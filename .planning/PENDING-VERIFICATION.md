@@ -295,3 +295,34 @@ write** (a non-2xx would make Resend retry forever).
 
 Do **not** treat this item as passed — it is a pre-deploy gate, and the live bounce is owner-verified
 (`deferred_human`).
+
+---
+
+## 60-03 — "Sent on this service" delivery-history panel — DEFERRED (visual/interaction UAT)
+
+**Status: built, fully unit-tested, NOT visually verified — do NOT mark passed.** The read-only
+per-service delivery-history panel (R142) with per-message hard-bounce surfacing (R143) ships this plan:
+a `serviceMessages` read store (nested `services/{id}/messages` onSnapshot + lazy `messages/{id}/recipients`
+`status=='bounced'` getDocs — NESTED-path reads only, under the already-shipped Phase 58 `isOrgMember`
+rules; **no new Firestore rule, no deploy, no `.env.local`**), the `ServiceMessageHistory.vue` card, its
+mount + kill-switch/editor gate in `ServiceEditorView.vue`, and the RosterView `?edit={personId}` deep-link.
+
+Automated coverage is green (serviceMessages.test.ts, ServiceMessageHistory.test.ts, ServiceEditorView.test.ts
+present/absent, RosterViewEditQuery.test.ts; type-check clean; full app suite at the 2-file known-failing
+baseline). What no test can assert is the **visual/interaction** contract — that is owner UAT at
+`/gsd-verify-work 60`:
+
+- **Layout matches DESIGN-messaging.md §5b / 60-UI-SPEC.md:** open a service with sent messages and confirm
+  the card renders below the messaging-defaults panel — newest-first rows, type badge (One-off / Reminder /
+  Share link / Automatic), the `{N} sent` count + send time (or "Scheduled for …"), and the correct status
+  pills (none for a clean sent; Partial/Failed/Scheduled/Sending…).
+- **Real bounce surfaces (needs 60-01/60-02 DEPLOYED first):** after the webhook is live and a real hard
+  bounce lands, confirm the red "N bounced" indicator appears on the affected row and expands to the bounced
+  recipients (name / email / reason).
+- **Fix-email deep-link navigates:** click "Fix email →" and confirm it lands on `/volunteers?edit={personId}`
+  with that volunteer's edit form open on the exact record.
+- **Kill-switch hides the panel:** with messaging OFF (Settings), confirm the history card is absent from the
+  Service Order tab (the composer's disabled ✉ action-bar item carries discoverability instead).
+
+Do **not** treat this item as passed — it is `deferred_human` visual/interaction UAT, and the live-bounce
+arm additionally depends on the 60-01/60-02 webhook deploy gate above.

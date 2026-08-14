@@ -65,7 +65,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 ### Delivery History & Bounces
 
-- [ ] **R142**: Each service has a "Sent on this service" history listing every message with its type
+- [x] **R142**: Each service has a "Sent on this service" history listing every message with its type
       (automatic / one-off / scheduled), recipient count, and send time.
 
 - [x] **R143**: Hard bounces are surfaced per message in the history with an affordance to fix the
@@ -150,7 +150,7 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R139 | Phase 59 | Complete |
 | R140 | Phase 59 | Complete |
 | R141 | Phase 59 | Complete |
-| R142 | Phase 60 | Pending |
+| R142 | Phase 60 | Complete |
 | R143 | Phase 60 | Complete |
 | R144 | Phase 61 | Pending |
 | R145 | Phase 61 | Pending |
