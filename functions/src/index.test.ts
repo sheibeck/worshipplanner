@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStorage } from "firebase-admin/storage";
 import { getFirestore } from "firebase-admin/firestore";
 import type { CallableRequest } from "firebase-functions/v2/https";
@@ -19,6 +19,8 @@ import {
   SECRET_INJECTED,
   parsePptxHandler,
   requestPptxRenderHandler,
+  sendQueuedMessageHandler,
+  sendQueuedMessage,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -28,6 +30,17 @@ import { invokeRenderService } from "./renderInvoker";
 // requestPptxRenderHandler test case can set/clear PPTX_RENDER_SERVICE_URL
 // independently without needing to re-import the module.
 let fakeRenderServiceUrl = "";
+// Send-path (59-03) config seams, keyed by defineString NAME below so the
+// three configs don't collide on one shared value.
+let fakeShareBaseUrl = "";
+let fakeMessageFromAddress = "Worship Planner <noreply@worshipplanner.app>";
+// The email getAuth().getUser(uid) resolves to for sendCopyToSelf.
+let fakeEditorEmail = "editor@example.com";
+
+// The mocked Resend .emails.send — hoisted so the vi.mock("resend") factory can
+// close over it. No real email is ever sent (59-03 ships against a mocked
+// provider; the real RESEND_API_KEY is never set in tests).
+const { mockSend } = vi.hoisted(() => ({ mockSend: vi.fn() }));
 
 // index.ts's module-scope initializeApp()/defineSecret() calls, and its
 // getAuth/getFirestore/getStorage imports, must be neutralized so importing
@@ -38,7 +51,12 @@ vi.mock("firebase-admin/app", () => ({
   getApps: vi.fn(() => []),
 }));
 vi.mock("firebase-admin/auth", () => ({
-  getAuth: vi.fn(() => ({ verifyIdToken: vi.fn() })),
+  getAuth: vi.fn(() => ({
+    verifyIdToken: vi.fn(),
+    // sendQueuedMessage resolves the requesting editor's own email server-side
+    // (never a client-supplied address) for options.sendCopyToSelf.
+    getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+  })),
 }));
 vi.mock("firebase-admin/firestore", () => ({
   getFirestore: vi.fn(),
@@ -49,7 +67,16 @@ vi.mock("firebase-admin/storage", () => ({
 }));
 vi.mock("firebase-functions/params", () => ({
   defineSecret: vi.fn(() => ({ value: () => "fake-secret" })),
-  defineString: vi.fn(() => ({ value: () => fakeRenderServiceUrl })),
+  // Name-aware so PPTX_RENDER_SERVICE_URL, SERVICE_SHARE_BASE_URL and
+  // MESSAGE_FROM_ADDRESS each read their own per-test seam instead of colliding
+  // on one shared value.
+  defineString: vi.fn((name: string) => ({
+    value: () => {
+      if (name === "SERVICE_SHARE_BASE_URL") return fakeShareBaseUrl;
+      if (name === "MESSAGE_FROM_ADDRESS") return fakeMessageFromAddress;
+      return fakeRenderServiceUrl;
+    },
+  })),
 }));
 vi.mock("firebase-functions/v2/firestore", () => ({
   onDocumentCreated: vi.fn((_path: string, handler: unknown) => handler),
@@ -67,6 +94,11 @@ vi.mock("./pptxParser", () => ({
 // (37-04) to pick up, and never imports/calls invokeRenderService itself.
 vi.mock("./renderInvoker", () => ({
   invokeRenderService: vi.fn(),
+}));
+// The Resend SDK is fully mocked — sendQueuedMessage never sends a real email
+// in tests (59-03 ships built/tested/UNDEPLOYED against a mocked provider).
+vi.mock("resend", () => ({
+  Resend: vi.fn(() => ({ emails: { send: mockSend } })),
 }));
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -1351,5 +1383,431 @@ describe("redactUrl", () => {
 
   it("fails closed to a generic placeholder on an unparseable URL, rather than risking a raw leak", () => {
     expect(redactUrl("not a url")).toBe("[unparseable URL]");
+  });
+});
+
+// --- sendQueuedMessage send trigger (59-03: R131/R138/R139) --------------
+//
+// The send half of the path: an onDocumentCreated trigger (handler body
+// exported separately, requestPptxRenderHandler precedent) that is the ONLY
+// Function bound to RESEND_API_KEY. It runs a transactional queued->sending
+// idempotency claim (GENUINELY NEW code — the PPTX precedent has no status
+// claim), re-resolves recipients server-side (never the client list,
+// Anti-Pattern 1), renders per-recipient tokens (R139), sends via a MOCKED
+// Resend, writes one recipients/{id} doc per recipient, rolls up
+// deliveryCounts, and flips the message status.
+
+describe("sendQueuedMessageHandler", () => {
+  const ORG_ID = "org1";
+  const SERVICE_ID = "svc1";
+  const MESSAGE_ID = "msg1";
+  const SERVICE_DATE = "2026-08-16";
+
+  interface FakeMessage {
+    status?: string;
+    subject?: string;
+    body?: string;
+    recipientSelector?: {
+      teams: string[];
+      individualPersonIds: string[];
+      includeEveryone: boolean;
+    };
+    options?: { attachServiceLink: boolean; sendCopyToSelf: boolean };
+    requestedByUid?: string;
+  }
+
+  interface SendDbConfig {
+    message?: FakeMessage | null; // null => message doc missing
+    service?: { date: string; slots?: unknown[]; roleAssignmentOverrides?: Record<string, string[]> } | null;
+    quarters?: Array<{ serviceDates: string[]; calendar: Record<string, Record<string, string[]>> }>;
+    roles?: Array<{ id: string; name: string; group: string; order: number }>;
+    people?: Array<{ id: string; name: string; email: string }>;
+    shareTokens?: Array<{ token: string; orgId: string; createdAtMs: number }>;
+  }
+
+  function docSnap(exists: boolean, data: unknown) {
+    return { exists, data: () => data };
+  }
+  function colSnap(docs: Array<{ id: string; data: unknown }>) {
+    return { docs: docs.map((d) => ({ id: d.id, data: () => d.data })) };
+  }
+
+  function makeSendDb(cfg: SendDbConfig) {
+    const messageExists = cfg.message !== null && cfg.message !== undefined;
+    const messageData = messageExists ? { ...(cfg.message as FakeMessage) } : undefined;
+    let messageStatus = messageExists ? (cfg.message as FakeMessage).status ?? "queued" : undefined;
+
+    const messageSetSpy = vi.fn(async () => undefined);
+    const txUpdateSpy = vi.fn();
+    const recipientWrites: Array<{ id: string; payload: Record<string, unknown> }> = [];
+
+    const recipientsCol = {
+      doc: vi.fn((rid: string) => ({
+        set: vi.fn(async (payload: Record<string, unknown>) => {
+          recipientWrites.push({ id: rid, payload });
+        }),
+      })),
+    };
+
+    const messageRef = {
+      set: messageSetSpy,
+      collection: vi.fn((name: string) => {
+        if (name === "recipients") return recipientsCol;
+        throw new Error(`makeSendDb: unexpected message subcollection "${name}"`);
+      }),
+    };
+    const messagesCol = { doc: vi.fn(() => messageRef) };
+
+    const serviceRef = {
+      get: vi.fn(async () =>
+        cfg.service ? docSnap(true, cfg.service) : docSnap(false, undefined),
+      ),
+      collection: vi.fn((name: string) => {
+        if (name === "messages") return messagesCol;
+        throw new Error(`makeSendDb: unexpected service subcollection "${name}"`);
+      }),
+    };
+    const servicesCol = { doc: vi.fn(() => serviceRef) };
+
+    const orgRef = {
+      collection: vi.fn((name: string) => {
+        if (name === "services") return servicesCol;
+        if (name === "quarters")
+          return {
+            get: vi.fn(async () =>
+              colSnap((cfg.quarters ?? []).map((q, i) => ({ id: `q${i}`, data: q }))),
+            ),
+          };
+        if (name === "roles")
+          return {
+            get: vi.fn(async () =>
+              colSnap((cfg.roles ?? []).map((r) => ({ id: r.id, data: r }))),
+            ),
+          };
+        if (name === "people")
+          return {
+            get: vi.fn(async () =>
+              colSnap((cfg.people ?? []).map((p) => ({ id: p.id, data: p }))),
+            ),
+          };
+        throw new Error(`makeSendDb: unexpected org subcollection "${name}"`);
+      }),
+    };
+
+    const shareTokensWhere = vi.fn(() => ({
+      get: vi.fn(async () =>
+        colSnap(
+          (cfg.shareTokens ?? []).map((t) => ({
+            id: t.token,
+            data: { orgId: t.orgId, createdAt: { toMillis: () => t.createdAtMs } },
+          })),
+        ),
+      ),
+    }));
+
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        get: vi.fn(async () =>
+          messageExists
+            ? docSnap(true, { ...messageData, status: messageStatus })
+            : docSnap(false, undefined),
+        ),
+        update: vi.fn((_ref: unknown, patch: { status?: string }) => {
+          txUpdateSpy(_ref, patch);
+          if (patch && typeof patch.status === "string") messageStatus = patch.status;
+        }),
+      };
+      return fn(tx);
+    });
+
+    const db = {
+      collection: vi.fn((name: string) => {
+        if (name === "organizations") return { doc: vi.fn(() => orgRef) };
+        if (name === "shareTokens") return { where: shareTokensWhere };
+        throw new Error(`makeSendDb: unexpected collection "${name}"`);
+      }),
+      runTransaction,
+    };
+
+    return { db, messageSetSpy, recipientWrites, txUpdateSpy, runTransaction };
+  }
+
+  // Two band people filling two different band roles — the R139 divergence fixture.
+  function twoRecipientConfig(overrides: Partial<FakeMessage> = {}): SendDbConfig {
+    return {
+      message: {
+        status: "queued",
+        subject: "Reminder for {{service_date}}",
+        body: "You: {{their_roles}}",
+        recipientSelector: { teams: ["band"], individualPersonIds: [], includeEveryone: false },
+        options: { attachServiceLink: false, sendCopyToSelf: false },
+        requestedByUid: "uidEditor",
+        ...overrides,
+      },
+      service: { date: SERVICE_DATE, slots: [], roleAssignmentOverrides: {} },
+      quarters: [
+        {
+          serviceDates: [SERVICE_DATE],
+          calendar: { [SERVICE_DATE]: { rg: ["pA"], rb: ["pB"] } },
+        },
+      ],
+      roles: [
+        { id: "rg", name: "guitar", group: "band", order: 0 },
+        { id: "rb", name: "bass", group: "band", order: 1 },
+      ],
+      people: [
+        { id: "pA", name: "Alice", email: "alice@example.com" },
+        { id: "pB", name: "Bob", email: "bob@example.com" },
+      ],
+    };
+  }
+
+  beforeEach(() => {
+    mockSend.mockReset();
+    mockSend.mockResolvedValue({ data: { id: "re_fake_id" }, error: null });
+    fakeShareBaseUrl = "";
+    fakeMessageFromAddress = "Worship Planner <noreply@worshipplanner.app>";
+    fakeEditorEmail = "editor@example.com";
+  });
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+  });
+
+  it("a 'queued' doc: the transaction flips it to 'sending' and the handler sends to every reachable recipient", async () => {
+    const { db, txUpdateSpy, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const outcome = await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    // Idempotency claim ran and flipped queued -> sending.
+    expect(txUpdateSpy).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: "sending" }));
+    // One send per reachable recipient.
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    const toAddresses = mockSend.mock.calls.map((c) => (c[0] as { to: string }).to).sort();
+    expect(toAddresses).toEqual(["alice@example.com", "bob@example.com"]);
+    // recipients/{id} written per recipient, deliveryCounts + status rolled up.
+    expect(recipientWrites).toHaveLength(2);
+    expect(recipientWrites.every((w) => w.payload.status === "sent")).toBe(true);
+    expect(messageSetSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "sent", deliveryCounts: { sent: 2, failed: 0 } }),
+      { merge: true },
+    );
+    expect(outcome).toMatchObject({ status: "sent", sentCount: 2, failedCount: 0 });
+  });
+
+  it("carries the exact Resend tags [orgId, serviceId, messageId, recipientId] as the Firestore path segments (Phase 60 webhook contract)", async () => {
+    const { db } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const aliceCall = mockSend.mock.calls.find((c) => (c[0] as { to: string }).to === "alice@example.com");
+    expect(aliceCall).toBeDefined();
+    const tags = (aliceCall![0] as { tags: Array<{ name: string; value: string }> }).tags;
+    expect(tags).toEqual([
+      { name: "orgId", value: ORG_ID },
+      { name: "serviceId", value: SERVICE_ID },
+      { name: "messageId", value: MESSAGE_ID },
+      { name: "recipientId", value: "pA" },
+    ]);
+  });
+
+  it("R139: renders {{their_roles}} per recipient — person A ('guitar') != person B ('bass') from the SAME body template", async () => {
+    const { db } = makeSendDb(twoRecipientConfig({ body: "You: {{their_roles}}" }));
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const alice = mockSend.mock.calls.find((c) => (c[0] as { to: string }).to === "alice@example.com")![0] as { text: string };
+    const bob = mockSend.mock.calls.find((c) => (c[0] as { to: string }).to === "bob@example.com")![0] as { text: string };
+    expect(alice.text).toBe("You: guitar");
+    expect(bob.text).toBe("You: bass");
+    expect(alice.text).not.toBe(bob.text);
+  });
+
+  it("★ IDEMPOTENCY: a SECOND invocation on an already-'sending' doc sends ZERO emails and writes no status flip", async () => {
+    const cfg = twoRecipientConfig({ status: "sending" });
+    const { db, messageSetSpy, recipientWrites } = makeSendDb(cfg);
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const outcome = await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(recipientWrites).toHaveLength(0);
+    expect(messageSetSpy).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ status: "skipped", sentCount: 0, failedCount: 0 });
+  });
+
+  it("★ IDEMPOTENCY: an already-'sent' doc likewise sends ZERO emails", async () => {
+    const { db } = makeSendDb(twoRecipientConfig({ status: "sent" }));
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const outcome = await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(outcome.status).toBe("skipped");
+  });
+
+  it("a 'scheduled' doc never satisfies the === 'queued' guard — skipped, no send (left for Phase 61 cron)", async () => {
+    const { db, messageSetSpy } = makeSendDb(twoRecipientConfig({ status: "scheduled" }));
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const outcome = await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(messageSetSpy).not.toHaveBeenCalled();
+    expect(outcome.status).toBe("skipped");
+  });
+
+  it("a missing message doc is skipped without sending", async () => {
+    const { db } = makeSendDb({ message: null, service: { date: SERVICE_DATE } });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const outcome = await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(outcome.status).toBe("skipped");
+  });
+
+  it("Anti-Pattern 1: re-resolves the send list from Firestore — a stale individualPersonId in the selector is dropped, the real address comes only from people/{id}", async () => {
+    const cfg = twoRecipientConfig({
+      // Selector points at ONE team plus a stale/deleted individual id. The
+      // client never supplies an address — only Firestore re-resolution does.
+      recipientSelector: { teams: ["band"], individualPersonIds: ["ghost-deleted"], includeEveryone: false },
+    });
+    const { db } = makeSendDb(cfg);
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    // The ghost id has no people/{id} doc → silently skipped, never emailed.
+    const toAddresses = mockSend.mock.calls.map((c) => (c[0] as { to: string }).to).sort();
+    expect(toAddresses).toEqual(["alice@example.com", "bob@example.com"]);
+    expect(mockSend).toHaveBeenCalledTimes(2);
+  });
+
+  it("partial failure: one rejecting send → that recipient is 'failed', the batch continues, message rolls up to 'partial'", async () => {
+    const { db, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    // Fail Bob's send, succeed Alice's (order-independent: reject whenever the
+    // recipient is bob@…).
+    mockSend.mockImplementation(async (payload: { to: string }) => {
+      if (payload.to === "bob@example.com") throw new Error("invalid recipient");
+      return { data: { id: "re_ok" }, error: null };
+    });
+
+    const outcome = await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const byId = Object.fromEntries(recipientWrites.map((w) => [w.id, w.payload.status]));
+    expect(byId.pA).toBe("sent");
+    expect(byId.pB).toBe("failed");
+    expect(messageSetSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "partial", deliveryCounts: { sent: 1, failed: 1 } }),
+      { merge: true },
+    );
+    expect(outcome).toMatchObject({ status: "partial", sentCount: 1, failedCount: 1 });
+  });
+
+  it("all sends failing rolls the message up to 'failed'", async () => {
+    const { db, messageSetSpy } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    mockSend.mockRejectedValue(new Error("provider down"));
+
+    const outcome = await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    expect(messageSetSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed", deliveryCounts: { sent: 0, failed: 2 } }),
+      { merge: true },
+    );
+    expect(outcome.status).toBe("failed");
+  });
+
+  it("options.sendCopyToSelf: also sends to the requesting editor's own email, resolved server-side (never a client address)", async () => {
+    fakeEditorEmail = "self@editor.com";
+    const { db, recipientWrites } = makeSendDb(twoRecipientConfig({ options: { attachServiceLink: false, sendCopyToSelf: true }, requestedByUid: "uidEditor" }));
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const toAddresses = mockSend.mock.calls.map((c) => (c[0] as { to: string }).to);
+    expect(toAddresses).toContain("self@editor.com");
+    expect(mockSend).toHaveBeenCalledTimes(3); // 2 volunteers + 1 self copy
+    // The self copy is recorded under the editor's uid.
+    expect(recipientWrites.some((w) => w.id === "uidEditor")).toBe(true);
+  });
+
+  it("{{song_list}} renders the service doc's SONG-slot titles in order (non-SONG slots excluded)", async () => {
+    const cfg = twoRecipientConfig({ body: "Songs: {{song_list}}" });
+    cfg.service = {
+      date: SERVICE_DATE,
+      slots: [
+        { kind: "SONG", position: 0, songTitle: "Amazing Grace" },
+        { kind: "PRAYER", position: 1, body: "Opening prayer" },
+        { kind: "SONG", position: 2, songTitle: "How Great Thou Art" },
+      ],
+      roleAssignmentOverrides: {},
+    };
+    const { db } = makeSendDb(cfg);
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const alice = mockSend.mock.calls.find((c) => (c[0] as { to: string }).to === "alice@example.com")![0] as { text: string };
+    expect(alice.text).toBe("Songs: Amazing Grace, How Great Thou Art");
+  });
+
+  it("{{service_link}} renders ${base}/share/${token} from the latest adoptable shareTokens doc for this service", async () => {
+    fakeShareBaseUrl = "https://app.example.com";
+    const cfg = twoRecipientConfig({ body: "Plan: {{service_link}}" });
+    cfg.shareTokens = [
+      { token: "old_token", orgId: ORG_ID, createdAtMs: 1000 },
+      { token: "new_token", orgId: ORG_ID, createdAtMs: 5000 },
+      { token: "foreign_token", orgId: "other-org", createdAtMs: 9000 }, // wrong org, ignored
+    ];
+    const { db } = makeSendDb(cfg);
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const alice = mockSend.mock.calls.find((c) => (c[0] as { to: string }).to === "alice@example.com")![0] as { text: string };
+    expect(alice.text).toBe("Plan: https://app.example.com/share/new_token");
+  });
+
+  it("{{service_link}} renders '' when no share token exists for the service (A1 empty substitution)", async () => {
+    fakeShareBaseUrl = "https://app.example.com";
+    const cfg = twoRecipientConfig({ body: "Plan:{{service_link}}" });
+    cfg.shareTokens = [];
+    const { db } = makeSendDb(cfg);
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const alice = mockSend.mock.calls.find((c) => (c[0] as { to: string }).to === "alice@example.com")![0] as { text: string };
+    expect(alice.text).toBe("Plan:");
+  });
+
+  it("the sendQueuedMessage onDocumentCreated wrapper delegates event.params to the handler", async () => {
+    const { db } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    // onDocumentCreated is mocked to return the handler function directly.
+    await (sendQueuedMessage as unknown as (event: { params: { orgId: string; serviceId: string; messageId: string } }) => Promise<void>)({
+      params: { orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID },
+    });
+
+    expect(mockSend).toHaveBeenCalledTimes(2);
+  });
+
+  it("SOURCE INSPECTION: RESEND_API_KEY is bound to EXACTLY ONE Function, and it is sendQueuedMessage", () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    // The secret binds via `secrets: [RESEND_API_KEY]` exactly once in the file.
+    const bindings = source.match(/secrets:\s*\[RESEND_API_KEY\]/g) ?? [];
+    expect(bindings).toHaveLength(1);
+    // And that single binding lives inside the sendQueuedMessage wrapper.
+    const wrapperStart = source.indexOf("export const sendQueuedMessage = onDocumentCreated(");
+    expect(wrapperStart).toBeGreaterThan(-1);
+    const wrapperRegion = source.slice(wrapperStart, wrapperStart + 600);
+    expect(wrapperRegion).toMatch(/secrets:\s*\[RESEND_API_KEY\]/);
   });
 });
