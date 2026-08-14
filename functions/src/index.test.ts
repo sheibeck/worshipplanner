@@ -27,6 +27,7 @@ import {
   messageWebhookHandler,
   todayInTimeZone,
   minusDays,
+  sendScheduledRemindersHandler,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -1399,6 +1400,475 @@ describe("todayInTimeZone / minusDays", () => {
     // must not shift by an hour-based off-by-one.
     expect(minusDays("2026-03-09", 1)).toBe("2026-03-08");
     expect(minusDays("2026-03-15", 7)).toBe("2026-03-08");
+  });
+});
+
+// --- sendScheduledReminders daily cron (61-02: R145 / R133 / SC3 / SC4) --
+//
+// The R145 reminder engine: a daily onSchedule cron that auto-enqueues the
+// shared service link to everyone assigned N days before a service, reckoned in
+// the org's local timezone, exactly once. It mirrors cleanupOrphanRendersHandler
+// EXACTLY -- a broad collectionGroup('services').where('status','in',
+// ['planned','exported']) scan (NEVER 'draft'), org recovered from the parent
+// chain, per-item try/catch, handler exported separately for this unit test,
+// offset to its own 04:00 UTC slot. It enqueues via the SHARED createQueuedMessage
+// shaper (byte-identical to a human send) and holds NO secret. The two
+// load-bearing assertions of the whole reminder feature live here: the org-tz
+// date boundary (R133/SC3) and the reminderSentAt idempotency (SC4).
+describe("sendScheduledRemindersHandler", () => {
+  // 04:30 UTC on 2026-08-14 is still 2026-08-13 in Chicago (UTC-5 CDT) but
+  // already 2026-08-14 in Kiritimati (UTC+14) -- one instant, two calendar days.
+  // This is the load-bearing timezone boundary the reminder date check stands on.
+  const FIXED_NOW = new Date("2026-08-14T04:30:00Z");
+  const ORG_CHICAGO = "orgChi"; // today = 2026-08-13
+  const ORG_KIRITIMATI = "orgKir"; // today = 2026-08-14
+  const CHI_TZ = "America/Chicago";
+  const KIR_TZ = "Pacific/Kiritimati";
+  // With N=7 and Chicago's today 2026-08-13, a service on 2026-08-20 is due today.
+  const CHI_DUE_DATE = "2026-08-20";
+
+  interface FakeServiceMessaging {
+    reminderEnabled?: boolean;
+    reminderDaysBefore?: number;
+    reminderSentAt?: unknown;
+  }
+  interface FakeServiceOptions {
+    orgId?: string | null;
+    id?: string;
+    status?: "planned" | "exported" | "draft";
+    date?: string;
+    messaging?: FakeServiceMessaging;
+  }
+
+  // A fake collectionGroup("services") doc whose ref.set actually mutates the
+  // doc's own messaging state, so a SECOND handler run in the same window sees
+  // the reminderSentAt marker the first run wrote (the SC4 no-double-send proof).
+  function fakeServiceDoc(opts: FakeServiceOptions = {}) {
+    const orgId = opts.orgId === undefined ? ORG_CHICAGO : opts.orgId;
+    const id = opts.id ?? "svc1";
+    const status = opts.status ?? "planned";
+    let messaging: FakeServiceMessaging | undefined = opts.messaging;
+    const setSpy = vi.fn(async (data: { messaging?: FakeServiceMessaging }) => {
+      // Admin-SDK merge write of the idempotency marker -- reflect it into the
+      // doc's own data() so a re-scan in the same window skips it (SC4).
+      if (data?.messaging) {
+        messaging = { ...(messaging ?? {}), ...data.messaging };
+      }
+      return undefined;
+    });
+    return {
+      id,
+      data: () => ({ status, date: opts.date, messaging }),
+      ref: {
+        parent: { parent: orgId === null ? null : { id: orgId } },
+        path: `organizations/${orgId}/services/${id}`,
+        set: setSpy,
+      },
+    };
+  }
+
+  interface FakeOrgOptions {
+    enabled?: boolean;
+    reminderEnabled?: boolean;
+    reminderDaysBefore?: number | undefined;
+    timezone?: string;
+  }
+
+  function orgData(opts: FakeOrgOptions = {}) {
+    const messaging: Record<string, unknown> = {
+      enabled: opts.enabled ?? true,
+      reminderEnabled: opts.reminderEnabled ?? true,
+    };
+    // reminderDaysBefore is left ABSENT when explicitly undefined so the
+    // handler's `?? 7` default can be exercised.
+    if (opts.reminderDaysBefore !== undefined) {
+      messaging.reminderDaysBefore = opts.reminderDaysBefore;
+    }
+    return { settings: { timezone: opts.timezone ?? CHI_TZ, messaging } };
+  }
+
+  /**
+   * A fake Firestore exposing BOTH the collectionGroup("services") scan chain
+   * and the collection("organizations").doc(orgId) org read + the nested
+   * services/{id}/messages/{}.set() enqueue path. Every enqueued message doc is
+   * captured (with its serviceId) into the returned `enqueued` array; the org
+   * .get() spy is created per orgId so a two-zone test can hand each org its own
+   * settings. `orgs` maps orgId -> org data (or null to simulate a missing org).
+   */
+  function mockServicesDb(
+    services: ReturnType<typeof fakeServiceDoc>[],
+    orgs: Record<string, ReturnType<typeof orgData> | null>,
+  ) {
+    const enqueued: { serviceId: string; doc: Record<string, unknown> }[] = [];
+    const whereSpy = vi.fn((field: string, op: string, values: string[]) => {
+      const filtered =
+        field === "status" && op === "in"
+          ? services.filter((d) => values.includes(d.data().status as string))
+          : services;
+      return { get: vi.fn(async () => ({ docs: filtered })) };
+    });
+    const collectionGroupSpy = vi.fn((name: string) => {
+      if (name !== "services") {
+        throw new Error(`mockServicesDb: unexpected collectionGroup "${name}"`);
+      }
+      return { where: whereSpy };
+    });
+
+    const orgRefCache = new Map<string, unknown>();
+    function orgDocRef(orgId: string) {
+      const cached = orgRefCache.get(orgId);
+      if (cached) return cached;
+      const has = Object.prototype.hasOwnProperty.call(orgs, orgId);
+      const data = has ? orgs[orgId] : undefined;
+      const ref = {
+        get: vi.fn(async () => ({
+          exists: data !== undefined && data !== null,
+          data: () => data,
+        })),
+        collection: vi.fn((name: string) => {
+          if (name !== "services") {
+            throw new Error(`mockServicesDb: unexpected org sub-collection "${name}"`);
+          }
+          return {
+            doc: (serviceId: string) => ({
+              collection: (mname: string) => {
+                if (mname !== "messages") {
+                  throw new Error(`mockServicesDb: unexpected messages sub-collection "${mname}"`);
+                }
+                return {
+                  doc: () => ({
+                    id: `msg-${enqueued.length}`,
+                    set: vi.fn(async (doc: Record<string, unknown>) => {
+                      enqueued.push({ serviceId, doc });
+                      return undefined;
+                    }),
+                  }),
+                };
+              },
+            }),
+          };
+        }),
+      };
+      orgRefCache.set(orgId, ref);
+      return ref;
+    }
+
+    const collectionSpy = vi.fn((name: string) => {
+      if (name !== "organizations") {
+        throw new Error(`mockServicesDb: unexpected collection "${name}"`);
+      }
+      return { doc: (orgId: string) => orgDocRef(orgId) };
+    });
+
+    vi.mocked(getFirestore).mockReturnValue({
+      collectionGroup: collectionGroupSpy,
+      collection: collectionSpy,
+    } as never);
+    return { enqueued, whereSpy, collectionGroupSpy, collectionSpy };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.mocked(getFirestore).mockReset();
+  });
+
+  it("enqueues exactly one type:'reminder' message AND sets reminderSentAt for a due planned service", async () => {
+    const svc = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "svcDue",
+      status: "planned",
+      date: CHI_DUE_DATE,
+      messaging: {},
+    });
+    const { enqueued } = mockServicesDb([svc], { [ORG_CHICAGO]: orgData({ reminderDaysBefore: 7 }) });
+
+    const summary = await sendScheduledRemindersHandler();
+
+    expect(enqueued).toHaveLength(1);
+    expect(enqueued[0]!.serviceId).toBe("svcDue");
+    expect(enqueued[0]!.doc).toMatchObject({
+      type: "reminder",
+      status: "queued",
+      scheduledFor: null,
+      requestedByUid: "system",
+      recipientSelector: { teams: [], individualPersonIds: [], includeEveryone: true },
+      options: { attachServiceLink: true, sendCopyToSelf: false },
+    });
+    // Idempotency marker written AFTER the enqueue via the Admin-SDK merge write.
+    expect(svc.ref.set).toHaveBeenCalledTimes(1);
+    expect(svc.ref.set).toHaveBeenCalledWith(
+      { messaging: { reminderSentAt: "SERVER_TIMESTAMP_SENTINEL" } },
+      { merge: true },
+    );
+    expect(summary).toMatchObject({ enqueued: 1 });
+  });
+
+  it("does not enqueue or mark a service whose reminder is not due today (date - N !== today)", async () => {
+    // Chicago today is 2026-08-13; date 2026-08-21 with N=7 is due 2026-08-14, not today.
+    const svc = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "svcNotDue",
+      date: "2026-08-21",
+      messaging: {},
+    });
+    const { enqueued } = mockServicesDb([svc], { [ORG_CHICAGO]: orgData({ reminderDaysBefore: 7 }) });
+
+    const summary = await sendScheduledRemindersHandler();
+
+    expect(enqueued).toHaveLength(0);
+    expect(svc.ref.set).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ enqueued: 0 });
+  });
+
+  it("SC4: a 'draft' service is never returned by the scan -- the where filter excludes it, no reminder", async () => {
+    // A draft service that would otherwise be due today. Proven never-returned by
+    // the status filter itself (like the orphan 'ready' test), not skipped in-memory.
+    const draft = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "svcDraft",
+      status: "draft",
+      date: CHI_DUE_DATE,
+      messaging: {},
+    });
+    const due = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "svcDue",
+      status: "planned",
+      date: CHI_DUE_DATE,
+      messaging: {},
+    });
+    const { enqueued, whereSpy } = mockServicesDb([draft, due], {
+      [ORG_CHICAGO]: orgData({ reminderDaysBefore: 7 }),
+    });
+
+    await sendScheduledRemindersHandler();
+
+    expect(whereSpy).toHaveBeenCalledWith("status", "in", ["planned", "exported"]);
+    expect(draft.ref.set).not.toHaveBeenCalled();
+    expect(enqueued.map((e) => e.serviceId)).toEqual(["svcDue"]);
+  });
+
+  it("skips when the org kill-switch is off (settings.messaging.enabled !== true) -- fail-closed", async () => {
+    const svc = fakeServiceDoc({ orgId: ORG_CHICAGO, date: CHI_DUE_DATE, messaging: {} });
+    const { enqueued } = mockServicesDb([svc], {
+      [ORG_CHICAGO]: orgData({ enabled: false, reminderDaysBefore: 7 }),
+    });
+
+    await sendScheduledRemindersHandler();
+
+    expect(enqueued).toHaveLength(0);
+    expect(svc.ref.set).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the org doc is missing entirely", async () => {
+    const svc = fakeServiceDoc({ orgId: "orgGone", date: CHI_DUE_DATE, messaging: {} });
+    const { enqueued } = mockServicesDb([svc], { orgGone: null });
+
+    await sendScheduledRemindersHandler();
+
+    expect(enqueued).toHaveLength(0);
+    expect(svc.ref.set).not.toHaveBeenCalled();
+  });
+
+  it("skips when effectiveReminderEnabled resolves off (service-level reminderEnabled:false overrides on org)", async () => {
+    const svc = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      date: CHI_DUE_DATE,
+      messaging: { reminderEnabled: false },
+    });
+    const { enqueued } = mockServicesDb([svc], {
+      [ORG_CHICAGO]: orgData({ reminderEnabled: true, reminderDaysBefore: 7 }),
+    });
+
+    await sendScheduledRemindersHandler();
+
+    expect(enqueued).toHaveLength(0);
+    expect(svc.ref.set).not.toHaveBeenCalled();
+  });
+
+  it("skips when the org reminder default is off and the service does not override it", async () => {
+    const svc = fakeServiceDoc({ orgId: ORG_CHICAGO, date: CHI_DUE_DATE, messaging: {} });
+    const { enqueued } = mockServicesDb([svc], {
+      [ORG_CHICAGO]: orgData({ reminderEnabled: false, reminderDaysBefore: 7 }),
+    });
+
+    await sendScheduledRemindersHandler();
+
+    expect(enqueued).toHaveLength(0);
+  });
+
+  it("effectiveN uses the service-level reminderDaysBefore over the org default", async () => {
+    // Service overrides N=3; Chicago today 2026-08-13 -> due date must be 2026-08-16.
+    // (With the org default of 7 this same service would NOT be due today.)
+    const svc = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "svcOverride",
+      date: "2026-08-16",
+      messaging: { reminderDaysBefore: 3 },
+    });
+    const { enqueued } = mockServicesDb([svc], { [ORG_CHICAGO]: orgData({ reminderDaysBefore: 7 }) });
+
+    await sendScheduledRemindersHandler();
+
+    expect(enqueued.map((e) => e.serviceId)).toEqual(["svcOverride"]);
+  });
+
+  it("effectiveN falls back to 7 when neither the service nor the org sets reminderDaysBefore", async () => {
+    // No N anywhere -> default 7. Chicago today 2026-08-13 -> due date 2026-08-20.
+    const svc = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "svcDefault7",
+      date: CHI_DUE_DATE,
+      messaging: {},
+    });
+    const { enqueued } = mockServicesDb([svc], {
+      [ORG_CHICAGO]: orgData({ reminderDaysBefore: undefined }),
+    });
+
+    await sendScheduledRemindersHandler();
+
+    expect(enqueued.map((e) => e.serviceId)).toEqual(["svcDefault7"]);
+  });
+
+  it("R133/SC3 org-timezone boundary: the SAME instant + SAME service.date fires in Chicago but NOT in Kiritimati", async () => {
+    // Both services dated 2026-08-20, N=7. Chicago today (2026-08-13) -> due.
+    // Kiritimati today (2026-08-14) -> due date 2026-08-13 != today -> NOT due.
+    // One UTC instant, one calendar date, opposite outcomes purely by org zone.
+    const chiSvc = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "chiSvc",
+      date: "2026-08-20",
+      messaging: {},
+    });
+    const kirSvc = fakeServiceDoc({
+      orgId: ORG_KIRITIMATI,
+      id: "kirSvc",
+      date: "2026-08-20",
+      messaging: {},
+    });
+    const { enqueued } = mockServicesDb([chiSvc, kirSvc], {
+      [ORG_CHICAGO]: orgData({ timezone: CHI_TZ, reminderDaysBefore: 7 }),
+      [ORG_KIRITIMATI]: orgData({ timezone: KIR_TZ, reminderDaysBefore: 7 }),
+    });
+
+    await sendScheduledRemindersHandler();
+
+    expect(enqueued.map((e) => e.serviceId)).toEqual(["chiSvc"]);
+    expect(chiSvc.ref.set).toHaveBeenCalledTimes(1);
+    expect(kirSvc.ref.set).not.toHaveBeenCalled();
+  });
+
+  it("mirror boundary: a Kiritimati service dated to be due in ITS zone fires while the Chicago-dated one does not", async () => {
+    // Kiritimati today is 2026-08-14; date 2026-08-21 with N=7 is due today there.
+    const kirSvc = fakeServiceDoc({
+      orgId: ORG_KIRITIMATI,
+      id: "kirDue",
+      date: "2026-08-21",
+      messaging: {},
+    });
+    const { enqueued } = mockServicesDb([kirSvc], {
+      [ORG_KIRITIMATI]: orgData({ timezone: KIR_TZ, reminderDaysBefore: 7 }),
+    });
+
+    await sendScheduledRemindersHandler();
+
+    expect(enqueued.map((e) => e.serviceId)).toEqual(["kirDue"]);
+  });
+
+  it("SC4: a service whose reminderSentAt is already set enqueues ZERO messages", async () => {
+    const svc = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      date: CHI_DUE_DATE,
+      messaging: { reminderSentAt: "SERVER_TIMESTAMP_SENTINEL" },
+    });
+    const { enqueued } = mockServicesDb([svc], { [ORG_CHICAGO]: orgData({ reminderDaysBefore: 7 }) });
+
+    await sendScheduledRemindersHandler();
+
+    expect(enqueued).toHaveLength(0);
+    expect(svc.ref.set).not.toHaveBeenCalled();
+  });
+
+  it("★ SC4 no-double-send: a SECOND run in the same window against a just-marked service enqueues ZERO new messages", async () => {
+    const svc = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "svcOnce",
+      date: CHI_DUE_DATE,
+      messaging: {},
+    });
+    const { enqueued } = mockServicesDb([svc], { [ORG_CHICAGO]: orgData({ reminderDaysBefore: 7 }) });
+
+    // First run: fires once and writes reminderSentAt (the fake set() mutates data()).
+    await sendScheduledRemindersHandler();
+    expect(enqueued).toHaveLength(1);
+    expect(svc.ref.set).toHaveBeenCalledTimes(1);
+
+    // Second run in the SAME window: the marker is now set -> zero new messages.
+    await sendScheduledRemindersHandler();
+    expect(enqueued).toHaveLength(1); // still just the one from the first run
+    expect(svc.ref.set).toHaveBeenCalledTimes(1);
+  });
+
+  it("per-item try/catch: one service that throws (malformed date) is skipped; other candidates still enqueue", async () => {
+    const bad = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "svcBad",
+      date: "not-a-real-date", // minusDays() throws RangeError on toISOString of an Invalid Date
+      messaging: {},
+    });
+    const good = fakeServiceDoc({
+      orgId: ORG_CHICAGO,
+      id: "svcGood",
+      date: CHI_DUE_DATE,
+      messaging: {},
+    });
+    const { enqueued } = mockServicesDb([bad, good], {
+      [ORG_CHICAGO]: orgData({ reminderDaysBefore: 7 }),
+    });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const summary = await sendScheduledRemindersHandler();
+
+    expect(enqueued.map((e) => e.serviceId)).toEqual(["svcGood"]);
+    expect(summary).toMatchObject({ enqueued: 1 });
+    errSpy.mockRestore();
+  });
+
+  it("skips (never crashes) on a service whose parent chain is missing the org id", async () => {
+    const orphan = fakeServiceDoc({ orgId: null, date: CHI_DUE_DATE, messaging: {} });
+    const { enqueued } = mockServicesDb([orphan], {});
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const summary = await sendScheduledRemindersHandler();
+
+    expect(enqueued).toHaveLength(0);
+    expect(summary).toMatchObject({ enqueued: 0 });
+    errSpy.mockRestore();
+  });
+
+  it("★ SOURCE INSPECTION: the scan is planned/exported (never draft), the wrapper is 04:00 UTC, and it holds NO secret", () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const start = source.indexOf("export async function sendScheduledRemindersHandler(");
+    const wrapperStart = source.indexOf("export const sendScheduledReminders = onSchedule(");
+    expect(start).toBeGreaterThan(-1);
+    expect(wrapperStart).toBeGreaterThan(start);
+    const handlerBody = source.slice(start, wrapperStart);
+    // The scan must be status-in planned/exported and must never mention draft.
+    expect(handlerBody).toMatch(
+      /\.where\(\s*"status",\s*"in",\s*\[\s*"planned",\s*"exported"\s*\]\s*\)/,
+    );
+    expect(handlerBody).not.toMatch(/"draft"/);
+    // The wrapper runs at its own 04:00 UTC slot and carries NO secrets: array
+    // (only sendQueuedMessage holds RESEND_API_KEY -- R131 smallest surface).
+    const wrapperBody = source.slice(wrapperStart, wrapperStart + 300);
+    expect(wrapperBody).toMatch(/schedule:\s*"every day 04:00"/);
+    expect(wrapperBody).toMatch(/timeZone:\s*"UTC"/);
+    expect(wrapperBody).not.toMatch(/secrets:/);
   });
 });
 
