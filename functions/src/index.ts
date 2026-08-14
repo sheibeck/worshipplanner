@@ -4,7 +4,12 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import {
+  getFirestore,
+  FieldValue,
+  type Firestore,
+  type DocumentReference,
+} from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { parsePptxBuffer, type MappedSlide } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
@@ -1366,6 +1371,107 @@ export const sendQueuedMessage = onDocumentCreated(
     });
   },
 );
+
+// --- messageWebhook (60-02: R143 — Resend delivery/bounce receiver) ---------
+//
+// The milestone's new UNAUTHENTICATED trust boundary. Resend POSTs delivery and
+// bounce events here; the only thing that gates a Firestore write is the Svix
+// HMAC over the RAW request body (verifySvixSignature, 60-01), checked FIRST.
+// Only a hard (Permanent) bounce surfaces: it idempotently flips the addressed
+// recipients/{id} to status:'bounced' and increments
+// messages/{id}.deliveryCounts.bounced. See messageWebhookHandler for the
+// verify-first order contract.
+
+/**
+ * The subset of a Resend `email.bounced` event's `data` object this handler
+ * reads. Declared functions-local (mirroring index.ts's other inline domain
+ * types) rather than importing a client type. `tags` echoes back the four path
+ * segments 59-03 sent ({orgId,serviceId,messageId,recipientId}); `email_id` is
+ * the provider message id 59-03 stored as recipients/{id}.providerMessageId.
+ */
+interface ResendBounceData {
+  email_id?: string;
+  tags?: Record<string, string>;
+  bounce?: { type?: string; subType?: string; message?: string };
+}
+
+/**
+ * Resolve the bounced recipient's DocumentReference.
+ *
+ * PRIMARY (tags): when the echoed Resend tags carry all four path segments,
+ * build the recipients/{id} ref DIRECTLY at the exact nested path — a single
+ * doc() with NO query and NO index dependency (60-RESEARCH § Tags Echo). All
+ * ids are untrusted strings that only form path segments scoped under the org
+ * (Admin SDK), never a broader query (T-60-02e).
+ *
+ * FALLBACK (providerMessageId): when tags are absent/incomplete, look the
+ * recipient up by the provider message id 59-03 stored, via
+ * collectionGroup('recipients').where('providerMessageId','==',email_id) — the
+ * true safety net (tags echo is only MEDIUM confidence). Requires 60-01's
+ * deploy-gated collection-group index at run time.
+ *
+ * Returns null (never throws) when neither resolves — the caller 200s an
+ * unresolvable event rather than triggering a Resend retry storm.
+ */
+export async function resolveRecipientRef(
+  db: Firestore,
+  data: ResendBounceData,
+): Promise<DocumentReference | null> {
+  const tags = data.tags;
+  if (tags?.orgId && tags.serviceId && tags.messageId && tags.recipientId) {
+    return db.doc(
+      `organizations/${tags.orgId}/services/${tags.serviceId}/messages/${tags.messageId}/recipients/${tags.recipientId}`,
+    );
+  }
+  if (data.email_id) {
+    const snap = await db
+      .collectionGroup("recipients")
+      .where("providerMessageId", "==", data.email_id)
+      .limit(1)
+      .get();
+    if (!snap.empty && snap.docs[0]) return snap.docs[0].ref;
+  }
+  return null;
+}
+
+/**
+ * Idempotently record a hard bounce against an addressed recipient.
+ *
+ * Runs ONE transaction that reads the recipient status AND the message's
+ * current count BEFORE any write (mirrors sendQueuedMessageHandler's
+ * transition-guarded claim). Only on the not-bounced -> bounced transition does
+ * it set status:'bounced' + bounceReason + bouncedAt and write
+ * deliveryCounts.bounced as a LITERAL prev+1 (NOT FieldValue.increment). A
+ * duplicate at-least-once delivery finds status already 'bounced' and no-ops,
+ * so the count never double-counts (success criterion 4). The dot-path
+ * 'deliveryCounts.bounced' merges into the existing {sent,failed} leaf; a
+ * missing leaf is treated as 0, so older docs need no migration.
+ */
+export async function recordBounce(
+  db: Firestore,
+  recipientRef: DocumentReference,
+  bounce: { type?: string; subType?: string; message?: string },
+): Promise<void> {
+  const messageRef = recipientRef.parent.parent;
+  if (!messageRef) return; // a recipients/{id} always has a messages/{id} parent — defensive
+  const bounceReason = bounce.message ?? bounce.subType ?? null;
+  await db.runTransaction(async (tx) => {
+    const recipientSnap = await tx.get(recipientRef);
+    const messageSnap = await tx.get(messageRef);
+    const recipientData = recipientSnap.data() as { status?: string } | undefined;
+    if (recipientData?.status === "bounced") return; // duplicate delivery — no-op
+    tx.update(recipientRef, {
+      status: "bounced",
+      bounceReason,
+      bouncedAt: FieldValue.serverTimestamp(),
+    });
+    const messageData = messageSnap.data() as
+      | { deliveryCounts?: { bounced?: number } }
+      | undefined;
+    const prev = messageData?.deliveryCounts?.bounced ?? 0;
+    tx.update(messageRef, { "deliveryCounts.bounced": prev + 1 });
+  });
+}
 
 // --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
 //
