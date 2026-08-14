@@ -339,6 +339,39 @@
             class="basis-full text-sm text-red-300"
             data-testid="service-lock-banner-error"
           >{{ lifecycleError }}</p>
+
+          <!-- ★ R144 (61-04) — the first-lock auto-notification confirmation.
+               A subordinate, transient, informational line in the SAME basis-full
+               slot the lifecycleError line uses. It inherits the banner's amber
+               idiom (NEVER red — the lock succeeded; a failed secondary enqueue is
+               amber-informational, not a transition failure) and is the only line
+               here that is a live region: aria-live="polite" announces the
+               confirmation once without re-announcing the persistent banner
+               (61-UI-SPEC § Component #1). -->
+          <p
+            v-if="lockNotify"
+            class="basis-full text-sm"
+            :class="lockNotify.kind === 'sent' ? 'text-amber-200' : 'text-amber-300'"
+            aria-live="polite"
+            data-testid="lock-notify-confirmation"
+          >
+            <template v-if="lockNotify.kind === 'sent'">
+              Notified <span class="font-medium">{{ lockNotify.count }}</span>
+              assigned {{ lockNotify.count === 1 ? 'volunteer' : 'volunteers' }}.
+            </template>
+            <template v-else-if="lockNotify.kind === 'none-reachable'">
+              No assigned volunteers have an email — no one was notified.
+            </template>
+            <template v-else>
+              Locked — but the notification couldn’t be sent.
+              <button
+                type="button"
+                class="font-medium text-amber-100 underline hover:text-white"
+                @click="messageComposerOpen = true"
+              >Open Messages</button>
+              to send it.
+            </template>
+          </p>
         </div>
 
         <!-- Delete confirmation dialog -->
