@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
-current_phase: 58
-current_phase_name: Messaging Infrastructure, Settings & Recipient Resolution
-status: verifying
-stopped_at: Completed 58-05-PLAN.md
-last_updated: "2026-08-14T14:07:10.726Z"
-last_activity: 2026-08-13
-last_activity_desc: Phase 58 execution started
+current_phase: 59
+current_phase_name: Messages Composer & Send Path
+status: discussing
+stopped_at: Phase 58 verified GREEN (5/5); transitioning to Phase 59
+last_updated: "2026-08-14T14:30:00.000Z"
+last_activity: 2026-08-14
+last_activity_desc: Phase 58 verified GREEN; starting Phase 59 discuss
 progress:
   total_phases: 5
   completed_phases: 1
@@ -276,10 +276,18 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 58 (Messaging Infrastructure, Settings & Recipient Resolution) — EXECUTING
-Plan: 5 of 5
-Status: Phase complete — ready for verification
-Last activity: 2026-08-13 — Phase 58 execution started
+Phase: 59 (Messages Composer & Send Path) — DISCUSSING
+Plan: not yet planned
+Status: Phase 58 verified GREEN (5/5, one manual UAT deferred to PENDING-VERIFICATION.md); Phase 59 starting
+Last activity: 2026-08-14 — Phase 58 verified GREEN; starting Phase 59
+
+> **Phase 58 outcome (2026-08-14):** `58-VERIFICATION.md` = passed/GREEN, 5/5 requirements
+> (R130/R132/R133/R134/R135) present, wired, and behaviorally exercised. One manual UAT (Draft→locked
+> read-only visual, id D4) is `verification_deferred_human`, routed to `/gsd-verify-work 58` per the
+> v1.7 grant — NOT a defect, and covered by passing component tests. `firestore.rules` messaging blocks
+> ship built/tested/UNDEPLOYED (owner runs `firebase deploy --only firestore:rules`). Per the v1.5
+> precedent (OWNER DECISION 2026-08-07), Phase 58 is treated as SATISFIED for dependent planning while
+> its human UAT stays deferred — Phase 59 builds on the tested resolver/rules/kill-switch contract.
 
 ## ⏸ RESUME HERE (2026-08-13 — v1.7 ROADMAP.md created, ready to plan Phase 58)
 
