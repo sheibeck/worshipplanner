@@ -554,6 +554,20 @@ vi.mock('@/stores/quarters', () => ({
   }),
 }))
 
+// 60-03: the delivery-history panel subscribes this store on the Service Order
+// tab. Stub it like the other store mocks so no real onSnapshot/getDocs runs.
+const mockSubscribeServiceMessages = vi.fn()
+const mockUnsubscribeServiceMessages = vi.fn()
+vi.mock('@/stores/serviceMessages', () => ({
+  useServiceMessagesStore: () => ({
+    messages: [],
+    isLoading: false,
+    subscribeServiceMessages: mockSubscribeServiceMessages,
+    unsubscribeServiceMessages: mockUnsubscribeServiceMessages,
+    fetchBouncedRecipients: vi.fn(() => Promise.resolve([])),
+  }),
+}))
+
 // 32-05: a fresh, real Pinia before every test — new-precedent hazard, since
 // no component test in this file previously installed one (every store below
 // is vi.mock-ed). ServiceEditorView now consumes useSaveStatus directly, so a
@@ -7644,5 +7658,75 @@ describe('ServiceEditorView - Messaging defaults panel (58-05, R132)', () => {
     const panel = wrapper.find('[data-testid="messaging-defaults-panel"]')
     expect(panel.text()).toContain('Failed to save. Please try again.')
     consoleErrorSpy.mockRestore()
+  })
+})
+
+// ── 60-03 (R142/R143): "Sent on this service" delivery-history panel ──────────
+//
+// The Service Order tab mounts a read-only ServiceMessageHistory card directly
+// below the messaging-defaults panel, gated v-if=(isMessagingEnabled() &&
+// canEditService). The kill-switch HIDES the panel entirely (UI-SPEC #0), and a
+// viewer never mounts it. Focused present/absent assertions only — the panel's
+// own behavior is covered by ServiceMessageHistory.test.ts.
+describe('ServiceEditorView - delivery-history panel mount (60-03, R142/R143)', () => {
+  async function mountView(overrides: Partial<Service> = {}) {
+    mockServicesList = [{ ...mockService, status: 'draft', ...overrides }]
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockAuthState.settings.messaging = {
+      enabled: false,
+      lockNotifyDefault: false,
+      reminderEnabled: false,
+      reminderDaysBefore: 3,
+    }
+    mockSubscribeServiceMessages.mockClear()
+  })
+
+  it('mounts the history card in the Service Order tab for an editor with messaging ON', async () => {
+    mockAuthState.settings.messaging.enabled = true
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // It renders directly below the messaging-defaults panel.
+    expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="messaging-defaults-panel"]').exists()).toBe(true)
+    // And the store subscription was opened for this service.
+    expect(mockSubscribeServiceMessages).toHaveBeenCalledWith('org-1', 'service-1')
+  })
+
+  it('HIDES the history card when messaging is OFF (kill-switch)', async () => {
+    mockAuthState.settings.messaging.enabled = false
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(false)
+  })
+
+  it('HIDES the history card for a non-editor even when messaging is ON', async () => {
+    mockAuthState.settings.messaging.enabled = true
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(false)
   })
 })

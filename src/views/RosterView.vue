@@ -432,6 +432,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
@@ -440,6 +441,10 @@ import AppShell from '@/components/AppShell.vue'
 import RolesConfigPanel from '@/components/RolesConfigPanel.vue'
 import RosterImportModal from '@/components/RosterImportModal.vue'
 
+// `useRoute()` returns undefined when RosterView is mounted without a router
+// (some unit tests do this); every read below is optional-chained so the
+// ?edit deep-link handler is a purely additive enhancement that never throws.
+const route = useRoute()
 const authStore = useAuthStore()
 const rosterStore = useRosterStore()
 
@@ -519,6 +524,19 @@ function onEditPerson(person: Person) {
   formRoles.value = [...person.roles]
   formOpen.value = true
   unsavedGuard.capture()
+}
+
+// ── ?edit={personId} deep-link (60-03, R143 "Fix email →") ───────────────────
+// The delivery-history panel's "Fix email →" link routes here as
+// /volunteers?edit={personId} to land the planner on the exact broken record.
+// Additive: an unknown id or no query is a no-op (plain roster), and a person
+// not yet loaded is handled by the rosterStore.people watcher re-running this.
+function applyEditQuery() {
+  const editId = typeof route?.query?.edit === 'string' ? route.query.edit : null
+  if (!editId) return
+  if (editingPersonId.value === editId && formOpen.value) return
+  const person = rosterStore.people.find((p) => p.id === editId)
+  if (person) onEditPerson(person)
 }
 
 function forceCloseForm() {
@@ -668,7 +686,14 @@ function initStore() {
 
 onMounted(() => {
   initStore()
+  applyEditQuery()
 })
+
+// Re-apply when the ?edit query changes (in-app navigation to a new person)
+// or once the roster finishes loading (the target person may not exist yet on
+// first mount). Both are guarded no-ops when there is nothing to open.
+watch(() => route?.query?.edit, () => applyEditQuery())
+watch(() => rosterStore.people.length, () => applyEditQuery())
 
 onUnmounted(() => {
   stopSeedWatch?.()

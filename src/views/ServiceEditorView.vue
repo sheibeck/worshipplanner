@@ -868,6 +868,22 @@
           <p v-if="messagingSaveError" class="text-red-400 text-sm mt-2">{{ messagingSaveError }}</p>
         </div>
 
+        <!-- "Sent on this service" delivery-history panel (60-03, R142/R143).
+             Read-only; mounts directly below the messaging-defaults panel.
+             HIDDEN (v-if) when messaging is off OR the user is not an editor
+             (kill-switch hides the reference surface — UI-SPEC #0). -->
+        <ServiceMessageHistory
+          v-if="isMessagingEnabled() && canEditService"
+          class="mt-3"
+          data-testid="service-message-history"
+          :messages="serviceMessagesStore.messages"
+          :recipients-by-message="serviceMessagesRecipients"
+          :loading="serviceMessagesStore.isLoading"
+          :error="serviceMessagesError"
+          @new-message="messageComposerOpen = true"
+          @expand="onExpandMessage"
+        />
+
         <!-- Dynamic Service Flow. 260811-vsr: the item list fills the tab's content
              width, matching the Teams / Sermon Context blocks above it. (An earlier
              max-w-[1060px] cap from the mockup was removed — it applied only to this
@@ -1539,6 +1555,8 @@ import SlidesTab from '@/components/slides/SlidesTab.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
 import ContextualActionBar from '@/components/ContextualActionBar.vue'
 import MessageComposer from '@/components/MessageComposer.vue'
+import ServiceMessageHistory from '@/components/ServiceMessageHistory.vue'
+import { useServiceMessagesStore, type BouncedRecipient } from '@/stores/serviceMessages'
 import { isMessagingEnabled } from '@/utils/messaging'
 import { buildActionBarItems } from '@/views/serviceEditorActionBar'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
@@ -1556,6 +1574,7 @@ const serviceStore = useServiceStore()
 const songStore = useSongStore()
 const rosterStore = useRosterStore()
 const quartersStore = useQuartersStore()
+const serviceMessagesStore = useServiceMessagesStore()
 // R029/D-03 cascade target — the group delete cascade's scoped write action.
 // Reads for the delete-warning copy go through useSlideshowAssembly's
 // re-exposed groupsBySlotId below; the group-bed audio write (setGroupBedMedia)
@@ -1634,6 +1653,27 @@ const isDeleting = ref(false)
 // R136 (59-04): the ✉ Messages composer's open state, toggled by the
 // action-bar item's onMessages handler.
 const messageComposerOpen = ref(false)
+
+// ── Delivery-history panel state (60-03, R142/R143) ─────────────────────────
+// Bounced recipients read lazily per message on expand (keyed by messageId);
+// serviceMessagesError flags a read failure for the panel's error state.
+const serviceMessagesRecipients = ref<Record<string, BouncedRecipient[]>>({})
+const serviceMessagesError = ref(false)
+
+/** Lazily resolve a message's bounced recipients when its row is expanded. */
+async function onExpandMessage(messageId: string) {
+  const orgId = authStore.orgId
+  if (!orgId) return
+  if (serviceMessagesRecipients.value[messageId]) return
+  try {
+    const rows = await serviceMessagesStore.fetchBouncedRecipients(orgId, serviceId.value, messageId)
+    serviceMessagesRecipients.value = { ...serviceMessagesRecipients.value, [messageId]: rows }
+  } catch (err) {
+    console.error('[ServiceEditorView] fetchBouncedRecipients failed:', err)
+    serviceMessagesError.value = true
+  }
+}
+
 // D-14: slot delete confirmation
 const showSlotDeleteConfirm = ref(false)
 const pendingDeleteIndex = ref<number | null>(null)
@@ -2436,6 +2476,24 @@ watch(serviceId, (newId, oldId) => {
   if (oldId && oldId !== newId) saveStatus.clear(`service:${oldId}`)
 })
 
+// ── Delivery-history subscription (60-03) ────────────────────────────────────
+// Subscribe to this service's messages (newest-first) when the panel is
+// eligible — editor + messaging on. Re-subscribes on serviceId change or once
+// isEditor resolves (WR-01-style late role flip). The store's single-listener
+// guard makes repeat calls idempotent. Editor-only + nested-path reads run
+// under the Phase 58 isOrgMember rules (no new client rule).
+watch(
+  [serviceId, () => authStore.isEditor],
+  () => {
+    if (authStore.isEditor && isMessagingEnabled() && authStore.orgId) {
+      serviceMessagesError.value = false
+      serviceMessagesRecipients.value = {}
+      serviceMessagesStore.subscribeServiceMessages(authStore.orgId, serviceId.value)
+    }
+  },
+  { immediate: true },
+)
+
 // ── Watch for service store changes ───────────────────────────────────────────
 
 watch(
@@ -2617,6 +2675,8 @@ onUnmounted(() => {
   // outlive its surface (E2 `partial` backstop) — clear it here.
   saveStatus.clear(surfaceId.value)
   // Don't unsubscribe serviceStore here — DashboardView may still be using it
+  // Tear down the delivery-history listener (its surface is unmounting).
+  serviceMessagesStore.unsubscribeServiceMessages()
 })
 
 // ── CCLI helper ────────────────────────────────────────────────────────────────
