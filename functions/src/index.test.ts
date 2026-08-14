@@ -8,6 +8,7 @@ import {
   buildUpstreamUrl,
   cleanupExpiredMediaHandler,
   cleanupOrphanRendersHandler,
+  createQueuedMessage,
   MEDIA_PATH_GUARD,
   ORPHAN_RENDER_STALE_HOURS,
   PROXY_TARGETS,
@@ -954,6 +955,73 @@ describe("cleanupOrphanRendersHandler", () => {
     expect(handlerBody).toMatch(
       /const dryRun = process\.env\.PPTX_RENDER_CLEANUP_ENABLED !== "true";/,
     );
+  });
+});
+
+// --- queueServiceMessage send-path enqueue (59-02) ----------------------
+//
+// The thin enqueue half of the send path: a pure createQueuedMessage()
+// doc-shaper (shared with Phase 61's cron so the messages/{id} shape can
+// never drift) plus the queueServiceMessageHandler onCall body, which
+// re-authorizes the caller (editor-tier), re-reads the org messaging
+// kill-switch server-side, validates the request, and enqueues exactly one
+// messages/{id} doc. It holds NO provider secret (RESEND_API_KEY binds only
+// to sendQueuedMessage in 59-03). Follows the same mock-everything-at-module
+// -scope discipline as the parsePptxHandler block above.
+
+describe("createQueuedMessage", () => {
+  const BASE_INPUT = {
+    orgId: "org1",
+    serviceId: "svc1",
+    type: "oneoff" as const,
+    subject: "Sunday reminder",
+    body: "Please arrive by 8am. {{their_roles}}",
+    recipientSelector: {
+      teams: ["band"],
+      individualPersonIds: ["p1"],
+      includeEveryone: false,
+    },
+    options: { attachServiceLink: true, sendCopyToSelf: false },
+    scheduledFor: null as string | null,
+    requestedByUid: "user1",
+  };
+
+  it("shapes status 'queued' when scheduledFor is null (send-now)", () => {
+    const doc = createQueuedMessage({ ...BASE_INPUT, scheduledFor: null });
+    expect(doc.status).toBe("queued");
+    expect(doc.scheduledFor).toBeNull();
+  });
+
+  it("shapes status 'scheduled' when scheduledFor is a non-empty string", () => {
+    const when = "2099-01-01T09:00:00.000Z";
+    const doc = createQueuedMessage({ ...BASE_INPUT, scheduledFor: when });
+    expect(doc.status).toBe("scheduled");
+    expect(doc.scheduledFor).toBe(when);
+  });
+
+  it("carries the full CONTEXT §Data Model shape with zeroed deliveryCounts and null changeDiff/sentAt", () => {
+    const doc = createQueuedMessage(BASE_INPUT);
+    expect(doc).toMatchObject({
+      type: "oneoff",
+      status: "queued",
+      subject: BASE_INPUT.subject,
+      body: BASE_INPUT.body,
+      recipientSelector: BASE_INPUT.recipientSelector,
+      options: BASE_INPUT.options,
+      changeDiff: null,
+      sentAt: null,
+      requestedByUid: "user1",
+      deliveryCounts: { sent: 0, failed: 0 },
+    });
+    // createdAt is the FieldValue.serverTimestamp() sentinel (mocked at :42).
+    expect(doc.createdAt).toBe("SERVER_TIMESTAMP_SENTINEL");
+  });
+
+  it("never emits an undefined field value -- Firestore rejects undefined", () => {
+    const doc = createQueuedMessage(BASE_INPUT) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(doc)) {
+      expect(value, `field ${key} must not be undefined`).not.toBeUndefined();
+    }
   });
 });
 
