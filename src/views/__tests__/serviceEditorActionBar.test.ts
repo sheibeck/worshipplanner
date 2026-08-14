@@ -37,6 +37,8 @@ function makeHandlers() {
     onPresent: vi.fn(),
     onPrint: vi.fn(),
     onShare: vi.fn(),
+    // R136 (59-04): the ✉ Messages entry point's click handler.
+    onMessages: vi.fn(),
   }
 }
 
@@ -62,6 +64,13 @@ function makeContext(overrides: Partial<ActionBarContext> = {}): ActionBarContex
     isSharing: false,
     shareCopied: false,
     shareError: null,
+    // R136 (59-04): messaging kill-switch defaults ON so every pre-existing
+    // GATING MATRIX row (written before ✉ Messages existed) keeps exercising
+    // the SAME flag combinations — the ✉ item's presence/ordering and its
+    // disabled-when-off behavior are covered by the dedicated describe block
+    // below. Note the ✉ item is present-but-disabled when this is false, so it
+    // still appears in editor rows regardless of this flag.
+    messagingEnabled: true,
     handlers: makeHandlers(),
     ...overrides,
   }
@@ -129,7 +138,7 @@ describe('buildActionBarItems', () => {
         tab: 'service-order',
         overrides: { canEditService: true, hasPcCredentials: true },
         // R101 (48-03): Print/Share now trail Save (isEditor defaults true).
-        expected: ['suggest-all-songs', 'export-pc', 'save', 'print', 'share'],
+        expected: ['suggest-all-songs', 'export-pc', 'save', 'print', 'messages', 'share'],
       },
       {
         // Owner follow-up: Copy for PC deleted entirely — no export/copy item
@@ -138,7 +147,7 @@ describe('buildActionBarItems', () => {
         name: 'service-order, canEditService true, hasPcCredentials false — no export/copy item at all',
         tab: 'service-order',
         overrides: { canEditService: true, hasPcCredentials: false },
-        expected: ['suggest-all-songs', 'save', 'print', 'share'],
+        expected: ['suggest-all-songs', 'save', 'print', 'messages', 'share'],
       },
       {
         // R101 (48-03): Print/Share are NOT gated on canEditService (same as
@@ -147,7 +156,7 @@ describe('buildActionBarItems', () => {
         name: 'service-order, canEditService false, hasPcCredentials true (preserves the ungated export)',
         tab: 'service-order',
         overrides: { canEditService: false, hasPcCredentials: true },
-        expected: ['export-pc', 'print', 'share'],
+        expected: ['export-pc', 'print', 'messages', 'share'],
       },
       {
         // Owner follow-up: with no credentials AND no edit permission, the bar
@@ -156,7 +165,7 @@ describe('buildActionBarItems', () => {
         name: 'service-order, canEditService false, hasPcCredentials false — empty bar except Print/Share',
         tab: 'service-order',
         overrides: { canEditService: false, hasPcCredentials: false },
-        expected: ['print', 'share'],
+        expected: ['print', 'messages', 'share'],
       },
     ]
 
@@ -176,17 +185,17 @@ describe('buildActionBarItems', () => {
   describe('pcEnabled (39-05, R089)', () => {
     it('pcEnabled false, hasPcCredentials true: export-pc is absent from service-order', () => {
       const ctx = makeContext({ canEditService: true, hasPcCredentials: true, pcEnabled: false })
-      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'save', 'print', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'save', 'print', 'messages', 'share'])
     })
 
     it('pcEnabled true, hasPcCredentials true: export-pc is present in service-order', () => {
       const ctx = makeContext({ canEditService: true, hasPcCredentials: true, pcEnabled: true })
-      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'save', 'print', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'save', 'print', 'messages', 'share'])
     })
 
     it('pcEnabled false, hasPcCredentials false: export-pc is still absent (both gates agree)', () => {
       const ctx = makeContext({ canEditService: true, hasPcCredentials: false, pcEnabled: false })
-      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'save', 'print', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'save', 'print', 'messages', 'share'])
     })
   })
 
@@ -198,12 +207,12 @@ describe('buildActionBarItems', () => {
   describe('aiEnabled (WR-01)', () => {
     it('aiEnabled false: suggest-all-songs is absent from service-order', () => {
       const ctx = makeContext({ canEditService: true, aiEnabled: false })
-      expect(keysOf('service-order', ctx)).toEqual(['export-pc', 'save', 'print', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['export-pc', 'save', 'print', 'messages', 'share'])
     })
 
     it('aiEnabled true: suggest-all-songs is present in service-order', () => {
       const ctx = makeContext({ canEditService: true, aiEnabled: true })
-      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'save', 'print', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'save', 'print', 'messages', 'share'])
     })
 
     it('aiEnabled false composes with canEditService: suggest-all-songs never appears regardless of edit permission', () => {
@@ -227,12 +236,12 @@ describe('buildActionBarItems', () => {
 
   it('ORDERING: service-order with canEditService true is suggest, then export (when credentialed), then save, then print, then share', () => {
     const credentialed = keysOf('service-order', makeContext({ canEditService: true, hasPcCredentials: true }))
-    expect(credentialed).toEqual(['suggest-all-songs', 'export-pc', 'save', 'print', 'share'])
+    expect(credentialed).toEqual(['suggest-all-songs', 'export-pc', 'save', 'print', 'messages', 'share'])
 
     // Owner follow-up: uncredentialed no longer inserts a copy-pc item — the
     // export slot is simply absent, so suggest sits directly before save.
     const uncredentialed = keysOf('service-order', makeContext({ canEditService: true, hasPcCredentials: false }))
-    expect(uncredentialed).toEqual(['suggest-all-songs', 'save', 'print', 'share'])
+    expect(uncredentialed).toEqual(['suggest-all-songs', 'save', 'print', 'messages', 'share'])
   })
 
   it('IDEMPOTENCY: two successive calls with the same context return equal key arrays', () => {
@@ -387,10 +396,11 @@ describe('buildActionBarItems', () => {
   // button used (T-48-03-01); buildPrintItem is unconditional, matching the
   // bottom-row Print button it replaces.
   describe('Print/Share (R101, 48-03)', () => {
-    it('service-order ends in [..., save, print, share] when isEditor and canEditService', () => {
+    it('service-order ends in [..., save, print, messages, share] when isEditor and canEditService', () => {
       const ctx = makeContext({ canEditService: true, isEditor: true })
       const keys = keysOf('service-order', ctx)
-      expect(keys.slice(-3)).toEqual(['save', 'print', 'share'])
+      // R136 (59-04): ✉ Messages sits between Print and Share (left of Share).
+      expect(keys.slice(-4)).toEqual(['save', 'print', 'messages', 'share'])
     })
 
     it('share is absent (no "share" key) when isEditor is false', () => {
@@ -441,6 +451,57 @@ describe('buildActionBarItems', () => {
       const items = buildActionBarItems('service-order', ctx)
       expect(items.find((i) => i.key === 'print')?.onClick).toBe(ctx.handlers.onPrint)
       expect(items.find((i) => i.key === 'share')?.onClick).toBe(ctx.handlers.onShare)
+    })
+  })
+
+  // R136 (59-04): the ✉ Messages entry point. Editor-gated like Share, ordered
+  // LEFT OF Share, and — DIVERGING from Share's hide-on-fail — present-but-
+  // DISABLED with a Settings tooltip when messaging is off (UI-SPEC #0), so an
+  // editor can discover the feature and where to enable it.
+  describe('Messages (R136, 59-04)', () => {
+    it('is present for an editor with messaging enabled, and enabled', () => {
+      const ctx = makeContext({ isEditor: true, messagingEnabled: true })
+      const item = buildActionBarItems('service-order', ctx).find((i) => i.key === 'messages')
+      expect(item).toBeDefined()
+      expect(item?.label).toBe('Messages')
+      expect(item?.disabled).toBe(false)
+      expect(item?.title).toBeUndefined()
+    })
+
+    it('is present but DISABLED with the Settings tooltip when messaging is off (disabled, not hidden — UI-SPEC #0)', () => {
+      const ctx = makeContext({ isEditor: true, messagingEnabled: false })
+      const item = buildActionBarItems('service-order', ctx).find((i) => i.key === 'messages')
+      expect(item).toBeDefined()
+      expect(item?.disabled).toBe(true)
+      expect(item?.title).toBe('Turn on Messaging in Settings to email volunteers')
+    })
+
+    it('is absent for a viewer (isEditor false), regardless of messagingEnabled', () => {
+      const enabledViewer = buildActionBarItems('service-order', makeContext({ isEditor: false, messagingEnabled: true }))
+      const disabledViewer = buildActionBarItems('service-order', makeContext({ isEditor: false, messagingEnabled: false }))
+      expect(enabledViewer.find((i) => i.key === 'messages')).toBeUndefined()
+      expect(disabledViewer.find((i) => i.key === 'messages')).toBeUndefined()
+    })
+
+    it('is ordered immediately BEFORE share (left of Share) for an editor', () => {
+      const keys = keysOf('service-order', makeContext({ isEditor: true }))
+      expect(keys.indexOf('messages')).toBe(keys.indexOf('share') - 1)
+    })
+
+    it('never appears on the slides or roles tabs', () => {
+      expect(keysOf('slides', makeContext({ isEditor: true }))).not.toContain('messages')
+      expect(keysOf('roles', makeContext({ isEditor: true }))).not.toContain('messages')
+    })
+
+    it('HANDLER IDENTITY: messages onClick is reference-equal to ctx.handlers.onMessages', () => {
+      const ctx = makeContext({ isEditor: true, messagingEnabled: true })
+      const item = buildActionBarItems('service-order', ctx).find((i) => i.key === 'messages')
+      expect(item?.onClick).toBe(ctx.handlers.onMessages)
+    })
+
+    it('carries the mail icon', () => {
+      const item = buildActionBarItems('service-order', makeContext({ isEditor: true })).find((i) => i.key === 'messages')
+      expect(item?.icon).toBe('mail')
     })
   })
 })
