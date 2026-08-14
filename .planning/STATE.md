@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
-current_phase: 59
-current_phase_name: Messages Composer & Send Path
-status: executing
-stopped_at: Completed 59-04-PLAN.md
-last_updated: "2026-08-14T16:51:17.164Z"
+current_phase: 60
+current_phase_name: Delivery History & Bounce Webhook
+status: discussing
+stopped_at: Phase 59 verified GREEN (5/5); transitioning to Phase 60
+last_updated: "2026-08-14T17:05:00.000Z"
 last_activity: 2026-08-14
-last_activity_desc: executed 59-04 (Phase 59 code-complete)
+last_activity_desc: Phase 59 verified GREEN; starting Phase 60 discuss
 progress:
   total_phases: 5
   completed_phases: 2
@@ -276,11 +276,21 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 59 (Messages Composer & Send Path) — CODE-COMPLETE (4/4 plans have summaries; human UAT + deploy deferred)
-Plan: 59-04 complete (✉ Messages composer + client send surface) — the last plan of Phase 59
-Status: 59-04 shipped the CLIENT send surface — the ✉ Messages action-bar item (editor-gated, present-but-disabled with a Settings tooltip when messaging off, UI-SPEC #0) + src/components/MessageComposer.vue: teams-first recipients + individuals, 3 message types seeding subject/body behind a dirty guard, subject/body with caret-inserted merge tokens (raw template stored), live pluralized "Reaches N" via the Phase 58 resolver, the 3 options + schedule reveal, and a Send calling the queueServiceMessage client callable with the recipient SELECTOR only (no email list crosses the boundary; server re-resolves in 59-03). Gates green: serviceEditorActionBar.test.ts 47/47, MessageComposer.test.ts 19/19, npm run type-check (vue-tsc --build) clean, full app suite at the 2-file known baseline (13 failing = unchanged). The client calls the still-UNDEPLOYED queueServiceMessage — expected under the v1.7 grant. Visual/interaction UAT (composer vs DESIGN §5a; kill-switch disabled+tooltip end-to-end) DEFERRED to owner /gsd-verify-work 59, routed to PENDING-VERIFICATION.md item 59-04.
+Phase: 60 (Delivery History & Bounce Webhook) — DISCUSSING
+Plan: not yet planned
+Status: Phase 59 verified GREEN (5/5); Phase 60 starting
 Phase 59 whole: 59-01 (resend pin, undeployed) + 59-02 (queueServiceMessage enqueue) + 59-03 (sendQueuedMessage trigger, sole RESEND_API_KEY holder) + 59-04 (client composer) — all built/tested/UNDEPLOYED. Owner deploy: firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage (after Resend account + secret + DNS), then /gsd-verify-work 59.
-Last activity: 2026-08-14 — executed 59-04
+Last activity: 2026-08-14 — Phase 59 verified GREEN; starting Phase 60
+
+> **Phase 59 outcome (2026-08-14):** `59-VERIFICATION.md` = passed/GREEN, 5/5 must-haves, R131/R136–R141
+> present, wired, behaviorally exercised. Secret confinement (RESEND_API_KEY bound only to
+> sendQueuedMessage; resend@6.19.0 functions-only, absent from src/) and the transactional queued→sending
+> idempotency claim (duplicate-trigger sends ZERO emails) both proven by tests. Send path built/tested
+> against MOCKED Resend and UNDEPLOYED. Deferred (NOT defects, per v1.7 grant): composer visual/kill-switch
+> UAT (`verification_deferred_human`) + owner deploy (Resend account, RESEND_API_KEY secret,
+> SERVICE_SHARE_BASE_URL/MESSAGE_FROM_ADDRESS config, SPF/DKIM/DMARC DNS, firebase deploy) — all in
+> PENDING-VERIFICATION.md. Phase 60 builds the delivery-history panel + HMAC-verified bounce webhook on
+> the messages/recipients/deliveryCounts doc shape Phase 59 established.
 
 > **Phase 58 outcome (2026-08-14):** `58-VERIFICATION.md` = passed/GREEN, 5/5 requirements
 > (R130/R132/R133/R134/R135) present, wired, and behaviorally exercised. One manual UAT (Draft→locked
