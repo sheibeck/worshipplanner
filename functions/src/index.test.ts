@@ -12,6 +12,7 @@ import {
   MEDIA_PATH_GUARD,
   ORPHAN_RENDER_STALE_HOURS,
   PROXY_TARGETS,
+  queueServiceMessageHandler,
   redactUrl,
   RENDERED_OBJECT_GUARD,
   RETENTION_DAYS,
@@ -19,6 +20,7 @@ import {
   parsePptxHandler,
   requestPptxRenderHandler,
 } from "./index";
+import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
 
@@ -1022,6 +1024,253 @@ describe("createQueuedMessage", () => {
     for (const [key, value] of Object.entries(doc)) {
       expect(value, `field ${key} must not be undefined`).not.toBeUndefined();
     }
+  });
+});
+
+describe("queueServiceMessageHandler", () => {
+  const ORG_ID = "org1";
+  const SERVICE_ID = "svc1";
+  const UID = "user1";
+  const GENERATED_ID = "msg-generated-id";
+  const DAY = 24 * 60 * 60 * 1000;
+
+  interface FakeDbOptions {
+    memberExists?: boolean;
+    role?: string;
+    orgExists?: boolean;
+    messagingEnabled?: boolean;
+    setSpy?: ReturnType<typeof vi.fn>;
+  }
+
+  /**
+   * A minimal fake Firestore supporting exactly the chains
+   * queueServiceMessageHandler uses:
+   *   organizations/{orgId}/members/{uid}          -> .get()  (role re-check)
+   *   organizations/{orgId}                        -> .get()  (kill-switch)
+   *   organizations/{orgId}/services/{serviceId}/messages -> .doc().set() (enqueue)
+   */
+  function fakeDb(opts: FakeDbOptions = {}) {
+    const memberExists = opts.memberExists ?? true;
+    const role = opts.role ?? "editor";
+    const orgExists = opts.orgExists ?? true;
+    const messagingEnabled = opts.messagingEnabled ?? true;
+    const setSpy = opts.setSpy ?? vi.fn(async () => undefined);
+
+    const memberDoc = {
+      get: vi.fn(async () => ({
+        exists: memberExists,
+        data: () => (memberExists ? { role } : undefined),
+      })),
+    };
+    const messageDoc = { id: GENERATED_ID, set: setSpy };
+    const messagesCollection = { doc: vi.fn(() => messageDoc) };
+    const serviceDoc = {
+      collection: vi.fn((name: string) => {
+        if (name === "messages") return messagesCollection;
+        throw new Error(`fakeDb: unexpected service subcollection "${name}"`);
+      }),
+    };
+    const servicesCollection = { doc: vi.fn(() => serviceDoc) };
+
+    const orgDoc = {
+      get: vi.fn(async () => ({
+        exists: orgExists,
+        data: () =>
+          orgExists ? { settings: { messaging: { enabled: messagingEnabled } } } : undefined,
+      })),
+      collection: vi.fn((name: string) => {
+        if (name === "members") return { doc: vi.fn(() => memberDoc) };
+        if (name === "services") return servicesCollection;
+        throw new Error(`fakeDb: unexpected org subcollection "${name}"`);
+      }),
+    };
+
+    const db = {
+      collection: vi.fn((name: string) => {
+        if (name === "organizations") return { doc: vi.fn(() => orgDoc) };
+        throw new Error(`fakeDb: unexpected collection "${name}"`);
+      }),
+    };
+
+    return { db, memberDoc, orgDoc, messageDoc, messagesCollection, setSpy };
+  }
+
+  function validData(overrides: Partial<QueueMessageRequest> = {}): QueueMessageRequest {
+    return {
+      orgId: ORG_ID,
+      serviceId: SERVICE_ID,
+      type: "oneoff",
+      subject: "Sunday reminder",
+      body: "Please arrive by 8am.",
+      recipientSelector: { teams: ["band"], individualPersonIds: [], includeEveryone: false },
+      options: { attachServiceLink: false, sendCopyToSelf: false },
+      scheduledFor: null,
+      ...overrides,
+    };
+  }
+
+  function fakeRequest(
+    overrides: { auth?: { uid: string } | null; data?: Partial<QueueMessageRequest> } = {},
+  ): CallableRequest<QueueMessageRequest> {
+    const auth = overrides.auth === undefined ? { uid: UID } : overrides.auth;
+    return {
+      auth: auth ?? undefined,
+      data: validData(overrides.data ?? {}),
+    } as unknown as CallableRequest<QueueMessageRequest>;
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+  });
+
+  it("throws unauthenticated when request.auth is missing, and never reads Firestore", async () => {
+    await expect(
+      queueServiceMessageHandler(fakeRequest({ auth: null })),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
+    expect(getFirestore).not.toHaveBeenCalled();
+  });
+
+  it("throws invalid-argument when a required field is missing", async () => {
+    await expect(
+      queueServiceMessageHandler(fakeRequest({ data: { subject: "" } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    await expect(
+      queueServiceMessageHandler(fakeRequest({ data: { orgId: "" } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("throws invalid-argument for a type outside oneoff|reminder|share-link (R137)", async () => {
+    await expect(
+      queueServiceMessageHandler(
+        fakeRequest({ data: { type: "broadcast" as unknown as QueueMessageRequest["type"] } }),
+      ),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("throws permission-denied for a caller whose member doc is absent (wrong org / not a member)", async () => {
+    const { db } = fakeDb({ memberExists: false });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(queueServiceMessageHandler(fakeRequest())).rejects.toMatchObject({
+      code: "permission-denied",
+    });
+  });
+
+  it("throws permission-denied for a viewer (member role not in editor|admin)", async () => {
+    const { db, setSpy } = fakeDb({ role: "viewer" });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(queueServiceMessageHandler(fakeRequest())).rejects.toMatchObject({
+      code: "permission-denied",
+    });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("accepts an admin as editor-tier", async () => {
+    const { db, setSpy } = fakeDb({ role: "admin" });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await queueServiceMessageHandler(fakeRequest());
+
+    expect(result).toEqual({ messageId: GENERATED_ID });
+    expect(setSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-reads the kill-switch server-side and rejects when messaging is off, even for an editor", async () => {
+    const { db, setSpy } = fakeDb({ role: "editor", messagingEnabled: false });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(queueServiceMessageHandler(fakeRequest())).rejects.toMatchObject({
+      code: "failed-precondition",
+    });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects a scheduledFor in the past → invalid-argument", async () => {
+    const { db, setSpy } = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(
+      queueServiceMessageHandler(
+        fakeRequest({ data: { scheduledFor: new Date(Date.now() - DAY).toISOString() } }),
+      ),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects an implausibly far-future scheduledFor → invalid-argument", async () => {
+    const { db } = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(
+      queueServiceMessageHandler(
+        fakeRequest({ data: { scheduledFor: new Date(Date.now() + 400 * DAY).toISOString() } }),
+      ),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("rejects an unparseable scheduledFor → invalid-argument", async () => {
+    const { db } = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(
+      queueServiceMessageHandler(fakeRequest({ data: { scheduledFor: "not-a-date" } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("a valid send-now request enqueues ONE messages/{id} with status 'queued' and returns { messageId }", async () => {
+    const { db, setSpy, messageDoc } = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await queueServiceMessageHandler(fakeRequest());
+
+    expect(result).toEqual({ messageId: GENERATED_ID });
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    expect(setSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "queued",
+        type: "oneoff",
+        requestedByUid: UID,
+        scheduledFor: null,
+      }),
+    );
+    expect(messageDoc.id).toBe(GENERATED_ID);
+  });
+
+  it("a valid scheduled request enqueues status 'scheduled' with the scheduledFor persisted", async () => {
+    const when = new Date(Date.now() + 3 * DAY).toISOString();
+    const { db, setSpy } = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await queueServiceMessageHandler(fakeRequest({ data: { scheduledFor: when } }));
+
+    expect(result).toEqual({ messageId: GENERATED_ID });
+    expect(setSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "scheduled", scheduledFor: when }),
+    );
+  });
+
+  it("writes under organizations/{orgId}/services/{serviceId}/messages -- the enqueue path", async () => {
+    const { db, orgDoc } = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await queueServiceMessageHandler(fakeRequest());
+
+    expect(orgDoc.collection).toHaveBeenCalledWith("services");
+    expect(orgDoc.collection).toHaveBeenCalledWith("members");
+  });
+
+  it("SOURCE INSPECTION: the queueServiceMessage onCall wrapper carries NO secrets array (never holds RESEND_API_KEY)", () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const start = source.indexOf("export const queueServiceMessage = onCall(");
+    expect(start).toBeGreaterThan(-1);
+    // Slice to the end of the onCall(...) call expression.
+    const tail = source.slice(start, start + 400);
+    const optionsEnd = tail.indexOf("queueServiceMessageHandler");
+    expect(optionsEnd).toBeGreaterThan(-1);
+    const optionsObject = tail.slice(0, optionsEnd);
+    expect(optionsObject).not.toMatch(/secrets/);
+    expect(optionsObject).not.toMatch(/RESEND_API_KEY/);
   });
 });
 
