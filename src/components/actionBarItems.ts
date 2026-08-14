@@ -41,6 +41,11 @@ export type ActionBarIcon =
   | 'spinner'
   | 'print'
   | 'share'
+  // 'mail' — the ✉ envelope glyph for the Messages action-bar item (R136,
+  // 59-04). No existing icon fit a "message the team" action, so a new member
+  // was added (per 59-04-PLAN.md Task 1's "add one only if none fits"); its
+  // render arm lives in ContextualActionBar.vue alongside the others.
+  | 'mail'
 
 export interface ActionBarItem {
   key: string

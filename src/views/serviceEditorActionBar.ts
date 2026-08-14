@@ -61,6 +61,8 @@ export interface ActionBarHandlers {
   onPresent: () => void
   onPrint: () => void
   onShare: () => void
+  /** R136 (59-04): opens the ✉ Messages composer (MessageComposer.vue). */
+  onMessages: () => void
 }
 
 export interface ActionBarContext {
@@ -101,6 +103,16 @@ export interface ActionBarContext {
   shareCopied: boolean
   /** R101 (48-03): mirrors ServiceEditorView.vue's `shareError` ref. */
   shareError: string | null
+  /**
+   * R136 (59-04): the org-level volunteer-email messaging kill switch
+   * (`isMessagingEnabled()`, Phase 58). Required (not optional) so the
+   * compiler forces the one call site to supply it — the same rationale as
+   * `aiEnabled`/`pcEnabled` above. Unlike those two, a `false` here does NOT
+   * hide the ✉ Messages item: it renders present-but-DISABLED with a Settings
+   * tooltip (see `buildMessagesItem`), a deliberate divergence from the
+   * hide-on-fail rule (UI-SPEC #0).
+   */
+  messagingEnabled: boolean
   handlers: ActionBarHandlers
 }
 
@@ -222,6 +234,33 @@ function buildShareItem(ctx: ActionBarContext): ActionBarItem | undefined {
   }
 }
 
+/**
+ * R136 (59-04): the ✉ Messages entry point that opens `MessageComposer.vue`.
+ * Editor-gated like every mutating action (returns `undefined` for a viewer —
+ * a share/send denormalizes editor-only recipient data).
+ *
+ * ★ DELIBERATE DIVERGENCE — DISABLED, not hidden, when messaging is off.
+ * Unlike `buildShareItem` (which hides on gate failure) and the WR-01 AI
+ * "hide-don't-disable" rule, this item is returned present-but-`disabled`
+ * with a Settings tooltip when `!ctx.messagingEnabled`. 59-CONTEXT.md /
+ * 59-UI-SPEC.md #0 chose disabled+tooltip for discoverability: a silently
+ * absent button is undiscoverable, whereas the disabled form teaches the
+ * editor the feature exists and where to enable it (Settings → Messaging).
+ * The server kill-switch re-check in `queueServiceMessage` (59-02) is the real
+ * boundary; this UI gate is convenience. Do NOT "correct" this to hide-on-fail.
+ */
+function buildMessagesItem(ctx: ActionBarContext): ActionBarItem | undefined {
+  if (!ctx.isEditor) return undefined
+  return {
+    key: 'messages',
+    label: 'Messages',
+    icon: 'mail',
+    disabled: !ctx.messagingEnabled,
+    title: ctx.messagingEnabled ? undefined : 'Turn on Messaging in Settings to email volunteers',
+    onClick: ctx.handlers.onMessages,
+  }
+}
+
 function buildServiceOrderItems(ctx: ActionBarContext): ActionBarItem[] {
   const items: ActionBarItem[] = []
   // WR-01: "Suggest All Songs" is a live AI entry point (calls
@@ -246,6 +285,12 @@ function buildServiceOrderItems(ctx: ActionBarContext): ActionBarItem[] {
   // Share both use the bar's `default` gray tone (same as Present), reading
   // as an appendix to the primary actions rather than a competitor to Save.
   items.push(buildPrintItem(ctx))
+  // R136 (59-04): ✉ Messages sits LEFT OF Share (UI-SPEC #0) — pushed before
+  // the share item so the row reads [..., print, messages, share].
+  const messagesItem = buildMessagesItem(ctx)
+  if (messagesItem) {
+    items.push(messagesItem)
+  }
   const shareItem = buildShareItem(ctx)
   if (shareItem) {
     items.push(shareItem)
