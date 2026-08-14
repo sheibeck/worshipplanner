@@ -51,17 +51,26 @@ const {
   mockQueueCallable,
   mockResolveRecipients,
 } = vi.hoisted(() => {
-  const mockQueueCallable = vi.fn(() => Promise.resolve({ data: { messageId: 'msg-1' } }))
+  const mockQueueCallable = vi.fn<(...a: unknown[]) => Promise<{ data: { messageId: string } }>>(
+    () => Promise.resolve({ data: { messageId: 'msg-1' } }),
+  )
   return {
-    // Default: a FIRST lock (no prior snapshot). The legacy `.data().orgIds`
-    // shape is preserved so any pre-existing getDoc consumer stays happy.
-    mockGetDoc: vi.fn(() =>
-      Promise.resolve({ exists: () => false, data: () => ({ orgIds: ['org-1'] }) }),
-    ),
-    mockSetDoc: vi.fn(() => Promise.resolve()),
+    // Default: a FIRST lock (no prior snapshot). `data` is optional and the
+    // legacy `.data().orgIds` shape is preserved so any pre-existing getDoc
+    // consumer stays happy; `exists` is a plain boolean so per-test overrides
+    // (`() => true` for a re-lock) type-check.
+    mockGetDoc: vi.fn<
+      (...a: unknown[]) => Promise<{ exists: () => boolean; data?: () => { orgIds: string[] } }>
+    >(() => Promise.resolve({ exists: () => false, data: () => ({ orgIds: ['org-1'] }) })),
+    mockSetDoc: vi.fn<(...a: unknown[]) => Promise<void>>(() => Promise.resolve()),
     mockQueueCallable,
-    mockHttpsCallable: vi.fn(() => mockQueueCallable),
-    mockResolveRecipients: vi.fn(() => ({ reachable: [], unreachableCount: 0 })),
+    mockHttpsCallable: vi.fn<(...a: unknown[]) => typeof mockQueueCallable>(() => mockQueueCallable),
+    mockResolveRecipients: vi.fn<
+      (...a: unknown[]) => {
+        reachable: Array<{ id: string; name: string; email: string }>
+        unreachableCount: number
+      }
+    >(() => ({ reachable: [], unreachableCount: 0 })),
   }
 })
 

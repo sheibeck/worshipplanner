@@ -1527,7 +1527,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useServiceStore, ServiceLockedError } from '@/stores/services'
+import { useServiceStore, ServiceLockedError, buildServiceSnapshot } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
@@ -1562,7 +1562,10 @@ import { buildActionBarItems } from '@/views/serviceEditorActionBar'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanNeededPositionTeamIds, fetchTeamPositions, addNeededPosition } from '@/utils/planningCenterApi'
-import { serverTimestamp } from 'firebase/firestore'
+import { serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/firebase'
+import { resolveRecipients } from '@/utils/messagingRecipients'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
 import type { AiSongSuggestion } from '@/utils/claudeApi'
@@ -2677,6 +2680,8 @@ onUnmounted(() => {
   // Don't unsubscribe serviceStore here — DashboardView may still be using it
   // Tear down the delivery-history listener (its surface is unmounting).
   serviceMessagesStore.unsubscribeServiceMessages()
+  // The transient lock-notify auto-clear timer must not outlive the view.
+  clearLockNotifyTimer()
 })
 
 // ── CCLI helper ────────────────────────────────────────────────────────────────
@@ -2695,6 +2700,69 @@ function getCcliNumber(songId: string): string | null {
 const isTransitioning = ref(false)
 // lifecycleError is declared earlier (with the autosave watcher block) —
 // see CR-03's comment there for why.
+
+// ── R144 (61-04): first-lock auto-notification state ────────────────────────────
+//
+// The subordinate confirmation line inside the lock banner reads this. `null`
+// renders nothing (messaging off, default off, or a re-lock — the SC2 neutral
+// no-op). Discriminated by `kind` (61-UI-SPEC § Component #0).
+const lockNotify = ref<
+  | null
+  | { kind: 'sent'; count: number }
+  | { kind: 'none-reachable' }
+  | { kind: 'error' }
+>(null)
+let lockNotifyTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearLockNotifyTimer(): void {
+  if (lockNotifyTimer !== null) {
+    clearTimeout(lockNotifyTimer)
+    lockNotifyTimer = null
+  }
+}
+
+// Set the confirmation line and, mirroring the app's 6000ms toast auto-dismiss
+// (toasts.ts:27), auto-clear it ~6s later so it reads as a transient courtesy,
+// not permanent banner furniture.
+function setLockNotify(state: Exclude<typeof lockNotify.value, null>): void {
+  lockNotify.value = state
+  clearLockNotifyTimer()
+  lockNotifyTimer = setTimeout(() => {
+    lockNotify.value = null
+    lockNotifyTimer = null
+  }, 6000)
+}
+
+// Module-scope lock-notification template. The send path renders these tokens
+// per-recipient server-side (R144); the client never expands them.
+const LOCK_SUBJECT = 'You are scheduled to serve'
+const LOCK_BODY = [
+  'Hi,',
+  '',
+  'This service has been finalized and you are scheduled to serve.',
+  '',
+  'Your role(s): {{their_roles}}',
+  '',
+  'Songs for this service:',
+  '{{song_list}}',
+  '',
+  'View the full service order here: {{service_link}}',
+  '',
+  'Thanks for serving!',
+].join('\n')
+
+// The client cannot import from functions/, so the callable's request shape is
+// re-declared locally exactly as MessageComposer.vue:310-319 does.
+interface QueueMessageRequest {
+  orgId: string
+  serviceId: string
+  type: 'lock-notification'
+  subject: string
+  body: string
+  recipientSelector: { teams: string[]; individualPersonIds: string[]; includeEveryone: boolean }
+  options: { attachServiceLink: boolean; sendCopyToSelf: boolean }
+  scheduledFor: string | null
+}
 
 /**
  * ★ Reflect a transition in the UI only AFTER the store write has resolved.
@@ -2802,6 +2870,89 @@ async function onMarkAsPlanned(): Promise<void> {
     } catch (bumpErr) {
       console.error('[ServiceEditorView] lastUsedAt bump failed after a successful transition:', bumpErr)
     }
+
+    // ★ R144 (61-04) — first-lock auto-notification + lockSnapshots write.
+    //
+    // Runs AFTER the transition has landed and is on screen, in its OWN
+    // try/catch, and — exactly like the bump above — its failure is NEVER
+    // re-raised into `lifecycleError`. The lock the user asked for has already
+    // succeeded; reporting "Couldn't mark this service as Planned" because a
+    // secondary email enqueue failed would be the same lie ME-03 guards against.
+    // A failed enqueue drives the amber informational `lockNotify` line, not the
+    // red lock-failure line (61-UI-SPEC § Component #0 critical rule).
+    try {
+      const svc = localService.value
+      const orgId = authStore.orgId
+      if (svc && orgId) {
+        // READ BEFORE WRITE: the snapshot's prior existence is the first-lock
+        // signal. Reading AFTER the setDoc would make every lock look like a
+        // re-lock (61-RESEARCH Pitfall 4).
+        const snapRef = doc(db, 'organizations', orgId, 'services', svc.id, 'lockSnapshots', 'current')
+        const prior = await getDoc(snapRef)
+        const wasFirstLock = !prior.exists()
+
+        // Written on EVERY lock so Phase 62 has a prior snapshot to diff.
+        // slideGroupsFingerprint is null — deferred to Phase 62 (buildServiceSnapshot
+        // carries no slide text; 61-RESEARCH § slideGroupsFingerprint decision).
+        await setDoc(snapRef, {
+          snapshot: buildServiceSnapshot(svc),
+          slideGroupsFingerprint: null,
+          lockedAt: serverTimestamp(),
+          lockedByUid: authStore.user?.uid ?? null,
+        })
+
+        // A re-lock does NOT auto-send — the prompt-with-diff is Phase 62.
+        // lockNotify stays null (banner shows only its normal locked copy).
+        if (wasFirstLock) {
+          // NOTE the `settings.messaging.*` org path, not `messaging.*`.
+          const effectiveLockNotify =
+            svc.messaging?.lockNotifyEnabled ?? authStore.settings.messaging.lockNotifyDefault
+          // SC2: the enqueue sits ONLY on the draft→locked path, behind the
+          // kill-switch + effective-default gates. Off/default-off → neutral no-op.
+          if (isMessagingEnabled() && effectiveLockNotify) {
+            const reachable = resolveRecipients(
+              svc,
+              quartersStore.quarters,
+              rosterStore.roles,
+              rosterStore.people,
+              { teams: [], individualPersonIds: [], includeEveryone: true },
+            ).reachable
+            if (reachable.length === 0) {
+              // No false "Notified 0" — everyone assigned lacks an email, or no
+              // one is assigned.
+              setLockNotify({ kind: 'none-reachable' })
+            } else {
+              // NESTED try/catch: a throw here (network, or the server re-reading
+              // the kill-switch and rejecting a between-draft-and-lock kill) is
+              // the honest amber 'error' surface, never the red lock-failure line.
+              try {
+                await httpsCallable<QueueMessageRequest, { messageId: string }>(
+                  functions,
+                  'queueServiceMessage',
+                )({
+                  orgId,
+                  serviceId: svc.id,
+                  type: 'lock-notification',
+                  subject: LOCK_SUBJECT,
+                  body: LOCK_BODY,
+                  recipientSelector: { teams: [], individualPersonIds: [], includeEveryone: true },
+                  options: { attachServiceLink: true, sendCopyToSelf: false },
+                  scheduledFor: null,
+                })
+                setLockNotify({ kind: 'sent', count: reachable.length })
+              } catch (enqueueErr) {
+                console.error('[ServiceEditorView] lock-notification enqueue failed after a successful lock:', enqueueErr)
+                setLockNotify({ kind: 'error' })
+              }
+            }
+          }
+        }
+      }
+    } catch (lockSideErr) {
+      // A snapshot-write/gate failure leaves the lock succeeded and lockNotify
+      // null — never re-raised (mirrors the bump above).
+      console.error('[ServiceEditorView] lock side-effects failed after a successful transition:', lockSideErr)
+    }
   } catch (err) {
     console.error('Mark as Planned failed:', err)
     // ★ No optimistic flip: the pill, the banner and every gate are still
@@ -2835,6 +2986,9 @@ const showReopenConfirm = ref(false)
  */
 function onReopenRequest(): void {
   if (!localService.value || isTransitioning.value) return
+  // The confirmation line clears with the state it described (61-UI-SPEC).
+  lockNotify.value = null
+  clearLockNotifyTimer()
   if (hasPcExportEvidence.value) {
     showReopenConfirm.value = true
     return
