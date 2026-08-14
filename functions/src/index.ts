@@ -828,10 +828,20 @@ export const cleanupOrphanRenders = onSchedule(
 // resolves no recipients and sends nothing — the 59-03 trigger does that, and
 // is the only Function that holds RESEND_API_KEY.
 
-/** The three message types a composer can queue (R137). */
-export type MessageType = "oneoff" | "reminder" | "share-link";
+/**
+ * The message types a composer or an automatic trigger can queue (R137).
+ * 'lock-notification' (Phase 61) is the automatic lock email; Phase 62 will add
+ * 'relock-notification' the same way — append to BOTH the union and the
+ * MESSAGE_TYPES array, and the enum gate + shared shaper pick it up unchanged.
+ */
+export type MessageType = "oneoff" | "reminder" | "share-link" | "lock-notification";
 
-const MESSAGE_TYPES: readonly MessageType[] = ["oneoff", "reminder", "share-link"];
+const MESSAGE_TYPES: readonly MessageType[] = [
+  "oneoff",
+  "reminder",
+  "share-link",
+  "lock-notification",
+];
 
 /** Clock-skew grace so a "send now" whose client clock is slightly ahead is not rejected as past. */
 const SCHEDULE_PAST_GRACE_MS = 5 * 60 * 1000;
