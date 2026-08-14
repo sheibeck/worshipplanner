@@ -802,6 +802,72 @@
           </div>
         </div>
 
+        <!-- Messaging defaults (58-05, R132) — per-service overrides that inherit
+             from OrgSettings.messaging until explicitly changed. Same shell/tier
+             as Teams and Sermon Context above; reuses the exact inherit-or-
+             override select idiom + Draft-editable/locked-read-only branch
+             structure already shipped for the per-slot Bible-version override
+             below (see the SCRIPTURE slot's `#version` select). -->
+        <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3" data-testid="messaging-defaults-panel">
+          <div class="flex items-start gap-4">
+            <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap mt-1">Messaging defaults</h2>
+            <div class="flex-1 space-y-3">
+              <template v-if="canEditService">
+                <div>
+                  <p class="text-xs text-gray-500 mb-1">Lock notification</p>
+                  <select
+                    :value="localService.messaging?.lockNotifyEnabled ?? ''"
+                    data-testid="messaging-lock-notify-select"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    @change="onChangeLockNotifyEnabled(($event.target as HTMLSelectElement).value)"
+                  >
+                    <option value="">Default (Settings: {{ authStore.settings.messaging.lockNotifyDefault ? 'On' : 'Off' }})</option>
+                    <option value="true">On</option>
+                    <option value="false">Off</option>
+                  </select>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500 mb-1">Service-link reminder</p>
+                  <select
+                    :value="localService.messaging?.reminderEnabled ?? ''"
+                    data-testid="messaging-reminder-enabled-select"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    @change="onChangeReminderEnabled(($event.target as HTMLSelectElement).value)"
+                  >
+                    <option value="">Default (Settings: {{ authStore.settings.messaging.reminderEnabled ? 'On' : 'Off' }})</option>
+                    <option value="true">On</option>
+                    <option value="false">Off</option>
+                  </select>
+                </div>
+                <div v-if="messagingReminderResolvedOn">
+                  <p class="text-xs text-gray-500 mb-1">Reminder days-before</p>
+                  <select
+                    :value="localService.messaging?.reminderDaysBefore ?? ''"
+                    data-testid="messaging-reminder-days-select"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    @change="onChangeReminderDaysBefore(($event.target as HTMLSelectElement).value)"
+                  >
+                    <option value="">Default (Settings: {{ authStore.settings.messaging.reminderDaysBefore }} days)</option>
+                    <option v-for="days in MESSAGING_REMINDER_DAYS_OPTIONS" :key="days" :value="days">{{ days }}</option>
+                  </select>
+                </div>
+              </template>
+              <!-- Lifecycle lock: read-only summary. CLASS D — INVERSE branch,
+                   mirrors the scripture Bible-version override's locked-read-only
+                   paragraph exactly (ServiceEditorView.vue's SCRIPTURE slot,
+                   `#version` select). -->
+              <p v-else-if="authStore.isEditor && isLocked" class="text-sm text-gray-200" data-testid="messaging-defaults-readonly">
+                Lock notification: {{ messagingLockNotifyText }} · Service-link reminder: {{ messagingReminderText }}
+              </p>
+              <!-- Viewer: read-only summary. -->
+              <p v-else class="text-sm text-gray-200" data-testid="messaging-defaults-readonly">
+                Lock notification: {{ messagingLockNotifyText }} · Service-link reminder: {{ messagingReminderText }}
+              </p>
+            </div>
+          </div>
+          <p v-if="messagingSaveError" class="text-red-400 text-sm mt-2">{{ messagingSaveError }}</p>
+        </div>
+
         <!-- Dynamic Service Flow. 260811-vsr: the item list fills the tab's content
              width, matching the Teams / Sermon Context blocks above it. (An earlier
              max-w-[1060px] cap from the mockup was removed — it applied only to this
@@ -3833,6 +3899,96 @@ async function onResetRoleOverride(roleId: string) {
     }
     console.error('Failed to reset role override:', err)
   }
+}
+
+// ── Messaging defaults panel (58-05, R132) ──────────────────────────────────────
+//
+// Same shape as onToggleOverridePerson/onResetRoleOverride above: this action
+// bypasses updateService/the debounced autosave watcher entirely and carries
+// its own scoped-dot-path write (serviceStore.setServiceMessagingDefaults),
+// so both handlers guard on canEditService themselves — a template-only gate
+// would leave the write path open to a stray call.
+
+const MESSAGING_REMINDER_DAYS_OPTIONS = [1, 2, 3, 5, 7, 10, 14] as const
+
+const messagingSaveError = ref<string | null>(null)
+
+/** Whether the reminder row resolves "on" — explicitly overridden, or
+ *  inherited from the org default when unset. Gates the days-before select's
+ *  visibility, mirroring the Settings card's own conditional reveal. */
+const messagingReminderResolvedOn = computed(() => {
+  const override = localService.value?.messaging?.reminderEnabled
+  return override ?? authStore.settings.messaging.reminderEnabled
+})
+
+function resolvedOnOffText(override: boolean | null | undefined, orgDefault: boolean): string {
+  const value = override ?? orgDefault
+  const suffix = override === null || override === undefined ? '(default)' : '(overridden)'
+  return `${value ? 'On' : 'Off'} ${suffix}`
+}
+
+const messagingLockNotifyText = computed(() =>
+  resolvedOnOffText(localService.value?.messaging?.lockNotifyEnabled, authStore.settings.messaging.lockNotifyDefault),
+)
+
+const messagingReminderText = computed(() => {
+  const messaging = localService.value?.messaging
+  const enabledOverride = messaging?.reminderEnabled
+  const enabled = enabledOverride ?? authStore.settings.messaging.reminderEnabled
+  const suffix = enabledOverride === null || enabledOverride === undefined ? '(default)' : '(overridden)'
+  if (!enabled) return `Off ${suffix}`
+  const days = messaging?.reminderDaysBefore ?? authStore.settings.messaging.reminderDaysBefore
+  return `On, ${days} days before ${suffix}`
+})
+
+/**
+ * WR-02-style optimistic update, mirroring onToggleOverridePerson: mutate
+ * localService.value.messaging synchronously (so a same-tick second change
+ * reads the just-applied state), fire the scoped store write, and roll back
+ * on failure. `onSave`'s payload is a fixed field allowlist that does not
+ * include `messaging` (same as `roleAssignmentOverrides`), so this optimistic
+ * mutation cannot leak into a generic autosave write — only
+ * setServiceMessagingDefaults' own scoped updateDoc ever persists it.
+ */
+async function setMessagingOverride(
+  patch: Partial<{
+    lockNotifyEnabled: boolean | null
+    reminderEnabled: boolean | null
+    reminderDaysBefore: number | null
+  }>,
+): Promise<void> {
+  if (!canEditService.value || !localService.value) return
+  const previous = localService.value.messaging
+  messagingSaveError.value = null
+  localService.value.messaging = {
+    lockNotifyEnabled: null,
+    reminderEnabled: null,
+    reminderDaysBefore: null,
+    reminderSentAt: null,
+    ...previous,
+    ...patch,
+  }
+  try {
+    await serviceStore.setServiceMessagingDefaults(localService.value.id, patch)
+  } catch (err) {
+    if (localService.value) {
+      localService.value.messaging = previous
+    }
+    console.error('Failed to save messaging default:', err)
+    messagingSaveError.value = 'Failed to save. Please try again.'
+  }
+}
+
+function onChangeLockNotifyEnabled(rawValue: string): void {
+  void setMessagingOverride({ lockNotifyEnabled: rawValue === '' ? null : rawValue === 'true' })
+}
+
+function onChangeReminderEnabled(rawValue: string): void {
+  void setMessagingOverride({ reminderEnabled: rawValue === '' ? null : rawValue === 'true' })
+}
+
+function onChangeReminderDaysBefore(rawValue: string): void {
+  void setMessagingOverride({ reminderDaysBefore: rawValue === '' ? null : Number(rawValue) })
 }
 
 // ── Delete ─────────────────────────────────────────────────────────────────────
