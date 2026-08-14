@@ -48,7 +48,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 - [ ] **R136**: A ✉ Messages button on a service opens a composer whose recipients are teams first,
       with individuals addable below.
 
-- [ ] **R137**: The composer supports three message types — One-off message, Reminder, and Share
+- [x] **R137**: The composer supports three message types — One-off message, Reminder, and Share
       service link — including ad-hoc one-off reminders to chosen teams/individuals.
 
 - [ ] **R138**: The composer has a subject and a body with insertable merge tokens: service date,
@@ -60,7 +60,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 - [ ] **R140**: The composer shows a live "Reaches N people" count reflecting the selected
       teams/individuals minus unreachable roles.
 
-- [ ] **R141**: The composer offers attach-the-service-order-link, send-me-a-copy, and
+- [x] **R141**: The composer offers attach-the-service-order-link, send-me-a-copy, and
       schedule-for-later options.
 
 ### Delivery History & Bounces
@@ -145,11 +145,11 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R134 | Phase 58 | Complete |
 | R135 | Phase 58 | Complete |
 | R136 | Phase 59 | Pending |
-| R137 | Phase 59 | Pending |
+| R137 | Phase 59 | Complete |
 | R138 | Phase 59 | Pending |
 | R139 | Phase 59 | Complete |
 | R140 | Phase 59 | Pending |
-| R141 | Phase 59 | Pending |
+| R141 | Phase 59 | Complete |
 | R142 | Phase 60 | Pending |
 | R143 | Phase 60 | Pending |
 | R144 | Phase 61 | Pending |

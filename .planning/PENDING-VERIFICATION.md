@@ -134,6 +134,34 @@ Do **not** treat this item as passed — it is a pre-deploy gate, not a satisfie
 
 ---
 
+## ⏳ 59-02 — queueServiceMessage enqueue Function ships UNDEPLOYED (R131/R137/R141) — OWNER, PRE-DEPLOY
+
+Phase 59-02 added the **queue half** of the send path to `functions/src/index.ts`: the
+`queueServiceMessage` (`onCall`) Function + its exported `queueServiceMessageHandler` body,
+and the shared `createQueuedMessage()` doc-shaper. It re-authorizes the caller server-side
+(independent editor-tier membership re-check of the path-derived org — never the client-declared
+orgId), re-reads the org messaging kill-switch (`settings.messaging.enabled`) server-side, validates
+the type enum + `scheduledFor` sanity, then writes ONE `messages/{id}` doc and returns its id. It
+**resolves no recipients and sends nothing** and holds **NO secret** — `RESEND_API_KEY` is declared
+in the file but bound to no Function this plan (it binds only to `sendQueuedMessage` in 59-03).
+
+**Built, unit-tested, and UNDEPLOYED.** No `RESEND_API_KEY` secret was set. No Firestore rules
+changed (the `messages` create rule shipped deploy-gated in Phase 58; `queueServiceMessage` writes via
+the Admin SDK, which bypasses rules — its own editor + kill-switch re-checks are the real control).
+
+**OWNER, once 59-03 (the `sendQueuedMessage` trigger) also lands and legitimacy is re-confirmed
+(see item 59-01), deploy BOTH send Functions together:**
+```
+firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage
+```
+Before deploy, complete the owner setup still open in item 59-01 (create the Resend account,
+`firebase functions:secrets:set RESEND_API_KEY`, add sending-domain SPF/DKIM/DMARC DNS records).
+
+Do **not** treat this item as passed — it is a pre-deploy gate, not a satisfied one. The end-to-end
+live send (a real queued message reaching a real inbox) can only be verified after 59-03 + deploy.
+
+---
+
 ## Also still open (tracked in ROADMAP `## Backlog`, not here)
 
 - **999.3** — firestore.rules are deployed, but the **production devtools bypass check** (set a service to Planned, attempt a direct Firestore write, expect permission denied) was never performed against prod.

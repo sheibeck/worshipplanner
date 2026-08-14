@@ -5,15 +5,15 @@ milestone_name: Volunteer Messaging & Notifications
 current_phase: 59
 current_phase_name: Messages Composer & Send Path
 status: executing
-stopped_at: Completed 59-01-PLAN.md (send-path infra — resend pin + serviceRoles port)
-last_updated: "2026-08-14T15:46:01.653Z"
+stopped_at: Completed 59-02-PLAN.md
+last_updated: "2026-08-14T16:05:13.706Z"
 last_activity: 2026-08-14
-last_activity_desc: Executed 59-01 — resend@6.19.0 functions-only pin + functions/src/serviceRoles.ts port (R131/R139), UNDEPLOYED
+last_activity_desc: executed 59-02
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 8
   percent: 20
 ---
 
@@ -277,9 +277,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 59 (Messages Composer & Send Path) — EXECUTING
-Plan: 59-01 complete (send-path infra); more plans to follow
-Status: 59-01 shipped built/tested/UNDEPLOYED — resend@6.19.0 functions-only exact pin + functions/src/serviceRoles.ts port with per-recipient roleNames (R131/R139). All 3 gates green (functions vitest 14/14, functions build clean, root suite at 2-file known baseline). Owner pre-deploy re-confirm + secret/DNS/deploy routed to PENDING-VERIFICATION.md (item 59-01).
-Last activity: 2026-08-14 — executed 59-01
+Plan: 59-02 complete (queueServiceMessage enqueue handler); more plans to follow (59-03 sendQueuedMessage trigger, 59-04 composer)
+Status: 59-02 shipped built/tested/UNDEPLOYED — queueServiceMessage onCall enqueue Function + createQueuedMessage doc-shaper in functions/src/index.ts. Re-authorizes caller (independent editor-tier membership re-check), re-reads settings.messaging.enabled kill-switch server-side, validates type enum + scheduledFor, writes ONE messages/{id} and returns { messageId }; holds NO secret (RESEND_API_KEY declared, binds only to sendQueuedMessage in 59-03). Gates green: functions vitest 76/76 (full functions suite 149/149), functions build clean, root suite at 2-file known baseline. Owner deploy (firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage) + secret/DNS routed to PENDING-VERIFICATION.md (item 59-02, pre-deploy re-confirm in 59-01).
+Last activity: 2026-08-14 — executed 59-02
 
 > **Phase 58 outcome (2026-08-14):** `58-VERIFICATION.md` = passed/GREEN, 5/5 requirements
 > (R130/R132/R133/R134/R135) present, wired, and behaviorally exercised. One manual UAT (Draft→locked
@@ -1732,6 +1732,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 58 P04 | 40min | 2 tasks | 2 files |
 | Phase 58 P05 | 25 | 2 tasks | 5 files |
 | Phase 59 P01 | 36min | 3 tasks | 4 files |
+| Phase 59 P02 | 18min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2406,8 +2407,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-14T14:07:02.269Z
-Stopped at: Completed 58-05-PLAN.md
+Last session: 2026-08-14T16:05:13.647Z
+Stopped at: Completed 59-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
