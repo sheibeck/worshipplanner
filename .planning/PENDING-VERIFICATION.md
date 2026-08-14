@@ -326,3 +326,32 @@ baseline). What no test can assert is the **visual/interaction** contract — th
 
 Do **not** treat this item as passed — it is `deferred_human` visual/interaction UAT, and the live-bounce
 arm additionally depends on the 60-01/60-02 webhook deploy gate above.
+
+---
+
+## ⚠ DISCOVERED DEFECT (found during Phase 61 discuss, Phase 59 origin) — composer success toast misrenders
+
+**Not a Phase 61 item — a shipped Phase 59 UX bug, disclosed here for the owner to decide + fix.**
+
+`src/components/MessageComposer.vue:592` calls `toasts.push('Message queued to N people')` (or
+`'Message scheduled'`) on a SUCCESSFUL send. But `src/components/ToastHost.vue:18` hard-codes a red
+`<span class="font-medium">Save failed.</span> {{ toast.message }}` prefix on every toast — the toast
+store is a **failure-only** stack (R041 "Save failed" incident). So a successful send renders as:
+
+> **Save failed.** Message queued to 5 people
+
+i.e. success reads as failure. It fires on every composer send. Two independent agents (Phase 61
+UI-researcher + UI-checker) flagged it. Phase 61's own lock-notification deliberately AVOIDS the toast
+(it uses an inline amber lock-banner confirmation line) precisely because of this.
+
+**Recommended fix (owner's choice, small, out of Phase 61 scope so NOT auto-applied):**
+- **Option A (minimal):** remove the `toasts.push(...)` success call from `MessageComposer.vue` — the
+  composer already closes on success (`emit('sent', …)`) and the Phase 60 delivery-history panel now shows
+  the sent message, so the toast is redundant. Zero toast-system change. Update the composer test that
+  asserts the toast.
+- **Option B (durable):** add a success/info variant to `toasts`/`ToastHost.vue` (drop the hardcoded
+  "Save failed." prefix; carry a `variant: 'error' | 'success' | 'info'` on each toast). Larger,
+  project-wide feedback pass — benefits any future success toast.
+
+Recommendation: A now (stops the misrender immediately), B as a later feedback-system pass. Do NOT mark
+passed — this is a disclosed defect awaiting the owner's decision.
