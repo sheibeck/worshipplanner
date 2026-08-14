@@ -1123,6 +1123,35 @@ interface SendTarget {
 }
 
 /**
+ * Org-local calendar "today" as 'YYYY-MM-DD' (R145 / R133). Uses
+ * Intl.DateTimeFormat('en-CA', { timeZone }) — 'en-CA' emits YYYY-MM-DD
+ * directly and Node 22 ships full ICU, so any IANA zone resolves with NO npm
+ * package. This is the same timeZone-aware discipline formatServiceDate relies
+ * on (see the UTC-pin below, :1120-1130): a service near midnight is reckoned
+ * in the org's zone, not UTC. Pure — no Firestore, no firebase-admin.
+ */
+export function todayInTimeZone(timeZone: string, now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+/**
+ * Subtracts n calendar days from a 'YYYY-MM-DD' string, UTC-pinned. The `Z` in
+ * `${dateYmd}T00:00:00Z` is load-bearing: it makes the subtraction a pure
+ * calendar-day count immune to DST (no 23/25h drift), matching formatServiceDate's
+ * UTC pin (:1120-1130). Pure — string in, string out.
+ */
+export function minusDays(dateYmd: string, n: number): string {
+  const d = new Date(`${dateYmd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
  * Formats a service's YYYY-MM-DD date for {{service_date}}. UTC-pinned so the
  * output is deterministic regardless of the Function's locale/timezone; falls
  * back to the raw string if it does not parse.
