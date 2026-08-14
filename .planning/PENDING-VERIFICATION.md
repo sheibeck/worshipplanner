@@ -162,6 +162,43 @@ live send (a real queued message reaching a real inbox) can only be verified aft
 
 ---
 
+## ⏳ 59-03 — sendQueuedMessage send trigger ships UNDEPLOYED against a mocked Resend (R131/R138/R139) — OWNER, PRE-DEPLOY
+
+Phase 59-03 added the **send half** of the path to `functions/src/index.ts`: the
+`sendQueuedMessage` (`onDocumentCreated` on `.../messages/{messageId}`) trigger + its
+exported `sendQueuedMessageHandler` body, plus the pure `functions/src/messageTokens.ts`
+token renderer. `sendQueuedMessage` is the **ONLY Function bound to `RESEND_API_KEY`**
+(`secrets: [RESEND_API_KEY]` — verified by a source-inspection test that the binding occurs
+exactly once in the file). It runs a **transactional `queued→sending` idempotency claim** (a
+retried at-least-once trigger, or a `sending`/`sent`/`scheduled` doc, sends ZERO emails —
+explicitly tested), **re-resolves recipients server-side** via the 59-01 port (never the
+client's stored list — Anti-Pattern 1), renders per-recipient `{{their_roles}}` (R139), sends
+via a **fully MOCKED Resend** (`vi.mock("resend")`), writes one `recipients/{id}` doc per
+recipient, rolls up `deliveryCounts`, and flips the message status to `sent`|`partial`|`failed`.
+
+**Built, unit-tested, and UNDEPLOYED.** No real email is sent, no `RESEND_API_KEY` secret was
+set, and no Firestore rules changed. Two new config `defineString`s were added with tested
+empty/placeholder defaults: `SERVICE_SHARE_BASE_URL` (empty default → `{{service_link}}`
+renders `''`) and `MESSAGE_FROM_ADDRESS` (placeholder default; the owner sets a verified
+sending-domain address at deploy time).
+
+**OWNER, before the send path goes live — re-confirm the `resend@6.19.0` pin (item 59-01),
+then complete the deploy-side setup that is intentionally NOT done here:**
+- create the Resend account and `firebase functions:secrets:set RESEND_API_KEY`,
+- add the sending-domain SPF / DKIM / DMARC DNS records,
+- set the two configs to production values (`SERVICE_SHARE_BASE_URL` = the app origin,
+  `MESSAGE_FROM_ADDRESS` = a verified Resend sender),
+- **deploy both send Functions together:**
+  ```
+  firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage
+  ```
+
+The end-to-end live send (a real queued message reaching a real inbox) is owner-verified at
+`/gsd-verify-work 59` (59-VALIDATION.md Manual-Only). Do **not** treat this item as passed —
+it is a pre-deploy gate, not a satisfied one.
+
+---
+
 ## Also still open (tracked in ROADMAP `## Backlog`, not here)
 
 - **999.3** — firestore.rules are deployed, but the **production devtools bypass check** (set a service to Planned, attempt a direct Firestore write, expect permission denied) was never performed against prod.

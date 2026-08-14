@@ -51,7 +51,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 - [x] **R137**: The composer supports three message types — One-off message, Reminder, and Share
       service link — including ad-hoc one-off reminders to chosen teams/individuals.
 
-- [ ] **R138**: The composer has a subject and a body with insertable merge tokens: service date,
+- [x] **R138**: The composer has a subject and a body with insertable merge tokens: service date,
       service link, their roles, and song list.
 
 - [x] **R139**: Each recipient receives a personalized email — the "their roles" token renders that
@@ -146,7 +146,7 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R135 | Phase 58 | Complete |
 | R136 | Phase 59 | Pending |
 | R137 | Phase 59 | Complete |
-| R138 | Phase 59 | Pending |
+| R138 | Phase 59 | Complete |
 | R139 | Phase 59 | Complete |
 | R140 | Phase 59 | Pending |
 | R141 | Phase 59 | Complete |
