@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStorage } from "firebase-admin/storage";
 import { getFirestore } from "firebase-admin/firestore";
@@ -23,6 +24,7 @@ import {
   sendQueuedMessage,
   resolveRecipientRef,
   recordBounce,
+  messageWebhookHandler,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -2023,5 +2025,266 @@ describe("recordBounce (60-02 idempotent transition-guarded write)", () => {
     }).lastOrdering;
     expect(ordering.recipientReadAt).toBeLessThan(ordering.firstWriteAt);
     expect(ordering.messageReadAt).toBeLessThan(ordering.firstWriteAt);
+  });
+});
+
+// --- messageWebhookHandler (60-02 verify-first trust boundary) ---------------
+//
+// The unauthenticated boundary. ORDER CONTRACT: assert Buffer.isBuffer(rawBody)
+// (400 otherwise) -> verify the Svix HMAC over the RAW body (401 on any
+// missing/tampered/stale signature, with ZERO Firestore access) -> only then
+// parse and, only for email.bounced/Permanent, address + recordBounce. A
+// valid-but-unprocessable event (soft/Transient, delivered, complaint, unknown
+// type, unresolvable recipient) returns 200 with no write — a non-2xx would make
+// Resend retry forever. firebase-functions/v2/https is NOT mocked, so the handler
+// is called directly with a fake rawBody+headers and no res.
+
+describe("messageWebhookHandler (60-02 verify-first)", () => {
+  // A whsec_-prefixed secret whose remainder is real base64 (exercises the
+  // base64-decode key path in verifySvixSignature).
+  const WEBHOOK_SECRET = "whsec_" + Buffer.from("resend-webhook-signing-key").toString("base64");
+  const TAGS = { orgId: "org1", serviceId: "svc1", messageId: "msg1", recipientId: "rec1" };
+
+  function nowSec(): number {
+    return Math.floor(Date.now() / 1000);
+  }
+
+  // Self-consistent signer: mirrors the verifier's exact steps so the "valid"
+  // branch is genuinely valid (research A5), reused from webhookSignature.test.ts.
+  function signContent(rawBody: Buffer, id: string, ts: number, secret: string): string {
+    const keyBytes = Buffer.from(secret.replace(/^whsec_/, ""), "base64");
+    return createHmac("sha256", keyBytes)
+      .update(`${id}.${ts}.${rawBody.toString("utf8")}`)
+      .digest("base64");
+  }
+  function svixHeadersFor(
+    rawBody: Buffer,
+    ts: number,
+    secret: string,
+    id = "msg_evt1",
+  ): Record<string, string> {
+    return {
+      "svix-id": id,
+      "svix-timestamp": String(ts),
+      "svix-signature": `v1,${signContent(rawBody, id, ts, secret)}`,
+    };
+  }
+
+  function bouncedEvent(overrides: {
+    type?: string;
+    bounceType?: string;
+    tags?: Record<string, string> | undefined;
+    email_id?: string;
+    bounceMessage?: string;
+  } = {}) {
+    return {
+      type: overrides.type ?? "email.bounced",
+      data: {
+        email_id: overrides.email_id ?? "re_abc123",
+        ...(overrides.tags === undefined ? { tags: TAGS } : overrides.tags ? { tags: overrides.tags } : {}),
+        bounce: { type: overrides.bounceType ?? "Permanent", message: overrides.bounceMessage ?? "mailbox full" },
+      },
+    };
+  }
+
+  // A getFirestore fake wiring the tags-direct doc() to a seeded recipient/message
+  // world (so the end-to-end recordBounce path is exercised through the handler).
+  function makeWebhookFirestore(opts: { recipientStatus?: string; bounced?: number } = {}) {
+    const state = {
+      recipient: { status: opts.recipientStatus ?? "sent" } as Record<string, unknown>,
+      message: { deliveryCounts: { sent: 1, failed: 0, bounced: opts.bounced ?? 0 } } as {
+        deliveryCounts: { sent: number; failed: number; bounced: number };
+      },
+    };
+    const messageRef = { id: "msg1" };
+    const recipientRef = { id: "rec1", parent: { parent: messageRef } };
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        get: vi.fn(async (ref: unknown) => {
+          if (ref === recipientRef) return { exists: true, data: () => state.recipient };
+          if (ref === messageRef) return { exists: true, data: () => state.message };
+          throw new Error("webhook fake: unexpected tx.get ref");
+        }),
+        update: vi.fn((ref: unknown, patch: Record<string, unknown>) => {
+          if (ref === recipientRef) Object.assign(state.recipient, patch);
+          if (ref === messageRef && "deliveryCounts.bounced" in patch) {
+            state.message.deliveryCounts.bounced = patch["deliveryCounts.bounced"] as number;
+          }
+        }),
+      };
+      return fn(tx);
+    });
+    const collectionGroupGet = vi.fn(async () => ({ empty: true, docs: [] as unknown[] }));
+    const collectionGroup = vi.fn(() => ({
+      where: vi.fn(() => ({ limit: vi.fn(() => ({ get: collectionGroupGet })) })),
+    }));
+    const doc = vi.fn(() => recipientRef);
+    const db = { doc, collectionGroup, runTransaction };
+    return { db, state, runTransaction, collectionGroup };
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+  });
+
+  it("valid signature + email.bounced/Permanent -> 200 and drives recordBounce (recipient flips to bounced, deliveryCounts.bounced == 1)", async () => {
+    const { db, state } = makeWebhookFirestore({ recipientStatus: "sent", bounced: 0 });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    const rawBody = Buffer.from(JSON.stringify(bouncedEvent()));
+    const headers = svixHeadersFor(rawBody, nowSec(), WEBHOOK_SECRET);
+
+    const out = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(200);
+    expect(state.recipient.status).toBe("bounced");
+    expect(state.message.deliveryCounts.bounced).toBe(1);
+  });
+
+  it("TRUST BOUNDARY: no svix headers -> 401 and ZERO Firestore access (getFirestore NEVER called)", async () => {
+    vi.mocked(getFirestore).mockReturnValue({} as never);
+    const rawBody = Buffer.from(JSON.stringify(bouncedEvent()));
+
+    const out = await messageWebhookHandler(rawBody, {}, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(401);
+    expect(getFirestore).not.toHaveBeenCalled();
+  });
+
+  it("TRUST BOUNDARY: body tampered after signing -> 401 + zero Firestore access", async () => {
+    vi.mocked(getFirestore).mockReturnValue({} as never);
+    const signedBody = Buffer.from(JSON.stringify(bouncedEvent()));
+    const headers = svixHeadersFor(signedBody, nowSec(), WEBHOOK_SECRET);
+    const tamperedBody = Buffer.from(JSON.stringify(bouncedEvent({ bounceMessage: "tampered" })));
+
+    const out = await messageWebhookHandler(tamperedBody, headers, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(401);
+    expect(getFirestore).not.toHaveBeenCalled();
+  });
+
+  it("TRUST BOUNDARY: stale svix-timestamp (outside +/-5 min) -> 401 + zero Firestore access", async () => {
+    vi.mocked(getFirestore).mockReturnValue({} as never);
+    const rawBody = Buffer.from(JSON.stringify(bouncedEvent()));
+    const staleTs = nowSec() - 3600; // 1 hour old
+    const headers = svixHeadersFor(rawBody, staleTs, WEBHOOK_SECRET);
+
+    const out = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(401);
+    expect(getFirestore).not.toHaveBeenCalled();
+  });
+
+  it("wrong secret -> 401 + zero Firestore access", async () => {
+    vi.mocked(getFirestore).mockReturnValue({} as never);
+    const rawBody = Buffer.from(JSON.stringify(bouncedEvent()));
+    const headers = svixHeadersFor(rawBody, nowSec(), "whsec_" + Buffer.from("attacker-key").toString("base64"));
+
+    const out = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(401);
+    expect(getFirestore).not.toHaveBeenCalled();
+  });
+
+  it("non-Buffer body -> 400 (malformed) + zero Firestore access", async () => {
+    vi.mocked(getFirestore).mockReturnValue({} as never);
+
+    const out = await messageWebhookHandler(
+      "not a buffer" as unknown as Buffer,
+      {},
+      WEBHOOK_SECRET,
+    );
+
+    expect(out.status).toBe(400);
+    expect(getFirestore).not.toHaveBeenCalled();
+  });
+
+  it("valid signature but non-JSON body -> 400 (malformed json), parsed only AFTER the signature passes, no Firestore write", async () => {
+    vi.mocked(getFirestore).mockReturnValue({} as never);
+    const rawBody = Buffer.from("this is not json{");
+    const headers = svixHeadersFor(rawBody, nowSec(), WEBHOOK_SECRET);
+
+    const out = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(400);
+    expect(getFirestore).not.toHaveBeenCalled();
+  });
+
+  it("valid signature, soft bounce (Transient) -> 200 with NO recipient write and NO count change", async () => {
+    const { db, state, runTransaction } = makeWebhookFirestore({ recipientStatus: "sent", bounced: 0 });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    const rawBody = Buffer.from(JSON.stringify(bouncedEvent({ bounceType: "Transient" })));
+    const headers = svixHeadersFor(rawBody, nowSec(), WEBHOOK_SECRET);
+
+    const out = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(200);
+    expect(state.recipient.status).toBe("sent");
+    expect(state.message.deliveryCounts.bounced).toBe(0);
+    expect(runTransaction).not.toHaveBeenCalled();
+  });
+
+  it("valid signature, email.delivered -> 200, no write", async () => {
+    const { db, runTransaction } = makeWebhookFirestore();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    const rawBody = Buffer.from(JSON.stringify(bouncedEvent({ type: "email.delivered" })));
+    const headers = svixHeadersFor(rawBody, nowSec(), WEBHOOK_SECRET);
+
+    const out = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(200);
+    expect(runTransaction).not.toHaveBeenCalled();
+  });
+
+  it("valid signature, unknown event type -> 200, no write", async () => {
+    const { db, runTransaction } = makeWebhookFirestore();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    const rawBody = Buffer.from(JSON.stringify(bouncedEvent({ type: "email.opened" })));
+    const headers = svixHeadersFor(rawBody, nowSec(), WEBHOOK_SECRET);
+
+    const out = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(200);
+    expect(runTransaction).not.toHaveBeenCalled();
+  });
+
+  it("valid hard bounce but recipient cannot be resolved -> 200 (never 4xx/5xx, no retry storm), no transaction", async () => {
+    // No tags and an email_id whose collectionGroup fallback matches nothing.
+    const { db, runTransaction } = makeWebhookFirestore();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    const event = bouncedEvent({ tags: undefined, email_id: "re_missing" });
+    const rawBody = Buffer.from(JSON.stringify(event));
+    const headers = svixHeadersFor(rawBody, nowSec(), WEBHOOK_SECRET);
+
+    const out = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+
+    expect(out.status).toBe(200);
+    expect(runTransaction).not.toHaveBeenCalled();
+  });
+
+  it("IDEMPOTENT end-to-end: two identical valid deliveries -> recipient bounced once, deliveryCounts.bounced == 1", async () => {
+    const { db, state } = makeWebhookFirestore({ recipientStatus: "sent", bounced: 0 });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    const rawBody = Buffer.from(JSON.stringify(bouncedEvent()));
+    const headers = svixHeadersFor(rawBody, nowSec(), WEBHOOK_SECRET);
+
+    const first = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+    const second = await messageWebhookHandler(rawBody, headers, WEBHOOK_SECRET);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(state.recipient.status).toBe("bounced");
+    expect(state.message.deliveryCounts.bounced).toBe(1);
+  });
+
+  it("SOURCE INSPECTION: RESEND_WEBHOOK_SECRET is bound to EXACTLY ONE Function, and it is messageWebhook", () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    // The secret binds via `secrets: [RESEND_WEBHOOK_SECRET]` exactly once.
+    const bindings = source.match(/secrets:\s*\[RESEND_WEBHOOK_SECRET\]/g) ?? [];
+    expect(bindings).toHaveLength(1);
+    // And that single binding lives inside the messageWebhook wrapper.
+    const wrapperStart = source.indexOf("export const messageWebhook = onRequest(");
+    expect(wrapperStart).toBeGreaterThan(-1);
+    const wrapperRegion = source.slice(wrapperStart, wrapperStart + 400);
+    expect(wrapperRegion).toMatch(/secrets:\s*\[RESEND_WEBHOOK_SECRET\]/);
   });
 });
