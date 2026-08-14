@@ -1015,12 +1015,181 @@ export async function sendScheduledRemindersHandler(
 // NO secrets: array -- the cron only ENQUEUES; RESEND_API_KEY binds solely to
 // sendQueuedMessage (R131). 04:00 UTC is a NEW slot, offset from the taken 02:00
 // (media) and 03:00 (renders) so the three daily sweeps never overlap.
+//
+// TWO sweeps share this ONE daily invocation (one Cloud Scheduler job, one
+// deploy): the reminder sweep (R145) and the schedule-for-later dispatch sweep
+// (R141, 61-03). Each runs in its OWN try/catch so a failure in one never aborts
+// the other. No new onSchedule wrapper and no secret is added for the dispatch
+// sweep -- it only re-creates a 'queued' doc; only sendQueuedMessage holds the
+// key (R131).
 export const sendScheduledReminders = onSchedule(
   { schedule: "every day 04:00", timeZone: "UTC" },
   async () => {
-    await sendScheduledRemindersHandler();
+    try {
+      await sendScheduledRemindersHandler();
+    } catch (err) {
+      console.error(
+        "sendScheduledReminders: reminder sweep failed:",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+    try {
+      await dispatchDueScheduledMessagesHandler();
+    } catch (err) {
+      console.error(
+        "sendScheduledReminders: dispatch sweep failed:",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
   },
 );
+
+// --- dispatchDueScheduledMessagesHandler (61-03: R141 schedule-for-later) ---
+//
+// The Phase 59 carryover -- actually SEND user-scheduled messages. The composer
+// (59-02) writes a status:'scheduled' messages doc (createQueuedMessage :1141)
+// that sendQueuedMessage, an onDocumentCreated trigger, leaves inert by design
+// (:1440 comment). Flipping that existing doc's status to 'queued' would NOT
+// re-fire the create trigger (the whole trap), so this sweep CREATES A FRESH
+// 'queued' doc instead -- a genuine onDocumentCreated. It is exported separately
+// from the wrapper (the sendScheduledRemindersHandler convention) so it is unit
+// -tested with a fixed clock and a fake Firestore.
+
+/** The rolled-up outcome of one dispatch sweep. */
+export interface DispatchSummary {
+  scanned: number;
+  dispatched: number;
+}
+
+/**
+ * Reads a scheduledFor value (the composer stores an ISO string; a Firestore
+ * Timestamp exposes toMillis()) as epoch millis, or null when it is absent or
+ * unparseable. Supporting BOTH shapes is load-bearing: the real 59-02 composer
+ * writes an ISO string, so a Timestamp-only reader would silently never dispatch
+ * any production scheduled message.
+ */
+function scheduledForMillis(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value === "object" && typeof (value as { toMillis?: unknown }).toMillis === "function") {
+    const ms = (value as { toMillis: () => number }).toMillis();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  if (typeof value === "string") {
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? null : ms;
+  }
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    return Number.isNaN(ms) ? null : ms;
+  }
+  return null;
+}
+
+/**
+ * Finds due user-scheduled messages and dispatches each by (1) transactionally
+ * claiming the ORIGINAL scheduled->dispatched (only if still 'scheduled' -- the
+ * idempotency guard that makes an at-least-once cron retry a no-op) and (2)
+ * creating a FRESH status:'queued' doc via the shared createQueuedMessage shaper
+ * so onDocumentCreated fires sendQueuedMessage exactly as for a human send.
+ *
+ * The scan is a single-field equality collectionGroup('messages').where(
+ * 'status','==','scheduled') -- the SAME no-index class as the reminder scan.
+ * Due-ness (scheduledFor <= now) is filtered in CODE, NOT the query, so NO
+ * composite index is introduced. `now` defaults to the real clock; tests pin it.
+ */
+export async function dispatchDueScheduledMessagesHandler(
+  now: Date = new Date(),
+): Promise<DispatchSummary> {
+  const db = getFirestore();
+  const nowMs = now.getTime();
+
+  // Single-field equality collection-group scan -- NO composite index. The
+  // due-ness filter is applied in CODE below (a `.where('scheduledFor','<=',now)`
+  // would force a composite index; research § Firestore Indexes).
+  const snapshot = await db
+    .collectionGroup("messages")
+    .where("status", "==", "scheduled")
+    .get();
+
+  let dispatched = 0;
+
+  for (const msgDoc of snapshot.docs) {
+    // Per-item try/catch: one malformed scheduled message is logged and skipped,
+    // never aborting the remaining due candidates in the same run.
+    try {
+      const data = msgDoc.data() as QueuedMessageDoc | undefined;
+
+      // Code-side due filter: skip a null/absent or future scheduledFor.
+      const whenMs = scheduledForMillis(data?.scheduledFor);
+      if (whenMs === null || whenMs > nowMs) {
+        continue;
+      }
+
+      // Recover the service id from the parent chain (ref.parent.parent is the
+      // service doc) and the org id one level up.
+      const serviceDocRef = msgDoc.ref.parent?.parent;
+      const serviceId = serviceDocRef?.id;
+      const orgId = serviceDocRef?.parent?.parent?.id;
+      if (!serviceId || !orgId) {
+        console.error(
+          `dispatchDueScheduledMessages: skipping ${msgDoc.ref.path} -- missing service/org id`,
+        );
+        continue;
+      }
+
+      // Transactional claim on the ORIGINAL, mirroring sendQueuedMessage's
+      // queued->sending claim (:1442-1449): flip scheduled->dispatched ONLY if
+      // still 'scheduled'. A retried run reads 'dispatched' and no-ops here --
+      // the idempotency guard (T-61-03a).
+      const claim = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(msgDoc.ref);
+        if (!snap.exists) return { claimed: false as const };
+        const current = snap.data() as QueuedMessageDoc | undefined;
+        if (!current || current.status !== "scheduled") return { claimed: false as const };
+        tx.update(msgDoc.ref, { status: "dispatched", updatedAt: FieldValue.serverTimestamp() });
+        return { claimed: true as const };
+      });
+      if (!claim.claimed) {
+        continue;
+      }
+
+      // ONLY after a successful claim: CREATE a FRESH doc (a genuine
+      // onDocumentCreated that re-fires sendQueuedMessage). scheduledFor:null ->
+      // status:'queued' (:1141). Preserving requestedByUid keeps
+      // options.sendCopyToSelf resolving the ORIGINAL editor's address.
+      const newRef = db
+        .collection("organizations")
+        .doc(orgId)
+        .collection("services")
+        .doc(serviceId)
+        .collection("messages")
+        .doc();
+      await newRef.set(
+        createQueuedMessage({
+          orgId,
+          serviceId,
+          type: data!.type,
+          subject: data!.subject,
+          body: data!.body,
+          recipientSelector: data!.recipientSelector,
+          options: data!.options,
+          scheduledFor: null,
+          requestedByUid: data!.requestedByUid,
+        }),
+      );
+      dispatched++;
+    } catch (err) {
+      console.error(
+        `dispatchDueScheduledMessages: skipping ${msgDoc.ref.path} -- error during processing:`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  const summary: DispatchSummary = { scanned: snapshot.docs.length, dispatched };
+  console.log("dispatchDueScheduledMessages summary:", summary);
+  return summary;
+}
 
 // --- queueServiceMessage send-path enqueue (59-02: R131/R137/R141) ------
 //
