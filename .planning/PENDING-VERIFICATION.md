@@ -257,3 +257,41 @@ passed here:**
 - (60-02 will add) `firebase functions:secrets:set RESEND_WEBHOOK_SECRET`, `firebase deploy --only
   functions:messageWebhook`, and the Resend dashboard webhook-URL + signing-secret configuration — those
   are handed over when 60-02's `messageWebhook` Function lands.
+
+---
+
+## ⏳ 60-02 — messageWebhook bounce receiver ships UNDEPLOYED against a mocked secret (R143) — OWNER, PRE-DEPLOY
+
+Plan 60-02 added the milestone's new **unauthenticated trust boundary** to `functions/src/index.ts`:
+the `messageWebhook` (`onRequest`) HTTP Function + its exported `messageWebhookHandler` body, and the
+exported `resolveRecipientRef` + `recordBounce` helpers. `messageWebhook` is the **ONLY Function bound
+to `RESEND_WEBHOOK_SECRET`** (`secrets: [RESEND_WEBHOOK_SECRET]` — verified by a source-inspection test
+that the binding occurs exactly once and lives in the wrapper). The handler **verifies the Svix HMAC over
+`req.rawBody` FIRST** (60-01's `verifySvixSignature`): a non-Buffer body → 400, any
+missing/tampered/stale/wrong-secret signature → 401 with **ZERO Firestore access** (a test asserts
+`getFirestore` is never called on a bad-signature request). Only `email.bounced` with a `Permanent` bounce
+surfaces — it addresses the recipient via the echoed tags (direct doc) or the `providerMessageId`
+collectionGroup fallback and, in one transition-guarded transaction, flips `recipients/{id}` to
+`status:'bounced'` and writes a **literal** `deliveryCounts.bounced = prev+1` **only** on the
+not-bounced → bounced transition (a duplicate delivery keeps the count at 1). Every other valid event
+(soft/`Transient`, `email.delivered`, complaint, unknown type, unresolvable recipient) → **200 with no
+write** (a non-2xx would make Resend retry forever).
+
+**Built, unit-tested, and UNDEPLOYED against a MOCKED secret and a hand-computed valid signature.** No
+`RESEND_WEBHOOK_SECRET` was set, no deploy, no `.env.local` change, no Resend dashboard config (v1.7 grant).
+`RESEND_WEBHOOK_SECRET` appears in **no file under the client `src/`** and is **not in `.env.local`**.
+
+**OWNER, before the webhook goes live — do NOT mark passed here:**
+- `firebase functions:secrets:set RESEND_WEBHOOK_SECRET` — set the `whsec_`-prefixed Svix signing secret
+  (distinct from `RESEND_API_KEY`).
+- `firebase deploy --only firestore:indexes` — the 60-01 `recipients.providerMessageId` collection-group
+  index must reach **Enabled** in the console before the addressing fallback query runs live.
+- `firebase deploy --only functions:messageWebhook` — deploy the receiver.
+- **Configure the Resend dashboard webhook**: point it at the deployed `messageWebhook` URL and paste the
+  **same** signing secret that was set above.
+- At `/gsd-verify-work 60`: confirm a **real hard bounce** flips a recipient's history to `bounced` and
+  increments `deliveryCounts.bounced` once, and re-confirm the tags echo (research A2) and the ±5-min
+  `REPLAY_TOLERANCE_SEC` (A1) against one real event; keep tags as the fast path.
+
+Do **not** treat this item as passed — it is a pre-deploy gate, and the live bounce is owner-verified
+(`deferred_human`).

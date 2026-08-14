@@ -5,16 +5,16 @@ milestone_name: Volunteer Messaging & Notifications
 current_phase: 60
 current_phase_name: Delivery History & Bounce Webhook
 status: executing
-stopped_at: Completed 60-01-PLAN.md
-last_updated: "2026-08-14T17:47:14.360Z"
+stopped_at: Completed 60-02-PLAN.md
+last_updated: "2026-08-14T18:40:00.000Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 59 verified GREEN; starting Phase 60
+last_activity_desc: 60-02 messageWebhook bounce receiver built/tested/UNDEPLOYED
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 12
-  completed_plans: 10
-  percent: 40
+  total_plans: 13
+  completed_plans: 12
+  percent: 42
 ---
 
 # Project State
@@ -276,11 +276,11 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 60 (Delivery History & Bounce Webhook) — DISCUSSING
-Plan: not yet planned
-Status: Phase 59 verified GREEN (5/5); Phase 60 starting
-Phase 59 whole: 59-01 (resend pin, undeployed) + 59-02 (queueServiceMessage enqueue) + 59-03 (sendQueuedMessage trigger, sole RESEND_API_KEY holder) + 59-04 (client composer) — all built/tested/UNDEPLOYED. Owner deploy: firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage (after Resend account + secret + DNS), then /gsd-verify-work 59.
-Last activity: 2026-08-14 — Phase 59 verified GREEN; starting Phase 60
+Phase: 60 (Delivery History & Bounce Webhook) — EXECUTING
+Plan: 60-02 complete (2/3); next is 60-03
+Status: 60-01 (Svix verifier + fallback index) + 60-02 (messageWebhook bounce receiver) built/tested/UNDEPLOYED; 60-03 next
+Phase 60 so far: 60-01 (pure Svix HMAC verifier functions/src/webhookSignature.ts + deploy-gated recipients.providerMessageId collection-group index) + 60-02 (messageWebhook onRequest bounce receiver — verify-first over req.rawBody, 401/400 + zero Firestore on bad request, idempotent hard-bounce write to recipients/{id}.status + messages/{id}.deliveryCounts.bounced; sole RESEND_WEBHOOK_SECRET holder). Owner deploy: firebase functions:secrets:set RESEND_WEBHOOK_SECRET + firebase deploy --only functions:messageWebhook,firestore:indexes + Resend dashboard webhook config, then /gsd-verify-work 60. All in PENDING-VERIFICATION.md.
+Last activity: 2026-08-14 — 60-02 messageWebhook bounce receiver built/tested/UNDEPLOYED
 
 > **Phase 59 outcome (2026-08-14):** `59-VERIFICATION.md` = passed/GREEN, 5/5 must-haves, R131/R136–R141
 > present, wired, behaviorally exercised. Secret confinement (RESEND_API_KEY bound only to
@@ -1747,6 +1747,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 59 P03 | 13min | 2 tasks | 4 files |
 | Phase 59 P04 | 18min | 3 tasks | 7 files |
 | Phase 60 P01 | 9min | 2 tasks | 3 files |
+| Phase 60 P02 | 14min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
