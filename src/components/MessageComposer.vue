@@ -509,12 +509,18 @@ const songList = computed(() =>
     .join(', '),
 )
 
+// split/join replaces every occurrence without relying on String.prototype.replaceAll
+// (not in this project's TS lib target).
+function fillToken(template: string, token: string, value: string): string {
+  return template.split(`{{${token}}}`).join(value)
+}
+
 function renderSample(template: string): string {
-  return template
-    .replaceAll('{{service_date}}', serviceDateLabel.value)
-    .replaceAll('{{service_link}}', '[service link]')
-    .replaceAll('{{their_roles}}', sampleRolesFor(sampleRecipient.value?.id ?? null))
-    .replaceAll('{{song_list}}', songList.value || '[song list]')
+  let out = fillToken(template, 'service_date', serviceDateLabel.value)
+  out = fillToken(out, 'service_link', '[service link]')
+  out = fillToken(out, 'their_roles', sampleRolesFor(sampleRecipient.value?.id ?? null))
+  out = fillToken(out, 'song_list', songList.value || '[song list]')
+  return out
 }
 
 const samplePreview = computed(() => ({
