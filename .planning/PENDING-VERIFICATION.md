@@ -392,3 +392,44 @@ daily cadence; the claim-first transactional upgrade is documented as future har
   Cloud Scheduler).
 
 Do **not** treat this item as passed — it is a pre-deploy gate, not a satisfied one.
+
+---
+
+## ⏳ 61-03 — dispatch of due USER-SCHEDULED messages ships UNDEPLOYED inside the SAME cron (R141 schedule-for-later carryover) — OWNER, PRE-DEPLOY
+
+Plan 61-03 completed R141's deferred **dispatch half** (Phase 59 shipped only the compose-and-store
+half). The composer writes a `status:'scheduled'` messages doc that `sendQueuedMessage` (an
+`onDocumentCreated` trigger) leaves inert. Plan 61-03 added the exported
+`dispatchDueScheduledMessagesHandler` to `functions/src/index.ts` and wired it into the EXISTING
+`sendScheduledReminders` onSchedule wrapper (61-02), AFTER the reminder sweep, in its own try/catch
+(so a failure in either sweep never aborts the other).
+
+The sweep scans `collectionGroup('messages').where('status','==','scheduled')` (single-field equality —
+**no composite index**), code-filters `scheduledFor <= now`, runs a Firestore transaction that claims
+each original `scheduled→dispatched` **only if still `'scheduled'`** (the idempotency guard mirroring
+`sendQueuedMessage`'s `queued→sending` claim), and then **CREATES A FRESH `status:'queued'` doc** via
+the shared `createQueuedMessage()` shaper (`scheduledFor:null`, original type/subject/body/
+recipientSelector/options/requestedByUid preserved). A fresh create is required because flipping the
+existing doc's status would NOT re-fire the `onDocumentCreated` trigger — the whole trap this resolves.
+
+**Built, unit-tested (147 functions/index tests incl. the idempotency + future-dated + per-item-throw
+cases, 248 full functions suite), and UNDEPLOYED against a MOCKED provider.** Holds **NO secret** — it
+only re-creates a `queued` doc; `RESEND_API_KEY` binds solely to `sendQueuedMessage`. **No new npm
+package, no new Firestore index** (single-field scan; due-ness is a CODE filter), **no deploy, no
+`.env.local` change** (v1.7 grant).
+
+**Idempotency:** proven in the suite — a second run over an already-`'dispatched'` doc fails the claim
+guard and creates NOTHING (no double-dispatch under onSchedule at-least-once retry).
+
+**OWNER, before schedule-for-later goes live — do NOT mark passed here:**
+- **No additional deploy command.** The dispatch sweep ships INSIDE the same `sendScheduledReminders`
+  cron, so the single `firebase deploy --only functions:sendScheduledReminders` from the 61-02 gate
+  above covers it — **no separate onSchedule Function and no new index to deploy.**
+- **NO new secret, NO new index** (same rationale as 61-02; the send still flows through
+  `sendQueuedMessage`, whose `RESEND_API_KEY` + sending-domain setup are the still-open 59-01/59-03
+  pre-deploy gates).
+- At `/gsd-verify-work 61`: schedule a message for a near-future time in the LIVE app and confirm a
+  **real email actually sends** once the daily cron runs (`verification_deferred_human` — no automated
+  test can send a real email or drive Cloud Scheduler).
+
+Do **not** treat this item as passed — it is a pre-deploy gate, not a satisfied one.
