@@ -41,9 +41,47 @@ vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
+// 61-04 (R144): hoisted spies for the lock hook's Firestore + callable seams.
+// vi.hoisted guarantees these are initialized before any vi.mock factory that
+// references them runs, regardless of module-load order.
+const {
+  mockGetDoc,
+  mockSetDoc,
+  mockHttpsCallable,
+  mockQueueCallable,
+  mockResolveRecipients,
+} = vi.hoisted(() => {
+  const mockQueueCallable = vi.fn(() => Promise.resolve({ data: { messageId: 'msg-1' } }))
+  return {
+    // Default: a FIRST lock (no prior snapshot). The legacy `.data().orgIds`
+    // shape is preserved so any pre-existing getDoc consumer stays happy.
+    mockGetDoc: vi.fn(() =>
+      Promise.resolve({ exists: () => false, data: () => ({ orgIds: ['org-1'] }) }),
+    ),
+    mockSetDoc: vi.fn(() => Promise.resolve()),
+    mockQueueCallable,
+    mockHttpsCallable: vi.fn(() => mockQueueCallable),
+    mockResolveRecipients: vi.fn(() => ({ reachable: [], unreachableCount: 0 })),
+  }
+})
+
 vi.mock('@/firebase', () => ({
   auth: {},
   db: {},
+  functions: {},
+}))
+
+// 61-04: the lock hook enqueues via httpsCallable(functions, 'queueServiceMessage').
+vi.mock('firebase/functions', () => ({
+  httpsCallable: (...a: unknown[]) => mockHttpsCallable(...a),
+}))
+
+// 61-04: the hook resolves the assigned recipients client-side to get N. Mock
+// the whole module (also re-export MESSAGING_TEAM_LABELS, which MessageComposer
+// imports at module scope) so the reachable count is controllable per-test.
+vi.mock('@/utils/messagingRecipients', () => ({
+  resolveRecipients: (...a: unknown[]) => mockResolveRecipients(...a),
+  MESSAGING_TEAM_LABELS: { band: 'Worship', tech: 'Tech', vocals: 'Vocals', other: 'Hosts' },
 }))
 
 vi.mock('firebase/firestore', () => ({
@@ -51,7 +89,8 @@ vi.mock('firebase/firestore', () => ({
   collection: vi.fn(),
   doc: vi.fn(() => ({})),
   onSnapshot: vi.fn(),
-  getDoc: vi.fn(() => Promise.resolve({ data: () => ({ orgIds: ['org-1'] }) })),
+  getDoc: mockGetDoc,
+  setDoc: mockSetDoc,
   updateDoc: vi.fn(),
   serverTimestamp: vi.fn(() => ({})),
   // useSlideshowAssembly's default lyrics loader (20-04) issues a one-shot
@@ -319,6 +358,15 @@ const mockUpdateService = vi.fn((_id: string, _data: unknown) => Promise.resolve
 // contract is proved.
 const mockMarkAsPlanned = vi.fn<(id: string) => Promise<void>>(() => Promise.resolve())
 const mockReopenService = vi.fn<(id: string) => Promise<void>>(() => Promise.resolve())
+// 61-04: the lock hook writes lockSnapshots/current using buildServiceSnapshot,
+// which the component imports from the (fully mocked) '@/stores/services'. A
+// lightweight stub is enough — the tests assert only that a snapshot object was
+// written, not its full shape (the real builder needs live Pinia stores).
+const mockBuildServiceSnapshot = vi.fn((svc: Service) => ({
+  name: svc.name,
+  status: svc.status,
+  slots: svc.slots,
+}))
 const mockAssignSongToSlot = vi.fn<
   (id: string, index: number, song: { id: string; title: string; key: string }) => Promise<void>
 >(() => Promise.resolve())
@@ -356,6 +404,7 @@ class ServiceLockedErrorStub extends Error {
 
 vi.mock('@/stores/services', () => ({
   ServiceLockedError: ServiceLockedErrorStub,
+  buildServiceSnapshot: mockBuildServiceSnapshot,
   useServiceStore: () => ({
     services: mockServicesList,
     isLoading: false,
@@ -5879,6 +5928,198 @@ describe('ServiceEditorView - service lifecycle transitions (R036, R037)', () =>
 
     expect(viewerWrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(false)
     expect(viewerWrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+  })
+})
+
+// ── 61-04 (R144): first-lock auto-notification hook + banner confirmation ─────
+//
+// On the draft→locked transition, AFTER the lock lands, the hook writes
+// services/{id}/lockSnapshots/current on EVERY lock (so Phase 62 can diff) and,
+// ONLY on a FIRST lock behind the isMessagingEnabled() + effective-lockNotify +
+// ≥1-reachable gates, auto-enqueues one type:'lock-notification'. The whole
+// block runs in its own try/catch after the transition succeeded and NEVER
+// re-raises into lifecycleError — a failed enqueue is the amber 'error' line,
+// not the red lock-failure line (SC1/SC2, UI-SPEC § Component #0/#1).
+describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  type LockNotify =
+    | null
+    | { kind: 'sent'; count: number }
+    | { kind: 'none-reachable' }
+    | { kind: 'error' }
+  function lockNotifyOf(wrapper: VueWrapper): LockNotify {
+    return (wrapper.vm as unknown as { lockNotify: LockNotify }).lockNotify
+  }
+
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    // Gates OPEN by default; individual tests close a gate to prove the no-send.
+    mockAuthState.settings.messaging.enabled = true
+    mockAuthState.settings.messaging.lockNotifyDefault = true
+
+    mockMarkAsPlanned.mockClear()
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+    mockBuildServiceSnapshot.mockClear()
+
+    mockGetDoc.mockReset()
+    mockGetDoc.mockResolvedValue({ exists: () => false }) // first lock
+    mockSetDoc.mockReset()
+    mockSetDoc.mockResolvedValue(undefined)
+    mockHttpsCallable.mockClear()
+    mockQueueCallable.mockReset()
+    mockQueueCallable.mockResolvedValue({ data: { messageId: 'msg-1' } })
+    mockResolveRecipients.mockReset()
+    mockResolveRecipients.mockReturnValue({
+      reachable: [
+        { id: 'p1', name: 'Alice', email: 'alice@example.com' },
+        { id: 'p2', name: 'Bob', email: 'bob@example.com' },
+      ],
+      unreachableCount: 0,
+    })
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    // Reset the shared reactive auth mock so this block's OPEN gates never leak
+    // into a later describe (the module default is off/off).
+    mockAuthState.settings.messaging.enabled = false
+    mockAuthState.settings.messaging.lockNotifyDefault = false
+    consoleErrorSpy.mockRestore()
+  })
+
+  async function lockDraft(overrides: Partial<Service> = {}): Promise<VueWrapper> {
+    mockServicesList = [{ ...mockService, status: 'draft', ...overrides }]
+    const wrapper = await mountView()
+    await wrapper.find('[data-testid="mark-planned-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('first lock behind the gates: writes lockSnapshots/current (read-before-write) then enqueues one lock-notification', async () => {
+    const wrapper = await lockDraft()
+
+    // Snapshot written on the lock, read BEFORE the write (first-lock detection).
+    expect(mockGetDoc).toHaveBeenCalledTimes(1)
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    expect(mockGetDoc.mock.invocationCallOrder[0]!).toBeLessThan(
+      mockSetDoc.mock.invocationCallOrder[0]!,
+    )
+    const snapPayload = mockSetDoc.mock.calls[0]![1] as {
+      snapshot: unknown
+      slideGroupsFingerprint: unknown
+    }
+    expect(snapPayload.snapshot).toBeDefined()
+    expect(snapPayload.slideGroupsFingerprint).toBeNull()
+
+    // Exactly one lock-notification enqueued, selector-only (never an email list).
+    expect(mockHttpsCallable).toHaveBeenCalledWith(expect.anything(), 'queueServiceMessage')
+    expect(mockQueueCallable).toHaveBeenCalledTimes(1)
+    const req = mockQueueCallable.mock.calls[0]![0] as {
+      type: string
+      recipientSelector: { includeEveryone: boolean }
+      options: { attachServiceLink: boolean; sendCopyToSelf: boolean }
+      scheduledFor: unknown
+    }
+    expect(req.type).toBe('lock-notification')
+    expect(req.recipientSelector.includeEveryone).toBe(true)
+    expect(req.options.attachServiceLink).toBe(true)
+    expect(req.options.sendCopyToSelf).toBe(false)
+    expect(req.scheduledFor).toBeNull()
+
+    expect(lockNotifyOf(wrapper)).toEqual({ kind: 'sent', count: 2 })
+  })
+
+  it('messaging OFF: snapshot still written, NO enqueue, lockNotify null', async () => {
+    mockAuthState.settings.messaging.enabled = false
+    const wrapper = await lockDraft()
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    expect(mockQueueCallable).not.toHaveBeenCalled()
+    expect(lockNotifyOf(wrapper)).toBeNull()
+    // The lock itself still succeeded.
+    const vm = wrapper.vm as unknown as { localService: { status: string } | null }
+    expect(vm.localService!.status).toBe('planned')
+  })
+
+  it('effective lock-notify OFF (default off, no per-service override): snapshot written, NO enqueue, null', async () => {
+    mockAuthState.settings.messaging.lockNotifyDefault = false
+    const wrapper = await lockDraft() // service.messaging undefined → falls back to default (off)
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    expect(mockQueueCallable).not.toHaveBeenCalled()
+    expect(lockNotifyOf(wrapper)).toBeNull()
+  })
+
+  it('per-service lock-notify ON while org default OFF: enqueues (override wins)', async () => {
+    mockAuthState.settings.messaging.lockNotifyDefault = false
+    const wrapper = await lockDraft({ messaging: { lockNotifyEnabled: true } } as Partial<Service>)
+
+    expect(mockQueueCallable).toHaveBeenCalledTimes(1)
+    expect(lockNotifyOf(wrapper)).toEqual({ kind: 'sent', count: 2 })
+  })
+
+  it('zero reachable recipients: snapshot written, NO enqueue, lockNotify none-reachable', async () => {
+    mockResolveRecipients.mockReturnValue({ reachable: [], unreachableCount: 3 })
+    const wrapper = await lockDraft()
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    expect(mockQueueCallable).not.toHaveBeenCalled()
+    expect(lockNotifyOf(wrapper)).toEqual({ kind: 'none-reachable' })
+  })
+
+  it('re-lock (prior lockSnapshots/current exists): snapshot overwritten, NO enqueue, null', async () => {
+    mockGetDoc.mockResolvedValue({ exists: () => true })
+    const wrapper = await lockDraft()
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1) // still written for Phase 62's diff
+    expect(mockQueueCallable).not.toHaveBeenCalled() // but never auto-sends
+    expect(lockNotifyOf(wrapper)).toBeNull()
+  })
+
+  it('★ enqueue rejects AFTER a successful lock: transition stays succeeded, lifecycleError null, lockNotify error', async () => {
+    mockQueueCallable.mockRejectedValue(new Error('callable failed'))
+    const wrapper = await lockDraft()
+
+    const vm = wrapper.vm as unknown as { localService: { status: string } | null }
+    expect(vm.localService!.status).toBe('planned')
+    // The failure was NOT re-raised into the red lock-failure line.
+    expect(wrapper.find('[data-testid="service-lock-banner-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Planned')
+    expect(lockNotifyOf(wrapper)).toEqual({ kind: 'error' })
+  })
+
+  it('markAsPlanned itself rejects: neither snapshot nor callable written, status stays draft, lifecycleError set', async () => {
+    mockMarkAsPlanned.mockImplementation(() => Promise.reject(new Error('permission-denied')))
+    const wrapper = await lockDraft()
+
+    expect(mockSetDoc).not.toHaveBeenCalled()
+    expect(mockQueueCallable).not.toHaveBeenCalled()
+    const vm = wrapper.vm as unknown as { localService: { status: string } | null }
+    expect(vm.localService!.status).toBe('draft')
+    expect(wrapper.find('[data-testid="lifecycle-error"]').exists()).toBe(true)
+    expect(lockNotifyOf(wrapper)).toBeNull()
   })
 })
 
