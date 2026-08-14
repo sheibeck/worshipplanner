@@ -364,12 +364,12 @@ it happens, with no planner action either time.
 
   4. The reminder is skipped while the service is still a draft, and a retried scheduled run never
      sends the same reminder twice for the same service.
-**Plans**: 4 plans
+**Plans**: 2/4 plans executed
 
 Plans:
 
-- [ ] 61-01-PLAN.md — Functions foundation: 'lock-notification' MessageType/MESSAGE_TYPES + pure org-local date helpers todayInTimeZone/minusDays (Wave 1)
-- [ ] 61-02-PLAN.md — sendScheduledReminders onSchedule daily cron (Sweep A): org-tz N-days-before reminder, skip draft/off, reminderSentAt idempotent (R145/SC3/SC4, Wave 2, depends 61-01)
+- [x] 61-01-PLAN.md — Functions foundation: 'lock-notification' MessageType/MESSAGE_TYPES + pure org-local date helpers todayInTimeZone/minusDays (Wave 1)
+- [x] 61-02-PLAN.md — sendScheduledReminders onSchedule daily cron (Sweep A): org-tz N-days-before reminder, skip draft/off, reminderSentAt idempotent (R145/SC3/SC4, Wave 2, depends 61-01)
 - [ ] 61-03-PLAN.md — dispatchDueScheduledMessages sweep (Sweep B): transactional scheduled→dispatched claim + fresh queued doc; completes R141 schedule-for-later (Wave 3, depends 61-02)
 - [ ] 61-04-PLAN.md — Client first-lock hook: lockSnapshots/current write + gated lock-notification enqueue + amber banner confirmation line (R144/SC1/SC2, Wave 2, depends 61-01)
 

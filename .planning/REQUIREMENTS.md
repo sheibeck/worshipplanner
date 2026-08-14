@@ -79,7 +79,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 ### Scheduled Share-Link Reminder
 
-- [ ] **R145**: The shared service link auto-sends to everyone assigned N days before the service
+- [x] **R145**: The shared service link auto-sends to everyone assigned N days before the service
       (default 7, configurable), in the church-local timezone, and is skipped while the service is
       still a draft.
 
@@ -153,7 +153,7 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R142 | Phase 60 | Complete |
 | R143 | Phase 60 | Complete |
 | R144 | Phase 61 | Pending |
-| R145 | Phase 61 | Pending |
+| R145 | Phase 61 | Complete |
 | R146 | Phase 62 | Pending |
 | R147 | Phase 62 | Pending |
 | R148 | Phase 62 | Pending |

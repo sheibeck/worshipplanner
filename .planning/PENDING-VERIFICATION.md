@@ -355,3 +355,40 @@ UI-researcher + UI-checker) flagged it. Phase 61's own lock-notification deliber
 
 Recommendation: A now (stops the misrender immediately), B as a later feedback-system pass. Do NOT mark
 passed — this is a disclosed defect awaiting the owner's decision.
+
+---
+
+## ⏳ 61-02 — sendScheduledReminders daily reminder cron ships UNDEPLOYED against a mocked provider (R145/R133/SC3/SC4) — OWNER, PRE-DEPLOY
+
+Plan 61-02 added the **R145 reminder engine** to `functions/src/index.ts`: the exported
+`sendScheduledRemindersHandler` body + the `sendScheduledReminders` (`onSchedule`, **04:00 UTC**) wrapper.
+It mirrors `cleanupOrphanRendersHandler` exactly — a broad
+`collectionGroup('services').where('status','in',['planned','exported'])` scan (**NEVER `draft`**, so a
+draft is structurally unreachable — SC4), org recovered from the parent chain, per-item try/catch. Per due
+candidate (org-local `minusDays(service.date, effectiveN) === todayInTimeZone(org.settings.timezone)` — R133)
+it enqueues **one** `type:'reminder'` message via the shared `createQueuedMessage()` shaper
+(`includeEveryone:true`, `attachServiceLink:true`, `requestedByUid:'system'`), then sets
+`messaging.reminderSentAt` via an Admin-SDK dot-path merge (fires on a LOCKED service). It reads
+`settings.messaging.*` (kill-switch `enabled === true`, `reminderEnabled`, `reminderDaysBefore ?? 7`).
+
+**Built, unit-tested (139 functions/index tests, 240 full functions suite), and UNDEPLOYED against a MOCKED
+provider.** The cron holds **NO secret** — it only enqueues; `RESEND_API_KEY` binds solely to
+`sendQueuedMessage`. **No new npm package, no new Firestore index** (single-field collection-group scan; the
+~366-day lookahead is a CODE filter), **no deploy, no `.env.local` change** (v1.7 grant).
+
+**Idempotency note:** `reminderSentAt` is set AFTER the enqueue, satisfying SC4's same-window no-double-send
+(proven: a second same-window run enqueues zero). A rare crash-between-writes single double-send remains at
+daily cadence; the claim-first transactional upgrade is documented as future hardening in `61-02-SUMMARY.md`.
+
+**OWNER, before the reminder cron goes live — do NOT mark passed here:**
+- **Deploy the cron:** `firebase deploy --only functions:sendScheduledReminders`.
+- **NO new index is expected.** If (and only if) a real deploy throws `FAILED_PRECONDITION` on the
+  `status`-in collection-group scan, add the single-field `services.status` `COLLECTION_GROUP` `fieldOverride`
+  (research A3 documented contingency) and `firebase deploy --only firestore:indexes`.
+- **NO new secret** — the cron enqueues only; the send still flows through `sendQueuedMessage` (its
+  `RESEND_API_KEY` + sending-domain setup are the still-open 59-01/59-03 pre-deploy gates above).
+- At `/gsd-verify-work 61`: confirm a **real reminder email** arrives N days before a service, reckoned in the
+  **org-local timezone** (`verification_deferred_human` — no automated test can send a real email or drive
+  Cloud Scheduler).
+
+Do **not** treat this item as passed — it is a pre-deploy gate, not a satisfied one.
