@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
-current_phase: 61
-current_phase_name: Automatic Notifications — Lock & Scheduled Reminder
-status: executing
-stopped_at: Completed 61-04-PLAN.md
-last_updated: "2026-08-14T21:00:00.000Z"
+current_phase: 62
+current_phase_name: Re-lock Change Notice — Scoped Diff
+status: discussing
+stopped_at: Phase 61 verified GREEN (4/4); transitioning to Phase 62 (final phase)
+last_updated: "2026-08-14T21:30:00.000Z"
 last_activity: 2026-08-14
-last_activity_desc: "Phase 61 all 4 plans executed (61-04 shipped R144 client first-lock hook + amber banner); Phase 61 code-complete, human UAT deferred to /gsd-verify-work 61"
+last_activity_desc: Phase 61 verified GREEN; starting Phase 62 discuss (final v1.7 phase)
 progress:
   total_phases: 5
   completed_phases: 4
@@ -276,11 +276,23 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 61 (Automatic Notifications — Lock & Scheduled Reminder) — DISCUSSING
+Phase: 62 (Re-lock Change Notice — Scoped Diff) — DISCUSSING (FINAL v1.7 phase)
 Plan: not yet planned
-Status: Phase 60 verified GREEN (4/4); Phase 61 starting
-Phase 60 whole: 60-01 (pure Svix HMAC verifier functions/src/webhookSignature.ts + deploy-gated recipients.providerMessageId collection-group index) + 60-02 (messageWebhook onRequest bounce receiver — verify-first over req.rawBody, 401/400 + zero Firestore on bad request, idempotent hard-bounce write; sole RESEND_WEBHOOK_SECRET holder) + 60-03 (client read-only "Sent on this service" panel). Owner deploy (webhook): firebase functions:secrets:set RESEND_WEBHOOK_SECRET + firebase deploy --only functions:messageWebhook,firestore:indexes + Resend dashboard webhook config, then /gsd-verify-work 60. All in PENDING-VERIFICATION.md.
-Last activity: 2026-08-14 — Phase 60 verified GREEN; starting Phase 61
+Status: Phase 61 verified GREEN (4/4); Phase 62 starting — the last phase before milestone lifecycle (which is DEFERRED to the owner per the grant)
+Last activity: 2026-08-14 — Phase 61 verified GREEN; starting Phase 62
+
+> **Phase 61 outcome (2026-08-14):** `61-VERIFICATION.md` = passed/GREEN, 4/4 SC + R144/R145, all
+> test-exercised. SC1 lock-notification type + client first-lock hook (auto-enqueue on draft→locked, gated,
+> everyone assigned, attach-link); SC2 never-draft/off (transition-only + gates; cron excludes draft); SC3
+> N-days-before in org IANA timezone (todayInTimeZone/minusDays, no package, default 7); SC4 dual idempotency
+> (reminderSentAt same-window no-double-send + transactional scheduled→dispatched claim creating a FRESH
+> queued doc since sendQueuedMessage is onDocumentCreated). First-lock read-before-write, slideGroupsFingerprint
+> null (deferred to Phase 62), non-blocking enqueue never re-raised, amber banner states + aria-live, no new
+> secret/index. Deferred (NOT defects): owner deploy (firebase deploy --only functions:sendScheduledReminders)
+> + real lock-email/reminder/banner UAT — PENDING-VERIFICATION.md. Phase 62 (the LAST phase) builds the
+> re-lock scoped change diff on the lockSnapshots/current the lock hook now writes.
+> Also disclosed (PENDING-VERIFICATION): a Phase 59 composer success-toast misrender ("Save failed." prefix
+> on the success toast) — owner to fix (recommended Option A: drop the redundant toast).
 
 > **Phase 60 outcome (2026-08-14):** `60-VERIFICATION.md` = passed/GREEN, 4/4 success criteria +
 > supporting truths, R142/R143. Webhook security invariants test-exercised (not presence-only): verify-first
