@@ -303,6 +303,13 @@ const mockSetRoleOverride = vi.fn(
   (_serviceId: string, _roleId: string, _personIds: string[]) => Promise.resolve(),
 )
 const mockClearRoleOverride = vi.fn(() => Promise.resolve())
+// 58-05 (R132): scoped dot-path override write for the per-service Messaging
+// defaults panel. Hoisted so the panel tests can inspect the exact patch the
+// three inherit-or-override selects push, and make it reject to prove the
+// inline "Failed to save" surface.
+const mockSetServiceMessagingDefaults = vi.fn(
+  (_serviceId: string, _patch: unknown) => Promise.resolve(),
+)
 // Hoisted (not created fresh per useServiceStore() call) so the Phase 24-06
 // backfill tests below can inspect what the autosave path actually persisted.
 const mockUpdateService = vi.fn((_id: string, _data: unknown) => Promise.resolve())
@@ -361,6 +368,7 @@ vi.mock('@/stores/services', () => ({
     clearSongFromSlot: vi.fn(() => Promise.resolve()),
     setRoleOverride: mockSetRoleOverride,
     clearRoleOverride: mockClearRoleOverride,
+    setServiceMessagingDefaults: mockSetServiceMessagingDefaults,
     createShareToken: mockCreateShareToken,
     // R039 (32-01): arrow function evaluated lazily at call time — same reason
     // `services: mockServicesList` above stays live across a test's mutation
@@ -402,7 +410,23 @@ const mockAuthState = reactive<{
   // test in this file keeps its current behavior.
   // quick/260809-vvq: onConfirmExport now threads authStore.settings.bibleVersion
   // into every addSlotAsItem call, so the mock settings must carry it too.
-  settings: { aiEnabled: boolean; pcEnabled: boolean; vwModeEnabled: boolean; bibleVersion: 'ESV' | 'NLT' }
+  // 58-05 (R132): the Messaging defaults panel reads authStore.settings.messaging.*
+  // for each select's "Default (Settings: …)" label and the read-only summary's
+  // resolved value — without it, accessing `.lockNotifyDefault` on an undefined
+  // `messaging` throws at mount. Conservative org defaults (off) match
+  // DEFAULT_ORG_SETTINGS from 58-01.
+  settings: {
+    aiEnabled: boolean
+    pcEnabled: boolean
+    vwModeEnabled: boolean
+    bibleVersion: 'ESV' | 'NLT'
+    messaging: {
+      enabled: boolean
+      lockNotifyDefault: boolean
+      reminderEnabled: boolean
+      reminderDaysBefore: number
+    }
+  }
 }>({
   user: { uid: 'user-1' },
   isEditor: false,
@@ -411,7 +435,18 @@ const mockAuthState = reactive<{
   // "Copy for PC" branch it always took. Only the export tests flip these.
   hasPcCredentials: false,
   pcCredentials: null,
-  settings: { aiEnabled: true, pcEnabled: true, vwModeEnabled: true, bibleVersion: 'NLT' },
+  settings: {
+    aiEnabled: true,
+    pcEnabled: true,
+    vwModeEnabled: true,
+    bibleVersion: 'NLT',
+    messaging: {
+      enabled: false,
+      lockNotifyDefault: false,
+      reminderEnabled: false,
+      reminderDaysBefore: 3,
+    },
+  },
 })
 
 vi.mock('@/stores/auth', () => ({
@@ -7433,5 +7468,181 @@ describe('ServiceEditorView - 32-REVIEW: CR-01/CR-02/CR-03', () => {
     const bannerError = wrapper.find('[data-testid="service-lock-banner-error"]')
     expect(bannerError.exists()).toBe(true)
     expect(bannerError.text()).toBe("Couldn't save your changes — they're still here. Try again.")
+  })
+})
+
+// ── 58-05 (R132): per-service Messaging defaults panel ────────────────────────
+//
+// The Service Order tab carries a "Messaging defaults" card with three
+// inherit-or-override <select>s (lock-notify, service-link reminder, reminder
+// days-before). Editable only while the service is Draft (canEditService),
+// read-only once locked or for a viewer. Each @change writes the scoped
+// dot-path via serviceStore.setServiceMessagingDefaults — NEVER updateService —
+// mapping the empty "Default" option to null and coercing the days value to a
+// number. Mirrors the Roles-tab override selects' direct-write pattern.
+describe('ServiceEditorView - Messaging defaults panel (58-05, R132)', () => {
+  async function mountView(overrides: Partial<Service> = {}) {
+    mockServicesList = [{ ...mockService, status: 'draft', ...overrides }]
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    // Restore conservative org defaults each test (a prior test may flip them).
+    mockAuthState.settings.messaging = {
+      enabled: false,
+      lockNotifyDefault: false,
+      reminderEnabled: false,
+      reminderDaysBefore: 3,
+    }
+    mockSetServiceMessagingDefaults.mockClear()
+    mockSetServiceMessagingDefaults.mockImplementation(() => Promise.resolve())
+  })
+
+  it('a Draft service renders the lock-notify and reminder-enabled selects; the days-before select is hidden while the reminder row resolves off', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="messaging-lock-notify-select"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="messaging-reminder-enabled-select"]').exists()).toBe(true)
+    // Org default reminderEnabled is false and the service has no override, so
+    // the reminder row resolves off and the days-before select stays hidden.
+    expect(wrapper.find('[data-testid="messaging-reminder-days-select"]').exists()).toBe(false)
+    // No read-only summary on a Draft service.
+    expect(wrapper.find('[data-testid="messaging-defaults-readonly"]').exists()).toBe(false)
+  })
+
+  it('the days-before select appears once the reminder row resolves on — via the inherited org default', async () => {
+    mockAuthState.settings.messaging.reminderEnabled = true
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="messaging-reminder-days-select"]').exists()).toBe(true)
+  })
+
+  it('the days-before select appears once the reminder row resolves on — via an explicit service override', async () => {
+    const wrapper = await mountView({
+      messaging: {
+        lockNotifyEnabled: null,
+        reminderEnabled: true,
+        reminderDaysBefore: null,
+        reminderSentAt: null,
+      },
+    })
+
+    expect(wrapper.find('[data-testid="messaging-reminder-days-select"]').exists()).toBe(true)
+  })
+
+  it('selecting an explicit lock-notify value writes it as a boolean via setServiceMessagingDefaults (scoped dot-path, not updateService)', async () => {
+    const wrapper = await mountView()
+    // Clear any mount-time backfill write (Phase 24-06) so the assertion below
+    // isolates the @change handler: it must NOT route the override through the
+    // generic updateService autosave path.
+    mockUpdateService.mockClear()
+
+    await wrapper.find('[data-testid="messaging-lock-notify-select"]').setValue('true')
+    await flushPromises()
+
+    expect(mockSetServiceMessagingDefaults).toHaveBeenCalledWith('service-1', { lockNotifyEnabled: true })
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+
+  it('selecting the Default (empty) lock-notify option writes null to inherit', async () => {
+    const wrapper = await mountView({
+      messaging: {
+        lockNotifyEnabled: true,
+        reminderEnabled: null,
+        reminderDaysBefore: null,
+        reminderSentAt: null,
+      },
+    })
+
+    await wrapper.find('[data-testid="messaging-lock-notify-select"]').setValue('')
+    await flushPromises()
+
+    expect(mockSetServiceMessagingDefaults).toHaveBeenCalledWith('service-1', { lockNotifyEnabled: null })
+  })
+
+  it('selecting an explicit reminder-enabled value writes the boolean', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="messaging-reminder-enabled-select"]').setValue('true')
+    await flushPromises()
+
+    expect(mockSetServiceMessagingDefaults).toHaveBeenCalledWith('service-1', { reminderEnabled: true })
+  })
+
+  it('selecting a days-before value persists it coerced to a number, never the raw select string', async () => {
+    // Reminder resolves on via the org default, so the days-before select renders.
+    mockAuthState.settings.messaging.reminderEnabled = true
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="messaging-reminder-days-select"]').setValue('7')
+    await flushPromises()
+
+    expect(mockSetServiceMessagingDefaults).toHaveBeenCalledWith('service-1', { reminderDaysBefore: 7 })
+    const patch = mockSetServiceMessagingDefaults.mock.calls[0]![1] as { reminderDaysBefore: unknown }
+    expect(typeof patch.reminderDaysBefore).toBe('number')
+  })
+
+  it('selecting the Default (empty) days-before option writes null to inherit', async () => {
+    mockAuthState.settings.messaging.reminderEnabled = true
+    const wrapper = await mountView({
+      messaging: {
+        lockNotifyEnabled: null,
+        reminderEnabled: null,
+        reminderDaysBefore: 7,
+        reminderSentAt: null,
+      },
+    })
+
+    await wrapper.find('[data-testid="messaging-reminder-days-select"]').setValue('')
+    await flushPromises()
+
+    expect(mockSetServiceMessagingDefaults).toHaveBeenCalledWith('service-1', { reminderDaysBefore: null })
+  })
+
+  it('a locked service (editor, status planned) renders the read-only summary and no editable select', async () => {
+    const wrapper = await mountView({ status: 'planned' })
+
+    expect(wrapper.find('[data-testid="messaging-defaults-readonly"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="messaging-lock-notify-select"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="messaging-reminder-enabled-select"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="messaging-reminder-days-select"]').exists()).toBe(false)
+  })
+
+  it('a viewer (isEditor false) sees the read-only summary and no editable select', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="messaging-defaults-readonly"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="messaging-lock-notify-select"]').exists()).toBe(false)
+  })
+
+  it('a save failure surfaces the inline "Failed to save. Please try again." message', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockSetServiceMessagingDefaults.mockRejectedValueOnce(new Error('network down'))
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="messaging-lock-notify-select"]').setValue('true')
+    await flushPromises()
+
+    const panel = wrapper.find('[data-testid="messaging-defaults-panel"]')
+    expect(panel.text()).toContain('Failed to save. Please try again.')
+    consoleErrorSpy.mockRestore()
   })
 })

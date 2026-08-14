@@ -218,14 +218,37 @@ const mockAuthState = reactive<{
   orgId: string | null
   hasPcCredentials: boolean
   pcCredentials: { appId: string; secret: string } | null
-  settings: { aiEnabled: boolean; pcEnabled: boolean; vwModeEnabled: boolean }
+  // 58-05 (R132): ServiceEditorView's Messaging defaults panel reads
+  // authStore.settings.messaging.* — without it, mounting the editor throws
+  // "Cannot read properties of undefined (reading 'lockNotifyDefault')".
+  settings: {
+    aiEnabled: boolean
+    pcEnabled: boolean
+    vwModeEnabled: boolean
+    messaging: {
+      enabled: boolean
+      lockNotifyDefault: boolean
+      reminderEnabled: boolean
+      reminderDaysBefore: number
+    }
+  }
 }>({
   user: { uid: 'user-1' },
   isEditor: true,
   orgId: 'org-1',
   hasPcCredentials: false,
   pcCredentials: null,
-  settings: { aiEnabled: true, pcEnabled: true, vwModeEnabled: true },
+  settings: {
+    aiEnabled: true,
+    pcEnabled: true,
+    vwModeEnabled: true,
+    messaging: {
+      enabled: false,
+      lockNotifyDefault: false,
+      reminderEnabled: false,
+      reminderDaysBefore: 3,
+    },
+  },
 })
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => mockAuthState,
