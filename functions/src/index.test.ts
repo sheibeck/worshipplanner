@@ -21,6 +21,8 @@ import {
   requestPptxRenderHandler,
   sendQueuedMessageHandler,
   sendQueuedMessage,
+  resolveRecipientRef,
+  recordBounce,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -1813,5 +1815,213 @@ describe("sendQueuedMessageHandler", () => {
     expect(wrapperStart).toBeGreaterThan(-1);
     const wrapperRegion = source.slice(wrapperStart, wrapperStart + 600);
     expect(wrapperRegion).toMatch(/secrets:\s*\[RESEND_API_KEY\]/);
+  });
+});
+
+// --- messageWebhook addressing + idempotent bounce persistence (60-02) -------
+//
+// resolveRecipientRef addresses the bounced recipient from the echoed Resend
+// tags (a direct doc() at the exact nested path — no query, no index) and, only
+// when tags are absent, falls back to a collectionGroup('recipients') lookup on
+// the providerMessageId (data.email_id) 59-03 stored. recordBounce is a
+// transition-guarded transaction: it flips recipients/{id} to status:'bounced'
+// and increments messages/{id}.deliveryCounts.bounced as a LITERAL prev+1 ONLY
+// on the not-bounced -> bounced transition, so a duplicate (at-least-once)
+// delivery is a safe no-op and the count never double-counts (success
+// criterion 4).
+
+describe("resolveRecipientRef (60-02 addressing)", () => {
+  const TAGS = { orgId: "org1", serviceId: "svc1", messageId: "msg1", recipientId: "rec1" };
+
+  function makeAddressingDb(fallbackRef: unknown | null = null) {
+    const collectionGroupGet = vi.fn(async () => ({
+      empty: fallbackRef == null,
+      docs: fallbackRef == null ? [] : [{ ref: fallbackRef }],
+    }));
+    const limit = vi.fn(() => ({ get: collectionGroupGet }));
+    const where = vi.fn(() => ({ limit }));
+    const collectionGroup = vi.fn(() => ({ where }));
+    const doc = vi.fn((docPath: string) => ({ path: docPath }));
+    const db = { doc, collectionGroup };
+    return { db, doc, collectionGroup, where, limit, collectionGroupGet };
+  }
+
+  it("addresses the recipient DIRECTLY from tags — a single doc() at the nested path, NO collectionGroup query", async () => {
+    const { db, doc, collectionGroup } = makeAddressingDb();
+
+    const ref = await resolveRecipientRef(db as never, { tags: TAGS });
+
+    expect(doc).toHaveBeenCalledWith(
+      "organizations/org1/services/svc1/messages/msg1/recipients/rec1",
+    );
+    expect(ref).toEqual({ path: "organizations/org1/services/svc1/messages/msg1/recipients/rec1" });
+    // The tags path must NOT touch the collection-group query (no index dependency).
+    expect(collectionGroup).not.toHaveBeenCalled();
+  });
+
+  it("falls back to collectionGroup('recipients').where('providerMessageId','==',email_id) when tags are absent", async () => {
+    const fallbackRef = { path: "fallback/ref" };
+    const { db, doc, collectionGroup, where, limit } = makeAddressingDb(fallbackRef);
+
+    const ref = await resolveRecipientRef(db as never, { email_id: "re_abc123" });
+
+    expect(collectionGroup).toHaveBeenCalledWith("recipients");
+    expect(where).toHaveBeenCalledWith("providerMessageId", "==", "re_abc123");
+    expect(limit).toHaveBeenCalledWith(1);
+    expect(doc).not.toHaveBeenCalled();
+    expect(ref).toBe(fallbackRef);
+  });
+
+  it("returns null when tags are absent and the providerMessageId fallback matches nothing", async () => {
+    const { db } = makeAddressingDb(null);
+
+    const ref = await resolveRecipientRef(db as never, { email_id: "re_missing" });
+
+    expect(ref).toBeNull();
+  });
+
+  it("returns null (no throw) when neither tags nor an email_id are present", async () => {
+    const { db, collectionGroup } = makeAddressingDb(null);
+
+    const ref = await resolveRecipientRef(db as never, {});
+
+    expect(ref).toBeNull();
+    expect(collectionGroup).not.toHaveBeenCalled();
+  });
+
+  it("ignores partial tags (missing recipientId) and uses the providerMessageId fallback instead", async () => {
+    const fallbackRef = { path: "fallback/ref" };
+    const { db, doc, collectionGroup } = makeAddressingDb(fallbackRef);
+
+    const ref = await resolveRecipientRef(db as never, {
+      tags: { orgId: "org1", serviceId: "svc1", messageId: "msg1" } as never,
+      email_id: "re_abc123",
+    });
+
+    expect(doc).not.toHaveBeenCalled();
+    expect(collectionGroup).toHaveBeenCalledWith("recipients");
+    expect(ref).toBe(fallbackRef);
+  });
+});
+
+describe("recordBounce (60-02 idempotent transition-guarded write)", () => {
+  // A recipients/{id} + its messages/{id} parent, seeded with a status and a
+  // current deliveryCounts.bounced, wired into a runTransaction fake that reads
+  // before writing and applies the dot-path count merge.
+  function makeRecipientWorld(opts: { status?: string; bounced?: number } = {}) {
+    const state = {
+      recipient: { status: opts.status ?? "sent" } as Record<string, unknown>,
+      message: {
+        deliveryCounts: { sent: 1, failed: 0, bounced: opts.bounced ?? 0 },
+      } as { deliveryCounts: { sent: number; failed: number; bounced: number } },
+    };
+    const messageRef = { id: "msg1", __kind: "message" };
+    const recipientRef = { id: "rec1", __kind: "recipient", parent: { parent: messageRef } };
+    const updates: Array<{ ref: unknown; patch: Record<string, unknown> }> = [];
+    const getSpy = vi.fn();
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      let recipientReadAt = -1;
+      let messageReadAt = -1;
+      let firstWriteAt = -1;
+      let step = 0;
+      const tx = {
+        get: vi.fn(async (ref: unknown) => {
+          getSpy(ref);
+          const at = step++;
+          if (ref === recipientRef) {
+            recipientReadAt = at;
+            return { exists: true, data: () => state.recipient };
+          }
+          if (ref === messageRef) {
+            messageReadAt = at;
+            return { exists: true, data: () => state.message };
+          }
+          throw new Error("recordBounce fake: unexpected tx.get ref");
+        }),
+        update: vi.fn((ref: unknown, patch: Record<string, unknown>) => {
+          if (firstWriteAt === -1) firstWriteAt = step++;
+          else step++;
+          updates.push({ ref, patch });
+          if (ref === recipientRef) Object.assign(state.recipient, patch);
+          if (ref === messageRef && "deliveryCounts.bounced" in patch) {
+            state.message.deliveryCounts.bounced = patch["deliveryCounts.bounced"] as number;
+          }
+        }),
+      };
+      const result = await fn(tx);
+      // Expose read/write ordering for the "all reads before writes" assertion.
+      (runTransaction as unknown as { lastOrdering?: unknown }).lastOrdering = {
+        recipientReadAt,
+        messageReadAt,
+        firstWriteAt,
+      };
+      return result;
+    });
+    const db = { runTransaction };
+    return { db, recipientRef, messageRef, state, updates, runTransaction };
+  }
+
+  it("on a not-yet-bounced recipient: sets status:'bounced' + bounceReason + bouncedAt AND writes deliveryCounts.bounced = prev+1 as a literal, in one transaction", async () => {
+    const world = makeRecipientWorld({ status: "sent", bounced: 0 });
+
+    await recordBounce(world.db as never, world.recipientRef as never, {
+      type: "Permanent",
+      message: "mailbox does not exist",
+    });
+
+    expect(world.runTransaction).toHaveBeenCalledTimes(1);
+    expect(world.state.recipient.status).toBe("bounced");
+    expect(world.state.recipient.bounceReason).toBe("mailbox does not exist");
+    expect(world.state.recipient.bouncedAt).toBe("SERVER_TIMESTAMP_SENTINEL");
+    expect(world.state.message.deliveryCounts.bounced).toBe(1);
+    // The count was written as a literal number (prev+1), not a FieldValue sentinel.
+    const messageUpdate = world.updates.find((u) => u.ref === world.messageRef);
+    expect(messageUpdate?.patch["deliveryCounts.bounced"]).toBe(1);
+  });
+
+  it("preserves the sibling sent/failed counts by writing the dot-path 'deliveryCounts.bounced' (no full-object overwrite)", async () => {
+    const world = makeRecipientWorld({ status: "sent", bounced: 0 });
+
+    await recordBounce(world.db as never, world.recipientRef as never, { type: "Permanent" });
+
+    const messageUpdate = world.updates.find((u) => u.ref === world.messageRef);
+    expect(Object.keys(messageUpdate!.patch)).toEqual(["deliveryCounts.bounced"]);
+    expect(world.state.message.deliveryCounts).toEqual({ sent: 1, failed: 0, bounced: 1 });
+  });
+
+  it("derives bounceReason from subType when message is absent, and null when both are absent", async () => {
+    const w1 = makeRecipientWorld({ status: "sent" });
+    await recordBounce(w1.db as never, w1.recipientRef as never, { type: "Permanent", subType: "General" });
+    expect(w1.state.recipient.bounceReason).toBe("General");
+
+    const w2 = makeRecipientWorld({ status: "sent" });
+    await recordBounce(w2.db as never, w2.recipientRef as never, { type: "Permanent" });
+    expect(w2.state.recipient.bounceReason).toBeNull();
+  });
+
+  it("IDEMPOTENT: a second identical delivery finds status already 'bounced' and no-ops — count stays 1 (success criterion 4)", async () => {
+    const world = makeRecipientWorld({ status: "sent", bounced: 0 });
+
+    await recordBounce(world.db as never, world.recipientRef as never, { type: "Permanent", message: "hard bounce" });
+    await recordBounce(world.db as never, world.recipientRef as never, { type: "Permanent", message: "hard bounce" });
+
+    expect(world.state.recipient.status).toBe("bounced");
+    expect(world.state.message.deliveryCounts.bounced).toBe(1);
+    // Second transaction ran but performed NO update (guarded by the prior status).
+    expect(world.runTransaction).toHaveBeenCalledTimes(2);
+    const messageUpdates = world.updates.filter((u) => u.ref === world.messageRef);
+    expect(messageUpdates).toHaveLength(1);
+  });
+
+  it("reads BOTH the recipient and the message before any write within the transaction", async () => {
+    const world = makeRecipientWorld({ status: "sent", bounced: 0 });
+
+    await recordBounce(world.db as never, world.recipientRef as never, { type: "Permanent" });
+
+    const ordering = (world.runTransaction as unknown as {
+      lastOrdering: { recipientReadAt: number; messageReadAt: number; firstWriteAt: number };
+    }).lastOrdering;
+    expect(ordering.recipientReadAt).toBeLessThan(ordering.firstWriteAt);
+    expect(ordering.messageReadAt).toBeLessThan(ordering.firstWriteAt);
   });
 });
