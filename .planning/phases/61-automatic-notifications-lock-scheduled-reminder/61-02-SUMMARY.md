@@ -209,6 +209,12 @@ None in-repo. The owner deploy step is recorded in `.planning/PENDING-VERIFICATI
 - The R145 reminder engine is complete, built, unit-tested, and UNDEPLOYED. Ready for `62` (relock-notification, which appends a `'relock-notification'` type the same way) and for owner deploy + `/gsd-verify-work 61`.
 - **Deploy handover (PENDING-VERIFICATION):** `firebase deploy --only functions:sendScheduledReminders`. NO new index is needed (single-field collection-group scan); the single-field `services.status` COLLECTION_GROUP fieldOverride is the documented contingency only if a real deploy throws `FAILED_PRECONDITION` (research A3). NO new secret (the cron only enqueues).
 
+## Self-Check: PASSED
+
+- `functions/src/index.ts` + `functions/src/index.test.ts` modified and on disk.
+- Commits verified in git log: `a3dc6948` (test/RED), `1585e1a4` (feat/GREEN), `a225daf8` (docs/metadata).
+- SUMMARY.md present at `.planning/phases/61-automatic-notifications-lock-scheduled-reminder/61-02-SUMMARY.md`.
+
 ---
 *Phase: 61-automatic-notifications-lock-scheduled-reminder*
 *Completed: 2026-08-14*
