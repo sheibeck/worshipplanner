@@ -433,3 +433,30 @@ guard and creates NOTHING (no double-dispatch under onSchedule at-least-once ret
   test can send a real email or drive Cloud Scheduler).
 
 Do **not** treat this item as passed — it is a pre-deploy gate, not a satisfied one.
+
+## ⏳ 61-04 — first-lock auto-notification: banner render + real lock email — DEFERRED (owner at /gsd-verify-work 61)
+
+Plan 61-04 shipped the **R144 client hook**: locking a DRAFT service for the FIRST time (behind the
+Phase 58 messaging kill-switch + effective lock-notify default + ≥1 reachable recipient) writes
+`services/{id}/lockSnapshots/current` and auto-enqueues one `type:'lock-notification'` via the 59-04
+`queueServiceMessage` client wrapper, then shows a subordinate amber confirmation line inside the
+existing lock banner. Every behavior below is proven by `ServiceEditorView.test.ts` (13 new specs:
+first-lock-only, gated no-sends on messaging-off / default-off / re-lock / zero-reachable, the
+non-blocking failed-enqueue path, and the banner line's states incl. pluralization + aria-live).
+
+**What only a human at `/gsd-verify-work 61` can confirm (`verification_deferred_human`):**
+- **The real lock email actually sends.** The client calls the **UNDEPLOYED** `queueServiceMessage`
+  (fine for tests; a real send needs the still-open 59-01/59-03 pre-deploy gates — `RESEND_API_KEY` +
+  sending domain). In the LIVE app: lock a draft service (messaging on, lock-notify default on, ≥1
+  assigned volunteer with an email) and confirm the assigned volunteers receive the roles/song-list/
+  service-link email, and that the row lands in the Phase 60 "Sent on this service" history panel.
+- **The banner confirmation renders as designed.** Confirm the amber line reads "Notified N assigned
+  volunteers." on a sent first lock; shows the muted zero-reachable line when everyone assigned lacks
+  an email; and shows the muted "Locked — but the notification couldn't be sent. Open Messages…" line
+  (never red) when the enqueue fails, with the link opening the composer.
+- **SC2 by eyeball:** turn messaging OFF (or the default off), lock a draft, and confirm NO line
+  appears and NO email is sent; re-lock an already-locked service and confirm no auto-send.
+
+**Client-only plan — NO deploy, NO `.env.local`, NO functions change this plan.** Do **not** treat
+this item as passed — the visual + real-email UAT is deferred to the owner, gated behind the same
+undeployed send path as 59/60/61-02/61-03.

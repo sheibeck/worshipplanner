@@ -73,7 +73,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 ### Lock Notification
 
-- [ ] **R144**: When a service is locked, it can automatically email everyone assigned — their roles,
+- [x] **R144**: When a service is locked, it can automatically email everyone assigned — their roles,
       the song list, and a link to the service order — governed by the per-service/Settings default,
       and never sent while the service is a draft or when messaging is off.
 
@@ -152,7 +152,7 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R141 | Phase 59 | Complete |
 | R142 | Phase 60 | Complete |
 | R143 | Phase 60 | Complete |
-| R144 | Phase 61 | Pending |
+| R144 | Phase 61 | Complete |
 | R145 | Phase 61 | Complete |
 | R146 | Phase 62 | Pending |
 | R147 | Phase 62 | Pending |
