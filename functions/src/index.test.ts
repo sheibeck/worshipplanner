@@ -25,6 +25,8 @@ import {
   resolveRecipientRef,
   recordBounce,
   messageWebhookHandler,
+  todayInTimeZone,
+  minusDays,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -1358,6 +1360,45 @@ describe("queueServiceMessageHandler", () => {
     const optionsObject = tail.slice(0, optionsEnd);
     expect(optionsObject).not.toMatch(/secrets/);
     expect(optionsObject).not.toMatch(/RESEND_API_KEY/);
+  });
+});
+
+// --- todayInTimeZone / minusDays (61-01 org-local date primitives) ------
+//
+// Pure helpers consumed by 61-02's reminder cron: todayInTimeZone reckons the
+// org-local calendar date so a service near midnight is dated in the org zone,
+// not UTC (R133); minusDays subtracts calendar days UTC-pinned so DST never
+// drifts the count. No Firestore, no mocks -- pure string/date in, string out.
+
+describe("todayInTimeZone / minusDays", () => {
+  it("returns different local dates for two IANA zones on the SAME UTC instant (R133 boundary)", () => {
+    // 04:30 UTC is still 2026-08-13 in Chicago (UTC-5 CDT) but already
+    // 2026-08-14 in Kiritimati (UTC+14) -- one instant, two calendar days.
+    const instant = new Date("2026-08-14T04:30:00Z");
+    expect(todayInTimeZone("America/Chicago", instant)).toBe("2026-08-13");
+    expect(todayInTimeZone("Pacific/Kiritimati", instant)).toBe("2026-08-14");
+    expect(todayInTimeZone("America/Chicago", instant)).not.toBe(
+      todayInTimeZone("Pacific/Kiritimati", instant),
+    );
+  });
+
+  it("formats org-local today as a 10-char 'YYYY-MM-DD' string for any IANA zone", () => {
+    const instant = new Date("2026-08-14T04:30:00Z");
+    const ymd = todayInTimeZone("Asia/Tokyo", instant);
+    expect(ymd).toBe("2026-08-14");
+    expect(ymd).toHaveLength(10);
+    expect(ymd).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("minusDays subtracts plain calendar days", () => {
+    expect(minusDays("2026-08-14", 7)).toBe("2026-08-07");
+  });
+
+  it("minusDays is DST-safe (UTC-pinned, no 23/25h drift across a spring-forward week)", () => {
+    // 2026-03-08 is US spring-forward day; subtracting exactly n calendar days
+    // must not shift by an hour-based off-by-one.
+    expect(minusDays("2026-03-09", 1)).toBe("2026-03-08");
+    expect(minusDays("2026-03-15", 7)).toBe("2026-03-08");
   });
 });
 
