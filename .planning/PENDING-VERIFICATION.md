@@ -232,3 +232,28 @@ secret changes were made this plan.
 ## Also still open (tracked in ROADMAP `## Backlog`, not here)
 
 - **999.3** — firestore.rules are deployed, but the **production devtools bypass check** (set a service to Planned, attempt a direct Firestore write, expect permission denied) was never performed against prod.
+
+---
+
+## Phase 60 (Delivery History & Bounce Webhook) — 60-01, built/tested/UNDEPLOYED 2026-08-14
+
+Plan 60-01 shipped the pure Svix HMAC signature verifier (`functions/src/webhookSignature.ts`) and the
+deploy-gated collection-group index for 60-02's addressing fallback. No secret set, no deploy, no
+`.env.local` change this plan (v1.7 grant). The following are **OWNER pre-deploy steps — do NOT mark
+passed here:**
+
+- **Deploy the collection-group index** so 60-02's fallback query does not throw `FAILED_PRECONDITION`
+  in production:
+  ```
+  firebase deploy --only firestore:indexes
+  ```
+  This enables `collectionGroup('recipients').where('providerMessageId','==', data.email_id)`. The
+  index build is async on Firebase's side — confirm it reaches **Enabled** in the console before the
+  fallback path is exercised live.
+- **Confirm `REPLAY_TOLERANCE_SEC` (±300s / 5 min) against a real Resend event** at `/gsd-verify-work 60`.
+  The 5-minute window is the Svix library default `[ASSUMED]` (research A1 / Open Question 1); if
+  legitimate, slightly-delayed events are being rejected, loosen the named constant in
+  `functions/src/webhookSignature.ts` and redeploy the webhook (60-02).
+- (60-02 will add) `firebase functions:secrets:set RESEND_WEBHOOK_SECRET`, `firebase deploy --only
+  functions:messageWebhook`, and the Resend dashboard webhook-URL + signing-secret configuration — those
+  are handed over when 60-02's `messageWebhook` Function lands.

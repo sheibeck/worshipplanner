@@ -4,16 +4,16 @@ milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
 current_phase: 60
 current_phase_name: Delivery History & Bounce Webhook
-status: discussing
-stopped_at: Phase 59 verified GREEN (5/5); transitioning to Phase 60
-last_updated: "2026-08-14T17:05:00.000Z"
+status: executing
+stopped_at: Completed 60-01-PLAN.md
+last_updated: "2026-08-14T17:47:14.360Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 59 verified GREEN; starting Phase 60 discuss
+last_activity_desc: Phase 59 verified GREEN; starting Phase 60
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 12
+  completed_plans: 10
   percent: 40
 ---
 
@@ -1746,6 +1746,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 59 P02 | 18min | 2 tasks | 2 files |
 | Phase 59 P03 | 13min | 2 tasks | 4 files |
 | Phase 59 P04 | 18min | 3 tasks | 7 files |
+| Phase 60 P01 | 9min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -2103,6 +2104,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: reminderDaysBefore explicitly wrapped in Number(...) on write and revert, verified typeof === 'number' in tests
 - [Phase ?]: From-name/Reply-to use explicit-Save (not auto-save), mirroring Organization Name's debounce-boundary pattern
 - [Phase ?]: 58-05: per-service messaging overrides write via scoped setServiceMessagingDefaults dot-path (never updateService), bypassing the R036 draft-content affectedKeys() guard (R132)
+- [Phase 60]: 60-01: verify Svix webhook signatures manually with node:crypto (no svix package); REPLAY_TOLERANCE_SEC=300 tagged confirm-against-real-event; recipients.providerMessageId collection-group index ships UNDEPLOYED (owner deploy).
 
 ### Roadmap Evolution
 
@@ -2420,8 +2422,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-14T16:51:17.108Z
-Stopped at: Completed 59-04-PLAN.md
+Last session: 2026-08-14T17:47:14.284Z
+Stopped at: Completed 60-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
