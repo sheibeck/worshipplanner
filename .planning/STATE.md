@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
-current_phase: 60
-current_phase_name: Delivery History & Bounce Webhook
-status: executing
-stopped_at: Completed 60-03-PLAN.md
-last_updated: "2026-08-14T18:38:31.491Z"
+current_phase: 61
+current_phase_name: Automatic Notifications — Lock & Scheduled Reminder
+status: discussing
+stopped_at: Phase 60 verified GREEN (4/4); transitioning to Phase 61
+last_updated: "2026-08-14T19:00:00.000Z"
 last_activity: 2026-08-14
-last_activity_desc: 60-03 delivery-history panel + serviceMessages store + RosterView ?edit deep-link (client, read-only)
+last_activity_desc: Phase 60 verified GREEN; starting Phase 61 discuss
 progress:
   total_phases: 5
   completed_phases: 3
@@ -276,11 +276,22 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 60 (Delivery History & Bounce Webhook) — ALL PLANS COMPLETE (3/3)
-Plan: 60-03 complete (3/3); Phase 60 done — next is /gsd-verify-work 60
-Status: 60-01 + 60-02 (webhook) built/tested/UNDEPLOYED; 60-03 (client delivery-history panel) built/tested (read-only, no deploy). R142 + R143 complete.
-Phase 60 so far: 60-01 (pure Svix HMAC verifier functions/src/webhookSignature.ts + deploy-gated recipients.providerMessageId collection-group index) + 60-02 (messageWebhook onRequest bounce receiver — verify-first over req.rawBody, 401/400 + zero Firestore on bad request, idempotent hard-bounce write to recipients/{id}.status + messages/{id}.deliveryCounts.bounced; sole RESEND_WEBHOOK_SECRET holder) + 60-03 (client read-only "Sent on this service" panel: serviceMessages store nested onSnapshot + lazy status=='bounced' read, ServiceMessageHistory.vue, ServiceEditorView mount gated isMessagingEnabled()&&canEditService, RosterView ?edit={personId} deep-link — NESTED-path reads only, NO new Firestore rule, NO deploy). Owner deploy (webhook): firebase functions:secrets:set RESEND_WEBHOOK_SECRET + firebase deploy --only functions:messageWebhook,firestore:indexes + Resend dashboard webhook config, then /gsd-verify-work 60. 60-03 visual/interaction UAT deferred. All in PENDING-VERIFICATION.md.
-Last activity: 2026-08-14 — 60-03 client delivery-history panel built/tested (read-only)
+Phase: 61 (Automatic Notifications — Lock & Scheduled Reminder) — DISCUSSING
+Plan: not yet planned
+Status: Phase 60 verified GREEN (4/4); Phase 61 starting
+Phase 60 whole: 60-01 (pure Svix HMAC verifier functions/src/webhookSignature.ts + deploy-gated recipients.providerMessageId collection-group index) + 60-02 (messageWebhook onRequest bounce receiver — verify-first over req.rawBody, 401/400 + zero Firestore on bad request, idempotent hard-bounce write; sole RESEND_WEBHOOK_SECRET holder) + 60-03 (client read-only "Sent on this service" panel). Owner deploy (webhook): firebase functions:secrets:set RESEND_WEBHOOK_SECRET + firebase deploy --only functions:messageWebhook,firestore:indexes + Resend dashboard webhook config, then /gsd-verify-work 60. All in PENDING-VERIFICATION.md.
+Last activity: 2026-08-14 — Phase 60 verified GREEN; starting Phase 61
+
+> **Phase 60 outcome (2026-08-14):** `60-VERIFICATION.md` = passed/GREEN, 4/4 success criteria +
+> supporting truths, R142/R143. Webhook security invariants test-exercised (not presence-only): verify-first
+> (bad sig → 401/400 with getFirestore NEVER called), Svix scheme byte-for-byte, transactional idempotent
+> bounce count (duplicate → count==1), only-401-for-sig-failure (unprocessable → 200 no write). RESEND_WEBHOOK_SECRET
+> bound only to messageWebhook, no new npm package (manual node:crypto), collection-group fallback index
+> UNDEPLOYED. Panel is nested-path read-only (no new firestore.rules), hidden when messaging off/non-editor.
+> Deferred (NOT defects): owner deploy (secret/deploy/index/Resend-dashboard) + visual/live-bounce/fix-nav UAT —
+> PENDING-VERIFICATION.md. Non-blocking note: panel count line shows "N sent" (delivered leaf), within the
+> deferred visual UAT. Phase 61 builds the auto lock notification + the scheduled-reminder cron (which also
+> dispatches user-scheduled status:'scheduled' messages from Phase 59) on this send path.
 
 > **Phase 59 outcome (2026-08-14):** `59-VERIFICATION.md` = passed/GREEN, 5/5 must-haves, R131/R136–R141
 > present, wired, behaviorally exercised. Secret confinement (RESEND_API_KEY bound only to
