@@ -1,10 +1,11 @@
 ---
 phase: 61
 slug: automatic-notifications-lock-scheduled-reminder
-status: draft
-nyquist_compliant: false
+status: planned
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-14
+planned_at: 2026-08-14
 ---
 
 # Phase 61 — Validation Strategy
@@ -51,10 +52,12 @@ created: 2026-08-14
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _(planner fills)_ | | | R144 | never-on-draft/off | lock hook: draft→locked auto-enqueue lock-notification, gated + first-lock-only; lockSnapshots/current written | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
-| _(planner fills)_ | | | R144 | send-path plumbing | MessageType accepts 'lock-notification'; queueServiceMessage enqueues it | unit (functions) | `cd functions && npm test` | ✅ extend | ⬜ pending |
-| _(planner fills)_ | | | R145 | idempotent + never-draft | cron: N-days-before in org tz, skip draft/off, reminderSentAt no-double-send | unit (functions) | `cd functions && npm test` | ❌ W0 | ⬜ pending |
-| _(planner fills)_ | | | R145 | scheduled dispatch idempotent | due scheduled message → fresh queued doc via transactional claim; retry no double | unit (functions) | `cd functions && npm test` | ❌ W0 | ⬜ pending |
+| 61-01·T1 | 61-01 | 1 | R144 (plumbing) | T-61-01a send-path plumbing | MessageType/MESSAGE_TYPES accept 'lock-notification'; queueServiceMessage enqueues it (editor+on) yet still rejects unknown types + non-editor/kill-switch-off | unit (functions) | `cd functions && npx vitest run src/index.test.ts` | ✅ extend | ⬜ pending |
+| 61-01·T2 | 61-01 | 1 | R145 / R133 | T-61-01b tz correctness | todayInTimeZone('en-CA',{timeZone}) org-local date + UTC-pinned minusDays; two IANA zones diverge on one instant; DST-safe subtraction (pure helpers) | unit (functions) | `cd functions && npx vitest run src/index.test.ts` | ✅ extend | ⬜ pending |
+| 61-02·T1 | 61-02 | 2 | R145 / SC3 / SC4 | T-61-02a/b/c idempotent + never-draft + tz | sendScheduledRemindersHandler: N-days-before in org tz, skip draft/kill-switch-off/reminder-off/not-due, enqueue type:'reminder', reminderSentAt no-double-send; onSchedule 04:00 no-secret wrapper | unit (functions) | `cd functions && npx vitest run src/index.test.ts` | ✅ extend | ⬜ pending |
+| 61-03·T1 | 61-03 | 3 | R141 (P59 carryover) | T-61-03a/b/c dispatch idempotent | dispatchDueScheduledMessagesHandler: due scheduled message → transactional scheduled→dispatched claim + fresh status:'queued' doc via createQueuedMessage; retry no double; future skipped; single-field query, no index | unit (functions) | `cd functions && npx vitest run src/index.test.ts` | ✅ extend | ⬜ pending |
+| 61-04·T1 | 61-04 | 2 | R144 / SC1 / SC2 | T-61-04a/b/c/d never-on-draft/off + non-blocking | lock hook: draft→locked first-lock auto-enqueue lock-notification gated (isMessagingEnabled + effective lockNotify + ≥1 reachable), lockSnapshots/current written every lock (read-before-write), enqueue own try/catch never re-raised into lifecycleError | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
+| 61-04·T2 | 61-04 | 2 | R144 | UI-SPEC #1 zero-one-many | lock-banner confirmation line: "Notified N assigned volunteer(s)." pluralized (sent), muted zero-reachable, muted error + Open Messages link, null renders nothing; aria-live='polite' | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -87,11 +90,11 @@ created: 2026-08-14
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency acceptable per suite
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies — all 6 tasks carry a scoped `<automated>` command; both target test files already exist and are extended within each `tdd` task (no MISSING scaffold, so no separate Wave 0 plan)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify — every task has one
+- [x] Wave 0 covers all MISSING references — none MISSING (`functions/src/index.test.ts` + `src/views/__tests__/ServiceEditorView.test.ts` both exist; the new `describe`/hook tests are written in-plan)
+- [x] No watch-mode flags — all commands are `vitest run` / `tsc`
+- [x] Feedback latency acceptable per suite — functions scoped ~5–15s, client scoped ~5–20s, full app suite ~300s at wave boundaries
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved (planner, 2026-08-14) — 4 plans / 3 waves; SC4 (no double reminder / no double dispatch) and SC2 (never-on-draft/off) are the load-bearing automated assertions in 61-02·T1 / 61-03·T1 / 61-04·T1.
