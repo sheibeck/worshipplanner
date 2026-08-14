@@ -816,6 +816,212 @@ export const cleanupOrphanRenders = onSchedule(
   },
 );
 
+// --- sendScheduledReminders daily reminder cron (61-02: R145/R133/SC3/SC4) --
+//
+// The R145 reminder engine: a daily onSchedule cron that auto-enqueues the
+// shared service link to everyone assigned N days before a service, reckoned in
+// the org's LOCAL timezone (R133), exactly once (SC4). It mirrors
+// cleanupOrphanRendersHandler (729-817) EXACTLY -- a broad
+// collectionGroup('services').where('status','in',['planned','exported']) scan
+// (NEVER 'draft', so a draft is structurally unreachable -- SC4), the org id
+// recovered from the parent chain (never a client field), a per-item try/catch
+// so one bad service never aborts the daily run, the handler body exported
+// separately from the wrapper for direct unit test, and its own 04:00 UTC slot
+// (offset from cleanupExpiredMedia's 02:00 and cleanupOrphanRenders' 03:00 so
+// the three daily sweeps never overlap). It enqueues via the SHARED
+// createQueuedMessage() shaper, so a cron-created reminder is byte-identical to
+// a human send at the sendQueuedMessage trigger. It holds NO secret -- only
+// sendQueuedMessage binds RESEND_API_KEY (R131 smallest key-holding surface).
+
+/**
+ * A reminderDaysBefore further ahead than this is treated as a misconfiguration
+ * and skipped -- the code-side lookahead bound (the scan returns all
+ * planned/exported services regardless of how far out they are; N varies per
+ * service so it cannot be a query filter). A year comfortably covers any real
+ * "remind me N days before" while refusing an absurd value that would fire a
+ * reminder years early.
+ */
+export const REMINDER_MAX_DAYS_BEFORE = 366;
+
+export interface ReminderSummary {
+  scanned: number;
+  enqueued: number;
+}
+
+/** The per-service messaging leaf the reminder cron reads (all fields optional). */
+interface ServiceMessagingFields {
+  reminderEnabled?: boolean;
+  reminderDaysBefore?: number;
+  reminderSentAt?: unknown;
+}
+
+/** The org doc shape the reminder cron reads (settings.messaging.*, NOT messaging.*). */
+interface OrgReminderData {
+  settings?: {
+    timezone?: string;
+    messaging?: {
+      enabled?: boolean;
+      reminderEnabled?: boolean;
+      reminderDaysBefore?: number;
+    };
+  };
+}
+
+/**
+ * The sendScheduledReminders handler body, exported separately from the
+ * onSchedule wrapper (the cleanupOrphanRendersHandler convention) so the unit
+ * test imports it by name and drives it with a fixed system time -- required for
+ * the timezone-boundary (R133) and SC4 idempotency assertions.
+ *
+ * `now` defaults to the real clock; the wrapper passes nothing so production
+ * uses the invocation time, while tests pin it via vi.setSystemTime.
+ */
+export async function sendScheduledRemindersHandler(
+  now: Date = new Date(),
+): Promise<ReminderSummary> {
+  const db = getFirestore();
+
+  // Broad collection-group scan -- NEVER 'draft' (SC4 never-on-draft is
+  // structural, not a runtime check). Same single-field `in` collection-group
+  // class as the shipped pptxRenders scan, so it needs NO firestore.indexes.json
+  // entry. The due-date and lookahead filters are applied in CODE below (N
+  // varies per service, so it cannot be pushed into the query).
+  const snapshot = await db
+    .collectionGroup("services")
+    .where("status", "in", ["planned", "exported"])
+    .get();
+
+  // Cache each org's settings across the loop so a run scanning many services in
+  // one org reads that org doc at most once. `null` caches a missing org.
+  const orgCache = new Map<string, OrgReminderData | null>();
+  let enqueued = 0;
+
+  for (const svcDoc of snapshot.docs) {
+    // Per-item try/catch: one malformed service/org is logged and skipped, never
+    // aborting the remaining candidates in the same daily run.
+    try {
+      const orgId = svcDoc.ref.parent.parent?.id;
+      if (!orgId) {
+        console.error(
+          `sendScheduledReminders: skipping ${svcDoc.ref.path} -- missing parent org id`,
+        );
+        continue;
+      }
+
+      const svc = svcDoc.data() as {
+        date?: string;
+        messaging?: ServiceMessagingFields;
+      };
+
+      // SC4 idempotency: skip BEFORE any work if this service was already
+      // reminded. This is the first line of the never-double-send guard.
+      if (svc.messaging?.reminderSentAt) {
+        continue;
+      }
+
+      // Load the org settings for THIS org (cached). Read settings.messaging.*
+      // and settings.timezone -- NOT messaging.* (research Pitfall 2).
+      let org = orgCache.get(orgId);
+      if (org === undefined) {
+        const orgSnap = await db.collection("organizations").doc(orgId).get();
+        org = orgSnap.exists ? (orgSnap.data() as OrgReminderData) : null;
+        orgCache.set(orgId, org);
+      }
+
+      // Fail-closed kill-switch: absent settings.messaging.enabled = OFF (the
+      // === true read the enqueue handler uses at :1035-1037).
+      if (org?.settings?.messaging?.enabled !== true) {
+        continue;
+      }
+      const orgMessaging = org.settings.messaging;
+
+      // service-then-org resolution for the enable flag and N (service-then-org
+      // -then-7 for N).
+      const effectiveReminderEnabled =
+        svc.messaging?.reminderEnabled ?? orgMessaging.reminderEnabled;
+      if (!effectiveReminderEnabled) {
+        continue;
+      }
+      const effectiveN =
+        svc.messaging?.reminderDaysBefore ?? orgMessaging.reminderDaysBefore ?? 7;
+
+      // Code-side lookahead bound (not a query filter): refuse an absurd N.
+      if (!Number.isFinite(effectiveN) || effectiveN < 0 || effectiveN > REMINDER_MAX_DAYS_BEFORE) {
+        continue;
+      }
+
+      // Due check (R133/SC3): fire only when the service date minus N days equals
+      // "today" in the ORG's local timezone -- calendar-day granularity via the
+      // 61-01 helpers. A malformed svc.date makes minusDays throw, which the
+      // per-item catch turns into a skip.
+      const dueDate = minusDays(svc.date as string, effectiveN);
+      const today = todayInTimeZone(org.settings.timezone ?? "UTC", now);
+      if (dueDate !== today) {
+        continue;
+      }
+
+      // Enqueue via the SHARED shaper -- the SAME write shape as
+      // queueServiceMessageHandler (:1047-1064), so sendQueuedMessage fires
+      // identically to a human send. requestedByUid:'system' is a safe sentinel:
+      // sendCopyToSelf:false means the requester email is never resolved.
+      const subject = "Reminder: your upcoming service";
+      const body =
+        "This is a reminder that you're scheduled to serve at an upcoming service. " +
+        "View the service details here: {{service_link}}";
+      const messageRef = db
+        .collection("organizations")
+        .doc(orgId)
+        .collection("services")
+        .doc(svcDoc.id)
+        .collection("messages")
+        .doc();
+      await messageRef.set(
+        createQueuedMessage({
+          orgId,
+          serviceId: svcDoc.id,
+          type: "reminder",
+          subject,
+          body,
+          recipientSelector: { teams: [], individualPersonIds: [], includeEveryone: true },
+          options: { attachServiceLink: true, sendCopyToSelf: false },
+          scheduledFor: null,
+          requestedByUid: "system",
+        }),
+      );
+
+      // AFTER a successful enqueue, set the idempotency marker via the Admin SDK
+      // dot-path merge -- this bypasses the Phase 58 draft-only /services rule so
+      // it lands on a LOCKED service. (The crash-between-writes window is a rare
+      // single double-send at daily cadence; the claim-first transactional
+      // upgrade is documented in 61-02-SUMMARY.)
+      await svcDoc.ref.set(
+        { messaging: { reminderSentAt: FieldValue.serverTimestamp() } },
+        { merge: true },
+      );
+      enqueued++;
+    } catch (err) {
+      console.error(
+        `sendScheduledReminders: skipping ${svcDoc.ref.path} -- error during processing:`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  const summary: ReminderSummary = { scanned: snapshot.docs.length, enqueued };
+  console.log("sendScheduledReminders summary:", summary);
+  return summary;
+}
+
+// NO secrets: array -- the cron only ENQUEUES; RESEND_API_KEY binds solely to
+// sendQueuedMessage (R131). 04:00 UTC is a NEW slot, offset from the taken 02:00
+// (media) and 03:00 (renders) so the three daily sweeps never overlap.
+export const sendScheduledReminders = onSchedule(
+  { schedule: "every day 04:00", timeZone: "UTC" },
+  async () => {
+    await sendScheduledRemindersHandler();
+  },
+);
+
 // --- queueServiceMessage send-path enqueue (59-02: R131/R137/R141) ------
 //
 // The thin enqueue half of the send path, mirroring the parsePptxHandler ->
