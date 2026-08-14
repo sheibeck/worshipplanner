@@ -1,1 +1,15 @@
-{ "indexes": [], "fieldOverrides": [] }
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "recipients",
+      "fieldPath": "providerMessageId",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    }
+  ]
+}
