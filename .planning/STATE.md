@@ -4,16 +4,16 @@ milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
 current_phase: 59
 current_phase_name: Messages Composer & Send Path
-status: discussing
-stopped_at: Phase 58 verified GREEN (5/5); transitioning to Phase 59
-last_updated: "2026-08-14T14:30:00.000Z"
+status: executing
+stopped_at: Completed 59-01-PLAN.md (send-path infra — resend pin + serviceRoles port)
+last_updated: "2026-08-14T15:46:01.653Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 58 verified GREEN; starting Phase 59 discuss
+last_activity_desc: Executed 59-01 — resend@6.19.0 functions-only pin + functions/src/serviceRoles.ts port (R131/R139), UNDEPLOYED
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 9
+  completed_plans: 6
   percent: 20
 ---
 
@@ -276,10 +276,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 59 (Messages Composer & Send Path) — DISCUSSING
-Plan: not yet planned
-Status: Phase 58 verified GREEN (5/5, one manual UAT deferred to PENDING-VERIFICATION.md); Phase 59 starting
-Last activity: 2026-08-14 — Phase 58 verified GREEN; starting Phase 59
+Phase: 59 (Messages Composer & Send Path) — EXECUTING
+Plan: 59-01 complete (send-path infra); more plans to follow
+Status: 59-01 shipped built/tested/UNDEPLOYED — resend@6.19.0 functions-only exact pin + functions/src/serviceRoles.ts port with per-recipient roleNames (R131/R139). All 3 gates green (functions vitest 14/14, functions build clean, root suite at 2-file known baseline). Owner pre-deploy re-confirm + secret/DNS/deploy routed to PENDING-VERIFICATION.md (item 59-01).
+Last activity: 2026-08-14 — executed 59-01
 
 > **Phase 58 outcome (2026-08-14):** `58-VERIFICATION.md` = passed/GREEN, 5/5 requirements
 > (R130/R132/R133/R134/R135) present, wired, and behaviorally exercised. One manual UAT (Draft→locked
@@ -1731,6 +1731,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 58 P03 | 20min | 2 tasks | 2 files |
 | Phase 58 P04 | 40min | 2 tasks | 2 files |
 | Phase 58 P05 | 25 | 2 tasks | 5 files |
+| Phase 59 P01 | 36min | 3 tasks | 4 files |
 
 ## Accumulated Context
 

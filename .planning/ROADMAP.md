@@ -301,9 +301,9 @@ key confined to a single server-side Function.
   5. Provider account setup (Resend) and domain authentication (SPF/DKIM/DMARC DNS records) are owner
      steps; the send Functions ship built/tested/undeployed with the exact
      `firebase deploy --only functions:...` command handed to the owner.
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
-  - [ ] 59-01-PLAN.md — Functions infra: resend@6.19.0 (legitimacy-gated) + ported serviceRoles resolver (R131/R139)
+  - [x] 59-01-PLAN.md — Functions infra: resend@6.19.0 (legitimacy-gated) + ported serviceRoles resolver (R131/R139)
   - [ ] 59-02-PLAN.md — queueServiceMessage onCall: re-auth + kill-switch re-check + createQueuedMessage shaper (R131/R137/R141)
   - [ ] 59-03-PLAN.md — sendQueuedMessage trigger: idempotency txn, re-resolve, per-recipient token render, Resend-mock send (R131/R138/R139)
   - [ ] 59-04-PLAN.md — MessageComposer.vue + ✉ action-bar entry: teams-first recipients, tokens, Reaches-N, options (R136/R137/R138/R140/R141)

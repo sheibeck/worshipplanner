@@ -25,7 +25,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 - [x] **R130**: An org owner can turn messaging off entirely from the main Settings screen; messaging
       is disabled by default until an org enables it, and every send surface honors the switch.
 
-- [ ] **R131**: Volunteer email sends through a backend send path that holds the provider API key
+- [x] **R131**: Volunteer email sends through a backend send path that holds the provider API key
       server-side — no email address list or provider key is ever exposed to the client bundle.
 
 - [x] **R132**: Per-service automatic-email defaults (lock notification, re-lock prompt, share-link
@@ -54,7 +54,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 - [ ] **R138**: The composer has a subject and a body with insertable merge tokens: service date,
       service link, their roles, and song list.
 
-- [ ] **R139**: Each recipient receives a personalized email — the "their roles" token renders that
+- [x] **R139**: Each recipient receives a personalized email — the "their roles" token renders that
       individual's own assigned roles, not a shared block.
 
 - [ ] **R140**: The composer shows a live "Reaches N people" count reflecting the selected
@@ -139,7 +139,7 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R130 | Phase 58 | Complete |
-| R131 | Phase 59 | Pending |
+| R131 | Phase 59 | Complete |
 | R132 | Phase 58 | Complete |
 | R133 | Phase 58 | Complete |
 | R134 | Phase 58 | Complete |
@@ -147,7 +147,7 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R136 | Phase 59 | Pending |
 | R137 | Phase 59 | Pending |
 | R138 | Phase 59 | Pending |
-| R139 | Phase 59 | Pending |
+| R139 | Phase 59 | Complete |
 | R140 | Phase 59 | Pending |
 | R141 | Phase 59 | Pending |
 | R142 | Phase 60 | Pending |

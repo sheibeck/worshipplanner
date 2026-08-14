@@ -107,6 +107,33 @@ editable select. Coverage id D4 in `58-05-SUMMARY.md`.
 
 ---
 
+## ⏳ 59-01 — Resend SDK pin re-confirmation before deploy (R131) — OWNER, PRE-DEPLOY
+
+Phase 59-01 added `resend` as a **functions-only** dependency, pinned **exactly**
+to `6.19.0` in `functions/package.json` (never `^`, never the <24h-old 6.20.0), and
+it appears nowhere in the root `package.json` or under `src/` (R131 — the provider
+SDK never reaches the client bundle). The package is **installed, built, and tested
+but UNDEPLOYED**, and no `RESEND_API_KEY` secret was set this phase.
+
+Legitimacy was **discharged by orchestrator npm-registry diligence on 2026-08-14**
+(recorded in `59-01-SUMMARY.md`): resend@6.19.0 published 2026-08-10 by the official
+Resend org maintainers, **no install/preinstall/postinstall scripts** (so
+`npm install` runs no package code), valid `dist.integrity` sha512, canonical
+registry tarball, ~9.5M weekly downloads. Residual risk this phase is ~zero because
+resend is functions-only, undeployed, and `vi.mock`'d in every test — the real
+module never executes until deploy.
+
+**OWNER, before the eventual send-path deploy (59-02/59-03):** re-confirm the
+`resend` pin is still legitimate at deploy time (unchanged version, no advisory),
+then perform the deploy-side setup that is intentionally NOT done here:
+- create the Resend account and `firebase functions:secrets:set RESEND_API_KEY`,
+- add the sending-domain SPF / DKIM / DMARC DNS records,
+- `firebase deploy` the functions send path.
+
+Do **not** treat this item as passed — it is a pre-deploy gate, not a satisfied one.
+
+---
+
 ## Also still open (tracked in ROADMAP `## Backlog`, not here)
 
 - **999.3** — firestore.rules are deployed, but the **production devtools bypass check** (set a service to Planned, attempt a direct Firestore write, expect permission denied) was never performed against prod.
