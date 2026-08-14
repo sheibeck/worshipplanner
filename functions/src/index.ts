@@ -14,10 +14,20 @@ import { syncOrgMembershipClaim } from "./orgMembershipClaims";
 //   firebase functions:secrets:set CLAUDE_API_KEY
 //   firebase functions:secrets:set ESV_API_KEY
 //   firebase functions:secrets:set NLT_API_KEY
+//   firebase functions:secrets:set RESEND_API_KEY
 // These are NEVER shipped to the browser — that is the whole point of this proxy.
 const CLAUDE_API_KEY = defineSecret("CLAUDE_API_KEY");
 const ESV_API_KEY = defineSecret("ESV_API_KEY");
 const NLT_API_KEY = defineSecret("NLT_API_KEY");
+
+// The Resend email provider key for the send path (59-02/59-03). DECLARED here
+// alongside the other secrets so the whole secret list lives in one place, but
+// bound to NO Function in this plan: it attaches ONLY to sendQueuedMessage
+// (59-03), the single Function that ever holds it — the smallest key-holding
+// surface (R131). queueServiceMessage below carries no secrets: array at all.
+// Exported (unlike the proxy secrets) only so noUnusedLocals does not flag it
+// while it is declared-but-unbound this plan; 59-03 references it in-file.
+export const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 
 if (!getApps().length) {
   initializeApp();
@@ -778,6 +788,118 @@ export const cleanupOrphanRenders = onSchedule(
     await cleanupOrphanRendersHandler();
   },
 );
+
+// --- queueServiceMessage send-path enqueue (59-02: R131/R137/R141) ------
+//
+// The thin enqueue half of the send path, mirroring the parsePptxHandler ->
+// pptxRenders queue -> requestPptxRender triad above: an onCall Function whose
+// handler body (queueServiceMessageHandler) is exported separately from the
+// wrapper for direct unit testing. It re-authorizes the caller server-side
+// (editor-tier of the PATH-derived org, never the client-declared orgId),
+// re-reads the org messaging kill-switch, validates the request, and writes
+// ONE messages/{id} doc via the shared createQueuedMessage() shaper. It
+// resolves no recipients and sends nothing — the 59-03 trigger does that, and
+// is the only Function that holds RESEND_API_KEY.
+
+/** The three message types a composer can queue (R137). */
+export type MessageType = "oneoff" | "reminder" | "share-link";
+
+/**
+ * A message is 'queued' for immediate send (the 59-03 trigger fires now) or
+ * 'scheduled' for a future scheduledFor that Phase 61's cron later flips to
+ * 'queued'. sendQueuedMessage (59-03) owns the rest of the lifecycle
+ * ('sending' | 'sent' | 'partial' | 'failed').
+ */
+export type QueuedMessageStatus = "queued" | "scheduled";
+
+/** teams-first recipient selection (R136) — a who-to-resolve instruction, never a final email list. */
+export interface RecipientSelector {
+  teams: string[];
+  individualPersonIds: string[];
+  includeEveryone: boolean;
+}
+
+/** attach-service-link / send-me-a-copy send options (R141). */
+export interface MessageOptions {
+  attachServiceLink: boolean;
+  sendCopyToSelf: boolean;
+}
+
+/** The client-declared queue request (every field is re-validated server-side). */
+export interface QueueMessageRequest {
+  orgId: string;
+  serviceId: string;
+  type: MessageType;
+  subject: string;
+  body: string;
+  recipientSelector: RecipientSelector;
+  options: MessageOptions;
+  /** ISO instant to send at, or null for send-now. */
+  scheduledFor: string | null;
+}
+
+export interface QueueMessageResponse {
+  messageId: string;
+}
+
+/** Rolled-up per-message delivery tallies, written by 59-03's send trigger. */
+export interface DeliveryCounts {
+  sent: number;
+  failed: number;
+}
+
+/**
+ * The persisted messages/{id} document shape (ARCHITECTURE §Data Model). The
+ * body stores the RAW token template, never pre-rendered — {{their_roles}} can
+ * only be correct per-recipient at send time (R139), so 59-03 renders it then.
+ * createdAt is the FieldValue.serverTimestamp() sentinel until the write lands.
+ */
+export interface QueuedMessageDoc {
+  type: MessageType;
+  status: QueuedMessageStatus;
+  subject: string;
+  body: string;
+  recipientSelector: RecipientSelector;
+  options: MessageOptions;
+  changeDiff: null;
+  scheduledFor: string | null;
+  requestedByUid: string;
+  createdAt: FieldValue;
+  sentAt: null;
+  deliveryCounts: DeliveryCounts;
+}
+
+/** Input to the pure createQueuedMessage shaper: the request plus the re-verified caller uid. */
+export type CreateQueuedMessageInput = QueueMessageRequest & { requestedByUid: string };
+
+/**
+ * The single canonical messages/{id} doc-shaper — pure, no Firestore I/O (its
+ * role mirrors pptxRenderDocRef's "one canonical shape so the callable and the
+ * trigger cannot drift", and buildServiceSnapshot's pure field-assembly). It is
+ * factored out precisely so queueServiceMessage now and Phase 61's cron later
+ * produce an IDENTICAL shape (R141).
+ *
+ * Status is 'scheduled' when a scheduledFor instant is present, else 'queued'
+ * (send-now). Optional/absent leaves are normalized to null (scheduledFor,
+ * changeDiff, sentAt) rather than left undefined — Firestore rejects undefined.
+ */
+export function createQueuedMessage(input: CreateQueuedMessageInput): QueuedMessageDoc {
+  const scheduledFor = input.scheduledFor ?? null;
+  return {
+    type: input.type,
+    status: scheduledFor ? "scheduled" : "queued",
+    subject: input.subject,
+    body: input.body,
+    recipientSelector: input.recipientSelector,
+    options: input.options,
+    changeDiff: null,
+    scheduledFor,
+    requestedByUid: input.requestedByUid,
+    createdAt: FieldValue.serverTimestamp(),
+    sentAt: null,
+    deliveryCounts: { sent: 0, failed: 0 },
+  };
+}
 
 // --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
 //

@@ -1018,7 +1018,7 @@ describe("createQueuedMessage", () => {
   });
 
   it("never emits an undefined field value -- Firestore rejects undefined", () => {
-    const doc = createQueuedMessage(BASE_INPUT) as Record<string, unknown>;
+    const doc = createQueuedMessage(BASE_INPUT) as unknown as Record<string, unknown>;
     for (const [key, value] of Object.entries(doc)) {
       expect(value, `field ${key} must not be undefined`).not.toBeUndefined();
     }
