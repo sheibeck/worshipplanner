@@ -28,6 +28,7 @@ import {
   todayInTimeZone,
   minusDays,
   sendScheduledRemindersHandler,
+  dispatchDueScheduledMessagesHandler,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -1869,6 +1870,316 @@ describe("sendScheduledRemindersHandler", () => {
     expect(wrapperBody).toMatch(/schedule:\s*"every day 04:00"/);
     expect(wrapperBody).toMatch(/timeZone:\s*"UTC"/);
     expect(wrapperBody).not.toMatch(/secrets:/);
+  });
+});
+
+// --- dispatchDueScheduledMessagesHandler (61-03: R141 schedule-for-later) ---
+//
+// The Phase 59 carryover: user-scheduled (status:'scheduled') message docs sit
+// inert because sendQueuedMessage is an onDocumentCreated trigger -- a status
+// FLIP on the existing doc does NOT re-fire it. This sweep finds due scheduled
+// messages via a single-field collectionGroup('messages').where('status','==',
+// 'scheduled') scan (NO composite index), code-filters scheduledFor <= now,
+// transactionally claims each scheduled->dispatched on the ORIGINAL (the
+// idempotency guard mirrors sendQueuedMessage's queued->sending claim), and then
+// CREATES A FRESH status:'queued' doc via the shared createQueuedMessage shaper
+// so onDocumentCreated fires sendQueuedMessage exactly as for a human send.
+describe("dispatchDueScheduledMessagesHandler", () => {
+  // One fixed instant so due-ness (scheduledFor <= now) is deterministic.
+  const FIXED_NOW = new Date("2026-08-14T04:30:00Z");
+  const NOW_MS = FIXED_NOW.getTime();
+  const ORG_ID = "orgDisp";
+  const SVC_ID = "svcDisp";
+
+  /** A Firestore-Timestamp-shaped scheduledFor (the real composer writes a string; the handler supports both). */
+  function ts(ms: number) {
+    return { toMillis: () => ms };
+  }
+
+  interface FakeScheduledOptions {
+    orgId?: string | null;
+    serviceId?: string;
+    id?: string;
+    status?: string;
+    scheduledFor?: unknown;
+    type?: string;
+    subject?: string;
+    body?: string;
+    recipientSelector?: unknown;
+    options?: unknown;
+    requestedByUid?: string;
+  }
+
+  // A fake scheduled messages/{id} doc. State lives on ref._state so the
+  // runTransaction fake's tx.get(ref)/tx.update(ref, patch) reads and mutates the
+  // SAME object a re-scan later sees (the idempotency proof). The parent chain
+  // resolves the service id (ref.parent.parent.id) and the org id one level up
+  // (ref.parent.parent.parent.parent.id).
+  function fakeScheduledDoc(opts: FakeScheduledOptions = {}) {
+    const orgId = opts.orgId === undefined ? ORG_ID : opts.orgId;
+    const serviceId = opts.serviceId ?? SVC_ID;
+    const id = opts.id ?? "sched1";
+    const state: Record<string, unknown> = {
+      status: opts.status ?? "scheduled",
+      scheduledFor: opts.scheduledFor === undefined ? ts(NOW_MS - 60_000) : opts.scheduledFor,
+      type: opts.type ?? "oneoff",
+      subject: opts.subject ?? "Scheduled subject",
+      body: opts.body ?? "Scheduled body {{service_link}}",
+      recipientSelector:
+        opts.recipientSelector ?? { teams: ["band"], individualPersonIds: [], includeEveryone: false },
+      options: opts.options ?? { attachServiceLink: true, sendCopyToSelf: true },
+      requestedByUid: opts.requestedByUid ?? "uidOriginalEditor",
+    };
+    const ref = {
+      path: `organizations/${orgId}/services/${serviceId}/messages/${id}`,
+      _state: state,
+      // messages collection -> service doc -> services collection -> org doc
+      parent: {
+        parent:
+          serviceId === null
+            ? null
+            : {
+                id: serviceId,
+                parent: { parent: orgId === null ? null : { id: orgId } },
+              },
+      },
+    };
+    return { id, ref, data: () => ({ ...ref._state }) };
+  }
+
+  /**
+   * A fake Firestore exposing the three seams the handler touches: the
+   * collectionGroup('messages').where('status','==','scheduled').get() scan, the
+   * runTransaction claim (reads/mutates ref._state), and the
+   * organizations/{orgId}/services/{serviceId}/messages/{}.set() fresh-doc write.
+   * Every created doc is captured into `created`.
+   */
+  function mockDispatchDb(docs: ReturnType<typeof fakeScheduledDoc>[]) {
+    const created: { orgId: string; serviceId: string; doc: Record<string, unknown> }[] = [];
+    const txUpdateSpy = vi.fn();
+
+    const whereSpy = vi.fn((_field: string, _op: string, _value: string) => ({
+      // The fake returns the fixed docs list regardless of mutated state so the
+      // idempotency test exercises the CLAIM guard, not the query filter.
+      get: vi.fn(async () => ({ docs })),
+    }));
+    const collectionGroupSpy = vi.fn((name: string) => {
+      if (name !== "messages") {
+        throw new Error(`mockDispatchDb: unexpected collectionGroup "${name}"`);
+      }
+      return { where: whereSpy };
+    });
+
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        get: vi.fn(async (r: { _state?: Record<string, unknown> | null }) => ({
+          exists: r._state != null,
+          data: () => (r._state ? { ...r._state } : undefined),
+        })),
+        update: vi.fn((r: { _state?: Record<string, unknown> }, patch: Record<string, unknown>) => {
+          txUpdateSpy(r, patch);
+          if (r._state) Object.assign(r._state, patch);
+        }),
+      };
+      return fn(tx);
+    });
+
+    function orgDocRef(orgId: string) {
+      return {
+        collection: (n: string) => {
+          if (n !== "services") throw new Error(`mockDispatchDb: unexpected org sub-collection "${n}"`);
+          return {
+            doc: (serviceId: string) => ({
+              collection: (m: string) => {
+                if (m !== "messages")
+                  throw new Error(`mockDispatchDb: unexpected messages sub-collection "${m}"`);
+                return {
+                  doc: () => ({
+                    id: `new-${created.length}`,
+                    set: vi.fn(async (doc: Record<string, unknown>) => {
+                      created.push({ orgId, serviceId, doc });
+                      return undefined;
+                    }),
+                  }),
+                };
+              },
+            }),
+          };
+        },
+      };
+    }
+
+    const collectionSpy = vi.fn((name: string) => {
+      if (name !== "organizations") {
+        throw new Error(`mockDispatchDb: unexpected collection "${name}"`);
+      }
+      return { doc: (orgId: string) => orgDocRef(orgId) };
+    });
+
+    vi.mocked(getFirestore).mockReturnValue({
+      collectionGroup: collectionGroupSpy,
+      collection: collectionSpy,
+      runTransaction,
+    } as never);
+    return { created, txUpdateSpy, whereSpy, collectionGroupSpy, runTransaction };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.mocked(getFirestore).mockReset();
+  });
+
+  it("a due scheduled message is claimed scheduled->dispatched AND one fresh status:'queued' doc is created with copied fields", async () => {
+    const doc = fakeScheduledDoc({
+      scheduledFor: ts(NOW_MS - 60_000),
+      type: "oneoff",
+      subject: "Hi there",
+      body: "Body {{service_link}}",
+      requestedByUid: "uidOriginalEditor",
+      recipientSelector: { teams: ["band"], individualPersonIds: ["p1"], includeEveryone: false },
+      options: { attachServiceLink: true, sendCopyToSelf: true },
+    });
+    const { created, txUpdateSpy, whereSpy } = mockDispatchDb([doc]);
+
+    const summary = await dispatchDueScheduledMessagesHandler();
+
+    // Single-field equality scan (no composite index).
+    expect(whereSpy).toHaveBeenCalledWith("status", "==", "scheduled");
+    // The ORIGINAL is transactionally claimed scheduled -> dispatched.
+    expect(txUpdateSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "dispatched" }),
+    );
+    expect(doc.ref._state.status).toBe("dispatched");
+    // Exactly one FRESH doc, under the same service, byte-identical to a human send.
+    expect(created).toHaveLength(1);
+    expect(created[0]!.orgId).toBe(ORG_ID);
+    expect(created[0]!.serviceId).toBe(SVC_ID);
+    expect(created[0]!.doc).toMatchObject({
+      type: "oneoff",
+      status: "queued",
+      scheduledFor: null,
+      requestedByUid: "uidOriginalEditor",
+      subject: "Hi there",
+      body: "Body {{service_link}}",
+      recipientSelector: { teams: ["band"], individualPersonIds: ["p1"], includeEveryone: false },
+      options: { attachServiceLink: true, sendCopyToSelf: true },
+      deliveryCounts: { sent: 0, failed: 0 },
+      sentAt: null,
+    });
+    expect(summary).toMatchObject({ scanned: 1, dispatched: 1 });
+  });
+
+  it("a future-scheduled message (scheduledFor > now) is neither claimed nor recreated (code-filtered)", async () => {
+    const doc = fakeScheduledDoc({ scheduledFor: ts(NOW_MS + 60 * 60 * 1000) });
+    const { created, txUpdateSpy } = mockDispatchDb([doc]);
+
+    const summary = await dispatchDueScheduledMessagesHandler();
+
+    expect(txUpdateSpy).not.toHaveBeenCalled();
+    expect(created).toHaveLength(0);
+    expect(doc.ref._state.status).toBe("scheduled");
+    expect(summary).toMatchObject({ dispatched: 0 });
+  });
+
+  it("idempotency: a SECOND run over an already-'dispatched' doc claims nothing and creates NO additional doc", async () => {
+    const doc = fakeScheduledDoc({ scheduledFor: ts(NOW_MS - 60_000) });
+    const { created } = mockDispatchDb([doc]);
+
+    await dispatchDueScheduledMessagesHandler();
+    expect(created).toHaveLength(1);
+    expect(doc.ref._state.status).toBe("dispatched");
+
+    // The scan still returns the doc; the transaction now reads 'dispatched', so
+    // the claim guard (status !== 'scheduled') fails and nothing fresh is made.
+    const summary2 = await dispatchDueScheduledMessagesHandler();
+    expect(created).toHaveLength(1);
+    expect(summary2).toMatchObject({ dispatched: 0 });
+  });
+
+  it("supports the real composer's ISO-string scheduledFor (not just a Timestamp) so production docs actually dispatch", async () => {
+    const doc = fakeScheduledDoc({ scheduledFor: new Date(NOW_MS - 60_000).toISOString() });
+    const { created } = mockDispatchDb([doc]);
+
+    const summary = await dispatchDueScheduledMessagesHandler();
+
+    expect(created).toHaveLength(1);
+    expect(created[0]!.doc).toMatchObject({ status: "queued", scheduledFor: null });
+    expect(summary).toMatchObject({ dispatched: 1 });
+  });
+
+  it("skips a scheduled message with a null/absent scheduledFor (never due)", async () => {
+    const doc = fakeScheduledDoc({ scheduledFor: null });
+    const { created, txUpdateSpy } = mockDispatchDb([doc]);
+
+    const summary = await dispatchDueScheduledMessagesHandler();
+
+    expect(txUpdateSpy).not.toHaveBeenCalled();
+    expect(created).toHaveLength(0);
+    expect(summary).toMatchObject({ dispatched: 0 });
+  });
+
+  it("one malformed scheduled message that throws is logged and skipped; other due messages still dispatch", async () => {
+    const bad = fakeScheduledDoc({
+      id: "bad",
+      serviceId: "svcBad",
+      scheduledFor: {
+        toMillis: () => {
+          throw new Error("boom");
+        },
+      },
+    });
+    const good = fakeScheduledDoc({ id: "good", serviceId: "svcGood", scheduledFor: ts(NOW_MS - 60_000) });
+    const { created } = mockDispatchDb([bad, good]);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const summary = await dispatchDueScheduledMessagesHandler();
+
+    expect(created).toHaveLength(1);
+    expect(created[0]!.serviceId).toBe("svcGood");
+    expect(summary).toMatchObject({ dispatched: 1 });
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  it("skips (never crashes) a scheduled message whose parent chain is missing the org id", async () => {
+    const orphan = fakeScheduledDoc({ orgId: null, scheduledFor: ts(NOW_MS - 60_000) });
+    const { created, txUpdateSpy } = mockDispatchDb([orphan]);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const summary = await dispatchDueScheduledMessagesHandler();
+
+    expect(txUpdateSpy).not.toHaveBeenCalled();
+    expect(created).toHaveLength(0);
+    expect(summary).toMatchObject({ dispatched: 0 });
+    errSpy.mockRestore();
+  });
+
+  it("SOURCE: the dispatch sweep is wired into the sendScheduledReminders wrapper in its own try/catch — no new onSchedule wrapper, no secret", () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const wrapperStart = source.indexOf("export const sendScheduledReminders = onSchedule(");
+    expect(wrapperStart).toBeGreaterThan(-1);
+    const wrapperBody = source.slice(wrapperStart, wrapperStart + 900);
+    // Both sweeps run inside the one wrapper; the dispatch sweep is called here.
+    expect(wrapperBody).toContain("dispatchDueScheduledMessagesHandler()");
+    expect(wrapperBody).toMatch(/try\s*\{/);
+    // No dedicated onSchedule wrapper and no secret bound to the dispatch sweep.
+    expect(source).not.toContain("export const dispatchDueScheduledMessages = onSchedule");
+    const handlerStart = source.indexOf("export async function dispatchDueScheduledMessagesHandler(");
+    expect(handlerStart).toBeGreaterThan(-1);
+    const wrapperEnd = source.indexOf("// ---", wrapperStart);
+    const handlerBody = source.slice(handlerStart, handlerStart + 2500);
+    expect(handlerBody).not.toMatch(/secrets:/);
+    // The scan is a single-field equality on status (no composite index).
+    expect(handlerBody).toMatch(
+      /collectionGroup\(\s*"messages"\s*\)\s*\.where\(\s*"status",\s*"==",\s*"scheduled"\s*\)/,
+    );
+    void wrapperEnd;
   });
 });
 
