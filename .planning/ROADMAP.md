@@ -331,7 +331,12 @@ bounced.
 
   4. A duplicate webhook delivery for the same bounce event is a safe no-op (idempotent status
      overwrite), never a duplicate count.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 60-01-PLAN.md — Svix HMAC signature verifier (pure node:crypto) + recipients.providerMessageId collection-group index (Wave 1)
+- [ ] 60-02-PLAN.md — messageWebhook onRequest handler: verify-first (401/zero-write), tags+providerMessageId addressing, transactional idempotent bounce count (Wave 2, depends 60-01)
+- [ ] 60-03-PLAN.md — "Sent on this service" delivery-history panel + serviceMessages store + RosterView ?edit deep-link (Wave 1)
 **UI hint**: yes
 
 Notes: Deploy-gated — `messageWebhook` (onRequest) ships built/tested/undeployed; after the owner
