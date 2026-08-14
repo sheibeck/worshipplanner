@@ -804,6 +804,14 @@ export const cleanupOrphanRenders = onSchedule(
 /** The three message types a composer can queue (R137). */
 export type MessageType = "oneoff" | "reminder" | "share-link";
 
+const MESSAGE_TYPES: readonly MessageType[] = ["oneoff", "reminder", "share-link"];
+
+/** Clock-skew grace so a "send now" whose client clock is slightly ahead is not rejected as past. */
+const SCHEDULE_PAST_GRACE_MS = 5 * 60 * 1000;
+
+/** A scheduledFor further ahead than ~1 year is treated as absurd input. */
+const MAX_SCHEDULE_AHEAD_MS = 366 * 24 * 60 * 60 * 1000;
+
 /**
  * A message is 'queued' for immediate send (the 59-03 trigger fires now) or
  * 'scheduled' for a future scheduledFor that Phase 61's cron later flips to
@@ -900,6 +908,131 @@ export function createQueuedMessage(input: CreateQueuedMessageInput): QueuedMess
     deliveryCounts: { sent: 0, failed: 0 },
   };
 }
+
+/**
+ * The queueServiceMessage handler body, exported separately from the onCall
+ * wrapper (parsePptxHandler/parsePptx precedent) so tests invoke it directly
+ * with a fake CallableRequest.
+ *
+ * Security contract (59-02 threat model T-59-02a..e):
+ * - Requires Firebase Auth (request.auth).
+ * - Independently re-reads organizations/{orgId}/members/{uid} and requires the
+ *   member's role ∈ ['editor','admin'] — a viewer or a wrong-org caller is
+ *   rejected. The client-declared orgId is used ONLY to scope the Firestore
+ *   path; membership and role are re-verified for THAT path, never trusted
+ *   (mirrors parsePptxHandler's membership re-check and firestore.rules'
+ *   isOrgEditor).
+ * - Re-reads the org messaging kill-switch (settings.messaging.enabled) server
+ *   -side and rejects when off — the composer's disabled entry point is
+ *   convenience; this is the boundary.
+ * - Validates the type enum (R137) and scheduledFor sanity before any write.
+ * - Writes exactly ONE messages/{id} doc via the shared createQueuedMessage
+ *   shaper and returns its id. It resolves NO recipients and sends nothing —
+ *   the 59-03 trigger does that. This Function holds NO secret (see the wrapper
+ *   below: no secrets: array — only sendQueuedMessage gets RESEND_API_KEY).
+ */
+export async function queueServiceMessageHandler(
+  request: CallableRequest<QueueMessageRequest>,
+): Promise<QueueMessageResponse> {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const {
+    orgId,
+    serviceId,
+    type,
+    subject,
+    body,
+    recipientSelector,
+    options,
+    scheduledFor,
+  } = request.data ?? ({} as QueueMessageRequest);
+
+  if (!orgId || !serviceId || !type || !subject || !body || !recipientSelector || !options) {
+    throw new HttpsError(
+      "invalid-argument",
+      "orgId, serviceId, type, subject, body, recipientSelector, and options are all required.",
+    );
+  }
+
+  // Type enum (R137) — reject anything outside the three known types.
+  if (!MESSAGE_TYPES.includes(type)) {
+    throw new HttpsError("invalid-argument", `Unknown message type "${type}".`);
+  }
+
+  // scheduledFor sanity: null means send now. When present it must parse and
+  // fall within (now - grace, now + ~1 year]; a past or absurd-future instant
+  // is rejected before any Firestore work.
+  const normalizedScheduledFor = scheduledFor ?? null;
+  if (normalizedScheduledFor !== null) {
+    const whenMs = Date.parse(normalizedScheduledFor);
+    if (Number.isNaN(whenMs)) {
+      throw new HttpsError("invalid-argument", "scheduledFor is not a valid date.");
+    }
+    const now = Date.now();
+    if (whenMs < now - SCHEDULE_PAST_GRACE_MS) {
+      throw new HttpsError("invalid-argument", "scheduledFor is in the past.");
+    }
+    if (whenMs > now + MAX_SCHEDULE_AHEAD_MS) {
+      throw new HttpsError("invalid-argument", "scheduledFor is too far in the future.");
+    }
+  }
+
+  const orgRef = getFirestore().collection("organizations").doc(orgId);
+
+  // Independent editor-tier re-check — never trust the client-declared orgId.
+  const memberDoc = await orgRef.collection("members").doc(request.auth.uid).get();
+  if (!memberDoc.exists) {
+    throw new HttpsError("permission-denied", "You are not a member of this organization.");
+  }
+  const role = (memberDoc.data() as { role?: string } | undefined)?.role;
+  if (role !== "editor" && role !== "admin") {
+    throw new HttpsError("permission-denied", "You must be an editor to send messages.");
+  }
+
+  // Kill-switch re-read server-side (no existing Function reads settings.messaging;
+  // modeled on the memberDoc.get() shape above). Defaults closed: a missing org
+  // doc or absent settings.messaging.enabled is treated as OFF.
+  const orgDoc = await orgRef.get();
+  const messagingEnabled =
+    (orgDoc.data() as { settings?: { messaging?: { enabled?: boolean } } } | undefined)?.settings
+      ?.messaging?.enabled === true;
+  if (!messagingEnabled) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Messaging is turned off for this organization.",
+    );
+  }
+
+  // Enqueue exactly one messages/{id} doc via the shared shaper. Recipients are
+  // NOT resolved and nothing is sent here — the 59-03 trigger owns that.
+  const messageRef = orgRef
+    .collection("services")
+    .doc(serviceId)
+    .collection("messages")
+    .doc();
+  await messageRef.set(
+    createQueuedMessage({
+      orgId,
+      serviceId,
+      type,
+      subject,
+      body,
+      recipientSelector,
+      options,
+      scheduledFor: normalizedScheduledFor,
+      requestedByUid: request.auth.uid,
+    }),
+  );
+
+  return { messageId: messageRef.id };
+}
+
+// NO secrets: array — queueServiceMessage only enqueues and must never hold
+// RESEND_API_KEY (R131 "smallest key-holding surface"). The secret binds only
+// to sendQueuedMessage (59-03).
+export const queueServiceMessage = onCall(queueServiceMessageHandler);
 
 // --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
 //
