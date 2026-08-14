@@ -55,7 +55,7 @@ created: 2026-08-14
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 59-01·T1 | 59-01 | 1 | R131 | T-59-01b / T-59-SC | Human-verify resend@6.19.0 pin before install (SUS/too-new; never auto-approved) | checkpoint (human) | — (blocking human-verify, no automated) | n/a | ⬜ pending |
+| 59-01·T1 | 59-01 | 1 | R131 | T-59-01b / T-59-SC | resend@6.19.0 legitimacy DISCHARGED by orchestrator npm diligence 2026-08-14 (SUS flag was 6.20.0, not the pin); evidence recorded, owner re-confirms before deploy | registry check | `cd functions && npm view resend@6.19.0 version dist.integrity` | ✅ discharged | ⬜ pending |
 | 59-01·T2 | 59-01 | 1 | R131 | T-59-01a | resend is a functions-only exact-pinned dep, never in the client bundle | build (functions) | `cd functions && node -e "require.resolve('resend')"` | ✅ build gate | ⬜ pending |
 | 59-01·T3 | 59-01 | 1 | R131/R139 | T-59-01c | ported pure resolver + per-recipient roleNames split (lockstep with client) | unit (functions) | `cd functions && npx vitest run src/serviceRoles.test.ts` | ❌ W0 (new) | ⬜ pending |
 | 59-02·T1 | 59-02 | 1 | R141 | T-59-02e | createQueuedMessage shapes the doc (queued vs scheduled), no undefined leaves, no secret | unit (functions) | `cd functions && npx vitest run src/index.test.ts` | ✅ extend existing | ⬜ pending |
