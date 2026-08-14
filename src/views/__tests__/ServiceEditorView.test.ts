@@ -6130,6 +6130,69 @@ describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () =>
     expect(wrapper.find('[data-testid="lifecycle-error"]').exists()).toBe(true)
     expect(lockNotifyOf(wrapper)).toBeNull()
   })
+
+  // ── Task 2: the subordinate confirmation line inside the lock banner ─────────
+
+  it('sent (N=2): renders "Notified 2 assigned volunteers." with aria-live polite inside the banner', async () => {
+    const wrapper = await lockDraft()
+
+    const banner = wrapper.find('[data-testid="service-lock-banner"]')
+    expect(banner.exists()).toBe(true)
+    const line = banner.find('[data-testid="lock-notify-confirmation"]')
+    expect(line.exists()).toBe(true)
+    expect(line.text()).toBe('Notified 2 assigned volunteers.')
+    expect(line.attributes('aria-live')).toBe('polite')
+    expect(line.classes()).toContain('text-amber-200')
+  })
+
+  it('sent (N=1): pluralization backstop renders the singular "1 assigned volunteer."', async () => {
+    mockResolveRecipients.mockReturnValue({
+      reachable: [{ id: 'p1', name: 'Alice', email: 'alice@example.com' }],
+      unreachableCount: 0,
+    })
+    const wrapper = await lockDraft()
+
+    expect(wrapper.find('[data-testid="lock-notify-confirmation"]').text()).toBe(
+      'Notified 1 assigned volunteer.',
+    )
+  })
+
+  it('none-reachable: renders the muted zero-reachable line (amber-300, not red)', async () => {
+    mockResolveRecipients.mockReturnValue({ reachable: [], unreachableCount: 2 })
+    const wrapper = await lockDraft()
+
+    const line = wrapper.find('[data-testid="lock-notify-confirmation"]')
+    expect(line.exists()).toBe(true)
+    expect(line.text()).toContain('no one was notified')
+    expect(line.classes()).toContain('text-amber-300')
+    expect(line.classes()).not.toContain('text-red-300')
+  })
+
+  it('error: renders the muted amber error line whose "Open Messages" button opens the composer', async () => {
+    mockQueueCallable.mockRejectedValue(new Error('callable failed'))
+    const wrapper = await lockDraft()
+
+    const line = wrapper.find('[data-testid="lock-notify-confirmation"]')
+    expect(line.exists()).toBe(true)
+    expect(line.text()).toContain('Locked')
+    expect(line.classes()).toContain('text-amber-300')
+    expect(line.classes()).not.toContain('text-red-300')
+
+    const openBtn = line.findAll('button').find((b) => b.text() === 'Open Messages')
+    expect(openBtn).toBeDefined()
+    const vm = wrapper.vm as unknown as { messageComposerOpen: boolean }
+    expect(vm.messageComposerOpen).toBe(false)
+    await openBtn!.trigger('click')
+    expect(vm.messageComposerOpen).toBe(true)
+  })
+
+  it('null (a re-lock): renders NO confirmation line — only the banner copy', async () => {
+    mockGetDoc.mockResolvedValue({ exists: () => true }) // re-lock
+    const wrapper = await lockDraft()
+
+    expect(wrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lock-notify-confirmation"]').exists()).toBe(false)
+  })
 })
 
 // ── 31-04: the three tabs go read-only when the service is locked (R036) ──────
