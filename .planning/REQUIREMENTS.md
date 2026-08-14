@@ -45,7 +45,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 ### Messages Composer & Send
 
-- [ ] **R136**: A ✉ Messages button on a service opens a composer whose recipients are teams first,
+- [x] **R136**: A ✉ Messages button on a service opens a composer whose recipients are teams first,
       with individuals addable below.
 
 - [x] **R137**: The composer supports three message types — One-off message, Reminder, and Share
@@ -57,7 +57,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 - [x] **R139**: Each recipient receives a personalized email — the "their roles" token renders that
       individual's own assigned roles, not a shared block.
 
-- [ ] **R140**: The composer shows a live "Reaches N people" count reflecting the selected
+- [x] **R140**: The composer shows a live "Reaches N people" count reflecting the selected
       teams/individuals minus unreachable roles.
 
 - [x] **R141**: The composer offers attach-the-service-order-link, send-me-a-copy, and
@@ -144,11 +144,11 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R133 | Phase 58 | Complete |
 | R134 | Phase 58 | Complete |
 | R135 | Phase 58 | Complete |
-| R136 | Phase 59 | Pending |
+| R136 | Phase 59 | Complete |
 | R137 | Phase 59 | Complete |
 | R138 | Phase 59 | Complete |
 | R139 | Phase 59 | Complete |
-| R140 | Phase 59 | Pending |
+| R140 | Phase 59 | Complete |
 | R141 | Phase 59 | Complete |
 | R142 | Phase 60 | Pending |
 | R143 | Phase 60 | Pending |

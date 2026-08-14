@@ -199,6 +199,36 @@ it is a pre-deploy gate, not a satisfied one.
 
 ---
 
+## ⏳ 59-04 — ✉ Messages composer visual/interaction UAT — DEFERRED (owner at /gsd-verify-work 59)
+
+Phase 59-04 shipped the **client** send surface: the ✉ **Messages** action-bar entry point
+(`src/views/serviceEditorActionBar.ts`, editor-gated, **present-but-disabled with a Settings tooltip
+when messaging is off** per UI-SPEC #0) and `src/components/MessageComposer.vue` — teams-first recipient
+chips + Everyone + addable individuals, three message types seeding subject/body behind a dirty guard,
+subject/body with caret-inserted merge tokens (raw template stored), a live pluralized "Reaches N"
+count via the Phase 58 `resolveRecipients`, the three options (attach-link default on, send-me-a-copy,
+schedule-for-later reveal), and a dynamic Send calling the `queueServiceMessage` client callable with
+the recipient **selector only** (no email list crosses the boundary; the server re-resolves in 59-03).
+
+**Automated gates all pass** (2026-08-14): `serviceEditorActionBar.test.ts` (47) green,
+`MessageComposer.test.ts` (19) green, `npm run type-check` (vue-tsc --build) clean, full app suite at
+the 2-file known-failing baseline (storage.rules.test.ts + RosterView.test.ts), no new regressions.
+
+**The client calls the (still-UNDEPLOYED) `queueServiceMessage` callable** — that is expected under the
+v1.7 grant; the send path is exercised by tests, not a live deploy. No deploy, no `.env.local`, no
+secret changes were made this plan.
+
+**OWNER, at `/gsd-verify-work 59` — manual visual/interaction UAT (do NOT mark passed here):**
+- open a service, click **✉ Messages**, and compare the composer to
+  `.planning/research/DESIGN-messaging.md` §5a (teams-first layout, indigo accent, live "Reaches N").
+- toggle recipients and confirm the per-chip counts, "Reaches N", and the Send enabled-state update live.
+- turn **Messaging off** in Settings and confirm the ✉ item renders **disabled with the tooltip**
+  ("Turn on Messaging in Settings to email volunteers"), not hidden.
+- the end-to-end **live send** (a real queued message reaching a real inbox) remains gated on the
+  59-01/59-02/59-03 pre-deploy steps above — it cannot be verified until the send Functions deploy.
+
+---
+
 ## Also still open (tracked in ROADMAP `## Backlog`, not here)
 
 - **999.3** — firestore.rules are deployed, but the **production devtools bypass check** (set a service to Planned, attempt a direct Firestore write, expect permission denied) was never performed against prod.

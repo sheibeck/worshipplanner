@@ -5,16 +5,16 @@ milestone_name: Volunteer Messaging & Notifications
 current_phase: 59
 current_phase_name: Messages Composer & Send Path
 status: executing
-stopped_at: Completed 59-03-PLAN.md
-last_updated: "2026-08-14T16:26:34.643Z"
+stopped_at: Completed 59-04-PLAN.md
+last_updated: "2026-08-14T16:51:17.164Z"
 last_activity: 2026-08-14
-last_activity_desc: executed 59-03
+last_activity_desc: executed 59-04 (Phase 59 code-complete)
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 8
-  percent: 20
+  completed_plans: 9
+  percent: 40
 ---
 
 # Project State
@@ -276,10 +276,11 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 59 (Messages Composer & Send Path) — EXECUTING
-Plan: 59-02 complete (queueServiceMessage enqueue handler); more plans to follow (59-03 sendQueuedMessage trigger, 59-04 composer)
-Status: 59-02 shipped built/tested/UNDEPLOYED — queueServiceMessage onCall enqueue Function + createQueuedMessage doc-shaper in functions/src/index.ts. Re-authorizes caller (independent editor-tier membership re-check), re-reads settings.messaging.enabled kill-switch server-side, validates type enum + scheduledFor, writes ONE messages/{id} and returns { messageId }; holds NO secret (RESEND_API_KEY declared, binds only to sendQueuedMessage in 59-03). Gates green: functions vitest 76/76 (full functions suite 149/149), functions build clean, root suite at 2-file known baseline. Owner deploy (firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage) + secret/DNS routed to PENDING-VERIFICATION.md (item 59-02, pre-deploy re-confirm in 59-01).
-Last activity: 2026-08-14 — executed 59-02
+Phase: 59 (Messages Composer & Send Path) — CODE-COMPLETE (4/4 plans have summaries; human UAT + deploy deferred)
+Plan: 59-04 complete (✉ Messages composer + client send surface) — the last plan of Phase 59
+Status: 59-04 shipped the CLIENT send surface — the ✉ Messages action-bar item (editor-gated, present-but-disabled with a Settings tooltip when messaging off, UI-SPEC #0) + src/components/MessageComposer.vue: teams-first recipients + individuals, 3 message types seeding subject/body behind a dirty guard, subject/body with caret-inserted merge tokens (raw template stored), live pluralized "Reaches N" via the Phase 58 resolver, the 3 options + schedule reveal, and a Send calling the queueServiceMessage client callable with the recipient SELECTOR only (no email list crosses the boundary; server re-resolves in 59-03). Gates green: serviceEditorActionBar.test.ts 47/47, MessageComposer.test.ts 19/19, npm run type-check (vue-tsc --build) clean, full app suite at the 2-file known baseline (13 failing = unchanged). The client calls the still-UNDEPLOYED queueServiceMessage — expected under the v1.7 grant. Visual/interaction UAT (composer vs DESIGN §5a; kill-switch disabled+tooltip end-to-end) DEFERRED to owner /gsd-verify-work 59, routed to PENDING-VERIFICATION.md item 59-04.
+Phase 59 whole: 59-01 (resend pin, undeployed) + 59-02 (queueServiceMessage enqueue) + 59-03 (sendQueuedMessage trigger, sole RESEND_API_KEY holder) + 59-04 (client composer) — all built/tested/UNDEPLOYED. Owner deploy: firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage (after Resend account + secret + DNS), then /gsd-verify-work 59.
+Last activity: 2026-08-14 — executed 59-04
 
 > **Phase 58 outcome (2026-08-14):** `58-VERIFICATION.md` = passed/GREEN, 5/5 requirements
 > (R130/R132/R133/R134/R135) present, wired, and behaviorally exercised. One manual UAT (Draft→locked
@@ -1734,6 +1735,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 59 P01 | 36min | 3 tasks | 4 files |
 | Phase 59 P02 | 18min | 2 tasks | 2 files |
 | Phase 59 P03 | 13min | 2 tasks | 4 files |
+| Phase 59 P04 | 18min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -2408,8 +2410,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-14T16:26:34.587Z
-Stopped at: Completed 59-03-PLAN.md
+Last session: 2026-08-14T16:51:17.108Z
+Stopped at: Completed 59-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
