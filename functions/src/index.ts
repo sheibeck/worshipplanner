@@ -1205,17 +1205,24 @@ export async function dispatchDueScheduledMessagesHandler(
 
 /**
  * The message types a composer or an automatic trigger can queue (R137).
- * 'lock-notification' (Phase 61) is the automatic lock email; Phase 62 will add
- * 'relock-notification' the same way — append to BOTH the union and the
- * MESSAGE_TYPES array, and the enum gate + shared shaper pick it up unchanged.
+ * 'lock-notification' (Phase 61) is the automatic lock email; 'relock-notification'
+ * (Phase 62) is the re-lock change notice, added the same way — appended to BOTH the
+ * union and the MESSAGE_TYPES array, and the enum gate + shared shaper pick it up
+ * unchanged.
  */
-export type MessageType = "oneoff" | "reminder" | "share-link" | "lock-notification";
+export type MessageType =
+  | "oneoff"
+  | "reminder"
+  | "share-link"
+  | "lock-notification"
+  | "relock-notification";
 
 const MESSAGE_TYPES: readonly MessageType[] = [
   "oneoff",
   "reminder",
   "share-link",
   "lock-notification",
+  "relock-notification",
 ];
 
 /** Clock-skew grace so a "send now" whose client clock is slightly ahead is not rejected as past. */
