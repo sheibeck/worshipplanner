@@ -519,3 +519,60 @@ Plans:
 Plans:
 
 - [ ] TBD (promote with /gsd-review-backlog when ready — and BEFORE onboarding any multi-org user)
+
+---
+
+## v1.8 — Messaging UX & Fixes (Phases 63–64)
+
+Follow-up milestone from owner UAT of v1.7. Continues phase numbering from Phase 62. Mostly client-side
+UI over the existing send path (`MessageComposer.vue`, `ServiceMessageHistory.vue`, `ServiceEditorView.vue`,
+`src/utils/messagingRecipients.ts`). No new provider integration; message-type seeding (R156) is
+client-only. `coarse` granularity → 2 phases. **v1.7 stays open** (owner deploy/verify pending).
+
+| Phase | Goal | Requirements | UI hint |
+|-------|------|--------------|---------|
+| 63 Messages Tab & Always-Visible History | A dedicated Messages tab holds the messaging defaults + a delivery history that never disappears when the service locks | R149, R150 | yes |
+| 64 Composer Refinements | The ✉ composer sends correctly and legibly: roster-matching team labels, working add-individual, live preview, corrected tokens, a sending spinner, and message types that seed distinct content | R151, R152, R153, R154, R155, R156 | yes |
+
+### Phase 63: Messages Tab & Always-Visible History
+
+**Goal**: The per-service messaging surfaces live in one dedicated Messages tab, and the "Sent on this
+service" history is visible whether the service is a draft, locked, or exported.
+**Depends on**: — (builds on shipped v1.7 Phases 58/60/62 surfaces)
+**Requirements**: R149, R150
+**Success Criteria** (what must be TRUE):
+  1. The Service Editor has a **Messages tab**; the "Messaging defaults" panel and the "Sent on this
+     service" delivery-history panel render there and NO LONGER in the Service Order tab.
+  2. The delivery-history panel is **visible at all times** (draft / locked / exported) — its render no
+     longer depends on `canEditService`; it shows for any org editor, gated only by `isMessagingEnabled()`.
+  3. The ✉ Messages composer still opens as an action-bar modal (unchanged); no send behavior regresses.
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 64: Composer Refinements
+
+**Goal**: The composer is correct and legible — team labels match the roster, adding an individual works,
+the preview is live, tokens are right, sending shows progress, and each message type seeds distinct content.
+**Depends on**: — (independent of Phase 63; both touch messaging UI but different components)
+**Requirements**: R151, R152, R153, R154, R155, R156
+**Success Criteria** (what must be TRUE):
+  1. Send-To team labels read **Band / Vocals / Tech / Other** (mirroring Volunteer Roles), everywhere
+     messaging renders team names — the Worship/Hosts remap is gone.
+  2. **"+ Add someone"** adds the chosen individual to the recipient selection (and the live "Reaches N"
+     reflects them); the person can be removed again.
+  3. The email **preview updates live** as the subject/body change (tokens rendered against a sample
+     recipient) — no click-to-preview step.
+  4. The **`{{song_list}}` token is gone**; a **`{{name}}`** token renders each recipient's own name.
+  5. Sending shows an **in-progress spinner**; a message that cannot progress shows a **failed/timeout**
+     state in the history rather than a perpetual "Sending…".
+  6. Selecting **One-off / Reminder / Share service link** seeds the distinct subject/body/recipients
+     defined in R156; changing type re-seeds only when the fields are untouched (dirty-guard).
+**Plans**: TBD
+**UI hint**: yes
+
+**Sequencing**: 63 and 64 are independent (tab restructure vs composer internals); either order works. R151
+touches `MESSAGING_TEAM_LABELS` (`src/utils/messagingRecipients.ts`), used by the composer AND the re-lock
+prompt — relabel once, globally. R155's history-side "Sending… vs failed" affordance touches
+`ServiceMessageHistory.vue`, which Phase 63 relocates — if 63 lands first, 64 edits it in its new home.
+
+*v1.8 roadmap created: 2026-08-15. Traceability: REQUIREMENTS.md (R149–R156, 8/8 mapped, 0 unmapped).*

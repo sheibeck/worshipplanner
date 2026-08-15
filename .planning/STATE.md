@@ -1,21 +1,42 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.7
-milestone_name: Volunteer Messaging & Notifications
-current_phase: 62
-current_phase_name: Re-lock Change Notice — Scoped Diff
-status: verification_deferred_human
-stopped_at: v1.7 COMPLETE (all 5 phases 58-62 code-complete + verified GREEN); STOPPED before milestone lifecycle per grant
-last_updated: "2026-08-15T03:00:00.000Z"
+milestone: v1.8
+milestone_name: Messaging UX & Fixes
+current_phase: 63
+current_phase_name: Messages Tab & Always-Visible History
+status: roadmap_created
+stopped_at: v1.8 REQUIREMENTS + ROADMAP created (R149-R156, Phases 63-64); ready to plan Phase 63
+last_updated: "2026-08-15T04:00:00.000Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 62 verified GREEN (4/4). ALL 5 v1.7 phases code-complete + verified. Milestone lifecycle (audit/complete/cleanup) + all /gsd-verify-work + deploys DEFERRED to owner per the standing grant.
+last_activity_desc: Started v1.8 (Messaging UX & Fixes) from owner UAT of v1.7 — 8 requirements, 2 phases. v1.7 stays open (owner deploy/verify pending).
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 20
-  completed_plans: 20
-  percent: 100
+  total_phases: 2
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
+
+## ⏸ RESUME HERE (2026-08-15 — v1.8 roadmap created, ready to plan Phase 63)
+
+**v1.8 "Messaging UX & Fixes"** — `.planning/REQUIREMENTS.md` (R149–R156, 8/8 mapped) and
+`.planning/ROADMAP.md` (Phases 63–64) are filled. No plan created yet. Started from owner UAT of the
+shipped v1.7 messaging feature. Decisions locked at scoping (2026-08-15):
+- **Message types seed distinct content** (R156): One-off = blank; Reminder = `Reminder: {{service_date}}`
+  + link body, everyone assigned; Share = `Service plan for {{service_date}}`, body = `{{service_link}}`
+  only. Client-only (no send-path change).
+- **Composer stays an action-bar modal**; the new Messages tab holds only the defaults + the
+  always-visible "Sent on this service" history.
+
+**Next step:** `/gsd-plan-phase 63` (optionally `/gsd-discuss-phase 63` first). Phase 63 = the Messages
+tab + always-visible history (R149, R150); Phase 64 = composer refinements (R151–R156). The two are
+independent; either order works.
+
+**v1.7 is NOT archived** — it is code-complete + verified GREEN but its send path is UNDEPLOYED and its
+owner steps (deploy/secret/DNS + `/gsd-verify-work 58..62`) are still open in
+`.planning/PENDING-VERIFICATION.md`. See § v1.7 MILESTONE HAND-OVER below (preserved). Local emulator
+sends were unblocked 2026-08-15 via `functions/.secret.local` (gitignored placeholder secrets; debug
+session `resolved/functions-emulator-load-failure.md`).
 
 # Project State
 

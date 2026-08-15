@@ -8,7 +8,29 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v1.7 Volunteer Messaging & Notifications
+## Current Milestone: v1.8 Messaging UX & Fixes
+
+**Goal:** Refine the shipped v1.7 messaging feature from owner UAT — a dedicated Messages tab, a
+delivery history that stays visible when the service locks, roster-matching team labels, a working
+add-individual, a live email preview, corrected merge tokens, a sending spinner, and message types that
+actually seed distinct content. Continues phase numbering (Phases 63–64) and the `R###` scheme
+(R149–R156). **v1.7 remains open** — its send path is UNDEPLOYED and its owner deploy/verify steps are
+tracked in `.planning/PENDING-VERIFICATION.md`; v1.8 stacks on top rather than waiting on that.
+
+**Target changes (from live testing of v1.7 messaging):**
+- **Messages tab** — move the per-service Messaging defaults + "Sent on this service" history out of the
+  Service Order tab into a dedicated tab; the ✉ composer stays an action-bar modal.
+- **History always visible** — fix the Phase 60 defect where the history vanishes once the service locks
+  (it was gated on `canEditService`).
+- **Composer fixes** — Send-To labels mirror Volunteer Roles (Band/Vocals/Tech/Other, dropping
+  Worship/Hosts); "+ Add someone" actually adds an individual; live real-time email preview; remove the
+  `{{song_list}}` token and add a per-recipient `{{name}}` token; a sending spinner; and message types
+  (One-off / Reminder / Share service link) that seed distinct subject/body/recipient defaults.
+
+See `.planning/REQUIREMENTS.md` (v1.8 section, R149–R156) and `.planning/ROADMAP.md` (Phases 63–64).
+
+<details>
+<summary>Previous milestone — v1.7 Volunteer Messaging & Notifications (code-complete + verified GREEN 2026-08-15; owner deploy/verify pending)</summary>
 
 **Goal:** Let planners email the volunteers scheduled on a service — targeted messages to teams or
 individuals, automatic notifications when a service is locked/re-locked (with a scoped change diff),
@@ -42,6 +64,8 @@ backend concern requiring a provider secret in `.env.local` (owner-added) and a 
 (owner-gated), consistent with the standing no-deploys / no-`.env.local`-writes rules. Design imported
 from the Claude Design project "Worship Planner Slideshow Design" (canvas *Turn 5 — Messaging
 volunteers*, panels 5a composer / 5b lock + automatic mail + history).
+
+</details>
 
 ## Current State
 

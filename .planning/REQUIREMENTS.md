@@ -167,3 +167,53 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 ---
 *Requirements defined: 2026-08-13*
 *Last updated: 2026-08-13 — ROADMAP.md created, 19/19 requirements mapped to Phases 58-62.*
+
+---
+
+# v1.8 — Messaging UX & Fixes
+
+Follow-up milestone refining the shipped v1.7 volunteer-messaging feature from owner UAT. Continues the
+`R###` scheme (v1.7 ended at R148) and phase numbering (v1.7 ended at Phase 62). Mostly client-side UI.
+**v1.7 remains open** (its send path is UNDEPLOYED; owner deploy/verify pending in PENDING-VERIFICATION.md).
+
+## Requirements
+
+- [ ] **R149** — Dedicated **Messages tab** in the Service Editor. The per-service "Messaging defaults"
+  panel and the "Sent on this service" delivery-history panel MOVE out of the Service Order tab into this
+  new tab. The ✉ composer stays an action-bar modal (unchanged location).
+- [ ] **R150** — The **"Sent on this service" delivery history is visible at all times** — locked, draft,
+  or exported — no longer gated on `canEditService` (the Phase 60 / 60-03 defect where it vanished once the
+  service locked). It lives in the Messages tab (R149) and renders for any editor of the org.
+- [ ] **R151** — The composer's **Send-To team labels mirror the Volunteer Roles group names exactly**:
+  **Band, Vocals, Tech, Other** — dropping the v1.7 `MESSAGING_TEAM_LABELS` remap (band→Worship,
+  other→Hosts) everywhere messaging renders team names.
+- [ ] **R152** — The composer's **"+ Add someone" actually adds** the selected individual to the recipient
+  selector (`individualPersonIds`) — today it only focuses/highlights the dropdown and adds no one.
+- [ ] **R153** — The composer shows a **live email preview that updates in real time** as the subject/body
+  are edited (merge tokens re-rendered against a sample recipient) — replacing the click-to-preview button.
+- [ ] **R154** — **Merge tokens:** remove `{{song_list}}` (the song list already ships in the service-plan
+  / share link); add a **`{{name}}`** per-recipient token that renders the recipient's own name.
+- [ ] **R155** — The **Send action shows an in-progress spinner** while `queueServiceMessage` runs; and a
+  message that cannot progress surfaces a **failed/timeout** affordance in the history instead of the
+  perpetual "Sending…" (a `queued` doc currently renders "Sending…" forever).
+- [ ] **R156** — The three **message types seed distinct content** on selection (same send mechanism):
+  **One-off** = blank subject/body; **Reminder** = subject `Reminder: {{service_date}}`, body seeded with
+  the service link, recipients default to everyone assigned; **Share service link** = subject
+  `Service plan for {{service_date}}`, body = `{{service_link}}` only.
+
+## Traceability (v1.8)
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| R149 | Phase 63 | Pending |
+| R150 | Phase 63 | Pending |
+| R151 | Phase 64 | Pending |
+| R152 | Phase 64 | Pending |
+| R153 | Phase 64 | Pending |
+| R154 | Phase 64 | Pending |
+| R155 | Phase 64 | Pending |
+| R156 | Phase 64 | Pending |
+
+**Coverage:** v1.8 = 8 requirements (R149–R156), mapped to Phases 63–64, 0 unmapped ✓
+
+*v1.8 requirements defined: 2026-08-15 (from owner UAT of v1.7 messaging).*
