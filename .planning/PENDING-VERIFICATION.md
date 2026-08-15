@@ -460,3 +460,33 @@ non-blocking failed-enqueue path, and the banner line's states incl. pluralizati
 **Client-only plan — NO deploy, NO `.env.local`, NO functions change this plan.** Do **not** treat
 this item as passed — the visual + real-email UAT is deferred to the owner, gated behind the same
 undeployed send path as 59/60/61-02/61-03.
+
+## ⏳ 62-04 — re-lock change-notice prompt: scoped diff + real send + "Lock quietly" — DEFERRED (owner at /gsd-verify-work 62)
+
+Plan 62-04 wired the Phase 62 pieces into the shipped lock hook. `onMarkAsPlanned` now computes a REAL
+`slideGroupsFingerprint` on every lock (the Phase 61 `slideGroupsFingerprint: null` stub is realized),
+and on a **re-lock** (a prior `lockSnapshots/current` exists) it reads the prior snapshot + fingerprint
+BEFORE writing, runs `diffServiceSnapshots`, and — for a non-empty diff with messaging on — opens
+`ReLockNotifyPrompt` while **DEFERRING** the `lockSnapshots/current` overwrite to the modal's confirm.
+An empty diff or messaging off overwrites silently with no prompt. Every behavior below is proven by
+`ServiceEditorView.test.ts` (8 new re-lock specs + the updated first-lock fingerprint assertions):
+prompt-opens/no-overwrite-while-open, `sent`→overwrite, `cancel`→overwrite, a **send-failure**→
+no-overwrite (SC4 safe basis), empty-diff/messaging-off silent overwrite, and first-lock-never-opens.
+
+**What only a human at `/gsd-verify-work 62` can confirm (`verification_deferred_human`):**
+- **The scoped diff prompt renders + sends for real.** In the LIVE app (messaging on): lock a draft,
+  reopen it, edit it (change a song / reorder / a role assignment / notes / slides), and re-lock —
+  confirm `ReLockNotifyPrompt` opens listing exactly the typed changes with the right affected-team
+  tags, and that **Send notice** actually emails the chosen recipients (Affected teams vs Everyone) via
+  the **UNDEPLOYED** `queueServiceMessage`, landing a row in the Phase 60 "Sent on this service" history
+  panel. Requires the still-open 59-01/59-03 pre-deploy gates (`RESEND_API_KEY` + sending domain).
+- **SC4 overwrite timing by eyeball.** Confirm **Lock quietly** re-locks with NO email AND resets the
+  diff basis (a subsequent immediate re-lock shows "no changes"); confirm a **failed send** leaves the
+  prompt open and does NOT reset the basis (retry still diffs against the pre-edit state).
+- **Empty-diff / messaging-off:** re-lock with no edits → no prompt; turn messaging OFF and re-lock an
+  edited service → no prompt, silent re-lock.
+
+**Client-only plan — NO deploy, NO `.env.local`, NO functions change this plan** (v1.7 grant). Do
+**not** treat this item as passed — the visual + real-email + overwrite-timing UAT is deferred to the
+owner, gated behind the same undeployed send path as 59/60/61/62-03. **This is the FINAL plan of
+milestone v1.7; the phase is code-complete — the milestone lifecycle (audit/complete) is the owner's.**

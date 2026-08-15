@@ -4,17 +4,17 @@ milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
 current_phase: 62
 current_phase_name: Re-lock Change Notice — Scoped Diff
-status: discussing
-stopped_at: Completed 62-03-PLAN.md
-last_updated: "2026-08-15T02:06:40.732Z"
-last_activity: 2026-08-14
-last_activity_desc: Phase 61 verified GREEN; starting Phase 62
+status: verification_deferred_human
+stopped_at: Completed 62-04-PLAN.md (FINAL plan of v1.7) — Phase 62 code-complete
+last_updated: "2026-08-15T02:40:28.685Z"
+last_activity: 2026-08-15
+last_activity_desc: Phase 62 code-complete (62-04 re-lock change-notice lock-hook integration executed GREEN); v1.7 milestone lifecycle DEFERRED to owner per grant
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 20
-  completed_plans: 19
-  percent: 95
+  completed_plans: 20
+  percent: 100
 ---
 
 # Project State
@@ -276,10 +276,26 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 62 (Re-lock Change Notice — Scoped Diff) — DISCUSSING (FINAL v1.7 phase)
-Plan: not yet planned
-Status: Phase 61 verified GREEN (4/4); Phase 62 starting — the last phase before milestone lifecycle (which is DEFERRED to the owner per the grant)
-Last activity: 2026-08-14 — Phase 61 verified GREEN; starting Phase 62
+Phase: 62 (Re-lock Change Notice — Scoped Diff) — CODE-COMPLETE (FINAL v1.7 phase; all 4 plans executed)
+Plan: 62-04 executed GREEN (last plan of the phase and the milestone)
+Status: v1.7 is CODE-COMPLETE. Per the standing grant, STOP before the milestone lifecycle (audit/complete/cleanup) — that is the owner's step after verifying + deploying. Hand over the `/gsd-verify-work 58..62` deferred list in `.planning/PENDING-VERIFICATION.md`.
+Last activity: 2026-08-15 — 62-04 wired the pure diff (62-02) + ReLockNotifyPrompt (62-03) into the shipped Phase 61 lock hook
+
+> **Phase 62 outcome (2026-08-15) — 62-04 (R146/R148/SC4):** `onMarkAsPlanned` now computes a REAL
+> `slideGroupsFingerprint` on every lock (the Phase 61 `slideGroupsFingerprint: null` stub is realized —
+> Phase 61 first-lock tests updated to the real map, NOT a regression). Read-before-write existence check
+> branches: FIRST LOCK writes immediately + keeps the Phase 61 gated auto-send; RE-LOCK reads prior
+> snapshot+fingerprint, runs `diffServiceSnapshots`, and on a non-empty diff with messaging ON opens
+> `ReLockNotifyPrompt` while DEFERRING the `lockSnapshots/current` overwrite into a `writeSnapshot` closure
+> that the modal's `sent` OR `cancel` resolver runs (both overwrite; a failed send emits neither → snapshot
+> stays as the safe pre-edit diff basis — SC4). Empty diff OR messaging off overwrites silently, no prompt.
+> Whole block stays in its own try/catch, never re-raised into `lifecycleError`. Gates: scoped
+> `ServiceEditorView.test.ts` 317 pass (+8 re-lock specs incl. the explicit send-failure-no-overwrite SC4
+> test); `npm run type-check` (`vue-tsc --build`) clean; full app suite at the 2-file known-failing baseline
+> (`storage.rules.test.ts` emulator limitation + `RosterView.test.ts` stale assertion). NO deploy, NO
+> `.env.local` (v1.7 grant). Deferred (NOT defects): visual + real-email + overwrite-timing UAT via the
+> UNDEPLOYED `queueServiceMessage` → `/gsd-verify-work 62`, recorded in PENDING-VERIFICATION.md. **All 5
+> v1.7 phases (58-62) are now code-complete; the milestone lifecycle is the owner's.**
 
 > **Phase 61 outcome (2026-08-14):** `61-VERIFICATION.md` = passed/GREEN, 4/4 SC + R144/R145, all
 > test-exercised. SC1 lock-notification type + client first-lock hook (auto-enqueue on draft→locked, gated,
@@ -1777,6 +1793,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 62 P01 | 6 min | 2 tasks | 2 files |
 | Phase 62 P02 | 8 min | 2 tasks | 2 files |
 | Phase 62 P03 | 14 min | 2 tasks | 2 files |
+| Phase 62 P04 | 34 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2452,8 +2469,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-15T02:06:40.655Z
-Stopped at: Completed 62-03-PLAN.md
+Last session: 2026-08-15T02:40:28.611Z
+Stopped at: Completed 62-04-PLAN.md (FINAL plan of v1.7)
 Resume file: None
 
 ## Operator Next Steps
