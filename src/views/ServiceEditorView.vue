@@ -1599,6 +1599,7 @@ import { serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/firebase'
 import { resolveRecipients } from '@/utils/messagingRecipients'
+import { fingerprintSlideGroups } from '@/utils/serviceLockDiff'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
 import type { AiSongSuggestion } from '@/utils/claudeApi'
@@ -2924,12 +2925,15 @@ async function onMarkAsPlanned(): Promise<void> {
         const prior = await getDoc(snapRef)
         const wasFirstLock = !prior.exists()
 
-        // Written on EVERY lock so Phase 62 has a prior snapshot to diff.
-        // slideGroupsFingerprint is null — deferred to Phase 62 (buildServiceSnapshot
-        // carries no slide text; 61-RESEARCH § slideGroupsFingerprint decision).
+        // Phase 62 (R146): compute a REAL slideGroupsFingerprint over the ALREADY
+        // loaded slideGroupsStore.groups (NO new Firestore read; NOT pushed into
+        // buildServiceSnapshot — the share-link path stays untouched), replacing
+        // the Phase 61 `slideGroupsFingerprint: null` stub. Written on EVERY lock
+        // so Phase 62 has a prior snapshot + fingerprint to diff.
+        const currFingerprint = fingerprintSlideGroups(slideGroupsStore.groups, svc.id)
         await setDoc(snapRef, {
           snapshot: buildServiceSnapshot(svc),
-          slideGroupsFingerprint: null,
+          slideGroupsFingerprint: currFingerprint,
           lockedAt: serverTimestamp(),
           lockedByUid: authStore.user?.uid ?? null,
         })
