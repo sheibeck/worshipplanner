@@ -1252,6 +1252,19 @@ export interface MessageOptions {
   sendCopyToSelf: boolean;
 }
 
+/**
+ * A single scoped change entry in a relock-notification's audit trail (R148).
+ * Functions-LOCAL: the monorepo has no shared package, so `affectedTeams` is
+ * `string[]` (the same RoleGroup enum-string values the client uses), never the
+ * client `RoleGroup` type. `type` is a change-category string ('SONG' | 'ORDER'
+ * | 'ROLE' | 'NOTES' | 'SLIDES').
+ */
+export interface ChangeEntry {
+  type: string;
+  description: string;
+  affectedTeams: string[];
+}
+
 /** The client-declared queue request (every field is re-validated server-side). */
 export interface QueueMessageRequest {
   orgId: string;
@@ -1263,6 +1276,8 @@ export interface QueueMessageRequest {
   options: MessageOptions;
   /** ISO instant to send at, or null for send-now. */
   scheduledFor: string | null;
+  /** Optional scoped change audit trail — relock-notification only (R148). */
+  changeDiff?: ChangeEntry[] | null;
 }
 
 export interface QueueMessageResponse {
@@ -1288,7 +1303,7 @@ export interface QueuedMessageDoc {
   body: string;
   recipientSelector: RecipientSelector;
   options: MessageOptions;
-  changeDiff: null;
+  changeDiff: ChangeEntry[] | null;
   scheduledFor: string | null;
   requestedByUid: string;
   createdAt: FieldValue;
@@ -1319,7 +1334,7 @@ export function createQueuedMessage(input: CreateQueuedMessageInput): QueuedMess
     body: input.body,
     recipientSelector: input.recipientSelector,
     options: input.options,
-    changeDiff: null,
+    changeDiff: input.changeDiff ?? null,
     scheduledFor,
     requestedByUid: input.requestedByUid,
     createdAt: FieldValue.serverTimestamp(),
@@ -1366,6 +1381,7 @@ export async function queueServiceMessageHandler(
     recipientSelector,
     options,
     scheduledFor,
+    changeDiff,
   } = request.data ?? ({} as QueueMessageRequest);
 
   if (!orgId || !serviceId || !type || !subject || !body || !recipientSelector || !options) {
@@ -1441,6 +1457,7 @@ export async function queueServiceMessageHandler(
       recipientSelector,
       options,
       scheduledFor: normalizedScheduledFor,
+      changeDiff,
       requestedByUid: request.auth.uid,
     }),
   );
