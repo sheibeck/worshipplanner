@@ -8,9 +8,13 @@ import type { Song } from '@/types/song'
 import type { Person, Role, Quarter } from '@/types/roster'
 import type { Timestamp } from 'firebase/firestore'
 import type { SlideGroup } from '@/types/slideGroup'
+import type { ServiceSnapshot } from '@/stores/services'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
+// 62-04 (R146/R148): matched against the shallowMount stub so re-lock tests can
+// read the mounted prompt's props and emit its sent/cancel events.
+import ReLockNotifyPrompt from '@/components/ReLockNotifyPrompt.vue'
 // 32-05: ServiceEditorView now consumes the REAL, Firestore-free useSaveStatus
 // store directly (not vi.mock-ed) — the same new-precedent choice 32-03/32-04
 // already made for their own store/component tests.
@@ -6114,13 +6118,23 @@ describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () =>
     expect(lockNotifyOf(wrapper)).toEqual({ kind: 'none-reachable' })
   })
 
-  it('re-lock (prior lockSnapshots/current exists): snapshot overwritten, NO enqueue, null', async () => {
-    mockGetDoc.mockResolvedValue({ exists: () => true })
+  it('re-lock with an EMPTY diff: snapshot overwritten silently, NO prompt, NO enqueue, null', async () => {
+    // 62-04: the Phase 61 "re-lock still overwrites" assertion, updated to the
+    // deferred/gated form — an EMPTY diff (prior === current, matching fingerprint)
+    // overwrites immediately with no prompt (nothing changed to notify about).
+    const snap = { slots: [], roleAssignments: [], notes: '' }
+    mockBuildServiceSnapshot.mockReturnValue(snap)
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ snapshot: snap, slideGroupsFingerprint: {} }),
+    })
     const wrapper = await lockDraft()
 
-    expect(mockSetDoc).toHaveBeenCalledTimes(1) // still written for Phase 62's diff
+    expect(mockSetDoc).toHaveBeenCalledTimes(1) // still written for the next diff
     expect(mockQueueCallable).not.toHaveBeenCalled() // but never auto-sends
     expect(lockNotifyOf(wrapper)).toBeNull()
+    // No re-lock prompt was opened.
+    expect((wrapper.vm as unknown as { reLockEntries: unknown }).reLockEntries).toBeNull()
   })
 
   it('★ enqueue rejects AFTER a successful lock: transition stays succeeded, lifecycleError null, lockNotify error', async () => {
@@ -6203,11 +6217,236 @@ describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () =>
   })
 
   it('null (a re-lock): renders NO confirmation line — only the banner copy', async () => {
-    mockGetDoc.mockResolvedValue({ exists: () => true }) // re-lock
+    // 62-04: an empty-diff re-lock (prior === current) never sets lockNotify, so
+    // the subordinate confirmation line stays absent.
+    const snap = { slots: [], roleAssignments: [], notes: '' }
+    mockBuildServiceSnapshot.mockReturnValue(snap)
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ snapshot: snap, slideGroupsFingerprint: {} }),
+    }) // re-lock
     const wrapper = await lockDraft()
 
     expect(wrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="lock-notify-confirmation"]').exists()).toBe(false)
+  })
+})
+
+// ── 62-04 (R146/R148/SC4): re-lock change-notice prompt + deferred overwrite ──
+//
+// On a RE-LOCK (a prior lockSnapshots/current exists), the hook reads the prior
+// snapshot + fingerprint BEFORE overwriting, runs the pure diffServiceSnapshots,
+// and — for a non-empty diff with messaging ON — opens ReLockNotifyPrompt while
+// DEFERRING the lockSnapshots/current overwrite to a writeSnapshot closure that
+// the modal's `sent` OR `cancel` resolution runs. A failed send emits neither,
+// so the snapshot stays as the safe pre-edit diff basis (SC4). An empty diff or
+// messaging OFF overwrites silently with no prompt. The whole block stays in its
+// own try/catch, never re-raised into lifecycleError.
+describe('ServiceEditorView - re-lock change-notice prompt (R146/R148/SC4, 62-04)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  /** A full ServiceSnapshot fixture — the real diffServiceSnapshots runs against
+   *  these, so every field it reads (slots, roleAssignments, notes) is present. */
+  function snap(overrides: Partial<ServiceSnapshot> = {}): ServiceSnapshot {
+    return {
+      date: '2026-03-08',
+      name: '',
+      progression: '1-2-2-3',
+      teams: [],
+      slots: [],
+      sermonPassage: null,
+      notes: '',
+      status: 'planned',
+      roleAssignments: [],
+      ...overrides,
+    }
+  }
+
+  // A non-empty diff: only the service-level notes differ (one NOTES entry).
+  const CURR = snap({ notes: 'edited notes' })
+  const PRIOR = snap({ notes: 'original notes' })
+
+  function reLockEntriesOf(wrapper: VueWrapper): unknown {
+    return (wrapper.vm as unknown as { reLockEntries: unknown }).reLockEntries
+  }
+
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockAuthState.settings.messaging.enabled = true
+    mockAuthState.settings.messaging.lockNotifyDefault = true
+
+    mockMarkAsPlanned.mockClear()
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+    mockBuildServiceSnapshot.mockReset()
+    mockGetDoc.mockReset()
+    mockSetDoc.mockReset()
+    mockSetDoc.mockResolvedValue(undefined)
+    mockHttpsCallable.mockClear()
+    mockQueueCallable.mockReset()
+    mockQueueCallable.mockResolvedValue({ data: { messageId: 'msg-1' } })
+    mockSlideGroupsState.groups = [] // → currFingerprint = {}
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    mockAuthState.settings.messaging.enabled = false
+    mockAuthState.settings.messaging.lockNotifyDefault = false
+    // Restore the module-default snapshot builder so later describes are unaffected.
+    mockBuildServiceSnapshot.mockReset()
+    mockBuildServiceSnapshot.mockImplementation((svc: Service) => ({
+      name: svc.name,
+      status: svc.status,
+      slots: svc.slots,
+    }))
+    consoleErrorSpy.mockRestore()
+  })
+
+  async function lockDraft(): Promise<VueWrapper> {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    await wrapper.find('[data-testid="mark-planned-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  /** Drive a re-lock: current snapshot = `curr`, prior snapshot = `prior`. */
+  async function reLock(curr: ServiceSnapshot, prior: ServiceSnapshot): Promise<VueWrapper> {
+    mockBuildServiceSnapshot.mockReturnValue(curr)
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ snapshot: prior, slideGroupsFingerprint: {} }),
+    })
+    return lockDraft()
+  }
+
+  function prompt(wrapper: VueWrapper) {
+    return wrapper.findComponent(ReLockNotifyPrompt)
+  }
+
+  it('non-empty diff + messaging ON: opens the prompt and does NOT overwrite lockSnapshots/current yet (SC4)', async () => {
+    const wrapper = await reLock(CURR, PRIOR)
+
+    // read-before-write ran, but the overwrite is DEFERRED to the modal's confirm.
+    expect(mockGetDoc).toHaveBeenCalledTimes(1)
+    expect(mockSetDoc).not.toHaveBeenCalled()
+
+    const p = prompt(wrapper)
+    expect(p.exists()).toBe(true)
+    expect(p.props('open')).toBe(true)
+    expect((p.props('entries') as unknown[]).length).toBeGreaterThan(0)
+    expect(reLockEntriesOf(wrapper)).not.toBeNull()
+  })
+
+  it('emitting `sent`: runs the deferred writeSnapshot (new snapshot + real fingerprint) and closes the prompt (SC4)', async () => {
+    const wrapper = await reLock(CURR, PRIOR)
+    expect(mockSetDoc).not.toHaveBeenCalled()
+
+    await prompt(wrapper).vm.$emit('sent')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    const payload = mockSetDoc.mock.calls[0]![1] as {
+      snapshot: unknown
+      slideGroupsFingerprint: unknown
+    }
+    expect(payload.snapshot).toBe(CURR) // exactly the state that was diffed
+    expect(payload.slideGroupsFingerprint).toEqual({})
+    expect(reLockEntriesOf(wrapper)).toBeNull()
+    expect(prompt(wrapper).exists()).toBe(false)
+  })
+
+  it('emitting `cancel` (Lock quietly / dismiss): runs the SAME deferred writeSnapshot and closes the prompt (SC4)', async () => {
+    const wrapper = await reLock(CURR, PRIOR)
+    expect(mockSetDoc).not.toHaveBeenCalled()
+
+    await prompt(wrapper).vm.$emit('cancel')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    const payload = mockSetDoc.mock.calls[0]![1] as { snapshot: unknown }
+    expect(payload.snapshot).toBe(CURR)
+    expect(reLockEntriesOf(wrapper)).toBeNull()
+    expect(prompt(wrapper).exists()).toBe(false)
+  })
+
+  it('SC4 safe basis: a SEND FAILURE (modal stays open, emits NEITHER) leaves lockSnapshots/current NOT overwritten', async () => {
+    const wrapper = await reLock(CURR, PRIOR)
+    expect(prompt(wrapper).exists()).toBe(true)
+
+    // The modal's onSend catch surfaces an inline error and emits NEITHER `sent`
+    // nor `cancel`, so the deferred writeSnapshot never runs and the prior
+    // snapshot stays as the safe pre-edit diff basis for a retry.
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(mockSetDoc).not.toHaveBeenCalled()
+    expect(reLockEntriesOf(wrapper)).not.toBeNull() // still open, awaiting the planner
+  })
+
+  it('empty diff: overwrites lockSnapshots/current silently, no prompt, no callable', async () => {
+    const wrapper = await reLock(CURR, CURR) // identical → diff === []
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    expect(prompt(wrapper).exists()).toBe(false)
+    expect(mockQueueCallable).not.toHaveBeenCalled()
+    expect(reLockEntriesOf(wrapper)).toBeNull()
+  })
+
+  it('messaging OFF: overwrites silently with NO prompt even when the diff is non-empty', async () => {
+    mockAuthState.settings.messaging.enabled = false
+    const wrapper = await reLock(CURR, PRIOR)
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    expect(prompt(wrapper).exists()).toBe(false)
+    expect(reLockEntriesOf(wrapper)).toBeNull()
+  })
+
+  it('a first lock never opens the re-lock prompt (immediate write, Task 1 path)', async () => {
+    mockBuildServiceSnapshot.mockReturnValue(CURR)
+    mockGetDoc.mockResolvedValue({ exists: () => false }) // first lock
+    const wrapper = await lockDraft()
+
+    expect(prompt(wrapper).exists()).toBe(false)
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    expect(reLockEntriesOf(wrapper)).toBeNull()
+  })
+
+  it('the re-lock block never re-raises into lifecycleError: a deferred-write failure leaves the lock succeeded', async () => {
+    const wrapper = await reLock(CURR, PRIOR)
+    mockSetDoc.mockRejectedValueOnce(new Error('snapshot write failed'))
+
+    await prompt(wrapper).vm.$emit('sent')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    // The lock itself already landed; no red lock-failure line, prompt closed.
+    expect(wrapper.find('[data-testid="lifecycle-error"]').exists()).toBe(false)
+    const vm = wrapper.vm as unknown as { localService: { status: string } | null }
+    expect(vm.localService!.status).toBe('planned')
+    expect(reLockEntriesOf(wrapper)).toBeNull()
   })
 })
 
