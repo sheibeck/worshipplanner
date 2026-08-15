@@ -1554,13 +1554,31 @@
     @cancel="messageComposerOpen = false"
     @sent="messageComposerOpen = false"
   />
+
+  <!-- Re-lock change-notice prompt (R146/R148, 62-04) — opened by onMarkAsPlanned
+       ONLY on a re-lock with a non-empty diff and messaging on. Both `sent` and
+       `cancel` run onReLockResolved, which runs the DEFERRED lockSnapshots/current
+       overwrite then closes; a failed send emits neither, leaving the snapshot as
+       the safe pre-edit diff basis (SC4). -->
+  <ReLockNotifyPrompt
+    v-if="localService && reLockEntries"
+    :open="reLockEntries !== null"
+    :service="localService"
+    :entries="reLockEntries"
+    :quarters="quartersStore.quarters"
+    :roles="rosterStore.roles"
+    :people="rosterStore.people"
+    :org-id="authStore.orgId!"
+    @sent="onReLockResolved"
+    @cancel="onReLockResolved"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useServiceStore, ServiceLockedError, buildServiceSnapshot } from '@/stores/services'
+import { useServiceStore, ServiceLockedError, buildServiceSnapshot, type ServiceSnapshot } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
@@ -1588,6 +1606,7 @@ import SlidesTab from '@/components/slides/SlidesTab.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
 import ContextualActionBar from '@/components/ContextualActionBar.vue'
 import MessageComposer from '@/components/MessageComposer.vue'
+import ReLockNotifyPrompt from '@/components/ReLockNotifyPrompt.vue'
 import ServiceMessageHistory from '@/components/ServiceMessageHistory.vue'
 import { useServiceMessagesStore, type BouncedRecipient } from '@/stores/serviceMessages'
 import { isMessagingEnabled } from '@/utils/messaging'
@@ -1599,7 +1618,7 @@ import { serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/firebase'
 import { resolveRecipients } from '@/utils/messagingRecipients'
-import { fingerprintSlideGroups } from '@/utils/serviceLockDiff'
+import { fingerprintSlideGroups, diffServiceSnapshots, type ChangeEntry, type SlideFingerprint } from '@/utils/serviceLockDiff'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
 import type { AiSongSuggestion } from '@/utils/claudeApi'
@@ -1690,6 +1709,30 @@ const isDeleting = ref(false)
 // R136 (59-04): the ✉ Messages composer's open state, toggled by the
 // action-bar item's onMessages handler.
 const messageComposerOpen = ref(false)
+
+// R146/R148 (62-04): the re-lock change-notice prompt. `reLockEntries` is the
+// computed ChangeEntry[] to show — non-null means the prompt is open. On a
+// re-lock with a non-empty diff the lockSnapshots/current overwrite is DEFERRED
+// into `pendingSnapshotWrite`, run only when the modal resolves (sent OR cancel),
+// so a failed send leaves the prior snapshot as the safe pre-edit diff basis (SC4).
+const reLockEntries = ref<ChangeEntry[] | null>(null)
+let pendingSnapshotWrite: (() => Promise<void>) | null = null
+
+// Both the modal's `sent` (send succeeded) and `cancel` (Lock quietly / ✕ /
+// backdrop / Escape) run the deferred overwrite, then close the prompt. A failed
+// send emits neither, so this never runs and the snapshot is untouched (SC4).
+async function onReLockResolved() {
+  try {
+    await pendingSnapshotWrite?.()
+  } catch (writeErr) {
+    // The lock already succeeded and is on screen — a deferred-write failure is
+    // never re-raised into lifecycleError (the non-blocking follow-up posture).
+    console.error('[ServiceEditorView] deferred re-lock snapshot write failed:', writeErr)
+  } finally {
+    pendingSnapshotWrite = null
+    reLockEntries.value = null
+  }
+}
 
 // ── Delivery-history panel state (60-03, R142/R143) ─────────────────────────
 // Bounced recipients read lazily per message on expand (keyed by messageId);
@@ -2923,24 +2966,29 @@ async function onMarkAsPlanned(): Promise<void> {
         // re-lock (61-RESEARCH Pitfall 4).
         const snapRef = doc(db, 'organizations', orgId, 'services', svc.id, 'lockSnapshots', 'current')
         const prior = await getDoc(snapRef)
-        const wasFirstLock = !prior.exists()
 
         // Phase 62 (R146): compute a REAL slideGroupsFingerprint over the ALREADY
         // loaded slideGroupsStore.groups (NO new Firestore read; NOT pushed into
         // buildServiceSnapshot — the share-link path stays untouched), replacing
-        // the Phase 61 `slideGroupsFingerprint: null` stub. Written on EVERY lock
-        // so Phase 62 has a prior snapshot + fingerprint to diff.
+        // the Phase 61 `slideGroupsFingerprint: null` stub. The current snapshot +
+        // fingerprint are captured ONCE by the deferred writeSnapshot so a re-lock
+        // confirm overwrites with exactly the state that was diffed.
         const currFingerprint = fingerprintSlideGroups(slideGroupsStore.groups, svc.id)
-        await setDoc(snapRef, {
-          snapshot: buildServiceSnapshot(svc),
-          slideGroupsFingerprint: currFingerprint,
-          lockedAt: serverTimestamp(),
-          lockedByUid: authStore.user?.uid ?? null,
-        })
+        const currSnapshot = buildServiceSnapshot(svc)
+        const writeSnapshot = async () => {
+          await setDoc(snapRef, {
+            snapshot: currSnapshot,
+            slideGroupsFingerprint: currFingerprint,
+            lockedAt: serverTimestamp(),
+            lockedByUid: authStore.user?.uid ?? null,
+          })
+        }
 
-        // A re-lock does NOT auto-send — the prompt-with-diff is Phase 62.
-        // lockNotify stays null (banner shows only its normal locked copy).
-        if (wasFirstLock) {
+        if (!prior.exists()) {
+          // ── FIRST LOCK ──────────────────────────────────────────────────────
+          // Write immediately, then the Phase 61 gated auto-send (unchanged).
+          await writeSnapshot()
+
           // NOTE the `settings.messaging.*` org path, not `messaging.*`.
           const effectiveLockNotify =
             svc.messaging?.lockNotifyEnabled ?? authStore.settings.messaging.lockNotifyDefault
@@ -2982,6 +3030,33 @@ async function onMarkAsPlanned(): Promise<void> {
                 setLockNotify({ kind: 'error' })
               }
             }
+          }
+        } else {
+          // ── RE-LOCK (R146/R148/SC4) ─────────────────────────────────────────
+          // Read the prior snapshot + fingerprint (already fetched above, BEFORE
+          // any write) and diff against the current state.
+          const p = prior.data()
+          const priorSnapshot = p?.snapshot as ServiceSnapshot
+          const priorFingerprint = (p?.slideGroupsFingerprint ?? null) as SlideFingerprint | null
+          const entries = diffServiceSnapshots(
+            priorSnapshot,
+            currSnapshot,
+            priorFingerprint,
+            currFingerprint,
+          )
+
+          if (entries.length === 0 || !isMessagingEnabled()) {
+            // Nothing changed, or messaging is off (nowhere to send) → overwrite
+            // the snapshot SILENTLY, no prompt.
+            await writeSnapshot()
+          } else {
+            // A real diff with messaging on → open the change-notice prompt and
+            // DEFER the overwrite to its resolver. Writing now would destroy the
+            // diff basis, so the next re-lock would show "no changes" (SC4). A
+            // failed send emits neither event → writeSnapshot never runs → the
+            // prior snapshot stays as the safe basis for a retry.
+            pendingSnapshotWrite = writeSnapshot
+            reLockEntries.value = entries
           }
         }
       }

@@ -64,7 +64,7 @@ const {
     // consumer stays happy; `exists` is a plain boolean so per-test overrides
     // (`() => true` for a re-lock) type-check.
     mockGetDoc: vi.fn<
-      (...a: unknown[]) => Promise<{ exists: () => boolean; data?: () => { orgIds: string[] } }>
+      (...a: unknown[]) => Promise<{ exists: () => boolean; data?: () => Record<string, unknown> }>
     >(() => Promise.resolve({ exists: () => false, data: () => ({ orgIds: ['org-1'] }) })),
     mockSetDoc: vi.fn<(...a: unknown[]) => Promise<void>>(() => Promise.resolve()),
     mockQueueCallable,
@@ -6122,7 +6122,7 @@ describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () =>
     // 62-04: the Phase 61 "re-lock still overwrites" assertion, updated to the
     // deferred/gated form — an EMPTY diff (prior === current, matching fingerprint)
     // overwrites immediately with no prompt (nothing changed to notify about).
-    const snap = { slots: [], roleAssignments: [], notes: '' }
+    const snap = { name: '', status: 'planned' as const, slots: [], roleAssignments: [], notes: '' }
     mockBuildServiceSnapshot.mockReturnValue(snap)
     mockGetDoc.mockResolvedValue({
       exists: () => true,
@@ -6219,7 +6219,7 @@ describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () =>
   it('null (a re-lock): renders NO confirmation line — only the banner copy', async () => {
     // 62-04: an empty-diff re-lock (prior === current) never sets lockNotify, so
     // the subordinate confirmation line stays absent.
-    const snap = { slots: [], roleAssignments: [], notes: '' }
+    const snap = { name: '', status: 'planned' as const, slots: [], roleAssignments: [], notes: '' }
     mockBuildServiceSnapshot.mockReturnValue(snap)
     mockGetDoc.mockResolvedValue({
       exists: () => true,
