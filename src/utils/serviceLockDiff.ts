@@ -99,3 +99,128 @@ export function fingerprintSlideGroups(groups: SlideGroup[], serviceId: string):
   }
   return out
 }
+
+// ---------------------------------------------------------------------------
+// Diff
+// ---------------------------------------------------------------------------
+
+type RoleAssignment = ServiceSnapshot['roleAssignments'][number]
+
+/**
+ * R147 broad default — the distinct `group` values whose CURRENT-snapshot
+ * roleAssignments entry has at least one assigned person. A broad change
+ * (SONG/ORDER/NOTES/SLIDES) tags every team that actually has someone serving.
+ */
+function groupsWithAssignments(roleAssignments: RoleAssignment[]): RoleGroup[] {
+  const seen = new Set<RoleGroup>()
+  for (const ra of roleAssignments) {
+    if (ra.personNames.length > 0) seen.add(ra.group)
+  }
+  return [...seen]
+}
+
+/** Order-insensitive equality of two person-name lists. */
+function sameNames(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const sa = [...a].sort()
+  const sb = [...b].sort()
+  return sa.every((name, i) => name === sb[i])
+}
+
+/** True if any key is added/removed or any shared key's value changed. `null` is treated as an empty map. */
+function fingerprintsDiffer(prev: SlideFingerprint | null, curr: SlideFingerprint | null): boolean {
+  const p = prev ?? {}
+  const c = curr ?? {}
+  const keys = new Set([...Object.keys(p), ...Object.keys(c)])
+  for (const k of keys) {
+    if (p[k] !== c[k]) return true
+  }
+  return false
+}
+
+/**
+ * PURE diff of two locked ServiceSnapshots plus their two slide fingerprint
+ * maps. Returns the typed ChangeEntry[] (SONG/ORDER/ROLE/NOTES/SLIDES) with
+ * R147 affected-teams tagging: ROLE narrow (exactly the changed role's group),
+ * SONG/ORDER/NOTES/SLIDES broad (every current group with an assigned person).
+ * Two identical snapshots with identical fingerprints return [] — the empty-diff
+ * branch 62-04's lock hook uses to overwrite lockSnapshots/current silently.
+ *
+ * Both `slots` arrays are ALREADY section-major (buildServiceSnapshot calls
+ * orderSlotsBySection) — this function must NOT re-sort them; ORDER is detected
+ * on the shipped ordering as-is. Matching is by stable `slot.id`, never by array
+ * index or `position`, both of which a drag-reorder rewrites.
+ */
+export function diffServiceSnapshots(
+  previous: ServiceSnapshot,
+  current: ServiceSnapshot,
+  prevFingerprint: SlideFingerprint | null,
+  currFingerprint: SlideFingerprint | null,
+): ChangeEntry[] {
+  const entries: ChangeEntry[] = []
+  const broad = groupsWithAssignments(current.roleAssignments)
+
+  const prevById = new Map(previous.slots.map((s) => [s.id, s]))
+  const currById = new Map(current.slots.map((s) => [s.id, s]))
+
+  // SONG — a shared slot id, both SONG, songId/songTitle changed; plus a SONG
+  // slot added or removed (present in only one snapshot).
+  let songChanged = false
+  for (const [id, cur] of currById) {
+    const prior = prevById.get(id)
+    if (prior && prior.kind === 'SONG' && cur.kind === 'SONG') {
+      if (prior.songId !== cur.songId || prior.songTitle !== cur.songTitle) songChanged = true
+    } else if (!prior && cur.kind === 'SONG') {
+      songChanged = true
+    }
+  }
+  for (const [id, prior] of prevById) {
+    if (!currById.has(id) && prior.kind === 'SONG') songChanged = true
+  }
+  if (songChanged) {
+    entries.push({ type: 'SONG', description: 'Song changed', affectedTeams: broad })
+  }
+
+  // ORDER — the sequence of shared slot ids moved, OR the slot-id set changed
+  // (an add/remove). Do NOT re-sort — both arrays are already section-major.
+  const prevIds = previous.slots.map((s) => s.id)
+  const currIds = current.slots.map((s) => s.id)
+  const currIdSet = new Set(currIds)
+  const prevIdSet = new Set(prevIds)
+  const setChanged =
+    prevIds.length !== currIds.length ||
+    prevIds.some((id) => !currIdSet.has(id)) ||
+    currIds.some((id) => !prevIdSet.has(id))
+  const sharedPrevOrder = prevIds.filter((id) => currIdSet.has(id))
+  const sharedCurrOrder = currIds.filter((id) => prevIdSet.has(id))
+  const sequenceMoved = sharedPrevOrder.some((id, i) => id !== sharedCurrOrder[i])
+  if (setChanged || sequenceMoved) {
+    entries.push({ type: 'ORDER', description: 'Service order changed', affectedTeams: broad })
+  }
+
+  // ROLE — a roleAssignments[roleId].personNames change tags EXACTLY that role's
+  // group (the one narrow tag, R147 — never broad).
+  for (const cur of current.roleAssignments) {
+    const prior = previous.roleAssignments.find((ra) => ra.roleId === cur.roleId)
+    const priorNames = prior ? prior.personNames : []
+    if (!sameNames(priorNames, cur.personNames)) {
+      entries.push({
+        type: 'ROLE',
+        description: `${cur.roleName} assignment changed`,
+        affectedTeams: [cur.group],
+      })
+    }
+  }
+
+  // NOTES — service-level notes string inequality (broad).
+  if (previous.notes !== current.notes) {
+    entries.push({ type: 'NOTES', description: 'Service notes changed', affectedTeams: broad })
+  }
+
+  // SLIDES — the two fingerprint maps differ by any key or value (broad, coarse).
+  if (fingerprintsDiffer(prevFingerprint, currFingerprint)) {
+    entries.push({ type: 'SLIDES', description: 'Slides changed', affectedTeams: broad })
+  }
+
+  return entries
+}

@@ -334,7 +334,7 @@ describe('diffServiceSnapshots', () => {
     })
     const diff = diffServiceSnapshots(prev, curr, null, null)
     expect(typesOf(diff)).toEqual(['ROLE'])
-    expect(diff[0].affectedTeams).toEqual(['band'])
+    expect(diff[0]!.affectedTeams).toEqual(['band'])
   })
 
   it('treats personNames comparison as order-insensitive (no ROLE entry on reorder)', () => {
@@ -383,7 +383,7 @@ describe('diffServiceSnapshots', () => {
     const curr = makeSnapshot({ slots: [makeSongSlot('slot-1', { songTitle: 'New' })], roleAssignments: assignments })
     const diff = diffServiceSnapshots(prev, curr, null, null)
     expect(typesOf(diff)).toEqual(['SONG'])
-    expect([...diff[0].affectedTeams].sort()).toEqual(['band', 'vocals'])
+    expect([...diff[0]!.affectedTeams].sort()).toEqual(['band', 'vocals'])
   })
 
   it('returns [] for two identical snapshots with identical fingerprints (empty-diff branch)', () => {
