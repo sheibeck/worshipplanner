@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
+import { mount, flushPromises, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import ReLockNotifyPrompt from '../ReLockNotifyPrompt.vue'
 import type { Service } from '@/types/service'
@@ -223,5 +223,159 @@ describe('ReLockNotifyPrompt', () => {
     mountPrompt({ entries: vocalsOnlyEntries })
     // vocals has no assigned role → 0 reachable.
     expect(q('reaches-count').text()).toContain('Reaches 0 people')
+  })
+
+  describe('Send notice', () => {
+    it('calls queueServiceMessage once with type:relock-notification, the selector, and changeDiff = the CHECKED entries', async () => {
+      const wrapper = mountPrompt()
+      // All 3 checked, Affected teams → union {band, tech}, reaches 2 → enabled.
+      expect((q('send-btn').element as HTMLButtonElement).disabled).toBe(false)
+
+      await q('send-btn').trigger('click')
+      await flushPromises()
+
+      expect(mockHttpsCallable).toHaveBeenCalledWith({}, 'queueServiceMessage')
+      expect(mockQueueServiceMessage).toHaveBeenCalledTimes(1)
+      const payload = mockQueueServiceMessage.mock.calls[0]![0] as Record<string, unknown>
+      expect(payload).toMatchObject({
+        orgId: 'org-1',
+        serviceId: 'svc-1',
+        type: 'relock-notification',
+        recipientSelector: {
+          teams: ['band', 'tech'],
+          individualPersonIds: [],
+          includeEveryone: false,
+        },
+        options: { attachServiceLink: true, sendCopyToSelf: false },
+        scheduledFor: null,
+        changeDiff: entries,
+      })
+      // Selector only — no resolved email address crosses to the server.
+      const serialized = JSON.stringify(payload)
+      expect(serialized).not.toContain('@example.com')
+
+      // Success → emits `sent` exactly once, and NEVER cancel.
+      expect(wrapper.emitted('sent')).toBeTruthy()
+      expect(wrapper.emitted('sent')!.length).toBe(1)
+      expect(wrapper.emitted('cancel')).toBeFalsy()
+    })
+
+    it('sends changeDiff = only the CHECKED entries and the Everyone selector when Everyone is chosen', async () => {
+      mountPrompt()
+      // Uncheck e0 (SONG) → changeDiff should carry only e1 + e2.
+      await toggleRow(0)
+      await q('notify-everyone').trigger('click')
+
+      await q('send-btn').trigger('click')
+      await flushPromises()
+
+      const payload = mockQueueServiceMessage.mock.calls[0]![0] as {
+        recipientSelector: { teams: string[]; includeEveryone: boolean }
+        changeDiff: ChangeEntry[]
+      }
+      expect(payload.recipientSelector).toEqual({ teams: [], individualPersonIds: [], includeEveryone: true })
+      expect(payload.changeDiff).toEqual([entries[1], entries[2]])
+    })
+
+    it('Send is disabled with an explanatory title when zero entries are checked', async () => {
+      mountPrompt()
+      await toggleRow(0)
+      await toggleRow(1)
+      await toggleRow(2)
+      const btn = q('send-btn').element as HTMLButtonElement
+      expect(btn.disabled).toBe(true)
+      expect(btn.getAttribute('title')).toContain('Select at least one change')
+    })
+
+    it('Send is disabled with an explanatory title when the selection reaches zero people', () => {
+      mountPrompt({ entries: vocalsOnlyEntries })
+      const btn = q('send-btn').element as HTMLButtonElement
+      expect(btn.disabled).toBe(true)
+      expect(btn.getAttribute('title')).toContain('anyone with an email')
+    })
+
+    it('Send is disabled and reads "Sending…" while a send is in flight', async () => {
+      let release: (v: { data: { messageId: string } }) => void = () => {}
+      mockQueueServiceMessage.mockReturnValueOnce(new Promise((res) => { release = res }))
+      mountPrompt()
+
+      await q('send-btn').trigger('click')
+      await nextTick()
+
+      const btn = q('send-btn').element as HTMLButtonElement
+      expect(btn.disabled).toBe(true)
+      expect(q('send-btn').text()).toContain('Sending…')
+
+      release({ data: { messageId: 'msg-1' } })
+      await flushPromises()
+    })
+
+    it('a rejected send shows the inline error, re-enables Send, and emits NEITHER sent NOR cancel', async () => {
+      mockQueueServiceMessage.mockRejectedValueOnce(new Error('network went away'))
+      const wrapper = mountPrompt()
+
+      await q('send-btn').trigger('click')
+      await flushPromises()
+
+      expect(q('send-error').exists()).toBe(true)
+      expect(q('send-error').text()).toContain('Couldn’t send the notice')
+      // Re-enabled for a safe retry (still 3 checked, reaches 2).
+      expect((q('send-btn').element as HTMLButtonElement).disabled).toBe(false)
+      // The parent must NOT overwrite the snapshot on a failed send (SC4).
+      expect(wrapper.emitted('sent')).toBeFalsy()
+      expect(wrapper.emitted('cancel')).toBeFalsy()
+    })
+
+    it('shows the kill-switch variant when the server rejects with failed-precondition', async () => {
+      mockQueueServiceMessage.mockRejectedValueOnce({ code: 'functions/failed-precondition', message: 'off' })
+      mountPrompt()
+
+      await q('send-btn').trigger('click')
+      await flushPromises()
+
+      expect(q('send-error').text()).toContain('Messaging is turned off for your organization')
+    })
+  })
+
+  describe('Lock quietly / dismiss (no send)', () => {
+    it('Lock quietly emits cancel and NEVER calls queueServiceMessage', async () => {
+      const wrapper = mountPrompt()
+      await q('lock-quietly-btn').trigger('click')
+      expect(wrapper.emitted('cancel')).toBeTruthy()
+      expect(wrapper.emitted('cancel')!.length).toBe(1)
+      expect(mockQueueServiceMessage).not.toHaveBeenCalled()
+    })
+
+    it('Lock quietly stays enabled and emits cancel even when the selection reaches zero people', async () => {
+      const wrapper = mountPrompt({ entries: vocalsOnlyEntries })
+      // Send is blocked (zero reachable), but Lock quietly is never disabled.
+      expect((q('send-btn').element as HTMLButtonElement).disabled).toBe(true)
+      const lock = q('lock-quietly-btn').element as HTMLButtonElement
+      expect(lock.disabled).toBe(false)
+      await q('lock-quietly-btn').trigger('click')
+      expect(wrapper.emitted('cancel')).toBeTruthy()
+      expect(mockQueueServiceMessage).not.toHaveBeenCalled()
+    })
+
+    it('the ✕ close button emits cancel with no send', async () => {
+      const wrapper = mountPrompt()
+      await q('close-btn').trigger('click')
+      expect(wrapper.emitted('cancel')).toBeTruthy()
+      expect(mockQueueServiceMessage).not.toHaveBeenCalled()
+    })
+
+    it('a backdrop click emits cancel with no send', async () => {
+      const wrapper = mountPrompt()
+      await q('backdrop').trigger('click')
+      expect(wrapper.emitted('cancel')).toBeTruthy()
+      expect(mockQueueServiceMessage).not.toHaveBeenCalled()
+    })
+
+    it('Escape emits cancel with no send', async () => {
+      const wrapper = mountPrompt()
+      await body().find('[role="dialog"]').trigger('keydown.esc')
+      expect(wrapper.emitted('cancel')).toBeTruthy()
+      expect(mockQueueServiceMessage).not.toHaveBeenCalled()
+    })
   })
 })
