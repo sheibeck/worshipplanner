@@ -1351,6 +1351,53 @@ describe("queueServiceMessageHandler", () => {
     expect(setSpy).not.toHaveBeenCalled();
   });
 
+  it("enqueues a type:'relock-notification' from an editor with messaging on (R146 send-path plumbing)", async () => {
+    const { db, setSpy } = fakeDb({ role: "editor", messagingEnabled: true });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await queueServiceMessageHandler(
+      fakeRequest({ data: { type: "relock-notification" } }),
+    );
+
+    expect(result).toEqual({ messageId: GENERATED_ID });
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    expect(setSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "relock-notification", status: "queued" }),
+    );
+  });
+
+  it("still rejects an unknown type after the relock-notification enum add → invalid-argument", async () => {
+    const { db, setSpy } = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(
+      queueServiceMessageHandler(
+        fakeRequest({ data: { type: "relock-nonsense" as unknown as QueueMessageRequest["type"] } }),
+      ),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("still rejects a viewer sending 'relock-notification' → permission-denied (enum widened, auth unchanged)", async () => {
+    const { db, setSpy } = fakeDb({ role: "viewer" });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(
+      queueServiceMessageHandler(fakeRequest({ data: { type: "relock-notification" } })),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("still rejects 'relock-notification' when the kill-switch is off → failed-precondition (enum widened, kill-switch unchanged)", async () => {
+    const { db, setSpy } = fakeDb({ role: "editor", messagingEnabled: false });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(
+      queueServiceMessageHandler(fakeRequest({ data: { type: "relock-notification" } })),
+    ).rejects.toMatchObject({ code: "failed-precondition" });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
   it("SOURCE INSPECTION: the queueServiceMessage onCall wrapper carries NO secrets array (never holds RESEND_API_KEY)", () => {
     const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
     const start = source.indexOf("export const queueServiceMessage = onCall(");
