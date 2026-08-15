@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
+import type { ServiceSnapshot } from '@/stores/services'
+import type { SongSlot, NonAssignableSlot } from '@/types/service'
 import {
   fingerprintSlideGroups,
+  diffServiceSnapshots,
   type SlideFingerprint,
+  type ChangeEntry,
 } from '@/utils/serviceLockDiff'
 
 // ---------------------------------------------------------------------------
@@ -203,5 +207,190 @@ describe('fingerprintSlideGroups', () => {
     expect(fp['slot-1']).toBeDefined()
     expect(typeof fp['slot-1']).toBe('string')
     expect(fingerprintSlideGroups([empty], 'svc-1')['slot-1']).toBe(fp['slot-1'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// diffServiceSnapshots
+// ---------------------------------------------------------------------------
+
+type RoleAssignment = ServiceSnapshot['roleAssignments'][number]
+
+function makeSongSlot(id: string, overrides: Partial<SongSlot> = {}): SongSlot {
+  return {
+    id,
+    kind: 'SONG',
+    position: 0,
+    requiredVwType: 1,
+    songId: 'song-a',
+    songTitle: 'Song A',
+    songKey: 'C',
+    ...overrides,
+  }
+}
+
+function makeMiscSlot(id: string, overrides: Partial<NonAssignableSlot> = {}): NonAssignableSlot {
+  return {
+    id,
+    kind: 'MISC',
+    position: 0,
+    ...overrides,
+  }
+}
+
+function makeAssignment(overrides: Partial<RoleAssignment> = {}): RoleAssignment {
+  return {
+    roleId: 'r1',
+    roleName: 'guitar',
+    group: 'band',
+    personNames: ['Alice'],
+    ...overrides,
+  }
+}
+
+function makeSnapshot(overrides: Partial<ServiceSnapshot> = {}): ServiceSnapshot {
+  return {
+    date: '2026-08-02',
+    name: 'Sunday Service',
+    progression: '1-2-2-3',
+    teams: [],
+    slots: [],
+    sermonPassage: null,
+    notes: '',
+    status: 'planned',
+    roleAssignments: [],
+    ...overrides,
+  }
+}
+
+const typesOf = (entries: ChangeEntry[]) => entries.map((e) => e.type).sort()
+
+describe('diffServiceSnapshots', () => {
+  it('detects a SONG change (songTitle) on a slot matched by stable id — exactly one SONG entry', () => {
+    const prev = makeSnapshot({ slots: [makeSongSlot('slot-1', { songTitle: 'Old Title' })] })
+    const curr = makeSnapshot({ slots: [makeSongSlot('slot-1', { songTitle: 'New Title' })] })
+    const diff = diffServiceSnapshots(prev, curr, null, null)
+    expect(typesOf(diff)).toEqual(['SONG'])
+  })
+
+  it('detects a SONG change (songId swap) on a slot matched by stable id', () => {
+    const prev = makeSnapshot({ slots: [makeSongSlot('slot-1', { songId: 'song-a' })] })
+    const curr = makeSnapshot({ slots: [makeSongSlot('slot-1', { songId: 'song-b' })] })
+    expect(typesOf(diffServiceSnapshots(prev, curr, null, null))).toEqual(['SONG'])
+  })
+
+  it('reports no SONG entry for an unchanged song slot', () => {
+    const prev = makeSnapshot({ slots: [makeSongSlot('slot-1')] })
+    const curr = makeSnapshot({ slots: [makeSongSlot('slot-1')] })
+    expect(diffServiceSnapshots(prev, curr, null, null)).toEqual([])
+  })
+
+  it('detects an ORDER change when a shared slot id moves position without content change', () => {
+    const a = makeSongSlot('slot-1', { position: 0 })
+    const b = makeSongSlot('slot-2', { position: 1, songId: 'song-b', songTitle: 'Song B' })
+    const prev = makeSnapshot({ slots: [a, b] })
+    const curr = makeSnapshot({ slots: [b, a] })
+    expect(typesOf(diffServiceSnapshots(prev, curr, null, null))).toEqual(['ORDER'])
+  })
+
+  it('reports no ORDER entry when the order is identical', () => {
+    const a = makeSongSlot('slot-1')
+    const b = makeMiscSlot('slot-2')
+    const prev = makeSnapshot({ slots: [a, b] })
+    const curr = makeSnapshot({ slots: [a, b] })
+    expect(diffServiceSnapshots(prev, curr, null, null)).toEqual([])
+  })
+
+  it('folds a SONG slot ADD into SONG + ORDER', () => {
+    const prev = makeSnapshot({ slots: [makeSongSlot('slot-1')] })
+    const curr = makeSnapshot({ slots: [makeSongSlot('slot-1'), makeSongSlot('slot-2', { songId: 'song-b' })] })
+    expect(typesOf(diffServiceSnapshots(prev, curr, null, null))).toEqual(['ORDER', 'SONG'])
+  })
+
+  it('folds a SONG slot REMOVE into SONG + ORDER', () => {
+    const prev = makeSnapshot({ slots: [makeSongSlot('slot-1'), makeSongSlot('slot-2', { songId: 'song-b' })] })
+    const curr = makeSnapshot({ slots: [makeSongSlot('slot-1')] })
+    expect(typesOf(diffServiceSnapshots(prev, curr, null, null))).toEqual(['ORDER', 'SONG'])
+  })
+
+  it('folds a non-SONG slot ADD/REMOVE into ORDER only', () => {
+    const prev = makeSnapshot({ slots: [makeSongSlot('slot-1')] })
+    const curr = makeSnapshot({ slots: [makeSongSlot('slot-1'), makeMiscSlot('slot-2')] })
+    expect(typesOf(diffServiceSnapshots(prev, curr, null, null))).toEqual(['ORDER'])
+  })
+
+  it('detects a ROLE change and tags EXACTLY that role\'s group (narrow, never broad)', () => {
+    const prev = makeSnapshot({
+      roleAssignments: [
+        makeAssignment({ roleId: 'r1', group: 'band', personNames: ['Charlie'] }),
+        makeAssignment({ roleId: 'r2', roleName: 'sound', group: 'tech', personNames: ['Bob'] }),
+      ],
+    })
+    const curr = makeSnapshot({
+      roleAssignments: [
+        makeAssignment({ roleId: 'r1', group: 'band', personNames: ['Alice'] }),
+        makeAssignment({ roleId: 'r2', roleName: 'sound', group: 'tech', personNames: ['Bob'] }),
+      ],
+    })
+    const diff = diffServiceSnapshots(prev, curr, null, null)
+    expect(typesOf(diff)).toEqual(['ROLE'])
+    expect(diff[0].affectedTeams).toEqual(['band'])
+  })
+
+  it('treats personNames comparison as order-insensitive (no ROLE entry on reorder)', () => {
+    const prev = makeSnapshot({
+      roleAssignments: [makeAssignment({ roleId: 'r1', personNames: ['Alice', 'Bob'] })],
+    })
+    const curr = makeSnapshot({
+      roleAssignments: [makeAssignment({ roleId: 'r1', personNames: ['Bob', 'Alice'] })],
+    })
+    expect(diffServiceSnapshots(prev, curr, null, null)).toEqual([])
+  })
+
+  it('detects a NOTES change', () => {
+    const prev = makeSnapshot({ notes: 'old' })
+    const curr = makeSnapshot({ notes: 'new' })
+    expect(typesOf(diffServiceSnapshots(prev, curr, null, null))).toEqual(['NOTES'])
+  })
+
+  it('detects a SLIDES change when the fingerprint maps differ (map vs map)', () => {
+    const prev = makeSnapshot()
+    const curr = makeSnapshot()
+    const diff = diffServiceSnapshots(prev, curr, { 'slot-1': 'aaa' }, { 'slot-1': 'bbb' })
+    expect(typesOf(diff)).toEqual(['SLIDES'])
+  })
+
+  it('detects a SLIDES change when a fingerprint key is added/removed (null vs map)', () => {
+    const prev = makeSnapshot()
+    const curr = makeSnapshot()
+    expect(typesOf(diffServiceSnapshots(prev, curr, null, { 'slot-1': 'aaa' }))).toEqual(['SLIDES'])
+  })
+
+  it('reports no SLIDES entry when both fingerprints are null or equal', () => {
+    const prev = makeSnapshot()
+    const curr = makeSnapshot()
+    expect(diffServiceSnapshots(prev, curr, null, null)).toEqual([])
+    expect(diffServiceSnapshots(prev, curr, { 'slot-1': 'x' }, { 'slot-1': 'x' })).toEqual([])
+  })
+
+  it('tags broad entries (SONG) with only groups that have >=1 assigned person on the CURRENT snapshot', () => {
+    const assignments = [
+      makeAssignment({ roleId: 'r1', group: 'band', personNames: ['Alice'] }),
+      makeAssignment({ roleId: 'r2', roleName: 'sound', group: 'tech', personNames: [] }),
+      makeAssignment({ roleId: 'r3', roleName: 'lead vocal', group: 'vocals', personNames: ['Dan'] }),
+    ]
+    const prev = makeSnapshot({ slots: [makeSongSlot('slot-1', { songTitle: 'Old' })], roleAssignments: assignments })
+    const curr = makeSnapshot({ slots: [makeSongSlot('slot-1', { songTitle: 'New' })], roleAssignments: assignments })
+    const diff = diffServiceSnapshots(prev, curr, null, null)
+    expect(typesOf(diff)).toEqual(['SONG'])
+    expect([...diff[0].affectedTeams].sort()).toEqual(['band', 'vocals'])
+  })
+
+  it('returns [] for two identical snapshots with identical fingerprints (empty-diff branch)', () => {
+    const slots = [makeSongSlot('slot-1'), makeMiscSlot('slot-2')]
+    const assignments = [makeAssignment({ roleId: 'r1', personNames: ['Alice'] })]
+    const prev = makeSnapshot({ slots, roleAssignments: assignments, notes: 'same' })
+    const curr = makeSnapshot({ slots, roleAssignments: assignments, notes: 'same' })
+    expect(diffServiceSnapshots(prev, curr, { 'slot-1': 'x' }, { 'slot-1': 'x' })).toEqual([])
   })
 })
