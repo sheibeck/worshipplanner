@@ -5,10 +5,10 @@ milestone_name: Volunteer Messaging & Notifications
 current_phase: 62
 current_phase_name: Re-lock Change Notice — Scoped Diff
 status: verification_deferred_human
-stopped_at: Completed 62-04-PLAN.md (FINAL plan of v1.7) — Phase 62 code-complete
-last_updated: "2026-08-15T02:40:28.685Z"
+stopped_at: v1.7 COMPLETE (all 5 phases 58-62 code-complete + verified GREEN); STOPPED before milestone lifecycle per grant
+last_updated: "2026-08-15T03:00:00.000Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 62 code-complete (62-04 re-lock change-notice lock-hook integration executed GREEN); v1.7 milestone lifecycle DEFERRED to owner per grant
+last_activity_desc: Phase 62 verified GREEN (4/4). ALL 5 v1.7 phases code-complete + verified. Milestone lifecycle (audit/complete/cleanup) + all /gsd-verify-work + deploys DEFERRED to owner per the standing grant.
 progress:
   total_phases: 5
   completed_phases: 5
@@ -276,10 +276,33 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 62 (Re-lock Change Notice — Scoped Diff) — CODE-COMPLETE (FINAL v1.7 phase; all 4 plans executed)
-Plan: 62-04 executed GREEN (last plan of the phase and the milestone)
-Status: v1.7 is CODE-COMPLETE. Per the standing grant, STOP before the milestone lifecycle (audit/complete/cleanup) — that is the owner's step after verifying + deploying. Hand over the `/gsd-verify-work 58..62` deferred list in `.planning/PENDING-VERIFICATION.md`.
-Last activity: 2026-08-15 — 62-04 wired the pure diff (62-02) + ReLockNotifyPrompt (62-03) into the shipped Phase 61 lock hook
+Phase: 62 (Re-lock Change Notice — Scoped Diff) — VERIFIED GREEN (FINAL v1.7 phase; 4/4 plans)
+Plan: 62-04 executed + phase verified (62-VERIFICATION.md = passed, 4/4)
+Status: ★ v1.7 IS CODE-COMPLETE AND ALL 5 PHASES VERIFIED GREEN (58,59,60,61,62). Per the standing grant I STOPPED before the milestone lifecycle (audit/complete/cleanup) — that is the owner's step after verifying + deploying. Owner hand-over below (§ v1.7 MILESTONE HAND-OVER) + the running `/gsd-verify-work 58..62` deferred list in `.planning/PENDING-VERIFICATION.md`.
+Last activity: 2026-08-15 — Phase 62 verified GREEN; v1.7 code-complete, handed to owner
+
+## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
+
+**All 5 phases (58–62) are code-complete and each verified GREEN by goal-backward analysis.** 20/20 plans.
+The app suite stays at its documented 2-file known-failing baseline throughout; functions suite green;
+`npm run type-check` + `cd functions && npm run build` clean.
+
+**What shipped (all built/tested; the send path + rules + indexes are UNDEPLOYED by design):**
+- **58** messaging kill-switch (default OFF) + org timezone + per-service messaging defaults + shared recipient resolver + `firestore.rules` for messages/recipients/lockSnapshots.
+- **59** ✉ Messages composer + queue-then-trigger send (`queueServiceMessage`→`sendQueuedMessage`, RESEND_API_KEY confined to the trigger, transactional idempotency).
+- **60** delivery-history panel + `messageWebhook` (Svix HMAC verify-first, idempotent hard-bounce) + collection-group index.
+- **61** auto lock-notification on first lock + `sendScheduledReminders` daily cron (org-tz N-days-before) + user-scheduled dispatch.
+- **62** re-lock scoped change diff (SONG/ORDER/ROLE/NOTES/SLIDES) + team-tagged checkable prompt + Lock-quietly + snapshot-overwrite-on-confirm.
+
+**OWNER STEPS (nothing is deployed; no real email can send until these are done):**
+1. `/gsd-verify-work 58 59 60 61 62` — the deferred human UAT list (visual/interaction + real-email), all in `.planning/PENDING-VERIFICATION.md`.
+2. Create the Resend account; set secrets: `firebase functions:secrets:set RESEND_API_KEY` and `RESEND_WEBHOOK_SECRET`; set the `SERVICE_SHARE_BASE_URL` / `MESSAGE_FROM_ADDRESS` configs.
+3. Domain auth: SPF/DKIM/DMARC DNS records for the sending domain.
+4. Deploy: `firebase deploy --only firestore:rules,firestore:indexes` and `firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage,functions:messageWebhook,functions:sendScheduledReminders`.
+5. Configure the Resend dashboard webhook URL (the deployed `messageWebhook`) + signing secret.
+6. Then run the milestone lifecycle (audit → complete → cleanup).
+
+**Also disclosed (PENDING-VERIFICATION):** a Phase 59 composer success-toast misrender ("Save failed." prefix on the success toast, from the failure-only ToastHost) — recommended fix Option A (drop the redundant toast). NOT auto-applied (out of Phase 59's closed scope).
 
 > **Phase 62 outcome (2026-08-15) — 62-04 (R146/R148/SC4):** `onMarkAsPlanned` now computes a REAL
 > `slideGroupsFingerprint` on every lock (the Phase 61 `slideGroupsFingerprint: null` stub is realized —
