@@ -85,14 +85,14 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 ### Re-lock Change Notice
 
-- [ ] **R146**: After editing a locked service and re-locking, the planner is prompted to notify with a
+- [x] **R146**: After editing a locked service and re-locking, the planner is prompted to notify with a
       scoped change diff of typed, checkable entries (SONG / ORDER / ROLE / NOTES / SLIDES).
 
 - [ ] **R147**: Each change entry is tagged with the teams it affects (defaulting to all assigned teams
       for non-role changes), and the planner can send the update to only the affected teams or to
       everyone on the service.
 
-- [ ] **R148**: "Lock quietly" is always available to re-lock without sending; confirming a notify
+- [x] **R148**: "Lock quietly" is always available to re-lock without sending; confirming a notify
       overwrites the lock snapshot so the next re-lock diffs against the new state, not the original.
 
 ## Future Requirements
@@ -154,9 +154,9 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R143 | Phase 60 | Complete |
 | R144 | Phase 61 | Complete |
 | R145 | Phase 61 | Complete |
-| R146 | Phase 62 | Pending |
+| R146 | Phase 62 | Complete |
 | R147 | Phase 62 | Pending |
-| R148 | Phase 62 | Pending |
+| R148 | Phase 62 | Complete |
 
 **Coverage:**
 
