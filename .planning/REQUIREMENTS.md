@@ -88,7 +88,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 - [x] **R146**: After editing a locked service and re-locking, the planner is prompted to notify with a
       scoped change diff of typed, checkable entries (SONG / ORDER / ROLE / NOTES / SLIDES).
 
-- [ ] **R147**: Each change entry is tagged with the teams it affects (defaulting to all assigned teams
+- [x] **R147**: Each change entry is tagged with the teams it affects (defaulting to all assigned teams
       for non-role changes), and the planner can send the update to only the affected teams or to
       everyone on the service.
 
@@ -155,7 +155,7 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R144 | Phase 61 | Complete |
 | R145 | Phase 61 | Complete |
 | R146 | Phase 62 | Complete |
-| R147 | Phase 62 | Pending |
+| R147 | Phase 62 | Complete |
 | R148 | Phase 62 | Complete |
 
 **Coverage:**

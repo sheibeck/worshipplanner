@@ -397,12 +397,12 @@ and choose who to tell.
   3. "Lock quietly" is always available to re-lock without sending anything.
   4. Confirming either a notify-send or a quiet lock overwrites `lockSnapshots/current`, so the next
      re-lock diffs against this new state, not the original lock.
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 
 Plans:
 
 - [x] 62-01-PLAN.md — Functions plumbing: 'relock-notification' MessageType/MESSAGE_TYPES + changeDiff widened to ChangeEntry[] | null through request/handler/shaper (R146/R148, Wave 1)
-- [ ] 62-02-PLAN.md — Pure utils: fingerprintSlideGroups (deterministic per-group hash) + diffServiceSnapshots (SONG/ORDER/ROLE/NOTES/SLIDES + ROLE-narrow/others-broad affectedTeams) (R146/R147, Wave 1)
+- [x] 62-02-PLAN.md — Pure utils: fingerprintSlideGroups (deterministic per-group hash) + diffServiceSnapshots (SONG/ORDER/ROLE/NOTES/SLIDES + ROLE-narrow/others-broad affectedTeams) (R146/R147, Wave 1)
 - [ ] 62-03-PLAN.md — ReLockNotifyPrompt.vue modal: checkable typed diff + team chips + affected-vs-everyone Reaches-N + Send/Lock-quietly (R146/R147/R148, Wave 2, depends 62-01/62-02)
 - [ ] 62-04-PLAN.md — Lock-hook restructure: real fingerprint on every lock + re-lock diff branch + deferred overwrite-on-confirm (SC4) + mount modal (R146/R148, Wave 3, depends 62-02/62-03)
 
