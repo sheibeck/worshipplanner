@@ -6027,6 +6027,19 @@ describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () =>
   }
 
   it('first lock behind the gates: writes lockSnapshots/current (read-before-write) then enqueues one lock-notification', async () => {
+    // 62-04 (R146): seed a slide group for this service so the written fingerprint
+    // is a REAL { [slotId]: hash } map (Phase 61's `slideGroupsFingerprint: null`
+    // stub is now realized — a stub filled, NOT a behavior regression).
+    mockSlideGroupsState.groups = [
+      {
+        id: 'slot-0',
+        slotId: 'slot-0',
+        serviceId: 'service-1',
+        slides: [{ id: 's0', order: 0, sourceRef: { kind: 'text', title: 'T', body: 'B' } }],
+        createdAt: mockTimestamp,
+        updatedAt: mockTimestamp,
+      } as SlideGroup,
+    ]
     const wrapper = await lockDraft()
 
     // Snapshot written on the lock, read BEFORE the write (first-lock detection).
@@ -6037,10 +6050,13 @@ describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () =>
     )
     const snapPayload = mockSetDoc.mock.calls[0]![1] as {
       snapshot: unknown
-      slideGroupsFingerprint: unknown
+      slideGroupsFingerprint: Record<string, string>
     }
     expect(snapPayload.snapshot).toBeDefined()
-    expect(snapPayload.slideGroupsFingerprint).toBeNull()
+    // 62-04: a REAL fingerprint map (not null), keyed by the in-service group's slotId.
+    expect(snapPayload.slideGroupsFingerprint).toEqual(expect.any(Object))
+    expect(snapPayload.slideGroupsFingerprint).toHaveProperty('slot-0')
+    expect(typeof snapPayload.slideGroupsFingerprint['slot-0']).toBe('string')
 
     // Exactly one lock-notification enqueued, selector-only (never an email list).
     expect(mockHttpsCallable).toHaveBeenCalledWith(expect.anything(), 'queueServiceMessage')
