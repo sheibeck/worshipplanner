@@ -1069,6 +1069,20 @@ describe("createQueuedMessage", () => {
       expect(value, `field ${key} must not be undefined`).not.toBeUndefined();
     }
   });
+
+  it("persists a provided changeDiff array as the audit trail (relock-notification)", () => {
+    const changeDiff = [
+      { type: "SONG", description: "Added 'Amazing Grace'", affectedTeams: ["band", "vocals"] },
+      { type: "ORDER", description: "Moved sermon before offering", affectedTeams: [] },
+    ];
+    const doc = createQueuedMessage({ ...BASE_INPUT, changeDiff });
+    expect(doc.changeDiff).toEqual(changeDiff);
+  });
+
+  it("normalizes an absent changeDiff to null (every other message type is unaffected)", () => {
+    const doc = createQueuedMessage(BASE_INPUT);
+    expect(doc.changeDiff).toBeNull();
+  });
 });
 
 describe("queueServiceMessageHandler", () => {
@@ -1396,6 +1410,45 @@ describe("queueServiceMessageHandler", () => {
       queueServiceMessageHandler(fakeRequest({ data: { type: "relock-notification" } })),
     ).rejects.toMatchObject({ code: "failed-precondition" });
     expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("threads a changeDiff array into the messages/{id} doc for a relock-notification enqueue (R148 audit trail)", async () => {
+    const { db, setSpy } = fakeDb({ role: "editor", messagingEnabled: true });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const changeDiff = [
+      { type: "ROLE", description: "Jane now on drums", affectedTeams: ["band"] },
+    ];
+
+    const result = await queueServiceMessageHandler(
+      fakeRequest({ data: { type: "relock-notification", changeDiff } }),
+    );
+
+    expect(result).toEqual({ messageId: GENERATED_ID });
+    expect(setSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "relock-notification", changeDiff }),
+    );
+  });
+
+  it("writes changeDiff:null for an ordinary enqueue that provides no changeDiff (unaffected)", async () => {
+    const { db, setSpy } = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await queueServiceMessageHandler(fakeRequest());
+
+    expect(setSpy).toHaveBeenCalledWith(expect.objectContaining({ changeDiff: null }));
+  });
+
+  it("does NOT require changeDiff -- a relock-notification without one still enqueues (optional field)", async () => {
+    const { db, setSpy } = fakeDb({ role: "editor", messagingEnabled: true });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await queueServiceMessageHandler(
+      fakeRequest({ data: { type: "relock-notification" } }),
+    );
+
+    expect(result).toEqual({ messageId: GENERATED_ID });
+    expect(setSpy).toHaveBeenCalledWith(expect.objectContaining({ changeDiff: null }));
   });
 
   it("SOURCE INSPECTION: the queueServiceMessage onCall wrapper carries NO secrets array (never holds RESEND_API_KEY)", () => {
