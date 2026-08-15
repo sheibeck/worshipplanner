@@ -1,8 +1,8 @@
 ---
 phase: 62
 slug: relock-change-notice-scoped-diff
-status: draft
-nyquist_compliant: false
+status: planned
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-14
 ---
@@ -52,11 +52,14 @@ created: 2026-08-14
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _(planner fills)_ | | | R146/R147 | pure diff | diffServiceSnapshots: SONG/ORDER/ROLE/NOTES/SLIDES detection + ROLE-narrow/others-broad affectedTeams + empty-diff | unit (client) | `npx vitest run src/utils/__tests__/serviceLockDiff.test.ts` | ❌ W0 | ⬜ pending |
-| _(planner fills)_ | | | R146 (SLIDES) | fingerprint | slideGroupsFingerprint: deterministic per-group hash; deck add/remove/reorder/authored-edit → changed | unit (client) | `npx vitest run src/utils/__tests__/serviceLockDiff.test.ts` | ❌ W0 | ⬜ pending |
-| _(planner fills)_ | | | R146/R148 | send-path plumbing | MessageType accepts 'relock-notification'; changeDiff persisted (not forced null) | unit (functions) | `cd functions && npm test` | ✅ extend | ⬜ pending |
-| _(planner fills)_ | | | R147 | modal | ReLockNotifyPrompt: checkable entries → Reaches-N, affected-vs-everyone, Send vs Lock-quietly | unit (client) | `npx vitest run src/components/__tests__/ReLockNotifyPrompt.test.ts` | ❌ W0 | ⬜ pending |
-| _(planner fills)_ | | | R146/R148/SC4 | lock-hook re-lock branch | re-lock diff opens prompt on change / silent overwrite on none; overwrite lockSnapshots ONLY on confirm | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
+| 62-01 T1 | 62-01 | 1 | R146 | T-62-01a/c | MessageType/MESSAGE_TYPES accept 'relock-notification' (enum gate); unknown type + non-editor/kill-switch-off still rejected | unit (functions) | `cd functions && npx vitest run src/index.test.ts` | ✅ extend | ⬜ pending |
+| 62-01 T2 | 62-01 | 1 | R148 | T-62-01b/d | changeDiff widened to ChangeEntry[] \| null; persisted array when provided, null otherwise; every other type byte-unchanged; audit doc immutable | unit (functions) | `cd functions && npx vitest run src/index.test.ts` | ✅ extend | ⬜ pending |
+| 62-02 T1 | 62-02 | 1 | R146 (SLIDES) | T-62-02b/c | fingerprintSlideGroups: deterministic per-group hash of ordered sourceRef identities; add/remove/reorder/authored-edit → changed; A1 documented | unit (client) | `npx vitest run src/utils/__tests__/serviceLockDiff.test.ts` | ❌ W0 | ⬜ pending |
+| 62-02 T2 | 62-02 | 1 | R146/R147 | T-62-02a/b | diffServiceSnapshots: SONG/ORDER/ROLE/NOTES/SLIDES (+slot add/remove) detection; ROLE-narrow/others-broad affectedTeams; empty-diff → [] | unit (client) | `npx vitest run src/utils/__tests__/serviceLockDiff.test.ts` | ❌ W0 | ⬜ pending |
+| 62-03 T1 | 62-03 | 2 | R146/R147 | T-62-03b | ReLockNotifyPrompt: checkable typed rows + team chips; affected-vs-everyone; Reaches-N recompute on check/uncheck + choice switch | unit (client) | `npx vitest run src/components/__tests__/ReLockNotifyPrompt.test.ts` | ❌ W0 | ⬜ pending |
+| 62-03 T2 | 62-03 | 2 | R146/R148 | T-62-03a/c/d | Send → queueServiceMessage type:'relock-notification' + changeDiff=checked; Lock-quietly/dismiss emit cancel; disabled/error states; failed send keeps snapshot | unit (client) | `npx vitest run src/components/__tests__/ReLockNotifyPrompt.test.ts` | ❌ W0 | ⬜ pending |
+| 62-04 T1 | 62-04 | 3 | R146 | T-62-04b | real slideGroupsFingerprint on every lock (replaces P61 null stub); first-lock auto-send unchanged; P61 null-fingerprint assertions updated | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
+| 62-04 T2 | 62-04 | 3 | R146/R148/SC4 | T-62-04a/c | re-lock diff opens prompt on change / silent overwrite on empty or messaging-off; overwrite lockSnapshots ONLY on confirm (sent OR cancel); overwrite-timing asserted | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -89,11 +92,11 @@ created: 2026-08-14
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency acceptable per suite
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies — all 8 tasks carry an `<automated>` command; the four missing test files are CREATED in-plan by their own tasks (`serviceLockDiff.test.ts`, `ReLockNotifyPrompt.test.ts`) or EXTENDED (`functions/src/index.test.ts`, `ServiceEditorView.test.ts`)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify — every task ends in a scoped vitest run
+- [x] Wave 0 covers all MISSING references — the two new test files are authored alongside their production code (TDD tasks); the two extended suites already exist
+- [x] No watch-mode flags — all commands are `vitest run` (one-shot), not `vitest` watch
+- [x] Feedback latency acceptable per suite — client scoped ~5–20s, functions scoped ~5–15s; full app suite ~300s at wave boundaries only
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** planner-approved 2026-08-14 — 4 plans / 8 tasks mapped; every task has an automated verify; the pure `diffServiceSnapshots` + fingerprint determinism (62-02) and the SC4 overwrite-only-on-confirm test (62-04 T2) are the load-bearing gates. Manual-only rows remain owner-deferred (deployed send path).
