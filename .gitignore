@@ -75,6 +75,11 @@ lpt[1-9].*
 .env
 .env.*
 !.env.example
+# Firebase Functions emulator local secret overrides (may hold real Resend keys).
+# Committed template lives at functions/.secret.local.example.
+.secret.local
+*.secret.local
+!.secret.local.example
 .next/
 build/
 __pycache__/
