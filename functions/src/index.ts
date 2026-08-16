@@ -1735,7 +1735,7 @@ export async function sendQueuedMessageHandler(params: {
       if (!RESEND_TAG_SAFE.test(target.id)) {
         throw new Error("recipient id is not Resend-tag-safe");
       }
-      const tokenCtx = { serviceDate, theirRoles: target.roleNames, songTitles, serviceLink };
+      const tokenCtx = { serviceDate, theirRoles: target.roleNames, recipientName: target.name, songTitles, serviceLink };
       const subject = renderMessageTokens(message.subject, tokenCtx);
       const body = renderMessageTokens(message.body, tokenCtx);
 

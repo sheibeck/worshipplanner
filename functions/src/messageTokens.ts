@@ -7,19 +7,21 @@
  * and no import of the client `buildServiceSnapshot` (which is store-bound and
  * not importable in the functions project, 59-RESEARCH.md Anti-Pattern). The
  * caller (the send trigger) Admin-SDK-loads the service/quarters/roles/people,
- * derives the four token values, and calls this once PER RECIPIENT so
- * `{{their_roles}}` reflects that person's own roles (R139).
+ * derives the token values, and calls this once PER RECIPIENT so
+ * `{{their_roles}}` and `{{name}}` reflect that person's own roles/name (R139/R154).
  *
- * The four supported tokens are substituted GLOBALLY; every other `{{token}}`
+ * The supported tokens are substituted GLOBALLY; every other `{{token}}`
  * is left verbatim, and a template with no tokens is returned unchanged.
  */
 
-/** The four token values a message is rendered against, for ONE recipient. */
+/** The token values a message is rendered against, for ONE recipient. */
 export interface MessageTokenContext {
   /** The service date, already formatted for display by the caller. */
   serviceDate: string;
   /** THIS recipient's own resolved role names (R139) — the per-recipient field. */
   theirRoles: string[];
+  /** THIS recipient's own display name (R154) — the per-recipient field. */
+  recipientName: string;
   /** The service's SONG-slot titles, in service order. */
   songTitles: string[];
   /** The service's public share-link URL, or '' when none exists (A1). */
@@ -47,9 +49,9 @@ function replaceToken(template: string, name: string, value: string): string {
 }
 
 /**
- * Renders the four supported merge tokens in `template` from `ctx`. PURE: no
+ * Renders the supported merge tokens in `template` from `ctx`. PURE: no
  * side effects, no I/O. Called once per recipient by the send trigger so
- * `{{their_roles}}` is personalized. Unknown tokens are left untouched.
+ * `{{their_roles}}` and `{{name}}` are personalized. Unknown tokens are left untouched.
  */
 export function renderMessageTokens(template: string, ctx: MessageTokenContext): string {
   const rolesText = ctx.theirRoles.length > 0 ? ctx.theirRoles.join(", ") : EMPTY_ROLES_PLACEHOLDER;
@@ -58,6 +60,7 @@ export function renderMessageTokens(template: string, ctx: MessageTokenContext):
   let out = template;
   out = replaceToken(out, "service_date", ctx.serviceDate);
   out = replaceToken(out, "their_roles", rolesText);
+  out = replaceToken(out, "name", ctx.recipientName);
   out = replaceToken(out, "song_list", songText);
   out = replaceToken(out, "service_link", ctx.serviceLink);
   return out;
