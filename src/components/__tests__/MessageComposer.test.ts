@@ -191,6 +191,57 @@ describe('MessageComposer', () => {
     expect(q('reaches-count').text()).toContain('Reaches 0 people')
   })
 
+  describe('add-someone picker (R152 — visible standalone select)', () => {
+    it('has a DISABLED placeholder first option reading "＋ Add someone…" when people are addable', () => {
+      mountComposer()
+      const select = q('add-someone-select').element as HTMLSelectElement
+      expect(select.disabled).toBe(false)
+      const first = select.querySelector('option') as HTMLOptionElement
+      expect(first.disabled).toBe(true)
+      expect(first.value).toBe('')
+      expect(first.textContent).toContain('＋ Add someone')
+    })
+
+    it('disables the select and shows "No one left to add" when nobody is addable', () => {
+      mountComposer({ people: [] })
+      const select = q('add-someone-select').element as HTMLSelectElement
+      expect(select.disabled).toBe(true)
+      const first = select.querySelector('option') as HTMLOptionElement
+      expect(first.textContent).toContain('No one left to add')
+    })
+  })
+
+  describe('always-on live preview (R153)', () => {
+    it('renders the sample-preview on mount with NO Preview button, and updates live as the subject changes', async () => {
+      mountComposer()
+      // Present immediately — no click-to-preview toggle.
+      expect(q('sample-preview').exists()).toBe(true)
+      expect(q('preview-btn').exists()).toBe(false)
+      // Editing the subject updates the rendered sample live.
+      await fillSubject('Rehearsal at 8:15')
+      expect(q('sample-preview').text()).toContain('Rehearsal at 8:15')
+    })
+  })
+
+  describe('token palette + {{name}} sample (R154 client)', () => {
+    it('offers a Name token chip and NO Song list chip', () => {
+      mountComposer()
+      expect(q('token-name').exists()).toBe(true)
+      expect(q('token-song_list').exists()).toBe(false)
+    })
+
+    it('renders {{name}} as the sample recipient own name in the preview', async () => {
+      mountComposer()
+      // band → Alice (p1) reachable is the sample recipient.
+      await q('team-chip-band').trigger('click')
+      const el = q('body-textarea').element as HTMLTextAreaElement
+      el.value = 'Hi {{name}}!'
+      el.dispatchEvent(new Event('input'))
+      await nextTick()
+      expect(q('sample-preview').text()).toContain('Hi Alice!')
+    })
+  })
+
   describe('message type seeding with a dirty guard', () => {
     it('defaults to One-off (blank) and seeds Reminder/Share-link defaults when the draft is clean', async () => {
       mountComposer()
