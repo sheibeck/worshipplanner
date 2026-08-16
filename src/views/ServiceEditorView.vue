@@ -729,6 +729,20 @@
           >
             Roles
           </button>
+          <!-- Messages tab (63-01, R149): appended last (Service Order · Slides ·
+               Roles · Messages). Copies the Roles button verbatim; gated on the
+               Roles editor check PLUS the messaging kill-switch. -->
+          <button
+            v-if="authStore.isEditor && isMessagingEnabled()"
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'messages'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'messages'"
+          >
+            Messages
+          </button>
         </div>
 
         <div v-show="activeTab === 'service-order'" data-testid="service-order-panel">
@@ -834,88 +848,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Messaging defaults (58-05, R132) — per-service overrides that inherit
-             from OrgSettings.messaging until explicitly changed. Same shell/tier
-             as Teams and Sermon Context above; reuses the exact inherit-or-
-             override select idiom + Draft-editable/locked-read-only branch
-             structure already shipped for the per-slot Bible-version override
-             below (see the SCRIPTURE slot's `#version` select). -->
-        <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3" data-testid="messaging-defaults-panel">
-          <div class="flex items-start gap-4">
-            <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap mt-1">Messaging defaults</h2>
-            <div class="flex-1 space-y-3">
-              <template v-if="canEditService">
-                <div>
-                  <p class="text-xs text-gray-500 mb-1">Lock notification</p>
-                  <select
-                    :value="localService.messaging?.lockNotifyEnabled ?? ''"
-                    data-testid="messaging-lock-notify-select"
-                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    @change="onChangeLockNotifyEnabled(($event.target as HTMLSelectElement).value)"
-                  >
-                    <option value="">Default (Settings: {{ authStore.settings.messaging.lockNotifyDefault ? 'On' : 'Off' }})</option>
-                    <option value="true">On</option>
-                    <option value="false">Off</option>
-                  </select>
-                </div>
-                <div>
-                  <p class="text-xs text-gray-500 mb-1">Service-link reminder</p>
-                  <select
-                    :value="localService.messaging?.reminderEnabled ?? ''"
-                    data-testid="messaging-reminder-enabled-select"
-                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    @change="onChangeReminderEnabled(($event.target as HTMLSelectElement).value)"
-                  >
-                    <option value="">Default (Settings: {{ authStore.settings.messaging.reminderEnabled ? 'On' : 'Off' }})</option>
-                    <option value="true">On</option>
-                    <option value="false">Off</option>
-                  </select>
-                </div>
-                <div v-if="messagingReminderResolvedOn">
-                  <p class="text-xs text-gray-500 mb-1">Reminder days-before</p>
-                  <select
-                    :value="localService.messaging?.reminderDaysBefore ?? ''"
-                    data-testid="messaging-reminder-days-select"
-                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    @change="onChangeReminderDaysBefore(($event.target as HTMLSelectElement).value)"
-                  >
-                    <option value="">Default (Settings: {{ authStore.settings.messaging.reminderDaysBefore }} days)</option>
-                    <option v-for="days in MESSAGING_REMINDER_DAYS_OPTIONS" :key="days" :value="days">{{ days }}</option>
-                  </select>
-                </div>
-              </template>
-              <!-- Lifecycle lock: read-only summary. CLASS D — INVERSE branch,
-                   mirrors the scripture Bible-version override's locked-read-only
-                   paragraph exactly (ServiceEditorView.vue's SCRIPTURE slot,
-                   `#version` select). -->
-              <p v-else-if="authStore.isEditor && isLocked" class="text-sm text-gray-200" data-testid="messaging-defaults-readonly">
-                Lock notification: {{ messagingLockNotifyText }} · Service-link reminder: {{ messagingReminderText }}
-              </p>
-              <!-- Viewer: read-only summary. -->
-              <p v-else class="text-sm text-gray-200" data-testid="messaging-defaults-readonly">
-                Lock notification: {{ messagingLockNotifyText }} · Service-link reminder: {{ messagingReminderText }}
-              </p>
-            </div>
-          </div>
-          <p v-if="messagingSaveError" class="text-red-400 text-sm mt-2">{{ messagingSaveError }}</p>
-        </div>
-
-        <!-- "Sent on this service" delivery-history panel (60-03, R142/R143).
-             Read-only; mounts directly below the messaging-defaults panel.
-             HIDDEN (v-if) when messaging is off OR the user is not an editor
-             (kill-switch hides the reference surface — UI-SPEC #0). -->
-        <ServiceMessageHistory
-          v-if="isMessagingEnabled() && canEditService"
-          class="mt-3"
-          data-testid="service-message-history"
-          :messages="serviceMessagesStore.messages"
-          :recipients-by-message="serviceMessagesRecipients"
-          :loading="serviceMessagesStore.isLoading"
-          :error="serviceMessagesError"
-          @new-message="messageComposerOpen = true"
-          @expand="onExpandMessage"
-        />
 
         <!-- Dynamic Service Flow. 260811-vsr: the item list fills the tab's content
              width, matching the Teams / Sermon Context blocks above it. (An earlier
@@ -1508,6 +1440,96 @@
           />
         </div>
 
+        <!-- Messages tab (63-01, R149/R150): the messaging-defaults panel and the
+             "Sent on this service" delivery history, relocated verbatim out of the
+             Service Order tab. v-show (not v-if) so the moved selects keep their
+             state across tab switches, consistent with the sibling panels. -->
+        <div v-show="activeTab === 'messages'" data-testid="messages-panel">
+        <!-- Messaging defaults (58-05, R132) — per-service overrides that inherit
+             from OrgSettings.messaging until explicitly changed. Same shell/tier
+             as Teams and Sermon Context above; reuses the exact inherit-or-
+             override select idiom + Draft-editable/locked-read-only branch
+             structure already shipped for the per-slot Bible-version override
+             below (see the SCRIPTURE slot's `#version` select). -->
+        <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3" data-testid="messaging-defaults-panel">
+          <div class="flex items-start gap-4">
+            <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap mt-1">Messaging defaults</h2>
+            <div class="flex-1 space-y-3">
+              <template v-if="canEditService">
+                <div>
+                  <p class="text-xs text-gray-500 mb-1">Lock notification</p>
+                  <select
+                    :value="localService.messaging?.lockNotifyEnabled ?? ''"
+                    data-testid="messaging-lock-notify-select"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    @change="onChangeLockNotifyEnabled(($event.target as HTMLSelectElement).value)"
+                  >
+                    <option value="">Default (Settings: {{ authStore.settings.messaging.lockNotifyDefault ? 'On' : 'Off' }})</option>
+                    <option value="true">On</option>
+                    <option value="false">Off</option>
+                  </select>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-500 mb-1">Service-link reminder</p>
+                  <select
+                    :value="localService.messaging?.reminderEnabled ?? ''"
+                    data-testid="messaging-reminder-enabled-select"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    @change="onChangeReminderEnabled(($event.target as HTMLSelectElement).value)"
+                  >
+                    <option value="">Default (Settings: {{ authStore.settings.messaging.reminderEnabled ? 'On' : 'Off' }})</option>
+                    <option value="true">On</option>
+                    <option value="false">Off</option>
+                  </select>
+                </div>
+                <div v-if="messagingReminderResolvedOn">
+                  <p class="text-xs text-gray-500 mb-1">Reminder days-before</p>
+                  <select
+                    :value="localService.messaging?.reminderDaysBefore ?? ''"
+                    data-testid="messaging-reminder-days-select"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    @change="onChangeReminderDaysBefore(($event.target as HTMLSelectElement).value)"
+                  >
+                    <option value="">Default (Settings: {{ authStore.settings.messaging.reminderDaysBefore }} days)</option>
+                    <option v-for="days in MESSAGING_REMINDER_DAYS_OPTIONS" :key="days" :value="days">{{ days }}</option>
+                  </select>
+                </div>
+              </template>
+              <!-- Lifecycle lock: read-only summary. CLASS D — INVERSE branch,
+                   mirrors the scripture Bible-version override's locked-read-only
+                   paragraph exactly (ServiceEditorView.vue's SCRIPTURE slot,
+                   `#version` select). -->
+              <p v-else-if="authStore.isEditor && isLocked" class="text-sm text-gray-200" data-testid="messaging-defaults-readonly">
+                Lock notification: {{ messagingLockNotifyText }} · Service-link reminder: {{ messagingReminderText }}
+              </p>
+              <!-- Viewer: read-only summary. -->
+              <p v-else class="text-sm text-gray-200" data-testid="messaging-defaults-readonly">
+                Lock notification: {{ messagingLockNotifyText }} · Service-link reminder: {{ messagingReminderText }}
+              </p>
+            </div>
+          </div>
+          <p v-if="messagingSaveError" class="text-red-400 text-sm mt-2">{{ messagingSaveError }}</p>
+        </div>
+
+        <!-- "Sent on this service" delivery-history panel (60-03, R142/R143).
+             Read-only. R150 (63-01): its gate dropped canEditService (which
+             embedded !isLocked), so it now renders on a LOCKED service too. It
+             stays gated isMessagingEnabled() && authStore.isEditor — the panel is
+             v-show (kept in DOM), so the viewer-hidden / kill-switch invariants
+             live on the history's OWN v-if, not on the tab button alone. -->
+        <ServiceMessageHistory
+          v-if="isMessagingEnabled() && authStore.isEditor"
+          class="mt-3"
+          data-testid="service-message-history"
+          :messages="serviceMessagesStore.messages"
+          :recipients-by-message="serviceMessagesRecipients"
+          :loading="serviceMessagesStore.isLoading"
+          :error="serviceMessagesError"
+          @new-message="messageComposerOpen = true"
+          @expand="onExpandMessage"
+        />
+        </div>
+
         <!-- Bottom actions: Delete only. Print and Share moved into the top
              ContextualActionBar (R101, 48-03) — see serviceEditorActionBar.ts's
              buildPrintItem/buildShareItem. Delete stays here deliberately,
@@ -1646,7 +1668,7 @@ const saveStatus = useSaveStatus()
 // the editor still opens on the Service Order tab (renamed from 'music' in
 // Phase 27, D-03); D-05's auto-selection is about which GROUP is selected
 // once the Slides tab itself is opened, not about which tab opens first.
-const activeTab = ref<'service-order' | 'roles' | 'slides'>('service-order')
+const activeTab = ref<'service-order' | 'roles' | 'slides' | 'messages'>('service-order')
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

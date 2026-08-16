@@ -8279,7 +8279,7 @@ describe('ServiceEditorView - Messages tab: relocated defaults + history (63-01,
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    const btn = wrapper.findAll('button').find((b) => b.text() === 'Messages')
+    const btn = wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))
     expect(btn?.exists()).toBe(true)
   })
 
@@ -8289,7 +8289,7 @@ describe('ServiceEditorView - Messages tab: relocated defaults + history (63-01,
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findAll('button').find((b) => b.text() === 'Messages')).toBeUndefined()
+    expect(wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))).toBeUndefined()
   })
 
   it('HIDES the Messages tab button when org messaging is OFF', async () => {
@@ -8297,7 +8297,7 @@ describe('ServiceEditorView - Messages tab: relocated defaults + history (63-01,
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findAll('button').find((b) => b.text() === 'Messages')).toBeUndefined()
+    expect(wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))).toBeUndefined()
   })
 
   it('relocates the defaults panel + history INTO the messages-panel (not service-order-panel)', async () => {
@@ -8305,7 +8305,7 @@ describe('ServiceEditorView - Messages tab: relocated defaults + history (63-01,
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages')
+    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))
     await messagesBtn!.trigger('click')
 
     // Both surfaces resolve INSIDE the messages-panel container.
@@ -8390,7 +8390,7 @@ describe('ServiceEditorView - Messages tab R150 locked-service regression (63-01
     const wrapper = await mountView({ status: 'planned' })
     await wrapper.vm.$nextTick()
 
-    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages')
+    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))
     await messagesBtn!.trigger('click')
 
     expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(true)
@@ -8403,7 +8403,7 @@ describe('ServiceEditorView - Messages tab R150 locked-service regression (63-01
     const wrapper = await mountView({ status: 'planned' })
     await wrapper.vm.$nextTick()
 
-    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages')
+    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))
     await messagesBtn!.trigger('click')
 
     expect(wrapper.find('[data-testid="messaging-defaults-readonly"]').exists()).toBe(true)

@@ -52,7 +52,7 @@
  */
 import type { ActionBarItem } from '@/components/actionBarItems'
 
-export type ActionBarTab = 'service-order' | 'roles' | 'slides'
+export type ActionBarTab = 'service-order' | 'roles' | 'slides' | 'messages'
 
 export interface ActionBarHandlers {
   suggestAllSongs: () => void
@@ -317,6 +317,10 @@ function buildSlidesItems(ctx: ActionBarContext): ActionBarItem[] {
  */
 export function buildActionBarItems(tab: ActionBarTab, ctx: ActionBarContext): ActionBarItem[] {
   if (tab === 'roles') return []
+  // 63-01 (R149): the Messages tab exposes no action-bar items — like Roles.
+  // The ✉ Messages composer entry stays inside buildServiceOrderItems, reached
+  // only on the Service Order tab (SC3 unchanged).
+  if (tab === 'messages') return []
   if (tab === 'slides') return buildSlidesItems(ctx)
   return buildServiceOrderItems(ctx)
 }
