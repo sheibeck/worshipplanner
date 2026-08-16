@@ -203,6 +203,24 @@ interface StatusPill {
   spinner: boolean
 }
 
+// A queued/sending message older than this surfaces as "Failed to send" rather
+// than a perpetual grey spinner (R155 history). Read-only affordance — there is
+// NO retry path from history (deferred enhancement).
+const STUCK_THRESHOLD_MS = 5 * 60 * 1000 // 300000 ms / 5 min
+
+/**
+ * True when an in-flight (`queued`/`sending`) message's server-set `createdAt`
+ * is older than the threshold. A null `createdAt` (fresh serverTimestamp
+ * sentinel) is treated as NOT stuck so a just-queued doc never flashes "Failed".
+ */
+function isStuck(message: ServiceMessageDoc): boolean {
+  return (
+    (message.status === 'queued' || message.status === 'sending') &&
+    message.createdAt != null &&
+    Date.now() - message.createdAt.toMillis() > STUCK_THRESHOLD_MS
+  )
+}
+
 /**
  * The status pill per the UI-SPEC § Color table. A clean `sent` returns null
  * (no pill — the count carries it), keeping the list quiet so the red bounce
@@ -218,6 +236,10 @@ function statusPill(message: ServiceMessageDoc): StatusPill | null {
       return { label: 'Failed', classes: 'bg-red-900/50 text-red-300 border-red-800', spinner: false }
     case 'queued':
     case 'sending':
+      if (isStuck(message)) {
+        // Reuse the `failed` red recipe verbatim — no spinner, "Failed to send".
+        return { label: 'Failed to send', classes: 'bg-red-900/50 text-red-300 border-red-800', spinner: false }
+      }
       return { label: 'Sending…', classes: 'bg-gray-800 text-gray-300 border-gray-700', spinner: true }
     default:
       return null
@@ -245,7 +267,8 @@ function sendTimeLabel(message: ServiceMessageDoc): string {
     return Number.isNaN(ms) ? 'Scheduled' : `Scheduled for ${formatInstant(ms)}`
   }
   if (message.status === 'sending' || message.status === 'queued') {
-    return 'Sending…'
+    // Mirror the pill's age check so an aged row's time line never disagrees.
+    return isStuck(message) ? 'Failed to send' : 'Sending…'
   }
   const sentAt = message.sentAt
   if (sentAt && typeof sentAt.toMillis === 'function') {
