@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Messaging UX & Fixes
-current_phase: 62
+current_phase: 64
 current_phase_name: Composer Refinements
-status: discussing
-stopped_at: Completed 64-03-PLAN.md
-last_updated: "2026-08-16T02:14:51.855Z"
+status: verification_deferred_human
+stopped_at: v1.8 COMPLETE (Phases 63+64 code-complete + verified GREEN); STOPPED before milestone lifecycle per grant
+last_updated: "2026-08-16T03:00:00.000Z"
 last_activity: 2026-08-15
-last_activity_desc: Phase 62 verified GREEN; v1.7 code-complete, handed to owner
+last_activity_desc: Phase 64 verified GREEN (6/6). ALL v1.8 phases (63,64) code-complete + verified. Milestone lifecycle + /gsd-verify-work + deploys DEFERRED to owner per the standing grant.
 progress:
   total_phases: 2
   completed_phases: 2
@@ -37,22 +37,44 @@ first. Phase 63 is the only planned phase so far in v1.8; Phase 64 is independen
 
 ---
 
-## ⏸ RESUME HERE (2026-08-15 — v1.8 roadmap created, ready to plan Phase 63)
+## ★★ v1.8 MILESTONE HAND-OVER (2026-08-15) — code-complete + verified GREEN, owner steps remain
 
-**v1.8 "Messaging UX & Fixes"** — `.planning/REQUIREMENTS.md` (R149–R156, 8/8 mapped) and
-`.planning/ROADMAP.md` (Phases 63–64) are filled. No plan created yet. Started from owner UAT of the
-shipped v1.7 messaging feature. Decisions locked at scoping (2026-08-15):
+**Both v1.8 phases (63, 64) are code-complete and each verified GREEN.** 5/5 plans. App suite at its 2-file
+known-failing baseline throughout; functions suite green; `npm run type-check` + `cd functions && npm run
+build` clean.
 
-- **Message types seed distinct content** (R156): One-off = blank; Reminder = `Reminder: {{service_date}}`
-  + link body, everyone assigned; Share = `Service plan for {{service_date}}`, body = `{{service_link}}`
-  only. Client-only (no send-path change).
+**What shipped (all built/tested; the one functions change — R154 server `{{name}}` — is UNDEPLOYED):**
+- **63** Messages tab in the Service Editor holding the per-service Messaging defaults + the "Sent on this
+  service" history; the history is now visible when the service is LOCKED (fixed the Phase 60 `canEditService`
+  defect). Composer stays an action-bar modal.
+- **64** Composer refinements: team labels Band/Vocals/Tech/Other (dropped Worship/Hosts); "+ Add someone"
+  is a working visible person picker; live email preview (no click-to-preview); `{{song_list}}` dropped from
+  the palette, `{{name}}` per-recipient token added (client + server); Send spinner; the misleading
+  success-toast removed (resolved the disclosed Phase 59 defect); history no longer shows a perpetual
+  "Sending…" (aged-`queued` >5min or `failed` → red "Failed to send"); message types seed distinct content
+  (One-off blank · Reminder `Reminder: {{service_date}}` + link, everyone · Share `Service plan for
+  {{service_date}}`, link-only).
 
-- **Composer stays an action-bar modal**; the new Messages tab holds only the defaults + the
-  always-visible "Sent on this service" history.
+**OWNER STEPS:**
+1. `/gsd-verify-work 63 64` — the deferred visual/interaction UAT (all in `.planning/PENDING-VERIFICATION.md`).
+2. The R154 `{{name}}` server token takes effect only after the send path is (re)deployed — this FOLDS INTO
+   the existing v1.7 send-path deploy (no new command); see the v1.7 hand-over below for the full deploy/secret/
+   DNS list.
+3. Run the milestone lifecycle (audit → complete → cleanup) for v1.8 — and for v1.7 — once verified + deployed.
 
-**Next step:** `/gsd-plan-phase 63` (optionally `/gsd-discuss-phase 63` first). Phase 63 = the Messages
-tab + always-visible history (R149, R150); Phase 64 = composer refinements (R151–R156). The two are
-independent; either order works.
+**Note:** v1.8 stacked on v1.7 without archiving it; BOTH milestones are code-complete + verified but neither
+has run its lifecycle (owner-gated on deploy/verify). Phase numbering: v1.7 = 58–62, v1.8 = 63–64.
+
+---
+
+<details>
+<summary>Historical — v1.8 RESUME HERE (2026-08-15, roadmap-created; superseded by the hand-over above)</summary>
+
+**v1.8 "Messaging UX & Fixes"** — Phases 63–64, R149–R156. Decisions locked at scoping: message types seed
+distinct content (client-only); composer stays an action-bar modal, Messages tab holds defaults + always-visible
+history. (Both phases are now code-complete + verified — see the hand-over above.)
+
+</details>
 
 **v1.7 is NOT archived** — it is code-complete + verified GREEN but its send path is UNDEPLOYED and its
 owner steps (deploy/secret/DNS + `/gsd-verify-work 58..62`) are still open in
