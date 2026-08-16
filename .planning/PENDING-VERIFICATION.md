@@ -490,3 +490,28 @@ no-overwrite (SC4 safe basis), empty-diff/messaging-off silent overwrite, and fi
 **not** treat this item as passed — the visual + real-email + overwrite-timing UAT is deferred to the
 owner, gated behind the same undeployed send path as 59/60/61/62-03. **This is the FINAL plan of
 milestone v1.7; the phase is code-complete — the milestone lifecycle (audit/complete) is the owner's.**
+
+## ⏳ 63-01 — Messages tab + always-visible delivery history — DEFERRED (owner at /gsd-verify-work 63)
+
+Plan 63-01 added a dedicated **Messages** tab to the Service Editor (4th button, after Roles, gated
+`authStore.isEditor && isMessagingEnabled()`) and MOVED the messaging-defaults panel + the "Sent on this
+service" `ServiceMessageHistory` out of the Service Order tab into a `v-show="activeTab === 'messages'"`
+panel. The R150 gate fix dropped `canEditService` from the history's `v-if` (now
+`isMessagingEnabled() && authStore.isEditor`) so it renders on a LOCKED service. Every behavior is proven
+by unit tests: tab presence/absence (editor+on / viewer / messaging-off), relocation asserted by CONTAINER
+(defaults + history inside `messages-panel`, not `service-order-panel`), `buildActionBarItems('messages')`
+returns `[]` with the ✉ composer key still on the Service Order bar, and the R150 locked-service regression
+(history still renders; viewer / messaging-off still hidden). Scoped suite 373/373 green; type-check clean;
+full app suite at the 2-file baseline.
+
+**What only a human at `/gsd-verify-work 63` can confirm (`verification_deferred_human`):**
+- **The Messages tab looks right.** In the LIVE app (messaging on, as an editor): open a service, click
+  **Messages**, and confirm the tab reads Service Order · Slides · Roles · Messages, the messaging-defaults
+  controls and the "Sent on this service" history render there, and both are GONE from the Service Order tab.
+- **History visible when locked.** Lock the service (Mark as Planned / exported) and confirm the delivery
+  history is STILL shown (read-only) on the Messages tab — the R150 point. Confirm a viewer (shared link)
+  and a messaging-off org see no Messages tab and no history.
+
+**Client-only plan — NO deploy, NO `.env.local`, NO functions change this plan** (v1.8 grant). Do **not**
+treat this item as passed — the visual UAT (tab layout + locked-service history) is deferred to the owner.
+**This is the FIRST plan of milestone v1.8.**

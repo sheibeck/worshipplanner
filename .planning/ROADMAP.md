@@ -541,13 +541,19 @@ service" history is visible whether the service is a draft, locked, or exported.
 **Depends on**: — (builds on shipped v1.7 Phases 58/60/62 surfaces)
 **Requirements**: R149, R150
 **Success Criteria** (what must be TRUE):
+
   1. The Service Editor has a **Messages tab**; the "Messaging defaults" panel and the "Sent on this
      service" delivery-history panel render there and NO LONGER in the Service Order tab.
+
   2. The delivery-history panel is **visible at all times** (draft / locked / exported) — its render no
      longer depends on `canEditService`; it shows for any org editor, gated only by `isMessagingEnabled()`.
+
   3. The ✉ Messages composer still opens as an action-bar modal (unchanged); no send behavior regresses.
-**Plans**: 1 plan
-- [ ] 63-01-PLAN.md — Add the Messages tab + relocate the defaults/history panels into it (R149) and fix the history gate so it stays visible on a locked service (R150)
+
+**Plans**: 1/1 plans executed
+
+- [x] 63-01-PLAN.md — Add the Messages tab + relocate the defaults/history panels into it (R149) and fix the history gate so it stays visible on a locked service (R150)
+
 **UI hint**: yes
 
 ### Phase 64: Composer Refinements
@@ -557,15 +563,20 @@ the preview is live, tokens are right, sending shows progress, and each message 
 **Depends on**: — (independent of Phase 63; both touch messaging UI but different components)
 **Requirements**: R151, R152, R153, R154, R155, R156
 **Success Criteria** (what must be TRUE):
+
   1. Send-To team labels read **Band / Vocals / Tech / Other** (mirroring Volunteer Roles), everywhere
      messaging renders team names — the Worship/Hosts remap is gone.
+
   2. **"+ Add someone"** adds the chosen individual to the recipient selection (and the live "Reaches N"
      reflects them); the person can be removed again.
+
   3. The email **preview updates live** as the subject/body change (tokens rendered against a sample
      recipient) — no click-to-preview step.
+
   4. The **`{{song_list}}` token is gone**; a **`{{name}}`** token renders each recipient's own name.
   5. Sending shows an **in-progress spinner**; a message that cannot progress shows a **failed/timeout**
      state in the history rather than a perpetual "Sending…".
+
   6. Selecting **One-off / Reminder / Share service link** seeds the distinct subject/body/recipients
      defined in R156; changing type re-seeds only when the fields are untouched (dirty-guard).
 **Plans**: TBD

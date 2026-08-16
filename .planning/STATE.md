@@ -4,17 +4,37 @@ milestone: v1.8
 milestone_name: Messaging UX & Fixes
 current_phase: 63
 current_phase_name: Messages Tab & Always-Visible History
-status: roadmap_created
-stopped_at: v1.8 REQUIREMENTS + ROADMAP created (R149-R156, Phases 63-64); ready to plan Phase 63
-last_updated: "2026-08-15T04:00:00.000Z"
+status: phase_complete
+stopped_at: Completed 63-01-PLAN.md
+last_updated: "2026-08-16T00:46:35.266Z"
 last_activity: 2026-08-15
-last_activity_desc: Started v1.8 (Messaging UX & Fixes) from owner UAT of v1.7 — 8 requirements, 2 phases. v1.7 stays open (owner deploy/verify pending).
+last_activity_desc: "63-01 executed GREEN — Messages tab + relocated defaults/history + R150 fix (R149, R150)"
 progress:
   total_phases: 2
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 50
+---
+
+## ⏸ RESUME HERE (2026-08-15 — Phase 63 code-complete via 63-01; Phase 64 not yet planned)
+
+**63-01 executed GREEN (R149, R150).** Added a dedicated **Messages** tab to `ServiceEditorView.vue`
+(4th button after Roles, gated `authStore.isEditor && isMessagingEnabled()`), MOVED the messaging-defaults
+panel + the "Sent on this service" `ServiceMessageHistory` out of the Service Order tab into a `v-show`
+`messages-panel` (byte-for-byte), and fixed **R150**: the history gate dropped `canEditService`
+(now `isMessagingEnabled() && authStore.isEditor`) so it renders on a LOCKED service while a viewer /
+messaging-off org still hides it. `ActionBarTab` widened with `'messages'`; `buildActionBarItems('messages')`
+returns `[]` (the ✉ composer stays on the Service Order bar — SC3 unchanged). Commits `119f038e` (test),
+`cb2c0e6c` (feat). Gates: scoped `ServiceEditorView.test.ts` + `serviceEditorActionBar.test.ts` 373/373 green;
+`npm run type-check` (vue-tsc --build) clean; full app suite at the 2-file known-failing baseline
+(`storage.rules.test.ts`, `RosterView.test.ts`). NO deploy, NO `.env.local` (v1.8 grant). Visual UAT (tab
+layout; history visible when locked) DEFERRED to owner at `/gsd-verify-work 63` — `.planning/PENDING-VERIFICATION.md`
+§ 63-01 (`verification_deferred_human`, NOT marked passed).
+
+**Next step:** `/gsd-plan-phase 64` (composer refinements, R151–R156) — optionally `/gsd-discuss-phase 64`
+first. Phase 63 is the only planned phase so far in v1.8; Phase 64 is independent.
+
 ---
 
 ## ⏸ RESUME HERE (2026-08-15 — v1.8 roadmap created, ready to plan Phase 63)
@@ -22,9 +42,11 @@ progress:
 **v1.8 "Messaging UX & Fixes"** — `.planning/REQUIREMENTS.md` (R149–R156, 8/8 mapped) and
 `.planning/ROADMAP.md` (Phases 63–64) are filled. No plan created yet. Started from owner UAT of the
 shipped v1.7 messaging feature. Decisions locked at scoping (2026-08-15):
+
 - **Message types seed distinct content** (R156): One-off = blank; Reminder = `Reminder: {{service_date}}`
   + link body, everyone assigned; Share = `Service plan for {{service_date}}`, body = `{{service_link}}`
   only. Client-only (no send-path change).
+
 - **Composer stays an action-bar modal**; the new Messages tab holds only the defaults + the
   always-visible "Sent on this service" history.
 
@@ -49,17 +71,23 @@ Owner request (2026-08-15): run v1.8 "Messaging UX & Fixes" the **same way as v1
 via the post-milestone menu ("Autonomous, like v1.7").
 
 **What it authorizes / does NOT — identical to the v1.7 grant terms immediately below:**
+
 - Proceed through both v1.8 phases (63, 64) without pausing for ordinary implementation decisions; run
   default smart-discuss, pick the reasonable default for each grey area, state it, keep moving.
+
 - **Defer human verification.** Route each `human_needed` check to `.planning/PENDING-VERIFICATION.md`
   and continue; never record a deferred check as passed.
+
 - **STOP BEFORE THE MILESTONE LIFECYCLE.** When Phases 63+64 are code-complete, STOP and hand over the
   `/gsd-verify-work 63 64` list. Do NOT run audit/complete/cleanup.
+
 - **NO deploys. NO `.env.local` writes.** v1.8 is mostly client-side UI; if a functions change lands it
   ships built/tested/UNDEPLOYED with the command handed over. (The v1.7 send path is still undeployed;
   local sends work via the gitignored `functions/.secret.local` placeholder from the 2026-08-15 debug.)
+
 - **No destructive/irreversible actions** without asking (no `git stash`, no project-wide lint --fix, no
   history rewrites, no bulk deletions beyond a plan's scope).
+
 - Type gate is `npm run type-check` (vue-tsc --build); app-suite baseline is the 2 known-failing files
   (`storage.rules.test.ts`, `RosterView.test.ts`); functions suite via `cd functions && npm test`.
 
@@ -341,6 +369,7 @@ The app suite stays at its documented 2-file known-failing baseline throughout; 
 `npm run type-check` + `cd functions && npm run build` clean.
 
 **What shipped (all built/tested; the send path + rules + indexes are UNDEPLOYED by design):**
+
 - **58** messaging kill-switch (default OFF) + org timezone + per-service messaging defaults + shared recipient resolver + `firestore.rules` for messages/recipients/lockSnapshots.
 - **59** ✉ Messages composer + queue-then-trigger send (`queueServiceMessage`→`sendQueuedMessage`, RESEND_API_KEY confined to the trigger, transactional idempotency).
 - **60** delivery-history panel + `messageWebhook` (Svix HMAC verify-first, idempotent hard-bounce) + collection-group index.
@@ -348,6 +377,7 @@ The app suite stays at its documented 2-file known-failing baseline throughout; 
 - **62** re-lock scoped change diff (SONG/ORDER/ROLE/NOTES/SLIDES) + team-tagged checkable prompt + Lock-quietly + snapshot-overwrite-on-confirm.
 
 **OWNER STEPS (nothing is deployed; no real email can send until these are done):**
+
 1. `/gsd-verify-work 58 59 60 61 62` — the deferred human UAT list (visual/interaction + real-email), all in `.planning/PENDING-VERIFICATION.md`.
 2. Create the Resend account; set secrets: `firebase functions:secrets:set RESEND_API_KEY` and `RESEND_WEBHOOK_SECRET`; set the `SERVICE_SHARE_BASE_URL` / `MESSAGE_FROM_ADDRESS` configs.
 3. Domain auth: SPF/DKIM/DMARC DNS records for the sending domain.
@@ -1870,6 +1900,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 62 P02 | 8 min | 2 tasks | 2 files |
 | Phase 62 P03 | 14 min | 2 tasks | 2 files |
 | Phase 62 P04 | 34 min | 2 tasks | 2 files |
+| Phase 63 P01 | 18 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2545,8 +2576,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-15T02:40:28.611Z
-Stopped at: Completed 62-04-PLAN.md (FINAL plan of v1.7)
+Last session: 2026-08-16T00:46:35.205Z
+Stopped at: Completed 63-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
