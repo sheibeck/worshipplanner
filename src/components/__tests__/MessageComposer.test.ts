@@ -249,7 +249,7 @@ describe('MessageComposer', () => {
 
       await q('type-reminder').trigger('click')
       expect((q('subject-input').element as HTMLInputElement).value).not.toBe('')
-      expect((q('body-textarea').element as HTMLTextAreaElement).value).toContain('{{their_roles}}')
+      expect((q('body-textarea').element as HTMLTextAreaElement).value).toContain('{{service_link}}')
 
       // Share-link pre-inserts the {{service_link}} token.
       await q('type-share-link').trigger('click')
@@ -263,6 +263,28 @@ describe('MessageComposer', () => {
       expect((q('subject-input').element as HTMLInputElement).value).toBe('My own subject')
       // body was untouched by the user → still seeded
       expect((q('body-textarea').element as HTMLTextAreaElement).value).not.toBe('')
+    })
+
+    it('Reminder defaults recipients to Everyone when the recipient set is clean (R156)', async () => {
+      mountComposer()
+      expect(q('everyone-chip').attributes('aria-checked')).toBe('false')
+      await q('type-reminder').trigger('click')
+      expect(q('everyone-chip').attributes('aria-checked')).toBe('true')
+    })
+
+    it('Reminder does NOT flip to Everyone after the user picked a team (recipientDirty guard)', async () => {
+      mountComposer()
+      await q('team-chip-band').trigger('click')
+      await q('type-reminder').trigger('click')
+      expect(q('everyone-chip').attributes('aria-checked')).toBe('false')
+    })
+
+    it('One-off and Share-link never auto-set Everyone', async () => {
+      mountComposer()
+      await q('type-oneoff').trigger('click')
+      expect(q('everyone-chip').attributes('aria-checked')).toBe('false')
+      await q('type-share-link').trigger('click')
+      expect(q('everyone-chip').attributes('aria-checked')).toBe('false')
     })
   })
 
@@ -341,6 +363,32 @@ describe('MessageComposer', () => {
   })
 
   describe('Send', () => {
+    it('shows an in-button spinner + "Sending" and disables Send/Cancel while the send is in flight (R155)', async () => {
+      let resolveSend!: (v: { data: { messageId: string } }) => void
+      mockQueueServiceMessage.mockReturnValueOnce(
+        new Promise((res) => {
+          resolveSend = res
+        }),
+      )
+      mountComposer()
+      await q('team-chip-band').trigger('click')
+      await fillSubject('Rehearsal at 8:15')
+
+      await q('send-btn').trigger('click')
+      await nextTick()
+
+      // In-flight: disabled, spinner present, label reads "Sending", Cancel disabled.
+      expect((q('send-btn').element as HTMLButtonElement).disabled).toBe(true)
+      expect(q('send-btn').find('.animate-spin').exists()).toBe(true)
+      expect(q('send-btn').text()).toContain('Sending')
+      expect((q('cancel-btn').element as HTMLButtonElement).disabled).toBe(true)
+
+      resolveSend({ data: { messageId: 'msg-1' } })
+      await flushPromises()
+      expect((q('send-btn').element as HTMLButtonElement).disabled).toBe(false)
+      expect(q('send-btn').find('.animate-spin').exists()).toBe(false)
+    })
+
     it('calls queueServiceMessage with the recipient SELECTOR only — no raw email list crosses to the server', async () => {
       const wrapper = mountComposer()
       await q('team-chip-band').trigger('click')
@@ -372,10 +420,11 @@ describe('MessageComposer', () => {
       expect(serialized).not.toContain('cara@example.com')
       expect(serialized).not.toContain('@example.com')
 
-      // Success → emits 'sent' with the messageId + raises a toast.
+      // Success → emits 'sent' with the messageId; NO toast (the failure-only
+      // toast store misrenders success as "Save failed." — dropped in 64-03).
       expect(wrapper.emitted('sent')).toBeTruthy()
       expect(wrapper.emitted('sent')![0]).toEqual(['msg-1'])
-      expect(mockToastPush).toHaveBeenCalledTimes(1)
+      expect(mockToastPush).not.toHaveBeenCalled()
     })
 
     it('sends scheduledFor as an ISO instant when scheduling is on', async () => {
