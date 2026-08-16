@@ -8229,14 +8229,19 @@ describe('ServiceEditorView - Messaging defaults panel (58-05, R132)', () => {
   })
 })
 
-// ── 60-03 (R142/R143): "Sent on this service" delivery-history panel ──────────
+// ── 63-01 (R149/R150): Messages tab — relocated defaults + delivery history ────
 //
-// The Service Order tab mounts a read-only ServiceMessageHistory card directly
-// below the messaging-defaults panel, gated v-if=(isMessagingEnabled() &&
-// canEditService). The kill-switch HIDES the panel entirely (UI-SPEC #0), and a
-// viewer never mounts it. Focused present/absent assertions only — the panel's
-// own behavior is covered by ServiceMessageHistory.test.ts.
-describe('ServiceEditorView - delivery-history panel mount (60-03, R142/R143)', () => {
+// The messaging surfaces now live in a dedicated Messages tab (4th button,
+// after Roles), gated authStore.isEditor && isMessagingEnabled(). The
+// messaging-defaults panel and the read-only ServiceMessageHistory card MOVED
+// out of the Service Order tab into the v-show="activeTab==='messages'"
+// messages-panel. R150: the history's own gate dropped canEditService (→
+// isMessagingEnabled() && authStore.isEditor), so it renders on a LOCKED
+// service. Panels use v-show (kept in DOM), so relocation is proven by the
+// CONTAINER a surface resolves inside, not a bare .exists(). Focused
+// present/absent assertions only — the panel's own behavior is covered by
+// ServiceMessageHistory.test.ts.
+describe('ServiceEditorView - Messages tab: relocated defaults + history (63-01, R149/R150)', () => {
   async function mountView(overrides: Partial<Service> = {}) {
     mockServicesList = [{ ...mockService, status: 'draft', ...overrides }]
     const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
@@ -8269,15 +8274,52 @@ describe('ServiceEditorView - delivery-history panel mount (60-03, R142/R143)', 
     mockSubscribeServiceMessages.mockClear()
   })
 
-  it('mounts the history card in the Service Order tab for an editor with messaging ON', async () => {
+  it('shows the Messages tab button for an editor with messaging ON', async () => {
     mockAuthState.settings.messaging.enabled = true
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    // It renders directly below the messaging-defaults panel.
-    expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="messaging-defaults-panel"]').exists()).toBe(true)
-    // And the store subscription was opened for this service.
+    const btn = wrapper.findAll('button').find((b) => b.text() === 'Messages')
+    expect(btn?.exists()).toBe(true)
+  })
+
+  it('HIDES the Messages tab button for a viewer (non-editor)', async () => {
+    mockAuthState.settings.messaging.enabled = true
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAll('button').find((b) => b.text() === 'Messages')).toBeUndefined()
+  })
+
+  it('HIDES the Messages tab button when org messaging is OFF', async () => {
+    mockAuthState.settings.messaging.enabled = false
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAll('button').find((b) => b.text() === 'Messages')).toBeUndefined()
+  })
+
+  it('relocates the defaults panel + history INTO the messages-panel (not service-order-panel)', async () => {
+    mockAuthState.settings.messaging.enabled = true
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages')
+    await messagesBtn!.trigger('click')
+
+    // Both surfaces resolve INSIDE the messages-panel container.
+    const messagesPanel = wrapper.find('[data-testid="messages-panel"]')
+    expect(messagesPanel.find('[data-testid="messaging-defaults-panel"]').exists()).toBe(true)
+    expect(messagesPanel.find('[data-testid="service-message-history"]').exists()).toBe(true)
+
+    // And they are NO LONGER inside the service-order-panel container (v-show
+    // keeps both panels in the DOM, so the container is what proves the move).
+    const serviceOrderPanel = wrapper.find('[data-testid="service-order-panel"]')
+    expect(serviceOrderPanel.find('[data-testid="messaging-defaults-panel"]').exists()).toBe(false)
+    expect(serviceOrderPanel.find('[data-testid="service-message-history"]').exists()).toBe(false)
+
+    // The store subscription is still opened for this service.
     expect(mockSubscribeServiceMessages).toHaveBeenCalledWith('org-1', 'service-1')
   })
 
@@ -8293,6 +8335,93 @@ describe('ServiceEditorView - delivery-history panel mount (60-03, R142/R143)', 
     mockAuthState.settings.messaging.enabled = true
     mockAuthState.isEditor = false
     const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(false)
+  })
+})
+
+// ── 63-01 (R150): the delivery history stays visible on a LOCKED service ───────
+//
+// The R150 defect: the history's gate used canEditService (= isEditor &&
+// !isLocked), so it vanished the moment the service left draft. The gate is now
+// isMessagingEnabled() && authStore.isEditor — no lock term — so a locked
+// (status !== 'draft') service still renders the read-only history for an org
+// editor. The messaging-defaults panel's OWN canEditService branch is
+// intentionally UNCHANGED (locked-read-only summary, no editable selects). A
+// viewer / messaging-off org still hides the history on a locked service.
+describe('ServiceEditorView - Messages tab R150 locked-service regression (63-01)', () => {
+  async function mountView(overrides: Partial<Service> = {}) {
+    mockServicesList = [{ ...mockService, status: 'draft', ...overrides }]
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockAuthState.settings.messaging = {
+      enabled: false,
+      lockNotifyDefault: false,
+      reminderEnabled: false,
+      reminderDaysBefore: 3,
+    }
+    mockSubscribeServiceMessages.mockClear()
+  })
+
+  it('R150: on a LOCKED service the history STILL renders for an editor with messaging ON', async () => {
+    // Regression guard: canEditService is gone from the history's gate. It was
+    // false on a locked service and used to collapse the read-only history.
+    mockAuthState.settings.messaging.enabled = true
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages')
+    await messagesBtn!.trigger('click')
+
+    expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(true)
+  })
+
+  it('locked service: the defaults panel shows its locked-read-only summary and no editable selects (unchanged 58-05/62)', async () => {
+    // The defaults panel's OWN canEditService branch is intentionally untouched
+    // — only the history's gate dropped canEditService.
+    mockAuthState.settings.messaging.enabled = true
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages')
+    await messagesBtn!.trigger('click')
+
+    expect(wrapper.find('[data-testid="messaging-defaults-readonly"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="messaging-lock-notify-select"]').exists()).toBe(false)
+  })
+
+  it('locked service: a viewer (non-editor) still hides the history', async () => {
+    mockAuthState.settings.messaging.enabled = true
+    mockAuthState.isEditor = false
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(false)
+  })
+
+  it('locked service: messaging OFF still hides the history', async () => {
+    mockAuthState.settings.messaging.enabled = false
+    const wrapper = await mountView({ status: 'planned' })
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(false)

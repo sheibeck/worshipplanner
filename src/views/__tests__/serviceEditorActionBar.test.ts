@@ -127,6 +127,22 @@ describe('buildActionBarItems', () => {
     }
   })
 
+  // 63-01 (R149): the Messages tab exposes no action-bar items — exactly like
+  // Roles. The ✉ Messages composer entry stays on the Service Order tab
+  // (buildServiceOrderItems), so a value of `messages` for `tab` must return an
+  // empty array while `service-order` still carries the `messages` composer key.
+  it('MESSAGES EMPTY: the messages item list has length 0 across the same cartesian product', () => {
+    for (const ctx of cartesianContexts()) {
+      expect(buildActionBarItems('messages', ctx).length).toBe(0)
+    }
+  })
+
+  it('SC3: the ✉ Messages composer key stays on the Service Order tab (not the Messages tab)', () => {
+    const ctx = makeContext({ canEditService: true })
+    expect(keysOf('service-order', ctx)).toContain('messages')
+    expect(keysOf('messages', ctx)).not.toContain('messages')
+  })
+
   describe('GATING MATRIX (exact key arrays, toEqual not toContain)', () => {
     const rows: Array<{ name: string; tab: ActionBarTab; overrides: Partial<ActionBarContext>; expected: string[] }> = [
       { name: 'roles, editor', tab: 'roles', overrides: { canEditService: true }, expected: [] },
