@@ -94,17 +94,16 @@
             <div class="rounded-lg bg-gray-800/60 border border-gray-700 p-3">
               <div class="flex items-center justify-between">
                 <p class="text-xs text-gray-400">Individuals</p>
-                <label class="text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer">
-                  ＋ Add someone
-                  <select
-                    data-testid="add-someone-select"
-                    class="ml-2 bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-xs text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    @change="onAddIndividual"
-                  >
-                    <option value="">Choose a person…</option>
-                    <option v-for="person in addablePeople" :key="person.id" :value="person.id">{{ person.name }}</option>
-                  </select>
-                </label>
+                <select
+                  data-testid="add-someone-select"
+                  aria-label="Add someone"
+                  :disabled="addablePeople.length === 0"
+                  class="bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-xs text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  @change="onAddIndividual"
+                >
+                  <option value="" disabled>{{ addablePeople.length > 0 ? '＋ Add someone…' : 'No one left to add' }}</option>
+                  <option v-for="person in addablePeople" :key="person.id" :value="person.id">{{ person.name }}</option>
+                </select>
               </div>
               <div v-if="selection.individualPersonIds.length > 0" class="flex flex-wrap gap-2 mt-2">
                 <span
@@ -191,7 +190,7 @@
             </div>
 
             <!-- #9 Sample preview -->
-            <div v-if="showPreview" data-testid="sample-preview" class="rounded-lg bg-gray-800/60 border border-gray-700 p-3">
+            <div data-testid="sample-preview" class="rounded-lg bg-gray-800/60 border border-gray-700 p-3">
               <div class="flex items-center gap-2 mb-2">
                 <span class="text-[10px] uppercase tracking-wide bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">Sample</span>
                 <span class="text-xs text-gray-400">{{ sampleCaption }}</span>
@@ -238,12 +237,6 @@
               <p v-if="sendError" data-testid="send-error" class="text-red-400 text-sm mt-1">{{ sendError }}</p>
             </div>
             <div class="flex items-center gap-3">
-              <button
-                type="button"
-                data-testid="preview-btn"
-                class="px-4 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-                @click="showPreview = !showPreview"
-              >Preview</button>
               <button
                 type="button"
                 data-testid="cancel-btn"
@@ -348,7 +341,6 @@ const scheduledFor = ref('')
 
 const sending = ref(false)
 const sendError = ref('')
-const showPreview = ref(false)
 
 const bodyTextareaRef = ref<HTMLTextAreaElement | null>(null)
 
@@ -363,7 +355,7 @@ const tokenChips: ReadonlyArray<{ token: string; label: string }> = [
   { token: 'service_date', label: 'Service date' },
   { token: 'service_link', label: 'Service link' },
   { token: 'their_roles', label: 'Their roles' },
-  { token: 'song_list', label: 'Song list' },
+  { token: 'name', label: 'Name' },
 ]
 
 // Type defaults are RAW token templates — the authoritative per-recipient
@@ -519,6 +511,7 @@ function renderSample(template: string): string {
   let out = fillToken(template, 'service_date', serviceDateLabel.value)
   out = fillToken(out, 'service_link', '[service link]')
   out = fillToken(out, 'their_roles', sampleRolesFor(sampleRecipient.value?.id ?? null))
+  out = fillToken(out, 'name', sampleRecipient.value?.name ?? '[name]')
   out = fillToken(out, 'song_list', songList.value || '[song list]')
   return out
 }
@@ -626,7 +619,6 @@ function resetComposer() {
   scheduledFor.value = ''
   sending.value = false
   sendError.value = ''
-  showPreview.value = false
 }
 
 watch(
