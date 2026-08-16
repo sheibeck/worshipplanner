@@ -40,10 +40,40 @@ session `resolved/functions-emulator-load-failure.md`).
 
 # Project State
 
+## ★★ STANDING AUTONOMY GRANT — v1.8, granted 2026-08-15
+
+**This is the ACTIVE grant** (supersedes the v1.7 grant below, now historical but still relevant because
+v1.7's owner deploy/verify remains open). Re-read before deciding to stop — it survives compaction.
+
+Owner request (2026-08-15): run v1.8 "Messaging UX & Fixes" the **same way as v1.7** — chosen explicitly
+via the post-milestone menu ("Autonomous, like v1.7").
+
+**What it authorizes / does NOT — identical to the v1.7 grant terms immediately below:**
+- Proceed through both v1.8 phases (63, 64) without pausing for ordinary implementation decisions; run
+  default smart-discuss, pick the reasonable default for each grey area, state it, keep moving.
+- **Defer human verification.** Route each `human_needed` check to `.planning/PENDING-VERIFICATION.md`
+  and continue; never record a deferred check as passed.
+- **STOP BEFORE THE MILESTONE LIFECYCLE.** When Phases 63+64 are code-complete, STOP and hand over the
+  `/gsd-verify-work 63 64` list. Do NOT run audit/complete/cleanup.
+- **NO deploys. NO `.env.local` writes.** v1.8 is mostly client-side UI; if a functions change lands it
+  ships built/tested/UNDEPLOYED with the command handed over. (The v1.7 send path is still undeployed;
+  local sends work via the gitignored `functions/.secret.local` placeholder from the 2026-08-15 debug.)
+- **No destructive/irreversible actions** without asking (no `git stash`, no project-wide lint --fix, no
+  history rewrites, no bulk deletions beyond a plan's scope).
+- Type gate is `npm run type-check` (vue-tsc --build); app-suite baseline is the 2 known-failing files
+  (`storage.rules.test.ts`, `RosterView.test.ts`); functions suite via `cd functions && npm test`.
+
+Scoping decisions for v1.8 (message types seed distinct content; composer stays an action-bar modal) are
+in the RESUME HERE block above and REQUIREMENTS.md/ROADMAP.md.
+
+---
+
+<details>
+<summary>Historical — the v1.7 grant of 2026-08-13 (governed the v1.7 build, now code-complete + verified; owner deploy/verify still open)</summary>
+
 ## ★★ STANDING AUTONOMY GRANT — v1.7, granted 2026-08-13
 
-**This is the ACTIVE grant. It supersedes the v1.6 grant of 2026-08-11 (now historical, preserved
-below).** Re-read this before deciding to stop for a checkpoint — it survives context compaction.
+**Superseded by the v1.8 grant above.** Re-read this before deciding to stop for a checkpoint — it survives context compaction.
 
 Owner request: run `/gsd-autonomous` for milestone v1.7 (Volunteer Messaging & Notifications).
 Boundaries settled by explicit question and answer at launch, 2026-08-13.
@@ -275,6 +305,8 @@ literally can't work because of outstanding issues that must have answers, or un
 Authorized deferring human-verify checkpoints through Phases 31 → 37; prohibited deploys,
 `.env.local` changes, destructive actions, and recording any deferred check as passed. Its deploy
 prohibition and its never-self-approve rule are both carried forward above.
+
+</details>
 
 </details>
 
