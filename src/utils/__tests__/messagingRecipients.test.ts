@@ -83,10 +83,10 @@ function makeSelection(overrides: Partial<RecipientSelection> = {}): RecipientSe
 describe('MESSAGING_TEAM_LABELS', () => {
   it('maps every RoleGroup to its own messaging-surface label, independent of RolesConfigPanel groupLabels', () => {
     expect(MESSAGING_TEAM_LABELS).toEqual({
-      band: 'Worship',
+      band: 'Band',
       tech: 'Tech',
       vocals: 'Vocals',
-      other: 'Hosts',
+      other: 'Other',
     })
   })
 })

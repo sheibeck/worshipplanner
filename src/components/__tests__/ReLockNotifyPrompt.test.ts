@@ -153,11 +153,11 @@ describe('ReLockNotifyPrompt', () => {
     expect(q('change-row-0').text()).toContain('Song changed')
     expect(q('change-row-1').text()).toContain('guitar assignment changed')
 
-    // Team chips use MESSAGING_TEAM_LABELS (band→Worship, tech→Tech).
-    expect(q('change-row-0').text()).toContain('Worship')
+    // Team chips use MESSAGING_TEAM_LABELS (band→Band, tech→Tech).
+    expect(q('change-row-0').text()).toContain('Band')
     expect(q('change-row-0').text()).toContain('Tech')
-    // The ROLE row is narrow — exactly one chip (Worship), no Tech.
-    expect(q('change-row-1').text()).toContain('Worship')
+    // The ROLE row is narrow — exactly one chip (Band), no Tech.
+    expect(q('change-row-1').text()).toContain('Band')
     expect(q('change-row-1').text()).not.toContain('Tech')
   })
 

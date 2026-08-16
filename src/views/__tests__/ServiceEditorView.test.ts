@@ -94,7 +94,7 @@ vi.mock('firebase/functions', () => ({
 // imports at module scope) so the reachable count is controllable per-test.
 vi.mock('@/utils/messagingRecipients', () => ({
   resolveRecipients: (...a: unknown[]) => mockResolveRecipients(...a),
-  MESSAGING_TEAM_LABELS: { band: 'Worship', tech: 'Tech', vocals: 'Vocals', other: 'Hosts' },
+  MESSAGING_TEAM_LABELS: { band: 'Band', tech: 'Tech', vocals: 'Vocals', other: 'Other' },
 }))
 
 vi.mock('firebase/firestore', () => ({

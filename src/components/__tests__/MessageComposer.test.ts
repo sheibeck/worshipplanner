@@ -136,9 +136,9 @@ describe('MessageComposer', () => {
     expect(q('team-chip-other').exists()).toBe(true)
     expect(q('everyone-chip').exists()).toBe(true)
     expect(q('add-someone-select').exists()).toBe(true)
-    // Team labels come from MESSAGING_TEAM_LABELS (Worship/Tech/Vocals/Hosts).
-    expect(q('team-chip-band').text()).toContain('Worship')
-    expect(q('team-chip-other').text()).toContain('Hosts')
+    // Team labels come from MESSAGING_TEAM_LABELS (Band/Tech/Vocals/Other).
+    expect(q('team-chip-band').text()).toContain('Band')
+    expect(q('team-chip-other').text()).toContain('Other')
   })
 
   describe('Reaches-N pluralization (UI-SPEC :401 zero-one-many backstop)', () => {
@@ -167,7 +167,7 @@ describe('MessageComposer', () => {
   it('per-team chips display their reachable count as "{label} · {count}"', () => {
     mountComposer()
     // band → 1 reachable (Alice; Bob has no email)
-    expect(q('team-chip-band').text()).toMatch(/Worship\s*·\s*1/)
+    expect(q('team-chip-band').text()).toMatch(/Band\s*·\s*1/)
     // tech → 1 reachable (Cara; Ed has no email)
     expect(q('team-chip-tech').text()).toMatch(/Tech\s*·\s*1/)
     // vocals → 0 assigned

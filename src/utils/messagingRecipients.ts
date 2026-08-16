@@ -15,10 +15,10 @@ import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
  * describe the same enum differently (58-CONTEXT.md).
  */
 export const MESSAGING_TEAM_LABELS: Record<RoleGroup, string> = {
-  band: 'Worship',
+  band: 'Band',
   tech: 'Tech',
   vocals: 'Vocals',
-  other: 'Hosts',
+  other: 'Other',
 }
 
 export interface RecipientCandidate {
