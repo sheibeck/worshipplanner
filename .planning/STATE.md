@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Messaging UX & Fixes
-current_phase: 63
-current_phase_name: Messages Tab & Always-Visible History
-status: phase_complete
-stopped_at: Completed 63-01-PLAN.md
-last_updated: "2026-08-16T00:46:35.266Z"
+current_phase: 64
+current_phase_name: Composer Refinements
+status: discussing
+stopped_at: Phase 63 verified GREEN (3/3); transitioning to Phase 64 (final v1.8 phase)
+last_updated: "2026-08-16T01:15:00.000Z"
 last_activity: 2026-08-15
-last_activity_desc: "63-01 executed GREEN — Messages tab + relocated defaults/history + R150 fix (R149, R150)"
+last_activity_desc: Phase 63 verified GREEN; starting Phase 64 (composer refinements R151-R156)
 progress:
   total_phases: 2
   completed_phases: 1
