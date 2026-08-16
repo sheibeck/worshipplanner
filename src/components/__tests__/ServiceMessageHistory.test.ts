@@ -96,6 +96,56 @@ describe('ServiceMessageHistory', () => {
     }
   })
 
+  it('surfaces an aged (> 5 min) queued row as a red "Failed to send" pill with no spinner', () => {
+    const wrapper = mountHistory({
+      messages: [
+        makeMessage({
+          id: 'm1',
+          status: 'queued',
+          sentAt: null,
+          createdAt: { toMillis: () => FIXED_NOW - 6 * 60_000 } as never,
+        }),
+      ],
+    })
+    const pill = wrapper.find('[data-testid="status-pill"]')
+    expect(pill.exists()).toBe(true)
+    expect(pill.text()).toContain('Failed to send')
+    expect(pill.classes()).toContain('bg-red-900/50')
+    expect(pill.find('.animate-spin').exists()).toBe(false)
+    // The time line must not disagree with the pill.
+    expect(wrapper.find('[data-testid="count-line"]').text()).toContain('Failed to send')
+  })
+
+  it('keeps the grey "Sending…" spinner for a recent (< 5 min) sending row', () => {
+    const wrapper = mountHistory({
+      messages: [
+        makeMessage({
+          id: 'm1',
+          status: 'sending',
+          sentAt: null,
+          createdAt: { toMillis: () => FIXED_NOW - 60_000 } as never,
+        }),
+      ],
+    })
+    const pill = wrapper.find('[data-testid="status-pill"]')
+    expect(pill.exists()).toBe(true)
+    expect(pill.text()).toContain('Sending')
+    expect(pill.text()).not.toContain('Failed')
+    expect(pill.find('.animate-spin').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="count-line"]').text()).toContain('Sending')
+  })
+
+  it('treats a null createdAt as not-yet-aged (keeps the "Sending…" spinner)', () => {
+    const wrapper = mountHistory({
+      messages: [makeMessage({ id: 'm1', status: 'queued', sentAt: null, createdAt: null })],
+    })
+    const pill = wrapper.find('[data-testid="status-pill"]')
+    expect(pill.exists()).toBe(true)
+    expect(pill.text()).toContain('Sending')
+    expect(pill.text()).not.toContain('Failed')
+    expect(pill.find('.animate-spin').exists()).toBe(true)
+  })
+
   it('shows a "Scheduled for" send-time line for a scheduled message', () => {
     const wrapper = mountHistory({
       messages: [makeMessage({ id: 'm1', status: 'scheduled', sentAt: null, scheduledFor: '2026-09-01T10:00:00Z' })],
