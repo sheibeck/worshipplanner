@@ -329,7 +329,14 @@ arm additionally depends on the 60-01/60-02 webhook deploy gate above.
 
 ---
 
-## ⚠ DISCOVERED DEFECT (found during Phase 61 discuss, Phase 59 origin) — composer success toast misrenders
+## ✅ RESOLVED (by 64-03, 2026-08-16) — composer success toast misrenders
+
+**Fixed via Option A:** `MessageComposer.vue`'s success `toasts.push(...)` call (and the now-unused
+`useToasts` import) were removed in Phase 64 Plan 03 (R155). A successful send now relies on
+`emit('sent', …)` + the modal close + the Phase 60 delivery-history panel — no toast, so the
+failure-only `ToastHost.vue` "Save failed." prefix can no longer misrender success as failure. The
+composer test that asserted the toast was flipped to `expect(mockToastPush).not.toHaveBeenCalled()`.
+The original disclosure is retained below for the record.
 
 **Not a Phase 61 item — a shipped Phase 59 UX bug, disclosed here for the owner to decide + fix.**
 
@@ -515,3 +522,28 @@ full app suite at the 2-file baseline.
 **Client-only plan — NO deploy, NO `.env.local`, NO functions change this plan** (v1.8 grant). Do **not**
 treat this item as passed — the visual UAT (tab layout + locked-service history) is deferred to the owner.
 **This is the FIRST plan of milestone v1.8.**
+
+---
+
+## ⏳ 64-03 — ✉ composer refinements visual/interaction UAT — DEFERRED (owner at /gsd-verify-work 64)
+
+Plan 64-03 (the FINAL plan of v1.8) reworked `src/components/MessageComposer.vue` (+ its test) with five
+owner-UAT refinements: R152 a visible standalone add-someone `<select>` (disabled `＋ Add someone…`
+placeholder, disabled `No one left to add` when empty), R153 the sample-preview renders always and updates
+live (Preview button + `showPreview` removed), R154 client dropped the `{{song_list}}` chip / added
+`{{name}}` and the sample renders `{{name}}` as the recipient's own name, R155 a white in-button Send
+spinner with Send + Cancel disabled in flight and the misrendering success toast removed, and R156 aligned
+per-type seeds with Reminder defaulting to Everyone behind a new `recipientDirty` guard.
+
+**Automated gates all green:** `MessageComposer.test.ts` (28 tests) passes, `npm run type-check`
+(`vue-tsc --build`) is clean, and the full app suite sits at the 2-file known-failing baseline
+(`storage.rules.test.ts`, `RosterView.test.ts`) with no new failing file.
+
+**What only a human at `/gsd-verify-work 64` can confirm (`verification_deferred_human`):** open a service,
+click **✉ Messages**, and in the LIVE app — add a person via the visible picker and watch **Reaches N**
+bump; watch the always-on preview update live as you type the subject/body and as you switch message types;
+click Send and see the in-button spinner with **no** "Save failed." toast on success.
+
+**Client-only plan — NO deploy, NO `.env.local`, callable stays UNDEPLOYED (mocked in tests)** (v1.8 grant).
+Do **not** treat this item as passed — the composer end-to-end visual UAT is deferred to the owner.
+**This is the FINAL plan of milestone v1.8.**

@@ -190,20 +190,20 @@ Follow-up milestone refining the shipped v1.7 volunteer-messaging feature from o
   **Band, Vocals, Tech, Other** — dropping the v1.7 `MESSAGING_TEAM_LABELS` remap (band→Worship,
   other→Hosts) everywhere messaging renders team names.
 
-- [ ] **R152** — The composer's **"+ Add someone" actually adds** the selected individual to the recipient
+- [x] **R152** — The composer's **"+ Add someone" actually adds** the selected individual to the recipient
   selector (`individualPersonIds`) — today it only focuses/highlights the dropdown and adds no one.
 
-- [ ] **R153** — The composer shows a **live email preview that updates in real time** as the subject/body
+- [x] **R153** — The composer shows a **live email preview that updates in real time** as the subject/body
   are edited (merge tokens re-rendered against a sample recipient) — replacing the click-to-preview button.
 
-- [ ] **R154** — **Merge tokens:** remove `{{song_list}}` (the song list already ships in the service-plan
+- [x] **R154** — **Merge tokens:** remove `{{song_list}}` (the song list already ships in the service-plan
   / share link); add a **`{{name}}`** per-recipient token that renders the recipient's own name.
 
-- [ ] **R155** — The **Send action shows an in-progress spinner** while `queueServiceMessage` runs; and a
+- [x] **R155** — The **Send action shows an in-progress spinner** while `queueServiceMessage` runs; and a
   message that cannot progress surfaces a **failed/timeout** affordance in the history instead of the
   perpetual "Sending…" (a `queued` doc currently renders "Sending…" forever).
 
-- [ ] **R156** — The three **message types seed distinct content** on selection (same send mechanism):
+- [x] **R156** — The three **message types seed distinct content** on selection (same send mechanism):
   **One-off** = blank subject/body; **Reminder** = subject `Reminder: {{service_date}}`, body seeded with
   the service link, recipients default to everyone assigned; **Share service link** = subject
   `Service plan for {{service_date}}`, body = `{{service_link}}` only.
@@ -215,11 +215,11 @@ Follow-up milestone refining the shipped v1.7 volunteer-messaging feature from o
 | R149 | Phase 63 | Complete (63-01) |
 | R150 | Phase 63 | Complete (63-01) |
 | R151 | Phase 64 | Complete (64-01) |
-| R152 | Phase 64 | Pending |
-| R153 | Phase 64 | Pending |
-| R154 | Phase 64 | Pending |
-| R155 | Phase 64 | Pending |
-| R156 | Phase 64 | Pending |
+| R152 | Phase 64 | Complete (64-03) |
+| R153 | Phase 64 | Complete (64-03) |
+| R154 | Phase 64 | Complete (64-03) |
+| R155 | Phase 64 | Complete (64-03) |
+| R156 | Phase 64 | Complete (64-03) |
 
 **Coverage:** v1.8 = 8 requirements (R149–R156), mapped to Phases 63–64, 0 unmapped ✓
 
