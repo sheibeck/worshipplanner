@@ -1,8 +1,8 @@
 ---
 phase: 64
 slug: composer-refinements
-status: draft
-nyquist_compliant: false
+status: planned
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-15
 ---
@@ -42,14 +42,18 @@ created: 2026-08-15
 
 ## Per-Task Verification Map
 
-> Seeded here; the gsd-planner populates one row per task. Derived from `64-RESEARCH.md` § Validation Architecture.
+> One row per task. Derived from `64-RESEARCH.md` § Validation Architecture. All target spec files EXIST
+> (extend, not create) → no Wave 0 scaffold gaps. Waves: 1 = {64-01, 64-02, 64-04} (zero file overlap,
+> parallel-capable; worktrees disabled → sequential); 2 = {64-03} depends_on 64-01 (both edit
+> `MessageComposer.test.ts`).
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _(planner fills)_ | | | R151 | — | MESSAGING_TEAM_LABELS = Band/Vocals/Tech/Other; the 4 hard-coded Worship/Hosts test assertions updated | unit (client) | `npx vitest run src/utils/__tests__/messagingRecipients.test.ts` | ✅ extend | ⬜ pending |
-| _(planner fills)_ | | | R154 (server) | — | renderMessageTokens renders `{{name}}` per recipient; song_list still supported | unit (functions) | `cd functions && npm test` | ✅ extend | ⬜ pending |
-| _(planner fills)_ | | | R152/R153/R154(client)/R156 | — | add-person adds+bumps Reaches-N; preview always-live; token chips (Name, no song_list); types seed distinct + Reminder→everyone | unit (client) | `npx vitest run src/components/__tests__/MessageComposer.test.ts` | ✅ extend | ⬜ pending |
-| _(planner fills)_ | | | R155 | — | Send shows spinner + disables; success toast removed; history aged-queued(>5min)→"Failed to send" | unit (client) | `npx vitest run src/components/__tests__/MessageComposer.test.ts src/components/__tests__/ServiceMessageHistory.test.ts` | ✅ extend | ⬜ pending |
+| 64-01·T1 | 64-01 | 1 | R151 | T-64-01a/b | MESSAGING_TEAM_LABELS = Band/Vocals/Tech/Other; the 4 hard-coded Worship/Hosts test assertions updated (mock :97 only, NOT the :1780 section header) | unit (client) | `npx vitest run src/utils/__tests__/messagingRecipients.test.ts src/components/__tests__/MessageComposer.test.ts src/components/__tests__/ReLockNotifyPrompt.test.ts src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
+| 64-02·T1 | 64-02 | 1 | R154 (server) | T-64-02a/b/c | renderMessageTokens renders `{{name}}` per recipient (+ call site + ctx() helper); `{{song_list}}` still supported | unit (functions) | `cd functions && npm test && npm run build` | ✅ extend | ⬜ pending |
+| 64-03·T1 | 64-03 | 2 | R152 / R153 / R154 (client) | T-64-03a/d/e | visible add-person picker adds+bumps Reaches-N (disabled when empty); preview always-live; token chips (Name, no song_list) + sample renders `{{name}}` | unit (client) | `npx vitest run src/components/__tests__/MessageComposer.test.ts` | ✅ extend | ⬜ pending |
+| 64-03·T2 | 64-03 | 2 | R155 (composer) / R156 | T-64-03b/c | Send spinner + disabled + Cancel disabled; success toast removed (emit 'sent' kept); types seed distinct + Reminder→everyone behind recipientDirty | unit (client) | `npx vitest run src/components/__tests__/MessageComposer.test.ts` | ✅ extend | ⬜ pending |
+| 64-04·T1 | 64-04 | 1 | R155 (history) | T-64-04a/b/c | aged-queued/sending (>5min) OR null-guard → red "Failed to send" pill (no spinner) in statusPill + sendTimeLabel; recent keeps spinner | unit (client) | `npx vitest run src/components/__tests__/ServiceMessageHistory.test.ts` | ✅ extend | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -57,11 +61,11 @@ created: 2026-08-15
 
 ## Wave 0 Requirements
 
-- [ ] Existing test files EXTENDED (none new): `src/utils/__tests__/messagingRecipients.test.ts` (labels),
+- [x] Existing test files EXTENDED (none new — all verified present during planning): `src/utils/__tests__/messagingRecipients.test.ts` (labels),
       `functions/src/messageTokens.test.ts` (`{{name}}`), `src/components/__tests__/MessageComposer.test.ts`
       (add-person, live preview, tokens, spinner, no-toast, type seeding), `src/components/__tests__/ServiceMessageHistory.test.ts`
-      (aged-queued → failed). Update the label assertions in `ReLockNotifyPrompt.test.ts` +
-      `ServiceEditorView.test.ts` mock that hard-code Worship/Hosts.
+      (aged-queued → failed — confirmed present, uses `vi.useFakeTimers()` + FIXED_NOW; default `makeMessage` createdAt is 60s ago so the existing sending/failed matrix stays green). Update the label assertions in `ReLockNotifyPrompt.test.ts` +
+      `ServiceEditorView.test.ts` mock (`:97` only) that hard-code Worship/Hosts. NO Wave 0 scaffold gaps — no framework install.
 
 ---
 
@@ -79,11 +83,11 @@ created: 2026-08-15
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s scoped
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies (5/5 tasks carry an `<automated>` command)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify (every task has one)
+- [x] Wave 0 covers all MISSING references (none missing — all spec files exist)
+- [x] No watch-mode flags (all runs are `vitest run` / `npm test` / `npm run build`)
+- [x] Feedback latency < 30s scoped (client scoped ~10–30s; functions scoped ~5–15s)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** map filled by gsd-planner 2026-08-15 — nyquist_compliant true; awaiting execution.
