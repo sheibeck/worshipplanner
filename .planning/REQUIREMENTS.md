@@ -186,7 +186,7 @@ Follow-up milestone refining the shipped v1.7 volunteer-messaging feature from o
   or exported — no longer gated on `canEditService` (the Phase 60 / 60-03 defect where it vanished once the
   service locked). It lives in the Messages tab (R149) and renders for any editor of the org.
 
-- [ ] **R151** — The composer's **Send-To team labels mirror the Volunteer Roles group names exactly**:
+- [x] **R151** — The composer's **Send-To team labels mirror the Volunteer Roles group names exactly**:
   **Band, Vocals, Tech, Other** — dropping the v1.7 `MESSAGING_TEAM_LABELS` remap (band→Worship,
   other→Hosts) everywhere messaging renders team names.
 
@@ -214,7 +214,7 @@ Follow-up milestone refining the shipped v1.7 volunteer-messaging feature from o
 |-------------|-------|--------|
 | R149 | Phase 63 | Complete (63-01) |
 | R150 | Phase 63 | Complete (63-01) |
-| R151 | Phase 64 | Pending |
+| R151 | Phase 64 | Complete (64-01) |
 | R152 | Phase 64 | Pending |
 | R153 | Phase 64 | Pending |
 | R154 | Phase 64 | Pending |

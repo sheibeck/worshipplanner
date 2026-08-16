@@ -579,11 +579,13 @@ the preview is live, tokens are right, sending shows progress, and each message 
 
   6. Selecting **One-off / Reminder / Share service link** seeds the distinct subject/body/recipients
      defined in R156; changing type re-seeds only when the fields are untouched (dirty-guard).
-**Plans**: 4 plans
-- [ ] 64-01-PLAN.md — R151 team labels → Band/Vocals/Tech/Other (constant + the 4 test assertions it breaks) [wave 1]
+**Plans**: 1/4 plans executed
+
+- [x] 64-01-PLAN.md — R151 team labels → Band/Vocals/Tech/Other (constant + the 4 test assertions it breaks) [wave 1]
 - [ ] 64-02-PLAN.md — R154 server `{{name}}` token in messageTokens.ts + call site + tests (UNDEPLOYED) [wave 1]
 - [ ] 64-03-PLAN.md — MessageComposer client: R152 add-person + R153 live preview + R154 palette + R155 spinner/toast + R156 seeds [wave 2, depends 64-01]
 - [ ] 64-04-PLAN.md — R155 history: aged queued/sending (>5min) → "Failed to send" pill [wave 1]
+
 **UI hint**: yes
 
 **Sequencing**: 63 and 64 are independent (tab restructure vs composer internals); either order works. R151
