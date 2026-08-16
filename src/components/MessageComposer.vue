@@ -240,17 +240,25 @@
               <button
                 type="button"
                 data-testid="cancel-btn"
-                class="px-4 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                class="px-4 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="sending"
                 @click="onCancel"
               >Cancel</button>
               <button
                 type="button"
                 data-testid="send-btn"
-                class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="sendDisabled"
                 :title="sendTitle"
                 @click="onSend"
-              >{{ sendLabel }}</button>
+              >
+                <span
+                  v-if="sending"
+                  class="inline-block h-4 w-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin"
+                  aria-hidden="true"
+                ></span>
+                {{ sendLabel }}
+              </button>
             </div>
           </div>
 
@@ -264,7 +272,6 @@
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/firebase'
-import { useToasts } from '@/stores/toasts'
 import { resolveRecipients, MESSAGING_TEAM_LABELS, type RecipientSelection } from '@/utils/messagingRecipients'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import type { Service, SongSlot } from '@/types/service'
@@ -314,7 +321,6 @@ interface QueueMessageRequest {
 const GENERIC_ERROR = "Couldn't send this message. Please try again."
 const KILL_SWITCH_ERROR = 'Messaging is turned off for your organization. Turn it on in Settings to send.'
 
-const toasts = useToasts()
 const titleId = 'message-composer-title'
 
 // ── Selection state ──────────────────────────────────────────────────────────
@@ -333,6 +339,9 @@ const body = ref('')
 // destroys the draft (UI-SPEC #6).
 const subjectDirty = ref(false)
 const bodyDirty = ref(false)
+// Set once the user touches the recipient selection (team/individual/everyone).
+// Gates Reminder's auto-default to Everyone so a manual choice is never clobbered.
+const recipientDirty = ref(false)
 
 const attachServiceLink = ref(true)
 const sendCopyToSelf = ref(false)
@@ -363,12 +372,12 @@ const tokenChips: ReadonlyArray<{ token: string; label: string }> = [
 const TYPE_DEFAULTS: Record<MessageType, { subject: string; body: string }> = {
   oneoff: { subject: '', body: '' },
   reminder: {
-    subject: 'Reminder: serving on {{service_date}}',
-    body: "Hi {{their_roles}} — a quick reminder that you're scheduled to serve at our {{service_date}} service. Here's the plan: {{service_link}}",
+    subject: 'Reminder: {{service_date}}',
+    body: "Hi {{name}} — a reminder you're scheduled to serve on {{service_date}}. Here's the plan: {{service_link}}",
   },
   'share-link': {
-    subject: 'Service order for {{service_date}}',
-    body: "Here's the service order for {{service_date}}: {{service_link}}",
+    subject: 'Service plan for {{service_date}}',
+    body: '{{service_link}}',
   },
 }
 
@@ -421,6 +430,7 @@ function chipClass(selected: boolean): string {
 
 // ── Selection mutations ──────────────────────────────────────────────────────
 function toggleTeam(group: RoleGroup) {
+  recipientDirty.value = true
   if (selection.includeEveryone) {
     // Toggling a specific team off Everyone clears includeEveryone and keeps
     // the remaining explicit teams (UI-SPEC #3).
@@ -434,6 +444,7 @@ function toggleTeam(group: RoleGroup) {
 }
 
 function toggleEveryone() {
+  recipientDirty.value = true
   selection.includeEveryone = !selection.includeEveryone
   if (selection.includeEveryone) selection.teams = []
 }
@@ -441,11 +452,15 @@ function toggleEveryone() {
 function onAddIndividual(event: Event) {
   const el = event.target as HTMLSelectElement
   const id = el.value
-  if (id && !selection.individualPersonIds.includes(id)) selection.individualPersonIds.push(id)
+  if (id && !selection.individualPersonIds.includes(id)) {
+    selection.individualPersonIds.push(id)
+    recipientDirty.value = true
+  }
   el.value = ''
 }
 
 function removeIndividual(id: string) {
+  recipientDirty.value = true
   const i = selection.individualPersonIds.indexOf(id)
   if (i >= 0) selection.individualPersonIds.splice(i, 1)
 }
@@ -456,6 +471,12 @@ function selectType(t: MessageType) {
   const d = TYPE_DEFAULTS[t]
   if (!subjectDirty.value) subject.value = d.subject
   if (!bodyDirty.value) body.value = d.body
+  // Reminder defaults to Everyone on a clean recipient set (mirrors toggleEveryone);
+  // a manual recipient choice (recipientDirty) is never overwritten.
+  if (t === 'reminder' && !recipientDirty.value) {
+    selection.includeEveryone = true
+    selection.teams = []
+  }
 }
 
 function insertToken(token: string) {
@@ -582,11 +603,6 @@ async function onSend() {
       },
       scheduledFor: scheduleForLater.value && scheduledFor.value ? new Date(scheduledFor.value).toISOString() : null,
     })
-    toasts.push(
-      scheduleForLater.value
-        ? 'Message scheduled'
-        : `Message queued to ${reachableCount.value} ${reachableCount.value === 1 ? 'person' : 'people'}`,
-    )
     emit('sent', result.data.messageId)
   } catch (err) {
     console.error('[MessageComposer] queueServiceMessage failed:', err)
@@ -613,6 +629,7 @@ function resetComposer() {
   body.value = TYPE_DEFAULTS.oneoff.body
   subjectDirty.value = false
   bodyDirty.value = false
+  recipientDirty.value = false
   attachServiceLink.value = true
   sendCopyToSelf.value = false
   scheduleForLater.value = false
