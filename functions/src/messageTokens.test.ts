@@ -12,6 +12,7 @@ function ctx(overrides: Partial<MessageTokenContext> = {}): MessageTokenContext 
     theirRoles: ["guitar"],
     songTitles: ["Amazing Grace", "How Great Thou Art"],
     serviceLink: "https://app.example.com/share/tok_abc",
+    recipientName: "Alex Kim",
     ...overrides,
   };
 }
@@ -34,6 +35,25 @@ describe("renderMessageTokens", () => {
     expect(personA).toBe("Your role(s): guitar");
     expect(personB).toBe("Your role(s): sound, livestream");
     expect(personA).not.toBe(personB);
+  });
+
+  it("replaces {{name}} with the CURRENT recipient's own display name (R154 server)", () => {
+    const out = renderMessageTokens("Hi {{name}}", ctx({ recipientName: "Alex Kim" }));
+    expect(out).toBe("Hi Alex Kim");
+  });
+
+  it("R154: the SAME body template renders different {{name}} for recipient A vs recipient B", () => {
+    const template = "Hi {{name}}, thanks for serving!";
+    const personA = renderMessageTokens(template, ctx({ recipientName: "Alex Kim" }));
+    const personB = renderMessageTokens(template, ctx({ recipientName: "Sam Lee" }));
+    expect(personA).toBe("Hi Alex Kim, thanks for serving!");
+    expect(personB).toBe("Hi Sam Lee, thanks for serving!");
+    expect(personA).not.toBe(personB);
+  });
+
+  it("replaces every occurrence of a repeated {{name}} token, not just the first", () => {
+    const out = renderMessageTokens("{{name}} — {{name}}", ctx({ recipientName: "Alex Kim" }));
+    expect(out).toBe("Alex Kim — Alex Kim");
   });
 
   it("renders an empty {{their_roles}} list as the documented placeholder, not a bare empty string", () => {
