@@ -2,7 +2,7 @@
 phase: 63
 slug: messages-tab-always-visible-history
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-15
 ---
@@ -41,8 +41,8 @@ created: 2026-08-15
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _(planner fills)_ | | | R149 | — | Messages tab (editor+messaging gated) hosts the defaults + history; both absent from the Service Order tab | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
-| _(planner fills)_ | | | R150 | — | history renders on a LOCKED service (canEditService gate removed); hidden for viewer / messaging-off | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
+| 63-01-T1 | 63-01 | 1 | R149 | T-63-01a, T-63-01c, T-63-01d | Messages tab (editor+messaging gated) hosts the defaults + history inside `messages-panel`; both absent from `service-order-panel`; `buildActionBarItems('messages')` returns `[]` and the ✉ composer entry stays on the Service Order action bar (SC3) | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts src/views/__tests__/serviceEditorActionBar.test.ts` | ✅ extend | ⬜ pending |
+| 63-01-T2 | 63-01 | 1 | R150 | T-63-01b | history renders on a LOCKED service (`status: 'planned'`, `canEditService` gate dropped → `isMessagingEnabled() && authStore.isEditor`); hidden for viewer / messaging-off; defaults panel keeps its locked-read-only summary | unit (client) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -70,11 +70,11 @@ created: 2026-08-15
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s scoped
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies (both tasks carry an `<automated>` scoped vitest command; no MISSING scaffolds)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify (2/2 tasks automated)
+- [x] Wave 0 covers all MISSING references (none — the test files exist and are extended, not created)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s scoped
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** map filled by gsd-planner 2026-08-15 (plan 63-01, 2 tasks, wave 1); nyquist_compliant set true.

@@ -546,7 +546,8 @@ service" history is visible whether the service is a draft, locked, or exported.
   2. The delivery-history panel is **visible at all times** (draft / locked / exported) — its render no
      longer depends on `canEditService`; it shows for any org editor, gated only by `isMessagingEnabled()`.
   3. The ✉ Messages composer still opens as an action-bar modal (unchanged); no send behavior regresses.
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 63-01-PLAN.md — Add the Messages tab + relocate the defaults/history panels into it (R149) and fix the history gate so it stays visible on a locked service (R150)
 **UI hint**: yes
 
 ### Phase 64: Composer Refinements
