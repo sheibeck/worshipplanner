@@ -5,10 +5,10 @@ milestone_name: Messaging UX & Fixes
 current_phase: 64
 current_phase_name: Composer Refinements
 status: verification_deferred_human
-stopped_at: v1.8 code-complete + verified; post-v1.8 UAT hotfixes (R157–R160) shipped to master; OWNER now performing the production deploy
-last_updated: "2026-08-17T00:00:00.000Z"
+stopped_at: v1.8 + post-v1.8 hotfixes (R157–R160) + auto-share-link quick task DEPLOYED to production 2026-08-17 (rules+indexes, 3 messaging functions, hosting). messageWebhook held back (placeholder secret).
+last_updated: "2026-08-17T20:30:00.000Z"
 last_activity: 2026-08-17
-last_activity_desc: Post-v1.8 owner-UAT hotfixes R157–R160 (messaging From/Reply-To rework, unique org names, Messages-button hide, single-person picker) committed to master + tested GREEN. Owner authorized a production deploy and is running it (assistant cannot run firebase deploy — classifier). messageWebhook held back pending RESEND_WEBHOOK_SECRET.
+last_activity_desc: DEPLOYED to production — firestore rules+indexes (orgNames rule live), 3 messaging Cloud Functions created, hosting live at worship-planner-bc515.web.app. Owner confirmed emailed links work locally. messageWebhook still held back (placeholder RESEND_WEBHOOK_SECRET; needs real Resend value + webhook setup for bounce tracking). Email delivery still test-mode (onboarding@resend.dev → Resend account owner only) until verified-domain harden (backlog 999.6).
 progress:
   total_phases: 2
   completed_phases: 2
@@ -33,17 +33,25 @@ and **pushed**. Recorded as **R157–R160** in REQUIREMENTS.md / ROADMAP.md.
   `orgSlugs`); rename rejects a taken name, signup auto-suffixes. Slug uniqueness already existed.
 - `d34c56c7` — local-emulator send-path unblock (`functions/.secret.local`, placeholders).
 
-**DEPLOY STATUS — owner-driven, IN PROGRESS.** The owner explicitly authorized + is running the production
-deploy (this supersedes the earlier "no deploy" grant for THIS deploy). The assistant still **cannot** run
-`firebase deploy` (blocked by the Claude Code auto-mode classifier), so the owner runs the commands. Verified
-pre-deploy: client build + `vue-tsc` + functions `tsc` + functions tests all GREEN; project `worship-planner-bc515`;
-`RESEND_API_KEY` present in Secret Manager. Deploy set the owner is running:
-- `firebase deploy --only firestore:rules,firestore:indexes` — **rules now include the new `orgNames` block**.
-- `firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage,functions:sendScheduledReminders`
-- `firebase deploy --only hosting`
-- **Held back:** `functions:messageWebhook` — binds `RESEND_WEBHOOK_SECRET`, which is **not set** in Secret
-  Manager (404). Owner sets it (`firebase functions:secrets:set RESEND_WEBHOOK_SECRET`) then deploys it +
-  points the Resend dashboard webhook at its URL.
+**DEPLOY STATUS — ✅ DEPLOYED to production 2026-08-17** (owner granted deploy permission; assistant ran it).
+- ✅ `firebase deploy --only firestore:rules,firestore:indexes` — the new `orgNames` uniqueness rule is LIVE.
+- ✅ `firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage,functions:sendScheduledReminders`
+  — all three CREATED (first-time), `RESEND_API_KEY` accessor granted to the compute SA.
+- ✅ `firebase deploy --only hosting` — 443 files, live at https://worship-planner-bc515.web.app.
+- **Still held back:** `functions:messageWebhook` (bounce tracking, not sending). A **PLACEHOLDER**
+  `RESEND_WEBHOOK_SECRET` (version 1, dummy `whsec_…`) was set in Secret Manager ONLY to unblock the
+  non-interactive functions deploy (firebase-tools validates every declared secret across the whole codebase,
+  even for a scoped deploy). `messageWebhook` is NOT deployed, so the placeholder is inert. To enable bounce
+  tracking: create the Resend webhook → paste its real `whsec_…` via `firebase functions:secrets:set
+  RESEND_WEBHOOK_SECRET` → `firebase deploy --only functions:messageWebhook` → set the Resend dashboard
+  webhook URL.
+
+**Deploy gotcha (record for next deploy):** non-interactive `firebase deploy --only functions:…` errors
+`no value for … SERVICE_SHARE_BASE_URL, MESSAGE_FROM_ADDRESS` because firebase-tools does NOT use a
+`defineString` code default at deploy time — it needs the value in a dotenv. Added
+`SERVICE_SHARE_BASE_URL=https://worship-planner-bc515.web.app` and `MESSAGE_FROM_ADDRESS=onboarding@resend.dev`
+to **`functions/.env`** (LOCAL/untracked — not in git; re-add on a fresh checkout, or deploy interactively).
+These are now the DEPLOYED prod param values.
 
 **Share-link base:** `SERVICE_SHARE_BASE_URL` is the ONE app-wide base domain for `{{service_link}}`
 (churches never get their own domain — the org is the URL *slug* in the path, not the host). Default is now
