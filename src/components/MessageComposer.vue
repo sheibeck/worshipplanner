@@ -97,6 +97,7 @@
                 <select
                   data-testid="add-someone-select"
                   aria-label="Add someone"
+                  :value="addPickerValue"
                   :disabled="addablePeople.length === 0"
                   class="bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-xs text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   @change="onAddIndividual"
@@ -343,6 +344,13 @@ const bodyDirty = ref(false)
 // Gates Reminder's auto-default to Everyone so a manual choice is never clobbered.
 const recipientDirty = ref(false)
 
+// Controlled value for the add-someone <select>, pinned to the empty
+// placeholder. Without this, a disabled placeholder makes the browser
+// auto-select the first real person as the shown value, so picking that
+// person fires no change event and they can never be added (acute with a
+// single-person roster — owner UAT 2026-08-17).
+const addPickerValue = ref('')
+
 const attachServiceLink = ref(true)
 const sendCopyToSelf = ref(false)
 const scheduleForLater = ref(false)
@@ -456,6 +464,10 @@ function onAddIndividual(event: Event) {
     selection.individualPersonIds.push(id)
     recipientDirty.value = true
   }
+  // Snap the control back to the placeholder. Reset both the ref (Vue's
+  // controlled value) and the live DOM element so the picker re-displays
+  // the placeholder even when only one person exists.
+  addPickerValue.value = ''
   el.value = ''
 }
 

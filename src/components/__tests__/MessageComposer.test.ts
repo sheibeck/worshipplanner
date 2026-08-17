@@ -209,6 +209,21 @@ describe('MessageComposer', () => {
       const first = select.querySelector('option') as HTMLOptionElement
       expect(first.textContent).toContain('No one left to add')
     })
+
+    it('with a single addable person, stays on the placeholder and still adds them on select (owner UAT 2026-08-17)', async () => {
+      const solo = [mkPerson('solo', 'Solo', 'solo@example.com')]
+      mountComposer({ people: solo })
+      const select = q('add-someone-select').element as HTMLSelectElement
+      // Controlled to the empty placeholder — NOT auto-selected to the lone
+      // person (the bug: a disabled placeholder let the browser pre-select the
+      // person, so choosing them fired no change and nothing was added).
+      expect(select.value).toBe('')
+      // Selecting that one person fires change → they are added and pilled.
+      select.value = 'solo'
+      select.dispatchEvent(new Event('change'))
+      await nextTick()
+      expect(q('individual-pill-solo').exists()).toBe(true)
+    })
   })
 
   describe('always-on live preview (R153)', () => {
