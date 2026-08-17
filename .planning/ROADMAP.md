@@ -594,3 +594,26 @@ prompt — relabel once, globally. R155's history-side "Sending… vs failed" af
 `ServiceMessageHistory.vue`, which Phase 63 relocates — if 63 lands first, 64 edits it in its new home.
 
 *v1.8 roadmap created: 2026-08-15. Traceability: REQUIREMENTS.md (R149–R156, 8/8 mapped, 0 unmapped).*
+
+---
+
+## Post-v1.8 Owner UAT Hotfixes (2026-08-17, direct-to-master)
+
+Owner-UAT fixes to the shipped messaging feature, done + tested GREEN + committed outside the phase flow
+(each small and self-tested). Requirements R157–R160 in REQUIREMENTS.md.
+
+- **R157** `bece0dc4` — hide the ✉ Messages action-bar button when org Messaging is off.
+- **R158** `e866e2f0` — composer add-someone picker can select the only addable person.
+- **R159** `9f8ccf3c` — email From = `"<Org Name>" <no-reply@…web.app>` (app-owned verified address + org
+  name display), auto Reply-To = sending editor; removed church `fromName`/`replyTo` fields. Root cause: a
+  Resend 403 on unverified per-church From domains. `MESSAGE_FROM_ADDRESS` must be overridden at deploy with
+  a Resend-verified domain.
+- **R160** `972bdf04` — unique org names via a new `orgNames` create-only registry + rule (mirrors
+  `orgSlugs`); enforced at rename (reject) + best-effort suffix at signup. Slug uniqueness already existed.
+
+Supporting: `d34c56c7` — local-emulator send-path unblock (`functions/.secret.local`).
+
+**Deploy (owner):** now also needs `firebase deploy --only firestore:rules` (new `orgNames` rule) on top of
+the pending send-path functions + `hosting`. `messageWebhook` held back pending `RESEND_WEBHOOK_SECRET`.
+
+*Post-v1.8 hotfixes recorded: 2026-08-17.*

@@ -224,3 +224,41 @@ Follow-up milestone refining the shipped v1.7 volunteer-messaging feature from o
 **Coverage:** v1.8 = 8 requirements (R149–R156), mapped to Phases 63–64, 0 unmapped ✓
 
 *v1.8 requirements defined: 2026-08-15 (from owner UAT of v1.7 messaging).*
+
+---
+
+## Post-v1.8 Owner UAT Hotfixes (2026-08-17)
+
+A batch of owner-UAT fixes/changes to the shipped messaging feature, implemented + tested GREEN and
+committed **directly to master** (outside the phase flow — small, targeted, each with its own tests). Not
+part of a numbered phase; recorded here for traceability.
+
+- [x] **R157** — The action-bar **✉ Messages button is HIDDEN when org Messaging is off** (not
+  disabled-with-tooltip). Reverses Phase 59-04's deliberate discoverability choice per owner UAT; matches
+  the Share / AI hide-on-fail rule. *(commit `bece0dc4`)*
+- [x] **R158** — The composer **add-someone picker can select the only addable person**. A disabled
+  placeholder let the browser pre-select the lone person, so choosing them fired no `change` event; fixed
+  with a controlled empty-placeholder `<select>`. *(commit `e866e2f0`)*
+- [x] **R159** — **Messaging From/Reply-To rework.** Outgoing volunteer emails send From
+  `"<Organization Name>" <no-reply@worship-planner-bc515.web.app>` — the app's own single sending address
+  (`MESSAGE_FROM_ADDRESS`, deploy-config) with the **org name** as the RFC 5322 display name
+  (header-sanitized against injection) — and **Reply-To = the sending editor's email** (auto-built,
+  needs no domain verification). The church-configured `fromName`/`replyTo` Settings fields are **removed**
+  (a church can't own the sending domain). ⚠ `MESSAGE_FROM_ADDRESS` MUST be overridden at deploy time with
+  an address on a **Resend-verified** domain — the `.web.app` default 403s ("domain not verified") until
+  then. *(commit `9f8ccf3c`; root cause: Resend 403 on unverified per-church From domains)*
+- [x] **R160** — **Unique organization names across all orgs.** New `orgNames/{normalizedName}` create-only
+  registry + Firestore rule mirroring the existing `orgSlugs` pattern (slug uniqueness already existed).
+  `claimOrgName` is idempotent for an org's own name. Enforced at **rename** (Settings rejects a taken
+  name) and **best-effort at signup** (the default "<name>'s Church" auto-suffixes on collision, never
+  blocking account creation). Going-forward only — pre-existing duplicates untouched until next edited.
+  *(commit `972bdf04`)*
+
+Supporting: the earlier local-emulator send-path unblock (`functions/.secret.local`, commit `d34c56c7`).
+
+**Deploy impact (owner action):** `firebase deploy --only firestore:rules` is now **also required** (new
+`orgNames` rule) alongside the pending v1.7/v1.8 send-path deploy (functions
+`queueServiceMessage`/`sendQueuedMessage`/`sendScheduledReminders`) + `hosting`. `messageWebhook` stays held
+back pending `RESEND_WEBHOOK_SECRET`. Set `MESSAGE_FROM_ADDRESS` to a verified-domain address at deploy.
+
+*Post-v1.8 hotfixes recorded: 2026-08-17.*

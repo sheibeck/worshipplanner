@@ -5,16 +5,49 @@ milestone_name: Messaging UX & Fixes
 current_phase: 64
 current_phase_name: Composer Refinements
 status: verification_deferred_human
-stopped_at: v1.8 COMPLETE (Phases 63+64 code-complete + verified GREEN); STOPPED before milestone lifecycle per grant
-last_updated: "2026-08-16T03:00:00.000Z"
-last_activity: 2026-08-15
-last_activity_desc: Phase 64 verified GREEN (6/6). ALL v1.8 phases (63,64) code-complete + verified. Milestone lifecycle + /gsd-verify-work + deploys DEFERRED to owner per the standing grant.
+stopped_at: v1.8 code-complete + verified; post-v1.8 UAT hotfixes (R157–R160) shipped to master; OWNER now performing the production deploy
+last_updated: "2026-08-17T00:00:00.000Z"
+last_activity: 2026-08-17
+last_activity_desc: Post-v1.8 owner-UAT hotfixes R157–R160 (messaging From/Reply-To rework, unique org names, Messages-button hide, single-person picker) committed to master + tested GREEN. Owner authorized a production deploy and is running it (assistant cannot run firebase deploy — classifier). messageWebhook held back pending RESEND_WEBHOOK_SECRET.
 progress:
   total_phases: 2
   completed_phases: 2
   total_plans: 5
   completed_plans: 5
   percent: 100
+---
+
+## ★ POST-v1.8 UAT HOTFIXES + PRODUCTION DEPLOY IN PROGRESS (2026-08-17)
+
+After v1.8 was verified GREEN, the owner ran UAT on the shipped messaging feature and requested a batch of
+fixes, then **authorized a production deploy**. All fixes are implemented, tested GREEN, committed to master,
+and **pushed**. Recorded as **R157–R160** in REQUIREMENTS.md / ROADMAP.md.
+
+**Shipped (direct-to-master, each self-tested):**
+- `bece0dc4` **R157** — hide the ✉ Messages action-bar button when org Messaging is off.
+- `e866e2f0` **R158** — composer add-someone picker can select the only addable person (controlled placeholder).
+- `9f8ccf3c` **R159** — email From = `"<Org Name>" <no-reply@worship-planner-bc515.web.app>` (app-owned
+  sending address + org-name display, header-sanitized) + auto Reply-To = sending editor; removed church
+  `fromName`/`replyTo` Settings fields. Root cause: Resend 403 on unverified per-church From domains.
+- `972bdf04` **R160** — unique org **names** via new `orgNames` create-only registry + rule (mirrors
+  `orgSlugs`); rename rejects a taken name, signup auto-suffixes. Slug uniqueness already existed.
+- `d34c56c7` — local-emulator send-path unblock (`functions/.secret.local`, placeholders).
+
+**DEPLOY STATUS — owner-driven, IN PROGRESS.** The owner explicitly authorized + is running the production
+deploy (this supersedes the earlier "no deploy" grant for THIS deploy). The assistant still **cannot** run
+`firebase deploy` (blocked by the Claude Code auto-mode classifier), so the owner runs the commands. Verified
+pre-deploy: client build + `vue-tsc` + functions `tsc` + functions tests all GREEN; project `worship-planner-bc515`;
+`RESEND_API_KEY` present in Secret Manager. Deploy set the owner is running:
+- `firebase deploy --only firestore:rules,firestore:indexes` — **rules now include the new `orgNames` block**.
+- `firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage,functions:sendScheduledReminders`
+- `firebase deploy --only hosting`
+- **Held back:** `functions:messageWebhook` — binds `RESEND_WEBHOOK_SECRET`, which is **not set** in Secret
+  Manager (404). Owner sets it (`firebase functions:secrets:set RESEND_WEBHOOK_SECRET`) then deploys it +
+  points the Resend dashboard webhook at its URL.
+
+**⚠ To actually DELIVER email:** `MESSAGE_FROM_ADDRESS` must be overridden with an address on a
+**Resend-verified** domain — the `.web.app` default 403s. (`onboarding@resend.dev` works for testing.)
+
 ---
 
 ## ⏸ RESUME HERE (2026-08-15 — Phase 63 code-complete via 63-01; Phase 64 not yet planned)
