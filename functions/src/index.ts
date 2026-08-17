@@ -1523,6 +1523,19 @@ export function fromDisplayName(name: string | null | undefined): string {
   return (name ?? "").replace(/[\r\n]+/g, " ").replace(/["\\]/g, "").trim();
 }
 
+/**
+ * Extract the bare email address from a configured From value. MESSAGE_FROM_ADDRESS
+ * may be a plain `email@x` OR an already-decorated `Display Name <email@x>` form
+ * (e.g. a leftover `.env` override). We always re-apply the org name as the display
+ * name, so we must peel any existing `<…>` off first — otherwise wrapping produces
+ * an invalid nested `"Org" <Name <email>>` and Resend 422s. Returns the inner
+ * address when angle-bracketed, else the trimmed input.
+ */
+export function bareEmailAddress(configured: string): string {
+  const m = configured.match(/<([^>]*)>/);
+  return (m ? m[1] : configured).trim();
+}
+
 /** Resend tag names AND values allow only these chars (59-RESEARCH.md Pitfall 3). */
 const RESEND_TAG_SAFE = /^[A-Za-z0-9_-]+$/;
 
@@ -1750,10 +1763,12 @@ export async function sendQueuedMessageHandler(params: {
   // mocked-in-tests Resend, and write recipients/{id}. Per-recipient try/catch
   // so one bad address is a status:'failed' recipient, not an aborted batch.
   const resend = new Resend(RESEND_API_KEY.value());
-  // From = the org's own name (display) over the app's verified sending address
-  // (MESSAGE_FROM_ADDRESS). Org name is header-sanitized above; wrap in a
-  // quoted-string. Bare address when the org has no name.
-  const fromEmail = MESSAGE_FROM_ADDRESS.value();
+  // From = the org's own name (display) over the app's verified sending address.
+  // bareEmailAddress peels any display name already baked into MESSAGE_FROM_ADDRESS
+  // (e.g. a "Name <email>" .env override) so wrapping never nests angle brackets.
+  // Org name is header-sanitized above; wrap in a quoted-string. Bare address when
+  // the org has no name.
+  const fromEmail = bareEmailAddress(MESSAGE_FROM_ADDRESS.value());
   const fromAddress = orgName ? `"${orgName}" <${fromEmail}>` : fromEmail;
   let sentCount = 0;
   let failedCount = 0;

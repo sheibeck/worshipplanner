@@ -2590,6 +2590,22 @@ describe("sendQueuedMessageHandler", () => {
     expect(from).toBe('"Test Church" <onboarding@resend.dev>');
   });
 
+  it("peels a display name already in MESSAGE_FROM_ADDRESS so wrapping never nests brackets (422 repro)", async () => {
+    // Reproduces the reported 422: a "Name <email>" config value wrapped again
+    // produced "My's Church" <Worship Planner <noreply@…>>. bareEmailAddress must
+    // extract just the address → a single, valid quoted-name form.
+    fakeMessageFromAddress = "Worship Planner <noreply@worshipplanner.app>";
+    const { db } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const from = (mockSend.mock.calls[0][0] as { from: string }).from;
+    expect(from).toBe('"Test Church" <noreply@worshipplanner.app>');
+    expect(from).not.toContain("<Worship Planner");
+    expect((from.match(/</g) ?? []).length).toBe(1);
+  });
+
   it("From falls back to the BARE address when the org has no name", async () => {
     const { db } = makeSendDb({ ...twoRecipientConfig(), orgName: "" });
     vi.mocked(getFirestore).mockReturnValue(db as never);
