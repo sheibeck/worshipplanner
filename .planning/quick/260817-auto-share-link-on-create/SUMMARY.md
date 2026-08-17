@@ -27,7 +27,9 @@ failing the create.
 ## Deploy / follow-up
 - **Client-only change** — ships with the next `hosting` deploy (no functions/rules
   change). The server-side `{{service_link}}` resolver is unchanged.
-- Existing services created **before** this change still have no link until edited or
-  Shared once — this fix is forward-looking (going-forward, like the org-name work).
-  A backfill (mint links for existing services) was not requested; note it if the
-  owner wants old services covered.
+- Existing services created **before** this change still have no link until the user
+  clicks **Share** once. An ordinary edit does NOT create one: `maybeRefreshShareLink`
+  is deliberately incapable of the create branch (it calls `writeSharePayload`, never
+  `ensureShareLink`, "or an ordinary edit to a never-shared service would publish it").
+  This fix is forward-looking (new services only). A backfill (mint links for existing
+  services) was not requested; note it if the owner wants old services covered.
