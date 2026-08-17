@@ -38,13 +38,13 @@ and **pushed**. Recorded as **R157–R160** in REQUIREMENTS.md / ROADMAP.md.
 - ✅ `firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage,functions:sendScheduledReminders`
   — all three CREATED (first-time), `RESEND_API_KEY` accessor granted to the compute SA.
 - ✅ `firebase deploy --only hosting` — 443 files, live at https://worship-planner-bc515.web.app.
-- **Still held back:** `functions:messageWebhook` (bounce tracking, not sending). A **PLACEHOLDER**
-  `RESEND_WEBHOOK_SECRET` (version 1, dummy `whsec_…`) was set in Secret Manager ONLY to unblock the
-  non-interactive functions deploy (firebase-tools validates every declared secret across the whole codebase,
-  even for a scoped deploy). `messageWebhook` is NOT deployed, so the placeholder is inert. To enable bounce
-  tracking: create the Resend webhook → paste its real `whsec_…` via `firebase functions:secrets:set
-  RESEND_WEBHOOK_SECRET` → `firebase deploy --only functions:messageWebhook` → set the Resend dashboard
-  webhook URL.
+- ✅ `firebase deploy --only functions:messageWebhook` — DEPLOYED 2026-08-17 with the REAL
+  `RESEND_WEBHOOK_SECRET` (version 2; version 1 was a placeholder used only to unblock the initial
+  non-interactive deploy, since firebase-tools validates every declared secret across the whole codebase).
+  Resend webhook endpoint configured at `https://us-central1-worship-planner-bc515.cloudfunctions.net/messageWebhook`
+  (a stable alias for the gen2 Cloud Run URL `https://messagewebhook-d2jqpzommq-uc.a.run.app`), subscribed to
+  `email.bounced`. Bounce tracking is LIVE — a Permanent hard bounce flips the recipient to `bounced` and
+  bumps `deliveryCounts.bounced`.
 
 **Deploy gotcha (record for next deploy):** non-interactive `firebase deploy --only functions:…` errors
 `no value for … SERVICE_SHARE_BASE_URL, MESSAGE_FROM_ADDRESS` because firebase-tools does NOT use a
