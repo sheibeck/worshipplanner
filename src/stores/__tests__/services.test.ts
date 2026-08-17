@@ -632,6 +632,39 @@ describe('useServiceStore', () => {
 
       expect(id).toBe('new-service-id')
     })
+
+    it('auto-generates a share link at creation so every service has one (owner UAT 2026-08-17)', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      // ensureShareLink's first read (serviceShareLinks/{id}) must be "not exists"
+      // so it mints a fresh token instead of adopting a phantom existing link.
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await store.createService({ date: '2026-03-08', name: '', teams: [] })
+
+      // A shareTokens/{token} doc was written for the NEW service (serviceId = the
+      // addDoc-returned id) — so {{service_link}} resolves server-side without a
+      // manual Share click.
+      const shareWrite = vi
+        .mocked(setDoc)
+        .mock.calls.find(([, data]) => (data as Record<string, unknown>)?.serviceId === 'new-service-id')
+      expect(shareWrite).toBeDefined()
+    })
+
+    it('createService still returns the id when share-link generation fails (soft-fail)', async () => {
+      const { getDoc } = await import('firebase/firestore')
+      // Force ensureShareLink to throw on its first read; createService must still resolve.
+      vi.mocked(getDoc).mockRejectedValueOnce(new Error('boom'))
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      const id = await store.createService({ date: '2026-03-08', name: '', teams: [] })
+
+      expect(id).toBe('new-service-id')
+    })
   })
 
   describe('updateService', () => {

@@ -259,6 +259,30 @@ export const useServiceStore = defineStore('services', () => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
+
+    // Auto-generate the share link at creation so EVERY service always has one
+    // (owner request 2026-08-17): a volunteer message's {{service_link}} resolves
+    // server-side from the newest shareTokens doc for the service, so without this
+    // a never-"Shared" service silently emails an empty link. ensureShareLink mints
+    // the opaque token + serviceShareLinks identity doc + payload; from here on
+    // maybeRefreshShareLink keeps it current on every edit. Soft-fail (mirrors the
+    // Phase 41 share writes): a share problem must never fail the user's create.
+    try {
+      const created: Service = {
+        ...(data as object),
+        id: ref.id,
+        progression: '1-2-2-3',
+        slots,
+        status: 'draft',
+        notes: '',
+        sermonPassage: null,
+        sermonTopic: '',
+      } as Service
+      await ensureShareLink(created, orgId.value)
+    } catch (err) {
+      console.error('createService: auto share-link generation failed (non-blocking)', err)
+    }
+
     return ref.id
   }
 
@@ -715,8 +739,9 @@ export const useServiceStore = defineStore('services', () => {
    *
    * Deliberately NOT hooked: `markAsPlanned` and `reopenService` are
    * status-only writes and `ShareView.vue` never renders `status`;
-   * `deleteService` uses `deleteDoc` and is not a refresh trigger;
-   * `createService` has nothing yet to refresh.
+   * `deleteService` uses `deleteDoc` and is not a refresh trigger.
+   * `createService` now generates the link at creation via `ensureShareLink`
+   * (so every service always has one); subsequent edits refresh through here.
    *
    * Loop safety (T-41-02): the store's only `onSnapshot` subscribes to
    * `organizations/{orgId}/services` (see `subscribe()` above). Nothing
