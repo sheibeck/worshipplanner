@@ -1485,12 +1485,18 @@ export const queueServiceMessage = onCall(queueServiceMessageHandler);
 // per recipient, rolls up deliveryCounts, and flips the message status.
 
 /**
- * The public share-link base origin (e.g. https://app.example.com). Config, not
- * a secret — defineString, mirroring PPTX_RENDER_SERVICE_URL. Empty default is
- * deliberate and TESTED: with no base configured, {{service_link}} renders ''
- * (A1 empty substitution). The owner sets it at deploy time.
+ * The public share-link base origin — the APPLICATION's own base domain, shared
+ * by ALL orgs (churches never get their own domain; the org is identified by the
+ * URL slug in the path, not the host). Config, not a secret — defineString,
+ * mirroring PPTX_RENDER_SERVICE_URL. Defaults to the app's hosting domain so
+ * {{service_link}} always renders a real link; override at deploy time only to
+ * point at a custom app domain, or locally (e.g. http://localhost:5173) for
+ * dev links. A blank value still renders {{service_link}} as '' (A1 empty
+ * substitution) rather than a broken URL.
  */
-export const SERVICE_SHARE_BASE_URL = defineString("SERVICE_SHARE_BASE_URL", { default: "" });
+export const SERVICE_SHARE_BASE_URL = defineString("SERVICE_SHARE_BASE_URL", {
+  default: "https://worship-planner-bc515.web.app",
+});
 
 /**
  * The bare From *address* Resend sends as. Config, not a secret. The

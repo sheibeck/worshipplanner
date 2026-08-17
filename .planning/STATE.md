@@ -45,6 +45,14 @@ pre-deploy: client build + `vue-tsc` + functions `tsc` + functions tests all GRE
   Manager (404). Owner sets it (`firebase functions:secrets:set RESEND_WEBHOOK_SECRET`) then deploys it +
   points the Resend dashboard webhook at its URL.
 
+**Share-link base:** `SERVICE_SHARE_BASE_URL` is the ONE app-wide base domain for `{{service_link}}`
+(churches never get their own domain — the org is the URL *slug* in the path, not the host). Default is now
+`https://worship-planner-bc515.web.app` (was empty); override only for a custom app domain or local dev
+(`http://localhost:5173`). The old `.env.local` overrides (`SERVICE_SHARE_BASE_URL=mytestchurch.com`,
+`MESSAGE_FROM_ADDRESS=Worship Planner <noreply@worshipplanner.app>`) are stale test values — remove them so
+the code defaults apply. Also hardened `bareEmailAddress` so a `Name <email>` config value can't produce the
+nested-bracket From that Resend 422'd on.
+
 **Email From (testing):** `MESSAGE_FROM_ADDRESS` default is now `onboarding@resend.dev` (commit after
 `972bdf04`) — Resend's zero-setup sender, needs no domain verification, but in test mode only delivers to
 the Resend account owner's own email. Sends as `"<Org Name>" <onboarding@resend.dev>`. **Future fix (backlog):
