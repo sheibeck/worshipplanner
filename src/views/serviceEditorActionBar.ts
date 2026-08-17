@@ -107,10 +107,9 @@ export interface ActionBarContext {
    * R136 (59-04): the org-level volunteer-email messaging kill switch
    * (`isMessagingEnabled()`, Phase 58). Required (not optional) so the
    * compiler forces the one call site to supply it — the same rationale as
-   * `aiEnabled`/`pcEnabled` above. Unlike those two, a `false` here does NOT
-   * hide the ✉ Messages item: it renders present-but-DISABLED with a Settings
-   * tooltip (see `buildMessagesItem`), a deliberate divergence from the
-   * hide-on-fail rule (UI-SPEC #0).
+   * `aiEnabled`/`pcEnabled` above. A `false` here HIDES the ✉ Messages item
+   * entirely (see `buildMessagesItem`), the same hide-on-fail rule those two
+   * follow (owner UAT 2026-08-17 reversed 59-04's disabled+tooltip form).
    */
   messagingEnabled: boolean
   handlers: ActionBarHandlers
@@ -239,24 +238,22 @@ function buildShareItem(ctx: ActionBarContext): ActionBarItem | undefined {
  * Editor-gated like every mutating action (returns `undefined` for a viewer —
  * a share/send denormalizes editor-only recipient data).
  *
- * ★ DELIBERATE DIVERGENCE — DISABLED, not hidden, when messaging is off.
- * Unlike `buildShareItem` (which hides on gate failure) and the WR-01 AI
- * "hide-don't-disable" rule, this item is returned present-but-`disabled`
- * with a Settings tooltip when `!ctx.messagingEnabled`. 59-CONTEXT.md /
- * 59-UI-SPEC.md #0 chose disabled+tooltip for discoverability: a silently
- * absent button is undiscoverable, whereas the disabled form teaches the
- * editor the feature exists and where to enable it (Settings → Messaging).
- * The server kill-switch re-check in `queueServiceMessage` (59-02) is the real
- * boundary; this UI gate is convenience. Do NOT "correct" this to hide-on-fail.
+ * HIDE-ON-FAIL when messaging is off (owner UAT, 2026-08-17): "The messages
+ * button ... shows up even if Messaging setting is turned off. It should be
+ * hidden if message setting is turned off." This REVERSES 59-04's deliberate
+ * disabled+tooltip-for-discoverability choice (59-UI-SPEC.md #0). The item now
+ * returns `undefined` when `!ctx.messagingEnabled`, matching `buildShareItem`
+ * and the WR-01 AI "hide-don't-disable" rule. The server kill-switch re-check
+ * in `queueServiceMessage` (59-02) remains the real boundary; this UI gate is
+ * convenience. Do NOT "restore" the disabled+tooltip form — the owner asked
+ * for the opposite.
  */
 function buildMessagesItem(ctx: ActionBarContext): ActionBarItem | undefined {
-  if (!ctx.isEditor) return undefined
+  if (!ctx.isEditor || !ctx.messagingEnabled) return undefined
   return {
     key: 'messages',
     label: 'Messages',
     icon: 'mail',
-    disabled: !ctx.messagingEnabled,
-    title: ctx.messagingEnabled ? undefined : 'Turn on Messaging in Settings to email volunteers',
     onClick: ctx.handlers.onMessages,
   }
 }

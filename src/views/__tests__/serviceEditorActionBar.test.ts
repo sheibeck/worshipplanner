@@ -480,16 +480,16 @@ describe('buildActionBarItems', () => {
       const item = buildActionBarItems('service-order', ctx).find((i) => i.key === 'messages')
       expect(item).toBeDefined()
       expect(item?.label).toBe('Messages')
-      expect(item?.disabled).toBe(false)
+      // Hide-on-fail (owner UAT 2026-08-17): when present the item is always
+      // enabled — no disabled state / Settings tooltip anymore.
+      expect(item?.disabled).toBeFalsy()
       expect(item?.title).toBeUndefined()
     })
 
-    it('is present but DISABLED with the Settings tooltip when messaging is off (disabled, not hidden — UI-SPEC #0)', () => {
+    it('is HIDDEN (absent) when messaging is off (owner UAT 2026-08-17 — reversed 59-04 disabled+tooltip)', () => {
       const ctx = makeContext({ isEditor: true, messagingEnabled: false })
       const item = buildActionBarItems('service-order', ctx).find((i) => i.key === 'messages')
-      expect(item).toBeDefined()
-      expect(item?.disabled).toBe(true)
-      expect(item?.title).toBe('Turn on Messaging in Settings to email volunteers')
+      expect(item).toBeUndefined()
     })
 
     it('is absent for a viewer (isEditor false), regardless of messagingEnabled', () => {
