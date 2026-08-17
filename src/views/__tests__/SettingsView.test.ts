@@ -123,8 +123,6 @@ let mockMessagingEnabled = false
 let mockLockNotifyDefault = false
 let mockReminderEnabled = false
 let mockReminderDaysBefore = 7
-let mockFromName: string | undefined = undefined
-let mockReplyTo: string | undefined = undefined
 let mockTimezone = 'America/Chicago'
 
 const mockSetPcCredentials = vi.fn()
@@ -245,18 +243,6 @@ vi.mock('@/stores/auth', () => ({
           set reminderDaysBefore(v: number) {
             mockReminderDaysBefore = v
           },
-          get fromName() {
-            return mockFromName
-          },
-          set fromName(v: string | undefined) {
-            mockFromName = v
-          },
-          get replyTo() {
-            return mockReplyTo
-          },
-          set replyTo(v: string | undefined) {
-            mockReplyTo = v
-          },
         }
       },
       // 58-04: setter required for onChangeTimezone's mirror-write
@@ -302,8 +288,6 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockLockNotifyDefault = false
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
-    mockFromName = undefined
-    mockReplyTo = undefined
     mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -353,8 +337,6 @@ describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
     mockLockNotifyDefault = false
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
-    mockFromName = undefined
-    mockReplyTo = undefined
     mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -462,8 +444,6 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     mockLockNotifyDefault = false
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
-    mockFromName = undefined
-    mockReplyTo = undefined
     mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -543,8 +523,6 @@ describe('SettingsView — no Services template card (R113)', () => {
     mockLockNotifyDefault = false
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
-    mockFromName = undefined
-    mockReplyTo = undefined
     mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -578,8 +556,6 @@ describe('SettingsView Bible Translation card (R090) — 45-02', () => {
     mockLockNotifyDefault = false
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
-    mockFromName = undefined
-    mockReplyTo = undefined
     mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -683,8 +659,6 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
     mockLockNotifyDefault = false
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
-    mockFromName = undefined
-    mockReplyTo = undefined
     mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -841,8 +815,6 @@ describe('SettingsView Messaging card — kill-switch + automatic email defaults
     mockLockNotifyDefault = false
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
-    mockFromName = undefined
-    mockReplyTo = undefined
     mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -895,8 +867,9 @@ describe('SettingsView Messaging card — kill-switch + automatic email defaults
 
     expect(wrapper.find('[data-testid="messaging-lock-notify-toggle"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="messaging-reminder-enabled-toggle"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="messaging-from-name-input"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="messaging-reply-to-input"]').exists()).toBe(true)
+    // From name / Reply-to fields removed (owner UAT 2026-08-17).
+    expect(wrapper.find('[data-testid="messaging-from-name-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="messaging-reply-to-input"]').exists()).toBe(false)
   })
 
   it('writes the dot-path leaf and mirrors the store when lock-notify default is toggled', async () => {
@@ -973,27 +946,6 @@ describe('SettingsView Messaging card — kill-switch + automatic email defaults
     expect(mockReminderDaysBefore).toBe(7)
   })
 
-  it('saves From name / Reply-to together under one Save button and mirrors the store', async () => {
-    mockMessagingEnabled = true
-    const wrapper = mountSettingsView()
-
-    await wrapper.get('[data-testid="messaging-from-name-input"]').setValue('First Baptist Church')
-    await wrapper.get('[data-testid="messaging-reply-to-input"]').setValue('planning@yourchurch.org')
-    // No write yet — free text needs the explicit Save button (mirrors Org Name).
-    expect(mockUpdateDoc).not.toHaveBeenCalled()
-
-    await wrapper.get('[data-testid="messaging-email-save-button"]').trigger('click')
-    await flushPromises()
-
-    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
-    expect(payload).toHaveProperty('settings.messaging.fromName', 'First Baptist Church')
-    expect(payload).toHaveProperty('settings.messaging.replyTo', 'planning@yourchurch.org')
-    expect(mockFromName).toBe('First Baptist Church')
-    expect(mockReplyTo).toBe('planning@yourchurch.org')
-    expect(wrapper.text()).toContain('Saved!')
-  })
-
   it('disables the kill-switch and blocks saving for a non-editor (viewer)', async () => {
     mockIsEditor = false
     const wrapper = mountSettingsView()
@@ -1030,8 +982,6 @@ describe('SettingsView organization timezone select (R133) — 58-04', () => {
     mockLockNotifyDefault = false
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
-    mockFromName = undefined
-    mockReplyTo = undefined
     mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()

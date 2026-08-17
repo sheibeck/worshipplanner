@@ -1493,14 +1493,30 @@ export const queueServiceMessage = onCall(queueServiceMessageHandler);
 export const SERVICE_SHARE_BASE_URL = defineString("SERVICE_SHARE_BASE_URL", { default: "" });
 
 /**
- * The From address Resend sends as (a verified sending-domain address). Config,
- * not a secret. Owner overrides at deploy time with the domain they verified in
- * Resend; the default is a placeholder that never sends in tests (Resend is
- * fully mocked) and is corrected before the owner's deploy.
+ * The bare From *address* Resend sends as. Config, not a secret. The
+ * organization's own name is applied as the RFC 5322 display name at send time
+ * (see `fromDisplayName`), so this holds only the address — no display name.
+ *
+ * ⚠ This address's domain MUST be verified in Resend or every send 403s
+ * ("domain is not verified"). `*.web.app` is a Google-managed domain with no
+ * DNS access, so it CANNOT be verified — override this at deploy time with an
+ * address on a domain you've verified (or `onboarding@resend.dev` for testing)
+ * to actually deliver. The default is the owner-chosen placeholder for now.
  */
 export const MESSAGE_FROM_ADDRESS = defineString("MESSAGE_FROM_ADDRESS", {
-  default: "Worship Planner <noreply@worshipplanner.app>",
+  default: "no-reply@worship-planner-bc515.web.app",
 });
+
+/**
+ * Build a header-safe RFC 5322 display name from an org-supplied name. The org
+ * name is user-controlled and flows into the From header, so CR/LF (email
+ * header-injection vectors) and quote/backslash chars are stripped; the caller
+ * wraps the result in a quoted-string. Empty in → empty out (caller omits the
+ * display name and sends the bare address).
+ */
+export function fromDisplayName(name: string | null | undefined): string {
+  return (name ?? "").replace(/[\r\n]+/g, " ").replace(/["\\]/g, "").trim();
+}
 
 /** Resend tag names AND values allow only these chars (59-RESEARCH.md Pitfall 3). */
 const RESEND_TAG_SAFE = /^[A-Za-z0-9_-]+$/;
@@ -1673,11 +1689,13 @@ export async function sendQueuedMessageHandler(params: {
     roleAssignmentOverrides?: Record<string, string[]>;
   };
 
-  const [quartersSnap, rolesSnap, peopleSnap] = await Promise.all([
+  const [orgSnap, quartersSnap, rolesSnap, peopleSnap] = await Promise.all([
+    orgRef.get(),
     orgRef.collection("quarters").get(),
     orgRef.collection("roles").get(),
     orgRef.collection("people").get(),
   ]);
+  const orgName = fromDisplayName((orgSnap.data() as { name?: string | null } | undefined)?.name);
   const quarters = quartersSnap.docs.map((d) => d.data() as PortedQuarter);
   const roles = rolesSnap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as PortedRole);
   const people = peopleSnap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as PortedPerson);
@@ -1714,18 +1732,24 @@ export async function sendQueuedMessageHandler(params: {
     email: r.email,
     roleNames: r.roleNames,
   }));
-  if (message.options?.sendCopyToSelf && message.requestedByUid) {
-    const selfEmail = await resolveEditorEmail(message.requestedByUid);
-    if (selfEmail) {
-      sendList.push({ id: message.requestedByUid, name: "You", email: selfEmail, roleNames: [] });
-    }
+  // Resolve the sending editor's email ONCE — it is both the auto-built
+  // Reply-To (so a volunteer's reply reaches the human who sent the message,
+  // with no domain-verification requirement on Reply-To) and, when opted in,
+  // the self-copy recipient. Empty string when unresolved (Reply-To omitted).
+  const senderEmail = message.requestedByUid ? await resolveEditorEmail(message.requestedByUid) : "";
+  if (message.options?.sendCopyToSelf && message.requestedByUid && senderEmail) {
+    sendList.push({ id: message.requestedByUid, name: "You", email: senderEmail, roleNames: [] });
   }
 
   // ⑤ + ⑥ Per recipient: render THAT person's subject/body (R139), send via the
   // mocked-in-tests Resend, and write recipients/{id}. Per-recipient try/catch
   // so one bad address is a status:'failed' recipient, not an aborted batch.
   const resend = new Resend(RESEND_API_KEY.value());
-  const fromAddress = MESSAGE_FROM_ADDRESS.value();
+  // From = the org's own name (display) over the app's verified sending address
+  // (MESSAGE_FROM_ADDRESS). Org name is header-sanitized above; wrap in a
+  // quoted-string. Bare address when the org has no name.
+  const fromEmail = MESSAGE_FROM_ADDRESS.value();
+  const fromAddress = orgName ? `"${orgName}" <${fromEmail}>` : fromEmail;
   let sentCount = 0;
   let failedCount = 0;
 
@@ -1742,6 +1766,7 @@ export async function sendQueuedMessageHandler(params: {
       const result = await resend.emails.send({
         from: fromAddress,
         to: target.email,
+        ...(senderEmail ? { replyTo: senderEmail } : {}),
         subject,
         text: body,
         tags: [

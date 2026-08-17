@@ -549,45 +549,12 @@
             </p>
           </div>
 
-          <!-- From name / Reply-to — explicit-Save free-text sub-form, mirrors the
-               Organization Name field's explicit-Save pattern exactly. -->
-          <div class="mt-6 pt-6 border-t border-gray-800 space-y-3">
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">From name</label>
-              <input
-                v-model="fromNameInput"
-                type="text"
-                placeholder="e.g. First Baptist Church"
-                :disabled="!authStore.isEditor"
-                data-testid="messaging-from-name-input"
-                class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-              />
-            </div>
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">Reply-to email</label>
-              <input
-                v-model="replyToInput"
-                type="text"
-                placeholder="e.g. planning@yourchurch.org"
-                :disabled="!authStore.isEditor"
-                data-testid="messaging-reply-to-input"
-                class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-              />
-            </div>
-
-            <div class="flex items-center gap-3">
-              <button
-                type="button"
-                @click="onSaveMessagingEmail"
-                :disabled="messagingEmailSaving || !authStore.isEditor"
-                data-testid="messaging-email-save-button"
-                class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {{ messagingEmailSaving ? 'Saving...' : messagingEmailSavedFeedback ? 'Saved!' : 'Save' }}
-              </button>
-            </div>
-            <p v-if="messagingEmailSaveError" class="text-red-400 text-sm mt-2">{{ messagingEmailSaveError }}</p>
-          </div>
+          <!-- From name / Reply-to removed (owner UAT 2026-08-17): outgoing
+               volunteer emails now send from the app's own verified address with
+               the organization's name as the display name, and Reply-to is
+               auto-built from the sending editor — churches no longer configure
+               either (they can't own the sending domain). See functions/src/index.ts
+               `fromDisplayName` + the sendQueuedMessage From/Reply-To assembly. -->
         </div>
 
         <!-- Organization timezone — always visible, NOT gated by the kill-switch
@@ -707,12 +674,6 @@ const reminderDaysBeforeOptions = [1, 2, 3, 5, 7, 10, 14] as const
 const reminderDaysBeforeInput = ref(authStore.settings.messaging.reminderDaysBefore)
 const reminderDaysBeforeSavedFeedback = ref(false)
 const reminderDaysBeforeSaveError = ref<string | null>(null)
-
-const fromNameInput = ref(authStore.settings.messaging.fromName ?? '')
-const replyToInput = ref(authStore.settings.messaging.replyTo ?? '')
-const messagingEmailSaving = ref(false)
-const messagingEmailSavedFeedback = ref(false)
-const messagingEmailSaveError = ref<string | null>(null)
 
 // ── Organization timezone state (R133, Phase 58) ───────────────────────────────
 // Curated shortlist (58-CONTEXT.md's "Claude's Discretion") rather than the full
@@ -867,8 +828,6 @@ watch(
     lockNotifyDefaultInput.value = val.lockNotifyDefault
     reminderEnabledInput.value = val.reminderEnabled
     reminderDaysBeforeInput.value = val.reminderDaysBefore
-    fromNameInput.value = val.fromName ?? ''
-    replyToInput.value = val.replyTo ?? ''
   },
   { deep: true },
 )
@@ -1298,38 +1257,6 @@ async function onChangeReminderDaysBefore() {
     reminderDaysBeforeSaveError.value = 'Failed to save. Please try again.'
     // Revert to the prior NUMERIC value, not a two-way flip.
     reminderDaysBeforeInput.value = previous
-  }
-}
-
-// From name / Reply-to save together under one explicit Save button (mirrors the
-// Organization Name field's explicit-Save pattern) — an empty string clears the
-// field, same as PC credentials' clear semantics.
-async function onSaveMessagingEmail() {
-  if (!authStore.orgId || !authStore.isEditor) return
-
-  messagingEmailSaveError.value = null
-  messagingEmailSaving.value = true
-
-  try {
-    const fromName = fromNameInput.value.trim()
-    const replyTo = replyToInput.value.trim()
-
-    await updateDoc(doc(db, 'organizations', authStore.orgId), {
-      'settings.messaging.fromName': fromName,
-      'settings.messaging.replyTo': replyTo,
-    })
-    authStore.settings.messaging.fromName = fromName
-    authStore.settings.messaging.replyTo = replyTo
-
-    messagingEmailSavedFeedback.value = true
-    setTimeout(() => {
-      messagingEmailSavedFeedback.value = false
-    }, 2000)
-  } catch (err) {
-    console.error('[SettingsView] save messaging.fromName/replyTo error:', err)
-    messagingEmailSaveError.value = 'Failed to save. Please try again.'
-  } finally {
-    messagingEmailSaving.value = false
   }
 }
 

@@ -136,12 +136,11 @@ export interface OrgSettings {
      *  (Phase 61 cron). Only load-bearing once that scheduler ships; this
      *  phase persists the field + its Settings UI. */
     reminderDaysBefore: number
-    /** Optional display "From" name for outgoing messages. Absent = the
-     *  send-path default (Phase 59). */
-    fromName?: string
-    /** Optional Reply-To address for outgoing messages. Absent = the
-     *  send-path default (Phase 59). */
-    replyTo?: string
+    // `fromName`/`replyTo` removed (owner UAT 2026-08-17): outgoing emails send
+    // from the app's own verified address with the ORG NAME as the display name,
+    // and Reply-To is auto-built from the sending editor — neither is
+    // church-configurable (a church can't own the sending domain). The From
+    // display name comes from Organization.name; see functions/src/index.ts.
   }
   /** Church-wide local timezone (IANA name, e.g. `'America/Chicago'`),
    *  R133. Only load-bearing for Phase 61's scheduled reminder cron; this
@@ -215,7 +214,6 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
   // false (kill-switch fails closed for a fresh org with no email provider
   // configured yet). `lockNotifyDefault`/`reminderEnabled` default false
   // (conservative opt-in); `reminderDaysBefore` defaults to 7.
-  // `fromName`/`replyTo` stay OUT of this object (optional leaves).
   messaging: {
     enabled: false,
     lockNotifyDefault: false,

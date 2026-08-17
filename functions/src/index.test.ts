@@ -41,7 +41,7 @@ let fakeRenderServiceUrl = "";
 // Send-path (59-03) config seams, keyed by defineString NAME below so the
 // three configs don't collide on one shared value.
 let fakeShareBaseUrl = "";
-let fakeMessageFromAddress = "Worship Planner <noreply@worshipplanner.app>";
+let fakeMessageFromAddress = "no-reply@worship-planner-bc515.web.app";
 // The email getAuth().getUser(uid) resolves to for sendCopyToSelf.
 let fakeEditorEmail = "editor@example.com";
 
@@ -2400,6 +2400,7 @@ describe("sendQueuedMessageHandler", () => {
     roles?: Array<{ id: string; name: string; group: string; order: number }>;
     people?: Array<{ id: string; name: string; email: string }>;
     shareTokens?: Array<{ token: string; orgId: string; createdAtMs: number }>;
+    orgName?: string | null; // the org doc's name → From display name (default "Test Church")
   }
 
   function docSnap(exists: boolean, data: unknown) {
@@ -2447,6 +2448,8 @@ describe("sendQueuedMessageHandler", () => {
     const servicesCol = { doc: vi.fn(() => serviceRef) };
 
     const orgRef = {
+      // The send path reads the org doc for its name (the From display name).
+      get: vi.fn(async () => docSnap(true, { name: cfg.orgName ?? "Test Church" })),
       collection: vi.fn((name: string) => {
         if (name === "services") return servicesCol;
         if (name === "quarters")
@@ -2543,7 +2546,7 @@ describe("sendQueuedMessageHandler", () => {
     mockSend.mockReset();
     mockSend.mockResolvedValue({ data: { id: "re_fake_id" }, error: null });
     fakeShareBaseUrl = "";
-    fakeMessageFromAddress = "Worship Planner <noreply@worshipplanner.app>";
+    fakeMessageFromAddress = "no-reply@worship-planner-bc515.web.app";
     fakeEditorEmail = "editor@example.com";
   });
 
@@ -2571,6 +2574,61 @@ describe("sendQueuedMessageHandler", () => {
       { merge: true },
     );
     expect(outcome).toMatchObject({ status: "sent", sentCount: 2, failedCount: 0 });
+  });
+
+  // --- From / Reply-To (owner UAT 2026-08-17) --------------------------------
+  // Churches no longer set From/Reply-To. From = the org's own NAME (display)
+  // over the app's single verified sending address (MESSAGE_FROM_ADDRESS);
+  // Reply-To = the sending editor's email, auto-resolved server-side.
+  it("From = the org's name as display name over MESSAGE_FROM_ADDRESS", async () => {
+    const { db } = makeSendDb(twoRecipientConfig()); // orgName defaults to "Test Church"
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const from = (mockSend.mock.calls[0][0] as { from: string }).from;
+    expect(from).toBe('"Test Church" <no-reply@worship-planner-bc515.web.app>');
+  });
+
+  it("From falls back to the BARE address when the org has no name", async () => {
+    const { db } = makeSendDb({ ...twoRecipientConfig(), orgName: "" });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const from = (mockSend.mock.calls[0][0] as { from: string }).from;
+    expect(from).toBe("no-reply@worship-planner-bc515.web.app");
+  });
+
+  it("SECURITY: strips CR/LF and quotes from the org name before the From header (no header injection)", async () => {
+    const { db } = makeSendDb({ ...twoRecipientConfig(), orgName: 'Bad\r\nBcc: evil@x.com "Church"' });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const from = (mockSend.mock.calls[0][0] as { from: string }).from;
+    expect(from).not.toMatch(/[\r\n]/);
+    expect(from).toBe('"Bad Bcc: evil@x.com Church" <no-reply@worship-planner-bc515.web.app>');
+  });
+
+  it("Reply-To = the sending editor's own email (auto-built from requestedByUid)", async () => {
+    fakeEditorEmail = "leader@church.example";
+    const { db } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    expect((mockSend.mock.calls[0][0] as { replyTo?: string }).replyTo).toBe("leader@church.example");
+  });
+
+  it("omits Reply-To when the requesting editor's email cannot be resolved", async () => {
+    fakeEditorEmail = "";
+    const { db } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    expect((mockSend.mock.calls[0][0] as { replyTo?: string }).replyTo).toBeUndefined();
   });
 
   it("carries the exact Resend tags [orgId, serviceId, messageId, recipientId] as the Firestore path segments (Phase 60 webhook contract)", async () => {
