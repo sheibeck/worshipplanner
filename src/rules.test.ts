@@ -320,6 +320,49 @@ describe('orgSlugs — public read, org-editor-scoped create-once claim (WR-01)'
   })
 })
 
+describe('orgNames — public read, org-editor-scoped create-once claim (name uniqueness)', () => {
+  it('allows unauthenticated read of an orgNames doc', async () => {
+    await seedDoc('orgNames/grace church', { orgId: 'orgA' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'orgNames', 'grace church')))
+  })
+
+  it('allows an editor of the target org to create an unclaimed orgNames doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(setDoc(doc(db, 'orgNames', 'grace church'), { orgId: 'orgA' }))
+  })
+
+  it('denies a signed-in user with no membership in the target org from claiming a name for it', async () => {
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(setDoc(doc(db, 'orgNames', 'grace church'), { orgId: 'orgA' }))
+  })
+
+  it('denies a member of a DIFFERENT org from claiming a name for orgA (cross-tenant name-squatting)', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(setDoc(doc(db, 'orgNames', 'grace church'), { orgId: 'orgA' }))
+  })
+
+  it('denies unauthenticated write to orgNames', async () => {
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(setDoc(doc(db, 'orgNames', 'grace church'), { orgId: 'orgA' }))
+  })
+
+  it('denies a second write to an already-claimed orgNames key, even from an editor of the new orgId (first-writer-wins)', async () => {
+    await seedDoc('orgNames/grace church', { orgId: 'orgA' })
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(setDoc(doc(db, 'orgNames', 'grace church'), { orgId: 'orgB' }))
+  })
+})
+
 describe('quarterShares — public read, org-editor-scoped create/update (CR-01)', () => {
   it('allows unauthenticated read of a quarterShares doc', async () => {
     await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })

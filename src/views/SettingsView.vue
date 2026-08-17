@@ -590,6 +590,7 @@ import { useAuthStore } from '@/stores/auth'
 import AppShell from '@/components/AppShell.vue'
 import { validatePcCredentials } from '@/utils/planningCenterApi'
 import { deriveSlug, claimSlug } from '@/utils/slug'
+import { normalizeOrgName, claimOrgName } from '@/utils/orgName'
 import { SLIDE_FONTS, SLIDE_FONT_FAMILY_NAMES } from '@/config/slideFonts'
 import { cssVarsFor, snapWeight, loadFontCss } from '@/utils/slideTypography'
 
@@ -850,6 +851,15 @@ async function onSave() {
 
   try {
     const trimmed = editName.value.trim()
+    // Names are unique across all orgs (owner decision 2026-08-17): claim the
+    // normalized name via the create-only orgNames registry FIRST; a collision
+    // with another org is rejected (claimOrgName is idempotent for our own name,
+    // so re-saving or renaming back to a name we hold is not a false "taken").
+    const claimed = await claimOrgName(normalizeOrgName(trimmed), authStore.orgId)
+    if (!claimed) {
+      saveError.value = 'That name is already taken — try a different one.'
+      return
+    }
     await updateDoc(doc(db, 'organizations', authStore.orgId), { name: trimmed })
     authStore.orgName = trimmed
 

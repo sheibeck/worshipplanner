@@ -27,6 +27,7 @@ import type { OrgSettings } from '@/types/organization'
 import { DEFAULT_ORG_SETTINGS } from '@/types/organization'
 import { SLIDE_FONTS } from '@/config/slideFonts'
 import { loadFontCss, snapWeight } from '@/utils/slideTypography'
+import { normalizeOrgName, claimOrgName } from '@/utils/orgName'
 
 let memberUnsub: Unsubscribe | null = null
 
@@ -399,6 +400,26 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       await batch.commit()
+
+      // Claim a unique org name now that membership exists (isOrgEditor passes).
+      // Best-effort + non-blocking: never fail account creation on it. The default
+      // "<name>'s Church" can collide between two same-named users, so suffix
+      // (" 2", " 3", …) until a name claims, then persist that final name.
+      try {
+        const baseName = `${firebaseUser.displayName || 'My'}'s Church`
+        for (let n = 1; n <= 50; n++) {
+          const candidate = n === 1 ? baseName : `${baseName} ${n}`
+          if (await claimOrgName(normalizeOrgName(candidate), newOrgId)) {
+            if (candidate !== baseName) {
+              await updateDoc(orgRef, { name: candidate })
+            }
+            break
+          }
+        }
+      } catch (err) {
+        console.error('[auth] org name uniqueness claim failed (non-blocking):', err)
+      }
+
       return { membershipCreated: true }
     }
 
