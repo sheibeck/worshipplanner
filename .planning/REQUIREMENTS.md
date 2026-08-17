@@ -244,9 +244,10 @@ part of a numbered phase; recorded here for traceability.
   (`MESSAGE_FROM_ADDRESS`, deploy-config) with the **org name** as the RFC 5322 display name
   (header-sanitized against injection) — and **Reply-To = the sending editor's email** (auto-built,
   needs no domain verification). The church-configured `fromName`/`replyTo` Settings fields are **removed**
-  (a church can't own the sending domain). ⚠ `MESSAGE_FROM_ADDRESS` MUST be overridden at deploy time with
-  an address on a **Resend-verified** domain — the `.web.app` default 403s ("domain not verified") until
-  then. *(commit `9f8ccf3c`; root cause: Resend 403 on unverified per-church From domains)*
+  (a church can't own the sending domain). `MESSAGE_FROM_ADDRESS` default is `onboarding@resend.dev` (Resend's
+  zero-setup test sender — no domain verification, delivers only to the Resend account owner in test mode).
+  **Future fix (backlog): harden to a Resend-verified domain address** so real volunteers receive mail.
+  *(commits `9f8ccf3c` + follow-up; root cause: Resend 403 on unverified per-church From domains)*
 - [x] **R160** — **Unique organization names across all orgs.** New `orgNames/{normalizedName}` create-only
   registry + Firestore rule mirroring the existing `orgSlugs` pattern (slug uniqueness already existed).
   `claimOrgName` is idempotent for an org's own name. Enforced at **rename** (Settings rejects a taken

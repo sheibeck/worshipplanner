@@ -1498,13 +1498,18 @@ export const SERVICE_SHARE_BASE_URL = defineString("SERVICE_SHARE_BASE_URL", { d
  * (see `fromDisplayName`), so this holds only the address — no display name.
  *
  * ⚠ This address's domain MUST be verified in Resend or every send 403s
- * ("domain is not verified"). `*.web.app` is a Google-managed domain with no
- * DNS access, so it CANNOT be verified — override this at deploy time with an
- * address on a domain you've verified (or `onboarding@resend.dev` for testing)
- * to actually deliver. The default is the owner-chosen placeholder for now.
+ * ("domain is not verified"). The default is Resend's zero-setup test sender
+ * `onboarding@resend.dev`, which needs NO domain verification but (in Resend's
+ * test mode) only delivers to the Resend account owner's own email — enough to
+ * validate the send path end-to-end while testing.
+ *
+ * TODO (harden — future fix): replace this default with `no-reply@<a domain you
+ * verified in Resend>` (add its DKIM/SPF DNS records first), or override
+ * MESSAGE_FROM_ADDRESS at deploy time, so real volunteers receive mail. A
+ * `*.web.app` address can never be verified (Google-managed, no DNS access).
  */
 export const MESSAGE_FROM_ADDRESS = defineString("MESSAGE_FROM_ADDRESS", {
-  default: "no-reply@worship-planner-bc515.web.app",
+  default: "onboarding@resend.dev",
 });
 
 /**

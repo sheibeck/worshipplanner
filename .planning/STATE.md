@@ -45,8 +45,11 @@ pre-deploy: client build + `vue-tsc` + functions `tsc` + functions tests all GRE
   Manager (404). Owner sets it (`firebase functions:secrets:set RESEND_WEBHOOK_SECRET`) then deploys it +
   points the Resend dashboard webhook at its URL.
 
-**⚠ To actually DELIVER email:** `MESSAGE_FROM_ADDRESS` must be overridden with an address on a
-**Resend-verified** domain — the `.web.app` default 403s. (`onboarding@resend.dev` works for testing.)
+**Email From (testing):** `MESSAGE_FROM_ADDRESS` default is now `onboarding@resend.dev` (commit after
+`972bdf04`) — Resend's zero-setup sender, needs no domain verification, but in test mode only delivers to
+the Resend account owner's own email. Sends as `"<Org Name>" <onboarding@resend.dev>`. **Future fix (backlog):
+harden to `no-reply@<a Resend-verified domain>`** (add DKIM/SPF DNS) so real volunteers receive mail — a
+`*.web.app` address can never be verified.
 
 ---
 

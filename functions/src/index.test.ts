@@ -41,7 +41,7 @@ let fakeRenderServiceUrl = "";
 // Send-path (59-03) config seams, keyed by defineString NAME below so the
 // three configs don't collide on one shared value.
 let fakeShareBaseUrl = "";
-let fakeMessageFromAddress = "no-reply@worship-planner-bc515.web.app";
+let fakeMessageFromAddress = "onboarding@resend.dev";
 // The email getAuth().getUser(uid) resolves to for sendCopyToSelf.
 let fakeEditorEmail = "editor@example.com";
 
@@ -2546,7 +2546,7 @@ describe("sendQueuedMessageHandler", () => {
     mockSend.mockReset();
     mockSend.mockResolvedValue({ data: { id: "re_fake_id" }, error: null });
     fakeShareBaseUrl = "";
-    fakeMessageFromAddress = "no-reply@worship-planner-bc515.web.app";
+    fakeMessageFromAddress = "onboarding@resend.dev";
     fakeEditorEmail = "editor@example.com";
   });
 
@@ -2587,7 +2587,7 @@ describe("sendQueuedMessageHandler", () => {
     await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
 
     const from = (mockSend.mock.calls[0][0] as { from: string }).from;
-    expect(from).toBe('"Test Church" <no-reply@worship-planner-bc515.web.app>');
+    expect(from).toBe('"Test Church" <onboarding@resend.dev>');
   });
 
   it("From falls back to the BARE address when the org has no name", async () => {
@@ -2597,7 +2597,7 @@ describe("sendQueuedMessageHandler", () => {
     await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
 
     const from = (mockSend.mock.calls[0][0] as { from: string }).from;
-    expect(from).toBe("no-reply@worship-planner-bc515.web.app");
+    expect(from).toBe("onboarding@resend.dev");
   });
 
   it("SECURITY: strips CR/LF and quotes from the org name before the From header (no header injection)", async () => {
@@ -2608,7 +2608,7 @@ describe("sendQueuedMessageHandler", () => {
 
     const from = (mockSend.mock.calls[0][0] as { from: string }).from;
     expect(from).not.toMatch(/[\r\n]/);
-    expect(from).toBe('"Bad Bcc: evil@x.com Church" <no-reply@worship-planner-bc515.web.app>');
+    expect(from).toBe('"Bad Bcc: evil@x.com Church" <onboarding@resend.dev>');
   });
 
   it("Reply-To = the sending editor's own email (auto-built from requestedByUid)", async () => {

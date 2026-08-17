@@ -508,6 +508,16 @@ Plans:
 
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
+### Phase 999.6: Harden messaging From address to a Resend-verified domain (BACKLOG)
+
+Currently `MESSAGE_FROM_ADDRESS` defaults to `onboarding@resend.dev` (Resend's zero-setup test sender) so the
+send path can be tested end-to-end without domain setup — but in test mode it only delivers to the Resend
+account owner's own email, so real volunteers won't receive mail. Harden: verify a real domain in Resend
+(add DKIM/SPF/DMARC DNS records), then set `MESSAGE_FROM_ADDRESS` to `no-reply@<that-domain>` (change the
+`defineString` default or override at deploy). Emails already send as `"<Org Name>" <address>` and set
+Reply-To to the sending editor, so only the address changes. A `*.web.app` address can never be verified
+(Google-managed, no DNS access). Introduced alongside R159 (2026-08-17).
+
 ### Phase 999.5: Multi-org-aware auth claim for Storage membership (BACKLOG)
 
 **Goal:** Widen the org-membership custom auth claim to carry ALL of a user's orgs (and roles), and update `storage.rules`' `isOrgMemberByClaim` to check the requested `orgId` against that set — so a user who belongs to more than one organization retains Storage access to every org, not just their primary.
