@@ -1,21 +1,39 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.8
-milestone_name: Messaging UX & Fixes
+milestone: v1.7
+milestone_name: Volunteer Messaging
+status: Milestone complete — awaiting next milestone
+stopped_at: v1.7 Volunteer Messaging (Phases 58–64, R130–R160) CLOSED & ARCHIVED 2026-08-18; deployed to production 2026-08-17. Combined the internal v1.7 (58–62) + v1.8 (63–64) into one milestone at close (owner decision).
+last_updated: "2026-08-18T13:17:28.553Z"
+last_activity: 2026-08-18
+last_activity_desc: Milestone v1.7 completed and archived (combined 58–64)
+progress:
+  total_phases: 7
+  completed_phases: 7
+  total_plans: 25
+  completed_plans: 25
+  percent: 100
 current_phase: 64
 current_phase_name: Composer Refinements
-status: verification_deferred_human
-stopped_at: v1.8 + post-v1.8 hotfixes (R157–R160) + auto-share-link quick task DEPLOYED to production 2026-08-17 (rules+indexes, 3 messaging functions, hosting). messageWebhook held back (placeholder secret).
-last_updated: "2026-08-17T20:30:00.000Z"
-last_activity: 2026-08-17
-last_activity_desc: DEPLOYED to production — firestore rules+indexes (orgNames rule live), 3 messaging Cloud Functions created, hosting live at worship-planner-bc515.web.app. Owner confirmed emailed links work locally. messageWebhook still held back (placeholder RESEND_WEBHOOK_SECRET; needs real Resend value + webhook setup for bounce tracking). Email delivery still test-mode (onboarding@resend.dev → Resend account owner only) until verified-domain harden (backlog 999.6).
-progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
 ---
+
+## ✅ MILESTONE v1.7 VOLUNTEER MESSAGING — CLOSED & ARCHIVED 2026-08-18
+
+The combined messaging milestone (internal v1.7 Phases 58–62 + v1.8 Phases 63–64, R130–R160) is
+**complete, deployed to production 2026-08-17, and archived** to `milestones/v1.7-*` (ROADMAP,
+REQUIREMENTS, phases). Tagged `v1.7`. Closed on owner acceptance — the `/gsd-verify-work 58..64`
+human-UAT items were accepted as **deferred** (preserved in `PENDING-VERIFICATION.md`), per the
+v1.4/v1.5/v1.6 precedent.
+
+**Everything below this banner is HISTORICAL** — the RESUME/hand-over/autonomy-grant blocks describe the
+build that is now shipped and archived. They are kept for provenance, not as active state.
+
+**Next:** `/gsd-new-milestone` for the next version. Standing owner follow-ups that outlived the
+milestone: verified-domain email harden (backlog 999.6 — email is still test-mode `onboarding@resend.dev`);
+production draft-lock devtools check + the multi-org Storage claim (backlog 999.3 / 999.5).
+
+<details>
+<summary>Historical — v1.7/v1.8 build state prior to the 2026-08-18 close</summary>
 
 ## ★ POST-v1.8 UAT HOTFIXES + PRODUCTION DEPLOY IN PROGRESS (2026-08-17)
 
@@ -24,19 +42,24 @@ fixes, then **authorized a production deploy**. All fixes are implemented, teste
 and **pushed**. Recorded as **R157–R160** in REQUIREMENTS.md / ROADMAP.md.
 
 **Shipped (direct-to-master, each self-tested):**
+
 - `bece0dc4` **R157** — hide the ✉ Messages action-bar button when org Messaging is off.
 - `e866e2f0` **R158** — composer add-someone picker can select the only addable person (controlled placeholder).
 - `9f8ccf3c` **R159** — email From = `"<Org Name>" <no-reply@worship-planner-bc515.web.app>` (app-owned
   sending address + org-name display, header-sanitized) + auto Reply-To = sending editor; removed church
   `fromName`/`replyTo` Settings fields. Root cause: Resend 403 on unverified per-church From domains.
+
 - `972bdf04` **R160** — unique org **names** via new `orgNames` create-only registry + rule (mirrors
   `orgSlugs`); rename rejects a taken name, signup auto-suffixes. Slug uniqueness already existed.
+
 - `d34c56c7` — local-emulator send-path unblock (`functions/.secret.local`, placeholders).
 
 **DEPLOY STATUS — ✅ DEPLOYED to production 2026-08-17** (owner granted deploy permission; assistant ran it).
+
 - ✅ `firebase deploy --only firestore:rules,firestore:indexes` — the new `orgNames` uniqueness rule is LIVE.
 - ✅ `firebase deploy --only functions:queueServiceMessage,functions:sendQueuedMessage,functions:sendScheduledReminders`
   — all three CREATED (first-time), `RESEND_API_KEY` accessor granted to the compute SA.
+
 - ✅ `firebase deploy --only hosting` — 443 files, live at https://worship-planner-bc515.web.app.
 - ✅ `firebase deploy --only functions:messageWebhook` — DEPLOYED 2026-08-17 with the REAL
   `RESEND_WEBHOOK_SECRET` (version 2; version 1 was a placeholder used only to unblock the initial
@@ -96,9 +119,11 @@ known-failing baseline throughout; functions suite green; `npm run type-check` +
 build` clean.
 
 **What shipped (all built/tested; the one functions change — R154 server `{{name}}` — is UNDEPLOYED):**
+
 - **63** Messages tab in the Service Editor holding the per-service Messaging defaults + the "Sent on this
   service" history; the history is now visible when the service is LOCKED (fixed the Phase 60 `canEditService`
   defect). Composer stays an action-bar modal.
+
 - **64** Composer refinements: team labels Band/Vocals/Tech/Other (dropped Worship/Hosts); "+ Add someone"
   is a working visible person picker; live email preview (no click-to-preview); `{{song_list}}` dropped from
   the palette, `{{name}}` per-recipient token added (client + server); Send spinner; the misleading
@@ -108,10 +133,12 @@ build` clean.
   {{service_date}}`, link-only).
 
 **OWNER STEPS:**
+
 1. `/gsd-verify-work 63 64` — the deferred visual/interaction UAT (all in `.planning/PENDING-VERIFICATION.md`).
 2. The R154 `{{name}}` server token takes effect only after the send path is (re)deployed — this FOLDS INTO
    the existing v1.7 send-path deploy (no new command); see the v1.7 hand-over below for the full deploy/secret/
    DNS list.
+
 3. Run the milestone lifecycle (audit → complete → cleanup) for v1.8 — and for v1.7 — once verified + deployed.
 
 **Note:** v1.8 stacked on v1.7 without archiving it; BOTH milestones are code-complete + verified but neither
@@ -431,10 +458,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 62 (Re-lock Change Notice — Scoped Diff) — VERIFIED GREEN (FINAL v1.7 phase; 4/4 plans)
-Plan: 62-04 executed + phase verified (62-VERIFICATION.md = passed, 4/4)
-Status: ★ v1.7 IS CODE-COMPLETE AND ALL 5 PHASES VERIFIED GREEN (58,59,60,61,62). Per the standing grant I STOPPED before the milestone lifecycle (audit/complete/cleanup) — that is the owner's step after verifying + deploying. Owner hand-over below (§ v1.7 MILESTONE HAND-OVER) + the running `/gsd-verify-work 58..62` deferred list in `.planning/PENDING-VERIFICATION.md`.
-Last activity: 2026-08-15 — Phase 62 verified GREEN; v1.7 code-complete, handed to owner
+Phase: Milestone v1.7 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-18 — Milestone v1.7 completed and archived
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 
@@ -2660,3 +2687,5 @@ Resume file: None
 ## Operator Next Steps
 
 - Start the next milestone with /gsd-new-milestone
+
+</details>

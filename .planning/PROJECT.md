@@ -8,62 +8,33 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v1.8 Messaging UX & Fixes
+## Current Milestone: none — v1.7 Volunteer Messaging shipped (awaiting next)
 
-**Goal:** Refine the shipped v1.7 messaging feature from owner UAT — a dedicated Messages tab, a
-delivery history that stays visible when the service locks, roster-matching team labels, a working
-add-individual, a live email preview, corrected merge tokens, a sending spinner, and message types that
-actually seed distinct content. Continues phase numbering (Phases 63–64) and the `R###` scheme
-(R149–R156). **v1.7 remains open** — its send path is UNDEPLOYED and its owner deploy/verify steps are
-tracked in `.planning/PENDING-VERIFICATION.md`; v1.8 stacks on top rather than waiting on that.
-
-**Target changes (from live testing of v1.7 messaging):**
-- **Messages tab** — move the per-service Messaging defaults + "Sent on this service" history out of the
-  Service Order tab into a dedicated tab; the ✉ composer stays an action-bar modal.
-- **History always visible** — fix the Phase 60 defect where the history vanishes once the service locks
-  (it was gated on `canEditService`).
-- **Composer fixes** — Send-To labels mirror Volunteer Roles (Band/Vocals/Tech/Other, dropping
-  Worship/Hosts); "+ Add someone" actually adds an individual; live real-time email preview; remove the
-  `{{song_list}}` token and add a per-recipient `{{name}}` token; a sending spinner; and message types
-  (One-off / Reminder / Share service link) that seed distinct subject/body/recipient defaults.
-
-See `.planning/REQUIREMENTS.md` (v1.8 section, R149–R156) and `.planning/ROADMAP.md` (Phases 63–64).
+The most recent milestone, **v1.7 Volunteer Messaging** (Phases 58–64, R130–R160), shipped and was
+**deployed to production 2026-08-17**, then closed and archived 2026-08-18. Next milestone is scoped
+via `/gsd-new-milestone`.
 
 <details>
-<summary>Previous milestone — v1.7 Volunteer Messaging & Notifications (code-complete + verified GREEN 2026-08-15; owner deploy/verify pending)</summary>
+<summary>Shipped milestone — v1.7 Volunteer Messaging (Phases 58–64, deployed 2026-08-17, archived 2026-08-18)</summary>
 
-**Goal:** Let planners email the volunteers scheduled on a service — targeted messages to teams or
-individuals, automatic notifications when a service is locked/re-locked (with a scoped change diff),
-and a scheduled "here's the link" reminder — all governed by a global on/off switch in Settings.
+**Delivered:** the complete volunteer-messaging system — a Settings kill-switch and org timezone, one
+shared server-side recipient resolver, a ✉ composer (teams-first recipients, merge tokens, live
+"Reaches N", schedule-for-later), per-service delivery history, an HMAC-verified bounce webhook,
+automatic lock and N-days-before scheduled-reminder emails, and a re-lock scoped change diff — all
+governed by a global Settings kill-switch and one queue-then-trigger send primitive holding the Resend
+key server-side. Plus the messaging-UX refinements (dedicated Messages tab, always-visible history,
+live preview, corrected `{{name}}` token) and the post-UAT hotfix batch (R157–R160: hide-when-off,
+add-someone fix, From/Reply-To rework, unique org names).
 
-**Target features:**
-- **Messages composer** — a ✉ Messages button on the service opens a composer whose recipients are
-  **teams first** (Worship, Tech, Vocals, Hosts, "Everyone on this service"), with individuals added
-  below; message types One-off / Reminder / Share service link; subject + body with insertable tokens
-  (service date, service link, their roles, song list); attach-service-order-link, send-me-a-copy, and
-  schedule-for-later options; a live "Reaches N people" recipient count.
-- **Lock notification** — when a service is locked, optionally email everyone assigned (their roles,
-  the song list, and a link to the service order).
-- **Re-lock change notice** — after editing a locked service and re-locking, prompt to notify with a
-  **scoped diff** of what changed (typed SONG / ORDER / ROLE / NOTES / SLIDES entries, each checkable
-  and tagged with affected teams), sending only to affected teams or to everyone; Lock quietly is
-  always available.
-- **Scheduled share-link reminder** — auto-send the shared service link to everyone assigned N days
-  before the service (default 7), skipped while the service is still a draft.
-- **One-off reminders** — ad-hoc reminder emails to chosen teams/individuals.
-- **Delivery history & status** — a per-service "Sent on this service" log with sent counts and
-  **hard-bounce** surfacing (sent + bounces tracking; open-tracking is out of scope for v1.7).
-- **Email infrastructure** — a provider (chosen by research, owner-approved) wired through a backend
-  send path; provider API key lives in `.env.local` and the send function deploys are **owner-gated**.
-- **Settings kill-switch** — turn messaging off entirely from the main Settings screen; per-service
-  automatic-email defaults inherit from Settings.
+**Scope note:** internally tracked as two milestones (v1.7 Phases 58–62, v1.8 Phases 63–64) that
+stacked without archiving between them; shipped together in one production deploy and combined into a
+single v1.7 milestone at close (owner decision 2026-08-18). Full record:
+[milestones/v1.7-ROADMAP.md](milestones/v1.7-ROADMAP.md) ·
+[milestones/v1.7-REQUIREMENTS.md](milestones/v1.7-REQUIREMENTS.md). See MILESTONES.md for the full
+accomplishment list.
 
-**Key context:** Recipients derive from the roles assigned on the service (roster emails from the
-existing Volunteer Role Scheduling / Roles tab) — unassigned roles have no email. Sending mail is a
-backend concern requiring a provider secret in `.env.local` (owner-added) and a Cloud Function deploy
-(owner-gated), consistent with the standing no-deploys / no-`.env.local`-writes rules. Design imported
-from the Claude Design project "Worship Planner Slideshow Design" (canvas *Turn 5 — Messaging
-volunteers*, panels 5a composer / 5b lock + automatic mail + history).
+**Standing follow-ups:** email is still test-mode `onboarding@resend.dev` until the verified-domain
+harden (backlog 999.6); `messageWebhook` bounce tracking is live with the real Resend secret.
 
 </details>
 
@@ -71,16 +42,17 @@ volunteers*, panels 5a composer / 5b lock + automatic mail + history).
 
 **Shipped:** v1.0 MVP (Phases 1–4, 6–7) · v1.1 (Phases 8–17) · v1.2 Worship Service Slide Management
 (Phases 18–23) · v1.3 Slides Tab Rework (Phases 24–28) · v1.4 Service and Slides (Phases 29–38,
-shipped 2026-08-05) · **v1.5 Settings, Sharing, and Fidelity (Phases 39–50, shipped & deployed to
-production 2026-08-10)** — all archived.
+shipped 2026-08-05) · v1.5 Settings, Sharing, and Fidelity (Phases 39–50, shipped 2026-08-10) · v1.6
+Editing Reliability & Song Slides (Phases 51–57, shipped 2026-08-12) · **v1.7 Volunteer Messaging
+(Phases 58–64, shipped & deployed to production 2026-08-17, archived 2026-08-18)** — all archived.
 
-**Open:** v1.7 Volunteer Messaging & Notifications is being scoped (`/gsd-new-milestone`). v1.5
-delivered per-church settings & feature toggles, custom-auth-claim org membership, sharing correctness,
-PPTX rendered-image display, service item types, default service template, ESV/NLT Bible selection,
-global slide typography, congregational reading UX, multi-image/mobile polish, and slide
-bulk-delete/provenance/render-fidelity. Phase 50 was genuinely verified (incl. live R109/R108 in
-production); Phases 39, 43–49 were owner-accepted at milestone close on the basis of the production
-deploy + real-world use.
+**Open:** no active milestone — next is scoped via `/gsd-new-milestone`. v1.7 delivered the full
+volunteer-messaging system (kill-switch + timezone, shared recipient resolver, ✉ composer, delivery
+history + HMAC bounce webhook, lock & scheduled-reminder auto-notifications, re-lock scoped diff,
+dedicated Messages tab, composer refinements, R157–R160 hotfixes). Closed on owner acceptance with the
+`/gsd-verify-work 58..64` human-UAT items accepted as deferred (preserved in `PENDING-VERIFICATION.md`),
+per the v1.4/v1.5/v1.6 precedent. Standing follow-up: email remains test-mode `onboarding@resend.dev`
+until the verified-domain harden (backlog 999.6).
 
 ### v1.4 shipped on owner acceptance, with two things left genuinely unfinished
 
@@ -172,6 +144,7 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Validated
 
+- ✓ Volunteer messaging — Settings kill-switch + org timezone, shared recipient resolver, ✉ composer, delivery history + HMAC bounce webhook, lock & scheduled-reminder auto-notifications, re-lock scoped diff, dedicated Messages tab, composer refinements + From/Reply-To rework + unique org names (R130–R160) — v1.7 (deployed 2026-08-17; archived: `milestones/v1.7-REQUIREMENTS.md`). Owner-accepted at close; human-UAT deferred in `PENDING-VERIFICATION.md`.
 - ✓ Editing reliability, service-template relocation, song-slide splitting, per-item notes + Miscellaneous labels + Scripture version override, preview/export polish, template-editor UX parity (R110–R129) — v1.6 (archived: `milestones/v1.6-REQUIREMENTS.md`)
 - ✓ Import song stable from CSV (Planning Center export) with arrangements, keys, BPM, tags, CCLI numbers — v1.0
 - ✓ Manage song stable in-app (add, edit, categorize, tag team compatibility) — v1.0
@@ -212,35 +185,23 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-<!-- v1.7 Volunteer Messaging & Notifications — scoped 2026-08-13. REQUIREMENTS.md carries the
-     REQ-ID-level detail; this section is the narrative summary. -->
+<!-- No active milestone. v1.7 Volunteer Messaging shipped & archived 2026-08-18. Define the next
+     milestone's requirements via /gsd-new-milestone. -->
 
-**v1.7 — new this milestone**
+_No active milestone — define the next one with `/gsd-new-milestone`._
 
-- [ ] A ✉ Messages button on a service opens a composer whose recipients are teams first
-      (Worship/Tech/Vocals/Hosts/Everyone), with individuals added below
-- [ ] Compose a One-off message, a Reminder, or a Share-service-link message with subject, body, and
-      insertable tokens (service date, link, their roles, song list)
-- [ ] Composer shows a live "Reaches N people" count and options to attach the service-order link,
-      send me a copy, and schedule for later
-- [ ] Locking a service can automatically email everyone assigned (roles, song list, service link)
-- [ ] Re-locking an edited service prompts to notify with a scoped, checkable change diff and sends
-      only to affected teams or to everyone; Lock quietly is always available
-- [ ] The shared service link auto-sends to everyone assigned N days before the service (default 7),
-      skipped while still a draft
-- [ ] A per-service delivery history logs sent messages and surfaces hard bounces
-- [ ] Messaging can be turned off entirely from the main Settings screen; per-service automatic-email
-      defaults inherit from Settings
-- [ ] Email sends through an owner-approved provider via a backend send path (provider key in
-      `.env.local`, deploy owner-gated)
+**Carried forward / backlog (promote with `/gsd-review-backlog` when ready)**
 
-**Carried forward / backlog (not v1.7 scope unless promoted)**
-
-- [ ] Confirm the production draft lock by hand and deploy `firestore.rules` (backlog 999.3 — the
-      deploy is the owner's step)
+- [ ] Harden the messaging From address to a Resend-verified domain so real volunteers receive mail —
+      email is still test-mode `onboarding@resend.dev` (backlog 999.6)
+- [ ] Confirm the production draft lock by hand and re-run the devtools bypass check (backlog 999.3 —
+      `firestore.rules` is deployed; the hand-check is outstanding)
+- [ ] Multi-org-aware auth claim for Storage membership, BEFORE onboarding any multi-org user
+      (backlog 999.5)
 - [ ] Clearing a song should clear its slides, even when the song is reprised (backlog 999.2)
 - [ ] Extract a shared song-browse component used by both the Songs page and the service-plan picker
       (backlog 999.1)
+- [ ] Export non-song/non-scripture slots in ALL Planning Center export modes (backlog 999.4)
 
 ### Out of Scope
 
@@ -343,10 +304,10 @@ Administrative, Communication, Rehearsal, Service time, Training, Physical setup
 | AI gated at the `claudeApi.ts` choke point | All three AI surfaces (song suggestions, scripture discovery, congregational split) already route through one module — the toggle has exactly one place to live, and it doubles as the future paywall seam | — Pending (v1.5) |
 | Blank service template eliminated | Every new service now starts from the org's Suggested Template; a blank starting point was a dead default nobody wanted | — Pending (v1.6) |
 | A split song section is one logical unit | The slides that make up a split section duplicate together and keep one position-based number, so a non-technical user never sees the split leak into numbering or duplication | — Pending (v1.6) |
-| Messaging recipients derive from assigned service roles | Volunteers are already staffed onto a service via the Roles tab with roster emails; teams (Worship/Tech/…) are role groupings, so the composer reuses that data rather than a second contact list — unassigned roles simply have no email | — Pending (v1.7) |
-| v1.7 tracks sent + hard bounces, not opens | Bounce surfacing (via a provider webhook) is what actually prevents silently-lost mail; open-tracking adds pixels/webhook complexity and privacy questions for little planning value — deferred | — Pending (v1.7) |
-| Email provider chosen by research, owner-approved | Provider selection is a cost + deliverability + Firebase-fit decision with a real recurring bill and a secret the owner must add to `.env.local`; the research pass surfaces options and the owner picks | — Pending (v1.7) |
-| Send path is a backend Cloud Function, deploy owner-gated | Provider API keys cannot ship to the client; mail sends through Firebase Functions holding the secret, and per the standing grant every such deploy is handed to the owner, not run autonomously | — Pending (v1.7) |
+| Messaging recipients derive from assigned service roles | Volunteers are already staffed onto a service via the Roles tab with roster emails; teams (Band/Vocals/Tech/Other) are role groupings, so the composer reuses that data rather than a second contact list — unassigned roles simply have no email | ✓ Good — one shared resolver (client + Functions port) shipped v1.7 |
+| v1.7 tracks sent + hard bounces, not opens | Bounce surfacing (via a provider webhook) is what actually prevents silently-lost mail; open-tracking adds pixels/webhook complexity and privacy questions for little planning value — deferred | ✓ Good — HMAC-verified bounce webhook live in production v1.7 |
+| Email provider chosen by research, owner-approved | Provider selection is a cost + deliverability + Firebase-fit decision with a real recurring bill and a secret the owner must add to `.env.local`; the research pass surfaces options and the owner picks | ✓ Good — Resend chosen; deployed v1.7 (email still test-mode until domain verified, backlog 999.6) |
+| Send path is a backend Cloud Function, deploy owner-gated | Provider API keys cannot ship to the client; mail sends through Firebase Functions holding the secret, and per the standing grant every such deploy is handed to the owner, not run autonomously | ✓ Good — key confined to `sendQueuedMessage`; owner deployed 2026-08-17 |
 
 ## Evolution
 
@@ -366,4 +327,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-13 — v1.7 (Volunteer Messaging & Notifications) scoped via `/gsd-new-milestone`. Next: research → requirements → roadmap.*
+*Last updated: 2026-08-18 after v1.7 Volunteer Messaging milestone (Phases 58–64, deployed 2026-08-17, archived 2026-08-18). Next: `/gsd-new-milestone`.*

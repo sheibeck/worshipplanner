@@ -2,147 +2,94 @@
 
 *A living document updated after each milestone. Lessons feed forward into future planning.*
 
-## Milestone: v1.0 — MVP
+## Milestone: v1.7 — Volunteer Messaging
 
-**Shipped:** 2026-03-05
-**Phases:** 6 | **Plans:** 18 | **Commits:** 218
+**Shipped:** 2026-08-18 (deployed to production 2026-08-17)
+**Phases:** 7 (58–64) | **Plans:** 25 | **Tasks:** 41 | **Span:** 5 days (Aug 13→17), 150 commits
 
 ### What Was Built
-- Complete song library with CSV import, VW type categorization, team tags, search & filter
-- Weekly service planning with 9-slot template, progression enforcement, smart suggestion algorithm
-- Print layout, Planning Center text export, and shareable read-only links
-- AI-powered song suggestions and natural language scripture discovery using Claude
-- Team management with email invite flow and editor/viewer RBAC
-- 14 quick-task UX improvements (autosave, hymn slots, infinite scroll, settings, rotation tables)
+- A Settings **messaging kill-switch** (fail-closed, default OFF) + org timezone + per-service
+  automatic-email defaults, and one shared **server-side recipient resolver** (teams → deduped
+  reachable people + unreachable count) reused by every send surface.
+- A ✉ **composer** (teams-first recipients, merge tokens, live "Reaches N", schedule-for-later) over a
+  **queue-then-trigger send primitive** (`queueServiceMessage` → `sendQueuedMessage`) that confines the
+  Resend key to a single Function, with a transactional idempotency claim.
+- Per-service **delivery history** + an **HMAC-verified bounce webhook** (`messageWebhook`, verify-first
+  over the raw body, idempotent hard-bounce), **automatic lock notification** + **N-days-before
+  scheduled reminder** cron in org-local time, and a **re-lock scoped change diff** (typed, team-tagged,
+  checkable) with Lock-quietly and snapshot-overwrite-on-confirm.
+- Messaging-UX refinements: a dedicated **Messages tab**, always-visible history (fixed the Phase 60
+  `canEditService` defect), live email preview, corrected `{{name}}` token — plus a post-UAT hotfix
+  batch (R157–R160): hide-when-off, add-someone fix, From/Reply-To rework, unique org names.
 
 ### What Worked
-- Phase-based execution with clear dependency ordering kept work focused
-- Denormalized Firestore patterns (song snapshots in slots, shareTokens) eliminated N+1 reads
-- Static Tailwind class lookups (not dynamic string interpolation) prevented v4 purge issues — pattern reused in every component with dynamic classes
-- Teleport-to-body pattern for dropdowns/slide-overs solved AppShell overflow stacking consistently
-- AI features designed as additive (never blocking) — graceful null-return on error means the app works without API key
-- Quick tasks provided effective polish between major phases without disrupting phase structure
+- **Rules-first, allow-case-included discipline** (carried from the v1.4 storage.rules incident): every
+  `firestore.rules` change shipped with a genuine emulator ALLOW-case, not only deny-cases.
+- **Deploy-gated Functions built against a mocked provider** landed built/tested/undeployed with the exact
+  deploy command handed over — the whole send path was verifiable before a single real email, and the
+  eventual production deploy (2026-08-17) went in cleanly.
+- **Secret confinement proven by test** (RESEND_API_KEY bound only to `sendQueuedMessage`; resend
+  functions-only, absent from `src/`) — a security property asserted, not assumed.
 
 ### What Was Inefficient
-- Phase 3 ROADMAP shows 4/5 plans but disk shows 5/5 — roadmap wasn't updated when plan 05 completed
-- Phase 5 scope was originally too broad (auth + tasks + events) — auth was extracted to Phase 7, but Phase 5 remains unstarted with just tasks/events
-- Some plan checkboxes in ROADMAP.md were never checked despite plans being complete (cosmetic inconsistency)
-- STATE.md progress tracking fell behind — showed 50% when actual was 100%
+- **Two milestones stacked without archiving** (v1.7 = 58–62, v1.8 = 63–64). Because the standing grant
+  stopped before the lifecycle pending owner deploy/verify, they piled up and had to be **combined at
+  close** — the archival tool counted only the `milestone:` marker's 5 phases and had to be corrected by
+  hand to 7 phases / 25 plans, with the 63/64 and hotfix accomplishments added manually.
+- A composer **success-toast misrender** (Phase 59) surfaced in owner UAT and was fixed in the v1.8/hotfix
+  wave rather than caught in-phase — the phase's closed scope deliberately didn't auto-fix it.
+- Deploy friction: firebase-tools needs declared secrets present across the **whole** codebase and dotenv
+  values (not `defineString` defaults) at deploy time — the `messageWebhook` secret and
+  `SERVICE_SHARE_BASE_URL`/`MESSAGE_FROM_ADDRESS` params each cost a round of diagnosis.
 
 ### Patterns Established
-- Dark mode canonical palette: gray-950 body, gray-900 cards/sidebar, gray-800 inputs
-- Pinia stores subscribe via onSnapshot (not VueFire composables)
-- Static class lookup objects for Tailwind v4 purge safety
-- Teleport to body for z-index escape from AppShell overflow
-- signInWithPopup preferred over signInWithRedirect
-- AI functions return null on error, never throw
-- orgId/userRole centralized in auth store — no ad-hoc getDoc calls
+- **Queue-then-trigger send** (onCall enqueue with no secret → onDocumentCreated sender holding the
+  secret, transactional status claim for idempotency) is the reusable shape for any future provider send.
+- **Verify-first webhook**: HMAC over the raw request body before any Firestore access; 401/400 + zero
+  writes on a bad request; idempotent state overwrite on duplicate delivery.
+- **Deferred-verification close on owner acceptance** (v1.4/v1.5/v1.6/v1.7): human-UAT items preserved in
+  `PENDING-VERIFICATION.md`, never recorded as passed — the milestone archives with the deferrals intact.
 
 ### Key Lessons
-1. Denormalize early for Firestore — read-time joins are expensive and complex
-2. VW type as soft priority signal (+100 bonus) works better than hard filter — lets planners see all songs with smart ordering
-3. Autosave with debounce + one-step undo is worth the complexity over explicit save buttons
-4. Team filtering with AND logic (song must support ALL active teams) is the correct semantic
+1. **A standing "stop before lifecycle" grant plus a stacking follow-up milestone = un-archived debt.**
+   When a second milestone builds on an un-closed one, decide the archival story early (combine vs. close
+   the base first) rather than at the end — the tool archives by the single `milestone:` marker and will
+   undercount a combined close.
+2. **`onboarding@resend.dev` unblocks the send path but is not shippable** — test-mode only delivers to
+   the Resend account owner. A zero-setup sender is great for proving the pipe end-to-end, but "real
+   volunteers receive mail" is a separate, DNS-gated task (backlog 999.6). Don't let the working pipe read
+   as a working feature.
+3. **Deploy-time config lives in dotenv, not code defaults** — firebase-tools validates every declared
+   secret across the codebase and won't read a `defineString` default; record the exact prod param values
+   with the deploy runbook so the next deploy isn't a rediscovery.
 
 ### Cost Observations
-- Model mix: primarily opus for planning/execution, haiku for AI suggestions in-app
-- Sessions: ~20+ across 2 days
-- Notable: Entire v1.0 MVP built in 2 calendar days with 218 commits
+- Model mix: predominantly opus (autonomous multi-phase execution under the v1.7/v1.8 grants).
+- Notable: building all deploy-gated Functions against a mocked provider up front (vs. waiting on owner
+  deploy) kept the autonomous run unblocked across 7 phases without a single production side effect until
+  the owner's one-shot deploy.
 
 ---
-
-## Milestone: v1.5 — Settings, Sharing, and Fidelity
-
-**Shipped:** 2026-08-10 (deployed to production) · **Phases:** 13 (39–50) · **Plans:** 49 · **Tasks:** ~110
-
-### What Was Built
-Per-church settings + feature toggles (AI, Planning Center, Vertical Worship), custom-auth-claim org
-membership with a dual-read migration path, sharing correctness (one stable share link per service,
-auto-refreshed), client display of server-rendered PPTX images, service item types + default service
-template, ESV/NLT Bible selection with immutable per-slide attribution, global slide typography,
-hand-divided congregational reading UX, multi-image ordering + mobile polish, and slide
-bulk-delete / render-stable provenance / render fidelity.
-
-### What Worked
-- **Deploy-then-verify closed the loop cheaply.** R109's cache header was deploy-gated; deploying and
-  inspecting real production `Cache-Control` headers turned a "human-verify later" item into a
-  same-session confirmation — and caught a genuine design gap (WR-01) before it shipped ineffective.
-- **Code review as a real gate.** The Phase 50 review's WR-01 finding (a LOCKED `/index.html`-only
-  header that Firebase never applies to `/` or deep links) was fixed before close rather than deferred.
-- **Owner-attributed close, honestly recorded.** 7 phases with deferred human-verify were accepted on
-  the basis of production use — recorded as `owner-attributed`, never silently marked self-verified.
-
-### What Was Inefficient
-- **Verification/UAT status vocabulary drift.** UAT terminal status is `complete`/`resolved` but the
-  work used `passed`; verification used `human_needed` long after phases were deployed. The pre-close
-  audit surfaced 18 "open" items that were nearly all already done — a status-hygiene tax, not real work.
-- **Quick-task hygiene.** 11 of 14 "incomplete" quick tasks were actually done but lacked a
-  `status: complete` in their SUMMARY; 3 were delivered by later work with no SUMMARY at all.
-
-### Key Lessons
-- A deploy-gated check is verifiable the moment you deploy — don't defer what a header inspection can confirm.
-- "A test/claim explained away as environment-limited is an untested assertion" held again: the
-  `/index.html`-only header *looked* fine and *tested* green while not achieving its own requirement.
-- Set a terminal `status:` on quick-task summaries and flip UAT/verification status at completion, or
-  milestone-close audits inherit a large false-positive backlog.
-
-### Cost Observations
-- Executors ran on Sonnet (sequential, worktrees auto-degraded due to HEAD ahead of origin); orchestration + reviews on Opus.
-- One production deploy (`firebase deploy --only hosting,functions`), owner-authorized.
-
-## Milestone: v1.6 — Editing Reliability & Song Slides
-
-**Shipped:** 2026-08-12
-**Phases:** 7 (51–57) | **Plans:** 19
-
-### What Was Built
-Drag-and-drop editing reliability (cross-section phantom, "No Section" save error, empty-body order)
-in both editors; service-template relocation to the Services page; hand-split song slides (+ Pre-Chorus,
-position-derived numbering, "Save" rename); per-item notes; a full Service Order redesign (three-rail
-rows, colored badges, per-row ⋯ menu, "No Section" band) applied to both the service and template
-editors; per-item Miscellaneous labels (inline-editable badge) and a Scripture ESV/NLT override;
-preview/export polish (no auto-version, export spinner, Roboto). Closed a 3rd-recurrence Firestore
-delete bug (`resource == null` on a never-materialized slideGroup).
-
-### What Worked
-- Autonomous run (`--from 56 --to 57`) drove discuss→plan→execute cleanly for the owner scope addition.
-- A Claude Design mockup imported via DesignSync gave a concrete visual target for the Service Order
-  redesign, cutting design ambiguity.
-- Adversarial emulator reproduction finally root-caused the recurring delete bug that two prior
-  field-shape fixes had missed — the lesson being "a test explained away as an environment quirk is an
-  untested assertion" applied to the missing `resource == null` case.
-- Shared helpers (`kindBadgeClass`, `miscLabel`, `MiscLabelBadge`) extracted so the two editors can't drift.
-
-### What Was Inefficient
-- Rapid-fire owner UI tweaks arrived after 56/57 as many small follow-ups; each needed its own
-  build/test/commit cycle rather than being batched into the phases.
-- The MISC label went through three shapes (separate input → editable badge) as the UX was refined live.
-
-### Key Lessons
-- For a security rule that "fails only in the emulator," reproduce the exact production shape before
-  declaring it an environment quirk — the delete bug hid behind that assumption twice.
-- Slot the version selector into the child (ScriptureInput) rather than floating a sibling, so it can
-  share the child's live `effectiveVersion` for both the link and the fetch.
-
-### Cost Observations
-- Autonomous phase execution + the delete-bug debug on Sonnet subagents; orchestration + design import + UI tweaks on Opus.
-- Two owner-authorized production deploys (firestore.rules, then hosting at close).
 
 ## Cross-Milestone Trends
 
 ### Process Evolution
 
-| Milestone | Commits | Phases | Key Change |
-|-----------|---------|--------|------------|
-| v1.0 | 218 | 6 | Initial build — established all patterns |
-
-### Cumulative Quality
-
-| Milestone | LOC | Quick Tasks | Known Gaps |
-|-----------|-----|-------------|------------|
-| v1.0 | 12,747 | 14 | Phase 5 (Tasks & Events) deferred |
+| Milestone | Phases | Key Change |
+|-----------|--------|------------|
+| v1.4 | 10 | `workflow.verifier` enabled (2026-07-28) — first milestone with real per-phase VERIFICATION.md |
+| v1.5 | 13 | Autonomous run with deferred human-verify; deploy-gated security work (custom auth claim) built undeployed |
+| v1.6 | 7 | Client-side reliability milestone; owner-attributed close, deployed same day |
+| v1.7 | 7 | First messaging/backend-send milestone; deploy-gated Functions built against a mocked provider, one owner deploy at close; two stacked milestones combined at archive |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Static Tailwind class lookups prevent v4 purge — confirmed across 5+ components
-2. Firestore denormalization pays off at read time — confirmed across songs, services, shareTokens
+1. **A test explained away as an environment quirk is an untested assertion** (v1.4 storage.rules → v1.5
+   rules-first discipline → v1.7 allow-case + secret-confinement tests). Make the assertion runnable, not
+   a comment.
+2. **Deploy-gated work ships built/tested/undeployed with the exact command handed over** (v1.4 PPTX
+   render → v1.5 auth claim → v1.7 send path). The autonomous run stays unblocked; the owner owns the
+   irreversible step.
+3. **Close on owner acceptance with deferrals preserved, never self-approved** (v1.4→v1.7). Deferred
+   human-UAT lives in `PENDING-VERIFICATION.md` so any later defect traces to the check that would have
+   caught it.
