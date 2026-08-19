@@ -543,7 +543,7 @@ describe('useQuartersStore', () => {
       expect(data.updatedAt).toBeDefined()
     })
 
-    it('reciprocally adds this person to a newly paired partner who did not previously list them', async () => {
+    it('does NOT touch a newly paired partner (one-way): pairing is not mirrored onto the partner', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useQuartersStore } = await import('../quarters')
       const store = useQuartersStore()
@@ -558,22 +558,20 @@ describe('useQuartersStore', () => {
       })
 
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
-      // dean had no prior entry — should be seeded whole with defaults and julia in pairedWith
-      const deanEntry = data['personQuarterData.dean'] as
-        | { pairedWith: string[] }
-        | undefined
-      const deanPairedPath = data['personQuarterData.dean.pairedWith'] as string[] | undefined
-      const deanPairedWith = deanEntry?.pairedWith ?? deanPairedPath
-      expect(deanPairedWith).toContain('julia')
+      // One-way: adding dean to julia's list must NOT write anything to dean's entry.
+      expect(data['personQuarterData.dean']).toBeUndefined()
+      expect(data['personQuarterData.dean.pairedWith']).toBeUndefined()
     })
 
-    it('reciprocally removes this person from a dropped partners pairedWith without touching other fields', async () => {
+    it('does NOT touch a dropped partner (one-way): removing a partner only edits this persons list', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useQuartersStore } = await import('../quarters')
       const store = useQuartersStore()
       store.subscribe('org-1')
-      seedJuliaPairedWithLisa()
+      seedJuliaPairedWithLisa() // julia.pairedWith === ['lisa'], lisa.pairedWith === ['julia']
 
+      // Drop lisa from julia's list. Under one-way pairing lisa's own entry (incl. her
+      // pairedWith → julia) must be left completely untouched.
       await store.setPersonAvailability('quarter-1', 'julia', {
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
@@ -582,8 +580,7 @@ describe('useQuartersStore', () => {
       })
 
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
-      expect(data['personQuarterData.lisa.pairedWith']).toEqual([])
-      // scoping: partner remove must only touch pairedWith, never rewrite lisa's whole entry
+      expect(data['personQuarterData.lisa.pairedWith']).toBeUndefined()
       expect(data['personQuarterData.lisa']).toBeUndefined()
     })
 
@@ -629,13 +626,12 @@ describe('useQuartersStore', () => {
         roleFrequency: { vocals: { tier: 'out', n: 4 }, guitar: { tier: 'regular', n: 4 } },
       })
       expect(data.personQuarterData).toBeUndefined()
-      // scoping: only julia's own write is affected — lisa's entry is untouched by this call
-      // (pairing-diff writes are covered by the tests above; assert they still apply unchanged)
+      // scoping: only julia's own write is affected — no partner entry is touched (one-way).
       expect(Object.keys(data)).not.toContain('personQuarterData')
     })
 
-    // D-05 gap closure (15-07): the reciprocal 'added' write must not silently erase an
-    // already-tuned partner's roleFrequency by reconstructing their whole PersonQuarterData.
+    // One-way pairing writes nothing to a partner, so a partner's tuned roleFrequency (or any
+    // other field) is inherently safe — there is no reciprocal write that could clobber it.
     function seedJuliaAndDeanWithRoleFrequency() {
       triggerQuartersSnapshot([
         makeQuarterDoc({
@@ -659,7 +655,7 @@ describe('useQuartersStore', () => {
       ])
     }
 
-    it('existing-entry reciprocal write uses a scoped pairedWith-only sub-path, preserving the partners tuned roleFrequency (D-05 gap closure)', async () => {
+    it('leaves an existing partners entry (incl. tuned roleFrequency) fully untouched — no reciprocal write (one-way)', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useQuartersStore } = await import('../quarters')
       const store = useQuartersStore()
@@ -674,12 +670,13 @@ describe('useQuartersStore', () => {
       })
 
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
-      // Scoped sub-path only — a whole-object replace here would silently drop dean's roleFrequency.
-      expect(data['personQuarterData.dean.pairedWith']).toEqual(['julia'])
+      // No write to dean at all — neither a scoped sub-path nor a whole-object replace — so
+      // dean's tuned roleFrequency cannot be affected by julia pairing to him.
+      expect(data['personQuarterData.dean.pairedWith']).toBeUndefined()
       expect(data['personQuarterData.dean']).toBeUndefined()
     })
 
-    it('brand-new-partner reciprocal write seeds a complete PersonQuarterData entry with blackoutDates initialized, not a pairedWith-only partial (D-05 gap closure)', async () => {
+    it('does not seed a brand-new partner entry when paired (one-way)', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useQuartersStore } = await import('../quarters')
       const store = useQuartersStore()
@@ -694,15 +691,8 @@ describe('useQuartersStore', () => {
       })
 
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
-      expect(data['personQuarterData.dean']).toEqual({
-        personId: 'dean',
-        blackoutDates: [],
-        pairedWith: ['julia'],
-        roleFrequency: {},
-        note: '',
-      })
-      // Must not be a partial pairedWith-only sub-path write — that would leave
-      // blackoutDates undefined and crash downstream unguarded .blackoutDates.includes() reads.
+      // One-way: julia listing dean must not fabricate an entry for dean.
+      expect(data['personQuarterData.dean']).toBeUndefined()
       expect(data['personQuarterData.dean.pairedWith']).toBeUndefined()
     })
   })

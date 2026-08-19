@@ -50,7 +50,8 @@ export interface RoleFrequencyEntry {
 export interface PersonQuarterData {
   personId: string
   blackoutDates: string[] // expanded YYYY-MM-DD list (D-17 ranges already expanded against serviceDates)
-  pairedWith: string[] // Person.id[], bidirectional — must-serve-with pairings (D-09)
+  pairedWith: string[] // Person.id[], directional — people THIS person must serve with; the
+  // scheduler pulls them in when this person serves. One-way: not mirrored onto the partner (D-09)
   /** Quarter-scoped, per-role, single source of truth (D-04/D-05) — one control, one
    *  lookup, one field per held role. Default when a role entry is absent:
    *  { tier: 'regular', n: 4 }. */

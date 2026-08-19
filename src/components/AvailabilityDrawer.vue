@@ -163,7 +163,7 @@
           <!-- Must serve with -->
           <section class="border-t border-gray-800 pt-5">
             <h3 class="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
-              Must serve with <span class="font-normal normal-case text-gray-600">bidirectional — both get scheduled together</span>
+              Must serve with <span class="font-normal normal-case text-gray-600">one-way — when this person serves, these people are pulled in too</span>
             </h3>
             <div class="relative">
               <input

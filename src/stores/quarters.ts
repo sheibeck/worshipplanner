@@ -212,12 +212,16 @@ export const useQuartersStore = defineStore('quarters', () => {
     await updateQuarter(quarterId, { personQuarterData })
   }
 
-  // D-03/D-05/D-06: single-person quarter-data save from the availability drawer. Writes only
-  // scoped `personQuarterData.${id}` / `personQuarterData.${id}.pairedWith` dot-paths — never the
-  // whole `personQuarterData` map — so concurrent edits to other people's entries aren't clobbered
-  // (T-14-03-01). Performs a symmetric added/removed diff against the *previous* pairedWith so a
-  // dropped partner is reciprocally un-paired, not just left as a stale one-directional link
-  // (T-14-03-02 / 14-RESEARCH Pitfall 2).
+  // D-03/D-05/D-06: single-person quarter-data save from the availability drawer. Writes ONLY
+  // the scoped `personQuarterData.${id}` dot-path — never the whole `personQuarterData` map — so
+  // concurrent edits to other people's entries aren't clobbered (T-14-03-01).
+  //
+  // Pairing is ONE-WAY (directional): `pairedWith` on this person is the list of people THEY
+  // must serve with (the scheduler pulls those partners in when this person is scheduled — see
+  // propagatePairing in scheduler.ts, which follows each person's OWN pairedWith). This save
+  // therefore touches only this person's entry: no reciprocal write is mirrored onto a partner,
+  // so "Nolan must serve with Tim" does not imply "Tim must serve with Nolan". Removing a partner
+  // here likewise only edits this person's list, leaving the partner's own record untouched.
   async function setPersonAvailability(
     quarterId: string,
     personId: string,
@@ -232,48 +236,10 @@ export const useQuartersStore = defineStore('quarters', () => {
     },
   ): Promise<void> {
     if (!orgId.value) return
-    const quarter = getQuarter(quarterId)
-    const previous = quarter.personQuarterData[personId]?.pairedWith ?? []
-    const added = data.pairedWith.filter((id) => !previous.includes(id))
-    const removed = previous.filter((id) => !data.pairedWith.includes(id))
 
     const updates: Record<string, unknown> = {
       [`personQuarterData.${personId}`]: { personId, ...data },
       updatedAt: serverTimestamp(),
-    }
-    for (const partnerId of added) {
-      const existingPartnerData = quarter.personQuarterData[partnerId]
-      const partnerPaired = existingPartnerData?.pairedWith ?? []
-      if (!partnerPaired.includes(personId)) {
-        if (existingPartnerData) {
-          // D-05 gap closure: partner already has an entry (possibly with tuned roleFrequency) —
-          // write ONLY the scoped pairedWith sub-path so every other field, including
-          // roleFrequency, is left untouched. A whole-object replace here would silently erase
-          // the partner's tuned per-role cadence (this is a Firestore field replacement, not
-          // a merge).
-          updates[`personQuarterData.${partnerId}.pairedWith`] = [...partnerPaired, personId]
-        } else {
-          // Brand-new partner — no prior entry exists, so there is nothing to preserve.
-          // Seed a complete, well-formed PersonQuarterData with defaults so downstream
-          // unguarded `.blackoutDates.includes(date)` reads (QuarterGrid.vue, scheduler.ts)
-          // never see a partial doc.
-          updates[`personQuarterData.${partnerId}`] = {
-            personId: partnerId,
-            blackoutDates: [],
-            pairedWith: [personId],
-            roleFrequency: {},
-            note: '',
-          }
-        }
-      }
-    }
-    for (const partnerId of removed) {
-      const partnerData = quarter.personQuarterData[partnerId]
-      if (partnerData) {
-        updates[`personQuarterData.${partnerId}.pairedWith`] = partnerData.pairedWith.filter(
-          (id) => id !== personId,
-        )
-      }
     }
     await updateDoc(doc(db, 'organizations', orgId.value, 'quarters', quarterId), updates)
   }

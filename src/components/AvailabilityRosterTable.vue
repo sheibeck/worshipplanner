@@ -241,6 +241,6 @@ function firstName(id: string): string {
 function pairSummary(person: Person): string {
   const pairedWith = quarterDataFor(person).pairedWith
   if (pairedWith.length === 0) return ''
-  return '↔ ' + pairedWith.map((id) => firstName(id)).join(', ')
+  return '→ ' + pairedWith.map((id) => firstName(id)).join(', ')
 }
 </script>
