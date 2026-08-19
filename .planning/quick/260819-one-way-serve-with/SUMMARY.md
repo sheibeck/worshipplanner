@@ -42,7 +42,12 @@ is removed.
 - Full app suite: green at the documented 2-file baseline (storage.rules.test.ts,
   RosterView.test.ts — pre-existing, unrelated).
 
-## Owner follow-up — production data (LIVE, do this AFTER deploy)
+## Status: shipped + deployed + data split (2026-08-19)
+
+Deployed to production hosting on 2026-08-19. Owner completed both live-data splits
+in the UI (removed Nolan from Tim, removed Lilly from Gabriel). Loop fully closed.
+
+## Owner follow-up — production data (LIVE, do this AFTER deploy) — DONE
 
 The code touches **zero** production records. The existing two-way pairs in the
 live DB (Tim↔Nolan, Gabriel↔Lilly) are each stored on both people. Once this fix
