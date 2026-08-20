@@ -48,7 +48,7 @@ REQ-IDs continue from v1.8 (last R173).
       ceiling), and the messaging/fan-out knobs (`SCHEDULED_MESSAGING_CRON_ENABLED`, message recipient cap,
       per-org daily email quota).
 
-- [ ] **R181**: The Cloud Functions read each managed value from `appConfig/global` at runtime; changing a
+- [x] **R181**: The Cloud Functions read each managed value from `appConfig/global` at runtime; changing a
       value in the console takes effect **without a redeploy**.
 
 - [x] **R182**: A missing or empty `appConfig/global` doc reproduces today's exact behavior — code defaults
@@ -62,7 +62,7 @@ REQ-IDs continue from v1.8 (last R173).
       AI model allow-list fail **closed** (off / restrictive), AI rate limits fail **open** but with capped
       fallback values — never a single blanket all-permissive or all-restrictive default.
 
-- [ ] **R185**: The instance-ceiling knobs (`AI_PROXY_MAX_INSTANCES`, `GLOBAL_MAX_INSTANCES`, render-service
+- [x] **R185**: The instance-ceiling knobs (`AI_PROXY_MAX_INSTANCES`, `GLOBAL_MAX_INSTANCES`, render-service
       caps) remain deploy-time config and are **not** presented as live-editable; if surfaced in the console
       they are read-only and labeled "requires redeploy." *(Cloud Functions v2 reads them at module load.)*
 
@@ -147,11 +147,11 @@ REQ-IDs continue from v1.8 (last R173).
 | R178 | Phase 68 | Complete (UAT deferred) |
 | R179 | Phase 68 | Complete (UAT deferred) |
 | R180 | Phase 69 | Complete |
-| R181 | Phase 69 | Pending |
+| R181 | Phase 69 | Complete |
 | R182 | Phase 69 | Complete |
 | R183 | Phase 69 | Complete |
 | R184 | Phase 69 | Complete |
-| R185 | Phase 69 | Pending |
+| R185 | Phase 69 | Complete |
 | R186 | Phase 70 | Pending |
 | R187 | Phase 70 | Pending |
 | R188 | Phase 71 | Pending |

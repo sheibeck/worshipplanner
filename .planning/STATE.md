@@ -5,15 +5,15 @@ milestone_name: Owner Admin Console
 current_phase: 69
 current_phase_name: firestore-runtime-config
 status: executing
-stopped_at: Completed 69-01-PLAN.md
-last_updated: "2026-08-20T17:25:33.990Z"
+stopped_at: Completed 69-02-PLAN.md
+last_updated: "2026-08-20T18:12:52.047Z"
 last_activity: 2026-08-20
 last_activity_desc: Phase 69 execution started
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 25
 ---
 
@@ -668,7 +668,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 69 (firestore-runtime-config) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-08-20 — Phase 69 execution started
 
@@ -2246,6 +2246,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 68 P02 | 8min | 2 tasks | 5 files |
 | Phase 68 P05 | 6min | 1 tasks | 1 files |
 | Phase 69-firestore-runtime-config P01 | 22min | 2 tasks | 2 files |
+| Phase 69 P02 | 40min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2623,6 +2624,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Phase 68 Plan 05: mirrored DEPLOY-ORG-CLAIMS.md structure for functions/DEPLOY-SUPER-ADMIN.md; split rules deploy and Functions deploy into two independent steps; consolidated all deferred R176/R177/R179 UAT items from Plans 02-04 into one owner-facing section
 - [Phase ?]: coerceConfigNumber rejects negative values in addition to NaN/Infinity/non-numeric (fail-open-capped extends to negatives, per plan's own R184 test spec)
 - [Phase ?]: sender.fromName defined in AppConfig schema now but dormant this phase (Phase 70 forward-compat); sender.fromAddress wired in Plan 02
+- [Phase ?]: 69-02: kept the six env-wrapper helpers (readAiProxyLimits/readDeleteCap/readMediaRetentionDays/readOrphanRenderStaleHours/readBackgroundRetentionDays/readPptxSourceRetentionDays) as thin passthroughs over a resolved AppConfig rather than deleting-and-inlining, minimizing diff/test churn
+- [Phase ?]: 69-02: MESSAGE_FROM_ADDRESS defineString removed outright (declaration + read-site + all comment references) in favor of config.sender.fromAddress; sender.fromName stays dormant, per-message display name remains the org's own name (R159 unchanged)
 
 ### Roadmap Evolution
 
@@ -2942,8 +2945,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T17:25:33.937Z
-Stopped at: Completed 69-01-PLAN.md
+Last session: 2026-08-20T18:12:51.978Z
+Stopped at: Completed 69-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
