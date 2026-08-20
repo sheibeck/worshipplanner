@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: Owner Admin Console
-current_phase: 69
-current_phase_name: firestore-runtime-config
-status: verifying
-stopped_at: Completed 69-03-PLAN.md
+current_phase: 70
+current_phase_name: admin-console-ui
+status: planning
+stopped_at: Phase 69 code-complete + auto-verified (human UAT deferred /gsd-verify-work 69); advancing to Phase 70
 last_updated: "2026-08-20T18:19:18.455Z"
 last_activity: 2026-08-20
-last_activity_desc: Phase 69 execution started
+last_activity_desc: Phase 69 code-complete (verification deferred), advancing to Phase 70
 progress:
   total_phases: 4
   completed_phases: 2
@@ -76,6 +76,7 @@ re-entry these phases are dropped from the run queue and resumed only via the re
 | Phase | State | Resume |
 |-------|-------|--------|
 | 68 | verification_deferred_human | /gsd-verify-work 68 |
+| 69 | verification_deferred_human | /gsd-verify-work 69 |
 
 **Phase 68 (Super-Admin Access Gate & Claim-Merge Fix)** — code-complete + automatically verified 5/5 SC
 on 2026-08-20 (functions 397/397, functions build clean, root type-check clean, rules ALLOW/DENY 6/6 vs a

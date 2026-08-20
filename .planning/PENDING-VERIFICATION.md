@@ -564,3 +564,18 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 **Owner deploy hand-over (from `functions/DEPLOY-SUPER-ADMIN.md`):** `firebase deploy --only firestore:rules` · `firebase deploy --only functions:syncSuperAdminClaim,functions:setSuperAdminClaim` · then the bootstrap `--apply`.
 
 **Owner infra check flagged for before Phase 71's live deletion toggles ship:** confirm Cloud Storage Object Versioning / bucket retention is enabled as a delete safety-net (this milestone's code can't verify it).
+
+---
+
+## Phase 69 — Firestore Runtime Config (v1.9) — `verification_deferred_human`
+
+**Code-complete + automatically verified 2026-08-20** (verifier ran every gate: `cd functions && npm test` 419/419 after review fixes; `cd functions && npm run build` clean; `npm run type-check` clean; app baseline held; grep confirms only `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` remain `process.env`; `MESSAGE_FROM_ADDRESS` fully removed). R190 `cleanupOrphanBackgrounds` fail-safe block byte-identical (diff-confirmed). Code review: 0 Critical; the api-proxy/send fail-open Warning + Info fixed. Test-count delta (428→416→419) audited: no coverage lost (24 redundant coercion tests moved to `appConfig.test.ts`'s 29; 12 behavioral tests preserved 1:1; +3 fail-open tests added). **Nothing deployed** — functions ship built/tested/UNDEPLOYED (`functions/DEPLOY-RUNTIME-CONFIG.md`).
+
+**What only a human at `/gsd-verify-work 69` can confirm — do NOT mark passed:**
+
+1. **R181 — live no-redeploy change:** after the owner deploys the 7 managed functions + Phase 68 rules, write a value to `appConfig/global` (e.g. flip an AI rate limit or a retention window) and confirm a hot-path handler and a cron reflect it **without a redeploy**.
+2. **R183 — real cross-instance TTL staleness:** confirm a hot-path change is picked up within ~60s (the TTL window) and a cron/emergency-disable takes effect on the very next scheduled run. (Unit-proven with fake timers; real warm-instance timing is a live behavior.)
+
+**Owner deploy hand-over (`functions/DEPLOY-RUNTIME-CONFIG.md`):** deploy the Phase 68 `firestore.rules` (appConfig/superAdmins gate) first/together, then `firebase deploy --only functions:api,functions:cleanupExpiredMedia,functions:cleanupOrphanRenders,functions:cleanupOrphanBackgrounds,functions:cleanupPptxSources,functions:sendScheduledReminders,functions:sendQueuedMessage`. Behavior-neutral until a value is written to `appConfig/global` (defaults-merge). `RESEND_API_KEY` stays a server secret — never in the config doc.
+
+**Carry-forward note for Phase 70 (from review Info-2):** the numeric config knobs have no UPPER bound in `appConfig.ts` coercion — the Phase 70 admin form should enforce sensible min/max on each field (defense-in-depth; the rules gate WHO writes, not WHAT magnitude).

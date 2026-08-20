@@ -296,7 +296,7 @@ only transient slideshow backgrounds tied to a service. This guarantee must surv
 (closed by Phase 71 / R190).
 
 - [x] **Phase 68: Super-Admin Access Gate & Claim-Merge Fix** — ✅ code-complete + automatically verified 2026-08-20 (5/5 SC; human UAT deferred to `/gsd-verify-work 68`, UNDEPLOYED owner hand-over). A super-admin custom-claim gate, grantable via `superAdmins/{uid}`, enforced by both the client route and claim-only Firestore rules, with the shared merge-and-set helper closing the claim-replace hazard
-- [ ] **Phase 69: Firestore Runtime Config** - The v1.8 cost/cleanup/messaging knobs move into an admin-only `appConfig/global` doc Cloud Functions read at runtime, with safe deep-merged defaults and per-knob fail-open/closed behavior
+- [x] **Phase 69: Firestore Runtime Config** — ✅ code-complete + auto-verified 2026-08-20 (8/8 code SC; human UAT R181/R183 deferred to `/gsd-verify-work 69`, UNDEPLOYED owner hand-over). The v1.8 cost/cleanup/messaging knobs move into an admin-only `appConfig/global` doc Cloud Functions read at runtime, with safe deep-merged defaults and per-knob fail-open/closed behavior
 - [ ] **Phase 70: Admin Console UI & No-Reply Sender** - A super-admin console showing/editing every managed setting with validation and provenance, plus the app's no-reply sender configuration
 - [ ] **Phase 71: Cleanup Deletion-Toggle Safety** - A dry-run blast-radius preview and explicit confirm step gate every `*_CLEANUP_ENABLED` flip, with the song-linked-background fail-safes proven intact
 
@@ -393,7 +393,7 @@ deploy command handed to the owner. The owner runs the first-super-admin bootstr
 | 66 | v1.8 | 2/2 | Complete    | 2026-08-20 |
 | 67 | v1.8 | 2/2 | Complete    | 2026-08-20 |
 | 68 | v1.9 | 5/5 | Code-complete (UAT deferred) | 2026-08-20 |
-| 69 | v1.9 | 3/3 | In Progress|  |
+| 69 | v1.9 | 3/3 | Code-complete (UAT deferred) | 2026-08-20 |
 | 70 | v1.9 | 0/? | Not started | - |
 | 71 | v1.9 | 0/? | Not started | - |
 
