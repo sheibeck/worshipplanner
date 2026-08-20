@@ -102,11 +102,37 @@
         <p v-if="actionError" class="text-red-400 text-sm mt-3">{{ actionError }}</p>
       </div>
 
-      <!-- Platform configuration — placeholder section/slot for Phase 70's
-           config-editor panels. Intentionally not built out here (68-04). -->
-      <div class="rounded-lg bg-gray-900 border border-gray-800 border-dashed p-4">
-        <h2 class="text-sm font-semibold text-gray-500">Platform configuration</h2>
-        <p class="text-xs text-gray-600 mt-1">Config-editor panels will appear here in a future release.</p>
+      <!-- Platform configuration (R186/R187/R191/R192, Phase 70) — four config
+           cards built from Plan 01's store + field components, plus the
+           single global provenance stamp and a read-only deploy-time note. -->
+      <div class="mt-6">
+        <h2 class="text-sm font-semibold text-gray-300">Platform configuration</h2>
+        <p v-if="appConfigStore.resolvedConfig.updatedBy" class="text-xs text-gray-500 mt-1 mb-4">
+          Last changed by {{ appConfigStore.resolvedConfig.updatedBy }} at
+          {{ formatStamp(appConfigStore.resolvedConfig.updatedAt) }}
+        </p>
+
+        <div v-if="!appConfigStore.loaded" class="text-sm text-gray-400 py-8 text-center">
+          Loading configuration...
+        </div>
+        <div v-else-if="appConfigStore.loadError" class="text-sm text-red-400 py-8 text-center">
+          Couldn't load platform configuration. Refresh the page and try again.
+        </div>
+        <template v-else>
+          <CleanupConfigCard />
+          <AiProxyConfigCard />
+          <MessagingConfigCard />
+          <SenderConfigCard />
+        </template>
+
+        <div class="rounded-lg bg-gray-900 border border-gray-800 border-dashed p-4 mt-6">
+          <h2 class="text-sm font-semibold text-gray-500">Deploy-time settings (requires redeploy)</h2>
+          <p class="text-xs text-gray-600 mt-1">
+            Function instance limits (AI proxy, global, and render-service concurrency caps) are set
+            in deploy-time environment configuration, not here. Changing them requires a redeploy —
+            see functions/.env and render-service deploy config.
+          </p>
+        </div>
       </div>
     </div>
   </AppShell>
@@ -118,7 +144,12 @@ import { collection, onSnapshot, type Unsubscribe } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
+import { useAppConfigStore } from '@/stores/appConfig'
 import AppShell from '@/components/AppShell.vue'
+import CleanupConfigCard from '@/components/admin/CleanupConfigCard.vue'
+import AiProxyConfigCard from '@/components/admin/AiProxyConfigCard.vue'
+import MessagingConfigCard from '@/components/admin/MessagingConfigCard.vue'
+import SenderConfigCard from '@/components/admin/SenderConfigCard.vue'
 
 interface SuperAdminEntry {
   uid: string
@@ -137,6 +168,7 @@ interface SetSuperAdminClaimResponse {
 }
 
 const authStore = useAuthStore()
+const appConfigStore = useAppConfigStore()
 
 // ── Data state ─────────────────────────────────────────────────────────────────
 
@@ -167,6 +199,28 @@ function formatDate(ts: { toDate?: () => Date } | null): string {
   if (!ts || !ts.toDate) return '—'
   const d = ts.toDate()
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// Platform configuration provenance stamp (R186, Phase 70) — extends (does
+// not replace) the date-only formatDate above with a date+time rendering for
+// appConfig/global's updatedAt, which may arrive as either a Firestore
+// Timestamp (has .toDate()) or a plain Date (e.g. a test's serverTimestamp
+// mock, or an emulator round-trip before the SDK converts it).
+function formatStamp(ts: unknown): string {
+  let date: Date | null = null
+  if (ts instanceof Date) {
+    date = ts
+  } else if (ts && typeof ts === 'object' && typeof (ts as { toDate?: () => Date }).toDate === 'function') {
+    date = (ts as { toDate: () => Date }).toDate()
+  }
+  if (!date) return '—'
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 // R179 — the ONLY path this view ever uses to change super-admin status. The
@@ -258,9 +312,14 @@ onMounted(() => {
       loaded.value = true
     },
   )
+
+  // Platform configuration (Phase 70) — separate subscription, does not
+  // disturb the roster subscription above.
+  appConfigStore.subscribe()
 })
 
 onUnmounted(() => {
   superAdminsUnsub?.()
+  appConfigStore.unsubscribe()
 })
 </script>
