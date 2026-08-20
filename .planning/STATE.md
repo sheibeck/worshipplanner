@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Cost & Billing Hardening
-current_phase: 65
-current_phase_name: AI Proxy Cost Controls
-status: verifying
+current_phase: 66
+current_phase_name: Storage Retention
+status: planning
 stopped_at: Completed 65-02-ledger-access-hardening-PLAN.md
-last_updated: "2026-08-20T03:48:27.495Z"
-last_activity: 2026-08-19
-last_activity_desc: Phase 65 execution started
+last_updated: "2026-08-20T05:08:54.383Z"
+last_activity: 2026-08-20
+last_activity_desc: Phase 65 complete, transitioned to Phase 66
 progress:
   total_phases: 3
   completed_phases: 1
@@ -22,7 +22,7 @@ progress:
 **Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
 predictable. Phases 65+ (continuing numbering from v1.7's 58–64). Requirements R161+ in REQUIREMENTS.md.
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to plan
 
 Five confirmed exposures (investigation 2026-08-19, `functions/src/index.ts` unless noted):
 
@@ -530,10 +530,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 65 (AI Proxy Cost Controls) — EXECUTING
-Plan: 2 of 2
+Phase: 66 — Storage Retention
+Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-08-19 — Phase 65 execution started
+Last activity: 2026-08-20 — Phase 65 complete, transitioned to Phase 66
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 
