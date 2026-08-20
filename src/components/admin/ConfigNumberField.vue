@@ -60,6 +60,14 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   save: [value: number]
+  // Phase 70-02 addition (Rule 2 — missing critical functionality): a parent
+  // card needs the LIVE edited value (not just the effective modelValue) to
+  // compute a cross-field rule while the user types — e.g. AiProxyConfigCard's
+  // rateLimitPerDay >= rateLimitPerMin check must react to what's currently in
+  // the input, not only the last-saved value. This is purely additive: nothing
+  // rebinds it back into `modelValue`, so isDirty/re-sync semantics above are
+  // unchanged for every existing consumer.
+  'update:modelValue': [value: number]
 }>()
 
 const inputValue = ref<number>(props.modelValue)
@@ -73,6 +81,11 @@ watch(
     inputValue.value = v
   },
 )
+
+// Notify the parent of every live edit (see emit comment above).
+watch(inputValue, (v) => {
+  emit('update:modelValue', v)
+})
 
 // Inline validation error, shown BEFORE Save is clicked so the owner sees
 // WHY Save is disabled, not just that it is (UI-SPEC States & Interactions).

@@ -84,4 +84,15 @@ describe('ConfigTextField', () => {
     const wrapper = mountField({ saveError: 'Failed to save. Please try again.' })
     expect(wrapper.text()).toContain('Failed to save. Please try again.')
   })
+
+  // 70-02 addition: a parent card (SenderConfigCard) needs the LIVE edited
+  // value to compute format-validity and the unverifiable-host warning while
+  // the user types.
+  it('emits update:modelValue with the live input value on every edit', async () => {
+    const wrapper = mountField({ modelValue: 'onboarding@resend.dev' })
+    await wrapper.find('input').setValue('owner@example.com')
+    const emitted = wrapper.emitted('update:modelValue')
+    expect(emitted).toBeTruthy()
+    expect(emitted![emitted!.length - 1]).toEqual(['owner@example.com'])
+  })
 })

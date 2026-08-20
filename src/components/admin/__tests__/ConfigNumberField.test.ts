@@ -87,4 +87,14 @@ describe('ConfigNumberField', () => {
     const wrapper = mountField({ saveError: 'Failed to save. Please try again.' })
     expect(wrapper.text()).toContain('Failed to save. Please try again.')
   })
+
+  // 70-02 addition: a parent card (AiProxyConfigCard) needs the LIVE edited
+  // value to compute a cross-field rule while the user types.
+  it('emits update:modelValue with the live input value on every edit', async () => {
+    const wrapper = mountField({ modelValue: 30 })
+    await wrapper.find('input').setValue(45)
+    const emitted = wrapper.emitted('update:modelValue')
+    expect(emitted).toBeTruthy()
+    expect(emitted![emitted!.length - 1]).toEqual([45])
+  })
 })

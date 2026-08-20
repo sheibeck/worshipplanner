@@ -64,6 +64,13 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   save: [value: string]
+  // Phase 70-02 addition (Rule 2 — missing critical functionality): a parent
+  // card needs the LIVE edited value to compute format/warning checks while
+  // the user types (e.g. SenderConfigCard's email-shape validity and the
+  // .web.app/.firebaseapp.com unverifiable-host warning). Purely additive —
+  // nothing feeds this back into `modelValue`, so isDirty/re-sync semantics
+  // above are unchanged for every existing consumer.
+  'update:modelValue': [value: string]
 }>()
 
 const inputValue = ref<string>(props.modelValue)
@@ -74,6 +81,11 @@ watch(
     inputValue.value = v
   },
 )
+
+// Notify the parent of every live edit (see emit comment above).
+watch(inputValue, (v) => {
+  emit('update:modelValue', v)
+})
 
 const trimmed = computed(() => inputValue.value.trim())
 
