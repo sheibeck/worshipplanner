@@ -4,17 +4,17 @@ milestone: v1.9
 milestone_name: Owner Admin Console
 current_phase: 69
 current_phase_name: firestore-runtime-config
-status: executing
-stopped_at: Completed 69-02-PLAN.md
-last_updated: "2026-08-20T18:12:52.047Z"
+status: verifying
+stopped_at: Completed 69-03-PLAN.md
+last_updated: "2026-08-20T18:19:18.455Z"
 last_activity: 2026-08-20
 last_activity_desc: Phase 69 execution started
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 7
-  percent: 25
+  completed_plans: 8
+  percent: 50
 ---
 
 # ▶ ACTIVE MILESTONE — v1.9 Owner Admin Console (started 2026-08-20)
@@ -669,7 +669,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 69 (firestore-runtime-config) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-20 — Phase 69 execution started
 
 ## ★ v1.9 ROADMAP.md phase breakdown (created 2026-08-20)
@@ -2247,6 +2247,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 68 P05 | 6min | 1 tasks | 1 files |
 | Phase 69-firestore-runtime-config P01 | 22min | 2 tasks | 2 files |
 | Phase 69 P02 | 40min | 3 tasks | 2 files |
+| Phase 69 P03 | 5min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -2626,6 +2627,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: sender.fromName defined in AppConfig schema now but dormant this phase (Phase 70 forward-compat); sender.fromAddress wired in Plan 02
 - [Phase ?]: 69-02: kept the six env-wrapper helpers (readAiProxyLimits/readDeleteCap/readMediaRetentionDays/readOrphanRenderStaleHours/readBackgroundRetentionDays/readPptxSourceRetentionDays) as thin passthroughs over a resolved AppConfig rather than deleting-and-inlining, minimizing diff/test churn
 - [Phase ?]: 69-02: MESSAGE_FROM_ADDRESS defineString removed outright (declaration + read-site + all comment references) in favor of config.sender.fromAddress; sender.fromName stays dormant, per-message display name remains the org's own name (R159 unchanged)
+- [Phase ?]: 69-03: documentation-only runbook plan strictly scoped to functions/DEPLOY-RUNTIME-CONFIG.md; deferred R181/R183 manual UAT pointed at 69-VALIDATION.md rather than duplicated into PENDING-VERIFICATION.md
 
 ### Roadmap Evolution
 
@@ -2945,8 +2947,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T18:12:51.978Z
-Stopped at: Completed 69-02-PLAN.md
+Last session: 2026-08-20T18:19:18.374Z
+Stopped at: Completed 69-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
