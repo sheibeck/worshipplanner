@@ -206,6 +206,33 @@ describe("setSuperAdminClaimHandler", () => {
     ).rejects.toMatchObject({ code: "invalid-argument" });
   });
 
+  it("WR-01 (68-REVIEW.md): throws invalid-argument when grant is a non-boolean (undefined) -- never silently treated as revoke", async () => {
+    mockAuth();
+    const { setSpy, deleteSpy } = mockFirestore({ callerDocExists: true });
+
+    await expect(
+      setSuperAdminClaimHandler(fakeRequest({ data: { grant: undefined } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    // The caller-authority re-check (#2, doc(callerUid).get()) legitimately
+    // runs before argument validation -- only the TARGET write path (doc(targetUid)
+    // .set/.delete) must never be reached on a malformed grant field.
+    expect(setSpy).not.toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
+  it("WR-01 (68-REVIEW.md): throws invalid-argument when grant is a non-boolean (string) -- never silently treated as revoke", async () => {
+    mockAuth();
+    const { setSpy, deleteSpy } = mockFirestore({ callerDocExists: true });
+
+    await expect(
+      setSuperAdminClaimHandler(
+        fakeRequest({ data: { grant: "true" as unknown as boolean } }),
+      ),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(setSpy).not.toHaveBeenCalled();
+    expect(deleteSpy).not.toHaveBeenCalled();
+  });
+
   it("throws not-found when getUserByEmail cannot resolve the target", async () => {
     mockAuth({
       getUserByEmailImpl: async () => {
