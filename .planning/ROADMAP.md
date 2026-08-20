@@ -214,7 +214,7 @@ activation of media/background/pptx pruning) or changes rules/auth ships built +
 with the exact deploy command handed to the owner.
 
 - [x] **Phase 65: AI Proxy Cost Controls** - Rate-limit, server-side model/`max_tokens` enforcement, usage logging, and an instance cap on the metered Claude `api` proxy (the largest variable bill — sequenced first) (completed 2026-08-20)
-- [ ] **Phase 66: Storage Retention** - Verify/enable the dry-run media & orphan-render sweeps and build retention for the never-pruned backgrounds & PPTX-import paths (mechanisms tested; first live deletion is the owner's gated deploy)
+- [x] **Phase 66: Storage Retention** - Verify/enable the dry-run media & orphan-render sweeps and build retention for the never-pruned backgrounds & PPTX-import paths (mechanisms tested; first live deletion is the owner's gated deploy) (completed 2026-08-20)
 - [ ] **Phase 67: Fan-out, Cron & Instance Guardrails** - Disable the unused daily cross-org reminder scan, cap the Resend send loop, and set function + Cloud Run instance ceilings
 
 **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R161–R168, R170–R173 (12 mapped; R169 deferred)
@@ -285,7 +285,7 @@ with the exact deploy command handed to the owner.
 | 51-57 | v1.6 | 19/19 | Complete (archived) | 2026-08-12 |
 | 58-64 | v1.7 | 25/25 | Complete (archived) | 2026-08-18 |
 | 65 | v1.8 | 2/2 | Complete    | 2026-08-20 |
-| 66 | v1.8 | 2/2 | In Progress|  |
+| 66 | v1.8 | 2/2 | Complete    | 2026-08-20 |
 | 67 | v1.8 | 0/TBD | Not started | - |
 
 ## Backlog
