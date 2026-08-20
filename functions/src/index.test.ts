@@ -38,6 +38,7 @@ import {
   checkAndConsumeRateLimit,
   buildUsageEntry,
   writeUsageLedger,
+  api,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -2716,6 +2717,151 @@ describe("writeUsageLedger", () => {
     });
     await writeUsageLedger(db, entry);
     expect(addSpy).toHaveBeenCalledWith(entry);
+  });
+});
+
+// WR-04: every control above (enforceModelAndTokens, checkAndConsumeRateLimit,
+// buildUsageEntry, writeUsageLedger, verifyAppCaller, resolveOrgId) is
+// unit-tested in isolation against its own extracted pure function, but
+// nothing proved the `api` onRequest handler actually WIRES them together --
+// that `outboundBody` (the clamped body), not raw `req.body`, is what's
+// passed to `fetch`, and that a 2xx anthropic response writes exactly one
+// aiUsage ledger entry. `onRequest` (firebase-functions/v2/https, NOT mocked
+// in this suite) just wraps the handler and returns it directly callable as
+// `(req, res) => Promise<void>` -- so `api` can be driven with a hand-rolled
+// fake req/res, no supertest/emulator needed.
+describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
+  // No AI_ALLOWED_MODELS env override is set in this test process, so
+  // readAiProxyLimits() falls back to the compiled-in DEFAULT_AI_ALLOWED_MODELS.
+  const ALLOWED_MODEL = "claude-haiku-4-5-20251001";
+
+  function fakeReq(body: unknown, headers: Record<string, string> = {}) {
+    return {
+      path: "/api/anthropic/v1/messages",
+      originalUrl: "/api/anthropic/v1/messages",
+      method: "POST",
+      headers: { "x-app-auth": "valid-token", ...headers },
+      body,
+    };
+  }
+
+  function fakeRes() {
+    const res = {
+      statusCode: undefined as number | undefined,
+      jsonBody: undefined as unknown,
+      sentBody: undefined as unknown,
+      setHeaders: {} as Record<string, string>,
+    };
+    const status = vi.fn((code: number) => {
+      res.statusCode = code;
+      return typed;
+    });
+    const json = vi.fn((body: unknown) => {
+      res.jsonBody = body;
+      return typed;
+    });
+    const set = vi.fn((key: string, value: string) => {
+      res.setHeaders[key] = value;
+      return typed;
+    });
+    const send = vi.fn((body: unknown) => {
+      res.sentBody = body;
+      return typed;
+    });
+    const typed = { ...res, status, json, set, send };
+    return typed;
+  }
+
+  function mockCombinedDb() {
+    const addSpy = vi.fn(async (_entry: unknown) => ({ id: "ledger-doc" }));
+    const setSpy = vi.fn();
+    const doc = vi.fn((id: string) => ({ id, _docId: id }));
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        get: vi.fn(async () => ({ exists: false, data: () => undefined })),
+        set: vi.fn((ref: { _docId: string }, patch: unknown) => {
+          setSpy(ref._docId, patch);
+        }),
+      };
+      return fn(tx);
+    });
+    const collection = vi.fn((name: string) => {
+      if (name === "aiRateLimits") return { doc };
+      if (name === "aiUsage") return { add: addSpy };
+      throw new Error(`unexpected collection "${name}"`);
+    });
+    return { db: { collection, runTransaction } as never, addSpy, setSpy };
+  }
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.mocked(getAuth).mockReturnValue({
+      verifyIdToken: vi.fn(async () => ({ uid: "uid1", orgId: "org1" })),
+      getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+    } as never);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(getAuth).mockReset();
+    vi.mocked(getAuth).mockReturnValue({
+      verifyIdToken: vi.fn(),
+      getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+    } as never);
+    vi.mocked(getFirestore).mockReset();
+  });
+
+  it("WR-04: a disallowed model is rejected 400 before fetch is ever called", async () => {
+    const { db } = mockCombinedDb();
+    vi.mocked(getFirestore).mockReturnValue(db);
+    const req = fakeReq({ model: "claude-opus-4-1", max_tokens: 100, messages: [] });
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("WR-04: a normal request forwards the CLAMPED outboundBody (not raw req.body) and writes exactly one aiUsage ledger entry", async () => {
+    const { db, addSpy } = mockCombinedDb();
+    vi.mocked(getFirestore).mockReturnValue(db);
+    fetchMock.mockResolvedValue({
+      status: 200,
+      headers: { get: () => "application/json" },
+      text: async () => JSON.stringify({ usage: { input_tokens: 12, output_tokens: 34 } }),
+    });
+    const rawBody = {
+      model: ALLOWED_MODEL,
+      max_tokens: 999_999, // deliberately over the 2048 default ceiling
+      messages: [{ role: "user", content: "hi" }],
+    };
+    const req = fakeReq(rawBody);
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const fetchOpts = fetchMock.mock.calls[0]?.[1] as { body: string };
+    const sentBody = JSON.parse(fetchOpts.body) as Record<string, unknown>;
+    // The clamped body was forwarded -- NOT the raw 999_999 max_tokens.
+    expect(sentBody.max_tokens).toBe(2048);
+    expect(sentBody).not.toEqual(rawBody);
+
+    expect(addSpy).toHaveBeenCalledTimes(1);
+    const ledgerEntry = addSpy.mock.calls[0]?.[0] as {
+      uid: string;
+      inputTokens: number;
+      outputTokens: number;
+    };
+    expect(ledgerEntry.uid).toBe("uid1");
+    expect(ledgerEntry.inputTokens).toBe(12);
+    expect(ledgerEntry.outputTokens).toBe(34);
+
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });
 
