@@ -107,6 +107,31 @@ describe('CleanupEnableConfirmDialog', () => {
     expect(wrapper.emitted('confirm')).toBeUndefined()
   })
 
+  // Review CR-01: backdrop click, panel @click.self, and Escape must all be
+  // no-ops while `confirming` is true -- not just the Cancel button.
+  it('does NOT emit cancel on Escape while confirming (write in flight)', async () => {
+    const wrapper = mountDialog({ confirming: true })
+    const dialogRoot = wrapper.find('[role="dialog"]')
+    await dialogRoot.trigger('keydown', { key: 'Escape' })
+    expect(wrapper.emitted('cancel')).toBeUndefined()
+  })
+
+  it('does NOT emit cancel on backdrop click while confirming (write in flight)', async () => {
+    const wrapper = mountDialog({ confirming: true })
+    const backdrop = wrapper.findAll('div')[0]!
+    await backdrop.trigger('click')
+    expect(wrapper.emitted('cancel')).toBeUndefined()
+  })
+
+  it('does NOT emit cancel on panel @click.self while confirming (write in flight)', async () => {
+    const wrapper = mountDialog({ confirming: true })
+    // The panel wrapper carries @click.self -- find it via its distinctive
+    // classes (fixed inset-0 z-50 ... panel wrapper, not the backdrop).
+    const panelWrapper = wrapper.find('.z-50')
+    await panelWrapper.trigger('click')
+    expect(wrapper.emitted('cancel')).toBeUndefined()
+  })
+
   it('restores focus to the previously-focused element when the dialog closes', async () => {
     const trigger = document.createElement('button')
     trigger.textContent = 'Enable'

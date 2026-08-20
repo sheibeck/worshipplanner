@@ -182,7 +182,14 @@ watch(
   },
 )
 
+// Gated on `confirming` so EVERY dismissal path (backdrop click, panel
+// @click.self, Escape, and the Cancel button itself) is a genuine no-op
+// while the enable write is in flight -- matches 71-UI-SPEC.md's "Cancel
+// also disabled during the enabling state (prevents closing mid-write)"
+// requirement, which previously only the Cancel <button>'s :disabled
+// attribute honored (review CR-01).
 function onCancel(): void {
+  if (props.confirming) return
   emit('cancel')
 }
 
