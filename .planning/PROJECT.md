@@ -360,4 +360,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-19 — started milestone v1.8 Cost & Billing Hardening (Phases 65+, R161+). Next: `/gsd-plan-phase 65`.*
+*Last updated: 2026-08-20 — v1.8 Cost & Billing Hardening code-complete (Phases 65–67, R161–R168 + R170–R173, all verified + reviewed); safe config DEPLOYED to production 2026-08-20. Owner steps remain (see STATE.md): activate storage-deletion flags, deploy the firestore.rules deny, redeploy render-service caps, `/gsd-verify-work 65 66 67`, then the milestone lifecycle.*

@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Cost & Billing Hardening
-current_phase: 999.2
-current_phase_name: BACKLOG
-status: planning
-stopped_at: Completed 67-02-render-service-instance-cap-PLAN.md
-last_updated: "2026-08-20T07:58:28.299Z"
+current_phase: 67
+current_phase_name: v1.8 code-complete + safe config deployed
+status: milestone-code-complete-awaiting-owner-lifecycle
+stopped_at: v1.8 Phases 65-67 code-complete, verified, reviewed; safe config DEPLOYED to prod 2026-08-20; stopped before milestone lifecycle per grant
+last_updated: "2026-08-20T08:15:00.000Z"
 last_activity: 2026-08-20
-last_activity_desc: Phase 67 complete, transitioned to Phase 999.2
+last_activity_desc: v1.8 safe config deployed to production; owner steps + lifecycle remain
 progress:
   total_phases: 3
   completed_phases: 3
@@ -22,7 +22,51 @@ progress:
 **Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
 predictable. Phases 65+ (continuing numbering from v1.7's 58–64). Requirements R161+ in REQUIREMENTS.md.
 
-**Status:** Ready to plan
+**Status: v1.8 CODE-COMPLETE (Phases 65–67, R161–R168 + R170–R173) + safe config DEPLOYED to
+production 2026-08-20.** Milestone lifecycle (audit/complete/cleanup) NOT run — stopped before it per the
+v1.8 autonomy grant; owner steps remain (below).
+
+## ✅ DEPLOYED 2026-08-20 — safe config live in production (`worship-planner-bc515`)
+
+`firebase deploy --only functions` succeeded (assistant ran it under the v1.8 grant's autonomous-deploy
+authorization). Now LIVE:
+- **Phase 65 (R161–R164):** `api` proxy — per-uid rate limit (429, fail-open), model allow-list (400) +
+  max_tokens clamp, `aiUsage` ledger (Admin SDK), `maxInstances: 10`. Anthropic-upstream-only.
+- **Phase 66 (R165–R168):** all 4 cleanup crons deployed in **DRY-RUN** mode (delete NOTHING yet) —
+  `cleanupExpiredMedia`, `cleanupOrphanRenders`, `cleanupOrphanBackgrounds` (new), `cleanupPptxSources`
+  (new). They log what they WOULD delete; no real deletion until the owner enables the flags.
+- **Phase 67 (R170–R173 functions):** `sendScheduledReminders` **gated OFF** — the daily cross-org scan
+  is STOPPED (immediate read-cost relief); `sendQueuedMessage` recipient cap + per-org daily quota (fail-
+  open); project-wide `setGlobalOptions({maxInstances:20})` applied to all functions (`api` keeps its 10).
+
+## ⚠ OWNER STEPS REMAINING (nothing below is done — hand-over)
+
+1. **⚠ Live behavior change now in prod:** gating `sendScheduledReminders` OFF also pauses the composer's
+   **"schedule-for-later"** dispatch. If you use scheduled/reminder emails, set
+   `SCHEDULED_MESSAGING_CRON_ENABLED=true` in `functions/.env` and redeploy that function. (Reminders were
+   reported unused, so default-off is intended — but this is a real, reversible prod change.)
+2. **Owner-gated: activate storage deletion (data loss — your button).** Review each dry-run cron's Cloud
+   Logging output first (what it WOULD delete), then per path add the flag to `functions/.env` + redeploy:
+   - `MEDIA_CLEANUP_ENABLED=true` → `firebase deploy --only functions:cleanupExpiredMedia`
+   - `PPTX_RENDER_CLEANUP_ENABLED=true` → `firebase deploy --only functions:cleanupOrphanRenders`
+   - `BACKGROUND_CLEANUP_ENABLED=true` → `firebase deploy --only functions:cleanupOrphanBackgrounds`
+     (confirm the dry-run log shows `referencesComplete: true` before enabling)
+   - `PPTX_SOURCE_CLEANUP_ENABLED=true` → `firebase deploy --only functions:cleanupPptxSources`
+3. **Owner-gated: deploy the `firestore.rules` deny** hardening `aiUsage`/`aiRateLimits` against client
+   access (Phase 65, defense-in-depth; the ledger works without it): `firebase deploy --only firestore:rules`.
+4. **R173 render-service ceiling (staged, not run):** redeploy Cloud Run with the pinned caps —
+   `render-service/DEPLOY.md` has the exact command (`--max-instances=3 --concurrency=1`, substitute
+   `PROJECT_ID`). Needs `gcloud`/Docker.
+5. **Deferred human UAT:** `/gsd-verify-work 65 66 67` (visual/interaction + real-email + a real dry-run
+   deletion review) — routed to `.planning/PENDING-VERIFICATION.md` per the grant; none recorded as passed.
+6. **Then** run the milestone lifecycle: `/gsd-audit-milestone` → `/gsd-complete-milestone v1.8` →
+   `/gsd-cleanup`.
+
+**Tunable env knobs (all have safe code defaults; set in `functions/.env` to override):**
+`AI_RATELIMIT_MAX_PER_MIN`=20, `AI_RATELIMIT_MAX_PER_DAY`=500, `AI_ALLOWED_MODELS`=claude-haiku-4-5-20251001,
+`AI_MAX_TOKENS_CEILING`=2048, `AI_PROXY_MAX_INSTANCES`=10, `STORAGE_CLEANUP_MAX_DELETES_PER_RUN`=500,
+`BACKGROUND_RETENTION_DAYS`=30, `PPTX_SOURCE_RETENTION_DAYS`=30, `MESSAGE_MAX_RECIPIENTS`=200,
+`ORG_MAX_EMAILS_PER_DAY`=1000, `GLOBAL_MAX_INSTANCES`=20, `SCHEDULED_MESSAGING_CRON_ENABLED`=off.
 
 Five confirmed exposures (investigation 2026-08-19, `functions/src/index.ts` unless noted):
 
