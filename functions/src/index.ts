@@ -1,6 +1,7 @@
 import { onCall, onRequest, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { setGlobalOptions } from "firebase-functions/v2/options";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
@@ -233,6 +234,16 @@ export function readAiProxyLimits(env: NodeJS.ProcessEnv = process.env): AiProxy
 // upstream within a single function. Env-overridable so the owner can tune
 // fan-out without a logic redeploy.
 const AI_PROXY_MAX_INSTANCES = readNumericKnob(process.env.AI_PROXY_MAX_INSTANCES, 10);
+
+// R172: a project-wide maxInstances ceiling so EVERY function inherits a
+// fan-out cap, even ones with no explicit per-function option of their own
+// (e.g. messageWebhook). Called ONCE, here, before the first function
+// definition (`api` below) so the default is in place for the whole module.
+// A per-function `maxInstances` (like api's own AI_PROXY_MAX_INSTANCES just
+// above) OVERRIDES this default for that function -- it is never clobbered.
+// Env-overridable so the owner can tune fan-out without a logic redeploy.
+const GLOBAL_MAX_INSTANCES = readNumericKnob(process.env.GLOBAL_MAX_INSTANCES, 20);
+setGlobalOptions({ maxInstances: GLOBAL_MAX_INSTANCES });
 
 export interface EnforceModelAndTokensOk {
   ok: true;

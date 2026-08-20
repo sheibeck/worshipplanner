@@ -69,6 +69,10 @@ let fakeEditorEmail = "editor@example.com";
 // close over it. No real email is ever sent (59-03 ships against a mocked
 // provider; the real RESEND_API_KEY is never set in tests).
 const { mockSend } = vi.hoisted(() => ({ mockSend: vi.fn() }));
+// R172: setGlobalOptions is called at index.ts MODULE-SCOPE (once, at import
+// time), so this spy must be hoisted and wired in BEFORE `./index` is
+// imported below -- there is no other seam to observe that call.
+const { setGlobalOptionsSpy } = vi.hoisted(() => ({ setGlobalOptionsSpy: vi.fn() }));
 
 // index.ts's module-scope initializeApp()/defineSecret() calls, and its
 // getAuth/getFirestore/getStorage imports, must be neutralized so importing
@@ -113,6 +117,13 @@ vi.mock("firebase-functions/v2/firestore", () => ({
   // trigger's behavior (see orgMembershipClaims.test.ts), it just needs the
   // module-scope call itself neutralized so importing ./index doesn't throw.
   onDocumentWritten: vi.fn((_path: string, handler: unknown) => handler),
+}));
+// R172: only setGlobalOptions is mocked (a spy) -- the module-scope call in
+// index.ts is the ONLY thing under test here; every other v2 builder
+// (onRequest/onCall/onSchedule) is left real because they're pure
+// declarative wrappers with no side effect requiring network/credentials.
+vi.mock("firebase-functions/v2/options", () => ({
+  setGlobalOptions: setGlobalOptionsSpy,
 }));
 vi.mock("./pptxParser", () => ({
   parsePptxBuffer: vi.fn(),
@@ -3661,6 +3672,28 @@ describe("writeUsageLedger", () => {
     });
     await writeUsageLedger(db, entry);
     expect(addSpy).toHaveBeenCalledWith(entry);
+  });
+});
+
+// R172: a project-wide setGlobalOptions({ maxInstances }) ceiling so EVERY
+// function inherits a fan-out cap, even ones (like messageWebhook) with no
+// per-function option of their own. setGlobalOptions is called exactly once,
+// at index.ts module scope, which this suite observes via the hoisted
+// setGlobalOptionsSpy wired into the firebase-functions/v2/options mock.
+describe("setGlobalOptions (R172: project-wide maxInstances ceiling)", () => {
+  it("is called exactly once, at module load, with the default maxInstances of 20", () => {
+    expect(setGlobalOptionsSpy).toHaveBeenCalledTimes(1);
+    expect(setGlobalOptionsSpy).toHaveBeenCalledWith({ maxInstances: 20 });
+  });
+
+  it("SOURCE: api's own maxInstances is NOT clobbered by the global default", () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const globalCallIndex = source.indexOf("setGlobalOptions({ maxInstances: GLOBAL_MAX_INSTANCES });");
+    const apiStart = source.indexOf("export const api = onRequest(");
+    expect(globalCallIndex).toBeGreaterThan(-1);
+    expect(apiStart).toBeGreaterThan(globalCallIndex);
+    const apiOptions = source.slice(apiStart, apiStart + 300);
+    expect(apiOptions).toMatch(/maxInstances:\s*AI_PROXY_MAX_INSTANCES/);
   });
 });
 
