@@ -2668,7 +2668,18 @@ export async function sendQueuedMessageHandler(params: {
   // per-message request path, not a cron (mirrors the api proxy's own
   // cached read above). Anti-pattern to avoid: never re-resolve inside the
   // recipient loop -- the loop can iterate up to maxRecipients recipients.
-  const config = await getAppConfig(db);
+  // Fail OPEN to DEFAULT_APP_CONFIG (review IN-01): this is a cost/limits
+  // guardrail, not a security control -- a Firestore hiccup here must not
+  // strand the message in 'queued' (the onDocumentCreated trigger has no
+  // retry configured, so it would otherwise sit stuck until manual reprocess).
+  let config: AppConfig = DEFAULT_APP_CONFIG;
+  try {
+    config = await getAppConfig(db);
+  } catch (configErr) {
+    console.warn("[sendQueuedMessage] appConfig read failed; failing open to defaults:", {
+      message: configErr instanceof Error ? configErr.message : String(configErr),
+    });
+  }
   const orgRef = db.collection("organizations").doc(orgId);
   const serviceRef = orgRef.collection("services").doc(serviceId);
   const messageRef = serviceRef.collection("messages").doc(messageId);

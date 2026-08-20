@@ -4289,6 +4289,26 @@ describe("sendQueuedMessageHandler", () => {
     expect(outcome).toMatchObject({ status: "sent", sentCount: 2, failedCount: 0 });
   });
 
+  it("IN-01 (69-REVIEW.md): getAppConfig() rejecting fails OPEN to DEFAULT_APP_CONFIG rather than leaving the message stuck 'queued'", async () => {
+    vi.mocked(getAppConfig).mockRejectedValueOnce(new Error("appConfig Firestore read boom"));
+    const { db, txUpdateSpy, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const outcome = await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    // The idempotency claim still ran (queued -> sending) and both
+    // recipients were sent to using DEFAULT_APP_CONFIG's limits -- the
+    // Firestore hiccup on the config read did not strand the message.
+    expect(txUpdateSpy).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: "sending" }));
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    expect(recipientWrites).toHaveLength(2);
+    expect(messageSetSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "sent", deliveryCounts: { sent: 2, failed: 0 } }),
+      { merge: true },
+    );
+    expect(outcome).toMatchObject({ status: "sent", sentCount: 2, failedCount: 0 });
+  });
+
   // --- R171: Resend volume guardrails (67-01) --------------------------------
   describe("R171: recipient cap + org daily quota", () => {
     it("an over-cap send (config.messaging.maxRecipients) is REJECTED 'failed' with ZERO sends -- never truncated", async () => {
