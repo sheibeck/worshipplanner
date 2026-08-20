@@ -428,6 +428,29 @@ service cloud.firestore {
       allow delete: if isOrgEditor(resource.data.orgId);
     }
 
+    // AI usage ledger (R163) — one entry per proxied Claude request, written
+    // ONLY by the api Cloud Function via the Admin SDK (functions/src/index.ts,
+    // Phase 65 Plan 01), which bypasses rules entirely. This top-level
+    // collection is already denied by the catch-all below; this explicit deny
+    // is defense-in-depth documenting the intent (Admin-SDK-only, never
+    // client-readable/writable) and future-proofs against a refactor that
+    // might nest it under organizations/{orgId} — where it would otherwise
+    // fall through the org-scoped /{collection}/{docId} wildcard above
+    // (T-37-15) and become editor-writable. Owner-gated: see 65-02 PLAN/
+    // SUMMARY for the UNDEPLOYED handover; the api function does not depend
+    // on this rule to operate.
+    match /aiUsage/{docId} {
+      allow read, write: if false;
+    }
+
+    // AI proxy rate-limit counters (R161) — fixed-window per-uid request
+    // counters, written ONLY by the api Cloud Function via the Admin SDK
+    // (functions/src/index.ts, Phase 65 Plan 01). Same rationale and
+    // owner-gated/UNDEPLOYED status as the aiUsage block above.
+    match /aiRateLimits/{docId} {
+      allow read, write: if false;
+    }
+
     // Catch-all: deny everything else
     match /{document=**} {
       allow read, write: if false;

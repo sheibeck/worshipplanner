@@ -275,6 +275,78 @@ describe('Catch-all deny', () => {
   })
 })
 
+// Phase 65 Plan 02 (65-02): explicit top-level deny for the aiUsage ledger
+// (R163) and aiRateLimits counters (R161). Both collections are written
+// ONLY by the api Cloud Function via the Admin SDK, which bypasses rules
+// entirely — these client-side assertions prove a signed-in app user (even
+// an org editor) can neither read nor write either collection. This block
+// is committed but UNDEPLOYED (see 65-02-SUMMARY.md for the owner handover);
+// the app and functions do not depend on it to operate.
+describe('aiUsage / aiRateLimits — explicit deny of client read/write (R161/R163, Admin-SDK-only)', () => {
+  it('denies an authenticated org editor from reading an aiUsage doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('aiUsage/entry1', {
+      uid: 'userA',
+      orgId: 'orgA',
+      model: 'claude-haiku-4-5-20251001',
+      inputTokens: 100,
+      outputTokens: 50,
+      createdAt: new Date(),
+    })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'aiUsage', 'entry1')))
+  })
+
+  it('denies an authenticated org editor from writing an aiUsage doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'aiUsage', 'entry2'), {
+        uid: 'userA',
+        orgId: 'orgA',
+        model: 'claude-haiku-4-5-20251001',
+        inputTokens: 100,
+        outputTokens: 50,
+        createdAt: new Date(),
+      }),
+    )
+  })
+
+  it('denies an authenticated org editor from reading an aiRateLimits doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('aiRateLimits/userA__min__12345', { count: 3, expireAt: new Date() })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'aiRateLimits', 'userA__min__12345')))
+  })
+
+  it('denies an authenticated org editor from writing an aiRateLimits doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'aiRateLimits', 'userA__min__12345'), { count: 1, expireAt: new Date() }),
+    )
+  })
+
+  it('denies unauthenticated read/write on both collections', async () => {
+    await seedDoc('aiUsage/entry3', {
+      uid: 'userA',
+      orgId: 'orgA',
+      model: 'claude-haiku-4-5-20251001',
+      inputTokens: 10,
+      outputTokens: 5,
+      createdAt: new Date(),
+    })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'aiUsage', 'entry3')))
+    await assertFails(setDoc(doc(db, 'aiRateLimits', 'anon__min__1'), { count: 1 }))
+  })
+})
+
 describe('orgSlugs — public read, org-editor-scoped create-once claim (WR-01)', () => {
   it('allows unauthenticated read of an orgSlugs doc', async () => {
     await seedDoc('orgSlugs/grace-church', { orgId: 'orgA' })
