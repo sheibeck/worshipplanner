@@ -75,6 +75,7 @@ import {
   SPLIT_SCHEMA,
   validateSplitResult,
   splitCongregationalReading,
+  logAiProxyError,
 } from '@/utils/claudeApi'
 import type { AiSongSuggestion, AiScriptureSuggestion } from '@/utils/claudeApi'
 import {
@@ -1113,5 +1114,171 @@ describe('WR-03: isAiEnabled() guard never throws out of a gated export', () => 
     await expect(splitCongregationalReading('Leader: Test line\nAll: Response line')).resolves.toBeNull()
     expect(mockCreate).not.toHaveBeenCalled()
     expect(mockParse).not.toHaveBeenCalled()
+  })
+})
+
+// ─── Phase 65 (65-02): proxy 429/400 cost-control rejections (R161/R162) ──────
+//
+// The proxy can now legitimately reject a request with HTTP 429 (per-uid
+// rate/cost limit, R161) or HTTP 400 (disallowed model / server policy,
+// R162) — failure modes that did not exist before Phase 65. AI is additive
+// per the project's Key Decisions: every one of these three exported calls
+// must still resolve to null (never throw/reject), and the two cost-control
+// statuses must be logged distinctly (console.warn) from a generic failure
+// (console.error) so an operator can tell a deliberate rejection from a real
+// outage.
+
+describe('logAiProxyError — classifies 429/400 distinctly from a generic failure', () => {
+  it('logs via console.warn for a 429 status (rate/cost limited)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    logAiProxyError('getSongSuggestions', { status: 429, message: 'rate limited' })
+
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy.mock.calls[0]![0]).toContain('429')
+    expect(errorSpy).not.toHaveBeenCalled()
+
+    warnSpy.mockRestore()
+    errorSpy.mockRestore()
+  })
+
+  it('logs via console.warn for a 400 status (server policy rejection), distinctly from the 429 message', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    logAiProxyError('getScriptureSuggestions', { status: 400, message: 'model not allowed' })
+
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy.mock.calls[0]![0]).toContain('400')
+    expect(errorSpy).not.toHaveBeenCalled()
+
+    warnSpy.mockRestore()
+    errorSpy.mockRestore()
+  })
+
+  it('falls back to console.error (generic) for any other status or a statusless error', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    logAiProxyError('splitCongregationalReading', new Error('network blip'))
+    logAiProxyError('splitCongregationalReading', { status: 500, message: 'server error' })
+
+    expect(errorSpy).toHaveBeenCalledTimes(2)
+    expect(warnSpy).not.toHaveBeenCalled()
+
+    warnSpy.mockRestore()
+    errorSpy.mockRestore()
+  })
+})
+
+describe('getSongSuggestions — resolves to null (never throws) on a proxy 429/400', () => {
+  beforeEach(() => {
+    mockCreate.mockReset()
+  })
+
+  it('resolves to null on a 429 (rate/cost-limited) rejection from the proxy, and warns rather than errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockCreate.mockRejectedValueOnce({ status: 429, message: 'Too Many Requests' })
+
+    const result = await getSongSuggestions({
+      sermonTopic: 'Grace',
+      sermonPassage: null,
+      slotVwType: 1,
+      alreadySelectedSongIds: [],
+      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
+      recentServiceSongIds: [],
+    })
+
+    expect(result).toBeNull()
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
+  })
+
+  it('resolves to null on a 400 (server policy) rejection from the proxy, and warns rather than errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockCreate.mockRejectedValueOnce({ status: 400, message: 'Model not permitted' })
+
+    const result = await getSongSuggestions({
+      sermonTopic: 'Grace',
+      sermonPassage: null,
+      slotVwType: 1,
+      alreadySelectedSongIds: [],
+      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
+      recentServiceSongIds: [],
+    })
+
+    expect(result).toBeNull()
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
+  })
+})
+
+describe('getScriptureSuggestions — resolves to null (never throws) on a proxy 429/400', () => {
+  beforeEach(() => {
+    mockCreate.mockReset()
+  })
+
+  it('resolves to null on a 429 (rate/cost-limited) rejection from the proxy, and warns rather than errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockCreate.mockRejectedValueOnce({ status: 429, message: 'Too Many Requests' })
+
+    const result = await getScriptureSuggestions({
+      sermonTopic: 'Forgiveness',
+      sermonPassage: null,
+      query: 'passages about forgiveness',
+      recentScriptures: [],
+    })
+
+    expect(result).toBeNull()
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
+  })
+
+  it('resolves to null on a 400 (server policy) rejection from the proxy, and warns rather than errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockCreate.mockRejectedValueOnce({ status: 400, message: 'Model not permitted' })
+
+    const result = await getScriptureSuggestions({
+      sermonTopic: 'Forgiveness',
+      sermonPassage: null,
+      query: 'passages about forgiveness',
+      recentScriptures: [],
+    })
+
+    expect(result).toBeNull()
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
+  })
+})
+
+describe('splitCongregationalReading — resolves to null (never throws) on a proxy 429/400', () => {
+  const RAW_TEXT =
+    '[1] The Lord is my shepherd; I shall not want. [2] He makes me lie down in green pastures.'
+
+  beforeEach(() => {
+    mockParse.mockReset()
+  })
+
+  it('resolves to null on a 429 (rate/cost-limited) rejection from the proxy, and warns rather than errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockParse.mockRejectedValueOnce({ status: 429, message: 'Too Many Requests' })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
+  })
+
+  it('resolves to null on a 400 (server policy) rejection from the proxy, and warns rather than errors', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockParse.mockRejectedValueOnce({ status: 400, message: 'Model not permitted' })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
   })
 })

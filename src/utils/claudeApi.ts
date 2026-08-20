@@ -155,6 +155,43 @@ export function safeParseJsonArray(text: string): unknown[] | null {
 }
 
 /**
+ * Classifies and logs a failed proxied AI call. Phase 65's cost controls
+ * (R161/R162) mean the proxy can now legitimately reject a request with HTTP
+ * 429 (per-uid rate/cost limit exceeded) or HTTP 400 (disallowed model /
+ * server-side policy rejection) — these are DELIBERATE cost-control
+ * rejections, not an outage, so they are logged distinctly (console.warn,
+ * quiet) from every other failure (console.error). This helper only
+ * classifies and logs; it never throws and never changes control flow — each
+ * of this module's three network-calling exports still does its own
+ * unconditional `return null` in the catch block that calls this.
+ *
+ * The Anthropic SDK's `APIError` carries a numeric `.status`; classification
+ * reads that field only (never message text, which is not a stable contract).
+ */
+export function logAiProxyError(context: string, err: unknown): void {
+  const status =
+    typeof err === 'object' && err !== null && 'status' in err
+      ? (err as { status: unknown }).status
+      : undefined
+
+  if (status === 429) {
+    console.warn(
+      `[claudeApi] ${context}: proxy rate/cost-limited this request (429) — AI degraded gracefully, not an outage`,
+    )
+    return
+  }
+
+  if (status === 400) {
+    console.warn(
+      `[claudeApi] ${context}: proxy rejected this request by server policy (400, e.g. disallowed model) — AI degraded gracefully, not an outage`,
+    )
+    return
+  }
+
+  console.error(`[claudeApi] ${context} failed:`, err)
+}
+
+/**
  * Filter AI song suggestions to only include songIds that exist in the provided song library.
  * Removes hallucinated IDs.
  */
@@ -298,7 +335,7 @@ export async function getSongSuggestions(
 
     return validated
   } catch (err) {
-    console.error('[claudeApi] getSongSuggestions failed:', err)
+    logAiProxyError('getSongSuggestions', err)
     return null
   }
 }
@@ -378,7 +415,7 @@ export async function getScriptureSuggestions(
 
     return validated
   } catch (err) {
-    console.error('[claudeApi] getScriptureSuggestions failed:', err)
+    logAiProxyError('getScriptureSuggestions', err)
     return null
   }
 }
@@ -587,7 +624,7 @@ export async function splitCongregationalReading(
       }
     })
   } catch (err) {
-    console.error('[claudeApi] splitCongregationalReading failed:', err)
+    logAiProxyError('splitCongregationalReading', err)
     return null
   }
 }
