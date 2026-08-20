@@ -2,14 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: Owner Admin Console
-status: planning
-last_updated: "2026-08-20T13:34:40.019Z"
+current_phase: 68
+current_phase_name: super-admin-access-gate
+status: executing
+stopped_at: Completed 68-01-PLAN.md
+last_updated: "2026-08-20T15:12:04.102Z"
 last_activity: 2026-08-20
+last_activity_desc: Phase 68 execution started
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 5
+  completed_plans: 1
   percent: 0
 ---
 
@@ -634,7 +638,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 67 — Fan-out, Cron & Instance Guardrails
+**Current focus:** Phase 68 — super-admin-access-gate
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -644,10 +648,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 68 (Super-Admin Access Gate & Claim-Merge Fix) — not started
-Plan: —
-Status: ROADMAP.md created — ready to plan Phase 68 (`/gsd-plan-phase 68`)
-Last activity: 2026-08-20 — v1.9 ROADMAP.md created (Phases 68-71, 19/19 requirements R174-R192 mapped, 0 unmapped)
+Phase: 68 (super-admin-access-gate) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-08-20 — Phase 68 execution started
 
 ## ★ v1.9 ROADMAP.md phase breakdown (created 2026-08-20)
 
@@ -669,7 +673,6 @@ no-reply sender folded into the console UI phase. **Numbering continues from v1.
 See `.planning/ROADMAP.md` § v1.9 Owner Admin Console for the full phase detail table (goals,
 dependencies, success criteria). Next step: `/gsd-plan-phase 68` (optionally preceded by
 `/gsd-discuss-phase 68`).
-
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 
@@ -2218,6 +2221,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 66 P02 | 35min | 2 tasks | 2 files |
 | Phase 67 P01 | 30min | 3 tasks | 2 files |
 | Phase 67 P02 | 6min | 1 tasks | 1 files |
+| Phase 68 P01 | 9min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2586,6 +2590,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R171: reject-over-cap (never truncate) for MESSAGE_MAX_RECIPIENTS; fixed-window per-org ORG_MAX_EMAILS_PER_DAY quota via new checkAndConsumeOrgEmailQuota
 - [Phase ?]: R172: one setGlobalOptions maxInstances=20 ceiling at module top; api keeps its own tighter maxInstances=10 (not clobbered)
 - [Phase ?]: R173: kept --concurrency=1 on render-service (not the 4 floated in 67-CONTEXT.md) — LibreOffice shared-profile-lock makes concurrent conversions on one instance unreliable; --max-instances tightened to 3 as the explicit cost ceiling.
+- [Phase ?]: 68-01: Shared mergeAndSetCustomClaims/clearClaimKeys helper closes the org-membership claim replace/wipe hazard (R175); both write branches refactored, SC1 regression proves superAdmin survives an org-membership clear.
 
 ### Roadmap Evolution
 
@@ -2905,8 +2910,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T07:34:35.872Z
-Stopped at: Completed 67-02-render-service-instance-cap-PLAN.md
+Last session: 2026-08-20T15:12:04.052Z
+Stopped at: Completed 68-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
