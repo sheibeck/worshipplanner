@@ -2,13 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Cost & Billing Hardening
-status: planning
-last_updated: "2026-08-20T02:00:12.353Z"
+current_phase: 65
+current_phase_name: AI Proxy Cost Controls
+status: executing
+stopped_at: Completed 65-01-proxy-cost-controls-PLAN.md
+last_updated: "2026-08-20T03:22:53.060Z"
 last_activity: 2026-08-19
+last_activity_desc: Phase 65 execution started
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
   percent: 0
 ---
@@ -18,17 +22,21 @@ progress:
 **Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
 predictable. Phases 65+ (continuing numbering from v1.7's 58–64). Requirements R161+ in REQUIREMENTS.md.
 
-**Status:** planning — requirements being defined, roadmap next, then autonomous execution.
+**Status:** Ready to execute
 
 Five confirmed exposures (investigation 2026-08-19, `functions/src/index.ts` unless noted):
+
 1. **Claude proxy** `api` (index.ts:156) — authenticated but uncapped; model + `max_tokens` chosen
    client-side (`src/utils/claudeApi.ts:282/362/569`) and forwarded byte-unchanged; no usage logging;
    no `maxInstances`. Largest variable bill.
+
 2. **Storage grows forever** — backgrounds (`useBackgroundUpload.ts:103`) and pptx-import sources are
    never pruned; `cleanupExpiredMedia` (index.ts:658, `MEDIA_CLEANUP_ENABLED`) and `cleanupOrphanRenders`
    (index.ts:812, `PPTX_RENDER_CLEANUP_ENABLED`) both **dry-run by default**.
+
 3. **`sendScheduledReminders`** (index.ts:1025) — two unbounded cross-org collection-group scans daily,
    no early gate. Reminders NOT in production use → disable.
+
 4. **Resend send loop** (index.ts:1782) — no recipient/volume cap.
 5. **No instance ceilings / budget guardrails** anywhere (`firebase.json`, render-service Dockerfile).
 
@@ -43,11 +51,13 @@ settled by explicit Q&A at launch (2026-08-19).
 - **Reminders are NOT used → disable** the daily `sendScheduledReminders` cross-org scan. (Keep the
   scheduled-message *dispatch* path working only if a phase shows it is independently needed; otherwise
   gate the whole daily function off.)
+
 - **Deploy policy: deploy the low-risk config autonomously; hand over data-loss / lockout deploys.**
   - **Autonomous deploy (bounded, reversible, no user lockout, no data loss):** function `maxInstances`
     / `setGlobalOptions` caps, Claude-proxy rate-limiting + server-side model/`max_tokens` enforcement +
     usage logging, disabling the reminders cron, Resend volume caps, Cloud Run render-service
     max-instances/concurrency, query changes.
+
   - **HAND OVER (owner runs) — anything that DELETES DATA or could LOCK USERS OUT:** the first activation
     of any pruning that removes existing objects (enabling `MEDIA_CLEANUP_ENABLED`, enabling
     `PPTX_RENDER_CLEANUP_ENABLED`, any Storage lifecycle rule or background/pptx retention job that
@@ -59,15 +69,20 @@ settled by explicit Q&A at launch (2026-08-19).
 
 - **Defer human verification.** Route each `human_needed` check to `.planning/PENDING-VERIFICATION.md`
   and continue; **never record a deferred check as passed.**
+
 - **STOP BEFORE THE MILESTONE LIFECYCLE.** When all v1.8 phases are code-complete (and the autonomous
   deploys done), STOP and hand over the `/gsd-verify-work` list + any owner-gated deploy commands. Do
   NOT run audit → complete → cleanup.
+
 - **No `.env.local` / `functions/.env` secret writes.** Env-var *config* the owner must set for a deploy
   (e.g. flipping `MEDIA_CLEANUP_ENABLED`) is handed over, not written here.
+
 - **No destructive / irreversible actions** without asking (no `git stash` in this multi-worktree repo,
   no project-wide lint --fix, no history rewrites, no bulk deletions beyond a plan's scope).
+
 - Pick the reasonable default on ordinary grey areas, state it, keep moving. Stop and ask only when a
   wrong assumption would be unsafe or waste the work.
+
 - Gates: type-check via `npm run type-check` (vue-tsc --build); app-suite baseline is the 2 known-failing
   files (`storage.rules.test.ts`, `RosterView.test.ts`); functions suite via `cd functions && npm test`;
   render-service via `cd render-service && npm test`.
@@ -505,7 +520,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 58 — Messaging Infrastructure, Settings & Recipient Resolution
+**Current focus:** Phase 65 — AI Proxy Cost Controls
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -515,10 +530,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 65 — AI Proxy Cost Controls (not started; roadmap created)
-Plan: —
-Status: Roadmap created — ready to plan Phase 65
-Last activity: 2026-08-19 — v1.8 roadmap created (Phases 65–67; R161–R168/R170–R173, 12/12 mapped, R169 deferred)
+Phase: 65 (AI Proxy Cost Controls) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-08-19 — Phase 65 execution started
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 
@@ -2061,6 +2076,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 63 P01 | 18 min | 2 tasks | 4 files |
 | Phase 64 P01 | 7 min | 1 tasks | 5 files |
 | Phase 64 P03 | 13 min | 2 tasks | 2 files |
+| Phase 65 P01 | 55min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2419,6 +2435,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: From-name/Reply-to use explicit-Save (not auto-save), mirroring Organization Name's debounce-boundary pattern
 - [Phase ?]: 58-05: per-service messaging overrides write via scoped setServiceMessagingDefaults dot-path (never updateService), bypassing the R036 draft-content affectedKeys() guard (R132)
 - [Phase 60]: 60-01: verify Svix webhook signatures manually with node:crypto (no svix package); REPLAY_TOLERANCE_SEC=300 tagged confirm-against-real-event; recipients.providerMessageId collection-group index ships UNDEPLOYED (owner deploy).
+- [Phase ?]: aiUsage/aiRateLimits kept top-level (not nested under organizations/{orgId}) so the firestore.rules catch-all deny blocks client reads with zero rules change
+- [Phase ?]: Rate limiter fails OPEN on its own Firestore error (cost guardrail, not security control) — a datastore hiccup never takes AI down
 
 ### Roadmap Evolution
 
@@ -2738,8 +2756,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-16T02:14:51.796Z
-Stopped at: Completed 64-03-PLAN.md
+Last session: 2026-08-20T03:22:53.006Z
+Stopped at: Completed 65-01-proxy-cost-controls-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -20,16 +20,19 @@ otherwise **uncapped**, and it forwards `req.body` byte-unchanged (index.ts:220)
 `claude-haiku-4-5-20251001`, max_tokens 512/512/1024). There is no rate limiting, no usage logging, and
 no instance ceiling.
 
-- [ ] **R161**: The Claude proxy enforces a server-side per-user (and/or per-org) request rate limit —
+- [x] **R161**: The Claude proxy enforces a server-side per-user (and/or per-org) request rate limit —
       requests beyond a configurable window ceiling are rejected with a clear error, so one signed-in
       user cannot drive unbounded token spend in a loop.
-- [ ] **R162**: The Claude proxy enforces server-side allow-lists/ceilings for `model` and `max_tokens`
+
+- [x] **R162**: The Claude proxy enforces server-side allow-lists/ceilings for `model` and `max_tokens`
       — a client request naming a more expensive model or a larger `max_tokens` than policy is rejected
       or clamped before it reaches Anthropic, instead of being forwarded unchanged.
-- [ ] **R163**: Every proxied Claude request records a usage entry (caller uid + org, model, input and
+
+- [x] **R163**: Every proxied Claude request records a usage entry (caller uid + org, model, input and
       output token counts, timestamp) to a queryable ledger, so per-user/per-org token spend is
       observable inside the app rather than only on the external Anthropic console.
-- [ ] **R164**: The `api` proxy function has an explicit `maxInstances` ceiling so a traffic spike or
+
+- [x] **R164**: The `api` proxy function has an explicit `maxInstances` ceiling so a traffic spike or
       abuse cannot fan the function out without bound.
 
 ### Storage Retention
@@ -43,11 +46,14 @@ import sources (`orgs/{orgId}/pptx-imports/{importId}/…`) are **never pruned b
 - [ ] **R165**: Media auto-cleanup is enabled and verified in production — objects under
       `orgs/{orgId}/media/` older than the retention window are actually deleted, not dry-run-logged.
       (First live deletion is an owner-gated deploy per the autonomy grant.)
+
 - [ ] **R166**: Orphan-render cleanup is enabled and verified — stale `pending`/`failed` `rendered/`
       objects are actually deleted. (First live deletion owner-gated.)
+
 - [ ] **R167**: Background images have a defined, implemented retention story so they stop accumulating
       forever — unreferenced/aged backgrounds under `orgs/{orgId}/backgrounds/…` become eligible for
       pruning by a job. (First live deletion owner-gated.)
+
 - [ ] **R168**: PPTX import sources (the source `.pptx` and extracted `images/` under
       `orgs/{orgId}/pptx-imports/{importId}/…`) have a defined, implemented retention story so they stop
       accumulating forever after an import is consumed/rendered. (First live deletion owner-gated.)
@@ -75,9 +81,11 @@ limits.
 - [ ] **R171**: The Resend send path enforces a volume cap — a per-message maximum recipient count
       and/or a per-org send quota — so a single send (or the crons that enqueue through it) cannot fan
       out without bound.
+
 - [ ] **R172**: Project-wide function instance ceilings are set (a `setGlobalOptions({ maxInstances })`
       and/or explicit per-function caps), covering at least the `api` proxy and `messageWebhook`, so no
       HTTP function can scale out unbounded under load or abuse.
+
 - [ ] **R173**: The Cloud Run PPTX render service has an explicit `--max-instances` (and appropriate
       `--concurrency`) ceiling so rendering cannot scale out without bound.
 
@@ -103,10 +111,10 @@ Each requirement maps to exactly one phase. Phase numbering continues from v1.7 
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R161 | Phase 65 | Pending |
-| R162 | Phase 65 | Pending |
-| R163 | Phase 65 | Pending |
-| R164 | Phase 65 | Pending |
+| R161 | Phase 65 | Complete |
+| R162 | Phase 65 | Complete |
+| R163 | Phase 65 | Complete |
+| R164 | Phase 65 | Complete |
 | R165 | Phase 66 | Pending |
 | R166 | Phase 66 | Pending |
 | R167 | Phase 66 | Pending |
@@ -117,12 +125,14 @@ Each requirement maps to exactly one phase. Phase numbering continues from v1.7 
 | R173 | Phase 67 | Pending |
 
 **Coverage:**
+
 - v1.8 requirements: 12 total (R161–R168, R170–R173)
 - Mapped to phases: 12 ✓ (Phase 65: R161–R164 · Phase 66: R165–R168 · Phase 67: R170–R173)
 - Unmapped: 0 ✓
 - Deferred (not mapped): R169 — in-app per-org storage-usage visibility
 
 **Phase boundaries:**
+
 - **Phase 65 — AI Proxy Cost Controls** (R161–R164): the metered `api` proxy + `src/utils/claudeApi.ts` client. Largest variable bill, sequenced first. Fully autonomous-deployable.
 - **Phase 66 — Storage Retention** (R165–R168): enable/verify the two dry-run sweeps and build retention for the never-pruned backgrounds & pptx-import paths. Mechanisms build/test autonomously; the first live deletion of real objects is an owner-gated deploy.
 - **Phase 67 — Fan-out, Cron & Instance Guardrails** (R170–R173): disable the unused daily cross-org reminder scan, cap the Resend send loop, and set function + Cloud Run instance ceilings. All bounded/reversible config → autonomous-deployable.
