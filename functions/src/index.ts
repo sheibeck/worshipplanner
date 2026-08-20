@@ -212,6 +212,58 @@ export function readAiProxyLimits(env: NodeJS.ProcessEnv = process.env): AiProxy
 // the owner can tune fan-out without a logic redeploy.
 const AI_PROXY_MAX_INSTANCES = Number(process.env.AI_PROXY_MAX_INSTANCES) || 10;
 
+export interface EnforceModelAndTokensOk {
+  ok: true;
+  body: Record<string, unknown>;
+}
+export interface EnforceModelAndTokensReject {
+  ok: false;
+  status: number;
+  error: { error: string; allowedModels: string[] };
+}
+export type EnforceModelAndTokensResult = EnforceModelAndTokensOk | EnforceModelAndTokensReject;
+
+/**
+ * R162: server-side model allow-list + max_tokens ceiling. The proxy stops
+ * trusting the client-supplied `model`/`max_tokens` -- a disallowed, missing,
+ * or blank model is REJECTED (400, not forwarded; a wrong/expensive model is
+ * almost certainly a bug or abuse). An over-ceiling max_tokens is CLAMPED
+ * down rather than rejected (friendlier, still caps per-call output cost);
+ * an absent max_tokens is left absent, never injected.
+ */
+export function enforceModelAndTokens(
+  body: unknown,
+  limits: Pick<AiProxyLimits, "allowedModels" | "maxTokensCeiling">,
+): EnforceModelAndTokensResult {
+  if (typeof body !== "object" || body === null) {
+    return {
+      ok: false,
+      status: 400,
+      error: {
+        error: "Request body must be a JSON object naming a server-permitted model.",
+        allowedModels: limits.allowedModels,
+      },
+    };
+  }
+  const record = body as Record<string, unknown>;
+  const model = record.model;
+  if (typeof model !== "string" || model.trim().length === 0 || !limits.allowedModels.includes(model)) {
+    return {
+      ok: false,
+      status: 400,
+      error: {
+        error: "The requested model is not permitted by server policy.",
+        allowedModels: limits.allowedModels,
+      },
+    };
+  }
+  const maxTokens = record.max_tokens;
+  if (typeof maxTokens === "number" && maxTokens > limits.maxTokensCeiling) {
+    return { ok: true, body: { ...record, max_tokens: limits.maxTokensCeiling } };
+  }
+  return { ok: true, body: record };
+}
+
 export const api = onRequest(
   { secrets: [CLAUDE_API_KEY, ESV_API_KEY, NLT_API_KEY], maxInstances: AI_PROXY_MAX_INSTANCES },
   async (req, res) => {
@@ -280,13 +332,26 @@ export const api = onRequest(
       headers["authorization"] = `Token ${ESV_API_KEY.value()}`;
     }
 
+    // R162: model allow-list + max_tokens clamp apply to the anthropic
+    // upstream ONLY. esv/nlt/planningcenter fall straight through to the
+    // fetch below with `outboundBody` left as `req.body`, byte-unchanged.
+    let outboundBody: unknown = req.body;
+    if (service === "anthropic") {
+      const enforcement = enforceModelAndTokens(req.body, readAiProxyLimits());
+      if (!enforcement.ok) {
+        res.status(enforcement.status).json(enforcement.error);
+        return;
+      }
+      outboundBody = enforcement.body;
+    }
+
     try {
       const upstream = await fetch(upstreamUrl, {
         method: req.method,
         headers,
         body: ["GET", "HEAD"].includes(req.method)
           ? undefined
-          : JSON.stringify(req.body),
+          : JSON.stringify(outboundBody),
       });
 
       res.status(upstream.status);

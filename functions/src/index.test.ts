@@ -33,6 +33,7 @@ import {
   readAiProxyLimits,
   resolveOrgId,
   verifyAppCaller,
+  enforceModelAndTokens,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -2463,6 +2464,57 @@ describe("verifyAppCaller", () => {
     });
     vi.mocked(getAuth).mockReturnValue({ verifyIdToken } as never);
     expect(await verifyAppCaller("bad-token")).toBeNull();
+  });
+});
+
+describe("enforceModelAndTokens", () => {
+  const limits = { allowedModels: ["claude-haiku-4-5-20251001"], maxTokensCeiling: 2048 };
+
+  it("passes an allow-listed model with an under-ceiling max_tokens through unchanged", () => {
+    const body = { model: "claude-haiku-4-5-20251001", max_tokens: 512, messages: [] };
+    const result = enforceModelAndTokens(body, limits);
+    expect(result).toEqual({ ok: true, body });
+  });
+
+  it("rejects a non-allow-listed model with 400", () => {
+    const result = enforceModelAndTokens({ model: "claude-opus-4-1", max_tokens: 100 }, limits);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(400);
+      expect(result.error.allowedModels).toEqual(limits.allowedModels);
+    }
+  });
+
+  it("clamps an over-ceiling max_tokens down to the ceiling rather than rejecting", () => {
+    const result = enforceModelAndTokens(
+      { model: "claude-haiku-4-5-20251001", max_tokens: 9999 },
+      limits,
+    );
+    expect(result).toEqual({
+      ok: true,
+      body: { model: "claude-haiku-4-5-20251001", max_tokens: 2048 },
+    });
+  });
+
+  it("leaves an absent max_tokens absent rather than injecting one", () => {
+    const result = enforceModelAndTokens({ model: "claude-haiku-4-5-20251001" }, limits);
+    expect(result).toEqual({ ok: true, body: { model: "claude-haiku-4-5-20251001" } });
+  });
+
+  it("rejects a missing model with 400", () => {
+    const result = enforceModelAndTokens({ max_tokens: 100 }, limits);
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a blank model with 400", () => {
+    const result = enforceModelAndTokens({ model: "   ", max_tokens: 100 }, limits);
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a non-object body with 400", () => {
+    expect(enforceModelAndTokens(null, limits).ok).toBe(false);
+    expect(enforceModelAndTokens("a string", limits).ok).toBe(false);
+    expect(enforceModelAndTokens(42, limits).ok).toBe(false);
   });
 });
 
