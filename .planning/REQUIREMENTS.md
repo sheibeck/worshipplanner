@@ -32,7 +32,7 @@ REQ-IDs continue from v1.8 (last R173).
       a non-super-admin is denied/redirected client-side, and the route is distinctly named (not `/admins`,
       which the per-org TeamView already owns).
 
-- [ ] **R178**: Firestore security rules permit read/write of the admin-only collections (`appConfig/*`,
+- [x] **R178**: Firestore security rules permit read/write of the admin-only collections (`appConfig/*`,
       `superAdmins/*`) to super-admins only, via a claim-based `isSuperAdmin()` check (no cross-document
       `get()`/`exists()`), proven by genuine ALLOW **and** DENY emulator tests.
 
@@ -144,7 +144,7 @@ REQ-IDs continue from v1.8 (last R173).
 | R175 | Phase 68 | Complete |
 | R176 | Phase 68 | Pending |
 | R177 | Phase 68 | Pending |
-| R178 | Phase 68 | Pending |
+| R178 | Phase 68 | Complete |
 | R179 | Phase 68 | Pending |
 | R180 | Phase 69 | Pending |
 | R181 | Phase 69 | Pending |

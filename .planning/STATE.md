@@ -5,15 +5,15 @@ milestone_name: Owner Admin Console
 current_phase: 68
 current_phase_name: super-admin-access-gate
 status: executing
-stopped_at: Completed 68-01-PLAN.md
-last_updated: "2026-08-20T15:12:04.102Z"
+stopped_at: Completed 68-03-PLAN.md
+last_updated: "2026-08-20T15:22:21.234Z"
 last_activity: 2026-08-20
 last_activity_desc: Phase 68 execution started
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -649,7 +649,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 68 (super-admin-access-gate) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-08-20 — Phase 68 execution started
 
@@ -2222,6 +2222,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 67 P01 | 30min | 3 tasks | 2 files |
 | Phase 67 P02 | 6min | 1 tasks | 1 files |
 | Phase 68 P01 | 9min | 2 tasks | 4 files |
+| Phase 68 P03 | 18min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2591,6 +2592,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R172: one setGlobalOptions maxInstances=20 ceiling at module top; api keeps its own tighter maxInstances=10 (not clobbered)
 - [Phase ?]: R173: kept --concurrency=1 on render-service (not the 4 floated in 67-CONTEXT.md) — LibreOffice shared-profile-lock makes concurrent conversions on one instance unreliable; --max-instances tightened to 3 as the explicit cost ceiling.
 - [Phase ?]: 68-01: Shared mergeAndSetCustomClaims/clearClaimKeys helper closes the org-membership claim replace/wipe hazard (R175); both write branches refactored, SC1 regression proves superAdmin survives an org-membership clear.
+- [Phase ?]: isSuperAdmin() Firestore rules helper is claim-only (no get()/exists()) per R178, avoiding the storage.rules deny-everyone fragility class
+- [Phase ?]: appConfig/* and superAdmins/* gated on isSuperAdmin() with genuine ALLOW + DENY emulator tests; no appConfig doc contents written (Phase 69 boundary)
 
 ### Roadmap Evolution
 
@@ -2910,8 +2913,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T15:12:04.052Z
-Stopped at: Completed 68-01-PLAN.md
+Last session: 2026-08-20T15:22:21.186Z
+Stopped at: Completed 68-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
