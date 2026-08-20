@@ -1839,25 +1839,53 @@ export async function sendScheduledRemindersHandler(
 // the other. No new onSchedule wrapper and no secret is added for the dispatch
 // sweep -- it only re-creates a 'queued' doc; only sendQueuedMessage holds the
 // key (R131).
+//
+// R170: the body used to live directly in the onSchedule callback below;
+// it is now extracted into this EXPORTED orchestrator, exclusively so an
+// env gate can sit at its very top, before EITHER sweep -- and therefore
+// before the first getFirestore()/collectionGroup call either sweep makes.
+// Default OFF (unset, "false", "True", "1", anything that is not exactly
+// "true" -- the same fail-safe idiom as MEDIA_CLEANUP_ENABLED et al. above):
+// gating the WHOLE function off is the lowest-cost option and kills BOTH the
+// reminder collectionGroup('services') scan AND the schedule-for-later
+// collectionGroup('messages') scan -- zero cross-org reads when disabled.
+//
+// DISCLOSED behavior change: gating the whole function off also disables
+// dispatchDueScheduledMessagesHandler, i.e. the composer's "schedule for
+// later" send. To restore reminders OR schedule-for-later dispatch, set
+// SCHEDULED_MESSAGING_CRON_ENABLED=true and redeploy sendScheduledReminders
+// -- fully reversible via the flag, no data loss either way.
+export async function runScheduledMessagingCron(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  if (env.SCHEDULED_MESSAGING_CRON_ENABLED !== "true") {
+    console.log(
+      'runScheduledMessagingCron: SCHEDULED_MESSAGING_CRON_ENABLED is not "true" -- skipping both the reminder sweep and the schedule-for-later dispatch sweep (zero cross-org reads).',
+    );
+    return;
+  }
+  try {
+    await sendScheduledRemindersHandler();
+  } catch (err) {
+    console.error(
+      "sendScheduledReminders: reminder sweep failed:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+  try {
+    await dispatchDueScheduledMessagesHandler();
+  } catch (err) {
+    console.error(
+      "sendScheduledReminders: dispatch sweep failed:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
 export const sendScheduledReminders = onSchedule(
   { schedule: "every day 04:00", timeZone: "UTC" },
   async () => {
-    try {
-      await sendScheduledRemindersHandler();
-    } catch (err) {
-      console.error(
-        "sendScheduledReminders: reminder sweep failed:",
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-    try {
-      await dispatchDueScheduledMessagesHandler();
-    } catch (err) {
-      console.error(
-        "sendScheduledReminders: dispatch sweep failed:",
-        err instanceof Error ? err.message : String(err),
-      );
-    }
+    await runScheduledMessagingCron();
   },
 );
 

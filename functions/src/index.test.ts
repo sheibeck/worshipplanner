@@ -38,6 +38,7 @@ import {
   minusDays,
   sendScheduledRemindersHandler,
   dispatchDueScheduledMessagesHandler,
+  runScheduledMessagingCron,
   readAiProxyLimits,
   readNumericKnob,
   resolveOrgId,
@@ -2803,6 +2804,44 @@ describe("sendScheduledRemindersHandler", () => {
     expect(wrapperBody).toMatch(/timeZone:\s*"UTC"/);
     expect(wrapperBody).not.toMatch(/secrets:/);
   });
+
+  // R170: gate the WHOLE cron off by default -- the flag lives at the very
+  // top of runScheduledMessagingCron, before either sweep, so a
+  // disabled/default cron makes ZERO calls into getFirestore/collectionGroup.
+  // Reuses this suite's mockServicesDb (collectionGroup-spy) harness so
+  // "zero reads" is proven against the SAME fake Firestore the enqueue tests
+  // above use, not a hand-waved assertion.
+  describe("runScheduledMessagingCron (R170: gate OFF by default)", () => {
+    it("performs ZERO collectionGroup reads when SCHEDULED_MESSAGING_CRON_ENABLED is unset", async () => {
+      const { collectionGroupSpy } = mockServicesDb([], {});
+
+      await runScheduledMessagingCron({});
+
+      expect(collectionGroupSpy).not.toHaveBeenCalled();
+    });
+
+    it("performs ZERO collectionGroup reads for any value that is not exactly 'true'", async () => {
+      const { collectionGroupSpy } = mockServicesDb([], {});
+
+      await runScheduledMessagingCron({ SCHEDULED_MESSAGING_CRON_ENABLED: "False" });
+
+      expect(collectionGroupSpy).not.toHaveBeenCalled();
+    });
+
+    it("runs both sweeps (collectionGroup IS invoked) when SCHEDULED_MESSAGING_CRON_ENABLED is exactly 'true'", async () => {
+      const { collectionGroupSpy } = mockServicesDb([], {});
+      // The dispatch sweep's own collectionGroup('messages') scan is outside
+      // this suite's mockServicesDb (which only wires 'services') and throws
+      // -- caught by runScheduledMessagingCron's own try/catch, same as
+      // production; suppress the expected console.error noise.
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+      await runScheduledMessagingCron({ SCHEDULED_MESSAGING_CRON_ENABLED: "true" });
+
+      expect(collectionGroupSpy).toHaveBeenCalledWith("services");
+      errSpy.mockRestore();
+    });
+  });
 });
 
 // --- dispatchDueScheduledMessagesHandler (61-03: R141 schedule-for-later) ---
@@ -3092,14 +3131,21 @@ describe("dispatchDueScheduledMessagesHandler", () => {
     errSpy.mockRestore();
   });
 
-  it("SOURCE: the dispatch sweep is wired into the sendScheduledReminders wrapper in its own try/catch — no new onSchedule wrapper, no secret", () => {
+  it("SOURCE: the dispatch sweep is wired into runScheduledMessagingCron in its own try/catch — no new onSchedule wrapper, no secret", () => {
     const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    // R170: the two sweeps now live inside the gated runScheduledMessagingCron
+    // orchestrator (not directly in the onSchedule callback) -- assert against
+    // ITS body, then separately assert the onSchedule wrapper just delegates.
+    const cronStart = source.indexOf("export async function runScheduledMessagingCron(");
     const wrapperStart = source.indexOf("export const sendScheduledReminders = onSchedule(");
-    expect(wrapperStart).toBeGreaterThan(-1);
-    const wrapperBody = source.slice(wrapperStart, wrapperStart + 900);
-    // Both sweeps run inside the one wrapper; the dispatch sweep is called here.
-    expect(wrapperBody).toContain("dispatchDueScheduledMessagesHandler()");
-    expect(wrapperBody).toMatch(/try\s*\{/);
+    expect(cronStart).toBeGreaterThan(-1);
+    expect(wrapperStart).toBeGreaterThan(cronStart);
+    const cronBody = source.slice(cronStart, wrapperStart);
+    // Both sweeps run inside the one gated orchestrator; the dispatch sweep is called here.
+    expect(cronBody).toContain("dispatchDueScheduledMessagesHandler()");
+    expect(cronBody).toMatch(/try\s*\{/);
+    const wrapperBody = source.slice(wrapperStart, wrapperStart + 300);
+    expect(wrapperBody).toContain("runScheduledMessagingCron()");
     // No dedicated onSchedule wrapper and no secret bound to the dispatch sweep.
     expect(source).not.toContain("export const dispatchDueScheduledMessages = onSchedule");
     const handlerStart = source.indexOf("export async function dispatchDueScheduledMessagesHandler(");
