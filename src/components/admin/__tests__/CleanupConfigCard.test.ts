@@ -13,8 +13,10 @@ enableAutoUnmount(afterEach)
 //    no real Vue reactivity is needed (every test mounts fresh after the
 //    state it wants is in place). ──
 const { mockSaveField, storeState, mockPreviewFn, mockHttpsCallable } = vi.hoisted(() => {
-  const mockPreviewFn = vi.fn((_req: { type: string }) =>
-    Promise.resolve({ data: { wouldDeleteCount: 0, wouldDeleteBytes: 0 } }),
+  const mockPreviewFn = vi.fn(
+    (_req: { type: string }): Promise<{
+      data: { wouldDeleteCount: number; wouldDeleteBytes: number; referencesComplete?: boolean }
+    }> => Promise.resolve({ data: { wouldDeleteCount: 0, wouldDeleteBytes: 0 } }),
   )
   return {
     mockSaveField: vi.fn((_path: string, _value: unknown) => Promise.resolve()),
