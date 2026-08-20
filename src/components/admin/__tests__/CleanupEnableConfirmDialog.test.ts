@@ -106,4 +106,22 @@ describe('CleanupEnableConfirmDialog', () => {
     expect(wrapper.emitted('cancel')).toHaveLength(1)
     expect(wrapper.emitted('confirm')).toBeUndefined()
   })
+
+  it('restores focus to the previously-focused element when the dialog closes', async () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = 'Enable'
+    document.body.appendChild(trigger)
+    trigger.focus()
+    expect(document.activeElement).toBe(trigger)
+
+    const wrapper = mountDialog({ open: false })
+    await wrapper.setProps({ open: true })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(document.activeElement).not.toBe(trigger)
+
+    await wrapper.setProps({ open: false })
+    expect(document.activeElement).toBe(trigger)
+
+    trigger.remove()
+  })
 })

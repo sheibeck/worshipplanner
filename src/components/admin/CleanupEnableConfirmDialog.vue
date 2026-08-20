@@ -158,6 +158,12 @@ const bodyText = computed(() => {
   return 'Nothing would be deleted right now. Enabling arms the next scheduled run — newly orphaned data will be deleted automatically once it becomes eligible.'
 })
 
+// The element that had focus immediately before the dialog opened (almost
+// always the row's Enable button that triggered it) -- captured on open,
+// restored on close per 71-UI-SPEC.md Accessibility: "on close, focus
+// returns to the row's Enable button that opened the dialog" (review WR-01).
+const previouslyFocusedElement = ref<HTMLElement | null>(null)
+
 // Focus-on-open: land on Cancel, never Confirm — a deliberate safe default
 // for a dialog that can arm a permanent deletion (71-UI-SPEC.md
 // Accessibility). Runs after the DOM has updated for the new `open` value.
@@ -165,9 +171,13 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) {
+      previouslyFocusedElement.value = document.activeElement as HTMLElement | null
       void nextTick(() => {
         cancelButtonRef.value?.focus()
       })
+    } else {
+      previouslyFocusedElement.value?.focus()
+      previouslyFocusedElement.value = null
     }
   },
 )
