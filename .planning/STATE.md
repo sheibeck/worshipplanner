@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: Owner Admin Console
-current_phase: 70
-current_phase_name: admin-console-ui
-status: verifying
-stopped_at: Completed 70-02-PLAN.md
+current_phase: 71
+current_phase_name: cleanup-deletion-toggle-safety
+status: planning
+stopped_at: Phase 70 code-complete + auto-verified (human UAT deferred /gsd-verify-work 70); advancing to Phase 71 (final)
 last_updated: "2026-08-20T20:47:25.570Z"
 last_activity: 2026-08-20
-last_activity_desc: Phase 70 execution started
+last_activity_desc: Phase 70 code-complete (verification deferred), advancing to Phase 71
 progress:
   total_phases: 4
   completed_phases: 3
@@ -77,6 +77,7 @@ re-entry these phases are dropped from the run queue and resumed only via the re
 |-------|-------|--------|
 | 68 | verification_deferred_human | /gsd-verify-work 68 |
 | 69 | verification_deferred_human | /gsd-verify-work 69 |
+| 70 | verification_deferred_human | /gsd-verify-work 70 |
 
 **Phase 68 (Super-Admin Access Gate & Claim-Merge Fix)** — code-complete + automatically verified 5/5 SC
 on 2026-08-20 (functions 397/397, functions build clean, root type-check clean, rules ALLOW/DENY 6/6 vs a

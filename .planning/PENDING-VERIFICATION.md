@@ -579,3 +579,18 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 **Owner deploy hand-over (`functions/DEPLOY-RUNTIME-CONFIG.md`):** deploy the Phase 68 `firestore.rules` (appConfig/superAdmins gate) first/together, then `firebase deploy --only functions:api,functions:cleanupExpiredMedia,functions:cleanupOrphanRenders,functions:cleanupOrphanBackgrounds,functions:cleanupPptxSources,functions:sendScheduledReminders,functions:sendQueuedMessage`. Behavior-neutral until a value is written to `appConfig/global` (defaults-merge). `RESEND_API_KEY` stays a server secret — never in the config doc.
 
 **Carry-forward note for Phase 70 (from review Info-2):** the numeric config knobs have no UPPER bound in `appConfig.ts` coercion — the Phase 70 admin form should enforce sensible min/max on each field (defense-in-depth; the rules gate WHO writes, not WHAT magnitude).
+
+---
+
+## Phase 70 — Admin Console UI & No-Reply Sender (v1.9) — `verification_deferred_human`
+
+**Code-complete + automatically verified 2026-08-20** (verifier ran gates: `npx vitest run` 3861/3875 after review fixes — only the 2 documented baseline files fail; `npm run type-check` clean; `DEFAULT_APP_CONFIG` client mirror byte-identical to functions, now guarded by a REAL cross-file import test that empirically fires on drift). Code review: 0 Critical; 3 Warnings + top UI finding fixed (bidirectional rate-limit cross-field, empty-number required, real drift-guard, allowedModels proactive Save-disable). **UI review: 21/24** (copywriting/visuals/typography/spacing clean). Client-only — nothing deployed.
+
+**What only a human at `/gsd-verify-work 70` can confirm — do NOT mark passed:**
+
+1. **Visual UI pass:** open `/owner-console` as a super-admin and eyeball the four config cards (Cleanup read-only, AI Proxy, Messaging, Sender) against the dark theme — effective values + `(default)` badges, provenance stamp, inline validation errors, the read-only cleanup note, and the amber "must be a Resend-verified domain" sender warning all render correctly and legibly on desktop + mobile.
+2. **Live Firestore round-trip (R187):** as a real super-admin, edit a field (e.g. a retention window or an AI rate limit), Save, reload — the value persists in `appConfig/global` and shows as explicitly-set (badge cleared). Requires the emulator or deployed rules+functions.
+3. **Real-cron pickup (R181 spot-check, the milestone's point):** after deploy, a saved `retention.mediaDays` is honored by the real `cleanupMedia` cron with no redeploy.
+4. **Real-email (R191):** a saved `sender.fromAddress` on a genuinely Resend-verified domain delivers mail (needs a live Resend account + DNS).
+
+**No deploy for this phase itself** (client-only UI) — but it is only USABLE once the Phase 68 rules + Phase 69 functions are deployed (owner hand-over: `functions/DEPLOY-SUPER-ADMIN.md` + `functions/DEPLOY-RUNTIME-CONFIG.md`).
