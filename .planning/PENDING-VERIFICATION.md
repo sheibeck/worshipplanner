@@ -547,3 +547,20 @@ click Send and see the in-button spinner with **no** "Save failed." toast on suc
 **Client-only plan — NO deploy, NO `.env.local`, callable stays UNDEPLOYED (mocked in tests)** (v1.8 grant).
 Do **not** treat this item as passed — the composer end-to-end visual UAT is deferred to the owner.
 **This is the FINAL plan of milestone v1.8.**
+
+---
+
+## Phase 68 — Super-Admin Access Gate & Claim-Merge Fix (v1.9) — `verification_deferred_human`
+
+**Code-complete + automatically verified 2026-08-20** (verifier re-ran every gate independently: `cd functions && npm test` 397/397; `cd functions && npm run build` clean; `npm run type-check` clean; rules ALLOW/DENY 6/6 against a **live Firestore emulator**; app suite at the documented 2-file baseline). Code review: no Critical findings; 3 Warnings fixed (W1 grant-boolean validation, W3 router auth-ready gate) / documented (W2 residual same-uid claim TOCTOU). **Nothing deployed** — auth + rules + bootstrap are owner hand-over per the v1.9 grant (see `functions/DEPLOY-SUPER-ADMIN.md`).
+
+**What only a human at `/gsd-verify-work 68` can confirm — do NOT mark these passed:**
+
+1. **R177 — real route/nav gate:** sign in as a super-admin → the "Owner Console" nav entry shows and `/owner-console` loads; sign in as an ordinary user → the nav entry is absent and a direct visit to `/owner-console` redirects to the app home. (No router-guard unit precedent in this repo — needs a real signed-in browser session, and needs the rules + functions DEPLOYED, or the local emulator.)
+2. **R179 — real grant/revoke E2E:** from the Owner Console roster, grant another user super-admin by email and confirm they gain access on their next token refresh; revoke and confirm they lose it. (Needs the deployed `setSuperAdminClaim` callable + `syncSuperAdminClaim` trigger.)
+3. **R176 — production first-super-admin bootstrap:** the real `node lib/bootstrapSuperAdmin.js --email <owner> --apply` run against production, after deploying rules + functions (the dry-run path is unit-tested; the real `--apply` is owner-run once). See `functions/DEPLOY-SUPER-ADMIN.md`.
+4. **R179 — real revoke session-cutoff timing:** confirm the ≤1hr `revokeRefreshTokens` residual window behaves as documented (the unit test only mock-verifies the call is made; actual propagation timing is a live-Firebase behavior).
+
+**Owner deploy hand-over (from `functions/DEPLOY-SUPER-ADMIN.md`):** `firebase deploy --only firestore:rules` · `firebase deploy --only functions:syncSuperAdminClaim,functions:setSuperAdminClaim` · then the bootstrap `--apply`.
+
+**Owner infra check flagged for before Phase 71's live deletion toggles ship:** confirm Cloud Storage Object Versioning / bucket retention is enabled as a delete safety-net (this milestone's code can't verify it).

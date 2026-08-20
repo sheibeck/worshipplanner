@@ -140,12 +140,12 @@ REQ-IDs continue from v1.8 (last R173).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R174 | Phase 68 | Complete |
-| R175 | Phase 68 | Complete |
-| R176 | Phase 68 | Complete |
-| R177 | Phase 68 | Complete |
-| R178 | Phase 68 | Complete |
-| R179 | Phase 68 | Complete |
+| R174 | Phase 68 | Complete (UAT deferred) |
+| R175 | Phase 68 | Complete (UAT deferred) |
+| R176 | Phase 68 | Complete (UAT deferred) |
+| R177 | Phase 68 | Complete (UAT deferred) |
+| R178 | Phase 68 | Complete (UAT deferred) |
+| R179 | Phase 68 | Complete (UAT deferred) |
 | R180 | Phase 69 | Pending |
 | R181 | Phase 69 | Pending |
 | R182 | Phase 69 | Pending |

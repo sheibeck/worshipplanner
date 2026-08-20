@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.9
 milestone_name: Owner Admin Console
-current_phase: 68
-current_phase_name: super-admin-access-gate
-status: verifying
-stopped_at: Completed 68-05-PLAN.md (final plan of Phase 68 — code-complete, ready for /gsd-verify-work 68 per v1.9 standing autonomy grant)
+current_phase: 69
+current_phase_name: firestore-runtime-config
+status: planning
+stopped_at: Phase 68 code-complete + auto-verified (human UAT deferred /gsd-verify-work 68); advancing to Phase 69
 last_updated: "2026-08-20T15:55:22.164Z"
 last_activity: 2026-08-20
-last_activity_desc: Phase 68 execution started
+last_activity_desc: Phase 68 code-complete (verification deferred), advancing to Phase 69
 progress:
   total_phases: 4
   completed_phases: 1
@@ -65,6 +65,25 @@ pattern as v1.6/v1.7/v1.8. Re-read before deciding to stop — it survives conte
   rules change carries a genuine ALLOW-case test that actually runs against the real emulator, not just
   deny-cases. Cross-service `firestore.exists()` is inert in the Storage emulator (firebase-js-sdk#6803) —
   do not gate a Storage rule on it.
+
+---
+
+## Deferred Verification
+
+Per the v1.9 grant, human UAT is deferred to milestone end and NEVER recorded as passed. On autonomous
+re-entry these phases are dropped from the run queue and resumed only via the recorded command.
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 68 | verification_deferred_human | /gsd-verify-work 68 |
+
+**Phase 68 (Super-Admin Access Gate & Claim-Merge Fix)** — code-complete + automatically verified 5/5 SC
+on 2026-08-20 (functions 397/397, functions build clean, root type-check clean, rules ALLOW/DENY 6/6 vs a
+live emulator, app baseline held; code review: 0 Critical, W1/W3 fixed, W2 documented). UNDEPLOYED — auth +
+rules + bootstrap are owner hand-over (`functions/DEPLOY-SUPER-ADMIN.md`). Deferred items detailed in
+`.planning/PENDING-VERIFICATION.md` (R176 prod `--apply`, R177 real route/nav, R179 real grant/revoke E2E +
+revoke-timing). Owner infra check flagged: enable Cloud Storage Object Versioning before Phase 71's live
+deletion toggles ship.
 
 ---
 
