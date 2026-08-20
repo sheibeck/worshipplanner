@@ -1353,9 +1353,14 @@ export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroun
         | { backgroundImageUrl?: unknown; slides?: Array<{ backgroundImageUrl?: unknown }> }
         | undefined;
       trackUrl(data?.backgroundImageUrl);
-      if (Array.isArray(data?.slides)) {
-        for (const slide of data.slides) {
-          trackUrl(slide?.backgroundImageUrl);
+      if (data?.slides !== undefined) {
+        if (Array.isArray(data.slides)) {
+          for (const slide of data.slides) {
+            trackUrl(slide?.backgroundImageUrl);
+          }
+        } else {
+          // Malformed slides field -- can't prove no reference exists in it.
+          referencesComplete = false;
         }
       }
     }

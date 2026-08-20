@@ -1421,6 +1421,25 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     expect(summary).toMatchObject({ dryRun: true, referencesComplete: false });
   });
 
+  it("REFERENCES-INCOMPLETE FAIL-SAFE: a slideGroups doc with a non-array slides field forces the whole run to dry-run", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    mockBackgroundDb({
+      slideGroups: [
+        // `slides` present but not an array -- a corrupted/malformed write.
+        // Cannot prove no reference exists inside it, so this must NOT be
+        // treated the same as "no slides".
+        { data: () => ({ backgroundImageUrl: undefined, slides: "not-an-array" }) },
+      ],
+    });
+    const orphan = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg-orphan/delete-me.png`, STALE_DAYS);
+    mockBackgroundBucket([orphan]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(orphan.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: true, deletedCount: 0, referencesComplete: false });
+  });
+
   it("FLOOR GUARD: zero total references found anywhere, yet candidate backgrounds exist -- treats references as incomplete and deletes nothing", async () => {
     // Both collectionGroup scans succeed (no throw, no unparseable URL) but
     // return zero docs -- a silent-empty result, not an error. This must be
