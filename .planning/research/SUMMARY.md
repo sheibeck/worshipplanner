@@ -1,333 +1,161 @@
 # Project Research Summary
 
-**Project:** WorshipPlanner
-**Domain:** Volunteer/team transactional messaging & notifications, bolted onto an existing Vue 3 + Firebase worship-service planning SPA
-**Researched:** 2026-08-13
-**Confidence:** MEDIUM-HIGH
+**Project:** Worship Planner — v1.9 Owner Admin Console
+**Domain:** Owner-only super-admin console for a live Vue 3 + Firebase SaaS — Firestore-backed runtime config, custom-claim admin gate, admin UI, live cleanup-toggle safety
+**Researched:** 2026-08-20
+**Confidence:** HIGH
 
 ## Executive Summary
 
-v1.7 adds email to a mature app that already has everything messaging needs to lean on: a roster with
-emails (Roles tab), a lock/reopen service lifecycle, a share-link/snapshot-builder discipline, and three
-`defineSecret`-backed Cloud Function integrations to copy the pattern from. All four research passes
-converge on the same shape: this is an **integration** project, not a greenfield one — zero new
-architectural primitives, only new wiring on proven precedent (queue-then-trigger send, `onSchedule`
-cron, `defineSecret` secrets, nested-subcollection data model, org-settings kill-switch). The provider
-recommendation is **Resend** (free at this app's volume, cleanest Node SDK, first-class webhook bounce
-events, easiest domain-auth setup) sending through a single owner-gated Cloud Function that is the only
-code holding the API key.
+This milestone moves nine-plus operational knobs (four cleanup enable flags + retention windows, AI-proxy rate limits/model allow-list, messaging fan-out caps, the no-reply sender address) off `process.env`/deploy-gated config and into a super-admin-only Firestore doc editable from a new console, gated by a `superAdmin` custom claim built on the exact `orgMembershipClaims.ts` trigger-sync pattern this codebase already proved out in v1.5. All four research tracks (Stack, Features, Architecture, Pitfalls) converge on the same shape and, critically, on the same landmines: zero new npm dependencies are needed (plain Admin SDK + a module-scope TTL cache + the app's existing no-validation-library form style covers everything); the super-admin claim must be **merged**, never blind-replaced, into the existing `{orgId, role}` claims object via a new shared `mergeAndSetCustomClaims()` helper, because `syncOrgMembershipClaim`'s existing blind `setCustomUserClaims` write will otherwise silently wipe `superAdmin` off the owner's own token the next time their org membership doc is touched by ordinary product usage; and `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` structurally cannot become "live, no redeploy" because they are Cloud Functions v2 deploy-time settings evaluated at module load, not per-invocation values — this must be scoped as a documented exception, not silently promised or silently mishandled.
 
-The recommended approach: stand up provider infrastructure and the kill-switch first, build one shared
-server-side recipient resolver that every send surface (composer, lock, re-lock, scheduled reminder)
-calls — never a per-surface reimplementation — then layer the composer, the lock/re-lock triggers, and
-the scheduled reminder on top of that resolver and the same queue-then-trigger send primitive. The
-re-lock scoped change-diff is explicitly the outlier: no peer tool (Planning Center, Elvanto, Rock RMS)
-does anything like it, it is the single highest-complexity net-new piece of logic in the milestone, and
-it depends on everything else (lock snapshotting, the send primitive, the recipient resolver) already
-being solid — so it belongs in its own phase, sequenced last.
+The recommended approach is a five-phase, dependency-ordered build: (A) super-admin claim + client/server gate + the claims-merge fix, shipped together so the hazard never exists unpatched even briefly; (B) the `appConfig` Firestore doc + `isSuperAdmin()`-gated rules (claim-only check, no cross-document `get()`, deliberately avoiding the exact "cross-service `firestore.exists()`" rules-fragility class that already caused a production deny-everyone incident on `storage.rules`); (C) mechanical, one-line-per-call-site swaps of every Cloud Functions config read from `process.env` to a cached `getAppConfig()`, with asymmetric caching (TTL for hot paths like the `api` proxy, always-fresh reads for the daily cleanup crons) and a per-knob fail-open/fail-closed default table so a missing/malformed doc is safe by construction; (D) the admin console UI itself, reusing every existing pattern in this app (Pinia `onSnapshot` store, plain-cast-and-guard form validation, Tailwind card layout — no new libraries); and (E) the dry-run blast-radius preview + confirm-to-flip flow, which is a hard requirement co-located with the deletion-toggle UI, not a follow-on polish pass, because a one-click enable removes the deploy-time friction that today gives the owner an implicit review step for free.
 
-Key risks, all converged on across research files: (1) sending without SPF/DKIM/DMARC on a real
-church-controlled domain silently lands in spam — this is DNS-level owner work that must be scoped as an
-explicit early step, not assumed done; (2) Cloud Functions are at-least-once, so every send path needs a
-transactional idempotency-key check or volunteers get duplicate emails; (3) an unauthenticated bounce
-webhook is a forgeable write surface unless HMAC-verified from the first commit; (4) recipient
-correctness (dedup by email, unassigned-role handling, stale roster data, kill-switch enforcement) must
-live in exactly one shared resolver, or four independently-written send surfaces will each get it
-slightly wrong. None of these is exotic — they're all "apply the discipline this codebase already has
-once more, consistently" — but they are the difference between a trustworthy feature and a silent-failure
-one, which is explicitly why this milestone exists (delivery visibility beats doing nothing).
+The dominant risk category, repeated across all four research files, is **conflating "move config off env vars" with "make everything uniformly live and uniformly cached."** Nine sub-risks fall out of this: (1) the claims-merge hazard above; (2) `*_MAX_INSTANCES` cannot go live; (3) a naive per-request config read inside the hot `api` proxy would multiply Firestore reads 1:1 with traffic, undoing the v1.8 cost-hardening work; (4) the inverse mistake — over-caching a destructive-enable flag so an emergency disable doesn't reach a warm cron instance in time; (5) a single global fail-open-or-fail-closed policy applied uniformly to a missing config doc will get at least one knob category backwards (deletion flags must fail closed, AI rate limits must fail open with capped fallback values); (6) type/validation drift once `process.env`'s forced-string-parsing discipline disappears; (7) a client-only route guard with no `firestore.rules`/function-side enforcement, mirroring a mistake class this app has already made once (the `storage.rules` incident); (8) the song-linked-background fail-safes living in the exact function body the config swap touches, at risk from an over-eager refactor; and (9) provider secrets (`RESEND_API_KEY`) leaking onto the client-readable `appConfig` surface if sender-config scope creeps toward credentials. Every one of these has a concrete, cheap prevention documented in PITFALLS.md and is mapped to a specific phase below.
 
 ## Key Findings
 
 ### Recommended Stack
 
-**Resend** is the recommended email provider: $0/month at this app's realistic volume (3,000/mo free
-tier vs. a low-hundreds-per-month usage pattern), the cleanest Node SDK of the group, native
-`scheduledAt` for one-off delayed sends, webhook-based hard-bounce events (Svix-signed, HMAC-verifiable
-— no SNS/SQS plumbing like SES), and the fastest domain-auth setup (dashboard generates exact DNS
-records, one-click verify). It slots into the existing `defineSecret` pattern used for
-`CLAUDE_API_KEY`/`ESV_API_KEY`/`NLT_API_KEY` with zero new secret-management design. The scheduled
-reminder should use this app's own `onSchedule` (already used twice, for `cleanupExpiredMedia` and
-`cleanupOrphanRenders`) rather than Resend's `scheduledAt`, because it needs Draft-state-aware logic
-evaluated at fire time — reserve `scheduledAt` for the composer's single-message "schedule for later."
+No new runtime dependency is required anywhere in this milestone — `firebase-admin@^13.10.0`, `firebase-functions@^7.2.5`, and the client `firebase@^12.0.0` SDK already cover every capability needed (Firestore doc reads/writes, `setCustomUserClaims`, `getIdTokenResult`, `onSnapshot`). Config caching is a hand-rolled `{ value, fetchedAt }` module-scope object with a TTL check — a caching library (`node-cache`/`lru-cache`) is rejected as unnecessary complexity for caching exactly one document. Firebase Remote Config was considered and explicitly rejected as a second, architecturally inconsistent config surface. Form validation reuses the app's existing zero-library, plain-cast-and-guard pattern (`SettingsView.vue`) rather than introducing `zod`/`vee-validate`/`yup`.
 
 **Core technologies:**
-- `resend` npm SDK (`^6.19.0`) — official Node SDK for send + webhook signature verification, no
-  Firebase-specific dependency, Node >=20 compatible with this repo's Node 22 Functions
-- `defineSecret` (`firebase-functions/params`, already `^7.2.5`) — injects `RESEND_API_KEY` and
-  `RESEND_WEBHOOK_SECRET`, exactly mirroring the three existing secrets in `functions/src/index.ts`
-- `onSchedule` (already `^7.2.5`) — drives the daily reminder scan as a third cron job alongside the two
-  that already exist
+- `firebase-admin` (installed `^13.10.0`) — server-side Firestore reads + `setCustomUserClaims` — already the only Firestore/Auth touchpoint in Functions; do NOT bump to v14, no capability needed is v14-only
+- `firebase-functions` (installed `^7.2.5`) — `onCall`/`onSchedule`/`onDocumentWritten` wrappers — reuse `onDocumentWritten` for an audit trail, NOT for cache invalidation (cannot reach sibling warm instances)
+- `firebase` client SDK (installed `^12.0.0`) — `onSnapshot`/`updateDoc` for the admin console store — identical pattern to every other Pinia store in the app
 
 ### Expected Features
 
-Peer landscape (Planning Center Services, Elvanto, Rock RMS) validates nearly every element of the
-already-imported design as table stakes, with one clear standout differentiator.
+**Must have (table stakes):**
+- Super-admin auth gate on a real custom claim (not a hardcoded UID check), enforced client AND server side
+- A minimal admin shell distinct from `AppShell.vue`/existing "Admins" TeamView (naming collision — see Architecture)
+- Typed config editor with inline min/max/required validation, client-side AND rules/function-side
+- Effective-value display with a last-changed-by/at stamp (not a live staleness ticker — that's deferred)
+- Dry-run blast-radius preview + confirm-to-flip flow specifically gating the four `*_CLEANUP_ENABLED` toggles — the milestone's hard requirement, not optional polish
+- No-reply sender address field with format validation and a "must be Resend-verified" warning (domain verification itself is an out-of-band owner action in Resend/DNS, outside this console's reach — `*.web.app` is confirmed permanently unreachable)
+- `updatedBy`/`updatedAt` on the config doc (cheap, do it while the save path is being built)
 
-**Must have (table stakes) — P1, all locked into v1.7 scope:**
-- Recipients derived from who's scheduled on the service (teams-first, matches every peer tool)
-- Auto-notify on lock (maps onto PCO's "send scheduling email" / Elvanto's "publish" moment)
-- Configurable pre-service reminder (PCO ships 0-7 days out as a first-class feature)
-- Ad-hoc one-off message to teams/individuals
-- Live recipient count before send ("Reaches N")
-- Skip/exclude unreachable (no-email) roster entries silently
-- Basic delivery log (sent/pending, matching Rock RMS's confirmation-status tracking)
-- Org-wide kill switch (PCO has an equivalent org/browser-level disable)
+**Should have (differentiators, fold cheaply into P1 work):**
+- Confirm-to-flip modal echoing the real dry-run count before a destructive toggle commits
+- Who-changed-what stamp per section (the `updatedBy`/`updatedAt` fields above, surfaced in the UI)
 
-**Should have (differentiators) — the standout is the re-lock scoped diff:**
-- Explicit, typed, team-tagged change diff on re-lock (SONG/ORDER/ROLE/NOTES/SLIDES) — **no peer tool
-  surveyed does this**; it directly exploits this app's unique lock/reopen lifecycle
-- Insertable merge tokens in free-text composer — PCO only does fixed auto-included blocks, not
-  user-insertable tokens
-- Hard-bounce surfacing per service — PCO's docs don't describe bounce visibility to the planner at all
-- Draft-aware reminder suppression — peers have no equivalent Draft concept to skip against
-
-**Defer (v2+, explicit anti-features):**
-- Accept/Decline RSVP + response tracking (duplicates PCO's core scheduling job — explicitly out of scope
-  per PROJECT.md's "complement, not replace")
-- Open-tracking/read receipts (locked decision: sent + hard bounces only)
-- SMS channel, rich HTML template builder, two-way reply threading, general-purpose contact list/CRM —
-  all over-scoped for a 2-3-planner tool already served by PCO for anything beyond messaging
+**Defer (v2+):**
+- Billing/plan management UI, church/org provisioning from the console (no data model exists yet)
+- Multi-admin grant/revoke UI (bootstrap-script-only for now; a UI managing a set of 1-2 people is ceremony)
+- In-app `aiUsage`/dry-run-log dashboards and charts (the single dry-run count is the only "usage visibility" this pass needs)
+- Per-org override of global config knobs (single/few-org app today; note the extension point, don't build it)
+- Full audit-log collection + browsing UI, live staleness ticker, real-time collaborative editing (all explicitly rejected as scope creep for a 1-2-admin console)
 
 ### Architecture Approach
 
-Every new element reuses an existing pattern rather than inventing one: nested `services/{id}/messages/{id}/recipients/{id}`
-subcollections (mirroring the `songs/{id}/lyrics/{id}` two-segment-nesting precedent, kept out of the
-hot `services` list-read path exactly like `slideGroups`); a queue-then-trigger send split
-(`onCall` enqueues -> `onDocumentCreated` sends), the *exact* shape `parsePptxHandler` ->
-`pptxRenders` -> `requestPptxRender` already proves out in this codebase; one shared pure recipient
-resolver built on the existing `resolveServiceRoleAssignments`; and reuse of `buildServiceSnapshot`
-verbatim for the re-lock diff's lock-time baseline (zero new serialization logic).
+The system is additive plumbing layered onto proven idioms, not a restructuring: a new `superAdmins/{uid}` collection (existence = granted) mirrors `organizations/{orgId}/members/{uid}`; a new `syncSuperAdminClaim` trigger mirrors `syncOrgMembershipClaim`; a new top-level `appConfig/global` singleton doc mirrors where `aiUsage`/`aiRateLimits` already live; a new `isSuperAdmin()` rules helper mirrors `isOrgEditor()` but reads the token claim directly (no `get()`/`exists()` cross-document call, deliberately cheaper and safer than the org-membership pattern). Per-org RBAC, the messaging pipeline, and the PPTX render pipeline are untouched.
 
 **Major components:**
-1. `src/utils/messagingRecipients.ts` + a server-side port under `functions/src/` — pure recipient
-   resolution (team->RoleGroup mapping, dedup by email, unreachable-count), consumed identically by the
-   composer's live count and the Function's authoritative re-resolve at send time
-2. `queueServiceMessage` (onCall) -> `messages/{id}` doc -> `sendQueuedMessage` (onDocumentCreated) —
-   the single code path and single secret-holder for every trigger type (one-off, lock, re-lock,
-   scheduled reminder all terminate here)
-3. `sendScheduledReminders` (onSchedule, daily cron) — scans due services, creates `messages` docs;
-   never calls the provider directly, so there remains exactly one send code path
-4. `messageWebhook` (onRequest, HMAC-verified, no Firebase Auth) — the one genuinely new public/unauthenticated
-   trust boundary, updating `recipients/{id}.status` from the echoed `{orgId, serviceId, messageId, recipientId}` metadata
-5. `serviceLockDiff.ts` — pure diff of two `ServiceSnapshot`s into typed, team-tagged `ChangeEntry[]`,
-   built on the same snapshot-builder discipline that already fixed a prior share-link bug (v1.5 root
-   cause: "snapshot frozen at share time")
+1. `functions/src/claimsHelpers.ts` (new) — `mergeAndSetCustomClaims(uid, patch)`, the single load-bearing fix shared by both claim writers
+2. `functions/src/superAdminClaims.ts` (new) + `orgMembershipClaims.ts` (modified) — both route through the merge helper; `superAdmins/{uid}` collection is the source of truth
+3. `functions/src/appConfig.ts` (new) — `AppConfig` type, `DEFAULT_APP_CONFIG` (identical numbers to today's env fallbacks, deep-merged so an empty doc reproduces current behavior byte-for-byte), `getAppConfig(db)` with per-instance TTL cache
+4. `functions/src/index.ts` (modified, mechanical) — every v1.8 knob read-site swapped to `getAppConfig()`; `previewCleanupDryRun` (new `onCall`) forces `dryRun = true` unconditionally, reusing the already-exported handler bodies
+5. `src/stores/auth.ts`, `src/router/index.ts`, `src/components/AppSidebar.vue` (modified) — `isSuperAdmin` ref off the existing `getIdTokenResult` call, `requiresSuperAdmin` route guard, a distinctly-named nav entry (`/owner-console`, NOT `/admins` — that's taken by `TeamView.vue`)
+6. `src/stores/admin.ts` + `src/views/AdminView.vue`/`OwnerConsoleView.vue` + `src/components/admin/*` (new) — console shell, config panels, sender form, dry-run preview modal, roster manager
+7. `firestore.rules` (modified) — `isSuperAdmin()` helper + `appConfig/*` + `superAdmins/*` match blocks, claim-only, no cross-document lookup
 
 ### Critical Pitfalls
 
-1. **No domain authentication (SPF/DKIM/DMARC)** — sending from an unauthenticated or free-address
-   domain silently lands in spam or gets dropped; this is owner DNS work, must be scoped as an explicit
-   first-phase blocking step, not assumed done before "it works" is claimed.
-2. **Non-idempotent sends on at-least-once Cloud Functions** — a retried trigger without a transactional
-   `sent/{key}`-check-before-send re-sends duplicate emails; must be baked into the very first send
-   Function, not retrofitted.
-3. **Provider key exposed to the client or stored via deprecated `functions.config()`** — must be
-   `defineSecret`-only, never a `VITE_*` var, matching the existing three-secret pattern exactly.
-4. **Open/forgeable bounce webhook** — must verify HMAC signature over the raw request body before any
-   Firestore write, reject with 401 first; a naive `onRequest` endpoint is public by default.
-5. **Recipient correctness scattered across four send surfaces** — one shared server-side resolver
-   (dedup by email, unassigned-role handling, kill-switch + draft-skip checks) must be built once and
-   consumed by composer/lock/re-lock/reminder, or each surface will independently re-break the same rules.
+1. **Claim replacement, not merge** — `setCustomUserClaims` overwrites the whole claims object; `syncOrgMembershipClaim`'s existing blind write will silently strip `superAdmin` the next time any org membership doc is touched. Fix: a shared `mergeAndSetCustomClaims()` helper, used by BOTH the new grant path and the modified `syncOrgMembershipClaimHandler`, shipped in the same phase as the claim itself — not later hardening.
+2. **`*_MAX_INSTANCES` cannot go live** — `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` are Cloud Functions v2 deploy-time settings evaluated once at module load, before any Firestore read is possible. Scope them explicitly as staying `process.env`-based, surfaced read-only in the console if shown at all, labeled "requires redeploy" — never silently promised as live.
+3. **A live enable-toggle removes the deploy-time review step for free** — flipping `BACKGROUND_CLEANUP_ENABLED` today requires an env edit + redeploy, a deliberate friction point. The admin UI must never expose a bare toggle: require an on-demand dry-run preview showing the real count, a confirm step echoing that count, and never trigger an immediate delete as a toggle side effect (only the next *scheduled* run acts).
+4. **Asymmetric caching by knob criticality** — TTL cache (30-60s) for hot paths (`api` proxy, `sendQueuedMessage`); NO cache, fresh read every invocation, for the four daily cleanup crons and `sendScheduledReminders`, so an emergency disable takes effect on the very next run. A single uniform caching policy gets this backwards in one direction or the other.
+5. **Fail-open vs fail-closed is per-knob, not global** — a missing/malformed `appConfig` doc must default cleanup flags to OFF/dry-run (fail-closed), AI rate limits to capped fallback values (fail-open on the read, still bounded on spend), and the AI model allow-list to the existing restrictive default — never "allow all models." A single blanket try/catch returning one kind of default (all-permissive or all-restrictive) gets at least one category wrong.
 
 ## Implications for Roadmap
 
-Based on combined research, the four researchers agree on this backbone: **(a)** a single shared
-server-side recipient resolver and idempotent send-record consumed by ALL send surfaces; **(b)** the
-Settings kill-switch ships before or with any auto-send path; **(c)** the re-lock scoped diff is the
-highest-complexity differentiator and should be its own phase, sequenced last; **(d)** an
-infrastructure/provider-setup phase (Resend account, domain SPF/DKIM/DMARC, secrets — all owner-gated)
-comes first, before any send-path code is built.
+Based on research, suggested phase structure — all four research tracks independently converged on this same five-phase, dependency ordering:
 
-### Phase 1: Provider infrastructure & settings foundation
-**Rationale:** Every other phase depends on the provider secret existing and the kill-switch existing
-before any auto-send is possible; PITFALLS' Pitfall 1 requires DNS/domain-auth work to be scoped and
-completed by the owner before any "it works" claim is credible, and ARCHITECTURE's default-off kill
-switch must exist before a fresh org's send Function has anything real to call.
-**Delivers:** Resend account (owner step) + `RESEND_API_KEY`/`RESEND_WEBHOOK_SECRET` via `defineSecret`;
-`OrgSettings.messaging` block (`enabled: false` default) merged into `loadOrgContext`; the
-`isMessagingEnabled()` client choke point (mirroring `claudeApi.ts`); `firestore.rules` additions for
-`messages`/`recipients`/`lockSnapshots` added early, locked-down by default per this codebase's
-rules-first discipline.
-**Addresses:** Settings kill-switch (P1 feature), email provider infra (P1 feature)
-**Avoids:** Pitfall 1 (domain auth), Pitfall 3 (secret handling)
+### Phase A: Super-admin claim, client/server gate, and the claims-merge fix
+**Rationale:** Foundation for every other phase — the console is meaningless as a security boundary without this, and the merge-hazard fix must exist before the `superAdmin` claim type exists even one phase without it, since ordinary org-membership writes happen constantly in production.
+**Delivers:** `claimsHelpers.ts` (`mergeAndSetCustomClaims`), `superAdminClaims.ts` (decide/sync/onCall), `orgMembershipClaims.ts` modified to route through the merge helper, a one-off owner-run bootstrap script for the first super-admin (chicken-and-egg — mirrors `backfillOrgClaims.ts`), `auth.ts`/router/nav wiring (route can be a placeholder — proves the gate end-to-end early).
+**Addresses:** Admin auth gate (table stakes), server-enforced route (table stakes).
+**Avoids:** Pitfall 1 (claim replacement), Pitfall 8 (client-only gate), Pitfall 9 (token refresh gap on grant/revoke — force-refresh via a listened claims-changed signal, `revokeRefreshTokens` + `checkRevoked: true` on revocation), Pitfall 10 (bootstrap chicken-and-egg), Pitfall 11 (claim-only rules check, never a cross-document Firestore lookup — avoids repeating the `storage.rules` deny-everyone incident class).
 
-### Phase 2: Shared recipient resolver
-**Rationale:** FEATURES' dependency graph and PITFALLS' Pitfall 6 both single this out as the thing that
-must exist once, consumed everywhere, before the composer or any auto-send is built — building it inline
-per-surface is explicitly named technical debt that's "never acceptable past a spike."
-**Delivers:** `src/utils/messagingRecipients.ts` (pure, client-side, unit-testable with no Firestore
-mocking) wrapping `resolveServiceRoleAssignments`; a server-side port under `functions/src/` kept in
-lockstep; dedup-by-email, unreachable-role surfacing, kill-switch + draft-skip checks centralized here.
-**Uses:** `resolveServiceRoleAssignments` (existing, `src/utils/serviceRoles.ts`)
-**Implements:** the recipient-resolution architecture component
+### Phase B: `appConfig` config doc + Firestore rules
+**Rationale:** Must land before the console (Phase D) is given direct client-SDK read/write access; independently buildable/testable once Phase A exists (claim to gate against).
+**Delivers:** `appConfig.ts` (type, `DEFAULT_APP_CONFIG` matching today's exact env fallback numbers, deep-merge reader), `firestore.rules` additions (`isSuperAdmin()` + `appConfig/*` + `superAdmins/*`), genuine ALLOW-case emulator tests in `rules.test.ts` (not just DENY cases — per CLAUDE.md's own documented incident).
+**Implements:** Architecture components 3 and 7 above.
+**Uses:** Plain Admin SDK, no new library (Stack).
 
-### Phase 3: Messages composer + send path (queue-then-trigger)
-**Rationale:** ARCHITECTURE's queue-then-trigger split (mirroring `parsePptxHandler`->`pptxRenders`->
-`requestPptxRender`) is the one new send primitive every later trigger reuses; PITFALLS' Pitfall 2
-(idempotency) and Pitfall 5 (RBAC re-check) must be baked into this Function from its first commit, since
-retrofitting after other phases build on it is harder. The composer UI itself can build in parallel once
-Phase 2's resolver and Phase 1's rules land.
-**Delivers:** `MessageComposer.vue` (teams-first recipients, One-off/Reminder/Share-link types, tokens,
-"Reaches N" live count, send-copy/schedule-for-later); `queueServiceMessage` (onCall, thin) ->
-`messages/{id}` doc -> `sendQueuedMessage` (onDocumentCreated, the only Function holding the provider
-secret, transactional idempotency check, server-side re-resolution of recipients, per-recipient token
-rendering).
-**Addresses:** Messages composer (P1 feature)
-**Avoids:** Pitfall 2 (idempotency), Pitfall 5 (RBAC/recipient trust), Pitfall 3 (secret confined to
-Functions)
+### Phase C: Cloud Functions read config (mechanical swap)
+**Rationale:** Each swap is a no-behavior-change deploy while `appConfig/global` is empty (defaults-merge guarantee), so this can ship ahead of the UI; the console (Phase D) should land after this so a UI-flipped toggle has an observable effect during UAT.
+**Delivers:** All nine-plus knob read-sites swapped from `process.env` to cached `getAppConfig()` reads — cleanup handlers' four enable/retention/cap reads, AI proxy limits, messaging caps, no-reply sender address. `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` explicitly EXCLUDED and documented as staying env-var-based.
+**Addresses:** "Show effective value" table-stake feasibility (caching choice determines it).
+**Avoids:** Pitfall 2 (song-linked-background fail-safes — one-line swap only, existing unit tests must pass UNCHANGED), Pitfall 3 (uncached hot-path reads undoing v1.8 cost work), Pitfall 4 (stale warm-instance cache on emergency disable), Pitfall 5 (per-knob fail-open/fail-closed table), Pitfall 6 (`maxInstances` exception, resolved as a scoping decision here, not discovered mid-implementation), Pitfall 7 (type/validation drift — schema validation on every read, typed the way `readNumericKnob`'s zero-vs-falsy fix already handles).
 
-### Phase 4: Delivery history & bounce webhook
-**Rationale:** ARCHITECTURE and PITFALLS both flag the webhook as the one genuinely new
-unauthenticated-by-Firebase trust boundary in the whole feature — it must ship with HMAC verification
-from its first deploy, never added after a demo. It depends on Phase 3's `messages`/`recipients` doc
-shape and provider message-id capture already existing.
-**Delivers:** `messageWebhook` (onRequest, HMAC-verified against raw body, rejects unsigned/malformed
-requests with 401 before touching Firestore); per-service delivery-history panel reading
-`messages`+`recipients`; `deliveryCounts` rollup.
-**Addresses:** Delivery history & hard-bounce surfacing (P1 feature)
-**Avoids:** Pitfall 4 (forged webhook)
+### Phase D: Admin console UI
+**Rationale:** Depends on A (gated route) and B (rules permitting direct reads/writes); best sequenced after C so toggles have observable effect, though technically buildable in parallel with C.
+**Delivers:** `stores/admin.ts` (Pinia, `onSnapshot`), `AdminView.vue`/`OwnerConsoleView.vue` shell + per-knob-group panels, super-admin roster management UI (`setSuperAdminClaim` onCall).
+**Addresses:** Minimal admin shell, typed config editor, effective-value display, no-reply sender field (table stakes).
+**Avoids:** Pitfall 12 (secret leak — sender-config fields stay address/display-name only, never credentials).
 
-### Phase 5: Lock / re-lock triggers (first-lock notification only)
-**Rationale:** Depends on Phases 2-4 all being solid (a stable send primitive + delivery visibility to
-hang the lock-notify prompt off of). This phase covers the simpler "first lock" case only — no diff —
-deliberately separated from the diff-engine work per FEATURES' explicit dependency-note ("scope [the diff]
-as its own phase; it should not share a phase with the simpler lock-notification... work").
-**Delivers:** `lockSnapshots/current` write hooked into `onMarkAsPlanned`; first-lock notification prompt
-(no diff) using org/service messaging defaults; per-service automatic-email defaults toggle
-(Settings-inherited).
-**Addresses:** Lock notification (P1 feature)
-**Avoids:** Pitfall 6 recurrence (kill-switch/draft-skip must be checked here too, not just in the
-scheduled path)
+### Phase E: Deletion-toggle safety (dry-run preview + confirm-to-flip)
+**Rationale:** Depends on C (handlers must already be config-driven so preview and live toggle share one source of truth) and D (console shell to host the modal). Ships in the SAME phase as the cleanup toggles reaching the UI — never a later hardening pass, since the unsafe version is a fully functional-looking MVP.
+**Delivers:** `previewCleanupDryRun` onCall (dry-run forced true, independent of live config), UI confirm-then-preview flow gating any `*_CLEANUP_ENABLED` flip.
+**Addresses:** Dry-run blast-radius preview, confirm-to-flip flow (differentiators treated as hard requirements here).
+**Avoids:** Pitfall 1 (live toggle deleting before review) and Anti-Pattern 3 from Architecture (preview accidentally deleting for real — `dryRun` must never derive from the live config value).
 
-### Phase 6: Scheduled share-link reminder
-**Rationale:** Independent of Phase 5 (FEATURES' dependency graph marks it "independent of D"); depends
-only on Phase 3's send primitive existing. Grouping it separately lets it land in parallel with or after
-Phase 5 without blocking either.
-**Delivers:** `sendScheduledReminders` (onSchedule daily cron, mirroring `cleanupExpiredMedia`/
-`cleanupOrphanRenders`'s shape exactly); Draft-state skip logic; reminder-days-before Settings UI;
-idempotency via `reminderSentAt`.
-**Addresses:** Scheduled share-link reminder (P1 feature)
-**Avoids:** Pitfall 2 (idempotent reminder sends), UX Pitfall (timezone — flagged as open question below)
-
-### Phase 7: Re-lock scoped change-diff notification
-**Rationale:** All four research files agree this is the single highest-complexity, highest-differentiation
-piece and should be sequenced last — it depends on the lock-snapshot mechanism (Phase 5), the send
-primitive (Phase 3), and the recipient resolver (Phase 2) all already being proven. PITFALLS' Pitfall 7
-(snapshot drift, the same bug class already diagnosed once in v1.5's share-link work) means this phase
-must build directly on the existing snapshot-builder discipline rather than ad hoc comparison logic.
-**Delivers:** `src/utils/serviceLockDiff.ts` (pure diff of two `ServiceSnapshot`s into typed,
-team-tagged `ChangeEntry[]`); checkable re-lock diff UI feeding the same composer/queue path
-(`type='relock-notification'`); "Lock quietly" always-available escape hatch; snapshot overwrite on
-confirm so the *next* re-lock diffs against the new state, not the original.
-**Addresses:** Re-lock change notice (P1 feature, standout differentiator per FEATURES)
-**Avoids:** Pitfall 7 (snapshot drift / over- or under-reporting)
+**No-reply sender** is delivered inside C (functions side) + D (console form) — it does not need its own phase.
 
 ### Phase Ordering Rationale
 
-- **Infrastructure-first (Phase 1) is non-negotiable**: PITFALLS' Pitfall 1 explicitly names this the
-  "first v1.7 phase," and STACK's provider choice is a prerequisite input every other phase's Function
-  code depends on.
-- **Shared resolver before any send surface (Phase 2)**: FEATURES' dependency graph and PITFALLS'
-  Pitfall 6 both call out duplicated per-surface recipient logic as a "never acceptable past a spike"
-  shortcut — building it once, early, prevents four independent implementations from drifting.
-- **Send primitive before any trigger that uses it (Phase 3 before 5, 6, 7)**: ARCHITECTURE's
-  queue-then-trigger design is reused identically by every later phase; building it once with idempotency
-  and RBAC baked in avoids retrofitting those properties into four call sites.
-- **Delivery history/webhook (Phase 4) before the auto-send paths mature**: shipping lock-notify or the
-  scheduled reminder without bounce visibility "recreates the silent-failure problem this milestone exists
-  to solve" (FEATURES' dependency notes) — sequenced right after the send primitive, before the auto-send
-  triggers that make failures likely to matter in volume.
-- **Re-lock diff last (Phase 7)**: unanimous across FEATURES, ARCHITECTURE, and PITFALLS — it is the
-  highest-complexity, most novel logic (no peer-tool precedent to crib from) and depends on every other
-  piece (snapshot builder, send primitive, resolver) being stable first.
+- Dependency chain is strict and linear: claim/gate → config doc/rules → functions read config → UI → deletion safety. Every research file independently arrived at this exact order.
+- The claims-merge fix (Pitfall 1) is the single highest-priority correctness item — it must not exist unpatched for even one phase, so it is bundled into Phase A rather than treated as a separate hardening phase.
+- Cross-cutting process disciplines (every rules/functions/secrets deploy is owner-run, not autonomous; `.env.local`/`functions/.env` must be present in any worktree before local testing) apply to every phase, not one — call these out in each phase's plan/verification checklist rather than as a standalone phase.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning (`--research-phase`):
-- **Phase 7 (re-lock diff):** ARCHITECTURE flags real open design questions (SLIDES-diff granularity,
-  `affectedTeams` inference for non-ROLE entries) that were deliberately left unresolved for
-  requirements/roadmap — worth a focused research or discussion pass before planning this phase in detail.
-- **Phase 6 (scheduled reminder):** the timezone approach (naive UTC vs. org-local time) is flagged as an
-  open UX pitfall with no resolution in any research file — needs a decision before implementation.
-- **Phase 3 (composer/send path):** the "their roles" token's per-recipient personalization — true
-  per-recipient rendering vs. a merged blast for the initial cut — is explicitly deferred to a P2 decision
-  in FEATURES; the roadmap should decide up front whether Phase 3 ships the simpler merged version or the
-  full personalized version, since it changes the phase's scope materially.
+Phases likely needing deeper research during planning:
+- **Phase A:** the token-refresh-on-grant/revoke mechanics (`revokeRefreshTokens` + `checkRevoked: true`) are MEDIUM-confidence general Firebase platform behavior, not yet exercised in this codebase the way claim-sync itself has been — worth a research pass or at least explicit UAT design before planning.
+- **Phase C:** the per-knob fail-open/fail-closed default table (Pitfall 5) and the differentiated-caching design (TTL vs. always-fresh, Pitfall 3/4) are both named as required PLAN.md-level design decisions, not implementation details — treat as needing explicit design documentation during `/gsd-plan-phase`, even if not full external research.
 
-Phases with standard, well-documented patterns (skip research-phase, plan directly from this SUMMARY +
-ARCHITECTURE.md):
-- **Phase 1 (infra/settings):** directly copies the existing `defineSecret`/`OrgSettings` merge pattern,
-  no open design questions.
-- **Phase 2 (resolver):** pure-function port of existing, already-tested logic (`resolveServiceRoleAssignments`).
-- **Phase 4 (webhook):** standard HMAC-verification pattern, well-documented by the provider and by PITFALLS.
-- **Phase 5 (first-lock notify):** direct application of the Phase 3 send primitive to an existing trigger
-  point (`onMarkAsPlanned`), no new logic beyond what Phase 3 already establishes.
+Phases with standard patterns (skip research-phase):
+- **Phase B:** directly mirrors the existing `aiUsage`/`aiRateLimits` top-level-collection + claim-based-rule precedent already proven in this codebase.
+- **Phase D:** directly mirrors `SettingsView.vue`'s existing form/save/validation pattern and `auth.ts`'s existing `onSnapshot`-in-a-Pinia-store pattern; no new UI library or pattern needed.
+- **Phase E:** the dry-run code path already exists in all four v1.8 cleanup handlers; this phase exposes it on-demand, it doesn't invent new logic.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM-HIGH | Provider pricing/features cross-checked across 2+ independent web sources each; the `defineSecret` pattern verified directly against this repo's own `functions/src/index.ts`, not just docs — the strongest-grounded of the four files |
-| Features | MEDIUM | Peer-tool behavior (PCO especially) is grounded in official first-party help-center docs; broader "industry consensus" claims (tokens, bounce UX) are lower-confidence general web search |
-| Architecture | HIGH | Every recommendation is anchored to a real, currently-shipping file in this codebase by path; only two genuinely new decisions (provider choice, SLIDES-diff shape) are flagged as open rather than asserted |
-| Pitfalls | MEDIUM | Firebase/GCF idempotency guidance corroborated by official Google Cloud Blog + Firebase docs (HIGH within that topic); deliverability/inbox-placement specifics from a single benchmark source are explicitly flagged LOW and treated as directional only |
+| Stack | HIGH | Every recommendation verified directly against this repo's installed package manifests and source, cross-checked against live npm registry queries this session |
+| Features | MEDIUM (HIGH for codebase-grounded complexity/dependency claims) | Table-stakes/differentiator framing is well-grounded in PROJECT.md/SEED-001; general admin-UX comparables (kill-switch confirmation conventions) are LOW-confidence aggregated blog consensus, used only as corroboration |
+| Architecture | HIGH for codebase-derived findings; MEDIUM for general Firebase best-practice patterns | Component/rules/build-order recommendations read directly from `functions/src/index.ts`, `orgMembershipClaims.ts`, `firestore.rules`, `storage.rules`, `router/index.ts`; caching-across-instances reasoning corroborated by official Firebase docs |
+| Pitfalls | HIGH | Grounded directly in this repo's existing code and its own documented incident history (the `storage.rules` deny-everyone bug in CLAUDE.md); only token-revocation semantics are MEDIUM (general platform knowledge, not yet repo-proven) |
 
-**Overall confidence:** MEDIUM-HIGH — the architecture and stack conclusions are strongly grounded in
-this specific codebase's existing precedent; the open questions below are genuine product decisions, not
-research gaps.
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **SLIDES-diff granularity** (coarse yes/no changed vs. per-slide-group fingerprint) — ARCHITECTURE
-  proposes a lightweight per-group text-hash fingerprint stored only on `lockSnapshots/current`, but flags
-  this as needing requirements/roadmap confirmation before implementation (Phase 7).
-- **`affectedTeams` inference for non-ROLE diff entries** (SONG/ORDER/NOTES/SLIDES) — ARCHITECTURE
-  proposes a broad "every team with an assigned role" default, but notes a narrower mapping (e.g.
-  SONG->vocals+band only) is equally defensible and changes default recipient selection materially; needs
-  an owner/roadmap call before Phase 7 is planned in detail.
-- **Per-recipient "their roles" token rendering** — true per-recipient personalized rendering vs. a single
-  merged blast for the initial cut is explicitly P2 in FEATURES' prioritization matrix; the roadmap should
-  decide which version Phase 3 ships, since it changes that phase's scope.
-- **Scheduled-reminder timezone approach** — naive UTC date math vs. org-configured local time is flagged
-  as an unresolved UX pitfall with no research-file answer; needs a decision before Phase 6 is planned.
-- **Per-service messaging defaults on a locked service** — ARCHITECTURE recommends keeping
-  `services/{id}.messaging` draft-only-editable (no new rules carve-out), but flags this as needing
-  confirmation that toggling automatic-email defaults on an already-locked service isn't actually needed
-  for v1.7.
+- **`*_MAX_INSTANCES` console treatment:** whether to surface these read-only in the console at all, or omit them entirely — needs an explicit requirements-stage decision, not left to phase-planning discretion.
+- **Storage retention/versioning as a safety net:** whether Cloud Storage Object Versioning or bucket-level retention is enabled before live deletion toggles ship — an owner-side infrastructure check, not something this milestone's code can verify or enforce; flag for the owner explicitly before Phase E's toggles go live in production.
+- **`superAdmin` claim survival on last-org-membership removal:** `syncOrgMembershipClaimHandler`'s clear-path (`setCustomUserClaims(uid, null)` today) needs an explicit decision — recommended: preserve `superAdmin` when a user's last org membership is removed, since a super-admin isn't required to belong to any org to administer the app. Resolve this as part of Phase A's design, not left implicit.
+- **Bootstrap script scope:** confirmed as the right shape (mirrors `backfillOrgClaims.ts`, dry-run-by-default, `--apply`-gated, owner-run-once) — no open question, but worth restating in Phase A's plan as an explicit owner-handoff step, not an autonomously-run script.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `functions/src/index.ts` — existing `defineSecret` pattern (`CLAUDE_API_KEY`/`ESV_API_KEY`/`NLT_API_KEY`),
-  `onSchedule` cron precedent (`cleanupExpiredMedia`/`cleanupOrphanRenders`), queue-then-trigger precedent
-  (`parsePptxHandler`->`pptxRenders`->`requestPptxRender`) — verified directly, not from docs
-- `src/stores/services.ts` — `buildServiceSnapshot`, `markAsPlanned`, `reopenService`, `setRoleOverride`
-  scoped dot-path write precedent
-- `src/utils/serviceRoles.ts`, `src/utils/claudeApi.ts`, `src/types/organization.ts` — recipient
-  resolution and settings-choke-point precedent
-- `firestore.rules` — nested-vs-wildcard subcollection precedent (`songs/{id}/lyrics/{id}`, `pptxRenders`)
-- npm registry (`registry.npmjs.org/resend/latest` -> `6.19.0`) — direct primary-source version check
-- firebase.google.com/docs/functions/config-env — official `functions.config()` deprecation (March 2027)
-- Google Cloud Blog (idempotent/retry Cloud Functions guidance, 2 posts) + firebase.google.com/docs/functions/retries — official at-least-once delivery documentation
+- Direct repo inspection: `functions/package.json`, `package.json`, `functions/src/index.ts`, `functions/src/orgMembershipClaims.ts`, `functions/src/backfillOrgClaims.ts`, `src/stores/auth.ts`, `firestore.rules`, `storage.rules`, `src/router/index.ts`, `src/components/AppSidebar.vue`, `src/views/SettingsView.vue`, `.planning/PROJECT.md`, `.planning/seeds/SEED-001-admin-settings-interface.md`, `CLAUDE.md` (this repo's own incident record)
+- `npm view <pkg> version` live registry queries (2026-08-20): `firebase-admin`, `firebase-functions`, `firebase`, `resend`, `zod`, `node-cache`, `lru-cache`, `firebase-functions-test`
+- [Tips & tricks — Cloud Functions for Firebase](https://firebase.google.com/docs/functions/tips) — global-scope caching, `onInit()`
+- [Extend Cloud Firestore with Cloud Functions (2nd gen)](https://firebase.google.com/docs/firestore/extend-with-functions-2nd-gen) — gen2 trigger shape
+- [Control Access with Custom Claims and Security Rules | Firebase Authentication](https://firebase.google.com/docs/auth/admin/custom-claims) — 1000-byte claims limit, refresh behavior
+- `.planning/milestones/v1.5-phases/40-custom-auth-claim-for-org-membership/40-RESEARCH.md` — prior in-repo verified research on `setCustomUserClaims`
 
 ### Secondary (MEDIUM confidence)
-- help.planningcenter.com / pcoservices.zendesk.com (official PCO help docs) — scheduling-email, reminder,
-  and communicate-with-teams behavior
-- help.elvanto.com (official Elvanto docs) — publish-triggers-notify and contact-volunteers behavior
-- resend.com/docs (webhooks, verify-webhooks-requests, domain restriction) — official Resend docs
-- Provider pricing cross-checks (automationatlas.io, tiergauge.com, nuntly.com, saaspricepulse.com,
-  sendx.io, costbench.com) — 2+ independent sources per provider
-- Mailgun SPF/DKIM/DMARC setup guide; webhook signature verification guide (inventivehq.com) — cross-checked
-  against multiple independent sources
+- [Resend — Verified Domains](https://resend.com/docs/dashboard/domains/introduction) — corroborates existing codebase comment on DNS/domain verification requirements
+- [Firebase Remote Config](https://firebase.google.com/docs/remote-config) — reviewed to support the explicit reject-and-explain decision against it
+- General Cloud Functions v2 instance warm-reuse / cold-start / module-load timing and `revokeRefreshTokens`/`checkRevoked` semantics (community sources, corroborating official docs)
 
 ### Tertiary (LOW confidence)
-- itsupport.life.church (Rock RMS operational guide) — third-party, single source
-- theleadpastor.com and similar WorshipTools-vs-PCO blog comparisons — secondary, cross-checked across
-  two write-ups only
-- mailtrap.io transactional-email-services benchmark — single-vendor inbox-placement percentages, treated
-  as directional only, not precise
+- General feature-flag/kill-switch UX guidance (Harness, LaunchDarkly, Unleash, Flagsmith blogs) — used only for general "confirm destructive toggles, log who/when" pattern, which this project's own dry-run-preview requirement already exceeds
 
 ---
-*Research completed: 2026-08-13*
+*Research completed: 2026-08-20*
 *Ready for roadmap: yes*

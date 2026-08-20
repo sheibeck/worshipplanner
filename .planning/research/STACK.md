@@ -1,146 +1,351 @@
-# Stack Research: Email/Transactional-Mail Provider (v1.7 Volunteer Messaging & Notifications)
+# Stack Research
 
-**Domain:** Transactional email sending from a Firebase Cloud Functions backend (low-volume church app, ~50–2,000 emails/month)
-**Researched:** 2026-08-13
-**Confidence:** MEDIUM-HIGH (pricing/feature claims cross-checked across 2+ independent web sources per provider; Firebase secret-injection pattern confirmed directly against this repo's existing code, not just docs)
-
-## Answer to the owner's headline questions
-
-**What email service do we use?** **Resend.**
-
-**How much does it cost?** **$0 (Free plan) at this project's realistic volume.** Resend's free tier is 3,000 emails/month and 100/day, with one verified sending domain. A church of 20–60 volunteers sending one-off messages, lock notifications, re-lock diffs, and a weekly 7-day-out reminder will land in the low hundreds of emails/month — nowhere near 3,000. If usage ever exceeds that, the next tier (Pro) is **$20/month for 50,000 emails**, an order of magnitude of headroom past anything this app will generate. Budget for **$0/month**, with a plausible ceiling of $20/month only if the org list grows dramatically.
+**Domain:** Owner-only super-admin console for a live Vue 3 + Firebase app — Firestore-backed runtime
+config for Cloud Functions gen2, custom-claim admin gate, admin UI
+**Researched:** 2026-08-20
+**Confidence:** HIGH — every recommendation below is either (a) verified against this repo's installed
+package manifests / source (`functions/package.json`, `functions/src/index.ts`,
+`functions/src/orgMembershipClaims.ts`, `src/stores/auth.ts`, `firestore.rules`), or (b) confirmed against
+current npm registry versions and official Firebase documentation fetched this session. No new runtime
+dependency is required for any of the three questions in scope — this is a near-zero-new-dependency
+milestone by design.
 
 ## Recommended Stack
 
-### Core Technologies
+### Core Technologies (already installed — no bump required for this milestone)
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|------------------|
-| Resend | API (no version pin) + `resend` npm SDK `^6.19.0` | Transactional email send + delivery/bounce webhooks | Best fit for this exact shape of app: generous free tier at this volume, first-class Node SDK, native `scheduledAt` for delayed sends, webhook-based bounce events (not a separate SNS/SQS stack like SES), and the fastest domain-auth setup of the group (DNS records generated for you, single "Verify" click) — all while being a from-scratch integration effort the size of the existing NLT/Claude proxy Functions already in `functions/src/index.ts`. |
-| `firebase-functions/params` `defineSecret` | already `^7.2.5` in `functions/package.json` | Injects `RESEND_API_KEY` into the send Cloud Function at runtime, backed by Google Secret Manager | Already the established pattern in this repo — `CLAUDE_API_KEY`, `ESV_API_KEY`, and `NLT_API_KEY` are all wired this exact way in `functions/src/index.ts` (see `defineSecret(...)` calls, `secrets: [...]` on the function, and `.value()` at call time). `RESEND_API_KEY` is a fourth secret following the identical, already-proven pattern — no new plumbing to design. |
-| `onSchedule` (`firebase-functions/v2/scheduler`) | already `^7.2.5` | Drives the "N days before service" reminder and any other cron-style send | Already used twice in this codebase (`cleanupExpiredMedia`, `cleanupOrphanRenders`), so the "scheduled share-link reminder" (default 7 days out) is not new infrastructure — it's a third `onSchedule` function that queries upcoming services and calls the same send path. Do **not** rely on Resend's own `scheduledAt` for this recurring, condition-checked reminder (it needs "skip if still Draft" logic evaluated at send time, which only a server-side scheduled function can do); reserve `scheduledAt` for the composer's one-off "schedule for later" option on a single already-composed message. |
+| Technology | Installed | Latest (npm, verified 2026-08-20) | Purpose | Why Recommended |
+|------------|-----------|-------------------------------------|---------|-----------------|
+| `firebase-admin` | `^13.10.0` | `14.3.0` | Reads the Firestore config doc server-side (`getFirestore()`), sets the `superAdmin` custom claim (`getAuth().setCustomUserClaims`) | Already the only thing in this codebase that talks to Firestore/Auth from Functions. `^13.10.0` covers everything this milestone needs (`Firestore#doc().get()`, `Auth#setCustomUserClaims`, `Auth#getUser`) — no capability in v14 this milestone requires. **Do not bump** to v14 as part of this milestone; it's an unrelated major-version risk for zero gain here (same call made in the v1.5 custom-claims research). |
+| `firebase-functions` | `^7.2.5` | `7.3.2` | `onCall`/`onSchedule`/`onDocumentWritten` wrappers already used for every v1.8 knob and the org-claim trigger | The existing `^7.2.5` range already resolves to `7.3.2` on a plain `npm install` — nothing to change. No new trigger type is needed: `onDocumentWritten` (already imported, already used by `syncOrgMembershipClaim`) is the right primitive to log/audit config-doc writes; it is **not** used for cache invalidation (see Pattern 1 below — that's a deliberate non-use, not an oversight). |
+| `firebase` (client SDK) | `^12.0.0` | `12.18.0` | Admin console reads/writes the config doc via `onSnapshot`/`updateDoc`, exactly like every other Pinia store in this app | Already the app's only Firestore client. The `^12.0.0` range already resolves to `12.18.0`. |
+
+**Net effect: zero `npm install` needed for either `functions/` or the root app to build this milestone.**
+Both existing semver ranges already cover the current latest patch/minor; the only "version change" worth
+doing is letting a routine `npm install`/`npm update` pick up 7.3.2 / 12.18.0 opportunistically, unrelated
+to this feature.
 
 ### Supporting Libraries
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| `resend` (npm) | `^6.19.0` (latest as of 2026-08-13; requires Node ≥20 — this repo's Functions run Node 22, compatible) | Official Node SDK: `resend.emails.send()`, `resend.emails.batch()`, `resend.webhooks.*` | The only library needed on the Functions side to send mail and to verify inbound webhook payloads. |
-| `svix` (npm, transitively used by Resend's webhook verify helper) — or just call `resend.webhooks.verify()` directly | current via `resend` SDK | Verifies the `svix-id` / `svix-timestamp` / `svix-signature` headers on the inbound bounce-webhook HTTP Function so a forged POST can't fake a "delivered" or fabricate/hide a bounce | Required on the bounce-webhook receiving endpoint (an `onRequest` HTTPS Function). Use the raw request body — do not let Express/Firebase's JSON body-parser re-serialize it before verification, or the signature check breaks. |
+| *(none — plain Admin SDK + a module-scope object)* | — | In-memory config cache with TTL | See Pattern 1. A cache library is unnecessary complexity for caching **one document**. |
+| *(none — plain functions)* | — | Admin-form validation (numeric knob bounds, toggle state) | See "What NOT to Use" — matches the app's existing validation style (`SettingsView.vue`'s `Number(...)` + guard, no library) exactly. |
 
 ### Development Tools
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| Resend dashboard (Domains tab) | Add + verify the sending domain, view generated SPF/DKIM/DMARC DNS records | One-time setup by the owner (who controls DNS for the church's domain). Records go under a `send.` subdomain, not the apex — a common failure mode is publishing them at the wrong host or leaving a conflicting MX (e.g. Google Workspace) on that subdomain. |
-| Resend dashboard (Webhooks tab) | Register the production webhook URL (the Cloud Function's HTTPS trigger) and subscribe to `email.bounced` (+ optionally `email.delivered`, `email.sent`) | Copy the generated webhook signing secret into a second `defineSecret` (e.g. `RESEND_WEBHOOK_SECRET`). |
-| `firebase functions:secrets:set RESEND_API_KEY` / `firebase functions:secrets:set RESEND_WEBHOOK_SECRET` | Populates Secret Manager the same way `CLAUDE_API_KEY` etc. are already set | Owner-run, consistent with the standing "deploys and secret writes are owner-gated" rule already governing this milestone. |
+No new dev tooling. `vitest` (already `^4.1.10` in `functions/`) covers unit-testing the new
+`getRuntimeConfig()` cache module and the claim-merge helper, mirroring the existing
+`orgMembershipClaims.test.ts` / `backfillOrgClaims.test.ts` pattern (mocked Admin SDK, handler body
+exported separately from the trigger/onCall wrapper for testability).
 
 ## Installation
 
 ```bash
-# In functions/
-npm install resend
+# No new dependencies required for functions/ or the root app.
+# Optional, unrelated-to-this-feature housekeeping only:
+cd functions && npm install   # picks up firebase-functions 7.3.2 within the existing ^7.2.5 range
+npm install                   # root: picks up firebase 12.18.0 within the existing ^12.0.0 range
 ```
 
-No client-side (`src/`) package is needed or wanted — see "What NOT to Use" below.
+## Q1 — Firestore-as-runtime-config for gen2 Cloud Functions
 
-## Provider Comparison (verified 2026-08-13)
+**Answer: plain Admin SDK `Firestore#doc().get()`, wrapped in a module-scope TTL cache. No library.**
 
-| Provider | Free tier | Paid entry tier (small-church volume) | Hard-bounce webhook? | Domain auth (SPF/DKIM/DMARC) | Firebase/Node integration effort |
-|---|---|---|---|---|---|
-| **Resend** (recommended) | 3,000 emails/mo, 100/day, 1 domain | Pro: **$20/mo for 50,000 emails** | **Yes** — `email.bounced` webhook event (Svix-delivered, HMAC-verifiable), fires instead of `email.delivered` for the same message | Easiest of the group: dashboard generates the exact DNS records, single "Verify" button, guided troubleshooting for common misconfig | Lowest effort: one official `resend` npm package, `resend.emails.send()`, native `scheduledAt`, webhook verify helper built into the same SDK |
-| Postmark | Permanent free dev tier, but capped at **100 emails/month total** (not per-domain) and does not allow overage — sending simply stops at 100 | Basic: **$15/mo for 10,000 emails**, $1.80/1K overage | **Yes** — dedicated bounce webhook, classifies `HardBounce` explicitly via a `Type` field, very mature/purpose-built for this | Strong — separates transactional vs. broadcast streams, good reputation defaults | Good — official `postmark` npm package exists, similar shape to Resend, but the 100/mo free cap means this app would likely need the $15/mo tier from day one given roster sizes × message types (composer + lock + re-lock + weekly reminder easily exceeds 100/mo for an active church) |
-| SendGrid (Twilio) | Time-limited **60-day trial**, 100/day during trial; no indefinite free production tier as of 2026 | Essentials: **$19.95/mo for 100,000 emails** | Yes — Event Webhook with a `bounce` event type, further split into hard/soft via classification fields | Solid, well-documented, but historically the most complaint-prone reputation of this group (shared-IP spam history under the SendGrid brand) | Good SDK (`@sendgrid/mail`), but heavier/more enterprise-flavored API surface than needed here; no meaningfully-usable free production tier undercuts the "low volume, low cost" fit |
-| Amazon SES | 3,000 msgs/mo for the **first 12 months only** (post-2023 tier cut; old 62,000/mo EC2 allowance is gone); after that, **$0.10 per 1,000 emails** — cheapest at scale | Effectively pay-as-you-go: at 2,000 emails/mo, roughly **$0.20/month** in raw send cost | Yes, but **not a simple webhook** — bounces arrive via an SNS topic subscription (HTTPS endpoint or SQS), meaningfully more infrastructure than a POST endpoint: create an SNS topic, subscribe an HTTPS/Lambda endpoint, wire it to the SES identity's notification settings | Cheapest in dollars but most manual: you manage verified identities, SPF/DKIM (Easy DKIM via Route 53 or manual CNAMEs) yourself in the AWS console — no single guided flow | Highest integration effort of the group: `@aws-sdk/client-sesv2` (or client-ses) plus SNS plumbing for bounce handling, IAM policy setup, and — notably — **new AWS accounts start in a "sandbox" that can only send to verified addresses until a manual production-access request is approved**, an extra approval step none of the other providers require |
-| Mailgun | 3-month free trial only (Flex plan); **no indefinite free tier** as of late 2025 pricing changes | Foundation: **$35/mo** flat (better than Flex's now-doubled $2/1,000 pay-as-you-go rate once you're past ~17,500 emails/mo, but at 50–2,000 emails/mo Flex's $2/1K means **under $4/month** in raw cost after the trial — cheaper in dollars than Resend's $20 tier, but with no permanent free option) | Yes — mature webhook system, bounce/complaint/delivered events | Solid, established, EU/US region choice | Decent SDK (`mailgun.js`), but Mailgun's 2025 reputation/pricing churn (Flex doubled from $1→$2/1K, deliverability complaints in community reviews) makes it a worse long-term bet than Resend for a "set it and don't think about it again" church tool |
-| Firebase Extension: **Trigger Email from Firestore** (`firestore-send-email`) | Free (the extension itself); cost is entirely whatever SMTP provider you point it at | N/A — pass-through | **No** — the extension only writes a document and relies on SMTP `send`; it has no built-in bounce/delivery event pipeline. Bounce handling would have to come from whatever provider's SMTP credentials you plug in, observed completely outside the extension | Depends entirely on the underlying SMTP provider (commonly SendGrid, Mailgun, or Mailchimp Transactional creds) | Lowest code-effort to get a first email out (write a Firestore doc, extension does the rest) but this is a trap for this milestone: it needs an SMTP-capable provider behind it anyway (so you still pick and pay for one of the rows above), and it gives up the structured send API, native scheduling, and native webhook events that the recommended direct-SDK approach gets for free. **Not recommended** — it re-adds a middle layer without removing the underlying provider decision, and the delivery-history/bounce-tracking requirement (R "Sent on this service" log) needs the provider's own API/webhook, which this extension doesn't expose. |
+### Pattern 1 (recommended): module-scope object + TTL, NOT trigger-based invalidation
 
-### Why Resend over the close alternatives
+```typescript
+// functions/src/runtimeConfig.ts (new file, mirrors readAiProxyLimits's DI-for-testability style)
+import { getFirestore } from "firebase-admin/firestore";
 
-- **vs. Postmark:** Postmark's free tier (100 emails/month, no overage) is very likely to run out immediately given four message types (one-off, lock, re-lock, weekly reminder) across a volunteer roster — meaning Postmark effectively starts this project at $15/mo, while Resend's 3,000/mo free tier realistically covers this app's entire lifetime volume at zero cost.
-- **vs. SendGrid:** No durable free production tier (60-day trial only) and a materially worse sender-reputation history under the shared SendGrid brand; heavier API for no benefit at this scale.
-- **vs. SES:** Cheapest per-email in isolation, but the bounce pipeline requires standing up SNS + a subscription endpoint (more moving parts than a signed webhook POST), plus a sandbox-approval step for new accounts before it can send to arbitrary recipients — friction this milestone doesn't need to accept to save a few dollars a month that are already $0 with Resend.
-- **vs. Mailgun:** No indefinite free tier post-2025 changes, and 2025's Flex price doubling plus community deliverability complaints make it the least "set and forget" choice, which matters for a volunteer team with no dedicated ops person.
-- **vs. the Firebase Trigger Email extension:** Doesn't remove the provider decision (still needs SMTP creds from one of the above), and gives up native bounce webhooks and scheduling — both explicit v1.7 requirements — for a marginal reduction in the Cloud Function code this app already knows how to write (it has three `defineSecret`-backed integrations already).
+export interface RuntimeConfig {
+  mediaCleanupEnabled: boolean;
+  pptxRenderCleanupEnabled: boolean;
+  backgroundCleanupEnabled: boolean;
+  pptxSourceCleanupEnabled: boolean;
+  // ...retention windows, AI-proxy knobs, messaging knobs — same shape as SEED-001's list
+  noReplyFromAddress: string;
+}
+
+const DEFAULTS: RuntimeConfig = { /* today's process.env fallback defaults, unchanged */ };
+const TTL_MS = 60_000; // 60s: bounds staleness without meaningfully raising read cost
+
+let cached: { value: RuntimeConfig; fetchedAt: number } | null = null;
+
+export async function getRuntimeConfig(
+  db = getFirestore(),
+  now = () => Date.now(),
+): Promise<RuntimeConfig> {
+  if (cached && now() - cached.fetchedAt < TTL_MS) {
+    return cached.value;
+  }
+  try {
+    const snap = await db.doc("system/runtimeConfig").get();
+    const value: RuntimeConfig = { ...DEFAULTS, ...(snap.exists ? snap.data() : {}) };
+    cached = { value, fetchedAt: now() };
+    return value;
+  } catch (err) {
+    console.error("[runtimeConfig] read failed, serving last-known/defaults:", err);
+    // Fail OPEN to the last good cache if one exists, else DEFAULTS — matches
+    // this codebase's existing fail-open posture (AI rate limiter, dry-run
+    // cleanup flags all default to the safe/off state already).
+    return cached?.value ?? DEFAULTS;
+  }
+}
+```
+
+**Why TTL, not an `onDocumentWritten` trigger flipping a global flag:** the natural-looking design —
+have `syncOrgMembershipClaim`-style trigger on `system/runtimeConfig` set some in-memory
+"dirty"/"latest" flag that every warm `api`/cron instance reads — **does not work across gen2 Cloud
+Functions instances.** Each `onRequest`/`onCall`/`onSchedule` function can scale to N separate Cloud Run
+instances/processes; module-scope state persists only *within one instance's own warm invocations*, per
+Firebase's own guidance on caching in global scope ([Tips & tricks — Cloud Functions for
+Firebase](https://firebase.google.com/docs/functions/tips)). A trigger firing in instance A cannot reach
+into instance B's memory. So a trigger-based "push invalidation" would only ever invalidate the one
+instance that happened to also be warm and receive the trigger event — every other warm instance keeps
+serving stale config until ITS OWN TTL naturally expires anyway. The trigger adds a second, unreliable
+invalidation path on top of a TTL path you need regardless — pure complexity for no correctness gain.
+
+**Use `onDocumentWritten` for something else it's actually good at instead:** an audit-log side effect
+(who-changed-what-when) when the admin writes the config doc, matching the existing
+`syncOrgMembershipClaim` shape 1:1 — but NOT for cache invalidation.
+
+**60s TTL, not a raw per-invocation read:** the pattern above is one Firestore `get()` per warm instance
+per 60 seconds, not one read per request. Cost is negligible at this app's scale (Firestore reads are
+$0.036/100K beyond the free 50K/day — even the busiest function here, the `api` proxy, is nowhere near
+volume where a 60s-TTL'd single-document read matters). A **cold start always reads fresh** (module
+state resets), so a brand-new instance never serves data older than the deploy, and updated config
+propagates within, worst case, one TTL window on any already-warm instance — acceptable per SEED-001
+("takes effect with no redeploy"; it does not require sub-second propagation).
+
+**Reads from the config doc must be safe even when it doesn't exist yet.** `DEFAULTS` above should be the
+literal values the codebase's `process.env` fallbacks use today (`readNumericKnob(..., 500)` etc.) — this
+makes the Firestore doc purely additive: an org with no doc yet, or a doc missing a field, behaves
+exactly as production does today. Never make an absent field mean "0"/"disabled" by accident — mirror the
+existing `readNumericKnob` "unset falls back to fallback, not to 0" fix (WR-01, already in this file)
+for every new knob.
+
+**Where the read integration points are:** every `process.env.X` read flagged in `functions/src/index.ts`
+(lines around 236, 245, 961, 1009, 1037, 1169, 1199, 1387, 1439, 1633, 1667, 2743–2744, plus
+`readAiProxyLimits`'s `env` parameter, and `MESSAGE_FROM_ADDRESS`'s `defineString`) becomes a call to
+`getRuntimeConfig()` at the top of the relevant handler body, replacing (or falling back to, if you want
+a safety net during rollout) the `process.env` read. Because the existing code already threads a
+`readAiProxyLimits(env = process.env)` / handler-body-vs-wrapper split for testability, swapping the
+source from `process.env` to `await getRuntimeConfig()` is a like-for-like substitution, not a new
+architecture.
+
+### What NOT to add for this: `node-cache` (5.1.2), `lru-cache` (11.5.2), Firebase Remote Config
+
+- **`node-cache` / `lru-cache`** — both are general-purpose multi-key eviction caches. This milestone
+  caches exactly **one document**. A `{ value, fetchedAt }` object with a `Date.now()` comparison is the
+  entire feature; a cache library adds an API surface and a dependency for something 6 lines already
+  solve. Reach for one of these only if the config surface grows into many independently-fetched
+  documents/keys with different TTLs — not the case here (SEED-001 explicitly scopes this to global
+  knobs).
+- **Firebase Remote Config** — a real alternative worth naming and rejecting explicitly, since it's
+  Firebase's own purpose-built "runtime config without redeploy" product. Rejected because: (1) it's a
+  **second config surface** alongside Firestore — the app is Firestore end-to-end already (org settings,
+  messaging settings, everything else in `organizations/{orgId}`), and SEED-001 explicitly asks for "an
+  admin-only Firestore config doc," not a second system; (2) Remote Config values are flat
+  string/number/boolean key-value pairs with no native nested-object modeling (this config has structured
+  groups — cleanup flags, retention windows, AI knobs, messaging knobs — that map naturally onto one
+  Firestore document's fields but awkwardly onto flat RC parameters); (3) reading RC from a gen2 Cloud
+  Function requires the separate `firebase-admin/remote-config` module and its own template-fetch/caching
+  API, with real-time propagation to server-side Functions only via 1st-gen-era
+  `onConfigUpdated`-style triggers that don't map cleanly to gen2 without extra plumbing; (4) writing to
+  RC from the admin console needs either the Firebase Console or the Remote Config REST API/Admin SDK —
+  another new client integration, versus reusing the `onSnapshot`/`updateDoc` pattern every other settings
+  screen in this app already uses. Firestore wins on architectural consistency with zero new moving parts.
+
+## Q2 — Custom auth claim from an admin action, and the client-side refresh
+
+**Answer: the same `getAuth().setCustomUserClaims` + `getIdTokenResult(user, true)` pair the v1.5
+org-membership claim already uses — but with one critical, codebase-specific gotcha this milestone MUST
+handle: custom claims are set by full REPLACEMENT, not merge, and this app already has ONE claim-writer
+(`syncOrgMembershipClaim`) that will silently wipe a `superAdmin` claim the moment it runs.**
+
+### The mechanism (already proven in this codebase — reuse verbatim)
+
+- **Server side (Admin SDK, unchanged API):** `getAuth().setCustomUserClaims(uid, claims | null)` —
+  confirmed signature already verified against the installed `firebase-admin` types in the v1.5 research
+  (`base-auth.d.ts:300`), still current at `firebase-admin@14.3.0`. 1000-byte total claims limit still
+  applies (well within budget for `{orgId, role, superAdmin}`).
+- **Client side (force the token to reflect the new claim):** `getIdTokenResult(user, /* forceRefresh */
+  true)` — exactly `src/stores/auth.ts`'s existing `refreshOrgClaim` helper (line ~131). Reuse the same
+  primitive; you do not need a new one. A bounded-retry variant (the `CLAIM_REFRESH_MAX_ATTEMPTS` /
+  `CLAIM_REFRESH_DELAY_MS` pattern) matters when the claim write and the client refresh race each other —
+  for `superAdmin`, that race is rarer (grants are infrequent, admin-initiated, not part of the hot
+  sign-up path), so a single forced refresh after the grant call resolves is likely sufficient; add the
+  retry loop only if UAT shows the admin's own session doesn't see the new claim immediately after
+  granting themselves/another admin.
+
+### The gotcha this milestone MUST design around: claim replacement, not merge
+
+`setCustomUserClaims(uid, claims)` **overwrites the entire custom-claims object** — it does not deep-merge
+with whatever claims already exist. This codebase already has exactly one claim writer,
+`syncOrgMembershipClaim` (`functions/src/orgMembershipClaims.ts:188`/`191`), which calls
+`getAuth().setCustomUserClaims(uid, decision.claims)` where `decision.claims` is `{orgId, role}` **only**
+— and `setCustomUserClaims(uid, null)` on delete, which clears everything. The owner (and any future
+super-admin) is necessarily also an org member with their own `organizations/{orgId}/members/{uid}` doc.
+The first time that member doc is written again for ANY reason after `superAdmin` is granted — a role
+change, a re-invite, even the "one-time migration: admin → editor" backfill patch already in
+`loadOrgContext` (`src/stores/auth.ts:278`) triggering a Firestore write that re-fires
+`syncOrgMembershipClaim` — **the trigger will silently overwrite `{orgId, role, superAdmin}` with
+`{orgId, role}`, dropping `superAdmin` with no error, no log line naming the loss, and no user-visible
+symptom until the owner is locked out of the admin console.**
+
+**Required fix, in scope for this milestone, not optional hardening:** every claim writer must
+read-merge-write, not blind-write. Two call sites need this:
+1. **The new super-admin grant path** (whatever writes `superAdmin: true`) must first `getAuth().getUser(uid)`
+   to read `customClaims`, merge in `superAdmin`, then write the full merged object — matching
+   `decideMembershipClaim`'s own idempotency check (`orgMembershipClaims.ts:138`, which already calls
+   `getAuth().getUser(uid)` to compare before writing) as the precedent to follow.
+2. **`syncOrgMembershipClaimHandler`** (`orgMembershipClaims.ts:173`) must be changed to preserve any
+   existing `superAdmin` key when it recomputes `{orgId, role}` — read the current claims first (same
+   `getAuth().getUser(uid)` call it already makes for the idempotency check can be reused/extended to also
+   carry `superAdmin` forward into the new claims object) and on the `clear` branch
+   (`setCustomUserClaims(uid, null)`), decide explicitly whether losing org membership should also strip
+   `superAdmin` (probably not — a super-admin isn't required to belong to any org to administer the app) —
+   i.e. `clear` should become "set `{superAdmin}` only" rather than `null`, when a `superAdmin` claim is
+   present.
+
+This is the single most important integration finding of this research: **do not treat `superAdmin` as an
+independent claim namespace from `{orgId, role}` — they share one JSON object on the token, and every
+existing and new writer must merge, not replace.**
+
+### Bootstrapping the first super-admin (chicken-and-egg)
+
+An `onCall` "grant super-admin" Function gated by "caller must already have `superAdmin: true`" cannot
+grant the very first super-admin (the owner). Follow the exact precedent already in this codebase:
+`functions/src/backfillOrgClaims.ts` is a **Node script, not a deployed Function** (deliberately excluded
+from `functions/src/index.ts`'s exports — see its own header comment, "THIS IS A NODE SCRIPT, NOT A
+DEPLOYED FUNCTION"), run once by the owner with admin credentials, dry-run by default, `--apply` to write.
+Add a sibling one-off script (`functions/src/grantSuperAdmin.ts` or similar) using the same shape — the
+owner runs it once, by uid, to bootstrap their own claim; every subsequent grant (adding a second
+super-admin) goes through the in-console `onCall` Function once at least one super-admin exists.
+
+### Firestore/Storage rules integration
+
+Add a `isSuperAdmin()` helper to `firestore.rules` alongside the existing `isSignedIn()` / `isOrgMember()`
+/ `isOrgEditor()` helpers (`firestore.rules:7-26`), reading the claim the same way those already read
+`role`:
+
+```
+function isSuperAdmin() {
+  return isSignedIn() && request.auth.token.get('superAdmin', false) == true;
+}
+```
+
+Gate `match /system/runtimeConfig` (or wherever the config doc lives) to `allow read, write: if
+isSuperAdmin();` — consistent with the org-scoped rules' `isOrgEditor(orgId)` pattern, just claim-based
+instead of `exists()`-based (this doc has no natural per-org membership to check against, and rules'
+`request.auth.token.X` reads are the ones that work reliably — unlike the Storage-rules
+`firestore.exists()` cross-service call already documented as permanently broken in `CLAUDE.md`, a
+**Firestore rule reading its own request's `auth.token` claim has no such limitation**; that pitfall is
+specific to Storage rules calling out to Firestore, not to Firestore rules reading the token).
+
+## Q3 — Admin UI
+
+**Answer: the existing Vue 3 + Pinia + Tailwind v4 stack fully covers this. Add nothing.**
+
+- **Forms/validation:** this app has never used a validation library anywhere — `SettingsView.vue`'s
+  numeric-knob editing (`reminderDaysBeforeInput`, line ~1245-1252) is a plain `ref` + `Number(...)` cast +
+  manual bounds check + revert-on-invalid, no `zod`/`vee-validate`/`yup`/`vuelidate` (confirmed: none of
+  these appear anywhere in `package.json` or the codebase). The new admin console's knobs (booleans,
+  small integers, one email-ish string) are simpler than that existing screen — reuse its exact pattern:
+  local `ref`, cast/guard on save, `updateDoc`/`setDoc` straight to Firestore. Introducing a schema
+  validation library for ~15 fields on one admin-only screen would be the first validation library in a
+  12.7K-LOC app and inconsistent with every other settings surface (org Settings, messaging config,
+  slide typography) already shipped without one.
+- **Live sync:** reuse the `onSnapshot` in a Pinia store pattern already established
+  (`memberUnsub`/`onSnapshot` in `src/stores/auth.ts:268`) for a new `useAdminConfigStore` (or similar)
+  that subscribes to `system/runtimeConfig` — the same shape as every other real-time store in this app.
+  VueFire is correctly still out of scope (already rejected app-wide: "VueFire composables don't work
+  inside Pinia stores" — Key Decisions table, `PROJECT.md`).
+- **Access gate at the route level:** `vue-router` (already `^5.0.3`) navigation guard checking
+  `authStore`'s exposed `superAdmin` computed (sourced from the decoded ID token claim, same shape as the
+  existing `isEditor` computed at `src/stores/auth.ts:74`) — no new router capability needed.
+- **Deletion-toggle safety UI (dry-run count before flip):** no new library — this is a callable-Function
+  round trip (`onCall`, already the established pattern for every admin-adjacent action in this codebase)
+  that runs the existing cleanup handler's dry-run branch and returns the count synchronously, then a
+  confirm step in the UI before the actual `updateDoc` that flips the enable flag. Plain Tailwind
+  modal/confirm markup, matching existing modal patterns already in the app (no headless-ui/radix needed —
+  none is currently installed and none should be added for one confirm dialog).
+
+## Alternatives Considered
+
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|--------------------------|
+| Module-scope TTL cache (plain object) | `node-cache` / `lru-cache` | If the config surface grows to many independently-keyed, independently-expiring documents — not the case for one global config doc |
+| Firestore config doc | Firebase Remote Config | If this were a client-facing feature-flag/A-B-test surface needing percentage rollouts, condition targeting, or non-technical marketing-team editing via the Firebase Console UI — not this milestone's shape (owner-only, structured operational knobs, already-Firestore-native app) |
+| Custom auth claim (`superAdmin`) | A Firestore `system/admins/{uid}` allowlist doc checked via `exists()` in rules + re-fetched in Functions | If super-admin membership needed to change without any token-refresh propagation delay, or needed to be queryable/listable server-side trivially. Rejected because the milestone explicitly asks to build on the v1.5 custom-claims work, and claims are already the trusted signal `storage.rules` depends on cross-service — a second admin-membership mechanism would fork the pattern this codebase just standardized on |
+| Read-merge-write for every claim writer | Two independent claim namespaces via separate Firebase Auth tenants/providers | Massive overkill — a single Firebase project, single Auth instance app; multi-tenant Auth is not warranted for an internal admin flag |
+| Plain manual form validation | `zod` (4.4.3 latest) | If server-side (Functions) input validation on a public-facing `onCall`/`onRequest` endpoint becomes warranted — worth it for un-trusted client input, not for an owner-only admin screen editing ~15 known fields. If added later, scope it to Functions-side validation of the config doc shape, not client form validation |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|--------------|
-| Building/running your own SMTP server | Deliverability (SPF/DKIM/DMARC reputation, IP warm-up, feedback loops) takes months to earn and one misconfiguration tanks it; nothing here justifies owning that infrastructure | A managed transactional provider (Resend) |
-| Sending email from the client (`src/`) with the provider's API key embedded in the SPA | The API key would be exposed in the shipped JS bundle — anyone could read it from devtools and send arbitrary mail as the org's verified domain | Send only from a Cloud Function holding the key via `defineSecret`, exactly like the existing Claude/ESV/NLT integrations |
-| `firebase functions:config` for the provider API key | Deprecated; Google will **decommission it in March 2027** and deployments using it will start failing before then | `defineSecret()` from `firebase-functions/params`, set via `firebase functions:secrets:set RESEND_API_KEY` — already this repo's established pattern |
-| Open-tracking pixels / click-tracking | Explicitly out of scope for v1.7 (Key Decision: "tracks sent + hard bounces, not opens") — also raises privacy questions for volunteer emails and adds webhook/complexity for no v1.7 requirement | Track only `email.sent` and `email.bounced` webhook events for the delivery-history log |
-| The Firebase "Trigger Email from Firestore" extension as the whole solution | It's a thin SMTP wrapper, not a send API — no native bounce webhooks, no native scheduling, and it still needs a provider's SMTP credentials behind it, so it doesn't actually avoid the provider-selection decision this research exists to make | Call the Resend SDK directly from a purpose-built Cloud Function |
-| Amazon SES for this specific app, despite lowest raw per-email cost | The SNS-based bounce pipeline and sandbox production-access approval step are meaningfully more infrastructure than this milestone's scope justifies, for a savings of pennies/month that Resend's free tier already erases to $0 | Resend |
-| Resend's `onboarding@resend.dev` sending address in production | It can only send to the account owner's own signed-up address — unusable for a volunteer roster of many distinct recipients | Verify the church's real domain (or a `send.` subdomain of it) in Resend before going live |
-
-## Cloud Function Secret Injection Pattern (current, non-deprecated)
-
-This repo already has the exact pattern to follow — confirmed directly in `functions/src/index.ts`:
-
-```typescript
-import { defineSecret } from "firebase-functions/params";
-
-// Set once by the owner (deploy-gated, per standing project rule):
-//   firebase functions:secrets:set RESEND_API_KEY
-//   firebase functions:secrets:set RESEND_WEBHOOK_SECRET
-const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
-const RESEND_WEBHOOK_SECRET = defineSecret("RESEND_WEBHOOK_SECRET");
-
-export const sendVolunteerEmail = onCall(
-  { secrets: [RESEND_API_KEY] },
-  async (request) => {
-    const resend = new Resend(RESEND_API_KEY.value());
-    await resend.emails.send({ /* ... */ });
-  }
-);
-
-export const resendWebhook = onRequest(
-  { secrets: [RESEND_WEBHOOK_SECRET] },
-  async (req, res) => {
-    // verify svix-id / svix-timestamp / svix-signature against RESEND_WEBHOOK_SECRET.value()
-    // using the RAW body, then update the per-service delivery-history doc on `email.bounced`
-  }
-);
-```
-
-This mirrors `CLAUDE_API_KEY` / `ESV_API_KEY` / `NLT_API_KEY` already in the codebase — no new secret-management pattern to introduce. `firebase functions:config()` must **not** be used for this (deprecated, decommissioned March 2027).
+| `node-cache` / `lru-cache` for config caching | Caches one document; a library adds API surface + a dependency for a 6-line problem | Module-scope `{ value, fetchedAt }` object + TTL check (Pattern 1 above) |
+| Firebase Remote Config for this config surface | Second config system alongside Firestore, flat key-value model fights the structured knob groups, separate SDK/caching/propagation model, separate admin-editing surface (Console or REST) instead of reusing `onSnapshot`/`updateDoc` | Firestore doc, gated by the new `isSuperAdmin()` rule |
+| `onDocumentWritten` as the cache-invalidation mechanism | Cannot reach other warm gen2 instances' memory — false sense of "live propagation," adds complexity without closing the actual staleness window | TTL-based re-read (60s), which already bounds staleness correctly and requires no trigger at all |
+| `setCustomUserClaims(uid, { superAdmin: true })` written blind, without reading existing claims first | Silently replaces (not merges) the whole claims object — will wipe the `{orgId, role}` claim `storage.rules` and `firestore.rules` already depend on, the instant it runs | Read-merge-write: `getAuth().getUser(uid)` → merge → `setCustomUserClaims(uid, mergedClaims)`, in BOTH the new grant path and the existing `syncOrgMembershipClaimHandler` |
+| A new validation library (`zod`, `vee-validate`, `yup`, `vuelidate`) for the admin form | Zero precedent anywhere in this 12.7K-LOC app; every existing settings screen validates inline with plain casts/guards | Match `SettingsView.vue`'s existing `Number(...)` + guard + revert-on-invalid pattern |
+| A deployed `onCall` "grant super-admin" Function as the ONLY way to create the first super-admin | Chicken-and-egg: a caller-must-already-be-super-admin gate can never grant the first one | A one-off Node script under `functions/src/`, dry-run-by-default, `--apply` to write, excluded from `index.ts`'s exports — exact shape of the existing `backfillOrgClaims.ts` |
+| Bumping `firebase-admin` to v14.x as part of this milestone | No capability this milestone needs is v14-only; it's an unrelated major-version risk bundled into an otherwise low-risk milestone | Stay on the installed `^13.10.0` range |
 
 ## Stack Patterns by Variant
 
-**If the org's volunteer count/messaging cadence ever pushes past ~3,000 emails/month:**
-- Upgrade to Resend Pro ($20/mo for 50,000 emails) — no code change required, only a billing-tier change on the same account/API key.
+**If the config surface later grows beyond one global doc (e.g., per-org overrides of some knobs):**
+- Move from a single `system/runtimeConfig` doc to `system/runtimeConfig` (global defaults) +
+  `organizations/{orgId}/runtimeConfigOverrides` (sparse, only overridden keys), with `getRuntimeConfig`
+  taking an optional `orgId` and merging global defaults under org overrides.
+- At that point, revisit whether a real cache library earns its keep (now genuinely multi-key with
+  per-org TTLs) — still likely not, since it would be N+1 documents keyed by org, each independently
+  small, and a `Map<orgId, {value, fetchedAt}>` is still just as simple as today's single-value cache.
 
-**If the owner ever wants marketing-style broadcast sends (not this milestone's scope):**
-- Resend has a separate contacts/broadcast product billed by contact count — do not conflate it with the transactional send path used here; v1.7 is transactional only.
+**If cold-start latency on the highest-traffic function (`api`) becomes a measured problem because of the
+added `getRuntimeConfig()` await on every cold start:**
+- Not expected at this app's scale, but if it materializes, prefetch the config doc in a
+  `functions.https.onInit()` hook (per the official Tips & Tricks guidance already fetched this session)
+  rather than lazily on first request — keeps the TTL-cache design, just moves the very first fetch earlier
+  in the instance lifecycle.
 
 ## Version Compatibility
 
-| Package | Compatible With | Notes |
-|---------|------------------|-------|
-| `resend@^6.19.0` | Node ≥20 (this repo's Functions run Node 22 per `functions/package.json` `engines.node: "22"`) | No conflict. |
-| `resend@^6.19.0` | `firebase-functions@^7.2.5`, `firebase-admin@^13.10.0` (already in `functions/package.json`) | No known incompatibility; Resend's SDK has no Firebase-specific dependency, it's a generic REST wrapper. |
+| Package A | Compatible With | Notes |
+|-----------|------------------|-------|
+| `firebase-admin@^13.10.0` | `firebase-functions@^7.2.5`, Node 22 (`functions/package.json` engines pin) | Already the running production combination; no change needed for any of Q1–Q3 |
+| `firebase@^12.0.0` (client) | Vue `^3.5.29`, Pinia `^3.0.4` | Already the running combination; `onSnapshot`/`updateDoc` for the new admin config store need nothing beyond what every other store already imports |
+| Custom claims (`request.auth.token.*`) | `firestore.rules` `rules_version = '2'` | Already proven in this file's `isOrgEditor`/`isOrgMember` helpers reading `request.auth.token.email`; a new `isSuperAdmin()` helper reading `request.auth.token.superAdmin` needs no rules-version change |
 
 ## Sources
 
-- WebSearch, cross-checked 2+ sources each, 2026-08-13 (MEDIUM confidence per this project's `classify-confidence --provider websearch --verified` tier):
-  - Resend pricing: automationatlas.io/tools/resend, tiergauge.com/tools/resend, nuntly.com/resend-pricing
-  - SendGrid pricing: sendx.io/blog/sendgrid-pricing, costbench.com/software/email-api/sendgrid
-  - Postmark pricing: saaspricepulse.com/tools/postmark, sendx.io/blog/postmark-pricing
-  - Amazon SES pricing: aws.amazon.com/ses/pricing (official), saaspricepulse.com/blog/amazon-ses-pricing-per-1000-emails-2026
-  - Mailgun pricing: gmass.co/blog/mailgun-review, saaspricepulse.com/tools/mailgun
-  - Resend bounce webhooks: resend.com/docs/webhooks/introduction, resend.com/blog/webhooks (official)
-  - Postmark bounce webhook: postmarkapp.com/developer/webhooks/bounce-webhook (official)
-  - SendGrid event webhook: twilio.com/docs/sendgrid/for-developers/tracking-events/event (official)
-  - SES bounce/SNS setup: docs.aws.amazon.com/ses/latest/dg/monitor-sending-activity-using-notifications-sns.html (official)
-  - Firebase Trigger Email extension: firebase.google.com/docs/extensions/official/firestore-send-email (official)
-  - `resend` npm version: verified directly via `npm registry` (`registry.npmjs.org/resend/latest` → `6.19.0`, `engines.node: ">=20"`) — HIGH confidence, primary source
-  - `functions.config()` deprecation date (March 2027): firebase.google.com/docs/functions/config-env (official), corroborated by github.com/firebase/firebase-tools issue discussion
-  - `defineSecret` pattern: firebase.google.com/docs/functions/config-env (official), and directly verified against this repo's own `functions/src/index.ts` (PRIMARY, HIGH confidence — not just docs, the working pattern already in production)
-  - Resend webhook signature verification (Svix): resend.com/docs/dashboard/webhooks/verify-webhooks-requests (official)
-  - Resend `resend.dev` domain restriction: resend.com/docs/knowledge-base/403-error-resend-dev-domain (official)
+- Direct read of `functions/package.json`, `package.json`, `functions/src/index.ts`,
+  `functions/src/orgMembershipClaims.ts`, `functions/src/backfillOrgClaims.ts`, `src/stores/auth.ts`,
+  `firestore.rules`, `src/views/SettingsView.vue` (this session) — installed versions, existing env-read
+  sites, existing claim-write call sites, existing rules helpers, existing form-validation style.
+  Confidence: HIGH (ground truth, not recalled).
+- `npm view <pkg> version` against the public npm registry (this session, 2026-08-20) for
+  `firebase-admin` (14.3.0), `firebase-functions` (7.3.2), `firebase` (12.18.0), `resend` (6.20.0),
+  `zod` (4.4.3), `node-cache` (5.1.2), `lru-cache` (11.5.2), `firebase-functions-test` (3.5.0).
+  Confidence: HIGH (live registry query).
+- [Tips & tricks — Cloud Functions for Firebase](https://firebase.google.com/docs/functions/tips) —
+  official guidance on global-scope caching across warm invocations and `onInit()` for deferred
+  expensive initialization; confirms the module-scope-TTL pattern and its cross-instance limitation.
+  Confidence: HIGH (official docs, fetched this session).
+- [Extend Cloud Firestore with Cloud Functions (2nd gen) — Firebase](https://firebase.google.com/docs/firestore/extend-with-functions-2nd-gen) —
+  confirms gen2 `onDocumentWritten` trigger shape (already matches this codebase's own usage in
+  `syncOrgMembershipClaim`). Confidence: HIGH (official docs).
+- [Firebase Remote Config](https://firebase.google.com/docs/remote-config) — reviewed to make the
+  explicit reject-and-explain-why call against it as the config mechanism. Confidence: HIGH (official
+  docs).
+- `.planning/milestones/v1.5-phases/40-custom-auth-claim-for-org-membership/40-RESEARCH.md` (this
+  project's own prior research) — reused its already-verified `setCustomUserClaims` signature
+  (`base-auth.d.ts:300`, `object | null`), 1000-byte claims limit, and "claims are Admin-SDK-only, never
+  client-writable" framing rather than re-deriving them. Confidence: HIGH (prior in-repo verified
+  research, cross-checked against current npm registry state this session).
 
 ---
-*Stack research for: Volunteer email messaging provider, v1.7*
-*Researched: 2026-08-13*
+*Stack research for: v1.9 Owner Admin Console — Firestore runtime config, super-admin claim gate, admin UI*
+*Researched: 2026-08-20*

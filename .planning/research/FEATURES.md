@@ -1,233 +1,154 @@
 # Feature Research
 
-**Domain:** Volunteer/team messaging & service-change notifications for a worship-service planning app (v1.7 Volunteer Messaging & Notifications)
-**Researched:** 2026-08-13
-**Confidence:** MEDIUM (peer-tool behavior is corroborated by official docs where cited; transactional-email UX conventions are broad industry consensus, not project-specific verification)
-
-## Method Note
-
-This research targeted the peer-tool landscape (Planning Center Services, WorshipTools, Elvanto, Rock
-RMS) plus general transactional-email UX conventions, and validated the already-imported Claude Design
-composer/lock-diff/automatic-mail/history model (canvas "Turn 5 — Messaging volunteers") against them.
-Findings below are cited per claim. Planning Center's own help-center pages (`help.planningcenter.com`,
-`pcoservices.zendesk.com`) are first-party documentation of the dominant tool in this space — treat
-those specific citations as reliable despite the generic `websearch`-provider confidence tag the tooling
-applies; broader "best practice" web results are genuinely lower-confidence industry consensus and are
-flagged as such.
+**Domain:** Owner-only super-admin console for a small live Vue 3 + Firebase SaaS (first admin surface)
+**Researched:** 2026-08-20
+**Confidence:** MEDIUM (codebase-grounded HIGH for complexity/dependency claims; general admin-UX claims MEDIUM/LOW per source tier — see Sources)
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist in any church volunteer-communication tool. Missing these makes v1.7 feel
-incomplete relative to Planning Center, the tool this app explicitly complements.
+A first admin console for a solo/small-team-owned SaaS is expected to have these five things. Skipping any of them makes the console feel unsafe to use, not just unfinished.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Recipients derived from who's actually scheduled | Every peer tool (PCO, Elvanto, Rock RMS) sends to the roster attached to the specific service/plan, not a separate mailing list — this app's design already does this via the Roles tab | LOW | Already decided (Key Decision, PROJECT.md) — reuse roster emails, no second contact list |
-| Team-level recipient grouping | PCO lets you "email an entire team" or "scheduled people"; Elvanto/Rock RMS group by roster/team | LOW | Matches imported design: teams-first (Worship/Tech/Vocals/Hosts), individuals added below |
-| "Everyone on this service" recipient option | PCO's "Scheduled People" = every team member scheduled for the plan, functionally the "everyone" option | LOW | Matches imported design |
-| Subject + body composer with plan context auto-included | PCO auto-includes assigned times and the recipient's team-scoped plan notes in scheduling emails | MEDIUM | Design's tokens (service date, link, their roles, song list) cover this; PCO does it as fixed fields, not literal tokens — see Differentiators |
-| A link back to the full service order/plan | Every peer tool's notification includes a link to view the plan; this app already has a shareable read-only link to reuse | LOW | Direct dependency: reuses existing share-link feature |
-| Automatic notification when a plan/schedule becomes final | PCO's model is explicit: a "prepared" (unsent) notification means the volunteer can't even see the plan until it's sent; Elvanto sends automatically the moment a service is **published** | MEDIUM | Maps directly onto this app's Draft→Planned lock transition — lock = PCO's "send"/Elvanto's "publish" moment |
-| Scheduled/automatic reminder before the service date | PCO ships this as a first-class, configurable (0–7 days out) feature; industry-universal expectation for scheduling tools | MEDIUM | Matches imported design's N-days-out (default 7) share-link reminder |
-| Ad-hoc/one-off message to a team or individuals | PCO, Elvanto, and Rock RMS all support "contact volunteers on this service" outside the automatic flows | LOW-MEDIUM | Matches imported design's One-off message type |
-| Recipient count / "who is this going to" visibility before send | PCO's compose screen shows the resolved recipient list and a send-count on the button before sending | LOW | Matches imported design's live "Reaches N people" |
-| Skip/exclude people with no email on file | Unassigned or email-less roster entries are a universal edge case every one of these tools has to handle silently (they just don't get a message) | LOW | Already anticipated in Key Decisions: "unassigned roles simply have no email" |
-| A record that a message was sent (basic delivery log) | Rock RMS explicitly tracks "confirmation status"; PCO's UI shows sent/pending badges per person | MEDIUM | Matches imported design's "Sent on this service" history |
-| Church-level ability to turn automatic email off | PCO allows disabling reminders org-wide/per-browser for all teams in a plan; this is the expected admin escape hatch for any auto-notify feature | LOW-MEDIUM | Matches imported design's Settings kill-switch |
+| Admin auth gate on a real claim, not a hardcoded UID/email check | A hardcoded `if (uid === OWNER_UID)` is the obvious shortcut and the obvious footgun — it doesn't scale to "anyone the owner grants" and it's easy to leave stale. The project already has a proven pattern: v1.5 Phase 40 built `orgMembershipClaims.ts`, a Firestore-trigger-synced custom claim (`{orgId, role}`) read by both `storage.rules` and the client. A `superAdmin: true` (or `role: 'superadmin'`) claim is the same shape, one level up. | MEDIUM | **Dependency:** builds directly on v1.5's custom-claims machinery — same `setCustomUserClaims` mechanics, same "claims cache until ID-token refresh" gotcha (`getIdToken(true)` needed after grant, or the newly-granted admin still can't get in until their token naturally refreshes in ~1hr). **Constraint:** Firebase caps custom claims at 1000 bytes total — trivial to stay under with one boolean, but note if org claim + admin claim ever merge into one object. **Bootstrap problem:** the very first super-admin (the owner) can't be granted via an admin UI that doesn't exist yet — needs a one-time Admin-SDK script or Firebase Console manual claim set, same as any first-superuser bootstrap. |
+| Admin route/nav gated client-side AND enforced server-side | The console is only "private" if both the Vue router guard *and* every Cloud Function/Firestore rule it talks to reject non-admins. Client-only gating is security theater — anyone can navigate to the URL by guessing it if the underlying reads/writes aren't locked down. | MEDIUM | **Dependency:** Firestore rules for the new admin-config doc(s) must check `request.auth.token.superAdmin == true` (or equivalent), mirroring the existing `isOrgMemberByClaim` pattern in `storage.rules`. The functions that *read* the config (cleanup crons, AI proxy, message sender) do not need the claim — they run with Admin SDK privileges — but any Cloud Function *endpoint* that lets the admin console *write* config needs the same claim check the rules do. |
+| A minimal admin shell/nav, separate from `AppShell.vue` (the per-org shell) | Reusing the org shell (with its org switcher, org-scoped nav) would visually and conceptually conflate "my church's settings" with "the whole app's cost knobs" — a mistake this milestone explicitly wants to avoid (SEED-001: "distinct from the existing per-org editor/viewer RBAC"). A first-pass shell can be a single page or a small set of collapsible sections; it does not need multi-page nav yet. | LOW | No new UI kit needed — reuse existing Tailwind card/section patterns already proven in `SettingsView.vue` (bordered `bg-gray-900` cards, label+input blocks, Save button with Saving/Saved states). |
+| A typed settings/config editor with inline validation (min/max, required, numeric-only) | Every knob in scope has a real invalid range (e.g. negative retention days, a rate limit of 0 that silently breaks AI features, a recipient cap above what Resend/the org plan can sustain). Client-side validation before write prevents an admin from bricking a live cron with a typo — this is the single highest-leverage thing to get right for a config panel whose values feed unattended background jobs. | MEDIUM | **Dependency:** none new — same "controlled input + validation + disabled Save until valid" shape already in `SettingsView.vue`'s slug field. **Note:** validation must exist BOTH client-side (UX) and Firestore-rules/function-side (defense — a config doc write from anywhere else, or a rules bug, shouldn't be able to set `AI_MAX_TOKENS_CEILING: -1`). |
+| Showing the **currently effective value**, not just the last-saved input | If the config doc read is cached in the Cloud Functions runtime (SEED-001 explicitly flags "the read must be safe/cached"), there is a real gap between "what's in Firestore" and "what the running function is actually using right now" until the cache expires or a cold start happens. An admin who just flipped a toggle and doesn't see it take effect immediately will assume the console is broken. | MEDIUM | **This is the one non-obvious table-stake.** At minimum: label the field with a "last changed / by whom / at what time" stamp so the admin can tell their write succeeded, even if propagation to a warm function instance takes up to the cache TTL. Consider surfacing the cache TTL itself ("changes apply within ~N minutes") rather than promising instant effect, since Cloud Functions v2 instances are long-lived and a per-invocation Firestore read on every cold path is a cost regression the whole v1.8 milestone was built to avoid. |
+| Basic save confirmation + error surfacing | Matches existing app-wide pattern (`isSaving` / `savedFeedback` / `saveError` triad in `SettingsView.vue`). Not optional — a config write that silently fails leaves the admin believing a dangerous toggle changed when it didn't. | LOW | Direct reuse of the existing pattern; no new design needed. |
 
-### Differentiators (Competitive Advantage)
+### Differentiators (Value-Add for THIS Console, Not Required for v1)
 
-Features that go beyond what peers typically offer, or where this app's narrower scope lets it do a
-specific thing better than a general-purpose tool. Should reinforce Core Value (planning brain) rather
-than compete with PCO on breadth.
+These separate "a config editor that happens to be gated" from a console that actually earns trust for its most dangerous job: enabling real deletion.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Explicit, checkable scoped change-diff on re-lock (SONG/ORDER/ROLE/NOTES/SLIDES, tagged by affected team) | None of the four peers surveyed expose a structured, typed diff of *what changed* since the last notification — PCO/Elvanto re-notify wholesale or leave it to the human to remember. This is a genuine gap-filler specific to a tool with a lock/reopen lifecycle | HIGH | This is the standout design element worth keeping — it directly exploits a feature (Draft→Planned lock, Reopen) that PCO doesn't have in the same shape. Complexity is real: diffing typed service-item changes and mapping each to affected teams is nontrivial logic, not just an email feature |
-| Literal insertable merge tokens in a free-text composer (service date, link, their roles, song list) | PCO's "personalization" is really just fixed auto-included blocks (times, notes) in scheduling-email templates — it does not expose a token-in-freetext composer for ad-hoc messages. Giving planners `{{songList}}`-style tokens in a One-off message is more flexible than anything peer tools expose in ad-hoc mode | MEDIUM | "Their roles" implies true per-recipient personalization (each volunteer sees only their own role), which is harder than a single merged send — needs per-recipient render or at minimum per-team variants, not one blast |
-| Message type selector (One-off / Reminder / Share link) as a first-class composer control | PCO separates these as different *screens* (scheduling email vs. reminder settings vs. plain team email) rather than one composer with a type switch; a single composer with a type dropdown is a genuine simplification of PCO's fragmented model | LOW-MEDIUM | Good scope-reduction differentiator: fewer distinct surfaces for the planner to learn |
-| Hard-bounce surfacing per service with a path to fix a bad address | PCO's public docs do not describe bounce surfacing to the planner at all (it's invisible/handled by PCO internally); this app doing sent+bounce visibility is ahead of the documented PCO UX | MEDIUM-HIGH | Requires provider webhook + Cloud Function + Firestore write-back; real infra cost, but genuinely differentiated since the target audience (small church, 2-3 planners) currently has *zero* visibility into "did that email actually land" |
-| Draft-service-aware reminder suppression (reminder skipped while still Draft) | Peer tools don't have an equivalent Draft concept, so they can't skip-if-still-planning the way this app can; this closes a real risk (auto-sending a reminder about an unfinished plan) that's specific to this app's lifecycle | LOW | Direct dependency on the existing Draft→Planned lock feature; low effort, meaningfully higher trust than peers can offer |
+| Dry-run blast-radius preview gating each `*_CLEANUP_ENABLED` toggle | This is not optional per PROJECT.md's hard constraint ("show the dry-run blast-radius count BEFORE a cleanup toggle is flipped") — it's the whole reason this milestone exists over just moving env vars to Firestore. Framed as a differentiator here only because it's *more* than table-stakes config-editing: it requires calling into the existing dry-run cleanup logic on demand (not waiting for the next scheduled cron run) and showing a real count before the toggle commits. | MEDIUM–HIGH | **Dependency:** the four v1.8 cleanup functions (`cleanupMedia`, `cleanupOrphanRenders`, `cleanupOrphanBackgrounds`, `cleanupPptxSources`) already compute a dry-run count as their normal code path (`dryRun = process.env.X_CLEANUP_ENABLED !== "true"`) — the "preview" feature is calling that same code on-demand from an admin action rather than only from the schedule, and returning the count to the UI before commit. **Complexity driver:** this needs a new callable Cloud Function (admin-gated) that runs the dry-run pass synchronously and returns a count — cleanup sweeps can touch thousands of Storage objects, so it must be bounded/paginated or time-box itself to avoid a slow admin-console click turning into a long-running function call. Simplest safe v1: reuse `STORAGE_CLEANUP_MAX_DELETES_PER_RUN` as the same cap on the preview call. |
+| Confirm-to-flip flow (typed confirmation or a second explicit step) for switching a cleanup toggle from OFF→ON | General admin/kill-switch UX precedent (e.g., platforms that require typing "KILL" or the resource name before a destructive change lands) exists specifically because a single-click toggle is too easy to flip by accident, and the consequence here is **permanent data deletion**. | LOW–MEDIUM | Pure client-side UX addition on top of the toggle + preview count already required above — a "type CONFIRM" or "click again to confirm" modal that shows the dry-run count inline. No new backend surface beyond what the preview feature already needs. |
+| Who-changed-what audit trail on the config doc | Not asked for explicitly in PROJECT.md, but it's the natural companion to "any admin the owner grants can flip these" — once it's not just the owner, "who turned off cleanup last Tuesday" becomes a real question. Cheap to add now (Firestore's own `updatedBy`/`updatedAt` fields on write), expensive to retrofit later once multiple people have write access with no history. | LOW | **Cheapest form (recommended for v1):** store `updatedBy: uid`, `updatedByEmail`, `updatedAt: serverTimestamp()` on the single config doc itself, shown as a "last changed by X at Y" line per section — NOT a separate audit-log collection/UI (that's the deferred differentiator below). This is a field, not a feature. |
+| Effective-value staleness indicator (surfacing the read-cache TTL/last-refresh time server-side) | Goes one step beyond the table-stakes "show effective value" — actually querying or exposing when the Cloud Functions runtime last re-read the config doc, so the admin has ground truth instead of a promise. | MEDIUM | Only worth it if the caching mechanism chosen (in-memory TTL cache vs. Firestore `onSnapshot` listener kept warm in the function's global scope) makes this cheap to expose. If config is read via a live `onSnapshot` listener at module scope (propagates in seconds, no polling delay), this differentiator collapses to near-zero value — decide caching strategy first, this second. |
 
-### Anti-Features (Commonly Requested, Often Problematic)
+### Anti-Features (Deliberately Deferred — Do NOT Build This Pass)
 
-Features that seem good but create problems for a 2-3-planner small-church tool, or that duplicate what
-Planning Center already owns (this app "complements, not replaces" PCO — Constraint in PROJECT.md).
+PROJECT.md and SEED-001 both explicitly scope this milestone thin. These look like natural next steps from inside an admin console, which is exactly why they're worth naming and explicitly deferring rather than silently scope-creeping in.
 
-| Feature | Why Requested | Why Problematic | Alternative |
-|---------|---------------|------------------|-------------|
-| Accept/Decline RSVP buttons in emails, with response tracking | PCO's signature feature; feels like an obvious "complete the loop" addition | This is PCO's core scheduling-availability workflow (blockouts, confirm/decline, auto-substitution) — replicating it duplicates PCO's actual job and turns a messaging feature into a second scheduling system. PROJECT.md's constraint is explicit: PC integration is out of scope, complement not replace | Volunteer confirmation of availability stays in Planning Center (or the roster's existing blockout/frequency-tier data already imported from PC); this app's email is one-way, informational |
-| Open-tracking (read receipts/pixel tracking) | "Wouldn't it be nice to know who read it" | PROJECT.md explicitly defers this (Key Decision) for privacy/complexity reasons; tracking pixels also raise church-context privacy concerns and most providers gate open-tracking behind extra webhook plumbing for marginal planning value | Hard-bounce tracking only (sent + bounced) — tells the planner what actually failed to deliver, which is the decision that matters (resend / fix address), without the privacy cost of tracking whether a volunteer opened it |
-| SMS/text notifications alongside email | PCO, Elvanto, and Rock RMS all offer SMS as a channel and it "feels incomplete" without it | Adds a second delivery provider, a second compliance regime (10DLC registration, opt-in law), and a second cost line for a 2-3-planner team already served by email; the app's roster data model captures email, not verified mobile numbers | Email-only for v1.7; if volunteers want SMS, PCO/Elvanto already provide it and this app doesn't need to re-solve it |
-| Marketing-style campaign builder / drip sequences (Rock RMS's "Communications" module) | Rock RMS bundles full drip campaigns and two-way SMS conversations; looks powerful | Wildly over-scoped for a per-service messaging feature on a niche planning tool — it's built for large multi-site orgs with comms staff, not a volunteer worship team | Keep the composer scoped to one service's recipients and one send (or one scheduled send); no campaigns, no audience segmentation beyond team/individual |
-| A general-purpose contact list / CRM independent of service rosters | Feels natural to want to "just email everyone in the church" | This app has no independent People/Contacts model beyond the roster tied to Volunteer Role Scheduling — building a parallel contact list duplicates Planning Center People, which this app is explicitly not replacing | Recipients are always derived from who's scheduled on a specific service (already decided) |
-| Rich HTML template builder / drag-and-drop email designer | PCO supports templates with images/attachments up to 10MB; "professional-looking" emails feel desirable | High build cost (WYSIWYG editor, image hosting, spam-score risk from heavy HTML) for a transactional/informational message type where clarity beats design polish; also raises deliverability risk (image-heavy HTML trips spam filters more than plain-formatted text) | Plain, well-formatted text/simple-HTML composer with tokens; save richer template design for a future milestone if ever requested |
-| Two-way reply-and-thread conversations in-app (Rock RMS's two-way SMS) | Feels like "real messaging" | Requires inbound-mail handling, threading UI, and moderation — a large scope increase disconnected from the stated goal (notify volunteers of schedule/changes) | One-way send only; replies go to the planner's real email address (reply-to), handled outside the app like any other email |
+| Feature | Why It's Tempting Here | Why Defer | What To Do Instead (this pass) |
+|---------|------------------------|-----------|---------------------------------|
+| Billing / plan management UI | "Owner admin console" naturally suggests billing next. | PROJECT.md states billing is explicitly out of scope this pass — no billing provider is even chosen yet (no Stripe integration exists in the codebase). Building UI for it now means designing against a data model that doesn't exist. | Note it as the console's "next tenant" in the shell (e.g., a disabled/placeholder nav item), nothing functional. |
+| Church/org provisioning from the admin console (create org, assign owner, etc.) | The admin console is the obvious place a future "grant a church access" flow would live. | Also explicitly out of scope. Org creation today happens via the existing signup flow; building an admin-driven provisioning UI duplicates that path and adds another way orgs can be created inconsistently. | None — leave org creation exactly as it works today. |
+| Multi-admin management UI (list/add/remove super-admins from the console itself) | "Owner + anyone the owner grants" implies a UI to grant/revoke. | Real, but the FIRST admin can't be created by a UI that requires being an admin to reach (bootstrap problem) — and a management UI for a set that's realistically 1-2 people this pass is disproportionate. A UI that manages a list of exactly one person is not a UI, it's ceremony. | Grant additional super-admins via a one-time Admin-SDK script or Firebase Console custom-claim edit (same mechanism the FIRST admin needs anyway). Document the script; skip the UI. |
+| In-app `aiUsage` ledger / dry-run-log dashboards (charts, historical trends) | v1.8 already produces this data (`aiUsage` ledger via Admin SDK, dry-run cleanup logs) — a dashboard feels like "just add a chart." | Explicitly named as deferred in both PROJECT.md ("R169 in-app usage visibility" deferred) and SEED-001. Charting/aggregation is real work (query design, pagination, possibly a scheduled rollup) that has nothing to do with THIS milestone's job of moving config off env vars. | The dry-run-count-before-toggle preview (in Differentiators above) is the only "usage visibility" this pass needs — it's a single number, not a dashboard. Leave `aiUsage` queryable only via Firestore Console / a follow-up milestone. |
+| Per-org override of the cleanup/AI/messaging knobs (vs. one global config doc) | SEED-001 raises this as an open design question ("Global vs per-org... relevant once there's more than one org"). | The app currently has effectively one production org in active use; building per-org override plumbing (doc-per-org + fallback-to-global resolution logic) roughly doubles the read/write surface for a capability nobody needs yet. | One global `appConfig`/`platformConfig` doc, explicitly. Note the per-org path as a documented future extension point (e.g., resolution function takes an optional `orgId` param today, even if unused), not built. |
+| A generic audit-log collection + browsing UI (full change history, filters, pagination) | Natural companion to "who changed what," and looks like a small step up from the recommended `updatedBy`/`updatedAt` fields. | A queryable history collection + a UI to browse/filter it is a second feature (storage design, retention policy, its own UI) layered on top of config editing. The `updatedBy`/`updatedAt`-on-the-doc approach (Differentiators, above) answers "who changed it last" — the only question this milestone's scope actually requires an answer to. | `updatedBy`/`updatedAt` fields only. If a full history becomes necessary later, Firestore's document write history isn't natively queryable anyway — that's a real design task for its own phase. |
+| Real-time collaborative editing of the config doc (multiple admins editing simultaneously with live conflict resolution) | Firestore's real-time nature makes this feel "free." | PROJECT.md already rejects real-time collaborative editing as an anti-feature for the whole app ("planners take turns, not simultaneous editing") — same logic applies here, doubly so since there's realistically one admin active at a time. | Last-write-wins is fine. If it becomes a problem with 2 admins, `updatedAt` on the doc lets the second saver see they're overwriting a change made after they loaded the page (simple staleness check), which is a one-line addition, not a feature. |
 
 ## Feature Dependencies
 
 ```
-Draft -> Planned lock/reopen lifecycle (existing, v1.4)
-    └──requires (for lock notification)──> Volunteer Role Scheduling / roster emails (existing)
-                                               └──requires──> Roles tab team groupings (existing)
+v1.5 custom-claims machinery (orgMembershipClaims.ts pattern)
+    └──requires──> Super-admin custom claim + gate (admin auth)
+                       └──requires──> Admin shell/nav (route guard needs a claim to check)
+                                          └──requires──> Config editor UI (needs somewhere to live)
 
-Messages composer (recipients, subject/body, tokens)
-    └──requires──> Volunteer Role Scheduling roster + roles (existing — recipient source of truth)
-    └──requires──> Shareable read-only service link (existing — populates the "link" token / share-link message type)
-    └──requires──> Email provider + backend send path (new, v1.7) 
-                       └──requires──> Settings kill-switch (new, v1.7 — must exist before any auto-send path is live)
+v1.8 cleanup functions' existing dry-run code path
+    └──requires──> Dry-run blast-radius preview (on-demand callable)
+                       └──requires──> Confirm-to-flip destructive toggle flow
+                                          └──enhances──> Config editor UI (specifically the 4 CLEANUP_ENABLED fields)
 
-Lock notification (auto-email on lock)
-    └──requires──> Draft->Planned lock event (existing)
-    └──requires──> Messages composer's send primitive (new, v1.7)
-    └──requires──> Settings per-service automatic-email default (new, v1.7)
+Firestore-backed runtime config doc + caching strategy
+    └──requires──> ALL Cloud Functions config reads refactored off process.env
+    └──enhances──> "Show effective value" table-stake (caching choice determines feasibility of live staleness indicator)
+    └──conflicts──> AI_PROXY_MAX_INSTANCES / GLOBAL_MAX_INSTANCES specifically (see Dependency Notes — these two do NOT
+                     become live-without-redeploy under Cloud Functions v2's architecture)
 
-Re-lock change notice (scoped diff)
-    └──requires──> Reopen-for-editing path (existing, v1.4)
-    └──requires──> Lock notification's send primitive (new, v1.7)
-    └──requires──> A diff engine over service-item types (SONG/ORDER/ROLE/NOTES/SLIDES) tagged to teams (new, v1.7 — highest-complexity net-new logic)
+Config editor UI
+    └──enhances──> updatedBy/updatedAt fields (cheap addition once a save path exists)
 
-Scheduled share-link reminder (N days out)
-    └──requires──> Shareable read-only service link (existing)
-    └──requires──> Draft-state check (existing — used to SKIP the reminder while still Draft)
-    └──requires──> A scheduled/cron-triggered Cloud Function (new, v1.7)
-
-Delivery history & bounce surfacing
-    └──requires──> Every send path above (Messages composer, lock notification, re-lock notice, reminder) writing a log entry
-    └──requires──> Email provider webhook -> Cloud Function -> Firestore write-back (new, v1.7)
-    └──enhances──> planner trust in all four send paths above (without it, sends are a black box)
-
-Settings kill-switch (global on/off)
-    └──conflicts with──> any auto-send path if built before the switch exists (must ship first / same phase)
+[Deferred: multi-admin management UI] ──requires──> [Deferred: billing UI, church provisioning]
+    (all three explicitly out of scope this pass — no dependency work needed now)
 ```
 
 ### Dependency Notes
 
-- **Messages composer requires Volunteer Role Scheduling roster + Roles tab:** recipients, per-person
-  email, and team groupings are 100% sourced from data this app already has (Key Decision, PROJECT.md:
-  "Messaging recipients derive from assigned service roles"). No new contact model needed — this is a
-  load-bearing simplification versus every peer tool, which also derive from their own roster/serving
-  models.
-- **Lock notification requires the existing Draft→Planned lock event:** this is the same "moment" PCO
-  calls sending a prepared notification and Elvanto calls publishing — the trigger point already exists
-  in this app's data model (v1.4, Phase 31); v1.7 just needs to hang a side effect off it.
-- **Re-lock change notice requires Reopen-for-editing (v1.4) AND a new typed diff engine:** this is the
-  single highest-complexity net-new piece in the milestone. Nothing in the peer landscape (PCO, Elvanto,
-  Rock RMS, WorshipTools) does a structured before/after diff — they just re-send the whole notification
-  or leave re-notification to the human. Scope this as its own phase; it should not share a phase with
-  the simpler lock-notification or composer work.
-- **Scheduled reminder requires Draft-state check to skip while still Draft:** this is a real
-  differentiator (see above) but also a dependency risk — the reminder Cloud Function needs read access
-  to current service lock-state at cron-fire time, not just at schedule-creation time, since a service
-  could still be Draft 7 days out and get Planned only 2 days out.
-- **Settings kill-switch conflicts with (must precede) all auto-send paths:** shipping lock-notification
-  or the scheduled reminder before the kill-switch exists means there is no way to turn off unwanted
-  auto-mail once it's live — sequence the kill-switch and its Settings-inherited per-service defaults
-  into the same phase as (or strictly before) the first auto-send feature.
-- **Delivery history enhances, not blocks, the send paths:** each send path can technically go live
-  without the log, but shipping any auto-send (lock, re-lock, scheduled reminder) without delivery
-  visibility recreates the "silent failure" problem this milestone explicitly exists to solve (sent +
-  bounce tracking is called out as the reason to build this over doing nothing).
+- **Admin auth gate requires the v1.5 custom-claims pattern:** `functions/src/orgMembershipClaims.ts` is the direct template — a Firestore-trigger-synced claim, read by both server-side rules and client-side UI state. The super-admin claim should follow the same shape (small, boolean-or-enum, synced via `setCustomUserClaims`), not reinvent a second claims mechanism.
+- **Config editor requires a caching-strategy decision BEFORE the "effective value" and "dry-run preview" features can be scoped precisely.** SEED-001 flags this itself ("the functions must read config from Firestore instead of `process.env`, and the read must be safe/cached"). Whether that's an in-memory TTL cache re-read every N minutes, or a live `onSnapshot` listener held at module scope, changes both propagation latency (what "effective now" means) and whether a staleness indicator is even needed.
+- **Two knobs cannot become "live, no redeploy" the way the others can — this is a real constraint, not a preference.** `AI_PROXY_MAX_INSTANCES` and `GLOBAL_MAX_INSTANCES` are read from `process.env` at **module load time** in `functions/src/index.ts` and passed into `{ maxInstances: AI_PROXY_MAX_INSTANCES }` (a function-definition-time option) and `setGlobalOptions({ maxInstances: GLOBAL_MAX_INSTANCES })` (called once at cold start). Cloud Functions v2's `maxInstances` is a deployment/infrastructure setting, not a per-invocation runtime value — moving these two specific knobs to Firestore either (a) requires the function to read Firestore synchronously before `setGlobalOptions()` runs at module load (adds cold-start latency and a hard failure mode if that read fails), or (b) simply doesn't achieve "no redeploy" for these two and should be documented as a known exception rather than silently promised. Every other knob in scope (the four cleanup enables, retention days, AI rate limits/token ceiling/allowed models, message caps) is read per-invocation via `readNumericKnob(process.env.X, default)` or inline `process.env.X !== "true"` checks and can genuinely move to a per-request Firestore/cache read with no such constraint.
+- **Dry-run preview requires the existing cleanup functions' dry-run code path, not new logic.** All four sweeps already compute "what would I delete" as their default behavior when `*_CLEANUP_ENABLED` is unset/false — the feature is exposing that computation on-demand via an admin-gated callable, capped the same way the real run is (`STORAGE_CLEANUP_MAX_DELETES_PER_RUN`), rather than writing a second counting mechanism.
+- **The song-linked-background protection (hard constraint) is orthogonal to this console and must not be touched by it.** `cleanupOrphanBackgrounds`'s 3-tier reference detection + fail-safes already live in `functions/src/index.ts` (lines ~1329–1439) and does not change when its enable flag moves from env var to Firestore — the config-doc migration only changes *where the boolean is read from*, never the deletion logic gated behind it. Any refactor that touches that function's body (not just its config source) is in scope for extra scrutiny/testing, not a rewrite.
+- **No-reply sender config is independent of the cleanup/AI/messaging knobs** — it's a single string (`MESSAGE_FROM_ADDRESS`, currently a `defineString` with default `onboarding@resend.dev`) with its own real-world precondition (Resend domain verification) rather than a numeric/boolean validation problem. It can ship in the same config doc and UI but has a fundamentally different "is this a valid value" check (see below).
+
+## No-Reply Sender Config — Specific Findings
+
+- **Format validation is table-stakes and cheap:** a plain-email-or-`Display Name <email>` shape check (the codebase's own `bareEmailAddress()` already parses both forms), reused directly rather than reimplemented.
+- **Domain *verification* is a real, external precondition this console cannot fully self-serve.** Resend requires the sending domain to have DNS records (SPF/DKIM, added at the registrar) added and verified in the Resend dashboard before that domain can send — this is an out-of-band, one-time setup step the owner performs in Resend/their DNS provider, not something the admin console UI can complete on its own. The console's job is narrower: let the owner *enter* the verified address, and — as a genuine differentiator worth including even in v1 — validate-on-save by checking the domain against Resend's API (if such an endpoint is available) or at minimum warning "this domain must be verified in Resend before use" rather than silently accepting an unverified one and only failing at send time (a 403 the current codebase comment already documents as the exact failure mode).
+- **A `*.web.app` (Firebase Hosting) address is confirmed OUT of reach — not a config gap, a platform limit.** The codebase's own `functions/src/index.ts` comment states this plainly: `*.web.app` is Google-managed with no DNS access, so it can never be Resend-verified. This is consistent with how Resend/most transactional-email providers require registrar-level DNS control to verify a sending domain. **Decision this research surfaces for requirements:** getting a real verified domain (buying/pointing a custom domain, adding its DNS records in Resend) is an owner action outside the app entirely — it is IN SCOPE for the admin console to *let the owner configure the address once they have one*, but OUT OF SCOPE for the console to *provision or verify the domain itself*. The milestone should not block on the owner actually completing domain verification; it should ship the config UI that's ready the moment they do (superseding the standing v1.7 backlog item 999.6, "harden the messaging From address to a Resend-verified domain").
 
 ## MVP Definition
 
-### Launch With (v1.7)
+### Launch With (v1 — this milestone)
 
-Minimum viable slice — the milestone as scoped in PROJECT.md's Active requirements.
+- [ ] Super-admin custom claim + Vue router gate + Firestore-rules enforcement — the console has no value if it isn't actually private
+- [ ] Minimal admin shell (single page or a few collapsible sections is enough; no multi-page nav needed)
+- [ ] One global Firestore config doc holding all in-scope knobs, with Cloud Functions refactored to read it (per-invocation, cached) instead of `process.env` — except `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES`, documented as the redeploy-still-required exception
+- [ ] Typed inputs with min/max/required validation per knob, both client-side and rules/function-side
+- [ ] Effective-value display with a last-changed-by/at stamp (not a live staleness ticker — that's a differentiator)
+- [ ] Dry-run blast-radius preview + confirm-to-flip flow specifically gating the four `*_CLEANUP_ENABLED` toggles — this is the milestone's hard requirement, not optional polish
+- [ ] No-reply sender address field with format validation and a "must be Resend-verified" warning
+- [ ] `updatedBy`/`updatedAt` on the config doc (cheap, do it while the save path is being built anyway)
 
-- [ ] Settings kill-switch (global on/off + per-service automatic-email defaults) — must exist before
-      any auto-send ships; the escape hatch every peer tool provides
-- [ ] Messages composer: teams-first recipients + individuals + Everyone, subject/body, One-off /
-      Reminder / Share-link types, tokens (date/link/roles/song list), "Reaches N people" count
-- [ ] Lock notification (auto-email on lock, roles+songs+link) — direct mapping of PCO/Elvanto's
-      publish-triggers-notify pattern onto this app's existing lock event
-- [ ] Scheduled share-link reminder, N days out (default 7), skipped while Draft — table stakes,
-      matches PCO's configurable reminder feature almost exactly
-- [ ] Delivery history: per-service sent log + hard-bounce surfacing — the thing that makes auto-send
-      trustworthy; without it this app is worse than doing nothing (silent failures)
-- [ ] Email provider + backend send path (owner-approved provider, secret in `.env.local`, owner-gated
-      deploy) — infrastructure prerequisite for everything else
+### Add After Validation (v1.x / once this console gets real use)
 
-### Add After Validation (v1.7, later phase within milestone)
+- [ ] Live staleness indicator for effective values (worth it once the caching strategy is settled and if propagation lag turns out to actually confuse the owner in practice)
+- [ ] Per-knob change history beyond "last changed by" (only if a real need to see older changes shows up)
+- [ ] Send-domain verification status check against Resend's API from within the console (nice, not necessary — the owner can check Resend's own dashboard)
 
-Higher-complexity pieces that depend on the above being solid first.
+### Future Consideration (v2+ — explicitly deferred, not roadmap items for v1.9)
 
-- [ ] Re-lock change notice with scoped, checkable, team-tagged diff (SONG/ORDER/ROLE/NOTES/SLIDES) —
-      the standout differentiator, but the highest-complexity item; should follow lock-notification and
-      the composer so the diff engine has a stable send primitive to call
-- [ ] "Send me a copy" and "schedule for later" composer options — nice-to-have composer affordances
-      called out in the imported design; low risk to defer one phase if the composer core needs to ship
-      first
-- [ ] Per-recipient personalized token rendering ("their roles" = only the viewer's own role, not
-      everyone's) — if the simplest implementation ships as one merged blast first, tighten to true
-      per-recipient rendering once the send pipeline is proven
-
-### Future Consideration (v1.8+)
-
-Explicitly deferred, matches PROJECT.md's stated scope boundaries.
-
-- [ ] Open-tracking (read receipts) — deferred by Key Decision; revisit only if bounce-only visibility
-      proves insufficient in practice
-- [ ] SMS/text channel — peers offer it, but out of scope; church already has PCO/Elvanto for that if
-      truly needed
-- [ ] Volunteer accept/decline response tracking inside this app — deliberately not replicating PCO's
-      scheduling-confirmation loop (anti-feature, see above)
+- [ ] Billing / plan management
+- [ ] Church/org provisioning from the console
+- [ ] Multi-admin grant/revoke UI (bootstrap-script-only for now)
+- [ ] In-app `aiUsage` / dry-run-log dashboards and charts
+- [ ] Per-org override of global config knobs
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Settings kill-switch + per-service defaults | HIGH | LOW | P1 |
-| Messages composer (teams/individuals/everyone, subject/body, tokens, reach count) | HIGH | MEDIUM | P1 |
-| Lock notification (auto-email on lock) | HIGH | MEDIUM | P1 |
-| Scheduled share-link reminder (N days, Draft-skip) | HIGH | MEDIUM | P1 |
-| Delivery history (sent log + hard bounces) | HIGH | MEDIUM-HIGH | P1 |
-| Email provider infra (Cloud Function send path + secret) | HIGH (blocking) | MEDIUM | P1 |
-| Re-lock scoped change-diff notice | MEDIUM-HIGH | HIGH | P2 |
-| Send-me-a-copy / schedule-for-later | LOW-MEDIUM | LOW | P2 |
-| Per-recipient personalized "their roles" rendering | MEDIUM | MEDIUM | P2 |
-| Bad-address fix-and-resend UX | MEDIUM | LOW-MEDIUM | P2 |
-| Open-tracking | LOW (for this audience) | MEDIUM-HIGH | P3 (deferred) |
-| SMS channel | LOW (duplicates PCO) | HIGH | P3 (out of scope) |
-| Accept/Decline response tracking | LOW (duplicates PCO) | HIGH | P3 (anti-feature) |
+|---------|------------|----------------------|----------|
+| Super-admin claim + gate (client + server) | HIGH | MEDIUM | P1 |
+| Firestore config doc + functions refactor off `process.env` | HIGH | MEDIUM–HIGH | P1 |
+| Typed config editor with validation | HIGH | MEDIUM | P1 |
+| Dry-run preview + confirm-to-flip on cleanup toggles | HIGH | MEDIUM–HIGH | P1 |
+| No-reply sender field + format validation | MEDIUM | LOW | P1 |
+| Effective-value + last-changed display | MEDIUM | LOW–MEDIUM | P1 |
+| Live staleness indicator | LOW | MEDIUM | P3 |
+| Full audit-log collection/UI | LOW (this pass) | MEDIUM–HIGH | P3 (deferred) |
+| Multi-admin management UI | LOW (this pass, 1-2 people) | MEDIUM | P3 (deferred) |
+| Billing / provisioning UI | N/A this pass | HIGH | P3 (deferred, out of scope) |
 
 **Priority key:**
-- P1: Must have for v1.7 launch
-- P2: Should have within v1.7, can land in a later phase of the same milestone
-- P3: Explicitly deferred/out of scope
+- P1: Must have for this milestone
+- P2: Should have, add when possible (none identified as strictly P2 this pass — the differentiators either fold cheaply into P1 work or are cleanly deferred)
+- P3: Deferred to a future milestone
 
-## Competitor Feature Analysis
+## Comparable Pattern Analysis
 
-| Feature | Planning Center Services | Elvanto | Rock RMS | This App's Plan |
-|---------|---------------------------|---------|----------|------------------|
-| Trigger for first notification | Explicit "send scheduling email" action by leader (plan can be prepared/unsent indefinitely) | Automatic the moment a service is **published** | Auto- or manual-schedule triggers confirmation email | Auto-send on Draft→Planned **lock** (the app's own equivalent "publish" moment), toggleable via Settings |
-| Recipient targeting | Team, "Scheduled People" (everyone on plan), or filter by response status (Prepared/Confirmed/Declined) | Whole roster on the published service | Scheduler-selected volunteers | Teams-first + individuals + "Everyone on this service" — no response-status filtering (no RSVP loop, by design) |
-| Reminder before service | Configurable per plan-time/team, 0–7 days out, 10am local, bundles same-day reminders | Not clearly documented as separate from initial roster notice | Not clearly documented as a distinct reminder feature | N days out (default 7), auto-skipped while still Draft — matches PCO's model, adds the Draft-skip peers can't do |
-| Ad-hoc/one-off message | Yes, from plan page or People filter, with templates | Yes, via "Contact Volunteers" on a service | Communications module (broader, drip-capable) | Yes, One-off message type in same composer as Reminder/Share-link — narrower and simpler than any peer |
-| Change-since-last-notify handling | None documented — re-send is manual/whole | None documented | None documented | Scoped, typed, team-tagged diff prompt on re-lock — no peer tool does this; genuine differentiator |
-| Delivery visibility to planner | Sent/pending badges per person on plan; no documented bounce surfacing | Not documented | Confirmation status tracked; no documented bounce surfacing | Per-service sent history + hard-bounce surfacing — ahead of documented peer UX |
-| RSVP/Accept-Decline loop | Yes — central feature | Yes (accept/decline) | Yes (confirmation status) | Deliberately NOT built — anti-feature, PCO's job to keep |
-| Org-wide off switch | Yes, disable reminders for all teams in a plan (browser/org-level) | Not documented | Not documented | Yes — global Settings kill-switch, explicit requirement |
-| Merge tokens in free text | No — auto-included fixed blocks (times, notes), not user-insertable tokens in ad-hoc mail | Not documented | Not documented | Yes — service date, link, their roles, song list as insertable tokens; a genuine step ahead of PCO's fixed-block model |
+No direct public competitor has a documented "owner admin console" pattern worth reverse-engineering line-by-line — this is an internal/ops surface, not a customer-facing feature, so the relevant comparison is to general internal-admin-panel and feature-flag-platform conventions rather than worship-planning competitors.
+
+| Pattern | How it typically works elsewhere | Our approach |
+|---------|-----------------------------------|--------------|
+| Kill-switch confirmation friction | Higher-risk toggles require typed confirmation (e.g. typing the resource name/"KILL") before applying, per feature-flag-platform convention | Confirm-to-flip + dry-run count shown inline before the toggle commits — arguably stronger than a typed-phrase pattern alone, since it shows *concrete impact* rather than just adding friction |
+| Change auditability | "Every toggle should record who, when, and why" is standard guidance across feature-flag platforms | `updatedBy`/`updatedAt` on the config doc for v1; a full audit trail deferred (see Anti-Features) |
+| Role separation (ops/admin claim vs. app-level RBAC) | Standard in multi-tenant SaaS: platform-admin claims are issued and checked separately from tenant-level roles | Matches directly — super-admin claim is deliberately separate from the existing per-org editor/viewer claim, reusing the same underlying claims mechanism |
 
 ## Sources
 
-- [Send scheduling emails — Planning Center Help](https://help.planningcenter.com/en/142892-send-scheduling-emails.html) — official docs, HIGH real-world confidence (first-party)
-- [Communicate with your teams — Planning Center Help](https://help.planningcenter.com/en/142889-communicate-with-your-teams.html) — official docs, composer/recipient/attachment details
-- [Respond to scheduling emails — Planning Center Help](https://help.planningcenter.com/en/142893-respond-to-scheduling-emails.html) — official docs, Accept/Decline loop
-- [Set up reminder emails — Planning Center Help](https://help.planningcenter.com/en/142894-set-up-reminder-emails.html) — official docs, reminder timing/scope/settings
-- [Use Blockout Dates for Predictable Scheduling — PCO Zendesk](https://pcoservices.zendesk.com/hc/en-us/articles/115011726967-Use-Blockout-Dates-for-Predictable-Scheduling) — official docs
-- [Bundled Scheduling & Notification Emails — Planning Center Blog](https://www.planningcenter.com/blog/2018/06/bundled-email-and-notifications) — official blog, email-bundling rationale
-- [How to Setup Email and SMS Notifications to Volunteers — Elvanto Help](https://help.elvanto.com/hc/en-us/articles/7604214211351-How-to-Setup-Email-and-SMS-Notifications-to-Volunteers) — official docs, publish-triggers-notify behavior
-- [How to Contact Volunteers who are Scheduled on a Service — Elvanto Help](https://help.elvanto.com/hc/en-us/articles/7604105489303-How-to-Contact-Volunteers-who-are-Scheduled-on-a-Service) — official docs, ad-hoc messaging
-- [Rock RMS Volunteer Scheduler — Life.Church IT Support Knowledge Base](https://itsupport.life.church/a/1612242-how-to-use-the-volunteer-scheduler) — third-party operational guide, MEDIUM confidence
-- Rock RMS product marketing (communications module scope) — vendor-reported, MEDIUM confidence, general web search
-- WorshipTools vs. Planning Center comparisons (theleadpastor.com, blog secondary sources) — MEDIUM/LOW confidence, general web search, cross-checked across two independent write-ups
-- Transactional email personalization/token best practices — general industry consensus (Twilio, Mailtrap, Chamaileon, Moosend resource pages), LOW-MEDIUM confidence, no single authoritative source
-- Email bounce-handling best practices (hard vs. soft bounce treatment, dashboards) — general industry consensus (Mailflow Authority, Bloomreach docs, various ESP blogs), LOW-MEDIUM confidence
+- **Codebase (HIGH confidence — direct inspection):** `functions/src/orgMembershipClaims.ts` (custom-claims pattern), `functions/src/index.ts` (all `process.env.*_CLEANUP_ENABLED`/`*_RETENTION_DAYS`/`AI_*`/`MESSAGE_*`/`GLOBAL_MAX_INSTANCES` read sites, `MESSAGE_FROM_ADDRESS` definition + its Resend/`*.web.app` comment, `cleanupOrphanBackgrounds` reference-protection region), `src/views/SettingsView.vue` (existing settings-editor UI pattern), `.planning/PROJECT.md`, `.planning/seeds/SEED-001-admin-settings-interface.md`
+- [Resend — Verified Domains](https://resend.com/docs/dashboard/domains/introduction) — MEDIUM confidence (websearch); corroborates the codebase's own comment that domain verification (DNS records at the registrar) is required before sending, consistent with `*.web.app` being unreachable since it's Google-managed with no DNS access
+- [Firebase — Control Access with Custom Claims and Security Rules](https://firebase.google.com/docs/auth/admin/custom-claims) and related search results — MEDIUM confidence (websearch); 1000-byte claims-payload limit and the ID-token-refresh-required-after-claim-change behavior, both directly relevant to the super-admin claim design and the "why isn't my new admin working yet" support question this will generate at least once
+- General feature-flag/kill-switch UX guidance (Harness, LaunchDarkly, Unleash, Flagsmith docs/blogs surfaced via websearch) — LOW confidence (aggregated blog/vendor-doc consensus, not a single authoritative source); used only for the general "confirm destructive toggles, log who/when" pattern, which this project's own dry-run-preview requirement already exceeds
 
 ---
-*Feature research for: volunteer/team messaging in worship-service planning tools (v1.7)*
-*Researched: 2026-08-13*
+*Feature research for: owner-only super-admin console, v1.9 milestone*
+*Researched: 2026-08-20*
