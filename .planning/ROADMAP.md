@@ -315,7 +315,12 @@ only transient slideshow backgrounds tied to a service. This guarantee must surv
   4. Firestore rules allow read/write of `appConfig/*` and `superAdmins/*` only to a super-admin, via a claim-only `isSuperAdmin()` check (no cross-document `get()`/`exists()`), proven by genuine emulator ALLOW and DENY tests (R178).
   5. A super-admin can grant and revoke another user's super-admin access from the console, and a revoked user loses access on their next token refresh (R179).
 
-**Plans**: TBD
+**Plans**: 5 plans
+- [ ] 68-01-PLAN.md — Shared claims-merge helper + orgMembershipClaims merge-safety fix (R175)
+- [ ] 68-02-PLAN.md — superAdmin claim function (sync trigger + onCall) + owner bootstrap script (R174, R175, R176, R179)
+- [ ] 68-03-PLAN.md — Claim-only isSuperAdmin() Firestore rules + genuine ALLOW/DENY emulator tests (R178)
+- [ ] 68-04-PLAN.md — Client gate (auth store, router guard, nav) + Owner Console roster (R177, R179)
+- [ ] 68-05-PLAN.md — Owner hand-over deploy + first-super-admin bootstrap runbook (R174, R176, R178, R179)
 
 ### Phase 69: Firestore Runtime Config
 
