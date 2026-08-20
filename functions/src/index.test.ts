@@ -4171,7 +4171,14 @@ describe("sendQueuedMessageHandler", () => {
       expect(mockSend).not.toHaveBeenCalled();
       expect(recipientWrites).toHaveLength(0);
       expect(messageSetSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ status: "failed", deliveryCounts: { sent: 0, failed: 0 } }),
+        expect.objectContaining({
+          status: "failed",
+          deliveryCounts: { sent: 0, failed: 0 },
+          // IN-01 (67-REVIEW.md): failureReason must be set on the message
+          // doc, matching the sibling recipient-cap rejection's
+          // failureReason: "over-recipient-cap".
+          failureReason: "over-org-daily-quota",
+        }),
         { merge: true },
       );
       expect(outcome).toMatchObject({

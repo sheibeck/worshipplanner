@@ -2726,7 +2726,12 @@ export async function sendQueuedMessageHandler(params: {
       const quota = await checkAndConsumeOrgEmailQuota(db, orgId, sendList.length, ORG_MAX_EMAILS_PER_DAY);
       if (!quota.allowed) {
         await messageRef.set(
-          { status: "failed", sentAt: FieldValue.serverTimestamp(), deliveryCounts: { sent: 0, failed: 0 } },
+          {
+            status: "failed",
+            sentAt: FieldValue.serverTimestamp(),
+            deliveryCounts: { sent: 0, failed: 0 },
+            failureReason: "over-org-daily-quota",
+          },
           { merge: true },
         );
         console.error(
