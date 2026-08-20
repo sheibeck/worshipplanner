@@ -4,6 +4,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStorage } from "firebase-admin/storage";
 import { getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 import type { CallableRequest } from "firebase-functions/v2/https";
 import {
   buildUpstreamUrl,
@@ -29,6 +30,9 @@ import {
   minusDays,
   sendScheduledRemindersHandler,
   dispatchDueScheduledMessagesHandler,
+  readAiProxyLimits,
+  resolveOrgId,
+  verifyAppCaller,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -2360,6 +2364,105 @@ describe("redactUrl", () => {
 
   it("fails closed to a generic placeholder on an unparseable URL, rather than risking a raw leak", () => {
     expect(redactUrl("not a url")).toBe("[unparseable URL]");
+  });
+});
+
+// --- AI proxy cost controls (65-01: R161/R162/R163/R164) -----------------
+//
+// Mirrors the buildUpstreamUrl/redactUrl precedent above: the `api`
+// onRequest handler still has no full test harness, so each control is
+// exercised through its exported pure/helper function against a mocked
+// Firestore/Auth -- never a live Anthropic call.
+
+describe("readAiProxyLimits", () => {
+  it("returns the documented defaults for an empty env", () => {
+    expect(readAiProxyLimits({})).toEqual({
+      maxPerMin: 20,
+      maxPerDay: 500,
+      allowedModels: ["claude-haiku-4-5-20251001"],
+      maxTokensCeiling: 2048,
+    });
+  });
+
+  it("parses all four knobs from env when present", () => {
+    expect(
+      readAiProxyLimits({
+        AI_RATELIMIT_MAX_PER_MIN: "5",
+        AI_RATELIMIT_MAX_PER_DAY: "50",
+        AI_MAX_TOKENS_CEILING: "512",
+        AI_ALLOWED_MODELS: " claude-haiku-4-5-20251001 , claude-sonnet-4-5-20250929 ",
+      }),
+    ).toEqual({
+      maxPerMin: 5,
+      maxPerDay: 50,
+      allowedModels: ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"],
+      maxTokensCeiling: 512,
+    });
+  });
+
+  it("falls back to defaults for unset or non-numeric knobs", () => {
+    expect(
+      readAiProxyLimits({
+        AI_RATELIMIT_MAX_PER_MIN: "not-a-number",
+        AI_ALLOWED_MODELS: "",
+      }),
+    ).toEqual({
+      maxPerMin: 20,
+      maxPerDay: 500,
+      allowedModels: ["claude-haiku-4-5-20251001"],
+      maxTokensCeiling: 2048,
+    });
+  });
+
+  it("drops empty entries from a comma-separated AI_ALLOWED_MODELS list", () => {
+    const limits = readAiProxyLimits({ AI_ALLOWED_MODELS: "claude-haiku-4-5-20251001,, ," });
+    expect(limits.allowedModels).toEqual(["claude-haiku-4-5-20251001"]);
+  });
+});
+
+describe("resolveOrgId", () => {
+  it("returns the orgId custom claim when present", () => {
+    expect(resolveOrgId({ orgId: "org1" } as never)).toBe("org1");
+  });
+
+  it("returns null when the orgId claim is absent", () => {
+    expect(resolveOrgId({} as never)).toBeNull();
+  });
+
+  it("returns null when the orgId claim is an empty string", () => {
+    expect(resolveOrgId({ orgId: "" } as never)).toBeNull();
+  });
+});
+
+describe("verifyAppCaller", () => {
+  afterEach(() => {
+    vi.mocked(getAuth).mockReset();
+    vi.mocked(getAuth).mockReturnValue({
+      verifyIdToken: vi.fn(),
+      getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+    } as never);
+  });
+
+  it("returns null for a missing token, without calling verifyIdToken", async () => {
+    const verifyIdToken = vi.fn();
+    vi.mocked(getAuth).mockReturnValue({ verifyIdToken } as never);
+    expect(await verifyAppCaller(undefined)).toBeNull();
+    expect(verifyIdToken).not.toHaveBeenCalled();
+  });
+
+  it("resolves to the decoded token for a valid token", async () => {
+    const decoded = { uid: "uid1", orgId: "org1" };
+    const verifyIdToken = vi.fn(async () => decoded);
+    vi.mocked(getAuth).mockReturnValue({ verifyIdToken } as never);
+    expect(await verifyAppCaller("good-token")).toEqual(decoded);
+  });
+
+  it("resolves to null when verifyIdToken throws (invalid token)", async () => {
+    const verifyIdToken = vi.fn(async () => {
+      throw new Error("invalid token");
+    });
+    vi.mocked(getAuth).mockReturnValue({ verifyIdToken } as never);
+    expect(await verifyAppCaller("bad-token")).toBeNull();
   });
 });
 

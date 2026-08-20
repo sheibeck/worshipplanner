@@ -3,7 +3,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { initializeApp, getApps } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
+import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
 import {
   getFirestore,
   FieldValue,
@@ -143,18 +143,77 @@ const FORWARDED_HEADERS = [
   "anthropic-dangerous-direct-browser-access",
 ];
 
-async function callerIsAuthenticated(idToken: string | undefined): Promise<boolean> {
-  if (!idToken) return false;
+/**
+ * verifyAppCaller replaces the old boolean `callerIsAuthenticated` gate with
+ * the SAME accept/reject decision (valid token -> proceed, missing/invalid ->
+ * 401), but resolves to the decoded ID token itself rather than throwing it
+ * away -- the anthropic-only controls below (Tasks 2-3, R161/R162/R163) need
+ * `decoded.uid` for the rate limiter/ledger and the `orgId` custom claim for
+ * the ledger's org attribution. Every other SECRET_INJECTED service
+ * (esv/nlt) keeps the identical "any valid caller" behavior; only the
+ * anthropic branch reads anything off the returned token.
+ */
+export async function verifyAppCaller(idToken: string | undefined): Promise<DecodedIdToken | null> {
+  if (!idToken) return null;
   try {
-    await getAuth().verifyIdToken(idToken);
-    return true;
+    return await getAuth().verifyIdToken(idToken);
   } catch {
-    return false;
+    return null;
   }
 }
 
+/**
+ * Reads the `orgId` custom claim (the v1.5 org-membership claim -- see
+ * orgMembershipClaims.ts's ORG_CLAIM_KEYS, a top-level readable key on the
+ * decoded token). Returns null rather than throwing when the claim is
+ * absent/empty, so an otherwise-valid caller with no org (yet) still gets a
+ * uid-only usage ledger entry instead of a failed request.
+ */
+export function resolveOrgId(decoded: DecodedIdToken): string | null {
+  const orgId = (decoded as unknown as Record<string, unknown>)["orgId"];
+  return typeof orgId === "string" && orgId.length > 0 ? orgId : null;
+}
+
+/** R161/R162 tunable knobs -- all env-configurable with generous defaults so
+ * a fresh deploy works with zero config (v1.8 grant: no .env file is written
+ * by this plan). Mirrors the existing env-read style at MEDIA_CLEANUP_ENABLED
+ * (index.ts, near the media-cleanup handlers below).
+ */
+export interface AiProxyLimits {
+  maxPerMin: number;
+  maxPerDay: number;
+  allowedModels: string[];
+  maxTokensCeiling: number;
+}
+
+const DEFAULT_AI_ALLOWED_MODELS = ["claude-haiku-4-5-20251001"];
+
+export function readAiProxyLimits(env: NodeJS.ProcessEnv = process.env): AiProxyLimits {
+  const maxPerMin = Number(env.AI_RATELIMIT_MAX_PER_MIN) || 20;
+  const maxPerDay = Number(env.AI_RATELIMIT_MAX_PER_DAY) || 500;
+  const maxTokensCeiling = Number(env.AI_MAX_TOKENS_CEILING) || 2048;
+  const rawModels = env.AI_ALLOWED_MODELS;
+  const parsedModels = rawModels
+    ? rawModels
+        .split(",")
+        .map((m) => m.trim())
+        .filter((m) => m.length > 0)
+    : [];
+  return {
+    maxPerMin,
+    maxPerDay,
+    allowedModels: parsedModels.length > 0 ? parsedModels : DEFAULT_AI_ALLOWED_MODELS,
+    maxTokensCeiling,
+  };
+}
+
+// R164: an explicit maxInstances ceiling on the highest-cost function (the
+// anthropic branch of `api` spends real money per call). Env-overridable so
+// the owner can tune fan-out without a logic redeploy.
+const AI_PROXY_MAX_INSTANCES = Number(process.env.AI_PROXY_MAX_INSTANCES) || 10;
+
 export const api = onRequest(
-  { secrets: [CLAUDE_API_KEY, ESV_API_KEY, NLT_API_KEY] },
+  { secrets: [CLAUDE_API_KEY, ESV_API_KEY, NLT_API_KEY], maxInstances: AI_PROXY_MAX_INSTANCES },
   async (req, res) => {
     // Extract service name from /api/<service>/...
     const match = req.path.match(/^\/api\/(\w+)(\/.*)?$/);
@@ -170,11 +229,16 @@ export const api = onRequest(
       return;
     }
 
-    // Gate the secret-bearing routes: only signed-in app users may spend our keys.
+    // Gate the secret-bearing routes: only signed-in app users may spend our
+    // keys. `decodedCaller` is held for the rest of the handler so the
+    // anthropic-only controls below (R161 rate limit, R163 ledger) can read
+    // `decoded.uid` / resolveOrgId(decoded) without re-verifying the token.
+    let decodedCaller: DecodedIdToken | null = null;
     if (SECRET_INJECTED.has(service)) {
       const appToken = req.headers["x-app-auth"];
       const token = typeof appToken === "string" ? appToken : undefined;
-      if (!(await callerIsAuthenticated(token))) {
+      decodedCaller = await verifyAppCaller(token);
+      if (!decodedCaller) {
         res.status(401).json({ error: "Authentication required" });
         return;
       }
