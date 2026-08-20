@@ -57,6 +57,7 @@ import {
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
+import { getAppConfig, DEFAULT_APP_CONFIG, type AppConfig } from "./appConfig";
 
 // A per-test variable the mocked defineString's value() reads, so each
 // requestPptxRenderHandler test case can set/clear PPTX_RENDER_SERVICE_URL
@@ -138,6 +139,20 @@ vi.mock("./pptxParser", () => ({
 vi.mock("./renderInvoker", () => ({
   invokeRenderService: vi.fn(),
 }));
+// R181/R183: every managed knob now resolves through getAppConfig() instead
+// of process.env -- mocked the same way as the sibling modules above so each
+// test can inject a resolved AppConfig object (spread DEFAULT_APP_CONFIG with
+// a test-specific override) rather than mutating process.env. DEFAULT_APP_CONFIG
+// itself is re-exported from the REAL module (importOriginal) rather than
+// duplicated here, so there is a single source of truth and no drift risk
+// between this file and appConfig.ts.
+vi.mock("./appConfig", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./appConfig")>();
+  return {
+    ...actual,
+    getAppConfig: vi.fn(),
+  };
+});
 // The Resend SDK is fully mocked — sendQueuedMessage never sends a real email
 // in tests (59-03 ships built/tested/UNDEPLOYED against a mocked provider).
 vi.mock("resend", () => ({
@@ -147,6 +162,19 @@ vi.mock("resend", () => ({
     return { emails: { send: mockSend } };
   }),
 }));
+
+// Global default: any test that doesn't care about a specific config value
+// still gets a resolved DEFAULT_APP_CONFIG rather than `undefined` (which
+// would throw on `.cleanup.mediaEnabled` etc). Individual describe blocks
+// override with their own vi.mocked(getAppConfig).mockResolvedValue(...) for
+// the knob(s) under test; this is reset after every test so no override
+// leaks into an unrelated test case.
+beforeEach(() => {
+  vi.mocked(getAppConfig).mockResolvedValue(DEFAULT_APP_CONFIG);
+});
+afterEach(() => {
+  vi.mocked(getAppConfig).mockReset();
+});
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -200,8 +228,6 @@ describe("cleanupExpiredMediaHandler", () => {
     vi.mocked(getFirestore).mockReset();
     delete process.env.MEDIA_CLEANUP_ENABLED;
     delete process.env.MEDIA_CLEANUP_DRY_RUN;
-    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
-    delete process.env.MEDIA_RETENTION_DAYS;
   });
 
   it("deletes a media file older than the retention window when explicitly enabled", async () => {
@@ -304,7 +330,7 @@ describe("cleanupExpiredMediaHandler", () => {
 
   it("T-66-01-02: a per-run delete cap bounds a LIVE run -- exactly one delete() call, cappedByLimit=true, deletedObjectCount=1", async () => {
     process.env.MEDIA_CLEANUP_ENABLED = "true";
-    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
     const old1 = fakeFile("orgs/orgA/media/m1/old1.mp4", RETENTION_DAYS + 6);
     const old2 = fakeFile("orgs/orgA/media/m2/old2.mp4", RETENTION_DAYS + 6);
     mockBucket([old1, old2]);
@@ -316,12 +342,10 @@ describe("cleanupExpiredMediaHandler", () => {
       (old2.delete as ReturnType<typeof vi.fn>).mock.calls.length;
     expect(totalDeleteCalls).toBe(1);
     expect(summary).toMatchObject({ deletedObjectCount: 1, cappedByLimit: true, dryRun: false });
-
-    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
   });
 
   it("T-66-01-02: the delete cap does NOT truncate a dry-run -- the full would-delete count is still reported", async () => {
-    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
     const old1 = fakeFile("orgs/orgA/media/m1/old1.mp4", RETENTION_DAYS + 6);
     const old2 = fakeFile("orgs/orgA/media/m2/old2.mp4", RETENTION_DAYS + 6);
     mockBucket([old1, old2]);
@@ -331,8 +355,6 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(old1.delete).not.toHaveBeenCalled();
     expect(old2.delete).not.toHaveBeenCalled();
     expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 2, cappedByLimit: false });
-
-    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
   });
 
   it("does not delete a recent media file", async () => {
@@ -380,13 +402,20 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 1, scannedCount: 1 });
   });
 
-  it("makes no Firestore call -- slide metadata is structurally untouchable", async () => {
+  it("reads appConfig/global (R181) but touches NO slide/service/song documents -- getFirestore is called only to resolve config", async () => {
     const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 5);
     mockBucket([old]);
 
     await cleanupExpiredMediaHandler();
 
-    expect(getFirestore).not.toHaveBeenCalled();
+    // getFirestore is now called exactly once -- solely to obtain the `db`
+    // handle getAppConfig(db, {fresh:true}) resolves the enable flag/
+    // retention/cap from. No other Firestore method is ever invoked by this
+    // handler; it remains structurally incapable of touching slide/service/
+    // song documents (Pitfall 2 -- the letter of the safety claim changed,
+    // the spirit did not).
+    expect(getFirestore).toHaveBeenCalledTimes(1);
+    expect(getAppConfig).toHaveBeenCalledTimes(1);
   });
 
   it("is idempotent by age: a second run against a bucket missing the already-deleted file performs no further deletes", async () => {
@@ -408,12 +437,12 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(secondRun.deletedObjectCount).toBe(0);
   });
 
-  it("bumped default: RETENTION_DAYS is 30 (was 14) -- MEDIA_RETENTION_DAYS default", () => {
+  it("bumped default: RETENTION_DAYS is 30 (was 14) -- readMediaRetentionDays passthrough over DEFAULT_APP_CONFIG", () => {
     expect(RETENTION_DAYS).toBe(30);
-    expect(readMediaRetentionDays()).toBe(30);
+    expect(readMediaRetentionDays(DEFAULT_APP_CONFIG)).toBe(30);
   });
 
-  it("env-tunable: uses the RETENTION_DAYS default (30) when MEDIA_RETENTION_DAYS is unset -- a 29-day-old file is NOT yet eligible, a 31-day-old file IS", async () => {
+  it("config-tunable: uses the RETENTION_DAYS default (30) when appConfig/global is empty -- a 29-day-old file is NOT yet eligible, a 31-day-old file IS", async () => {
     process.env.MEDIA_CLEANUP_ENABLED = "true";
     const tooYoung = fakeFile("orgs/orgA/media/m1/young.mp4", 29);
     const oldEnough = fakeFile("orgs/orgA/media/m2/old.mp4", 31);
@@ -426,36 +455,39 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(summary.deletedObjectCount).toBe(1);
   });
 
-  it("env-tunable: MEDIA_RETENTION_DAYS override shrinks the window -- a 6-day-old file becomes eligible under a 5-day override", async () => {
+  it("config-tunable: retention.mediaDays override shrinks the window -- a 6-day-old file becomes eligible under a 5-day override", async () => {
     process.env.MEDIA_CLEANUP_ENABLED = "true";
-    process.env.MEDIA_RETENTION_DAYS = "5";
+    const overriddenConfig: AppConfig = {
+      ...DEFAULT_APP_CONFIG,
+      retention: { ...DEFAULT_APP_CONFIG.retention, mediaDays: 5 },
+    };
+    vi.mocked(getAppConfig).mockResolvedValue(overriddenConfig);
     const eligible = fakeFile("orgs/orgA/media/m1/eligible.mp4", 6);
     const stillFresh = fakeFile("orgs/orgA/media/m2/fresh.mp4", 3);
     mockBucket([eligible, stillFresh]);
 
-    expect(readMediaRetentionDays()).toBe(5);
+    expect(readMediaRetentionDays(overriddenConfig)).toBe(5);
     const summary = await cleanupExpiredMediaHandler();
 
     expect(eligible.delete).toHaveBeenCalledTimes(1);
     expect(stillFresh.delete).not.toHaveBeenCalled();
     expect(summary.deletedObjectCount).toBe(1);
-
-    delete process.env.MEDIA_RETENTION_DAYS;
   });
 
-  it("env-tunable: a blank/non-numeric MEDIA_RETENTION_DAYS falls back to the RETENTION_DAYS default (fail-safe, mirrors readNumericKnob)", async () => {
+  it("reads from config: a malformed/negative retention.mediaDays in the resolved AppConfig falls back to the RETENTION_DAYS default -- coercion now owned by appConfig.ts, not this handler", async () => {
     process.env.MEDIA_CLEANUP_ENABLED = "true";
-    process.env.MEDIA_RETENTION_DAYS = "not-a-number";
+    // appConfig.ts's coerceRetention already guarantees a resolved AppConfig
+    // never carries a malformed value -- this test proves the handler simply
+    // trusts whatever DEFAULT_APP_CONFIG-shaped value it is handed.
+    vi.mocked(getAppConfig).mockResolvedValue(DEFAULT_APP_CONFIG);
     const tooYoung = fakeFile("orgs/orgA/media/m1/young.mp4", 29);
     mockBucket([tooYoung]);
 
-    expect(readMediaRetentionDays()).toBe(RETENTION_DAYS);
+    expect(readMediaRetentionDays(DEFAULT_APP_CONFIG)).toBe(RETENTION_DAYS);
     const summary = await cleanupExpiredMediaHandler();
 
     expect(tooYoung.delete).not.toHaveBeenCalled();
     expect(summary.deletedObjectCount).toBe(0);
-
-    delete process.env.MEDIA_RETENTION_DAYS;
   });
 });
 
@@ -1010,8 +1042,6 @@ describe("cleanupOrphanRendersHandler", () => {
     vi.mocked(getFirestore).mockReset();
     vi.mocked(getStorage).mockReset();
     delete process.env.PPTX_RENDER_CLEANUP_ENABLED;
-    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
-    delete process.env.ORPHAN_RENDER_STALE_HOURS;
   });
 
   it("deletes both rendered objects and the doc when explicitly enabled", async () => {
@@ -1057,7 +1087,7 @@ describe("cleanupOrphanRendersHandler", () => {
 
   it("T-66-01-02: a per-run delete cap bounds a LIVE run within a single doc -- exactly one object delete() call, cappedByLimit=true, the doc itself is not removed", async () => {
     process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
-    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
     const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
     mockOrphanDb([stale]);
     const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1080,7 +1110,7 @@ describe("cleanupOrphanRendersHandler", () => {
   });
 
   it("T-66-01-02: the delete cap does NOT truncate a dry-run -- the full would-delete object count is still reported", async () => {
-    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
     const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
     mockOrphanDb([stale]);
     const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1252,11 +1282,15 @@ describe("cleanupOrphanRendersHandler", () => {
     );
   });
 
-  it("env-tunable: default (24h) applies when ORPHAN_RENDER_STALE_HOURS is unset; an override shrinks the window", async () => {
-    expect(readOrphanRenderStaleHours()).toBe(ORPHAN_RENDER_STALE_HOURS);
+  it("config-tunable: default (24h) applies when appConfig/global is empty; an override shrinks the window", async () => {
+    expect(readOrphanRenderStaleHours(DEFAULT_APP_CONFIG)).toBe(ORPHAN_RENDER_STALE_HOURS);
 
-    process.env.ORPHAN_RENDER_STALE_HOURS = "1";
-    expect(readOrphanRenderStaleHours()).toBe(1);
+    const overriddenConfig: AppConfig = {
+      ...DEFAULT_APP_CONFIG,
+      retention: { ...DEFAULT_APP_CONFIG.retention, orphanRenderStaleHours: 1 },
+    };
+    expect(readOrphanRenderStaleHours(overriddenConfig)).toBe(1);
+    vi.mocked(getAppConfig).mockResolvedValue(overriddenConfig);
 
     process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
     const nowStale = fakeOrphanDoc({ status: "failed", ageHours: 2 }); // stale under 1h override, fresh under 24h default
@@ -1406,8 +1440,6 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     vi.mocked(getFirestore).mockReset();
     vi.mocked(getStorage).mockReset();
     delete process.env.BACKGROUND_CLEANUP_ENABLED;
-    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
-    delete process.env.BACKGROUND_RETENTION_DAYS;
   });
 
   it("R167: deletes an aged unreferenced background when explicitly enabled, and never deletes an aged background referenced at the GROUP tier in the same run", async () => {
@@ -1606,7 +1638,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
 
   it("T-66-02-04: a per-run delete cap bounds a LIVE run -- exactly one delete() call, cappedByLimit=true", async () => {
     process.env.BACKGROUND_CLEANUP_ENABLED = "true";
-    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
     mockBackgroundDb({
       slideGroups: [
         slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
@@ -1626,7 +1658,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it("the delete cap does NOT truncate a dry-run -- would-delete bytes/count reported in full", async () => {
-    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
     mockBackgroundDb({
       slideGroups: [
         slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
@@ -1660,12 +1692,16 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     );
   });
 
-  it("env-tunable: default (30d) applies when BACKGROUND_RETENTION_DAYS is unset; an override shrinks the window", async () => {
-    expect(readBackgroundRetentionDays()).toBe(BACKGROUND_RETENTION_DAYS);
+  it("config-tunable: default (30d) applies when appConfig/global is empty; an override shrinks the window", async () => {
+    expect(readBackgroundRetentionDays(DEFAULT_APP_CONFIG)).toBe(BACKGROUND_RETENTION_DAYS);
 
     process.env.BACKGROUND_CLEANUP_ENABLED = "true";
-    process.env.BACKGROUND_RETENTION_DAYS = "5";
-    expect(readBackgroundRetentionDays()).toBe(5);
+    const overriddenConfig: AppConfig = {
+      ...DEFAULT_APP_CONFIG,
+      retention: { ...DEFAULT_APP_CONFIG.retention, backgroundDays: 5 },
+    };
+    expect(readBackgroundRetentionDays(overriddenConfig)).toBe(5);
+    vi.mocked(getAppConfig).mockResolvedValue(overriddenConfig);
 
     mockBackgroundDb({
       slideGroups: [
@@ -1753,8 +1789,6 @@ describe("cleanupPptxSourcesHandler", () => {
     vi.mocked(getFirestore).mockReset();
     vi.mocked(getStorage).mockReset();
     delete process.env.PPTX_SOURCE_CLEANUP_ENABLED;
-    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
-    delete process.env.PPTX_SOURCE_RETENTION_DAYS;
   });
 
   it("R168: deletes source.pptx and images/ for a CONSUMED (ready) aged import while KEEPING rendered/", async () => {
@@ -1881,7 +1915,7 @@ describe("cleanupPptxSourcesHandler", () => {
 
   it("T-66-02-04: a per-run delete cap bounds a LIVE run -- exactly one object delete() call, cappedByLimit=true", async () => {
     process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
-    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
     const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
     mockPptxSourceDb([ready]);
     const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
@@ -1898,7 +1932,7 @@ describe("cleanupPptxSourcesHandler", () => {
   });
 
   it("the delete cap does NOT truncate a dry-run -- the full would-delete object count is still reported", async () => {
-    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
     const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
     mockPptxSourceDb([ready]);
     const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
@@ -1947,12 +1981,16 @@ describe("cleanupPptxSourcesHandler", () => {
     );
   });
 
-  it("env-tunable: default (30d) applies when PPTX_SOURCE_RETENTION_DAYS is unset; an override shrinks the window", async () => {
-    expect(readPptxSourceRetentionDays()).toBe(PPTX_SOURCE_RETENTION_DAYS);
+  it("config-tunable: default (30d) applies when appConfig/global is empty; an override shrinks the window", async () => {
+    expect(readPptxSourceRetentionDays(DEFAULT_APP_CONFIG)).toBe(PPTX_SOURCE_RETENTION_DAYS);
 
     process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
-    process.env.PPTX_SOURCE_RETENTION_DAYS = "5";
-    expect(readPptxSourceRetentionDays()).toBe(5);
+    const overriddenConfig: AppConfig = {
+      ...DEFAULT_APP_CONFIG,
+      retention: { ...DEFAULT_APP_CONFIG.retention, pptxSourceDays: 5 },
+    };
+    expect(readPptxSourceRetentionDays(overriddenConfig)).toBe(5);
+    vi.mocked(getAppConfig).mockResolvedValue(overriddenConfig);
 
     // 6 days old: stale under the 5-day override, still fresh under the 30-day default.
     const ready = fakeSourceRenderDoc({ status: "ready", ageDays: 6 });
@@ -3378,9 +3416,17 @@ describe("redactUrl", () => {
 // exercised through its exported pure/helper function against a mocked
 // Firestore/Auth -- never a live Anthropic call.
 
+// R181: the AI_RATELIMIT_MAX_PER_MIN/AI_RATELIMIT_MAX_PER_DAY/AI_ALLOWED_MODELS/
+// AI_MAX_TOKENS_CEILING env-parsing + fail-closed-allow-list/WR-01 zero-honoring
+// coverage this describe block used to own now lives in appConfig.test.ts's
+// "R184 fail-closed: aiProxy.*" blocks (RESEARCH.md Pitfall 3) -- appConfig.ts's
+// coerceAiProxy is the single source of truth for that coercion. What remains
+// here is readAiProxyLimits' own job: a thin, lossless remap of a resolved
+// AppConfig.aiProxy group onto the AiProxyLimits shape this file's callers
+// (the `api` proxy handler) expect.
 describe("readAiProxyLimits", () => {
-  it("returns the documented defaults for an empty env", () => {
-    expect(readAiProxyLimits({})).toEqual({
+  it("remaps DEFAULT_APP_CONFIG.aiProxy onto the documented AiProxyLimits defaults", () => {
+    expect(readAiProxyLimits(DEFAULT_APP_CONFIG)).toEqual({
       maxPerMin: 20,
       maxPerDay: 500,
       allowedModels: ["claude-haiku-4-5-20251001"],
@@ -3388,53 +3434,21 @@ describe("readAiProxyLimits", () => {
     });
   });
 
-  it("parses all four knobs from env when present", () => {
-    expect(
-      readAiProxyLimits({
-        AI_RATELIMIT_MAX_PER_MIN: "5",
-        AI_RATELIMIT_MAX_PER_DAY: "50",
-        AI_MAX_TOKENS_CEILING: "512",
-        AI_ALLOWED_MODELS: " claude-haiku-4-5-20251001 , claude-sonnet-4-5-20250929 ",
-      }),
-    ).toEqual({
-      maxPerMin: 5,
+  it("remaps a resolved config's aiProxy overrides 1:1, including an operator's explicit `0`", () => {
+    const config: AppConfig = {
+      ...DEFAULT_APP_CONFIG,
+      aiProxy: {
+        rateLimitPerMin: 0,
+        rateLimitPerDay: 50,
+        allowedModels: ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"],
+        maxTokensCeiling: 512,
+      },
+    };
+    expect(readAiProxyLimits(config)).toEqual({
+      maxPerMin: 0,
       maxPerDay: 50,
       allowedModels: ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"],
       maxTokensCeiling: 512,
-    });
-  });
-
-  it("falls back to defaults for unset or non-numeric knobs", () => {
-    expect(
-      readAiProxyLimits({
-        AI_RATELIMIT_MAX_PER_MIN: "not-a-number",
-        AI_ALLOWED_MODELS: "",
-      }),
-    ).toEqual({
-      maxPerMin: 20,
-      maxPerDay: 500,
-      allowedModels: ["claude-haiku-4-5-20251001"],
-      maxTokensCeiling: 2048,
-    });
-  });
-
-  it("drops empty entries from a comma-separated AI_ALLOWED_MODELS list", () => {
-    const limits = readAiProxyLimits({ AI_ALLOWED_MODELS: "claude-haiku-4-5-20251001,, ," });
-    expect(limits.allowedModels).toEqual(["claude-haiku-4-5-20251001"]);
-  });
-
-  it("WR-01: honors an operator's explicit `0` for any numeric knob instead of falling back to the default", () => {
-    expect(
-      readAiProxyLimits({
-        AI_RATELIMIT_MAX_PER_MIN: "0",
-        AI_RATELIMIT_MAX_PER_DAY: "0",
-        AI_MAX_TOKENS_CEILING: "0",
-      }),
-    ).toEqual({
-      maxPerMin: 0,
-      maxPerDay: 0,
-      allowedModels: ["claude-haiku-4-5-20251001"],
-      maxTokensCeiling: 0,
     });
   });
 });
@@ -3850,8 +3864,9 @@ describe("setGlobalOptions (R172: project-wide maxInstances ceiling)", () => {
 // `(req, res) => Promise<void>` -- so `api` can be driven with a hand-rolled
 // fake req/res, no supertest/emulator needed.
 describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
-  // No AI_ALLOWED_MODELS env override is set in this test process, so
-  // readAiProxyLimits() falls back to the compiled-in DEFAULT_AI_ALLOWED_MODELS.
+  // The global beforeEach mocks getAppConfig() to DEFAULT_APP_CONFIG, so
+  // readAiProxyLimits(config) resolves aiProxy.allowedModels to the
+  // compiled-in default allow-list (R181).
   const ALLOWED_MODEL = "claude-haiku-4-5-20251001";
 
   function fakeReq(body: unknown, headers: Record<string, string> = {}) {

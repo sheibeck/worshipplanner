@@ -28,6 +28,7 @@ import {
   type RoleGroup,
   type RecipientSelection,
 } from "./serviceRoles";
+import { getAppConfig, type AppConfig } from "./appConfig";
 
 // Server-held secrets (Google Secret Manager). Set once with:
 //   firebase functions:secrets:set CLAUDE_API_KEY
@@ -188,8 +189,6 @@ export interface AiProxyLimits {
   maxTokensCeiling: number;
 }
 
-const DEFAULT_AI_ALLOWED_MODELS = ["claude-haiku-4-5-20251001"];
-
 /**
  * WR-01 fix: parses an env-var numeric knob so an operator's explicit `0`
  * (e.g. an emergency full-stop on `AI_RATELIMIT_MAX_PER_MIN=0`) is honored
@@ -206,22 +205,18 @@ export function readNumericKnob(raw: string | undefined, fallback: number): numb
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function readAiProxyLimits(env: NodeJS.ProcessEnv = process.env): AiProxyLimits {
-  const maxPerMin = readNumericKnob(env.AI_RATELIMIT_MAX_PER_MIN, 20);
-  const maxPerDay = readNumericKnob(env.AI_RATELIMIT_MAX_PER_DAY, 500);
-  const maxTokensCeiling = readNumericKnob(env.AI_MAX_TOKENS_CEILING, 2048);
-  const rawModels = env.AI_ALLOWED_MODELS;
-  const parsedModels = rawModels
-    ? rawModels
-        .split(",")
-        .map((m) => m.trim())
-        .filter((m) => m.length > 0)
-    : [];
+/**
+ * Remaps the resolved appConfig.aiProxy group onto the AiProxyLimits shape
+ * this file's callers/tests already expect. The parsing/coercion/fail-closed
+ * allow-list logic now lives in appConfig.ts's coerceAiProxy -- this is a
+ * thin passthrough, not a re-implementation (R181).
+ */
+export function readAiProxyLimits(config: AppConfig): AiProxyLimits {
   return {
-    maxPerMin,
-    maxPerDay,
-    allowedModels: parsedModels.length > 0 ? parsedModels : DEFAULT_AI_ALLOWED_MODELS,
-    maxTokensCeiling,
+    maxPerMin: config.aiProxy.rateLimitPerMin,
+    maxPerDay: config.aiProxy.rateLimitPerDay,
+    allowedModels: config.aiProxy.allowedModels,
+    maxTokensCeiling: config.aiProxy.maxTokensCeiling,
   };
 }
 
@@ -550,7 +545,12 @@ export const api = onRequest(
     // ONLY. esv/nlt/planningcenter fall straight through to the existing
     // fetch below with `outboundBody` left as `req.body`, byte-unchanged.
     let outboundBody: unknown = req.body;
-    const aiLimits = readAiProxyLimits();
+    // Cached form (no {fresh:true}) -- the api handler is a hot request path
+    // (R183); getFirestore() is already called later in this same handler
+    // (checkAndConsumeRateLimit/writeUsageLedger), so this is no new
+    // Firestore dependency class, only an additional cached read.
+    const config = await getAppConfig(getFirestore());
+    const aiLimits = readAiProxyLimits(config);
     if (service === "anthropic") {
       const enforcement = enforceModelAndTokens(req.body, aiLimits);
       if (!enforcement.ok) {
@@ -958,9 +958,12 @@ export const requestPptxRender = onDocumentCreated(
 // object stuck past its retention window, only spreads its deletion over
 // more runs. Dry-run summaries are NEVER capped: the owner needs the true
 // backlog count/bytes before flipping the enable flag, not a truncated one.
-export function readDeleteCap(): number {
-  const raw = readNumericKnob(process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN, 500);
-  return Number.isInteger(raw) && raw > 0 ? raw : 500;
+//
+// R181/R184: this is now a thin passthrough over a resolved AppConfig
+// (appConfig.ts owns the coercion/fail-open-capped default logic) rather
+// than a direct process.env read -- see appConfig.ts's coercePositiveInt.
+export function readDeleteCap(config: AppConfig): number {
+  return config.deleteCapPerRun;
 }
 
 // --- cleanupExpiredMedia (R015: 2-week Storage retention) ---------------
@@ -1000,14 +1003,12 @@ export function readDeleteCap(): number {
 export const RETENTION_DAYS = 30;
 
 /**
- * Reads the effective media retention window in days, checked at
- * handler-call time (not module load) so it reflects the deployed env and
- * is testable via process.env mutation -- mirrors readDeleteCap(). Falls
- * back to RETENTION_DAYS when MEDIA_RETENTION_DAYS is unset, blank, or
- * non-numeric.
+ * Reads the effective media retention window in days from a resolved
+ * AppConfig (R181) -- a thin passthrough; the fail-open-capped default
+ * (RETENTION_DAYS) is applied by appConfig.ts's coerceRetention, not here.
  */
-export function readMediaRetentionDays(): number {
-  return readNumericKnob(process.env.MEDIA_RETENTION_DAYS, RETENTION_DAYS);
+export function readMediaRetentionDays(config: AppConfig): number {
+  return config.retention.mediaDays;
 }
 
 /**
@@ -1033,12 +1034,14 @@ export interface CleanupSummary {
  * unit-tested directly against a mocked bucket.
  */
 export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
+  const db = getFirestore();
+  const config = await getAppConfig(db, { fresh: true });
   // Fail safe: only an explicit opt-in enables real deletion. Anything else --
   // unset, empty, "false", a typo -- leaves this a dry run.
   const dryRun = process.env.MEDIA_CLEANUP_ENABLED !== "true";
   const bucket = getStorage().bucket();
-  const cutoffMs = Date.now() - readMediaRetentionDays() * 24 * 60 * 60 * 1000;
-  const deleteCap = readDeleteCap();
+  const cutoffMs = Date.now() - readMediaRetentionDays(config) * 24 * 60 * 60 * 1000;
+  const deleteCap = readDeleteCap(config);
 
   let scannedCount = 0;
   let deletedObjectCount = 0;
@@ -1161,13 +1164,13 @@ export const cleanupExpiredMedia = onSchedule(
 export const ORPHAN_RENDER_STALE_HOURS = 24;
 
 /**
- * Reads the effective orphan-render staleness window in hours, checked at
- * handler-call time (not module load) -- mirrors readDeleteCap(). Falls
- * back to ORPHAN_RENDER_STALE_HOURS (the constant) when the
- * ORPHAN_RENDER_STALE_HOURS env var is unset, blank, or non-numeric.
+ * Reads the effective orphan-render staleness window in hours from a
+ * resolved AppConfig (R181) -- a thin passthrough over
+ * config.retention.orphanRenderStaleHours; appConfig.ts's coerceRetention
+ * owns the fail-open-capped default (ORPHAN_RENDER_STALE_HOURS).
  */
-export function readOrphanRenderStaleHours(): number {
-  return readNumericKnob(process.env.ORPHAN_RENDER_STALE_HOURS, ORPHAN_RENDER_STALE_HOURS);
+export function readOrphanRenderStaleHours(config: AppConfig): number {
+  return config.retention.orphanRenderStaleHours;
 }
 
 /**
@@ -1195,12 +1198,14 @@ export interface OrphanCleanupSummary {
  * so it can be unit-tested directly against mocked Firestore/Storage.
  */
 export async function cleanupOrphanRendersHandler(): Promise<OrphanCleanupSummary> {
+  const db = getFirestore();
+  const config = await getAppConfig(db, { fresh: true });
   // Fail safe: only an explicit opt-in enables real deletion. Anything else --
   // unset, empty, "false", a typo -- leaves this a dry run.
   const dryRun = process.env.PPTX_RENDER_CLEANUP_ENABLED !== "true";
 
-  const cutoffMs = Date.now() - readOrphanRenderStaleHours() * 60 * 60 * 1000;
-  const deleteCap = readDeleteCap();
+  const cutoffMs = Date.now() - readOrphanRenderStaleHours(config) * 60 * 60 * 1000;
+  const deleteCap = readDeleteCap(config);
 
   let scannedCount = 0;
   let deletedDocCount = 0;
@@ -1208,7 +1213,7 @@ export async function cleanupOrphanRendersHandler(): Promise<OrphanCleanupSummar
   let deletedBytes = 0;
   let cappedByLimit = false;
 
-  const snapshot = await getFirestore()
+  const snapshot = await db
     .collectionGroup("pptxRenders")
     .where("status", "in", ["pending", "failed"])
     .get();
@@ -1379,13 +1384,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const BACKGROUND_RETENTION_DAYS = 30;
 
 /**
- * Reads the effective background retention window in days, checked at
- * handler-call time (not module load) -- mirrors readDeleteCap(). Falls
- * back to BACKGROUND_RETENTION_DAYS (the constant) when the
- * BACKGROUND_RETENTION_DAYS env var is unset, blank, or non-numeric.
+ * Reads the effective background retention window in days from a resolved
+ * AppConfig (R181) -- a thin passthrough over config.retention.backgroundDays;
+ * appConfig.ts's coerceRetention owns the fail-open-capped default
+ * (BACKGROUND_RETENTION_DAYS).
  */
-export function readBackgroundRetentionDays(): number {
-  return readNumericKnob(process.env.BACKGROUND_RETENTION_DAYS, BACKGROUND_RETENTION_DAYS);
+export function readBackgroundRetentionDays(config: AppConfig): number {
+  return config.retention.backgroundDays;
 }
 
 /**
@@ -1435,11 +1440,12 @@ export function extractBackgroundObjectPath(url: string): string | null {
  * unit-tested directly against mocked Firestore/Storage.
  */
 export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroundSummary> {
+  const db = getFirestore();
+  const config = await getAppConfig(db, { fresh: true });
   // Fail safe: only an explicit opt-in enables real deletion. Anything else --
   // unset, empty, "false", a typo -- leaves this a dry run.
   const dryRun = process.env.BACKGROUND_CLEANUP_ENABLED !== "true";
 
-  const db = getFirestore();
   const referencedPaths = new Set<string>();
   let referencesComplete = true;
 
@@ -1503,8 +1509,8 @@ export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroun
   }
 
   const effectiveDryRun = dryRun || !referencesComplete;
-  const cutoffMs = Date.now() - readBackgroundRetentionDays() * DAY_MS;
-  const deleteCap = readDeleteCap();
+  const cutoffMs = Date.now() - readBackgroundRetentionDays(config) * DAY_MS;
+  const deleteCap = readDeleteCap(config);
 
   let scannedCount = 0;
   let orphanCount = 0;
@@ -1625,13 +1631,13 @@ export const cleanupOrphanBackgrounds = onSchedule(
 export const PPTX_SOURCE_RETENTION_DAYS = 30;
 
 /**
- * Reads the effective pptx-source retention window in days, checked at
- * handler-call time (not module load) -- mirrors readDeleteCap(). Falls
- * back to PPTX_SOURCE_RETENTION_DAYS (the constant) when the
- * PPTX_SOURCE_RETENTION_DAYS env var is unset, blank, or non-numeric.
+ * Reads the effective pptx-source retention window in days from a resolved
+ * AppConfig (R181) -- a thin passthrough over config.retention.pptxSourceDays;
+ * appConfig.ts's coerceRetention owns the fail-open-capped default
+ * (PPTX_SOURCE_RETENTION_DAYS).
  */
-export function readPptxSourceRetentionDays(): number {
-  return readNumericKnob(process.env.PPTX_SOURCE_RETENTION_DAYS, PPTX_SOURCE_RETENTION_DAYS);
+export function readPptxSourceRetentionDays(config: AppConfig): number {
+  return config.retention.pptxSourceDays;
 }
 
 /**
@@ -1663,19 +1669,21 @@ export interface PptxSourceCleanupSummary {
  * unit-tested directly against mocked Firestore/Storage.
  */
 export async function cleanupPptxSourcesHandler(): Promise<PptxSourceCleanupSummary> {
+  const db = getFirestore();
+  const config = await getAppConfig(db, { fresh: true });
   // Fail safe: only an explicit opt-in enables real deletion. Anything else --
   // unset, empty, "false", a typo -- leaves this a dry run.
   const dryRun = process.env.PPTX_SOURCE_CLEANUP_ENABLED !== "true";
 
-  const cutoffMs = Date.now() - readPptxSourceRetentionDays() * DAY_MS;
-  const deleteCap = readDeleteCap();
+  const cutoffMs = Date.now() - readPptxSourceRetentionDays(config) * DAY_MS;
+  const deleteCap = readDeleteCap(config);
 
   let scannedCount = 0;
   let deletedObjectCount = 0;
   let deletedBytes = 0;
   let cappedByLimit = false;
 
-  const snapshot = await getFirestore()
+  const snapshot = await db
     .collectionGroup("pptxRenders")
     .where("status", "in", ["ready", "failed"])
     .get();
