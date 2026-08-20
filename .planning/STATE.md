@@ -4,17 +4,17 @@ milestone: v1.9
 milestone_name: Owner Admin Console
 current_phase: 71
 current_phase_name: cleanup-deletion-toggle-safety
-status: executing
-stopped_at: Completed 71-01-PLAN.md
-last_updated: "2026-08-20T21:55:53.943Z"
+status: verifying
+stopped_at: Completed 71-02-PLAN.md (final plan of Phase 71, v1.9 milestone)
+last_updated: "2026-08-20T22:16:53.547Z"
 last_activity: 2026-08-20
 last_activity_desc: Phase 71 execution started
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
-  percent: 75
+  completed_plans: 12
+  percent: 100
 ---
 
 # ▶ ACTIVE MILESTONE — v1.9 Owner Admin Console (started 2026-08-20)
@@ -671,7 +671,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 71 (cleanup-deletion-toggle-safety) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-20 — Phase 71 execution started
 
 ## ★ v1.9 ROADMAP.md phase breakdown (created 2026-08-20)
@@ -2253,6 +2253,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 70-admin-console-ui P01 | 20min | 3 tasks | 9 files |
 | Phase 70 P02 | 55min | 3 tasks | 14 files |
 | Phase 71 P01 | 20min | 2 tasks | 2 files |
+| Phase 71 P02 | 35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2638,6 +2639,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Added additive update:modelValue emit to ConfigNumberField/ConfigTextField (Plan 01 files) so cross-field/format validation in AiProxyConfigCard/SenderConfigCard reacts to the live-edited value, not just the last-saved effective value.
 - [Phase ?]: Per-field save-state uses a Record<string,{saving,saved,error}> plus a stateFor(path) non-null-assertion helper across all four config cards, since noUncheckedIndexedAccess makes a bare Record index access T|undefined.
 - [Phase ?]: previewCleanupDryRun: one shared onCall with a type-param dispatch over the four cleanup handlers, forceDryRun OR'd in via a forceDryRun-first ternary rather than a forked pure compute function
+- [Phase ?]: R190 hard block implemented as a structurally separate disabled Confirm button with no click handler wired at all (not a conditional disabled attribute) when referencesComplete===false
+- [Phase ?]: Card rows carry data-testid=cleanup-row-{type} so tests can disambiguate the row Enable button from the dialog's own Confirm button, which is also labeled Enable per the UI-SPEC copy
 
 ### Roadmap Evolution
 
@@ -2957,8 +2960,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T21:55:53.889Z
-Stopped at: Completed 71-01-PLAN.md
+Last session: 2026-08-20T22:16:53.493Z
+Stopped at: Completed 71-02-PLAN.md (final plan of Phase 71, v1.9 milestone)
 Resume file: None
 
 ## Operator Next Steps

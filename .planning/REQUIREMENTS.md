@@ -81,7 +81,7 @@ REQ-IDs continue from v1.8 (last R173).
       blast-radius count (what that cron would delete right now), fetched from a callable that forces
       dry-run regardless of the stored flag.
 
-- [ ] **R189**: Enabling a cleanup that deletes data requires an explicit confirm step echoing the dry-run
+- [x] **R189**: Enabling a cleanup that deletes data requires an explicit confirm step echoing the dry-run
       count; flipping the flag never triggers an immediate deletion — only the next scheduled cron run acts.
 
 - [x] **R190**: No cleanup can ever delete a song-linked background — the `cleanupOrphanBackgrounds`
@@ -155,7 +155,7 @@ REQ-IDs continue from v1.8 (last R173).
 | R186 | Phase 70 | Complete (UAT deferred) |
 | R187 | Phase 70 | Complete (UAT deferred) |
 | R188 | Phase 71 | Complete |
-| R189 | Phase 71 | Pending |
+| R189 | Phase 71 | Complete |
 | R190 | Phase 71 | Complete |
 | R191 | Phase 70 | Complete (UAT deferred) |
 | R192 | Phase 70 | Complete (UAT deferred) |
