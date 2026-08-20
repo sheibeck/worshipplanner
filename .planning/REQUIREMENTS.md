@@ -28,7 +28,7 @@ REQ-IDs continue from v1.8 (last R173).
 - [ ] **R176**: The owner can bootstrap the first super-admin with a dry-run-by-default, `--apply`-gated,
       owner-run Node script (no pre-existing super-admin required), mirroring `backfillOrgClaims.ts`.
 
-- [ ] **R177**: The admin console route and its nav entry are reachable only by a signed-in super-admin;
+- [x] **R177**: The admin console route and its nav entry are reachable only by a signed-in super-admin;
       a non-super-admin is denied/redirected client-side, and the route is distinctly named (not `/admins`,
       which the per-org TeamView already owns).
 
@@ -36,7 +36,7 @@ REQ-IDs continue from v1.8 (last R173).
       `superAdmins/*`) to super-admins only, via a claim-based `isSuperAdmin()` check (no cross-document
       `get()`/`exists()`), proven by genuine ALLOW **and** DENY emulator tests.
 
-- [ ] **R179**: A super-admin can grant and revoke another user's super-admin access from the console;
+- [x] **R179**: A super-admin can grant and revoke another user's super-admin access from the console;
       revocation takes effect on the target's next token refresh. *(Minimal roster — serves the owner's
       "whoever I give access to" goal; full multi-admin management UI stays deferred.)*
 
@@ -143,9 +143,9 @@ REQ-IDs continue from v1.8 (last R173).
 | R174 | Phase 68 | Pending |
 | R175 | Phase 68 | Complete |
 | R176 | Phase 68 | Pending |
-| R177 | Phase 68 | Pending |
+| R177 | Phase 68 | Complete |
 | R178 | Phase 68 | Complete |
-| R179 | Phase 68 | Pending |
+| R179 | Phase 68 | Complete |
 | R180 | Phase 69 | Pending |
 | R181 | Phase 69 | Pending |
 | R182 | Phase 69 | Pending |

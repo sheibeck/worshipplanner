@@ -5,15 +5,15 @@ milestone_name: Owner Admin Console
 current_phase: 68
 current_phase_name: super-admin-access-gate
 status: executing
-stopped_at: Completed 68-03-PLAN.md
-last_updated: "2026-08-20T15:22:21.234Z"
+stopped_at: Completed 68-04-PLAN.md
+last_updated: "2026-08-20T15:39:06.723Z"
 last_activity: 2026-08-20
 last_activity_desc: Phase 68 execution started
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -649,7 +649,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 68 (super-admin-access-gate) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-08-20 — Phase 68 execution started
 
@@ -2223,6 +2223,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 67 P02 | 6min | 1 tasks | 1 files |
 | Phase 68 P01 | 9min | 2 tasks | 4 files |
 | Phase 68 P03 | 18min | 2 tasks | 2 files |
+| Phase 68 P04 | 9min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -2594,6 +2595,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 68-01: Shared mergeAndSetCustomClaims/clearClaimKeys helper closes the org-membership claim replace/wipe hazard (R175); both write branches refactored, SC1 regression proves superAdmin survives an org-membership clear.
 - [Phase ?]: isSuperAdmin() Firestore rules helper is claim-only (no get()/exists()) per R178, avoiding the storage.rules deny-everyone fragility class
 - [Phase ?]: appConfig/* and superAdmins/* gated on isSuperAdmin() with genuine ALLOW + DENY emulator tests; no appConfig doc contents written (Phase 69 boundary)
+- [Phase ?]: 68-04: reused the existing shared functions export (httpsCallable(functions, 'setSuperAdminClaim')) instead of a fresh getFunctions() call, matching the codebase's established onCall convention.
 
 ### Roadmap Evolution
 
@@ -2913,8 +2915,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T15:22:21.186Z
-Stopped at: Completed 68-03-PLAN.md
+Last session: 2026-08-20T15:39:06.672Z
+Stopped at: Completed 68-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
