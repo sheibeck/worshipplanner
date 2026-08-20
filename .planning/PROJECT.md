@@ -8,35 +8,36 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v1.8 Cost & Billing Hardening
+## Current Milestone: none — v1.8 Cost & Billing Hardening shipped (awaiting next)
 
-**Goal:** Cap and observe every runaway cost surface in the live app — the metered Claude API proxy,
-unbounded Storage growth, the daily all-org reminder scan, and uncapped email/instance fan-out — so
-production billing stays predictable as usage grows.
+The most recent milestone, **v1.8 Cost & Billing Hardening** (Phases 65–67, R161–R168 + R170–R173),
+shipped 2026-08-20 with its safe config **deployed to production** the same day. Next milestone is scoped
+via `/gsd-new-milestone` — the owner's stated next plan is an **owner-only admin UI for these cost/cleanup
+settings** (see `.planning/seeds/SEED-001-admin-settings-interface.md`), so the levers aren't buried
+`functions/.env` vars.
 
-**Target features:**
-- **AI proxy cost controls** — the `/api/anthropic` proxy is authenticated but otherwise uncapped, and
-  the model + `max_tokens` are chosen client-side and forwarded byte-unchanged. Add per-user/per-org
-  rate limiting, server-side model + `max_tokens` enforcement, token-usage logging for observability,
-  and an instance ceiling. (Anthropic's own console bill is watched by the owner separately — external.)
-- **Storage retention** — backgrounds (`orgs/{orgId}/backgrounds/…`) and PPTX import sources
-  (`orgs/{orgId}/pptx-imports/{importId}/…`) are never pruned; media cleanup (`MEDIA_CLEANUP_ENABLED`)
-  and orphan-render cleanup (`PPTX_RENDER_CLEANUP_ENABLED`) both ship **dry-run by default**. Verify/enable
-  the existing sweeps and decide a retention story for backgrounds + pptx sources.
-- **Reminder-cron read cost** — `sendScheduledReminders` runs two unbounded cross-org collection-group
-  scans daily with no early gate. Reminders are not in production use → disable the cron scan.
-- **Fan-out & instance guardrails** — the Resend send loop, the `api` proxy, `messageWebhook`, and the
-  Cloud Run render service have no `maxInstances`/concurrency ceilings or volume caps. Add them so a
-  spike (or abuse) can't scale out without bound.
+<details>
+<summary>Shipped milestone — v1.8 Cost & Billing Hardening (Phases 65–67, deployed 2026-08-20)</summary>
 
-**Key context:** Live app on the Firebase Blaze plan, deployed 2026-08-17. Investigation (2026-08-19)
-confirmed five concrete exposures — see the requirements. Owner decisions at scoping: reminders are
-**not used** (safe to disable the cron); the assistant may **deploy the low-risk config autonomously**
-(instance caps, proxy rate-limiting, cron disable, query changes) but **hands over** anything that
-deletes data (first activation of media/background/pptx pruning) or could lock users out (rules/auth).
+**Delivered:** capped and made observable every runaway cost surface on the live Blaze-plan app.
+**Phase 65** — the metered Claude `api` proxy gained a per-uid rate limit (429, fail-open), server-side
+model allow-list (400) + `max_tokens` clamp, an `aiUsage` token-usage ledger, and a `maxInstances` cap,
+all gated to the anthropic upstream. **Phase 66** — proved+hardened the media/orphan-render sweeps and
+added two new retention sweeps (`cleanupOrphanBackgrounds` with 3-tier reference detection + two
+fail-safes, `cleanupPptxSources`), all dry-run by default; retention windows later made env-tunable with
+media bumped to 30 days. **Phase 67** — gated the unused daily cross-org `sendScheduledReminders` scan
+off, added a Resend recipient cap + per-org daily quota, a project-wide `setGlobalOptions` instance
+ceiling, and Cloud Run render-service caps (`--max-instances=3`). **Deployed:** the AI proxy caps,
+reminder-cron gate, send caps, and all instance ceilings are LIVE; the four cleanup crons are live in
+**dry-run** (delete nothing until the owner sets each `*_CLEANUP_ENABLED=true`).
 
-The most recent milestone, **v1.7 Volunteer Messaging** (Phases 58–64, R130–R160), shipped and was
-**deployed to production 2026-08-17**, then closed and archived 2026-08-18.
+**Standing owner follow-ups (outlived the milestone):** activate the storage-deletion flags after
+reviewing dry-run logs; deploy the Phase 65 `firestore.rules` deny (`firebase deploy --only
+firestore:rules`); gating the reminder cron also pauses composer "schedule-for-later" until
+`SCHEDULED_MESSAGING_CRON_ENABLED=true`. Full record: [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md) ·
+[milestones/v1.8-REQUIREMENTS.md](milestones/v1.8-REQUIREMENTS.md) · [milestones/v1.8-MILESTONE-AUDIT.md](milestones/v1.8-MILESTONE-AUDIT.md).
+
+</details>
 
 <details>
 <summary>Shipped milestone — v1.7 Volunteer Messaging (Phases 58–64, deployed 2026-08-17, archived 2026-08-18)</summary>
@@ -365,4 +366,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-20 — v1.8 Cost & Billing Hardening code-complete (Phases 65–67, R161–R168 + R170–R173, all verified + reviewed); safe config DEPLOYED to production 2026-08-20. Owner steps remain (see STATE.md): activate storage-deletion flags, deploy the firestore.rules deny, redeploy render-service caps, `/gsd-verify-work 65 66 67`, then the milestone lifecycle.*
+*Last updated: 2026-08-20 after v1.8 Cost & Billing Hardening milestone (Phases 65–67, shipped + safe config deployed to production 2026-08-20, archived). Standing owner follow-ups: activate storage-deletion flags after reviewing dry-run logs, deploy the Phase 65 firestore.rules deny. Next: `/gsd-new-milestone` (owner plan: admin settings UI — SEED-001).*

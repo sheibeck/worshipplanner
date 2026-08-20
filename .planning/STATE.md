@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Cost & Billing Hardening
-current_phase: 67
-current_phase_name: v1.8 code-complete + safe config deployed
-status: milestone-code-complete-awaiting-owner-lifecycle
-stopped_at: v1.8 Phases 65-67 code-complete, verified, reviewed; safe config DEPLOYED to prod 2026-08-20; stopped before milestone lifecycle per grant
-last_updated: "2026-08-20T08:15:00.000Z"
+status: Awaiting next milestone
+stopped_at: Completed 67-02-render-service-instance-cap-PLAN.md
+last_updated: "2026-08-20T13:07:53.702Z"
 last_activity: 2026-08-20
-last_activity_desc: v1.8 safe config deployed to production; owner steps + lifecycle remain
+last_activity_desc: Milestone v1.8 completed and archived
 progress:
   total_phases: 3
   completed_phases: 3
   total_plans: 6
   completed_plans: 6
   percent: 100
+current_phase: 67
+current_phase_name: v1.8 code-complete + safe config deployed
 ---
 
 # ▶ ACTIVE MILESTONE — v1.8 Cost & Billing Hardening (started 2026-08-19)
@@ -30,11 +30,14 @@ v1.8 autonomy grant; owner steps remain (below).
 
 `firebase deploy --only functions` succeeded (assistant ran it under the v1.8 grant's autonomous-deploy
 authorization). Now LIVE:
+
 - **Phase 65 (R161–R164):** `api` proxy — per-uid rate limit (429, fail-open), model allow-list (400) +
   max_tokens clamp, `aiUsage` ledger (Admin SDK), `maxInstances: 10`. Anthropic-upstream-only.
+
 - **Phase 66 (R165–R168):** all 4 cleanup crons deployed in **DRY-RUN** mode (delete NOTHING yet) —
   `cleanupExpiredMedia`, `cleanupOrphanRenders`, `cleanupOrphanBackgrounds` (new), `cleanupPptxSources`
   (new). They log what they WOULD delete; no real deletion until the owner enables the flags.
+
 - **Phase 67 (R170–R173 functions):** `sendScheduledReminders` **gated OFF** — the daily cross-org scan
   is STOPPED (immediate read-cost relief); `sendQueuedMessage` recipient cap + per-org daily quota (fail-
   open); project-wide `setGlobalOptions({maxInstances:20})` applied to all functions (`api` keeps its 10).
@@ -45,20 +48,26 @@ authorization). Now LIVE:
    **"schedule-for-later"** dispatch. If you use scheduled/reminder emails, set
    `SCHEDULED_MESSAGING_CRON_ENABLED=true` in `functions/.env` and redeploy that function. (Reminders were
    reported unused, so default-off is intended — but this is a real, reversible prod change.)
+
 2. **Owner-gated: activate storage deletion (data loss — your button).** Review each dry-run cron's Cloud
    Logging output first (what it WOULD delete), then per path add the flag to `functions/.env` + redeploy:
+
    - `MEDIA_CLEANUP_ENABLED=true` → `firebase deploy --only functions:cleanupExpiredMedia`
    - `PPTX_RENDER_CLEANUP_ENABLED=true` → `firebase deploy --only functions:cleanupOrphanRenders`
    - `BACKGROUND_CLEANUP_ENABLED=true` → `firebase deploy --only functions:cleanupOrphanBackgrounds`
      (confirm the dry-run log shows `referencesComplete: true` before enabling)
+
    - `PPTX_SOURCE_CLEANUP_ENABLED=true` → `firebase deploy --only functions:cleanupPptxSources`
 3. **Owner-gated: deploy the `firestore.rules` deny** hardening `aiUsage`/`aiRateLimits` against client
    access (Phase 65, defense-in-depth; the ledger works without it): `firebase deploy --only firestore:rules`.
+
 4. **R173 render-service ceiling (staged, not run):** redeploy Cloud Run with the pinned caps —
    `render-service/DEPLOY.md` has the exact command (`--max-instances=3 --concurrency=1`, substitute
    `PROJECT_ID`). Needs `gcloud`/Docker.
+
 5. **Deferred human UAT:** `/gsd-verify-work 65 66 67` (visual/interaction + real-email + a real dry-run
    deletion review) — routed to `.planning/PENDING-VERIFICATION.md` per the grant; none recorded as passed.
+
 6. **Then** run the milestone lifecycle: `/gsd-audit-milestone` → `/gsd-complete-milestone v1.8` →
    `/gsd-cleanup`.
 
@@ -130,6 +139,17 @@ settled by explicit Q&A at launch (2026-08-19).
 - Gates: type-check via `npm run type-check` (vue-tsc --build); app-suite baseline is the 2 known-failing
   files (`storage.rules.test.ts`, `RosterView.test.ts`); functions suite via `cd functions && npm test`;
   render-service via `cd render-service && npm test`.
+
+---
+
+## Deferred Items
+
+Items acknowledged and deferred at v1.8 milestone close on 2026-08-20 (owner-accepted, "Verified"):
+
+| Category | Item | Status | Note |
+|----------|------|--------|------|
+| debug | knowledge-base | unknown | Stale debug session predating v1.8; unrelated to this milestone. Close/triage separately. |
+| seed | SEED-001-admin-settings-interface | dormant | INTENTIONAL — planted for the NEXT milestone (owner admin settings UI). Must remain until then; do not resolve. |
 
 ---
 
@@ -574,10 +594,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 999.2 — Clearing a song should clear its slides, even when the song is reprised (BACKLOG)
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-08-20 — Phase 67 complete, transitioned to Phase 999.2
+Phase: Milestone v1.8 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-20 — Milestone v1.8 completed and archived
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 
@@ -2820,5 +2840,3 @@ Resume file: None
 ## Operator Next Steps
 
 - Start the next milestone with /gsd-new-milestone
-
-</details>

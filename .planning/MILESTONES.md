@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.8 Cost & Billing Hardening (Shipped: 2026-08-20)
+
+**Phases completed:** 3 phases, 6 plans, 13 tasks
+
+**Key accomplishments:**
+
+- Rate limiter, model/token enforcement, usage ledger, and maxInstances ceiling on the anthropic branch of the `api` proxy — all four cost controls wired, tested against mocked Firestore/Auth, built and committed, staged for the orchestrator's consolidated deploy.
+- Client-side 429/400 graceful-degrade guard for the AI proxy's new cost controls, plus an owner-gated (committed, UNDEPLOYED) firestore.rules deny for the aiUsage/aiRateLimits collections.
+- Proved by test (against mocked Storage/Firestore) that `cleanupExpiredMediaHandler` (R165) and `cleanupOrphanRendersHandler` (R166) actually delete the right objects when enabled, and added a shared `readDeleteCap()` per-run delete-cap plus `deletedBytes`/`cappedByLimit` observability to both — every enable flag still ships OFF.
+- Built the first-ever retention paths for two Storage areas that grow forever today: background images (orphan+age, with a three-tier reference model and two independent fail-safes) and PPTX-import sources (positive-guard consumed/failed pruning that structurally cannot touch the rendered display artifacts) -- both dry-run by default, both proven only against mocked Storage/Firestore.
+- Gated the daily cross-org reminder scan off by default, capped the Resend send loop with a reject-over-cap recipient limit + per-org daily quota, and applied a project-wide `maxInstances` ceiling — all built, tested, and committed but NOT deployed (staged for the orchestrator's consolidated milestone-end deploy).
+- Pinned Cloud Run `pptx-render`'s `--max-instances` at an explicit R173 ceiling of 3 and kept `--concurrency=1` deliberately (not the 4 floated in 67-CONTEXT), with the rationale committed in render-service/DEPLOY.md.
+
+---
+
 ## v1.7 Volunteer Messaging (Shipped: 2026-08-18)
 
 **Phases completed:** 7 phases, 25 plans, 41 tasks (58–64)
