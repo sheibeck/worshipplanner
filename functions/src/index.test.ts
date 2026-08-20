@@ -3621,6 +3621,30 @@ describe("checkAndConsumeOrgEmailQuota", () => {
     expect(setSpy).not.toHaveBeenCalled();
   });
 
+  // WR-01 (67-REVIEW.md): the check must be against the PROJECTED total
+  // (dayCount + count), not the pre-send dayCount alone -- otherwise a send
+  // accepted just under the ceiling can push the day's total past `limit` by
+  // up to `count - 1`.
+  it("allows a send whose PROJECTED total lands exactly ON the ceiling", async () => {
+    const dayWindow = Math.floor(NOW / 86400000);
+    const { db, setSpy } = mockOrgEmailCounterDb({ [`org1__day__${dayWindow}`]: LIMIT - 2 });
+    const result = await checkAndConsumeOrgEmailQuota(db, "org1", 2, LIMIT, NOW);
+    expect(result).toEqual({ allowed: true });
+    expect(setSpy).toHaveBeenCalledWith(`org1__day__${dayWindow}`, expect.objectContaining({ count: LIMIT }));
+  });
+
+  it("blocks and does NOT increment a send whose PROJECTED total would EXCEED the ceiling, even though the current count is under the limit", async () => {
+    const dayWindow = Math.floor(NOW / 86400000);
+    // dayCount = 3, count = 3, limit = 5: pre-send count (3) is under the
+    // limit, but 3 + 3 = 6 > 5 -- the whole point of WR-01.
+    const { db, setSpy, state } = mockOrgEmailCounterDb({ [`org1__day__${dayWindow}`]: 3 });
+    const result = await checkAndConsumeOrgEmailQuota(db, "org1", 3, LIMIT, NOW);
+    expect(result).toEqual({ allowed: false, scope: "day" });
+    expect(setSpy).not.toHaveBeenCalled();
+    // Counter must not have been advanced past the limit (or at all).
+    expect(state[`org1__day__${dayWindow}`].count).toBe(3);
+  });
+
   it("propagates a throwing transaction so the caller decides the fail policy", async () => {
     const db = {
       collection: () => ({ doc: (id: string) => ({ id }) }),

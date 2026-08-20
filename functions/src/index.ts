@@ -383,10 +383,14 @@ export async function checkAndConsumeRateLimit(
  * top-level `orgEmailCounters` doc keyed `${orgId}__day__${dayWindow}`, and
  * increments by an arbitrary `count` -- the number of emails THIS send is
  * about to attempt -- rather than always by 1 (a single 50-recipient send
- * costs 50 against the quota, not 1). At/over the limit, returns not-allowed
- * WITHOUT incrementing -- the org's quota is not consumed by a send that
- * never happens. Kept TOP-LEVEL (not nested under organizations/{orgId}) for
- * the same T-37-15 reason as aiRateLimits/aiUsage: the firestore.rules
+ * costs 50 against the quota, not 1). Rejects when the PROJECTED total
+ * (`dayCount + count`) would EXCEED the limit, not merely when `dayCount`
+ * already meets it (WR-01, 67-REVIEW.md) -- because `count` can be well
+ * above 1, a check against only the pre-send count could let one accepted
+ * send push the day's total past `limit` by up to `count - 1`. On rejection,
+ * returns not-allowed WITHOUT incrementing -- the org's quota is not
+ * consumed by a send that never happens. Kept TOP-LEVEL (not nested under
+ * organizations/{orgId}) for the same T-37-15 reason as aiRateLimits/aiUsage: the firestore.rules
  * catch-all deny already blocks client reads, so no rules change is needed.
  *
  * Deliberately does NOT catch its own Firestore errors -- the caller
@@ -407,7 +411,16 @@ export async function checkAndConsumeOrgEmailQuota(
     const daySnap = await tx.get(dayRef);
     const dayCount = daySnap.exists ? ((daySnap.data()?.count as number | undefined) ?? 0) : 0;
 
-    if (dayCount >= limit) {
+    // WR-01 (67-REVIEW.md): PROJECTED check, not a check against the
+    // pre-send count. `count` (this send's recipient count, up to
+    // MESSAGE_MAX_RECIPIENTS) can be far more than 1, so comparing only
+    // `dayCount` to `limit` (the checkAndConsumeRateLimit shape, correct
+    // there because it always increments by exactly 1) let an accepted send
+    // push the day total past `limit` by up to `count - 1`. Rejecting when
+    // the PROJECTED total would exceed the limit keeps the daily total from
+    // ever exceeding `limit`, at the cost of possibly rejecting a send that
+    // would fit under a smaller one -- the correct tradeoff for a hard cap.
+    if (dayCount + count > limit) {
       return { allowed: false, scope: "day" as const };
     }
 
