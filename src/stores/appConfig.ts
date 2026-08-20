@@ -9,11 +9,11 @@ import { defineStore } from 'pinia'
 import { doc, onSnapshot, setDoc, serverTimestamp, type Unsubscribe } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
-import { mergeAppConfig, type AppConfig } from '@/config/appConfigDefaults'
+import { mergeAppConfig, type AppConfig, type AppConfigInput } from '@/config/appConfigDefaults'
 
 export const useAppConfigStore = defineStore('appConfig', () => {
   // Pre-merge raw doc — drives the presence-based (default) badge (R186).
-  const rawDoc = ref<Partial<AppConfig> | undefined>(undefined)
+  const rawDoc = ref<AppConfigInput | undefined>(undefined)
   // Post-merge resolved config — what every field's effective value reads.
   const resolvedConfig = ref<AppConfig>(mergeAppConfig(undefined))
   const loaded = ref(false)
@@ -25,7 +25,7 @@ export const useAppConfigStore = defineStore('appConfig', () => {
     unsub = onSnapshot(
       doc(db, 'appConfig', 'global'),
       (snap) => {
-        rawDoc.value = snap.exists() ? (snap.data() as Partial<AppConfig>) : undefined
+        rawDoc.value = snap.exists() ? (snap.data() as AppConfigInput) : undefined
         resolvedConfig.value = mergeAppConfig(rawDoc.value)
         loaded.value = true
       },

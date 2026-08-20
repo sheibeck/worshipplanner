@@ -49,6 +49,22 @@ export interface AppConfig {
   updatedAt?: unknown
 }
 
+// A raw Firestore doc (or a hand-written test fixture) legitimately sets
+// only SOME leaves of a nested group — e.g. { cleanup: { mediaEnabled: true } }
+// with no sibling cleanup.* keys at all. `Partial<AppConfig>` only makes the
+// TOP-LEVEL keys optional; each nested group's own type is still the FULL
+// interface, so a partial nested literal fails to type-check against it.
+// AppConfigInput recursively makes every leaf optional so both mergeAppConfig
+// and isExplicitlySet accept exactly the partial-doc shapes R182/R186 exist
+// to handle.
+export type AppConfigInput = {
+  [K in keyof AppConfig]?: AppConfig[K] extends object
+    ? AppConfig[K] extends unknown[]
+      ? AppConfig[K]
+      : Partial<AppConfig[K]>
+    : AppConfig[K]
+}
+
 // DEFAULT_APP_CONFIG — byte-identical to functions/src/appConfig.ts's
 // DEFAULT_APP_CONFIG, verified against the shipped Phase 69 source
 // (functions/src/appConfig.ts:64-97) on 2026-08-20.
@@ -95,7 +111,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
  * needs to be forgiving of a partial/absent doc, matching R182's guarantee
  * that an absent appConfig/global doc resolves to DEFAULT_APP_CONFIG.
  */
-export function mergeAppConfig(raw: Partial<AppConfig> | undefined): AppConfig {
+export function mergeAppConfig(raw: AppConfigInput | undefined): AppConfig {
   const p = raw ?? {}
   return {
     cleanup: { ...DEFAULT_APP_CONFIG.cleanup, ...p.cleanup },
@@ -117,7 +133,7 @@ export function mergeAppConfig(raw: Partial<AppConfig> | undefined): AppConfig {
  * "set it back to 30" save as still-default, which is dishonest provenance
  * (70-UI-SPEC.md's precise semantics section).
  */
-export function isExplicitlySet(rawDoc: Partial<AppConfig> | undefined, path: string): boolean {
+export function isExplicitlySet(rawDoc: AppConfigInput | undefined, path: string): boolean {
   if (!rawDoc) return false
   const segments = path.split('.')
   let cursor: unknown = rawDoc
