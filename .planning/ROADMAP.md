@@ -11,6 +11,7 @@
 - ✅ **v1.6 — Editing Reliability & Song Slides** — Phases 51-57 (shipped 2026-08-12; drag-and-drop editing reliability, service-template relocation, song-slide splitting, service-item notes + MISC labels + per-item Scripture version, preview/export polish, template-editor UX parity)
 - ✅ **v1.7 — Volunteer Messaging** — Phases 58-64 (shipped 2026-08-18; deployed to production 2026-08-17 — messages composer, delivery history + bounce webhook, lock & scheduled-reminder auto-notifications, re-lock scoped change diff, dedicated Messages tab, composer refinements + R157–R160 hotfixes — all behind a Settings kill-switch)
 - ✅ **v1.8 — Cost & Billing Hardening** — Phases 65-67 (shipped 2026-08-20; safe config deployed to production — capped the metered Claude `api` proxy, gave every unbounded Storage path a dry-run retention sweep, gated off the daily all-org reminder scan, and capped email/instance fan-out — R161–R168, R170–R173; storage-deletion activation + firestore.rules deny owner-gated)
+- 🚧 **v1.9 — Owner Admin Console** — Phases 68-71 (in progress, started 2026-08-20; super-admin console lifting the v1.8 cost/cleanup levers + no-reply sender into Firestore-backed runtime config, with a dry-run blast-radius preview gating every cleanup-toggle flip)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -281,6 +282,91 @@ with the exact deploy command handed to the owner.
 
 </details>
 
+## v1.9 Owner Admin Console (Phases 68-71) — ACTIVE
+
+**Milestone Goal:** A private, owner-only admin console — separate from per-church settings — where the
+owner (and anyone granted super-admin access) controls the v1.8 cost/cleanup levers and the app's no-reply
+sender at runtime, instead of via buried `functions/.env` vars + redeploy. Phase numbering continues from
+v1.8 (65–67); this milestone is Phases 68–71. Research (`.planning/research/SUMMARY.md`) converged on a
+strict, linear dependency chain across all four research tracks (Stack, Features, Architecture, Pitfalls):
+claim/gate → config doc/rules → UI + sender → deletion safety.
+
+**Hard constraint (owner, emphasized 2026-08-20):** song-linked backgrounds must **never** be cleaned up —
+only transient slideshow backgrounds tied to a service. This guarantee must survive the config swap
+(closed by Phase 71 / R190).
+
+- [ ] **Phase 68: Super-Admin Access Gate & Claim-Merge Fix** - A super-admin custom-claim gate, grantable via `superAdmins/{uid}`, enforced by both the client route and claim-only Firestore rules, with the shared merge-and-set helper closing the claim-replace hazard
+- [ ] **Phase 69: Firestore Runtime Config** - The v1.8 cost/cleanup/messaging knobs move into an admin-only `appConfig/global` doc Cloud Functions read at runtime, with safe deep-merged defaults and per-knob fail-open/closed behavior
+- [ ] **Phase 70: Admin Console UI & No-Reply Sender** - A super-admin console showing/editing every managed setting with validation and provenance, plus the app's no-reply sender configuration
+- [ ] **Phase 71: Cleanup Deletion-Toggle Safety** - A dry-run blast-radius preview and explicit confirm step gate every `*_CLEANUP_ENABLED` flip, with the song-linked-background fail-safes proven intact
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R174–R192 (19 mapped, 100% coverage)
+
+### Phase 68: Super-Admin Access Gate & Claim-Merge Fix
+
+**Goal**: A super-admin custom-claim gate exists end-to-end — grantable, claim-merge-safe, and enforced by both the client route and Firestore rules — establishing the security foundation every other v1.9 capability depends on.
+**Depends on**: Nothing (first v1.9 phase)
+**Requirements**: R174, R175, R176, R177, R178, R179
+**Success Criteria** (what must be TRUE):
+
+  1. A user granted access via `superAdmins/{uid}` carries `superAdmin: true` on their ID token, and an ordinary org-membership claim sync (join/leave/role change) never strips that claim — nor does a super-admin grant/revoke ever strip the user's existing `{orgId, role}` claim — because both writers route through one shared merge-and-set helper (R174, R175).
+  2. The owner can bootstrap the very first super-admin by running a dry-run-by-default, `--apply`-gated, owner-run Node script with no pre-existing super-admin required (R176).
+  3. Only a signed-in super-admin can reach the admin console route and its nav entry (distinctly named, not `/admins`, which the per-org TeamView already owns); a non-super-admin is denied/redirected client-side (R177).
+  4. Firestore rules allow read/write of `appConfig/*` and `superAdmins/*` only to a super-admin, via a claim-only `isSuperAdmin()` check (no cross-document `get()`/`exists()`), proven by genuine emulator ALLOW and DENY tests (R178).
+  5. A super-admin can grant and revoke another user's super-admin access from the console, and a revoked user loses access on their next token refresh (R179).
+
+**Plans**: TBD
+
+### Phase 69: Firestore Runtime Config
+
+**Goal**: Every v1.8 cost/cleanup/messaging knob lives in one admin-only Firestore doc that Cloud Functions read at runtime with safe, per-knob fail-open/closed defaults, so a config change takes effect without a redeploy.
+**Depends on**: Phase 68 (needs the `superAdmin` claim + `isSuperAdmin()` rules helper to gate `appConfig/global`)
+**Requirements**: R180, R181, R182, R183, R184, R185
+**Success Criteria** (what must be TRUE):
+
+  1. All v1.8 levers — the four `*_CLEANUP_ENABLED` flags, retention windows, delete blast-radius cap, AI-proxy knobs (rate limits, model allow-list, `max_tokens` ceiling), and messaging/fan-out knobs (incl. `SCHEDULED_MESSAGING_CRON_ENABLED`, recipient cap, per-org daily quota) — live in `appConfig/global`, readable/writable only by a super-admin (R180).
+  2. Changing a managed value in `appConfig/global` changes Cloud Functions runtime behavior with no redeploy (R181).
+  3. Deleting or emptying `appConfig/global` reproduces today's exact behavior byte-for-byte via deep-merged code defaults identical to the current env fallbacks (R182).
+  4. Hot paths (`api` proxy, `sendQueuedMessage`) read config from a short-TTL cache; the daily cleanup crons and `sendScheduledReminders` always read fresh, so an emergency disable takes effect on the very next scheduled run (R183).
+  5. A missing/malformed config value fails safe per-knob — cleanup flags and the AI model allow-list default closed, AI rate limits default open but capped — never one blanket all-permissive or all-restrictive policy (R184).
+  6. `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES`/render-service caps remain env/deploy-time only; if shown anywhere in the console they are read-only, labeled "requires redeploy" (R185).
+
+**Plans**: TBD
+
+### Phase 70: Admin Console UI & No-Reply Sender
+
+**Goal**: The super-admin console shows and edits every managed setting with validation and provenance, and lets the owner configure the app's no-reply sender — the human-usable surface on top of Phase 69's runtime config.
+**Depends on**: Phase 68 (gated route), Phase 69 (rules + config doc + functions reading it)
+**Requirements**: R186, R187, R191, R192
+**Success Criteria** (what must be TRUE):
+
+  1. The console displays the current effective value of every managed setting, grouped by area (cleanup, AI proxy, messaging, sender), each with a last-changed-by / last-changed-at stamp (R186).
+  2. A super-admin can edit each toggle/number/text setting inline with min/max/required validation, enforced both client-side and by rules/functions, and saving persists the change to `appConfig/global` (R187).
+  3. A super-admin can set the no-reply From display name + address from the console; it is format-validated and used by the Resend send path (R191).
+  4. The sender config never accepts or exposes provider secrets (`RESEND_API_KEY` stays server-side), and an address on an un-verifiable host (e.g. `*.web.app`) surfaces a "must be a Resend-verified domain" warning (R192).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 71: Cleanup Deletion-Toggle Safety
+
+**Goal**: No `*_CLEANUP_ENABLED` flag can be flipped on blind — every enable is preceded by a real dry-run blast-radius count and an explicit confirm, and the song-linked-background protection is proven intact after the config swap — completing the safety the v1.8 flags always needed before going live in production.
+**Depends on**: Phase 69 (config-driven cleanup handlers to preview against), Phase 70 (console shell to host the confirm modal)
+**Requirements**: R188, R189, R190
+**Success Criteria** (what must be TRUE):
+
+  1. Before any `*_CLEANUP_ENABLED` flag can be turned on, the console shows an on-demand dry-run blast-radius count — what that cron would delete right now — fetched from a callable that forces dry-run regardless of the stored flag (R188).
+  2. Enabling a deletion-capable cleanup requires an explicit confirm step that echoes the dry-run count; flipping the flag never itself triggers a deletion — only the next scheduled cron run acts (R189).
+  3. `cleanupOrphanBackgrounds`'s `referencesComplete` / floor-guard fail-safes remain intact after the config swap, with its existing unit tests passing unchanged — no cleanup can ever delete a song-linked background, only transient slideshow backgrounds tied to a service (R190).
+
+**Plans**: TBD
+**UI hint**: yes
+
+**Deploy**: Per the v1.9 standing autonomy grant (STATE.md), every deployable artifact this milestone —
+the `superAdmin` custom claim + claims-merge fix, `firestore.rules` changes (`appConfig/*`,
+`superAdmins/*`), and any live cleanup-toggle control — ships built + tested + UNDEPLOYED with the exact
+deploy command handed to the owner. The owner runs the first-super-admin bootstrap script.
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -296,6 +382,10 @@ with the exact deploy command handed to the owner.
 | 65 | v1.8 | 2/2 | Complete    | 2026-08-20 |
 | 66 | v1.8 | 2/2 | Complete    | 2026-08-20 |
 | 67 | v1.8 | 2/2 | Complete    | 2026-08-20 |
+| 68 | v1.9 | 0/? | Not started | - |
+| 69 | v1.9 | 0/? | Not started | - |
+| 70 | v1.9 | 0/? | Not started | - |
+| 71 | v1.9 | 0/? | Not started | - |
 
 ## Backlog
 
@@ -387,7 +477,9 @@ account owner's own email, so real volunteers won't receive mail. Harden: verify
 (add DKIM/SPF/DMARC DNS records), then set `MESSAGE_FROM_ADDRESS` to `no-reply@<that-domain>` (change the
 `defineString` default or override at deploy). Emails already send as `"<Org Name>" <address>` and set
 Reply-To to the sending editor, so only the address changes. A `*.web.app` address can never be verified
-(Google-managed, no DNS access). Introduced alongside R159 (2026-08-17).
+(Google-managed, no DNS access). Introduced alongside R159 (2026-08-17). **Note (v1.9):** the v1.9 admin
+console's no-reply sender field (R191/R192) configures this same address from the UI, but domain
+verification itself stays an out-of-band owner action — see R192.
 
 ### Phase 999.5: Multi-org-aware auth claim for Storage membership (BACKLOG)
 

@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-08-20T13:34:40.019Z"
 last_activity: 2026-08-20
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -644,10 +644,32 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 68 (Super-Admin Access Gate & Claim-Merge Fix) — not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-20 — Milestone v1.9 started
+Status: ROADMAP.md created — ready to plan Phase 68 (`/gsd-plan-phase 68`)
+Last activity: 2026-08-20 — v1.9 ROADMAP.md created (Phases 68-71, 19/19 requirements R174-R192 mapped, 0 unmapped)
+
+## ★ v1.9 ROADMAP.md phase breakdown (created 2026-08-20)
+
+4 phases (68-71), derived from `research/SUMMARY.md`'s dependency-ordered backbone (super-admin claim +
+gate → appConfig doc + rules → Cloud Functions read config → console UI + no-reply sender →
+deletion-toggle safety), all four research tracks (Stack, Features, Architecture, Pitfalls) converging on
+the same order, with this project's `coarse` granularity setting applied — the config-doc-and-rules phase
+merged with the Cloud-Functions-read-config phase into one Firestore Runtime Config phase, and the
+no-reply sender folded into the console UI phase. **Numbering continues from v1.8, which ended at Phase
+67** — v1.9 starts at Phase 68, not reset.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 68 Super-Admin Access Gate & Claim-Merge Fix | superAdmin custom claim, grantable/revocable via `superAdmins/{uid}`, merge-safe (never wipes org-membership claims or vice versa via one shared helper), enforced by client route + claim-only Firestore rules; owner bootstrap script | R174-R179 | Nothing (first) | no |
+| 69 Firestore Runtime Config | v1.8 cost/cleanup/messaging knobs move into admin-only `appConfig/global`, read at runtime by Cloud Functions with deep-merged safe defaults and per-knob fail-open/closed behavior; asymmetric TTL-vs-fresh caching; MAX_INSTANCES knobs stay deploy-time | R180-R185 | Phase 68 | no |
+| 70 Admin Console UI & No-Reply Sender | Console shows/edits every managed setting (validation, last-changed provenance); no-reply From address configurable, secrets never exposed | R186, R187, R191, R192 | Phase 68, Phase 69 | yes |
+| 71 Cleanup Deletion-Toggle Safety | On-demand dry-run blast-radius preview + explicit confirm gates every `*_CLEANUP_ENABLED` flip; song-linked-background fail-safes proven intact after the config swap | R188-R190 | Phase 69, Phase 70 | yes |
+
+See `.planning/ROADMAP.md` § v1.9 Owner Admin Console for the full phase detail table (goals,
+dependencies, success criteria). Next step: `/gsd-plan-phase 68` (optionally preceded by
+`/gsd-discuss-phase 68`).
+
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 

@@ -117,4 +117,26 @@ REQ-IDs continue from v1.8 (last R173).
 
 ## Traceability
 
-*(Filled by the roadmap — every REQ-ID mapped to exactly one phase.)*
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| R174 | Phase 68 | Pending |
+| R175 | Phase 68 | Pending |
+| R176 | Phase 68 | Pending |
+| R177 | Phase 68 | Pending |
+| R178 | Phase 68 | Pending |
+| R179 | Phase 68 | Pending |
+| R180 | Phase 69 | Pending |
+| R181 | Phase 69 | Pending |
+| R182 | Phase 69 | Pending |
+| R183 | Phase 69 | Pending |
+| R184 | Phase 69 | Pending |
+| R185 | Phase 69 | Pending |
+| R186 | Phase 70 | Pending |
+| R187 | Phase 70 | Pending |
+| R188 | Phase 71 | Pending |
+| R189 | Phase 71 | Pending |
+| R190 | Phase 71 | Pending |
+| R191 | Phase 70 | Pending |
+| R192 | Phase 70 | Pending |
+
+**Coverage:** 19/19 v1.9 requirements (R174–R192) mapped to exactly one phase. No orphans.
