@@ -10,11 +10,13 @@
       <ConfigNumberField
         label="Requests per minute"
         :model-value="store.resolvedConfig.aiProxy.rateLimitPerMin"
+        @update:model-value="rateLimitPerMinLive = $event"
         :min="1"
         :max="1000"
         :integer="true"
         :required="true"
         :is-default="!isExplicitlySet(store.rawDoc, 'aiProxy.rateLimitPerMin')"
+        :external-error="rateLimitPerMinCrossFieldError"
         :saving="stateFor('aiProxy.rateLimitPerMin').saving"
         :saved="stateFor('aiProxy.rateLimitPerMin').saved"
         :save-error="stateFor('aiProxy.rateLimitPerMin').error"
@@ -131,6 +133,28 @@ watch(
 const rateLimitPerDayCrossFieldError = computed<string | null>(() => {
   if (rateLimitPerDayLive.value < store.resolvedConfig.aiProxy.rateLimitPerMin) {
     return 'Daily limit must be at least the per-minute limit.'
+  }
+  return null
+})
+
+// Mirror of the above (review WR-01): the original cross-field rule was only
+// wired onto the rateLimitPerDay field, so an owner could raise
+// rateLimitPerMin above the (unchanged) rateLimitPerDay with no warning and
+// Save would succeed. Bidirectional by construction — both computeds react
+// to the OTHER field's live edited value the same way, so raising either
+// field past the other's current effective value blocks Save on the field
+// being edited.
+const rateLimitPerMinLive = ref(store.resolvedConfig.aiProxy.rateLimitPerMin)
+watch(
+  () => store.resolvedConfig.aiProxy.rateLimitPerMin,
+  (v) => {
+    rateLimitPerMinLive.value = v
+  },
+)
+
+const rateLimitPerMinCrossFieldError = computed<string | null>(() => {
+  if (rateLimitPerMinLive.value > store.resolvedConfig.aiProxy.rateLimitPerDay) {
+    return 'Per-minute limit cannot exceed the daily limit.'
   }
   return null
 })

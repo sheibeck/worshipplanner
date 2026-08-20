@@ -85,6 +85,21 @@ describe('AiProxyConfigCard', () => {
     expect(mockSaveField).not.toHaveBeenCalledWith('aiProxy.rateLimitPerDay', 10)
   })
 
+  it('blocks Save with the mirrored cross-field message when rateLimitPerMin rises above rateLimitPerDay (reverse direction, WR-01)', async () => {
+    const wrapper = mountCard()
+    const numberFields = wrapper.findAllComponents(ConfigNumberField)
+    const rateLimitPerMinField = numberFields[0]!
+    // Default rateLimitPerDay is 500 (DEFAULT_APP_CONFIG) — 600 individually
+    // passes rateLimitPerMin's own min(1)/max(1000) but violates the
+    // cross-field rule against the (unchanged) daily limit.
+    await rateLimitPerMinField.find('input').setValue(600)
+    expect(rateLimitPerMinField.text()).toContain(
+      'Per-minute limit cannot exceed the daily limit.',
+    )
+    expect(rateLimitPerMinField.find('button').attributes('disabled')).toBeDefined()
+    expect(mockSaveField).not.toHaveBeenCalledWith('aiProxy.rateLimitPerMin', 600)
+  })
+
   it('allows a valid rateLimitPerDay save at or above rateLimitPerMin', async () => {
     const wrapper = mountCard()
     const numberFields = wrapper.findAllComponents(ConfigNumberField)
