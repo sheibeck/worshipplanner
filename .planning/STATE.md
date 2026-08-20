@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.8
-milestone_name: Cost & Billing Hardening
-status: Awaiting next milestone
-stopped_at: Completed 67-02-render-service-instance-cap-PLAN.md
-last_updated: "2026-08-20T13:07:53.702Z"
+milestone: v1.9
+milestone_name: Owner Admin Console
+status: planning
+last_updated: "2026-08-20T13:34:40.019Z"
 last_activity: 2026-08-20
-last_activity_desc: Milestone v1.8 completed and archived
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
-current_phase: 67
-current_phase_name: v1.8 code-complete + safe config deployed
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # ▶ ACTIVE MILESTONE — v1.8 Cost & Billing Hardening (started 2026-08-19)
@@ -594,10 +590,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v1.8 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-20 — Milestone v1.8 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-20 — Milestone v1.9 started
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 

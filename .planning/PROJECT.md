@@ -8,13 +8,44 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: none — v1.8 Cost & Billing Hardening shipped (awaiting next)
+## Current Milestone: v1.9 Owner Admin Console
 
-The most recent milestone, **v1.8 Cost & Billing Hardening** (Phases 65–67, R161–R168 + R170–R173),
-shipped 2026-08-20 with its safe config **deployed to production** the same day. Next milestone is scoped
-via `/gsd-new-milestone` — the owner's stated next plan is an **owner-only admin UI for these cost/cleanup
-settings** (see `.planning/seeds/SEED-001-admin-settings-interface.md`), so the levers aren't buried
-`functions/.env` vars.
+**Goal:** A private, owner-only admin console — separate from per-church settings — where the owner (and
+anyone granted super-admin access) controls the v1.8 cost/cleanup levers and the app's no-reply sender at
+runtime, instead of via buried `functions/.env` vars + redeploy.
+
+**Target features:**
+- **Owner-only admin shell + super-admin access gate** — a private admin surface only the owner and
+  granted admins can enter, gated by a real super-admin custom auth claim (builds on the v1.5
+  custom-claims work), distinct from the per-org editor/viewer RBAC. First step toward granting church
+  access / managing billing — those remain out of scope this pass (deliberately not fully fleshed out).
+- **Firestore-backed live cost/cleanup control panel** — the v1.8 levers move from `functions/.env` to an
+  admin-only Firestore config doc the Cloud Functions read at runtime (cached), so toggling a control
+  takes effect with **no redeploy**: the four `*_CLEANUP_ENABLED` switches, retention windows, delete
+  blast-radius cap, AI-proxy knobs, and messaging/fan-out knobs (incl. `SCHEDULED_MESSAGING_CRON_ENABLED`,
+  which also gates composer "schedule-for-later").
+- **No-reply sender setup** — configure the app-owned no-reply From address used by the Resend send path
+  from the admin console.
+- **Deletion-toggle safety** — enabling any cleanup that deletes data surfaces the dry-run count / blast
+  radius before the toggle can be flipped.
+
+**Hard constraint (owner, emphasized 2026-08-20):** song-linked backgrounds must **never** be cleaned up —
+only transient slideshow backgrounds tied to a service. v1.8's `cleanupOrphanBackgrounds` already carries
+3-tier reference detection + two fail-safes; this milestone must preserve and verify that guarantee when
+the enable toggle becomes live-controllable.
+
+Requirements defined in `.planning/REQUIREMENTS.md`; roadmap in `.planning/ROADMAP.md`.
+
+<details>
+<summary>Shipped milestone — v1.8 Cost & Billing Hardening (Phases 65–67, deployed 2026-08-20)</summary>
+
+Full record below and in [milestones/v1.8-ROADMAP.md](milestones/v1.8-ROADMAP.md). The most recent
+milestone, **v1.8 Cost & Billing Hardening** (Phases 65–67, R161–R168 + R170–R173), shipped 2026-08-20
+with its safe config **deployed to production** the same day. Its cost/cleanup levers are the env vars this
+v1.9 admin console lifts into a Firestore-backed, owner-controllable surface (see
+`.planning/seeds/SEED-001-admin-settings-interface.md`).
+
+</details>
 
 <details>
 <summary>Shipped milestone — v1.8 Cost & Billing Hardening (Phases 65–67, deployed 2026-08-20)</summary>
@@ -213,23 +244,23 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-<!-- Milestone v1.8 Cost & Billing Hardening. Requirements defined in .planning/REQUIREMENTS.md
-     (R161+), grouped: AI proxy cost controls, Storage retention, Reminder-cron, Fan-out/instance
-     guardrails. Traceability filled by the roadmap. -->
+<!-- Milestone v1.9 Owner Admin Console. Requirements defined in .planning/REQUIREMENTS.md
+     (R174+), grouped: admin access gate, Firestore-backed runtime config, cost/cleanup control panel,
+     no-reply sender setup, deletion-toggle safety. Traceability filled by the roadmap. -->
 
-**v1.8 Cost & Billing Hardening (R161+)** — cap and observe the metered Claude proxy (rate limit +
-server-side model/`max_tokens` enforcement + usage logging + instance cap), give backgrounds and
-PPTX-import sources a retention story and verify/enable the dry-run-by-default media/orphan sweeps,
-disable the unused daily cross-org `sendScheduledReminders` scan, and add `maxInstances`/volume caps
-across the Resend send loop, `api` proxy, `messageWebhook`, and the Cloud Run render service. Full list
-in `.planning/REQUIREMENTS.md`.
+**v1.9 Owner Admin Console (R174+)** — a private super-admin surface (custom-claim gated) that lifts the
+v1.8 cost/cleanup levers and the no-reply sender out of `functions/.env` into an admin-only Firestore
+config doc the Cloud Functions read at runtime, so the four `*_CLEANUP_ENABLED` switches, retention
+windows, AI-proxy knobs, and messaging/fan-out knobs (incl. `SCHEDULED_MESSAGING_CRON_ENABLED`) toggle
+live with no redeploy — with a dry-run blast-radius preview before any deletion toggle is flipped, and the
+song-linked-background protection preserved. Full list in `.planning/REQUIREMENTS.md`.
+
+*(SEED-001 promoted into this milestone 2026-08-20.)*
 
 **Carried forward / backlog (promote with `/gsd-review-backlog` when ready)**
 
-- [ ] **Owner-only admin interface for the v1.8 cost/cleanup settings** — turn the cleanup enable
-      switches, retention windows, AI-proxy and messaging/fan-out knobs on/off and tune them from an
-      admin UI instead of buried `functions/.env` vars + redeploy (owner's stated next milestone,
-      2026-08-20). Full detail + design considerations in `.planning/seeds/SEED-001-admin-settings-interface.md`.
+- [ ] Activate storage deletion after reviewing dry-run logs, and deploy the Phase 65 `firestore.rules`
+      deny — v1.8 standing owner follow-ups (may be superseded once v1.9's live cleanup toggles ship)
 
 - [ ] Harden the messaging From address to a Resend-verified domain so real volunteers receive mail —
       email is still test-mode `onboarding@resend.dev` (backlog 999.6)
@@ -366,4 +397,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-20 after v1.8 Cost & Billing Hardening milestone (Phases 65–67, shipped + safe config deployed to production 2026-08-20, archived). Standing owner follow-ups: activate storage-deletion flags after reviewing dry-run logs, deploy the Phase 65 firestore.rules deny. Next: `/gsd-new-milestone` (owner plan: admin settings UI — SEED-001).*
+*Last updated: 2026-08-20 — started milestone v1.9 Owner Admin Console (super-admin console lifting the v1.8 cost/cleanup levers + no-reply sender into Firestore-backed runtime config; SEED-001 promoted). Decisions: v1.9 minor, Firestore live config, custom-claim super-admin gate, research-first. Next: defining requirements → roadmap.*
