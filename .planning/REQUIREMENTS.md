@@ -66,7 +66,7 @@ collection-group scans** — services (index.ts:889) and scheduled messages (ind
 per-org messaging kill-switch is only checked *after* the scan. Owner confirms reminders are **not in
 production use**.
 
-- [ ] **R170**: The daily `sendScheduledReminders` cross-org scan no longer runs while reminders are
+- [x] **R170**: The daily `sendScheduledReminders` cross-org scan no longer runs while reminders are
       unused — the cron is disabled (or gated so it performs no cross-org read) — eliminating the daily
       read cost. Any scheduled-message dispatch that must survive is preserved or independently gated,
       not silently broken.
@@ -78,11 +78,11 @@ No function has a `maxInstances`/concurrency ceiling (`firebase.json` has no glo
 per reachable recipient with no cap. The Cloud Run render service Dockerfile sets no instance/concurrency
 limits.
 
-- [ ] **R171**: The Resend send path enforces a volume cap — a per-message maximum recipient count
+- [x] **R171**: The Resend send path enforces a volume cap — a per-message maximum recipient count
       and/or a per-org send quota — so a single send (or the crons that enqueue through it) cannot fan
       out without bound.
 
-- [ ] **R172**: Project-wide function instance ceilings are set (a `setGlobalOptions({ maxInstances })`
+- [x] **R172**: Project-wide function instance ceilings are set (a `setGlobalOptions({ maxInstances })`
       and/or explicit per-function caps), covering at least the `api` proxy and `messageWebhook`, so no
       HTTP function can scale out unbounded under load or abuse.
 
@@ -119,9 +119,9 @@ Each requirement maps to exactly one phase. Phase numbering continues from v1.7 
 | R166 | Phase 66 | Complete |
 | R167 | Phase 66 | Complete |
 | R168 | Phase 66 | Complete |
-| R170 | Phase 67 | Pending |
-| R171 | Phase 67 | Pending |
-| R172 | Phase 67 | Pending |
+| R170 | Phase 67 | Complete |
+| R171 | Phase 67 | Complete |
+| R172 | Phase 67 | Complete |
 | R173 | Phase 67 | Pending |
 
 **Coverage:**
