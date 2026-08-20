@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_APP_CONFIG, mergeAppConfig, isExplicitlySet } from '../appConfigDefaults'
+// WR-03: the drift-guard below imports functions/src/appConfig.ts's OWN
+// DEFAULT_APP_CONFIG directly, rather than comparing against a second
+// hand-typed literal in this file (which could only ever catch someone
+// editing appConfigDefaults.ts alone — never the actual documented risk of
+// functions/src/appConfig.ts drifting out from under this client mirror).
+// functions/src/appConfig.ts's only external import
+// (`import type { Firestore } from "firebase-admin/firestore"`) is a
+// TYPE-ONLY import, erased at compile time by esbuild — confirmed
+// empirically that this import resolves and runs clean under jsdom with no
+// firebase-admin runtime code pulled in.
+import { DEFAULT_APP_CONFIG as FUNCTIONS_DEFAULT_APP_CONFIG } from '../../../functions/src/appConfig'
 
 describe('appConfigDefaults', () => {
   describe('mergeAppConfig', () => {
@@ -60,42 +71,27 @@ describe('appConfigDefaults', () => {
     })
   })
 
-  describe('drift guard — DEFAULT_APP_CONFIG snapshot', () => {
-    // Hard-coded against functions/src/appConfig.ts's DEFAULT_APP_CONFIG
-    // (verified 2026-08-20). If this test fails, either this file's mirror
-    // or the functions/ source was changed without updating the other —
-    // see 70-RESEARCH.md Pitfall 2.
-    it('matches the known-current default values', () => {
-      expect(DEFAULT_APP_CONFIG).toEqual({
-        cleanup: {
-          mediaEnabled: false,
-          pptxRenderEnabled: false,
-          backgroundEnabled: false,
-          pptxSourceEnabled: false,
-        },
-        retention: {
-          mediaDays: 30,
-          orphanRenderStaleHours: 24,
-          backgroundDays: 30,
-          pptxSourceDays: 30,
-        },
-        deleteCapPerRun: 500,
-        aiProxy: {
-          rateLimitPerMin: 20,
-          rateLimitPerDay: 500,
-          allowedModels: ['claude-haiku-4-5-20251001'],
-          maxTokensCeiling: 2048,
-        },
-        messaging: {
-          scheduledCronEnabled: false,
-          maxRecipients: 200,
-          orgDailyEmailQuota: 1000,
-        },
-        sender: {
-          fromName: '',
-          fromAddress: 'onboarding@resend.dev',
-        },
-      })
+  describe('drift guard — DEFAULT_APP_CONFIG cross-check against functions/src/appConfig.ts', () => {
+    // This is a REAL cross-file guard (WR-03 fix), not a same-file
+    // regression guard against a second hand-typed literal (the prior
+    // version of this test). It will fail if EITHER file's
+    // DEFAULT_APP_CONFIG values change without a matching change in the
+    // other — e.g. someone bumps functions/src/appConfig.ts's
+    // rateLimitPerDay and forgets this file exists, or edits this file's
+    // mirror alone.
+    //
+    // What this test DOES catch: any values-level mismatch between the two
+    // DEFAULT_APP_CONFIG constants.
+    //
+    // What this test does NOT catch: a shape/interface drift (a field
+    // renamed/added/removed in one file's AppConfig type but not the
+    // other) that happens not to produce a values-level mismatch on this
+    // particular run — e.g. a brand-new optional field added to only one
+    // side with no default asserted elsewhere. That class of drift is
+    // TypeScript's job (a genuinely new required field would fail to
+    // type-check at its call sites), not this runtime equality check's.
+    it('matches functions/src/appConfig.ts DEFAULT_APP_CONFIG exactly', () => {
+      expect(DEFAULT_APP_CONFIG).toEqual(FUNCTIONS_DEFAULT_APP_CONFIG)
     })
   })
 })
