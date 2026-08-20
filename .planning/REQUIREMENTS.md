@@ -154,9 +154,9 @@ REQ-IDs continue from v1.8 (last R173).
 | R185 | Phase 69 | Complete (UAT deferred) |
 | R186 | Phase 70 | Complete (UAT deferred) |
 | R187 | Phase 70 | Complete (UAT deferred) |
-| R188 | Phase 71 | Complete |
-| R189 | Phase 71 | Complete |
-| R190 | Phase 71 | Complete |
+| R188 | Phase 71 | Complete (UAT deferred) |
+| R189 | Phase 71 | Complete (UAT deferred) |
+| R190 | Phase 71 | Complete (UAT deferred) |
 | R191 | Phase 70 | Complete (UAT deferred) |
 | R192 | Phase 70 | Complete (UAT deferred) |
 

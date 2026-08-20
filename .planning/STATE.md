@@ -4,11 +4,11 @@ milestone: v1.9
 milestone_name: Owner Admin Console
 current_phase: 71
 current_phase_name: cleanup-deletion-toggle-safety
-status: verifying
-stopped_at: Completed 71-02-PLAN.md (final plan of Phase 71, v1.9 milestone)
+status: milestone-code-complete
+stopped_at: v1.9 ALL 4 phases (68–71) code-complete + auto-verified; STOPPED before milestone lifecycle per v1.9 grant — owner runs /gsd-verify-work + deploys, then audit→complete→cleanup
 last_updated: "2026-08-20T22:16:53.547Z"
 last_activity: 2026-08-20
-last_activity_desc: Phase 71 execution started
+last_activity_desc: v1.9 milestone code-complete (Phases 68–71); human UAT + deploys handed to owner
 progress:
   total_phases: 4
   completed_phases: 4
@@ -78,6 +78,7 @@ re-entry these phases are dropped from the run queue and resumed only via the re
 | 68 | verification_deferred_human | /gsd-verify-work 68 |
 | 69 | verification_deferred_human | /gsd-verify-work 69 |
 | 70 | verification_deferred_human | /gsd-verify-work 70 |
+| 71 | verification_deferred_human | /gsd-verify-work 71 |
 
 **Phase 68 (Super-Admin Access Gate & Claim-Merge Fix)** — code-complete + automatically verified 5/5 SC
 on 2026-08-20 (functions 397/397, functions build clean, root type-check clean, rules ALLOW/DENY 6/6 vs a

@@ -594,3 +594,18 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 4. **Real-email (R191):** a saved `sender.fromAddress` on a genuinely Resend-verified domain delivers mail (needs a live Resend account + DNS).
 
 **No deploy for this phase itself** (client-only UI) — but it is only USABLE once the Phase 68 rules + Phase 69 functions are deployed (owner hand-over: `functions/DEPLOY-SUPER-ADMIN.md` + `functions/DEPLOY-RUNTIME-CONFIG.md`).
+
+---
+
+## Phase 71 — Cleanup Deletion-Toggle Safety (v1.9, FINAL) — `verification_deferred_human`
+
+**Code-complete + automatically verified 2026-08-20** (verifier ran gates + git-diff review: `cd functions && npm test` 429/429; `cd functions && npm run build` clean; `npm run type-check` clean; `npx vitest run` at the 2-file baseline. `previewCleanupDryRun` forces dry-run via a `forceDryRun===true ? true : !enabled` ternary — NOT `||` — with a load-bearing test proving it never deletes even when config is mocked ENABLED; dual super-admin re-check; per-type field mapping correct (backgrounds→`orphanCount`). **R190 byte-identical (git-diff confirmed)** — only the signature + one dryRun line changed in each handler; the 15-test backgrounds fail-safe block passes unedited). Code review: 1 Critical (dialog dismissal-during-write) + 1 Warning + polish all FIXED; UI review 21/24. **Nothing deployed, nothing enabled** — the `previewCleanupDryRun` callable is owner hand-over; enabling a cleanup in production is the owner's button.
+
+**What only a human at `/gsd-verify-work 71` can confirm — do NOT mark passed:**
+
+1. **Real dry-run preview:** after deploy, open the Owner Console → Cleanup card → click Enable on a cleanup and confirm the dry-run blast-radius count matches a genuine production backlog (unit tests mock Storage/Firestore).
+2. **The production enable→delete cycle (the owner's button, the milestone's whole point):** Enable a cleanup via the confirm flow, then confirm the NEXT scheduled cron run actually deletes exactly the previewed objects — and NOTHING is deleted in-band on the flag flip itself.
+3. **Visual + a11y pass of the confirm dialog:** the echoed count, "cannot be undone" + "on the next scheduled run" copy, the destructive-red-vs-indigo Confirm, and especially the **background hard-block** (`referencesComplete:false` → un-clickable Confirm + warning) render correctly; mobile reflow at ~375px (UI-review Fix #2, not live-verified).
+4. **Song-background safety (owner's hard constraint) end-to-end:** confirm that with reference detection incomplete, background cleanup CANNOT be enabled, and that a real run never deletes a song-linked background — only transient slideshow backgrounds tied to a service.
+
+**Owner deploy hand-over:** `firebase deploy --only functions:previewCleanupDryRun` (fold in with the Phase 69 runtime-config functions deploy). No `.env` writes.
