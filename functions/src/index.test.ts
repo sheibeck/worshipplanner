@@ -63,10 +63,12 @@ import { getAppConfig, DEFAULT_APP_CONFIG, type AppConfig } from "./appConfig";
 // requestPptxRenderHandler test case can set/clear PPTX_RENDER_SERVICE_URL
 // independently without needing to re-import the module.
 let fakeRenderServiceUrl = "";
-// Send-path (59-03) config seams, keyed by defineString NAME below so the
-// three configs don't collide on one shared value.
+// Send-path (59-03) config seam, keyed by defineString NAME below. The
+// sender address (formerly MESSAGE_FROM_ADDRESS, also a defineString) moved
+// to config.sender.fromAddress (R181) -- it is now set via
+// vi.mocked(getAppConfig).mockResolvedValue(...) at each send-path test, not
+// through this defineString seam.
 let fakeShareBaseUrl = "";
-let fakeMessageFromAddress = "onboarding@resend.dev";
 // The email getAuth().getUser(uid) resolves to for sendCopyToSelf.
 let fakeEditorEmail = "editor@example.com";
 
@@ -104,13 +106,13 @@ vi.mock("firebase-admin/storage", () => ({
 }));
 vi.mock("firebase-functions/params", () => ({
   defineSecret: vi.fn(() => ({ value: () => "fake-secret" })),
-  // Name-aware so PPTX_RENDER_SERVICE_URL, SERVICE_SHARE_BASE_URL and
-  // MESSAGE_FROM_ADDRESS each read their own per-test seam instead of colliding
-  // on one shared value.
+  // Name-aware so PPTX_RENDER_SERVICE_URL and SERVICE_SHARE_BASE_URL each
+  // read their own per-test seam instead of colliding on one shared value.
+  // MESSAGE_FROM_ADDRESS was REMOVED from index.ts (R181, replaced by
+  // config.sender.fromAddress) -- no seam needed here for it anymore.
   defineString: vi.fn((name: string) => ({
     value: () => {
       if (name === "SERVICE_SHARE_BASE_URL") return fakeShareBaseUrl;
-      if (name === "MESSAGE_FROM_ADDRESS") return fakeMessageFromAddress;
       return fakeRenderServiceUrl;
     },
   })),
@@ -2956,23 +2958,24 @@ describe("sendScheduledRemindersHandler", () => {
   // "zero reads" is proven against the SAME fake Firestore the enqueue tests
   // above use, not a hand-waved assertion.
   describe("runScheduledMessagingCron (R170: gate OFF by default)", () => {
-    it("performs ZERO collectionGroup reads when SCHEDULED_MESSAGING_CRON_ENABLED is unset", async () => {
+    it("performs ZERO collectionGroup reads when messaging.scheduledCronEnabled is unset/default (appConfig/global empty)", async () => {
+      // The raw-value coercion matrix (non-"true" strings, malformed input)
+      // that used to be exercised here at the process.env layer is now owned
+      // by appConfig.test.ts's "R184 fail-closed: cleanup + cron flags" block
+      // (coerceEnableFlag) -- this test proves the handler-level wiring
+      // against the global beforeEach's DEFAULT_APP_CONFIG mock only.
       const { collectionGroupSpy } = mockServicesDb([], {});
 
-      await runScheduledMessagingCron({});
+      await runScheduledMessagingCron();
 
       expect(collectionGroupSpy).not.toHaveBeenCalled();
     });
 
-    it("performs ZERO collectionGroup reads for any value that is not exactly 'true'", async () => {
-      const { collectionGroupSpy } = mockServicesDb([], {});
-
-      await runScheduledMessagingCron({ SCHEDULED_MESSAGING_CRON_ENABLED: "False" });
-
-      expect(collectionGroupSpy).not.toHaveBeenCalled();
-    });
-
-    it("runs both sweeps (collectionGroup IS invoked) when SCHEDULED_MESSAGING_CRON_ENABLED is exactly 'true'", async () => {
+    it("runs both sweeps (collectionGroup IS invoked) when messaging.scheduledCronEnabled is true", async () => {
+      vi.mocked(getAppConfig).mockResolvedValue({
+        ...DEFAULT_APP_CONFIG,
+        messaging: { ...DEFAULT_APP_CONFIG.messaging, scheduledCronEnabled: true },
+      });
       const { collectionGroupSpy } = mockServicesDb([], {});
       // The dispatch sweep's own collectionGroup('messages') scan is outside
       // this suite's mockServicesDb (which only wires 'services') and throws
@@ -2980,7 +2983,7 @@ describe("sendScheduledRemindersHandler", () => {
       // production; suppress the expected console.error noise.
       const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-      await runScheduledMessagingCron({ SCHEDULED_MESSAGING_CRON_ENABLED: "true" });
+      await runScheduledMessagingCron();
 
       expect(collectionGroupSpy).toHaveBeenCalledWith("services");
       errSpy.mockRestore();
@@ -4204,7 +4207,6 @@ describe("sendQueuedMessageHandler", () => {
     mockSend.mockReset();
     mockSend.mockResolvedValue({ data: { id: "re_fake_id" }, error: null });
     fakeShareBaseUrl = "";
-    fakeMessageFromAddress = "onboarding@resend.dev";
     fakeEditorEmail = "editor@example.com";
   });
 
@@ -4236,13 +4238,11 @@ describe("sendQueuedMessageHandler", () => {
 
   // --- R171: Resend volume guardrails (67-01) --------------------------------
   describe("R171: recipient cap + org daily quota", () => {
-    afterEach(() => {
-      delete process.env.MESSAGE_MAX_RECIPIENTS;
-      delete process.env.ORG_MAX_EMAILS_PER_DAY;
-    });
-
-    it("an over-cap send (MESSAGE_MAX_RECIPIENTS) is REJECTED 'failed' with ZERO sends -- never truncated", async () => {
-      process.env.MESSAGE_MAX_RECIPIENTS = "1";
+    it("an over-cap send (config.messaging.maxRecipients) is REJECTED 'failed' with ZERO sends -- never truncated", async () => {
+      vi.mocked(getAppConfig).mockResolvedValue({
+        ...DEFAULT_APP_CONFIG,
+        messaging: { ...DEFAULT_APP_CONFIG.messaging, maxRecipients: 1 },
+      });
       const { db, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
       vi.mocked(getFirestore).mockReturnValue(db as never);
 
@@ -4266,8 +4266,11 @@ describe("sendQueuedMessageHandler", () => {
       });
     });
 
-    it("an org at/over ORG_MAX_EMAILS_PER_DAY (env override) is failed/skipped with ZERO sends", async () => {
-      process.env.ORG_MAX_EMAILS_PER_DAY = "0";
+    it("an org at/over config.messaging.orgDailyEmailQuota is failed/skipped with ZERO sends", async () => {
+      vi.mocked(getAppConfig).mockResolvedValue({
+        ...DEFAULT_APP_CONFIG,
+        messaging: { ...DEFAULT_APP_CONFIG.messaging, orgDailyEmailQuota: 0 },
+      });
       const { db, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
       vi.mocked(getFirestore).mockReturnValue(db as never);
 
@@ -4344,7 +4347,7 @@ describe("sendQueuedMessageHandler", () => {
       expect(outcome).toMatchObject({ status: "sent", sentCount: 2, failedCount: 0 });
     });
 
-    it("under both default limits, the two-recipient send is unaffected (no MESSAGE_MAX_RECIPIENTS/ORG_MAX_EMAILS_PER_DAY override)", async () => {
+    it("under both default limits, the two-recipient send is unaffected (no maxRecipients/orgDailyEmailQuota override)", async () => {
       const { db, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
       vi.mocked(getFirestore).mockReturnValue(db as never);
 
@@ -4366,9 +4369,10 @@ describe("sendQueuedMessageHandler", () => {
 
   // --- From / Reply-To (owner UAT 2026-08-17) --------------------------------
   // Churches no longer set From/Reply-To. From = the org's own NAME (display)
-  // over the app's single verified sending address (MESSAGE_FROM_ADDRESS);
-  // Reply-To = the sending editor's email, auto-resolved server-side.
-  it("From = the org's name as display name over MESSAGE_FROM_ADDRESS", async () => {
+  // over the app's single verified sending address (config.sender.fromAddress,
+  // R181 -- formerly the MESSAGE_FROM_ADDRESS defineString); Reply-To = the
+  // sending editor's email, auto-resolved server-side.
+  it("From = the org's name as display name over config.sender.fromAddress", async () => {
     const { db } = makeSendDb(twoRecipientConfig()); // orgName defaults to "Test Church"
     vi.mocked(getFirestore).mockReturnValue(db as never);
 
@@ -4378,11 +4382,17 @@ describe("sendQueuedMessageHandler", () => {
     expect(from).toBe('"Test Church" <onboarding@resend.dev>');
   });
 
-  it("peels a display name already in MESSAGE_FROM_ADDRESS so wrapping never nests brackets (422 repro)", async () => {
+  it("peels a display name already in config.sender.fromAddress so wrapping never nests brackets (422 repro)", async () => {
     // Reproduces the reported 422: a "Name <email>" config value wrapped again
     // produced "My's Church" <Worship Planner <noreply@…>>. bareEmailAddress must
     // extract just the address → a single, valid quoted-name form.
-    fakeMessageFromAddress = "Worship Planner <noreply@worshipplanner.app>";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      sender: {
+        ...DEFAULT_APP_CONFIG.sender,
+        fromAddress: "Worship Planner <noreply@worshipplanner.app>",
+      },
+    });
     const { db } = makeSendDb(twoRecipientConfig());
     vi.mocked(getFirestore).mockReturnValue(db as never);
 

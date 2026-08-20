@@ -1980,26 +1980,29 @@ export async function sendScheduledRemindersHandler(
 // key (R131).
 //
 // R170: the body used to live directly in the onSchedule callback below;
-// it is now extracted into this EXPORTED orchestrator, exclusively so an
-// env gate can sit at its very top, before EITHER sweep -- and therefore
-// before the first getFirestore()/collectionGroup call either sweep makes.
-// Default OFF (unset, "false", "True", "1", anything that is not exactly
-// "true" -- the same fail-safe idiom as MEDIA_CLEANUP_ENABLED et al. above):
-// gating the WHOLE function off is the lowest-cost option and kills BOTH the
-// reminder collectionGroup('services') scan AND the schedule-for-later
-// collectionGroup('messages') scan -- zero cross-org reads when disabled.
+// it is now extracted into this EXPORTED orchestrator, exclusively so a
+// config gate can sit at its very top, before EITHER sweep -- and therefore
+// before the first collectionGroup call either sweep makes. Default OFF
+// (unset, false, or malformed -- the same fail-CLOSED idiom as the cleanup
+// enable flags above, R181/R184): gating the WHOLE function off is the
+// lowest-cost option and kills BOTH the reminder collectionGroup('services')
+// scan AND the schedule-for-later collectionGroup('messages') scan -- zero
+// cross-org reads when disabled.
 //
 // DISCLOSED behavior change: gating the whole function off also disables
 // dispatchDueScheduledMessagesHandler, i.e. the composer's "schedule for
-// later" send. To restore reminders OR schedule-for-later dispatch, set
-// SCHEDULED_MESSAGING_CRON_ENABLED=true and redeploy sendScheduledReminders
-// -- fully reversible via the flag, no data loss either way.
+// later" send. To restore reminders OR schedule-for-later dispatch, flip
+// messaging.scheduledCronEnabled=true in appConfig/global -- no redeploy
+// needed (R181), and takes effect on the very next scheduled run since this
+// is a cron path reading {fresh:true} (R183). Fully reversible, no data loss
+// either way.
 export async function runScheduledMessagingCron(
-  env: NodeJS.ProcessEnv = process.env,
+  db: Firestore = getFirestore(),
 ): Promise<void> {
-  if (env.SCHEDULED_MESSAGING_CRON_ENABLED !== "true") {
+  const config = await getAppConfig(db, { fresh: true });
+  if (!config.messaging.scheduledCronEnabled) {
     console.log(
-      'runScheduledMessagingCron: SCHEDULED_MESSAGING_CRON_ENABLED is not "true" -- skipping both the reminder sweep and the schedule-for-later dispatch sweep (zero cross-org reads).',
+      "runScheduledMessagingCron: messaging.scheduledCronEnabled is not true -- skipping both the reminder sweep and the schedule-for-later dispatch sweep (zero cross-org reads).",
     );
     return;
   }
@@ -2482,25 +2485,24 @@ export const SERVICE_SHARE_BASE_URL = defineString("SERVICE_SHARE_BASE_URL", {
   default: "https://worship-planner-bc515.web.app",
 });
 
-/**
- * The bare From *address* Resend sends as. Config, not a secret. The
- * organization's own name is applied as the RFC 5322 display name at send time
- * (see `fromDisplayName`), so this holds only the address — no display name.
- *
- * ⚠ This address's domain MUST be verified in Resend or every send 403s
- * ("domain is not verified"). The default is Resend's zero-setup test sender
- * `onboarding@resend.dev`, which needs NO domain verification but (in Resend's
- * test mode) only delivers to the Resend account owner's own email — enough to
- * validate the send path end-to-end while testing.
- *
- * TODO (harden — future fix): replace this default with `no-reply@<a domain you
- * verified in Resend>` (add its DKIM/SPF DNS records first), or override
- * MESSAGE_FROM_ADDRESS at deploy time, so real volunteers receive mail. A
- * `*.web.app` address can never be verified (Google-managed, no DNS access).
- */
-export const MESSAGE_FROM_ADDRESS = defineString("MESSAGE_FROM_ADDRESS", {
-  default: "onboarding@resend.dev",
-});
+// R181: the bare From *address* Resend sends as used to live here as a
+// deploy-time defineString param -- REMOVED outright (not layered as a
+// fallback) and replaced by the live, admin-editable config.sender.fromAddress
+// (appConfig/global, resolved once at the top of sendQueuedMessageHandler
+// below). The organization's own name is still applied as the RFC 5322
+// display name at send time (see `fromDisplayName`); only the bare address
+// itself moved to appConfig.
+//
+// ⚠ Whatever address is configured MUST have its domain verified in Resend or
+// every send 403s ("domain is not verified"). appConfig.ts's DEFAULT_APP_CONFIG
+// falls back to Resend's zero-setup test sender `onboarding@resend.dev`, which
+// needs NO domain verification but (in Resend's test mode) only delivers to
+// the Resend account owner's own email -- enough to validate the send path
+// end-to-end while testing. Editing the live value (Phase 70 console, or
+// directly in appConfig/global) to a verified `no-reply@<your domain>` is how
+// real volunteers receive mail -- no redeploy required, unlike the old
+// deploy-time param. A `*.web.app` address can never be verified
+// (Google-managed, no DNS access).
 
 /**
  * Build a header-safe RFC 5322 display name from an org-supplied name. The org
@@ -2514,12 +2516,13 @@ export function fromDisplayName(name: string | null | undefined): string {
 }
 
 /**
- * Extract the bare email address from a configured From value. MESSAGE_FROM_ADDRESS
+ * Extract the bare email address from a configured From value. config.sender.fromAddress
  * may be a plain `email@x` OR an already-decorated `Display Name <email@x>` form
- * (e.g. a leftover `.env` override). We always re-apply the org name as the display
- * name, so we must peel any existing `<…>` off first — otherwise wrapping produces
- * an invalid nested `"Org" <Name <email>>` and Resend 422s. Returns the inner
- * address when angle-bracketed, else the trimmed input.
+ * (e.g. a legacy value carried over from the old defineString-based sender param). We
+ * always re-apply the org name as the display name, so we must peel any existing
+ * `<…>` off first — otherwise wrapping produces an invalid nested
+ * `"Org" <Name <email>>` and Resend 422s. Returns the inner address when
+ * angle-bracketed, else the trimmed input.
  */
 export function bareEmailAddress(configured: string): string {
   const m = configured.match(/<([^>]*)>/);
@@ -2646,6 +2649,12 @@ export async function sendQueuedMessageHandler(params: {
 }): Promise<SendOutcome> {
   const { orgId, serviceId, messageId } = params;
   const db = getFirestore();
+  // R181/R183: resolved ONCE here, before any per-recipient loop below --
+  // the CACHED form (no {fresh:true}), since sendQueuedMessage is a hot,
+  // per-message request path, not a cron (mirrors the api proxy's own
+  // cached read above). Anti-pattern to avoid: never re-resolve inside the
+  // recipient loop -- the loop can iterate up to maxRecipients recipients.
+  const config = await getAppConfig(db);
   const orgRef = db.collection("organizations").doc(orgId);
   const serviceRef = orgRef.collection("services").doc(serviceId);
   const messageRef = serviceRef.collection("messages").doc(messageId);
@@ -2749,14 +2758,13 @@ export async function sendQueuedMessageHandler(params: {
     sendList.push({ id: message.requestedByUid, name: "You", email: senderEmail, roleNames: [] });
   }
 
-  // R171: Resend send-loop volume guardrails, both env-overridable and both
-  // generous so a legitimate send never hits them -- they exist to stop a
-  // loop/bug/abuse fan-out, not to shape normal use. Read HERE (per
-  // invocation, mirroring readAiProxyLimits() in the `api` handler) rather
-  // than as a module-scope constant, so an env override takes effect on the
-  // very next invocation with no redeploy required.
-  const MESSAGE_MAX_RECIPIENTS = readNumericKnob(process.env.MESSAGE_MAX_RECIPIENTS, 200);
-  const ORG_MAX_EMAILS_PER_DAY = readNumericKnob(process.env.ORG_MAX_EMAILS_PER_DAY, 1000);
+  // R171/R181: Resend send-loop volume guardrails, both config-tunable (live,
+  // no redeploy) and both generous so a legitimate send never hits them --
+  // they exist to stop a loop/bug/abuse fan-out, not to shape normal use.
+  // Sourced from the `config` resolved once at the top of this handler
+  // (mirroring the api proxy's own cached readAiProxyLimits(config) read).
+  const MESSAGE_MAX_RECIPIENTS = config.messaging.maxRecipients;
+  const ORG_MAX_EMAILS_PER_DAY = config.messaging.orgDailyEmailQuota;
 
   // Per-message recipient cap: a queued message resolving to MORE than
   // MESSAGE_MAX_RECIPIENTS is REJECTED (never truncated) -- a 200+ recipient
@@ -2828,12 +2836,16 @@ export async function sendQueuedMessageHandler(params: {
   // mocked-in-tests Resend, and write recipients/{id}. Per-recipient try/catch
   // so one bad address is a status:'failed' recipient, not an aborted batch.
   const resend = new Resend(RESEND_API_KEY.value());
-  // From = the org's own name (display) over the app's verified sending address.
-  // bareEmailAddress peels any display name already baked into MESSAGE_FROM_ADDRESS
-  // (e.g. a "Name <email>" .env override) so wrapping never nests angle brackets.
-  // Org name is header-sanitized above; wrap in a quoted-string. Bare address when
-  // the org has no name.
-  const fromEmail = bareEmailAddress(MESSAGE_FROM_ADDRESS.value());
+  // From = the org's own name (display) over the app's verified sending
+  // address (R181: config.sender.fromAddress, resolved once at the top of
+  // this handler -- REPLACES the old defineString-based sender param
+  // outright, no competing fallback). bareEmailAddress peels any display
+  // name already baked into the configured value (e.g. a legacy "Name
+  // <email>" override) so wrapping never nests angle brackets. Org name is
+  // header-sanitized above; wrap in a quoted-string. Bare address when the
+  // org has no name. config.sender.fromName stays dormant this phase (the
+  // per-message display name is still the org's own name, R159 unchanged).
+  const fromEmail = bareEmailAddress(config.sender.fromAddress);
   const fromAddress = orgName ? `"${orgName}" <${fromEmail}>` : fromEmail;
   let sentCount = 0;
   let failedCount = 0;
