@@ -71,6 +71,56 @@
 
 ---
 
+## Milestone: v1.8 — Cost & Billing Hardening
+
+**Shipped:** 2026-08-20 | **Phases:** 3 (65–67) | **Plans:** 6 | **Tasks:** 13
+
+### What Was Built
+Capped and made observable every runaway cost surface on the live Blaze-plan app: AI-proxy rate limit +
+model/token enforcement + usage ledger + instance cap (65); dry-run retention sweeps for media, orphan
+renders, backgrounds (3-tier reference detection + fail-safes) and PPTX sources (66); reminder-cron gate,
+Resend volume caps, project-wide + Cloud Run instance ceilings (67). Safe config deployed to production;
+cleanup crons live in dry-run. Follow-up made the retention windows env-tunable (media 14→30d).
+
+### What Worked
+- **Grounding requirements in a code investigation first.** A single thorough investigation agent mapped
+  the five real exposures (with file:line) before any planning — every phase's plan and each REVIEW cited
+  real code, and the plan-checkers verified line refs rather than guessing.
+- **Deploy classification baked into the plans.** Splitting "autonomous bounded config" vs "owner-gated
+  data-deletion" at plan time (and staging every deploy for the orchestrator, not the executor) meant no
+  subagent ever fired a production deploy, and the one broad `firebase deploy` was a single reviewed step.
+- **Adversarial review caught real deletion-safety bugs.** The code-review→fix loop closed a quota
+  overshoot (P67 WR-01), a fail-open gap (P67 WR-02), and hardened the R167 background fail-safe against a
+  non-array field and a silently-empty scan — none blocking, all real, in code about to delete user data.
+
+### What Was Inefficient
+- **Env-configurability drifted from intent.** The plan said retention windows should be env-tunable; the
+  executor shipped them as hardcoded constants, and the orchestrator's handover doc then wrongly listed
+  them as env knobs — surfaced only when the owner asked. A quick follow-up fixed it, but a plan-checker
+  or verifier check on "config knobs are actually env-readable" would have caught it earlier.
+- **Recurring stale `.git/index.lock`** from finished subagents forced several manual lock clears mid-run.
+
+### Patterns Established
+- **Dry-run-by-default deletion crons** with a path guard + age gate + an env enable-flag + a per-run
+  delete cap + a fail-safe that forces the whole run to dry-run on any incomplete/ambiguous input — the
+  template every new sweep copied, and the safest shape for destructive background jobs.
+- **Deploy-the-mechanism-dry-run (autonomous) / owner-flips-the-switch (gated)** as the split for shipping
+  destructive automation to a live app without waiting on the owner for the harmless part.
+
+### Key Lessons
+- A handover doc is only as good as its claims — verify "there's a setting for X" against the code before
+  writing it down. The owner catching the env-knob misstatement is the same class of lesson this project
+  already learned about tests-explained-away (CLAUDE.md): an unverified assertion is a latent defect.
+
+### Cost Observations
+- Model mix: planning/planner on **opus**; discuss/plan-check/execute/verify/review/fix on **sonnet**;
+  orchestration on the session model. Every phase ran the full discuss→plan→check→execute→verify→review→fix
+  chain with independent subagents per gate.
+- Notable: shipping deletion logic to production with zero real deletions (dry-run default) meant the
+  risky half of the milestone could deploy autonomously and be observed before the owner ever enables it.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
