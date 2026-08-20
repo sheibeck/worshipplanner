@@ -194,7 +194,7 @@ describe("cleanupExpiredMediaHandler", () => {
     const summary = await cleanupExpiredMediaHandler();
 
     expect(old.delete).toHaveBeenCalledTimes(1);
-    expect(summary).toMatchObject({ deletedCount: 1, dryRun: false });
+    expect(summary).toMatchObject({ deletedObjectCount: 1, dryRun: false });
   });
 
   it("FAILS SAFE: deletes nothing when MEDIA_CLEANUP_ENABLED is unset, even for an expired file", async () => {
@@ -207,7 +207,7 @@ describe("cleanupExpiredMediaHandler", () => {
     const summary = await cleanupExpiredMediaHandler();
 
     expect(old.delete).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ dryRun: true, deletedCount: 1, scannedCount: 1 });
+    expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 1, scannedCount: 1 });
   });
 
   it("FAILS SAFE: a stray MEDIA_CLEANUP_DRY_RUN=false does not enable deletion", async () => {
@@ -267,7 +267,7 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(agedMedia.delete).toHaveBeenCalledTimes(1);
     expect(agedPptx.delete).not.toHaveBeenCalled();
     expect(recentMedia.delete).not.toHaveBeenCalled();
-    expect(summary.deletedCount).toBe(1);
+    expect(summary.deletedObjectCount).toBe(1);
   });
 
   it("R165/T-66-01-04: reports deletedBytes for a LIVE delete, and dry-run reports the same would-delete byte total", async () => {
@@ -284,7 +284,7 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(liveSummary).toMatchObject({ dryRun: false, deletedBytes: KNOWN_SIZE });
   });
 
-  it("T-66-01-02: a per-run delete cap bounds a LIVE run -- exactly one delete() call, cappedByLimit=true, deletedCount=1", async () => {
+  it("T-66-01-02: a per-run delete cap bounds a LIVE run -- exactly one delete() call, cappedByLimit=true, deletedObjectCount=1", async () => {
     process.env.MEDIA_CLEANUP_ENABLED = "true";
     process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
     const old1 = fakeFile("orgs/orgA/media/m1/old1.mp4", RETENTION_DAYS + 6);
@@ -297,7 +297,7 @@ describe("cleanupExpiredMediaHandler", () => {
       (old1.delete as ReturnType<typeof vi.fn>).mock.calls.length +
       (old2.delete as ReturnType<typeof vi.fn>).mock.calls.length;
     expect(totalDeleteCalls).toBe(1);
-    expect(summary).toMatchObject({ deletedCount: 1, cappedByLimit: true, dryRun: false });
+    expect(summary).toMatchObject({ deletedObjectCount: 1, cappedByLimit: true, dryRun: false });
 
     delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
   });
@@ -312,7 +312,7 @@ describe("cleanupExpiredMediaHandler", () => {
 
     expect(old1.delete).not.toHaveBeenCalled();
     expect(old2.delete).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ dryRun: true, deletedCount: 2, cappedByLimit: false });
+    expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 2, cappedByLimit: false });
 
     delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
   });
@@ -325,7 +325,7 @@ describe("cleanupExpiredMediaHandler", () => {
     const summary = await cleanupExpiredMediaHandler();
 
     expect(recent.delete).not.toHaveBeenCalled();
-    expect(summary.deletedCount).toBe(0);
+    expect(summary.deletedObjectCount).toBe(0);
   });
 
   it("never deletes a non-media (pptx-imports) object even when old", async () => {
@@ -352,14 +352,14 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(summary.scannedCount).toBe(0);
   });
 
-  it("dry-run mode counts/logs an old media file but calls no delete, and reports deletedCount via the dry-run count", async () => {
+  it("dry-run mode counts/logs an old media file but calls no delete, and reports deletedObjectCount via the dry-run count", async () => {
     const old = fakeFile("orgs/orgA/media/m1/old.mp4", 20);
     mockBucket([old]);
 
     const summary = await cleanupExpiredMediaHandler();
 
     expect(old.delete).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ dryRun: true, deletedCount: 1, scannedCount: 1 });
+    expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 1, scannedCount: 1 });
   });
 
   it("makes no Firestore call -- slide metadata is structurally untouchable", async () => {
@@ -379,7 +379,7 @@ describe("cleanupExpiredMediaHandler", () => {
 
     const firstRun = await cleanupExpiredMediaHandler();
     expect(old.delete).toHaveBeenCalledTimes(1);
-    expect(firstRun.deletedCount).toBe(1);
+    expect(firstRun.deletedObjectCount).toBe(1);
 
     // Second run: simulate the deleted file no longer present in the bucket
     // listing (as a real bucket would report after a successful delete).
@@ -387,7 +387,7 @@ describe("cleanupExpiredMediaHandler", () => {
     const secondRun = await cleanupExpiredMediaHandler();
 
     expect(recent.delete).not.toHaveBeenCalled();
-    expect(secondRun.deletedCount).toBe(0);
+    expect(secondRun.deletedObjectCount).toBe(0);
   });
 });
 
@@ -1337,7 +1337,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     expect(referenced.delete).not.toHaveBeenCalled();
     expect(summary).toMatchObject({
       dryRun: false,
-      deletedCount: 1,
+      deletedObjectCount: 1,
       orphanCount: 1,
       referencesComplete: true,
     });
@@ -1360,7 +1360,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     const summary = await cleanupOrphanBackgroundsHandler();
 
     expect(referenced.delete).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ dryRun: false, deletedCount: 0, referencesComplete: true });
+    expect(summary).toMatchObject({ dryRun: false, deletedObjectCount: 0, referencesComplete: true });
   });
 
   it("NEVER deletes a background referenced at the SONG (lyrics) tier", async () => {
@@ -1375,7 +1375,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     const summary = await cleanupOrphanBackgroundsHandler();
 
     expect(referenced.delete).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ dryRun: false, deletedCount: 0, referencesComplete: true });
+    expect(summary).toMatchObject({ dryRun: false, deletedObjectCount: 0, referencesComplete: true });
   });
 
   it("path guard: an aged object under orgs/{orgId}/media/ or .../pptx-imports/ is never considered, even when enabled", async () => {
@@ -1389,7 +1389,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
 
     expect(mediaFile.delete).not.toHaveBeenCalled();
     expect(pptxFile.delete).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ scannedCount: 0, deletedCount: 0 });
+    expect(summary).toMatchObject({ scannedCount: 0, deletedObjectCount: 0 });
   });
 
   it("REFERENCES-INCOMPLETE FAIL-SAFE: an unparseable backgroundImageUrl forces the whole run to dry-run, even with the flag enabled", async () => {
@@ -1437,7 +1437,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     const summary = await cleanupOrphanBackgroundsHandler();
 
     expect(orphan.delete).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ dryRun: true, deletedCount: 0, referencesComplete: false });
+    expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 0, referencesComplete: false });
   });
 
   it("FLOOR GUARD: zero total references found anywhere, yet candidate backgrounds exist -- treats references as incomplete and deletes nothing", async () => {
@@ -1455,7 +1455,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     expect(candidate.delete).not.toHaveBeenCalled();
     expect(summary).toMatchObject({
       dryRun: true,
-      deletedCount: 0,
+      deletedObjectCount: 0,
       referencesComplete: false,
     });
   });
@@ -1471,7 +1471,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
       dryRun: false,
       referencesComplete: true,
       scannedCount: 0,
-      deletedCount: 0,
+      deletedObjectCount: 0,
     });
   });
 
@@ -1490,7 +1490,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     const summary = await cleanupOrphanBackgroundsHandler();
 
     expect(unreadable.delete).not.toHaveBeenCalled();
-    expect(summary).toMatchObject({ orphanCount: 0, deletedCount: 0 });
+    expect(summary).toMatchObject({ orphanCount: 0, deletedObjectCount: 0 });
   });
 
   it("FAILS SAFE: unset/empty/false/1/True all leave dryRun=true and delete nothing", async () => {
@@ -1533,7 +1533,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
       (orphan1.delete as ReturnType<typeof vi.fn>).mock.calls.length +
       (orphan2.delete as ReturnType<typeof vi.fn>).mock.calls.length;
     expect(totalDeleteCalls).toBe(1);
-    expect(summary).toMatchObject({ dryRun: false, deletedCount: 1, cappedByLimit: true });
+    expect(summary).toMatchObject({ dryRun: false, deletedObjectCount: 1, cappedByLimit: true });
   });
 
   it("the delete cap does NOT truncate a dry-run -- would-delete bytes/count reported in full", async () => {
@@ -1553,7 +1553,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     expect(orphan2.delete).not.toHaveBeenCalled();
     expect(summary).toMatchObject({
       dryRun: true,
-      deletedCount: 0,
+      deletedObjectCount: 0,
       deletedBytes: 1234 + 5678,
       cappedByLimit: false,
     });

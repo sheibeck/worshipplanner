@@ -936,7 +936,7 @@ export const MEDIA_PATH_GUARD = /^orgs\/[^/]+\/media\//;
 
 export interface CleanupSummary {
   scannedCount: number;
-  deletedCount: number;
+  deletedObjectCount: number;
   dryRun: boolean;
   /** Total bytes deleted (LIVE) or would-delete (dry-run) this run (66-01: T-66-01-04). */
   deletedBytes: number;
@@ -958,7 +958,7 @@ export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
   const deleteCap = readDeleteCap();
 
   let scannedCount = 0;
-  let deletedCount = 0;
+  let deletedObjectCount = 0;
   let deletedBytes = 0;
   let cappedByLimit = false;
 
@@ -988,12 +988,12 @@ export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
     if (dryRun) {
       // Dry-run is NEVER capped -- the owner needs the true backlog
       // count/bytes before enabling live deletion, not a truncated one.
-      deletedCount++;
+      deletedObjectCount++;
       deletedBytes += fileBytes;
       continue;
     }
 
-    if (deletedCount >= deleteCap) {
+    if (deletedObjectCount >= deleteCap) {
       // T-66-01-02: bound this run's blast radius. Idempotent-by-age means
       // the next daily run resumes deleting the remaining backlog.
       cappedByLimit = true;
@@ -1002,7 +1002,7 @@ export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
 
     try {
       await file.delete();
-      deletedCount++;
+      deletedObjectCount++;
       deletedBytes += fileBytes;
     } catch (err) {
       // Partial-failure tolerance (T-22-03-03): one bad delete never aborts
@@ -1013,7 +1013,7 @@ export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
 
   const summary: CleanupSummary = {
     scannedCount,
-    deletedCount,
+    deletedObjectCount,
     dryRun,
     deletedBytes,
     cappedByLimit,
@@ -1288,7 +1288,7 @@ export const BACKGROUND_PATH_GUARD = /^orgs\/[^/]+\/backgrounds\//;
 export interface OrphanBackgroundSummary {
   scannedCount: number;
   orphanCount: number;
-  deletedCount: number;
+  deletedObjectCount: number;
   /** Total bytes deleted (LIVE) or would-delete (dry-run) this run. */
   deletedBytes: number;
   /** False when the reference picture could not be fully proven this run -- forces dryRun. */
@@ -1397,7 +1397,7 @@ export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroun
 
   let scannedCount = 0;
   let orphanCount = 0;
-  let deletedCount = 0;
+  let deletedObjectCount = 0;
   let deletedBytes = 0;
   let cappedByLimit = false;
 
@@ -1427,14 +1427,14 @@ export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroun
       continue;
     }
 
-    if (deletedCount >= deleteCap) {
+    if (deletedObjectCount >= deleteCap) {
       cappedByLimit = true;
       break;
     }
 
     try {
       await file.delete();
-      deletedCount++;
+      deletedObjectCount++;
       deletedBytes += fileBytes;
     } catch (err) {
       // Partial-failure tolerance: one bad delete never aborts the run.
@@ -1445,7 +1445,7 @@ export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroun
   const summary: OrphanBackgroundSummary = {
     scannedCount,
     orphanCount,
-    deletedCount,
+    deletedObjectCount,
     deletedBytes,
     referencesComplete,
     cappedByLimit,
