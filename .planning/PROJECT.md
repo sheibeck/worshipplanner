@@ -225,6 +225,11 @@ in `.planning/REQUIREMENTS.md`.
 
 **Carried forward / backlog (promote with `/gsd-review-backlog` when ready)**
 
+- [ ] **Owner-only admin interface for the v1.8 cost/cleanup settings** — turn the cleanup enable
+      switches, retention windows, AI-proxy and messaging/fan-out knobs on/off and tune them from an
+      admin UI instead of buried `functions/.env` vars + redeploy (owner's stated next milestone,
+      2026-08-20). Full detail + design considerations in `.planning/seeds/SEED-001-admin-settings-interface.md`.
+
 - [ ] Harden the messaging From address to a Resend-verified domain so real volunteers receive mail —
       email is still test-mode `onboarding@resend.dev` (backlog 999.6)
 - [ ] Confirm the production draft lock by hand and re-run the devtools bypass check (backlog 999.3 —
