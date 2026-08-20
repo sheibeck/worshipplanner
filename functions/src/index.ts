@@ -279,6 +279,25 @@ export function enforceModelAndTokens(
       },
     };
   }
+  // WR-03: reject a streamed request outright rather than forward it. The
+  // aiUsage ledger write below parses the upstream response body as a single
+  // JSON object (`JSON.parse(body) as { usage?: AnthropicUsage }`) -- an SSE
+  // stream's raw text is not valid JSON, so a `stream: true` request would
+  // still be billed/rate-limited but silently never recorded in the ledger
+  // (the `catch (ledgerErr)` swallows the JSON.parse throw). The server
+  // dictates non-streaming so every proxied request records a usage entry
+  // (R163), matching the "reject, don't silently trust" posture already used
+  // for `model` above.
+  if (record.stream === true) {
+    return {
+      ok: false,
+      status: 400,
+      error: {
+        error: "Streaming responses are not supported by this proxy; omit `stream` or set it to false.",
+        allowedModels: limits.allowedModels,
+      },
+    };
+  }
   const maxTokens = record.max_tokens;
   if (typeof maxTokens === "number" && maxTokens > limits.maxTokensCeiling) {
     return { ok: true, body: { ...record, max_tokens: limits.maxTokensCeiling } };

@@ -2559,6 +2559,30 @@ describe("enforceModelAndTokens", () => {
     expect(enforceModelAndTokens("a string", limits).ok).toBe(false);
     expect(enforceModelAndTokens(42, limits).ok).toBe(false);
   });
+
+  it("WR-03: rejects `stream: true` with 400 rather than forwarding it (would bypass the aiUsage ledger)", () => {
+    const result = enforceModelAndTokens(
+      { model: "claude-haiku-4-5-20251001", max_tokens: 100, stream: true },
+      limits,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(400);
+      expect(result.error.allowedModels).toEqual(limits.allowedModels);
+    }
+  });
+
+  it("WR-03: allows `stream: false` (an explicit non-streaming request) through unchanged", () => {
+    const body = { model: "claude-haiku-4-5-20251001", max_tokens: 100, stream: false };
+    const result = enforceModelAndTokens(body, limits);
+    expect(result).toEqual({ ok: true, body });
+  });
+
+  it("WR-03: allows a request that omits `stream` entirely (the normal case)", () => {
+    const body = { model: "claude-haiku-4-5-20251001", max_tokens: 100 };
+    const result = enforceModelAndTokens(body, limits);
+    expect(result).toEqual({ ok: true, body });
+  });
 });
 
 describe("checkAndConsumeRateLimit", () => {
