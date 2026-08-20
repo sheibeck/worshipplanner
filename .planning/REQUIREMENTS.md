@@ -17,7 +17,7 @@ REQ-IDs continue from v1.8 (last R173).
 
 ### Super-admin access gate
 
-- [ ] **R174**: A super-admin can be granted access via a `superAdmins/{uid}` record, and that grant is
+- [x] **R174**: A super-admin can be granted access via a `superAdmins/{uid}` record, and that grant is
       reflected as a `superAdmin: true` custom auth claim on the user's ID token.
 
 - [x] **R175**: Setting or clearing any custom claim preserves the user's other claims — writing
@@ -25,7 +25,7 @@ REQ-IDs continue from v1.8 (last R173).
       sync never wipes `superAdmin` — via one shared merge-and-set helper used by both claim writers.
       *(Closes the `setCustomUserClaims`-replaces-not-merges live gap in `orgMembershipClaims.ts`.)*
 
-- [ ] **R176**: The owner can bootstrap the first super-admin with a dry-run-by-default, `--apply`-gated,
+- [x] **R176**: The owner can bootstrap the first super-admin with a dry-run-by-default, `--apply`-gated,
       owner-run Node script (no pre-existing super-admin required), mirroring `backfillOrgClaims.ts`.
 
 - [x] **R177**: The admin console route and its nav entry are reachable only by a signed-in super-admin;
@@ -140,9 +140,9 @@ REQ-IDs continue from v1.8 (last R173).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R174 | Phase 68 | Pending |
+| R174 | Phase 68 | Complete |
 | R175 | Phase 68 | Complete |
-| R176 | Phase 68 | Pending |
+| R176 | Phase 68 | Complete |
 | R177 | Phase 68 | Complete |
 | R178 | Phase 68 | Complete |
 | R179 | Phase 68 | Complete |
