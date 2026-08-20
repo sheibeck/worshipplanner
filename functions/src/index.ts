@@ -28,7 +28,7 @@ import {
   type RoleGroup,
   type RecipientSelection,
 } from "./serviceRoles";
-import { getAppConfig, type AppConfig } from "./appConfig";
+import { getAppConfig, DEFAULT_APP_CONFIG, type AppConfig } from "./appConfig";
 
 // Server-held secrets (Google Secret Manager). Set once with:
 //   firebase functions:secrets:set CLAUDE_API_KEY
@@ -545,13 +545,27 @@ export const api = onRequest(
     // ONLY. esv/nlt/planningcenter fall straight through to the existing
     // fetch below with `outboundBody` left as `req.body`, byte-unchanged.
     let outboundBody: unknown = req.body;
-    // Cached form (no {fresh:true}) -- the api handler is a hot request path
-    // (R183); getFirestore() is already called later in this same handler
-    // (checkAndConsumeRateLimit/writeUsageLedger), so this is no new
-    // Firestore dependency class, only an additional cached read.
-    const config = await getAppConfig(getFirestore());
-    const aiLimits = readAiProxyLimits(config);
     if (service === "anthropic") {
+      // Cached form (no {fresh:true}) -- the api handler is a hot request
+      // path (R183); getFirestore() is already called later in this same
+      // handler (checkAndConsumeRateLimit/writeUsageLedger), so this is no
+      // new Firestore dependency class, only an additional cached read.
+      // Scoped to the anthropic branch only (review WR-01): esv/nlt/
+      // planningcenter have no relationship to AI cost controls and must
+      // stay Firestore-independent, exactly as before this phase. The read
+      // itself is fail-open (same guardrail-not-security-control rationale
+      // as the rate limiter below): a Firestore hiccup degrades the
+      // anthropic route to DEFAULT_APP_CONFIG's limits rather than failing
+      // the request outright.
+      let config: AppConfig = DEFAULT_APP_CONFIG;
+      try {
+        config = await getAppConfig(getFirestore());
+      } catch (configErr) {
+        console.warn("[api] appConfig read failed; failing open to defaults:", {
+          message: configErr instanceof Error ? configErr.message : String(configErr),
+        });
+      }
+      const aiLimits = readAiProxyLimits(config);
       const enforcement = enforceModelAndTokens(req.body, aiLimits);
       if (!enforcement.ok) {
         res.status(enforcement.status).json(enforcement.error);

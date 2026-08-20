@@ -3976,6 +3976,59 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
   });
+
+  it("WR-01 (69-REVIEW.md): a non-anthropic service (esv) never calls getAppConfig, and succeeds even if getAppConfig would reject", async () => {
+    // Proves the fix: getAppConfig() is now scoped inside the `service ===
+    // "anthropic"` branch, so esv/nlt/planningcenter stay Firestore-
+    // independent exactly as they were before this phase. Rejecting the
+    // mock (rather than merely asserting "not called") would surface a
+    // regression even if some other code path started awaiting it.
+    vi.mocked(getAppConfig).mockRejectedValue(new Error("appConfig Firestore read boom"));
+    fetchMock.mockResolvedValue({
+      status: 200,
+      headers: { get: () => "application/json" },
+      text: async () => JSON.stringify({ passages: ["In the beginning..."] }),
+    });
+    const req = {
+      path: "/api/esv/v1/passage/text/",
+      originalUrl: "/api/esv/v1/passage/text/?q=John+1",
+      method: "GET",
+      headers: { "x-app-auth": "valid-token" },
+      body: undefined,
+    };
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(getAppConfig).not.toHaveBeenCalled();
+    expect(getFirestore).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("WR-01 (69-REVIEW.md): the anthropic branch fails OPEN to DEFAULT_APP_CONFIG when getAppConfig rejects, instead of the request failing", async () => {
+    const { db } = mockCombinedDb();
+    vi.mocked(getFirestore).mockReturnValue(db);
+    vi.mocked(getAppConfig).mockRejectedValueOnce(new Error("appConfig Firestore read boom"));
+    fetchMock.mockResolvedValue({
+      status: 200,
+      headers: { get: () => "application/json" },
+      text: async () => JSON.stringify({ usage: { input_tokens: 1, output_tokens: 1 } }),
+    });
+    const req = fakeReq({
+      model: ALLOWED_MODEL,
+      max_tokens: 100,
+      messages: [{ role: "user", content: "hi" }],
+    });
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    // Degrades to DEFAULT_APP_CONFIG's allowed-model list rather than
+    // erroring -- the model is still allowed, and the request completes.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
 });
 
 // --- sendQueuedMessage send trigger (59-03: R131/R138/R139) --------------
