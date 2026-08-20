@@ -138,6 +138,32 @@ describe('AiProxyConfigCard', () => {
     expect(wrapper.text()).toContain('Enter at least one model.')
   })
 
+  it('proactively disables Save the moment allowedModels parses to zero models, BEFORE any click (UI-1)', async () => {
+    const wrapper = mountCard()
+    const textFields = wrapper.findAllComponents(ConfigTextField)
+    const allowedModelsField = textFields[0]!
+    // Effectively-empty comma list per the UI-review finding — button must
+    // be disabled and the reason visible pre-click, not just post-click.
+    await allowedModelsField.find('input').setValue(',,,')
+    expect(allowedModelsField.find('button').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Enter at least one model.')
+    expect(mockSaveField).not.toHaveBeenCalled()
+  })
+
+  it('dedupes allowedModels on save (IN-01)', async () => {
+    const wrapper = mountCard()
+    const textFields = wrapper.findAllComponents(ConfigTextField)
+    const allowedModelsField = textFields[0]!
+    await allowedModelsField
+      .find('input')
+      .setValue('claude-a, claude-a, claude-b')
+    await allowedModelsField.find('button').trigger('click')
+    expect(mockSaveField).toHaveBeenCalledWith('aiProxy.allowedModels', [
+      'claude-a',
+      'claude-b',
+    ])
+  })
+
   it('shows the (default) badge only for fields absent from the raw doc (default badge)', () => {
     setStore(cloneDefaults(), { aiProxy: { rateLimitPerMin: 50 } })
     const wrapper = mountCard()

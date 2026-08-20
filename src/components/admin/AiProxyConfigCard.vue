@@ -40,8 +40,10 @@
       <ConfigTextField
         label="Allowed models (comma-separated)"
         :model-value="allowedModelsText"
+        @update:model-value="allowedModelsLive = $event"
         :required="true"
         :is-default="!isExplicitlySet(store.rawDoc, 'aiProxy.allowedModels')"
+        :valid="allowedModelsValid"
         :saving="stateFor('aiProxy.allowedModels').saving"
         :saved="stateFor('aiProxy.allowedModels').saved"
         :save-error="stateFor('aiProxy.allowedModels').error"
@@ -159,21 +161,50 @@ const rateLimitPerMinCrossFieldError = computed<string | null>(() => {
   return null
 })
 
-// ── allowedModels: one comma-separated text field, split/trim/filter on save ──
+// ── allowedModels: one comma-separated text field, split/trim/dedupe/filter ──
 const allowedModelsText = computed(() => store.resolvedConfig.aiProxy.allowedModels.join(', '))
-const allowedModelsError = ref<string | null>(null)
+
+// IN-01: de-duplicate parsed models so the console never itself creates
+// duplicate allow-list entries (harmless downstream, but stored-data
+// hygiene noise this component controls).
+function parseAllowedModels(rawInput: string): string[] {
+  return [
+    ...new Set(
+      rawInput
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    ),
+  ]
+}
+
+// UI-1 (UI-review top finding): the parsed model list is recomputed
+// reactively from the LIVE edited text (mirroring the rateLimitPerDayLive /
+// fromAddressLive pattern already used for this card's other cross-field-
+// shaped checks) and fed into ConfigTextField's `valid` prop, so Save is
+// DISABLED the moment the input parses to zero models (e.g. ",,," or a
+// lone trailing comma) — not only after a click, per the UI-SPEC's "an
+// owner sees why Save is disabled, not just that it is" contract.
+const allowedModelsLive = ref(allowedModelsText.value)
+watch(allowedModelsText, (v) => {
+  allowedModelsLive.value = v
+})
+
+const allowedModelsParsedLive = computed(() => parseAllowedModels(allowedModelsLive.value))
+const allowedModelsValid = computed(() => allowedModelsParsedLive.value.length > 0)
+const allowedModelsError = computed<string | null>(() =>
+  allowedModelsValid.value ? null : 'Enter at least one model.',
+)
 
 async function onSaveAllowedModels(rawInput: string): Promise<void> {
-  const parsed = rawInput
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
+  const parsed = parseAllowedModels(rawInput)
 
   if (parsed.length === 0) {
-    allowedModelsError.value = 'Enter at least one model.'
+    // Defense in depth only — unreachable via the UI once `valid` gates
+    // ConfigTextField's own Save-disabled state above, but keeps this
+    // function safe against a direct/programmatic `save` emit.
     return
   }
-  allowedModelsError.value = null
 
   const state = stateFor('aiProxy.allowedModels')
   state.error = null
