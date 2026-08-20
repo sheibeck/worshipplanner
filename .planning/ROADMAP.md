@@ -231,10 +231,10 @@ with the exact deploy command handed to the owner.
   3. Every proxied Claude request records a usage entry (caller uid + org, model, input/output token counts, timestamp) to a queryable ledger, so per-user/per-org token spend is observable inside the app (R163).
   4. The `api` proxy function runs under an explicit `maxInstances` ceiling, so a traffic spike or abuse cannot fan it out without bound (R164).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 - [x] 65-01-proxy-cost-controls-PLAN.md — rate limiter (R161), model allow-list + max_tokens clamp (R162), usage ledger (R163), maxInstances cap (R164) — all on the anthropic branch of `functions/src/index.ts`; autonomous `firebase deploy --only functions:api`
-- [ ] 65-02-ledger-access-hardening-PLAN.md — client 429/400 graceful-surface regression guard + owner-gated firestore.rules deny for aiUsage/aiRateLimits (built + tested, UNDEPLOYED)
+- [x] 65-02-ledger-access-hardening-PLAN.md — client 429/400 graceful-surface regression guard + owner-gated firestore.rules deny for aiUsage/aiRateLimits (built + tested, UNDEPLOYED)
 
 **Deploy**: All four controls are bounded/reversible config → deploy autonomously per the v1.8 grant. The 65-02 firestore.rules deny is owner-gated (UNDEPLOYED; owner runs `firebase deploy --only firestore:rules`) and no success criterion depends on it.
 
@@ -280,7 +280,7 @@ with the exact deploy command handed to the owner.
 | 39-50 | v1.5 | all | Complete (archived) | 2026-08-10 |
 | 51-57 | v1.6 | 19/19 | Complete (archived) | 2026-08-12 |
 | 58-64 | v1.7 | 25/25 | Complete (archived) | 2026-08-18 |
-| 65 | v1.8 | 1/2 | In Progress|  |
+| 65 | v1.8 | 2/2 | In Progress|  |
 | 66 | v1.8 | 0/TBD | Not started | - |
 | 67 | v1.8 | 0/TBD | Not started | - |
 

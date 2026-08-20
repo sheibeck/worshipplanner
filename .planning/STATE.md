@@ -4,17 +4,17 @@ milestone: v1.8
 milestone_name: Cost & Billing Hardening
 current_phase: 65
 current_phase_name: AI Proxy Cost Controls
-status: executing
-stopped_at: Completed 65-01-proxy-cost-controls-PLAN.md
-last_updated: "2026-08-20T03:22:53.060Z"
+status: verifying
+stopped_at: Completed 65-02-ledger-access-hardening-PLAN.md
+last_updated: "2026-08-20T03:48:27.495Z"
 last_activity: 2026-08-19
 last_activity_desc: Phase 65 execution started
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 0
-  percent: 0
+  completed_plans: 2
+  percent: 33
 ---
 
 # ▶ ACTIVE MILESTONE — v1.8 Cost & Billing Hardening (started 2026-08-19)
@@ -22,7 +22,7 @@ progress:
 **Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
 predictable. Phases 65+ (continuing numbering from v1.7's 58–64). Requirements R161+ in REQUIREMENTS.md.
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 Five confirmed exposures (investigation 2026-08-19, `functions/src/index.ts` unless noted):
 
@@ -532,7 +532,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 65 (AI Proxy Cost Controls) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-19 — Phase 65 execution started
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
@@ -2077,6 +2077,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 64 P01 | 7 min | 1 tasks | 5 files |
 | Phase 64 P03 | 13 min | 2 tasks | 2 files |
 | Phase 65 P01 | 55min | 3 tasks | 2 files |
+| Phase 65 P02 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2437,6 +2438,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 60]: 60-01: verify Svix webhook signatures manually with node:crypto (no svix package); REPLAY_TOLERANCE_SEC=300 tagged confirm-against-real-event; recipients.providerMessageId collection-group index ships UNDEPLOYED (owner deploy).
 - [Phase ?]: aiUsage/aiRateLimits kept top-level (not nested under organizations/{orgId}) so the firestore.rules catch-all deny blocks client reads with zero rules change
 - [Phase ?]: Rate limiter fails OPEN on its own Firestore error (cost guardrail, not security control) — a datastore hiccup never takes AI down
+- [Phase ?]: logAiProxyError classifies proxy 429/400 by err.status structurally (console.warn) vs generic failure (console.error), added to the existing src/utils/__tests__/claudeApi.test.ts per repo convention
+- [Phase ?]: firestore.rules aiUsage/aiRateLimits deny blocks committed but NOT deployed (owner-gated per v1.8 grant); firebase deploy --only firestore:rules handed to owner
 
 ### Roadmap Evolution
 
@@ -2756,8 +2759,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T03:22:53.006Z
-Stopped at: Completed 65-01-proxy-cost-controls-PLAN.md
+Last session: 2026-08-20T03:48:27.445Z
+Stopped at: Completed 65-02-ledger-access-hardening-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
