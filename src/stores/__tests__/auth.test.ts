@@ -750,6 +750,112 @@ describe('useAuthStore', () => {
     })
   })
 
+  // ── 68-04 (R177) ──────────────────────────────────────────────────────────────
+  // isSuperAdmin is read from the SAME getIdTokenResult call refreshOrgClaim
+  // already performs — no second Firestore/Auth round-trip. These tests assert
+  // the claim value flows through, not just that a refresh happened.
+  describe('isSuperAdmin (R177)', () => {
+    it('defaults to false before any auth state change', async () => {
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      expect(store.isSuperAdmin).toBe(false)
+    })
+
+    it('becomes true when the refreshed token carries claims.superAdmin === true', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
+        claims: { orgId: 'org-1', superAdmin: true },
+      } as never)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.isSuperAdmin).toBe(true)
+    })
+
+    it('stays false when the refreshed token has no superAdmin claim', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
+        claims: { orgId: 'org-1' },
+      } as never)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.isSuperAdmin).toBe(false)
+    })
+
+    it('resets to false on logout', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
+        claims: { orgId: 'org-1', superAdmin: true },
+      } as never)
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.isSuperAdmin).toBe(true)
+
+      await store.logout()
+      expect(store.isSuperAdmin).toBe(false)
+    })
+
+    it('resets to false when onAuthStateChanged fires with no user (sign-out event)', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
+        claims: { orgId: 'org-1', superAdmin: true },
+      } as never)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.isSuperAdmin).toBe(true)
+
+      await triggerAuthStateChange(null)
+      expect(store.isSuperAdmin).toBe(false)
+    })
+  })
+
+  // ── 68-04 (R177, Pitfall 4) ──────────────────────────────────────────────────
+  // refreshSuperAdminClaim is the router guard's dedicated force-refresh action —
+  // distinct from refreshOrgClaim's org-scoped retry loop.
+  describe('refreshSuperAdminClaim (R177, Pitfall 4)', () => {
+    it('forces a fresh getIdTokenResult read and sets isSuperAdmin from it', async () => {
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
+        claims: { superAdmin: true },
+      } as never)
+
+      await store.refreshSuperAdminClaim()
+
+      expect(getIdTokenResult).toHaveBeenCalledWith(mockUser, true)
+      expect(store.isSuperAdmin).toBe(true)
+    })
+
+    it('sets isSuperAdmin to false when there is no signed-in user', async () => {
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await store.refreshSuperAdminClaim()
+      expect(store.isSuperAdmin).toBe(false)
+    })
+
+    it('a throwing refresh is logged and swallowed, leaving isSuperAdmin unchanged', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      vi.mocked(getIdTokenResult).mockRejectedValueOnce(new Error('token refresh boom'))
+
+      await store.refreshSuperAdminClaim()
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[auth] refreshSuperAdminClaim:',
+        expect.any(Error),
+      )
+      expect(store.isSuperAdmin).toBe(false)
+      consoleErrorSpy.mockRestore()
+    })
+  })
+
   describe('ensureUserDocument membershipCreated reporting (P-01)', () => {
     it('reports membershipCreated true on the invite-acceptance path', async () => {
       vi.mocked(doc).mockImplementation(

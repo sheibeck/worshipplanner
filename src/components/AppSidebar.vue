@@ -159,6 +159,20 @@ const navItems = computed(() => {
     })
   }
 
+  // Group D: Owner Console — platform-level, super-admin-only (R177). Separated
+  // from Group C's per-org "Admins"/"Settings" to make clear this is a
+  // different, higher-privilege surface, not a per-org role.
+  if (authStore.isSuperAdmin) {
+    items.push({
+      label: 'Owner Console',
+      to: '/owner-console',
+      separatorBefore: true,
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>`,
+    })
+  }
+
   return items
 })
 

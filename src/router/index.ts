@@ -6,6 +6,7 @@ declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
     requiresEditor?: boolean
+    requiresSuperAdmin?: boolean
   }
 }
 
@@ -75,6 +76,14 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresEditor: true },
     },
     {
+      // R177 — deliberately NOT /admins (owned by TeamView.vue, per-org roles).
+      // This is the platform-level, super-admin-only console.
+      path: '/owner-console',
+      name: 'owner-console',
+      component: () => import('../views/OwnerConsoleView.vue'),
+      meta: { requiresAuth: true, requiresSuperAdmin: true },
+    },
+    {
       path: '/share/:token',
       name: 'share',
       component: () => import('../views/ShareView.vue'),
@@ -119,6 +128,20 @@ router.beforeEach(async (to) => {
     const authStore = useAuthStore()
     await authStore.waitForRole()
     if (!authStore.isEditor) {
+      return { name: 'services' }
+    }
+  }
+
+  if (to.meta.requiresSuperAdmin) {
+    // R177 (Pitfall 4) — force a fresh claim read BEFORE deciding to redirect,
+    // so a just-granted super-admin's very next navigation sees it rather than
+    // waiting out the token's normal refresh cadence. Convenience gate only —
+    // the real enforcement is firestore.rules' isSuperAdmin() + the
+    // setSuperAdminClaim onCall's server-side caller re-check.
+    const { useAuthStore } = await import('../stores/auth')
+    const authStore = useAuthStore()
+    await authStore.refreshSuperAdminClaim()
+    if (!authStore.isSuperAdmin) {
       return { name: 'services' }
     }
   }

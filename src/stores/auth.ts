@@ -52,6 +52,13 @@ export const useAuthStore = defineStore('auth', () => {
   const orgSlug = ref<string | null>(null)
   const userRole = ref<'editor' | 'viewer' | null>(null)
 
+  // R177 — platform-level super-admin flag, read from the SAME decoded
+  // getIdTokenResult claims as orgId/role (no extra Firestore round-trip).
+  // Convenience only: the enforced boundary is firestore.rules' isSuperAdmin()
+  // (Plan 03) + the setSuperAdminClaim onCall's server-side caller re-check
+  // (Plan 02) — this flag must never be treated as access control on its own.
+  const isSuperAdmin = ref(false)
+
   // Planning Center credential state
   const pcAppId = ref<string | null>(null)
   const pcSecret = ref<string | null>(null)
@@ -136,6 +143,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const result = await getIdTokenResult(currentUser, true)
+        isSuperAdmin.value = result.claims.superAdmin === true
         if (result.claims.orgId === targetOrgId) {
           return
         }
@@ -145,6 +153,26 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch (err) {
       console.error('[auth] refreshOrgClaim:', err)
+    }
+  }
+
+  // R177 (Pitfall 4) — forces a single getIdTokenResult(user, true) read and
+  // updates isSuperAdmin from it. Used by the requiresSuperAdmin route guard
+  // so a just-granted super-admin's next navigation picks up the fresh claim
+  // instead of relying on the token's normal hourly refresh cadence. Never
+  // throws: a failed refresh just leaves isSuperAdmin at its last known
+  // value, and the guard's redirect-on-false still applies safely.
+  async function refreshSuperAdminClaim(): Promise<void> {
+    const currentUser = user.value
+    if (!currentUser) {
+      isSuperAdmin.value = false
+      return
+    }
+    try {
+      const result = await getIdTokenResult(currentUser, true)
+      isSuperAdmin.value = result.claims.superAdmin === true
+    } catch (err) {
+      console.error('[auth] refreshSuperAdminClaim:', err)
     }
   }
 
@@ -310,6 +338,7 @@ export const useAuthStore = defineStore('auth', () => {
       orgName.value = null
       orgSlug.value = null
       userRole.value = null
+      isSuperAdmin.value = false
       vwModeEnabled.value = true
       settings.value = { ...DEFAULT_ORG_SETTINGS }
       memberUnsub?.()
@@ -476,6 +505,7 @@ export const useAuthStore = defineStore('auth', () => {
     orgName.value = null
     orgSlug.value = null
     userRole.value = null
+    isSuperAdmin.value = false
     pcAppId.value = null
     pcSecret.value = null
     vwModeEnabled.value = true
@@ -502,6 +532,8 @@ export const useAuthStore = defineStore('auth', () => {
     orgSlug,
     userRole,
     isEditor,
+    isSuperAdmin,
+    refreshSuperAdminClaim,
     waitForRole,
     loginWithGoogle,
     loginWithEmail,
