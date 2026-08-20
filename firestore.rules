@@ -25,6 +25,20 @@ service cloud.firestore {
         get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('role', '') in ['editor', 'admin'];
     }
 
+    // Phase 68 (R178): super-admin gate. Deliberately CLAIM-ONLY — NO
+    // get()/exists() cross-document lookup — unlike isOrgMember/isOrgEditor
+    // above. This repo has a documented production incident (CLAUDE.md,
+    // 2026-08-06) where a cross-document/cross-service rules lookup produced
+    // a deny-everyone outage on storage.rules; isSuperAdmin() avoids that
+    // fragility class entirely by reading only the request's own auth token.
+    // `superAdmin` is a wholly separate top-level boolean claim — it never
+    // reuses `role` or the string "admin" from isOrgEditor's per-org role
+    // normalization above, so an org 'editor'/'admin' role claim can never
+    // satisfy this check (naming-collision guard, proven in src/rules.test.ts).
+    function isSuperAdmin() {
+      return request.auth != null && request.auth.token.superAdmin == true;
+    }
+
     // User profiles - only the owner can read/write their own profile
     match /users/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
@@ -449,6 +463,26 @@ service cloud.firestore {
     // owner-gated/UNDEPLOYED status as the aiUsage block above.
     match /aiRateLimits/{docId} {
       allow read, write: if false;
+    }
+
+    // appConfig — Phase 68 Plan 03 (R178): RULES ONLY. This block gates the
+    // collection to super-admins; it does NOT define or validate the doc's
+    // contents/schema — that belongs to appConfig/global's managed values
+    // and the Cloud Functions that read it at runtime (Phase 69). No doc is
+    // written by this plan.
+    match /appConfig/{docId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // superAdmins — Phase 68 Plan 03 (R178): document existence = granted
+    // (source of truth for the `superAdmin` custom claim; syncSuperAdminClaim,
+    // Plan 02, mirrors that claim off writes here via the Admin SDK, which
+    // bypasses these rules entirely). Client read/write gated to existing
+    // super-admins only — the setSuperAdminClaim onCall (Plan 02) re-checks
+    // the caller server-side before writing, so this rule is defense-in-depth
+    // for direct client SDK access, not the only guard.
+    match /superAdmins/{uid} {
+      allow read, write: if isSuperAdmin();
     }
 
     // Catch-all: deny everything else
