@@ -44,6 +44,11 @@ describe('ConfigTextField', () => {
     expect(wrapper.emitted('save')![0]).toEqual(['owner@church.org'])
   })
 
+  it('does not appear dirty on mount when the stored value carries incidental whitespace (IN-03)', () => {
+    const wrapper = mountField({ modelValue: '  onboarding@resend.dev  ' })
+    expect(wrapper.find('button').attributes('disabled')).toBeDefined()
+  })
+
   it('disables Save when a value over maxLength is entered', async () => {
     const wrapper = mountField({ label: 'Display name', modelValue: '', required: false, maxLength: 10 })
     await wrapper.find('input').setValue('this is way too long')

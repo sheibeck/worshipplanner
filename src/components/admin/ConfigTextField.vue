@@ -97,7 +97,12 @@ const ownError = computed<string | null>(() => {
   return null
 })
 
-const isDirty = computed(() => trimmed.value !== props.modelValue)
+// IN-03: compare trimmed-to-trimmed. Comparing the trimmed local input
+// against the RAW (untrimmed) prop meant a stored value carrying incidental
+// whitespace (a direct Firestore console edit, a migration, etc.) rendered
+// the field as dirty — Save enabled — the instant it mounted, before the
+// owner typed anything.
+const isDirty = computed(() => trimmed.value !== props.modelValue.trim())
 
 const isSaveDisabled = computed(
   () => ownError.value !== null || !props.valid || !isDirty.value || props.saving,
