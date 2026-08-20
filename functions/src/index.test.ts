@@ -911,11 +911,15 @@ describe("cleanupOrphanRendersHandler", () => {
 
   interface FakeRenderedObject {
     name: string;
+    metadata: { size: number };
     delete: ReturnType<typeof vi.fn>;
   }
 
-  function fakeRenderedObject(name: string): FakeRenderedObject {
-    return { name, delete: vi.fn(async () => undefined) };
+  // sizeBytes defaults to a fixed value so every pre-existing call site
+  // (which never passes a second arg) keeps working unchanged -- only the
+  // new 66-01 byte-observability/cap tests below pass an explicit size.
+  function fakeRenderedObject(name: string, sizeBytes = 1000): FakeRenderedObject {
+    return { name, metadata: { size: sizeBytes }, delete: vi.fn(async () => undefined) };
   }
 
   function mockOrphanBucket(files: FakeRenderedObject[]) {
@@ -930,6 +934,7 @@ describe("cleanupOrphanRendersHandler", () => {
     vi.mocked(getFirestore).mockReset();
     vi.mocked(getStorage).mockReset();
     delete process.env.PPTX_RENDER_CLEANUP_ENABLED;
+    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
   });
 
   it("deletes both rendered objects and the doc when explicitly enabled", async () => {
@@ -946,6 +951,75 @@ describe("cleanupOrphanRendersHandler", () => {
     expect(obj2.delete).toHaveBeenCalledTimes(1);
     expect(stale.ref.delete).toHaveBeenCalledTimes(1);
     expect(summary).toMatchObject({ dryRun: false, deletedDocCount: 1, deletedObjectCount: 2 });
+  });
+
+  it("R166/T-66-01-04: reports deletedBytes for a LIVE run summing known rendered-object sizes, and dry-run reports the same total", async () => {
+    const SIZE_1 = 11111;
+    const SIZE_2 = 22222;
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const obj1 = fakeRenderedObject(
+      `orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`,
+      SIZE_1,
+    );
+    const obj2 = fakeRenderedObject(
+      `orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0002.png`,
+      SIZE_2,
+    );
+    mockOrphanBucket([obj1, obj2]);
+
+    const dryRunSummary = await cleanupOrphanRendersHandler();
+    expect(dryRunSummary).toMatchObject({ dryRun: true, deletedBytes: SIZE_1 + SIZE_2 });
+
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    const liveSummary = await cleanupOrphanRendersHandler();
+    expect(obj1.delete).toHaveBeenCalledTimes(1);
+    expect(obj2.delete).toHaveBeenCalledTimes(1);
+    expect(liveSummary).toMatchObject({ dryRun: false, deletedBytes: SIZE_1 + SIZE_2 });
+  });
+
+  it("T-66-01-02: a per-run delete cap bounds a LIVE run within a single doc -- exactly one object delete() call, cappedByLimit=true, the doc itself is not removed", async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    const obj2 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0002.png`);
+    mockOrphanBucket([obj1, obj2]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    const totalDeleteCalls =
+      (obj1.delete as ReturnType<typeof vi.fn>).mock.calls.length +
+      (obj2.delete as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(totalDeleteCalls).toBe(1);
+    expect(stale.ref.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({
+      dryRun: false,
+      deletedObjectCount: 1,
+      deletedDocCount: 0,
+      cappedByLimit: true,
+    });
+  });
+
+  it("T-66-01-02: the delete cap does NOT truncate a dry-run -- the full would-delete object count is still reported", async () => {
+    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    const obj2 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0002.png`);
+    mockOrphanBucket([obj1, obj2]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(obj2.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({
+      dryRun: true,
+      deletedObjectCount: 2,
+      deletedDocCount: 1,
+      cappedByLimit: false,
+    });
   });
 
   it("FAILS SAFE: unset PPTX_RENDER_CLEANUP_ENABLED deletes nothing, even for a stale failed doc with rendered objects", async () => {
