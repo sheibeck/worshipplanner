@@ -30,6 +30,14 @@ describe('ConfigNumberField', () => {
     expect(withBadge.text()).toContain('(default)')
   })
 
+  it('shows "This field is required." (not a min-bound message) when a required field is emptied (WR-02/IN-02)', async () => {
+    const wrapper = mountField()
+    await wrapper.find('input').setValue('')
+    expect(wrapper.text()).toContain('This field is required.')
+    expect(wrapper.text()).not.toContain('Must be at least 1.')
+    expect(wrapper.find('button').attributes('disabled')).toBeDefined()
+  })
+
   it('shows an inline error and disables Save when the value is below min', async () => {
     const wrapper = mountField()
     await wrapper.find('input').setValue(0)
