@@ -111,6 +111,33 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
+  // WR-03 (68-REVIEW.md) — the requiresSuperAdmin router guard read
+  // authStore.user without waiting for the store's own onAuthStateChanged
+  // listener to have populated it, unlike requiresEditor's waitForRole()
+  // above. That listener is only registered on the FIRST useAuthStore() call
+  // anywhere in the app (Pinia stores are lazy), so a fresh page-load/reload
+  // directly on a super-admin-only route had an implicit, untested ordering
+  // dependency on when that first call happened to occur. waitForReady()
+  // gives requiresSuperAdmin the same explicit wait shape as waitForRole():
+  // it resolves immediately once isReady is already true, otherwise it waits
+  // for the onAuthStateChanged listener below to flip isReady true (whether
+  // the resolved user is present or null) before the guard proceeds to call
+  // refreshSuperAdminClaim().
+  function waitForReady(): Promise<void> {
+    return new Promise((resolve) => {
+      if (isReady.value) {
+        resolve()
+        return
+      }
+      const unwatch = watch(isReady, (val) => {
+        if (val) {
+          unwatch()
+          resolve()
+        }
+      })
+    })
+  }
+
   // R075 (D-06/D-07) / P-01 — force the custom `orgId`/`role` claim (set by
   // functions/src/orgMembershipClaims.ts's syncOrgMembershipClaim trigger)
   // onto the active session's ID token so a member does not wait out a full
@@ -535,6 +562,7 @@ export const useAuthStore = defineStore('auth', () => {
     isSuperAdmin,
     refreshSuperAdminClaim,
     waitForRole,
+    waitForReady,
     loginWithGoogle,
     loginWithEmail,
     registerWithEmail,

@@ -856,6 +856,46 @@ describe('useAuthStore', () => {
     })
   })
 
+  // ── 68-REVIEW.md WR-03 ────────────────────────────────────────────────────
+  // waitForReady mirrors waitForRole's wait shape but gates on isReady rather
+  // than userRole, giving the requiresSuperAdmin router guard the same
+  // explicit "don't read user state before it's populated" guarantee
+  // requiresEditor's waitForRole already has.
+  describe('waitForReady (WR-03, 68-REVIEW.md)', () => {
+    it('resolves immediately when isReady is already true', async () => {
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(null)
+      expect(store.isReady).toBe(true)
+
+      let resolved = false
+      await store.waitForReady().then(() => {
+        resolved = true
+      })
+      expect(resolved).toBe(true)
+    })
+
+    it('waits until isReady becomes true before resolving', async () => {
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      expect(store.isReady).toBe(false)
+
+      let resolved = false
+      const waitPromise = store.waitForReady().then(() => {
+        resolved = true
+      })
+
+      // Not yet resolved -- onAuthStateChanged has not fired.
+      await Promise.resolve()
+      expect(resolved).toBe(false)
+
+      await triggerAuthStateChange(mockUser)
+      await waitPromise
+      expect(resolved).toBe(true)
+      expect(store.isReady).toBe(true)
+    })
+  })
+
   describe('ensureUserDocument membershipCreated reporting (P-01)', () => {
     it('reports membershipCreated true on the invite-acceptance path', async () => {
       vi.mocked(doc).mockImplementation(
