@@ -82,13 +82,30 @@ gcloud run deploy pptx-render \
   --timeout=300 \
   --concurrency=1 \
   --min-instances=0 \
-  --max-instances=5 \
+  --max-instances=3 \
   --set-env-vars=STORAGE_BUCKET=PROJECT_ID.firebasestorage.app \
   --project=PROJECT_ID
 ```
 
 `--source=./render-service` builds the `Dockerfile` via Cloud Build — no local Docker daemon is
 required on the owner's machine.
+
+> ### R173 (v1.8, phase 67) — explicit instance/concurrency ceilings, and why concurrency stayed at 1
+>
+> `--max-instances` is now pinned at **3** (down from the prior starting cap of 5) — the R173 /
+> ROADMAP SC4 cost ceiling: bound worst-case billable LibreOffice containers under a burst of PPTX
+> imports, deliberately tighter than the original untested guess.
+>
+> 67-CONTEXT.md (phase 67) floated a `--concurrency` default of **4** as part of the same
+> guardrail sweep. **This file deliberately keeps `--concurrency=1`, not 4.** The rationale
+> documented below under "Every flag explained" — LibreOffice's shared-profile-lock making
+> concurrent conversions on ONE instance unreliable — predates this phase and still applies
+> unchanged: raising concurrency risks silent render corruption/failure from two `soffice
+> --headless` processes fighting over the same profile lock inside one container. Parallelism
+> under a burst comes from Cloud Run scaling OUT to more instances (now capped at 3), never from
+> letting one instance handle multiple renders at once. This satisfies R173's requirement for an
+> "explicit and appropriate `--concurrency` ceiling" — appropriate here means confirming 1,
+> not raising it.
 
 ### Every flag explained
 
@@ -101,9 +118,9 @@ required on the owner's machine.
 | `--memory=2Gi` | starting point, **NOT empirically validated** | LibreOffice is memory-hungry. 2Gi is a reasonable starting point per general LibreOffice-in-container guidance, but this was never validated against a real render because that requires deploying. Watch Cloud Run's memory metrics after the first real decks and adjust. |
 | `--cpu=2` | starting point, **NOT empirically validated** | Conversion is CPU-bound; 2 vCPU balances speed against per-render cost, same caveat as memory |
 | `--timeout=300` | 5 minutes | Sits above the render code's own internal timeouts (`soffice`: 180s, `pdftoppm`: 120s — `render-service/src/render.ts`'s `SOFFICE_TIMEOUT_MS`/`PDFTOPPM_TIMEOUT_MS`) and well under Cloud Run's platform maximum (3600s) |
-| `--concurrency=1` | deliberately serialized | LibreOffice's shared-profile-lock behavior makes concurrent conversions on ONE instance unreliable (a `soffice --headless` process bootstraps a per-profile lock file). Parallelism comes from Cloud Run scaling OUT to more instances, never from raising this value. |
+| `--concurrency=1` | deliberately serialized — **R173 (v1.8): kept at 1, not the 4 floated in 67-CONTEXT.md** | LibreOffice's shared-profile-lock behavior makes concurrent conversions on ONE instance unreliable (a `soffice --headless` process bootstraps a per-profile lock file). Parallelism comes from Cloud Run scaling OUT to more instances (bounded by `--max-instances`), never from raising this value. |
 | `--min-instances=0` | scale-to-zero | Low-frequency async workload — one render per PPTX import. No reason to pay for an always-warm instance. |
-| `--max-instances=5` | starting cap | Bounds worst-case cost from a burst of imports; raise if real usage patterns justify it |
+| `--max-instances=3` | **R173 (v1.8) cost ceiling** — tightened from the original starting cap of 5 | Bounds worst-case cost from a burst of imports; the explicit ceiling required by R173/ROADMAP SC4. Raise only if real usage patterns justify it. |
 | `--set-env-vars=STORAGE_BUCKET=...` | the project's default bucket name | See "Required environment variables" below — this is **required**, the container will throw on its first render request without it |
 | `--project` | `PROJECT_ID` | Explicit project targeting |
 
@@ -216,8 +233,8 @@ item in `.planning/PENDING-VERIFICATION.md`'s `## Phase 37` section (items 37.1�
   60-metric-compat-aliases.conf` ships the alias mapping for exactly this reason, but it has
   never been exercised against real LibreOffice at render time.
 - **Real cost and latency** across several decks — cold starts likely dominate given
-  `--min-instances=0`. Revisit `--memory=2Gi`, `--cpu=2`, and `--max-instances=5` against the
-  observed numbers.
+  `--min-instances=0`. Revisit `--memory=2Gi`, `--cpu=2`, and `--max-instances=3` (the R173 v1.8
+  ceiling) against the observed numbers.
 
 Do not execute any command in this file, and do not create any GCP resource, until the owner has
 reviewed this file and made the deploy decision.
