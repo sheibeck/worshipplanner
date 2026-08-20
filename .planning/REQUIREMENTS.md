@@ -68,10 +68,10 @@ REQ-IDs continue from v1.8 (last R173).
 
 ### Admin console UI
 
-- [ ] **R186**: The console shows the current effective value of every managed setting, grouped by area
+- [x] **R186**: The console shows the current effective value of every managed setting, grouped by area
       (cleanup, AI proxy, messaging, sender), each with a last-changed-by / last-changed-at stamp.
 
-- [ ] **R187**: A super-admin can edit each managed toggle/number/text setting inline with min/max/required
+- [x] **R187**: A super-admin can edit each managed toggle/number/text setting inline with min/max/required
       validation, and saving writes the change to `appConfig/global` (validation client-side and enforced by
       rules/functions).
 
@@ -152,8 +152,8 @@ REQ-IDs continue from v1.8 (last R173).
 | R183 | Phase 69 | Complete (UAT deferred) |
 | R184 | Phase 69 | Complete (UAT deferred) |
 | R185 | Phase 69 | Complete (UAT deferred) |
-| R186 | Phase 70 | Pending |
-| R187 | Phase 70 | Pending |
+| R186 | Phase 70 | Complete |
+| R187 | Phase 70 | Complete |
 | R188 | Phase 71 | Pending |
 | R189 | Phase 71 | Pending |
 | R190 | Phase 71 | Pending |
