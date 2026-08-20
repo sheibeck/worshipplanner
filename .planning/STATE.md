@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Cost & Billing Hardening
-current_phase: 67
-current_phase_name: Fan-out, Cron & Instance Guardrails
-status: verifying
+current_phase: 999.2
+current_phase_name: BACKLOG
+status: planning
 stopped_at: Completed 67-02-render-service-instance-cap-PLAN.md
-last_updated: "2026-08-20T07:34:35.923Z"
+last_updated: "2026-08-20T07:58:28.299Z"
 last_activity: 2026-08-20
-last_activity_desc: Phase 67 execution started
+last_activity_desc: Phase 67 complete, transitioned to Phase 999.2
 progress:
   total_phases: 3
   completed_phases: 3
@@ -22,7 +22,7 @@ progress:
 **Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
 predictable. Phases 65+ (continuing numbering from v1.7's 58–64). Requirements R161+ in REQUIREMENTS.md.
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to plan
 
 Five confirmed exposures (investigation 2026-08-19, `functions/src/index.ts` unless noted):
 
@@ -530,10 +530,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 67 (Fan-out, Cron & Instance Guardrails) — EXECUTING
-Plan: 2 of 2
+Phase: 999.2 — Clearing a song should clear its slides, even when the song is reprised (BACKLOG)
+Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-08-20 — Phase 67 execution started
+Last activity: 2026-08-20 — Phase 67 complete, transitioned to Phase 999.2
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 
