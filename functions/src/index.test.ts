@@ -14,18 +14,22 @@ import {
   cleanupPptxSourcesHandler,
   BACKGROUND_PATH_GUARD,
   BACKGROUND_RETENTION_DAYS,
+  readBackgroundRetentionDays,
   extractBackgroundObjectPath,
   PPTX_SOURCE_GUARD,
   PPTX_SOURCE_RETENTION_DAYS,
+  readPptxSourceRetentionDays,
   sourcePrefixFor,
   createQueuedMessage,
   MEDIA_PATH_GUARD,
   ORPHAN_RENDER_STALE_HOURS,
+  readOrphanRenderStaleHours,
   PROXY_TARGETS,
   queueServiceMessageHandler,
   redactUrl,
   RENDERED_OBJECT_GUARD,
   RETENTION_DAYS,
+  readMediaRetentionDays,
   SECRET_INJECTED,
   parsePptxHandler,
   requestPptxRenderHandler,
@@ -197,6 +201,7 @@ describe("cleanupExpiredMediaHandler", () => {
     delete process.env.MEDIA_CLEANUP_ENABLED;
     delete process.env.MEDIA_CLEANUP_DRY_RUN;
     delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
+    delete process.env.MEDIA_RETENTION_DAYS;
   });
 
   it("deletes a media file older than the retention window when explicitly enabled", async () => {
@@ -366,7 +371,7 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("dry-run mode counts/logs an old media file but calls no delete, and reports deletedObjectCount via the dry-run count", async () => {
-    const old = fakeFile("orgs/orgA/media/m1/old.mp4", 20);
+    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 5);
     mockBucket([old]);
 
     const summary = await cleanupExpiredMediaHandler();
@@ -376,7 +381,7 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("makes no Firestore call -- slide metadata is structurally untouchable", async () => {
-    const old = fakeFile("orgs/orgA/media/m1/old.mp4", 20);
+    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 5);
     mockBucket([old]);
 
     await cleanupExpiredMediaHandler();
@@ -386,7 +391,7 @@ describe("cleanupExpiredMediaHandler", () => {
 
   it("is idempotent by age: a second run against a bucket missing the already-deleted file performs no further deletes", async () => {
     process.env.MEDIA_CLEANUP_ENABLED = "true";
-    const old = fakeFile("orgs/orgA/media/m1/old.mp4", 20);
+    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 5);
     const recent = fakeFile("orgs/orgA/media/m2/new.mp3", 3);
     const { getFiles } = mockBucket([old, recent]);
 
@@ -401,6 +406,56 @@ describe("cleanupExpiredMediaHandler", () => {
 
     expect(recent.delete).not.toHaveBeenCalled();
     expect(secondRun.deletedObjectCount).toBe(0);
+  });
+
+  it("bumped default: RETENTION_DAYS is 30 (was 14) -- MEDIA_RETENTION_DAYS default", () => {
+    expect(RETENTION_DAYS).toBe(30);
+    expect(readMediaRetentionDays()).toBe(30);
+  });
+
+  it("env-tunable: uses the RETENTION_DAYS default (30) when MEDIA_RETENTION_DAYS is unset -- a 29-day-old file is NOT yet eligible, a 31-day-old file IS", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    const tooYoung = fakeFile("orgs/orgA/media/m1/young.mp4", 29);
+    const oldEnough = fakeFile("orgs/orgA/media/m2/old.mp4", 31);
+    mockBucket([tooYoung, oldEnough]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(tooYoung.delete).not.toHaveBeenCalled();
+    expect(oldEnough.delete).toHaveBeenCalledTimes(1);
+    expect(summary.deletedObjectCount).toBe(1);
+  });
+
+  it("env-tunable: MEDIA_RETENTION_DAYS override shrinks the window -- a 6-day-old file becomes eligible under a 5-day override", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    process.env.MEDIA_RETENTION_DAYS = "5";
+    const eligible = fakeFile("orgs/orgA/media/m1/eligible.mp4", 6);
+    const stillFresh = fakeFile("orgs/orgA/media/m2/fresh.mp4", 3);
+    mockBucket([eligible, stillFresh]);
+
+    expect(readMediaRetentionDays()).toBe(5);
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(eligible.delete).toHaveBeenCalledTimes(1);
+    expect(stillFresh.delete).not.toHaveBeenCalled();
+    expect(summary.deletedObjectCount).toBe(1);
+
+    delete process.env.MEDIA_RETENTION_DAYS;
+  });
+
+  it("env-tunable: a blank/non-numeric MEDIA_RETENTION_DAYS falls back to the RETENTION_DAYS default (fail-safe, mirrors readNumericKnob)", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    process.env.MEDIA_RETENTION_DAYS = "not-a-number";
+    const tooYoung = fakeFile("orgs/orgA/media/m1/young.mp4", 29);
+    mockBucket([tooYoung]);
+
+    expect(readMediaRetentionDays()).toBe(RETENTION_DAYS);
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(tooYoung.delete).not.toHaveBeenCalled();
+    expect(summary.deletedObjectCount).toBe(0);
+
+    delete process.env.MEDIA_RETENTION_DAYS;
   });
 });
 
@@ -956,6 +1011,7 @@ describe("cleanupOrphanRendersHandler", () => {
     vi.mocked(getStorage).mockReset();
     delete process.env.PPTX_RENDER_CLEANUP_ENABLED;
     delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
+    delete process.env.ORPHAN_RENDER_STALE_HOURS;
   });
 
   it("deletes both rendered objects and the doc when explicitly enabled", async () => {
@@ -1195,6 +1251,25 @@ describe("cleanupOrphanRendersHandler", () => {
       /const dryRun = process\.env\.PPTX_RENDER_CLEANUP_ENABLED !== "true";/,
     );
   });
+
+  it("env-tunable: default (24h) applies when ORPHAN_RENDER_STALE_HOURS is unset; an override shrinks the window", async () => {
+    expect(readOrphanRenderStaleHours()).toBe(ORPHAN_RENDER_STALE_HOURS);
+
+    process.env.ORPHAN_RENDER_STALE_HOURS = "1";
+    expect(readOrphanRenderStaleHours()).toBe(1);
+
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    const nowStale = fakeOrphanDoc({ status: "failed", ageHours: 2 }); // stale under 1h override, fresh under 24h default
+    mockOrphanDb([nowStale]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([obj1]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(obj1.delete).toHaveBeenCalledTimes(1);
+    expect(nowStale.ref.delete).toHaveBeenCalledTimes(1);
+    expect(summary.deletedObjectCount).toBe(1);
+  });
 });
 
 describe("BACKGROUND_PATH_GUARD", () => {
@@ -1332,6 +1407,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     vi.mocked(getStorage).mockReset();
     delete process.env.BACKGROUND_CLEANUP_ENABLED;
     delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
+    delete process.env.BACKGROUND_RETENTION_DAYS;
   });
 
   it("R167: deletes an aged unreferenced background when explicitly enabled, and never deletes an aged background referenced at the GROUP tier in the same run", async () => {
@@ -1583,6 +1659,28 @@ describe("cleanupOrphanBackgroundsHandler", () => {
       /const dryRun = process\.env\.BACKGROUND_CLEANUP_ENABLED !== "true";/,
     );
   });
+
+  it("env-tunable: default (30d) applies when BACKGROUND_RETENTION_DAYS is unset; an override shrinks the window", async () => {
+    expect(readBackgroundRetentionDays()).toBe(BACKGROUND_RETENTION_DAYS);
+
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    process.env.BACKGROUND_RETENTION_DAYS = "5";
+    expect(readBackgroundRetentionDays()).toBe(5);
+
+    mockBackgroundDb({
+      slideGroups: [
+        slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
+      ],
+    });
+    // 6 days old: stale under the 5-day override, still fresh under the 30-day default.
+    const eligible = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg1/one.png`, 6);
+    mockBackgroundBucket([eligible]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(eligible.delete).toHaveBeenCalledTimes(1);
+    expect(summary).toMatchObject({ dryRun: false, deletedObjectCount: 1, referencesComplete: true });
+  });
 });
 
 describe("cleanupPptxSourcesHandler", () => {
@@ -1656,6 +1754,7 @@ describe("cleanupPptxSourcesHandler", () => {
     vi.mocked(getStorage).mockReset();
     delete process.env.PPTX_SOURCE_CLEANUP_ENABLED;
     delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
+    delete process.env.PPTX_SOURCE_RETENTION_DAYS;
   });
 
   it("R168: deletes source.pptx and images/ for a CONSUMED (ready) aged import while KEEPING rendered/", async () => {
@@ -1846,6 +1945,25 @@ describe("cleanupPptxSourcesHandler", () => {
     expect(handlerBody).toMatch(
       /const dryRun = process\.env\.PPTX_SOURCE_CLEANUP_ENABLED !== "true";/,
     );
+  });
+
+  it("env-tunable: default (30d) applies when PPTX_SOURCE_RETENTION_DAYS is unset; an override shrinks the window", async () => {
+    expect(readPptxSourceRetentionDays()).toBe(PPTX_SOURCE_RETENTION_DAYS);
+
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    process.env.PPTX_SOURCE_RETENTION_DAYS = "5";
+    expect(readPptxSourceRetentionDays()).toBe(5);
+
+    // 6 days old: stale under the 5-day override, still fresh under the 30-day default.
+    const ready = fakeSourceRenderDoc({ status: "ready", ageDays: 6 });
+    mockPptxSourceDb([ready]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    mockSourceBucket([source]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    expect(source.delete).toHaveBeenCalledTimes(1);
+    expect(summary).toMatchObject({ dryRun: false, deletedObjectCount: 1 });
   });
 });
 

@@ -991,8 +991,23 @@ export function readDeleteCap(): number {
 //   is safely retried by the next daily invocation. Per-file deletes are each
 //   wrapped in try/catch so one failure never aborts the whole run.
 
-/** Objects are only eligible for cleanup once older than this many days. */
-export const RETENTION_DAYS = 14;
+/**
+ * Default retention window (days), used when MEDIA_RETENTION_DAYS is
+ * unset/blank/non-numeric. Bumped 14 -> 30 (v1.8 follow-up) per owner
+ * request; env-tunable via readMediaRetentionDays() below.
+ */
+export const RETENTION_DAYS = 30;
+
+/**
+ * Reads the effective media retention window in days, checked at
+ * handler-call time (not module load) so it reflects the deployed env and
+ * is testable via process.env mutation -- mirrors readDeleteCap(). Falls
+ * back to RETENTION_DAYS when MEDIA_RETENTION_DAYS is unset, blank, or
+ * non-numeric.
+ */
+export function readMediaRetentionDays(): number {
+  return readNumericKnob(process.env.MEDIA_RETENTION_DAYS, RETENTION_DAYS);
+}
 
 /**
  * Hard path guard: matches ONLY object names under orgs/{orgId}/media/.
@@ -1021,7 +1036,7 @@ export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
   // unset, empty, "false", a typo -- leaves this a dry run.
   const dryRun = process.env.MEDIA_CLEANUP_ENABLED !== "true";
   const bucket = getStorage().bucket();
-  const cutoffMs = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const cutoffMs = Date.now() - readMediaRetentionDays() * 24 * 60 * 60 * 1000;
   const deleteCap = readDeleteCap();
 
   let scannedCount = 0;
@@ -1137,8 +1152,22 @@ export const cleanupExpiredMedia = onSchedule(
 // - Runs on its own daily schedule, 03:00 UTC -- deliberately one hour after
 //   cleanupExpiredMedia's 02:00 UTC, so the two sweeps never overlap.
 
-/** Render docs older than this many hours (and still pending/failed) are orphan candidates. */
+/**
+ * Default staleness window (hours), used when ORPHAN_RENDER_STALE_HOURS
+ * (env var) is unset/blank/non-numeric. Render docs older than this many
+ * hours (and still pending/failed) are orphan candidates.
+ */
 export const ORPHAN_RENDER_STALE_HOURS = 24;
+
+/**
+ * Reads the effective orphan-render staleness window in hours, checked at
+ * handler-call time (not module load) -- mirrors readDeleteCap(). Falls
+ * back to ORPHAN_RENDER_STALE_HOURS (the constant) when the
+ * ORPHAN_RENDER_STALE_HOURS env var is unset, blank, or non-numeric.
+ */
+export function readOrphanRenderStaleHours(): number {
+  return readNumericKnob(process.env.ORPHAN_RENDER_STALE_HOURS, ORPHAN_RENDER_STALE_HOURS);
+}
 
 /**
  * Hard path guard: matches ONLY object names under the rendered/ prefix of a
@@ -1169,7 +1198,7 @@ export async function cleanupOrphanRendersHandler(): Promise<OrphanCleanupSummar
   // unset, empty, "false", a typo -- leaves this a dry run.
   const dryRun = process.env.PPTX_RENDER_CLEANUP_ENABLED !== "true";
 
-  const cutoffMs = Date.now() - ORPHAN_RENDER_STALE_HOURS * 60 * 60 * 1000;
+  const cutoffMs = Date.now() - readOrphanRenderStaleHours() * 60 * 60 * 1000;
   const deleteCap = readDeleteCap();
 
   let scannedCount = 0;
@@ -1341,8 +1370,22 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 //   orphan-renders (03:00), and reminders (04:00), so the sweeps never
 //   overlap.
 
-/** Backgrounds are only orphan-eligible once older than this many days. */
+/**
+ * Default retention window (days), used when the BACKGROUND_RETENTION_DAYS
+ * env var is unset/blank/non-numeric. Backgrounds are only orphan-eligible
+ * once older than this many days.
+ */
 export const BACKGROUND_RETENTION_DAYS = 30;
+
+/**
+ * Reads the effective background retention window in days, checked at
+ * handler-call time (not module load) -- mirrors readDeleteCap(). Falls
+ * back to BACKGROUND_RETENTION_DAYS (the constant) when the
+ * BACKGROUND_RETENTION_DAYS env var is unset, blank, or non-numeric.
+ */
+export function readBackgroundRetentionDays(): number {
+  return readNumericKnob(process.env.BACKGROUND_RETENTION_DAYS, BACKGROUND_RETENTION_DAYS);
+}
 
 /**
  * Hard path guard: matches ONLY object names under
@@ -1459,7 +1502,7 @@ export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroun
   }
 
   const effectiveDryRun = dryRun || !referencesComplete;
-  const cutoffMs = Date.now() - BACKGROUND_RETENTION_DAYS * DAY_MS;
+  const cutoffMs = Date.now() - readBackgroundRetentionDays() * DAY_MS;
   const deleteCap = readDeleteCap();
 
   let scannedCount = 0;
@@ -1573,8 +1616,22 @@ export const cleanupOrphanBackgrounds = onSchedule(
 // - Runs on its own daily schedule, 06:00 UTC -- after the 05:00 background
 //   sweep, so the sweeps never overlap.
 
-/** Source decks are only prune-eligible once older than this many days. */
+/**
+ * Default retention window (days), used when the PPTX_SOURCE_RETENTION_DAYS
+ * env var is unset/blank/non-numeric. Source decks are only prune-eligible
+ * once older than this many days.
+ */
 export const PPTX_SOURCE_RETENTION_DAYS = 30;
+
+/**
+ * Reads the effective pptx-source retention window in days, checked at
+ * handler-call time (not module load) -- mirrors readDeleteCap(). Falls
+ * back to PPTX_SOURCE_RETENTION_DAYS (the constant) when the
+ * PPTX_SOURCE_RETENTION_DAYS env var is unset, blank, or non-numeric.
+ */
+export function readPptxSourceRetentionDays(): number {
+  return readNumericKnob(process.env.PPTX_SOURCE_RETENTION_DAYS, PPTX_SOURCE_RETENTION_DAYS);
+}
 
 /**
  * Hard POSITIVE path guard: matches ONLY the source deck and the extracted
@@ -1609,7 +1666,7 @@ export async function cleanupPptxSourcesHandler(): Promise<PptxSourceCleanupSumm
   // unset, empty, "false", a typo -- leaves this a dry run.
   const dryRun = process.env.PPTX_SOURCE_CLEANUP_ENABLED !== "true";
 
-  const cutoffMs = Date.now() - PPTX_SOURCE_RETENTION_DAYS * DAY_MS;
+  const cutoffMs = Date.now() - readPptxSourceRetentionDays() * DAY_MS;
   const deleteCap = readDeleteCap();
 
   let scannedCount = 0;
