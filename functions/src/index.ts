@@ -365,6 +365,49 @@ export async function checkAndConsumeRateLimit(
   });
 }
 
+/**
+ * R171: per-org daily Resend email quota -- a fixed-window Admin-SDK counter
+ * that mirrors checkAndConsumeRateLimit's shape (single-doc transaction,
+ * check-then-increment, no double-count on a rejected send) but on ONE
+ * top-level `orgEmailCounters` doc keyed `${orgId}__day__${dayWindow}`, and
+ * increments by an arbitrary `count` -- the number of emails THIS send is
+ * about to attempt -- rather than always by 1 (a single 50-recipient send
+ * costs 50 against the quota, not 1). At/over the limit, returns not-allowed
+ * WITHOUT incrementing -- the org's quota is not consumed by a send that
+ * never happens. Kept TOP-LEVEL (not nested under organizations/{orgId}) for
+ * the same T-37-15 reason as aiRateLimits/aiUsage: the firestore.rules
+ * catch-all deny already blocks client reads, so no rules change is needed.
+ *
+ * Deliberately does NOT catch its own Firestore errors -- the caller
+ * (sendQueuedMessageHandler) decides the fail policy, same as
+ * checkAndConsumeRateLimit above.
+ */
+export async function checkAndConsumeOrgEmailQuota(
+  db: Firestore,
+  orgId: string,
+  count: number,
+  limit: number,
+  now: number = Date.now(),
+): Promise<RateLimitResult> {
+  const dayWindow = Math.floor(now / 86_400_000);
+  const dayRef = db.collection("orgEmailCounters").doc(`${orgId}__day__${dayWindow}`);
+
+  return db.runTransaction(async (tx) => {
+    const daySnap = await tx.get(dayRef);
+    const dayCount = daySnap.exists ? ((daySnap.data()?.count as number | undefined) ?? 0) : 0;
+
+    if (dayCount >= limit) {
+      return { allowed: false, scope: "day" as const };
+    }
+
+    // expireAt is a bit past the window's own end so an OPTIONAL owner TTL
+    // policy on orgEmailCounters can reap stale counters -- nothing here
+    // depends on that policy existing.
+    tx.set(dayRef, { count: dayCount + count, expireAt: new Date((dayWindow + 2) * 86_400_000) });
+    return { allowed: true };
+  });
+}
+
 export interface AiUsageEntry {
   uid: string;
   orgId: string | null;
@@ -2608,6 +2651,55 @@ export async function sendQueuedMessageHandler(params: {
   const senderEmail = message.requestedByUid ? await resolveEditorEmail(message.requestedByUid) : "";
   if (message.options?.sendCopyToSelf && message.requestedByUid && senderEmail) {
     sendList.push({ id: message.requestedByUid, name: "You", email: senderEmail, roleNames: [] });
+  }
+
+  // R171: Resend send-loop volume guardrails, both env-overridable and both
+  // generous so a legitimate send never hits them -- they exist to stop a
+  // loop/bug/abuse fan-out, not to shape normal use. Read HERE (per
+  // invocation, mirroring readAiProxyLimits() in the `api` handler) rather
+  // than as a module-scope constant, so an env override takes effect on the
+  // very next invocation with no redeploy required.
+  const MESSAGE_MAX_RECIPIENTS = readNumericKnob(process.env.MESSAGE_MAX_RECIPIENTS, 200);
+  const ORG_MAX_EMAILS_PER_DAY = readNumericKnob(process.env.ORG_MAX_EMAILS_PER_DAY, 1000);
+
+  // Per-message recipient cap: a queued message resolving to MORE than
+  // MESSAGE_MAX_RECIPIENTS is REJECTED (never truncated) -- a 200+ recipient
+  // worship-team message is almost certainly a mistake, and silent
+  // truncation would be worse than a visible failure. Checked BEFORE `new
+  // Resend(...)` / the send loop, so an over-cap message sends zero emails.
+  if (sendList.length > MESSAGE_MAX_RECIPIENTS) {
+    await messageRef.set(
+      {
+        status: "failed",
+        sentAt: FieldValue.serverTimestamp(),
+        deliveryCounts: { sent: 0, failed: 0 },
+        failureReason: "over-recipient-cap",
+      },
+      { merge: true },
+    );
+    console.error(
+      `sendQueuedMessage: rejected ${messageId} -- ${sendList.length} recipients exceeds MESSAGE_MAX_RECIPIENTS (${MESSAGE_MAX_RECIPIENTS})`,
+    );
+    return { status: "failed", sentCount: 0, failedCount: 0, skippedReason: "over-recipient-cap" };
+  }
+
+  // R171: per-org daily Resend send quota -- a fixed-window Admin-SDK
+  // counter backstopping a loop/cron fan-out. Also checked BEFORE `new
+  // Resend(...)` / the send loop, so an over-quota message sends zero
+  // emails. Skipped entirely for a zero-recipient send -- nothing to
+  // consume, and an org already at quota should not block an empty send.
+  if (sendList.length > 0) {
+    const quota = await checkAndConsumeOrgEmailQuota(db, orgId, sendList.length, ORG_MAX_EMAILS_PER_DAY);
+    if (!quota.allowed) {
+      await messageRef.set(
+        { status: "failed", sentAt: FieldValue.serverTimestamp(), deliveryCounts: { sent: 0, failed: 0 } },
+        { merge: true },
+      );
+      console.error(
+        `sendQueuedMessage: skipped ${messageId} -- org ${orgId} is at/over ORG_MAX_EMAILS_PER_DAY (${ORG_MAX_EMAILS_PER_DAY})`,
+      );
+      return { status: "failed", sentCount: 0, failedCount: 0, skippedReason: "over-org-daily-quota" };
+    }
   }
 
   // ⑤ + ⑥ Per recipient: render THAT person's subject/body (R139), send via the

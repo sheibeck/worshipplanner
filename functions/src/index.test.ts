@@ -45,6 +45,7 @@ import {
   verifyAppCaller,
   enforceModelAndTokens,
   checkAndConsumeRateLimit,
+  checkAndConsumeOrgEmailQuota,
   buildUsageEntry,
   writeUsageLedger,
   api,
@@ -3547,6 +3548,81 @@ describe("checkAndConsumeRateLimit", () => {
   });
 });
 
+// R171: per-org daily Resend email quota -- mirrors checkAndConsumeRateLimit's
+// harness above, but on a single top-level orgEmailCounters doc keyed by day
+// and incremented by an arbitrary `count` (the number of emails one send is
+// about to attempt), not always by 1.
+describe("checkAndConsumeOrgEmailQuota", () => {
+  const NOW = 1_700_000_000_000; // fixed instant
+  const LIMIT = 5;
+
+  function mockOrgEmailCounterDb(counts: Record<string, number>) {
+    const state: Record<string, { count: number }> = {};
+    for (const [id, count] of Object.entries(counts)) {
+      state[id] = { count };
+    }
+    const setSpy = vi.fn();
+    const doc = vi.fn((id: string) => ({ id, _docId: id }));
+    const collection = vi.fn((name: string) => {
+      if (name !== "orgEmailCounters") throw new Error(`unexpected collection "${name}"`);
+      return { doc };
+    });
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        get: vi.fn(async (ref: { _docId: string }) => {
+          const entry = state[ref._docId];
+          return {
+            exists: entry !== undefined,
+            data: () => (entry ? { ...entry } : undefined),
+          };
+        }),
+        set: vi.fn((ref: { _docId: string }, patch: { count: number }) => {
+          setSpy(ref._docId, patch);
+          state[ref._docId] = { count: patch.count };
+        }),
+      };
+      return fn(tx);
+    });
+    return { db: { collection, runTransaction } as never, runTransaction, setSpy, state };
+  }
+
+  it("allows and increments the day counter by `count` when under the limit", async () => {
+    const { db, setSpy } = mockOrgEmailCounterDb({});
+    const result = await checkAndConsumeOrgEmailQuota(db, "org1", 3, LIMIT, NOW);
+    expect(result).toEqual({ allowed: true });
+    const dayWindow = Math.floor(NOW / 86400000);
+    expect(setSpy).toHaveBeenCalledWith(`org1__day__${dayWindow}`, expect.objectContaining({ count: 3 }));
+  });
+
+  it("blocks and does NOT increment when the day counter is already at the ceiling", async () => {
+    const dayWindow = Math.floor(NOW / 86400000);
+    const { db, setSpy } = mockOrgEmailCounterDb({ [`org1__day__${dayWindow}`]: LIMIT });
+    const result = await checkAndConsumeOrgEmailQuota(db, "org1", 2, LIMIT, NOW);
+    expect(result).toEqual({ allowed: false, scope: "day" });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("blocks and does NOT increment when the day counter is already OVER the ceiling", async () => {
+    const dayWindow = Math.floor(NOW / 86400000);
+    const { db, setSpy } = mockOrgEmailCounterDb({ [`org1__day__${dayWindow}`]: LIMIT + 10 });
+    const result = await checkAndConsumeOrgEmailQuota(db, "org1", 1, LIMIT, NOW);
+    expect(result).toEqual({ allowed: false, scope: "day" });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("propagates a throwing transaction so the caller decides the fail policy", async () => {
+    const db = {
+      collection: () => ({ doc: (id: string) => ({ id }) }),
+      runTransaction: vi.fn(async () => {
+        throw new Error("Firestore unavailable");
+      }),
+    } as never;
+    await expect(checkAndConsumeOrgEmailQuota(db, "org1", 1, LIMIT, NOW)).rejects.toThrow(
+      "Firestore unavailable",
+    );
+  });
+});
+
 describe("buildUsageEntry", () => {
   it("returns the exact documented shape, reading input/output tokens from usage", () => {
     const entry = buildUsageEntry("uid1", "org1", "claude-haiku-4-5-20251001", {
@@ -3771,6 +3847,10 @@ describe("sendQueuedMessageHandler", () => {
     people?: Array<{ id: string; name: string; email: string }>;
     shareTokens?: Array<{ token: string; orgId: string; createdAtMs: number }>;
     orgName?: string | null; // the org doc's name → From display name (default "Test Church")
+    // R171: seeds the fake top-level orgEmailCounters collection the
+    // checkAndConsumeOrgEmailQuota transaction reads/writes, keyed exactly as
+    // the helper keys it (`${orgId}__day__${dayWindow}`). Absent = under quota.
+    orgEmailCounterSeed?: Record<string, number>;
   }
 
   function docSnap(exists: boolean, data: unknown) {
@@ -3855,16 +3935,42 @@ describe("sendQueuedMessageHandler", () => {
       ),
     }));
 
+    // R171: the org-quota counter state, seeded from cfg.orgEmailCounterSeed.
+    // orgEmailCounters doc refs are tagged { _kind: "orgEmailCounter" } so the
+    // ONE shared runTransaction fake below can route tx.get/tx.set to the
+    // right store WITHOUT guessing from call order — it distinguishes the
+    // message-claim transaction from the counter transaction by the ref
+    // itself, exactly as production code passes two structurally different
+    // refs (messageRef vs. an orgEmailCounters doc) into the same db.runTransaction.
+    const orgEmailCounters: Record<string, { count: number }> = {};
+    for (const [id, count] of Object.entries(cfg.orgEmailCounterSeed ?? {})) {
+      orgEmailCounters[id] = { count };
+    }
+    const orgEmailCounterSetSpy = vi.fn();
+    const orgEmailCountersCol = {
+      doc: vi.fn((id: string) => ({ _kind: "orgEmailCounter" as const, _docId: id })),
+    };
+
     const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
-        get: vi.fn(async () =>
-          messageExists
+        get: vi.fn(async (ref?: { _kind?: string; _docId?: string }) => {
+          if (ref && ref._kind === "orgEmailCounter") {
+            const entry = orgEmailCounters[ref._docId!];
+            return { exists: entry !== undefined, data: () => (entry ? { ...entry } : undefined) };
+          }
+          return messageExists
             ? docSnap(true, { ...messageData, status: messageStatus })
-            : docSnap(false, undefined),
-        ),
+            : docSnap(false, undefined);
+        }),
         update: vi.fn((_ref: unknown, patch: { status?: string }) => {
           txUpdateSpy(_ref, patch);
           if (patch && typeof patch.status === "string") messageStatus = patch.status;
+        }),
+        set: vi.fn((ref: { _kind?: string; _docId?: string }, patch: { count: number }) => {
+          if (ref && ref._kind === "orgEmailCounter") {
+            orgEmailCounterSetSpy(ref._docId, patch);
+            orgEmailCounters[ref._docId!] = { count: patch.count };
+          }
         }),
       };
       return fn(tx);
@@ -3874,12 +3980,21 @@ describe("sendQueuedMessageHandler", () => {
       collection: vi.fn((name: string) => {
         if (name === "organizations") return { doc: vi.fn(() => orgRef) };
         if (name === "shareTokens") return { where: shareTokensWhere };
+        if (name === "orgEmailCounters") return orgEmailCountersCol;
         throw new Error(`makeSendDb: unexpected collection "${name}"`);
       }),
       runTransaction,
     };
 
-    return { db, messageSetSpy, recipientWrites, txUpdateSpy, runTransaction };
+    return {
+      db,
+      messageSetSpy,
+      recipientWrites,
+      txUpdateSpy,
+      runTransaction,
+      orgEmailCounterSetSpy,
+      orgEmailCounters,
+    };
   }
 
   // Two band people filling two different band roles — the R139 divergence fixture.
@@ -3944,6 +4059,103 @@ describe("sendQueuedMessageHandler", () => {
       { merge: true },
     );
     expect(outcome).toMatchObject({ status: "sent", sentCount: 2, failedCount: 0 });
+  });
+
+  // --- R171: Resend volume guardrails (67-01) --------------------------------
+  describe("R171: recipient cap + org daily quota", () => {
+    afterEach(() => {
+      delete process.env.MESSAGE_MAX_RECIPIENTS;
+      delete process.env.ORG_MAX_EMAILS_PER_DAY;
+    });
+
+    it("an over-cap send (MESSAGE_MAX_RECIPIENTS) is REJECTED 'failed' with ZERO sends -- never truncated", async () => {
+      process.env.MESSAGE_MAX_RECIPIENTS = "1";
+      const { db, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      const outcome = await sendQueuedMessageHandler({
+        orgId: ORG_ID,
+        serviceId: SERVICE_ID,
+        messageId: MESSAGE_ID,
+      });
+
+      expect(mockSend).not.toHaveBeenCalled();
+      expect(recipientWrites).toHaveLength(0);
+      expect(messageSetSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "failed", deliveryCounts: { sent: 0, failed: 0 } }),
+        { merge: true },
+      );
+      expect(outcome).toMatchObject({
+        status: "failed",
+        sentCount: 0,
+        failedCount: 0,
+        skippedReason: "over-recipient-cap",
+      });
+    });
+
+    it("an org at/over ORG_MAX_EMAILS_PER_DAY (env override) is failed/skipped with ZERO sends", async () => {
+      process.env.ORG_MAX_EMAILS_PER_DAY = "0";
+      const { db, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      const outcome = await sendQueuedMessageHandler({
+        orgId: ORG_ID,
+        serviceId: SERVICE_ID,
+        messageId: MESSAGE_ID,
+      });
+
+      expect(mockSend).not.toHaveBeenCalled();
+      expect(recipientWrites).toHaveLength(0);
+      expect(messageSetSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "failed", deliveryCounts: { sent: 0, failed: 0 } }),
+        { merge: true },
+      );
+      expect(outcome).toMatchObject({
+        status: "failed",
+        sentCount: 0,
+        failedCount: 0,
+        skippedReason: "over-org-daily-quota",
+      });
+    });
+
+    it("an org whose counter is already AT the default daily cap is failed/skipped, without incrementing it further", async () => {
+      const dayWindow = Math.floor(Date.now() / 86_400_000);
+      const { db, recipientWrites, orgEmailCounterSetSpy } = makeSendDb({
+        ...twoRecipientConfig(),
+        orgEmailCounterSeed: { [`${ORG_ID}__day__${dayWindow}`]: 1000 },
+      });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      const outcome = await sendQueuedMessageHandler({
+        orgId: ORG_ID,
+        serviceId: SERVICE_ID,
+        messageId: MESSAGE_ID,
+      });
+
+      expect(mockSend).not.toHaveBeenCalled();
+      expect(recipientWrites).toHaveLength(0);
+      expect(orgEmailCounterSetSpy).not.toHaveBeenCalled();
+      expect(outcome).toMatchObject({ status: "failed", skippedReason: "over-org-daily-quota" });
+    });
+
+    it("under both default limits, the two-recipient send is unaffected (no MESSAGE_MAX_RECIPIENTS/ORG_MAX_EMAILS_PER_DAY override)", async () => {
+      const { db, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      const outcome = await sendQueuedMessageHandler({
+        orgId: ORG_ID,
+        serviceId: SERVICE_ID,
+        messageId: MESSAGE_ID,
+      });
+
+      expect(mockSend).toHaveBeenCalledTimes(2);
+      expect(recipientWrites).toHaveLength(2);
+      expect(messageSetSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "sent", deliveryCounts: { sent: 2, failed: 0 } }),
+        { merge: true },
+      );
+      expect(outcome).toMatchObject({ status: "sent", sentCount: 2, failedCount: 0 });
+    });
   });
 
   // --- From / Reply-To (owner UAT 2026-08-17) --------------------------------
