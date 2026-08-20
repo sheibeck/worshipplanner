@@ -267,6 +267,64 @@ describe('Members create — R104 self-service membership hole', () => {
   })
 })
 
+// Phase 68 Plan 03 (68-03, R178): claim-based isSuperAdmin() gate for
+// appConfig/* and superAdmins/*. isSuperAdmin() is deliberately claim-only
+// (request.auth.token.superAdmin == true, NO get()/exists()) — this repo has
+// a documented production incident (CLAUDE.md, 2026-08-06) where a
+// cross-document/cross-service rules lookup produced a deny-everyone outage,
+// and a deny-only test suite is exactly what let that ship undetected. Both
+// ALLOW (genuine super-admin token) and DENY (unauthenticated, ordinary
+// user, org-editor-role-only naming-collision guard) cases are required.
+describe('appConfig / superAdmins — claim-based isSuperAdmin() gate (R178)', () => {
+  it('ALLOWS a genuine super-admin to write appConfig/global', async () => {
+    const context = testEnv.authenticatedContext('ownerUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertSucceeds(setDoc(doc(db, 'appConfig', 'global'), { anything: true }))
+  })
+
+  it('ALLOWS a genuine super-admin to write superAdmins/{uid}', async () => {
+    const context = testEnv.authenticatedContext('ownerUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'superAdmins', 'targetUid'), {
+        email: 'target@example.com',
+        grantedBy: 'ownerUid',
+        grantedAt: new Date(),
+      }),
+    )
+  })
+
+  it('DENIES an unauthenticated caller from reading appConfig/global', async () => {
+    await seedDoc('appConfig/global', { anything: true })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'appConfig', 'global')))
+  })
+
+  it('DENIES a signed-in non-admin from reading appConfig/global', async () => {
+    await seedDoc('appConfig/global', { anything: true })
+    const context = testEnv.authenticatedContext('userA') // no superAdmin claim
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'appConfig', 'global')))
+  })
+
+  it('DENIES an ordinary org editor (orgId/role claim, no superAdmin) from writing superAdmins/{uid} — naming-collision guard', async () => {
+    const context = testEnv.authenticatedContext('editorUid', { orgId: 'orgA', role: 'editor' })
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'superAdmins', 'targetUid'), { email: 'x@example.com' }),
+    )
+  })
+
+  it('DENIES an unauthenticated caller from writing superAdmins/{uid}', async () => {
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'superAdmins', 'targetUid'), { email: 'x@example.com' }),
+    )
+  })
+})
+
 describe('Catch-all deny', () => {
   it('denies access to undefined paths', async () => {
     const context = testEnv.authenticatedContext('userA')
