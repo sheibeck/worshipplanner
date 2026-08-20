@@ -50,11 +50,11 @@ import sources (`orgs/{orgId}/pptx-imports/{importId}/…`) are **never pruned b
 - [x] **R166**: Orphan-render cleanup is enabled and verified — stale `pending`/`failed` `rendered/`
       objects are actually deleted. (First live deletion owner-gated.)
 
-- [ ] **R167**: Background images have a defined, implemented retention story so they stop accumulating
+- [x] **R167**: Background images have a defined, implemented retention story so they stop accumulating
       forever — unreferenced/aged backgrounds under `orgs/{orgId}/backgrounds/…` become eligible for
       pruning by a job. (First live deletion owner-gated.)
 
-- [ ] **R168**: PPTX import sources (the source `.pptx` and extracted `images/` under
+- [x] **R168**: PPTX import sources (the source `.pptx` and extracted `images/` under
       `orgs/{orgId}/pptx-imports/{importId}/…`) have a defined, implemented retention story so they stop
       accumulating forever after an import is consumed/rendered. (First live deletion owner-gated.)
 
@@ -117,8 +117,8 @@ Each requirement maps to exactly one phase. Phase numbering continues from v1.7 
 | R164 | Phase 65 | Complete |
 | R165 | Phase 66 | Complete |
 | R166 | Phase 66 | Complete |
-| R167 | Phase 66 | Pending |
-| R168 | Phase 66 | Pending |
+| R167 | Phase 66 | Complete |
+| R168 | Phase 66 | Complete |
 | R170 | Phase 67 | Pending |
 | R171 | Phase 67 | Pending |
 | R172 | Phase 67 | Pending |

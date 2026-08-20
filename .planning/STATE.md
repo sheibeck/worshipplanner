@@ -4,17 +4,17 @@ milestone: v1.8
 milestone_name: Cost & Billing Hardening
 current_phase: 66
 current_phase_name: Storage Retention
-status: executing
-stopped_at: Completed 66-01-prove-harden-existing-sweeps-PLAN.md
-last_updated: "2026-08-20T05:33:11.425Z"
+status: verifying
+stopped_at: Completed 66-02-new-retention-sweeps-PLAN.md
+last_updated: "2026-08-20T05:48:04.373Z"
 last_activity: 2026-08-20
 last_activity_desc: Phase 66 execution started
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 33
+  completed_plans: 4
+  percent: 67
 ---
 
 # ▶ ACTIVE MILESTONE — v1.8 Cost & Billing Hardening (started 2026-08-19)
@@ -22,7 +22,7 @@ progress:
 **Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
 predictable. Phases 65+ (continuing numbering from v1.7's 58–64). Requirements R161+ in REQUIREMENTS.md.
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 Five confirmed exposures (investigation 2026-08-19, `functions/src/index.ts` unless noted):
 
@@ -532,7 +532,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 66 (Storage Retention) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-20 — Phase 66 execution started
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
@@ -2079,6 +2079,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 65 P01 | 55min | 3 tasks | 2 files |
 | Phase 65 P02 | 25min | 2 tasks | 4 files |
 | Phase 66 P01 | 11min | 2 tasks | 2 files |
+| Phase 66 P02 | 35min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2442,6 +2443,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: logAiProxyError classifies proxy 429/400 by err.status structurally (console.warn) vs generic failure (console.error), added to the existing src/utils/__tests__/claudeApi.test.ts per repo convention
 - [Phase ?]: firestore.rules aiUsage/aiRateLimits deny blocks committed but NOT deployed (owner-gated per v1.8 grant); firebase deploy --only firestore:rules handed to owner
 - [Phase ?]: readDeleteCap() shared per-run delete cap (STORAGE_CLEANUP_MAX_DELETES_PER_RUN, default 500) bounds cleanupExpiredMediaHandler/cleanupOrphanRendersHandler LIVE runs; dry-run is never capped so owner sees true backlog before enabling
+- [Phase ?]: R167/R168: added a floor guard beyond the plan's original spec -- a background reference scan that succeeds but returns zero references while candidates exist is treated as incomplete (forces dry-run), per explicit orchestrator hardening instruction.
 
 ### Roadmap Evolution
 
@@ -2761,8 +2763,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T05:33:11.370Z
-Stopped at: Completed 66-01-prove-harden-existing-sweeps-PLAN.md
+Last session: 2026-08-20T05:48:04.322Z
+Stopped at: Completed 66-02-new-retention-sweeps-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
