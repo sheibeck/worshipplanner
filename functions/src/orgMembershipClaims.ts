@@ -1,6 +1,7 @@
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { clearClaimKeys, mergeAndSetCustomClaims } from "./claimsHelpers";
 
 // --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
 //
@@ -185,10 +186,15 @@ export async function syncOrgMembershipClaimHandler(
 
     switch (decision.action) {
       case "set":
-        await getAuth().setCustomUserClaims(uid, decision.claims);
+        // R175: merges onto the user's existing claims rather than
+        // replacing the whole object -- see claimsHelpers.ts.
+        await mergeAndSetCustomClaims(uid, decision.claims);
         return { action: "set" };
       case "clear":
-        await getAuth().setCustomUserClaims(uid, null);
+        // R175: clears only { orgId, role } (ORG_CLAIM_KEYS), preserving
+        // any other claim -- e.g. a granted superAdmin -- rather than
+        // wiping the whole claims object via setCustomUserClaims(uid, null).
+        await clearClaimKeys(uid, ORG_CLAIM_KEYS);
         return { action: "clear" };
       case "skip":
         return { action: "skip", reason: decision.reason };

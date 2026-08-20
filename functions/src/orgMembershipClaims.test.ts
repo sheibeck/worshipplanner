@@ -349,6 +349,23 @@ describe("syncOrgMembershipClaimHandler", () => {
     expect(outcome).toEqual({ action: "skip", reason: "missing-role" });
   });
 
+  it("preserves superAdmin: a primary-org membership delete clears only { orgId, role }, leaving an existing superAdmin claim intact (SC1 direction A)", async () => {
+    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", superAdmin: true },
+    });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: undefined,
+    });
+
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { superAdmin: true });
+    expect(outcome).toEqual({ action: "clear" });
+  });
+
   it("auth lookup failure: getUser rejecting resolves with a failure outcome, does not throw out of the handler", async () => {
     mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
