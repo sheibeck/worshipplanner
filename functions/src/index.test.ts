@@ -31,6 +31,7 @@ import {
   sendScheduledRemindersHandler,
   dispatchDueScheduledMessagesHandler,
   readAiProxyLimits,
+  readNumericKnob,
   resolveOrgId,
   verifyAppCaller,
   enforceModelAndTokens,
@@ -2421,6 +2422,45 @@ describe("readAiProxyLimits", () => {
   it("drops empty entries from a comma-separated AI_ALLOWED_MODELS list", () => {
     const limits = readAiProxyLimits({ AI_ALLOWED_MODELS: "claude-haiku-4-5-20251001,, ," });
     expect(limits.allowedModels).toEqual(["claude-haiku-4-5-20251001"]);
+  });
+
+  it("WR-01: honors an operator's explicit `0` for any numeric knob instead of falling back to the default", () => {
+    expect(
+      readAiProxyLimits({
+        AI_RATELIMIT_MAX_PER_MIN: "0",
+        AI_RATELIMIT_MAX_PER_DAY: "0",
+        AI_MAX_TOKENS_CEILING: "0",
+      }),
+    ).toEqual({
+      maxPerMin: 0,
+      maxPerDay: 0,
+      allowedModels: ["claude-haiku-4-5-20251001"],
+      maxTokensCeiling: 0,
+    });
+  });
+});
+
+describe("readNumericKnob", () => {
+  it("WR-01: returns the fallback for an undefined value", () => {
+    expect(readNumericKnob(undefined, 20)).toBe(20);
+  });
+
+  it("WR-01: returns the fallback for a blank/whitespace-only value", () => {
+    expect(readNumericKnob("   ", 20)).toBe(20);
+    expect(readNumericKnob("", 20)).toBe(20);
+  });
+
+  it("WR-01: returns the fallback for a non-numeric value", () => {
+    expect(readNumericKnob("not-a-number", 20)).toBe(20);
+  });
+
+  it("WR-01: honors an explicit `0` rather than falling back to the default", () => {
+    expect(readNumericKnob("0", 20)).toBe(0);
+  });
+
+  it("parses a valid non-zero numeric string", () => {
+    expect(readNumericKnob("5", 20)).toBe(5);
+    expect(readNumericKnob(" 5 ", 20)).toBe(5);
   });
 });
 

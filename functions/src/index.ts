@@ -188,10 +188,26 @@ export interface AiProxyLimits {
 
 const DEFAULT_AI_ALLOWED_MODELS = ["claude-haiku-4-5-20251001"];
 
+/**
+ * WR-01 fix: parses an env-var numeric knob so an operator's explicit `0`
+ * (e.g. an emergency full-stop on `AI_RATELIMIT_MAX_PER_MIN=0`) is honored
+ * rather than discarded. `Number(x) || fallback` treats a genuinely-parsed
+ * `0` as falsy and silently replaces it with the default -- the opposite of
+ * the caller's intent. Only an unset, blank/whitespace-only, or non-numeric
+ * value falls back to `fallback`.
+ */
+export function readNumericKnob(raw: string | undefined, fallback: number): number {
+  if (raw === undefined) return fallback;
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return fallback;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export function readAiProxyLimits(env: NodeJS.ProcessEnv = process.env): AiProxyLimits {
-  const maxPerMin = Number(env.AI_RATELIMIT_MAX_PER_MIN) || 20;
-  const maxPerDay = Number(env.AI_RATELIMIT_MAX_PER_DAY) || 500;
-  const maxTokensCeiling = Number(env.AI_MAX_TOKENS_CEILING) || 2048;
+  const maxPerMin = readNumericKnob(env.AI_RATELIMIT_MAX_PER_MIN, 20);
+  const maxPerDay = readNumericKnob(env.AI_RATELIMIT_MAX_PER_DAY, 500);
+  const maxTokensCeiling = readNumericKnob(env.AI_MAX_TOKENS_CEILING, 2048);
   const rawModels = env.AI_ALLOWED_MODELS;
   const parsedModels = rawModels
     ? rawModels
@@ -207,10 +223,16 @@ export function readAiProxyLimits(env: NodeJS.ProcessEnv = process.env): AiProxy
   };
 }
 
-// R164: an explicit maxInstances ceiling on the highest-cost function (the
-// anthropic branch of `api` spends real money per call). Env-overridable so
-// the owner can tune fan-out without a logic redeploy.
-const AI_PROXY_MAX_INSTANCES = Number(process.env.AI_PROXY_MAX_INSTANCES) || 10;
+// R164: an explicit maxInstances ceiling motivated by the highest-cost route
+// (the anthropic branch of `api` spends real money per call). NOTE (WR-02,
+// accepted as won't-fix): `maxInstances` is a Cloud Functions v2 /
+// Cloud Run FUNCTION-level setting on the single shared `onRequest` below --
+// it caps the whole `api` function (esv/nlt/planningcenter traffic included),
+// not just the anthropic upstream. That's intentional: esv/nlt/planningcenter
+// also cost money to run, and there is no way to scope maxInstances to one
+// upstream within a single function. Env-overridable so the owner can tune
+// fan-out without a logic redeploy.
+const AI_PROXY_MAX_INSTANCES = readNumericKnob(process.env.AI_PROXY_MAX_INSTANCES, 10);
 
 export interface EnforceModelAndTokensOk {
   ok: true;
