@@ -4,16 +4,16 @@ milestone: v1.8
 milestone_name: Cost & Billing Hardening
 current_phase: 66
 current_phase_name: Storage Retention
-status: planning
-stopped_at: Completed 65-02-ledger-access-hardening-PLAN.md
-last_updated: "2026-08-20T05:08:54.383Z"
+status: executing
+stopped_at: Completed 66-01-prove-harden-existing-sweeps-PLAN.md
+last_updated: "2026-08-20T05:33:11.425Z"
 last_activity: 2026-08-20
-last_activity_desc: Phase 65 complete, transitioned to Phase 66
+last_activity_desc: Phase 66 execution started
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 33
 ---
 
@@ -22,7 +22,7 @@ progress:
 **Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
 predictable. Phases 65+ (continuing numbering from v1.7's 58–64). Requirements R161+ in REQUIREMENTS.md.
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 
 Five confirmed exposures (investigation 2026-08-19, `functions/src/index.ts` unless noted):
 
@@ -520,7 +520,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 65 — AI Proxy Cost Controls
+**Current focus:** Phase 66 — Storage Retention
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -530,10 +530,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 66 — Storage Retention
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-08-20 — Phase 65 complete, transitioned to Phase 66
+Phase: 66 (Storage Retention) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-08-20 — Phase 66 execution started
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 
@@ -2078,6 +2078,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 64 P03 | 13 min | 2 tasks | 2 files |
 | Phase 65 P01 | 55min | 3 tasks | 2 files |
 | Phase 65 P02 | 25min | 2 tasks | 4 files |
+| Phase 66 P01 | 11min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2440,6 +2441,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Rate limiter fails OPEN on its own Firestore error (cost guardrail, not security control) — a datastore hiccup never takes AI down
 - [Phase ?]: logAiProxyError classifies proxy 429/400 by err.status structurally (console.warn) vs generic failure (console.error), added to the existing src/utils/__tests__/claudeApi.test.ts per repo convention
 - [Phase ?]: firestore.rules aiUsage/aiRateLimits deny blocks committed but NOT deployed (owner-gated per v1.8 grant); firebase deploy --only firestore:rules handed to owner
+- [Phase ?]: readDeleteCap() shared per-run delete cap (STORAGE_CLEANUP_MAX_DELETES_PER_RUN, default 500) bounds cleanupExpiredMediaHandler/cleanupOrphanRendersHandler LIVE runs; dry-run is never capped so owner sees true backlog before enabling
 
 ### Roadmap Evolution
 
@@ -2759,8 +2761,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T03:48:27.445Z
-Stopped at: Completed 65-02-ledger-access-hardening-PLAN.md
+Last session: 2026-08-20T05:33:11.370Z
+Stopped at: Completed 66-01-prove-harden-existing-sweeps-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

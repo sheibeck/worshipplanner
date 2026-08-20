@@ -43,11 +43,11 @@ index.ts:658) and only `rendered/` orphans are otherwise eligible (`cleanupOrpha
 equal `"true"`). Background images (`orgs/{orgId}/backgrounds/…`, `useBackgroundUpload.ts:103`) and PPTX
 import sources (`orgs/{orgId}/pptx-imports/{importId}/…`) are **never pruned by any job**.
 
-- [ ] **R165**: Media auto-cleanup is enabled and verified in production — objects under
+- [x] **R165**: Media auto-cleanup is enabled and verified in production — objects under
       `orgs/{orgId}/media/` older than the retention window are actually deleted, not dry-run-logged.
       (First live deletion is an owner-gated deploy per the autonomy grant.)
 
-- [ ] **R166**: Orphan-render cleanup is enabled and verified — stale `pending`/`failed` `rendered/`
+- [x] **R166**: Orphan-render cleanup is enabled and verified — stale `pending`/`failed` `rendered/`
       objects are actually deleted. (First live deletion owner-gated.)
 
 - [ ] **R167**: Background images have a defined, implemented retention story so they stop accumulating
@@ -115,8 +115,8 @@ Each requirement maps to exactly one phase. Phase numbering continues from v1.7 
 | R162 | Phase 65 | Complete |
 | R163 | Phase 65 | Complete |
 | R164 | Phase 65 | Complete |
-| R165 | Phase 66 | Pending |
-| R166 | Phase 66 | Pending |
+| R165 | Phase 66 | Complete |
+| R166 | Phase 66 | Complete |
 | R167 | Phase 66 | Pending |
 | R168 | Phase 66 | Pending |
 | R170 | Phase 67 | Pending |
