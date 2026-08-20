@@ -81,7 +81,10 @@
               type="button"
               disabled
               :aria-describedby="warningId"
-              class="px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 opacity-60 cursor-not-allowed transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              :class="[
+                'px-4 py-2 rounded-md text-sm font-medium text-white opacity-60 cursor-not-allowed transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-500',
+                isDestructive ? 'bg-red-600' : 'bg-indigo-600',
+              ]"
             >
               Enable
             </button>

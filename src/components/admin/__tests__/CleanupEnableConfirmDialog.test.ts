@@ -72,6 +72,24 @@ describe('CleanupEnableConfirmDialog', () => {
     expect(wrapper.emitted('confirm')).toBeUndefined()
   })
 
+  it('uses indigo (not red) for the hard-blocked Confirm when wouldDeleteCount is 0 (review IN-01/UI-1)', () => {
+    const wrapper = mountDialog({ referencesComplete: false, wouldDeleteCount: 0, wouldDeleteBytes: 0 })
+    const buttons = wrapper.findAll('button')
+    const confirm = buttons[buttons.length - 1]!
+    expect(confirm.attributes('disabled')).toBeDefined()
+    expect(confirm.classes()).toContain('bg-indigo-600')
+    expect(confirm.classes()).not.toContain('bg-red-600')
+  })
+
+  it('keeps the hard-blocked Confirm red when wouldDeleteCount > 0 (review IN-01/UI-1)', () => {
+    const wrapper = mountDialog({ referencesComplete: false, wouldDeleteCount: 47 })
+    const buttons = wrapper.findAll('button')
+    const confirm = buttons[buttons.length - 1]!
+    expect(confirm.attributes('disabled')).toBeDefined()
+    expect(confirm.classes()).toContain('bg-red-600')
+    expect(confirm.classes()).not.toContain('bg-indigo-600')
+  })
+
   it('does not render the warning or block Confirm when referencesComplete is undefined (non-background types)', () => {
     const wrapper = mountDialog({ referencesComplete: undefined })
     expect(wrapper.text()).not.toContain('Reference detection is incomplete')
