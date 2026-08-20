@@ -34,6 +34,9 @@ import {
   resolveOrgId,
   verifyAppCaller,
   enforceModelAndTokens,
+  checkAndConsumeRateLimit,
+  buildUsageEntry,
+  writeUsageLedger,
 } from "./index";
 import type { QueueMessageRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
@@ -2515,6 +2518,117 @@ describe("enforceModelAndTokens", () => {
     expect(enforceModelAndTokens(null, limits).ok).toBe(false);
     expect(enforceModelAndTokens("a string", limits).ok).toBe(false);
     expect(enforceModelAndTokens(42, limits).ok).toBe(false);
+  });
+});
+
+describe("checkAndConsumeRateLimit", () => {
+  const NOW = 1_700_000_000_000; // fixed instant
+  const limits = { maxPerMin: 2, maxPerDay: 5 };
+
+  function mockRateLimitDb(counts: Record<string, number>) {
+    const state: Record<string, { count: number }> = {};
+    for (const [id, count] of Object.entries(counts)) {
+      state[id] = { count };
+    }
+    const setSpy = vi.fn();
+    const doc = vi.fn((id: string) => ({ id, _docId: id }));
+    const collection = vi.fn((name: string) => {
+      if (name !== "aiRateLimits") throw new Error(`unexpected collection "${name}"`);
+      return { doc };
+    });
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        get: vi.fn(async (ref: { _docId: string }) => {
+          const entry = state[ref._docId];
+          return {
+            exists: entry !== undefined,
+            data: () => (entry ? { ...entry } : undefined),
+          };
+        }),
+        set: vi.fn((ref: { _docId: string }, patch: { count: number }) => {
+          setSpy(ref._docId, patch);
+          state[ref._docId] = { count: patch.count };
+        }),
+      };
+      return fn(tx);
+    });
+    return { db: { collection, runTransaction } as never, runTransaction, setSpy, state };
+  }
+
+  it("allows and increments both counters when under both ceilings", async () => {
+    const { db, setSpy } = mockRateLimitDb({});
+    const result = await checkAndConsumeRateLimit(db, "uid1", limits, NOW);
+    expect(result).toEqual({ allowed: true });
+    expect(setSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("blocks and does NOT increment when the minute counter is already at the ceiling", async () => {
+    const minuteWindow = Math.floor(NOW / 60000);
+    const { db, setSpy } = mockRateLimitDb({ [`uid1__min__${minuteWindow}`]: 2 });
+    const result = await checkAndConsumeRateLimit(db, "uid1", limits, NOW);
+    expect(result).toEqual({ allowed: false, scope: "minute" });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("blocks and does NOT increment when the day counter is already at the ceiling", async () => {
+    const dayWindow = Math.floor(NOW / 86400000);
+    const { db, setSpy } = mockRateLimitDb({ [`uid1__day__${dayWindow}`]: 5 });
+    const result = await checkAndConsumeRateLimit(db, "uid1", limits, NOW);
+    expect(result).toEqual({ allowed: false, scope: "day" });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("propagates a throwing transaction so the caller can fail open", async () => {
+    const db = {
+      collection: () => ({ doc: (id: string) => ({ id }) }),
+      runTransaction: vi.fn(async () => {
+        throw new Error("Firestore unavailable");
+      }),
+    } as never;
+    await expect(checkAndConsumeRateLimit(db, "uid1", limits, NOW)).rejects.toThrow(
+      "Firestore unavailable",
+    );
+  });
+});
+
+describe("buildUsageEntry", () => {
+  it("returns the exact documented shape, reading input/output tokens from usage", () => {
+    const entry = buildUsageEntry("uid1", "org1", "claude-haiku-4-5-20251001", {
+      input_tokens: 120,
+      output_tokens: 340,
+    });
+    expect(entry).toEqual({
+      uid: "uid1",
+      orgId: "org1",
+      model: "claude-haiku-4-5-20251001",
+      inputTokens: 120,
+      outputTokens: 340,
+      createdAt: "SERVER_TIMESTAMP_SENTINEL",
+    });
+  });
+
+  it("falls back orgId to null and token counts to 0 when unresolved", () => {
+    const entry = buildUsageEntry("uid1", null, "claude-haiku-4-5-20251001", undefined);
+    expect(entry.orgId).toBeNull();
+    expect(entry.inputTokens).toBe(0);
+    expect(entry.outputTokens).toBe(0);
+  });
+});
+
+describe("writeUsageLedger", () => {
+  it("adds the entry to the top-level aiUsage collection via the Admin SDK", async () => {
+    const addSpy = vi.fn(async () => ({ id: "new-doc" }));
+    const collection = vi.fn((name: string) => {
+      if (name !== "aiUsage") throw new Error(`unexpected collection "${name}"`);
+      return { add: addSpy };
+    });
+    const db = { collection } as never;
+    const entry = buildUsageEntry("uid1", "org1", "claude-haiku-4-5-20251001", {
+      input_tokens: 1,
+      output_tokens: 2,
+    });
+    await writeUsageLedger(db, entry);
+    expect(addSpy).toHaveBeenCalledWith(entry);
   });
 });
 

@@ -264,6 +264,101 @@ export function enforceModelAndTokens(
   return { ok: true, body: record };
 }
 
+export interface RateLimitResult {
+  allowed: boolean;
+  scope?: "minute" | "day";
+}
+
+/**
+ * R161: per-uid fixed-window Firestore rate limit. Two top-level
+ * `aiRateLimits` counter docs per call -- `${uid}__min__${minuteWindow}` and
+ * `${uid}__day__${dayWindow}` -- read inside a single transaction so the
+ * check-then-increment is atomic across concurrent requests from the same
+ * user. A rejected request (either ceiling already met) does NOT increment
+ * either counter. Kept TOP-LEVEL (not nested under organizations/{orgId}) so
+ * the firestore.rules catch-all deny already blocks client reads (T-37-15).
+ *
+ * Deliberately does NOT catch its own Firestore errors -- the caller (the
+ * anthropic branch below) decides the fail-open policy so a limiter
+ * datastore hiccup never takes AI down (locked decision, 65-CONTEXT.md).
+ */
+export async function checkAndConsumeRateLimit(
+  db: Firestore,
+  uid: string,
+  limits: Pick<AiProxyLimits, "maxPerMin" | "maxPerDay">,
+  now: number = Date.now(),
+): Promise<RateLimitResult> {
+  const minuteWindow = Math.floor(now / 60_000);
+  const dayWindow = Math.floor(now / 86_400_000);
+  const minuteRef = db.collection("aiRateLimits").doc(`${uid}__min__${minuteWindow}`);
+  const dayRef = db.collection("aiRateLimits").doc(`${uid}__day__${dayWindow}`);
+
+  return db.runTransaction(async (tx) => {
+    const [minuteSnap, daySnap] = await Promise.all([tx.get(minuteRef), tx.get(dayRef)]);
+    const minuteCount = minuteSnap.exists ? ((minuteSnap.data()?.count as number | undefined) ?? 0) : 0;
+    const dayCount = daySnap.exists ? ((daySnap.data()?.count as number | undefined) ?? 0) : 0;
+
+    if (minuteCount >= limits.maxPerMin) {
+      return { allowed: false, scope: "minute" as const };
+    }
+    if (dayCount >= limits.maxPerDay) {
+      return { allowed: false, scope: "day" as const };
+    }
+
+    // expireAt is a bit past the window's own end so an OPTIONAL owner TTL
+    // policy on aiRateLimits can reap stale counters -- nothing here depends
+    // on that policy existing.
+    tx.set(minuteRef, { count: minuteCount + 1, expireAt: new Date((minuteWindow + 2) * 60_000) });
+    tx.set(dayRef, { count: dayCount + 1, expireAt: new Date((dayWindow + 2) * 86_400_000) });
+    return { allowed: true };
+  });
+}
+
+export interface AiUsageEntry {
+  uid: string;
+  orgId: string | null;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  createdAt: unknown;
+}
+
+interface AnthropicUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+}
+
+/**
+ * R163: builds one aiUsage ledger entry per proxied Claude request. orgId is
+ * null (uid-only) rather than throwing when unresolved; token counts default
+ * to 0 when the upstream response usage is missing either field.
+ */
+export function buildUsageEntry(
+  uid: string,
+  orgId: string | null,
+  model: string,
+  usage: AnthropicUsage | undefined,
+): AiUsageEntry {
+  return {
+    uid,
+    orgId: orgId ?? null,
+    model,
+    inputTokens: usage?.input_tokens ?? 0,
+    outputTokens: usage?.output_tokens ?? 0,
+    createdAt: FieldValue.serverTimestamp(),
+  };
+}
+
+/**
+ * Writes the ledger entry to the TOP-LEVEL `aiUsage` collection via the
+ * Admin SDK (bypasses rules -- no firestore.rules change needed to write;
+ * see 65-CONTEXT.md). Kept top-level, not nested under organizations/{orgId},
+ * for the same T-37-15 reason as aiRateLimits above.
+ */
+export async function writeUsageLedger(db: Firestore, entry: AiUsageEntry): Promise<void> {
+  await db.collection("aiUsage").add(entry);
+}
+
 export const api = onRequest(
   { secrets: [CLAUDE_API_KEY, ESV_API_KEY, NLT_API_KEY], maxInstances: AI_PROXY_MAX_INSTANCES },
   async (req, res) => {
@@ -332,17 +427,43 @@ export const api = onRequest(
       headers["authorization"] = `Token ${ESV_API_KEY.value()}`;
     }
 
-    // R162: model allow-list + max_tokens clamp apply to the anthropic
-    // upstream ONLY. esv/nlt/planningcenter fall straight through to the
+    // R161/R162/R163: all four cost controls apply to the anthropic upstream
+    // ONLY. esv/nlt/planningcenter fall straight through to the existing
     // fetch below with `outboundBody` left as `req.body`, byte-unchanged.
     let outboundBody: unknown = req.body;
+    const aiLimits = readAiProxyLimits();
     if (service === "anthropic") {
-      const enforcement = enforceModelAndTokens(req.body, readAiProxyLimits());
+      const enforcement = enforceModelAndTokens(req.body, aiLimits);
       if (!enforcement.ok) {
         res.status(enforcement.status).json(enforcement.error);
         return;
       }
       outboundBody = enforcement.body;
+
+      // decodedCaller is always non-null here: anthropic is in SECRET_INJECTED,
+      // so the auth gate above already returned 401 for a null caller.
+      try {
+        const rateResult = await checkAndConsumeRateLimit(
+          getFirestore(),
+          decodedCaller!.uid,
+          aiLimits,
+        );
+        if (!rateResult.allowed) {
+          res.status(429).json({
+            error: "Rate limit exceeded. Please slow down and try again shortly.",
+            scope: rateResult.scope,
+            retryAfterSec: rateResult.scope === "minute" ? 60 : 86_400,
+          });
+          return;
+        }
+      } catch (limiterErr) {
+        // Fail OPEN: the limiter is a cost guardrail, not a security control
+        // (locked decision, 65-CONTEXT.md) -- a Firestore hiccup must never
+        // take AI down.
+        console.warn("[api] rate limiter Firestore op failed; failing open:", {
+          message: limiterErr instanceof Error ? limiterErr.message : String(limiterErr),
+        });
+      }
     }
 
     try {
@@ -359,6 +480,29 @@ export const api = onRequest(
       if (ct) res.set("content-type", ct);
 
       const body = await upstream.text();
+
+      // R163: one aiUsage ledger entry per 2xx anthropic response. Reads the
+      // token counts from the parsed (non-streaming) response body BEFORE
+      // res.send -- wrapped so a parse/usage/write failure never breaks the
+      // proxy response the caller is waiting on.
+      if (service === "anthropic" && decodedCaller && upstream.status >= 200 && upstream.status < 300) {
+        try {
+          const parsed = JSON.parse(body) as { usage?: AnthropicUsage };
+          const outboundModel =
+            outboundBody && typeof outboundBody === "object" && typeof (outboundBody as Record<string, unknown>).model === "string"
+              ? ((outboundBody as Record<string, unknown>).model as string)
+              : "unknown";
+          await writeUsageLedger(
+            getFirestore(),
+            buildUsageEntry(decodedCaller.uid, resolveOrgId(decodedCaller), outboundModel, parsed.usage),
+          );
+        } catch (ledgerErr) {
+          console.warn("[api] aiUsage ledger write failed:", {
+            message: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+          });
+        }
+      }
+
       res.send(body);
     } catch (err) {
       // Never log `err` verbatim -- a future `cause`/stack-trace field could
