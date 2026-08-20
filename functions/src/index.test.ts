@@ -11,9 +11,13 @@ import {
   cleanupExpiredMediaHandler,
   cleanupOrphanRendersHandler,
   cleanupOrphanBackgroundsHandler,
+  cleanupPptxSourcesHandler,
   BACKGROUND_PATH_GUARD,
   BACKGROUND_RETENTION_DAYS,
   extractBackgroundObjectPath,
+  PPTX_SOURCE_GUARD,
+  PPTX_SOURCE_RETENTION_DAYS,
+  sourcePrefixFor,
   createQueuedMessage,
   MEDIA_PATH_GUARD,
   ORPHAN_RENDER_STALE_HOURS,
@@ -1208,6 +1212,24 @@ describe("extractBackgroundObjectPath", () => {
   });
 });
 
+describe("PPTX_SOURCE_GUARD", () => {
+  it("matches source.pptx and images/ under a pptx-imports scope", () => {
+    expect(PPTX_SOURCE_GUARD.test("orgs/orgA/pptx-imports/i1/source.pptx")).toBe(true);
+    expect(PPTX_SOURCE_GUARD.test("orgs/orgA/pptx-imports/i1/images/0.png")).toBe(true);
+  });
+
+  it("NEVER matches rendered/ -- structurally excluded, not by exception list", () => {
+    expect(PPTX_SOURCE_GUARD.test("orgs/orgA/pptx-imports/i1/rendered/page-0001.png")).toBe(
+      false,
+    );
+  });
+
+  it("does not match other non-source paths", () => {
+    expect(PPTX_SOURCE_GUARD.test("orgs/orgA/media/m1/old.mp4")).toBe(false);
+    expect(PPTX_SOURCE_GUARD.test("orgs/orgA/pptx-imports/i1/other.txt")).toBe(false);
+  });
+});
+
 describe("cleanupOrphanBackgroundsHandler", () => {
   const ORG_ID = "orgA";
   const STALE_DAYS = BACKGROUND_RETENTION_DAYS + 60; // comfortably past the retention window
@@ -1527,6 +1549,270 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     const handlerBody = source.slice(start, wrapperStart);
     expect(handlerBody).toMatch(
       /const dryRun = process\.env\.BACKGROUND_CLEANUP_ENABLED !== "true";/,
+    );
+  });
+});
+
+describe("cleanupPptxSourcesHandler", () => {
+  const ORG_ID = "orgA";
+  const STALE_DAYS = PPTX_SOURCE_RETENTION_DAYS + 5; // comfortably past the retention window
+  const FRESH_DAYS = 1; // comfortably inside it
+
+  interface FakeSourceRenderDocOptions {
+    orgId?: string | null;
+    importId?: string;
+    status?: "pending" | "failed" | "ready";
+    ageDays?: number; // omit to simulate an unreadable/missing createdAt
+  }
+
+  function fakeSourceRenderDoc(opts: FakeSourceRenderDocOptions = {}) {
+    const orgId = opts.orgId === undefined ? ORG_ID : opts.orgId;
+    const importId = opts.importId ?? "i1";
+    const status = opts.status ?? "ready";
+    const createdAt =
+      opts.ageDays === undefined
+        ? undefined
+        : { toMillis: () => Date.now() - opts.ageDays! * 24 * 60 * 60 * 1000 };
+    return {
+      id: importId,
+      data: () => ({ status, createdAt }),
+      ref: {
+        parent: { parent: orgId === null ? null : { id: orgId } },
+        path: `organizations/${orgId}/pptxRenders/${importId}`,
+      },
+    };
+  }
+
+  function mockPptxSourceDb(allDocs: ReturnType<typeof fakeSourceRenderDoc>[]) {
+    const whereSpy = vi.fn((field: string, op: string, values: string[]) => {
+      const filtered =
+        field === "status" && op === "in"
+          ? allDocs.filter((d) => values.includes(d.data().status as string))
+          : allDocs;
+      return { get: vi.fn(async () => ({ docs: filtered })) };
+    });
+    const collectionGroupSpy = vi.fn((name: string) => {
+      if (name !== "pptxRenders") {
+        throw new Error(`mockPptxSourceDb: unexpected collectionGroup "${name}"`);
+      }
+      return { where: whereSpy };
+    });
+    vi.mocked(getFirestore).mockReturnValue({ collectionGroup: collectionGroupSpy } as never);
+    return { collectionGroupSpy, whereSpy };
+  }
+
+  interface FakeSourceObject {
+    name: string;
+    metadata: { size: number };
+    delete: ReturnType<typeof vi.fn>;
+  }
+
+  function fakeSourceObject(name: string, sizeBytes = 1000): FakeSourceObject {
+    return { name, metadata: { size: sizeBytes }, delete: vi.fn(async () => undefined) };
+  }
+
+  function mockSourceBucket(files: FakeSourceObject[]) {
+    const getFiles = vi.fn(async () => [files]);
+    vi.mocked(getStorage).mockReturnValue({
+      bucket: () => ({ getFiles }),
+    } as never);
+    return { getFiles };
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+    vi.mocked(getStorage).mockReset();
+    delete process.env.PPTX_SOURCE_CLEANUP_ENABLED;
+    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
+  });
+
+  it("R168: deletes source.pptx and images/ for a CONSUMED (ready) aged import while KEEPING rendered/", async () => {
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
+    mockPptxSourceDb([ready]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    const image = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/images/0.png`);
+    const rendered = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockSourceBucket([source, image, rendered]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    expect(source.delete).toHaveBeenCalledTimes(1);
+    expect(image.delete).toHaveBeenCalledTimes(1);
+    expect(rendered.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: false, deletedObjectCount: 2 });
+  });
+
+  it("KEEP rendered/: even a 90-day-old ready import with the flag enabled never has a rendered/ object deleted", async () => {
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    const ready = fakeSourceRenderDoc({ status: "ready", ageDays: 90 });
+    mockPptxSourceDb([ready]);
+    const rendered1 = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    const rendered2 = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0002.png`);
+    mockSourceBucket([rendered1, rendered2]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    expect(rendered1.delete).not.toHaveBeenCalled();
+    expect(rendered2.delete).not.toHaveBeenCalled();
+    expect(summary.deletedObjectCount).toBe(0);
+  });
+
+  it("prunes source.pptx + images/ for an aged FAILED import too -- rendered/ and doc lifecycle stay owned by cleanupOrphanRenders", async () => {
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    const failed = fakeSourceRenderDoc({ status: "failed", ageDays: STALE_DAYS });
+    mockPptxSourceDb([failed]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    const image = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/images/0.png`);
+    mockSourceBucket([source, image]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    expect(source.delete).toHaveBeenCalledTimes(1);
+    expect(image.delete).toHaveBeenCalledTimes(1);
+    expect(summary.deletedObjectCount).toBe(2);
+    // This sweep never deletes the render doc itself -- no delete method was
+    // even attached to the fake doc ref, so calling it would throw.
+    expect((failed.ref as { delete?: unknown }).delete).toBeUndefined();
+  });
+
+  it("never touches a fresh/too-new ready import -- consumption alone is not sufficient, only consumption AND age", async () => {
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    const fresh = fakeSourceRenderDoc({ status: "ready", ageDays: FRESH_DAYS });
+    mockPptxSourceDb([fresh]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    mockSourceBucket([source]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    expect(source.delete).not.toHaveBeenCalled();
+    expect(summary.scannedCount).toBe(0);
+  });
+
+  it("never touches a pending import -- excluded by the status filter itself", async () => {
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    const pending = fakeSourceRenderDoc({ status: "pending", ageDays: STALE_DAYS });
+    const { whereSpy } = mockPptxSourceDb([pending]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    mockSourceBucket([source]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    expect(source.delete).not.toHaveBeenCalled();
+    expect(summary.scannedCount).toBe(0);
+    expect(whereSpy).toHaveBeenCalledWith("status", "in", ["ready", "failed"]);
+  });
+
+  it("an unreadable/missing createdAt is skipped even with the gate enabled -- fail safe", async () => {
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    const unreadable = fakeSourceRenderDoc({ status: "ready" }); // ageDays omitted
+    mockPptxSourceDb([unreadable]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    mockSourceBucket([source]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    expect(source.delete).not.toHaveBeenCalled();
+    expect(summary.scannedCount).toBe(0);
+  });
+
+  it("skips a doc whose parent org id is missing from the parent chain", async () => {
+    const orphaned = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS, orgId: null });
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    mockPptxSourceDb([orphaned]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    mockSourceBucket([source]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    expect(source.delete).not.toHaveBeenCalled();
+    expect(summary.scannedCount).toBe(0);
+  });
+
+  it("FAILS SAFE: unset/empty/false/1/True all leave dryRun=true and delete nothing", async () => {
+    for (const value of [undefined, "", "false", "1", "True"]) {
+      if (value === undefined) {
+        delete process.env.PPTX_SOURCE_CLEANUP_ENABLED;
+      } else {
+        process.env.PPTX_SOURCE_CLEANUP_ENABLED = value;
+      }
+      const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
+      mockPptxSourceDb([ready]);
+      const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+      mockSourceBucket([source]);
+
+      const summary = await cleanupPptxSourcesHandler();
+
+      expect(source.delete).not.toHaveBeenCalled();
+      expect(summary.dryRun).toBe(true);
+    }
+  });
+
+  it("T-66-02-04: a per-run delete cap bounds a LIVE run -- exactly one object delete() call, cappedByLimit=true", async () => {
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
+    mockPptxSourceDb([ready]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    const image = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/images/0.png`);
+    mockSourceBucket([source, image]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    const totalDeleteCalls =
+      (source.delete as ReturnType<typeof vi.fn>).mock.calls.length +
+      (image.delete as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(totalDeleteCalls).toBe(1);
+    expect(summary).toMatchObject({ dryRun: false, deletedObjectCount: 1, cappedByLimit: true });
+  });
+
+  it("the delete cap does NOT truncate a dry-run -- the full would-delete object count is still reported", async () => {
+    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
+    mockPptxSourceDb([ready]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    const image = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/images/0.png`);
+    mockSourceBucket([source, image]);
+
+    const summary = await cleanupPptxSourcesHandler();
+
+    expect(source.delete).not.toHaveBeenCalled();
+    expect(image.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 2, cappedByLimit: false });
+  });
+
+  it("reports deletedBytes for a LIVE run summing known object sizes, and dry-run reports the same would-delete total", async () => {
+    const SIZE_1 = 33333;
+    const SIZE_2 = 44444;
+    const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
+    mockPptxSourceDb([ready]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`, SIZE_1);
+    const image = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/images/0.png`, SIZE_2);
+    mockSourceBucket([source, image]);
+
+    const dryRunSummary = await cleanupPptxSourcesHandler();
+    expect(dryRunSummary).toMatchObject({ dryRun: true, deletedBytes: SIZE_1 + SIZE_2 });
+
+    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    const liveSummary = await cleanupPptxSourcesHandler();
+    expect(source.delete).toHaveBeenCalledTimes(1);
+    expect(image.delete).toHaveBeenCalledTimes(1);
+    expect(liveSummary).toMatchObject({ dryRun: false, deletedBytes: SIZE_1 + SIZE_2 });
+  });
+
+  it("sourcePrefixFor builds the per-import prefix mirroring renderedPrefixFor's shape", () => {
+    expect(sourcePrefixFor("orgA", "i1")).toBe("orgs/orgA/pptx-imports/i1/");
+  });
+
+  it('★ SOURCE INSPECTION: the dry-run gate direction is pinned (PPTX_SOURCE_CLEANUP_ENABLED)', () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const start = source.indexOf("export async function cleanupPptxSourcesHandler(");
+    const wrapperStart = source.indexOf("export const cleanupPptxSources = onSchedule(");
+    expect(start).toBeGreaterThan(-1);
+    expect(wrapperStart).toBeGreaterThan(start);
+    const handlerBody = source.slice(start, wrapperStart);
+    expect(handlerBody).toMatch(
+      /const dryRun = process\.env\.PPTX_SOURCE_CLEANUP_ENABLED !== "true";/,
     );
   });
 });

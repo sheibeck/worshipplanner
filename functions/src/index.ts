@@ -1457,6 +1457,177 @@ export const cleanupOrphanBackgrounds = onSchedule(
   },
 );
 
+// --- cleanupPptxSources (R168: prune consumed/failed import sources) -----
+//
+// A NEW sweep, never shipped before this phase. cleanupOrphanRendersHandler
+// (above) already prunes a stale pending/failed import's rendered/ pages,
+// but it has never touched the heavier source.pptx deck or the extracted
+// images/ intermediate files -- those grow forever today. This sweep closes
+// that gap while NEVER touching rendered/, the PNGs the app actually
+// displays.
+//
+// SAFETY CONTRACT (66-02 threat model T-66-02-02/T-66-02-03/T-66-02-05):
+// - PPTX_SOURCE_GUARD is a POSITIVE guard: it matches ONLY
+//   orgs/{orgId}/pptx-imports/{importId}/source.pptx and
+//   orgs/{orgId}/pptx-imports/{importId}/images/*. It is structurally
+//   unable to match .../rendered/* -- rendered/ is excluded by construction,
+//   not by a runtime exception list.
+// - Driven by the pptxRenders collectionGroup (status "ready" or "failed"),
+//   the same collection cleanupOrphanRendersHandler reads. "ready" = the
+//   import is CONSUMED -- the app now displays from rendered/, so the
+//   source deck and its extracted images are dead weight. "failed" = an
+//   orphaned import whose source is also dead weight; its rendered/ +
+//   doc lifecycle stay owned by cleanupOrphanRendersHandler, unchanged by
+//   this sweep. An image-only import (no pptxRenders doc at all, whose
+//   images/ ARE the only display) is structurally out of scope -- this scan
+//   never sees it because it is driven entirely by render docs.
+// - Age is keyed on the server-set Firestore createdAt timestamp
+//   (FieldValue.serverTimestamp(), written by parsePptxHandler's queue
+//   write), never on client-settable input. A "ready" doc younger than
+//   PPTX_SOURCE_RETENTION_DAYS is skipped -- consumption alone is not
+//   sufficient, only consumption AND age.
+// - Disclosed benign race: if cleanupOrphanRendersHandler (once owner-
+//   enabled) deletes a "failed" doc before this sweep first observes it,
+//   that failed import's source may be missed this run. This is
+//   under-deletion only -- never over-deletion -- and the source stays
+//   in place (safe) until manually cleared or the doc reappears.
+// - FAILS SAFE: real deletion requires the exact string
+//   PPTX_SOURCE_CLEANUP_ENABLED="true"; anything else (unset, "", "false",
+//   "1", "True") is a dry run, matching the gate direction of every other
+//   sweep in this file.
+// - Per-object deletes are wrapped in try/catch so one failure never aborts
+//   the run; readDeleteCap() bounds a single LIVE run's blast radius across
+//   the WHOLE run (all imports), and dry-run is never capped.
+// - Runs on its own daily schedule, 06:00 UTC -- after the 05:00 background
+//   sweep, so the sweeps never overlap.
+
+/** Source decks are only prune-eligible once older than this many days. */
+export const PPTX_SOURCE_RETENTION_DAYS = 30;
+
+/**
+ * Hard POSITIVE path guard: matches ONLY the source deck and the extracted
+ * images/ prefix of a pptx-imports scope. Structurally unable to match
+ * anything under rendered/ at the same importId -- rendered/ is excluded by
+ * construction, never by a runtime name check.
+ */
+export const PPTX_SOURCE_GUARD = /^orgs\/[^/]+\/pptx-imports\/[^/]+\/(source\.pptx$|images\/)/;
+
+/** Builds the per-import Storage prefix a pptx import's source lives under. */
+export function sourcePrefixFor(orgId: string, importId: string): string {
+  return `orgs/${orgId}/pptx-imports/${importId}/`;
+}
+
+export interface PptxSourceCleanupSummary {
+  scannedCount: number;
+  deletedObjectCount: number;
+  /** Total bytes deleted (LIVE) or would-delete (dry-run) this run. */
+  deletedBytes: number;
+  /** True when readDeleteCap() stopped a LIVE run before all eligible objects were cleared. */
+  cappedByLimit: boolean;
+  dryRun: boolean;
+}
+
+/**
+ * The cleanupPptxSources handler body, exported separately from the
+ * `onSchedule` wrapper (mirroring cleanupOrphanRendersHandler) so it can be
+ * unit-tested directly against mocked Firestore/Storage.
+ */
+export async function cleanupPptxSourcesHandler(): Promise<PptxSourceCleanupSummary> {
+  // Fail safe: only an explicit opt-in enables real deletion. Anything else --
+  // unset, empty, "false", a typo -- leaves this a dry run.
+  const dryRun = process.env.PPTX_SOURCE_CLEANUP_ENABLED !== "true";
+
+  const cutoffMs = Date.now() - PPTX_SOURCE_RETENTION_DAYS * DAY_MS;
+  const deleteCap = readDeleteCap();
+
+  let scannedCount = 0;
+  let deletedObjectCount = 0;
+  let deletedBytes = 0;
+  let cappedByLimit = false;
+
+  const snapshot = await getFirestore()
+    .collectionGroup("pptxRenders")
+    .where("status", "in", ["ready", "failed"])
+    .get();
+
+  const bucket = getStorage().bucket();
+
+  outer: for (const renderDoc of snapshot.docs) {
+    // Recover the org id from the parent chain rather than guessing -- skip
+    // any doc whose parent chain is unexpectedly missing.
+    const orgId = renderDoc.ref.parent.parent?.id;
+    if (!orgId) {
+      console.error(
+        `cleanupPptxSources: skipping ${renderDoc.ref.path} -- missing parent org id`,
+      );
+      continue;
+    }
+    const importId = renderDoc.id;
+
+    const data = renderDoc.data() as { createdAt?: { toMillis?: () => number } } | undefined;
+    const createdAt = data?.createdAt;
+    const createdMs = typeof createdAt?.toMillis === "function" ? createdAt.toMillis() : NaN;
+    if (Number.isNaN(createdMs) || createdMs > cutoffMs) {
+      // Not old enough yet (or timestamp unreadable -- fail safe, skip it).
+      continue;
+    }
+
+    scannedCount++;
+
+    const [files] = await bucket.getFiles({ prefix: sourcePrefixFor(orgId, importId) });
+
+    // Hard safety gate, applied BEFORE any delete decision: never consider
+    // anything outside source.pptx/images/, no matter how old this import is.
+    const eligibleFiles = files.filter((file) => PPTX_SOURCE_GUARD.test(file.name));
+
+    if (dryRun) {
+      // Dry-run is NEVER capped -- the owner needs the true backlog
+      // count/bytes before enabling live deletion, not a truncated one.
+      deletedObjectCount += eligibleFiles.length;
+      for (const file of eligibleFiles) {
+        deletedBytes += Number(file.metadata?.size ?? 0);
+      }
+      continue;
+    }
+
+    for (const file of eligibleFiles) {
+      if (deletedObjectCount >= deleteCap) {
+        // T-66-02-04: bound this run's blast radius across the WHOLE run.
+        // Idempotent-by-status/age means the next daily run resumes.
+        cappedByLimit = true;
+        break outer;
+      }
+      try {
+        await file.delete();
+        deletedObjectCount++;
+        deletedBytes += Number(file.metadata?.size ?? 0);
+      } catch (err) {
+        // Partial-failure tolerance: one bad delete never aborts the run.
+        console.error(`cleanupPptxSources: failed to delete ${file.name}:`, err);
+      }
+    }
+    // Deliberately never delete renderDoc.ref here -- that doc's lifecycle
+    // (and its rendered/ objects) stays owned by cleanupOrphanRendersHandler.
+  }
+
+  const summary: PptxSourceCleanupSummary = {
+    scannedCount,
+    deletedObjectCount,
+    deletedBytes,
+    cappedByLimit,
+    dryRun,
+  };
+  console.log("cleanupPptxSources summary:", summary);
+  return summary;
+}
+
+export const cleanupPptxSources = onSchedule(
+  { schedule: "every day 06:00", timeZone: "UTC" },
+  async () => {
+    await cleanupPptxSourcesHandler();
+  },
+);
+
 // --- sendScheduledReminders daily reminder cron (61-02: R145/R133/SC3/SC4) --
 //
 // The R145 reminder engine: a daily onSchedule cron that auto-enqueues the
