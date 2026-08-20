@@ -61,6 +61,13 @@ export interface AppConfig {
 // values (R182 source of truth) -- every field cites its origin read-site
 // in index.ts so a future diff of that file's defaults can be checked
 // against this constant.
+//
+// Phase 70 (R186): src/config/appConfigDefaults.ts is a DELIBERATE CLIENT-
+// SIDE DUPLICATE of this interface + constant (src/ cannot import functions/
+// -- separate build targets). If you change a default value here, mirror the
+// change there too, or the Owner Console's (default) badge will show a
+// stale value. src/config/__tests__/appConfigDefaults.test.ts's drift-guard
+// snapshot test will fail if the two fall out of sync.
 export const DEFAULT_APP_CONFIG: AppConfig = {
   cleanup: {
     mediaEnabled: false, // MEDIA_CLEANUP_ENABLED unset today == dry-run (index.ts:1038)
