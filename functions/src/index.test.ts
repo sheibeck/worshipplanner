@@ -53,8 +53,9 @@ import {
   buildUsageEntry,
   writeUsageLedger,
   api,
+  previewCleanupDryRunHandler,
 } from "./index";
-import type { QueueMessageRequest } from "./index";
+import type { QueueMessageRequest, PreviewCleanupDryRunRequest } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
 import { getAppConfig, DEFAULT_APP_CONFIG, type AppConfig } from "./appConfig";
@@ -1992,6 +1993,264 @@ describe("cleanupPptxSourcesHandler", () => {
 
     expect(source.delete).toHaveBeenCalledTimes(1);
     expect(summary).toMatchObject({ dryRun: false, deletedObjectCount: 1 });
+  });
+});
+
+describe("previewCleanupDryRun", () => {
+  const CALLER_UID = "previewCallerUid";
+  const ORG_ID = "orgA";
+  const STALE_DAYS = 90; // comfortably past every 30-day retention default
+  const STALE_HOURS = (ORPHAN_RENDER_STALE_HOURS + 24) as number; // past the 24h default
+
+  function fakeRequest(
+    overrides: {
+      auth?: { uid: string; token?: Record<string, unknown> } | null;
+      data?: Partial<PreviewCleanupDryRunRequest>;
+    } = {},
+  ): CallableRequest<PreviewCleanupDryRunRequest> {
+    const auth =
+      overrides.auth === undefined ? { uid: CALLER_UID, token: { superAdmin: true } } : overrides.auth;
+    return {
+      auth: auth === null ? undefined : { uid: auth.uid, token: auth.token ?? {} },
+      data: { type: "media", ...overrides.data },
+    } as unknown as CallableRequest<PreviewCleanupDryRunRequest>;
+  }
+
+  interface FakePreviewRenderDocOpts {
+    importId?: string;
+    orgId?: string;
+    status?: "pending" | "failed" | "ready";
+    ageHours?: number;
+  }
+
+  // Mirrors cleanupOrphanRendersHandler describe block's fakeOrphanDoc shape
+  // (a self-contained local copy, not a cross-describe-block reuse -- the
+  // R190 hard constraint forbids editing that block, including hoisting its
+  // helpers out to module scope).
+  function fakePreviewRenderDoc(opts: FakePreviewRenderDocOpts = {}) {
+    const orgId = opts.orgId ?? ORG_ID;
+    const importId = opts.importId ?? "i1";
+    const status = opts.status ?? "failed";
+    const createdAt =
+      opts.ageHours === undefined
+        ? undefined
+        : { toMillis: () => Date.now() - opts.ageHours! * 60 * 60 * 1000 };
+    return {
+      id: importId,
+      data: () => ({ status, createdAt }),
+      ref: {
+        parent: { parent: { id: orgId } },
+        path: `organizations/${orgId}/pptxRenders/${importId}`,
+        delete: vi.fn(async () => undefined),
+      },
+    };
+  }
+
+  function downloadUrlFor(objectPath: string): string {
+    return `https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/${encodeURIComponent(objectPath)}?alt=media&token=abc123`;
+  }
+
+  interface MockPreviewFirestoreOpts {
+    callerDocExists?: boolean;
+    pptxRendersDocs?: ReturnType<typeof fakePreviewRenderDoc>[];
+    slideGroups?: Array<{ data: () => unknown }>;
+    lyrics?: Array<{ data: () => unknown }>;
+    slideGroupsThrows?: boolean;
+  }
+
+  // Combined Firestore mock: supports BOTH the previewCleanupDryRun caller
+  // re-check (collection("superAdmins").doc(uid).get()) AND whichever
+  // collectionGroup scan the dispatched-to handler needs
+  // (pptxRenders/slideGroups/lyrics) -- since previewCleanupDryRunHandler and
+  // the handler it dispatches to share the SAME getFirestore() mock.
+  function mockPreviewFirestore(opts: MockPreviewFirestoreOpts = {}) {
+    const callerDocExists = opts.callerDocExists ?? true;
+    const docSpy = vi.fn((uid: string) => ({
+      get: vi.fn(async () => ({ exists: uid === CALLER_UID ? callerDocExists : true })),
+    }));
+    const superAdminsCollection = { doc: docSpy };
+
+    const whereSpy = vi.fn((field: string, op: string, values: string[]) => {
+      const docs = opts.pptxRendersDocs ?? [];
+      const filtered =
+        field === "status" && op === "in"
+          ? docs.filter((d) => values.includes(d.data().status as string))
+          : docs;
+      return { get: vi.fn(async () => ({ docs: filtered })) };
+    });
+
+    const collectionGroupSpy = vi.fn((name: string) => {
+      if (name === "pptxRenders") return { where: whereSpy };
+      if (name === "slideGroups") {
+        return {
+          get: vi.fn(async () => {
+            if (opts.slideGroupsThrows) {
+              throw new Error("slideGroups scan failed");
+            }
+            return { docs: opts.slideGroups ?? [] };
+          }),
+        };
+      }
+      if (name === "lyrics") return { get: vi.fn(async () => ({ docs: opts.lyrics ?? [] })) };
+      throw new Error(`mockPreviewFirestore: unexpected collectionGroup "${name}"`);
+    });
+
+    vi.mocked(getFirestore).mockReturnValue({
+      collection: vi.fn((name: string) => {
+        if (name === "superAdmins") return superAdminsCollection;
+        throw new Error(`mockPreviewFirestore: unexpected collection "${name}"`);
+      }),
+      collectionGroup: collectionGroupSpy,
+    } as never);
+
+    return { docSpy, collectionGroupSpy, whereSpy };
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+    vi.mocked(getStorage).mockReset();
+  });
+
+  // --- 3 auth-reject cases -------------------------------------------
+
+  it("throws unauthenticated when request.auth is missing", async () => {
+    mockPreviewFirestore();
+
+    await expect(previewCleanupDryRunHandler(fakeRequest({ auth: null }))).rejects.toMatchObject({
+      code: "unauthenticated",
+    });
+  });
+
+  it("rejects a caller whose token lacks superAdmin -- permission-denied, never reads Firestore", async () => {
+    const { docSpy } = mockPreviewFirestore();
+
+    await expect(
+      previewCleanupDryRunHandler(fakeRequest({ auth: { uid: CALLER_UID, token: {} } })),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    expect(docSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the token claims superAdmin but superAdmins/{callerUid} does not exist (re-check #2)", async () => {
+    mockPreviewFirestore({ callerDocExists: false });
+
+    await expect(previewCleanupDryRunHandler(fakeRequest())).rejects.toMatchObject({
+      code: "permission-denied",
+    });
+  });
+
+  // --- invalid type ----------------------------------------------------
+
+  it("throws invalid-argument for an unrecognized type, listing only the 4 valid values", async () => {
+    mockPreviewFirestore();
+
+    await expect(
+      previewCleanupDryRunHandler(
+        fakeRequest({ data: { type: "bogus" as unknown as PreviewCleanupDryRunRequest["type"] } }),
+      ),
+    ).rejects.toMatchObject({
+      code: "invalid-argument",
+      message: expect.stringContaining("media, orphanRenders, backgrounds, pptxSources"),
+    });
+  });
+
+  // --- 4 per-type dispatch + field-mapping cases ------------------------
+
+  it("media: wouldDeleteCount/wouldDeleteBytes map from deletedObjectCount/deletedBytes", async () => {
+    mockPreviewFirestore();
+    const f1 = fakeFile(`orgs/${ORG_ID}/media/m1/old1.mp4`, STALE_DAYS, 1000);
+    const f2 = fakeFile(`orgs/${ORG_ID}/media/m2/old2.mp4`, STALE_DAYS, 2000);
+    mockBucket([f1, f2]);
+
+    const result = await previewCleanupDryRunHandler(fakeRequest({ data: { type: "media" } }));
+
+    expect(f1.delete).not.toHaveBeenCalled();
+    expect(f2.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ wouldDeleteCount: 2, wouldDeleteBytes: 3000 });
+  });
+
+  it("orphanRenders: wouldDeleteCount/wouldDeleteBytes map from deletedObjectCount/deletedBytes", async () => {
+    const staleDoc = fakePreviewRenderDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockPreviewFirestore({ pptxRendersDocs: [staleDoc] });
+    const obj1 = fakeFile(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`, 0, 500);
+    const obj2 = fakeFile(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0002.png`, 0, 700);
+    mockBucket([obj1, obj2]);
+
+    const result = await previewCleanupDryRunHandler(
+      fakeRequest({ data: { type: "orphanRenders" } }),
+    );
+
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(obj2.delete).not.toHaveBeenCalled();
+    expect(staleDoc.ref.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ wouldDeleteCount: 2, wouldDeleteBytes: 1200 });
+  });
+
+  it("backgrounds: wouldDeleteCount maps from orphanCount (NOT deletedObjectCount, which stays 0 in forced-dry-run)", async () => {
+    const referencedPath = `orgs/${ORG_ID}/backgrounds/bg-ref/keep.png`;
+    mockPreviewFirestore({
+      slideGroups: [
+        { data: () => ({ backgroundImageUrl: downloadUrlFor(referencedPath) }) },
+      ],
+    });
+    const orphan = fakeFile(`orgs/${ORG_ID}/backgrounds/bg-orphan/delete-me.png`, STALE_DAYS, 999);
+    const referenced = fakeFile(referencedPath, STALE_DAYS, 111);
+    mockBucket([orphan, referenced]);
+
+    const result = await previewCleanupDryRunHandler(
+      fakeRequest({ data: { type: "backgrounds" } }),
+    );
+
+    expect(orphan.delete).not.toHaveBeenCalled();
+    expect(referenced.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ wouldDeleteCount: 1, wouldDeleteBytes: 999, referencesComplete: true });
+  });
+
+  it("pptxSources: wouldDeleteCount/wouldDeleteBytes map from deletedObjectCount/deletedBytes", async () => {
+    const readyDoc = fakePreviewRenderDoc({ status: "ready", ageHours: (PPTX_SOURCE_RETENTION_DAYS + 10) * 24 });
+    mockPreviewFirestore({ pptxRendersDocs: [readyDoc] });
+    const source = fakeFile(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`, 0, 4321);
+    mockBucket([source]);
+
+    const result = await previewCleanupDryRunHandler(fakeRequest({ data: { type: "pptxSources" } }));
+
+    expect(source.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ wouldDeleteCount: 1, wouldDeleteBytes: 4321 });
+  });
+
+  // --- LOAD-BEARING: never deletes even when getAppConfig is ENABLED -----
+
+  it("LOAD-BEARING: never deletes even when getAppConfig is mocked cleanup-ENABLED for the requested type", async () => {
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+    });
+    mockPreviewFirestore();
+    const f1 = fakeFile(`orgs/${ORG_ID}/media/m1/old1.mp4`, STALE_DAYS, 1000);
+    const f2 = fakeFile(`orgs/${ORG_ID}/media/m2/old2.mp4`, STALE_DAYS, 2000);
+    mockBucket([f1, f2]);
+
+    const result = await previewCleanupDryRunHandler(fakeRequest({ data: { type: "media" } }));
+
+    expect(f1.delete).not.toHaveBeenCalled();
+    expect(f2.delete).not.toHaveBeenCalled();
+    // A real, truthful backlog count is still returned -- forceDryRun never
+    // suppresses the count, only the actual delete.
+    expect(result).toEqual({ wouldDeleteCount: 2, wouldDeleteBytes: 3000 });
+  });
+
+  // --- backgrounds referencesComplete pass-through ------------------------
+
+  it("backgrounds: referencesComplete:false passes through the SAME scan a live run uses (slideGroups scan throws)", async () => {
+    mockPreviewFirestore({ slideGroupsThrows: true });
+    const orphan = fakeFile(`orgs/${ORG_ID}/backgrounds/bg-orphan/delete-me.png`, STALE_DAYS, 555);
+    mockBucket([orphan]);
+
+    const result = await previewCleanupDryRunHandler(
+      fakeRequest({ data: { type: "backgrounds" } }),
+    );
+
+    expect(orphan.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ wouldDeleteCount: 1, wouldDeleteBytes: 555, referencesComplete: false });
   });
 });
 

@@ -1806,6 +1806,136 @@ export const cleanupPptxSources = onSchedule(
   },
 );
 
+// --- previewCleanupDryRun (R188/R190: on-demand blast-radius preview) ----
+//
+// A super-admin-only onCall that gives the Owner Console a truthful,
+// on-demand "what would this cleanup delete right now" count for any of the
+// four *_CLEANUP_ENABLED sweeps above, WITHOUT ever deleting anything and
+// WITHOUT depending on the sweep's stored enable flag. It is the server half
+// of the safe-flip flow this phase adds in front of those flags (R189 is the
+// client confirm-to-flip UI, a separate plan).
+//
+// SAFETY CONTRACT:
+// - Reuses the SAME scan/reference-detection code the real cron uses --
+//   dispatches to the four handlers above with { forceDryRun: true } rather
+//   than forking a second scan-and-count implementation, so the preview can
+//   never under/over-count relative to what a live run would actually do
+//   (71-RESEARCH.md "Alternatives Considered": a forked pure function was
+//   explicitly rejected as strictly higher risk for zero benefit).
+// - forceDryRun structurally short-circuits each handler's dryRun/
+//   effectiveDryRun to true BEFORE any delete branch is reached (the
+//   forceDryRun-FIRST ternary added to each handler above) -- independent of
+//   the live cleanup.*Enabled config value. The belt-and-suspenders
+//   `if (!s.dryRun) throw` below is a defense-in-depth assertion of that
+//   guarantee, not the guarantee itself.
+// - Caller re-verification mirrors setSuperAdminClaimHandler
+//   (superAdminClaims.ts) EXACTLY: two independent server-side checks (the
+//   ID-token superAdmin claim AND a fresh superAdmins/{uid} Firestore read)
+//   -- a client-declared authority flag is never trusted.
+
+export type CleanupPreviewType = "media" | "orphanRenders" | "backgrounds" | "pptxSources";
+
+const CLEANUP_PREVIEW_TYPES: CleanupPreviewType[] = [
+  "media",
+  "orphanRenders",
+  "backgrounds",
+  "pptxSources",
+];
+
+export interface PreviewCleanupDryRunRequest {
+  type: CleanupPreviewType;
+}
+
+export interface PreviewCleanupDryRunResponse {
+  wouldDeleteCount: number;
+  wouldDeleteBytes: number;
+  /** Present only for type === "backgrounds" -- see BACKGROUND_PATH_GUARD's referencesComplete contract above. */
+  referencesComplete?: boolean;
+}
+
+/**
+ * The testable handler body, exported separately from the onCall wrapper
+ * below -- mirrors setSuperAdminClaimHandler/setSuperAdminClaim and
+ * parsePptxHandler/parsePptx.
+ */
+export async function previewCleanupDryRunHandler(
+  request: CallableRequest<PreviewCleanupDryRunRequest>,
+): Promise<PreviewCleanupDryRunResponse> {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  // Re-check #1: the caller's own ID-token claim.
+  if (request.auth.token.superAdmin !== true) {
+    throw new HttpsError("permission-denied", "You must be a super-admin.");
+  }
+
+  // Re-check #2: an independent Firestore re-read of the source-of-truth
+  // document. Defense-in-depth against a stale/forged token claim, verbatim
+  // from setSuperAdminClaimHandler.
+  const callerDoc = await getFirestore()
+    .collection("superAdmins")
+    .doc(request.auth.uid)
+    .get();
+  if (!callerDoc.exists) {
+    throw new HttpsError("permission-denied", "You must be a super-admin.");
+  }
+
+  const { type } = request.data ?? ({} as PreviewCleanupDryRunRequest);
+  if (typeof type !== "string" || !CLEANUP_PREVIEW_TYPES.includes(type as CleanupPreviewType)) {
+    throw new HttpsError(
+      "invalid-argument",
+      "type must be one of: " + CLEANUP_PREVIEW_TYPES.join(", "),
+    );
+  }
+
+  switch (type as CleanupPreviewType) {
+    case "media": {
+      const s = await cleanupExpiredMediaHandler({ forceDryRun: true });
+      if (!s.dryRun) {
+        throw new Error("previewCleanupDryRun: media preview did not return dryRun:true");
+      }
+      return { wouldDeleteCount: s.deletedObjectCount, wouldDeleteBytes: s.deletedBytes };
+    }
+    case "orphanRenders": {
+      const s = await cleanupOrphanRendersHandler({ forceDryRun: true });
+      if (!s.dryRun) {
+        throw new Error(
+          "previewCleanupDryRun: orphanRenders preview did not return dryRun:true",
+        );
+      }
+      return { wouldDeleteCount: s.deletedObjectCount, wouldDeleteBytes: s.deletedBytes };
+    }
+    case "backgrounds": {
+      const s = await cleanupOrphanBackgroundsHandler({ forceDryRun: true });
+      if (!s.dryRun) {
+        throw new Error(
+          "previewCleanupDryRun: backgrounds preview did not return dryRun:true",
+        );
+      }
+      // NOTE: orphanCount, NOT deletedObjectCount -- deletedObjectCount only
+      // increments on the live-delete branch and is always 0 in forced-dry-run
+      // mode for this handler (71-PATTERNS.md Pitfall 1).
+      return {
+        wouldDeleteCount: s.orphanCount,
+        wouldDeleteBytes: s.deletedBytes,
+        referencesComplete: s.referencesComplete,
+      };
+    }
+    case "pptxSources": {
+      const s = await cleanupPptxSourcesHandler({ forceDryRun: true });
+      if (!s.dryRun) {
+        throw new Error(
+          "previewCleanupDryRun: pptxSources preview did not return dryRun:true",
+        );
+      }
+      return { wouldDeleteCount: s.deletedObjectCount, wouldDeleteBytes: s.deletedBytes };
+    }
+  }
+}
+
+export const previewCleanupDryRun = onCall(previewCleanupDryRunHandler);
+
 // --- sendScheduledReminders daily reminder cron (61-02: R145/R133/SC3/SC4) --
 //
 // The R145 reminder engine: a daily onSchedule cron that auto-enqueues the
