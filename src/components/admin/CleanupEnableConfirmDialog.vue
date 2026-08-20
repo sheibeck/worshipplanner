@@ -54,6 +54,7 @@
 
             <div
               v-if="isBlocked"
+              :id="warningId"
               class="text-yellow-500 bg-yellow-500/10 border border-yellow-500/30 rounded-md p-3 text-sm"
             >
               ⚠ Reference detection is incomplete right now — this count may be missing backgrounds
@@ -79,6 +80,7 @@
               v-if="isBlocked"
               type="button"
               disabled
+              :aria-describedby="warningId"
               class="px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 opacity-60 cursor-not-allowed transition-colors focus:outline-none focus:ring-1 focus:ring-indigo-500"
             >
               Enable
@@ -141,6 +143,7 @@ const emit = defineEmits<{
 const idBase = useId()
 const titleId = `cleanup-confirm-title-${idBase}`
 const bodyId = `cleanup-confirm-body-${idBase}`
+const warningId = `cleanup-confirm-warning-${idBase}`
 
 const dialogRootRef = ref<HTMLElement | null>(null)
 const cancelButtonRef = ref<HTMLButtonElement | null>(null)

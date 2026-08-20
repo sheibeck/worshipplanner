@@ -62,6 +62,12 @@ describe('CleanupEnableConfirmDialog', () => {
     expect(confirm.text()).toBe('Enable')
     expect(confirm.attributes('disabled')).toBeDefined()
 
+    // Review UI-3: the disabled reason must be programmatically tied to the
+    // warning paragraph, not just adjacent in visual/DOM order.
+    const warningId = confirm.attributes('aria-describedby')
+    expect(warningId).toBeTruthy()
+    expect(wrapper.find(`#${warningId}`).text()).toContain('Reference detection is incomplete')
+
     await confirm.trigger('click')
     expect(wrapper.emitted('confirm')).toBeUndefined()
   })
