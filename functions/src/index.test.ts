@@ -10,6 +10,10 @@ import {
   buildUpstreamUrl,
   cleanupExpiredMediaHandler,
   cleanupOrphanRendersHandler,
+  cleanupOrphanBackgroundsHandler,
+  BACKGROUND_PATH_GUARD,
+  BACKGROUND_RETENTION_DAYS,
+  extractBackgroundObjectPath,
   createQueuedMessage,
   MEDIA_PATH_GUARD,
   ORPHAN_RENDER_STALE_HOURS,
@@ -1172,6 +1176,357 @@ describe("cleanupOrphanRendersHandler", () => {
     const handlerBody = source.slice(start, wrapperStart);
     expect(handlerBody).toMatch(
       /const dryRun = process\.env\.PPTX_RENDER_CLEANUP_ENABLED !== "true";/,
+    );
+  });
+});
+
+describe("BACKGROUND_PATH_GUARD", () => {
+  it("matches background objects under orgs/{orgId}/backgrounds/", () => {
+    expect(BACKGROUND_PATH_GUARD.test("orgs/orgA/backgrounds/bg1/file.png")).toBe(true);
+  });
+
+  it("does not match media/ or pptx-imports/ or other non-background paths", () => {
+    expect(BACKGROUND_PATH_GUARD.test("orgs/orgA/media/m1/old.mp4")).toBe(false);
+    expect(BACKGROUND_PATH_GUARD.test("orgs/orgA/pptx-imports/i1/source.pptx")).toBe(false);
+    expect(BACKGROUND_PATH_GUARD.test("some/other/path.txt")).toBe(false);
+  });
+});
+
+describe("extractBackgroundObjectPath", () => {
+  it("recovers the decoded object path from a Firebase download URL", () => {
+    const objectPath = "orgs/orgA/backgrounds/bg1/my file.png";
+    const url = `https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/${encodeURIComponent(objectPath)}?alt=media&token=abc123`;
+    expect(extractBackgroundObjectPath(url)).toBe(objectPath);
+  });
+
+  it("returns null for a URL with no /o/{path} segment", () => {
+    expect(extractBackgroundObjectPath("https://example.com/not-a-storage-url")).toBeNull();
+  });
+
+  it("returns null for a malformed percent-encoding that fails to decode", () => {
+    expect(extractBackgroundObjectPath("https://x/o/%E0%A4%A?alt=media")).toBeNull();
+  });
+});
+
+describe("cleanupOrphanBackgroundsHandler", () => {
+  const ORG_ID = "orgA";
+  const STALE_DAYS = BACKGROUND_RETENTION_DAYS + 60; // comfortably past the retention window
+
+  function downloadUrlFor(objectPath: string): string {
+    return `https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/${encodeURIComponent(objectPath)}?alt=media&token=abc123`;
+  }
+
+  interface FakeBackgroundFile {
+    name: string;
+    metadata: { timeCreated?: string; size: number };
+    delete: ReturnType<typeof vi.fn>;
+  }
+
+  // ageDays omitted simulates an unreadable/missing timeCreated.
+  function fakeBackgroundFile(
+    name: string,
+    ageDays?: number,
+    sizeBytes = 1000,
+  ): FakeBackgroundFile {
+    return {
+      name,
+      metadata: {
+        timeCreated: ageDays === undefined ? undefined : daysAgoIso(ageDays),
+        size: sizeBytes,
+      },
+      delete: vi.fn(async () => undefined),
+    };
+  }
+
+  function mockBackgroundBucket(files: FakeBackgroundFile[]) {
+    const getFiles = vi.fn(async () => [files]);
+    vi.mocked(getStorage).mockReturnValue({
+      bucket: () => ({ getFiles }),
+    } as never);
+    return { getFiles };
+  }
+
+  interface MockBackgroundDbOptions {
+    slideGroups?: Array<{ data: () => unknown }>;
+    lyrics?: Array<{ data: () => unknown }>;
+    slideGroupsThrows?: boolean;
+    lyricsThrows?: boolean;
+  }
+
+  function mockBackgroundDb(opts: MockBackgroundDbOptions = {}) {
+    const collectionGroupSpy = vi.fn((name: string) => {
+      if (name === "slideGroups") {
+        return {
+          get: vi.fn(async () => {
+            if (opts.slideGroupsThrows) {
+              throw new Error("slideGroups scan failed");
+            }
+            return { docs: opts.slideGroups ?? [] };
+          }),
+        };
+      }
+      if (name === "lyrics") {
+        return {
+          get: vi.fn(async () => {
+            if (opts.lyricsThrows) {
+              throw new Error("lyrics scan failed");
+            }
+            return { docs: opts.lyrics ?? [] };
+          }),
+        };
+      }
+      throw new Error(`mockBackgroundDb: unexpected collectionGroup "${name}"`);
+    });
+    vi.mocked(getFirestore).mockReturnValue({ collectionGroup: collectionGroupSpy } as never);
+    return { collectionGroupSpy };
+  }
+
+  function slideGroupDoc(opts: {
+    backgroundImageUrl?: string;
+    slides?: Array<{ backgroundImageUrl?: string }>;
+  }) {
+    return { data: () => ({ backgroundImageUrl: opts.backgroundImageUrl, slides: opts.slides }) };
+  }
+
+  function lyricsDoc(opts: { backgroundImageUrl?: string }) {
+    return { data: () => ({ backgroundImageUrl: opts.backgroundImageUrl }) };
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+    vi.mocked(getStorage).mockReset();
+    delete process.env.BACKGROUND_CLEANUP_ENABLED;
+    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
+  });
+
+  it("R167: deletes an aged unreferenced background when explicitly enabled, and never deletes an aged background referenced at the GROUP tier in the same run", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    const referencedPath = `orgs/${ORG_ID}/backgrounds/bg-ref/keep.png`;
+    mockBackgroundDb({
+      slideGroups: [slideGroupDoc({ backgroundImageUrl: downloadUrlFor(referencedPath) })],
+    });
+    const orphan = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg-orphan/delete-me.png`, STALE_DAYS);
+    const referenced = fakeBackgroundFile(referencedPath, STALE_DAYS);
+    mockBackgroundBucket([orphan, referenced]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(orphan.delete).toHaveBeenCalledTimes(1);
+    expect(referenced.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({
+      dryRun: false,
+      deletedCount: 1,
+      orphanCount: 1,
+      referencesComplete: true,
+    });
+  });
+
+  it("NEVER deletes a background referenced at the SLIDE tier (embedded slides[] array entry, not the group field)", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    const referencedPath = `orgs/${ORG_ID}/backgrounds/bg-slide/keep.png`;
+    mockBackgroundDb({
+      slideGroups: [
+        slideGroupDoc({
+          backgroundImageUrl: undefined,
+          slides: [{ backgroundImageUrl: downloadUrlFor(referencedPath) }],
+        }),
+      ],
+    });
+    const referenced = fakeBackgroundFile(referencedPath, STALE_DAYS);
+    mockBackgroundBucket([referenced]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(referenced.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: false, deletedCount: 0, referencesComplete: true });
+  });
+
+  it("NEVER deletes a background referenced at the SONG (lyrics) tier", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    const referencedPath = `orgs/${ORG_ID}/backgrounds/bg-song/keep.png`;
+    mockBackgroundDb({
+      lyrics: [lyricsDoc({ backgroundImageUrl: downloadUrlFor(referencedPath) })],
+    });
+    const referenced = fakeBackgroundFile(referencedPath, STALE_DAYS);
+    mockBackgroundBucket([referenced]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(referenced.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: false, deletedCount: 0, referencesComplete: true });
+  });
+
+  it("path guard: an aged object under orgs/{orgId}/media/ or .../pptx-imports/ is never considered, even when enabled", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    mockBackgroundDb({});
+    const mediaFile = fakeBackgroundFile(`orgs/${ORG_ID}/media/m1/old.mp4`, STALE_DAYS);
+    const pptxFile = fakeBackgroundFile(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`, STALE_DAYS);
+    mockBackgroundBucket([mediaFile, pptxFile]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(mediaFile.delete).not.toHaveBeenCalled();
+    expect(pptxFile.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ scannedCount: 0, deletedCount: 0 });
+  });
+
+  it("REFERENCES-INCOMPLETE FAIL-SAFE: an unparseable backgroundImageUrl forces the whole run to dry-run, even with the flag enabled", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    mockBackgroundDb({
+      slideGroups: [slideGroupDoc({ backgroundImageUrl: "https://example.com/not-a-storage-url" })],
+    });
+    const orphan = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg-orphan/delete-me.png`, STALE_DAYS);
+    mockBackgroundBucket([orphan]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(orphan.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: true, referencesComplete: false });
+  });
+
+  it("REFERENCES-INCOMPLETE FAIL-SAFE: a collectionGroup scan throwing forces the whole run to dry-run", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    mockBackgroundDb({
+      slideGroups: [slideGroupDoc({ backgroundImageUrl: downloadUrlFor("orgs/orgA/backgrounds/x/y.png") })],
+      lyricsThrows: true,
+    });
+    const orphan = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg-orphan/delete-me.png`, STALE_DAYS);
+    mockBackgroundBucket([orphan]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(orphan.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: true, referencesComplete: false });
+  });
+
+  it("FLOOR GUARD: zero total references found anywhere, yet candidate backgrounds exist -- treats references as incomplete and deletes nothing", async () => {
+    // Both collectionGroup scans succeed (no throw, no unparseable URL) but
+    // return zero docs -- a silent-empty result, not an error. This must be
+    // just as unsafe as a throw or a parse failure: never delete every
+    // background because a scan came back empty.
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    mockBackgroundDb({}); // no slideGroups docs, no lyrics docs at all
+    const candidate = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg1/maybe-orphan.png`, STALE_DAYS);
+    mockBackgroundBucket([candidate]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(candidate.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({
+      dryRun: true,
+      deletedCount: 0,
+      referencesComplete: false,
+    });
+  });
+
+  it("does NOT trip the floor guard when there truly are no candidate backgrounds at all (zero references, zero candidates is not suspicious)", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    mockBackgroundDb({});
+    mockBackgroundBucket([]); // no background objects exist yet -- not an anomaly
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(summary).toMatchObject({
+      dryRun: false,
+      referencesComplete: true,
+      scannedCount: 0,
+      deletedCount: 0,
+    });
+  });
+
+  it("an unreadable/missing timeCreated is skipped even with the gate enabled -- fail safe", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    // A dummy reference elsewhere keeps the floor guard from being the
+    // reason nothing is deleted -- isolates the assertion to the NaN path.
+    mockBackgroundDb({
+      slideGroups: [
+        slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
+      ],
+    });
+    const unreadable = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg1/unreadable.png`); // no ageDays
+    mockBackgroundBucket([unreadable]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(unreadable.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ orphanCount: 0, deletedCount: 0 });
+  });
+
+  it("FAILS SAFE: unset/empty/false/1/True all leave dryRun=true and delete nothing", async () => {
+    for (const value of [undefined, "", "false", "1", "True"]) {
+      if (value === undefined) {
+        delete process.env.BACKGROUND_CLEANUP_ENABLED;
+      } else {
+        process.env.BACKGROUND_CLEANUP_ENABLED = value;
+      }
+      mockBackgroundDb({
+        slideGroups: [
+          slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
+        ],
+      });
+      const candidate = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg1/maybe.png`, STALE_DAYS);
+      mockBackgroundBucket([candidate]);
+
+      const summary = await cleanupOrphanBackgroundsHandler();
+
+      expect(candidate.delete).not.toHaveBeenCalled();
+      expect(summary.dryRun).toBe(true);
+    }
+  });
+
+  it("T-66-02-04: a per-run delete cap bounds a LIVE run -- exactly one delete() call, cappedByLimit=true", async () => {
+    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    mockBackgroundDb({
+      slideGroups: [
+        slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
+      ],
+    });
+    const orphan1 = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg1/one.png`, STALE_DAYS);
+    const orphan2 = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg2/two.png`, STALE_DAYS);
+    mockBackgroundBucket([orphan1, orphan2]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    const totalDeleteCalls =
+      (orphan1.delete as ReturnType<typeof vi.fn>).mock.calls.length +
+      (orphan2.delete as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(totalDeleteCalls).toBe(1);
+    expect(summary).toMatchObject({ dryRun: false, deletedCount: 1, cappedByLimit: true });
+  });
+
+  it("the delete cap does NOT truncate a dry-run -- would-delete bytes/count reported in full", async () => {
+    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    mockBackgroundDb({
+      slideGroups: [
+        slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
+      ],
+    });
+    const orphan1 = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg1/one.png`, 90, 1234);
+    const orphan2 = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg2/two.png`, 90, 5678);
+    mockBackgroundBucket([orphan1, orphan2]);
+
+    const summary = await cleanupOrphanBackgroundsHandler();
+
+    expect(orphan1.delete).not.toHaveBeenCalled();
+    expect(orphan2.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({
+      dryRun: true,
+      deletedCount: 0,
+      deletedBytes: 1234 + 5678,
+      cappedByLimit: false,
+    });
+  });
+
+  it('★ SOURCE INSPECTION: the dry-run gate direction is pinned (BACKGROUND_CLEANUP_ENABLED)', () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const start = source.indexOf("export async function cleanupOrphanBackgroundsHandler(");
+    const wrapperStart = source.indexOf("export const cleanupOrphanBackgrounds = onSchedule(");
+    expect(start).toBeGreaterThan(-1);
+    expect(wrapperStart).toBeGreaterThan(start);
+    const handlerBody = source.slice(start, wrapperStart);
+    expect(handlerBody).toMatch(
+      /const dryRun = process\.env\.BACKGROUND_CLEANUP_ENABLED !== "true";/,
     );
   });
 });

@@ -1215,6 +1215,248 @@ export const cleanupOrphanRenders = onSchedule(
   },
 );
 
+/** Shared day-length constant for the two 66-02 retention sweeps below. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// --- cleanupOrphanBackgrounds (R167: orphan+age background sweep) --------
+//
+// A NEW sweep, never shipped before this phase. Backgrounds
+// (orgs/{orgId}/backgrounds/{backgroundId}/{fileName}, written by
+// src/composables/useBackgroundUpload.ts:103) are structurally exempt from
+// cleanupExpiredMediaHandler's MEDIA_PATH_GUARD and were never pruned at
+// all until now.
+//
+// SAFETY CONTRACT (66-02 threat model T-66-02-01/T-66-02-03/T-66-02-05):
+// - This is ORPHAN+AGE, deliberately NEVER pure age. A background is only a
+//   deletion candidate once it is BOTH (a) unreferenced by any live
+//   document, at ANY of the three tiers below, AND (b) older than
+//   BACKGROUND_RETENTION_DAYS. A 90-day-old background still set on an
+//   active slide is never eligible, regardless of age.
+// - The three reference tiers, all enumerated via plain collectionGroup()
+//   scans (no composite index required):
+//     1. Group tier   -- organizations/{orgId}/slideGroups/{slotId}.backgroundImageUrl
+//     2. Slide tier   -- the SAME doc's embedded slides[] array, each
+//                        entry.backgroundImageUrl (an array field, not a
+//                        subcollection -- read via doc.data().slides).
+//     3. Song tier    -- organizations/{orgId}/songs/{songId}/lyrics/{lyricsId}.backgroundImageUrl
+// - References are stored as full Firebase download URLs
+//   (https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{ENCODED_PATH}?...).
+//   extractBackgroundObjectPath() recovers the exact object name from the
+//   /o/{path} segment (URL-decoded) so it can be compared 1:1 against
+//   file.name from the bucket listing.
+// - REFERENCES-INCOMPLETE FAIL-SAFE: if any non-empty backgroundImageUrl
+//   cannot be parsed to an object path, or either collectionGroup scan
+//   throws, referencesComplete is set to false and the ENTIRE run is forced
+//   to dry-run -- it deletes NOTHING that run, regardless of
+//   BACKGROUND_CLEANUP_ENABLED. The sweep never deletes when it cannot
+//   prove an object is unreferenced. Under-deletion (leaving an orphan
+//   another day) is always preferred over deleting a live background.
+// - FLOOR GUARD (beyond the above): a reference scan that returns silently
+//   EMPTY -- no throw, no unparseable URL, just zero docs/zero references
+//   -- must never be trusted as "nothing anywhere is referenced". If there
+//   are background objects to consider at all (candidates.length > 0) but
+//   the reference Set ended up with zero entries, references are ALSO
+//   treated as incomplete and the run stays dry-run. This closes the one
+//   gap the throw/parse-failure fail-safe alone doesn't cover: a scan that
+//   "succeeds" against the wrong collection, an empty project, or a
+//   permissions issue that silently returns no docs.
+// - BACKGROUND_PATH_GUARD is applied to every candidate BEFORE any delete
+//   decision, mirroring MEDIA_PATH_GUARD/RENDERED_OBJECT_GUARD -- only
+//   objects under orgs/{orgId}/backgrounds/ are ever eligible.
+// - FAILS SAFE: real deletion requires the exact string
+//   BACKGROUND_CLEANUP_ENABLED="true"; anything else (unset, "", "false",
+//   "1", "True") is a dry run, matching the gate direction of every other
+//   sweep in this file (the 9f1b881 inverted-gate incident).
+// - Per-object deletes are wrapped in try/catch so one failure never aborts
+//   the run; readDeleteCap() bounds a single LIVE run's blast radius, and
+//   dry-run is never capped so the owner sees the true backlog first.
+// - Runs on its own daily schedule, 05:00 UTC -- after media (02:00),
+//   orphan-renders (03:00), and reminders (04:00), so the sweeps never
+//   overlap.
+
+/** Backgrounds are only orphan-eligible once older than this many days. */
+export const BACKGROUND_RETENTION_DAYS = 30;
+
+/**
+ * Hard path guard: matches ONLY object names under
+ * orgs/{orgId}/backgrounds/. Anything else (media/, pptx-imports/, or any
+ * future path) never reaches the delete decision, regardless of age or
+ * reference state.
+ */
+export const BACKGROUND_PATH_GUARD = /^orgs\/[^/]+\/backgrounds\//;
+
+export interface OrphanBackgroundSummary {
+  scannedCount: number;
+  orphanCount: number;
+  deletedCount: number;
+  /** Total bytes deleted (LIVE) or would-delete (dry-run) this run. */
+  deletedBytes: number;
+  /** False when the reference picture could not be fully proven this run -- forces dryRun. */
+  referencesComplete: boolean;
+  /** True when readDeleteCap() stopped a LIVE run before all orphan candidates were deleted. */
+  cappedByLimit: boolean;
+  dryRun: boolean;
+}
+
+/**
+ * Recovers the Storage object path from a Firebase Storage download URL of
+ * the shape `https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{ENCODED_PATH}?alt=media&token=...`.
+ * Returns the URL-decoded object path (e.g.
+ * `orgs/{orgId}/backgrounds/{backgroundId}/{fileName}`), or null when the
+ * string has no parseable `/o/{path}` segment -- callers treat a null as an
+ * incomplete reference picture rather than guessing.
+ */
+export function extractBackgroundObjectPath(url: string): string | null {
+  const match = /\/o\/([^?]+)/.exec(url);
+  if (!match) {
+    return null;
+  }
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The cleanupOrphanBackgrounds handler body, exported separately from the
+ * `onSchedule` wrapper (mirroring cleanupOrphanRendersHandler) so it can be
+ * unit-tested directly against mocked Firestore/Storage.
+ */
+export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroundSummary> {
+  // Fail safe: only an explicit opt-in enables real deletion. Anything else --
+  // unset, empty, "false", a typo -- leaves this a dry run.
+  const dryRun = process.env.BACKGROUND_CLEANUP_ENABLED !== "true";
+
+  const db = getFirestore();
+  const referencedPaths = new Set<string>();
+  let referencesComplete = true;
+
+  const trackUrl = (url: unknown): void => {
+    if (typeof url !== "string" || url.length === 0) {
+      return;
+    }
+    const objectPath = extractBackgroundObjectPath(url);
+    if (objectPath === null) {
+      // Unparseable reference -- the picture is incomplete, never guess.
+      referencesComplete = false;
+      return;
+    }
+    referencedPaths.add(objectPath);
+  };
+
+  // Tier 1 (group) + Tier 2 (slide, embedded slides[] array on the SAME doc).
+  try {
+    const slideGroupsSnap = await db.collectionGroup("slideGroups").get();
+    for (const doc of slideGroupsSnap.docs) {
+      const data = doc.data() as
+        | { backgroundImageUrl?: unknown; slides?: Array<{ backgroundImageUrl?: unknown }> }
+        | undefined;
+      trackUrl(data?.backgroundImageUrl);
+      if (Array.isArray(data?.slides)) {
+        for (const slide of data.slides) {
+          trackUrl(slide?.backgroundImageUrl);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("cleanupOrphanBackgrounds: slideGroups reference scan failed:", err);
+    referencesComplete = false;
+  }
+
+  // Tier 3 (song lyrics).
+  try {
+    const lyricsSnap = await db.collectionGroup("lyrics").get();
+    for (const doc of lyricsSnap.docs) {
+      const data = doc.data() as { backgroundImageUrl?: unknown } | undefined;
+      trackUrl(data?.backgroundImageUrl);
+    }
+  } catch (err) {
+    console.error("cleanupOrphanBackgrounds: lyrics reference scan failed:", err);
+    referencesComplete = false;
+  }
+
+  const bucket = getStorage().bucket();
+  const [files] = await bucket.getFiles({ prefix: "orgs/", autoPaginate: true });
+  const candidates = files.filter((file) => BACKGROUND_PATH_GUARD.test(file.name));
+
+  // FLOOR GUARD: zero references found anywhere, yet background objects
+  // exist to consider -- never trust an empty Set as "nothing referenced".
+  if (referencedPaths.size === 0 && candidates.length > 0) {
+    referencesComplete = false;
+  }
+
+  const effectiveDryRun = dryRun || !referencesComplete;
+  const cutoffMs = Date.now() - BACKGROUND_RETENTION_DAYS * DAY_MS;
+  const deleteCap = readDeleteCap();
+
+  let scannedCount = 0;
+  let orphanCount = 0;
+  let deletedCount = 0;
+  let deletedBytes = 0;
+  let cappedByLimit = false;
+
+  for (const file of candidates) {
+    scannedCount++;
+
+    if (referencedPaths.has(file.name)) {
+      // Referenced at some tier -- NEVER delete, no matter how old.
+      continue;
+    }
+
+    const timeCreated = file.metadata?.timeCreated;
+    const createdMs = timeCreated ? new Date(timeCreated).getTime() : NaN;
+    if (Number.isNaN(createdMs) || createdMs > cutoffMs) {
+      // Not old enough yet (or timestamp unreadable -- fail safe, skip it).
+      continue;
+    }
+
+    orphanCount++;
+    const fileBytes = Number(file.metadata?.size ?? 0);
+
+    if (effectiveDryRun) {
+      // Dry-run (explicit or references-incomplete) is NEVER capped -- the
+      // owner needs the true backlog count/bytes before enabling live
+      // deletion, not a truncated one.
+      deletedBytes += fileBytes;
+      continue;
+    }
+
+    if (deletedCount >= deleteCap) {
+      cappedByLimit = true;
+      break;
+    }
+
+    try {
+      await file.delete();
+      deletedCount++;
+      deletedBytes += fileBytes;
+    } catch (err) {
+      // Partial-failure tolerance: one bad delete never aborts the run.
+      console.error(`cleanupOrphanBackgrounds: failed to delete ${file.name}:`, err);
+    }
+  }
+
+  const summary: OrphanBackgroundSummary = {
+    scannedCount,
+    orphanCount,
+    deletedCount,
+    deletedBytes,
+    referencesComplete,
+    cappedByLimit,
+    dryRun: effectiveDryRun,
+  };
+  console.log("cleanupOrphanBackgrounds summary:", summary);
+  return summary;
+}
+
+export const cleanupOrphanBackgrounds = onSchedule(
+  { schedule: "every day 05:00", timeZone: "UTC" },
+  async () => {
+    await cleanupOrphanBackgroundsHandler();
+  },
+);
+
 // --- sendScheduledReminders daily reminder cron (61-02: R145/R133/SC3/SC4) --
 //
 // The R145 reminder engine: a daily onSchedule cron that auto-enqueues the
