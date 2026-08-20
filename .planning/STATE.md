@@ -13,6 +13,60 @@ progress:
   percent: 0
 ---
 
+# ▶ ACTIVE MILESTONE — v1.9 Owner Admin Console (started 2026-08-20)
+
+**Goal:** A private, owner-only super-admin console that lifts the v1.8 cost/cleanup levers + the no-reply
+sender out of `functions/.env` into an admin-only Firestore config doc the Cloud Functions read at runtime
+(no redeploy to change), gated by a super-admin custom auth claim. Requirements R174+ in REQUIREMENTS.md.
+
+**Scoping decisions (owner, 2026-08-20):** v1.9 minor increment · Firestore-backed **live** config (functions
+read a config doc at runtime, not `process.env`) · **custom-claim** super-admin gate (builds on v1.5 claims) ·
+research-first. Out of scope this pass: billing, church provisioning, multi-admin management UI, in-app
+usage/log dashboards.
+
+## ★★ STANDING AUTONOMY GRANT — v1.9, granted 2026-08-20
+
+**This is the ACTIVE grant.** Owner: *"use gsd-autonomous. Defer human verification to the end."* Same
+pattern as v1.6/v1.7/v1.8. Re-read before deciding to stop — it survives context compaction.
+
+- **Run all v1.9 phases autonomously** (discuss → plan → execute per phase). Pick the reasonable default on
+  ordinary grey areas, state it, keep moving. Stop and ask only when a wrong assumption would be unsafe or
+  waste the work.
+
+- **Defer human verification to the end.** Route each `human_needed` check to
+  `.planning/PENDING-VERIFICATION.md` and continue; **never record a deferred check as passed.**
+
+- **STOP BEFORE THE MILESTONE LIFECYCLE.** When all v1.9 phases are code-complete, STOP and hand over the
+  `/gsd-verify-work` list + the owner-gated deploy commands. Do NOT run audit → complete → cleanup.
+
+- **Deploy policy — HAND OVER all deploys this milestone (default).** v1.9 is dominated by exactly the
+  hand-over categories from the v1.8 grant: **auth changes** (the super-admin custom claim + the
+  read-merge-write fix to `syncOrgMembershipClaim`), **`firestore.rules` changes** (super-admin gate +
+  `appConfig`/grants rules), and **live control of data-loss cleanup toggles**. Every deployable artifact
+  ships **built + tested + UNDEPLOYED** with the exact `firebase deploy --only …` command handed over. The
+  owner runs the first super-admin bootstrap script and the rules/functions deploys. (If the owner later
+  wants the low-risk, non-auth/non-rules pieces auto-deployed, they can say so.)
+
+- **No `.env.local` / `functions/.env` secret writes.** `RESEND_API_KEY` stays server-side and never moves
+  into the client-readable config doc. Any secret/env the owner must set for a deploy is handed over.
+
+- **No destructive / irreversible actions** without asking (no `git stash` in this multi-worktree repo, no
+  project-wide lint --fix, no history rewrites, no bulk deletions beyond a plan's scope).
+
+- Gates: type-check via `npm run type-check` (vue-tsc --build); app-suite baseline is the 2 known-failing
+  files (`storage.rules.test.ts`, `RosterView.test.ts`); functions suite via `cd functions && npm test`;
+  rules suite via the emulator; render-service via `cd render-service && npm test`.
+
+- **Rules-testing discipline (carried from v1.5, applies to every `firestore.rules` change here):** every
+  rules change carries a genuine ALLOW-case test that actually runs against the real emulator, not just
+  deny-cases. Cross-service `firestore.exists()` is inert in the Storage emulator (firebase-js-sdk#6803) —
+  do not gate a Storage rule on it.
+
+---
+
+<details>
+<summary>Historical — v1.8 active/hand-over state (milestone shipped + safe config deployed 2026-08-20)</summary>
+
 # ▶ ACTIVE MILESTONE — v1.8 Cost & Billing Hardening (started 2026-08-19)
 
 **Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
