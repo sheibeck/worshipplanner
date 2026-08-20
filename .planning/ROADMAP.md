@@ -374,7 +374,11 @@ Plans:
   2. Enabling a deletion-capable cleanup requires an explicit confirm step that echoes the dry-run count; flipping the flag never itself triggers a deletion — only the next scheduled cron run acts (R189).
   3. `cleanupOrphanBackgrounds`'s `referencesComplete` / floor-guard fail-safes remain intact after the config swap, with its existing unit tests passing unchanged — no cleanup can ever delete a song-linked background, only transient slideshow backgrounds tied to a service (R190).
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+- [ ] 71-01-PLAN.md — Functions: {forceDryRun} handler seam + super-admin-gated previewCleanupDryRun callable + tests (R188, R190)
+- [ ] 71-02-PLAN.md — Client: CleanupEnableConfirmDialog + CleanupConfigCard Enable→preview→confirm flow + hard-block (R189, R190)
+
 **UI hint**: yes
 
 **Deploy**: Per the v1.9 standing autonomy grant (STATE.md), every deployable artifact this milestone —
