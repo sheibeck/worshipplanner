@@ -187,8 +187,10 @@ export async function syncOrgMembershipClaimHandler(
     switch (decision.action) {
       case "set":
         // R175: merges onto the user's existing claims rather than
-        // replacing the whole object -- see claimsHelpers.ts.
-        await mergeAndSetCustomClaims(uid, decision.claims);
+        // replacing the whole object -- see claimsHelpers.ts. Spread into a
+        // fresh object literal: OrgMembershipClaim has no index signature,
+        // so passing it directly fails TS2345 against Record<string, unknown>.
+        await mergeAndSetCustomClaims(uid, { ...decision.claims });
         return { action: "set" };
       case "clear":
         // R175: clears only { orgId, role } (ORG_CLAIM_KEYS), preserving
