@@ -15,6 +15,7 @@ import { getStorage } from "firebase-admin/storage";
 import { parsePptxBuffer, type MappedSlide } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
 import { syncOrgMembershipClaim } from "./orgMembershipClaims";
+import { syncSuperAdminClaim, setSuperAdminClaim } from "./superAdminClaims";
 import { Resend } from "resend";
 import { renderMessageTokens } from "./messageTokens";
 import { verifySvixSignature } from "./webhookSignature";
@@ -3107,3 +3108,16 @@ export const messageWebhook = onRequest(
 // exports, mirroring how requestPptxRenderHandler is reachable only via a
 // direct module import in tests.
 export { syncOrgMembershipClaim };
+
+// --- superAdminClaims (68-02: syncSuperAdminClaim trigger + setSuperAdminClaim
+// onCall, R174/R175-B/R176/R179) ------------------------------------------
+//
+// Implementation lives in ./superAdminClaims so its testable handlers
+// (syncSuperAdminClaimHandler, setSuperAdminClaimHandler) can be imported
+// directly by tests without going through the deployed wrappers. Only the
+// two deployed Functions are re-exported here -- the handlers are
+// intentionally NOT part of this module's exports, mirroring
+// syncOrgMembershipClaim above. bootstrapSuperAdmin.ts (the owner-run first-
+// grant script) is deliberately NOT imported or exported here -- it is a
+// Node script, not a deployed Function.
+export { syncSuperAdminClaim, setSuperAdminClaim };
