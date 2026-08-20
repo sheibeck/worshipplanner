@@ -298,8 +298,18 @@ export function enforceModelAndTokens(
       },
     };
   }
+  // IN-01: the clamp used to only fire for `typeof "number"`, so a numeric
+  // string (`max_tokens: "99999999"`) skipped it and was forwarded
+  // byte-unchanged. Coerce a numeric-string `max_tokens` before comparing so
+  // a client can't dodge the ceiling purely by changing the JSON type.
   const maxTokens = record.max_tokens;
-  if (typeof maxTokens === "number" && maxTokens > limits.maxTokensCeiling) {
+  const numericMaxTokens =
+    typeof maxTokens === "number"
+      ? maxTokens
+      : typeof maxTokens === "string" && maxTokens.trim().length > 0 && Number.isFinite(Number(maxTokens))
+        ? Number(maxTokens)
+        : undefined;
+  if (numericMaxTokens !== undefined && numericMaxTokens > limits.maxTokensCeiling) {
     return { ok: true, body: { ...record, max_tokens: limits.maxTokensCeiling } };
   }
   return { ok: true, body: record };

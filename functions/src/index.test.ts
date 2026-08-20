@@ -2583,6 +2583,29 @@ describe("enforceModelAndTokens", () => {
     const result = enforceModelAndTokens(body, limits);
     expect(result).toEqual({ ok: true, body });
   });
+
+  it("IN-01: clamps an over-ceiling max_tokens sent as a numeric STRING, not just a number", () => {
+    const result = enforceModelAndTokens(
+      { model: "claude-haiku-4-5-20251001", max_tokens: "99999999" },
+      limits,
+    );
+    expect(result).toEqual({
+      ok: true,
+      body: { model: "claude-haiku-4-5-20251001", max_tokens: 2048 },
+    });
+  });
+
+  it("IN-01: leaves an under-ceiling numeric-string max_tokens untouched", () => {
+    const body = { model: "claude-haiku-4-5-20251001", max_tokens: "512" };
+    const result = enforceModelAndTokens(body, limits);
+    expect(result).toEqual({ ok: true, body });
+  });
+
+  it("IN-01: ignores a non-numeric max_tokens string rather than throwing", () => {
+    const body = { model: "claude-haiku-4-5-20251001", max_tokens: "not-a-number" };
+    const result = enforceModelAndTokens(body, limits);
+    expect(result).toEqual({ ok: true, body });
+  });
 });
 
 describe("checkAndConsumeRateLimit", () => {
