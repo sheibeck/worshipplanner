@@ -977,13 +977,16 @@ export function readDeleteCap(config: AppConfig): number {
 // - Age is keyed on the object's native GCS `timeCreated` (server-set at
 //   upload time), NEVER on client-settable custom metadata -- a user cannot
 //   backdate metadata to force-expire another org's media early.
-// - This handler imports NO Firestore API at all. It is structurally
-//   incapable of touching slide documents, slot metadata, or slide text --
-//   it can only ever list/delete Storage objects.
-// - FAILS SAFE: deletion requires an explicit opt-in, MEDIA_CLEANUP_ENABLED="true".
-//   With it unset (or any other value) the run is a dry-run: it scans and logs
-//   what WOULD be deleted and deletes nothing. A human must review a dry-run
-//   before enabling live deletion.
+// - R181: this handler now reads appConfig/global via the Admin SDK (Plan
+//   69-01's getAppConfig, bypassing rules) for its enable flag/retention/cap
+//   -- its first-ever Firestore read. It still touches NO slide documents,
+//   slot metadata, or slide text: appConfig/global is the only doc it ever
+//   reads, so the letter of "no Firestore API" changed but the spirit --
+//   structurally incapable of touching content documents -- did not.
+// - FAILS SAFE: deletion requires an explicit opt-in, cleanup.mediaEnabled=true
+//   in the resolved config. With it unset/false/malformed the run is a
+//   dry-run: it scans and logs what WOULD be deleted and deletes nothing. A
+//   human must review a dry-run before enabling live deletion.
 //
 //   History: this shipped in 22-03 gated on `MEDIA_CLEANUP_DRY_RUN === "true"`,
 //   which meant an UNSET env var produced LIVE deletion -- while the comment here
@@ -1036,9 +1039,10 @@ export interface CleanupSummary {
 export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
   const db = getFirestore();
   const config = await getAppConfig(db, { fresh: true });
-  // Fail safe: only an explicit opt-in enables real deletion. Anything else --
-  // unset, empty, "false", a typo -- leaves this a dry run.
-  const dryRun = process.env.MEDIA_CLEANUP_ENABLED !== "true";
+  // Fail safe: only an explicit opt-in (cleanup.mediaEnabled=true in the
+  // resolved config) enables real deletion. Anything else -- unset, false, a
+  // malformed value -- leaves this a dry run (R181, fail-closed per R184).
+  const dryRun = !config.cleanup.mediaEnabled;
   const bucket = getStorage().bucket();
   const cutoffMs = Date.now() - readMediaRetentionDays(config) * 24 * 60 * 60 * 1000;
   const deleteCap = readDeleteCap(config);
@@ -1119,15 +1123,15 @@ export const cleanupExpiredMedia = onSchedule(
 //
 // A second, SEPARATE scheduled job from cleanupExpiredMedia above. It is not
 // folded into that handler because it must read the pptxRenders queue
-// (Firestore) -- something cleanupExpiredMedia deliberately never does, and
-// whose "imports no Firestore API at all" property is exactly why that
-// handler needs zero changes for this phase.
+// (Firestore) -- historically something cleanupExpiredMedia never touched at
+// all; as of R181 (69-02) BOTH handlers now also read appConfig/global via
+// getAppConfig(), but neither ever reads slide/service/song content docs.
 //
 // SAFETY CONTRACT:
 // - FAILS SAFE: real deletion requires an explicit opt-in,
-//   PPTX_RENDER_CLEANUP_ENABLED="true". With it unset, empty, "false", or any
-//   other value (including a case-sensitive typo like "True" or "1"), this is
-//   a dry run: it scans and logs what WOULD be deleted and deletes nothing.
+//   cleanup.pptxRenderEnabled=true in the resolved config. With it unset,
+//   false, or a malformed value, this is a dry run: it scans and logs what
+//   WOULD be deleted and deletes nothing.
 //   This is the same gate shape as cleanupExpiredMediaHandler's own
 //   post-incident fix above, in the same direction -- the 2026-07-28 incident
 //   (9f1b881) was precisely an inverted gate whose doc comment claimed the
@@ -1200,9 +1204,10 @@ export interface OrphanCleanupSummary {
 export async function cleanupOrphanRendersHandler(): Promise<OrphanCleanupSummary> {
   const db = getFirestore();
   const config = await getAppConfig(db, { fresh: true });
-  // Fail safe: only an explicit opt-in enables real deletion. Anything else --
-  // unset, empty, "false", a typo -- leaves this a dry run.
-  const dryRun = process.env.PPTX_RENDER_CLEANUP_ENABLED !== "true";
+  // Fail safe: only an explicit opt-in (cleanup.pptxRenderEnabled=true in the
+  // resolved config) enables real deletion. Anything else -- unset, false, a
+  // malformed value -- leaves this a dry run (R181, fail-closed per R184).
+  const dryRun = !config.cleanup.pptxRenderEnabled;
 
   const cutoffMs = Date.now() - readOrphanRenderStaleHours(config) * 60 * 60 * 1000;
   const deleteCap = readDeleteCap(config);
@@ -1365,10 +1370,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // - BACKGROUND_PATH_GUARD is applied to every candidate BEFORE any delete
 //   decision, mirroring MEDIA_PATH_GUARD/RENDERED_OBJECT_GUARD -- only
 //   objects under orgs/{orgId}/backgrounds/ are ever eligible.
-// - FAILS SAFE: real deletion requires the exact string
-//   BACKGROUND_CLEANUP_ENABLED="true"; anything else (unset, "", "false",
-//   "1", "True") is a dry run, matching the gate direction of every other
-//   sweep in this file (the 9f1b881 inverted-gate incident).
+// - FAILS SAFE: real deletion requires cleanup.backgroundEnabled=true in the
+//   resolved appConfig (R181); anything else (unset, false, malformed) is a
+//   dry run, matching the gate direction of every other sweep in this file
+//   (the 9f1b881 inverted-gate incident).
 // - Per-object deletes are wrapped in try/catch so one failure never aborts
 //   the run; readDeleteCap() bounds a single LIVE run's blast radius, and
 //   dry-run is never capped so the owner sees the true backlog first.
@@ -1442,9 +1447,10 @@ export function extractBackgroundObjectPath(url: string): string | null {
 export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroundSummary> {
   const db = getFirestore();
   const config = await getAppConfig(db, { fresh: true });
-  // Fail safe: only an explicit opt-in enables real deletion. Anything else --
-  // unset, empty, "false", a typo -- leaves this a dry run.
-  const dryRun = process.env.BACKGROUND_CLEANUP_ENABLED !== "true";
+  // Fail safe: only an explicit opt-in (cleanup.backgroundEnabled=true in the
+  // resolved config) enables real deletion. Anything else -- unset, false, a
+  // malformed value -- leaves this a dry run (R181, fail-closed per R184).
+  const dryRun = !config.cleanup.backgroundEnabled;
 
   const referencedPaths = new Set<string>();
   let referencesComplete = true;
@@ -1613,10 +1619,9 @@ export const cleanupOrphanBackgrounds = onSchedule(
 //   that failed import's source may be missed this run. This is
 //   under-deletion only -- never over-deletion -- and the source stays
 //   in place (safe) until manually cleared or the doc reappears.
-// - FAILS SAFE: real deletion requires the exact string
-//   PPTX_SOURCE_CLEANUP_ENABLED="true"; anything else (unset, "", "false",
-//   "1", "True") is a dry run, matching the gate direction of every other
-//   sweep in this file.
+// - FAILS SAFE: real deletion requires cleanup.pptxSourceEnabled=true in the
+//   resolved appConfig (R181); anything else (unset, false, malformed) is a
+//   dry run, matching the gate direction of every other sweep in this file.
 // - Per-object deletes are wrapped in try/catch so one failure never aborts
 //   the run; readDeleteCap() bounds a single LIVE run's blast radius across
 //   the WHOLE run (all imports), and dry-run is never capped.
@@ -1671,9 +1676,10 @@ export interface PptxSourceCleanupSummary {
 export async function cleanupPptxSourcesHandler(): Promise<PptxSourceCleanupSummary> {
   const db = getFirestore();
   const config = await getAppConfig(db, { fresh: true });
-  // Fail safe: only an explicit opt-in enables real deletion. Anything else --
-  // unset, empty, "false", a typo -- leaves this a dry run.
-  const dryRun = process.env.PPTX_SOURCE_CLEANUP_ENABLED !== "true";
+  // Fail safe: only an explicit opt-in (cleanup.pptxSourceEnabled=true in the
+  // resolved config) enables real deletion. Anything else -- unset, false, a
+  // malformed value -- leaves this a dry run (R181, fail-closed per R184).
+  const dryRun = !config.cleanup.pptxSourceEnabled;
 
   const cutoffMs = Date.now() - readPptxSourceRetentionDays(config) * DAY_MS;
   const deleteCap = readDeleteCap(config);

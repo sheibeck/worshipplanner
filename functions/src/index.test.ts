@@ -226,12 +226,13 @@ describe("cleanupExpiredMediaHandler", () => {
   afterEach(() => {
     vi.mocked(getStorage).mockReset();
     vi.mocked(getFirestore).mockReset();
-    delete process.env.MEDIA_CLEANUP_ENABLED;
-    delete process.env.MEDIA_CLEANUP_DRY_RUN;
   });
 
   it("deletes a media file older than the retention window when explicitly enabled", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+    });
     const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
     mockBucket([old]);
 
@@ -241,10 +242,14 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(summary).toMatchObject({ deletedObjectCount: 1, dryRun: false });
   });
 
-  it("FAILS SAFE: deletes nothing when MEDIA_CLEANUP_ENABLED is unset, even for an expired file", async () => {
+  it("FAILS SAFE: deletes nothing when cleanup.mediaEnabled is unset/default (appConfig/global empty), even for an expired file", async () => {
     // Regression guard for the 22-03 defect: the gate used to be
     // `MEDIA_CLEANUP_DRY_RUN === "true"`, so an unset env var meant LIVE
-    // deletion on a daily schedule. Unset must mean dry-run.
+    // deletion on a daily schedule. Unset/default must mean dry-run. The
+    // raw-value coercion matrix (non-"true" strings, malformed input) that
+    // used to be exercised here at the process.env layer is now owned by
+    // appConfig.test.ts's "R184 fail-closed: cleanup + cron flags" block
+    // (coerceEnableFlag) -- this test proves the handler-level wiring only.
     const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
     mockBucket([old]);
 
@@ -254,53 +259,11 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 1, scannedCount: 1 });
   });
 
-  it("FAILS SAFE: a stray MEDIA_CLEANUP_DRY_RUN=false does not enable deletion", async () => {
-    // The old flag is no longer read; only MEDIA_CLEANUP_ENABLED opts in.
-    process.env.MEDIA_CLEANUP_DRY_RUN = "false";
-    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
-    mockBucket([old]);
-
-    const summary = await cleanupExpiredMediaHandler();
-
-    expect(old.delete).not.toHaveBeenCalled();
-    expect(summary.dryRun).toBe(true);
-  });
-
-  it("FAILS SAFE: a non-\"true\" MEDIA_CLEANUP_ENABLED value does not enable deletion", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "1";
-    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
-    mockBucket([old]);
-
-    const summary = await cleanupExpiredMediaHandler();
-
-    expect(old.delete).not.toHaveBeenCalled();
-    expect(summary.dryRun).toBe(true);
-  });
-
-  it('FAILS SAFE: an empty-string MEDIA_CLEANUP_ENABLED behaves identically to unset', async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "";
-    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
-    mockBucket([old]);
-
-    const summary = await cleanupExpiredMediaHandler();
-
-    expect(old.delete).not.toHaveBeenCalled();
-    expect(summary.dryRun).toBe(true);
-  });
-
-  it('FAILS SAFE: a case-typo value ("True") does not enable deletion -- the comparison is exact and case-sensitive', async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "True";
-    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
-    mockBucket([old]);
-
-    const summary = await cleanupExpiredMediaHandler();
-
-    expect(old.delete).not.toHaveBeenCalled();
-    expect(summary.dryRun).toBe(true);
-  });
-
   it("R165: deletes exactly the guarded+aged set -- an aged pptx-imports file and a recent media file both survive alongside an aged media file", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+    });
     const agedMedia = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
     const agedPptx = fakeFile("orgs/orgA/pptx-imports/i1/deck.pptx", RETENTION_DAYS + 6);
     const recentMedia = fakeFile("orgs/orgA/media/m2/new.mp3", 3);
@@ -322,15 +285,21 @@ describe("cleanupExpiredMediaHandler", () => {
     const dryRunSummary = await cleanupExpiredMediaHandler();
     expect(dryRunSummary).toMatchObject({ dryRun: true, deletedBytes: KNOWN_SIZE });
 
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+    });
     const liveSummary = await cleanupExpiredMediaHandler();
     expect(old.delete).toHaveBeenCalledTimes(1);
     expect(liveSummary).toMatchObject({ dryRun: false, deletedBytes: KNOWN_SIZE });
   });
 
   it("T-66-01-02: a per-run delete cap bounds a LIVE run -- exactly one delete() call, cappedByLimit=true, deletedObjectCount=1", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
-    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+      deleteCapPerRun: 1,
+    });
     const old1 = fakeFile("orgs/orgA/media/m1/old1.mp4", RETENTION_DAYS + 6);
     const old2 = fakeFile("orgs/orgA/media/m2/old2.mp4", RETENTION_DAYS + 6);
     mockBucket([old1, old2]);
@@ -358,7 +327,10 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("does not delete a recent media file", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+    });
     const recent = fakeFile("orgs/orgA/media/m2/new.mp3", 3);
     mockBucket([recent]);
 
@@ -369,7 +341,10 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("never deletes a non-media (pptx-imports) object even when old", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+    });
     const oldPptx = fakeFile("orgs/orgA/pptx-imports/i1/deck.pptx", 60);
     mockBucket([oldPptx]);
 
@@ -378,8 +353,11 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(oldPptx.delete).not.toHaveBeenCalled();
   });
 
-  it("R062: never deletes a rendered/ page even 60 days old and MEDIA_CLEANUP_ENABLED=true -- the guard rejects it before the age check is even reached", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
+  it("R062: never deletes a rendered/ page even 60 days old and cleanup.mediaEnabled=true -- the guard rejects it before the age check is even reached", async () => {
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+    });
     const oldRenderedPage = fakeFile(
       "orgs/orgA/pptx-imports/i1/rendered/page-0001.png",
       60,
@@ -419,7 +397,10 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("is idempotent by age: a second run against a bucket missing the already-deleted file performs no further deletes", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+    });
     const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 5);
     const recent = fakeFile("orgs/orgA/media/m2/new.mp3", 3);
     const { getFiles } = mockBucket([old, recent]);
@@ -443,7 +424,10 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("config-tunable: uses the RETENTION_DAYS default (30) when appConfig/global is empty -- a 29-day-old file is NOT yet eligible, a 31-day-old file IS", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
+    });
     const tooYoung = fakeFile("orgs/orgA/media/m1/young.mp4", 29);
     const oldEnough = fakeFile("orgs/orgA/media/m2/old.mp4", 31);
     mockBucket([tooYoung, oldEnough]);
@@ -456,9 +440,9 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("config-tunable: retention.mediaDays override shrinks the window -- a 6-day-old file becomes eligible under a 5-day override", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
     const overriddenConfig: AppConfig = {
       ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, mediaEnabled: true },
       retention: { ...DEFAULT_APP_CONFIG.retention, mediaDays: 5 },
     };
     vi.mocked(getAppConfig).mockResolvedValue(overriddenConfig);
@@ -475,7 +459,6 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("reads from config: a malformed/negative retention.mediaDays in the resolved AppConfig falls back to the RETENTION_DAYS default -- coercion now owned by appConfig.ts, not this handler", async () => {
-    process.env.MEDIA_CLEANUP_ENABLED = "true";
     // appConfig.ts's coerceRetention already guarantees a resolved AppConfig
     // never carries a malformed value -- this test proves the handler simply
     // trusts whatever DEFAULT_APP_CONFIG-shaped value it is handed.
@@ -1041,11 +1024,13 @@ describe("cleanupOrphanRendersHandler", () => {
   afterEach(() => {
     vi.mocked(getFirestore).mockReset();
     vi.mocked(getStorage).mockReset();
-    delete process.env.PPTX_RENDER_CLEANUP_ENABLED;
   });
 
   it("deletes both rendered objects and the doc when explicitly enabled", async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxRenderEnabled: true },
+    });
     const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
     mockOrphanDb([stale]);
     const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1078,7 +1063,10 @@ describe("cleanupOrphanRendersHandler", () => {
     const dryRunSummary = await cleanupOrphanRendersHandler();
     expect(dryRunSummary).toMatchObject({ dryRun: true, deletedBytes: SIZE_1 + SIZE_2 });
 
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxRenderEnabled: true },
+    });
     const liveSummary = await cleanupOrphanRendersHandler();
     expect(obj1.delete).toHaveBeenCalledTimes(1);
     expect(obj2.delete).toHaveBeenCalledTimes(1);
@@ -1086,8 +1074,11 @@ describe("cleanupOrphanRendersHandler", () => {
   });
 
   it("T-66-01-02: a per-run delete cap bounds a LIVE run within a single doc -- exactly one object delete() call, cappedByLimit=true, the doc itself is not removed", async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
-    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxRenderEnabled: true },
+      deleteCapPerRun: 1,
+    });
     const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
     mockOrphanDb([stale]);
     const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1129,7 +1120,11 @@ describe("cleanupOrphanRendersHandler", () => {
     });
   });
 
-  it("FAILS SAFE: unset PPTX_RENDER_CLEANUP_ENABLED deletes nothing, even for a stale failed doc with rendered objects", async () => {
+  it("FAILS SAFE: deletes nothing when cleanup.pptxRenderEnabled is unset/default (appConfig/global empty), even for a stale failed doc with rendered objects", async () => {
+    // The raw-value coercion matrix (non-"true" strings, malformed input)
+    // that used to be exercised here at the process.env layer is now owned
+    // by appConfig.test.ts's "R184 fail-closed: cleanup + cron flags" block
+    // (coerceEnableFlag) -- this test proves the handler-level wiring only.
     const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
     mockOrphanDb([stale]);
     const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1142,60 +1137,11 @@ describe("cleanupOrphanRendersHandler", () => {
     expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 1, deletedDocCount: 1 });
   });
 
-  it("FAILS SAFE: an empty-string PPTX_RENDER_CLEANUP_ENABLED behaves identically to unset", async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "";
-    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
-    mockOrphanDb([stale]);
-    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
-    mockOrphanBucket([obj1]);
-
-    const summary = await cleanupOrphanRendersHandler();
-
-    expect(obj1.delete).not.toHaveBeenCalled();
-    expect(summary.dryRun).toBe(true);
-  });
-
-  it('FAILS SAFE: PPTX_RENDER_CLEANUP_ENABLED="false" does not enable deletion', async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "false";
-    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
-    mockOrphanDb([stale]);
-    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
-    mockOrphanBucket([obj1]);
-
-    const summary = await cleanupOrphanRendersHandler();
-
-    expect(obj1.delete).not.toHaveBeenCalled();
-    expect(summary.dryRun).toBe(true);
-  });
-
-  it('FAILS SAFE: a non-"true" value ("1") does not enable deletion', async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "1";
-    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
-    mockOrphanDb([stale]);
-    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
-    mockOrphanBucket([obj1]);
-
-    const summary = await cleanupOrphanRendersHandler();
-
-    expect(obj1.delete).not.toHaveBeenCalled();
-    expect(summary.dryRun).toBe(true);
-  });
-
-  it('FAILS SAFE: a case-typo value ("True") does not enable deletion -- the comparison is exact and case-sensitive', async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "True";
-    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
-    mockOrphanDb([stale]);
-    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
-    mockOrphanBucket([obj1]);
-
-    const summary = await cleanupOrphanRendersHandler();
-
-    expect(obj1.delete).not.toHaveBeenCalled();
-    expect(summary.dryRun).toBe(true);
-  });
-
   it("never touches a ready render, even with the gate enabled -- excluded by the status filter itself", async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxRenderEnabled: true },
+    });
     const ready = fakeOrphanDoc({ status: "ready", ageHours: 90 * 24 });
     const { whereSpy } = mockOrphanDb([ready]);
     const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1210,7 +1156,10 @@ describe("cleanupOrphanRendersHandler", () => {
   });
 
   it("never touches a fresh pending render -- a render in flight is not an orphan", async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxRenderEnabled: true },
+    });
     const fresh = fakeOrphanDoc({ status: "pending", ageHours: FRESH_HOURS });
     mockOrphanDb([fresh]);
     const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1224,7 +1173,10 @@ describe("cleanupOrphanRendersHandler", () => {
   });
 
   it("★ never deletes outside the rendered/ prefix -- source.pptx and images/ are structurally unreachable", async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxRenderEnabled: true },
+    });
     const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
     mockOrphanDb([stale]);
     const sourceFile = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
@@ -1241,7 +1193,10 @@ describe("cleanupOrphanRendersHandler", () => {
   });
 
   it("an unreadable createdAt is skipped even with the gate enabled -- fail safe", async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxRenderEnabled: true },
+    });
     const unreadable = fakeOrphanDoc({ status: "failed" }); // ageHours omitted -> unreadable createdAt
     mockOrphanDb([unreadable]);
     const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1255,7 +1210,10 @@ describe("cleanupOrphanRendersHandler", () => {
   });
 
   it("partial-failure tolerance: one rejecting object delete does not abort the run -- the second object and the doc are still deleted", async () => {
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxRenderEnabled: true },
+    });
     const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
     mockOrphanDb([stale]);
     const failing = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1278,7 +1236,7 @@ describe("cleanupOrphanRendersHandler", () => {
     expect(wrapperStart).toBeGreaterThan(start);
     const handlerBody = source.slice(start, wrapperStart);
     expect(handlerBody).toMatch(
-      /const dryRun = process\.env\.PPTX_RENDER_CLEANUP_ENABLED !== "true";/,
+      /const dryRun = !config\.cleanup\.pptxRenderEnabled;/,
     );
   });
 
@@ -1287,12 +1245,12 @@ describe("cleanupOrphanRendersHandler", () => {
 
     const overriddenConfig: AppConfig = {
       ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxRenderEnabled: true },
       retention: { ...DEFAULT_APP_CONFIG.retention, orphanRenderStaleHours: 1 },
     };
     expect(readOrphanRenderStaleHours(overriddenConfig)).toBe(1);
     vi.mocked(getAppConfig).mockResolvedValue(overriddenConfig);
 
-    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
     const nowStale = fakeOrphanDoc({ status: "failed", ageHours: 2 }); // stale under 1h override, fresh under 24h default
     mockOrphanDb([nowStale]);
     const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1439,11 +1397,22 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   afterEach(() => {
     vi.mocked(getFirestore).mockReset();
     vi.mocked(getStorage).mockReset();
-    delete process.env.BACKGROUND_CLEANUP_ENABLED;
   });
 
+  // Shared config-mock helper: enables cleanup.backgroundEnabled=true while
+  // keeping every other DEFAULT_APP_CONFIG field at its default, mirroring
+  // the old process.env.BACKGROUND_CLEANUP_ENABLED = "true" setup this
+  // describe block used to use across nearly every test (R181).
+  function enableBackgroundCleanup(overrides: Partial<AppConfig> = {}): void {
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      ...overrides,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, backgroundEnabled: true, ...overrides.cleanup },
+    });
+  }
+
   it("R167: deletes an aged unreferenced background when explicitly enabled, and never deletes an aged background referenced at the GROUP tier in the same run", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     const referencedPath = `orgs/${ORG_ID}/backgrounds/bg-ref/keep.png`;
     mockBackgroundDb({
       slideGroups: [slideGroupDoc({ backgroundImageUrl: downloadUrlFor(referencedPath) })],
@@ -1465,7 +1434,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it("NEVER deletes a background referenced at the SLIDE tier (embedded slides[] array entry, not the group field)", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     const referencedPath = `orgs/${ORG_ID}/backgrounds/bg-slide/keep.png`;
     mockBackgroundDb({
       slideGroups: [
@@ -1485,7 +1454,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it("NEVER deletes a background referenced at the SONG (lyrics) tier", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     const referencedPath = `orgs/${ORG_ID}/backgrounds/bg-song/keep.png`;
     mockBackgroundDb({
       lyrics: [lyricsDoc({ backgroundImageUrl: downloadUrlFor(referencedPath) })],
@@ -1500,7 +1469,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it("path guard: an aged object under orgs/{orgId}/media/ or .../pptx-imports/ is never considered, even when enabled", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     mockBackgroundDb({});
     const mediaFile = fakeBackgroundFile(`orgs/${ORG_ID}/media/m1/old.mp4`, STALE_DAYS);
     const pptxFile = fakeBackgroundFile(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`, STALE_DAYS);
@@ -1514,7 +1483,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it("REFERENCES-INCOMPLETE FAIL-SAFE: an unparseable backgroundImageUrl forces the whole run to dry-run, even with the flag enabled", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     mockBackgroundDb({
       slideGroups: [slideGroupDoc({ backgroundImageUrl: "https://example.com/not-a-storage-url" })],
     });
@@ -1528,7 +1497,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it("REFERENCES-INCOMPLETE FAIL-SAFE: a collectionGroup scan throwing forces the whole run to dry-run", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     mockBackgroundDb({
       slideGroups: [slideGroupDoc({ backgroundImageUrl: downloadUrlFor("orgs/orgA/backgrounds/x/y.png") })],
       lyricsThrows: true,
@@ -1543,7 +1512,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it("REFERENCES-INCOMPLETE FAIL-SAFE: a slideGroups doc with a non-array slides field forces the whole run to dry-run", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     mockBackgroundDb({
       slideGroups: [
         // `slides` present but not an array -- a corrupted/malformed write.
@@ -1566,7 +1535,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     // return zero docs -- a silent-empty result, not an error. This must be
     // just as unsafe as a throw or a parse failure: never delete every
     // background because a scan came back empty.
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     mockBackgroundDb({}); // no slideGroups docs, no lyrics docs at all
     const candidate = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg1/maybe-orphan.png`, STALE_DAYS);
     mockBackgroundBucket([candidate]);
@@ -1582,7 +1551,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it("does NOT trip the floor guard when there truly are no candidate backgrounds at all (zero references, zero candidates is not suspicious)", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     mockBackgroundDb({});
     mockBackgroundBucket([]); // no background objects exist yet -- not an anomaly
 
@@ -1597,7 +1566,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it("an unreadable/missing timeCreated is skipped even with the gate enabled -- fail safe", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
+    enableBackgroundCleanup();
     // A dummy reference elsewhere keeps the floor guard from being the
     // reason nothing is deleted -- isolates the assertion to the NaN path.
     mockBackgroundDb({
@@ -1614,31 +1583,29 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     expect(summary).toMatchObject({ orphanCount: 0, deletedObjectCount: 0 });
   });
 
-  it("FAILS SAFE: unset/empty/false/1/True all leave dryRun=true and delete nothing", async () => {
-    for (const value of [undefined, "", "false", "1", "True"]) {
-      if (value === undefined) {
-        delete process.env.BACKGROUND_CLEANUP_ENABLED;
-      } else {
-        process.env.BACKGROUND_CLEANUP_ENABLED = value;
-      }
-      mockBackgroundDb({
-        slideGroups: [
-          slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
-        ],
-      });
-      const candidate = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg1/maybe.png`, STALE_DAYS);
-      mockBackgroundBucket([candidate]);
+  it("FAILS SAFE: unset/default (appConfig/global empty) leaves dryRun=true and deletes nothing", async () => {
+    // The raw-value coercion matrix ("", "false", "1", "True", etc.) that
+    // used to be looped over process.env values here is now owned by
+    // appConfig.test.ts's "R184 fail-closed: cleanup + cron flags" block
+    // (coerceEnableFlag guarantees only a literal `true` ever resolves to
+    // enabled) -- this test proves the handler-level wiring against the
+    // global beforeEach's DEFAULT_APP_CONFIG mock only.
+    mockBackgroundDb({
+      slideGroups: [
+        slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
+      ],
+    });
+    const candidate = fakeBackgroundFile(`orgs/${ORG_ID}/backgrounds/bg1/maybe.png`, STALE_DAYS);
+    mockBackgroundBucket([candidate]);
 
-      const summary = await cleanupOrphanBackgroundsHandler();
+    const summary = await cleanupOrphanBackgroundsHandler();
 
-      expect(candidate.delete).not.toHaveBeenCalled();
-      expect(summary.dryRun).toBe(true);
-    }
+    expect(candidate.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
   });
 
   it("T-66-02-04: a per-run delete cap bounds a LIVE run -- exactly one delete() call, cappedByLimit=true", async () => {
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
-    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
+    enableBackgroundCleanup({ deleteCapPerRun: 1 });
     mockBackgroundDb({
       slideGroups: [
         slideGroupDoc({ backgroundImageUrl: downloadUrlFor(`orgs/${ORG_ID}/backgrounds/other/keep.png`) }),
@@ -1680,7 +1647,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     });
   });
 
-  it('★ SOURCE INSPECTION: the dry-run gate direction is pinned (BACKGROUND_CLEANUP_ENABLED)', () => {
+  it('★ SOURCE INSPECTION: the dry-run gate direction is pinned (cleanup.backgroundEnabled)', () => {
     const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
     const start = source.indexOf("export async function cleanupOrphanBackgroundsHandler(");
     const wrapperStart = source.indexOf("export const cleanupOrphanBackgrounds = onSchedule(");
@@ -1688,16 +1655,16 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     expect(wrapperStart).toBeGreaterThan(start);
     const handlerBody = source.slice(start, wrapperStart);
     expect(handlerBody).toMatch(
-      /const dryRun = process\.env\.BACKGROUND_CLEANUP_ENABLED !== "true";/,
+      /const dryRun = !config\.cleanup\.backgroundEnabled;/,
     );
   });
 
   it("config-tunable: default (30d) applies when appConfig/global is empty; an override shrinks the window", async () => {
     expect(readBackgroundRetentionDays(DEFAULT_APP_CONFIG)).toBe(BACKGROUND_RETENTION_DAYS);
 
-    process.env.BACKGROUND_CLEANUP_ENABLED = "true";
     const overriddenConfig: AppConfig = {
       ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, backgroundEnabled: true },
       retention: { ...DEFAULT_APP_CONFIG.retention, backgroundDays: 5 },
     };
     expect(readBackgroundRetentionDays(overriddenConfig)).toBe(5);
@@ -1788,11 +1755,22 @@ describe("cleanupPptxSourcesHandler", () => {
   afterEach(() => {
     vi.mocked(getFirestore).mockReset();
     vi.mocked(getStorage).mockReset();
-    delete process.env.PPTX_SOURCE_CLEANUP_ENABLED;
   });
 
+  // Shared config-mock helper: enables cleanup.pptxSourceEnabled=true while
+  // keeping every other DEFAULT_APP_CONFIG field at its default, mirroring
+  // the old process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true" setup this
+  // describe block used to use across nearly every test (R181).
+  function enablePptxSourceCleanup(overrides: Partial<AppConfig> = {}): void {
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      ...overrides,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxSourceEnabled: true, ...overrides.cleanup },
+    });
+  }
+
   it("R168: deletes source.pptx and images/ for a CONSUMED (ready) aged import while KEEPING rendered/", async () => {
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    enablePptxSourceCleanup();
     const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
     mockPptxSourceDb([ready]);
     const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
@@ -1809,7 +1787,7 @@ describe("cleanupPptxSourcesHandler", () => {
   });
 
   it("KEEP rendered/: even a 90-day-old ready import with the flag enabled never has a rendered/ object deleted", async () => {
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    enablePptxSourceCleanup();
     const ready = fakeSourceRenderDoc({ status: "ready", ageDays: 90 });
     mockPptxSourceDb([ready]);
     const rendered1 = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
@@ -1824,7 +1802,7 @@ describe("cleanupPptxSourcesHandler", () => {
   });
 
   it("prunes source.pptx + images/ for an aged FAILED import too -- rendered/ and doc lifecycle stay owned by cleanupOrphanRenders", async () => {
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    enablePptxSourceCleanup();
     const failed = fakeSourceRenderDoc({ status: "failed", ageDays: STALE_DAYS });
     mockPptxSourceDb([failed]);
     const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
@@ -1842,7 +1820,7 @@ describe("cleanupPptxSourcesHandler", () => {
   });
 
   it("never touches a fresh/too-new ready import -- consumption alone is not sufficient, only consumption AND age", async () => {
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    enablePptxSourceCleanup();
     const fresh = fakeSourceRenderDoc({ status: "ready", ageDays: FRESH_DAYS });
     mockPptxSourceDb([fresh]);
     const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
@@ -1855,7 +1833,7 @@ describe("cleanupPptxSourcesHandler", () => {
   });
 
   it("never touches a pending import -- excluded by the status filter itself", async () => {
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    enablePptxSourceCleanup();
     const pending = fakeSourceRenderDoc({ status: "pending", ageDays: STALE_DAYS });
     const { whereSpy } = mockPptxSourceDb([pending]);
     const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
@@ -1869,7 +1847,7 @@ describe("cleanupPptxSourcesHandler", () => {
   });
 
   it("an unreadable/missing createdAt is skipped even with the gate enabled -- fail safe", async () => {
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    enablePptxSourceCleanup();
     const unreadable = fakeSourceRenderDoc({ status: "ready" }); // ageDays omitted
     mockPptxSourceDb([unreadable]);
     const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
@@ -1883,7 +1861,7 @@ describe("cleanupPptxSourcesHandler", () => {
 
   it("skips a doc whose parent org id is missing from the parent chain", async () => {
     const orphaned = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS, orgId: null });
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    enablePptxSourceCleanup();
     mockPptxSourceDb([orphaned]);
     const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
     mockSourceBucket([source]);
@@ -1894,28 +1872,26 @@ describe("cleanupPptxSourcesHandler", () => {
     expect(summary.scannedCount).toBe(0);
   });
 
-  it("FAILS SAFE: unset/empty/false/1/True all leave dryRun=true and delete nothing", async () => {
-    for (const value of [undefined, "", "false", "1", "True"]) {
-      if (value === undefined) {
-        delete process.env.PPTX_SOURCE_CLEANUP_ENABLED;
-      } else {
-        process.env.PPTX_SOURCE_CLEANUP_ENABLED = value;
-      }
-      const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
-      mockPptxSourceDb([ready]);
-      const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
-      mockSourceBucket([source]);
+  it("FAILS SAFE: unset/default (appConfig/global empty) leaves dryRun=true and deletes nothing", async () => {
+    // The raw-value coercion matrix ("", "false", "1", "True", etc.) that
+    // used to be looped over process.env values here is now owned by
+    // appConfig.test.ts's "R184 fail-closed: cleanup + cron flags" block
+    // (coerceEnableFlag guarantees only a literal `true` ever resolves to
+    // enabled) -- this test proves the handler-level wiring against the
+    // global beforeEach's DEFAULT_APP_CONFIG mock only.
+    const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
+    mockPptxSourceDb([ready]);
+    const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    mockSourceBucket([source]);
 
-      const summary = await cleanupPptxSourcesHandler();
+    const summary = await cleanupPptxSourcesHandler();
 
-      expect(source.delete).not.toHaveBeenCalled();
-      expect(summary.dryRun).toBe(true);
-    }
+    expect(source.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
   });
 
   it("T-66-02-04: a per-run delete cap bounds a LIVE run -- exactly one object delete() call, cappedByLimit=true", async () => {
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
-    vi.mocked(getAppConfig).mockResolvedValue({ ...DEFAULT_APP_CONFIG, deleteCapPerRun: 1 });
+    enablePptxSourceCleanup({ deleteCapPerRun: 1 });
     const ready = fakeSourceRenderDoc({ status: "ready", ageDays: STALE_DAYS });
     mockPptxSourceDb([ready]);
     const source = fakeSourceObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
@@ -1958,7 +1934,7 @@ describe("cleanupPptxSourcesHandler", () => {
     const dryRunSummary = await cleanupPptxSourcesHandler();
     expect(dryRunSummary).toMatchObject({ dryRun: true, deletedBytes: SIZE_1 + SIZE_2 });
 
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
+    enablePptxSourceCleanup();
     const liveSummary = await cleanupPptxSourcesHandler();
     expect(source.delete).toHaveBeenCalledTimes(1);
     expect(image.delete).toHaveBeenCalledTimes(1);
@@ -1969,7 +1945,7 @@ describe("cleanupPptxSourcesHandler", () => {
     expect(sourcePrefixFor("orgA", "i1")).toBe("orgs/orgA/pptx-imports/i1/");
   });
 
-  it('★ SOURCE INSPECTION: the dry-run gate direction is pinned (PPTX_SOURCE_CLEANUP_ENABLED)', () => {
+  it('★ SOURCE INSPECTION: the dry-run gate direction is pinned (cleanup.pptxSourceEnabled)', () => {
     const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
     const start = source.indexOf("export async function cleanupPptxSourcesHandler(");
     const wrapperStart = source.indexOf("export const cleanupPptxSources = onSchedule(");
@@ -1977,16 +1953,16 @@ describe("cleanupPptxSourcesHandler", () => {
     expect(wrapperStart).toBeGreaterThan(start);
     const handlerBody = source.slice(start, wrapperStart);
     expect(handlerBody).toMatch(
-      /const dryRun = process\.env\.PPTX_SOURCE_CLEANUP_ENABLED !== "true";/,
+      /const dryRun = !config\.cleanup\.pptxSourceEnabled;/,
     );
   });
 
   it("config-tunable: default (30d) applies when appConfig/global is empty; an override shrinks the window", async () => {
     expect(readPptxSourceRetentionDays(DEFAULT_APP_CONFIG)).toBe(PPTX_SOURCE_RETENTION_DAYS);
 
-    process.env.PPTX_SOURCE_CLEANUP_ENABLED = "true";
     const overriddenConfig: AppConfig = {
       ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, pptxSourceEnabled: true },
       retention: { ...DEFAULT_APP_CONFIG.retention, pptxSourceDays: 5 },
     };
     expect(readPptxSourceRetentionDays(overriddenConfig)).toBe(5);
