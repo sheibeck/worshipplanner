@@ -2712,17 +2712,38 @@ export async function sendQueuedMessageHandler(params: {
   // Resend(...)` / the send loop, so an over-quota message sends zero
   // emails. Skipped entirely for a zero-recipient send -- nothing to
   // consume, and an org already at quota should not block an empty send.
+  //
+  // WR-02 (67-REVIEW.md): wrapped in try/catch and failed OPEN on a thrown
+  // Firestore error, matching this file's own documented cost-guardrail
+  // fail-open precedent for checkAndConsumeRateLimit (`// Fail OPEN: the
+  // limiter is a cost guardrail, not a security control`, locked decision,
+  // 65-CONTEXT.md). By this point the message doc has already been claimed
+  // `queued` -> `sending`, so a fail-CLOSED error here would leave the
+  // message stuck with no terminal status and no retry -- worse than
+  // letting one send through uncounted against the quota.
   if (sendList.length > 0) {
-    const quota = await checkAndConsumeOrgEmailQuota(db, orgId, sendList.length, ORG_MAX_EMAILS_PER_DAY);
-    if (!quota.allowed) {
-      await messageRef.set(
-        { status: "failed", sentAt: FieldValue.serverTimestamp(), deliveryCounts: { sent: 0, failed: 0 } },
-        { merge: true },
-      );
-      console.error(
-        `sendQueuedMessage: skipped ${messageId} -- org ${orgId} is at/over ORG_MAX_EMAILS_PER_DAY (${ORG_MAX_EMAILS_PER_DAY})`,
-      );
-      return { status: "failed", sentCount: 0, failedCount: 0, skippedReason: "over-org-daily-quota" };
+    try {
+      const quota = await checkAndConsumeOrgEmailQuota(db, orgId, sendList.length, ORG_MAX_EMAILS_PER_DAY);
+      if (!quota.allowed) {
+        await messageRef.set(
+          { status: "failed", sentAt: FieldValue.serverTimestamp(), deliveryCounts: { sent: 0, failed: 0 } },
+          { merge: true },
+        );
+        console.error(
+          `sendQueuedMessage: skipped ${messageId} -- org ${orgId} is at/over ORG_MAX_EMAILS_PER_DAY (${ORG_MAX_EMAILS_PER_DAY})`,
+        );
+        return { status: "failed", sentCount: 0, failedCount: 0, skippedReason: "over-org-daily-quota" };
+      }
+    } catch (quotaErr) {
+      // Fail OPEN: the quota is a cost guardrail, not a security control
+      // (locked decision, 65-CONTEXT.md) -- a quota-check Firestore hiccup
+      // must never take mail down or leave a claimed message stuck in
+      // `sending` with no terminal status.
+      console.warn("sendQueuedMessage: org quota check Firestore op failed; failing open:", {
+        messageId,
+        orgId,
+        message: quotaErr instanceof Error ? quotaErr.message : String(quotaErr),
+      });
     }
   }
 

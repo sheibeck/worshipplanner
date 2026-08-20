@@ -3908,6 +3908,10 @@ describe("sendQueuedMessageHandler", () => {
     // checkAndConsumeOrgEmailQuota transaction reads/writes, keyed exactly as
     // the helper keys it (`${orgId}__day__${dayWindow}`). Absent = under quota.
     orgEmailCounterSeed?: Record<string, number>;
+    // WR-02 (67-REVIEW.md): when true, the orgEmailCounter tx.get() throws --
+    // simulating a Firestore error inside checkAndConsumeOrgEmailQuota so
+    // tests can prove the caller fails OPEN instead of propagating.
+    orgEmailCounterThrows?: boolean;
   }
 
   function docSnap(exists: boolean, data: unknown) {
@@ -4012,6 +4016,9 @@ describe("sendQueuedMessageHandler", () => {
       const tx = {
         get: vi.fn(async (ref?: { _kind?: string; _docId?: string }) => {
           if (ref && ref._kind === "orgEmailCounter") {
+            if (cfg.orgEmailCounterThrows) {
+              throw new Error("Firestore unavailable (org quota check)");
+            }
             const entry = orgEmailCounters[ref._docId!];
             return { exists: entry !== undefined, data: () => (entry ? { ...entry } : undefined) };
           }
@@ -4193,6 +4200,32 @@ describe("sendQueuedMessageHandler", () => {
       expect(recipientWrites).toHaveLength(0);
       expect(orgEmailCounterSetSpy).not.toHaveBeenCalled();
       expect(outcome).toMatchObject({ status: "failed", skippedReason: "over-org-daily-quota" });
+    });
+
+    // WR-02 (67-REVIEW.md): a thrown Firestore error from the quota check
+    // must fail OPEN (the send proceeds) rather than propagate unhandled --
+    // by this point the message doc is already claimed queued -> sending, so
+    // a fail-closed error here would leave it stuck with no terminal status.
+    it("fails OPEN (the send proceeds) when the org quota check throws a Firestore error", async () => {
+      const { db, recipientWrites, messageSetSpy } = makeSendDb({
+        ...twoRecipientConfig(),
+        orgEmailCounterThrows: true,
+      });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      const outcome = await sendQueuedMessageHandler({
+        orgId: ORG_ID,
+        serviceId: SERVICE_ID,
+        messageId: MESSAGE_ID,
+      });
+
+      expect(mockSend).toHaveBeenCalledTimes(2);
+      expect(recipientWrites).toHaveLength(2);
+      expect(messageSetSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "sent", deliveryCounts: { sent: 2, failed: 0 } }),
+        { merge: true },
+      );
+      expect(outcome).toMatchObject({ status: "sent", sentCount: 2, failedCount: 0 });
     });
 
     it("under both default limits, the two-recipient send is unaffected (no MESSAGE_MAX_RECIPIENTS/ORG_MAX_EMAILS_PER_DAY override)", async () => {
