@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-08-20T02:00:12.353Z"
 last_activity: 2026-08-19
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -515,10 +515,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 65 — AI Proxy Cost Controls (not started; roadmap created)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-19 — Milestone v1.8 started
+Status: Roadmap created — ready to plan Phase 65
+Last activity: 2026-08-19 — v1.8 roadmap created (Phases 65–67; R161–R168/R170–R173, 12/12 mapped, R169 deferred)
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 

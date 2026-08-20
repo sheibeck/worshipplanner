@@ -85,7 +85,7 @@ limits.
 
 - **R169 (deferred)**: In-app per-org storage-usage visibility (total bytes per org surfaced in the UI
   or an admin view). Observability nicety; the retention jobs (R165–R168) are the cost fix. Revisit if
-  storage cost stays material after retention lands.
+  storage cost stays material after retention lands. **Not mapped to any v1.8 phase.**
 
 ## Out of Scope
 
@@ -99,29 +99,34 @@ limits.
 
 ## Traceability
 
-Populated during roadmap creation — each requirement maps to exactly one phase (continuing phase
-numbering from v1.7 at **Phase 65**).
+Each requirement maps to exactly one phase. Phase numbering continues from v1.7 at **Phase 65**.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R161 | TBD | Pending |
-| R162 | TBD | Pending |
-| R163 | TBD | Pending |
-| R164 | TBD | Pending |
-| R165 | TBD | Pending |
-| R166 | TBD | Pending |
-| R167 | TBD | Pending |
-| R168 | TBD | Pending |
-| R170 | TBD | Pending |
-| R171 | TBD | Pending |
-| R172 | TBD | Pending |
-| R173 | TBD | Pending |
+| R161 | Phase 65 | Pending |
+| R162 | Phase 65 | Pending |
+| R163 | Phase 65 | Pending |
+| R164 | Phase 65 | Pending |
+| R165 | Phase 66 | Pending |
+| R166 | Phase 66 | Pending |
+| R167 | Phase 66 | Pending |
+| R168 | Phase 66 | Pending |
+| R170 | Phase 67 | Pending |
+| R171 | Phase 67 | Pending |
+| R172 | Phase 67 | Pending |
+| R173 | Phase 67 | Pending |
 
 **Coverage:**
 - v1.8 requirements: 12 total (R161–R168, R170–R173)
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 12 ⚠️ (filled by roadmap)
+- Mapped to phases: 12 ✓ (Phase 65: R161–R164 · Phase 66: R165–R168 · Phase 67: R170–R173)
+- Unmapped: 0 ✓
+- Deferred (not mapped): R169 — in-app per-org storage-usage visibility
+
+**Phase boundaries:**
+- **Phase 65 — AI Proxy Cost Controls** (R161–R164): the metered `api` proxy + `src/utils/claudeApi.ts` client. Largest variable bill, sequenced first. Fully autonomous-deployable.
+- **Phase 66 — Storage Retention** (R165–R168): enable/verify the two dry-run sweeps and build retention for the never-pruned backgrounds & pptx-import paths. Mechanisms build/test autonomously; the first live deletion of real objects is an owner-gated deploy.
+- **Phase 67 — Fan-out, Cron & Instance Guardrails** (R170–R173): disable the unused daily cross-org reminder scan, cap the Resend send loop, and set function + Cloud Run instance ceilings. All bounded/reversible config → autonomous-deployable.
 
 ---
 *Requirements defined: 2026-08-19*
-*Last updated: 2026-08-19 after v1.8 milestone definition*
+*Last updated: 2026-08-19 — traceability filled by the v1.8 roadmap (Phases 65–67; 12/12 mapped, R169 deferred)*

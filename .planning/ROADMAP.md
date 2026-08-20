@@ -10,6 +10,7 @@
 - ✅ **v1.5 — Settings, Sharing, and Fidelity** — Phases 39-50 (shipped 2026-08-10; settings infra + feature toggles, custom auth claims, sharing correctness, PPTX rendered-image display, service item types, default template, ESV/NLT Bible version, slide typography, congregational reading, multi-image + mobile polish, bulk-delete/provenance/render-fidelity)
 - ✅ **v1.6 — Editing Reliability & Song Slides** — Phases 51-57 (shipped 2026-08-12; drag-and-drop editing reliability, service-template relocation, song-slide splitting, service-item notes + MISC labels + per-item Scripture version, preview/export polish, template-editor UX parity)
 - ✅ **v1.7 — Volunteer Messaging** — Phases 58-64 (shipped 2026-08-18; deployed to production 2026-08-17 — messages composer, delivery history + bounce webhook, lock & scheduled-reminder auto-notifications, re-lock scoped change diff, dedicated Messages tab, composer refinements + R157–R160 hotfixes — all behind a Settings kill-switch)
+- ▶ **v1.8 — Cost & Billing Hardening** — Phases 65-67 (active, started 2026-08-19; cap and observe the metered Claude `api` proxy, unbounded Storage growth, the daily all-org reminder scan, and uncapped email/instance fan-out on the live Blaze-plan app — R161–R168, R170–R173)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -199,6 +200,61 @@ queue-then-trigger send primitive; then refine the messaging UX from owner UAT.
 
 </details>
 
+## v1.8 Cost & Billing Hardening (Phases 65-67) — ▶ ACTIVE
+
+**Milestone Goal:** Cap and observe every runaway cost surface in the live production app (Blaze plan,
+deployed 2026-08-17) so billing stays predictable as usage grows — the metered Claude `api` proxy,
+unbounded Storage growth, the daily all-org reminder scan, and uncapped email/instance fan-out. Grounded
+in the 2026-08-19 code investigation (five confirmed exposures). Phase numbering continues from v1.7
+(58–64); this milestone is Phases 65–67.
+
+**Deploy policy (v1.8 autonomy grant, 2026-08-19):** low-risk config deploys **autonomously** (instance
+caps, proxy rate-limiting, cron disable, query changes); anything that DELETES existing data (the first
+activation of media/background/pptx pruning) or changes rules/auth ships built + tested + **UNDEPLOYED**
+with the exact deploy command handed to the owner.
+
+- [ ] **Phase 65: AI Proxy Cost Controls** - Rate-limit, server-side model/`max_tokens` enforcement, usage logging, and an instance cap on the metered Claude `api` proxy (the largest variable bill — sequenced first)
+- [ ] **Phase 66: Storage Retention** - Verify/enable the dry-run media & orphan-render sweeps and build retention for the never-pruned backgrounds & PPTX-import paths (mechanisms tested; first live deletion is the owner's gated deploy)
+- [ ] **Phase 67: Fan-out, Cron & Instance Guardrails** - Disable the unused daily cross-org reminder scan, cap the Resend send loop, and set function + Cloud Run instance ceilings
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R161–R168, R170–R173 (12 mapped; R169 deferred)
+
+### Phase 65: AI Proxy Cost Controls
+**Goal**: The metered Claude `/api/anthropic` proxy caps and observes every signed-in user's token spend, so no single user can drive unbounded AI cost in a loop and per-user/per-org spend is visible inside the app instead of only on the external Anthropic console.
+**Depends on**: Nothing (first v1.8 phase; independent — sequenced first as the largest variable bill)
+**Requirements**: R161, R162, R163, R164
+**Success Criteria** (what must be TRUE):
+  1. A signed-in user who exceeds the configured per-user/per-org request-window ceiling is rejected with a clear error instead of being able to loop the proxy for unbounded token spend (R161).
+  2. A proxied request naming a costlier model or a larger `max_tokens` than server policy is rejected or clamped before it reaches Anthropic — the client can no longer dictate the model or token budget forwarded byte-unchanged (R162).
+  3. Every proxied Claude request records a usage entry (caller uid + org, model, input/output token counts, timestamp) to a queryable ledger, so per-user/per-org token spend is observable inside the app (R163).
+  4. The `api` proxy function runs under an explicit `maxInstances` ceiling, so a traffic spike or abuse cannot fan it out without bound (R164).
+**Plans**: TBD
+**Deploy**: All four controls are bounded/reversible config → deploy autonomously per the v1.8 grant.
+
+### Phase 66: Storage Retention
+**Goal**: Every Storage path that grows forever gains a bounded, implemented retention story — the two dry-run sweeps are proven deletion-capable and the never-pruned backgrounds & PPTX-import paths gain a pruning path — with every first live deletion of real objects handed to the owner as a gated deploy.
+**Depends on**: Nothing (independent of Phase 65)
+**Requirements**: R165, R166, R167, R168
+**Success Criteria** (what must be TRUE):
+  1. `cleanupExpiredMedia` is proven by test to actually delete objects under `orgs/{orgId}/media/` past the retention window (not dry-run-logged); enabling it in production (`MEDIA_CLEANUP_ENABLED=true`) is handed to the owner as the gated first-deletion deploy (R165).
+  2. `cleanupOrphanRenders` is proven by test to actually delete stale `pending`/`failed` `rendered/` objects; the production enable (`PPTX_RENDER_CLEANUP_ENABLED=true`) is handed to the owner as gated (R166).
+  3. Background images under `orgs/{orgId}/backgrounds/…` have an implemented, tested pruning path so unreferenced/aged backgrounds stop accumulating forever — built and UNDEPLOYED, the first live deletion being the owner's deploy (R167).
+  4. PPTX import sources (source `.pptx` + extracted `images/`) under `orgs/{orgId}/pptx-imports/{importId}/…` have an implemented, tested retention path so they stop accumulating after an import is consumed/rendered — built and UNDEPLOYED, first live deletion owner-gated (R168).
+**Plans**: TBD
+**Deploy**: Retention mechanisms build + test autonomously; the first activation that deletes existing objects is owner-gated per the v1.8 grant — ship the exact enable/deploy command, do not run it.
+
+### Phase 67: Fan-out, Cron & Instance Guardrails
+**Goal**: Every unbounded fan-out and always-running scan is capped or eliminated — the unused daily reminder scan stops running, and email sends, HTTP functions, and the render service all carry explicit ceilings — so no spike or abuse can scale cost without bound.
+**Depends on**: Nothing (independent; naturally sequenced last, matching the milestone-goal priority order)
+**Requirements**: R170, R171, R172, R173
+**Success Criteria** (what must be TRUE):
+  1. The daily `sendScheduledReminders` cross-org scan no longer runs while reminders are unused — the cron is disabled or gated so it performs no cross-org read — eliminating the daily read cost, with any must-survive scheduled-message dispatch preserved or independently gated, not silently broken (R170).
+  2. The Resend send path enforces a volume cap (a per-message maximum recipient count and/or a per-org send quota), so a single send or the crons that enqueue through it cannot fan out without bound (R171).
+  3. Project-wide function instance ceilings are in force (a `setGlobalOptions({ maxInstances })` and/or explicit per-function caps) covering at least the `api` proxy and `messageWebhook`, so no HTTP function scales out unbounded under load or abuse (R172).
+  4. The Cloud Run PPTX render service has an explicit `--max-instances` and appropriate `--concurrency` ceiling, so rendering cannot scale out without bound (R173).
+**Plans**: TBD
+**Deploy**: All caps + the cron disable are bounded/reversible config → deploy autonomously per the v1.8 grant.
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -211,6 +267,9 @@ queue-then-trigger send primitive; then refine the messaging UX from owner UAT.
 | 39-50 | v1.5 | all | Complete (archived) | 2026-08-10 |
 | 51-57 | v1.6 | 19/19 | Complete (archived) | 2026-08-12 |
 | 58-64 | v1.7 | 25/25 | Complete (archived) | 2026-08-18 |
+| 65 | v1.8 | 0/TBD | Not started | - |
+| 66 | v1.8 | 0/TBD | Not started | - |
+| 67 | v1.8 | 0/TBD | Not started | - |
 
 ## Backlog
 
