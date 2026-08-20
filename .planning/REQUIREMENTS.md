@@ -86,7 +86,7 @@ limits.
       and/or explicit per-function caps), covering at least the `api` proxy and `messageWebhook`, so no
       HTTP function can scale out unbounded under load or abuse.
 
-- [ ] **R173**: The Cloud Run PPTX render service has an explicit `--max-instances` (and appropriate
+- [x] **R173**: The Cloud Run PPTX render service has an explicit `--max-instances` (and appropriate
       `--concurrency`) ceiling so rendering cannot scale out without bound.
 
 ## Deferred / Future
@@ -122,7 +122,7 @@ Each requirement maps to exactly one phase. Phase numbering continues from v1.7 
 | R170 | Phase 67 | Complete |
 | R171 | Phase 67 | Complete |
 | R172 | Phase 67 | Complete |
-| R173 | Phase 67 | Pending |
+| R173 | Phase 67 | Complete |
 
 **Coverage:**
 

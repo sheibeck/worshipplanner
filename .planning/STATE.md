@@ -4,17 +4,17 @@ milestone: v1.8
 milestone_name: Cost & Billing Hardening
 current_phase: 67
 current_phase_name: Fan-out, Cron & Instance Guardrails
-status: executing
-stopped_at: Completed 67-01-functions-guardrails-PLAN.md
-last_updated: "2026-08-20T07:31:00.008Z"
+status: verifying
+stopped_at: Completed 67-02-render-service-instance-cap-PLAN.md
+last_updated: "2026-08-20T07:34:35.923Z"
 last_activity: 2026-08-20
 last_activity_desc: Phase 67 execution started
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 67
+  completed_plans: 6
+  percent: 100
 ---
 
 # ▶ ACTIVE MILESTONE — v1.8 Cost & Billing Hardening (started 2026-08-19)
@@ -22,7 +22,7 @@ progress:
 **Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
 predictable. Phases 65+ (continuing numbering from v1.7's 58–64). Requirements R161+ in REQUIREMENTS.md.
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 Five confirmed exposures (investigation 2026-08-19, `functions/src/index.ts` unless noted):
 
@@ -532,7 +532,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 67 (Fan-out, Cron & Instance Guardrails) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-20 — Phase 67 execution started
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
@@ -2081,6 +2081,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 66 P01 | 11min | 2 tasks | 2 files |
 | Phase 66 P02 | 35min | 2 tasks | 2 files |
 | Phase 67 P01 | 30min | 3 tasks | 2 files |
+| Phase 67 P02 | 6min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -2448,6 +2449,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R170: gated the WHOLE sendScheduledReminders function off by default (SCHEDULED_MESSAGING_CRON_ENABLED); this also disables schedule-for-later dispatch until enabled
 - [Phase ?]: R171: reject-over-cap (never truncate) for MESSAGE_MAX_RECIPIENTS; fixed-window per-org ORG_MAX_EMAILS_PER_DAY quota via new checkAndConsumeOrgEmailQuota
 - [Phase ?]: R172: one setGlobalOptions maxInstances=20 ceiling at module top; api keeps its own tighter maxInstances=10 (not clobbered)
+- [Phase ?]: R173: kept --concurrency=1 on render-service (not the 4 floated in 67-CONTEXT.md) — LibreOffice shared-profile-lock makes concurrent conversions on one instance unreliable; --max-instances tightened to 3 as the explicit cost ceiling.
 
 ### Roadmap Evolution
 
@@ -2767,8 +2769,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T07:30:59.957Z
-Stopped at: Completed 67-01-functions-guardrails-PLAN.md
+Last session: 2026-08-20T07:34:35.872Z
+Stopped at: Completed 67-02-render-service-instance-cap-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
