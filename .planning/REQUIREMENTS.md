@@ -77,14 +77,14 @@ REQ-IDs continue from v1.8 (last R173).
 
 ### Cleanup deletion safety
 
-- [ ] **R188**: Before a `*_CLEANUP_ENABLED` flag can be turned on, the console shows an on-demand dry-run
+- [x] **R188**: Before a `*_CLEANUP_ENABLED` flag can be turned on, the console shows an on-demand dry-run
       blast-radius count (what that cron would delete right now), fetched from a callable that forces
       dry-run regardless of the stored flag.
 
 - [ ] **R189**: Enabling a cleanup that deletes data requires an explicit confirm step echoing the dry-run
       count; flipping the flag never triggers an immediate deletion — only the next scheduled cron run acts.
 
-- [ ] **R190**: No cleanup can ever delete a song-linked background — the `cleanupOrphanBackgrounds`
+- [x] **R190**: No cleanup can ever delete a song-linked background — the `cleanupOrphanBackgrounds`
       `referencesComplete` / floor-guard fail-safes remain intact after the config swap (its existing unit
       tests pass unchanged); only transient slideshow backgrounds tied to a service are eligible.
 
@@ -154,9 +154,9 @@ REQ-IDs continue from v1.8 (last R173).
 | R185 | Phase 69 | Complete (UAT deferred) |
 | R186 | Phase 70 | Complete (UAT deferred) |
 | R187 | Phase 70 | Complete (UAT deferred) |
-| R188 | Phase 71 | Pending |
+| R188 | Phase 71 | Complete |
 | R189 | Phase 71 | Pending |
-| R190 | Phase 71 | Pending |
+| R190 | Phase 71 | Complete |
 | R191 | Phase 70 | Complete (UAT deferred) |
 | R192 | Phase 70 | Complete (UAT deferred) |
 
