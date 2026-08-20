@@ -43,12 +43,14 @@ index.ts:658) and only `rendered/` orphans are otherwise eligible (`cleanupOrpha
 equal `"true"`). Background images (`orgs/{orgId}/backgrounds/…`, `useBackgroundUpload.ts:103`) and PPTX
 import sources (`orgs/{orgId}/pptx-imports/{importId}/…`) are **never pruned by any job**.
 
-- [x] **R165**: Media auto-cleanup is enabled and verified in production — objects under
-      `orgs/{orgId}/media/` older than the retention window are actually deleted, not dry-run-logged.
-      (First live deletion is an owner-gated deploy per the autonomy grant.)
+- [x] **R165**: Media auto-cleanup's delete branch is proven by test to actually delete objects under
+      `orgs/{orgId}/media/` older than the retention window (not dry-run-logged); the function is
+      deployed in **dry-run** (default off). Activating real deletion in production
+      (`MEDIA_CLEANUP_ENABLED=true`) is the owner-gated first-deletion step per the autonomy grant.
 
-- [x] **R166**: Orphan-render cleanup is enabled and verified — stale `pending`/`failed` `rendered/`
-      objects are actually deleted. (First live deletion owner-gated.)
+- [x] **R166**: Orphan-render cleanup's delete branch is proven by test to delete stale `pending`/`failed`
+      `rendered/` objects; deployed in **dry-run**. Production enable (`PPTX_RENDER_CLEANUP_ENABLED=true`)
+      is owner-gated.
 
 - [x] **R167**: Background images have a defined, implemented retention story so they stop accumulating
       forever — unreferenced/aged backgrounds under `orgs/{orgId}/backgrounds/…` become eligible for
