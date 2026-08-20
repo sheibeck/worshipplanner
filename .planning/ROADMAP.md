@@ -355,8 +355,12 @@ only transient slideshow backgrounds tied to a service. This guarantee must surv
   3. A super-admin can set the no-reply From display name + address from the console; it is format-validated and used by the Resend send path (R191).
   4. The sender config never accepts or exposes provider secrets (`RESEND_API_KEY` stays server-side), and an address on an un-verifiable host (e.g. `*.web.app`) surfaces a "must be a Resend-verified domain" warning (R192).
 
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
+
+Plans:
+- [ ] 70-01-PLAN.md — Foundation: `appConfigDefaults.ts` mirror + `mergeAppConfig`/`isExplicitlySet`, the `appConfig/global` onSnapshot store (`setDoc merge:true` saveField), and reusable `ConfigNumberField`/`ConfigTextField` components (R186, R187)
+- [ ] 70-02-PLAN.md — Owner Console config panels: Cleanup(read-only)/AI Proxy/Messaging/Sender cards wired to the store with validation, provenance, and the sender warning, plus the fresh `OwnerConsoleView.test.ts` (R186, R187, R191, R192)
 
 ### Phase 71: Cleanup Deletion-Toggle Safety
 
@@ -394,7 +398,7 @@ deploy command handed to the owner. The owner runs the first-super-admin bootstr
 | 67 | v1.8 | 2/2 | Complete    | 2026-08-20 |
 | 68 | v1.9 | 5/5 | Code-complete (UAT deferred) | 2026-08-20 |
 | 69 | v1.9 | 3/3 | Code-complete (UAT deferred) | 2026-08-20 |
-| 70 | v1.9 | 0/? | Not started | - |
+| 70 | v1.9 | 0/2 | Planned | - |
 | 71 | v1.9 | 0/? | Not started | - |
 
 ## Backlog
