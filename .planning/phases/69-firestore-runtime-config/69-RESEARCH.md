@@ -681,9 +681,13 @@ global-scope-per-instance behavior, `defineString` deploy-time resolution, the e
 exact read-sites) was verified directly against this repo's source or against official Firebase
 documentation this session.
 
-## Open Questions
+## Open Questions (RESOLVED — see 69-01/69-02 plan decisions)
 
-1. **Does `sender.fromName` override the per-org display name, or is it purely a Phase-70-forward field this
+> Both resolved at planning: (1) `sender.fromName` is schema-defined but DORMANT this phase — the per-message
+> display name stays the org name (R159 unchanged); Phase 70 surfaces `fromName`. (2) The env-wrapper helpers
+> are KEPT as thin passthroughs over the resolved `AppConfig` (not retired), minimizing call-site/test churn.
+
+1. **(RESOLVED — dormant this phase)** **Does `sender.fromName` override the per-org display name, or is it purely a Phase-70-forward field this
    phase defines but does not wire?**
    - What we know: today's send path ALWAYS uses the org's own `name` field (sanitized via
      `fromDisplayName`), never a global override; CONTEXT.md's shape lists `fromName` alongside `fromAddress`
@@ -696,7 +700,7 @@ documentation this session.
      alternative (defined-but-dead field) is a worse footgun than doing the small additional wiring now. If
      the planner disagrees, it must be an explicit, stated decision, not a silent omission.
 
-2. **Should the four `read*RetentionDays`/`readDeleteCap`/`readOrphanRenderStaleHours` wrapper functions be
+2. **(RESOLVED — kept as thin passthroughs)** **Should the four `read*RetentionDays`/`readDeleteCap`/`readOrphanRenderStaleHours` wrapper functions be
    retired outright or kept as thin deprecated re-exports?**
    - What we know: they are directly imported and unit-tested by name in `index.test.ts`; `readNumericKnob`
      itself is generic and reusable inside the new coercion layer.
