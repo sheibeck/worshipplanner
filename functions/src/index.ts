@@ -878,6 +878,23 @@ export const requestPptxRender = onDocumentCreated(
   },
 );
 
+// --- Shared cleanup-sweep safety knob (66-01: T-66-01-02) ----------------
+//
+// Bounds how many objects a SINGLE LIVE cleanup run may delete. The first
+// LIVE enablement of MEDIA_CLEANUP_ENABLED/PPTX_RENDER_CLEANUP_ENABLED (and
+// any future sweep built on this same helper, e.g. 66-02's background/pptx-
+// source sweeps) may hit a large accumulated backlog; without a cap that
+// first run could fan out an unbounded number of deletes/cost in one shot.
+// Both sweeps below are idempotent-by-age, so anything left uncapped this
+// run is picked up by the next daily invocation -- capping never leaves an
+// object stuck past its retention window, only spreads its deletion over
+// more runs. Dry-run summaries are NEVER capped: the owner needs the true
+// backlog count/bytes before flipping the enable flag, not a truncated one.
+export function readDeleteCap(): number {
+  const raw = readNumericKnob(process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN, 500);
+  return Number.isInteger(raw) && raw > 0 ? raw : 500;
+}
+
 // --- cleanupExpiredMedia (R015: 2-week Storage retention) ---------------
 //
 // SAFETY CONTRACT (see 22-03 threat model, T-22-03-01..05):
@@ -921,6 +938,10 @@ export interface CleanupSummary {
   scannedCount: number;
   deletedCount: number;
   dryRun: boolean;
+  /** Total bytes deleted (LIVE) or would-delete (dry-run) this run (66-01: T-66-01-04). */
+  deletedBytes: number;
+  /** True when readDeleteCap() stopped a LIVE run before all aged candidates were deleted. */
+  cappedByLimit: boolean;
 }
 
 /**
@@ -934,9 +955,12 @@ export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
   const dryRun = process.env.MEDIA_CLEANUP_ENABLED !== "true";
   const bucket = getStorage().bucket();
   const cutoffMs = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const deleteCap = readDeleteCap();
 
   let scannedCount = 0;
   let deletedCount = 0;
+  let deletedBytes = 0;
+  let cappedByLimit = false;
 
   const [files] = await bucket.getFiles({
     prefix: "orgs/",
@@ -959,14 +983,27 @@ export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
       continue;
     }
 
+    const fileBytes = Number(file.metadata?.size ?? 0);
+
     if (dryRun) {
+      // Dry-run is NEVER capped -- the owner needs the true backlog
+      // count/bytes before enabling live deletion, not a truncated one.
       deletedCount++;
+      deletedBytes += fileBytes;
       continue;
+    }
+
+    if (deletedCount >= deleteCap) {
+      // T-66-01-02: bound this run's blast radius. Idempotent-by-age means
+      // the next daily run resumes deleting the remaining backlog.
+      cappedByLimit = true;
+      break;
     }
 
     try {
       await file.delete();
       deletedCount++;
+      deletedBytes += fileBytes;
     } catch (err) {
       // Partial-failure tolerance (T-22-03-03): one bad delete never aborts
       // the run. Idempotent-by-age means the next daily run retries it.
@@ -974,7 +1011,13 @@ export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
     }
   }
 
-  const summary: CleanupSummary = { scannedCount, deletedCount, dryRun };
+  const summary: CleanupSummary = {
+    scannedCount,
+    deletedCount,
+    dryRun,
+    deletedBytes,
+    cappedByLimit,
+  };
   console.log("cleanupExpiredMedia summary:", summary);
   return summary;
 }
@@ -1043,6 +1086,10 @@ export interface OrphanCleanupSummary {
   deletedDocCount: number;
   deletedObjectCount: number;
   dryRun: boolean;
+  /** Total bytes deleted (LIVE) or would-delete (dry-run) this run (66-01: T-66-01-04). */
+  deletedBytes: number;
+  /** True when readDeleteCap() stopped a LIVE run before all stale candidates were cleared. */
+  cappedByLimit: boolean;
 }
 
 /**
@@ -1056,10 +1103,13 @@ export async function cleanupOrphanRendersHandler(): Promise<OrphanCleanupSummar
   const dryRun = process.env.PPTX_RENDER_CLEANUP_ENABLED !== "true";
 
   const cutoffMs = Date.now() - ORPHAN_RENDER_STALE_HOURS * 60 * 60 * 1000;
+  const deleteCap = readDeleteCap();
 
   let scannedCount = 0;
   let deletedDocCount = 0;
   let deletedObjectCount = 0;
+  let deletedBytes = 0;
+  let cappedByLimit = false;
 
   const snapshot = await getFirestore()
     .collectionGroup("pptxRenders")
@@ -1097,19 +1147,42 @@ export async function cleanupOrphanRendersHandler(): Promise<OrphanCleanupSummar
     const eligibleFiles = files.filter((file) => RENDERED_OBJECT_GUARD.test(file.name));
 
     if (dryRun) {
+      // Dry-run is NEVER capped -- the owner needs the true backlog
+      // count/bytes before enabling live deletion, not a truncated one.
       deletedObjectCount += eligibleFiles.length;
       deletedDocCount++;
+      for (const file of eligibleFiles) {
+        deletedBytes += Number(file.metadata?.size ?? 0);
+      }
       continue;
     }
 
+    // T-66-01-02: the cap bounds the TOTAL objects deleted across the whole
+    // run (a single run-level counter, not per-doc). If the cap is reached
+    // partway through this doc's rendered objects, stop deleting objects AND
+    // do not delete the doc itself -- a doc is only removed once its
+    // rendered objects are FULLY cleared, so the next daily run can finish
+    // the job before the doc disappears.
+    let hitCapThisDoc = false;
     for (const file of eligibleFiles) {
+      if (deletedObjectCount >= deleteCap) {
+        cappedByLimit = true;
+        hitCapThisDoc = true;
+        break;
+      }
       try {
         await file.delete();
         deletedObjectCount++;
+        deletedBytes += Number(file.metadata?.size ?? 0);
       } catch (err) {
         // Partial-failure tolerance: one bad delete never aborts the run.
         console.error(`cleanupOrphanRenders: failed to delete ${file.name}:`, err);
       }
+    }
+
+    if (hitCapThisDoc) {
+      // Stop processing further docs this run -- the cap is already spent.
+      break;
     }
 
     try {
@@ -1128,6 +1201,8 @@ export async function cleanupOrphanRendersHandler(): Promise<OrphanCleanupSummar
     deletedDocCount,
     deletedObjectCount,
     dryRun,
+    deletedBytes,
+    cappedByLimit,
   };
   console.log("cleanupOrphanRenders summary:", summary);
   return summary;

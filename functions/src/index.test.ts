@@ -131,14 +131,17 @@ function daysAgoIso(days: number): string {
 
 interface FakeFile {
   name: string;
-  metadata: { timeCreated: string };
+  metadata: { timeCreated: string; size: number };
   delete: ReturnType<typeof vi.fn>;
 }
 
-function fakeFile(name: string, ageDays: number): FakeFile {
+// sizeBytes defaults to a fixed value so every pre-existing call site (which
+// never passes a third arg) keeps working unchanged -- only the new 66-01
+// byte-observability tests below need to pass an explicit, known size.
+function fakeFile(name: string, ageDays: number, sizeBytes = 1000): FakeFile {
   return {
     name,
-    metadata: { timeCreated: daysAgoIso(ageDays) },
+    metadata: { timeCreated: daysAgoIso(ageDays), size: sizeBytes },
     delete: vi.fn(async () => undefined),
   };
 }
@@ -172,6 +175,7 @@ describe("cleanupExpiredMediaHandler", () => {
     vi.mocked(getFirestore).mockReset();
     delete process.env.MEDIA_CLEANUP_ENABLED;
     delete process.env.MEDIA_CLEANUP_DRY_RUN;
+    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
   });
 
   it("deletes a media file older than the retention window when explicitly enabled", async () => {
@@ -219,6 +223,90 @@ describe("cleanupExpiredMediaHandler", () => {
 
     expect(old.delete).not.toHaveBeenCalled();
     expect(summary.dryRun).toBe(true);
+  });
+
+  it('FAILS SAFE: an empty-string MEDIA_CLEANUP_ENABLED behaves identically to unset', async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "";
+    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
+    mockBucket([old]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(old.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
+  });
+
+  it('FAILS SAFE: a case-typo value ("True") does not enable deletion -- the comparison is exact and case-sensitive', async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "True";
+    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
+    mockBucket([old]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(old.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
+  });
+
+  it("R165: deletes exactly the guarded+aged set -- an aged pptx-imports file and a recent media file both survive alongside an aged media file", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    const agedMedia = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
+    const agedPptx = fakeFile("orgs/orgA/pptx-imports/i1/deck.pptx", RETENTION_DAYS + 6);
+    const recentMedia = fakeFile("orgs/orgA/media/m2/new.mp3", 3);
+    mockBucket([agedMedia, agedPptx, recentMedia]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(agedMedia.delete).toHaveBeenCalledTimes(1);
+    expect(agedPptx.delete).not.toHaveBeenCalled();
+    expect(recentMedia.delete).not.toHaveBeenCalled();
+    expect(summary.deletedCount).toBe(1);
+  });
+
+  it("R165/T-66-01-04: reports deletedBytes for a LIVE delete, and dry-run reports the same would-delete byte total", async () => {
+    const KNOWN_SIZE = 54321;
+    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6, KNOWN_SIZE);
+    mockBucket([old]);
+
+    const dryRunSummary = await cleanupExpiredMediaHandler();
+    expect(dryRunSummary).toMatchObject({ dryRun: true, deletedBytes: KNOWN_SIZE });
+
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    const liveSummary = await cleanupExpiredMediaHandler();
+    expect(old.delete).toHaveBeenCalledTimes(1);
+    expect(liveSummary).toMatchObject({ dryRun: false, deletedBytes: KNOWN_SIZE });
+  });
+
+  it("T-66-01-02: a per-run delete cap bounds a LIVE run -- exactly one delete() call, cappedByLimit=true, deletedCount=1", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    const old1 = fakeFile("orgs/orgA/media/m1/old1.mp4", RETENTION_DAYS + 6);
+    const old2 = fakeFile("orgs/orgA/media/m2/old2.mp4", RETENTION_DAYS + 6);
+    mockBucket([old1, old2]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    const totalDeleteCalls =
+      (old1.delete as ReturnType<typeof vi.fn>).mock.calls.length +
+      (old2.delete as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(totalDeleteCalls).toBe(1);
+    expect(summary).toMatchObject({ deletedCount: 1, cappedByLimit: true, dryRun: false });
+
+    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
+  });
+
+  it("T-66-01-02: the delete cap does NOT truncate a dry-run -- the full would-delete count is still reported", async () => {
+    process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN = "1";
+    const old1 = fakeFile("orgs/orgA/media/m1/old1.mp4", RETENTION_DAYS + 6);
+    const old2 = fakeFile("orgs/orgA/media/m2/old2.mp4", RETENTION_DAYS + 6);
+    mockBucket([old1, old2]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(old1.delete).not.toHaveBeenCalled();
+    expect(old2.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: true, deletedCount: 2, cappedByLimit: false });
+
+    delete process.env.STORAGE_CLEANUP_MAX_DELETES_PER_RUN;
   });
 
   it("does not delete a recent media file", async () => {
