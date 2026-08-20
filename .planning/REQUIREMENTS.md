@@ -42,7 +42,7 @@ REQ-IDs continue from v1.8 (last R173).
 
 ### Firestore runtime config
 
-- [ ] **R180**: The v1.8 levers are stored in an admin-only `appConfig/global` Firestore doc: the four
+- [x] **R180**: The v1.8 levers are stored in an admin-only `appConfig/global` Firestore doc: the four
       `*_CLEANUP_ENABLED` flags, retention windows (media/orphan-render/background/pptx-source), the delete
       blast-radius cap, the AI-proxy knobs (per-min/per-day rate limits, model allow-list, max_tokens
       ceiling), and the messaging/fan-out knobs (`SCHEDULED_MESSAGING_CRON_ENABLED`, message recipient cap,
@@ -51,14 +51,14 @@ REQ-IDs continue from v1.8 (last R173).
 - [ ] **R181**: The Cloud Functions read each managed value from `appConfig/global` at runtime; changing a
       value in the console takes effect **without a redeploy**.
 
-- [ ] **R182**: A missing or empty `appConfig/global` doc reproduces today's exact behavior — code defaults
+- [x] **R182**: A missing or empty `appConfig/global` doc reproduces today's exact behavior — code defaults
       (identical to the current env fallbacks) are deep-merged, so an absent doc is safe by construction.
 
-- [ ] **R183**: Config reads are cached with a short TTL on hot paths (`api` proxy, `sendQueuedMessage`) and
+- [x] **R183**: Config reads are cached with a short TTL on hot paths (`api` proxy, `sendQueuedMessage`) and
       read fresh (uncached) on the daily cleanup crons and `sendScheduledReminders`, so an emergency disable
       takes effect on the very next scheduled run.
 
-- [ ] **R184**: Per-knob fail-safe defaults apply on a missing/malformed value: cleanup enable-flags and the
+- [x] **R184**: Per-knob fail-safe defaults apply on a missing/malformed value: cleanup enable-flags and the
       AI model allow-list fail **closed** (off / restrictive), AI rate limits fail **open** but with capped
       fallback values — never a single blanket all-permissive or all-restrictive default.
 
@@ -146,11 +146,11 @@ REQ-IDs continue from v1.8 (last R173).
 | R177 | Phase 68 | Complete (UAT deferred) |
 | R178 | Phase 68 | Complete (UAT deferred) |
 | R179 | Phase 68 | Complete (UAT deferred) |
-| R180 | Phase 69 | Pending |
+| R180 | Phase 69 | Complete |
 | R181 | Phase 69 | Pending |
-| R182 | Phase 69 | Pending |
-| R183 | Phase 69 | Pending |
-| R184 | Phase 69 | Pending |
+| R182 | Phase 69 | Complete |
+| R183 | Phase 69 | Complete |
+| R184 | Phase 69 | Complete |
 | R185 | Phase 69 | Pending |
 | R186 | Phase 70 | Pending |
 | R187 | Phase 70 | Pending |

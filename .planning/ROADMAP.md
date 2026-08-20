@@ -337,9 +337,9 @@ only transient slideshow backgrounds tied to a service. This guarantee must surv
   5. A missing/malformed config value fails safe per-knob — cleanup flags and the AI model allow-list default closed, AI rate limits default open but capped — never one blanket all-permissive or all-restrictive policy (R184).
   6. `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES`/render-service caps remain env/deploy-time only; if shown anywhere in the console they are read-only, labeled "requires redeploy" (R185).
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 
-- [ ] 69-01-PLAN.md — appConfig.ts reader: AppConfig type + DEFAULT_APP_CONFIG + deep-merge + per-knob coercion + getAppConfig(db,{fresh?}) TTL cache, with appConfig.test.ts (R180, R182, R183, R184)
+- [x] 69-01-PLAN.md — appConfig.ts reader: AppConfig type + DEFAULT_APP_CONFIG + deep-merge + per-knob coercion + getAppConfig(db,{fresh?}) TTL cache, with appConfig.test.ts (R180, R182, R183, R184)
 - [ ] 69-02-PLAN.md — Swap the 17 managed index.ts read-sites to getAppConfig() (crons fresh, hot paths cached; R190 fail-safes untouched; MESSAGE_FROM_ADDRESS replaced) + convert index.test.ts setup (R181, R183, R184, R185)
 - [ ] 69-03-PLAN.md — Owner hand-over deploy note (functions/DEPLOY-RUNTIME-CONFIG.md) with the exact scoped firebase deploy command; built + tested + UNDEPLOYED (R181)
 
@@ -393,7 +393,7 @@ deploy command handed to the owner. The owner runs the first-super-admin bootstr
 | 66 | v1.8 | 2/2 | Complete    | 2026-08-20 |
 | 67 | v1.8 | 2/2 | Complete    | 2026-08-20 |
 | 68 | v1.9 | 5/5 | Code-complete (UAT deferred) | 2026-08-20 |
-| 69 | v1.9 | 0/3 | Planned | - |
+| 69 | v1.9 | 1/3 | In Progress|  |
 | 70 | v1.9 | 0/? | Not started | - |
 | 71 | v1.9 | 0/? | Not started | - |
 
