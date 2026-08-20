@@ -1,20 +1,77 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.7
-milestone_name: Volunteer Messaging
-status: Milestone complete — awaiting next milestone
-stopped_at: v1.7 Volunteer Messaging (Phases 58–64, R130–R160) CLOSED & ARCHIVED 2026-08-18; deployed to production 2026-08-17. Combined the internal v1.7 (58–62) + v1.8 (63–64) into one milestone at close (owner decision).
-last_updated: "2026-08-18T13:17:28.553Z"
-last_activity: 2026-08-18
-last_activity_desc: Milestone v1.7 completed and archived (combined 58–64)
+milestone: v1.8
+milestone_name: Cost & Billing Hardening
+status: planning
+last_updated: "2026-08-20T02:00:12.353Z"
+last_activity: 2026-08-19
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 25
-  completed_plans: 25
-  percent: 100
-current_phase: 64
-current_phase_name: Composer Refinements
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
+# ▶ ACTIVE MILESTONE — v1.8 Cost & Billing Hardening (started 2026-08-19)
+
+**Goal:** Cap and observe every runaway cost surface in the live app so production billing stays
+predictable. Phases 65+ (continuing numbering from v1.7's 58–64). Requirements R161+ in REQUIREMENTS.md.
+
+**Status:** planning — requirements being defined, roadmap next, then autonomous execution.
+
+Five confirmed exposures (investigation 2026-08-19, `functions/src/index.ts` unless noted):
+1. **Claude proxy** `api` (index.ts:156) — authenticated but uncapped; model + `max_tokens` chosen
+   client-side (`src/utils/claudeApi.ts:282/362/569`) and forwarded byte-unchanged; no usage logging;
+   no `maxInstances`. Largest variable bill.
+2. **Storage grows forever** — backgrounds (`useBackgroundUpload.ts:103`) and pptx-import sources are
+   never pruned; `cleanupExpiredMedia` (index.ts:658, `MEDIA_CLEANUP_ENABLED`) and `cleanupOrphanRenders`
+   (index.ts:812, `PPTX_RENDER_CLEANUP_ENABLED`) both **dry-run by default**.
+3. **`sendScheduledReminders`** (index.ts:1025) — two unbounded cross-org collection-group scans daily,
+   no early gate. Reminders NOT in production use → disable.
+4. **Resend send loop** (index.ts:1782) — no recipient/volume cap.
+5. **No instance ceilings / budget guardrails** anywhere (`firebase.json`, render-service Dockerfile).
+
+## ★★ STANDING AUTONOMY GRANT — v1.8, granted 2026-08-19
+
+**This is the ACTIVE grant.** Re-read before deciding to stop — it survives context compaction. Owner
+chose "use gsd-autonomous" for v1.8, same pattern as v1.6/v1.7, with two milestone-specific decisions
+settled by explicit Q&A at launch (2026-08-19).
+
+### Milestone-specific decisions (owner, 2026-08-19)
+
+- **Reminders are NOT used → disable** the daily `sendScheduledReminders` cross-org scan. (Keep the
+  scheduled-message *dispatch* path working only if a phase shows it is independently needed; otherwise
+  gate the whole daily function off.)
+- **Deploy policy: deploy the low-risk config autonomously; hand over data-loss / lockout deploys.**
+  - **Autonomous deploy (bounded, reversible, no user lockout, no data loss):** function `maxInstances`
+    / `setGlobalOptions` caps, Claude-proxy rate-limiting + server-side model/`max_tokens` enforcement +
+    usage logging, disabling the reminders cron, Resend volume caps, Cloud Run render-service
+    max-instances/concurrency, query changes.
+  - **HAND OVER (owner runs) — anything that DELETES DATA or could LOCK USERS OUT:** the first activation
+    of any pruning that removes existing objects (enabling `MEDIA_CLEANUP_ENABLED`, enabling
+    `PPTX_RENDER_CLEANUP_ENABLED`, any Storage lifecycle rule or background/pptx retention job that
+    deletes already-stored files), and any `firestore.rules` / `storage.rules` / auth change. Ship these
+    built + tested + UNDEPLOYED with the exact command handed over. The *mechanism/caps* may deploy; the
+    *first deletion of real data* is the owner's button.
+
+### Standard v1.7 terms carried forward
+
+- **Defer human verification.** Route each `human_needed` check to `.planning/PENDING-VERIFICATION.md`
+  and continue; **never record a deferred check as passed.**
+- **STOP BEFORE THE MILESTONE LIFECYCLE.** When all v1.8 phases are code-complete (and the autonomous
+  deploys done), STOP and hand over the `/gsd-verify-work` list + any owner-gated deploy commands. Do
+  NOT run audit → complete → cleanup.
+- **No `.env.local` / `functions/.env` secret writes.** Env-var *config* the owner must set for a deploy
+  (e.g. flipping `MEDIA_CLEANUP_ENABLED`) is handed over, not written here.
+- **No destructive / irreversible actions** without asking (no `git stash` in this multi-worktree repo,
+  no project-wide lint --fix, no history rewrites, no bulk deletions beyond a plan's scope).
+- Pick the reasonable default on ordinary grey areas, state it, keep moving. Stop and ask only when a
+  wrong assumption would be unsafe or waste the work.
+- Gates: type-check via `npm run type-check` (vue-tsc --build); app-suite baseline is the 2 known-failing
+  files (`storage.rules.test.ts`, `RosterView.test.ts`); functions suite via `cd functions && npm test`;
+  render-service via `cd render-service && npm test`.
+
 ---
 
 ## ✅ MILESTONE v1.7 VOLUNTEER MESSAGING — CLOSED & ARCHIVED 2026-08-18
@@ -458,10 +515,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v1.7 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-18 — Milestone v1.7 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-19 — Milestone v1.8 started
 
 ## ★★ v1.7 MILESTONE HAND-OVER (2026-08-15) — code-complete, owner steps remain
 

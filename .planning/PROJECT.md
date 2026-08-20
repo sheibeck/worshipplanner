@@ -8,11 +8,35 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: none — v1.7 Volunteer Messaging shipped (awaiting next)
+## Current Milestone: v1.8 Cost & Billing Hardening
+
+**Goal:** Cap and observe every runaway cost surface in the live app — the metered Claude API proxy,
+unbounded Storage growth, the daily all-org reminder scan, and uncapped email/instance fan-out — so
+production billing stays predictable as usage grows.
+
+**Target features:**
+- **AI proxy cost controls** — the `/api/anthropic` proxy is authenticated but otherwise uncapped, and
+  the model + `max_tokens` are chosen client-side and forwarded byte-unchanged. Add per-user/per-org
+  rate limiting, server-side model + `max_tokens` enforcement, token-usage logging for observability,
+  and an instance ceiling. (Anthropic's own console bill is watched by the owner separately — external.)
+- **Storage retention** — backgrounds (`orgs/{orgId}/backgrounds/…`) and PPTX import sources
+  (`orgs/{orgId}/pptx-imports/{importId}/…`) are never pruned; media cleanup (`MEDIA_CLEANUP_ENABLED`)
+  and orphan-render cleanup (`PPTX_RENDER_CLEANUP_ENABLED`) both ship **dry-run by default**. Verify/enable
+  the existing sweeps and decide a retention story for backgrounds + pptx sources.
+- **Reminder-cron read cost** — `sendScheduledReminders` runs two unbounded cross-org collection-group
+  scans daily with no early gate. Reminders are not in production use → disable the cron scan.
+- **Fan-out & instance guardrails** — the Resend send loop, the `api` proxy, `messageWebhook`, and the
+  Cloud Run render service have no `maxInstances`/concurrency ceilings or volume caps. Add them so a
+  spike (or abuse) can't scale out without bound.
+
+**Key context:** Live app on the Firebase Blaze plan, deployed 2026-08-17. Investigation (2026-08-19)
+confirmed five concrete exposures — see the requirements. Owner decisions at scoping: reminders are
+**not used** (safe to disable the cron); the assistant may **deploy the low-risk config autonomously**
+(instance caps, proxy rate-limiting, cron disable, query changes) but **hands over** anything that
+deletes data (first activation of media/background/pptx pruning) or could lock users out (rules/auth).
 
 The most recent milestone, **v1.7 Volunteer Messaging** (Phases 58–64, R130–R160), shipped and was
-**deployed to production 2026-08-17**, then closed and archived 2026-08-18. Next milestone is scoped
-via `/gsd-new-milestone`.
+**deployed to production 2026-08-17**, then closed and archived 2026-08-18.
 
 <details>
 <summary>Shipped milestone — v1.7 Volunteer Messaging (Phases 58–64, deployed 2026-08-17, archived 2026-08-18)</summary>
@@ -185,10 +209,16 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-<!-- No active milestone. v1.7 Volunteer Messaging shipped & archived 2026-08-18. Define the next
-     milestone's requirements via /gsd-new-milestone. -->
+<!-- Milestone v1.8 Cost & Billing Hardening. Requirements defined in .planning/REQUIREMENTS.md
+     (R161+), grouped: AI proxy cost controls, Storage retention, Reminder-cron, Fan-out/instance
+     guardrails. Traceability filled by the roadmap. -->
 
-_No active milestone — define the next one with `/gsd-new-milestone`._
+**v1.8 Cost & Billing Hardening (R161+)** — cap and observe the metered Claude proxy (rate limit +
+server-side model/`max_tokens` enforcement + usage logging + instance cap), give backgrounds and
+PPTX-import sources a retention story and verify/enable the dry-run-by-default media/orphan sweeps,
+disable the unused daily cross-org `sendScheduledReminders` scan, and add `maxInstances`/volume caps
+across the Resend send loop, `api` proxy, `messageWebhook`, and the Cloud Run render service. Full list
+in `.planning/REQUIREMENTS.md`.
 
 **Carried forward / backlog (promote with `/gsd-review-backlog` when ready)**
 
@@ -327,4 +357,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-18 after v1.7 Volunteer Messaging milestone (Phases 58–64, deployed 2026-08-17, archived 2026-08-18). Next: `/gsd-new-milestone`.*
+*Last updated: 2026-08-19 — started milestone v1.8 Cost & Billing Hardening (Phases 65+, R161+). Next: `/gsd-plan-phase 65`.*
