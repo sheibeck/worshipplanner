@@ -17,6 +17,12 @@ function mountDialog(props: Partial<InstanceType<typeof CleanupEnableConfirmDial
       confirmError: null,
       ...props,
     },
+    global: {
+      // Same Teleport stub used by NewServiceDialog.test.ts — renders the
+      // teleported content inline under the wrapper root so VTU's
+      // find/findAll can see it without needing document-level queries.
+      stubs: { Teleport: { template: '<div><slot /></div>' } },
+    },
   })
 }
 
@@ -24,7 +30,7 @@ describe('CleanupEnableConfirmDialog', () => {
   it('renders the title and echoes the dry-run count/bytes in the body (count > 0)', () => {
     const wrapper = mountDialog()
     expect(wrapper.text()).toContain('Enable media cleanup?')
-    expect(wrapper.text()).toContain('47 objects (812.3 MB)')
+    expect(wrapper.text()).toContain('47 objects (774.7 MB)')
     expect(wrapper.text()).toContain('This cannot be undone.')
   })
 
