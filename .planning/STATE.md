@@ -4,17 +4,17 @@ milestone: v1.9
 milestone_name: Owner Admin Console
 current_phase: 70
 current_phase_name: admin-console-ui
-status: executing
-stopped_at: Completed 70-01-PLAN.md
-last_updated: "2026-08-20T20:18:50.041Z"
+status: verifying
+stopped_at: Completed 70-02-PLAN.md
+last_updated: "2026-08-20T20:47:25.570Z"
 last_activity: 2026-08-20
 last_activity_desc: Phase 70 execution started
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 10
-  completed_plans: 9
-  percent: 50
+  completed_plans: 10
+  percent: 75
 ---
 
 # ▶ ACTIVE MILESTONE — v1.9 Owner Admin Console (started 2026-08-20)
@@ -670,7 +670,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 70 (admin-console-ui) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-20 — Phase 70 execution started
 
 ## ★ v1.9 ROADMAP.md phase breakdown (created 2026-08-20)
@@ -2250,6 +2250,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 69 P02 | 40min | 3 tasks | 2 files |
 | Phase 69 P03 | 5min | 1 tasks | 1 files |
 | Phase 70-admin-console-ui P01 | 20min | 3 tasks | 9 files |
+| Phase 70 P02 | 55min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -2632,6 +2633,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 69-03: documentation-only runbook plan strictly scoped to functions/DEPLOY-RUNTIME-CONFIG.md; deferred R181/R183 manual UAT pointed at 69-VALIDATION.md rather than duplicated into PENDING-VERIFICATION.md
 - [Phase ?]: AppConfigInput deep-partial type introduced for mergeAppConfig/isExplicitlySet since Partial<AppConfig> is only shallow-optional
 - [Phase ?]: (default) badge reuses OwnerConsoleView.vue's existing (read-only) badge style (text-xs text-gray-500 italic) for visual consistency
+- [Phase ?]: Added additive update:modelValue emit to ConfigNumberField/ConfigTextField (Plan 01 files) so cross-field/format validation in AiProxyConfigCard/SenderConfigCard reacts to the live-edited value, not just the last-saved effective value.
+- [Phase ?]: Per-field save-state uses a Record<string,{saving,saved,error}> plus a stateFor(path) non-null-assertion helper across all four config cards, since noUncheckedIndexedAccess makes a bare Record index access T|undefined.
 
 ### Roadmap Evolution
 
@@ -2951,8 +2954,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-20T20:18:49.983Z
-Stopped at: Completed 70-01-PLAN.md
+Last session: 2026-08-20T20:47:25.516Z
+Stopped at: Completed 70-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

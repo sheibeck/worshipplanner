@@ -90,10 +90,10 @@ REQ-IDs continue from v1.8 (last R173).
 
 ### No-reply sender
 
-- [ ] **R191**: A super-admin can configure the app's no-reply From address (display name + address) from the
+- [x] **R191**: A super-admin can configure the app's no-reply From address (display name + address) from the
       console; it is format-validated, persisted to `appConfig/global`, and used by the Resend send path.
 
-- [ ] **R192**: The sender config never accepts or exposes provider secrets (`RESEND_API_KEY` stays
+- [x] **R192**: The sender config never accepts or exposes provider secrets (`RESEND_API_KEY` stays
       server-side); an address on an un-verifiable host (e.g. `*.web.app`) surfaces a "must be a
       Resend-verified domain" warning. *(Domain verification itself is an out-of-band owner action.)*
 
@@ -157,7 +157,7 @@ REQ-IDs continue from v1.8 (last R173).
 | R188 | Phase 71 | Pending |
 | R189 | Phase 71 | Pending |
 | R190 | Phase 71 | Pending |
-| R191 | Phase 70 | Pending |
-| R192 | Phase 70 | Pending |
+| R191 | Phase 70 | Complete |
+| R192 | Phase 70 | Complete |
 
 **Coverage:** 19/19 v1.9 requirements (R174–R192) mapped to exactly one phase. No orphans.
