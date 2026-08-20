@@ -1050,13 +1050,18 @@ export interface CleanupSummary {
  * `onSchedule` wrapper (mirroring parsePptxHandler/parsePptx) so it can be
  * unit-tested directly against a mocked bucket.
  */
-export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
+export async function cleanupExpiredMediaHandler(
+  opts: { forceDryRun?: boolean } = {},
+): Promise<CleanupSummary> {
   const db = getFirestore();
   const config = await getAppConfig(db, { fresh: true });
   // Fail safe: only an explicit opt-in (cleanup.mediaEnabled=true in the
   // resolved config) enables real deletion. Anything else -- unset, false, a
   // malformed value -- leaves this a dry run (R181, fail-closed per R184).
-  const dryRun = !config.cleanup.mediaEnabled;
+  // R188: forceDryRun (set only by previewCleanupDryRun) short-circuits to
+  // true regardless of config -- the preview can NEVER derive dryRun from
+  // the live flag.
+  const dryRun = opts.forceDryRun === true ? true : !config.cleanup.mediaEnabled;
   const bucket = getStorage().bucket();
   const cutoffMs = Date.now() - readMediaRetentionDays(config) * 24 * 60 * 60 * 1000;
   const deleteCap = readDeleteCap(config);
@@ -1215,13 +1220,18 @@ export interface OrphanCleanupSummary {
  * `onSchedule` wrapper (mirroring cleanupExpiredMediaHandler/cleanupExpiredMedia)
  * so it can be unit-tested directly against mocked Firestore/Storage.
  */
-export async function cleanupOrphanRendersHandler(): Promise<OrphanCleanupSummary> {
+export async function cleanupOrphanRendersHandler(
+  opts: { forceDryRun?: boolean } = {},
+): Promise<OrphanCleanupSummary> {
   const db = getFirestore();
   const config = await getAppConfig(db, { fresh: true });
   // Fail safe: only an explicit opt-in (cleanup.pptxRenderEnabled=true in the
   // resolved config) enables real deletion. Anything else -- unset, false, a
   // malformed value -- leaves this a dry run (R181, fail-closed per R184).
-  const dryRun = !config.cleanup.pptxRenderEnabled;
+  // R188: forceDryRun (set only by previewCleanupDryRun) short-circuits to
+  // true regardless of config -- the preview can NEVER derive dryRun from
+  // the live flag.
+  const dryRun = opts.forceDryRun === true ? true : !config.cleanup.pptxRenderEnabled;
 
   const cutoffMs = Date.now() - readOrphanRenderStaleHours(config) * 60 * 60 * 1000;
   const deleteCap = readDeleteCap(config);
@@ -1458,13 +1468,18 @@ export function extractBackgroundObjectPath(url: string): string | null {
  * `onSchedule` wrapper (mirroring cleanupOrphanRendersHandler) so it can be
  * unit-tested directly against mocked Firestore/Storage.
  */
-export async function cleanupOrphanBackgroundsHandler(): Promise<OrphanBackgroundSummary> {
+export async function cleanupOrphanBackgroundsHandler(
+  opts: { forceDryRun?: boolean } = {},
+): Promise<OrphanBackgroundSummary> {
   const db = getFirestore();
   const config = await getAppConfig(db, { fresh: true });
   // Fail safe: only an explicit opt-in (cleanup.backgroundEnabled=true in the
   // resolved config) enables real deletion. Anything else -- unset, false, a
   // malformed value -- leaves this a dry run (R181, fail-closed per R184).
-  const dryRun = !config.cleanup.backgroundEnabled;
+  // R188: forceDryRun (set only by previewCleanupDryRun) short-circuits to
+  // true regardless of config -- the preview can NEVER derive dryRun from
+  // the live flag.
+  const dryRun = opts.forceDryRun === true ? true : !config.cleanup.backgroundEnabled;
 
   const referencedPaths = new Set<string>();
   let referencesComplete = true;
@@ -1687,13 +1702,18 @@ export interface PptxSourceCleanupSummary {
  * `onSchedule` wrapper (mirroring cleanupOrphanRendersHandler) so it can be
  * unit-tested directly against mocked Firestore/Storage.
  */
-export async function cleanupPptxSourcesHandler(): Promise<PptxSourceCleanupSummary> {
+export async function cleanupPptxSourcesHandler(
+  opts: { forceDryRun?: boolean } = {},
+): Promise<PptxSourceCleanupSummary> {
   const db = getFirestore();
   const config = await getAppConfig(db, { fresh: true });
   // Fail safe: only an explicit opt-in (cleanup.pptxSourceEnabled=true in the
   // resolved config) enables real deletion. Anything else -- unset, false, a
   // malformed value -- leaves this a dry run (R181, fail-closed per R184).
-  const dryRun = !config.cleanup.pptxSourceEnabled;
+  // R188: forceDryRun (set only by previewCleanupDryRun) short-circuits to
+  // true regardless of config -- the preview can NEVER derive dryRun from
+  // the live flag.
+  const dryRun = opts.forceDryRun === true ? true : !config.cleanup.pptxSourceEnabled;
 
   const cutoffMs = Date.now() - readPptxSourceRetentionDays(config) * DAY_MS;
   const deleteCap = readDeleteCap(config);

@@ -1237,8 +1237,12 @@ describe("cleanupOrphanRendersHandler", () => {
     expect(start).toBeGreaterThan(-1);
     expect(wrapperStart).toBeGreaterThan(start);
     const handlerBody = source.slice(start, wrapperStart);
+    // R188 (71-01): the line now also OR's in a forceDryRun-first ternary
+    // (previewCleanupDryRun's forced-preview seam) -- the pin is updated to
+    // match, but still asserts the config-derived fail-safe direction
+    // (!config.cleanup.pptxRenderEnabled) is unchanged and evaluated second.
     expect(handlerBody).toMatch(
-      /const dryRun = !config\.cleanup\.pptxRenderEnabled;/,
+      /const dryRun = opts\.forceDryRun === true \? true : !config\.cleanup\.pptxRenderEnabled;/,
     );
   });
 
@@ -1656,8 +1660,12 @@ describe("cleanupOrphanBackgroundsHandler", () => {
     expect(start).toBeGreaterThan(-1);
     expect(wrapperStart).toBeGreaterThan(start);
     const handlerBody = source.slice(start, wrapperStart);
+    // R188 (71-01): the line now also OR's in a forceDryRun-first ternary
+    // (previewCleanupDryRun's forced-preview seam) -- the pin is updated to
+    // match, but still asserts the config-derived fail-safe direction
+    // (!config.cleanup.backgroundEnabled) is unchanged and evaluated second.
     expect(handlerBody).toMatch(
-      /const dryRun = !config\.cleanup\.backgroundEnabled;/,
+      /const dryRun = opts\.forceDryRun === true \? true : !config\.cleanup\.backgroundEnabled;/,
     );
   });
 
@@ -1954,8 +1962,12 @@ describe("cleanupPptxSourcesHandler", () => {
     expect(start).toBeGreaterThan(-1);
     expect(wrapperStart).toBeGreaterThan(start);
     const handlerBody = source.slice(start, wrapperStart);
+    // R188 (71-01): the line now also OR's in a forceDryRun-first ternary
+    // (previewCleanupDryRun's forced-preview seam) -- the pin is updated to
+    // match, but still asserts the config-derived fail-safe direction
+    // (!config.cleanup.pptxSourceEnabled) is unchanged and evaluated second.
     expect(handlerBody).toMatch(
-      /const dryRun = !config\.cleanup\.pptxSourceEnabled;/,
+      /const dryRun = opts\.forceDryRun === true \? true : !config\.cleanup\.pptxSourceEnabled;/,
     );
   });
 
