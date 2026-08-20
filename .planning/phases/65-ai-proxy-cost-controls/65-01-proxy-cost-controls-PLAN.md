@@ -253,9 +253,11 @@ Gates (run from repo unless noted):
 - Behavioral proof is by the functions unit tests against MOCKED Firestore + a mocked upstream response;
   NO live Anthropic calls are made in tests.
 
-## Autonomous deploy (per the v1.8 grant)
-After all three tasks are green, deploy the function code (bounded, reversible config/logic — no data loss,
-no lockout):
+## Deploy — STAGED for the orchestrator (do NOT deploy in this executor)
+After all three tasks are green, STOP. **The executor must NOT run `firebase deploy`.** This function-code
+change is autonomous-deployable per the v1.8 grant, but the orchestrator runs all deploys as ONE reviewed,
+consolidated step after every v1.8 phase is code-complete and verified — not per-phase from inside an
+executor. Leave the code built, tested, and committed; the deploy command the orchestrator will run is:
 
   firebase deploy --only functions:api
 
@@ -270,12 +272,12 @@ redeploy. Do NOT write any .env file here — record the tunable knob names in t
 - R162: a /api/anthropic request naming a non-allow-listed model is rejected 400 and an over-ceiling max_tokens is clamped before reaching Anthropic; the client can no longer dictate model or token budget.
 - R163: every 2xx /api/anthropic request writes one aiUsage ledger entry {uid, orgId, model, inputTokens, outputTokens, createdAt} via the Admin SDK, queryable in Firestore.
 - R164: the api function runs under an explicit maxInstances ceiling (default 10, AI_PROXY_MAX_INSTANCES).
-- esv/nlt/planningcenter proxy behavior unchanged; functions suite green; tsc clean; functions:api deployed.
+- esv/nlt/planningcenter proxy behavior unchanged; functions suite green; tsc clean; `functions:api` built + tested + committed, STAGED for the orchestrator's consolidated deploy (not deployed from the executor).
 </success_criteria>
 
 <output>
 Create `.planning/phases/65-ai-proxy-cost-controls/65-01-SUMMARY.md` when done. Record: the exact
 collection paths used (aiUsage, aiRateLimits), the tunable AI_* env knob names + defaults for owner
-handover, and confirmation that `firebase deploy --only functions:api` was run (or, if deploy auth was
-unavailable, the exact command handed over).
+handover, and the exact deploy command STAGED for the orchestrator (`firebase deploy --only functions:api`)
+— do NOT run it in the executor.
 </output>
