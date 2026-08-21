@@ -1,7 +1,7 @@
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
-import { mergeAndSetCustomClaims, mergeSetAndClearCustomClaims } from "./claimsHelpers";
+import { isClaimsTooLargeError, mergeAndSetCustomClaims, mergeSetAndClearCustomClaims } from "./claimsHelpers";
 
 // --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
 //
@@ -362,7 +362,19 @@ export async function syncOrgMembershipClaimHandler(
       }
     }
   } catch (err) {
-    console.error("[orgMembershipClaims] syncOrgMembershipClaim:", err);
+    // WR-02 (73-REVIEW.md): the ~1000-byte custom-claims cap throws
+    // auth/claims-too-large -- give it a distinguishable, greppable log line
+    // rather than letting it blend into the generic failure path below.
+    // Still fail-closed (return { action: "failed" }) -- this only changes
+    // logging, never success behavior.
+    if (isClaimsTooLargeError(err)) {
+      console.error(
+        `[orgMembershipClaims] CLAIM SIZE LIMIT EXCEEDED for uid=${uid}: custom claims exceeded the ~1000-byte cap and were not written`,
+        err,
+      );
+    } else {
+      console.error("[orgMembershipClaims] syncOrgMembershipClaim:", err);
+    }
     return { action: "failed", error: String(err) };
   }
 }

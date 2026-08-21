@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getAuth } from "firebase-admin/auth";
-import { clearClaimKeys, mergeAndSetCustomClaims } from "./claimsHelpers";
+import {
+  clearClaimKeys,
+  isClaimsTooLargeError,
+  mergeAndSetCustomClaims,
+  mergeSetAndClearCustomClaims,
+} from "./claimsHelpers";
 
 // Mirrors orgMembershipClaims.test.ts's established mocking seam.
 vi.mock("firebase-admin/auth", () => ({
@@ -77,5 +82,60 @@ describe("clearClaimKeys", () => {
     await clearClaimKeys(UID, ["orgId"]);
 
     expect(setCustomUserClaims).toHaveBeenCalledWith(UID, null);
+  });
+});
+
+describe("mergeSetAndClearCustomClaims", () => {
+  it("clears the named keys and applies the set patch in a SINGLE setCustomUserClaims call (WR-01)", async () => {
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { orgId: "orgA", role: "editor", orgs: { orgA: "editor", orgB: "viewer" }, superAdmin: true },
+    });
+
+    await mergeSetAndClearCustomClaims(UID, {
+      set: { orgs: { orgB: "viewer" } },
+      clear: ["orgId", "role"],
+    });
+
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgs: { orgB: "viewer" },
+      superAdmin: true,
+    });
+  });
+
+  it("passes null (not {}) when clearing leaves nothing remaining and set is empty", async () => {
+    const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: "orgA", role: "editor" } });
+
+    await mergeSetAndClearCustomClaims(UID, { clear: ["orgId", "role"] });
+
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, null);
+  });
+
+  it("works with only `set` and no `clear` -- behaves like mergeAndSetCustomClaims", async () => {
+    const { setCustomUserClaims } = mockAuth({ existingClaims: { superAdmin: true } });
+
+    await mergeSetAndClearCustomClaims(UID, { set: { orgId: "orgA", role: "editor" } });
+
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      superAdmin: true,
+      orgId: "orgA",
+      role: "editor",
+    });
+  });
+});
+
+describe("isClaimsTooLargeError", () => {
+  it("returns true for an error with code 'auth/claims-too-large'", () => {
+    expect(isClaimsTooLargeError({ code: "auth/claims-too-large" })).toBe(true);
+    expect(isClaimsTooLargeError(Object.assign(new Error("too big"), { code: "auth/claims-too-large" }))).toBe(
+      true,
+    );
+  });
+
+  it("returns false for other error shapes", () => {
+    expect(isClaimsTooLargeError(new Error("boom"))).toBe(false);
+    expect(isClaimsTooLargeError({ code: "auth/user-not-found" })).toBe(false);
+    expect(isClaimsTooLargeError(undefined)).toBe(false);
+    expect(isClaimsTooLargeError("auth/claims-too-large")).toBe(false);
   });
 });

@@ -339,6 +339,31 @@ describe("backfillOrgMembershipClaims", () => {
     expect(summary.failed[0]).toEqual({ uid: "bad", orgId: ORG_A, error: expect.any(String) });
   });
 
+  it("claims-too-large: a per-uid setCustomUserClaims throwing auth/claims-too-large logs a distinguishable message and is still recorded as failed (WR-02)", async () => {
+    const doc = fakeMemberDoc({ uid: "bigorg", role: "editor", orgId: ORG_A });
+    mockFirestore([doc], { bigorg: fakeUserDoc(true, [ORG_A]) });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const claimsTooLargeError = Object.assign(new Error("Custom claims exceed max size"), {
+      code: "auth/claims-too-large",
+    });
+    const setCustomUserClaims = vi.fn(async () => {
+      throw claimsTooLargeError;
+    });
+    const getUser = vi.fn(async () => ({ customClaims: undefined }));
+    vi.mocked(getAuth).mockReturnValue({ setCustomUserClaims, getUser } as never);
+
+    const summary = await backfillOrgMembershipClaims({ apply: true });
+
+    expect(summary.failed).toEqual([
+      { uid: "bigorg", orgId: ORG_A, error: expect.stringContaining("Custom claims exceed max size") },
+    ]);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("CLAIM SIZE LIMIT EXCEEDED for uid=bigorg"),
+      claimsTooLargeError,
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
   it("a live members document whose role is undefined (missing-role, WR-01) is counted as skipped, not acted on", async () => {
     // decideMembershipClaim (post-WR-01) returns skip/missing-role -- never clear --
     // whenever documentExists is true and role is undefined. This loop always passes

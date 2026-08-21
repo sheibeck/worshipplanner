@@ -9,7 +9,7 @@ import {
   type OrgMembershipClaim,
   type OrgMembershipRole,
 } from "./orgMembershipClaims";
-import { mergeAndSetCustomClaims } from "./claimsHelpers";
+import { isClaimsTooLargeError, mergeAndSetCustomClaims } from "./claimsHelpers";
 
 // --- backfillOrgMembershipClaims (R074/R075: give the two existing users the claim) ---
 //
@@ -251,7 +251,18 @@ export async function backfillOrgMembershipClaims(
         console.log(`[backfillOrgClaims] ${uid} (${orgId}): set (orgs-only)`, { orgs: desiredOrgs });
       }
     } catch (err) {
-      console.error(`[backfillOrgClaims] ${uid} (${orgId}): failed`, err);
+      // WR-02 (73-REVIEW.md): give the ~1000-byte custom-claims cap's
+      // auth/claims-too-large error a distinguishable, greppable log line --
+      // mirrors syncOrgMembershipClaimHandler's identical carve-out. Still
+      // recorded in `failed` exactly as before; only the logging changes.
+      if (isClaimsTooLargeError(err)) {
+        console.error(
+          `[backfillOrgClaims] CLAIM SIZE LIMIT EXCEEDED for uid=${uid} (${orgId}): custom claims exceeded the ~1000-byte cap and were not written`,
+          err,
+        );
+      } else {
+        console.error(`[backfillOrgClaims] ${uid} (${orgId}): failed`, err);
+      }
       failed.push({ uid, orgId, error: String(err) });
     }
   }

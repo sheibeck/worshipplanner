@@ -622,6 +622,37 @@ describe("syncOrgMembershipClaimHandler", () => {
     expect(outcome).toEqual({ action: "clear" });
   });
 
+  it("claims-too-large: setCustomUserClaims throwing auth/claims-too-large logs a distinguishable message (WR-02)", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })]);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const claimsTooLargeError = Object.assign(new Error("Custom claims exceed max size"), {
+      code: "auth/claims-too-large",
+    });
+    const setCustomUserClaims = vi.fn(async () => {
+      throw claimsTooLargeError;
+    });
+    const getUser = vi.fn(async () => ({ customClaims: undefined }));
+    vi.mocked(getAuth).mockReturnValue({ setCustomUserClaims, getUser } as never);
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: { role: "editor" },
+    });
+
+    expect(outcome.action).toBe("failed");
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`CLAIM SIZE LIMIT EXCEEDED for uid=${UID}`),
+      claimsTooLargeError,
+    );
+    // Never the generic message for this distinct failure mode.
+    expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+      "[orgMembershipClaims] syncOrgMembershipClaim:",
+      expect.anything(),
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
   it("auth lookup failure: getUser rejecting resolves with a failure outcome, does not throw out of the handler", async () => {
     mockFirestore(fakeUserDoc(true, [ORG_A]));
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
