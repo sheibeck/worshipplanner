@@ -525,7 +525,10 @@ be in place before assigning a second-org admin)
      assigning a user who already belongs to another org is strictly additive — their existing
      memberships and roles are preserved, never overwritten (R203, R205, R206).
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 74-01-PLAN.md — Server: the three super-admin-gated callables (onboardOrganization, assignOrgAdmin, listOrganizations) + shared assignAdminCore + ported seed template + unit tests
+- [ ] 74-02-PLAN.md — Client: the Organizations tab UI (list + onboard form + per-org assign control) + component tests
+
 **UI hint**: yes
 
 **Deploy**: The two new org-provisioning callables (onboarding + admin assignment) ship built + tested +
