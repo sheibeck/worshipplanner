@@ -11,7 +11,8 @@
 - ✅ **v1.6 — Editing Reliability & Song Slides** — Phases 51-57 (shipped 2026-08-12; drag-and-drop editing reliability, service-template relocation, song-slide splitting, service-item notes + MISC labels + per-item Scripture version, preview/export polish, template-editor UX parity)
 - ✅ **v1.7 — Volunteer Messaging** — Phases 58-64 (shipped 2026-08-18; deployed to production 2026-08-17 — messages composer, delivery history + bounce webhook, lock & scheduled-reminder auto-notifications, re-lock scoped change diff, dedicated Messages tab, composer refinements + R157–R160 hotfixes — all behind a Settings kill-switch)
 - ✅ **v1.8 — Cost & Billing Hardening** — Phases 65-67 (shipped 2026-08-20; safe config deployed to production — capped the metered Claude `api` proxy, gave every unbounded Storage path a dry-run retention sweep, gated off the daily all-org reminder scan, and capped email/instance fan-out — R161–R168, R170–R173; storage-deletion activation + firestore.rules deny owner-gated)
-- 🚧 **v1.9 — Owner Admin Console** — Phases 68-71 (in progress, started 2026-08-20; super-admin console lifting the v1.8 cost/cleanup levers + no-reply sender into Firestore-backed runtime config, with a dry-run blast-radius preview gating every cleanup-toggle flip)
+- ✅ **v1.9 — Owner Admin Console** — Phases 68-71 (code-complete 2026-08-20; super-admin console lifting the v1.8 cost/cleanup levers + no-reply sender into Firestore-backed runtime config, with a dry-run blast-radius preview gating every cleanup-toggle flip — deploy + human UAT + milestone lifecycle parked with owner, archives as-is once those run)
+- 🚧 **v2.0 — Multi-Church Onboarding & Owner Console Tabs** — Phases 72-74 (active, started 2026-08-21; stacks on v1.9's code-complete console — tabbed Configuration/Organizations shell, org onboarding (org + settings + seeded template + first admin), and the multi-org Storage auth-claim widening (backlog 999.5) as a hard prerequisite for assigning a second-org admin)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -282,7 +283,7 @@ with the exact deploy command handed to the owner.
 
 </details>
 
-## v1.9 Owner Admin Console (Phases 68-71) — ACTIVE
+## v1.9 Owner Admin Console (Phases 68-71) — CODE-COMPLETE (lifecycle pending; v2.0 stacks on top)
 
 **Milestone Goal:** A private, owner-only admin console — separate from per-church settings — where the
 owner (and anyone granted super-admin access) controls the v1.8 cost/cleanup levers and the app's no-reply
@@ -294,6 +295,11 @@ claim/gate → config doc/rules → UI + sender → deletion safety.
 **Hard constraint (owner, emphasized 2026-08-20):** song-linked backgrounds must **never** be cleaned up —
 only transient slideshow backgrounds tied to a service. This guarantee must survive the config swap
 (closed by Phase 71 / R190).
+
+**Status note (2026-08-21):** all four phases are code-complete + auto-verified. Deploy, human UAT
+(`/gsd-verify-work 68..71`), and the milestone lifecycle (audit → complete → cleanup) remain parked with
+the owner (see PROJECT.md and STATE.md). v2.0 stacks directly on top of this code-complete console — its
+phase numbering continues at 72, and v1.9 archives as-is once its own deploy/UAT/lifecycle steps run.
 
 - [x] **Phase 68: Super-Admin Access Gate & Claim-Merge Fix** — ✅ code-complete + automatically verified 2026-08-20 (5/5 SC; human UAT deferred to `/gsd-verify-work 68`, UNDEPLOYED owner hand-over). A super-admin custom-claim gate, grantable via `superAdmins/{uid}`, enforced by both the client route and claim-only Firestore rules, with the shared merge-and-set helper closing the claim-replace hazard
 - [x] **Phase 69: Firestore Runtime Config** — ✅ code-complete + auto-verified 2026-08-20 (8/8 code SC; human UAT R181/R183 deferred to `/gsd-verify-work 69`, UNDEPLOYED owner hand-over). The v1.8 cost/cleanup/messaging knobs move into an admin-only `appConfig/global` doc Cloud Functions read at runtime, with safe deep-merged defaults and per-knob fail-open/closed behavior
@@ -386,6 +392,124 @@ the `superAdmin` custom claim + claims-merge fix, `firestore.rules` changes (`ap
 `superAdmins/*`), and any live cleanup-toggle control — ships built + tested + UNDEPLOYED with the exact
 deploy command handed to the owner. The owner runs the first-super-admin bootstrap script.
 
+## v2.0 Multi-Church Onboarding & Owner Console Tabs (Phases 72-74) — ACTIVE
+
+**Milestone Goal:** Turn the owner console into a tabbed shell and add platform-level multi-tenancy
+management — onboard new churches and assign their first admin from one place — while closing the
+multi-org Storage auth-claim gap that onboarding a second-org admin would otherwise trip. Phase numbering
+continues from v1.9 (68–71); this milestone is Phases 72–74. Stacks on v1.9's code-complete console
+(deploy + UAT + milestone-complete for v1.9 remain parked with the owner). A church admin reuses the
+existing editor role — no new role or claim type. Milestone-level research was skipped: all the patterns
+needed (super-admin-gated `onCall`, the shared claim-merge helper, the `orgNames` create-only registry,
+dry-run/`--apply` backfill scripts) already exist in-repo from v1.5–v1.9.
+
+**Hard sequencing constraint (owner, 2026-08-21):** assigning an admin into a second org (R206) silently
+breaks that user's Storage access unless the org-membership claim is first widened to carry all
+orgs+roles (R207–R211, backlog 999.5). Phase 73 (the widening) is sequenced ahead of Phase 74 (onboarding
++ admin assignment) for exactly this reason — the two are not otherwise coupled.
+
+- [ ] **Phase 72: Owner Console Tabs** - Restructure `OwnerConsoleView` into a Configuration tab (existing super-admins roster + four platform-config cards + deploy-time note, unchanged) and a new Organizations tab shell, with the open tab reflected in the route/query
+- [ ] **Phase 73: Multi-Org Storage Auth Claim** - Widen the org-membership claim to carry all of a user's orgs+roles, update `storage.rules`' `isOrgMemberByClaim` to match, and ship a dry-run/`--apply` backfill — closes backlog 999.5
+- [ ] **Phase 74: Organizations — List, Onboard & Admin Assignment** - List every church, onboard a new one (org record + default settings + seeded template + first admin), and assign additional admins to any org — all through super-admin-gated server callables
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R193–R211 (19 mapped, 100% coverage)
+
+**Deploy policy (carried from the standing grant):** every auth-claim / `firestore.rules` / `storage.rules`
+/ new org-provisioning-callable change in this milestone ships built + tested + UNDEPLOYED, with the exact
+`firebase deploy --only …` command and any owner-run backfill script handed over. `RESEND_API_KEY` and all
+other secrets stay server-side. Human verification is deferred to the end of the milestone (routed to
+`PENDING-VERIFICATION.md`), per the standing autonomy grant.
+
+### Phase 72: Owner Console Tabs
+
+**Goal**: The Owner Console presents its content as a tabbed shell — Configuration and Organizations —
+with the existing config surface preserved byte-for-byte, so Phase 74 has a stable tab to build the
+organization-management UI into and no existing super-admin workflow regresses.
+**Depends on**: Nothing (first v2.0 phase; independent, low-risk layout refactor)
+**Requirements**: R193, R194, R195
+**Success Criteria** (what must be TRUE):
+
+  1. A super-admin visiting the Owner Console sees two tabs — Configuration and Organizations — with
+     Configuration selected by default, both still gated behind the existing super-admin access check
+     (R193).
+  2. The Configuration tab is a behavior-identical relocation of the pre-v2.0 console body — the
+     super-admins roster (grant/revoke via `setSuperAdminClaim`), all four platform-config cards, and the
+     deploy-time note — nothing about how they work changes, only where they live (R194).
+  3. The open tab is reflected in the route/query, so reloading the page or opening a shared link to the
+     Organizations tab lands directly on that tab instead of resetting to Configuration (R195).
+  4. Every pre-existing Configuration-tab behavior (grant/revoke flow, the four config cards' validation
+     and provenance stamps) is proven unchanged by the carried-forward `OwnerConsoleView` test coverage,
+     not silently dropped in the restructure.
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 73: Multi-Org Storage Auth Claim
+
+**Goal**: A user who belongs to more than one organization keeps full Storage access to every org they
+belong to, not just their primary — closing backlog 999.5 before any admin is assigned into a second org.
+**Depends on**: Nothing (independent of Phase 72; sequenced ahead of Phase 74, which the widened claim is
+a hard prerequisite for)
+**Requirements**: R207, R208, R209, R210, R211
+**Success Criteria** (what must be TRUE):
+
+  1. The org-membership custom claim carries every organization a user belongs to and their per-org role
+     — not just a single primary org — in a shape both `firestore.rules` and `storage.rules` can read
+     (R207).
+  2. The claim-writer recomputes this full multi-org set on any `members/*` write and continues to
+     preserve the separate `superAdmin` claim through the existing shared merge helper (R175) — widening
+     the claim never wipes super-admin status, and vice versa (R208).
+  3. `storage.rules`' `isOrgMemberByClaim` checks the requested `orgId` against the full multi-org claim
+     set, proven by genuine multi-org ALLOW and cross-org DENY emulator tests — a user in two orgs keeps
+     Storage read/write on both (R209).
+  4. An idempotent, dry-run-by-default, owner-run backfill script (mirroring `backfillOrgClaims.ts`)
+     recomputes the widened claim for every existing user, with no manual per-user step (R210).
+  5. During rollout, a session still carrying the old single-org claim shape keeps working — both the old
+     and new claim shapes are tolerated by the rules until the backfill runs, so there is no Storage-access
+     gap while users migrate (R211).
+
+**Plans**: TBD
+**Deploy**: The widened claim-writer, the `storage.rules` change, and the backfill script ship built +
+tested + UNDEPLOYED — the exact `firebase deploy --only firestore:rules,storage` (or scoped equivalent)
+command and the backfill's dry-run/`--apply` invocation are handed to the owner, consistent with every
+prior auth-claim/rules change this project has shipped.
+
+### Phase 74: Organizations — List, Onboard & Admin Assignment
+
+**Goal**: A super-admin can see every church on the platform, onboard a brand-new one end-to-end (org
+record, default settings, a seeded service template, and its first admin), and assign additional admins
+to any existing org — entirely through super-admin-gated server callables that reuse the existing editor
+role and the Phase 73 multi-org claim.
+**Depends on**: Phase 72 (Organizations tab to host this UI), Phase 73 (the widened multi-org claim must
+be in place before assigning a second-org admin)
+**Requirements**: R196, R197, R198, R199, R200, R201, R202, R203, R204, R205, R206
+**Success Criteria** (what must be TRUE):
+
+  1. The Organizations tab lists every organization on the platform with at least its name and one
+     distinguishing detail (id, created date, and/or member count) (R196).
+  2. A super-admin can onboard a new church by entering a name and an admin email: this creates the
+     `organizations/{orgId}` record with deep-merged default `OrgSettings`, seeds the org's default service
+     template so a service can be created immediately, and assigns the entered email as the org's first
+     member at editor tier — all in one flow (R197, R198, R199).
+  3. Onboarding and admin assignment run entirely through super-admin-gated server callables that
+     independently re-verify the caller's `superAdmin` claim; the client never writes `organizations/*`,
+     `orgNames/*`, or another org's `members/*` directly (R200, R204).
+  4. A duplicate church name is caught by the existing `orgNames` create-only registry and reported
+     clearly; any failed onboarding step (name taken, unknown/invalid admin email, write error) never
+     strands a half-created org — retrying after fixing the input succeeds without manual cleanup (R201,
+     R202).
+  5. A super-admin can assign an admin to an existing org by email at any time: an email with no matching
+     account surfaces a clear result instead of a silent failure or a dangling membership doc, and
+     assigning a user who already belongs to another org is strictly additive — their existing
+     memberships and roles are preserved, never overwritten (R203, R205, R206).
+
+**Plans**: TBD
+**UI hint**: yes
+
+**Deploy**: The two new org-provisioning callables (onboarding + admin assignment) ship built + tested +
+UNDEPLOYED, with the exact `firebase deploy --only functions:…` command handed to the owner, per the
+milestone deploy policy above.
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -405,6 +529,9 @@ deploy command handed to the owner. The owner runs the first-super-admin bootstr
 | 69 | v1.9 | 3/3 | Code-complete (UAT deferred) | 2026-08-20 |
 | 70 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
 | 71 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
+| 72 | v2.0 | 0/TBD | Not started | - |
+| 73 | v2.0 | 0/TBD | Not started | - |
+| 74 | v2.0 | 0/TBD | Not started | - |
 
 ## Backlog
 
@@ -502,12 +629,16 @@ verification itself stays an out-of-band owner action — see R192.
 
 ### Phase 999.5: Multi-org-aware auth claim for Storage membership (BACKLOG)
 
+> **Promoted to v2.0 Phase 73** (2026-08-21) — see ROADMAP § Phase 73: Multi-Org Storage Auth Claim
+> above, requirements R207–R211. This entry is kept for its original motivation/history; the live work
+> item is Phase 73, not this backlog row.
+
 **Goal:** Widen the org-membership custom auth claim to carry ALL of a user's orgs (and roles), and update `storage.rules`' `isOrgMemberByClaim` to check the requested `orgId` against that set — so a user who belongs to more than one organization retains Storage access to every org, not just their primary.
 **Motivation:** Phase 40 Deploy 2 (2026-08-12) removed the cross-service `firestore.exists()` fallback, making the claim the sole authority for Storage membership. By design (D-01/D-04) the claim carries only the PRIMARY org (`users/{uid}.orgIds[0]`). This is safe today because every user is single-org (verified + cleaned up at the 2026-08-12 migration), but the moment a real user joins a second real org their non-primary org's Storage access would silently fail. This must be built BEFORE any such user is onboarded.
 **Blocking condition:** onboarding a user into a second organization.
-**Requirements:** relates to R074 (Phase 40 custom-claim membership)
+**Requirements:** relates to R074 (Phase 40 custom-claim membership); superseded by R207–R211
 **Plans:** 0 plans
 
 Plans:
 
-- [ ] TBD (promote with /gsd-review-backlog when ready — and BEFORE onboarding any multi-org user)
+- [x] Promoted to v2.0 Phase 73 (2026-08-21) — no longer tracked as a bare backlog item

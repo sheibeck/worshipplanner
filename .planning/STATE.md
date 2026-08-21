@@ -13,6 +13,77 @@ progress:
   percent: 0
 ---
 
+# ▶ ACTIVE MILESTONE — v2.0 Multi-Church Onboarding & Owner Console Tabs (started 2026-08-21)
+
+**Goal:** Turn the owner console into a tabbed shell and add platform-level multi-tenancy management —
+onboard new churches and assign their first admin from one place — while closing the multi-org Storage
+auth-claim gap that onboarding a second-org admin would otherwise trip. Requirements R193+ in
+REQUIREMENTS.md. Phase numbering continues from v1.9 (68–71); this milestone is Phases 72–74.
+
+**Scoping decisions (owner, 2026-08-21):** v2.0 major increment · **stacks on v1.9** (code-complete; its
+deploy + UAT + milestone-complete remain parked with the owner — v1.9 archives as-is once those run) · a
+church admin **reuses the existing editor role** (no new role/claim) · onboarding creates org record +
+default `OrgSettings` + seeds the default service template + assigns the first admin by email · backlog
+**999.5** (multi-org Storage auth claim) **pulled into scope** as a hard prerequisite for onboarding a
+second-org admin · milestone-level research skipped (all patterns already exist in-repo from v1.5–v1.9) ·
+run autonomous with human verification deferred to the end.
+
+## ★★ STANDING AUTONOMY GRANT — v2.0, granted 2026-08-21
+
+**This is the ACTIVE grant.** Same pattern as v1.6/v1.7/v1.8/v1.9: run autonomous, defer human
+verification to the end. Re-read before deciding to stop — it survives context compaction.
+
+- **Run all v2.0 phases autonomously** (discuss → plan → execute per phase). Pick the reasonable default
+  on ordinary grey areas, state it, keep moving. Stop and ask only when a wrong assumption would be
+  unsafe or waste the work.
+
+- **Defer human verification to the end.** Route each `human_needed` check to
+  `.planning/PENDING-VERIFICATION.md` and continue; **never record a deferred check as passed.**
+
+- **STOP BEFORE THE MILESTONE LIFECYCLE.** When all v2.0 phases are code-complete, STOP and hand over the
+  `/gsd-verify-work` list + the owner-gated deploy commands (including v1.9's still-outstanding hand-over
+  items, if not already run). Do NOT run audit → complete → cleanup.
+
+- **Deploy policy — HAND OVER all deploys this milestone (carried from v1.5–v1.9).** Every auth-claim /
+  `firestore.rules` / `storage.rules` / new org-provisioning-callable change ships **built + tested +
+  UNDEPLOYED** with the exact `firebase deploy --only …` command handed over, plus any owner-run backfill
+  script (mirroring `backfillOrgClaims.ts`). This covers essentially all of Phase 73 (claim + rules +
+  backfill) and the two new callables in Phase 74 (org onboarding, admin assignment). Phase 72 (tab
+  restructure, no new writes/rules) is the one phase with no auth/rules surface to hand over.
+
+- **No `.env.local` / `functions/.env` secret writes.** `RESEND_API_KEY` and all other secrets stay
+  server-side and never move into a client-readable doc.
+
+- **No destructive / irreversible actions** without asking (no `git stash` in this multi-worktree repo,
+  no project-wide lint --fix, no history rewrites, no bulk deletions beyond a plan's scope).
+
+- Gates: type-check via `npm run type-check` (vue-tsc --build); app-suite baseline is the 2 known-failing
+  files (`storage.rules.test.ts`, `RosterView.test.ts`); functions suite via `cd functions && npm test`;
+  rules suite via the emulator; render-service via `cd render-service && npm test` (not touched this
+  milestone).
+
+- **Rules-testing discipline (carried from v1.5 onward, applies to Phase 73's `storage.rules` change):**
+  every rules change carries a genuine ALLOW-case test that actually runs against the real emulator, not
+  just deny-cases — Phase 73 needs BOTH a genuine multi-org ALLOW and a cross-org DENY. Cross-service
+  `firestore.exists()` is inert in the Storage emulator (firebase-js-sdk#6803) — do not gate a Storage
+  rule on it; the claim is the sole authority for Storage membership (v1.5 D-01/D-04).
+
+---
+
+## Deferred Verification
+
+Per the v2.0 grant, human UAT is deferred to milestone end and NEVER recorded as passed. On autonomous
+re-entry these phases are dropped from the run queue and resumed only via the recorded command. (No
+phases code-complete yet — table fills in as phases close.)
+
+| Phase | State | Resume |
+|-------|-------|--------|
+
+---
+
+<details>
+<summary>Historical — v1.9 active/hand-over state (code-complete 2026-08-20; deploy + UAT + milestone-complete lifecycle parked with owner — v2.0 stacks on top, see PROJECT.md)</summary>
+
 # ▶ ACTIVE MILESTONE — v1.9 Owner Admin Console (started 2026-08-20)
 
 **Goal:** A private, owner-only super-admin console that lifts the v1.8 cost/cleanup levers + the no-reply
@@ -83,6 +154,9 @@ rules + bootstrap are owner hand-over (`functions/DEPLOY-SUPER-ADMIN.md`). Defer
 `.planning/PENDING-VERIFICATION.md` (R176 prod `--apply`, R177 real route/nav, R179 real grant/revoke E2E +
 revoke-timing). Owner infra check flagged: enable Cloud Storage Object Versioning before Phase 71's live
 deletion toggles ship.
+
+
+</details>
 
 ---
 
@@ -656,7 +730,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 71 — cleanup-deletion-toggle-safety
+**Current focus:** Phase 72 — owner-console-tabs (v2.0 ROADMAP.md created; ready to plan)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -666,10 +740,30 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 72 (Owner Console Tabs) — not yet planned
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-21 — Milestone v2.0 started
+Status: Roadmap created (Phases 72–74, R193–R211, 19/19 mapped); ready for /gsd-plan-phase 72
+Last activity: 2026-08-21 — v2.0 ROADMAP.md + STATE.md updated, REQUIREMENTS.md traceability filled
+
+## ★ v2.0 ROADMAP.md phase breakdown (created 2026-08-21)
+
+3 phases (72–74), derived directly from R193–R211 with this project's `coarse` granularity setting
+applied: the tabbed-shell restructure (R193–R195) is a low-risk layout refactor with no behavior change,
+sequenced first; the multi-org Storage claim widening (R207–R211, backlog 999.5) is sequenced next as a
+hard prerequisite — assigning an admin into a second org would otherwise silently break that user's
+Storage access; the Organizations list/onboard/admin-assignment work (R196–R206) lands last since it
+depends on both the tab shell (UI host) and the widened claim (safe to assign second-org admins).
+**Numbering continues from v1.9, which ended at Phase 71** — v2.0 starts at Phase 72, not reset.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 72 Owner Console Tabs | Restructure OwnerConsoleView into a Configuration tab (existing roster + config cards, unchanged) and a new Organizations tab shell; open tab reflected in route/query | R193-R195 | Nothing (first) | yes |
+| 73 Multi-Org Storage Auth Claim | Widen the org-membership claim to carry all of a user's orgs+roles; update storage.rules' isOrgMemberByClaim to match; ship a dry-run/--apply backfill (closes backlog 999.5) | R207-R211 | Nothing (independent; ahead of 74) | no |
+| 74 Organizations — List, Onboard & Admin Assignment | List every church; onboard a new one (org + settings + template + first admin); assign admins to any org — all via super-admin-gated callables | R196-R206 | Phase 72, Phase 73 | yes |
+
+See `.planning/ROADMAP.md` § v2.0 Multi-Church Onboarding & Owner Console Tabs for the full phase detail
+table (goals, dependencies, success criteria). Next step: `/gsd-plan-phase 72` (optionally preceded by
+`/gsd-discuss-phase 72`).
 
 ## ★ v1.9 ROADMAP.md phase breakdown (created 2026-08-20)
 

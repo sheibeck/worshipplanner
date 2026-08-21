@@ -52,7 +52,7 @@ REQ-IDs continue from v1.9 (last R192).
       flow, so a freshly-onboarded church has exactly one editor who can sign in and use it.
 
 - [ ] **R200**: Org creation/onboarding runs entirely through a **super-admin-gated server callable** — the
-      client never writes `organizations/*`, `orgNames/*`, or another org's `members/*` directly; the callable
+      client never writes `organizations/*`, `orgNames/*`, or another org's `members/*` directly — the callable
       independently re-verifies the caller's `superAdmin` claim server-side.
 
 - [ ] **R201**: Church-name uniqueness is enforced via the existing create-only `orgNames` registry (v1.7
@@ -122,4 +122,26 @@ REQ-IDs continue from v1.9 (last R192).
 
 ## Traceability
 
-*(Filled by the roadmap — each requirement maps to exactly one phase.)*
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| R193 | Phase 72 | Pending |
+| R194 | Phase 72 | Pending |
+| R195 | Phase 72 | Pending |
+| R196 | Phase 74 | Pending |
+| R197 | Phase 74 | Pending |
+| R198 | Phase 74 | Pending |
+| R199 | Phase 74 | Pending |
+| R200 | Phase 74 | Pending |
+| R201 | Phase 74 | Pending |
+| R202 | Phase 74 | Pending |
+| R203 | Phase 74 | Pending |
+| R204 | Phase 74 | Pending |
+| R205 | Phase 74 | Pending |
+| R206 | Phase 74 | Pending |
+| R207 | Phase 73 | Pending |
+| R208 | Phase 73 | Pending |
+| R209 | Phase 73 | Pending |
+| R210 | Phase 73 | Pending |
+| R211 | Phase 73 | Pending |
+
+**Coverage:** 19/19 v2.0 requirements mapped (R193–R211). No orphans, no duplicates.
