@@ -1,6 +1,6 @@
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { clearClaimKeys, mergeAndSetCustomClaims } from "./claimsHelpers";
 
 // --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
@@ -17,8 +17,15 @@ import { clearClaimKeys, mergeAndSetCustomClaims } from "./claimsHelpers";
 // changing either name here without updating storage.rules would silently
 // break the claim arm while every test on both sides kept passing.
 
-/** The exact top-level custom-claim keys this module ever writes. */
+/** The exact top-level custom-claim keys this module ever writes for the primary org. */
 export const ORG_CLAIM_KEYS = ["orgId", "role"] as const;
+
+/**
+ * The additive multi-org claim key added by 73-01-PLAN.md (R207). Carries a
+ * full `{ [orgId]: role }` map alongside the UNCHANGED primary `orgId`/`role`
+ * keys above -- storage.rules reads it as `request.auth.token.orgs`.
+ */
+export const ORGS_CLAIM_KEY = "orgs";
 
 /**
  * The role shape the claim ever carries. Legacy `admin` values are
@@ -34,6 +41,14 @@ export interface OrgMembershipClaim {
 }
 
 /**
+ * The widened claim shape (R207): the UNCHANGED primary `{ orgId, role }`
+ * plus the new additive `orgs` map carrying every org the user currently
+ * belongs to. Purely additive -- ORG_CLAIM_KEYS / OrgMembershipClaim /
+ * buildOrgMembershipClaim keep their exact pre-existing semantics below.
+ */
+export type OrgMembershipClaims = OrgMembershipClaim & { orgs: Record<string, OrgMembershipRole> };
+
+/**
  * Builds the `{ orgId, role }` claim object in the exact locked shape from
  * 40-CONTEXT.md's D-01/D-02/D-03: two readable top-level keys and nothing
  * else. Normalises a legacy `role` of `'admin'` to `'editor'`.
@@ -41,6 +56,84 @@ export interface OrgMembershipClaim {
 export function buildOrgMembershipClaim(orgId: string, role: string): OrgMembershipClaim {
   const normalizedRole: OrgMembershipRole = role === "admin" ? "editor" : (role as OrgMembershipRole);
   return { orgId, role: normalizedRole };
+}
+
+/**
+ * The shared, no-drift `orgs`-map builder (73-CONTEXT.md D-11): the ONE
+ * place multi-org role normalisation lives, imported by both
+ * computeOrgsClaimForUid below and plan 73-03's backfill so the trigger and
+ * the backfill can never drift on what an `orgs` map should contain.
+ * Normalises each membership's role exactly as buildOrgMembershipClaim does
+ * (`admin` -> `editor`) and skips any membership whose role is undefined --
+ * a live members doc with no `role` field never enters the map.
+ */
+export function buildOrgsMapClaim(
+  memberships: Array<{ orgId: string; role: string | undefined }>,
+): Record<string, OrgMembershipRole> {
+  const orgs: Record<string, OrgMembershipRole> = {};
+  for (const { orgId, role } of memberships) {
+    if (role === undefined) continue;
+    orgs[orgId] = role === "admin" ? "editor" : (role as OrgMembershipRole);
+  }
+  return orgs;
+}
+
+/**
+ * Structural guard, in the spirit of index.ts's MEDIA_PATH_GUARD -- mirrors
+ * backfillOrgClaims.ts's resolveOrgId byte-for-byte (D-11: one guard shared
+ * by the trigger and the backfill). A `members` document is only ever a real
+ * membership candidate when it is a child of an `organizations/{orgId}`
+ * document. `collectionGroup('members')` matches ANY subcollection literally
+ * named `members` anywhere in the database, so this guard is applied to
+ * every candidate before it can affect a claim. Returns the org id on
+ * success, undefined when the guard fails.
+ */
+export function resolveOrgId(memberDoc: QueryDocumentSnapshot): string | undefined {
+  const orgDoc = memberDoc.ref.parent.parent;
+  if (!orgDoc) return undefined;
+  if (orgDoc.parent.id !== "organizations") return undefined;
+  return orgDoc.id;
+}
+
+/**
+ * Recomputes the full `orgs` map for `uid` from the SURVIVING
+ * organizations/*\/members/{uid} documents -- NEVER from users/{uid}.orgIds.
+ * 73-RESEARCH.md Pattern 1 proves `orgIds` is structurally overwrite-broken:
+ * both the invite-acceptance and org-auto-create paths in src/stores/auth.ts
+ * RESET it to a single-element array rather than appending, so it can never
+ * list a second org, and it is also never updated on a client-side member
+ * deletion. A live collectionGroup scan of the actual membership documents
+ * is the only authoritative source for "which orgs does this uid currently
+ * belong to".
+ *
+ * This runs an UNFILTERED collectionGroup('members') scan, filtered
+ * client-side to `doc.id === uid` -- Firestore collection-group queries
+ * cannot filter by document-ID equality across differing parent paths
+ * (73-RESEARCH.md Pattern 2: FieldPath.documentId() equality requires the
+ * full path, including the not-yet-known parent org id), so this is the
+ * correct query shape, not a missed optimisation. This is proportionate at
+ * this project's current scale (a handful of users per org); if a future
+ * cost audit finds the per-write full scan material, the documented
+ * scale-out path is a denormalised `uid` field on every member doc plus a
+ * collection-group field-override index (see backfillOrgClaims.ts's own D-10
+ * scale note for the sibling pattern) -- do not build that speculatively.
+ *
+ * Firestore's default read/query mode is strongly consistent, so calling
+ * this immediately after the SAME event's own triggering write has
+ * committed is race-free -- a delete just committed by this very trigger is
+ * guaranteed to already be absent from this scan.
+ */
+export async function computeOrgsClaimForUid(uid: string): Promise<Record<string, OrgMembershipRole>> {
+  const snapshot = await getFirestore().collectionGroup("members").get();
+  const memberships: Array<{ orgId: string; role: string | undefined }> = [];
+  for (const memberDoc of snapshot.docs) {
+    if (memberDoc.id !== uid) continue;
+    const orgId = resolveOrgId(memberDoc);
+    if (orgId === undefined) continue;
+    const role = (memberDoc.data() as { role?: string } | undefined)?.role;
+    memberships.push({ orgId, role });
+  }
+  return buildOrgsMapClaim(memberships);
 }
 
 export interface DecideMembershipClaimParams {

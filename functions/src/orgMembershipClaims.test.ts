@@ -4,7 +4,10 @@ import { getFirestore } from "firebase-admin/firestore";
 import {
   ORG_CLAIM_KEYS,
   buildOrgMembershipClaim,
+  buildOrgsMapClaim,
+  computeOrgsClaimForUid,
   decideMembershipClaim,
+  resolveOrgId,
   syncOrgMembershipClaimHandler,
 } from "./orgMembershipClaims";
 
@@ -32,15 +35,67 @@ function fakeUserDoc(exists: boolean, orgIds?: string[]) {
   };
 }
 
-function mockUsersFirestore(userDoc: ReturnType<typeof fakeUserDoc>) {
+interface FakeMemberDocOptions {
+  uid: string;
+  role?: string;
+  orgId: string;
+  /** When true, the org doc's own parent collection is NOT named "organizations". */
+  structurallyInvalid?: boolean;
+}
+
+/**
+ * Mirrors backfillOrgClaims.test.ts's fakeMemberDoc byte-for-byte (same
+ * ref.parent.parent... structural chain resolveOrgId expects) so both test
+ * files exercise the shared resolveOrgId guard identically.
+ */
+function fakeMemberDoc(opts: FakeMemberDocOptions) {
+  return {
+    id: opts.uid,
+    data: () => (opts.role !== undefined ? { role: opts.role } : {}),
+    ref: {
+      parent: {
+        // The "members" CollectionReference.
+        id: "members",
+        parent: {
+          // The org DocumentReference (organizations/{orgId}).
+          id: opts.orgId,
+          parent: {
+            // The "organizations" CollectionReference.
+            id: opts.structurallyInvalid ? "not-organizations" : "organizations",
+          },
+        },
+      },
+    },
+  };
+}
+
+/**
+ * A combined getFirestore() mock: `collection("users")` for
+ * decideMembershipClaim's primary-org lookup, and `collectionGroup("members")`
+ * for computeOrgsClaimForUid's multi-org survivors scan -- mirrors
+ * backfillOrgClaims.test.ts's mockFirestore shape so both test files wire the
+ * two Firestore read surfaces identically. `memberDocs` defaults to an empty
+ * array so every pre-existing call site that only cares about the primary-org
+ * decision keeps working unchanged (computeOrgsClaimForUid resolves to {}).
+ */
+function mockFirestore(
+  userDoc: ReturnType<typeof fakeUserDoc>,
+  memberDocs: ReturnType<typeof fakeMemberDoc>[] = [],
+) {
   const usersCollection = { doc: vi.fn(() => userDoc) };
+  const collectionSpy = vi.fn((name: string) => {
+    if (name === "users") return usersCollection;
+    throw new Error(`mockFirestore: unexpected collection "${name}"`);
+  });
+  const collectionGroupSpy = vi.fn((name: string) => {
+    if (name !== "members") throw new Error(`mockFirestore: unexpected collectionGroup "${name}"`);
+    return { get: vi.fn(async () => ({ docs: memberDocs })) };
+  });
   vi.mocked(getFirestore).mockReturnValue({
-    collection: vi.fn((name: string) => {
-      if (name === "users") return usersCollection;
-      throw new Error(`mockUsersFirestore: unexpected collection "${name}"`);
-    }),
+    collection: collectionSpy,
+    collectionGroup: collectionGroupSpy,
   } as never);
-  return { usersCollection };
+  return { usersCollection, collectionSpy, collectionGroupSpy };
 }
 
 function mockAuth(opts: {
@@ -76,9 +131,90 @@ describe("buildOrgMembershipClaim", () => {
   });
 });
 
+describe("buildOrgsMapClaim", () => {
+  it("folds multiple memberships into an { [orgId]: role } map", () => {
+    expect(
+      buildOrgsMapClaim([
+        { orgId: "orgA", role: "editor" },
+        { orgId: "orgB", role: "viewer" },
+      ]),
+    ).toEqual({ orgA: "editor", orgB: "viewer" });
+  });
+
+  it("normalises a legacy 'admin' role to 'editor', same rule as buildOrgMembershipClaim", () => {
+    expect(buildOrgsMapClaim([{ orgId: ORG_A, role: "admin" }])).toEqual({ orgA: "editor" });
+  });
+
+  it("skips any membership whose role is undefined -- a live members doc with no role field never enters the map", () => {
+    expect(
+      buildOrgsMapClaim([
+        { orgId: ORG_A, role: "editor" },
+        { orgId: ORG_B, role: undefined },
+      ]),
+    ).toEqual({ orgA: "editor" });
+  });
+
+  it("returns {} for an empty membership list -- a user with no surviving memberships yields an empty map, not null", () => {
+    expect(buildOrgsMapClaim([])).toEqual({});
+  });
+});
+
+describe("resolveOrgId", () => {
+  it("returns the org id for a well-formed organizations/{orgId}/members/{uid} doc", () => {
+    expect(resolveOrgId(fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A }) as never)).toBe(ORG_A);
+  });
+
+  it("returns undefined when the parent collection is not named 'organizations'", () => {
+    expect(
+      resolveOrgId(
+        fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A, structurallyInvalid: true }) as never,
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe("computeOrgsClaimForUid", () => {
+  it("filters a collectionGroup('members') scan to only the target uid's orgs -- a second uid's docs are excluded", async () => {
+    const targetA = fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A });
+    const targetB = fakeMemberDoc({ uid: UID, role: "viewer", orgId: ORG_B });
+    const otherUser = fakeMemberDoc({ uid: "other-uid", role: "editor", orgId: ORG_A });
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [targetA, targetB, otherUser]);
+
+    const orgs = await computeOrgsClaimForUid(UID);
+
+    expect(orgs).toEqual({ orgA: "editor", orgB: "viewer" });
+  });
+
+  it("delete-staleness: a survivors snapshot that no longer contains the removed org's member doc does not carry that org", async () => {
+    // Simulates the post-delete state: only orgB's member doc survives.
+    const survivorB = fakeMemberDoc({ uid: UID, role: "viewer", orgId: ORG_B });
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [survivorB]);
+
+    const orgs = await computeOrgsClaimForUid(UID);
+
+    expect(orgs).toEqual({ orgB: "viewer" });
+    expect(orgs.orgA).toBeUndefined();
+  });
+
+  it("NEVER reads users/{uid}.orgIds -- the users collection is never queried by the orgs scan", async () => {
+    const memberDoc = fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A });
+    const { collectionSpy } = mockFirestore(fakeUserDoc(true, [ORG_A]), [memberDoc]);
+
+    await computeOrgsClaimForUid(UID);
+
+    expect(collectionSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns {} when no member doc matches the uid", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), []);
+
+    expect(await computeOrgsClaimForUid(UID)).toEqual({});
+  });
+});
+
 describe("decideMembershipClaim", () => {
   it("returns skip/no-user-doc when users/{uid} does not exist", async () => {
-    mockUsersFirestore(fakeUserDoc(false));
+    mockFirestore(fakeUserDoc(false));
     mockAuth();
 
     const decision = await decideMembershipClaim({
@@ -92,7 +228,7 @@ describe("decideMembershipClaim", () => {
   });
 
   it("returns skip/no-user-doc when orgIds is empty", async () => {
-    mockUsersFirestore(fakeUserDoc(true, []));
+    mockFirestore(fakeUserDoc(true, []));
     mockAuth();
 
     const decision = await decideMembershipClaim({
@@ -106,7 +242,7 @@ describe("decideMembershipClaim", () => {
   });
 
   it("returns skip/not-primary-org when orgIds[0] does not match the write's orgId", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth();
 
     const decision = await decideMembershipClaim({
@@ -120,7 +256,7 @@ describe("decideMembershipClaim", () => {
   });
 
   it("returns clear for a delete (documentExists false) of the primary org", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth();
 
     const decision = await decideMembershipClaim({
@@ -134,7 +270,7 @@ describe("decideMembershipClaim", () => {
   });
 
   it("returns skip/not-primary-org for a delete of a NON-primary membership -- the primary claim must survive", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth();
 
     const decision = await decideMembershipClaim({
@@ -148,7 +284,7 @@ describe("decideMembershipClaim", () => {
   });
 
   it("returns skip/missing-role when the document exists but has no role field -- ambiguous input must NOT clear a valid claim (WR-01)", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
 
     const decision = await decideMembershipClaim({
@@ -163,7 +299,7 @@ describe("decideMembershipClaim", () => {
   });
 
   it("returns set with the fresh claim when no existing claim matches", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth({ existingClaims: undefined });
 
     const decision = await decideMembershipClaim({
@@ -177,7 +313,7 @@ describe("decideMembershipClaim", () => {
   });
 
   it("returns skip/already-current when the existing claim already matches on both keys", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
 
     const decision = await decideMembershipClaim({
@@ -191,7 +327,7 @@ describe("decideMembershipClaim", () => {
   });
 
   it("never trusts the passed orgId as authority -- always reads users/{uid}.orgIds first", async () => {
-    const { usersCollection } = mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    const { usersCollection } = mockFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth();
 
     await decideMembershipClaim({ uid: UID, orgId: ORG_A, documentExists: true, role: "editor" });
@@ -202,7 +338,7 @@ describe("decideMembershipClaim", () => {
 
 describe("syncOrgMembershipClaimHandler", () => {
   it("create, primary org: calls setCustomUserClaims exactly once with { orgId, role }", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth({ existingClaims: undefined });
 
     const outcome = await syncOrgMembershipClaimHandler({
@@ -217,7 +353,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("role change: writes a fresh claim carrying the new role", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
 
     const outcome = await syncOrgMembershipClaimHandler({
@@ -231,7 +367,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("legacy admin: the claim written carries 'editor', never 'admin'", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth({ existingClaims: undefined });
 
     await syncOrgMembershipClaimHandler({
@@ -244,7 +380,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("delete, primary org: calls setCustomUserClaims exactly once with null as the second argument", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth();
 
     const outcome = await syncOrgMembershipClaimHandler({
@@ -259,7 +395,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("non-primary org write: setCustomUserClaims is NOT called at all", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth();
 
     const outcome = await syncOrgMembershipClaimHandler({
@@ -273,7 +409,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("non-primary org DELETE: setCustomUserClaims is NOT called -- the primary claim survives", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth();
 
     const outcome = await syncOrgMembershipClaimHandler({
@@ -287,7 +423,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("missing user document: no claims call, no throw", async () => {
-    mockUsersFirestore(fakeUserDoc(false));
+    mockFirestore(fakeUserDoc(false));
     const { setCustomUserClaims } = mockAuth();
 
     const outcome = await expect(
@@ -303,7 +439,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("empty orgIds: no claims call, no throw", async () => {
-    mockUsersFirestore(fakeUserDoc(true, []));
+    mockFirestore(fakeUserDoc(true, []));
     const { setCustomUserClaims } = mockAuth();
 
     await expect(
@@ -318,7 +454,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("already current: no redundant setCustomUserClaims call", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
 
     const outcome = await syncOrgMembershipClaimHandler({
@@ -332,7 +468,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("malformed create/update (document exists, no role field): does NOT clear a still-valid claim -- previously-ambiguous case (WR-01)", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
 
     // `after` exists (this is a create/update, not a delete) but has no `role`
@@ -350,7 +486,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("preserves superAdmin: a primary-org membership delete clears only { orgId, role }, leaving an existing superAdmin claim intact (SC1 direction A)", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const { setCustomUserClaims } = mockAuth({
       existingClaims: { orgId: ORG_A, role: "editor", superAdmin: true },
     });
@@ -367,7 +503,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("auth lookup failure: getUser rejecting resolves with a failure outcome, does not throw out of the handler", async () => {
-    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]));
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockAuth({
       getUserImpl: async () => {
