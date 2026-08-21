@@ -538,7 +538,7 @@ describe("syncOrgMembershipClaimHandler", () => {
     expect(outcome).toEqual({ action: "skip", reason: "missing-role" });
   });
 
-  it("primary-org DELETE while the user still belongs to a second org: orgId/role cleared, orgs recomputed STILL contains the second org (highest-risk case, R208)", async () => {
+  it("primary-org DELETE while the user still belongs to a second org: SINGLE atomic write clears orgId/role and sets orgs to the survivors (highest-risk case, R208, WR-01)", async () => {
     // Org A's member doc is gone (deleted); org B survives.
     mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "viewer", orgId: ORG_B })]);
     const { setCustomUserClaims } = statefulAuth({
@@ -553,19 +553,17 @@ describe("syncOrgMembershipClaimHandler", () => {
       after: undefined,
     });
 
-    expect(setCustomUserClaims).toHaveBeenCalledTimes(2);
-    // Call 1 (clearClaimKeys): orgId/role gone, orgs untouched by this call.
-    expect(setCustomUserClaims).toHaveBeenNthCalledWith(1, UID, {
-      orgs: { orgA: "editor", orgB: "viewer" },
-    });
-    // Call 2 (mergeAndSetCustomClaims): orgs recomputed from survivors --
-    // orgB remains, orgA is gone -- and orgId/role stay absent (proves the
-    // primary-clear and orgs-recompute are independent, not a blanket clear).
-    expect(setCustomUserClaims).toHaveBeenNthCalledWith(2, UID, { orgs: { orgB: "viewer" } });
+    // WR-01: the clear branch is now ONE atomic setCustomUserClaims call --
+    // never a window where a minted token could see cleared primary keys but
+    // a still-stale orgs map. orgId/role are gone, orgB remains, orgA is gone
+    // (proves the primary-clear and orgs-recompute are independent, not a
+    // blanket clear, while happening in a single write).
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgs: { orgB: "viewer" } });
     expect(outcome).toEqual({ action: "clear" });
   });
 
-  it("primary-org DELETE when the user belongs to no other org: orgId/role cleared, orgs becomes {}", async () => {
+  it("primary-org DELETE when the user belongs to no other org: SINGLE atomic write clears orgId/role and orgs becomes {} (WR-01)", async () => {
     mockFirestore(fakeUserDoc(true, [ORG_A]), []);
     const { setCustomUserClaims } = statefulAuth({ orgId: ORG_A, role: "editor", orgs: { orgA: "editor" } });
 
@@ -575,8 +573,8 @@ describe("syncOrgMembershipClaimHandler", () => {
       after: undefined,
     });
 
-    expect(setCustomUserClaims).toHaveBeenCalledTimes(2);
-    expect(setCustomUserClaims).toHaveBeenNthCalledWith(2, UID, { orgs: {} });
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgs: {} });
     expect(outcome).toEqual({ action: "clear" });
   });
 
@@ -600,7 +598,7 @@ describe("syncOrgMembershipClaimHandler", () => {
     expect(outcome).toEqual({ action: "set" });
   });
 
-  it("preserves superAdmin (direction B): a primary-org delete clears orgId/role, recomputes orgs, and leaves superAdmin:true intact (SC1)", async () => {
+  it("preserves superAdmin (direction B): a primary-org delete issues exactly ONE atomic write that clears orgId/role, recomputes orgs, and leaves superAdmin:true intact (SC1, WR-01)", async () => {
     mockFirestore(fakeUserDoc(true, [ORG_A]), []);
     const { setCustomUserClaims } = statefulAuth({
       orgId: ORG_A,
@@ -614,9 +612,13 @@ describe("syncOrgMembershipClaimHandler", () => {
       after: undefined,
     });
 
-    expect(setCustomUserClaims).toHaveBeenCalledTimes(2);
-    expect(setCustomUserClaims).toHaveBeenNthCalledWith(1, UID, { superAdmin: true });
-    expect(setCustomUserClaims).toHaveBeenNthCalledWith(2, UID, { superAdmin: true, orgs: {} });
+    // WR-01: exactly ONE claim write for the delete path -- no orgId/role, no
+    // stale org left in `orgs`, superAdmin still intact.
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { superAdmin: true, orgs: {} });
+    const [, writtenClaims] = setCustomUserClaims.mock.calls[0]!;
+    expect(writtenClaims).not.toHaveProperty("orgId");
+    expect(writtenClaims).not.toHaveProperty("role");
     expect(outcome).toEqual({ action: "clear" });
   });
 

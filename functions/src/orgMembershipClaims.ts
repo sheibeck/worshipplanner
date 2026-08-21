@@ -1,7 +1,7 @@
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
-import { clearClaimKeys, mergeAndSetCustomClaims } from "./claimsHelpers";
+import { mergeAndSetCustomClaims, mergeSetAndClearCustomClaims } from "./claimsHelpers";
 
 // --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
 //
@@ -331,15 +331,17 @@ export async function syncOrgMembershipClaimHandler(
         // A genuine primary-membership delete. Clearing the primary keys and
         // recomputing `orgs` are INDEPENDENT effects (73-RESEARCH.md Pitfall
         // 2) -- NEVER blanket-clear orgs here; a still-valid second-org
-        // membership must survive. Two calls through the shared
-        // merge-preserving helpers (claimsHelpers.ts), never a bare
-        // setCustomUserClaims -- each preserves everything it doesn't
-        // explicitly touch (e.g. superAdmin), and the second call's
-        // getUser() read reflects the first call's write (live Admin SDK
-        // state), so the surviving-orgs recompute lands on top of the
-        // already-cleared primary keys rather than reintroducing them.
-        await clearClaimKeys(uid, ORG_CLAIM_KEYS);
-        await mergeAndSetCustomClaims(uid, { orgs: desiredOrgs });
+        // membership must survive. WR-01 (73-REVIEW.md): this used to be TWO
+        // sequential Admin SDK writes (clearClaimKeys then
+        // mergeAndSetCustomClaims), which opened a brief TOCTOU window --
+        // a token minted between the two writes could carry no orgId/role
+        // but a STALE orgs map still listing the org just removed, retaining
+        // Storage access via storage.rules' orgs[orgId] arm. Collapsed into
+        // ONE atomic setCustomUserClaims call via mergeSetAndClearCustomClaims
+        // (claimsHelpers.ts), which reads current claims once and applies the
+        // clear+set in memory before the single write -- preserving
+        // everything it doesn't explicitly touch (e.g. superAdmin).
+        await mergeSetAndClearCustomClaims(uid, { set: { orgs: desiredOrgs }, clear: ORG_CLAIM_KEYS });
         return { action: "clear" };
       }
       case "skip": {

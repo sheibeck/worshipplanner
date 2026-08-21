@@ -71,3 +71,45 @@ export async function clearClaimKeys(uid: string, keys: readonly string[]): Prom
   const hasRemaining = Object.keys(current).length > 0;
   await getAuth().setCustomUserClaims(uid, hasRemaining ? current : null);
 }
+
+/**
+ * The atomic counterpart to calling clearClaimKeys then mergeAndSetCustomClaims
+ * as two SEPARATE writes (73-REVIEW.md WR-01). Reads current claims ONCE,
+ * removes `opts.clear` keys and applies `opts.set` on top -- all in memory --
+ * then issues a SINGLE setCustomUserClaims call. This closes the TOCTOU window
+ * a two-write clear+set sequence opens: a token minted between the two writes
+ * could carry a claim state that was never a deliberate end-state (e.g.
+ * cleared primary `orgId`/`role` keys but a still-stale `orgs` map that lists
+ * the org whose membership was just removed).
+ *
+ * Same null-vs-{} handling as clearClaimKeys: the Admin SDK requires `null`
+ * (not `{}`) to fully clear a user's custom claims, so `null` is only passed
+ * when nothing remains after clear+set.
+ */
+export async function mergeSetAndClearCustomClaims(
+  uid: string,
+  opts: { set?: Record<string, unknown>; clear?: readonly string[] },
+): Promise<void> {
+  const user = await getAuth().getUser(uid);
+  const current = { ...((user.customClaims as Record<string, unknown> | undefined) ?? {}) };
+  for (const key of opts.clear ?? []) delete current[key];
+  Object.assign(current, opts.set ?? {});
+  const hasRemaining = Object.keys(current).length > 0;
+  await getAuth().setCustomUserClaims(uid, hasRemaining ? current : null);
+}
+
+/**
+ * Detects the Firebase Admin SDK's `auth/claims-too-large` error -- thrown by
+ * `setCustomUserClaims` when the serialized custom-claims object exceeds the
+ * ~1000-byte cap (73-REVIEW.md WR-02). Shared by every claim-write call site
+ * so a claims-too-large failure logs a distinguishable, greppable line rather
+ * than being indistinguishable from any other transient Auth API failure.
+ */
+export function isClaimsTooLargeError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "auth/claims-too-large"
+  );
+}
