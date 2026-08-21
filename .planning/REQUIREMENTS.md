@@ -93,7 +93,7 @@ REQ-IDs continue from v1.9 (last R192).
       claim set, so a user in multiple orgs retains Storage read/write on **every** org — proven by genuine
       multi-org ALLOW **and** cross-org DENY emulator tests.
 
-- [ ] **R210**: An idempotent, dry-run-by-default, owner-run backfill recomputes the widened claim for all
+- [x] **R210**: An idempotent, dry-run-by-default, owner-run backfill recomputes the widened claim for all
       existing users, mirroring `backfillOrgClaims.ts`, so current users get the new claim shape without a
       manual per-user step.
 
@@ -145,7 +145,7 @@ REQ-IDs continue from v1.9 (last R192).
 | R207 | Phase 73 | Complete |
 | R208 | Phase 73 | Complete |
 | R209 | Phase 73 | Complete |
-| R210 | Phase 73 | Pending |
+| R210 | Phase 73 | Complete |
 | R211 | Phase 73 | Complete |
 
 **Coverage:** 19/19 v2.0 requirements mapped (R193–R211). No orphans, no duplicates.

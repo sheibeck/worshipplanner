@@ -479,13 +479,13 @@ a hard prerequisite for)
      and new claim shapes are tolerated by the rules until the backfill runs, so there is no Storage-access
      gap while users migrate (R211).
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 
 - [x] 73-01-PLAN.md — Widen the claim writer: additive `orgs` map recomputed from surviving member docs on every write, merge-preserving superAdmin (R207, R208) — Wave 1
 - [x] 73-02-PLAN.md — Widen `storage.rules` `isOrgMemberByClaim` with the `orgs`-map arm + legacy arm; multi-org ALLOW / cross-org DENY / legacy ALLOW emulator tests (R209, R211) — Wave 1
-- [ ] 73-03-PLAN.md — Idempotent dry-run/`--apply` backfill (group-by-uid, shared builder, mergeAndSetCustomClaims) + deploy runbook order (R210, R208) — Wave 2
+- [x] 73-03-PLAN.md — Idempotent dry-run/`--apply` backfill (group-by-uid, shared builder, mergeAndSetCustomClaims) + deploy runbook order (R210, R208) — Wave 2
 
 **Deploy**: The widened claim-writer, the `storage.rules` change, and the backfill script ship built +
 tested + UNDEPLOYED — the exact `firebase deploy --only firestore:rules,storage` (or scoped equivalent)
@@ -552,7 +552,7 @@ milestone deploy policy above.
 | 70 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
 | 71 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
 | 72 | v2.0 | 1/1 | Code-complete (UAT deferred) | 2026-08-21 |
-| 73 | v2.0 | 2/3 | In Progress|  |
+| 73 | v2.0 | 3/3 | In Progress|  |
 | 74 | v2.0 | 0/TBD | Not started | - |
 
 ## Backlog

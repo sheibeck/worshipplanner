@@ -4,17 +4,17 @@ milestone: v2.0
 milestone_name: Multi-Church Onboarding & Owner Console Tabs
 current_phase: 73
 current_phase_name: multi-org-storage-auth-claim
-status: executing
-stopped_at: Completed 73-02-PLAN.md
-last_updated: "2026-08-21T19:05:22.673Z"
+status: verifying
+stopped_at: Completed 73-03-PLAN.md
+last_updated: "2026-08-21T19:17:47.723Z"
 last_activity: 2026-08-21
 last_activity_desc: Phase 73 execution started
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 33
+  completed_plans: 4
+  percent: 67
 ---
 
 # ▶ ACTIVE MILESTONE — v2.0 Multi-Church Onboarding & Owner Console Tabs (started 2026-08-21)
@@ -745,7 +745,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 73 (multi-org-storage-auth-claim) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-21 — Phase 73 execution started
 
 ## ★ v2.0 ROADMAP.md phase breakdown (created 2026-08-21)
@@ -2351,6 +2351,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 72 P01 | 25min | 2 tasks | 4 files |
 | Phase 73 P01 | 40min | 2 tasks | 2 files |
 | Phase 73 P02 | 25min | 2 tasks | 2 files |
+| Phase 73 P03 | 24min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -2742,6 +2743,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Tab strip mirrors ServiceEditorView.vue's plain-button pattern with no ARIA tablist/tab roles, per UI-SPEC precedent
 - [Phase ?]: 73-01: decideMembershipClaim's contract stays unchanged; orgs recompute lives in the handler + buildOrgsMapClaim/computeOrgsClaimForUid so plan 73-03's backfill needs zero changes
 - [Phase ?]: 73-01: primary-membership delete uses two sequential merge-preserving writes (clearClaimKeys then mergeAndSetCustomClaims) rather than a combined raw setCustomUserClaims, per critical constraint 5
+- [Phase ?]: Kept the orgs-map equality check as a small local copy in backfillOrgClaims.ts (not exported from orgMembershipClaims.ts) to respect the plan's declared files_modified boundary
+- [Phase ?]: For a multi-org uid, resolve the primary decision by trying decideMembershipClaim against each membership until one is not skipped for not-primary-org, rather than pre-fetching orgIds ourselves
+- [Phase ?]: Rewrote the non-primary-org backfill test to expect an orgs-only write (previously a no-op skip) -- the widened behavior is the point of R210/R207
 
 ### Roadmap Evolution
 
@@ -3061,8 +3065,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-21T19:05:22.607Z
-Stopped at: Completed 73-02-PLAN.md
+Last session: 2026-08-21T19:17:47.667Z
+Stopped at: Completed 73-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
