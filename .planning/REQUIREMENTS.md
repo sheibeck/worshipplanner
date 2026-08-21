@@ -37,46 +37,46 @@ REQ-IDs continue from v1.9 (last R192).
 
 ### Organizations — list & onboard
 
-- [ ] **R196**: The Organizations tab lists every organization on the platform, showing at least each church's
+- [x] **R196**: The Organizations tab lists every organization on the platform, showing at least each church's
       name and a distinguishing detail (id and/or created date and/or member count), so the super-admin sees
       all churches at a glance.
 
-- [ ] **R197**: A super-admin can onboard a new organization by entering a church name, which creates the
+- [x] **R197**: A super-admin can onboard a new organization by entering a church name, which creates the
       `organizations/{orgId}` record with default `OrgSettings` deep-merged from the code defaults (identical
       to a normally-created org's settings).
 
-- [ ] **R198**: Onboarding seeds the new org's default service template (`OrgSettings.defaultServiceTemplate`)
+- [x] **R198**: Onboarding seeds the new org's default service template (`OrgSettings.defaultServiceTemplate`)
       so the church can create a service immediately, without any manual template setup.
 
-- [ ] **R199**: Onboarding assigns the church's first admin by email at **editor** tier as part of the same
+- [x] **R199**: Onboarding assigns the church's first admin by email at **editor** tier as part of the same
       flow, so a freshly-onboarded church has exactly one editor who can sign in and use it.
 
-- [ ] **R200**: Org creation/onboarding runs entirely through a **super-admin-gated server callable** — the
+- [x] **R200**: Org creation/onboarding runs entirely through a **super-admin-gated server callable** — the
       client never writes `organizations/*`, `orgNames/*`, or another org's `members/*` directly — the callable
       independently re-verifies the caller's `superAdmin` claim server-side.
 
-- [ ] **R201**: Church-name uniqueness is enforced via the existing create-only `orgNames` registry (v1.7
+- [x] **R201**: Church-name uniqueness is enforced via the existing create-only `orgNames` registry (v1.7
       R160), so onboarding cannot create a duplicate church name and reports the collision clearly.
 
-- [ ] **R202**: A failed onboarding step (name taken, invalid/unknown admin email, write error) surfaces a
+- [x] **R202**: A failed onboarding step (name taken, invalid/unknown admin email, write error) surfaces a
       clear error and does not strand a half-created org — the flow is ordered/idempotent so a retry after
       fixing the input succeeds without manual cleanup.
 
 ### Church-admin assignment (reuse editor role)
 
-- [ ] **R203**: A super-admin can assign a church admin by email — the target becomes an
+- [x] **R203**: A super-admin can assign a church admin by email — the target becomes an
       `organizations/{orgId}/members/{uid}` member at the **editor** role, reusing the existing editor/viewer
       RBAC with **no new role or claim type**.
 
-- [ ] **R204**: Admin assignment goes through the super-admin-gated membership callable that resolves the email
+- [x] **R204**: Admin assignment goes through the super-admin-gated membership callable that resolves the email
       to a user, writes the membership, and syncs the org-membership custom claim — the client never writes
       another org's `members/*` directly.
 
-- [ ] **R205**: Assigning an admin whose email has no existing account is handled gracefully — a clear
+- [x] **R205**: Assigning an admin whose email has no existing account is handled gracefully — a clear
       "no account for that email" result (or the app's existing invite path), never a silent failure or a
       dangling membership doc.
 
-- [ ] **R206**: Assigning an admin to an org for a user who **already belongs to another org** preserves the
+- [x] **R206**: Assigning an admin to an org for a user who **already belongs to another org** preserves the
       user's existing memberships and roles — the new membership is additive, never an overwrite (depends on
       the widened claim below).
 
@@ -131,17 +131,17 @@ REQ-IDs continue from v1.9 (last R192).
 | R193 | Phase 72 | Complete |
 | R194 | Phase 72 | Complete |
 | R195 | Phase 72 | Complete |
-| R196 | Phase 74 | Pending |
-| R197 | Phase 74 | Pending |
-| R198 | Phase 74 | Pending |
-| R199 | Phase 74 | Pending |
-| R200 | Phase 74 | Pending |
-| R201 | Phase 74 | Pending |
-| R202 | Phase 74 | Pending |
-| R203 | Phase 74 | Pending |
-| R204 | Phase 74 | Pending |
-| R205 | Phase 74 | Pending |
-| R206 | Phase 74 | Pending |
+| R196 | Phase 74 | Complete |
+| R197 | Phase 74 | Complete |
+| R198 | Phase 74 | Complete |
+| R199 | Phase 74 | Complete |
+| R200 | Phase 74 | Complete |
+| R201 | Phase 74 | Complete |
+| R202 | Phase 74 | Complete |
+| R203 | Phase 74 | Complete |
+| R204 | Phase 74 | Complete |
+| R205 | Phase 74 | Complete |
+| R206 | Phase 74 | Complete |
 | R207 | Phase 73 | Complete |
 | R208 | Phase 73 | Complete |
 | R209 | Phase 73 | Complete |

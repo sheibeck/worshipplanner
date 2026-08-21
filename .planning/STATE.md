@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Multi-Church Onboarding & Owner Console Tabs
-current_phase: 73
-current_phase_name: multi-org-storage-auth-claim
-status: verifying
-stopped_at: Completed 73-03-PLAN.md
-last_updated: "2026-08-21T19:17:47.723Z"
+current_phase: 74
+current_phase_name: organizations-list-onboard-admin-assignment
+status: executing
+stopped_at: Completed 74-01-PLAN.md
+last_updated: "2026-08-21T20:36:09.170Z"
 last_activity: 2026-08-21
-last_activity_desc: Phase 73 execution started
+last_activity_desc: Phase 74 execution started
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 67
 ---
 
@@ -733,7 +733,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 73 — multi-org-storage-auth-claim
+**Current focus:** Phase 74 — organizations-list-onboard-admin-assignment
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -743,10 +743,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 73 (multi-org-storage-auth-claim) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-08-21 — Phase 73 execution started
+Phase: 74 (organizations-list-onboard-admin-assignment) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-08-21 — Phase 74 execution started
 
 ## ★ v2.0 ROADMAP.md phase breakdown (created 2026-08-21)
 
@@ -2352,6 +2352,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 73 P01 | 40min | 2 tasks | 2 files |
 | Phase 73 P02 | 25min | 2 tasks | 2 files |
 | Phase 73 P03 | 24min | 2 tasks | 3 files |
+| Phase 74 P01 | 15min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -2746,6 +2747,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Kept the orgs-map equality check as a small local copy in backfillOrgClaims.ts (not exported from orgMembershipClaims.ts) to respect the plan's declared files_modified boundary
 - [Phase ?]: For a multi-org uid, resolve the primary decision by trying decideMembershipClaim against each membership until one is not skipped for not-primary-org, rather than pre-fetching orgIds ourselves
 - [Phase ?]: Rewrote the non-primary-org backfill test to expect an orgs-only write (previously a no-op skip) -- the widened behavior is the point of R210/R207
+- [Phase ?]: Used a structural AdminWriter interface (just .set) instead of a Transaction|WriteBatch union so writeAdminAssignment is shared verbatim between onboardOrganization's transaction and assignOrgAdmin's batch
 
 ### Roadmap Evolution
 
@@ -3065,8 +3067,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-21T19:17:47.667Z
-Stopped at: Completed 73-03-PLAN.md
+Last session: 2026-08-21T20:36:09.052Z
+Stopped at: Completed 74-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

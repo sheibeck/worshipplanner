@@ -525,8 +525,9 @@ be in place before assigning a second-org admin)
      assigning a user who already belongs to another org is strictly additive — their existing
      memberships and roles are preserved, never overwritten (R203, R205, R206).
 
-**Plans**: 2 plans
-- [ ] 74-01-PLAN.md — Server: the three super-admin-gated callables (onboardOrganization, assignOrgAdmin, listOrganizations) + shared assignAdminCore + ported seed template + unit tests
+**Plans**: 1/2 plans executed
+
+- [x] 74-01-PLAN.md — Server: the three super-admin-gated callables (onboardOrganization, assignOrgAdmin, listOrganizations) + shared assignAdminCore + ported seed template + unit tests
 - [ ] 74-02-PLAN.md — Client: the Organizations tab UI (list + onboard form + per-org assign control) + component tests
 
 **UI hint**: yes
@@ -556,7 +557,7 @@ milestone deploy policy above.
 | 71 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
 | 72 | v2.0 | 1/1 | Code-complete (UAT deferred) | 2026-08-21 |
 | 73 | v2.0 | 3/3 | Code-complete + SECURED (deploy UAT deferred) | 2026-08-21 |
-| 74 | v2.0 | 0/TBD | Not started | - |
+| 74 | v2.0 | 1/2 | In Progress|  |
 
 ## Backlog
 
