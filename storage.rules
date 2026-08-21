@@ -12,6 +12,13 @@ rules_version = '2';
 // milestone (see CLAUDE.md). Before the fallback was removed, every user was confirmed
 // single-org (backfill dry-run + mandatory pre-check) and all live tokens were soaked so
 // they carry the claim. Full runbook: functions/DEPLOY-ORG-CLAIMS.md.
+//
+// v2.0 multi-org claim widening (phase 73) — the claim now ALSO carries a full
+// `orgs: {[orgId]: role}` map alongside the unchanged primary `orgId`/`role` keys (see
+// functions/src/orgMembershipClaims.ts). isOrgMemberByClaim below checks the requested
+// orgId against the full `orgs` map first, ORed with the still-present legacy primary-only
+// arm — old/not-yet-backfilled tokens keep working on their primary org with no access gap
+// while the backfill (functions/src/backfillOrgClaims.ts) rolls out.
 service firebase.storage {
   match /b/{bucket}/o {
     // Reads request.auth.token.orgId / .role — a direct JWT claim read set server-side by
@@ -20,15 +27,23 @@ service firebase.storage {
     // involved, so this is fully verifiable in the emulator. `role != null` (not a specific
     // role) is the gate — any assigned role counts as membership.
     //
-    // KNOWN LIMITATION (D-01/D-04): the claim carries only the user's PRIMARY org
-    // (orgIds[0]). Safe today because every user is single-org, verified at the 2026-08-12
-    // migration. The Firestore fallback that used to cover a user's NON-primary orgs is
-    // gone, so if a user is ever to belong to more than one org, the claim must first be
-    // widened to carry all their orgs. Tracked in .planning/ROADMAP.md backlog.
+    // WIDENED (phase 73, D-01/D-04 closed): the claim now carries every org the user
+    // belongs to via the `orgs` map, not just the primary. The multi-org arm below checks
+    // the requested orgId against that full map; the legacy arm (unchanged) still matches
+    // the primary orgId/role alone, so a not-yet-backfilled token is never left without
+    // access to its own primary org during rollout (R211 backward-compat).
     function isOrgMemberByClaim(orgId) {
       return request.auth != null
-        && request.auth.token.orgId == orgId
-        && request.auth.token.role != null;
+        && (
+          // NEW — multi-org arm (R209): the claim's orgs map carries an entry for this
+          // org. Guard orgs != null BEFORE indexing it -- indexing into an absent orgs
+          // key is a rules evaluation error (hard deny), not a clean false.
+          (request.auth.token.orgs != null && request.auth.token.orgs[orgId] != null)
+          // Legacy arm (R211 backward-compat): pre-widening / not-yet-backfilled tokens
+          // still carry only the primary orgId/role — kept unchanged, unconditionally
+          // ORed (never ANDed) with the new arm above.
+          || (request.auth.token.orgId == orgId && request.auth.token.role != null)
+        );
     }
 
     // Membership is CLAIM-ONLY as of Deploy 2 (2026-08-12). Do NOT re-introduce a
