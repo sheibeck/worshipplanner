@@ -1,7 +1,15 @@
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
-import { decideMembershipClaim } from "./orgMembershipClaims";
+import { getFirestore } from "firebase-admin/firestore";
+import {
+  buildOrgsMapClaim,
+  decideMembershipClaim,
+  resolveOrgId,
+  type MembershipClaimDecision,
+  type OrgMembershipClaim,
+  type OrgMembershipRole,
+} from "./orgMembershipClaims";
+import { mergeAndSetCustomClaims } from "./claimsHelpers";
 
 // --- backfillOrgMembershipClaims (R074/R075: give the two existing users the claim) ---
 //
@@ -9,6 +17,15 @@ import { decideMembershipClaim } from "./orgMembershipClaims";
 // writes to organizations/{orgId}/members/{uid}. Members whose document was already
 // in place before that trigger was deployed have never had it rewritten, so without
 // this backfill they carry no claim until something touches their member doc again.
+//
+// WIDENED (73-03-PLAN.md, R210): this script now also backfills the additive `orgs`
+// map (73-01-PLAN.md, R207) for every existing user, not just the primary
+// `{ orgId, role }` claim -- the trigger's per-write orgs recompute
+// (computeOrgsClaimForUid) only ever runs on a FUTURE membership write, exactly the
+// same gap the original backfill closed for the primary claim. This backfill closes
+// it for `orgs` too, from a single grouped scan (see "SINGLE SCAN" below), and writes
+// through mergeAndSetCustomClaims rather than a bare setCustomUserClaims so a
+// superAdmin grant (Phase 68) is never wiped by a backfill run (R208/T-73-01).
 //
 // THIS IS A NODE SCRIPT, NOT A DEPLOYED FUNCTION (D-12). It is run by the owner with
 // admin credentials and is deliberately NOT exported from functions/src/index.ts --
@@ -21,11 +38,22 @@ import { decideMembershipClaim } from "./orgMembershipClaims";
 // any scale machinery here -- it would be speculative complexity for a set that fits
 // on one screen.
 //
-// SHARED DECISION LOGIC (DISC-02, T-40-05): this script imports decideMembershipClaim
-// from ./orgMembershipClaims rather than reimplementing primary-org resolution, role
-// normalisation, or the already-matching comparison. A second implementation of "what
-// should this user's claim be" would drift from the trigger and could write a claim to
-// production that disagrees with what the trigger would have written.
+// SINGLE SCAN, GROUPED BY UID IN MEMORY (73-RESEARCH.md Pattern 4): the ONE
+// collectionGroup('members').get() below is grouped by uid in memory into a per-uid
+// membership list. This is deliberately NOT the trigger's per-write
+// computeOrgsClaimForUid (orgMembershipClaims.ts) -- that helper does its OWN fresh
+// collectionGroup('members').get() scan, which is correct for a single uid on a
+// single write but would turn this backfill into an O(n) re-scan (one full-collection
+// scan per user) if called from inside this loop. Reusing it here would be exactly
+// the anti-pattern 73-RESEARCH.md warns against.
+//
+// SHARED DECISION LOGIC (DISC-02, T-40-05, D-11): this script imports
+// decideMembershipClaim AND buildOrgsMapClaim AND resolveOrgId from
+// ./orgMembershipClaims rather than reimplementing primary-org resolution, role
+// normalisation, the orgs-map shape, or the structural members-doc guard. A second
+// implementation of "what should this user's claim be" would drift from the trigger
+// and could write a claim to production that disagrees with what the trigger would
+// have written.
 //
 // SAFETY (D-13/D-14, T-40-10): dry run is the default. Nothing is written to Auth
 // unless --apply is passed. The CLI wrapper below prints the resolved project id and a
@@ -59,30 +87,74 @@ export interface BackfillSummary {
   failed: BackfillFailure[];
 }
 
-/**
- * Structural guard, in the spirit of index.ts's MEDIA_PATH_GUARD: a `members`
- * document is only ever a backfill candidate when it is a child of an
- * `organizations/{orgId}` document. `collectionGroup('members')` matches ANY
- * subcollection literally named `members` anywhere in the database, so this guard
- * is applied to every candidate BEFORE any decision is made -- a `members`
- * subcollection appearing anywhere else in the schema can never be acted on.
- * Returns the org id on success, undefined when the guard fails.
- */
-function resolveOrgId(memberDoc: QueryDocumentSnapshot): string | undefined {
-  const orgDoc = memberDoc.ref.parent.parent;
-  if (!orgDoc) return undefined;
-  if (orgDoc.parent.id !== "organizations") return undefined;
-  return orgDoc.id;
+/** One surviving organizations/{orgId}/members/{uid} membership for a given uid. */
+interface MembershipCandidate {
+  orgId: string;
+  role: string | undefined;
 }
 
 /**
- * Iterates every organizations/*\/members/* document and, via the shared
- * decideMembershipClaim, sets the { orgId, role } custom claim for every account
- * whose primary org (users/{uid}.orgIds[0]) matches the membership doc's org.
+ * Shallow-equal for two `orgs` maps -- mirrors orgMembershipClaims.ts's private
+ * orgsMapsEqual byte-for-byte (kept as a local copy rather than an exported/shared
+ * function so this plan's file surface stays exactly what 73-03-PLAN.md declares;
+ * it is pure equality on the SAME shared buildOrgsMapClaim output, so there is no
+ * risk of drift on what an `orgs` map should contain -- only on whether two of them
+ * are equal, which is not a decision either module can get wrong differently).
+ */
+function orgsMapsEqual(
+  current: Record<string, OrgMembershipRole>,
+  next: Record<string, OrgMembershipRole>,
+): boolean {
+  const currentKeys = Object.keys(current);
+  const nextKeys = Object.keys(next);
+  if (currentKeys.length !== nextKeys.length) return false;
+  return currentKeys.every((key) => current[key] === next[key]);
+}
+
+/**
+ * Resolves the single PRIMARY-claim decision for a uid from its grouped-by-uid
+ * membership list, via the shared decideMembershipClaim (D-11). At most one
+ * membership can ever be the user's actual primary org -- decideMembershipClaim
+ * independently re-derives the true primary from users/{uid}.orgIds on every call,
+ * so trying each membership in order until one is NOT skipped for "not-primary-org"
+ * converges on the real primary decision regardless of collectionGroup doc order,
+ * without needing a separate primary-org lookup of our own.
+ */
+async function decidePrimaryClaim(
+  uid: string,
+  memberships: MembershipCandidate[],
+): Promise<MembershipClaimDecision> {
+  let decision: MembershipClaimDecision = { action: "skip", reason: "not-primary-org" };
+  for (const membership of memberships) {
+    decision = await decideMembershipClaim({
+      uid,
+      orgId: membership.orgId,
+      documentExists: true,
+      role: membership.role,
+    });
+    if (!(decision.action === "skip" && decision.reason === "not-primary-org")) {
+      return decision;
+    }
+  }
+  return decision;
+}
+
+/**
+ * Iterates every organizations/*\/members/* document ONCE, grouped by uid in memory,
+ * and for each uid reconciles ONE Admin SDK write carrying:
+ *  - the PRIMARY `{ orgId, role }` claim, via the shared decideMembershipClaim on
+ *    the user's primary-org membership (unchanged primary logic, D-11), and
+ *  - the additive `orgs` map, via the shared buildOrgsMapClaim applied to this
+ *    uid's in-memory group (no second scan, no second "what orgs" implementation).
  *
- * Idempotent by skip-if-already-matching (D-11): re-running this after an
- * interruption is always safe -- every already-current account is reported as
- * skipped, not re-written, and there is no cursor state that could itself go stale.
+ * Idempotent by skip-if-already-matching (D-11, extended to `orgs`): re-running
+ * this after an interruption is always safe -- every already-current account
+ * (primary keys AND orgs both matching) is reported as skipped, not re-written,
+ * and there is no cursor state that could itself go stale.
+ *
+ * Writes via mergeAndSetCustomClaims (R208/T-73-01), never a bare
+ * setCustomUserClaims -- a bare replace would silently wipe an unrelated claim
+ * (e.g. Phase 68's superAdmin:true) the moment this backfill next ran for that uid.
  */
 export async function backfillOrgMembershipClaims(
   options: BackfillOptions,
@@ -95,6 +167,9 @@ export async function backfillOrgMembershipClaims(
 
   const snapshot = await getFirestore().collectionGroup("members").get();
 
+  // Group the ONE scan's surviving docs by uid IN MEMORY (73-RESEARCH.md Pattern 4)
+  // -- never re-scan collectionGroup('members') per uid or per membership.
+  const membershipsByUid = new Map<string, MembershipCandidate[]>();
   for (const memberDoc of snapshot.docs) {
     const orgId = resolveOrgId(memberDoc);
     if (orgId === undefined) {
@@ -106,31 +181,74 @@ export async function backfillOrgMembershipClaims(
 
     const uid = memberDoc.id;
     const role = (memberDoc.data() as { role?: string } | undefined)?.role;
+    const existing = membershipsByUid.get(uid);
+    if (existing) {
+      existing.push({ orgId, role });
+    } else {
+      membershipsByUid.set(uid, [{ orgId, role }]);
+    }
+  }
+
+  for (const [uid, memberships] of membershipsByUid) {
+    // memberships is always non-empty here: a uid only ever enters the map via the
+    // push/set above, which always supplies at least one entry.
+    const orgId = memberships[0]!.orgId;
 
     try {
-      const decision = await decideMembershipClaim({ uid, orgId, documentExists: true, role });
+      // The shared, no-drift orgs-map builder (D-11) -- the SAME function the
+      // trigger uses, applied to this uid's in-memory group instead of a fresh scan.
+      const desiredOrgs = buildOrgsMapClaim(memberships);
 
-      switch (decision.action) {
-        case "set":
-          if (apply) {
-            await getAuth().setCustomUserClaims(uid, decision.claims);
-          }
-          processed++;
-          console.log(`[backfillOrgClaims] ${uid} (${orgId}): set`, decision.claims);
-          break;
-        case "skip":
-          skipped++;
-          console.log(`[backfillOrgClaims] ${uid} (${orgId}): skip (${decision.reason})`);
-          break;
-        case "clear":
-          // Not reachable from this call site: decideMembershipClaim only ever
-          // returns 'clear' when documentExists is false (WR-01), and this loop
-          // always passes documentExists: true -- a query result is by definition
-          // a document that exists. Treated defensively as skipped rather than
-          // assumed unreachable.
-          skipped++;
-          console.log(`[backfillOrgClaims] ${uid} (${orgId}): skip (clear-not-reachable)`);
-          break;
+      const decision = await decidePrimaryClaim(uid, memberships);
+
+      if (
+        decision.action === "skip" &&
+        (decision.reason === "no-user-doc" || decision.reason === "missing-role")
+      ) {
+        // Fully-conservative skip: the write is too ambiguous to act on at all --
+        // mirrors syncOrgMembershipClaimHandler's identical carve-out for these two
+        // reasons. Never touch orgs here either.
+        skipped++;
+        console.log(`[backfillOrgClaims] ${uid} (${orgId}): skip (${decision.reason})`);
+        continue;
+      }
+
+      if (decision.action === "set") {
+        // R208/T-73-01: ONE merge call carries the primary keys AND the recomputed
+        // orgs map, preserving superAdmin (or any other unrelated claim) -- never
+        // the bare setCustomUserClaims this replaced.
+        const patch = { ...decision.claims, orgs: desiredOrgs };
+        if (apply) {
+          await mergeAndSetCustomClaims(uid, patch);
+        }
+        processed++;
+        console.log(`[backfillOrgClaims] ${uid} (${orgId}): set`, patch);
+        continue;
+      }
+
+      // decision.action is "skip" (reason "not-primary-org" or "already-current")
+      // or "clear" (not reachable from this call site: decideMembershipClaim only
+      // ever returns 'clear' when documentExists is false (WR-01), and
+      // decidePrimaryClaim always passes documentExists: true). Either way the
+      // primary keys are unaffected, but `orgs` still needs its own
+      // skip-if-matching check -- this is what lets a non-primary-org membership
+      // (or a primary membership whose claim is already current) still pick up a
+      // changed orgs map.
+      const existingUser = await getAuth().getUser(uid);
+      const existingClaims = existingUser.customClaims as
+        | (Partial<OrgMembershipClaim> & { orgs?: Record<string, OrgMembershipRole> })
+        | undefined;
+      const existingOrgs = existingClaims?.orgs ?? {};
+
+      if (orgsMapsEqual(existingOrgs, desiredOrgs)) {
+        skipped++;
+        console.log(`[backfillOrgClaims] ${uid} (${orgId}): skip (already-current, orgs unchanged)`);
+      } else {
+        if (apply) {
+          await mergeAndSetCustomClaims(uid, { orgs: desiredOrgs });
+        }
+        processed++;
+        console.log(`[backfillOrgClaims] ${uid} (${orgId}): set (orgs-only)`, { orgs: desiredOrgs });
       }
     } catch (err) {
       console.error(`[backfillOrgClaims] ${uid} (${orgId}): failed`, err);
@@ -157,7 +275,7 @@ export async function backfillOrgMembershipClaims(
 //
 // WR-02: the whole body is wrapped in try/catch. The initial
 // `getFirestore().collectionGroup('members').get()` inside backfillOrgMembershipClaims
-// is NOT covered by that function's own per-account try/catch (only the loop body is) --
+// is NOT covered by that function's own per-uid try/catch (only the loop body is) --
 // a rejection there (bad/expired credentials, wrong project, network failure) previously
 // propagated out of this IIFE as a raw unhandled rejection instead of the script's own
 // diagnostic output, with no process.exitCode set. The owner runs this by hand against

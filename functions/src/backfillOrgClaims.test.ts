@@ -119,7 +119,7 @@ afterEach(() => {
 });
 
 describe("backfillOrgMembershipClaims", () => {
-  it("apply mode: two members in their primary org, neither claimed -- processed 2, skipped 0, failed empty, setCustomUserClaims called twice", async () => {
+  it("apply mode: two members in their primary org, neither claimed -- processed 2, skipped 0, failed empty, setCustomUserClaims called twice with the widened claim (primary keys + orgs)", async () => {
     const u1 = fakeMemberDoc({ uid: "u1", role: "editor", orgId: ORG_A });
     const u2 = fakeMemberDoc({ uid: "u2", role: "viewer", orgId: ORG_A });
     mockFirestore([u1, u2], {
@@ -132,11 +132,60 @@ describe("backfillOrgMembershipClaims", () => {
 
     expect(summary).toEqual({ processed: 2, skipped: 0, failed: [] });
     expect(setCustomUserClaims).toHaveBeenCalledTimes(2);
-    expect(setCustomUserClaims).toHaveBeenCalledWith("u1", { orgId: ORG_A, role: "editor" });
-    expect(setCustomUserClaims).toHaveBeenCalledWith("u2", { orgId: ORG_A, role: "viewer" });
+    expect(setCustomUserClaims).toHaveBeenCalledWith("u1", {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { [ORG_A]: "editor" },
+    });
+    expect(setCustomUserClaims).toHaveBeenCalledWith("u2", {
+      orgId: ORG_A,
+      role: "viewer",
+      orgs: { [ORG_A]: "viewer" },
+    });
   });
 
-  it("immediate second run: processed 0, skipped 2, failed empty, setCustomUserClaims not called at all -- idempotency by skip-if-already-matching", async () => {
+  it("multi-org: a user with TWO org memberships (orgA primary, orgB secondary) gets ONE write carrying the primary keys plus a two-entry orgs map, from a single grouped scan (R210, 73-RESEARCH.md Pattern 4)", async () => {
+    const primaryDoc = fakeMemberDoc({ uid: "multi", role: "editor", orgId: ORG_A });
+    const secondaryDoc = fakeMemberDoc({ uid: "multi", role: "viewer", orgId: ORG_B });
+    const { collectionGroupSpy } = mockFirestore([primaryDoc, secondaryDoc], {
+      multi: fakeUserDoc(true, [ORG_A]),
+    });
+    const { setCustomUserClaims } = statefulAuth();
+
+    const summary = await backfillOrgMembershipClaims({ apply: true });
+
+    expect(summary).toEqual({ processed: 1, skipped: 0, failed: [] });
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith("multi", {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { [ORG_A]: "editor", [ORG_B]: "viewer" },
+    });
+    // Single scan: collectionGroup('members') is queried exactly once for the whole
+    // run, regardless of how many orgs "multi" belongs to -- grouped by uid in
+    // memory, never re-scanned per membership.
+    expect(collectionGroupSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("superAdmin preserved: mergeAndSetCustomClaims merges the widened claim on top of an existing superAdmin:true grant rather than replacing it (R208, closes T-73-01)", async () => {
+    const doc = fakeMemberDoc({ uid: "admin1", role: "editor", orgId: ORG_A });
+    mockFirestore([doc], { admin1: fakeUserDoc(true, [ORG_A]) });
+    const { setCustomUserClaims, claimsByUid } = statefulAuth();
+    claimsByUid.set("admin1", { superAdmin: true });
+
+    const summary = await backfillOrgMembershipClaims({ apply: true });
+
+    expect(summary).toEqual({ processed: 1, skipped: 0, failed: [] });
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith("admin1", {
+      superAdmin: true,
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { [ORG_A]: "editor" },
+    });
+  });
+
+  it("immediate second run: processed 0, skipped 2, failed empty, setCustomUserClaims not called at all -- idempotency by skip-if-already-matching (extended to orgs, D-11)", async () => {
     const u1 = fakeMemberDoc({ uid: "u1", role: "editor", orgId: ORG_A });
     const u2 = fakeMemberDoc({ uid: "u2", role: "viewer", orgId: ORG_A });
     mockFirestore([u1, u2], {
@@ -202,14 +251,31 @@ describe("backfillOrgMembershipClaims", () => {
     expect(summary).toEqual({ processed: 0, skipped: 1, failed: [] });
   });
 
-  it("non-primary org: a members doc for an org that is not the user's orgIds[0] is counted as skipped", async () => {
+  it("non-primary org: the primary claim is left untouched, but the user's orgs map is still added -- a genuine secondary-org membership is no longer dropped (R207/R210)", async () => {
     const u1 = fakeMemberDoc({ uid: "u1", role: "editor", orgId: ORG_B });
     mockFirestore([u1], { u1: fakeUserDoc(true, [ORG_A]) }); // primary org is ORG_A, doc is under ORG_B
     const { setCustomUserClaims } = statefulAuth();
 
     const summary = await backfillOrgMembershipClaims({ apply: true });
 
-    expect(summary).toEqual({ processed: 0, skipped: 1, failed: [] });
+    expect(summary).toEqual({ processed: 1, skipped: 0, failed: [] });
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith("u1", { orgs: { [ORG_B]: "editor" } });
+  });
+
+  it("non-primary org, second run: the orgs-only write from the previous test is idempotent -- an immediate repeat reports skipped and writes nothing", async () => {
+    const u1 = fakeMemberDoc({ uid: "u1", role: "editor", orgId: ORG_B });
+    mockFirestore([u1], { u1: fakeUserDoc(true, [ORG_A]) });
+    const { setCustomUserClaims } = statefulAuth();
+
+    const firstRun = await backfillOrgMembershipClaims({ apply: true });
+    expect(firstRun).toEqual({ processed: 1, skipped: 0, failed: [] });
+    setCustomUserClaims.mockClear();
+
+    mockFirestore([u1], { u1: fakeUserDoc(true, [ORG_A]) });
+    const secondRun = await backfillOrgMembershipClaims({ apply: true });
+
+    expect(secondRun).toEqual({ processed: 0, skipped: 1, failed: [] });
     expect(setCustomUserClaims).not.toHaveBeenCalled();
   });
 
