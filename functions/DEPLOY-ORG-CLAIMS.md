@@ -255,10 +255,14 @@ regardless of claim state — the same as before Deploy 2 ever happened.
 
 ## Known limitations and residual risks
 
-1. **Multi-org users.** The claim carries the primary org only. Non-primary orgs depend entirely
-   on the Firestore fallback arm and stop working the moment Deploy 2 removes it. This is a
-   documented limitation of this design (D-01/D-04), not an oversight — see the mandatory pre-check
-   in Step 4, which exists specifically to catch this before it can bite anyone.
+1. **Multi-org users — CLOSED by Phase 73, once its three steps below are deployed.** This
+   limitation described a claim that carried the primary org only, leaving non-primary orgs
+   dependent entirely on the Firestore fallback arm. Phase 73 adds an additive `orgs` map
+   (`{ [orgId]: role }`) alongside the unchanged primary `orgId`/`role` keys, and widens
+   `storage.rules`' `isOrgMemberByClaim` to also check that map — so a member's non-primary-org
+   access no longer depends on the Firestore fallback arm at all, once the Phase 73 rollout below
+   has run. **Until all three Phase 73 steps are deployed, this limitation is still live** — treat
+   it as open for any org whose owner has not yet completed the section below.
 
 2. **Stale claim after membership removal (T-40-04).** `setCustomUserClaims` clears a removed
    member's claim server-side immediately, but any ID token already issued to that user keeps
@@ -290,6 +294,108 @@ regardless of claim state — the same as before Deploy 2 ever happened.
    that motivated this whole phase applies directly here: **a test explained away as an environment
    quirk is an untested assertion** — which is exactly why that observation is written into this
    runbook as a required step, not left to memory or assumed to still be true.
+
+---
+
+## Phase 73 — widening to multi-org (`orgs` map): the owner-run rollout order
+
+> ★★ **NOTHING IN THIS SECTION HAS BEEN RUN BY THIS PHASE EITHER.** Same standing grant as the
+> banner at the top of this file. Phase 73 shipped `syncOrgMembershipClaim`'s widened write path
+> (73-01), `storage.rules`' widened `isOrgMemberByClaim` (73-02), and this widened backfill
+> (73-03) fully **built, tested, and undeployed**. Everything below is written for the owner to run
+> by hand, in this exact order — hand-over, not automation.
+
+### What is being added
+
+The Phase 40 claim above carries the user's PRIMARY org only (`orgId`/`role`, from
+`users/{uid}.orgIds[0]`). Phase 73 adds a purely additive third claim key, `orgs` — a
+`{ [orgId]: role }` map covering **every** org a user currently belongs to, primary or not — and
+widens `storage.rules`' `isOrgMemberByClaim(orgId)` to also accept membership proven by that map.
+The primary `orgId`/`role` keys are **unchanged**: nothing here modifies what Deploy 1/Deploy 2
+above already did, or removes the Firestore-fallback arm if it is still present in your
+`storage.rules`. This is closing Known Limitation #1 above, not replacing this file's earlier
+rollout.
+
+### The three steps, in order, and why that order matters
+
+**STEP 1 — deploy the widened writer first.**
+
+```bash
+firebase deploy --only functions:syncOrgMembershipClaim --project worship-planner-bc515
+```
+
+This makes every **new** `organizations/{orgId}/members/{uid}` write (create, update, or delete)
+recompute and merge the `orgs` map immediately, on top of the unchanged primary-key behaviour.
+Deploying the writer *before* anything reads `orgs` means no token is ever authorized against an
+`orgs` map that was never written — there is nothing yet for STEP 3's rule to trust incorrectly.
+
+**STEP 2 — run the backfill, dry-run then `--apply`,** to populate `orgs` for every **existing**
+account (the writer above only fires on future writes):
+
+```bash
+cd functions
+npm run build
+node lib/backfillOrgClaims.js
+```
+
+Read the dry-run summary — one log line per uid naming the resolved decision, and a final
+`{ processed, skipped, failed }` object. Once it looks right:
+
+```bash
+node lib/backfillOrgClaims.js --apply
+```
+
+**Idempotent, like Step 2 above (D-11, extended to `orgs`):** a repeat run — accidental or
+deliberate — reports every account `skipped` (now checking both the primary keys AND the `orgs`
+map for already-current) and calls `setCustomUserClaims` zero times. The script exits non-zero if
+`failed` is non-empty; treat any failure entry as blocking until resolved before continuing to
+STEP 3, exactly as Step 2 above already instructs.
+
+**STEP 3 — deploy the widened rule last:**
+
+```bash
+firebase deploy --only storage --project worship-planner-bc515
+```
+
+Deploying the rule *last* means the `orgs`-map authorization arm only goes live once every
+account's `orgs` claim already exists (STEP 1 covers every write from here forward; STEP 2 covers
+every write that already happened). There is no window where the rule expects an `orgs` map that a
+still-in-flight backfill hasn't written yet.
+
+### Why this order avoids an access gap
+
+`storage.rules`' legacy arms — both `isOrgMemberByFirestore` (if the Firestore fallback described
+earlier in this file is still present in your rules) and the pre-existing single-org
+`isOrgMemberByClaim(orgId)` check against the primary `orgId`/`role` keys — are untouched by 73-02
+and **stay live throughout this rollout**. A single-org session's access is proven exactly as it
+was before Phase 73 at every point in STEP 1 through STEP 3; the `orgs`-map arm is a pure `OR`
+addition, widening what is allowed, never narrowing it. This is what "no access gap" means
+concretely here: at no point does any account lose access it already had, because the check that
+already worked for it is never removed by this rollout — Phase 73 only adds a second, independent
+way to prove membership for accounts (or org relationships) the old primary-only claim couldn't
+cover.
+
+### Soak / token-refresh guidance — unchanged from Step 3 above
+
+The same 1-hour soak and forced-token-refresh reasoning from **Step 3 — Soak for one full
+max-token-lifetime (1 hour)** above applies identically here: a claim (including the new `orgs`
+key) only lands on a token at the moment that token is next minted, either via
+`src/stores/auth.ts`'s `refreshOrgClaim` or natural expiry. If you are running this Phase 73
+rollout well after Phase 40's original soak, most live sessions have already re-minted a token
+since then for unrelated reasons — but do not assume that; the same soak discipline that governed
+Deploy 1 → Deploy 2 above governs STEP 1 → STEP 3 here for the same reason.
+
+### Rollback
+
+Every step here is additive — a new claim key, a widened `OR` in the rule, a backfill that only
+ever writes what the deployed trigger would also write. Reverting any one step in isolation is
+safe:
+
+- Roll back the rule: `git checkout -- storage.rules && firebase deploy --only storage --project worship-planner-bc515`
+  restores the pre-73-02 rule; every account's access reverts to exactly what it was under Deploy
+  1/Deploy 2 above, since the primary-key and (if present) Firestore-fallback arms are untouched.
+- The writer and the backfill need no rollback beyond the rule: an `orgs` claim key nobody reads
+  is inert.
 
 ---
 
