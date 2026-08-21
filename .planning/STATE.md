@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Multi-Church Onboarding & Owner Console Tabs
-current_phase: 72
-current_phase_name: owner-console-tabs
-status: verifying
-stopped_at: Completed 72-01-PLAN.md
-last_updated: "2026-08-21T17:16:37.892Z"
+current_phase: 73
+current_phase_name: multi-org-storage-auth-claim
+status: executing
+stopped_at: Completed 73-01-PLAN.md
+last_updated: "2026-08-21T18:49:53.343Z"
 last_activity: 2026-08-21
-last_activity_desc: Phase 72 execution started
+last_activity_desc: Phase 73 execution started
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 4
+  completed_plans: 2
   percent: 33
 ---
 
@@ -733,7 +733,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 72 — owner-console-tabs
+**Current focus:** Phase 73 — multi-org-storage-auth-claim
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -743,10 +743,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 72 (owner-console-tabs) — EXECUTING
-Plan: 1 of 1
-Status: Phase complete — ready for verification
-Last activity: 2026-08-21 — Phase 72 execution started
+Phase: 73 (multi-org-storage-auth-claim) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-08-21 — Phase 73 execution started
 
 ## ★ v2.0 ROADMAP.md phase breakdown (created 2026-08-21)
 
@@ -2349,6 +2349,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 71 P01 | 20min | 2 tasks | 2 files |
 | Phase 71 P02 | 35min | 2 tasks | 4 files |
 | Phase 72 P01 | 25min | 2 tasks | 4 files |
+| Phase 73 P01 | 40min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2738,6 +2739,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Card rows carry data-testid=cleanup-row-{type} so tests can disambiguate the row Enable button from the dialog's own Confirm button, which is also labeled Enable per the UI-SPEC copy
 - [Phase ?]: ConfigurationTab owns its own subscriptions (not lifted to shell) since v-show guarantees exactly one mount for the console's lifetime
 - [Phase ?]: Tab strip mirrors ServiceEditorView.vue's plain-button pattern with no ARIA tablist/tab roles, per UI-SPEC precedent
+- [Phase ?]: 73-01: decideMembershipClaim's contract stays unchanged; orgs recompute lives in the handler + buildOrgsMapClaim/computeOrgsClaimForUid so plan 73-03's backfill needs zero changes
+- [Phase ?]: 73-01: primary-membership delete uses two sequential merge-preserving writes (clearClaimKeys then mergeAndSetCustomClaims) rather than a combined raw setCustomUserClaims, per critical constraint 5
 
 ### Roadmap Evolution
 
@@ -3057,8 +3060,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-21T17:16:37.816Z
-Stopped at: Completed 72-01-PLAN.md
+Last session: 2026-08-21T18:49:53.260Z
+Stopped at: Completed 73-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -82,10 +82,10 @@ REQ-IDs continue from v1.9 (last R192).
 
 ### Multi-org Storage auth claim (backlog 999.5)
 
-- [ ] **R207**: The org-membership custom auth claim carries **all** of a user's organizations and their
+- [x] **R207**: The org-membership custom auth claim carries **all** of a user's organizations and their
       per-org roles (not just the primary org), in a shape both `firestore.rules` and `storage.rules` can read.
 
-- [ ] **R208**: The claim-writer that recomputes the claim on any `members/*` write derives the full multi-org
+- [x] **R208**: The claim-writer that recomputes the claim on any `members/*` write derives the full multi-org
       set from the user's memberships and preserves the `superAdmin` claim via the shared merge helper (R175) —
       widening the claim never wipes super-admin, and vice-versa.
 
@@ -142,8 +142,8 @@ REQ-IDs continue from v1.9 (last R192).
 | R204 | Phase 74 | Pending |
 | R205 | Phase 74 | Pending |
 | R206 | Phase 74 | Pending |
-| R207 | Phase 73 | Pending |
-| R208 | Phase 73 | Pending |
+| R207 | Phase 73 | Complete |
+| R208 | Phase 73 | Complete |
 | R209 | Phase 73 | Pending |
 | R210 | Phase 73 | Pending |
 | R211 | Phase 73 | Pending |
