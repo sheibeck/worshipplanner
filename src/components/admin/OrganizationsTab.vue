@@ -310,11 +310,21 @@ async function onConfirmAssign(org: OrgSummary) {
       'assignOrgAdmin',
     )
     const result = await assignOrgAdmin({ orgId, email })
+    // Clear the just-submitted email so the row doesn't sit with a stale value,
+    // and surface the success message; mirror the onboard form's 2s auto-dismiss.
+    assignEmail.value = ''
     assignFeedback.value = {
       ...assignFeedback.value,
       [orgId]: result.data.status === 'added' ? 'Added as admin.' : 'No account yet — invited as admin.',
     }
     await refreshOrgs()
+    setTimeout(() => {
+      // Collapse the row and drop its feedback — guard against the user having
+      // meanwhile opened a different row's assign control.
+      if (assigningOrgId.value === orgId) assigningOrgId.value = null
+      const { [orgId]: _removed, ...rest } = assignFeedback.value
+      assignFeedback.value = rest
+    }, 2000)
   } catch (err) {
     console.error('[OrganizationsTab] assignOrgAdmin error:', err)
     assignError.value = { ...assignError.value, [orgId]: friendlyCallableError(err) }

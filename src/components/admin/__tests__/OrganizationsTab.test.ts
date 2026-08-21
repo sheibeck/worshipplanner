@@ -257,6 +257,34 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
     expect(wrapper.text()).toContain('Added as admin.')
   })
 
+  it('auto-collapses the assign row and clears the email 2s after a successful assign (UI review 74)', async () => {
+    vi.useFakeTimers()
+    try {
+      const wrapper = await mountWithOneOrg()
+
+      const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
+      await startButton.trigger('click')
+      const emailInput = wrapper.find('input[placeholder="Admin email"]')
+      await emailInput.setValue('newadmin@example.com')
+      const confirmButton = wrapper.findAll('button').find((b) => b.text() === 'Assign')!
+      await confirmButton.trigger('click')
+      await flushPromises()
+
+      // Immediately after success: row still open, success shown, email cleared (no stale value).
+      expect(wrapper.text()).toContain('Added as admin.')
+      expect((wrapper.find('input[placeholder="Admin email"]').element as HTMLInputElement).value).toBe('')
+
+      // After the 2s auto-dismiss: row collapses back to its trigger and the feedback is gone.
+      vi.advanceTimersByTime(2000)
+      await flushPromises()
+      expect(wrapper.findAll('button').some((b) => b.text() === 'Assign')).toBe(false)
+      expect(wrapper.findAll('button').some((b) => b.text() === 'Assign admin')).toBe(true)
+      expect(wrapper.text()).not.toContain('Added as admin.')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('shows the invited message when assignOrgAdmin returns status invited', async () => {
     mockAssignOrgAdmin.mockImplementation(() => Promise.resolve({ data: { status: 'invited' } }))
     const wrapper = await mountWithOneOrg()
