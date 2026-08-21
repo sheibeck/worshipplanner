@@ -90,8 +90,12 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: mockServerTimestamp,
 }))
 
+// Generic resolved shape covers both ConfigurationTab's setSuperAdminClaim
+// ({ok: true}) and OrganizationsTab's listOrganizations, which now mounts
+// unconditionally under v-show alongside ConfigurationTab (Phase 74-02) and
+// calls listOrganizations on mount, reading result.data.organizations.
 vi.mock('firebase/functions', () => ({
-  httpsCallable: vi.fn(() => vi.fn(() => Promise.resolve({ data: { ok: true } }))),
+  httpsCallable: vi.fn(() => vi.fn(() => Promise.resolve({ data: { ok: true, organizations: [] } }))),
 }))
 
 vi.mock('@/firebase', () => ({
