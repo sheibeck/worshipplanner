@@ -141,6 +141,56 @@ describe('storage.rules — org membership', () => {
   })
 })
 
+describe('storage.rules — multi-org claim (phase 73, R209/R211)', () => {
+  // Phase 73 widens the claim to also carry a full `orgs: {[orgId]: role}` map alongside
+  // the unchanged primary orgId/role. No members document is seeded in any of these cases
+  // -- membership is claim-only, so a pass can only have come from the widened
+  // isOrgMemberByClaim reading request.auth.token.orgs (or, for the legacy case, the
+  // unchanged primary orgId/role arm).
+
+  it('allows a multi-org user to read and write under BOTH orgs in their orgs map', async () => {
+    const context = testEnv.authenticatedContext('userA', {
+      orgId: 'orgA',
+      role: 'editor',
+      orgs: { orgA: 'editor', orgB: 'viewer' },
+    })
+    const storage = context.storage()
+
+    const fileRefA = ref(storage, 'orgs/orgA/pptx-imports/multi1/source.pptx')
+    await assertSucceeds(uploadBytes(fileRefA, SMALL_BYTES))
+    await assertSucceeds(getBytes(fileRefA))
+
+    const fileRefB = ref(storage, 'orgs/orgB/pptx-imports/multi2/source.pptx')
+    await assertSucceeds(uploadBytes(fileRefB, SMALL_BYTES))
+    await assertSucceeds(getBytes(fileRefB))
+  })
+
+  it('denies a multi-org user under an org NOT present in their orgs map (cross-org DENY)', async () => {
+    // orgs carries orgA + orgB but deliberately NOT orgC -- proves the new arm cannot be
+    // tricked into authorizing an org the token never listed.
+    const context = testEnv.authenticatedContext('userA', {
+      orgId: 'orgA',
+      role: 'editor',
+      orgs: { orgA: 'editor', orgB: 'viewer' },
+    })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgC/pptx-imports/multi3/source.pptx')
+
+    await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
+
+  it('allows a legacy claim (no orgs key at all) to still access its primary org (R211)', async () => {
+    // No `orgs` key at all -- this is the pre-widening / not-yet-backfilled token shape.
+    // Proves the legacy arm still authorizes AND that an absent orgs key does not
+    // error-deny (the null-guard from Pitfall 4 is exercised here).
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/multi4/source.pptx')
+
+    await assertSucceeds(uploadBytes(fileRef, SMALL_BYTES))
+  })
+})
+
 describe('storage.rules — media path', () => {
   // Phase 40: claim-arm proof, no members document seeded -- see the comment above
   // the org-membership describe block's allow-cases for why.
@@ -223,6 +273,9 @@ describe('storage.rules — claim-only membership (Deploy 2, R075 guard)', () =>
     // The claim predicate is present and reads the exact two keys plan 40-02 writes.
     expect(codeOnly).toContain('request.auth.token.orgId')
     expect(codeOnly).toContain('request.auth.token.role')
+
+    // Phase 73: the widened multi-org arm actually reads the orgs map claim.
+    expect(codeOnly).toContain('request.auth.token.orgs')
 
     // The cross-service Firestore fallback is GONE from the rule logic. Its inertness in
     // the Storage emulator is the whole reason this migration exists -- re-introducing any
