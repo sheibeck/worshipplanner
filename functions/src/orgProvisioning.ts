@@ -59,6 +59,24 @@ function deriveSlug(orgName: string): string {
 }
 
 /**
+ * Cheap server-side email-format guard (WR-02). Both callables use the
+ * admin email as a Firestore doc id (`invites/{email}` and
+ * `inviteLookup/{email}` inside `writeAdminAssignment`) -- an email
+ * containing `/` (or an otherwise malformed/empty value slipping past a
+ * naive client check) would otherwise throw an opaque internal error
+ * mid-transaction/batch instead of a clean, actionable one. Mirrors the
+ * client's `isValidEmailFormat` (src/components/admin/OrganizationsTab.vue)
+ * plus an explicit `/` rejection for the doc-id-safety concern -- not
+ * RFC-perfect, just rejects empty/`/`-containing/obviously-invalid values.
+ */
+function assertValidEmailFormat(email: string): void {
+  const trimmed = email.trim();
+  if (!trimmed || trimmed.includes("/") || !trimmed.includes("@") || !trimmed.includes(".")) {
+    throw new HttpsError("invalid-argument", "Enter a valid email address.");
+  }
+}
+
+/**
  * The single caller-gate helper applied verbatim by all three handlers below
  * (R200/R204) -- mirrors setSuperAdminClaimHandler (superAdminClaims.ts:106-128)
  * exactly. Factoring it into one function keeps the dual re-verification from
@@ -229,6 +247,7 @@ export async function onboardOrganizationHandler(
   if (typeof adminEmail !== "string" || adminEmail.trim() === "") {
     throw new HttpsError("invalid-argument", "adminEmail is required.");
   }
+  assertValidEmailFormat(adminEmail);
 
   const nameKey = normalizeOrgName(name);
   const db = getFirestore();
@@ -304,6 +323,7 @@ export async function assignOrgAdminHandler(
   if (typeof email !== "string" || email.trim() === "") {
     throw new HttpsError("invalid-argument", "email is required.");
   }
+  assertValidEmailFormat(email);
 
   const db = getFirestore();
 

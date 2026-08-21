@@ -421,6 +421,18 @@ describe("onboardOrganizationHandler", () => {
       onboardOrganizationHandler(onboardRequest({ data: { adminEmail: "" } })),
     ).rejects.toMatchObject({ code: "invalid-argument" });
   });
+
+  it("WR-02: rejects invalid-argument for a malformed adminEmail (e.g. containing '/'), writes nothing", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(
+      onboardOrganizationHandler(onboardRequest({ data: { adminEmail: "not/an/email" } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(fake.runTransactionSpy).not.toHaveBeenCalled();
+    expect(fake.txSetSpy).not.toHaveBeenCalled();
+  });
 });
 
 // --- assignOrgAdmin -----------------------------------------------------------
@@ -528,6 +540,18 @@ describe("assignOrgAdminHandler", () => {
     await expect(
       assignOrgAdminHandler(assignRequest({ data: { email: "" } })),
     ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("WR-02: rejects invalid-argument for a malformed email (e.g. containing '/'), never reads the org", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: {} });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(
+      assignOrgAdminHandler(assignRequest({ data: { email: "not/an/email" } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(fake.batchSetSpy).not.toHaveBeenCalled();
   });
 
   it("WR-01: assignOrgAdmin on an already-existing member preserves the original joinedAt and does not error", async () => {
