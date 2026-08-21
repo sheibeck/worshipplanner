@@ -234,6 +234,13 @@ async function refreshOrgs() {
 // ── Onboard action (R197/R201/R202) ───────────────────────────────────────
 
 async function onOnboard() {
+  // WR-03: the Enter-key handler on the admin-email input isn't gated by
+  // :disabled the way the submit button is, so a fast double-Enter could
+  // double-submit while a prior onboard call is still in flight. Guard here
+  // (shared by both the click and keydown.enter triggers) to match the
+  // button's :disabled="isOnboarding".
+  if (isOnboarding.value) return
+
   onboardError.value = null
   const name = churchName.value.trim()
   const email = adminEmail.value.trim()
@@ -283,6 +290,10 @@ function cancelAssign() {
 }
 
 async function onConfirmAssign(org: OrgSummary) {
+  // WR-03: same double-Enter guard as onOnboard -- the row's Enter-key
+  // handler isn't gated by :disabled the way the Assign button is.
+  if (isAssigning.value) return
+
   const orgId = org.orgId
   delete assignError.value[orgId]
 

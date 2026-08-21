@@ -208,6 +208,29 @@ describe('OrganizationsTab -- onboard form (R197/R201/R202)', () => {
 
     expect(wrapper.text()).toContain('That church name is taken.')
   })
+
+  it('WR-03: a second Enter on the admin-email input while onboarding is in flight does not double-submit', async () => {
+    let resolveFn: (v: { data: { status: 'added' | 'invited'; orgId: string; name: string } }) => void = () => {}
+    mockOnboardOrganization.mockImplementation(
+      () => new Promise((resolve) => { resolveFn = resolve }),
+    )
+    const wrapper = await mountTab()
+
+    await wrapper.find('input[placeholder="Church name"]').setValue('Test Church')
+    const emailInput = wrapper.find('input[placeholder="First admin email"]')
+    await emailInput.setValue('admin@example.com')
+
+    // First Enter kicks off the in-flight call.
+    await emailInput.trigger('keydown.enter')
+    expect(mockOnboardOrganization).toHaveBeenCalledTimes(1)
+
+    // A fast second Enter while isOnboarding is true must be a no-op.
+    await emailInput.trigger('keydown.enter')
+    expect(mockOnboardOrganization).toHaveBeenCalledTimes(1)
+
+    resolveFn({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } })
+    await flushPromises()
+  })
 })
 
 describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
@@ -305,6 +328,30 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
     // with no feedback text bleeding into it.
     const remainingStart = wrapper.findAll('button').filter((b) => b.text() === 'Assign admin')
     expect(remainingStart.length).toBe(1)
+  })
+
+  it('WR-03: a second Enter on the row admin-email input while assigning is in flight does not double-submit', async () => {
+    let resolveFn: (v: { data: { status: 'added' | 'invited'; uid?: string } }) => void = () => {}
+    mockAssignOrgAdmin.mockImplementation(
+      () => new Promise((resolve) => { resolveFn = resolve }),
+    )
+    const wrapper = await mountWithOneOrg()
+
+    const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
+    await startButton.trigger('click')
+    const emailInput = wrapper.find('input[placeholder="Admin email"]')
+    await emailInput.setValue('newadmin@example.com')
+
+    // First Enter kicks off the in-flight call.
+    await emailInput.trigger('keydown.enter')
+    expect(mockAssignOrgAdmin).toHaveBeenCalledTimes(1)
+
+    // A fast second Enter while isAssigning is true must be a no-op.
+    await emailInput.trigger('keydown.enter')
+    expect(mockAssignOrgAdmin).toHaveBeenCalledTimes(1)
+
+    resolveFn({ data: { status: 'added', uid: 'uid-1' } })
+    await flushPromises()
   })
 
   it('cancelAssign closes the row control without calling assignOrgAdmin', async () => {
