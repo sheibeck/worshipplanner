@@ -89,7 +89,7 @@ REQ-IDs continue from v1.9 (last R192).
       set from the user's memberships and preserves the `superAdmin` claim via the shared merge helper (R175) —
       widening the claim never wipes super-admin, and vice-versa.
 
-- [ ] **R209**: `storage.rules`' `isOrgMemberByClaim` checks the requested `orgId` against the full multi-org
+- [x] **R209**: `storage.rules`' `isOrgMemberByClaim` checks the requested `orgId` against the full multi-org
       claim set, so a user in multiple orgs retains Storage read/write on **every** org — proven by genuine
       multi-org ALLOW **and** cross-org DENY emulator tests.
 
@@ -97,7 +97,7 @@ REQ-IDs continue from v1.9 (last R192).
       existing users, mirroring `backfillOrgClaims.ts`, so current users get the new claim shape without a
       manual per-user step.
 
-- [ ] **R211**: The widened claim shape is backward-compatible during rollout — existing single-org sessions
+- [x] **R211**: The widened claim shape is backward-compatible during rollout — existing single-org sessions
       keep working before the backfill runs (old/new shapes both tolerated by the rules), so there is no
       Storage-access gap while the claim is being migrated.
 
@@ -144,8 +144,8 @@ REQ-IDs continue from v1.9 (last R192).
 | R206 | Phase 74 | Pending |
 | R207 | Phase 73 | Complete |
 | R208 | Phase 73 | Complete |
-| R209 | Phase 73 | Pending |
+| R209 | Phase 73 | Complete |
 | R210 | Phase 73 | Pending |
-| R211 | Phase 73 | Pending |
+| R211 | Phase 73 | Complete |
 
 **Coverage:** 19/19 v2.0 requirements mapped (R193–R211). No orphans, no duplicates.
