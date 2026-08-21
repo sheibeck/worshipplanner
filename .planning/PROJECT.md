@@ -291,6 +291,11 @@ working for a newly-onboarded second-org admin (999.5). Full list in `.planning/
 - [ ] Extract a shared song-browse component used by both the Songs page and the service-plan picker
       (backlog 999.1)
 - [ ] Export non-song/non-scripture slots in ALL Planning Center export modes (backlog 999.4)
+- [ ] Owner Console a11y retrofit — add real `<label>`/`aria-label` to the console's text inputs
+      (super-admins grant form, Organizations onboard + assign forms — currently placeholder-only) and ARIA
+      tab semantics (`role="tablist"`/`aria-selected`) to the Configuration/Organizations tab strip (and the
+      matching `ServiceEditorView` tab strip). Inherited console debt surfaced by the v2.0 UI reviews
+      (Phase 72 tab strip 23/24, Phase 74 forms 22/24); best done as one cross-surface pass (backlog 999.7)
 
 ### Out of Scope
 

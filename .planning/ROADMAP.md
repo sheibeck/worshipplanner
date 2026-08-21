@@ -411,7 +411,7 @@ orgs+roles (R207–R211, backlog 999.5). Phase 73 (the widening) is sequenced ah
 
 - [x] **Phase 72: Owner Console Tabs** — ✅ code-complete + auto-verified 2026-08-21 (6/6 SC; human visual/deep-link UAT deferred to `/gsd-verify-work 72`; client-only, nothing to deploy). Restructured `OwnerConsoleView` into a Configuration tab (super-admins roster + four platform-config cards + deploy-time note, byte-preserved) and an Organizations placeholder tab, with the open tab reflected in the route query (`?tab=`)
 - [x] **Phase 73: Multi-Org Storage Auth Claim** — ✅ code-complete + auto-verified + SECURED 2026-08-21 (5/5 SC; security 6/6 threats closed; owner-gated deploy UAT deferred to `/gsd-verify-work 73` + `DEPLOY-ORG-CLAIMS.md`; UNDEPLOYED hand-over). Widened the org-membership claim to an additive `orgs:{orgId:role}` map (recomputed from `collectionGroup('members')`, superAdmin-preserving, single-atomic-write removal), widened `storage.rules` with a null-guarded `orgs` arm OR the legacy arm (183/183 emulator), and extended the dry-run/`--apply` backfill — closes backlog 999.5
-- [ ] **Phase 74: Organizations — List, Onboard & Admin Assignment** - List every church, onboard a new one (org record + default settings + seeded template + first admin), and assign additional admins to any org — all through super-admin-gated server callables
+- [x] **Phase 74: Organizations — List, Onboard & Admin Assignment** — ✅ code-complete + auto-verified + SECURED 2026-08-21 (5/5 SC; security 8/8 threats closed; UI review 22/24; owner-gated deploy + real-browser UAT deferred to `/gsd-verify-work 74`; 3 callables UNDEPLOYED hand-over). Three super-admin-gated callables (`onboardOrganization` — atomic single-transaction org+settings+seeded-template+first-admin; `assignOrgAdmin` — additive `arrayUnion` editor membership or invite; `listOrganizations` — server `count()` summaries) + the Organizations tab UI (list/onboard/assign, pure httpsCallable). No rules change (Admin-SDK callables); depends on Phase 72 (tab shell) + Phase 73 (widened claim)
 
 **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R193–R211 (19 mapped, 100% coverage)
 
@@ -557,7 +557,7 @@ milestone deploy policy above.
 | 71 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
 | 72 | v2.0 | 1/1 | Code-complete (UAT deferred) | 2026-08-21 |
 | 73 | v2.0 | 3/3 | Code-complete + SECURED (deploy UAT deferred) | 2026-08-21 |
-| 74 | v2.0 | 2/2 | In Progress|  |
+| 74 | v2.0 | 2/2 | Code-complete + SECURED (deploy/UAT deferred) | 2026-08-21 |
 
 ## Backlog
 
