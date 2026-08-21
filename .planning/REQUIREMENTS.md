@@ -1,163 +1,125 @@
-# Requirements — v1.9 Owner Admin Console
+# Requirements — v2.0 Multi-Church Onboarding & Owner Console Tabs
 
-**Milestone goal:** A private, owner-only super-admin console that lifts the v1.8 cost/cleanup levers and
-the no-reply sender out of `functions/.env` into an admin-only Firestore config doc the Cloud Functions
-read at runtime (no redeploy to change), gated by a super-admin custom auth claim distinct from per-org
-RBAC — with a dry-run blast-radius preview before any deletion toggle is flipped, and the
-song-linked-background protection preserved.
+**Milestone goal:** Turn the owner console into a tabbed shell and add platform-level multi-tenancy
+management — onboard new churches and assign their first admin from one place — while closing the multi-org
+Storage auth-claim gap that onboarding a second-org admin would otherwise trip.
 
-**Scoping decisions (owner, 2026-08-20):** v1.9 minor · Firestore-backed **live** config · **custom-claim**
-super-admin gate (builds on v1.5 claims) · research-first. Research: `.planning/research/SUMMARY.md`.
+**Scoping decisions (owner, 2026-08-21):** v2.0 major · **stacks on v1.9** (code-complete; its deploy + UAT +
+milestone-complete remain parked with the owner) · a church admin **reuses the existing editor role** (no new
+role/claim) · onboarding creates org record + default `OrgSettings` + **seeds the default service template** +
+**assigns the first admin by email** · backlog **999.5** (multi-org Storage auth claim) **pulled into scope** as
+a hard prerequisite · milestone-level research skipped (all patterns already exist in-repo) · run autonomous
+with human verification deferred to the end.
 
-REQ-IDs continue from v1.8 (last R173).
+**Deploy policy (carried from the standing grant):** every auth-claim / `firestore.rules` / `storage.rules` /
+new org-provisioning-callable change ships **built + tested + UNDEPLOYED**, with the exact
+`firebase deploy --only …` command and any owner-run backfill script handed over. `RESEND_API_KEY` and all
+secrets stay server-side.
+
+REQ-IDs continue from v1.9 (last R192).
 
 ---
 
-## v1.9 Requirements
+## v2.0 Requirements
 
-### Super-admin access gate
+### Owner console tabs
 
-- [x] **R174**: A super-admin can be granted access via a `superAdmins/{uid}` record, and that grant is
-      reflected as a `superAdmin: true` custom auth claim on the user's ID token.
+- [ ] **R193**: The Owner Console presents its content as two tabs — **Configuration** and **Organizations** —
+      with Configuration selected by default, both behind the existing super-admin access gate (R177/R178) so
+      no new access surface is introduced.
 
-- [x] **R175**: Setting or clearing any custom claim preserves the user's other claims — writing
-      `superAdmin` never wipes the existing org-membership `{orgId, role}` claim, and an org-membership
-      sync never wipes `superAdmin` — via one shared merge-and-set helper used by both claim writers.
-      *(Closes the `setCustomUserClaims`-replaces-not-merges live gap in `orgMembershipClaims.ts`.)*
+- [ ] **R194**: The Configuration tab contains, with **no behavior change**, the existing super-admins roster
+      (grant/revoke via `setSuperAdminClaim`) and the four platform-config cards plus the deploy-time note —
+      i.e. the entire current `OwnerConsoleView` body, relocated under a tab.
 
-- [x] **R176**: The owner can bootstrap the first super-admin with a dry-run-by-default, `--apply`-gated,
-      owner-run Node script (no pre-existing super-admin required), mirroring `backfillOrgClaims.ts`.
+- [ ] **R195**: The open tab survives a page refresh and is directly linkable (reflected in the route/query),
+      so a super-admin can bookmark or share a link straight to Organizations.
 
-- [x] **R177**: The admin console route and its nav entry are reachable only by a signed-in super-admin;
-      a non-super-admin is denied/redirected client-side, and the route is distinctly named (not `/admins`,
-      which the per-org TeamView already owns).
+### Organizations — list & onboard
 
-- [x] **R178**: Firestore security rules permit read/write of the admin-only collections (`appConfig/*`,
-      `superAdmins/*`) to super-admins only, via a claim-based `isSuperAdmin()` check (no cross-document
-      `get()`/`exists()`), proven by genuine ALLOW **and** DENY emulator tests.
+- [ ] **R196**: The Organizations tab lists every organization on the platform, showing at least each church's
+      name and a distinguishing detail (id and/or created date and/or member count), so the super-admin sees
+      all churches at a glance.
 
-- [x] **R179**: A super-admin can grant and revoke another user's super-admin access from the console;
-      revocation takes effect on the target's next token refresh. *(Minimal roster — serves the owner's
-      "whoever I give access to" goal; full multi-admin management UI stays deferred.)*
+- [ ] **R197**: A super-admin can onboard a new organization by entering a church name, which creates the
+      `organizations/{orgId}` record with default `OrgSettings` deep-merged from the code defaults (identical
+      to a normally-created org's settings).
 
-### Firestore runtime config
+- [ ] **R198**: Onboarding seeds the new org's default service template (`OrgSettings.defaultServiceTemplate`)
+      so the church can create a service immediately, without any manual template setup.
 
-- [x] **R180**: The v1.8 levers are stored in an admin-only `appConfig/global` Firestore doc: the four
-      `*_CLEANUP_ENABLED` flags, retention windows (media/orphan-render/background/pptx-source), the delete
-      blast-radius cap, the AI-proxy knobs (per-min/per-day rate limits, model allow-list, max_tokens
-      ceiling), and the messaging/fan-out knobs (`SCHEDULED_MESSAGING_CRON_ENABLED`, message recipient cap,
-      per-org daily email quota).
+- [ ] **R199**: Onboarding assigns the church's first admin by email at **editor** tier as part of the same
+      flow, so a freshly-onboarded church has exactly one editor who can sign in and use it.
 
-- [x] **R181**: The Cloud Functions read each managed value from `appConfig/global` at runtime; changing a
-      value in the console takes effect **without a redeploy**.
+- [ ] **R200**: Org creation/onboarding runs entirely through a **super-admin-gated server callable** — the
+      client never writes `organizations/*`, `orgNames/*`, or another org's `members/*` directly; the callable
+      independently re-verifies the caller's `superAdmin` claim server-side.
 
-- [x] **R182**: A missing or empty `appConfig/global` doc reproduces today's exact behavior — code defaults
-      (identical to the current env fallbacks) are deep-merged, so an absent doc is safe by construction.
+- [ ] **R201**: Church-name uniqueness is enforced via the existing create-only `orgNames` registry (v1.7
+      R160), so onboarding cannot create a duplicate church name and reports the collision clearly.
 
-- [x] **R183**: Config reads are cached with a short TTL on hot paths (`api` proxy, `sendQueuedMessage`) and
-      read fresh (uncached) on the daily cleanup crons and `sendScheduledReminders`, so an emergency disable
-      takes effect on the very next scheduled run.
+- [ ] **R202**: A failed onboarding step (name taken, invalid/unknown admin email, write error) surfaces a
+      clear error and does not strand a half-created org — the flow is ordered/idempotent so a retry after
+      fixing the input succeeds without manual cleanup.
 
-- [x] **R184**: Per-knob fail-safe defaults apply on a missing/malformed value: cleanup enable-flags and the
-      AI model allow-list fail **closed** (off / restrictive), AI rate limits fail **open** but with capped
-      fallback values — never a single blanket all-permissive or all-restrictive default.
+### Church-admin assignment (reuse editor role)
 
-- [x] **R185**: The instance-ceiling knobs (`AI_PROXY_MAX_INSTANCES`, `GLOBAL_MAX_INSTANCES`, render-service
-      caps) remain deploy-time config and are **not** presented as live-editable; if surfaced in the console
-      they are read-only and labeled "requires redeploy." *(Cloud Functions v2 reads them at module load.)*
+- [ ] **R203**: A super-admin can assign a church admin by email — the target becomes an
+      `organizations/{orgId}/members/{uid}` member at the **editor** role, reusing the existing editor/viewer
+      RBAC with **no new role or claim type**.
 
-### Admin console UI
+- [ ] **R204**: Admin assignment goes through the super-admin-gated membership callable that resolves the email
+      to a user, writes the membership, and syncs the org-membership custom claim — the client never writes
+      another org's `members/*` directly.
 
-- [x] **R186**: The console shows the current effective value of every managed setting, grouped by area
-      (cleanup, AI proxy, messaging, sender), each with a last-changed-by / last-changed-at stamp.
+- [ ] **R205**: Assigning an admin whose email has no existing account is handled gracefully — a clear
+      "no account for that email" result (or the app's existing invite path), never a silent failure or a
+      dangling membership doc.
 
-- [x] **R187**: A super-admin can edit each managed toggle/number/text setting inline with min/max/required
-      validation, and saving writes the change to `appConfig/global` (validation client-side and enforced by
-      rules/functions).
+- [ ] **R206**: Assigning an admin to an org for a user who **already belongs to another org** preserves the
+      user's existing memberships and roles — the new membership is additive, never an overwrite (depends on
+      the widened claim below).
 
-### Cleanup deletion safety
+### Multi-org Storage auth claim (backlog 999.5)
 
-- [x] **R188**: Before a `*_CLEANUP_ENABLED` flag can be turned on, the console shows an on-demand dry-run
-      blast-radius count (what that cron would delete right now), fetched from a callable that forces
-      dry-run regardless of the stored flag.
+- [ ] **R207**: The org-membership custom auth claim carries **all** of a user's organizations and their
+      per-org roles (not just the primary org), in a shape both `firestore.rules` and `storage.rules` can read.
 
-- [x] **R189**: Enabling a cleanup that deletes data requires an explicit confirm step echoing the dry-run
-      count; flipping the flag never triggers an immediate deletion — only the next scheduled cron run acts.
+- [ ] **R208**: The claim-writer that recomputes the claim on any `members/*` write derives the full multi-org
+      set from the user's memberships and preserves the `superAdmin` claim via the shared merge helper (R175) —
+      widening the claim never wipes super-admin, and vice-versa.
 
-- [x] **R190**: No cleanup can ever delete a song-linked background — the `cleanupOrphanBackgrounds`
-      `referencesComplete` / floor-guard fail-safes remain intact after the config swap (its existing unit
-      tests pass unchanged); only transient slideshow backgrounds tied to a service are eligible.
+- [ ] **R209**: `storage.rules`' `isOrgMemberByClaim` checks the requested `orgId` against the full multi-org
+      claim set, so a user in multiple orgs retains Storage read/write on **every** org — proven by genuine
+      multi-org ALLOW **and** cross-org DENY emulator tests.
 
-### No-reply sender
+- [ ] **R210**: An idempotent, dry-run-by-default, owner-run backfill recomputes the widened claim for all
+      existing users, mirroring `backfillOrgClaims.ts`, so current users get the new claim shape without a
+      manual per-user step.
 
-- [x] **R191**: A super-admin can configure the app's no-reply From address (display name + address) from the
-      console; it is format-validated, persisted to `appConfig/global`, and used by the Resend send path.
-
-- [x] **R192**: The sender config never accepts or exposes provider secrets (`RESEND_API_KEY` stays
-      server-side); an address on an un-verifiable host (e.g. `*.web.app`) surfaces a "must be a
-      Resend-verified domain" warning. *(Domain verification itself is an out-of-band owner action.)*
+- [ ] **R211**: The widened claim shape is backward-compatible during rollout — existing single-org sessions
+      keep working before the backfill runs (old/new shapes both tolerated by the rules), so there is no
+      Storage-access gap while the claim is being migrated.
 
 ---
 
 ## Future Requirements (deferred)
 
-- **In-app usage visibility (R169, carried from v1.8):** surface the `aiUsage` ledger and the dry-run
-  cleanup logs as an in-console dashboard. This pass shows only the single on-demand dry-run count (R188).
-
-- **Church/org provisioning & billing management** from the console — the owner's stated longer-term goal;
-  no data model exists yet. Explicitly out of this first pass ("doesn't need to be fully fleshed out").
-
-- **Full multi-admin management UI** (bulk roster, audit history of grants) beyond the minimal grant/revoke
-  in R179.
-
-- **Full audit-log collection + browsing UI** (vs. the cheap `updatedBy`/`updatedAt` stamp in R186) and a
-  live staleness indicator on config values.
-
-- **Per-org override of the global config knobs** — note the extension point; single/few-org app today.
+- Editing an existing org's name/settings, or suspending/archiving/deleting an org, from the console —
+  this pass is list + onboard + assign-admin only.
+- Multi-admin management UI (bulk assignment, per-org role changes, removing members) beyond assigning the
+  first/additional editor by email.
+- Self-service church signup — onboarding is super-admin-driven only this pass.
 
 ## Out of Scope
 
-- **Making `RESEND_API_KEY` or any secret editable in the console** — secrets stay in `functions/.env` /
-  Firebase secrets, server-side only. The console configures the non-secret sender *address*, not credentials.
-
-- **Provisioning or DNS-verifying an email domain** — the console can store a verified address once the owner
-  has it; it cannot create/verify the domain. A `*.web.app` address can never be Resend-verified.
-
-- **Making the `*_MAX_INSTANCES` / render-service caps live-editable** — deploy-time config by nature (R185).
-- **Autonomous deploy of the auth/rules/data-loss changes** — every such deploy is handed to the owner per
-  the v1.9 grant; the console mechanism ships built/tested/UNDEPLOYED with the command handed over.
-
-## Open questions for the owner (flagged, not blocking — routed to PENDING-VERIFICATION at hand-off)
-
-- **Cloud Storage Object Versioning / bucket retention** as a safety net *before* live deletion toggles are
-  enabled in production — an owner-side infra check this milestone's code can't verify.
-
-- **`superAdmin` survival when a user's last org membership is removed** — recommended: preserve the
-  `superAdmin` claim (a super-admin need not belong to any org). Resolved in R175's merge design as "preserve
-  unless explicitly revoked"; confirm at UAT.
+- **Billing / subscription management** — explicitly deferred again (was out of scope for v1.9 too); onboarding
+  a church is free-of-charge provisioning only.
+- **A distinct per-org "admin" role above editor** — a church admin *is* the existing editor role by owner
+  decision; no new role tier or claim key is introduced.
+- **Changing per-org RBAC semantics** — editor/viewer behavior is unchanged; only the *claim's org coverage*
+  widens (999.5).
 
 ## Traceability
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| R174 | Phase 68 | Complete (UAT deferred) |
-| R175 | Phase 68 | Complete (UAT deferred) |
-| R176 | Phase 68 | Complete (UAT deferred) |
-| R177 | Phase 68 | Complete (UAT deferred) |
-| R178 | Phase 68 | Complete (UAT deferred) |
-| R179 | Phase 68 | Complete (UAT deferred) |
-| R180 | Phase 69 | Complete (UAT deferred) |
-| R181 | Phase 69 | Complete (UAT deferred) |
-| R182 | Phase 69 | Complete (UAT deferred) |
-| R183 | Phase 69 | Complete (UAT deferred) |
-| R184 | Phase 69 | Complete (UAT deferred) |
-| R185 | Phase 69 | Complete (UAT deferred) |
-| R186 | Phase 70 | Complete (UAT deferred) |
-| R187 | Phase 70 | Complete (UAT deferred) |
-| R188 | Phase 71 | Complete (UAT deferred) |
-| R189 | Phase 71 | Complete (UAT deferred) |
-| R190 | Phase 71 | Complete (UAT deferred) |
-| R191 | Phase 70 | Complete (UAT deferred) |
-| R192 | Phase 70 | Complete (UAT deferred) |
-
-**Coverage:** 19/19 v1.9 requirements (R174–R192) mapped to exactly one phase. No orphans.
+*(Filled by the roadmap — each requirement maps to exactly one phase.)*
