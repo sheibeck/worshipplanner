@@ -261,7 +261,7 @@ async function onGrant() {
       grantedFeedback.value = null
     }, 2000)
   } catch (err) {
-    console.error('[OwnerConsoleView] grant error:', err)
+    console.error('[ConfigurationTab] grant error:', err)
     grantError.value = friendlyCallableError(err)
   } finally {
     isGranting.value = false
@@ -276,7 +276,7 @@ async function onConfirmRevoke(admin: SuperAdminEntry) {
     await callSetSuperAdminClaim(admin.email, false)
     confirmingRevokeUid.value = null
   } catch (err) {
-    console.error('[OwnerConsoleView] revoke error:', err)
+    console.error('[ConfigurationTab] revoke error:', err)
     actionError.value = friendlyCallableError(err)
     confirmingRevokeUid.value = null
   }
@@ -297,7 +297,7 @@ onMounted(() => {
       loaded.value = true
     },
     (err) => {
-      console.error('[OwnerConsoleView] roster subscription error:', err)
+      console.error('[ConfigurationTab] roster subscription error:', err)
       loaded.value = true
     },
   )
