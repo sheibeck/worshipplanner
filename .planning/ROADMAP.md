@@ -283,7 +283,7 @@ with the exact deploy command handed to the owner.
 
 </details>
 
-## v1.9 Owner Admin Console (Phases 68-71) — CODE-COMPLETE (lifecycle pending; v2.0 stacks on top)
+## v1.9 Owner Admin Console (Phases 68-71) — CODE-COMPLETE (lifecycle pending; next milestone stacks on top)
 
 **Milestone Goal:** A private, owner-only admin console — separate from per-church settings — where the
 owner (and anyone granted super-admin access) controls the v1.8 cost/cleanup levers and the app's no-reply
