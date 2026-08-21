@@ -16,6 +16,42 @@ import { DEFAULT_APP_CONFIG } from '@/config/appConfigDefaults'
 
 enableAutoUnmount(afterEach)
 
+// ── vue-router mock (Phase 72) — mirrors QuarterShareView.test.ts's harness:
+//    a mutable `mockRouteQuery` object and a spy-able `router.replace` that
+//    writes its `query` argument back into `mockRouteQuery` so click → URL →
+//    pane round-trips are observable. `/owner-console` has no route params,
+//    so unlike QuarterShareView's mock, `params` is omitted here. ──
+const mockRouterReplace = vi.fn((to: { query?: Record<string, unknown> }) => {
+  if (to?.query) Object.assign(mockRouteQuery, to.query)
+  return Promise.resolve()
+})
+let mockRouteQuery: Record<string, unknown> = {}
+
+vi.mock('vue-router', () => ({
+  useRoute: vi.fn(() => ({
+    query: mockRouteQuery,
+  })),
+  useRouter: vi.fn(() => ({
+    replace: mockRouterReplace,
+  })),
+}))
+
+/**
+ * Walks an element's ancestor chain checking for an inline `display: none`
+ * (how `v-show` toggles visibility) — VTU's own `isVisible()` does not
+ * reliably reflect an ancestor's inline style in this jsdom environment
+ * (ServiceEditorView.test.ts precedent). Do NOT use `wrapper.text()` to
+ * distinguish panes either — v-show leaves the hidden pane's text in the DOM.
+ */
+function isVShowHidden(wrapper: { element: Element }): boolean {
+  let el: HTMLElement | null = wrapper.element as HTMLElement
+  while (el) {
+    if (el.style?.display === 'none') return true
+    el = el.parentElement
+  }
+  return false
+}
+
 // ── firebase/firestore mock — onSnapshot callbacks captured keyed by the
 //    mocked ref's `id` (doc()/collection() below both synthesize an id from
 //    the path segments), so this file can drive the roster snapshot and the
@@ -93,6 +129,8 @@ beforeEach(() => {
   mockSetDoc.mockClear()
   mockOnSnapshot.mockClear()
   for (const key of Object.keys(snapshotCallbacks)) delete snapshotCallbacks[key]
+  mockRouteQuery = {}
+  mockRouterReplace.mockClear()
 })
 
 function mountViewSync() {
@@ -198,5 +236,63 @@ describe('OwnerConsoleView — Platform configuration (Phase 70)', () => {
     expect(wrapper.text()).toContain('Super-admins')
     expect(wrapper.text()).toContain('owner@example.com')
     expect(wrapper.text()).toContain('You') // current user row never shows Revoke
+  })
+})
+
+describe('OwnerConsoleView — tabs (Phase 72)', () => {
+  it('defaults to the Configuration tab with no query, rendering both tab buttons (R193)', async () => {
+    const wrapper = await mountView()
+
+    const configPanel = wrapper.get('[data-testid="configuration-panel"]')
+    const orgsPanel = wrapper.get('[data-testid="organizations-panel"]')
+    expect(isVShowHidden(configPanel)).toBe(false)
+    expect(isVShowHidden(orgsPanel)).toBe(true)
+
+    const buttons = wrapper.findAll('button').map((b) => b.text())
+    expect(buttons).toContain('Configuration')
+    expect(buttons).toContain('Organizations')
+  })
+
+  it('deep-links directly to the Organizations pane when ?tab=organizations is set before mount (R195)', async () => {
+    mockRouteQuery = { tab: 'organizations' }
+    const wrapper = await mountView()
+
+    const configPanel = wrapper.get('[data-testid="configuration-panel"]')
+    const orgsPanel = wrapper.get('[data-testid="organizations-panel"]')
+    expect(isVShowHidden(orgsPanel)).toBe(false)
+    expect(isVShowHidden(configPanel)).toBe(true)
+  })
+
+  it('normalizes an unrecognized tab query value to Configuration', async () => {
+    mockRouteQuery = { tab: 'not-a-tab' }
+    const wrapper = await mountView()
+
+    const configPanel = wrapper.get('[data-testid="configuration-panel"]')
+    expect(isVShowHidden(configPanel)).toBe(false)
+  })
+
+  it('clicking the Organizations tab switches panes and calls router.replace once (not push) with tab: organizations (R195)', async () => {
+    const wrapper = await mountView()
+
+    const orgsButton = wrapper.findAll('button').find((b) => b.text() === 'Organizations')!
+    await orgsButton.trigger('click')
+
+    const orgsPanel = wrapper.get('[data-testid="organizations-panel"]')
+    const configPanel = wrapper.get('[data-testid="configuration-panel"]')
+    expect(isVShowHidden(orgsPanel)).toBe(false)
+    expect(isVShowHidden(configPanel)).toBe(true)
+
+    expect(mockRouterReplace).toHaveBeenCalledTimes(1)
+    const call = mockRouterReplace.mock.calls[0]![0] as { query: Record<string, unknown> }
+    expect(call.query.tab).toBe('organizations')
+  })
+
+  it('does not call router.replace again when clicking the already-active tab', async () => {
+    const wrapper = await mountView()
+
+    const configButton = wrapper.findAll('button').find((b) => b.text() === 'Configuration')!
+    await configButton.trigger('click')
+
+    expect(mockRouterReplace).not.toHaveBeenCalled()
   })
 })
