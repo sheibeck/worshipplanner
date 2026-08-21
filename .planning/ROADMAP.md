@@ -441,7 +441,8 @@ organization-management UI into and no existing super-admin workflow regresses.
      and provenance stamps) is proven unchanged by the carried-forward `OwnerConsoleView` test coverage,
      not silently dropped in the restructure.
 
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 72-01-PLAN.md — Restructure OwnerConsoleView into a query-driven tab shell (Configuration = verbatim console body relocation; Organizations = placeholder), plus carried-forward + tab-coverage tests
 **UI hint**: yes
 
 ### Phase 73: Multi-Org Storage Auth Claim
