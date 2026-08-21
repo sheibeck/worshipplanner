@@ -4,11 +4,11 @@ milestone: v2.0
 milestone_name: Multi-Church Onboarding & Owner Console Tabs
 current_phase: 74
 current_phase_name: organizations-list-onboard-admin-assignment
-status: verifying
-stopped_at: Completed 74-02-PLAN.md
+status: milestone-code-complete
+stopped_at: v2.0 ALL 3 phases (72-74) code-complete + auto-verified + secured; STOPPED before milestone lifecycle per the v2.0 grant — owner runs /gsd-verify-work + the owner-gated deploys, then audit→complete→cleanup
 last_updated: "2026-08-21T21:02:16.030Z"
 last_activity: 2026-08-21
-last_activity_desc: Phase 74 execution started
+last_activity_desc: v2.0 milestone code-complete (Phases 72-74); human UAT + deploys handed to owner
 progress:
   total_phases: 3
   completed_phases: 3
