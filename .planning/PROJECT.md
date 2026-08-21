@@ -8,33 +8,48 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v1.9 Owner Admin Console
+## Current Milestone: v2.0 Multi-Church Onboarding & Owner Console Tabs
 
-**Goal:** A private, owner-only admin console — separate from per-church settings — where the owner (and
-anyone granted super-admin access) controls the v1.8 cost/cleanup levers and the app's no-reply sender at
-runtime, instead of via buried `functions/.env` vars + redeploy.
+**Goal:** Turn the owner console into a tabbed shell and add platform-level multi-tenancy management —
+onboard new churches and assign their first admin from one place — while closing the multi-org Storage
+auth-claim gap that onboarding a second-org admin would otherwise trip.
 
 **Target features:**
-- **Owner-only admin shell + super-admin access gate** — a private admin surface only the owner and
-  granted admins can enter, gated by a real super-admin custom auth claim (builds on the v1.5
-  custom-claims work), distinct from the per-org editor/viewer RBAC. First step toward granting church
-  access / managing billing — those remain out of scope this pass (deliberately not fully fleshed out).
-- **Firestore-backed live cost/cleanup control panel** — the v1.8 levers move from `functions/.env` to an
-  admin-only Firestore config doc the Cloud Functions read at runtime (cached), so toggling a control
-  takes effect with **no redeploy**: the four `*_CLEANUP_ENABLED` switches, retention windows, delete
-  blast-radius cap, AI-proxy knobs, and messaging/fan-out knobs (incl. `SCHEDULED_MESSAGING_CRON_ENABLED`,
-  which also gates composer "schedule-for-later").
-- **No-reply sender setup** — configure the app-owned no-reply From address used by the Resend send path
-  from the admin console.
-- **Deletion-toggle safety** — enabling any cleanup that deletes data surfaces the dry-run count / blast
-  radius before the toggle can be flipped.
+- **Tabbed owner console** — restructure the single scrolling `OwnerConsoleView` into a **Configuration**
+  tab (existing super-admins roster + the four v1.9 platform-config cards + the deploy-time note) and a new
+  **Organizations** tab. Layout only — no behavior change to the existing config surfaces.
+- **Organizations tab — list + onboard** — view all orgs (churches) on the platform; onboard a new one that
+  creates the **org record + default `OrgSettings`**, **seeds the default service template** so the church
+  can create services immediately, and **assigns its first admin by email**.
+- **Assign admins to a church** — a church admin *is* the existing **editor** role (reuse the current
+  editor/viewer RBAC + membership custom claim — no new role/claim). Assigning = adding an org member at
+  editor tier by email via the server-verified membership path (never a direct privileged client write).
+- **Multi-org Storage auth claim (backlog 999.5, now required)** — widen the org-membership custom claim to
+  carry **all** of a user's orgs+roles and update `storage.rules`' `isOrgMemberByClaim` to check the
+  requested `orgId` against that set, so a newly-onboarded admin who belongs to a second org keeps Storage
+  access. Hard prerequisite for onboarding.
 
-**Hard constraint (owner, emphasized 2026-08-20):** song-linked backgrounds must **never** be cleaned up —
-only transient slideshow backgrounds tied to a service. v1.8's `cleanupOrphanBackgrounds` already carries
-3-tier reference detection + two fail-safes; this milestone must preserve and verify that guarantee when
-the enable toggle becomes live-controllable.
+**Key context (owner, 2026-08-21):** v2.0 major increment · **stacks on v1.9** (code-complete; its deploy +
+UAT + milestone-complete remain parked with the owner — v1.9 phases archive as-is). A church admin reuses the
+existing editor role. All auth-claim / `firestore.rules` / `storage.rules` / new org-provisioning-callable
+changes are **hand-over** deploys per the standing grant — built + tested + UNDEPLOYED with exact
+`firebase deploy` commands handed over.
 
 Requirements defined in `.planning/REQUIREMENTS.md`; roadmap in `.planning/ROADMAP.md`.
+
+<details>
+<summary>Code-complete milestone — v1.9 Owner Admin Console (Phases 68–71, code-complete 2026-08-20; deploy + UAT parked with owner)</summary>
+
+Delivered a private super-admin owner console: a super-admin custom-auth-claim access gate + roster grant/
+revoke (server-verified `setSuperAdminClaim`), a Firestore-backed live platform-config doc the Cloud
+Functions read at runtime (four `*_CLEANUP_ENABLED` switches, retention windows, delete blast-radius cap,
+AI-proxy + messaging/fan-out knobs), a no-reply sender field, and dry-run blast-radius safety before any
+deletion toggle — with the song-linked-background protection preserved. **Code-complete + auto-verified
+(Phases 68–71, R174–R192); human UAT + all deploys handed to the owner and not yet run.** v2.0 builds the
+tabbed shell + org onboarding on top of this console (the church-provisioning / multi-admin work v1.9
+deliberately deferred). Requirements: `.planning/REQUIREMENTS.md` (R174–R192).
+
+</details>
 
 <details>
 <summary>Shipped milestone — v1.8 Cost & Billing Hardening (Phases 65–67, deployed 2026-08-20)</summary>
@@ -244,18 +259,24 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-<!-- Milestone v1.9 Owner Admin Console. Requirements defined in .planning/REQUIREMENTS.md
-     (R174+), grouped: admin access gate, Firestore-backed runtime config, cost/cleanup control panel,
-     no-reply sender setup, deletion-toggle safety. Traceability filled by the roadmap. -->
+<!-- Milestone v2.0 Multi-Church Onboarding & Owner Console Tabs. Requirements defined in
+     .planning/REQUIREMENTS.md (R193+), grouped: tabbed owner console, organizations list + onboard,
+     church-admin assignment (reuse editor role), multi-org Storage auth claim (999.5). Traceability
+     filled by the roadmap. -->
 
-**v1.9 Owner Admin Console (R174+)** — a private super-admin surface (custom-claim gated) that lifts the
-v1.8 cost/cleanup levers and the no-reply sender out of `functions/.env` into an admin-only Firestore
-config doc the Cloud Functions read at runtime, so the four `*_CLEANUP_ENABLED` switches, retention
-windows, AI-proxy knobs, and messaging/fan-out knobs (incl. `SCHEDULED_MESSAGING_CRON_ENABLED`) toggle
-live with no redeploy — with a dry-run blast-radius preview before any deletion toggle is flipped, and the
-song-linked-background protection preserved. Full list in `.planning/REQUIREMENTS.md`.
+**v2.0 Multi-Church Onboarding & Owner Console Tabs (R193+)** — restructure `OwnerConsoleView` into a
+Configuration tab (super-admins roster + the four v1.9 platform-config cards) and a new Organizations tab
+that lists all churches and onboards a new one (org record + default `OrgSettings` + seeded default service
+template + first admin assigned by email at editor tier via the server-verified membership path), and widen
+the org-membership custom claim to carry all of a user's orgs+roles so `storage.rules` keeps Storage access
+working for a newly-onboarded second-org admin (999.5). Full list in `.planning/REQUIREMENTS.md`.
 
-*(SEED-001 promoted into this milestone 2026-08-20.)*
+*(Backlog 999.5 pulled into scope as a hard prerequisite for onboarding, 2026-08-21.)*
+
+**v1.9 standing follow-ups (owner-run; carried until v1.9 lifecycle completes)**
+
+- [ ] Run v1.9's `/gsd-verify-work 68..71` human UAT and the owner-gated v1.9 deploys (super-admin bootstrap
+      script, `firestore.rules`/`storage.rules`, functions), then audit → complete → cleanup for v1.9
 
 **Carried forward / backlog (promote with `/gsd-review-backlog` when ready)**
 
@@ -266,8 +287,6 @@ song-linked-background protection preserved. Full list in `.planning/REQUIREMENT
       email is still test-mode `onboarding@resend.dev` (backlog 999.6)
 - [ ] Confirm the production draft lock by hand and re-run the devtools bypass check (backlog 999.3 —
       `firestore.rules` is deployed; the hand-check is outstanding)
-- [ ] Multi-org-aware auth claim for Storage membership, BEFORE onboarding any multi-org user
-      (backlog 999.5)
 - [ ] Clearing a song should clear its slides, even when the song is reprised (backlog 999.2)
 - [ ] Extract a shared song-browse component used by both the Songs page and the service-plan picker
       (backlog 999.1)
@@ -397,4 +416,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-20 — started milestone v1.9 Owner Admin Console (super-admin console lifting the v1.8 cost/cleanup levers + no-reply sender into Firestore-backed runtime config; SEED-001 promoted). Decisions: v1.9 minor, Firestore live config, custom-claim super-admin gate, research-first. Next: defining requirements → roadmap.*
+*Last updated: 2026-08-21 — started milestone v2.0 Multi-Church Onboarding & Owner Console Tabs (tabbed owner console + Organizations onboarding: org record + settings + seeded default template + first admin by email; widen org-membership claim for multi-org Storage, backlog 999.5 pulled in). Decisions: v2.0 major, stacks on v1.9 (code-complete, lifecycle parked with owner), church admin = existing editor role, milestone research skipped, run autonomous w/ verification deferred. Next: defining requirements → roadmap.*

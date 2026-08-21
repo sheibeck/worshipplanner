@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.9
-milestone_name: Owner Admin Console
-current_phase: 71
-current_phase_name: cleanup-deletion-toggle-safety
-status: milestone-code-complete
-stopped_at: v1.9 ALL 4 phases (68–71) code-complete + auto-verified; STOPPED before milestone lifecycle per v1.9 grant — owner runs /gsd-verify-work + deploys, then audit→complete→cleanup
-last_updated: "2026-08-20T22:16:53.547Z"
-last_activity: 2026-08-20
-last_activity_desc: v1.9 milestone code-complete (Phases 68–71); human UAT + deploys handed to owner
+milestone: v2.0
+milestone_name: Multi-Church Onboarding & Owner Console Tabs
+status: planning
+last_updated: "2026-08-21T16:03:25.630Z"
+last_activity: 2026-08-21
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # ▶ ACTIVE MILESTONE — v1.9 Owner Admin Console (started 2026-08-20)
@@ -670,10 +666,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 71 (cleanup-deletion-toggle-safety) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-08-20 — Phase 71 execution started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-21 — Milestone v2.0 started
 
 ## ★ v1.9 ROADMAP.md phase breakdown (created 2026-08-20)
 
