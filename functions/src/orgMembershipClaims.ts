@@ -172,13 +172,15 @@ export type MembershipClaimDecision =
  * trigger below and plan 40-04's backfill import this rather than
  * reimplementing the rule, so the two can never drift.
  *
- * ★ KNOWN LIMITATION (D-01/D-04, deliberate, not an oversight): the claim
- * this function ever produces carries the user's PRIMARY org only
- * (`users/{uid}.orgIds[0]`). A user belonging to more than one organisation
- * is covered for their NON-primary orgs by storage.rules' Firestore-
- * membership arm alone -- this function will never set or clear a claim on
- * their behalf for a non-primary org. This is why the Firestore arm cannot
- * be removed for multi-org users even after the owner's second deploy.
+ * SCOPE (unchanged by 73-01-PLAN.md, deliberate): this function decides ONLY
+ * the primary `{ orgId, role }` claim -- it never sets or clears a claim for
+ * a non-primary org, and its return contract stays exactly what it was
+ * before the multi-org widening so plan 40-04's backfill (untouched this
+ * wave) keeps working unmodified. The MULTI-ORG `orgs` map that closes the
+ * "non-primary org" gap this docblock used to describe as a known limitation
+ * is computed separately, by computeOrgsClaimForUid below, and merged in by
+ * syncOrgMembershipClaimHandler on every write regardless of what this
+ * function decides for the primary keys (R207/R208).
  */
 export async function decideMembershipClaim(
   params: DecideMembershipClaimParams,
@@ -256,9 +258,39 @@ export type SyncOrgMembershipClaimOutcome =
   | { action: "failed"; error: string };
 
 /**
+ * Shallow-equal for two `orgs` maps. `undefined` (no `orgs` claim key at
+ * all -- a legacy pre-widening token) is treated as equivalent to `{}` (a
+ * freshly-computed empty map for a user with zero surviving memberships), so
+ * a legacy claim for a user with no memberships correctly compares as
+ * "already current" rather than triggering a spurious write.
+ */
+function orgsMapsEqual(
+  current: Record<string, OrgMembershipRole> | undefined,
+  next: Record<string, OrgMembershipRole>,
+): boolean {
+  const currentMap = current ?? {};
+  const currentKeys = Object.keys(currentMap);
+  const nextKeys = Object.keys(next);
+  if (currentKeys.length !== nextKeys.length) return false;
+  return currentKeys.every((key) => currentMap[key] === next[key]);
+}
+
+/**
  * The testable handler body, exported separately from the onDocumentWritten
  * wrapper below -- mirrors requestPptxRenderHandler/requestPptxRender
- * (index.ts). Applies decideMembershipClaim's decision via the Admin SDK.
+ * (index.ts). Applies decideMembershipClaim's PRIMARY decision AND a
+ * separately-recomputed multi-org `orgs` decision (R207/R208), merging both
+ * into as few Admin SDK writes as the case allows.
+ *
+ * decideMembershipClaim only ever fires for the user's PRIMARY org (its
+ * scope is unchanged, see its docblock above) -- but `orgs` must be
+ * recomputed on EVERY write, primary or not, since a non-primary-org
+ * join/leave never touches the primary claim yet must still update `orgs`
+ * (73-RESEARCH.md System Architecture Diagram step 2). computeOrgsClaimForUid
+ * is therefore called unconditionally except for the two fully-conservative
+ * skip reasons ("no-user-doc", "missing-role") where the write is too
+ * ambiguous to act on at all -- exactly the pre-widening behaviour for those
+ * two cases, extended unchanged.
  *
  * The whole body is wrapped in try/catch and resolves with a failure
  * outcome rather than rethrowing -- a throw out of a Firestore trigger
@@ -277,22 +309,55 @@ export async function syncOrgMembershipClaimHandler(
       role: after?.role,
     });
 
+    // Fully-conservative skips: the write is too ambiguous to act on at
+    // all (no user doc, or a create/update with no role field -- WR-01).
+    // Never touch orgs here either -- identical to pre-widening behaviour.
+    if (decision.action === "skip" && (decision.reason === "no-user-doc" || decision.reason === "missing-role")) {
+      return { action: "skip", reason: decision.reason };
+    }
+
+    const desiredOrgs = await computeOrgsClaimForUid(uid);
+
     switch (decision.action) {
       case "set":
-        // R175: merges onto the user's existing claims rather than
-        // replacing the whole object -- see claimsHelpers.ts. Spread into a
-        // fresh object literal: OrgMembershipClaim has no index signature,
-        // so passing it directly fails TS2345 against Record<string, unknown>.
-        await mergeAndSetCustomClaims(uid, { ...decision.claims });
+        // R175: ONE merge call carries the primary keys AND the recomputed
+        // orgs map, preserving superAdmin (or any other unrelated claim).
+        // Spread decision.claims into a fresh object literal: OrgMembershipClaim
+        // has no index signature, so passing it directly fails TS2345
+        // against Record<string, unknown>.
+        await mergeAndSetCustomClaims(uid, { ...decision.claims, orgs: desiredOrgs });
         return { action: "set" };
-      case "clear":
-        // R175: clears only { orgId, role } (ORG_CLAIM_KEYS), preserving
-        // any other claim -- e.g. a granted superAdmin -- rather than
-        // wiping the whole claims object via setCustomUserClaims(uid, null).
+      case "clear": {
+        // A genuine primary-membership delete. Clearing the primary keys and
+        // recomputing `orgs` are INDEPENDENT effects (73-RESEARCH.md Pitfall
+        // 2) -- NEVER blanket-clear orgs here; a still-valid second-org
+        // membership must survive. Two calls through the shared
+        // merge-preserving helpers (claimsHelpers.ts), never a bare
+        // setCustomUserClaims -- each preserves everything it doesn't
+        // explicitly touch (e.g. superAdmin), and the second call's
+        // getUser() read reflects the first call's write (live Admin SDK
+        // state), so the surviving-orgs recompute lands on top of the
+        // already-cleared primary keys rather than reintroducing them.
         await clearClaimKeys(uid, ORG_CLAIM_KEYS);
+        await mergeAndSetCustomClaims(uid, { orgs: desiredOrgs });
         return { action: "clear" };
-      case "skip":
-        return { action: "skip", reason: decision.reason };
+      }
+      case "skip": {
+        // Primary keys are unaffected ("not-primary-org" or
+        // "already-current"), but `orgs` still needs recomputing -- this is
+        // what makes a non-primary-org join/leave update orgs even though
+        // the primary decision never fires for it. Only write if orgs
+        // actually changed; otherwise this is a genuine no-op skip.
+        const existingUser = await getAuth().getUser(uid);
+        const existingOrgs = (
+          existingUser.customClaims as { orgs?: Record<string, OrgMembershipRole> } | undefined
+        )?.orgs;
+        if (orgsMapsEqual(existingOrgs, desiredOrgs)) {
+          return { action: "skip", reason: decision.reason };
+        }
+        await mergeAndSetCustomClaims(uid, { orgs: desiredOrgs });
+        return { action: "set" };
+      }
     }
   } catch (err) {
     console.error("[orgMembershipClaims] syncOrgMembershipClaim:", err);

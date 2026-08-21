@@ -111,6 +111,27 @@ function mockAuth(opts: {
   return { setCustomUserClaims, getUser };
 }
 
+/**
+ * A STATEFUL Auth fake: setCustomUserClaims writes into an in-memory slot
+ * that getUser reads back from, so a SECOND write inside the same handler
+ * invocation (the clear branch's clearClaimKeys -> mergeAndSetCustomClaims
+ * pair) sees the first write's effect -- exactly like the real Admin SDK,
+ * where every getUser() call reads live current state. Mirrors
+ * backfillOrgClaims.test.ts's statefulAuth. Required to genuinely prove the
+ * primary-clear-keeps-surviving-orgs and superAdmin-preservation-on-delete
+ * cases rather than asserting them by construction against a mock that
+ * silently ignores its own prior writes.
+ */
+function statefulAuth(initialClaims?: Record<string, unknown>) {
+  let claims = initialClaims;
+  const setCustomUserClaims = vi.fn(async (_uid: string, patch: Record<string, unknown> | null) => {
+    claims = patch ?? undefined;
+  });
+  const getUser = vi.fn(async () => ({ customClaims: claims }));
+  vi.mocked(getAuth).mockReturnValue({ setCustomUserClaims, getUser } as never);
+  return { setCustomUserClaims, getUser };
+}
+
 afterEach(() => {
   vi.mocked(getFirestore).mockReset();
   vi.mocked(getAuth).mockReset();
@@ -337,8 +358,8 @@ describe("decideMembershipClaim", () => {
 });
 
 describe("syncOrgMembershipClaimHandler", () => {
-  it("create, primary org: calls setCustomUserClaims exactly once with { orgId, role }", async () => {
-    mockFirestore(fakeUserDoc(true, [ORG_A]));
+  it("create, primary org: single write carries { orgId, role, orgs }, setCustomUserClaims called once", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })]);
     const { setCustomUserClaims } = mockAuth({ existingClaims: undefined });
 
     const outcome = await syncOrgMembershipClaimHandler({
@@ -348,12 +369,16 @@ describe("syncOrgMembershipClaimHandler", () => {
     });
 
     expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
-    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgId: ORG_A, role: "editor" });
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor" },
+    });
     expect(outcome).toEqual({ action: "set" });
   });
 
-  it("role change: writes a fresh claim carrying the new role", async () => {
-    mockFirestore(fakeUserDoc(true, [ORG_A]));
+  it("role change: writes a fresh claim carrying the new role in both orgId/role and orgs", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "viewer", orgId: ORG_A })]);
     const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
 
     const outcome = await syncOrgMembershipClaimHandler({
@@ -362,12 +387,16 @@ describe("syncOrgMembershipClaimHandler", () => {
       after: { role: "viewer" },
     });
 
-    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgId: ORG_A, role: "viewer" });
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "viewer",
+      orgs: { orgA: "viewer" },
+    });
     expect(outcome).toEqual({ action: "set" });
   });
 
-  it("legacy admin: the claim written carries 'editor', never 'admin'", async () => {
-    mockFirestore(fakeUserDoc(true, [ORG_A]));
+  it("legacy admin: the claim written carries 'editor', never 'admin', in both orgId/role and orgs", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "admin", orgId: ORG_A })]);
     const { setCustomUserClaims } = mockAuth({ existingClaims: undefined });
 
     await syncOrgMembershipClaimHandler({
@@ -376,41 +405,62 @@ describe("syncOrgMembershipClaimHandler", () => {
       after: { role: "admin" },
     });
 
-    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgId: ORG_A, role: "editor" });
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor" },
+    });
   });
 
-  it("delete, primary org: calls setCustomUserClaims exactly once with null as the second argument", async () => {
-    mockFirestore(fakeUserDoc(true, [ORG_A]));
-    const { setCustomUserClaims } = mockAuth();
+  it("non-primary org JOIN: orgs gains orgB AND keeps orgA, primary orgId/role are unchanged", async () => {
+    // Primary stays orgA -- this write is to orgB, a second org the user just joined.
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [
+      fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A }),
+      fakeMemberDoc({ uid: UID, role: "viewer", orgId: ORG_B }),
+    ]);
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", orgs: { orgA: "editor" } },
+    });
 
     const outcome = await syncOrgMembershipClaimHandler({
-      orgId: ORG_A,
+      orgId: ORG_B,
       uid: UID,
-      after: undefined,
+      after: { role: "viewer" },
     });
 
     expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
-    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, null);
-    expect(outcome).toEqual({ action: "clear" });
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor", orgB: "viewer" },
+    });
+    expect(outcome).toEqual({ action: "set" });
   });
 
-  it("non-primary org write: setCustomUserClaims is NOT called at all", async () => {
-    mockFirestore(fakeUserDoc(true, [ORG_A]));
-    const { setCustomUserClaims } = mockAuth();
+  it("non-primary org write, orgs already reflects it: no redundant setCustomUserClaims call", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [
+      fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A }),
+      fakeMemberDoc({ uid: UID, role: "viewer", orgId: ORG_B }),
+    ]);
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", orgs: { orgA: "editor", orgB: "viewer" } },
+    });
 
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_B,
       uid: UID,
-      after: { role: "editor" },
+      after: { role: "viewer" },
     });
 
     expect(setCustomUserClaims).toHaveBeenCalledTimes(0);
     expect(outcome).toEqual({ action: "skip", reason: "not-primary-org" });
   });
 
-  it("non-primary org DELETE: setCustomUserClaims is NOT called -- the primary claim survives", async () => {
-    mockFirestore(fakeUserDoc(true, [ORG_A]));
-    const { setCustomUserClaims } = mockAuth();
+  it("non-primary org DELETE, orgs unaffected: setCustomUserClaims is NOT called -- the primary claim survives", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })]);
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", orgs: { orgA: "editor" } },
+    });
 
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_B,
@@ -422,19 +472,20 @@ describe("syncOrgMembershipClaimHandler", () => {
     expect(outcome).toEqual({ action: "skip", reason: "not-primary-org" });
   });
 
-  it("missing user document: no claims call, no throw", async () => {
-    mockFirestore(fakeUserDoc(false));
+  it("missing user document: no claims call, no throw, orgs scan never runs (fully-conservative skip)", async () => {
+    const { collectionGroupSpy } = mockFirestore(fakeUserDoc(false));
     const { setCustomUserClaims } = mockAuth();
 
     const outcome = await expect(
       syncOrgMembershipClaimHandler({
         orgId: ORG_A,
         uid: UID,
-          after: { role: "editor" },
+        after: { role: "editor" },
       }),
     ).resolves.toEqual({ action: "skip", reason: "no-user-doc" });
 
     expect(setCustomUserClaims).not.toHaveBeenCalled();
+    expect(collectionGroupSpy).not.toHaveBeenCalled();
     void outcome;
   });
 
@@ -446,16 +497,18 @@ describe("syncOrgMembershipClaimHandler", () => {
       syncOrgMembershipClaimHandler({
         orgId: ORG_A,
         uid: UID,
-          after: { role: "editor" },
+        after: { role: "editor" },
       }),
     ).resolves.toEqual({ action: "skip", reason: "no-user-doc" });
 
     expect(setCustomUserClaims).not.toHaveBeenCalled();
   });
 
-  it("already current: no redundant setCustomUserClaims call", async () => {
-    mockFirestore(fakeUserDoc(true, [ORG_A]));
-    const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
+  it("already current AND orgs unchanged: no redundant setCustomUserClaims call (idempotency)", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })]);
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", orgs: { orgA: "editor" } },
+    });
 
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_A,
@@ -468,7 +521,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   });
 
   it("malformed create/update (document exists, no role field): does NOT clear a still-valid claim -- previously-ambiguous case (WR-01)", async () => {
-    mockFirestore(fakeUserDoc(true, [ORG_A]));
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })]);
     const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
 
     // `after` exists (this is a create/update, not a delete) but has no `role`
@@ -485,10 +538,13 @@ describe("syncOrgMembershipClaimHandler", () => {
     expect(outcome).toEqual({ action: "skip", reason: "missing-role" });
   });
 
-  it("preserves superAdmin: a primary-org membership delete clears only { orgId, role }, leaving an existing superAdmin claim intact (SC1 direction A)", async () => {
-    mockFirestore(fakeUserDoc(true, [ORG_A]));
-    const { setCustomUserClaims } = mockAuth({
-      existingClaims: { orgId: ORG_A, role: "editor", superAdmin: true },
+  it("primary-org DELETE while the user still belongs to a second org: orgId/role cleared, orgs recomputed STILL contains the second org (highest-risk case, R208)", async () => {
+    // Org A's member doc is gone (deleted); org B survives.
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "viewer", orgId: ORG_B })]);
+    const { setCustomUserClaims } = statefulAuth({
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor", orgB: "viewer" },
     });
 
     const outcome = await syncOrgMembershipClaimHandler({
@@ -497,8 +553,70 @@ describe("syncOrgMembershipClaimHandler", () => {
       after: undefined,
     });
 
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(2);
+    // Call 1 (clearClaimKeys): orgId/role gone, orgs untouched by this call.
+    expect(setCustomUserClaims).toHaveBeenNthCalledWith(1, UID, {
+      orgs: { orgA: "editor", orgB: "viewer" },
+    });
+    // Call 2 (mergeAndSetCustomClaims): orgs recomputed from survivors --
+    // orgB remains, orgA is gone -- and orgId/role stay absent (proves the
+    // primary-clear and orgs-recompute are independent, not a blanket clear).
+    expect(setCustomUserClaims).toHaveBeenNthCalledWith(2, UID, { orgs: { orgB: "viewer" } });
+    expect(outcome).toEqual({ action: "clear" });
+  });
+
+  it("primary-org DELETE when the user belongs to no other org: orgId/role cleared, orgs becomes {}", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), []);
+    const { setCustomUserClaims } = statefulAuth({ orgId: ORG_A, role: "editor", orgs: { orgA: "editor" } });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: undefined,
+    });
+
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(2);
+    expect(setCustomUserClaims).toHaveBeenNthCalledWith(2, UID, { orgs: {} });
+    expect(outcome).toEqual({ action: "clear" });
+  });
+
+  it("preserves superAdmin (direction A): a widened create/update on an account with superAdmin:true leaves it intact", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })]);
+    const { setCustomUserClaims } = mockAuth({ existingClaims: { superAdmin: true } });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: { role: "editor" },
+    });
+
     expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
-    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { superAdmin: true });
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      superAdmin: true,
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor" },
+    });
+    expect(outcome).toEqual({ action: "set" });
+  });
+
+  it("preserves superAdmin (direction B): a primary-org delete clears orgId/role, recomputes orgs, and leaves superAdmin:true intact (SC1)", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), []);
+    const { setCustomUserClaims } = statefulAuth({
+      orgId: ORG_A,
+      role: "editor",
+      superAdmin: true,
+    });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: undefined,
+    });
+
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(2);
+    expect(setCustomUserClaims).toHaveBeenNthCalledWith(1, UID, { superAdmin: true });
+    expect(setCustomUserClaims).toHaveBeenNthCalledWith(2, UID, { superAdmin: true, orgs: {} });
     expect(outcome).toEqual({ action: "clear" });
   });
 
