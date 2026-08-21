@@ -410,7 +410,7 @@ orgs+roles (R207–R211, backlog 999.5). Phase 73 (the widening) is sequenced ah
 + admin assignment) for exactly this reason — the two are not otherwise coupled.
 
 - [x] **Phase 72: Owner Console Tabs** — ✅ code-complete + auto-verified 2026-08-21 (6/6 SC; human visual/deep-link UAT deferred to `/gsd-verify-work 72`; client-only, nothing to deploy). Restructured `OwnerConsoleView` into a Configuration tab (super-admins roster + four platform-config cards + deploy-time note, byte-preserved) and an Organizations placeholder tab, with the open tab reflected in the route query (`?tab=`)
-- [ ] **Phase 73: Multi-Org Storage Auth Claim** - Widen the org-membership claim to carry all of a user's orgs+roles, update `storage.rules`' `isOrgMemberByClaim` to match, and ship a dry-run/`--apply` backfill — closes backlog 999.5
+- [x] **Phase 73: Multi-Org Storage Auth Claim** — ✅ code-complete + auto-verified + SECURED 2026-08-21 (5/5 SC; security 6/6 threats closed; owner-gated deploy UAT deferred to `/gsd-verify-work 73` + `DEPLOY-ORG-CLAIMS.md`; UNDEPLOYED hand-over). Widened the org-membership claim to an additive `orgs:{orgId:role}` map (recomputed from `collectionGroup('members')`, superAdmin-preserving, single-atomic-write removal), widened `storage.rules` with a null-guarded `orgs` arm OR the legacy arm (183/183 emulator), and extended the dry-run/`--apply` backfill — closes backlog 999.5
 - [ ] **Phase 74: Organizations — List, Onboard & Admin Assignment** - List every church, onboard a new one (org record + default settings + seeded template + first admin), and assign additional admins to any org — all through super-admin-gated server callables
 
 **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R193–R211 (19 mapped, 100% coverage)
@@ -552,7 +552,7 @@ milestone deploy policy above.
 | 70 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
 | 71 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
 | 72 | v2.0 | 1/1 | Code-complete (UAT deferred) | 2026-08-21 |
-| 73 | v2.0 | 3/3 | In Progress|  |
+| 73 | v2.0 | 3/3 | Code-complete + SECURED (deploy UAT deferred) | 2026-08-21 |
 | 74 | v2.0 | 0/TBD | Not started | - |
 
 ## Backlog
