@@ -263,8 +263,15 @@ export type SyncOrgMembershipClaimOutcome =
  * freshly-computed empty map for a user with zero surviving memberships), so
  * a legacy claim for a user with no memberships correctly compares as
  * "already current" rather than triggering a spurious write.
+ *
+ * Exported (IN-01, 73-REVIEW.md) so backfillOrgClaims.ts imports this SAME
+ * implementation rather than maintaining its own verbatim copy -- the two
+ * signatures had already started to drift (this one accepts `undefined` for
+ * `current`, the old backfill copy required a non-optional `Record`), which
+ * is exactly the kind of divergence a shared helper (mirroring
+ * buildOrgsMapClaim/resolveOrgId's existing pattern) prevents.
  */
-function orgsMapsEqual(
+export function orgsMapsEqual(
   current: Record<string, OrgMembershipRole> | undefined,
   next: Record<string, OrgMembershipRole>,
 ): boolean {

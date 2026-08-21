@@ -4,6 +4,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import {
   buildOrgsMapClaim,
   decideMembershipClaim,
+  orgsMapsEqual,
   resolveOrgId,
   type MembershipClaimDecision,
   type OrgMembershipClaim,
@@ -91,24 +92,6 @@ export interface BackfillSummary {
 interface MembershipCandidate {
   orgId: string;
   role: string | undefined;
-}
-
-/**
- * Shallow-equal for two `orgs` maps -- mirrors orgMembershipClaims.ts's private
- * orgsMapsEqual byte-for-byte (kept as a local copy rather than an exported/shared
- * function so this plan's file surface stays exactly what 73-03-PLAN.md declares;
- * it is pure equality on the SAME shared buildOrgsMapClaim output, so there is no
- * risk of drift on what an `orgs` map should contain -- only on whether two of them
- * are equal, which is not a decision either module can get wrong differently).
- */
-function orgsMapsEqual(
-  current: Record<string, OrgMembershipRole>,
-  next: Record<string, OrgMembershipRole>,
-): boolean {
-  const currentKeys = Object.keys(current);
-  const nextKeys = Object.keys(next);
-  if (currentKeys.length !== nextKeys.length) return false;
-  return currentKeys.every((key) => current[key] === next[key]);
 }
 
 /**
