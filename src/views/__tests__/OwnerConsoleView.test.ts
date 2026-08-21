@@ -295,4 +295,19 @@ describe('OwnerConsoleView — tabs (Phase 72)', () => {
 
     expect(mockRouterReplace).not.toHaveBeenCalled()
   })
+
+  it('does not re-subscribe when switching tabs and back (v-show invariant)', async () => {
+    const wrapper = await mountView()
+    expect(mockOnSnapshot).toHaveBeenCalledTimes(2)
+
+    const orgsButton = wrapper.findAll('button').find((b) => b.text() === 'Organizations')!
+    await orgsButton.trigger('click')
+    const configButton = wrapper.findAll('button').find((b) => b.text() === 'Configuration')!
+    await configButton.trigger('click')
+
+    // Still 2 — ConfigurationTab stays mounted under v-show (never torn down
+    // and remounted by a tab switch), so its onMounted subscriptions
+    // (superAdmins onSnapshot + appConfigStore.subscribe) never re-fire.
+    expect(mockOnSnapshot).toHaveBeenCalledTimes(2)
+  })
 })
