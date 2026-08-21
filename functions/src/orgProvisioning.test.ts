@@ -529,6 +529,30 @@ describe("assignOrgAdminHandler", () => {
       assignOrgAdminHandler(assignRequest({ data: { email: "" } })),
     ).rejects.toMatchObject({ code: "invalid-argument" });
   });
+
+  it("WR-01: assignOrgAdmin on an already-existing member preserves the original joinedAt and does not error", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: { name: "Grace Church" } });
+    fake.setDocState(`organizations/${ORG_ID}/members/${TARGET_UID}`, {
+      exists: true,
+      data: { role: "editor", joinedAt: "ORIGINAL_JOINED_AT", displayName: "Target Person", email: TARGET_EMAIL },
+    });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await assignOrgAdminHandler(assignRequest());
+
+    expect(result).toEqual({ status: "added", uid: TARGET_UID });
+    expect(fake.batchSetSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ __path: `organizations/${ORG_ID}/members/${TARGET_UID}` }),
+      expect.objectContaining({
+        role: "editor",
+        joinedAt: "ORIGINAL_JOINED_AT",
+        displayName: "Target Person",
+        email: TARGET_EMAIL,
+      }),
+    );
+  });
 });
 
 // --- listOrganizations ---------------------------------------------------------

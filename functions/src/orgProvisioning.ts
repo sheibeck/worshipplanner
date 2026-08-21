@@ -144,6 +144,15 @@ interface AdminWriter {
  * transform that needs no prior read, so this is transaction-safe with no
  * extra tx.get.
  *
+ * `existingJoinedAt` (WR-01): when the caller already read a prior
+ * members/{uid} doc and it exists, pass its `joinedAt` here so a
+ * re-assignment (assignOrgAdmin on someone already a member of this org)
+ * preserves the original join date instead of resetting it. Left
+ * `undefined` for a brand-new member (onboardOrganization's target is
+ * always new -- the org was just minted -- and assignOrgAdmin's caller
+ * passes `undefined` when its pre-batch read found no existing doc), which
+ * falls through to a fresh `FieldValue.serverTimestamp()`.
+ *
  * `target.kind === 'invite'`: writes the invites/{email} + inviteLookup/{email}
  * artifacts src/stores/auth.ts's ensureUserDocument already reads on next
  * sign-in -- no dangling membership, no silent failure (R205).
@@ -154,12 +163,13 @@ function writeAdminAssignment(
   orgId: string,
   target: AdminTarget,
   callerUid: string,
+  existingJoinedAt?: unknown,
 ): void {
   if (target.kind === "existing") {
     const memberRef = db.collection("organizations").doc(orgId).collection("members").doc(target.uid);
     writer.set(memberRef, {
       role: "editor",
-      joinedAt: FieldValue.serverTimestamp(),
+      joinedAt: existingJoinedAt ?? FieldValue.serverTimestamp(),
       displayName: target.displayName,
       email: target.email,
     });
@@ -304,8 +314,26 @@ export async function assignOrgAdminHandler(
 
   const target = await resolveAdminTarget(email);
 
+  // WR-01: if this admin is already a member of this org, preserve their
+  // original joinedAt instead of letting writeAdminAssignment's fresh
+  // serverTimestamp silently reset it. This read is pre-batch (same as the
+  // org-existence check above) -- there is no transaction constraint here
+  // since assignOrgAdmin uses a WriteBatch, not a Transaction.
+  let existingJoinedAt: unknown;
+  if (target.kind === "existing") {
+    const memberSnap = await db
+      .collection("organizations")
+      .doc(orgId)
+      .collection("members")
+      .doc(target.uid)
+      .get();
+    if (memberSnap.exists) {
+      existingJoinedAt = memberSnap.data()?.joinedAt;
+    }
+  }
+
   const batch = db.batch();
-  writeAdminAssignment(batch, db, orgId, target, callerUid);
+  writeAdminAssignment(batch, db, orgId, target, callerUid, existingJoinedAt);
   await batch.commit();
 
   if (target.kind === "existing") {
