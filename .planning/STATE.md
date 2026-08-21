@@ -4,17 +4,17 @@ milestone: v2.0
 milestone_name: Multi-Church Onboarding & Owner Console Tabs
 current_phase: 74
 current_phase_name: organizations-list-onboard-admin-assignment
-status: executing
-stopped_at: Completed 74-01-PLAN.md
-last_updated: "2026-08-21T20:36:09.170Z"
+status: verifying
+stopped_at: Completed 74-02-PLAN.md
+last_updated: "2026-08-21T21:02:16.030Z"
 last_activity: 2026-08-21
 last_activity_desc: Phase 74 execution started
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 67
+  completed_plans: 6
+  percent: 100
 ---
 
 # ▶ ACTIVE MILESTONE — v2.0 Multi-Church Onboarding & Owner Console Tabs (started 2026-08-21)
@@ -745,7 +745,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 74 (organizations-list-onboard-admin-assignment) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-21 — Phase 74 execution started
 
 ## ★ v2.0 ROADMAP.md phase breakdown (created 2026-08-21)
@@ -2353,6 +2353,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 73 P02 | 25min | 2 tasks | 2 files |
 | Phase 73 P03 | 24min | 2 tasks | 3 files |
 | Phase 74 P01 | 15min | 3 tasks | 5 files |
+| Phase 74 P02 | 55min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -2748,6 +2749,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: For a multi-org uid, resolve the primary decision by trying decideMembershipClaim against each membership until one is not skipped for not-primary-org, rather than pre-fetching orgIds ourselves
 - [Phase ?]: Rewrote the non-primary-org backfill test to expect an orgs-only write (previously a no-op skip) -- the widened behavior is the point of R210/R207
 - [Phase ?]: Used a structural AdminWriter interface (just .set) instead of a Transaction|WriteBatch union so writeAdminAssignment is shared verbatim between onboardOrganization's transaction and assignOrgAdmin's batch
+- [Phase ?]: OrganizationsTab.vue is a pure httpsCallable consumer (no firestore writes); friendlyCallableError extended inline with already-exists -> 'That church name is taken.'
+- [Phase ?]: OwnerConsoleView.test.ts's generic httpsCallable mock extended to resolve organizations:[] since OrganizationsTab now calls listOrganizations unconditionally on mount
 
 ### Roadmap Evolution
 
@@ -3067,8 +3070,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-21T20:36:09.052Z
-Stopped at: Completed 74-01-PLAN.md
+Last session: 2026-08-21T21:02:15.961Z
+Stopped at: Completed 74-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
