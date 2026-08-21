@@ -71,7 +71,9 @@ weights used by this phase's surface):
 | Compact inline control (assign-admin row action, org-id cell) | 12px (`text-xs`) | 400 (regular) | default |
 
 No new type tokens needed. Matches `ConfigurationTab.vue`'s roster table and grant-form typography
-exactly.
+exactly. **Weight buckets:** 500 (`font-medium`) and 600 (`font-semibold`) are treated as a single
+"emphasis" weight against 400 "regular" — the project does not distinguish 500 vs 600 as a hard rule
+(same convention locked in `72-UI-SPEC.md`), so this is a 2-weight contract (regular + emphasis).
 
 ---
 
@@ -100,7 +102,7 @@ surface uses indigo.
 | Section heading | "Organizations" (card `h2`, matches "Super-admins"/"Platform configuration" heading style) |
 | Onboard form — church name placeholder | "Church name" |
 | Onboard form — admin email placeholder | "First admin email" |
-| Primary CTA — Onboard button | Idle: "Onboard" · Submitting: "Onboarding..." · Momentary success flash: "Onboarded!" (mirrors Grant/Granting.../Granted! exactly) |
+| Primary CTA — Onboard button | Idle: "Onboard church" · Submitting: "Onboarding..." · Momentary success flash: "Onboarded!" (mirrors Grant/Granting.../Granted! exactly) |
 | Onboard success feedback | "Onboarded {church name} — admin added." (existing account) or "Onboarded {church name} — admin invited." (no account, invite path) — status string comes directly from the callable's `{status: 'added' \| 'invited'}` return |
 | Onboard error — name taken (R201) | "That church name is taken." |
 | Onboard error — invalid/missing input | "Enter a church name and a valid admin email address." |
@@ -112,7 +114,7 @@ surface uses indigo.
 | Assign-admin trigger (per row) | "Assign admin" |
 | Assign-admin inline input placeholder | "Admin email" |
 | Assign-admin confirm button | Idle: "Assign" · Submitting: "Assigning..." |
-| Assign-admin cancel button | "Cancel" |
+| Assign-admin cancel button | "Cancel assign" (action-scoped, not a bare generic "Cancel") |
 | Assign-admin success feedback — existing account (R203) | "Added as admin." |
 | Assign-admin success feedback — no account, invited (R205) | "No account yet — invited as admin." |
 | Assign-admin error — invalid input | "Enter a valid email address." |
@@ -146,6 +148,14 @@ No `nav` or `media` elements exist in this surface. No zero-one-many considerati
 onboard form or assign-admin control (neither is a `list-collection`).
 
 ---
+
+## Visual Hierarchy / Focal Point
+
+The **Onboard-a-church form sits at the top of the card as the primary action** (the eye's first anchor —
+it is the one create action on the tab, mirroring how the Grant form leads the Super-admins card). The
+**organizations table below it is secondary, scannable reference content**; the per-row "Assign admin"
+controls are tertiary, revealed on demand. Indigo accent is reserved to reinforce exactly that order
+(Onboard button → Assign-admin trigger/confirm → focus rings), so the primary action reads first.
 
 ## Component Spec: Organizations Card Shell
 
@@ -188,7 +198,7 @@ recipe, extended to two inputs:
     :disabled="isOnboarding"
     class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
   >
-    {{ isOnboarding ? 'Onboarding...' : onboardedFeedback ? 'Onboarded!' : 'Onboard' }}
+    {{ isOnboarding ? 'Onboarding...' : onboardedFeedback ? 'Onboarded!' : 'Onboard church' }}
   </button>
 </div>
 <p v-if="onboardError" class="text-red-400 text-sm mt-2">{{ onboardError }}</p>
@@ -283,7 +293,7 @@ bare confirm:
       @click="cancelAssign"
       class="text-xs text-gray-400 hover:text-gray-200 transition-colors"
     >
-      Cancel
+      Cancel assign
     </button>
   </div>
   <p v-if="assignError[org.orgId]" class="text-red-400 text-xs mt-1">{{ assignError[org.orgId] }}</p>
