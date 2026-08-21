@@ -409,7 +409,7 @@ orgs+roles (R207–R211, backlog 999.5). Phase 73 (the widening) is sequenced ah
 
 + admin assignment) for exactly this reason — the two are not otherwise coupled.
 
-- [ ] **Phase 72: Owner Console Tabs** - Restructure `OwnerConsoleView` into a Configuration tab (existing super-admins roster + four platform-config cards + deploy-time note, unchanged) and a new Organizations tab shell, with the open tab reflected in the route/query
+- [x] **Phase 72: Owner Console Tabs** — ✅ code-complete + auto-verified 2026-08-21 (6/6 SC; human visual/deep-link UAT deferred to `/gsd-verify-work 72`; client-only, nothing to deploy). Restructured `OwnerConsoleView` into a Configuration tab (super-admins roster + four platform-config cards + deploy-time note, byte-preserved) and an Organizations placeholder tab, with the open tab reflected in the route query (`?tab=`)
 - [ ] **Phase 73: Multi-Org Storage Auth Claim** - Widen the org-membership claim to carry all of a user's orgs+roles, update `storage.rules`' `isOrgMemberByClaim` to match, and ship a dry-run/`--apply` backfill — closes backlog 999.5
 - [ ] **Phase 74: Organizations — List, Onboard & Admin Assignment** - List every church, onboard a new one (org record + default settings + seeded template + first admin), and assign additional admins to any org — all through super-admin-gated server callables
 
@@ -544,7 +544,7 @@ milestone deploy policy above.
 | 69 | v1.9 | 3/3 | Code-complete (UAT deferred) | 2026-08-20 |
 | 70 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
 | 71 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
-| 72 | v2.0 | 1/1 | In Progress|  |
+| 72 | v2.0 | 1/1 | Code-complete (UAT deferred) | 2026-08-21 |
 | 73 | v2.0 | 0/TBD | Not started | - |
 | 74 | v2.0 | 0/TBD | Not started | - |
 

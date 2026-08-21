@@ -609,3 +609,16 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 4. **Song-background safety (owner's hard constraint) end-to-end:** confirm that with reference detection incomplete, background cleanup CANNOT be enabled, and that a real run never deletes a song-linked background — only transient slideshow backgrounds tied to a service.
 
 **Owner deploy hand-over:** `firebase deploy --only functions:previewCleanupDryRun` (fold in with the Phase 69 runtime-config functions deploy). No `.env` writes.
+
+---
+
+## Phase 72 — Owner Console Tabs (v2.0, FIRST) — `verification_deferred_human`
+
+**Code-complete + automatically verified 2026-08-21** (verifier ran gates directly: `npm run type-check` clean; `npx vitest run src/views/__tests__/OwnerConsoleView.test.ts` 13/13 (7 carried-forward tests unchanged + 6 new); full app suite `npx vitest run` 3900/3913 at the documented 2-file baseline (`storage.rules.test.ts`, `RosterView.test.ts`), no new regressions). `ConfigurationTab.vue` diff-confirmed byte-identical to the pre-refactor `OwnerConsoleView.vue` body (only wrapper-div removal + 3 cosmetic log-prefix corrections). Code review (`72-REVIEW.md`): 0 Critical, 1 Warning (WR-01 v-show single-subscribe invariant untested) + 1 Info (IN-01 stale log prefix) both fixed in follow-up commits `7e746fbb`/`95edbd15`, confirmed present on master. Router guard (`requiresSuperAdmin` on `/owner-console`) untouched — no new route, claim, rule, or callable introduced. See `72-VERIFICATION.md` for the full per-truth breakdown.
+
+**What only a human at `/gsd-verify-work 72` can confirm — do NOT mark passed:**
+
+1. **Real-browser deep-link + refresh (R195):** open `/owner-console?tab=organizations` in a real signed-in super-admin session — both a fresh navigation and a hard refresh — and confirm it lands on the Organizations pane, not a reset to Configuration. The automated test only proves this against a mocked `vue-router`.
+2. **Tab-strip visual active-state styling:** confirm the Configuration/Organizations tab strip's indigo active-accent vs. muted-gray inactive styling renders correctly and matches `ServiceEditorView.vue`'s existing tab pattern — not assertable from jsdom class-string checks.
+
+**No deploy involved** — this is a client-only layout refactor; nothing to hand over for deployment. `OrganizationsTab.vue` ships as an inert placeholder, ready for Phase 74's org-management UI build-out.
