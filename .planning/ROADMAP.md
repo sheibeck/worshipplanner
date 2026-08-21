@@ -406,6 +406,7 @@ dry-run/`--apply` backfill scripts) already exist in-repo from v1.5–v1.9.
 **Hard sequencing constraint (owner, 2026-08-21):** assigning an admin into a second org (R206) silently
 breaks that user's Storage access unless the org-membership claim is first widened to carry all
 orgs+roles (R207–R211, backlog 999.5). Phase 73 (the widening) is sequenced ahead of Phase 74 (onboarding
+
 + admin assignment) for exactly this reason — the two are not otherwise coupled.
 
 - [ ] **Phase 72: Owner Console Tabs** - Restructure `OwnerConsoleView` into a Configuration tab (existing super-admins roster + four platform-config cards + deploy-time note, unchanged) and a new Organizations tab shell, with the open tab reflected in the route/query
@@ -432,17 +433,22 @@ organization-management UI into and no existing super-admin workflow regresses.
   1. A super-admin visiting the Owner Console sees two tabs — Configuration and Organizations — with
      Configuration selected by default, both still gated behind the existing super-admin access check
      (R193).
+
   2. The Configuration tab is a behavior-identical relocation of the pre-v2.0 console body — the
      super-admins roster (grant/revoke via `setSuperAdminClaim`), all four platform-config cards, and the
      deploy-time note — nothing about how they work changes, only where they live (R194).
+
   3. The open tab is reflected in the route/query, so reloading the page or opening a shared link to the
      Organizations tab lands directly on that tab instead of resetting to Configuration (R195).
+
   4. Every pre-existing Configuration-tab behavior (grant/revoke flow, the four config cards' validation
      and provenance stamps) is proven unchanged by the carried-forward `OwnerConsoleView` test coverage,
      not silently dropped in the restructure.
 
-**Plans**: 1 plan
-- [ ] 72-01-PLAN.md — Restructure OwnerConsoleView into a query-driven tab shell (Configuration = verbatim console body relocation; Organizations = placeholder), plus carried-forward + tab-coverage tests
+**Plans**: 1/1 plans executed
+
+- [x] 72-01-PLAN.md — Restructure OwnerConsoleView into a query-driven tab shell (Configuration = verbatim console body relocation; Organizations = placeholder), plus carried-forward + tab-coverage tests
+
 **UI hint**: yes
 
 ### Phase 73: Multi-Org Storage Auth Claim
@@ -457,14 +463,18 @@ a hard prerequisite for)
   1. The org-membership custom claim carries every organization a user belongs to and their per-org role
      — not just a single primary org — in a shape both `firestore.rules` and `storage.rules` can read
      (R207).
+
   2. The claim-writer recomputes this full multi-org set on any `members/*` write and continues to
      preserve the separate `superAdmin` claim through the existing shared merge helper (R175) — widening
      the claim never wipes super-admin status, and vice versa (R208).
+
   3. `storage.rules`' `isOrgMemberByClaim` checks the requested `orgId` against the full multi-org claim
      set, proven by genuine multi-org ALLOW and cross-org DENY emulator tests — a user in two orgs keeps
      Storage read/write on both (R209).
+
   4. An idempotent, dry-run-by-default, owner-run backfill script (mirroring `backfillOrgClaims.ts`)
      recomputes the widened claim for every existing user, with no manual per-user step (R210).
+
   5. During rollout, a session still carrying the old single-org claim shape keeps working — both the old
      and new claim shapes are tolerated by the rules until the backfill runs, so there is no Storage-access
      gap while users migrate (R211).
@@ -488,17 +498,21 @@ be in place before assigning a second-org admin)
 
   1. The Organizations tab lists every organization on the platform with at least its name and one
      distinguishing detail (id, created date, and/or member count) (R196).
+
   2. A super-admin can onboard a new church by entering a name and an admin email: this creates the
      `organizations/{orgId}` record with deep-merged default `OrgSettings`, seeds the org's default service
      template so a service can be created immediately, and assigns the entered email as the org's first
      member at editor tier — all in one flow (R197, R198, R199).
+
   3. Onboarding and admin assignment run entirely through super-admin-gated server callables that
      independently re-verify the caller's `superAdmin` claim; the client never writes `organizations/*`,
      `orgNames/*`, or another org's `members/*` directly (R200, R204).
+
   4. A duplicate church name is caught by the existing `orgNames` create-only registry and reported
      clearly; any failed onboarding step (name taken, unknown/invalid admin email, write error) never
      strands a half-created org — retrying after fixing the input succeeds without manual cleanup (R201,
      R202).
+
   5. A super-admin can assign an admin to an existing org by email at any time: an email with no matching
      account surfaces a clear result instead of a silent failure or a dangling membership doc, and
      assigning a user who already belongs to another org is strictly additive — their existing
@@ -530,7 +544,7 @@ milestone deploy policy above.
 | 69 | v1.9 | 3/3 | Code-complete (UAT deferred) | 2026-08-20 |
 | 70 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
 | 71 | v1.9 | 2/2 | Code-complete (UAT deferred) | 2026-08-20 |
-| 72 | v2.0 | 0/TBD | Not started | - |
+| 72 | v2.0 | 1/1 | In Progress|  |
 | 73 | v2.0 | 0/TBD | Not started | - |
 | 74 | v2.0 | 0/TBD | Not started | - |
 

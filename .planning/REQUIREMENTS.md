@@ -24,15 +24,15 @@ REQ-IDs continue from v1.9 (last R192).
 
 ### Owner console tabs
 
-- [ ] **R193**: The Owner Console presents its content as two tabs — **Configuration** and **Organizations** —
+- [x] **R193**: The Owner Console presents its content as two tabs — **Configuration** and **Organizations** —
       with Configuration selected by default, both behind the existing super-admin access gate (R177/R178) so
       no new access surface is introduced.
 
-- [ ] **R194**: The Configuration tab contains, with **no behavior change**, the existing super-admins roster
+- [x] **R194**: The Configuration tab contains, with **no behavior change**, the existing super-admins roster
       (grant/revoke via `setSuperAdminClaim`) and the four platform-config cards plus the deploy-time note —
       i.e. the entire current `OwnerConsoleView` body, relocated under a tab.
 
-- [ ] **R195**: The open tab survives a page refresh and is directly linkable (reflected in the route/query),
+- [x] **R195**: The open tab survives a page refresh and is directly linkable (reflected in the route/query),
       so a super-admin can bookmark or share a link straight to Organizations.
 
 ### Organizations — list & onboard
@@ -107,16 +107,20 @@ REQ-IDs continue from v1.9 (last R192).
 
 - Editing an existing org's name/settings, or suspending/archiving/deleting an org, from the console —
   this pass is list + onboard + assign-admin only.
+
 - Multi-admin management UI (bulk assignment, per-org role changes, removing members) beyond assigning the
   first/additional editor by email.
+
 - Self-service church signup — onboarding is super-admin-driven only this pass.
 
 ## Out of Scope
 
 - **Billing / subscription management** — explicitly deferred again (was out of scope for v1.9 too); onboarding
   a church is free-of-charge provisioning only.
+
 - **A distinct per-org "admin" role above editor** — a church admin *is* the existing editor role by owner
   decision; no new role tier or claim key is introduced.
+
 - **Changing per-org RBAC semantics** — editor/viewer behavior is unchanged; only the *claim's org coverage*
   widens (999.5).
 
@@ -124,9 +128,9 @@ REQ-IDs continue from v1.9 (last R192).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R193 | Phase 72 | Pending |
-| R194 | Phase 72 | Pending |
-| R195 | Phase 72 | Pending |
+| R193 | Phase 72 | Complete |
+| R194 | Phase 72 | Complete |
+| R195 | Phase 72 | Complete |
 | R196 | Phase 74 | Pending |
 | R197 | Phase 74 | Pending |
 | R198 | Phase 74 | Pending |
