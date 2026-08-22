@@ -38,6 +38,7 @@ interface OrgListEntry {
   id: string;
   data: Record<string, unknown>;
   memberCount: number;
+  pendingCount?: number;
 }
 
 /**
@@ -99,12 +100,21 @@ class FakeFirestore {
             data: () => o.data,
             ref: {
               collection: (name: string) => {
-                if (name !== "members") throw new Error(`unexpected subcollection "${name}"`);
-                return {
-                  count: () => ({
-                    get: async () => ({ data: () => ({ count: o.memberCount }) }),
-                  }),
-                };
+                if (name === "members") {
+                  return {
+                    count: () => ({
+                      get: async () => ({ data: () => ({ count: o.memberCount }) }),
+                    }),
+                  };
+                }
+                if (name === "invites") {
+                  return {
+                    count: () => ({
+                      get: async () => ({ data: () => ({ count: o.pendingCount ?? 0 }) }),
+                    }),
+                  };
+                }
+                throw new Error(`unexpected subcollection "${name}"`);
               },
             },
           })),
@@ -582,12 +592,12 @@ describe("assignOrgAdminHandler", () => {
 // --- listOrganizations ---------------------------------------------------------
 
 describe("listOrganizationsHandler", () => {
-  it("R196: returns [{orgId,name,createdAt,memberCount}] for N orgs with server-computed counts", async () => {
+  it("R196: returns [{orgId,name,createdAt,memberCount,pendingCount}] for N orgs with server-computed counts", async () => {
     mockAuth();
     const fake = withCallerGate(new FakeFirestore());
     fake.orgsListDocs = [
-      { id: "org1", data: { name: "Grace Church", createdAt: "ts1" }, memberCount: 3 },
-      { id: "org2", data: { name: "Hope Chapel", createdAt: "ts2" }, memberCount: 0 },
+      { id: "org1", data: { name: "Grace Church", createdAt: "ts1" }, memberCount: 3, pendingCount: 0 },
+      { id: "org2", data: { name: "Hope Chapel", createdAt: "ts2" }, memberCount: 0, pendingCount: 0 },
     ];
     vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
 
@@ -595,8 +605,8 @@ describe("listOrganizationsHandler", () => {
 
     expect(result).toEqual({
       organizations: [
-        { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3 },
-        { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0 },
+        { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 0 },
+        { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 0 },
       ],
     });
   });
@@ -609,5 +619,37 @@ describe("listOrganizationsHandler", () => {
     const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
 
     expect(result).toEqual({ organizations: [] });
+  });
+
+  it("R222/R223: pendingCount reflects each org's live invites count() aggregate, computed alongside memberCount", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.orgsListDocs = [
+      { id: "org1", data: { name: "Grace Church", createdAt: "ts1" }, memberCount: 3, pendingCount: 2 },
+      { id: "org2", data: { name: "Hope Chapel", createdAt: "ts2" }, memberCount: 0, pendingCount: 1 },
+    ];
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
+
+    expect(result.organizations).toEqual([
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 2 },
+      { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 1 },
+    ]);
+  });
+
+  it("R222: an org with no invite docs returns pendingCount: 0 explicitly (never omitted/undefined)", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.orgsListDocs = [
+      { id: "org1", data: { name: "Grace Church", createdAt: "ts1" }, memberCount: 5 },
+    ];
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
+
+    expect(result.organizations).toEqual([
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 5, pendingCount: 0 },
+    ]);
   });
 });
