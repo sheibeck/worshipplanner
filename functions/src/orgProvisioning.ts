@@ -371,6 +371,7 @@ export interface OrgSummary {
   name: string;
   createdAt: unknown;
   memberCount: number;
+  pendingCount: number;
 }
 
 export interface ListOrganizationsResponse {
@@ -379,10 +380,12 @@ export interface ListOrganizationsResponse {
 
 /**
  * The testable handler body, exported separately from the onCall wrapper
- * below. Reads every `organizations` doc and computes each member count
- * server-side via the members subcollection's `count()` aggregate query
- * (Promise.all across orgs) -- keeps firestore.rules unchanged (no broadened
- * client read of organizations/* across every org).
+ * below. Reads every `organizations` doc and computes each member count and
+ * pending-invite count server-side via the members and invites subcollections'
+ * `count()` aggregate queries (Promise.all across orgs, and Promise.all across
+ * the two aggregates within each org so they fire concurrently) -- keeps
+ * firestore.rules unchanged (no broadened client read of organizations/*
+ * across every org).
  */
 export async function listOrganizationsHandler(
   request: CallableRequest<void>,
@@ -393,13 +396,17 @@ export async function listOrganizationsHandler(
   const orgsSnap = await db.collection("organizations").get();
   const organizations = await Promise.all(
     orgsSnap.docs.map(async (orgDoc) => {
-      const countSnap = await orgDoc.ref.collection("members").count().get();
+      const [membersCountSnap, invitesCountSnap] = await Promise.all([
+        orgDoc.ref.collection("members").count().get(),
+        orgDoc.ref.collection("invites").count().get(),
+      ]);
       const data = orgDoc.data() as { name?: string; createdAt?: unknown };
       return {
         orgId: orgDoc.id,
         name: data.name ?? "(unnamed)",
         createdAt: data.createdAt ?? null,
-        memberCount: countSnap.data().count,
+        memberCount: membersCountSnap.data().count,
+        pendingCount: invitesCountSnap.data().count,
       };
     }),
   );
