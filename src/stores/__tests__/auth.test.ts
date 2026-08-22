@@ -485,6 +485,38 @@ describe('useAuthStore', () => {
       expect(store.hasNoOrg).toBe(true)
       expect(store.requiresOrgSelection).toBe(true)
     })
+
+    // v2.0 — an org whose name can't be read (orphaned id / denied read) must
+    // fall back to its id in the picker, never blank or break the whole list.
+    it('falls back to the org id when an org name cannot be read', async () => {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: ['org-1', 'org-2'] }),
+          }) as never
+        }
+        if (path === 'organizations/org-1') {
+          return Promise.resolve({ exists: () => true, data: () => ({ name: 'Org One' }) }) as never
+        }
+        if (path === 'organizations/org-2') {
+          return Promise.reject(new Error('permission-denied')) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.memberships).toEqual([
+        { id: 'org-1', name: 'Org One' },
+        { id: 'org-2', name: 'org-2' },
+      ])
+      expect(store.needsOrgSelection).toBe(true)
+    })
   })
 
   describe('vwModeEnabled (D-15/D-16)', () => {

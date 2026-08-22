@@ -263,21 +263,22 @@ export const useAuthStore = defineStore('auth', () => {
     const userData = userSnap.exists() ? userSnap.data() : null
     const ids: string[] = userData?.orgIds ?? []
 
-    // Build the membership list ({id, name}) the church picker renders. Names
-    // are only needed when there is a choice to present (>1 org); a single-org
-    // user's name is loaded from the full org doc below, so skip the extra reads
-    // in the common case.
-    if (ids.length > 1) {
-      memberships.value = await Promise.all(
-        ids.map(async (id) => {
+    // Build the membership list ({id, name}) the church picker renders. Each
+    // org name is read individually and guarded: an org the user has an orgIds
+    // entry for but can't cleanly read (e.g. a stale/orphaned id with no member
+    // doc — a data inconsistency) falls back to its id instead of rejecting the
+    // whole list, so one bad membership never blanks or breaks the picker.
+    memberships.value = await Promise.all(
+      ids.map(async (id) => {
+        try {
           const snap = await getDoc(doc(db, 'organizations', id))
-          const name = snap.exists() ? ((snap.data().name as string) ?? id) : id
+          const name = snap.exists() ? (snap.data().name as string) || id : id
           return { id, name }
-        }),
-      )
-    } else {
-      memberships.value = ids.map((id) => ({ id, name: id }))
-    }
+        } catch {
+          return { id, name: id }
+        }
+      }),
+    )
 
     // Resolve the active org for this session:
     //  - a remembered choice for THIS user (survives refresh, cleared on logout),
