@@ -647,3 +647,16 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 2. **Real-browser visual confirmation of the Organizations tab.** List table (Church/Org ID/Created/Members/Actions), onboard-a-church form, and the per-org inline "Assign admin" control — dark-palette match, spacing, focus rings, loading/empty/error states, per `74-UI-SPEC.md`.
 
 **Everything in this phase ships built, tested, and UNDEPLOYED** — no `firebase deploy` was run by this phase, per the v2.0 milestone deploy policy. This is the final phase of v2.0 — once the owner runs the deploy + confirms both items above, the milestone is ready to close.
+
+---
+
+## Phase 75 — Pending-Invite Visibility (v2.1) — `verification_deferred_human`
+
+**Code-complete + automatically verified 2026-08-22** (verifier ran the gates independently: `cd functions && npx vitest run src/orgProvisioning.test.ts` 30/30; `npx vitest run src/components/admin/__tests__/OrganizationsTab.test.ts` 23/23; `npm run type-check` (`vue-tsc --build`) clean; full app suite at the documented 2-file baseline, no new regressions). 3/3 code truths verified (R222/R223): `listOrganizations` now returns `pendingCount` from a second `invites` `count()` aggregate run concurrently with the `members` aggregate — active vs pending, both server-side, no new client cross-org read — and the Organizations tab Members cell renders an accessible "N pending" amber badge when `pendingCount > 0`. Code review (`75-REVIEW.md`): 0 Critical, 0 Warning, 2 Info (accepted — loose test substrings; the non-optional `pendingCount` shares `memberCount`'s pre-existing deploy-lockstep pattern).
+
+**What only the owner at `/gsd-verify-work 75` can confirm — do NOT mark passed:**
+
+1. **Owner-gated deploy + production confirmation.** Run `firebase deploy --only functions:listOrganizations --project worship-planner-bc515`, then in the live Owner Console Organizations tab confirm an onboarded-but-never-logged-in admin's church shows as "1 pending" (not a bare "0 members"), and that the active count and pending count read correctly for a real church.
+2. **Real-browser visual of the pending badge** — contrast/spacing of the amber "N pending" pill against the live dark table.
+
+**Ships built + tested + UNDEPLOYED** — the client badge half needs no deploy; the `listOrganizations` server change is the single owner-gated deploy above.

@@ -90,11 +90,11 @@ end. Re-read before deciding to stop — it survives context compaction.
 ## Deferred Verification
 
 Per the v2.1 grant, human UAT is deferred to milestone end and NEVER recorded as passed. On autonomous
-re-entry these phases are dropped from the run queue and resumed only via the recorded command. (No
-phases code-complete yet — table fills in as phases close.)
+re-entry these phases are dropped from the run queue and resumed only via the recorded command.
 
 | Phase | State | Resume |
 |-------|-------|--------|
+| 75 | verification_deferred_human | /gsd-verify-work 75 |
 
 ---
 
