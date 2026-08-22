@@ -25,6 +25,7 @@ interface OrgSummaryFixture {
   name: string
   createdAt: unknown
   memberCount: number
+  pendingCount: number
 }
 
 const { mockListOrganizations, mockOnboardOrganization, mockAssignOrgAdmin } = vi.hoisted(() => ({
@@ -77,12 +78,21 @@ async function mountTab() {
   return wrapper
 }
 
-function makeOrg(overrides: Partial<{ orgId: string; name: string; createdAt: unknown; memberCount: number }> = {}) {
+function makeOrg(
+  overrides: Partial<{
+    orgId: string
+    name: string
+    createdAt: unknown
+    memberCount: number
+    pendingCount: number
+  }> = {},
+) {
   return {
     orgId: 'org-1',
     name: 'Test Church',
     createdAt: { toDate: () => new Date('2026-08-01T00:00:00Z') },
     memberCount: 3,
+    pendingCount: 0,
     ...overrides,
   }
 }
@@ -113,6 +123,47 @@ describe('OrganizationsTab -- list (R196)', () => {
     expect(wrapper.text()).toContain('org-2')
     const rows = wrapper.findAll('tbody tr')
     expect(rows.length).toBe(2)
+  })
+
+  it('renders an accessible "N pending" badge when pendingCount > 0 (R222)', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [makeOrg({ pendingCount: 2 })],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+
+    expect(wrapper.text()).toContain('pending')
+    expect(wrapper.text()).toContain('2')
+  })
+
+  it('shows "0" active plus "1 pending" for an onboarded-but-unclaimed admin (R222)', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [makeOrg({ memberCount: 0, pendingCount: 1 })],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+
+    expect(wrapper.text()).toContain('0')
+    expect(wrapper.text()).toContain('1 pending')
+  })
+
+  it('renders no "pending" text for a genuinely empty org (0 active, 0 pending) (R222)', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [makeOrg({ memberCount: 0, pendingCount: 0 })],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+
+    expect(wrapper.text()).not.toContain('pending')
   })
 
   // Regression: listOrganizations is a callable, so an Admin Timestamp arrives
