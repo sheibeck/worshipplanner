@@ -185,10 +185,24 @@ function isValidEmailFormat(email: string): boolean {
   return e.includes('@') && e.includes('.')
 }
 
+function toDate(ts: unknown): Date | null {
+  if (!ts) return null
+  // Client Firestore Timestamp (has toDate()).
+  const withToDate = ts as { toDate?: () => Date }
+  if (typeof withToDate.toDate === 'function') return withToDate.toDate()
+  // Admin Timestamp serialized over the callable wire: { _seconds } or { seconds }.
+  const secs =
+    (ts as { _seconds?: number })._seconds ?? (ts as { seconds?: number }).seconds ?? null
+  if (typeof secs === 'number') return new Date(secs * 1000)
+  // Epoch millis or an ISO string.
+  if (typeof ts === 'number') return new Date(ts)
+  if (typeof ts === 'string') return new Date(ts)
+  return null
+}
+
 function formatDate(ts: unknown): string {
-  const t = ts as { toDate?: () => Date } | null
-  if (!t || !t.toDate) return '—'
-  const d = t.toDate()
+  const d = toDate(ts)
+  if (!d || isNaN(d.getTime())) return '—'
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 

@@ -115,6 +115,24 @@ describe('OrganizationsTab -- list (R196)', () => {
     expect(rows.length).toBe(2)
   })
 
+  // Regression: listOrganizations is a callable, so an Admin Timestamp arrives
+  // JSON-serialized as { _seconds } with no toDate() — formatDate used to fall
+  // through to '—' for every real org. It must now render a date.
+  it('formats a callable-serialized createdAt ({ _seconds }) as a date, not a dash', async () => {
+    const seconds = Math.floor(Date.parse('2026-08-01T00:00:00Z') / 1000)
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [
+            makeOrg({ orgId: 'org-1', name: 'Grace Church', createdAt: { _seconds: seconds } }),
+          ],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+    expect(wrapper.text()).toContain('2026')
+  })
+
   it('shows the list-load error on rejection', async () => {
     mockListOrganizations.mockImplementation(() => Promise.reject(new Error('boom')))
     const wrapper = await mountTab()
