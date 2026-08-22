@@ -54,7 +54,15 @@
               <td class="px-4 py-3 text-gray-200">{{ org.name }}</td>
               <td class="px-4 py-3 text-gray-500 text-xs font-mono">{{ org.orgId }}</td>
               <td class="px-4 py-3 text-gray-400 text-sm">{{ formatDate(org.createdAt) }}</td>
-              <td class="px-4 py-3 text-gray-400 text-sm">{{ org.memberCount }}</td>
+              <td class="px-4 py-3 text-gray-400 text-sm">
+                {{ org.memberCount }}
+                <span
+                  v-if="org.pendingCount > 0"
+                  class="ml-1 inline-flex items-center rounded-full bg-amber-900/40 text-amber-300 border border-amber-800/50 px-1.5 py-0.5 text-xs font-medium"
+                >
+                  {{ org.pendingCount }} pending
+                </span>
+              </td>
               <td class="px-4 py-3">
                 <template v-if="assigningOrgId === org.orgId">
                   <div class="flex items-center gap-2">
@@ -128,6 +136,7 @@ interface OrgSummary {
   name: string
   createdAt: unknown
   memberCount: number
+  pendingCount: number
 }
 
 interface ListOrganizationsResponse {
