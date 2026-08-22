@@ -16,7 +16,6 @@ import {
   setDoc,
   getDoc,
   writeBatch,
-  collection,
   serverTimestamp,
   onSnapshot,
   updateDoc,
@@ -27,7 +26,6 @@ import type { OrgSettings } from '@/types/organization'
 import { DEFAULT_ORG_SETTINGS } from '@/types/organization'
 import { SLIDE_FONTS } from '@/config/slideFonts'
 import { loadFontCss, snapWeight } from '@/utils/slideTypography'
-import { normalizeOrgName, claimOrgName } from '@/utils/orgName'
 
 let memberUnsub: Unsubscribe | null = null
 
@@ -41,6 +39,41 @@ let memberUnsub: Unsubscribe | null = null
 // magic numbers.
 export const CLAIM_REFRESH_MAX_ATTEMPTS = 4
 export const CLAIM_REFRESH_DELAY_MS = 1500
+
+// Per-session memory of which church a multi-org user chose to enter. Kept in
+// sessionStorage (NOT localStorage) so it survives a page refresh but a full
+// logout clears it — matching "log out and back in to switch churches". Keyed
+// by uid so one browser session can't leak a choice across accounts. Every
+// access is guarded: sessionStorage throws in some privacy modes.
+const SELECTED_ORG_STORAGE_KEY = 'wp.selectedOrg'
+
+function readRememberedOrg(uid: string): string | null {
+  try {
+    const raw = sessionStorage.getItem(SELECTED_ORG_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { uid?: string; orgId?: string }
+    return parsed.uid === uid && typeof parsed.orgId === 'string' ? parsed.orgId : null
+  } catch {
+    return null
+  }
+}
+
+function rememberOrg(uid: string, orgId: string): void {
+  try {
+    sessionStorage.setItem(SELECTED_ORG_STORAGE_KEY, JSON.stringify({ uid, orgId }))
+  } catch {
+    // sessionStorage unavailable (private mode / disabled) — the choice simply
+    // won't persist across a refresh; not fatal.
+  }
+}
+
+function clearRememberedOrg(): void {
+  try {
+    sessionStorage.removeItem(SELECTED_ORG_STORAGE_KEY)
+  } catch {
+    // ignore — see rememberOrg
+  }
+}
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
@@ -77,8 +110,29 @@ export const useAuthStore = defineStore('auth', () => {
   // nothing can mutate the default object.
   const settings = ref<OrgSettings>({ ...DEFAULT_ORG_SETTINGS })
 
+  // The organizations the signed-in user belongs to ({id, name}) — the source
+  // the login church-picker renders when a user belongs to more than one.
+  // Populated by loadOrgContext.
+  const memberships = ref<{ id: string; name: string }[]>([])
+
   const isAuthenticated = computed(() => user.value !== null)
   const isEditor = computed(() => userRole.value === 'editor')
+
+  // Org-selection gates consumed by the router. A signed-in user with more than
+  // one church and no active choice must pick one; a signed-in user with zero
+  // churches has nothing to enter. Both cases route to /select-church. Guarded
+  // on isReady so a mid-load transient state never triggers a spurious redirect.
+  const needsOrgSelection = computed(
+    () =>
+      isReady.value &&
+      isAuthenticated.value &&
+      memberships.value.length > 1 &&
+      orgId.value === null,
+  )
+  const hasNoOrg = computed(
+    () => isReady.value && isAuthenticated.value && memberships.value.length === 0,
+  )
+  const requiresOrgSelection = computed(() => needsOrgSelection.value || hasNoOrg.value)
 
   const hasPcCredentials = computed(
     () =>
@@ -209,7 +263,35 @@ export const useAuthStore = defineStore('auth', () => {
     const userData = userSnap.exists() ? userSnap.data() : null
     const ids: string[] = userData?.orgIds ?? []
 
-    if (ids.length === 0) {
+    // Build the membership list ({id, name}) the church picker renders. Names
+    // are only needed when there is a choice to present (>1 org); a single-org
+    // user's name is loaded from the full org doc below, so skip the extra reads
+    // in the common case.
+    if (ids.length > 1) {
+      memberships.value = await Promise.all(
+        ids.map(async (id) => {
+          const snap = await getDoc(doc(db, 'organizations', id))
+          const name = snap.exists() ? ((snap.data().name as string) ?? id) : id
+          return { id, name }
+        }),
+      )
+    } else {
+      memberships.value = ids.map((id) => ({ id, name: id }))
+    }
+
+    // Resolve the active org for this session:
+    //  - a remembered choice for THIS user (survives refresh, cleared on logout),
+    //  - else the sole org when there is exactly one,
+    //  - else null: 0 orgs (no church) or >1 orgs with no choice yet (must pick).
+    // A null result leaves org context empty; the router's org-selection gate
+    // routes such a session to /select-church.
+    const remembered = readRememberedOrg(uid)
+    const activeId =
+      remembered && ids.includes(remembered) ? remembered : ids.length === 1 ? ids[0]! : null
+
+    if (activeId === null) {
+      memberUnsub?.()
+      memberUnsub = null
       orgId.value = null
       orgName.value = null
       orgSlug.value = null
@@ -221,15 +303,15 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
 
-    orgId.value = ids[0]!
+    orgId.value = activeId
 
     // R075/P-01 — force the claim onto the token now that we know which org
     // this session belongs to. Scoped retry only when membershipJustCreated
     // is true (see refreshOrgClaim above and the onAuthStateChanged call
     // site for why).
-    await refreshOrgClaim(ids[0]!, membershipJustCreated)
+    await refreshOrgClaim(activeId, membershipJustCreated)
 
-    const orgRef = doc(db, 'organizations', ids[0]!)
+    const orgRef = doc(db, 'organizations', activeId)
     const orgSnap = await getDoc(orgRef)
     if (orgSnap.exists()) {
       const orgData = orgSnap.data()
@@ -321,7 +403,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Unsubscribe from previous listener if any
     memberUnsub?.()
     memberUnsub = onSnapshot(
-      doc(db, 'organizations', ids[0]!, 'members', uid),
+      doc(db, 'organizations', activeId, 'members', uid),
       async (snap) => {
         if (!snap.exists()) {
           userRole.value = null
@@ -368,15 +450,26 @@ export const useAuthStore = defineStore('auth', () => {
       isSuperAdmin.value = false
       vwModeEnabled.value = true
       settings.value = { ...DEFAULT_ORG_SETTINGS }
+      memberships.value = []
       memberUnsub?.()
       memberUnsub = null
     }
     isReady.value = true
   })
 
+  // Switches the active org for a multi-church user to `targetOrgId` (which must
+  // be one they belong to), remembers the choice for the session, and reloads
+  // org context. Consumed by SelectChurchView.
+  async function selectOrg(targetOrgId: string): Promise<void> {
+    const currentUser = user.value
+    if (!currentUser) return
+    if (!memberships.value.some((m) => m.id === targetOrgId)) return
+    rememberOrg(currentUser.uid, targetOrgId)
+    await loadOrgContext(currentUser.uid, false)
+  }
+
   async function ensureUserDocument(firebaseUser: User): Promise<{ membershipCreated: boolean }> {
     const userRef = doc(db, 'users', firebaseUser.uid)
-    const userSnap = await getDoc(userRef)
 
     // Update/create the user profile document
     await setDoc(
@@ -390,9 +483,8 @@ export const useAuthStore = defineStore('auth', () => {
       { merge: true },
     )
 
-    // Always check for pending invite (even if user already has an org)
-    const userData = userSnap.exists() ? userSnap.data() : null
-    const hasOrg = userData?.orgIds && userData.orgIds.length > 0
+    // Always check for a pending invite (keyed by email) — an invite is now the
+    // ONLY way a signed-in user acquires org membership on login.
     const email = firebaseUser.email?.toLowerCase()
 
     if (email) {
@@ -430,55 +522,10 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
 
-    if (!hasOrg) {
-      // No invite found and no org — auto-create new org for this user
-      const batch = writeBatch(db)
-
-      const orgRef = doc(collection(db, 'organizations'))
-      const newOrgId = orgRef.id
-
-      batch.set(orgRef, {
-        name: `${firebaseUser.displayName || 'My'}'s Church`,
-        createdAt: serverTimestamp(),
-        createdBy: firebaseUser.uid,
-      })
-
-      const memberRef = doc(db, 'organizations', newOrgId, 'members', firebaseUser.uid)
-      batch.set(memberRef, {
-        role: 'editor',
-        joinedAt: serverTimestamp(),
-        displayName: firebaseUser.displayName ?? '',
-        email: firebaseUser.email ?? '',
-      })
-
-      batch.update(userRef, {
-        orgIds: [newOrgId],
-      })
-
-      await batch.commit()
-
-      // Claim a unique org name now that membership exists (isOrgEditor passes).
-      // Best-effort + non-blocking: never fail account creation on it. The default
-      // "<name>'s Church" can collide between two same-named users, so suffix
-      // (" 2", " 3", …) until a name claims, then persist that final name.
-      try {
-        const baseName = `${firebaseUser.displayName || 'My'}'s Church`
-        for (let n = 1; n <= 50; n++) {
-          const candidate = n === 1 ? baseName : `${baseName} ${n}`
-          if (await claimOrgName(normalizeOrgName(candidate), newOrgId)) {
-            if (candidate !== baseName) {
-              await updateDoc(orgRef, { name: candidate })
-            }
-            break
-          }
-        }
-      } catch (err) {
-        console.error('[auth] org name uniqueness claim failed (non-blocking):', err)
-      }
-
-      return { membershipCreated: true }
-    }
-
+    // No pending invite: a signed-in user is NEVER auto-provisioned an
+    // organization. Organizations are created only by a super-admin via the
+    // onboardOrganization callable; an un-invited, org-less user is routed to
+    // the church picker's empty state by the router's org-selection gate.
     return { membershipCreated: false }
   }
 
@@ -528,6 +575,8 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
+    clearRememberedOrg()
+    memberships.value = []
     orgId.value = null
     orgName.value = null
     orgSlug.value = null
@@ -558,6 +607,11 @@ export const useAuthStore = defineStore('auth', () => {
     orgName,
     orgSlug,
     userRole,
+    memberships,
+    needsOrgSelection,
+    hasNoOrg,
+    requiresOrgSelection,
+    selectOrg,
     isEditor,
     isSuperAdmin,
     refreshSuperAdminClaim,

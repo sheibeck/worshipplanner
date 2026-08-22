@@ -170,12 +170,59 @@ function mockOrgDocPathWithInvite(orgData: Record<string, unknown> | null) {
   })
 }
 
+/**
+ * v2.0 — a user who belongs to more than one org (orgIds: ['org-1','org-2']).
+ * Drives loadOrgContext's church-picker population + the org-selection gate.
+ */
+function mockMultiOrg() {
+  vi.mocked(doc).mockImplementation(
+    (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+  )
+  vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+    const path = (ref as { path?: string }).path
+    if (path === 'users/test-uid') {
+      return Promise.resolve({
+        exists: () => true,
+        data: () => ({ orgIds: ['org-1', 'org-2'] }),
+      }) as never
+    }
+    if (path === 'organizations/org-1') {
+      return Promise.resolve({ exists: () => true, data: () => ({ name: 'Org One' }) }) as never
+    }
+    if (path === 'organizations/org-2') {
+      return Promise.resolve({ exists: () => true, data: () => ({ name: 'Org Two' }) }) as never
+    }
+    return Promise.resolve({ exists: () => false, data: () => null }) as never
+  })
+}
+
+/** v2.0 — a signed-in user who belongs to NO organization (orgIds: []). */
+function mockNoOrg() {
+  vi.mocked(doc).mockImplementation(
+    (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+  )
+  vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+    const path = (ref as { path?: string }).path
+    if (path === 'users/test-uid') {
+      return Promise.resolve({ exists: () => true, data: () => ({ orgIds: [] }) }) as never
+    }
+    return Promise.resolve({ exists: () => false, data: () => null }) as never
+  })
+}
+
 describe('useAuthStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     // Reset auth callbacks
     ;(globalThis as Record<string, unknown>).__authCallbacks = []
+    // v2.0 — the church choice is remembered in sessionStorage; clear between
+    // tests so a prior selection never leaks into the next.
+    try {
+      sessionStorage.clear()
+    } catch {
+      /* jsdom may not expose sessionStorage in every config */
+    }
   })
 
   describe('initial state', () => {
@@ -353,6 +400,90 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
       await store.loginWithGoogle()
       expect(setDoc).toHaveBeenCalled()
+    })
+
+    // v2.0 — signing in must NEVER auto-provision an organization. Orgs are
+    // created only by a super-admin via onboardOrganization. An un-invited user
+    // gets no org and no writeBatch (which the removed auto-create path used).
+    it('does NOT auto-create an organization for an un-invited user', async () => {
+      const { writeBatch } = await import('firebase/firestore')
+      mockOrgDocPath({ name: 'Test Org' }) // no inviteLookup entry → no invite
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      const result = await store.ensureUserDocument(mockUser as never)
+      expect(result).toEqual({ membershipCreated: false })
+      expect(writeBatch).not.toHaveBeenCalled()
+    })
+
+    // v2.0 — a pending invite is now the ONLY way login grants membership.
+    it('consumes a pending invite and joins the invited org', async () => {
+      const { writeBatch } = await import('firebase/firestore')
+      mockOrgDocPathWithInvite({ name: 'Org One' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      const result = await store.ensureUserDocument(mockUser as never)
+      expect(result).toEqual({ membershipCreated: true })
+      expect(writeBatch).toHaveBeenCalled()
+    })
+  })
+
+  // v2.0 — multi-church login picker + org-selection gate state.
+  describe('multi-org selection', () => {
+    it('a user in multiple orgs must pick one — memberships populated, no active org yet', async () => {
+      mockMultiOrg()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.memberships).toEqual([
+        { id: 'org-1', name: 'Org One' },
+        { id: 'org-2', name: 'Org Two' },
+      ])
+      expect(store.orgId).toBeNull()
+      expect(store.needsOrgSelection).toBe(true)
+      expect(store.requiresOrgSelection).toBe(true)
+    })
+
+    it('selectOrg activates the chosen org and clears the selection requirement', async () => {
+      mockMultiOrg()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      await store.selectOrg('org-2')
+      expect(store.orgId).toBe('org-2')
+      expect(store.orgName).toBe('Org Two')
+      expect(store.needsOrgSelection).toBe(false)
+      expect(store.requiresOrgSelection).toBe(false)
+    })
+
+    it('selectOrg ignores an org the user does not belong to', async () => {
+      mockMultiOrg()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      await store.selectOrg('org-not-mine')
+      expect(store.orgId).toBeNull()
+      expect(store.needsOrgSelection).toBe(true)
+    })
+
+    it('a single-org user goes straight in (no selection required)', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.orgId).toBe('org-1')
+      expect(store.needsOrgSelection).toBe(false)
+      expect(store.requiresOrgSelection).toBe(false)
+    })
+
+    it('hasNoOrg is true when the user belongs to no organization', async () => {
+      mockNoOrg()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.memberships).toEqual([])
+      expect(store.orgId).toBeNull()
+      expect(store.hasNoOrg).toBe(true)
+      expect(store.requiresOrgSelection).toBe(true)
     })
   })
 
@@ -917,18 +1048,23 @@ describe('useAuthStore', () => {
       expect(result).toEqual({ membershipCreated: true })
     })
 
-    it('reports membershipCreated true on the auto-create-new-org path', async () => {
+    // v2.0 — the auto-create-new-org path was REMOVED: signing in never
+    // provisions an org. An org-less, un-invited user now reports
+    // membershipCreated false and triggers no write batch.
+    it('reports membershipCreated false for an org-less, un-invited user (no auto-create)', async () => {
+      const { writeBatch } = await import('firebase/firestore')
       vi.mocked(doc).mockImplementation(
         (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
       )
       vi.mocked(getDoc).mockImplementation(() => {
-        // No user doc, no invite -- hasOrg false, no invite found -> auto-create.
+        // No user doc, no invite -> nothing to join, and no org is created.
         return Promise.resolve({ exists: () => false, data: () => null }) as never
       })
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
       const result = await store.ensureUserDocument(mockUser as never)
-      expect(result).toEqual({ membershipCreated: true })
+      expect(result).toEqual({ membershipCreated: false })
+      expect(writeBatch).not.toHaveBeenCalled()
     })
 
     it('reports membershipCreated false on the already-a-member path', async () => {

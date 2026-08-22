@@ -84,6 +84,15 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresSuperAdmin: true },
     },
     {
+      // Login church-picker: shown to a signed-in user who belongs to more than
+      // one church (choose which to enter) or to none (empty state). Org-scoped
+      // routes redirect here via the org-selection gate below.
+      path: '/select-church',
+      name: 'select-church',
+      component: () => import('../views/SelectChurchView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/share/:token',
       name: 'share',
       component: () => import('../views/ShareView.vue'),
@@ -120,6 +129,30 @@ router.beforeEach(async (to) => {
     const user = await getCurrentUser()
     if (!user) {
       return { name: 'login' }
+    }
+
+    // Org-selection gate — a signed-in user with zero churches, or with more
+    // than one and no active choice, must resolve which church (if any) to
+    // enter before reaching an org-scoped view. The platform-level owner
+    // console is org-independent, so it is exempt; the picker itself is too.
+    if (!to.meta.requiresSuperAdmin && to.name !== 'select-church') {
+      const { useAuthStore } = await import('../stores/auth')
+      const authStore = useAuthStore()
+      await authStore.waitForReady()
+      if (authStore.requiresOrgSelection) {
+        return { name: 'select-church' }
+      }
+    }
+  }
+
+  // Never strand a user on the picker once they've resolved to an active org.
+  if (to.name === 'select-church') {
+    const { useAuthStore } = await import('../stores/auth')
+    const authStore = useAuthStore()
+    await authStore.waitForReady()
+    if (!authStore.requiresOrgSelection) {
+      await authStore.waitForRole()
+      return { name: authStore.isEditor ? 'dashboard' : 'services' }
     }
   }
 
@@ -159,6 +192,10 @@ router.beforeEach(async (to) => {
     if (user) {
       const { useAuthStore } = await import('../stores/auth')
       const authStore = useAuthStore()
+      await authStore.waitForReady()
+      if (authStore.requiresOrgSelection) {
+        return { name: 'select-church' }
+      }
       await authStore.waitForRole()
       return { name: authStore.isEditor ? 'dashboard' : 'services' }
     }
