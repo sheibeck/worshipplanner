@@ -116,21 +116,21 @@ REQ-IDs continue from v2.0 (last R211).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R212 | TBD | Pending |
-| R213 | TBD | Pending |
-| R214 | TBD | Pending |
-| R215 | TBD | Pending |
-| R216 | TBD | Pending |
-| R217 | TBD | Pending |
-| R218 | TBD | Pending |
-| R219 | TBD | Pending |
-| R220 | TBD | Pending |
-| R221 | TBD | Pending |
-| R222 | TBD | Pending |
-| R223 | TBD | Pending |
-| R224 | TBD | Pending |
-| R225 | TBD | Pending |
-| R226 | TBD | Pending |
-| R227 | TBD | Pending |
+| R212 | Phase 76 | Pending |
+| R213 | Phase 76 | Pending |
+| R214 | Phase 76 | Pending |
+| R215 | Phase 77 | Pending |
+| R216 | Phase 77 | Pending |
+| R217 | Phase 77 | Pending |
+| R218 | Phase 77 | Pending |
+| R219 | Phase 77 | Pending |
+| R220 | Phase 77 | Pending |
+| R221 | Phase 77 | Pending |
+| R222 | Phase 75 | Pending |
+| R223 | Phase 75 | Pending |
+| R224 | Phase 78 | Pending |
+| R225 | Phase 78 | Pending |
+| R226 | Phase 78 | Pending |
+| R227 | Phase 78 | Pending |
 
-**Coverage:** 16 v2.1 requirements (R212–R227). Traceability filled by the roadmapper.
+**Coverage:** 16/16 v2.1 requirements (R212–R227) mapped — Phase 75 (R222-R223), Phase 76 (R212-R214), Phase 77 (R215-R221), Phase 78 (R224-R227). 100% coverage, no orphans, no duplicates.

@@ -13,6 +13,7 @@
 - ✅ **v1.8 — Cost & Billing Hardening** — Phases 65-67 (shipped 2026-08-20; safe config deployed to production — capped the metered Claude `api` proxy, gave every unbounded Storage path a dry-run retention sweep, gated off the daily all-org reminder scan, and capped email/instance fan-out — R161–R168, R170–R173; storage-deletion activation + firestore.rules deny owner-gated)
 - ✅ **v1.9 — Owner Admin Console** — Phases 68-71 (code-complete 2026-08-20; super-admin console lifting the v1.8 cost/cleanup levers + no-reply sender into Firestore-backed runtime config, with a dry-run blast-radius preview gating every cleanup-toggle flip — deploy + human UAT + milestone lifecycle parked with owner, archives as-is once those run)
 - 🚧 **v2.0 — Multi-Church Onboarding & Owner Console Tabs** — Phases 72-74 (active, started 2026-08-21; stacks on v1.9's code-complete console — tabbed Configuration/Organizations shell, org onboarding (org + settings + seeded template + first admin), and the multi-org Storage auth-claim widening (backlog 999.5) as a hard prerequisite for assigning a second-org admin)
+- 🚧 **v2.1 — Organization Lifecycle & Super-Admin Access** — Phases 75-78 (active, started 2026-08-22; stacks on v2.0's code-complete Organizations tab — church deactivate/reactivate, deactivation-gated deletion with full cascade cleanup, pending-invite visibility, and a super-admin "enter any church" rules arm)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -536,6 +537,162 @@ be in place before assigning a second-org admin)
 UNDEPLOYED, with the exact `firebase deploy --only functions:…` command handed to the owner, per the
 milestone deploy policy above.
 
+## v2.1 Organization Lifecycle & Super-Admin Access (Phases 75-78) — ACTIVE
+
+**Milestone Goal:** Give the super-admin full lifecycle control over churches from the Organizations tab —
+deactivate, delete-with-full-cleanup, see pending invites, and drop into any church to help — without
+leaking cross-tenant access to ordinary users. Phase numbering continues from v2.0 (72–74); this milestone
+is Phases 75–78. Stacks on v2.0's code-complete Organizations tab (deploy + UAT + milestone-complete for
+v2.0 remain parked with the owner). Church rename and the invite→first-login claim flow already exist and
+are NOT re-scoped.
+
+**Sequencing constraints (owner, 2026-08-22):** deactivation (R212-R214) ships before deletion
+(R215-R221) — a delete attempt on an active org is refused, so Phase 77 depends on Phase 76. The
+super-admin "enter any church" rules arm (R225, Phase 78) and the deactivation login-block (R213, Phase
+76) both edit `firestore.rules`/`storage.rules`; Phase 78 is sequenced after Phase 76 so the super-admin
+arm composes cleanly on top of the deactivation-aware rules rather than the two changes landing
+concurrently. Pending-invite visibility (R222-R223, Phase 75) is independent and low-risk — it only
+extends the existing super-admin-gated `listOrganizations` callable and the v2.0 Organizations list UI —
+so it is sequenced first. The two security-critical areas — the destructive deletion cascade (Phase 77)
+and privileged super-admin cross-tenant access (Phase 78) — each get their own phase with a STRIDE threat
+model and genuine emulator ALLOW/DENY rules tests.
+
+- [ ] **Phase 75: Pending-Invite Visibility** - The Organizations list distinguishes active (logged-in) members from invited-but-pending ones, computed server-side by the existing `listOrganizations` callable
+- [ ] **Phase 76: Church Deactivation & Reactivation** - A reversible off-switch: a super-admin-gated callable flips an org's active status, `firestore.rules`/`storage.rules` deny a deactivated org's members org-scoped access, and reactivation restores it
+- [ ] **Phase 77: Church Deletion — Cascade Cleanup** - Deletion is gated on deactivation, runs through a re-verifying super-admin-gated callable, cascades every Firestore subcollection + cross-reference + Storage object, requires a typed confirmation, and is safely retriable
+- [ ] **Phase 78: Super-Admin Enter-Any-Church** - A super-admin arm in `firestore.rules`/`storage.rules` lets a super-admin read/write any church without a membership doc, invisibly to that church's member list, with a persistent "viewing as super-admin" banner and exit
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R212–R227 (16 mapped, 100% coverage)
+
+**Deploy policy (carried from the standing grant):** every auth-claim / `firestore.rules` /
+`storage.rules` / new-callable change in this milestone ships built + tested + UNDEPLOYED, with the exact
+`firebase deploy --only …` command handed over. Client-only phases need no deploy. `RESEND_API_KEY` and
+all other secrets stay server-side. Human verification is deferred to the end of the milestone (routed to
+`PENDING-VERIFICATION.md`), per the standing autonomy grant.
+
+### Phase 75: Pending-Invite Visibility
+
+**Goal**: The Organizations list shows which of a church's people have actually logged in versus are
+still invited-but-pending, so an onboarded-but-unclaimed admin reads as "1 pending," never a confusing
+"0 members."
+**Depends on**: Nothing (first v2.1 phase; independent of the other three — extends v2.0's existing
+`listOrganizations` callable and Organizations list UI)
+**Requirements**: R222, R223
+**Success Criteria** (what must be TRUE):
+
+  1. Each organization row in the Organizations tab shows an active-member count separate from a
+     "pending login" count/badge (R222).
+
+  2. An org whose only admin was onboarded via email but has never logged in shows as pending rather than
+     as having zero members (R222).
+
+  3. The active-vs-pending breakdown is computed server-side — from the org's `members` and `invites` —
+     by the existing super-admin-gated `listOrganizations` callable; no new direct client cross-org
+     Firestore reads are introduced (R223).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy**: Extends the existing `listOrganizations` callable's server-side computation — not a new
+callable, but still a Cloud Functions change. Ships built + tested + UNDEPLOYED, with
+`firebase deploy --only functions:listOrganizations` handed to the owner; the Organizations-list UI half
+needs no deploy.
+
+### Phase 76: Church Deactivation & Reactivation
+
+**Goal**: A super-admin can take a church offline and bring it back — a reversible, rules-enforced
+off-switch that blocks every member of a deactivated org while remaining fully accessible to a
+super-admin.
+**Depends on**: Nothing (independent of Phase 75; sequenced ahead of Phase 77, which it gates, and ahead
+of Phase 78, whose rules arm composes on top of this phase's rules change)
+**Requirements**: R212, R213, R214
+**Success Criteria** (what must be TRUE):
+
+  1. A super-admin can deactivate an organization from the Organizations tab via a super-admin-gated
+     callable, persisting `active: false` + `deactivatedAt` + `deactivatedBy` on the org record — the
+     client never flips another org's status directly (R212).
+
+  2. A member of a deactivated org who signs in or tries to load the app sees a clear "this church is
+     deactivated" message, never a blank app or a silent failure (R213).
+
+  3. `firestore.rules` and `storage.rules` independently deny org-scoped reads/writes from a deactivated
+     org's members, so the block holds even if the client-side check were bypassed (R213).
+
+  4. A super-admin can reactivate a deactivated org, and its members regain normal access on their next
+     load with no manual per-user fix-up (R214).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy**: New super-admin-gated callable(s) (deactivate/reactivate) plus a
+`firestore.rules`/`storage.rules` change enforcing the login-block. Ships built + tested + UNDEPLOYED,
+with the exact `firebase deploy --only firestore:rules,storage,functions:…` command handed to the owner.
+
+### Phase 77: Church Deletion — Cascade Cleanup
+
+**Goal**: A super-admin can permanently and completely remove a deactivated church — every Firestore
+document, every cross-reference, and every Storage object gone, with no orphan left behind, guarded by
+extra confirmation and a STRIDE threat model proving the destructive path is safe.
+**Depends on**: Phase 76 (deletion is refused unless the org is already deactivated)
+**Requirements**: R215, R216, R217, R218, R219, R220, R221
+**Success Criteria** (what must be TRUE):
+
+  1. Attempting to delete an org that is still active is refused with a clear message; deactivation is
+     the first delete guardrail (R215).
+
+  2. Deletion runs through a super-admin-gated callable that independently re-verifies the caller's
+     `superAdmin` claim — the client never bulk-deletes `organizations/*`, its subcollections,
+     `orgNames/*`, or `inviteLookup/*` directly (R216).
+
+  3. After deletion, no document remains under `organizations/{orgId}` — every subcollection (members,
+     invites, services, songs, slideGroups, shareTokens/quarter shares, quarters/roster, and any other
+     org subcollection) is gone (R217).
+
+  4. After deletion, the org's cross-collection references are gone too — `orgNames/{normalizedName}`,
+     every `inviteLookup/{email}` pointing at it, and the org's id removed from each affected member's
+     `users/{uid}.orgIds` via `arrayRemove` with their other memberships preserved — and every Storage
+     object under `orgs/{orgId}/…` (media, backgrounds, pptx-imports, rendered) is gone (R218, R219).
+
+  5. Deleting requires typing the church's name to confirm, echoes what will be destroyed, and is
+     clearly labeled irreversible; retrying an interrupted deletion completes safely with no cross-tenant
+     orphans and returns a clear summary of what was removed (R220, R221).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy**: New super-admin-gated `deleteOrganization`-style callable (Admin SDK cascade — no rules
+change required for the deletion path itself, but a defense-in-depth `firestore.rules` DENY on direct
+client deletes of `organizations/*` is proven by test). Ships built + tested + UNDEPLOYED, with the exact
+`firebase deploy --only functions:…` (and rules, if touched) command handed to the owner.
+
+### Phase 78: Super-Admin Enter-Any-Church
+
+**Goal**: A super-admin can step into any church to help — visibly to them, invisibly to that church's
+member list, without a membership document — proven by a STRIDE threat model and genuine emulator rules
+tests that a super-admin gets in and an ordinary non-member does not.
+**Depends on**: Phase 76 (the super-admin rules arm is added on top of this phase's already-modified
+`firestore.rules`/`storage.rules`, so the two rule changes compose instead of landing concurrently)
+**Requirements**: R224, R225, R226, R227
+**Success Criteria** (what must be TRUE):
+
+  1. Each Organizations row has a "Sign in" / "Enter church" action that switches the super-admin's
+     active org context to that church for support/setup (R224).
+
+  2. A super-admin can read and write a church's Firestore data and Storage without a membership
+     document, via a super-admin arm added to `firestore.rules` and `storage.rules` — proven by a genuine
+     emulator suite: ALLOW for a super-admin on any org, and continued DENY for a non-member, non-super-
+     admin (R225).
+
+  3. Entering a church as a super-admin creates no member doc — the super-admin never appears in that
+     church's member/team list or member count (R226).
+
+  4. While viewing a church they don't belong to, the super-admin sees a persistent "viewing as
+     super-admin" indicator with a one-click way to exit back to the owner console (R227).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy**: A super-admin arm added to `firestore.rules` and `storage.rules` (composed on top of Phase
+76's deactivation-aware rules). Ships built + tested + UNDEPLOYED, with the exact
+`firebase deploy --only firestore:rules,storage` command handed to the owner.
+
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -558,6 +715,10 @@ milestone deploy policy above.
 | 72 | v2.0 | 1/1 | Code-complete (UAT deferred) | 2026-08-21 |
 | 73 | v2.0 | 3/3 | Code-complete + SECURED (deploy UAT deferred) | 2026-08-21 |
 | 74 | v2.0 | 2/2 | Code-complete + SECURED (deploy/UAT deferred) | 2026-08-21 |
+| 75 | v2.1 | 0/TBD | Not started | - |
+| 76 | v2.1 | 0/TBD | Not started | - |
+| 77 | v2.1 | 0/TBD | Not started | - |
+| 78 | v2.1 | 0/TBD | Not started | - |
 
 ## Backlog
 

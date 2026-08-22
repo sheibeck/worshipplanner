@@ -6,12 +6,96 @@ status: planning
 last_updated: "2026-08-22T17:57:45.419Z"
 last_activity: 2026-08-22
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
 ---
+
+# ▶ ACTIVE MILESTONE — v2.1 Organization Lifecycle & Super-Admin Access (started 2026-08-22)
+
+**Goal:** Give the super-admin full lifecycle control over churches from the Organizations tab —
+deactivate, delete-with-full-cleanup, see pending invites, and drop into any church to help — without
+leaking cross-tenant access to ordinary users. Requirements R212+ in REQUIREMENTS.md. Phase numbering
+continues from v2.0 (72–74); this milestone is Phases 75–78.
+
+**Scoping decisions (owner, 2026-08-22):** v2.1 minor increment · **stacks on v2.0** (code-complete; its
+deploy + UAT + milestone-complete remain parked with the owner — v2.0 archives as-is once those run) ·
+deactivation is a **reversible** off-switch that must be set before an org can be **deleted** (deletion is
+irreversible + extra-confirmed) · a super-admin can **enter any church** as a **hidden**, rules-granted
+participant (no member doc, invisible in the church's member list) · church **rename** and the
+**invite→first-login claim** flow already exist and are NOT re-scoped · run autonomous with human
+verification deferred to the end.
+
+## ★★ STANDING AUTONOMY GRANT — v2.1, granted 2026-08-22
+
+**This is the ACTIVE grant.** Same pattern as v1.6–v2.0: run autonomous, defer human verification to the
+end. Re-read before deciding to stop — it survives context compaction.
+
+- **Run all v2.1 phases autonomously** (discuss → plan → execute per phase). Pick the reasonable default
+  on ordinary grey areas, state it, keep moving. Stop and ask only when a wrong assumption would be
+  unsafe or waste the work.
+
+- **Defer human verification to the end.** Route each `human_needed` check to
+  `.planning/PENDING-VERIFICATION.md` and continue; **never record a deferred check as passed.**
+
+- **STOP BEFORE THE MILESTONE LIFECYCLE.** When all v2.1 phases are code-complete, STOP and hand over the
+  `/gsd-verify-work` list + the owner-gated deploy commands (including v2.0's still-outstanding hand-over
+  items, if not already run). Do NOT run audit → complete → cleanup.
+
+- **Deploy policy — HAND OVER all deploys this milestone (carried from v1.5–v2.0).** Every auth-claim /
+  `firestore.rules` / `storage.rules` / new-callable change ships **built + tested + UNDEPLOYED** with the
+  exact `firebase deploy --only …` command handed over. Client-only phases (UI, list display) need no
+  deploy. This covers Phase 76 (deactivate/reactivate callable + rules), Phase 77 (delete callable), Phase
+  78 (super-admin rules arm), and — because it still changes `listOrganizations`' server logic — Phase 75.
+
+- **Sequencing constraints (owner, 2026-08-22):** deactivation (Phase 76, R212-R214) ships before deletion
+  (Phase 77, R215-R221) — deletion is refused on an active org. The super-admin "enter any church" rules
+  arm (Phase 78, R225) and the deactivation login-block (Phase 76, R213) both edit `firestore.rules` /
+  `storage.rules` — Phase 78 is sequenced after Phase 76 so the two rule changes compose instead of
+  landing concurrently. Pending-invite visibility (Phase 75, R222-R223) is independent and low-risk — it
+  only extends the existing super-admin-gated `listOrganizations` callable and the v2.0 Organizations list
+  UI — so it runs first. The two security-critical areas — the destructive deletion cascade (Phase 77)
+  and privileged super-admin cross-tenant access (Phase 78) — each get their own phase with a STRIDE
+  threat model and genuine emulator ALLOW/DENY rules tests.
+
+- **No `.env.local` / `functions/.env` secret writes.** `RESEND_API_KEY` and all other secrets stay
+  server-side and never move into a client-readable doc.
+
+- **No destructive / irreversible actions** without asking (no `git stash` in this multi-worktree repo,
+  no project-wide lint --fix, no history rewrites, no bulk deletions beyond a plan's scope). Note: Phase
+  77's own subject matter IS a destructive/irreversible action (org deletion) — that is in-scope work
+  gated by its own explicit-confirmation UI and STRIDE model, not an exception to this rule about the
+  *agent's* own housekeeping actions.
+
+- Gates: type-check via `npm run type-check` (vue-tsc --build); app-suite baseline is the 2 known-failing
+  files (`storage.rules.test.ts`, `RosterView.test.ts`); functions suite via `cd functions && npm test`;
+  rules suite via the emulator; render-service via `cd render-service && npm test` (not touched this
+  milestone).
+
+- **Rules-testing discipline (carried from v1.5 onward, applies to Phase 76 and Phase 78):** every rules
+  change carries a genuine ALLOW-case test that actually runs against the real emulator, not just
+  deny-cases — Phase 76 needs a deactivated-org DENY plus a continued-ALLOW for an active org; Phase 78
+  needs a genuine super-admin ALLOW plus a continued non-member DENY. Cross-service `firestore.exists()`
+  is inert in the Storage emulator (firebase-js-sdk#6803) — do not gate a Storage rule on it; the claim is
+  the sole authority for Storage membership (v1.5 D-01/D-04).
+
+---
+
+## Deferred Verification
+
+Per the v2.1 grant, human UAT is deferred to milestone end and NEVER recorded as passed. On autonomous
+re-entry these phases are dropped from the run queue and resumed only via the recorded command. (No
+phases code-complete yet — table fills in as phases close.)
+
+| Phase | State | Resume |
+|-------|-------|--------|
+
+---
+
+<details>
+<summary>Historical — v2.0 active/hand-over state (code-complete 2026-08-21; deploy + UAT + milestone-complete lifecycle parked with owner — v2.1 stacks on top, see PROJECT.md)</summary>
 
 # ▶ ACTIVE MILESTONE — v2.0 Multi-Church Onboarding & Owner Console Tabs (started 2026-08-21)
 
@@ -73,14 +157,23 @@ verification to the end. Re-read before deciding to stop — it survives context
 ## Deferred Verification
 
 Per the v2.0 grant, human UAT is deferred to milestone end and NEVER recorded as passed. On autonomous
-re-entry these phases are dropped from the run queue and resumed only via the recorded command. (No
-phases code-complete yet — table fills in as phases close.)
+re-entry these phases are dropped from the run queue and resumed only via the recorded command.
 
 | Phase | State | Resume |
 |-------|-------|--------|
+| 72 | verification_deferred_human | /gsd-verify-work 72 |
+| 73 | verification_deferred_human | /gsd-verify-work 73 |
+| 74 | verification_deferred_human | /gsd-verify-work 74 |
 
----
+**Phase 72 (Owner Console Tabs)** — code-complete + auto-verified 2026-08-21 (6/6 SC; client-only, nothing
+to deploy). **Phase 73 (Multi-Org Storage Auth Claim)** — code-complete + auto-verified + SECURED
+2026-08-21 (5/5 SC; security 6/6 threats closed; UNDEPLOYED — claim writer, `storage.rules`, backfill
+script all owner hand-over, see `DEPLOY-ORG-CLAIMS.md`). **Phase 74 (Organizations — List, Onboard &
+Admin Assignment)** — code-complete + auto-verified + SECURED 2026-08-21 (5/5 SC; security 8/8 threats
+closed; UI review 22/24; 3 callables UNDEPLOYED hand-over). All three phases' human UAT deferred to
+`/gsd-verify-work 72 73 74`; v2.1 stacks directly on top without waiting for that to run.
 
+</details>
 <details>
 <summary>Historical — v1.9 active/hand-over state (code-complete 2026-08-20; deploy + UAT + milestone-complete lifecycle parked with owner — v2.0 stacks on top, see PROJECT.md)</summary>
 
@@ -729,7 +822,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 74 — organizations-list-onboard-admin-assignment
+**Current focus:** Phase 75 — pending-invite-visibility (v2.1 roadmap created; ready to plan)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -739,10 +832,35 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 75 of 78 (Pending-Invite Visibility) — not yet planned
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-22 — Milestone v2.1 started
+Status: Roadmap created — ready to plan Phase 75
+Last activity: 2026-08-22 — v2.1 ROADMAP.md created (Phases 75-78, R212-R227, 100% coverage)
+
+## ★ v2.1 ROADMAP.md phase breakdown (created 2026-08-22)
+
+4 phases (75-78), derived directly from R212-R227 with this project's `coarse` granularity setting
+applied: pending-invite visibility (R222-R223) is independent and low-risk — it only extends v2.0's
+existing `listOrganizations` callable and Organizations list UI — so it is sequenced first; church
+deactivation/reactivation (R212-R214) is sequenced next since deletion is gated on it and its rules
+change is the one the super-admin arm later composes on top of; church deletion (R215-R221) depends on
+deactivation existing and gets its own phase for the STRIDE threat model over the destructive cascade;
+super-admin enter-any-church (R224-R227) is sequenced last, its rules arm built on top of the
+deactivation phase's already-modified `firestore.rules`/`storage.rules` so the two changes compose
+instead of landing concurrently, and it gets its own phase for the STRIDE threat model over privileged
+cross-tenant access. **Numbering continues from v2.0, which ended at Phase 74** — v2.1 starts at Phase
+75, not reset.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 75 Pending-Invite Visibility | Organizations list shows active vs. pending-login members, computed server-side by the existing `listOrganizations` callable | R222-R223 | Nothing (first) | yes |
+| 76 Church Deactivation & Reactivation | Super-admin-gated deactivate/reactivate callable; firestore.rules/storage.rules deny a deactivated org's members org-scoped access; clear "deactivated" messaging | R212-R214 | Nothing (independent; gates 77, rules precede 78) | yes |
+| 77 Church Deletion — Cascade Cleanup | Deletion refused unless deactivated; super-admin-gated callable cascades every Firestore subcollection + cross-reference + Storage object; typed confirmation; safely retriable | R215-R221 | Phase 76 | yes |
+| 78 Super-Admin Enter-Any-Church | Super-admin arm added to firestore.rules/storage.rules for membership-doc-free access; no member doc created; persistent "viewing as super-admin" banner + exit | R224-R227 | Phase 76 | yes |
+
+See `.planning/ROADMAP.md` § v2.1 Organization Lifecycle & Super-Admin Access for the full phase detail
+table (goals, dependencies, success criteria). Next step: `/gsd-plan-phase 75` (optionally preceded by
+`/gsd-discuss-phase 75`).
 
 ## ★ v2.0 ROADMAP.md phase breakdown (created 2026-08-21)
 
