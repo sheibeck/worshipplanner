@@ -625,11 +625,17 @@ of Phase 78, whose rules arm composes on top of this phase's rules change)
   4. A super-admin can reactivate a deactivated org, and its members regain normal access on their next
      load with no manual per-user fix-up (R214).
 
-**Plans**: TBD
+**Plans**: 0/2 plans executed
+
+Plans:
+
+- [ ] 76-01-PLAN.md — Server: `setOrgActive` callable + `deactivatedOrgs` claim fan-out (R212, R214); `firestore.rules` `isOrgActive()` + `storage.rules` `isOrgDeactivatedForCaller()` guards with emulator ALLOW/DENY suites (R213)
+- [ ] 76-02-PLAN.md — Client: `auth.ts` login-block for a deactivated org (R213); church picker greys out deactivated orgs (R213); Deactivate/Reactivate control on the Organizations tab (R212, R214)
+
 **UI hint**: yes
-**Deploy**: New super-admin-gated callable(s) (deactivate/reactivate) plus a
-`firestore.rules`/`storage.rules` change enforcing the login-block. Ships built + tested + UNDEPLOYED,
-with the exact `firebase deploy --only firestore:rules,storage,functions:…` command handed to the owner.
+**Deploy**: New super-admin-gated callable `setOrgActive` plus a `firestore.rules`/`storage.rules`
+change enforcing the login-block. Ships built + tested + UNDEPLOYED, with the exact
+`firebase deploy --only firestore:rules,storage,functions:setOrgActive` command handed to the owner.
 
 ### Phase 77: Church Deletion — Cascade Cleanup
 
