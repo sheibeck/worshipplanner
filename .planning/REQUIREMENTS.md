@@ -1,151 +1,136 @@
-# Requirements — v2.0 Multi-Church Onboarding & Owner Console Tabs
+# Requirements — v2.1 Organization Lifecycle & Super-Admin Access
 
-**Milestone goal:** Turn the owner console into a tabbed shell and add platform-level multi-tenancy
-management — onboard new churches and assign their first admin from one place — while closing the multi-org
-Storage auth-claim gap that onboarding a second-org admin would otherwise trip.
+**Milestone goal:** Give the super-admin full lifecycle control over churches from the Organizations tab —
+deactivate, delete-with-full-cleanup, see pending invites, and drop into any church to help — without
+leaking cross-tenant access to ordinary users.
 
-**Scoping decisions (owner, 2026-08-21):** v2.0 major · **stacks on v1.9** (code-complete; its deploy + UAT +
-milestone-complete remain parked with the owner) · a church admin **reuses the existing editor role** (no new
-role/claim) · onboarding creates org record + default `OrgSettings` + **seeds the default service template** +
-**assigns the first admin by email** · backlog **999.5** (multi-org Storage auth claim) **pulled into scope** as
-a hard prerequisite · milestone-level research skipped (all patterns already exist in-repo) · run autonomous
-with human verification deferred to the end.
+**Scoping decisions (owner, 2026-08-22):** v2.1 minor · **stacks on v2.0** (code-complete; its deploy + UAT +
+milestone-complete remain parked with the owner) · deactivate is a **reversible** off-switch that must be set
+before an org can be **deleted** (deletion is irreversible + extra-confirmed) · a super-admin can **enter any
+church** as a **hidden**, rules-granted participant (no member doc, invisible in the church's member list) ·
+church **rename** and the **invite→first-login claim** flow already exist and are NOT re-scoped · built with
+**gsd-autonomous**, human verification deferred to the end.
 
 **Deploy policy (carried from the standing grant):** every auth-claim / `firestore.rules` / `storage.rules` /
-new org-provisioning-callable change ships **built + tested + UNDEPLOYED**, with the exact
-`firebase deploy --only …` command and any owner-run backfill script handed over. `RESEND_API_KEY` and all
-secrets stay server-side.
+new-callable change ships **built + tested + UNDEPLOYED**, with the exact `firebase deploy --only …` command
+handed over. Features with destructive cascades (deletion) and privileged cross-tenant access (super-admin
+enter-any-church) get a STRIDE threat model and genuine emulator ALLOW/DENY rules tests. `RESEND_API_KEY` and
+all secrets stay server-side.
 
-REQ-IDs continue from v1.9 (last R192).
+REQ-IDs continue from v2.0 (last R211).
 
 ---
 
-## v2.0 Requirements
+## v2.1 Requirements
 
-### Owner console tabs
+### Church deactivation
 
-- [x] **R193**: The Owner Console presents its content as two tabs — **Configuration** and **Organizations** —
-      with Configuration selected by default, both behind the existing super-admin access gate (R177/R178) so
-      no new access surface is introduced.
+- [ ] **R212**: A super-admin can deactivate an organization from the Organizations tab, persisting a
+      deactivated status on the org record (e.g. `active: false` / `deactivatedAt` + `deactivatedBy`), via a
+      super-admin-gated server callable — the client never flips another org's status directly.
 
-- [x] **R194**: The Configuration tab contains, with **no behavior change**, the existing super-admins roster
-      (grant/revoke via `setSuperAdminClaim`) and the four platform-config cards plus the deploy-time note —
-      i.e. the entire current `OwnerConsoleView` body, relocated under a tab.
+- [ ] **R213**: While an org is deactivated, all of its members are blocked from using it — enforced both in
+      the client sign-in/org-load flow AND by `firestore.rules`/`storage.rules` (a deactivated org's members
+      are denied org-scoped reads/writes) — surfaced as a clear "this church is deactivated" message, never a
+      silent failure or a blank app.
 
-- [x] **R195**: The open tab survives a page refresh and is directly linkable (reflected in the route/query),
-      so a super-admin can bookmark or share a link straight to Organizations.
+- [ ] **R214**: A super-admin can reactivate a deactivated organization, restoring its members' normal
+      access on their next load.
 
-### Organizations — list & onboard
+### Church deletion (deactivate-gated, full cascade)
 
-- [x] **R196**: The Organizations tab lists every organization on the platform, showing at least each church's
-      name and a distinguishing detail (id and/or created date and/or member count), so the super-admin sees
-      all churches at a glance.
+- [ ] **R215**: An organization can be deleted **only while it is deactivated** — a delete attempt on an
+      active org is refused with a clear message (the deactivate-first requirement is the first delete
+      guardrail).
 
-- [x] **R197**: A super-admin can onboard a new organization by entering a church name, which creates the
-      `organizations/{orgId}` record with default `OrgSettings` deep-merged from the code defaults (identical
-      to a normally-created org's settings).
+- [ ] **R216**: Deletion runs through a super-admin-gated server callable that independently re-verifies the
+      caller's `superAdmin` claim; the client never bulk-deletes `organizations/*`, its subcollections,
+      `orgNames/*`, or `inviteLookup/*` directly.
 
-- [x] **R198**: Onboarding seeds the new org's default service template (`OrgSettings.defaultServiceTemplate`)
-      so the church can create a service immediately, without any manual template setup.
+- [ ] **R217**: Deleting an organization cascade-removes all of its Firestore data — the org doc and every
+      subcollection (members, invites, services, songs, slideGroups, shareTokens/quarter shares,
+      quarters/roster, and any other org subcollection) — leaving no orphaned documents under
+      `organizations/{orgId}`.
 
-- [x] **R199**: Onboarding assigns the church's first admin by email at **editor** tier as part of the same
-      flow, so a freshly-onboarded church has exactly one editor who can sign in and use it.
+- [ ] **R218**: Deletion also removes the org's cross-collection references — `orgNames/{normalizedName}`,
+      every `inviteLookup/{email}` pointing at the org, and the org's id from each member's
+      `users/{uid}.orgIds` (via `arrayRemove`, preserving that user's other org memberships).
 
-- [x] **R200**: Org creation/onboarding runs entirely through a **super-admin-gated server callable** — the
-      client never writes `organizations/*`, `orgNames/*`, or another org's `members/*` directly — the callable
-      independently re-verifies the caller's `superAdmin` claim server-side.
+- [ ] **R219**: Deletion removes all Cloud Storage objects under the org's path (`orgs/{orgId}/…` — media,
+      backgrounds, pptx-imports, rendered), leaving no orphaned files.
 
-- [x] **R201**: Church-name uniqueness is enforced via the existing create-only `orgNames` registry (v1.7
-      R160), so onboarding cannot create a duplicate church name and reports the collision clearly.
+- [ ] **R220**: Deleting requires an explicit extra confirmation (e.g. typing the church name) that echoes
+      what will be destroyed, and the action is clearly labeled irreversible; a mistaken click cannot delete
+      an org.
 
-- [x] **R202**: A failed onboarding step (name taken, invalid/unknown admin email, write error) surfaces a
-      clear error and does not strand a half-created org — the flow is ordered/idempotent so a retry after
-      fixing the input succeeds without manual cleanup.
+- [ ] **R221**: A partial/interrupted deletion can be safely retried and completes without leaving
+      cross-tenant orphans (idempotent/resumable, batched cleanup), returning a clear summary of what was
+      removed.
 
-### Church-admin assignment (reuse editor role)
+### Pending-invite visibility
 
-- [x] **R203**: A super-admin can assign a church admin by email — the target becomes an
-      `organizations/{orgId}/members/{uid}` member at the **editor** role, reusing the existing editor/viewer
-      RBAC with **no new role or claim type**.
+- [ ] **R222**: The Organizations list distinguishes, per org, members who have logged in (active) from
+      people who were invited but have never logged in ("pending login"), so an onboarded-but-unclaimed
+      admin is visible rather than the church reading as "0 members".
 
-- [x] **R204**: Admin assignment goes through the super-admin-gated membership callable that resolves the email
-      to a user, writes the membership, and syncs the org-membership custom claim — the client never writes
-      another org's `members/*` directly.
+- [ ] **R223**: The active-vs-pending breakdown is computed server-side (from the org's `members` +
+      `invites`) by the existing super-admin-gated `listOrganizations` callable — no direct client cross-org
+      reads are introduced.
 
-- [x] **R205**: Assigning an admin whose email has no existing account is handled gracefully — a clear
-      "no account for that email" result (or the app's existing invite path), never a silent failure or a
-      dangling membership doc.
+### Super-admin "enter any church"
 
-- [x] **R206**: Assigning an admin to an org for a user who **already belongs to another org** preserves the
-      user's existing memberships and roles — the new membership is additive, never an overwrite (depends on
-      the widened claim below).
+- [ ] **R224**: Each Organizations row has a "Sign in" / "Enter church" action that switches the
+      super-admin's active org context to that church for support/setup.
 
-### Multi-org Storage auth claim (backlog 999.5)
+- [ ] **R225**: A super-admin can read and write a church's Firestore data and Storage **without** a
+      membership document, via a super-admin arm added to `firestore.rules` and `storage.rules` — proven by
+      genuine emulator tests: ALLOW for a super-admin on any org, and continued DENY for a non-member
+      non-super-admin.
 
-- [x] **R207**: The org-membership custom auth claim carries **all** of a user's organizations and their
-      per-org roles (not just the primary org), in a shape both `firestore.rules` and `storage.rules` can read.
+- [ ] **R226**: A super-admin operating inside a church does **not** appear in that church's member/team
+      list or member count — no member doc is created for the super-admin, and the team list excludes any
+      super-admin identity.
 
-- [x] **R208**: The claim-writer that recomputes the claim on any `members/*` write derives the full multi-org
-      set from the user's memberships and preserves the `superAdmin` claim via the shared merge helper (R175) —
-      widening the claim never wipes super-admin, and vice-versa.
-
-- [x] **R209**: `storage.rules`' `isOrgMemberByClaim` checks the requested `orgId` against the full multi-org
-      claim set, so a user in multiple orgs retains Storage read/write on **every** org — proven by genuine
-      multi-org ALLOW **and** cross-org DENY emulator tests.
-
-- [x] **R210**: An idempotent, dry-run-by-default, owner-run backfill recomputes the widened claim for all
-      existing users, mirroring `backfillOrgClaims.ts`, so current users get the new claim shape without a
-      manual per-user step.
-
-- [x] **R211**: The widened claim shape is backward-compatible during rollout — existing single-org sessions
-      keep working before the backfill runs (old/new shapes both tolerated by the rules), so there is no
-      Storage-access gap while the claim is being migrated.
+- [ ] **R227**: While a super-admin is viewing a church they do not belong to, the UI shows a persistent,
+      clear "viewing as super-admin" indicator with a one-click way to exit back to the owner console.
 
 ---
 
 ## Future Requirements (deferred)
 
-- Editing an existing org's name/settings, or suspending/archiving/deleting an org, from the console —
-  this pass is list + onboard + assign-admin only.
-
-- Multi-admin management UI (bulk assignment, per-org role changes, removing members) beyond assigning the
-  first/additional editor by email.
-
-- Self-service church signup — onboarding is super-admin-driven only this pass.
+- An audit log of super-admin actions (deactivate/reactivate/delete/enter-church) for accountability.
+- Bulk lifecycle actions (deactivate/delete multiple orgs), scheduled/auto-purge of long-deactivated orgs,
+  and a soft "trash" with a restore window before hard delete.
+- Exporting/downloading an org's data before deletion.
 
 ## Out of Scope
 
-- **Billing / subscription management** — explicitly deferred again (was out of scope for v1.9 too); onboarding
-  a church is free-of-charge provisioning only.
-
-- **A distinct per-org "admin" role above editor** — a church admin *is* the existing editor role by owner
-  decision; no new role tier or claim key is introduced.
-
-- **Changing per-org RBAC semantics** — editor/viewer behavior is unchanged; only the *claim's org coverage*
-  widens (999.5).
+- **Billing / subscription** lifecycle — unchanged; deactivation is an access switch, not a billing state.
+- **Church rename** — already supported per-church in Settings (`editName` + `orgNames` uniqueness); not
+  re-scoped here.
+- **The invite → first-login "claim by email" flow** — already implemented and confirmed working; v2.1 only
+  adds *visibility* of pending invites, not new claim mechanics.
+- **Self-service church signup / deletion by church admins** — org lifecycle stays super-admin-only.
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R193 | Phase 72 | Complete |
-| R194 | Phase 72 | Complete |
-| R195 | Phase 72 | Complete |
-| R196 | Phase 74 | Complete |
-| R197 | Phase 74 | Complete |
-| R198 | Phase 74 | Complete |
-| R199 | Phase 74 | Complete |
-| R200 | Phase 74 | Complete |
-| R201 | Phase 74 | Complete |
-| R202 | Phase 74 | Complete |
-| R203 | Phase 74 | Complete |
-| R204 | Phase 74 | Complete |
-| R205 | Phase 74 | Complete |
-| R206 | Phase 74 | Complete |
-| R207 | Phase 73 | Complete |
-| R208 | Phase 73 | Complete |
-| R209 | Phase 73 | Complete |
-| R210 | Phase 73 | Complete |
-| R211 | Phase 73 | Complete |
+| R212 | TBD | Pending |
+| R213 | TBD | Pending |
+| R214 | TBD | Pending |
+| R215 | TBD | Pending |
+| R216 | TBD | Pending |
+| R217 | TBD | Pending |
+| R218 | TBD | Pending |
+| R219 | TBD | Pending |
+| R220 | TBD | Pending |
+| R221 | TBD | Pending |
+| R222 | TBD | Pending |
+| R223 | TBD | Pending |
+| R224 | TBD | Pending |
+| R225 | TBD | Pending |
+| R226 | TBD | Pending |
+| R227 | TBD | Pending |
 
-**Coverage:** 19/19 v2.0 requirements mapped (R193–R211). No orphans, no duplicates.
+**Coverage:** 16 v2.1 requirements (R212–R227). Traceability filled by the roadmapper.
