@@ -8,34 +8,50 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.0 Multi-Church Onboarding & Owner Console Tabs
+## Current Milestone: v2.1 Organization Lifecycle & Super-Admin Access
 
-**Goal:** Turn the owner console into a tabbed shell and add platform-level multi-tenancy management —
-onboard new churches and assign their first admin from one place — while closing the multi-org Storage
-auth-claim gap that onboarding a second-org admin would otherwise trip.
+**Goal:** Give the super-admin full lifecycle control over churches from the Organizations tab —
+deactivate, delete-with-full-cleanup, see pending invites, and drop into any church to help — without
+leaking cross-tenant access to ordinary users.
 
 **Target features:**
-- **Tabbed owner console** — restructure the single scrolling `OwnerConsoleView` into a **Configuration**
-  tab (existing super-admins roster + the four v1.9 platform-config cards + the deploy-time note) and a new
-  **Organizations** tab. Layout only — no behavior change to the existing config surfaces.
-- **Organizations tab — list + onboard** — view all orgs (churches) on the platform; onboard a new one that
-  creates the **org record + default `OrgSettings`**, **seeds the default service template** so the church
-  can create services immediately, and **assigns its first admin by email**.
-- **Assign admins to a church** — a church admin *is* the existing **editor** role (reuse the current
-  editor/viewer RBAC + membership custom claim — no new role/claim). Assigning = adding an org member at
-  editor tier by email via the server-verified membership path (never a direct privileged client write).
-- **Multi-org Storage auth claim (backlog 999.5, now required)** — widen the org-membership custom claim to
-  carry **all** of a user's orgs+roles and update `storage.rules`' `isOrgMemberByClaim` to check the
-  requested `orgId` against that set, so a newly-onboarded admin who belongs to a second org keeps Storage
-  access. Hard prerequisite for onboarding.
+- **Deactivate / reactivate a church** — a reversible off-switch that blocks all of that org's members from
+  logging in (a super-admin can still enter it).
+- **Delete a deactivated church** — only after deactivation; cascade-cleans every Firestore relationship
+  (members, invites, services, songs, slideGroups, share tokens, quarters/roster, the org doc, plus
+  `orgNames/*`, `inviteLookup/*`, and each member's `users/{uid}.orgIds`) **and** all Storage under the org
+  (media, backgrounds, pptx-imports, rendered). Extra confirmations; irreversible; super-admin-gated
+  callable (the client never bulk-deletes directly).
+- **Pending-invite visibility** — the Organizations list flags invited-but-not-yet-logged-in admins as
+  "pending login," distinct from active members (no more confusing "0 members").
+- **Super-admin "enter any church"** — a per-row Sign-in action switches the super-admin's active org to any
+  church for support/setup, granted via a super-admin arm in `firestore.rules`/`storage.rules` (no member
+  doc → invisible in that church's member list), with a clear "viewing as super-admin" banner.
 
-**Key context (owner, 2026-08-21):** v2.0 major increment · **stacks on v1.9** (code-complete; its deploy +
-UAT + milestone-complete remain parked with the owner — v1.9 phases archive as-is). A church admin reuses the
-existing editor role. All auth-claim / `firestore.rules` / `storage.rules` / new org-provisioning-callable
-changes are **hand-over** deploys per the standing grant — built + tested + UNDEPLOYED with exact
-`firebase deploy` commands handed over.
+**Key context (owner, 2026-08-22):** v2.1 minor increment · **stacks on v2.0** (code-complete; its deploy +
+UAT + milestone-complete remain parked with the owner — v2.0 phases archive as-is). Church rename +
+invite→first-login claim already exist (not re-scoped). Features 2 (destructive cascade) and 4 (privileged
+cross-tenant access) are security-critical → STRIDE + genuine rules ALLOW/DENY tests. Built with
+**gsd-autonomous**, human verification deferred to the end. All auth-claim / `firestore.rules` /
+`storage.rules` / new-callable changes are **hand-over** deploys per the standing grant — built + tested +
+UNDEPLOYED with exact `firebase deploy` commands handed over; secrets stay server-side.
 
 Requirements defined in `.planning/REQUIREMENTS.md`; roadmap in `.planning/ROADMAP.md`.
+
+<details>
+<summary>Code-complete milestone — v2.0 Multi-Church Onboarding & Owner Console Tabs (Phases 72–74, code-complete 2026-08-21; deploy + UAT + milestone lifecycle parked with owner)</summary>
+
+Turned the owner console into a tabbed shell (Configuration + Organizations) and added platform
+multi-tenancy: list all churches, onboard a new one (org record + default `OrgSettings` + seeded default
+service template + first admin by email) via super-admin-gated atomic callables, assign additional admins
+(reusing the editor role), and widened the org-membership custom claim to an additive `orgs:{orgId:role}`
+map (+`storage.rules`) so a multi-org user keeps Storage access everywhere (closed backlog 999.5).
+**Code-complete + auto-verified + SECURED (Phases 72–74, R193–R211); human UAT + all deploys handed to the
+owner and not yet run; the read-only milestone audit was gathered but not finalized.** v2.1 builds church
+lifecycle (deactivate/delete) + super-admin access on top. Requirements: `.planning/REQUIREMENTS.md`
+(R193–R211).
+
+</details>
 
 <details>
 <summary>Code-complete milestone — v1.9 Owner Admin Console (Phases 68–71, code-complete 2026-08-20; deploy + UAT parked with owner)</summary>

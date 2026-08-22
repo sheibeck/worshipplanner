@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Multi-Church Onboarding & Owner Console Tabs
-current_phase: 74
-current_phase_name: organizations-list-onboard-admin-assignment
-status: milestone-code-complete
-stopped_at: v2.0 ALL 3 phases (72-74) code-complete + auto-verified + secured; STOPPED before milestone lifecycle per the v2.0 grant — owner runs /gsd-verify-work + the owner-gated deploys, then audit→complete→cleanup
-last_updated: "2026-08-21T21:02:16.030Z"
-last_activity: 2026-08-21
-last_activity_desc: v2.0 milestone code-complete (Phases 72-74); human UAT + deploys handed to owner
+milestone: v2.1
+milestone_name: Organization Lifecycle & Super-Admin Access
+status: planning
+last_updated: "2026-08-22T17:57:45.419Z"
+last_activity: 2026-08-22
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # ▶ ACTIVE MILESTONE — v2.0 Multi-Church Onboarding & Owner Console Tabs (started 2026-08-21)
@@ -743,10 +739,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 74 (organizations-list-onboard-admin-assignment) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-08-21 — Phase 74 execution started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-22 — Milestone v2.1 started
 
 ## ★ v2.0 ROADMAP.md phase breakdown (created 2026-08-21)
 
