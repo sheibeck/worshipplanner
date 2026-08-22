@@ -590,7 +590,11 @@ still invited-but-pending, so an onboarded-but-unclaimed admin reads as "1 pendi
      by the existing super-admin-gated `listOrganizations` callable; no new direct client cross-org
      Firestore reads are introduced (R223).
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 75-01-PLAN.md — Server: `OrgSummary.pendingCount` from an invites `count()` aggregate in `listOrganizationsHandler` (R222, R223); Client: pending badge in the Organizations tab Members cell (R222)
+
 **UI hint**: yes
 **Deploy**: Extends the existing `listOrganizations` callable's server-side computation — not a new
 callable, but still a Cloud Functions change. Ships built + tested + UNDEPLOYED, with
