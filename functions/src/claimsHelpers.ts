@@ -99,6 +99,42 @@ export async function mergeSetAndClearCustomClaims(
 }
 
 /**
+ * Patches (or deletes) ONE key inside a NESTED map claim (e.g.
+ * `deactivatedOrgs[orgId]`), preserving every other top-level claim key AND
+ * every other key already inside that same nested map -- mirrors
+ * `mergeSetAndClearCustomClaims`'s TOCTOU-safe shape (76-RESEARCH.md Pitfall
+ * 3): a SINGLE `getUser` read, an in-memory patch of the ONE nested key, then
+ * a SINGLE `setCustomUserClaims` write. Never a bare replace of the nested
+ * map -- `mergeAndSetCustomClaims(uid, { deactivatedOrgs: {...} })` would
+ * REPLACE the whole nested object, silently wiping a sibling org's
+ * deactivated-flag for a user who belongs to more than one deactivated org.
+ *
+ * `value === true` sets `nested[nestedKey] = true`. `value === undefined`
+ * deletes `nested[nestedKey]` -- deleting the LAST remaining nested key
+ * leaves an empty object (`{}`), which is a valid, harmless claim value; this
+ * helper never collapses an empty nested map to `null` (that full-wipe
+ * special-case belongs to `clearClaimKeys`'s TOP-LEVEL-key contract only, not
+ * to a nested map inside an otherwise-populated claims object).
+ */
+export async function patchNestedClaimKey(
+  uid: string,
+  topLevelKey: string,
+  nestedKey: string,
+  value: true | undefined,
+): Promise<void> {
+  const user = await getAuth().getUser(uid);
+  const current = { ...((user.customClaims as Record<string, unknown> | undefined) ?? {}) };
+  const nested = { ...((current[topLevelKey] as Record<string, unknown> | undefined) ?? {}) };
+  if (value === true) {
+    nested[nestedKey] = true;
+  } else {
+    delete nested[nestedKey];
+  }
+  current[topLevelKey] = nested;
+  await getAuth().setCustomUserClaims(uid, current);
+}
+
+/**
  * Detects the Firebase Admin SDK's `auth/claims-too-large` error -- thrown by
  * `setCustomUserClaims` when the serialized custom-claims object exceeds the
  * ~1000-byte cap (73-REVIEW.md WR-02). Shared by every claim-write call site

@@ -28,6 +28,18 @@ export const ORG_CLAIM_KEYS = ["orgId", "role"] as const;
 export const ORGS_CLAIM_KEY = "orgs";
 
 /**
+ * Phase 76 (R212-R214): the additive, independent claim key `setOrgActive`
+ * (orgProvisioning.ts) fans out to every member of a deactivated org. Lives
+ * alongside -- never replacing or filtering -- the `orgs` map/legacy
+ * `orgId`/`role` keys above. `computeOrgsClaimForUid`/`buildOrgsMapClaim`/
+ * `decideMembershipClaim` are UNTOUCHED by this phase (76-RESEARCH.md
+ * Pattern 1) -- this is purely net-new claim surface, read by
+ * storage.rules' isOrgDeactivatedForCaller(orgId).
+ */
+export const DEACTIVATED_ORGS_CLAIM_KEY = "deactivatedOrgs";
+export type DeactivatedOrgsClaim = Record<string, true>;
+
+/**
  * The role shape the claim ever carries. Legacy `admin` values are
  * normalised to `editor` by buildOrgMembershipClaim below -- `admin` never
  * appears as a claim value, matching what loadOrgContext already shows the

@@ -5,6 +5,7 @@ import {
   isClaimsTooLargeError,
   mergeAndSetCustomClaims,
   mergeSetAndClearCustomClaims,
+  patchNestedClaimKey,
 } from "./claimsHelpers";
 
 // Mirrors orgMembershipClaims.test.ts's established mocking seam.
@@ -120,6 +121,83 @@ describe("mergeSetAndClearCustomClaims", () => {
       superAdmin: true,
       orgId: "orgA",
       role: "editor",
+    });
+  });
+});
+
+describe("patchNestedClaimKey", () => {
+  it("sets a nested key onto an empty/absent nested map", async () => {
+    const { setCustomUserClaims } = mockAuth({ existingClaims: undefined });
+
+    await patchNestedClaimKey(UID, "deactivatedOrgs", "orgA", true);
+
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { deactivatedOrgs: { orgA: true } });
+  });
+
+  it("sets a nested key alongside an EXISTING sibling nested key -- sibling survives", async () => {
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { deactivatedOrgs: { orgB: true }, superAdmin: true },
+    });
+
+    await patchNestedClaimKey(UID, "deactivatedOrgs", "orgA", true);
+
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      deactivatedOrgs: { orgB: true, orgA: true },
+      superAdmin: true,
+    });
+  });
+
+  it("deletes one nested key while a sibling nested key and an unrelated top-level claim both survive", async () => {
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: {
+        deactivatedOrgs: { orgA: true, orgB: true },
+        superAdmin: true,
+        orgs: { orgA: "editor", orgB: "viewer" },
+      },
+    });
+
+    await patchNestedClaimKey(UID, "deactivatedOrgs", "orgA", undefined);
+
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      deactivatedOrgs: { orgB: true },
+      superAdmin: true,
+      orgs: { orgA: "editor", orgB: "viewer" },
+    });
+  });
+
+  it("deleting the last remaining nested key leaves an empty object, not null", async () => {
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { deactivatedOrgs: { orgA: true }, superAdmin: true },
+    });
+
+    await patchNestedClaimKey(UID, "deactivatedOrgs", "orgA", undefined);
+
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { deactivatedOrgs: {}, superAdmin: true });
+  });
+
+  it("deactivate-then-reactivate round trip for the SAME uid preserves superAdmin/orgs/a sibling deactivatedOrgs entry", async () => {
+    // Deactivate orgA -- starting from a claims object that already has a
+    // sibling deactivated org and an unrelated superAdmin claim.
+    const { setCustomUserClaims: setDeactivate } = mockAuth({
+      existingClaims: { superAdmin: true, orgs: { orgA: "editor", orgB: "editor" }, deactivatedOrgs: { orgB: true } },
+    });
+    await patchNestedClaimKey(UID, "deactivatedOrgs", "orgA", true);
+    expect(setDeactivate).toHaveBeenCalledWith(UID, {
+      superAdmin: true,
+      orgs: { orgA: "editor", orgB: "editor" },
+      deactivatedOrgs: { orgB: true, orgA: true },
+    });
+
+    // Reactivate orgA -- from the claims state the deactivate call above produced.
+    const { setCustomUserClaims: setReactivate } = mockAuth({
+      existingClaims: { superAdmin: true, orgs: { orgA: "editor", orgB: "editor" }, deactivatedOrgs: { orgB: true, orgA: true } },
+    });
+    await patchNestedClaimKey(UID, "deactivatedOrgs", "orgA", undefined);
+    expect(setReactivate).toHaveBeenCalledWith(UID, {
+      superAdmin: true,
+      orgs: { orgA: "editor", orgB: "editor" },
+      deactivatedOrgs: { orgB: true },
     });
   });
 });

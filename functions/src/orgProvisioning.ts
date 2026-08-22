@@ -7,6 +7,8 @@ import {
   type Firestore,
 } from "firebase-admin/firestore";
 import { buildDefaultOrgSettings } from "./orgTemplateSeed";
+import { patchNestedClaimKey } from "./claimsHelpers";
+import { DEACTIVATED_ORGS_CLAIM_KEY } from "./orgMembershipClaims";
 
 // --- orgProvisioning (Phase 74, R196-R206: the owner-console org-provisioning
 // callables) ----------------------------------------------------------------
@@ -372,6 +374,11 @@ export interface OrgSummary {
   createdAt: unknown;
   memberCount: number;
   pendingCount: number;
+  /** Phase 76 (R212-R214): `false` only when the org doc explicitly carries
+   * `active: false`. Absent (every pre-Phase-76 org) or explicit `true` both
+   * read as active -- default-true, backward-compatible (see setOrgActive
+   * and firestore.rules' isOrgActive for the same default). */
+  active: boolean;
 }
 
 export interface ListOrganizationsResponse {
@@ -400,13 +407,14 @@ export async function listOrganizationsHandler(
         orgDoc.ref.collection("members").count().get(),
         orgDoc.ref.collection("invites").count().get(),
       ]);
-      const data = orgDoc.data() as { name?: string; createdAt?: unknown };
+      const data = orgDoc.data() as { name?: string; createdAt?: unknown; active?: boolean };
       return {
         orgId: orgDoc.id,
         name: data.name ?? "(unnamed)",
         createdAt: data.createdAt ?? null,
         memberCount: membersCountSnap.data().count,
         pendingCount: invitesCountSnap.data().count,
+        active: data.active ?? true,
       };
     }),
   );
@@ -415,3 +423,93 @@ export async function listOrganizationsHandler(
 }
 
 export const listOrganizations = onCall(listOrganizationsHandler);
+
+// --- setOrgActive (R212-R214: church deactivation/reactivation) ------------
+
+export interface SetOrgActiveRequest {
+  orgId: string;
+  active: boolean;
+}
+
+export interface SetOrgActiveResponse {
+  orgId: string;
+  active: boolean;
+  memberCount: number;
+  /** Count of member claim-fan-out writes that rejected (76-RESEARCH.md
+   * Pitfall 4) -- the org-doc write (the authoritative, firestore.rules-
+   * enforced source of truth) always succeeds independently of this. */
+  claimFailures: number;
+}
+
+/**
+ * The testable handler body, exported separately from the onCall wrapper
+ * below -- mirrors onboardOrganizationHandler/assignOrgAdminHandler's
+ * structure (caller gate, then input validation, then the org read, then the
+ * writes).
+ *
+ * Write sequencing (76-RESEARCH.md Pitfall 4 / Code Examples):
+ *   1. org-existence check (`not-found` if missing).
+ *   2. the same-state-aware `organizations/{orgId}` merge write -- this is
+ *      the AUTHORITATIVE write: firestore.rules' isOrgActive() reads it
+ *      LIVE, so Firestore-side enforcement is already complete once this
+ *      commits, regardless of the claim fan-out's outcome below.
+ *   3. the SCOPED `organizations/{orgId}/members` query -- never
+ *      `collectionGroup('members')` (T-40-05-class scope guard).
+ *   4. a `Promise.allSettled` fan-out patching each member's
+ *      `deactivatedOrgs[orgId]` claim key (Task 1 `patchNestedClaimKey`) --
+ *      PLUS `revokeRefreshTokens` on the deactivate branch only (bounded
+ *      exposure, not an instant cutoff -- 76-RESEARCH.md Pitfall 2).
+ *
+ * Same-state short-circuit: when the org's CURRENT active status (default
+ * `true` when absent) already equals the requested `active`, the org-doc
+ * write is SKIPPED (never rewrites deactivatedAt/deactivatedBy/
+ * reactivatedAt/reactivatedBy on a redundant call) -- but the member claim
+ * fan-out still runs UNCONDITIONALLY, so a retry of a call that partially
+ * failed on the claim side can still finish the job.
+ */
+export async function setOrgActiveHandler(
+  request: CallableRequest<SetOrgActiveRequest>,
+): Promise<SetOrgActiveResponse> {
+  const callerUid = await assertSuperAdminCaller(request);
+
+  const { orgId, active } = request.data ?? ({} as SetOrgActiveRequest);
+  if (typeof orgId !== "string" || orgId.trim() === "") {
+    throw new HttpsError("invalid-argument", "orgId is required.");
+  }
+  if (typeof active !== "boolean") {
+    throw new HttpsError("invalid-argument", "active (boolean) is required.");
+  }
+
+  const db = getFirestore();
+  const orgRef = db.collection("organizations").doc(orgId);
+  const orgSnap = await orgRef.get();
+  if (!orgSnap.exists) {
+    throw new HttpsError("not-found", `No organization found for id "${orgId}".`);
+  }
+
+  const currentActive = (orgSnap.data() as { active?: boolean } | undefined)?.active ?? true;
+  if (currentActive !== active) {
+    await orgRef.set(
+      active
+        ? { active: true, reactivatedAt: FieldValue.serverTimestamp(), reactivatedBy: callerUid }
+        : { active: false, deactivatedAt: FieldValue.serverTimestamp(), deactivatedBy: callerUid },
+      { merge: true },
+    );
+  }
+
+  const membersSnap = await orgRef.collection("members").get();
+  const results = await Promise.allSettled(
+    membersSnap.docs.map(async (memberDoc) => {
+      const uid = memberDoc.id;
+      await patchNestedClaimKey(uid, DEACTIVATED_ORGS_CLAIM_KEY, orgId, active ? undefined : true);
+      if (!active) {
+        await getAuth().revokeRefreshTokens(uid);
+      }
+    }),
+  );
+  const claimFailures = results.filter((r) => r.status === "rejected").length;
+
+  return { orgId, active, memberCount: membersSnap.size, claimFailures };
+}
+
+export const setOrgActive = onCall(setOrgActiveHandler);

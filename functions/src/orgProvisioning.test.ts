@@ -6,13 +6,17 @@ import {
   onboardOrganizationHandler,
   assignOrgAdminHandler,
   listOrganizationsHandler,
+  setOrgActiveHandler,
   type OnboardOrganizationRequest,
   type AssignOrgAdminRequest,
+  type SetOrgActiveRequest,
 } from "./orgProvisioning";
 
 // Mirrors functions/src/superAdminClaims.test.ts's established mocking seams,
 // widened with FieldValue.arrayUnion (needed for the R206 additive-write
-// assertions) per 74-PATTERNS.md.
+// assertions) per 74-PATTERNS.md, and further widened (Phase 76) with
+// getUser/setCustomUserClaims/revokeRefreshTokens for setOrgActiveHandler's
+// claim fan-out -- mirrors claimsHelpers.test.ts's mockAuth shape.
 vi.mock("firebase-admin/auth", () => ({
   getAuth: vi.fn(() => ({ getUserByEmail: vi.fn() })),
 }));
@@ -52,6 +56,10 @@ class FakeFirestore {
   docStates = new Map<string, DocState>();
   orgsListDocs: OrgListEntry[] = [];
   autoIdCounter = 0;
+  // Phase 76: `organizations/{orgId}/members` scoped query stub -- keyed by
+  // orgId, a configurable list of member uids for setOrgActiveHandler's
+  // fan-out to iterate.
+  membersByOrgId = new Map<string, string[]>();
 
   txGetSpy = vi.fn(async (ref: { get: () => Promise<unknown> }) => ref.get());
   txSetSpy = vi.fn();
@@ -61,15 +69,25 @@ class FakeFirestore {
   batchSetSpy = vi.fn();
   batchCommitSpy = vi.fn(async () => undefined);
   batchSpy = vi.fn(() => ({ set: this.batchSetSpy, commit: this.batchCommitSpy }));
+  // Phase 76: a general-purpose set/merge spy for a direct (non-transaction,
+  // non-batch) `docRef.set(data, {merge:true})` call -- setOrgActiveHandler's
+  // organizations/{orgId} write path.
+  docSetSpy = vi.fn();
 
   setDocState(path: string, state: DocState) {
     this.docStates.set(path, state);
+  }
+
+  /** Phase 76: seed the member uids `organizations/{orgId}/members` resolves to. */
+  setMembers(orgId: string, uids: string[]) {
+    this.membersByOrgId.set(orgId, uids);
   }
 
   private makeDocRef(path: string): {
     id: string;
     __path: string;
     get: () => Promise<{ id: string; exists: boolean; data: () => Record<string, unknown> | undefined }>;
+    set: (data: Record<string, unknown>, options?: { merge?: boolean }) => Promise<void>;
     collection: (name: string) => ReturnType<FakeFirestore["makeCollectionRef"]>;
   } {
     const id = path.split("/").pop() as string;
@@ -80,17 +98,25 @@ class FakeFirestore {
         const state = this.docStates.get(path) ?? { exists: false };
         return { id, exists: state.exists, data: () => state.data };
       },
+      set: async (data, options) => {
+        this.docSetSpy(path, data, options);
+      },
       collection: (name: string) => this.makeCollectionRef(`${path}/${name}`),
     };
   }
 
   private makeCollectionRef(path: string) {
+    const membersMatch = /^organizations\/([^/]+)\/members$/.exec(path);
     return {
       doc: (id?: string) => {
         const docId = id ?? `auto-${++this.autoIdCounter}`;
         return this.makeDocRef(`${path}/${docId}`);
       },
       get: async () => {
+        if (membersMatch) {
+          const uids = this.membersByOrgId.get(membersMatch[1] as string) ?? [];
+          return { size: uids.length, docs: uids.map((uid) => ({ id: uid })) };
+        }
         if (path !== "organizations") {
           throw new Error(`FakeFirestore: unexpected collection.get() for "${path}"`);
         }
@@ -168,6 +194,33 @@ afterEach(() => {
 
 const ONBOARD_DEFAULTS: OnboardOrganizationRequest = { name: "Grace Church", adminEmail: TARGET_EMAIL };
 const ASSIGN_DEFAULTS: AssignOrgAdminRequest = { orgId: ORG_ID, email: TARGET_EMAIL };
+const SET_ACTIVE_DEFAULTS: SetOrgActiveRequest = { orgId: ORG_ID, active: false };
+
+/**
+ * Phase 76: a distinct getAuth() mock seam for setOrgActiveHandler's claim
+ * fan-out -- mirrors claimsHelpers.test.ts's mockAuth shape but keyed
+ * per-uid (getUserByEmail is untouched/unused by setOrgActive, included only
+ * so the mocked getAuth() return shape stays structurally consistent with
+ * the other describe blocks' mockAuth()).
+ */
+function mockClaimsAuth(
+  existingClaimsByUid: Record<string, Record<string, unknown> | undefined> = {},
+  opts: { setCustomUserClaimsImpl?: (uid: string, claims: Record<string, unknown>) => Promise<void> } = {},
+) {
+  const getUser = vi.fn(async (uid: string) => ({ customClaims: existingClaimsByUid[uid] }));
+  const setCustomUserClaims = vi.fn(
+    opts.setCustomUserClaimsImpl ?? (async () => undefined),
+  );
+  const revokeRefreshTokens = vi.fn(async () => undefined);
+  const getUserByEmail = vi.fn(async () => ({ uid: TARGET_UID, displayName: "Target Person" }));
+  vi.mocked(getAuth).mockReturnValue({
+    getUser,
+    setCustomUserClaims,
+    revokeRefreshTokens,
+    getUserByEmail,
+  } as never);
+  return { getUser, setCustomUserClaims, revokeRefreshTokens };
+}
 
 function onboardRequest(overrides: {
   auth?: { uid: string; token?: Record<string, unknown> } | null;
@@ -181,6 +234,13 @@ function assignRequest(overrides: {
   data?: Partial<AssignOrgAdminRequest>;
 } = {}) {
   return fakeRequest<AssignOrgAdminRequest>(overrides, ASSIGN_DEFAULTS);
+}
+
+function setActiveRequest(overrides: {
+  auth?: { uid: string; token?: Record<string, unknown> } | null;
+  data?: Partial<SetOrgActiveRequest>;
+} = {}) {
+  return fakeRequest<SetOrgActiveRequest>(overrides, SET_ACTIVE_DEFAULTS);
 }
 
 // --- CALLER GATE (R200/R204, T-74-01/T-74-02) -------------------------------
@@ -282,6 +342,40 @@ describe("caller gate", () => {
     await expect(
       listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void)),
     ).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  // Phase 76 (R212-R214): setOrgActive's caller gate mirrors the above three
+  // exactly -- unauthenticated / no-claim / no-doc all rejected.
+  it("setOrgActive: rejects an unauthenticated caller", async () => {
+    mockClaimsAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(setOrgActiveHandler(setActiveRequest({ auth: null }))).rejects.toMatchObject({
+      code: "unauthenticated",
+    });
+  });
+
+  it("setOrgActive: rejects a token without superAdmin, never reads Firestore", async () => {
+    mockClaimsAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    const dbSpy = vi.fn(() => fake.db().collection("superAdmins"));
+    vi.mocked(getFirestore).mockReturnValue({ collection: dbSpy } as never);
+
+    await expect(
+      setOrgActiveHandler(setActiveRequest({ auth: { uid: CALLER_UID, token: {} } })),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    expect(dbSpy).not.toHaveBeenCalled();
+  });
+
+  it("setOrgActive: rejects when superAdmins/{callerUid} does not exist", async () => {
+    mockClaimsAuth();
+    const fake = withCallerGate(new FakeFirestore(), false);
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(setOrgActiveHandler(setActiveRequest())).rejects.toMatchObject({
+      code: "permission-denied",
+    });
   });
 });
 
@@ -605,8 +699,8 @@ describe("listOrganizationsHandler", () => {
 
     expect(result).toEqual({
       organizations: [
-        { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 0 },
-        { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 0 },
+        { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 0, active: true },
+        { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 0, active: true },
       ],
     });
   });
@@ -633,8 +727,8 @@ describe("listOrganizationsHandler", () => {
     const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
 
     expect(result.organizations).toEqual([
-      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 2 },
-      { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 1 },
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 2, active: true },
+      { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 1, active: true },
     ]);
   });
 
@@ -649,7 +743,177 @@ describe("listOrganizationsHandler", () => {
     const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
 
     expect(result.organizations).toEqual([
-      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 5, pendingCount: 0 },
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 5, pendingCount: 0, active: true },
     ]);
+  });
+
+  it("Phase 76 (R212-R214): reads active: false through from the org doc, no extra read", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.orgsListDocs = [
+      { id: "org1", data: { name: "Grace Church", createdAt: "ts1", active: false }, memberCount: 2 },
+    ];
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
+
+    expect(result.organizations).toEqual([
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 2, pendingCount: 0, active: false },
+    ]);
+  });
+});
+
+// --- setOrgActive (R212-R214) ------------------------------------------------
+
+describe("setOrgActiveHandler", () => {
+  it("rejects invalid-argument for a blank/non-string orgId", async () => {
+    mockClaimsAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(
+      setOrgActiveHandler(setActiveRequest({ data: { orgId: "" } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("rejects invalid-argument for a non-boolean active", async () => {
+    mockClaimsAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(
+      setOrgActiveHandler(setActiveRequest({ data: { active: "false" as unknown as boolean } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("rejects not-found for an orgId with no matching organizations/{orgId} doc", async () => {
+    mockClaimsAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: false });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(setOrgActiveHandler(setActiveRequest())).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("deactivate: persists active:false + deactivatedAt/deactivatedBy, patches deactivatedOrgs for every member, and revokes refresh tokens -- preserving unrelated claims", async () => {
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: {} }); // no `active` field -- default true
+    fake.setMembers(ORG_ID, ["m1", "m2"]);
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+    const { setCustomUserClaims, revokeRefreshTokens } = mockClaimsAuth({
+      m1: { superAdmin: true, orgs: { [ORG_ID]: "editor" } },
+      m2: { deactivatedOrgs: { orgB: true } },
+    });
+
+    const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 2, claimFailures: 0 });
+    expect(fake.docSetSpy).toHaveBeenCalledWith(
+      `organizations/${ORG_ID}`,
+      { active: false, deactivatedAt: "SERVER_TIMESTAMP_SENTINEL", deactivatedBy: CALLER_UID },
+      { merge: true },
+    );
+    // m1: previously no deactivatedOrgs key at all -- superAdmin/orgs survive untouched.
+    expect(setCustomUserClaims).toHaveBeenCalledWith("m1", {
+      superAdmin: true,
+      orgs: { [ORG_ID]: "editor" },
+      deactivatedOrgs: { [ORG_ID]: true },
+    });
+    // m2: a sibling deactivatedOrgs entry (orgB) survives alongside the new one.
+    expect(setCustomUserClaims).toHaveBeenCalledWith("m2", {
+      deactivatedOrgs: { orgB: true, [ORG_ID]: true },
+    });
+    expect(revokeRefreshTokens).toHaveBeenCalledWith("m1");
+    expect(revokeRefreshTokens).toHaveBeenCalledWith("m2");
+    expect(revokeRefreshTokens).toHaveBeenCalledTimes(2);
+  });
+
+  it("reactivate: persists active:true + reactivatedAt/reactivatedBy, clears deactivatedOrgs[orgId] for every member (sibling entries survive), never revokes", async () => {
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: { active: false } });
+    fake.setMembers(ORG_ID, ["m1", "m2"]);
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+    const { setCustomUserClaims, revokeRefreshTokens } = mockClaimsAuth({
+      m1: { deactivatedOrgs: { [ORG_ID]: true, orgB: true } },
+      m2: { deactivatedOrgs: { [ORG_ID]: true } },
+    });
+
+    const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: true } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, active: true, memberCount: 2, claimFailures: 0 });
+    expect(fake.docSetSpy).toHaveBeenCalledWith(
+      `organizations/${ORG_ID}`,
+      { active: true, reactivatedAt: "SERVER_TIMESTAMP_SENTINEL", reactivatedBy: CALLER_UID },
+      { merge: true },
+    );
+    // m1's sibling orgB entry survives -- reactivation of THIS org never wipes it.
+    expect(setCustomUserClaims).toHaveBeenCalledWith("m1", { deactivatedOrgs: { orgB: true } });
+    expect(setCustomUserClaims).toHaveBeenCalledWith("m2", { deactivatedOrgs: {} });
+    expect(revokeRefreshTokens).not.toHaveBeenCalled();
+  });
+
+  it("same-state short-circuit: a redundant deactivate call skips the org-doc rewrite but still runs the member fan-out (safe retry)", async () => {
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: { active: false } });
+    fake.setMembers(ORG_ID, ["m1"]);
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+    const { setCustomUserClaims } = mockClaimsAuth({ m1: {} });
+
+    const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 1, claimFailures: 0 });
+    expect(fake.docSetSpy).not.toHaveBeenCalled();
+    expect(setCustomUserClaims).toHaveBeenCalledWith("m1", { deactivatedOrgs: { [ORG_ID]: true } });
+  });
+
+  it("same-state short-circuit: a redundant reactivate call (org already active, no `active` field at all) skips the org-doc rewrite but still fans out", async () => {
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: {} }); // absent -- default true
+    fake.setMembers(ORG_ID, ["m1"]);
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+    mockClaimsAuth({ m1: { deactivatedOrgs: { [ORG_ID]: true } } });
+
+    const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: true } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, active: true, memberCount: 1, claimFailures: 0 });
+    expect(fake.docSetSpy).not.toHaveBeenCalled();
+  });
+
+  it("partial fan-out failure: one member's claim write rejects, the call does not throw, the org-doc write still succeeded, and claimFailures reflects the rejection", async () => {
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: {} });
+    fake.setMembers(ORG_ID, ["m1", "m2"]);
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+    const { revokeRefreshTokens } = mockClaimsAuth(
+      { m1: {}, m2: {} },
+      {
+        setCustomUserClaimsImpl: async (uid) => {
+          if (uid === "m2") throw new Error("auth/claims-too-large");
+        },
+      },
+    );
+
+    const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 2, claimFailures: 1 });
+    expect(fake.docSetSpy).toHaveBeenCalledWith(
+      `organizations/${ORG_ID}`,
+      { active: false, deactivatedAt: "SERVER_TIMESTAMP_SENTINEL", deactivatedBy: CALLER_UID },
+      { merge: true },
+    );
+    expect(revokeRefreshTokens).toHaveBeenCalledWith("m1");
+    expect(revokeRefreshTokens).not.toHaveBeenCalledWith("m2");
+  });
+
+  it("scoped query: reads organizations/{orgId}/members ONLY, never a global collectionGroup scan -- an org with zero members is a clean no-op fan-out", async () => {
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: {} });
+    // No setMembers call -- membersByOrgId has no entry for ORG_ID, resolving to [].
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+    mockClaimsAuth();
+
+    const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 0, claimFailures: 0 });
   });
 });

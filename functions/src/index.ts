@@ -16,7 +16,7 @@ import { parsePptxBuffer, type MappedSlide } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
 import { syncOrgMembershipClaim } from "./orgMembershipClaims";
 import { syncSuperAdminClaim, setSuperAdminClaim } from "./superAdminClaims";
-import { onboardOrganization, assignOrgAdmin, listOrganizations } from "./orgProvisioning";
+import { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive } from "./orgProvisioning";
 import { Resend } from "resend";
 import { renderMessageTokens } from "./messageTokens";
 import { verifySvixSignature } from "./webhookSignature";
@@ -3325,12 +3325,13 @@ export { syncOrgMembershipClaim };
 export { syncSuperAdminClaim, setSuperAdminClaim };
 
 // --- orgProvisioning (Phase 74: onboardOrganization/assignOrgAdmin/
-// listOrganizations, R196-R206) ----------------------------------------------
+// listOrganizations, R196-R206; Phase 76: setOrgActive, R212-R214) ----------
 //
 // Implementation lives in ./orgProvisioning so its testable handlers
-// (onboardOrganizationHandler/assignOrgAdminHandler/listOrganizationsHandler)
-// can be imported directly by tests without going through the deployed
-// wrappers. Only the three deployed Functions are re-exported here --
-// mirrors syncOrgMembershipClaim/setSuperAdminClaim above. Ship built +
-// tested + UNDEPLOYED per 74-01-PLAN.md's hand-over deploy note.
-export { onboardOrganization, assignOrgAdmin, listOrganizations };
+// (onboardOrganizationHandler/assignOrgAdminHandler/listOrganizationsHandler/
+// setOrgActiveHandler) can be imported directly by tests without going
+// through the deployed wrappers. Only the four deployed Functions are
+// re-exported here -- mirrors syncOrgMembershipClaim/setSuperAdminClaim
+// above. Ship built + tested + UNDEPLOYED per 74-01-PLAN.md's/
+// 76-01-PLAN.md's hand-over deploy notes.
+export { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive };
