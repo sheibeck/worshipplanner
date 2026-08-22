@@ -590,10 +590,11 @@ still invited-but-pending, so an onboarded-but-unclaimed admin reads as "1 pendi
      by the existing super-admin-gated `listOrganizations` callable; no new direct client cross-org
      Firestore reads are introduced (R223).
 
-**Plans**: 1 plan
+**Plans**: 1/1 plans executed
 
 Plans:
-- [ ] 75-01-PLAN.md — Server: `OrgSummary.pendingCount` from an invites `count()` aggregate in `listOrganizationsHandler` (R222, R223); Client: pending badge in the Organizations tab Members cell (R222)
+
+- [x] 75-01-PLAN.md — Server: `OrgSummary.pendingCount` from an invites `count()` aggregate in `listOrganizationsHandler` (R222, R223); Client: pending badge in the Organizations tab Members cell (R222)
 
 **UI hint**: yes
 **Deploy**: Extends the existing `listOrganizations` callable's server-side computation — not a new
@@ -696,7 +697,6 @@ tests that a super-admin gets in and an ordinary non-member does not.
 76's deactivation-aware rules). Ships built + tested + UNDEPLOYED, with the exact
 `firebase deploy --only firestore:rules,storage` command handed to the owner.
 
-
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -719,7 +719,7 @@ tests that a super-admin gets in and an ordinary non-member does not.
 | 72 | v2.0 | 1/1 | Code-complete (UAT deferred) | 2026-08-21 |
 | 73 | v2.0 | 3/3 | Code-complete + SECURED (deploy UAT deferred) | 2026-08-21 |
 | 74 | v2.0 | 2/2 | Code-complete + SECURED (deploy/UAT deferred) | 2026-08-21 |
-| 75 | v2.1 | 0/TBD | Not started | - |
+| 75 | v2.1 | 1/1 | In Progress|  |
 | 76 | v2.1 | 0/TBD | Not started | - |
 | 77 | v2.1 | 0/TBD | Not started | - |
 | 78 | v2.1 | 0/TBD | Not started | - |

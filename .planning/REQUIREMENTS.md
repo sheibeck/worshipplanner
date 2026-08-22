@@ -69,11 +69,11 @@ REQ-IDs continue from v2.0 (last R211).
 
 ### Pending-invite visibility
 
-- [ ] **R222**: The Organizations list distinguishes, per org, members who have logged in (active) from
+- [x] **R222**: The Organizations list distinguishes, per org, members who have logged in (active) from
       people who were invited but have never logged in ("pending login"), so an onboarded-but-unclaimed
       admin is visible rather than the church reading as "0 members".
 
-- [ ] **R223**: The active-vs-pending breakdown is computed server-side (from the org's `members` +
+- [x] **R223**: The active-vs-pending breakdown is computed server-side (from the org's `members` +
       `invites`) by the existing super-admin-gated `listOrganizations` callable — no direct client cross-org
       reads are introduced.
 
@@ -101,6 +101,7 @@ REQ-IDs continue from v2.0 (last R211).
 - An audit log of super-admin actions (deactivate/reactivate/delete/enter-church) for accountability.
 - Bulk lifecycle actions (deactivate/delete multiple orgs), scheduled/auto-purge of long-deactivated orgs,
   and a soft "trash" with a restore window before hard delete.
+
 - Exporting/downloading an org's data before deletion.
 
 ## Out of Scope
@@ -108,8 +109,10 @@ REQ-IDs continue from v2.0 (last R211).
 - **Billing / subscription** lifecycle — unchanged; deactivation is an access switch, not a billing state.
 - **Church rename** — already supported per-church in Settings (`editName` + `orgNames` uniqueness); not
   re-scoped here.
+
 - **The invite → first-login "claim by email" flow** — already implemented and confirmed working; v2.1 only
   adds *visibility* of pending invites, not new claim mechanics.
+
 - **Self-service church signup / deletion by church admins** — org lifecycle stays super-admin-only.
 
 ## Traceability
@@ -126,8 +129,8 @@ REQ-IDs continue from v2.0 (last R211).
 | R219 | Phase 77 | Pending |
 | R220 | Phase 77 | Pending |
 | R221 | Phase 77 | Pending |
-| R222 | Phase 75 | Pending |
-| R223 | Phase 75 | Pending |
+| R222 | Phase 75 | Complete |
+| R223 | Phase 75 | Complete |
 | R224 | Phase 78 | Pending |
 | R225 | Phase 78 | Pending |
 | R226 | Phase 78 | Pending |

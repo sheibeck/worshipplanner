@@ -2,15 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Organization Lifecycle & Super-Admin Access
-status: planning
-last_updated: "2026-08-22T17:57:45.419Z"
+current_phase: 75
+current_phase_name: Pending-Invite Visibility
+status: executing
+stopped_at: Completed 75-01-PLAN.md
+last_updated: "2026-08-22T19:24:22.189Z"
 last_activity: 2026-08-22
+last_activity_desc: Executed 75-01-PLAN.md (pendingCount server aggregate + Members-cell badge)
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 25
 ---
 
 # ▶ ACTIVE MILESTONE — v2.1 Organization Lifecycle & Super-Admin Access (started 2026-08-22)
@@ -822,7 +826,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 75 — pending-invite-visibility (v2.1 roadmap created; ready to plan)
+**Current focus:** Phase 75 — pending-invite-visibility (75-01 executed, code-complete + undeployed)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -832,10 +836,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 75 of 78 (Pending-Invite Visibility) — not yet planned
-Plan: —
-Status: Roadmap created — ready to plan Phase 75
-Last activity: 2026-08-22 — v2.1 ROADMAP.md created (Phases 75-78, R212-R227, 100% coverage)
+Phase: 75 of 78 (Pending-Invite Visibility) — 75-01 executed (code-complete, undeployed)
+Plan: 75-01 complete
+Status: Phase 75 code-complete — pendingCount server + UI shipped, awaiting owner deploy hand-over
+Last activity: 2026-08-22 — Executed 75-01-PLAN.md (pendingCount server aggregate + Members-cell badge)
 
 ## ★ v2.1 ROADMAP.md phase breakdown (created 2026-08-22)
 
@@ -2468,6 +2472,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 73 P03 | 24min | 2 tasks | 3 files |
 | Phase 74 P01 | 15min | 3 tasks | 5 files |
 | Phase 74 P02 | 55min | 2 tasks | 3 files |
+| Phase 75-pending-invite-visibility P01 | 17min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2865,6 +2870,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Used a structural AdminWriter interface (just .set) instead of a Transaction|WriteBatch union so writeAdminAssignment is shared verbatim between onboardOrganization's transaction and assignOrgAdmin's batch
 - [Phase ?]: OrganizationsTab.vue is a pure httpsCallable consumer (no firestore writes); friendlyCallableError extended inline with already-exists -> 'That church name is taken.'
 - [Phase ?]: OwnerConsoleView.test.ts's generic httpsCallable mock extended to resolve organizations:[] since OrganizationsTab now calls listOrganizations unconditionally on mount
+- [Phase 75]: pendingCount always explicit 0 rather than omitted/undefined; badge is a Members-cell suffix, not a new column
 
 ### Roadmap Evolution
 
@@ -3185,8 +3191,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-21T21:02:15.961Z
-Stopped at: Completed 74-02-PLAN.md
+Last session: 2026-08-22T19:24:22.128Z
+Stopped at: Completed 75-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
