@@ -686,3 +686,16 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 2. **Real-browser visual** of the type-to-confirm dialog + the Delete control (enabled only for a deactivated org).
 
 **Ships built + tested + UNDEPLOYED** — the owner-gated deploy above is the single hand-over; the client dialog/control needs no deploy beyond normal hosting.
+
+---
+
+## Phase 78 — Super-Admin Enter-Any-Church (v2.1, FINAL) — `verification_deferred_human`
+
+**Code-complete + auto-verified + SECURED 2026-08-23** (verifier ran gates independently: `npm run type-check` clean; rules-emulator `npx vitest run --config vitest.rules.config.ts` 213/213 incl. the R225 super-admin ALLOW/DENY matrix + the super-admin lifecycle-write DENY + delete DENY + all pre-existing Phase 76/77 rules tests; targeted client suites 138/138; full app suite at the documented 2-file baseline). 4/4 SC verified (R224–R227): a per-row "Enter church" action switches a super-admin's active org context; a super-admin arm ORed in FRONT of `isOrgMember`/`isOrgEditor` (`firestore.rules`) and `isOrgMemberByClaim` (`storage.rules`) grants read/write to ANY org without a member doc; entering writes NOTHING to Firestore (no member doc → hidden from the church's team list/count — `TeamView` reads only `members`); a persistent "viewing as super-admin" banner (AppShell) with one-click exit. Composition safety (the crux): the org-doc lifecycle-field write guard was TIGHTENED (the `|| isSuperAdmin()` disjunct removed) so a super-admin can NOT client-write `active:false` and skip `setOrgActive`'s claim fan-out, and Phase 77's `allow delete: if false` stays absolute (super-admin client org-delete DENIED). Security: `78-SECURITY.md` SECURED, 7/7 threats closed (super-admin claim non-forgeable; T-78-03 member-doc-create is an accepted client-contract residual, documented inline). Code review's 3 warnings (stale-message router-strand, double-submit guard, navigate-only-on-success) all fixed.
+
+**What only the owner at `/gsd-verify-work 78` can confirm — do NOT mark passed:**
+
+1. **Owner-gated deploy + production confirmation.** Run `firebase deploy --only firestore:rules,storage --project worship-planner-bc515`, then as a super-admin click "Enter church" on an org you don't belong to and confirm you can view/edit that church's data + Storage; confirm you do NOT appear in that church's team list; confirm a non-super-admin non-member still cannot access it; confirm a super-admin still CANNOT client-write a lifecycle field (deactivate is `setOrgActive`-only) or delete an org via the client.
+2. **Real-browser visual** of the Enter-church control + the "viewing as super-admin" banner + its exit to the owner console.
+
+**Ships built + tested + UNDEPLOYED** — the owner-gated `firebase deploy --only firestore:rules,storage` is the single hand-over; the client half needs no deploy beyond normal hosting.

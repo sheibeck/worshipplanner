@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Organization Lifecycle & Super-Admin Access
-current_phase: 76
-current_phase_name: Church Deactivation & Reactivation
-status: executing
-stopped_at: Completed 78-02-PLAN.md
+current_phase: 78
+current_phase_name: Super-Admin Enter-Any-Church
+status: milestone-code-complete
+stopped_at: v2.1 ALL 4 phases (75-78) code-complete + auto-verified + (76/77/78) SECURED; STOPPED before milestone lifecycle per the v2.1 grant — owner runs /gsd-verify-work 75-78 + the owner-gated deploys, then audit→complete→cleanup
 last_updated: "2026-08-23T05:14:06.996Z"
 last_activity: 2026-08-22
 last_activity_desc: Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim helper
@@ -97,6 +97,7 @@ re-entry these phases are dropped from the run queue and resumed only via the re
 | 75 | verification_deferred_human | /gsd-verify-work 75 |
 | 76 | verification_deferred_human | /gsd-verify-work 76 |
 | 77 | verification_deferred_human | /gsd-verify-work 77 |
+| 78 | verification_deferred_human | /gsd-verify-work 78 |
 
 ---
 
