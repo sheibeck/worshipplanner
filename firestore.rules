@@ -8,9 +8,35 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Phase 76 (R213): org lifecycle gate. `active` is absent on every org
+    // created before this phase and must read as active (default-true,
+    // backward-compatible) -- only an EXPLICIT `active: false` denies. A
+    // live get() (not a claim) is used because firestore.rules, unlike
+    // storage.rules, CAN read a sibling document -- no propagation lag on
+    // this side (76-RESEARCH.md). Composed into isOrgMember/isOrgEditor
+    // below, ORed with isSuperAdmin() -- the exemption is NARROW: it only
+    // waives the active check for a super-admin who is ALREADY a genuine
+    // member (the exists() checks in both functions are untouched). A
+    // super-admin with no membership doc still gets no access from this
+    // exemption alone -- that is Phase 78's explicit deliverable (R225).
+    //
+    // exists()-guarded FIRST, mirroring isOrgEditor's own established
+    // Null-value-error avoidance immediately below: an unguarded
+    // get(...).data on a non-existent organizations/{orgId} doc throws
+    // (Firestore treats the error as DENY, not false), and this codebase's
+    // own test suite has long-established members/{uid}-doc-only fixtures
+    // that never seed the parent org doc — a missing org doc must read as
+    // active (same default-true posture as a present doc with no `active`
+    // field), not silently deny every one of those call sites.
+    function isOrgActive(orgId) {
+      return !exists(/databases/$(database)/documents/organizations/$(orgId)) ||
+        get(/databases/$(database)/documents/organizations/$(orgId)).data.get('active', true) == true;
+    }
+
     function isOrgMember(orgId) {
       return isSignedIn() &&
-        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+        (isOrgActive(orgId) || isSuperAdmin());
     }
 
     function isOrgEditor(orgId) {
@@ -22,7 +48,8 @@ service cloud.firestore {
       // resolves to a clean false instead of erroring.
       return isSignedIn() &&
         exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('role', '') in ['editor', 'admin'];
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('role', '') in ['editor', 'admin'] &&
+        (isOrgActive(orgId) || isSuperAdmin());
     }
 
     // Phase 68 (R178): super-admin gate. Deliberately CLAIM-ONLY — NO

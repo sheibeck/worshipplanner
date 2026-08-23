@@ -325,6 +325,75 @@ describe('appConfig / superAdmins — claim-based isSuperAdmin() gate (R178)', (
   })
 })
 
+// Phase 76 (R212-R214): isOrgActive() live-reads organizations/{orgId}.active
+// (default-true, backward-compatible) and is composed into isOrgMember/
+// isOrgEditor, ORed with isSuperAdmin() -- a NARROW exemption that only
+// waives the active check for a super-admin who ALREADY has a genuine
+// membership doc (the exists() checks in both functions are untouched; a
+// super-admin with no membership doc gets nothing new from this exemption --
+// that is Phase 78's explicit deliverable, R225).
+describe('isOrgActive — deactivation gate (R213, Phase 76)', () => {
+  it('DENIES a deactivated org member from reading organizations/{orgId} itself', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { active: false, name: 'Deactivated Church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA')))
+  })
+
+  it('DENIES a deactivated org editor from writing organizations/{orgId}', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { active: false, name: 'Deactivated Church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA'), { name: 'Renamed', updatedAt: new Date() }),
+    )
+  })
+
+  it('DENIES a deactivated org editor from writing an isOrgEditor-gated nested collection (songs) -- proves the gate lives in the SHARED helpers, not just the org doc rule', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { active: false })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(setDoc(doc(db, 'organizations', 'orgA', 'songs', 'song1'), { title: 'Amazing Grace' }))
+  })
+
+  it('ALLOWS a super-admin WITH a genuine membership doc to read a deactivated org', async () => {
+    await seedMembershipDoc('orgA', 'adminUid', 'editor')
+    await seedDoc('organizations/orgA', { active: false })
+    const context = testEnv.authenticatedContext('adminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA')))
+  })
+
+  it('ALLOWS a super-admin WITH a genuine membership doc to write a deactivated org', async () => {
+    await seedMembershipDoc('orgA', 'adminUid', 'editor')
+    await seedDoc('organizations/orgA', { active: false })
+    const context = testEnv.authenticatedContext('adminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA'), { name: 'About to reactivate', updatedAt: new Date() }),
+    )
+  })
+
+  it('ALLOWS (regression) an ordinary member of an org with NO active field at all (legacy)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: 'Legacy Church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA')))
+  })
+
+  it('ALLOWS (regression) an ordinary member of an org with active:true explicit', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { active: true, name: 'Active Church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA')))
+  })
+})
+
 describe('Catch-all deny', () => {
   it('denies access to undefined paths', async () => {
     const context = testEnv.authenticatedContext('userA')

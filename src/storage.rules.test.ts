@@ -191,6 +191,71 @@ describe('storage.rules — multi-org claim (phase 73, R209/R211)', () => {
   })
 })
 
+// Phase 76 (R213): deactivatedOrgs claim guard. Storage CANNOT read
+// organizations/{orgId}.active live (firestore.get()/exists() is inert in
+// the Storage emulator -- firebase-js-sdk#6803, CLAUDE.md's documented
+// 2026-08-06 incident), so this is CLAIM-ONLY, fanned out server-side by
+// setOrgActive (functions/src/orgProvisioning.ts). No membership doc is
+// seeded in any case below -- Storage membership is claim-only, per this
+// file's own established convention.
+describe('storage.rules — deactivatedOrgs claim (R213, Phase 76)', () => {
+  it('DENIES a caller whose token carries the LEGACY arm only, plus deactivatedOrgs for that org', async () => {
+    const context = testEnv.authenticatedContext('userA', {
+      orgId: 'orgA',
+      role: 'editor',
+      deactivatedOrgs: { orgA: true },
+    })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/deact1/source.pptx')
+
+    await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
+
+  it('DENIES a caller whose token carries the MULTI-ORG arm, plus deactivatedOrgs for that org -- proves the guard wraps the WHOLE OR-expression, not either arm individually', async () => {
+    const context = testEnv.authenticatedContext('userA', {
+      orgs: { orgA: 'editor' },
+      deactivatedOrgs: { orgA: true },
+    })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/deact2/source.pptx')
+
+    await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
+
+  it('ALLOWS a super-admin with deactivatedOrgs set for the org, plus a valid membership claim for it -- the super-admin exemption', async () => {
+    const context = testEnv.authenticatedContext('adminUid', {
+      orgId: 'orgA',
+      role: 'editor',
+      deactivatedOrgs: { orgA: true },
+      superAdmin: true,
+    })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/deact3/source.pptx')
+
+    await assertSucceeds(uploadBytes(fileRef, SMALL_BYTES))
+  })
+
+  it('ALLOWS (regression) a caller whose deactivatedOrgs map names a DIFFERENT org -- no false-positive block', async () => {
+    const context = testEnv.authenticatedContext('userA', {
+      orgId: 'orgA',
+      role: 'editor',
+      deactivatedOrgs: { orgB: true },
+    })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/deact4/source.pptx')
+
+    await assertSucceeds(uploadBytes(fileRef, SMALL_BYTES))
+  })
+
+  it('ALLOWS (regression) a caller with NO deactivatedOrgs key at all -- absent key must not error-deny', async () => {
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/deact5/source.pptx')
+
+    await assertSucceeds(uploadBytes(fileRef, SMALL_BYTES))
+  })
+})
+
 describe('storage.rules — media path', () => {
   // Phase 40: claim-arm proof, no members document seeded -- see the comment above
   // the org-membership describe block's allow-cases for why.

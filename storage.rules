@@ -32,6 +32,19 @@ service firebase.storage {
     // the requested orgId against that full map; the legacy arm (unchanged) still matches
     // the primary orgId/role alone, so a not-yet-backfilled token is never left without
     // access to its own primary org during rollout (R211 backward-compat).
+    // Phase 76 (R213): org lifecycle gate, Storage side. Storage CANNOT read
+    // organizations/{orgId}.active live (firestore.get()/exists() is inert
+    // in the Storage emulator/service -- firebase-js-sdk#6803, the exact
+    // documented 2026-08-06 deny-everyone incident in CLAUDE.md), so
+    // deactivation must flow through a custom claim instead:
+    // deactivatedOrgs, fanned out by setOrgActive (functions/src/
+    // orgProvisioning.ts) to every affected member. `!= null` guards the
+    // absent-key case (a legacy, pre-this-phase token shape) so it reads as
+    // "not deactivated" rather than erroring.
+    function isOrgDeactivatedForCaller(orgId) {
+      return request.auth.token.get('deactivatedOrgs', {}).get(orgId, false) == true;
+    }
+
     function isOrgMemberByClaim(orgId) {
       return request.auth != null
         && (
@@ -43,7 +56,8 @@ service firebase.storage {
           // still carry only the primary orgId/role — kept unchanged, unconditionally
           // ORed (never ANDed) with the new arm above.
           || (request.auth.token.orgId == orgId && request.auth.token.role != null)
-        );
+        )
+        && (!isOrgDeactivatedForCaller(orgId) || request.auth.token.superAdmin == true);
     }
 
     // Membership is CLAIM-ONLY as of Deploy 2 (2026-08-12). Do NOT re-introduce a
