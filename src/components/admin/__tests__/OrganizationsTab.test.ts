@@ -41,8 +41,11 @@ const {
     mockListOrganizations: vi.fn<() => Promise<{ data: { organizations: OrgSummaryFixture[] } }>>(
       () => Promise.resolve({ data: { organizations: [] } }),
     ),
-    // R224 (Phase 78) — spy-able so tests can assert on the Enter-church row action.
-    mockEnterOrgAsSuperAdmin: vi.fn().mockResolvedValue(undefined),
+    // R224 (Phase 78) — spy-able so tests can assert on the Enter-church row
+    // action. Resolves `true` by default (WR-03, 78-REVIEW.md) -- matching
+    // the real enterOrgAsSuperAdmin's success return -- so per-test
+    // mockResolvedValueOnce(false) can drive the failure branch instead.
+    mockEnterOrgAsSuperAdmin: vi.fn().mockResolvedValue(true),
     mockOnboardOrganization: vi.fn<
       () => Promise<{ data: { status: 'added' | 'invited'; orgId: string; name: string } }>
     >(() => Promise.resolve({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } })),
@@ -855,9 +858,9 @@ describe('OrganizationsTab -- enter church (R224, Phase 78)', () => {
   // file uses for Onboard/Assign/Deactivate/Delete: the button disables and
   // a second click while entering is a no-op.
   it('disables the button while entering and re-enables it once resolved', async () => {
-    let resolveEnter!: () => void
+    let resolveEnter!: (v: boolean) => void
     mockEnterOrgAsSuperAdmin.mockImplementationOnce(
-      () => new Promise<void>((resolve) => (resolveEnter = resolve)),
+      () => new Promise<boolean>((resolve) => (resolveEnter = resolve)),
     )
     const wrapper = await mountWithOneOrg({ active: true })
 
@@ -873,9 +876,28 @@ describe('OrganizationsTab -- enter church (R224, Phase 78)', () => {
     await flushPromises()
     expect(mockEnterOrgAsSuperAdmin).toHaveBeenCalledTimes(1)
 
-    resolveEnter()
+    resolveEnter(true)
     await flushPromises()
 
+    const settledButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    expect(settledButton.attributes('disabled')).toBeUndefined()
+  })
+
+  // WR-03 (78-REVIEW.md) — enterOrgAsSuperAdmin resolving false (bad/stale
+  // org doc, denied read, error) must surface an inline error and NOT
+  // navigate, instead of bouncing the super-admin to /select-church with no
+  // explanation.
+  it('shows an inline error and does not navigate when enterOrgAsSuperAdmin resolves false', async () => {
+    mockEnterOrgAsSuperAdmin.mockResolvedValueOnce(false)
+    const wrapper = await mountWithOneOrg({ active: true })
+
+    const enterButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    await enterButton.trigger('click')
+    await flushPromises()
+
+    expect(mockEnterOrgAsSuperAdmin).toHaveBeenCalledWith('org-1')
+    expect(wrapper.text()).toContain("Couldn't enter this church. Refresh and try again.")
+    // Guard re-enabled after the failed attempt (not left stuck disabled).
     const settledButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
     expect(settledButton.attributes('disabled')).toBeUndefined()
   })

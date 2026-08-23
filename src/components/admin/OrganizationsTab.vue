@@ -178,6 +178,9 @@
                   >
                     {{ enteringOrgId === org.orgId ? 'Entering...' : 'Enter church' }}
                   </button>
+                  <p v-if="enterError[org.orgId]" class="text-red-400 text-xs mt-1">
+                    {{ enterError[org.orgId] }}
+                  </p>
                 </div>
               </td>
             </tr>
@@ -632,13 +635,30 @@ async function onConfirmDelete(typedName: string) {
 // (or two different rows in quick succession) could fire two overlapping
 // enterOrgAsSuperAdmin calls that interleave.
 const enteringOrgId = ref<string | null>(null)
+// WR-03 (78-REVIEW.md), keyed per orgId to match this file's other
+// per-row error state (assignError/toggleError).
+const enterError = ref<Record<string, string>>({})
 
 async function onEnterChurch(org: OrgSummary): Promise<void> {
   if (enteringOrgId.value !== null) return
 
-  enteringOrgId.value = org.orgId
+  const orgId = org.orgId
+  enteringOrgId.value = orgId
+  delete enterError.value[orgId]
   try {
-    await authStore.enterOrgAsSuperAdmin(org.orgId)
+    // WR-03 (78-REVIEW.md): enterOrgAsSuperAdmin now signals success/failure
+    // instead of silently no-oping (not a super-admin, denied/errored read,
+    // or a stale/missing org doc). Only navigate on a genuine entry --
+    // otherwise the super-admin was previously bounced to /select-church by
+    // the router's org-selection gate with zero explanation.
+    const entered = await authStore.enterOrgAsSuperAdmin(orgId)
+    if (!entered) {
+      enterError.value = {
+        ...enterError.value,
+        [orgId]: "Couldn't enter this church. Refresh and try again.",
+      }
+      return
+    }
     // 'services' has no requiresEditor gate (unlike 'dashboard'), so it is
     // the safer universal landing route regardless of the forced 'editor'
     // role.

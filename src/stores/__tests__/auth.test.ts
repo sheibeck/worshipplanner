@@ -1582,5 +1582,18 @@ describe('useAuthStore', () => {
       expect(store.hasDeactivatedOrg).toBe(false)
       expect(store.requiresOrgSelection).toBe(false)
     })
+
+    // WR-03 (78-REVIEW.md) — enterOrgAsSuperAdmin now signals success/failure
+    // instead of silently no-oping on a missing/stale org doc, so the caller
+    // (OrganizationsTab's onEnterChurch) can branch instead of navigating
+    // unconditionally.
+    it('resolves true on success and false when the target org doc does not exist', async () => {
+      const store = await signInSuperAdminNoMemberships()
+      mockTargetOrgDoc('church-x', { name: 'Church X' })
+      await expect(store.enterOrgAsSuperAdmin('church-x')).resolves.toBe(true)
+
+      mockTargetOrgDoc('church-missing', null)
+      await expect(store.enterOrgAsSuperAdmin('church-missing')).resolves.toBe(false)
+    })
   })
 })

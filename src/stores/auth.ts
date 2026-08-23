@@ -597,21 +597,28 @@ export const useAuthStore = defineStore('auth', () => {
   // unlike loadOrgContext — the rules layer already grants a super-admin
   // unconditional access to a deactivated org's doc, and entering one for
   // support is intended, not a bug to guard against.
-  async function enterOrgAsSuperAdmin(targetOrgId: string): Promise<void> {
-    if (!user.value || !isSuperAdmin.value) return
+  //
+  // WR-03 (78-REVIEW.md): returns a boolean so the caller (OrganizationsTab's
+  // onEnterChurch) can tell a genuine entry apart from a silent no-op (not a
+  // super-admin / no user, a denied or errored read, or a missing/stale org
+  // doc) instead of navigating unconditionally and stranding the super-admin
+  // at the router's org-selection gate with zero explanation.
+  async function enterOrgAsSuperAdmin(targetOrgId: string): Promise<boolean> {
+    if (!user.value || !isSuperAdmin.value) return false
     resetOrgContext()
     let orgSnap
     try {
       orgSnap = await getDoc(doc(db, 'organizations', targetOrgId))
     } catch (err) {
       console.error('[auth] enterOrgAsSuperAdmin:', err)
-      return
+      return false
     }
-    if (!orgSnap.exists()) return
+    if (!orgSnap.exists()) return false
     orgId.value = targetOrgId
     viewingAsSuperAdmin.value = targetOrgId
     applyOrgSnapshot(orgSnap.data())
     userRole.value = 'editor'
+    return true
   }
 
   // R227 — ends a super-admin's cross-tenant visit, restoring the store to
