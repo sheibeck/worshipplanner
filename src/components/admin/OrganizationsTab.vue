@@ -94,14 +94,14 @@
                       type="button"
                       @click="onConfirmAssign(org)"
                       :disabled="isAssigning"
-                      class="inline-flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium transition-colors"
+                      class="inline-flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
                     >
                       {{ isAssigning ? 'Assigning...' : 'Assign' }}
                     </button>
                     <button
                       type="button"
                       @click="cancelAssign"
-                      class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 text-xs font-medium transition-colors"
+                      class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
                     >
                       Cancel assign
                     </button>
@@ -116,12 +116,12 @@
                      Firestore writes. -->
                 <div
                   v-else
-                  class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+                  class="flex flex-col gap-2 sm:flex-row sm:items-center"
                 >
                   <button
                     type="button"
                     @click="startAssign(org.orgId)"
-                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 text-xs font-medium transition-colors"
+                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
                   >
                     Assign admin
                   </button>
@@ -129,7 +129,7 @@
                     type="button"
                     @click="onToggleActive(org)"
                     :disabled="togglingOrgId !== null"
-                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium transition-colors"
+                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
                   >
                     {{
                       togglingOrgId === org.orgId
@@ -145,7 +145,7 @@
                     type="button"
                     @click="onEnterChurch(org)"
                     :disabled="enteringOrgId !== null"
-                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium transition-colors"
+                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
                   >
                     {{ enteringOrgId === org.orgId ? 'Entering...' : 'Enter church' }}
                   </button>
@@ -153,7 +153,7 @@
                     v-if="org.active === false"
                     type="button"
                     @click="openDeleteDialog(org)"
-                    class="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 text-xs font-medium transition-colors"
+                    class="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
                   >
                     Delete
                   </button>

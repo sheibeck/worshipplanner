@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <div class="px-6 py-8 max-w-4xl">
+    <div class="px-6 py-8">
       <!-- Page header -->
       <div class="mb-6 pb-4 border-b border-gray-800">
         <h1 class="text-xl font-semibold text-gray-100">Owner Console</h1>
@@ -37,7 +37,7 @@
            and appConfigStore subscribe()/unsubscribe() are not
            idempotency-guarded, so it must stay permanently mounted for the
            life of this console regardless of which tab is active. -->
-      <div v-show="activeTab === 'configuration'" data-testid="configuration-panel">
+      <div v-show="activeTab === 'configuration'" data-testid="configuration-panel" class="max-w-4xl">
         <ConfigurationTab />
       </div>
       <div v-show="activeTab === 'organizations'" data-testid="organizations-panel">
