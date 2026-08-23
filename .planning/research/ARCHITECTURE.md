@@ -1,293 +1,294 @@
-# Architecture Research: v1.9 Owner Admin Console
+# Architecture Patterns
 
-**Domain:** Owner-only super-admin console integrated into an existing Vue 3 + Firebase (Firestore/Auth/Functions) app
-**Researched:** 2026-08-20
-**Confidence:** HIGH for codebase-derived findings (read directly from `functions/src/index.ts`, `src/stores/auth.ts`, `firestore.rules`, `storage.rules`, `src/router/index.ts`, `src/components/AppSidebar.vue`); MEDIUM for general Firebase best-practice patterns (web search, official docs + community sources, not independently re-verified against this project's exact Node 22 / firebase-functions v7 / firebase-admin v13 versions)
+**Domain:** Per-org worship configurability + hardening/cleanup integration (v2.2)
+**Researched:** 2026-08-23
 
-## System Overview
+## Recommended Architecture
+
+v2.2 is **pure integration work on an existing, mature architecture** — no new architectural layer,
+no new Firebase service. Every one of the five asks slots into a pattern the codebase already uses
+at least once. The job is: (1) reuse the `organizations/{orgId}/roles` subcollection pattern for a
+new `teams` subcollection, (2) tighten one `firestore.rules` clause to the exact idiom already used
+three times (`orgSlugs`, `orgNames`, `shareTokens`), (3) copy `deleteQuarter`'s share-revocation
+block into `deleteService`, (4) add a client-only guard in one drawer component, (5) dedupe a
+constant that is already correctly defined in one place and wrongly re-declared in six others.
 
 ```
-┌───────────────────────────────────────────────────────────────────────────┐
-│  Client (Vue 3 + Pinia)                                                    │
-│  ┌───────────────┐   ┌──────────────────┐   ┌───────────────────────────┐ │
-│  │ auth.ts store │   │ router/index.ts  │   │ AppSidebar.vue             │ │
-│  │ +isSuperAdmin │◄──┤ +requiresSuperAdm│◄──┤ +gated "Owner Console" nav │ │
-│  └───────┬───────┘   └──────────────────┘   └───────────────────────────┘ │
-│          │ getIdTokenResult().claims.superAdmin                            │
-│          ▼                                                                 │
-│  ┌────────────────────────┐   ┌─────────────────────────────────────────┐ │
-│  │ NEW: AdminView.vue     │──►│ NEW: stores/admin.ts (Pinia)             │ │
-│  │ (owner console shell)  │   │ onSnapshot(appConfig/global)             │ │
-│  │ config panels, sender, │   │ onSnapshot(superAdmins) roster           │ │
-│  │ dry-run preview modal  │   │ calls previewCleanupDryRun / setSuperAdmin│ │
-│  └────────────────────────┘   └───────────────┬───────────────────────────┘│
-└────────────────────────────────────────────────┼──────────────────────────┘
-                                                   │ direct Firestore read/write
-                                                   │ (rules-gated) + onCall
-┌──────────────────────────────────────────────────▼────────────────────────┐
-│  Firestore                                                                 │
-│  organizations/{orgId}/...   (existing, per-org RBAC — unchanged)          │
-│  NEW appConfig/global        (super-admin only; mirrors OrgSettings idiom) │
-│  NEW superAdmins/{uid}       (super-admin only; source-of-truth roster)    │
-│  aiUsage, aiRateLimits, orgEmailCounters (existing, Admin-SDK-only)        │
-└───────────────┬─────────────────────────────────────┬─────────────────────┘
-                 │ onDocumentWritten                    │ read (cached, TTL)
-┌────────────────▼──────────────┐   ┌───────────────────▼────────────────────┐
-│ MODIFIED orgMembershipClaims.ts│   │ NEW superAdminClaims.ts                │
-│ syncOrgMembershipClaim         │   │ syncSuperAdminClaim (mirrors it)       │
-│ (must MERGE claims, not replace)│  │ setSuperAdminClaim (onCall, gated)     │
-└────────────────┬───────────────┘   └───────────────┬─────────────────────┘
-                 │ shared                              │ shared
-                 └──────────────► NEW claimsHelpers.ts ◄┘
-                     mergeAndSetCustomClaims(uid, patch)
+organizations/{orgId}
+  .settings                     OrgSettings doc field — aiEnabled, pcEnabled, vwModeEnabled,
+                                 defaultServiceTemplate, bibleVersion, slideTypography, messaging,
+                                 timezone. NOT where the new team list goes (see below).
+  /roles/{roleId}                existing subcollection — CRUD via stores/roster.ts,
+                                 seeded via seedDefaultRolesIfEmpty() called from RosterView.vue
+                                 on first mount. Rules: falls through the generic per-org
+                                 wildcard (isOrgEditor read+write). <- exact precedent for teams
+  /teams/{teamId}                NEW subcollection, same shape of precedent as /roles
+  /services/{serviceId}          service.teams: string[] (denormalized team NAMES, unaffected
+                                 by the new subcollection's existence — no migration needed)
+  /invites/{email}               existing, org-scoped, editor-only (already correctly gated)
 
-┌──────────────────────────────────────────────────────────────────────────┐
-│  Cloud Functions (functions/src/index.ts) — MODIFIED read sites          │
-│  api (onRequest)            — readAiProxyLimits() → config.aiProxy.*     │
-│  cleanupExpiredMedia (cron) — process.env.MEDIA_CLEANUP_ENABLED → config │
-│  cleanupOrphanRenders (cron)— process.env.PPTX_RENDER_CLEANUP_ENABLED    │
-│  cleanupOrphanBackgrounds   — process.env.BACKGROUND_CLEANUP_ENABLED     │
-│  cleanupPptxSources (cron)  — process.env.PPTX_SOURCE_CLEANUP_ENABLED    │
-│  sendScheduledReminders     — env.SCHEDULED_MESSAGING_CRON_ENABLED       │
-│  sendQueuedMessage          — MESSAGE_MAX_RECIPIENTS/ORG_MAX_EMAILS_PER_DAY,│
-│                                 MESSAGE_FROM_ADDRESS → config.sender.*   │
-│                              all read through NEW getAppConfig(db)       │
-│                              (functions/src/appConfig.ts, per-instance   │
-│                              cache with TTL)                             │
-│  NEW previewCleanupDryRun (onCall) — reuses the 4 existing exported      │
-│      handler bodies with dryRun forced true, returns summary to console │
-└──────────────────────────────────────────────────────────────────────────┘
+inviteLookup/{email}             TOP-LEVEL collection (org-agnostic key), 1:1 shadow of the
+                                 org-scoped invite above, used for O(1) email->org lookup at
+                                 sign-in. THIS is the rules change target (§2 below).
+
+shareTokens/{token}              service.id      + = the 3 collections deleteQuarter already
+serviceShares/{slug}__service-*  service.date    |   revokes on quarter delete; deleteService
+serviceShareLinks/{serviceId}    service.id      + = must revoke the same 3 (§3 below)
 ```
 
-**What stays untouched:** per-org RBAC (`organizations/{orgId}/members`, `isOrgMember`/`isOrgEditor`), the `orgId`/`role` custom claim shape and `storage.rules`' claim-only membership check, the messaging send pipeline's internal logic, the PPTX render pipeline, and every existing onCall/onSchedule *signature*. This milestone is additive plumbing (a new claim, a new config doc, new rules, a new UI) plus mechanical read-site swaps inside functions already reading `process.env` — it does not restructure the app's existing store/router/rules architecture, it extends the same idioms already in use (org-scoped settings doc → global config doc; `isOrgEditor` claim/rules pattern → `isSuperAdmin` claim/rules pattern; `syncOrgMembershipClaim` trigger → `syncSuperAdminClaim` trigger).
+### Component Boundaries
 
-## 1. Config-doc data model, defaults, and the read/cache seam
+| Component | Responsibility | Communicates With |
+|-----------|---------------|-------------------|
+| `src/types/team.ts` (NEW) | `Team` shape: `{ id, name, order, songTagFilter?: string, allowsFreeTextName?: boolean }`. `DEFAULT_TEAMS` seed array (mirrors `DEFAULT_ROLES` in `roster.ts`) | `stores/teams.ts` |
+| `stores/teams.ts` (NEW) | `onSnapshot` subscribe to `organizations/{orgId}/teams`; `addTeam`/`updateTeam`/`deleteTeam`; `seedDefaultTeamsIfEmpty()` (verbatim structural mirror of `roster.ts`'s `seedDefaultRolesIfEmpty`) | Firestore `organizations/{orgId}/teams`; consumed by `ServiceEditorView.vue`, `NewServiceDialog.vue`, a new Settings teams panel |
+| Settings "Teams" panel (NEW, mirrors the existing Roles editor UI in `RosterView.vue`) | CRUD UI for team name + optional song-tag filter + optional "allows free-text service name" flag | `stores/teams.ts` |
+| `ServiceEditorView.vue` (MODIFIED) | Reads `teamsStore.teams` instead of the local `AVAILABLE_TEAMS` const (line 1675); replaces the two hardcoded Orchestra-filter blocks (lines 3426-3429, 3537-3540) with one helper that reads each selected team's `songTagFilter` | `stores/teams.ts` (new dependency); `stores/songs.ts` (unchanged) |
+| `NewServiceDialog.vue` (MODIFIED) | Reads `teamsStore.teams` instead of the local `availableTeams` const (line 145); **deletes** `sundayOrdinal()` (line 148) and the two ordinal-based auto-select blocks (lines 170-201) — B1 drop, no replacement | `stores/teams.ts` (new dependency) |
+| `ServiceCard.vue` (MODIFIED, minor) | The `'Special'` free-text-name special-case (line ~87) generalizes to "does the service's team set include any team with `allowsFreeTextName`" | `stores/teams.ts` |
+| `src/types/song.ts` (UNCHANGED, becomes the single source) | `VW_TYPE_LABELS` already lives here correctly | `ShareView.vue`, `SongSlideOver.vue`, `BatchQuickAssign.vue`, `VwExplainer.vue`, `SettingsView.vue`, `claudeApi.ts` (all MODIFIED to import instead of re-declare) |
+| `firestore.rules` `inviteLookup` block (MODIFIED) | `allow create` narrowed from `isSignedIn()` to `isOrgEditor(request.resource.data.orgId)`, mirroring `orgSlugs`/`orgNames`/`shareTokens` | Firestore rules engine only — no client code change required (see §2) |
+| `stores/services.ts` `deleteService` (MODIFIED) | Revoke `shareTokens` + `serviceShares` + `serviceShareLinks` before/with the service doc delete — same 3 docs `deleteQuarter` already revokes, addressed differently (service has a direct-keyed `serviceShareLinks/{serviceId}` identity doc; quarter has a denormalized `quarter.shareToken` field) | Firestore `shareTokens`, `serviceShares`, `serviceShareLinks` — all already `allow delete: if isOrgEditor(...)`, no rules change |
+| `EditSlideDrawer.vue` (MODIFIED) | Add `renderState` awareness: when the active entry's slide carries `renderState === 'pending'` (`src/types/slide.ts`), disable/warn on per-entry customization (label/notes/body/audio/background) instead of silently accepting edits that vanish on pending→ready | No new store; reads a field (`renderState`) the slide type already carries but the drawer never inspects today |
 
-### Shape: `appConfig/global`
+### Data Flow
 
-Top-level singleton doc (not nested under `organizations/{orgId}` — these are cross-org, owner-level controls, mirroring where `aiUsage`/`aiRateLimits`/`orgEmailCounters` already live today). Grouped by the same knob families SEED-001 enumerates:
+**Configurable Teams (1):** `stores/teams.ts` subscribes to `organizations/{orgId}/teams`
+exactly like `stores/roster.ts` subscribes to `.../roles` — same lifecycle (subscribe on org
+context load, unsubscribe on org switch, per the CLAUDE.md org-switch cache-clearing fix).
+`ServiceEditorView.vue`/`NewServiceDialog.vue` read `teamsStore.teams` reactively instead of a
+module-level const array, so a Settings-panel edit to the team list is live everywhere without a
+reload. The per-team `songTagFilter` field flows: team selected on service → helper looks up that
+team's `songTagFilter` in `teamsStore.teams` → filters `songStore`'s song list by `tags.includes(filter)`
+— a straight generalization of the existing `isOrchestraService ? base.filter(s => s.tags.includes('Orchestra')) : base` inline logic, replacing the hardcoded string with the configured one (or no filtering if the team has none set).
 
-```typescript
-// functions/src/appConfig.ts (NEW — shared by every Cloud Function)
-export interface AppConfig {
-  cleanup: {
-    mediaCleanupEnabled: boolean;
-    pptxRenderCleanupEnabled: boolean;
-    backgroundCleanupEnabled: boolean;
-    pptxSourceCleanupEnabled: boolean;
-    mediaRetentionDays: number;
-    orphanRenderStaleHours: number;
-    backgroundRetentionDays: number;
-    pptxSourceRetentionDays: number;
-    maxDeletesPerRun: number;
-  };
-  aiProxy: {
-    maxPerMin: number;
-    maxPerDay: number;
-    allowedModels: string[];
-    maxTokensCeiling: number;
-    // maxInstances is DELIBERATELY excluded — see the maxInstances note below.
-  };
-  messaging: {
-    scheduledMessagingCronEnabled: boolean;
-    messageMaxRecipients: number;
-    orgMaxEmailsPerDay: number;
-  };
-  sender: {
-    fromAddress: string; // e.g. "Worship Planner <noreply@yourdomain.com>"
-  };
-}
-```
+**inviteLookup gate (2):** No data-flow change. `TeamView.vue`'s `onInvite()` already writes
+`{ orgId, role, invitedAt }` into `inviteLookup/{email}` inside the SAME `writeBatch` as the
+`organizations/{orgId}/invites/{email}` doc — `orgId` is already present on the payload today, so
+`request.resource.data.orgId` is available to the tightened rule with zero client-code change. The
+only OTHER writer of `inviteLookup` is `assignOrgAdmin` (Cloud Function, Admin SDK) — Admin SDK
+writes bypass `firestore.rules` entirely, so that path is unaffected by this change and needs no
+functions redeploy.
 
-### Defaults strategy — reuse the exact numbers already hardcoded as env fallbacks
+**deleteService revocation (3):** `deleteQuarter`'s pattern (`stores/quarters.ts:460-483`) is:
+read `quarter.shareToken` (denormalized on the doc) → if present, delete `shareTokens/{token}` →
+compute the deterministic `quarterShares/{slug}__q{N}-{year}` key from the org's slug → delete it
+if present → delete the quarter doc. `deleteService` needs the SAME 3-collection cleanup but the
+service side has no denormalized token field on the service doc itself — instead
+`serviceShareLinks/{serviceId}` (keyed directly by serviceId, written by `ensureShareLink`) IS the
+identity doc holding `{ token, orgId, serviceId }`. So the mirrored sequence is: read
+`serviceShareLinks/{serviceId}` → if it exists, delete `shareTokens/{that token}` and delete
+`serviceShareLinks/{serviceId}` itself → compute `serviceShares/{slug}__service-{service.date}` from
+the org's slug + the service's own `date` field (exact key `writeSharePayload` already uses at
+`services.ts:629`) → delete it if present → then delete the service doc. All three collections
+already have `allow delete: if isOrgEditor(resource.data.orgId)` — **zero rules change**, per the
+carry-forward note in `PENDING-VERIFICATION.md` C5.
 
-Every knob already has a code-level default today, expressed via `readNumericKnob(process.env.X, DEFAULT)` or a literal (`RETENTION_DAYS = 30`, `DEFAULT_AI_ALLOWED_MODELS`, `500` for the delete cap, `200`/`1000` for messaging). Define one `DEFAULT_APP_CONFIG: AppConfig` constant in `appConfig.ts` using those SAME numbers, and merge it with whatever the doc actually contains, field-by-field — the identical idiom `src/stores/auth.ts`'s `loadOrgContext` already uses for `DEFAULT_ORG_SETTINGS` (`{ ...DEFAULT_APP_CONFIG, ...docData, cleanup: {...DEFAULT_APP_CONFIG.cleanup, ...docData.cleanup}, ... }`, deep-merged per nested group exactly like `slideTypography`/`messaging` are deep-merged today, not a shallow spread). This is why an **empty or entirely-missing `appConfig/global` doc is safe on day one**: deploying this milestone with zero writes to the doc reproduces today's env-derived behavior byte-for-byte, so the swap from `process.env` to Firestore is a no-behavior-change deploy in isolation, and only *becomes* live once the owner actually opens the console and changes a value.
+**Pending-slide guard (4):** No new data flow — `slide.ts`'s `renderState?: 'pending' | 'failed'`
+already exists on the entry the drawer edits; the drawer's `sourceKind === 'imported'` branch
+(where a PPTX-render entry surfaces) simply never reads it today. Adding the check is a pure
+UI-layer read of a field already streamed down via the assembled slideshow prop.
 
-### Read path: `getAppConfig()` — per-instance cache with TTL, not a listener
+## Patterns to Follow
 
-```typescript
-let cached: { value: AppConfig; fetchedAtMs: number } | null = null;
-const CONFIG_CACHE_TTL_MS = 60_000; // tunable; see rationale below
+### Pattern 1: Per-org subcollection with lazy "seed defaults if empty" (roles → teams)
+**What:** A per-org configurable list is its own top-level subcollection
+(`organizations/{orgId}/teams`), not a field on `OrgSettings`. `OrgSettings` is reserved for
+single-valued/nested-object settings (toggles, one template array, one font choice); anything that
+is itself a growing/editable **list of records with CRUD, ordering, and per-item fields** (roles
+today, teams tomorrow) gets a subcollection.
+**When:** Any new per-org configurable list.
+**Example (existing, `stores/roster.ts`):**
+```ts
+export const DEFAULT_ROLES: Array<Omit<Role, 'id'>> = [
+  { name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
+  // ...
+]
 
-export async function getAppConfig(
-  db: Firestore,
-  now: number = Date.now(),
-): Promise<AppConfig> {
-  if (cached && now - cached.fetchedAtMs < CONFIG_CACHE_TTL_MS) {
-    return cached.value;
+async function seedDefaultRolesIfEmpty(): Promise<void> {
+  if (!orgId.value) return
+  if (roles.value.length !== 0) return   // idempotent — no-op once anything exists
+  for (const role of DEFAULT_ROLES) {
+    await addDoc(collection(db, 'organizations', orgId.value, 'roles'), {
+      ...role, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    })
   }
-  const snap = await db.collection("appConfig").doc("global").get();
-  const value = mergeAppConfig(snap.exists ? (snap.data() as Partial<AppConfig>) : {});
-  cached = { value, fetchedAtMs: now };
-  return value;
+}
+```
+`RosterView.vue` calls `seedDefaultRolesIfEmpty()` once on mount after roles have had a chance to
+load. A new `stores/teams.ts` + `seedDefaultTeamsIfEmpty()` is a structural copy of this, called
+from wherever the Settings teams panel (or `ServiceEditorView`/`NewServiceDialog`, whichever mounts
+first for a given org) first needs the list. **No server-side (Cloud Functions) seeding needed** —
+note that `functions/src/orgTemplateSeed.ts` (the v2.0 onboarding seed) hand-mirrors `OrgSettings` +
+the suggested template for brand-new orgs, but deliberately does NOT seed roles server-side; roles
+seed lazily client-side regardless of org age. Teams should follow the SAME simpler precedent, not
+the onboarding-seed one — avoids touching `functions/` or `orgProvisioning.ts` at all for this
+feature.
+
+### Pattern 2: Rules gate mirrors an established create-only idiom (orgSlugs/orgNames/shareTokens → inviteLookup)
+**What:** `allow create: if isOrgEditor(request.resource.data.orgId)`, unaffected read/update/delete.
+**When:** A top-level, org-agnostic-keyed collection whose only legitimate writer is an editor of the
+org named in its own payload.
+**Example (existing, `firestore.rules:539-543`):**
+```
+match /orgSlugs/{slug} {
+  allow read: if true;
+  allow create: if isOrgEditor(request.resource.data.orgId);
+  allow update, delete: if false;
+}
+```
+Apply the identical `create` clause to `inviteLookup` (read/delete stay exactly as they are today —
+self-read-by-email and self-or-editor-delete are both still correct and untouched):
+```
+match /inviteLookup/{email} {
+  allow read: if isSignedIn() && request.auth.token.email.lower() == email;
+  allow create: if isOrgEditor(request.resource.data.orgId);   // was isSignedIn()
+  allow delete: if isSignedIn() && (
+    request.auth.token.email.lower() == email ||
+    isOrgEditor(resource.data.orgId)
+  );
 }
 ```
 
-### Invalidation approach — compared, and the recommendation is TTL, not a trigger and not a live listener
+### Pattern 3: Store-level cascade revocation on delete (deleteQuarter → deleteService)
+**What:** Before/alongside deleting the primary doc, delete every derived public-share artifact the
+entity minted, scoped by `isOrgEditor` on each artifact's own `orgId` — never a Cloud Function, this
+runs entirely in the client store (Firestore rules already authorize it, no Admin SDK bypass
+needed).
+**When:** Any entity that mints a public share link must revoke it on delete.
+**Example (existing, `stores/quarters.ts:460-483`, shown in full in Data Flow above)** — `deleteService`
+in `stores/services.ts` copies this shape, substituting the `serviceShareLinks/{serviceId}`
+direct-key lookup for `quarter.shareToken`'s denormalized field, and the
+`serviceShares/{slug}__service-${service.date}` key for `quarterShares`'s
+`${slug}__q${N}-${year}` key.
 
-| Approach | Correctness across warm instances | Complexity | Fit for hot `api` onCall/onRequest | Fit for daily `onSchedule` crons |
-|---|---|---|---|---|
-| **Short TTL (recommended)** | Bounded staleness (≤ TTL) on every instance, including newly cold-started ones (cache starts empty, first call always fetches fresh) | Low — one `if` before the existing Firestore call sites | **Best fit.** An owner's emergency stop (mirrors the existing `AI_RATELIMIT_MAX_PER_MIN=0` "full-stop" pattern in `readNumericKnob`'s own doc comment) takes effect within one TTL window on every instance, warm or cold | Good enough, but see below — crons should just skip the cache entirely |
-| `onDocumentWritten` cache-bust (module-scope flag clear) | **Broken as a sole mechanism.** Cloud Functions v2 instances are independent processes/containers; a write-triggered function running in its own instance cannot reach into another instance's module-scope variable. It only clears the cache of whichever instance happens to run the *trigger* itself, not the `api`/`sendQueuedMessage` instances actually serving traffic | Medium (a second exported function + wiring) | Marginal benefit on top of TTL, not a replacement for it | Not needed — see below |
-| Realtime `onSnapshot` listener kept alive per instance | Correct for *that* instance once the first snapshot arrives, but a fresh/cold-started instance can still receive its first request before the listener's first snapshot resolves — so an initial awaited `get()` is still required regardless, which is most of what TTL already buys you | Higher — listener lifecycle, error/reconnect handling, and Cloud Functions v2 does not guarantee your process stays warm long enough to make persistent listeners worth the overhead for a table this rarely written | Overkill for owner-tunable knobs (not a sub-second latency requirement) | Overkill |
-
-**Recommendation:** TTL cache (30–60s) for the hot paths (`api`, `sendQueuedMessage`, and any future onCall/onRequest reader), **no cache at all — read fresh every invocation** for the four `onSchedule` cleanup crons and `sendScheduledReminders`. Crons run once daily; the cost of one extra Firestore read per run is negligible next to the correctness requirement that a cleanup sweep must never act on a config value staler than "whatever the owner most recently saved" — especially given the song-linked-background hard constraint (below). Treat `onDocumentWritten`-based invalidation as optional defense-in-depth *layered on top of* TTL later, never as a substitute for it, since it cannot reach concurrent sibling instances.
-
-**Song-linked-background guarantee, made explicit for this seam:** `cleanupOrphanBackgroundsHandler`'s 3-tier reference detection and its two fail-safes (`referencesComplete` + floor-guard) are pure logic unrelated to the config source — swapping `process.env.BACKGROUND_CLEANUP_ENABLED` for `config.cleanup.backgroundCleanupEnabled` changes nothing about *how* a background is judged orphaned, only *where the enable flag comes from*. The existing safety net is preserved automatically as long as the swap is mechanical (same gate shape: `dryRun = config.cleanup.backgroundCleanupEnabled !== true`, still fail-safe on any falsy/missing value). This should be a unit-test assertion in the phase that does the swap, not just an inference.
-
-### The `maxInstances` limitation — flag for roadmap, not silently absorbed
-
-`AI_PROXY_MAX_INSTANCES` (bound to `api`'s `onRequest({ maxInstances: ... })`) and `GLOBAL_MAX_INSTANCES` (bound to `setGlobalOptions({ maxInstances: ... })`, called once at module load before the first function definition) are **Cloud Functions v2 deploy-time configuration**, not values read per-invocation — they are baked into the function's build/deploy artifact and cannot be changed by writing to Firestore without a redeploy, structurally, regardless of how `getAppConfig()` is wired. SEED-001 lists both under "AI proxy knobs" / "fan-out knobs" as candidates to lift into the live config doc; **that specific claim cannot be fully delivered for these two knobs.** Recommendation: keep `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` as `process.env`-configured exactly as today (no functional change), but surface their *current effective value* read-only in the admin console (a cheap onCall or a small `deployConfig` doc written once at deploy time, not user-editable) with a "requires redeploy to change" label, so the console is honest about what it can and cannot control live. The Cloud Run `render-service`'s own `--max-instances=3`/`--concurrency=1` flags (a separate deployable, `render-service/DEPLOY.md`) are even further outside this seam — deploy-time `gcloud` flags on a different service entirely, not in scope for `appConfig` at all.
-
-## 2. The super-admin claim
-
-### Reuse the trigger-sync architecture; do NOT reuse the claim keys
-
-`orgMembershipClaims.ts` already establishes the pattern this milestone should mirror: a Firestore doc is the source of truth, an `onDocumentWritten` trigger syncs it into a custom claim via a pure, independently-testable `decide*` function shared with a one-off bootstrap script. Reuse that *shape* for super-admin — a new top-level `superAdmins/{uid}` collection (existence = granted, mirroring how `organizations/{orgId}/members/{uid}` existence = org membership) plus a new `syncSuperAdminClaim` trigger and a shared `decideSuperAdminClaim` function.
-
-**Do NOT put `superAdmin` inside the existing `{orgId, role}` claim object.** `ORG_CLAIM_KEYS` (`orgId`, `role`) is a locked 2-key shape read directly by `storage.rules`' `isOrgMemberByClaim`; conflating a cross-org "am I the owner" bit into an org-scoped claim muddies both.
-
-### The load-bearing hazard this milestone must fix, not just avoid
-
-`getAuth().setCustomUserClaims(uid, claims)` **replaces the entire custom-claims object** — it is not a merge. `syncOrgMembershipClaimHandler` today calls it as `getAuth().setCustomUserClaims(uid, decision.claims)` with `decision.claims` being *only* `{orgId, role}`. Once a `superAdmin: true` claim exists on a user, **any subsequent write to that same user's `organizations/{orgId}/members/{uid}` doc — a role change, a re-invite, literally any membership write — silently wipes their `superAdmin` claim**, because the sync trigger overwrites the whole claims object with just the two org keys. This is not a hypothetical: the owner's own membership doc will be touched by ordinary product usage over time. Symmetrically, a naive new `setSuperAdminClaim` onCall that calls `setCustomUserClaims(uid, {superAdmin: true})` would wipe that user's `orgId`/`role` claim the moment it's granted, breaking their own org access until the next `loadOrgContext` re-sync.
-
-**Fix (must ship in the same phase as the new claim, not later):** a shared `functions/src/claimsHelpers.ts` exporting `mergeAndSetCustomClaims(uid, patch)` that reads the user's *current* claims via `getAuth().getUser(uid)`, spreads them, applies `patch`, and writes the merged object. Both `syncOrgMembershipClaimHandler` (**modified**) and the new `syncSuperAdminClaimHandler` (**new**) must route through it instead of calling `setCustomUserClaims` directly.
-
-### Where the claim is set
-
-- **Bootstrap (the very first owner):** a one-off Admin-SDK script mirroring the existing `40-04` org-claim backfill script precedent — run locally with a service account, writes `superAdmins/{ownerUid}` directly (or calls `mergeAndSetCustomClaims` directly), bypassing rules via the Admin SDK. Chicken-and-egg is unavoidable for the first grant; every subsequent grant goes through the gated onCall.
-- **Steady state:** a `setSuperAdminClaim` onCall guarded by `request.auth.token.superAdmin === true` (the caller's own already-verified ID token claim — onCall already verifies the token signature server-side, so no extra re-verification round-trip is needed, unlike `verifyAppCaller`'s manual `verifyIdToken` for the `onRequest`-based proxy). Writes/deletes the target's `superAdmins/{targetUid}` doc; the `syncSuperAdminClaim` trigger does the actual claim write, keeping one single writer of custom claims per concern (mirrors the existing "source doc → trigger → claim" indirection, never a direct claim write from the onCall itself).
-
-### Client-side surfacing
-
-- `src/stores/auth.ts` (**modified**): add `isSuperAdmin = ref(false)`, and read `result.claims.superAdmin === true` off the **same** `getIdTokenResult` call `refreshOrgClaim` already makes in `loadOrgContext` — no second token fetch needed, just read one more field off the existing result. Unlike org-claim refresh, a super-admin grant is a rare, manual, owner-initiated event, not a "just joined" race, so an unconditional forced refresh on every session load is unnecessary; instead, force one `getIdTokenResult(user, true)` specifically in the new admin route's guard (below) so a just-granted user doesn't have to sign out/in to see the console — mirrors `refreshOrgClaim`'s `awaitClaim` bounded-retry idea but scoped to the one place it's actually needed.
-- `src/router/index.ts` (**modified**): add `requiresSuperAdmin?: boolean` to `RouteMeta`, a new route (see naming note below), and a guard branch mirroring `requiresEditor`'s shape — `waitForSuperAdmin()` + a forced claim refresh + redirect when false.
-- `src/components/AppSidebar.vue` (**modified**): a new nav entry in the existing `navItems` computed, gated on `authStore.isSuperAdmin`, following the identical `if (authStore.isEditor) { ... }` pattern already used for every other entry.
-
-**Naming collision to avoid:** the route `/admins` and nav label "Admins" are already taken by the existing per-org `TeamView.vue` (editor/viewer team management). Name the new surface distinctly — e.g. route `owner-console` at `/owner-console`, nav label "Owner Console" — so neither users nor future contributors confuse per-org team admin with the cross-org super-admin console.
-
-## 3. Security rules
-
-### `appConfig/*` and `superAdmins/*` — claim-based, not `get()`-based
-
-Both new collections are top-level (not nested under `organizations/{orgId}`), same placement rationale already documented in `firestore.rules` for `aiUsage`/`aiRateLimits`: the catch-all `match /{document=**} { allow read, write: if false; }` denies them by default, and a claim check needs no cross-document read (cheaper and simpler than `isOrgEditor`'s `get()`-based role lookup, which exists only because org role isn't itself a claim value in the same request).
-
-```
-function isSuperAdmin() {
-  return request.auth != null && request.auth.token.superAdmin == true;
-}
-
-match /appConfig/{docId} {
-  allow read, write: if isSuperAdmin();
-}
-
-match /superAdmins/{uid} {
-  allow read, write: if isSuperAdmin();
-}
-```
-
-Cloud Functions read/write both via the Admin SDK regardless (bypasses rules entirely, same as every existing Admin-SDK-owned collection) — these rules exist solely to gate the **admin console's direct client-SDK access** (the console reads `appConfig/global` via `onSnapshot` and writes it via `setDoc`/`updateDoc` directly, no onCall wrapper needed for ordinary config edits, mirroring how `SettingsView.vue` already writes `organizations/{orgId}` fields directly today) and to gate a super-admin's own read of the roster.
-
-### Rules-testing discipline (per CLAUDE.md's storage.rules lesson)
-
-Every new rule needs a **genuine ALLOW-case** emulator test, not only DENY cases — the exact defect CLAUDE.md documents (`storage.rules`' deny-everyone bug survived a milestone because only DENY cases were proven) must not recur here. In `src/rules.test.ts`, use `@firebase/rules-unit-testing`'s `authenticatedContext(uid, { superAdmin: true })` to construct a genuinely-super-admin auth context and prove a real read AND a real write of `appConfig/global` and `superAdmins/{uid}` both succeed — alongside DENY cases for a signed-in non-admin and an org editor (who must NOT incidentally pass through the unrelated `/{collection}/{docId}` org-scoped wildcard, though that wildcard is scoped under `organizations/{orgId}` and structurally cannot reach a top-level collection, so this is a lower-risk boundary than the pptxRenders/services exclusions were).
-
-Since `appConfig`/`superAdmins` are pure Firestore constructs with no Storage-rules counterpart, the specific `firestore.exists()`-is-inert-in-the-Storage-emulator trap does not apply directly here (there is no cross-service check in either new rule — `request.auth.token.superAdmin` is read directly off the token, exactly the claim-only pattern `storage.rules` had to migrate *to* after that incident). The broader lesson — an environment-limitation label can silently hide a real defect — still applies to *how* these tests are graded: a passing ALLOW-case test against the real emulator is required evidence, not an assumption.
-
-## 4. New vs. modified components
-
-| Component | New / Modified | Notes |
-|---|---|---|
-| `functions/src/claimsHelpers.ts` | **New** | `mergeAndSetCustomClaims(uid, patch)` — shared merge-then-write, closes the claim-wipe hazard |
-| `functions/src/orgMembershipClaims.ts` | **Modified** | `syncOrgMembershipClaimHandler` switches from `setCustomUserClaims` (replace) to `mergeAndSetCustomClaims` (merge) |
-| `functions/src/superAdminClaims.ts` | **New** | `decideSuperAdminClaim`, `syncSuperAdminClaimHandler` + `syncSuperAdminClaim` (`onDocumentWritten` on `superAdmins/{uid}`), `setSuperAdminClaim` (`onCall`, gated on caller's own `superAdmin` claim) |
-| `functions/scripts/bootstrap-super-admin.ts` (or similar) | **New** | One-off Admin-SDK script, mirrors the existing `40-04` org-claim backfill precedent; grants the first owner |
-| `functions/src/appConfig.ts` | **New** | `AppConfig` type, `DEFAULT_APP_CONFIG`, `mergeAppConfig`, `getAppConfig(db)` — per-instance TTL cache |
-| `functions/src/index.ts` | **Modified** | Every v1.8 knob read-site (`readAiProxyLimits`, the four cleanup handlers' `process.env.*_ENABLED`/`*_RETENTION_DAYS`, `readDeleteCap`, `runScheduledMessagingCron`'s env gate, `sendQueuedMessage`'s `MESSAGE_MAX_RECIPIENTS`/`ORG_MAX_EMAILS_PER_DAY`/`MESSAGE_FROM_ADDRESS`) swapped to read through `getAppConfig()`. `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` explicitly **excluded** (deploy-time limitation, see §1) |
-| `functions/src/index.ts` — `previewCleanupDryRun` | **New** (additive export in the same file, or a new `functions/src/dryRunPreview.ts`) | `onCall`, gated `isSuperAdmin`; invokes the same 4 already-exported handler bodies (`cleanupExpiredMediaHandler`, `cleanupOrphanRendersHandler`, `cleanupOrphanBackgroundsHandler`, `cleanupPptxSourcesHandler`) with dry-run **forced true regardless of the live config**, returns the summary synchronously |
-| `src/stores/auth.ts` | **Modified** | `isSuperAdmin` ref, read off the existing `getIdTokenResult` call; no new token fetch on ordinary session load |
-| `src/router/index.ts` | **Modified** | `requiresSuperAdmin` meta key, new `owner-console` route, guard branch (forces one claim refresh before redirecting) |
-| `src/components/AppSidebar.vue` | **Modified** | New nav entry, gated `authStore.isSuperAdmin`, distinctly labeled from the existing "Admins" (TeamView) entry |
-| `src/stores/admin.ts` | **New** (Pinia) | `onSnapshot(appConfig/global)`, `onSnapshot(superAdmins)` roster, calls `previewCleanupDryRun`/`setSuperAdminClaim` |
-| `src/views/AdminView.vue` (or `OwnerConsoleView.vue`) | **New** | Console shell — routed at `/owner-console` |
-| `src/components/admin/*` (config panels, sender form, dry-run preview modal, roster manager) | **New** | Subcomponents of the console |
-| `firestore.rules` | **Modified** | `isSuperAdmin()` helper + `appConfig/*` + `superAdmins/*` match blocks (purely additive at the top level, same placement precedent as `aiUsage`/`aiRateLimits`) |
-| `src/rules.test.ts` | **Modified** | New `describe` blocks — genuine ALLOW-case + DENY-case coverage for both new collections |
-
-## 5. Suggested build order (dependency-ordered)
-
-**A — Claim & gate (foundation)**
-1. `claimsHelpers.ts` (`mergeAndSetCustomClaims`)
-2. `superAdminClaims.ts` (decide/sync/onCall) **shipped together with** the `orgMembershipClaims.ts` merge fix — do not let the new claim type exist even one phase without the fix, since ordinary org-membership writes happen constantly and would otherwise silently de-admin the owner
-3. Bootstrap script; owner runs it once, locally, against production (mirrors the existing org-claim backfill runbook precedent)
-4. `auth.ts` `isSuperAdmin` + router guard + nav entry — safe to ship even before the console has real content (route can 404/placeholder); proves the gate end-to-end early
-
-**B — Config doc + rules**
-5. `appConfig.ts` (type, defaults, cached reader) — unit-testable against a fake Firestore, no dependency on A beyond "a super-admin exists to eventually use it"
-6. `firestore.rules`: `isSuperAdmin()` + `appConfig/*` + `superAdmins/*`, plus the genuine ALLOW-case `rules.test.ts` coverage — must land before the console (phase D) is given direct client-SDK read/write access to `appConfig/global`
-
-**C — Functions read config (swap the levers)**
-7. Cleanup handlers' four `*_ENABLED`/retention/`maxDeletesPerRun` reads → `config.cleanup.*` (mechanical, per-handler; each already reads at call-time via small `readX()` helpers, so this is a source swap, not a control-flow change) — assert the song-linked-background fail-safes are unaffected
-8. AI proxy's `readAiProxyLimits()` → `config.aiProxy.*` (excluding `maxInstances`, per §1)
-9. `runScheduledMessagingCron` + `sendQueuedMessage`'s `MESSAGE_MAX_RECIPIENTS`/`ORG_MAX_EMAILS_PER_DAY` → `config.messaging.*`
-10. `MESSAGE_FROM_ADDRESS` → `config.sender.fromAddress` (drop or demote the `defineString` to a last-resort default only)
-
-Each swap depends only on B (the doc + rules existing) and is independently a no-behavior-change deploy while `appConfig/global` is empty (§1's defaults-merge guarantee) — safe to ship ahead of the UI.
-
-**D — Admin UI**
-11. `stores/admin.ts`
-12. `AdminView.vue` console shell + per-knob-group panels wired to the store, writing `appConfig/global` directly (client SDK, rules-gated)
-13. Super-admin roster management UI (`setSuperAdminClaim` onCall)
-
-Depends on A (to reach the gated route) and B (rules must already permit the console's direct reads/writes); should land **after** C so a toggle flipped in the UI has an observable effect during UAT, though it is technically buildable in parallel with C.
-
-**E — Deletion-toggle safety (dry-run preview)**
-14. `previewCleanupDryRun` onCall — reuses the phase-C-swapped handler bodies with dry-run forced true independent of the live config value
-15. UI: the confirm-then-preview flow gating any `*_CLEANUP_ENABLED` flip in the console behind a fresh preview call
-
-Depends on C (handlers must already be config-driven so the preview and the live toggle read the same source of truth) and D (console shell to host the modal).
-
-**No-reply sender** is delivered inside C.10 (functions side) + D.12 (console form) — it does not need its own phase.
+### Pattern 4: Single-source constant import (VW_TYPE_LABELS)
+**What:** `src/types/song.ts` already exports the canonical `VW_TYPE_LABELS: Record<VWType, string>`.
+Six other files re-declare the same three string literals locally instead of importing it:
+`ShareView.vue`, `SongSlideOver.vue`, `BatchQuickAssign.vue`, `VwExplainer.vue`, `SettingsView.vue`,
+`claudeApi.ts` (`src/utils/songSearch.ts` already imports it correctly — proof the pattern works
+once wired).
+**When:** Immediately, as the cross-cutting prerequisite the seed itself names ("duplication is the
+real liability... whatever gets configured, step one is collapsing each rule to a single source").
+Zero behavior change, pure refactor — do this FIRST so no other v2.2 work touches a file that still
+has a stale local copy.
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Calling `setCustomUserClaims` without merging existing claims
-**What people do:** write a new claim-setting path (or "fix" an existing one) with `setCustomUserClaims(uid, newClaimsOnly)`.
-**Why it's wrong:** it replaces the *entire* claims object; any other claim on that user (here, specifically `orgId`/`role` vs. `superAdmin`) silently disappears the next time either sync path fires.
-**Instead:** every claim write goes through `mergeAndSetCustomClaims`, which reads current claims first.
+### Anti-Pattern 1: Folding the team list into `OrgSettings.settings`
+**What:** Adding `settings.teams: Team[]` as a new `OrgSettings` field instead of a subcollection.
+**Why bad:** `OrgSettings` already carries a documented, deliberately-flat contract
+(`organization.ts`'s own JSDoc: "nothing else" beyond one field per phase) merged once at
+`auth.ts::loadOrgContext` under `DEFAULT_ORG_SETTINGS` — every consumer reads it as a plain,
+already-defaulted value with no further `?? default` anywhere. A growing, independently-CRUD'd list
+of records with per-item `order`/id churn does not fit that single-document-merge contract, and
+would force `DEFAULT_ORG_SETTINGS` to special-case an array of objects rather than a scalar/small
+nested object like every existing field.
+**Instead:** A subcollection, per Pattern 1 — this is exactly why roles are already NOT part of
+`OrgSettings` despite `OrgSettings` existing.
 
-### Anti-Pattern 2: Treating Cloud Functions v2 `maxInstances`/`setGlobalOptions` as runtime-readable
-**What people do:** assume "move it to Firestore" universally removes the redeploy requirement for every env-derived knob.
-**Why it's wrong:** function-level and project-level `maxInstances` are deploy-time build configuration, evaluated once when the function is deployed/instantiated, not per-invocation.
-**Instead:** exclude `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` (and the Cloud Run render-service's own `--max-instances` flag) from the "live, no-redeploy" claim; surface them read-only with a "requires redeploy" label if shown in the console at all.
+### Anti-Pattern 2: A dedicated `firestore.rules` block for `teams`
+**What:** Writing an explicit `match /organizations/{orgId}/teams/{teamId} { allow read, write: if
+isOrgEditor(orgId); }` block.
+**Why bad:** Unnecessary — `roles` has NO dedicated block today and needs none; both fall through
+the generic `match /{collection}/{docId}` wildcard at the bottom of the per-org rules
+(`firestore.rules:458-464`), which already grants `isOrgEditor` read+write to any single-segment
+nested collection except the three explicitly excluded (`services`, `slideGroups`, `pptxRenders`).
+Adding a redundant explicit block for `teams` is dead weight that could silently diverge from the
+wildcard over time.
+**Instead:** Add nothing to `firestore.rules` for the teams feature. Confirm this in the rules test
+suite with one new ALLOW/DENY pair exercising `organizations/{orgId}/teams/{docId}` through the
+wildcard, the same way `roles` is (or should be) covered.
 
-### Anti-Pattern 3: Letting the dry-run "preview" call actually delete
-**What people do:** reuse a handler for both "preview" and "live run" by passing the CURRENT config's enable flag through unchanged.
-**Why it's wrong:** a UI or wiring bug in the preview path could trigger a real delete under the "preview" label — exactly the blast-radius the deletion-toggle-safety requirement exists to prevent.
-**Instead:** `previewCleanupDryRun` must force `dryRun = true` unconditionally, never derive it from the live `appConfig` value.
+### Anti-Pattern 3: "Fixing" the pending-slide gap by pairing entries on the render index
+**What:** Trying to reattach a pending slide's customization to its eventual rendered counterpart by
+positional/index matching once the render flips `pending → ready`.
+**Why bad:** Already tried and rejected — per `PENDING-VERIFICATION.md` C4, "Not fixable by index
+pairing (would mis-attach)": a PPTX render can add/remove/reorder slides between the placeholder
+count and the final rendered count, so there is no reliable correspondence to re-pair against.
+**Instead:** Disable or warn on customization of a slide whose `renderState === 'pending'` in
+`EditSlideDrawer.vue`, so the UI never invites an edit it will silently discard — this is the
+owner-endorsed direction in the same carry-forward entry.
 
-### Anti-Pattern 4: Gating a new admin collection with a cross-document `get()`/`exists()` check when a claim suffices
-**What people do:** copy `isOrgEditor`'s `get(...).data.role in [...]` shape reflexively for every new gated collection.
-**Why it's wrong:** it's strictly more expensive (extra billed read) and, per this project's own storage.rules incident, cross-service/cross-document rule checks are exactly the pattern that produced an undetectable deny-everyone bug — a direct claim read is both cheaper and safer.
-**Instead:** `isSuperAdmin()` reads `request.auth.token.superAdmin` directly, no `get()` call, mirroring `storage.rules`' post-incident `isOrgMemberByClaim`.
+### Anti-Pattern 4: Making `deleteService`'s revocation a Cloud Function
+**What:** Routing the 3-collection share cleanup through a new `onCall`/`onDocumentDeleted` Cloud
+Function instead of the existing client store method.
+**Why bad:** `deleteQuarter` (the direct precedent) does this entirely client-side with no Function
+involved, and `PENDING-VERIFICATION.md` C5 explicitly notes "`allow delete` rules already in place,
+no rules change needed" — the existing `isOrgEditor`-gated delete rules on all three collections
+already authorize exactly this client-side sequence. Introducing a Function adds a deploy
+dependency and an Admin-SDK code path for something the client can already do safely and atomically
+enough (a same-session sequence of deletes, same risk profile as `deleteQuarter` already ships in
+production).
+**Instead:** Mirror `deleteQuarter` verbatim — client-only, ships with the rest of the app bundle,
+no `firebase deploy --only functions` needed for this piece.
 
-## Integration Points
+## Scalability Considerations
 
-| Boundary | Communication | Notes |
+Not a scaling milestone — no new collection is queried in an unbounded way, no new function adds
+cold-start surface, and team lists are small (a handful of rows per org, same order of magnitude as
+roles). The one thing worth flagging: `deleteService`'s revocation adds up to 3 extra
+`getDoc`/`deleteDoc` round-trips to an already-multi-step delete, mirroring `deleteQuarter`'s
+existing cost — negligible at this app's per-org document counts (services numbering in the
+hundreds, not millions).
+
+## Build Order (dependency-aware)
+
+1. **VW_TYPE_LABELS dedup (Pattern 4)** — zero-risk, zero-dependency, touches 6 files. Do this
+   first so nothing built afterward inherits a stale local copy. **Client-only.**
+2. **Configurable Teams (1)** — `types/team.ts` → `stores/teams.ts` (+ `seedDefaultTeamsIfEmpty`) →
+   Settings teams panel (mirrors the Roles editor UI) → `ServiceEditorView.vue` +
+   `NewServiceDialog.vue` + `ServiceCard.vue` consume the store instead of their local consts →
+   generalize the Orchestra filter to read each team's `songTagFilter` → delete
+   `sundayOrdinal()`/the ordinal auto-select blocks (B1). Internally ordered: type → store → UI
+   editor → consumers, because the two hardcoded-array call sites can't be replaced until the store
+   exists to replace them with. **Client-only** — confirmed no rules change needed (falls through
+   the existing wildcard, Anti-Pattern 2).
+3. **`inviteLookup` rules gate (2)** — independent of everything else; can run in parallel with
+   step 2. Add the rules-test ALLOW/DENY pair (editor-of-target-org create allowed;
+   non-editor/wrong-org create denied) against the existing `TeamView.vue` write path (no client
+   code change required — confirmed `orgId` is already on the payload). **Rules-only,
+   deploy-hand-over**: ships built + tested + UNDEPLOYED per the standing deploy discipline;
+   hand the owner `firebase deploy --only firestore:rules`.
+4. **`deleteService` revocation (3)** — independent; can run in parallel with 2/3. Copy
+   `deleteQuarter`'s shape into `stores/services.ts`'s `deleteService`, substituting the
+   `serviceShareLinks/{serviceId}` direct lookup and the `serviceShares` date-keyed lookup as
+   described in Data Flow. **Client-only** — no rules change (delete rules already permit it).
+5. **Pending-slide guard (4)** — independent; smallest, most isolated change, touches only
+   `EditSlideDrawer.vue`. **Client-only.**
+
+Steps 2-5 have no cross-dependencies on each other and can be sequenced in any order or built in
+parallel; step 1 should land before step 2 only because step 2's new Settings panel is a natural
+place to also import the now-deduped `VW_TYPE_LABELS` if the panel surfaces VW-related copy, and
+because touching `SettingsView.vue` twice (once for dedup, once for teams) in the same phase is
+cheaper done together.
+
+## Deploy-Hand-Over Summary
+
+| Change | Surface | Deploy needed? |
 |---|---|---|
-| Owner console (client) ↔ `appConfig/global` | Direct Firestore SDK (`onSnapshot`/`setDoc`), rules-gated | No onCall wrapper needed for ordinary config edits — matches `SettingsView.vue`'s existing direct-write pattern for org settings |
-| Owner console ↔ super-admin grant/revoke | `setSuperAdminClaim` onCall | Privileged write to a *different user's* claim; must go through Admin SDK, not a direct client write to `superAdmins/{targetUid}` from an arbitrary super-admin's session (rules alone would permit it, but centralizing in the onCall keeps one auditable write path and one place to add logging later) |
-| Cloud Functions ↔ `appConfig/global` | Admin SDK, cached via `getAppConfig()` | TTL for hot paths, uncached for daily crons (§1) |
-| `syncOrgMembershipClaim` ↔ `syncSuperAdminClaim` | Shared `claimsHelpers.ts` | The only two writers of custom claims in the codebase after this milestone; both must route through the merge helper |
-| Owner console ↔ cleanup dry-run preview | `previewCleanupDryRun` onCall | Read-only w.r.t. Storage/Firestore state; reuses existing exported handler bodies, never mutates |
+| VW_TYPE_LABELS dedup | `src/` only | No — client bundle only |
+| Configurable Teams (list + tag filter + drop ordinal rule) | `src/` only (new subcollection covered by existing wildcard rule) | No — client bundle only |
+| `inviteLookup` create gate | `firestore.rules` | **Yes** — `firebase deploy --only firestore:rules`, owner hand-over per standing deploy discipline |
+| `deleteService` share revocation | `src/` only (existing delete rules already permit it) | No — client bundle only |
+| Pending-slide (`renderState`) guard | `src/` only | No — client bundle only |
+
+Only ONE of the five v2.2 architectural changes touches `firestore.rules`. It is small (one `allow
+create` clause, mirroring an idiom already deployed three times), independently testable against
+the emulator, and independent of every other change in this milestone — it can ship in its own
+plan/phase without blocking or being blocked by the Teams work.
 
 ## Sources
 
-- Direct codebase reads (HIGH confidence): `functions/src/index.ts`, `functions/src/orgMembershipClaims.ts`, `src/stores/auth.ts`, `firestore.rules`, `storage.rules`, `src/router/index.ts`, `src/components/AppSidebar.vue`, `functions/package.json`, `.planning/PROJECT.md`, `.planning/seeds/SEED-001-admin-settings-interface.md`
-- [Control Access with Custom Claims and Security Rules | Firebase Authentication](https://firebase.google.com/docs/auth/admin/custom-claims) — official docs, custom-claims 1000-byte limit and role-claim guidance (MEDIUM→HIGH, official source)
-- [How to Set Up Firebase Auth with Custom Claims for Role-Based Access Control](https://oneuptime.com/blog/post/2026-02-17-how-to-set-up-firebase-auth-with-custom-claims-for-role-based-access-control-in-gcp/view) (MEDIUM, community source, corroborates official docs)
-- General search results on Cloud Functions v2 per-instance/module-scope caching and `onDocumentWritten`-based invalidation, and `minInstances` warm-instance behavior (LOW/MEDIUM — general web search, not independently re-verified against this project's exact dependency versions; used only to corroborate a design already reasoned from this project's own existing `readNumericKnob`/handler-export patterns, not as the primary basis for the recommendation)
-
----
-*Architecture research for: v1.9 Owner Admin Console*
-*Researched: 2026-08-20*
+- `C:\projects\worshipplanner\.planning\seeds\SEED-002-church-specific-rules-configurability.md`
+  (HIGH — owner-authored catalog with exact file:line references, 2026-08-23)
+- `C:\projects\worshipplanner\.planning\PENDING-VERIFICATION.md` C2/C4/C5 (HIGH — carried-forward,
+  owner-reviewed findings)
+- Direct source inspection (HIGH — read against the live repo, 2026-08-23):
+  `src/types/roster.ts`, `src/stores/roster.ts`, `src/views/RosterView.vue`,
+  `firestore.rules` (lines 1-100, 380-465, 534-556), `src/types/organization.ts`,
+  `functions/src/orgTemplateSeed.ts`, `functions/src/orgProvisioning.ts`,
+  `src/views/TeamView.vue`, `src/stores/quarters.ts` (`deleteQuarter`),
+  `src/stores/services.ts` (`deleteService`, `ensureShareLink`, `writeSharePayload`),
+  `src/components/slides/EditSlideDrawer.vue`, `src/types/slide.ts`, `src/types/song.ts`,
+  `src/views/ServiceEditorView.vue`, `src/components/NewServiceDialog.vue`

@@ -1,161 +1,155 @@
 # Project Research Summary
 
-**Project:** Worship Planner — v1.9 Owner Admin Console
-**Domain:** Owner-only super-admin console for a live Vue 3 + Firebase SaaS — Firestore-backed runtime config, custom-claim admin gate, admin UI, live cleanup-toggle safety
-**Researched:** 2026-08-20
+**Project:** WorshipPlanner
+**Domain:** Multi-tenant Vue 3 + Firebase worship-planning SPA — v2.2 Configurability, Hardening & Cleanup
+**Researched:** 2026-08-23
 **Confidence:** HIGH
 
 ## Executive Summary
 
-This milestone moves nine-plus operational knobs (four cleanup enable flags + retention windows, AI-proxy rate limits/model allow-list, messaging fan-out caps, the no-reply sender address) off `process.env`/deploy-gated config and into a super-admin-only Firestore doc editable from a new console, gated by a `superAdmin` custom claim built on the exact `orgMembershipClaims.ts` trigger-sync pattern this codebase already proved out in v1.5. All four research tracks (Stack, Features, Architecture, Pitfalls) converge on the same shape and, critically, on the same landmines: zero new npm dependencies are needed (plain Admin SDK + a module-scope TTL cache + the app's existing no-validation-library form style covers everything); the super-admin claim must be **merged**, never blind-replaced, into the existing `{orgId, role}` claims object via a new shared `mergeAndSetCustomClaims()` helper, because `syncOrgMembershipClaim`'s existing blind `setCustomUserClaims` write will otherwise silently wipe `superAdmin` off the owner's own token the next time their org membership doc is touched by ordinary product usage; and `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` structurally cannot become "live, no redeploy" because they are Cloud Functions v2 deploy-time settings evaluated at module load, not per-invocation values — this must be scoped as a documented exception, not silently promised or silently mishandled.
+v2.2 is integration work on a mature, already-conventioned codebase, not new-product work. All six milestone items — configurable per-org Teams, a generalized per-team song-tag filter, dropping a Berean-specific ordinal-Sunday auto-select rule, firestore.rules hardening (inviteLookup create gate + createdBy immutability), deleteService share-token revocation, an Owner Console a11y retrofit, and the Resend verified-sending-domain migration — each has a working precedent already in the repo to copy rather than a pattern to invent. Five of six need zero new dependencies; the sixth (a11y) needs exactly one dev-only lint plugin (eslint-plugin-vuejs-accessibility). Only one of the five architectural changes touches firestore.rules, and it is a narrow, mirrorable allow create clause — everything else is client-only.
 
-The recommended approach is a five-phase, dependency-ordered build: (A) super-admin claim + client/server gate + the claims-merge fix, shipped together so the hazard never exists unpatched even briefly; (B) the `appConfig` Firestore doc + `isSuperAdmin()`-gated rules (claim-only check, no cross-document `get()`, deliberately avoiding the exact "cross-service `firestore.exists()`" rules-fragility class that already caused a production deny-everyone incident on `storage.rules`); (C) mechanical, one-line-per-call-site swaps of every Cloud Functions config read from `process.env` to a cached `getAppConfig()`, with asymmetric caching (TTL for hot paths like the `api` proxy, always-fresh reads for the daily cleanup crons) and a per-knob fail-open/fail-closed default table so a missing/malformed doc is safe by construction; (D) the admin console UI itself, reusing every existing pattern in this app (Pinia `onSnapshot` store, plain-cast-and-guard form validation, Tailwind card layout — no new libraries); and (E) the dry-run blast-radius preview + confirm-to-flip flow, which is a hard requirement co-located with the deletion-toggle UI, not a follow-on polish pass, because a one-click enable removes the deploy-time friction that today gives the owner an implicit review step for free.
+The recommended approach is: dedupe first (the team-list literals still duplicated in ServiceEditorView.vue/NewServiceDialog.vue, and VW_TYPE_LABELS, which turned out to already be deduped — verify before "fixing" it), then build Configurable Teams as a teams subcollection modeled exactly on the existing roles subcollection (not an OrgSettings array field — that would fork the read pattern across two call sites and reintroduce drift), then land the independent hardening/hygiene items (rules gate, createdBy guard, share-token revocation) in parallel since none of them depend on Teams or each other, then close with the Owner Console a11y pass and the Resend domain-verification runbook (the latter is owner-run DNS ops, not a coding task the app can complete or self-verify).
 
-The dominant risk category, repeated across all four research files, is **conflating "move config off env vars" with "make everything uniformly live and uniformly cached."** Nine sub-risks fall out of this: (1) the claims-merge hazard above; (2) `*_MAX_INSTANCES` cannot go live; (3) a naive per-request config read inside the hot `api` proxy would multiply Firestore reads 1:1 with traffic, undoing the v1.8 cost-hardening work; (4) the inverse mistake — over-caching a destructive-enable flag so an emergency disable doesn't reach a warm cron instance in time; (5) a single global fail-open-or-fail-closed policy applied uniformly to a missing config doc will get at least one knob category backwards (deletion flags must fail closed, AI rate limits must fail open with capped fallback values); (6) type/validation drift once `process.env`'s forced-string-parsing discipline disappears; (7) a client-only route guard with no `firestore.rules`/function-side enforcement, mirroring a mistake class this app has already made once (the `storage.rules` incident); (8) the song-linked-background fail-safes living in the exact function body the config swap touches, at risk from an over-eager refactor; and (9) provider secrets (`RESEND_API_KEY`) leaking onto the client-readable `appConfig` surface if sender-config scope creeps toward credentials. Every one of these has a concrete, cheap prevention documented in PITFALLS.md and is mapped to a specific phase below.
+The main risks are all "looks done but isn't" traps rather than unknowns: porting deleteQuarter's single-token revocation shape onto deleteService naively misses that a service can accumulate multiple shareTokens docs across re-shares, so a query-based delete-all is required, not a single-doc lookup; the inviteLookup rules tightening needs a companion regression test proving first-login invite acceptance still works, not just a new DENY case, because the "obviously safe" narrowing has three distinct write/read actors and only one is the target of the fix; and the Owner Console tab strips deliberately use v-show (never v-if) to keep an onSnapshot roster listener alive across tab switches — a generic ARIA-tabs retrofit copied from a tutorial commonly swaps that to conditional rendering and silently kills the listener. Each of these is well-understood and cheaply avoided once named, which is why overall confidence is HIGH rather than the usual "hardening work is risky" caveat.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new runtime dependency is required anywhere in this milestone — `firebase-admin@^13.10.0`, `firebase-functions@^7.2.5`, and the client `firebase@^12.0.0` SDK already cover every capability needed (Firestore doc reads/writes, `setCustomUserClaims`, `getIdTokenResult`, `onSnapshot`). Config caching is a hand-rolled `{ value, fetchedAt }` module-scope object with a TTL check — a caching library (`node-cache`/`lru-cache`) is rejected as unnecessary complexity for caching exactly one document. Firebase Remote Config was considered and explicitly rejected as a second, architecturally inconsistent config surface. Form validation reuses the app's existing zero-library, plain-cast-and-guard pattern (`SettingsView.vue`) rather than introducing `zod`/`vee-validate`/`yup`.
+No new core technology. The only new dependency for the whole milestone is eslint-plugin-vuejs-accessibility@^2.6.0 (dev-only, flat-config compatible with the installed eslint@^10.0.2, drops into the existing eslint.config.ts with no config-format migration) — a static linter chosen over vue-axe/@axe-core/playwright because the known a11y defects (placeholder-only inputs, missing tab ARIA) are static-template issues a linter catches, and the project has no Playwright/E2E harness to justify a runtime tool. The Resend verified-domain item needs no SDK change at all — it is 100% Resend-dashboard + DNS configuration plus flipping two already-wired, already-owner-editable config values (appConfig/global.sender.fromAddress, live no-redeploy; SERVICE_SHARE_BASE_URL, a defineString param requiring firebase deploy --only functions only if the owner wants share links on the new domain too).
 
-**Core technologies:**
-- `firebase-admin` (installed `^13.10.0`) — server-side Firestore reads + `setCustomUserClaims` — already the only Firestore/Auth touchpoint in Functions; do NOT bump to v14, no capability needed is v14-only
-- `firebase-functions` (installed `^7.2.5`) — `onCall`/`onSchedule`/`onDocumentWritten` wrappers — reuse `onDocumentWritten` for an audit trail, NOT for cache invalidation (cannot reach sibling warm instances)
-- `firebase` client SDK (installed `^12.0.0`) — `onSnapshot`/`updateDoc` for the admin console store — identical pattern to every other Pinia store in the app
+**Core technologies (all already installed, reused as-is):**
+- Firebase client SDK (^12.0.0) + firebase-admin/firebase-functions — Firestore schema extension + Cloud Functions cascade-delete pattern reuse, no new integration
+- resend (6.19.0, optional bump to 6.22.0) — already the chosen provider (v1.7 ADR); this milestone is domain verification, not an API change
+- Vue 3 + Pinia + Vue Router — ordinary composition-API work for the Teams editor, song-browse extraction, and a11y retrofit
 
 ### Expected Features
 
-**Must have (table stakes):**
-- Super-admin auth gate on a real custom claim (not a hardcoded UID check), enforced client AND server side
-- A minimal admin shell distinct from `AppShell.vue`/existing "Admins" TeamView (naming collision — see Architecture)
-- Typed config editor with inline min/max/required validation, client-side AND rules/function-side
-- Effective-value display with a last-changed-by/at stamp (not a live staleness ticker — that's deferred)
-- Dry-run blast-radius preview + confirm-to-flip flow specifically gating the four `*_CLEANUP_ENABLED` toggles — the milestone's hard requirement, not optional polish
-- No-reply sender address field with format validation and a "must be Resend-verified" warning (domain verification itself is an out-of-band owner action in Resend/DNS, outside this console's reach — `*.web.app` is confirmed permanently unreachable)
-- `updatedBy`/`updatedAt` on the config doc (cheap, do it while the save path is being built)
+**Must have (table stakes) — all P1, all scoped for v2.2:**
+- Per-org editable Team list (add/edit/delete, seeded defaults), modeled exactly on the existing RolesConfigPanel.vue/roster.ts pattern — an inconsistent exception here would be more surprising than building it
+- Single source of truth for the team list, collapsing the ServiceEditorView.vue:1675 / NewServiceDialog.vue:145 duplication — a precondition, not optional polish
+- Per-team song-tag filter as an optional field on the Team row (generalizes the hard-coded Orchestra-to-Orchestra-tag rule)
+- Dropping the ordinal-Sunday auto-team-preselect rule entirely (once Teams are user-editable, manual selection already exists as the replacement — no new UI needed)
+- deleteService revokes all of a service's shareTokens/serviceShareLinks/serviceShares docs, mirroring deleteQuarter's already-shipped cascade
+- EditSlideDrawer.vue gains renderState awareness (warn/disable customization while a PPTX-render slide is pending) to close a known silent-data-loss gap
+- Real label/aria-label on Owner Console + new Teams-editor inputs, and role=tablist/aria-selected ARIA-tabs semantics on both the Owner Console and Service Editor tab strips (named, already-scored a11y debt from Phase 72/74 reviews)
 
-**Should have (differentiators, fold cheaply into P1 work):**
-- Confirm-to-flip modal echoing the real dry-run count before a destructive toggle commits
-- Who-changed-what stamp per section (the `updatedBy`/`updatedAt` fields above, surfaced in the UI)
+**Should have (differentiators):** the per-team song-tag filter generalized beyond the single Orchestra rule (the actual payoff of this milestone — lets a second church define its own team/song-pool rule with no code change); a disable-and-explain (not just warn) pending-render guard, which signals more maturity than either "block editing entirely" or "allow silent loss."
 
-**Defer (v2+):**
-- Billing/plan management UI, church/org provisioning from the console (no data model exists yet)
-- Multi-admin grant/revoke UI (bootstrap-script-only for now; a UI managing a set of 1-2 people is ceremony)
-- In-app `aiUsage`/dry-run-log dashboards and charts (the single dry-run count is the only "usage visibility" this pass needs)
-- Per-org override of global config knobs (single/few-org app today; note the extension point, don't build it)
-- Full audit-log collection + browsing UI, live staleness ticker, real-time collaborative editing (all explicitly rejected as scope creep for a 1-2-admin console)
+**Explicitly defer / drop, not build (anti-features named by both FEATURES.md and SEED-002):**
+- Making the ordinal-Sunday rule configurable instead of dropping it — a disproportionate mini-recurrence-rule editor to save Berean two clicks a month, meaningless to every other church
+- A fully generic boolean-expression "rule builder" for per-team filters — the observed need is a single-tag filter; build that, not a speculative general case
+- Configurable VW_TYPE_LABELS / org-editable Vertical Worship taxonomy labels — platform-scope concept, not a per-org one; only real defect here was duplication (see Gaps below — already resolved)
+- A grace window / soft-delete TTL on revoked share links — contradicts the security intent of immediate revocation and mirrors the no-grace-period posture already used for org deactivation
+- A generic "disable inputs during any pending async job" framework — solve the one concrete case (EditSlideDrawer.vue + renderState) narrowly; generalize only if a second case appears
 
 ### Architecture Approach
 
-The system is additive plumbing layered onto proven idioms, not a restructuring: a new `superAdmins/{uid}` collection (existence = granted) mirrors `organizations/{orgId}/members/{uid}`; a new `syncSuperAdminClaim` trigger mirrors `syncOrgMembershipClaim`; a new top-level `appConfig/global` singleton doc mirrors where `aiUsage`/`aiRateLimits` already live; a new `isSuperAdmin()` rules helper mirrors `isOrgEditor()` but reads the token claim directly (no `get()`/`exists()` cross-document call, deliberately cheaper and safer than the org-membership pattern). Per-org RBAC, the messaging pipeline, and the PPTX render pipeline are untouched.
+Every one of the five architectural changes slots into an existing pattern: (1) a new organizations/{orgId}/teams subcollection, structurally identical to the existing roles subcollection (seed-defaults-if-empty, per-row CRUD store, no dedicated firestore.rules block needed — it falls through the same generic per-org wildcard roles already uses); (2) one firestore.rules clause on inviteLookup's allow create, mirroring the exact orgSlugs/orgNames/shareTokens idiom (isOrgEditor(request.resource.data.orgId)) already deployed three times; (3) a client-side cascade-delete in deleteService copying deleteQuarter's shape, adapted for services' query-based (not single-field) share-token cardinality; (4) a narrow read-only renderState check added to EditSlideDrawer.vue; (5) a VW_TYPE_LABELS dedup that turns out to already be done (verify, don't re-implement).
 
 **Major components:**
-1. `functions/src/claimsHelpers.ts` (new) — `mergeAndSetCustomClaims(uid, patch)`, the single load-bearing fix shared by both claim writers
-2. `functions/src/superAdminClaims.ts` (new) + `orgMembershipClaims.ts` (modified) — both route through the merge helper; `superAdmins/{uid}` collection is the source of truth
-3. `functions/src/appConfig.ts` (new) — `AppConfig` type, `DEFAULT_APP_CONFIG` (identical numbers to today's env fallbacks, deep-merged so an empty doc reproduces current behavior byte-for-byte), `getAppConfig(db)` with per-instance TTL cache
-4. `functions/src/index.ts` (modified, mechanical) — every v1.8 knob read-site swapped to `getAppConfig()`; `previewCleanupDryRun` (new `onCall`) forces `dryRun = true` unconditionally, reusing the already-exported handler bodies
-5. `src/stores/auth.ts`, `src/router/index.ts`, `src/components/AppSidebar.vue` (modified) — `isSuperAdmin` ref off the existing `getIdTokenResult` call, `requiresSuperAdmin` route guard, a distinctly-named nav entry (`/owner-console`, NOT `/admins` — that's taken by `TeamView.vue`)
-6. `src/stores/admin.ts` + `src/views/AdminView.vue`/`OwnerConsoleView.vue` + `src/components/admin/*` (new) — console shell, config panels, sender form, dry-run preview modal, roster manager
-7. `firestore.rules` (modified) — `isSuperAdmin()` helper + `appConfig/*` + `superAdmins/*` match blocks, claim-only, no cross-document lookup
+1. src/types/team.ts + stores/teams.ts (NEW) — Team shape, DEFAULT_TEAMS seed, CRUD + seedDefaultTeamsIfEmpty(), structural copy of roster.ts
+2. Settings "Teams" panel (NEW, mirrors RosterView.vue's Roles editor) — CRUD UI for name + optional song-tag filter + optional free-text-name flag
+3. ServiceEditorView.vue / NewServiceDialog.vue / ServiceCard.vue (MODIFIED) — read teamsStore.teams instead of local hard-coded arrays; delete sundayOrdinal() and its call sites
+4. firestore.rules inviteLookup block (MODIFIED) — narrowed allow create, read/delete untouched
+5. stores/services.ts deleteService (MODIFIED) — query-based multi-doc share-token revocation before deleting the service doc
 
 ### Critical Pitfalls
 
-1. **Claim replacement, not merge** — `setCustomUserClaims` overwrites the whole claims object; `syncOrgMembershipClaim`'s existing blind write will silently strip `superAdmin` the next time any org membership doc is touched. Fix: a shared `mergeAndSetCustomClaims()` helper, used by BOTH the new grant path and the modified `syncOrgMembershipClaimHandler`, shipped in the same phase as the claim itself — not later hardening.
-2. **`*_MAX_INSTANCES` cannot go live** — `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` are Cloud Functions v2 deploy-time settings evaluated once at module load, before any Firestore read is possible. Scope them explicitly as staying `process.env`-based, surfaced read-only in the console if shown at all, labeled "requires redeploy" — never silently promised as live.
-3. **A live enable-toggle removes the deploy-time review step for free** — flipping `BACKGROUND_CLEANUP_ENABLED` today requires an env edit + redeploy, a deliberate friction point. The admin UI must never expose a bare toggle: require an on-demand dry-run preview showing the real count, a confirm step echoing that count, and never trigger an immediate delete as a toggle side effect (only the next *scheduled* run acts).
-4. **Asymmetric caching by knob criticality** — TTL cache (30-60s) for hot paths (`api` proxy, `sendQueuedMessage`); NO cache, fresh read every invocation, for the four daily cleanup crons and `sendScheduledReminders`, so an emergency disable takes effect on the very next run. A single uniform caching policy gets this backwards in one direction or the other.
-5. **Fail-open vs fail-closed is per-knob, not global** — a missing/malformed `appConfig` doc must default cleanup flags to OFF/dry-run (fail-closed), AI rate limits to capped fallback values (fail-open on the read, still bounded on spend), and the AI model allow-list to the existing restrictive default — never "allow all models." A single blanket try/catch returning one kind of default (all-permissive or all-restrictive) gets at least one category wrong.
+1. SEED-002's catalog is partially stale — it claims VW_TYPE_LABELS is duplicated in "6+ files"; a direct grep shows it is already down to one source file with one consumer. Re-verify every SEED-002 file/line claim by grep before scoping a phase off it; the team-list duplication (2 files) and the a11y tab-strip debt are still live and confirmed.
+2. deleteService share-token revocation must be query-based, not single-doc — unlike deleteQuarter (one shareToken field), a service can accumulate multiple shareTokens docs across re-shares (pickAdoptableToken already queries where serviceId equals the service id for this reason). Porting deleteQuarter's single-reference lookup verbatim orphans older tokens, leaving a deleted service's data publicly viewable via a stale link — a real data-exposure bug, not cosmetic debt.
+3. inviteLookup tightening needs a regression test, not just a DENY case — the collection has three distinct actors (client create via TeamView.vue, client read+delete at first login via ensureUserDocument, Admin-SDK create via orgProvisioning.ts which bypasses rules entirely). Ship ALLOW (editor-of-target-org create), DENY (non-editor/wrong-org create), AND a third test proving the existing first-login invite-acceptance read+delete path is unaffected.
+4. createdBy is still unprotected post-v2.1 — preservesLifecycleFields() guards exactly 5 fields (active/deactivatedAt/deactivatedBy/reactivatedAt/reactivatedBy); createdBy was never added despite PROJECT.md flagging it as "needs re-verification since v2.1." Fix by extending the same diff().affectedKeys() pattern, verified by quoting the literal current field array, not the v2.1 changelog narrative.
+5. A11y retrofit must not swap v-show for conditional rendering — OwnerConsoleView.vue deliberately keeps panels always-mounted (v-show) so a roster onSnapshot listener survives tab switches; generic ARIA-tabs tutorials commonly bundle a switch to v-if/unmount semantics that would silently kill that listener. Add ARIA attributes without changing mount/hide mechanics, and verify the listener is still firing after the change.
+6. Team-list backfill must follow the subcollection (roles) pattern, not the OrgSettings array pattern — SEED-002 explicitly specifies "model exactly like DEFAULT_ROLES." Bolting teams onto OrgSettings as an array would fork the merge logic across the two still-hard-coded read sites and require both to be repointed to the exact same merged value in the same commit — miss one and the 2-copy drift this feature exists to kill reappears.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure — all four research tracks independently converged on this same five-phase, dependency ordering:
+Based on combined research, suggested phase structure (5 phases, largely parallelizable after phase 1):
 
-### Phase A: Super-admin claim, client/server gate, and the claims-merge fix
-**Rationale:** Foundation for every other phase — the console is meaningless as a security boundary without this, and the merge-hazard fix must exist before the `superAdmin` claim type exists even one phase without it, since ordinary org-membership writes happen constantly in production.
-**Delivers:** `claimsHelpers.ts` (`mergeAndSetCustomClaims`), `superAdminClaims.ts` (decide/sync/onCall), `orgMembershipClaims.ts` modified to route through the merge helper, a one-off owner-run bootstrap script for the first super-admin (chicken-and-egg — mirrors `backfillOrgClaims.ts`), `auth.ts`/router/nav wiring (route can be a placeholder — proves the gate end-to-end early).
-**Addresses:** Admin auth gate (table stakes), server-enforced route (table stakes).
-**Avoids:** Pitfall 1 (claim replacement), Pitfall 8 (client-only gate), Pitfall 9 (token refresh gap on grant/revoke — force-refresh via a listened claims-changed signal, `revokeRefreshTokens` + `checkRevoked: true` on revocation), Pitfall 10 (bootstrap chicken-and-egg), Pitfall 11 (claim-only rules check, never a cross-document Firestore lookup — avoids repeating the `storage.rules` deny-everyone incident class).
+### Phase 1: Dedup and Configurable Teams (A1 + A2 + B1)
+Rationale: SEED-002, FEATURES.md, and ARCHITECTURE.md all treat de-dup as a hard prerequisite — building config against one copy of the team-list literal while the other stays hard-coded reintroduces the exact drift this milestone exists to fix. B1 (dropping the ordinal rule) is only a safe UX change once A1 gives users an editable list to select from manually, so it must land in the same phase, sequenced after A1's store/UI exist.
+Delivers: src/types/team.ts + stores/teams.ts (seeded subcollection, mirrors roster.ts), Settings Teams panel, both ServiceEditorView.vue/NewServiceDialog.vue repointed to the single store, per-team songTagFilter field replacing the hard-coded Orchestra rule, sundayOrdinal() and its call sites deleted with NewServiceDialog.test.ts updated to assert the deliberate new default-team behavior (not gutted).
+Addresses: Table-stakes per-org Team list, per-row Save/delete-confirm UX, the milestone's stated differentiator (generalized song-tag filter), and the B1 anti-feature cut.
+Avoids: Pitfall 1 (stale seed numbers — re-grep first), Pitfall 2 (backfill pattern choice + read-site repoint), Pitfall 3 (test-gutting on B1 removal).
 
-### Phase B: `appConfig` config doc + Firestore rules
-**Rationale:** Must land before the console (Phase D) is given direct client-SDK read/write access; independently buildable/testable once Phase A exists (claim to gate against).
-**Delivers:** `appConfig.ts` (type, `DEFAULT_APP_CONFIG` matching today's exact env fallback numbers, deep-merge reader), `firestore.rules` additions (`isSuperAdmin()` + `appConfig/*` + `superAdmins/*`), genuine ALLOW-case emulator tests in `rules.test.ts` (not just DENY cases — per CLAUDE.md's own documented incident).
-**Implements:** Architecture components 3 and 7 above.
-**Uses:** Plain Admin SDK, no new library (Stack).
+### Phase 2: Security and Data-Integrity Hardening (rules)
+Rationale: Independent of Teams; both sub-items are organizations-collection rule tightenings that belong in one rules-review pass sharing the same test file. Small, narrow, and mirrors an idiom (allow create if isOrgEditor) already deployed three times elsewhere.
+Delivers: inviteLookup create gate narrowed to the target org's editor (ALLOW/DENY/regression-test triad); createdBy added to an immutable-fields guard extending preservesLifecycleFields()'s pattern.
+Uses: Existing @firebase/rules-unit-testing harness (src/rules.test.ts, run via npm run test:rules).
+Implements: ARCHITECTURE.md Pattern 2 (create-only idiom mirror).
+Ships: Built + tested + UNDEPLOYED, per standing project deploy discipline — hand the owner the exact firebase deploy --only firestore:rules command.
 
-### Phase C: Cloud Functions read config (mechanical swap)
-**Rationale:** Each swap is a no-behavior-change deploy while `appConfig/global` is empty (defaults-merge guarantee), so this can ship ahead of the UI; the console (Phase D) should land after this so a UI-flipped toggle has an observable effect during UAT.
-**Delivers:** All nine-plus knob read-sites swapped from `process.env` to cached `getAppConfig()` reads — cleanup handlers' four enable/retention/cap reads, AI proxy limits, messaging caps, no-reply sender address. `AI_PROXY_MAX_INSTANCES`/`GLOBAL_MAX_INSTANCES` explicitly EXCLUDED and documented as staying env-var-based.
-**Addresses:** "Show effective value" table-stake feasibility (caching choice determines it).
-**Avoids:** Pitfall 2 (song-linked-background fail-safes — one-line swap only, existing unit tests must pass UNCHANGED), Pitfall 3 (uncached hot-path reads undoing v1.8 cost work), Pitfall 4 (stale warm-instance cache on emergency disable), Pitfall 5 (per-knob fail-open/fail-closed table), Pitfall 6 (`maxInstances` exception, resolved as a scoping decision here, not discovered mid-implementation), Pitfall 7 (type/validation drift — schema validation on every read, typed the way `readNumericKnob`'s zero-vs-falsy fix already handles).
+### Phase 3: deleteService Share-Token Revocation
+Rationale: Independent of Teams and rules hardening; a client-only store change with zero rules impact (existing allow delete already permits it).
+Delivers: deleteService queries and deletes ALL shareTokens docs matching serviceId (not a single-field lookup), plus serviceShareLinks/{serviceId} and the deterministic serviceShares/{slug}__service-{date} doc, ordered before the service doc delete itself.
+Uses: ARCHITECTURE.md Pattern 3 (cascade revocation), adapted per Pitfall 6 for services' multi-token cardinality.
+Implements: A unit test seeding 2+ shareTokens docs for one serviceId (simulating re-share) asserting all are removed.
 
-### Phase D: Admin console UI
-**Rationale:** Depends on A (gated route) and B (rules permitting direct reads/writes); best sequenced after C so toggles have observable effect, though technically buildable in parallel with C.
-**Delivers:** `stores/admin.ts` (Pinia, `onSnapshot`), `AdminView.vue`/`OwnerConsoleView.vue` shell + per-knob-group panels, super-admin roster management UI (`setSuperAdminClaim` onCall).
-**Addresses:** Minimal admin shell, typed config editor, effective-value display, no-reply sender field (table stakes).
-**Avoids:** Pitfall 12 (secret leak — sender-config fields stay address/display-name only, never credentials).
+### Phase 4: Pending-Render Edit Guard
+Rationale: Smallest, most isolated change; independent of everything else in the milestone.
+Delivers: EditSlideDrawer.vue reads the already-existing renderState field and disables/warns on customization of a slide whose render is still pending, closing a known silent-data-loss gap (previously ruled out as fixable by index-pairing).
+Uses: No new data flow — a read of an existing field already streamed to the drawer.
 
-### Phase E: Deletion-toggle safety (dry-run preview + confirm-to-flip)
-**Rationale:** Depends on C (handlers must already be config-driven so preview and live toggle share one source of truth) and D (console shell to host the modal). Ships in the SAME phase as the cleanup toggles reaching the UI — never a later hardening pass, since the unsafe version is a fully functional-looking MVP.
-**Delivers:** `previewCleanupDryRun` onCall (dry-run forced true, independent of live config), UI confirm-then-preview flow gating any `*_CLEANUP_ENABLED` flip.
-**Addresses:** Dry-run blast-radius preview, confirm-to-flip flow (differentiators treated as hard requirements here).
-**Avoids:** Pitfall 1 (live toggle deleting before review) and Anti-Pattern 3 from Architecture (preview accidentally deleting for real — `dryRun` must never derive from the live config value).
-
-**No-reply sender** is delivered inside C (functions side) + D (console form) — it does not need its own phase.
+### Phase 5: Owner Console A11y Retrofit and Resend Domain Verification
+Rationale: Both are cross-cutting, dependency-free polish/ops items that can land in any order relative to the rest; grouping them keeps the "closing-out" phase focused on debt and owner-facing runbook items rather than new capability.
+Delivers: eslint-plugin-vuejs-accessibility added to eslint.config.ts; real label/aria-label on Owner Console (super-admin grant, Organizations onboard/assign) and the new Teams-editor inputs; role=tablist/role=tab/aria-selected/aria-controls added to BOTH OwnerConsoleView.vue and ServiceEditorView.vue tab strips without changing v-show mount semantics; a documented manual runbook for Resend domain verification (owner adds a controlled domain plus SPF/DKIM/DMARC/MX records, verifies fully in Resend's dashboard, only then flips appConfig/global.sender.fromAddress, then sends a real test message to a real external inbox).
+Avoids: Pitfall 5/8 (a11y retrofit must not swap v-show to v-if, must cover both tab strips in one pass, must not desync ARIA state from the existing route-query tab sync); Pitfall 7 (Resend: never a web.app domain, never flip the config before DNS shows fully Verified).
 
 ### Phase Ordering Rationale
 
-- Dependency chain is strict and linear: claim/gate → config doc/rules → functions read config → UI → deletion safety. Every research file independently arrived at this exact order.
-- The claims-merge fix (Pitfall 1) is the single highest-priority correctness item — it must not exist unpatched for even one phase, so it is bundled into Phase A rather than treated as a separate hardening phase.
-- Cross-cutting process disciplines (every rules/functions/secrets deploy is owner-run, not autonomous; `.env.local`/`functions/.env` must be present in any worktree before local testing) apply to every phase, not one — call these out in each phase's plan/verification checklist rather than as a standalone phase.
+- Phase 1 must come first only because its new Settings panel is a natural place to also confirm/import the already-deduped VW_TYPE_LABELS if the panel surfaces VW-related copy, and because it establishes the teams subcollection every later reference to "team" (a11y retrofit of the Teams editor's own inputs) builds on.
+- Phases 2, 3, and 4 have no cross-dependencies and can be planned/executed in parallel — ARCHITECTURE.md's Build Order confirms this explicitly ("Steps 2-5 have no cross-dependencies on each other and can be sequenced in any order or built in parallel").
+- Phase 5 is scheduled last only for narrative/cleanup reasons (it's genuinely dependency-free); the a11y half could equally run first or in parallel — the Resend half is gated on owner DNS action outside the app's control regardless of phase order, so scheduling it doesn't block or accelerate anything else.
+- Only Phase 2 touches firestore.rules; it is deliberately isolated so its owner deploy-hand-over doesn't gate any other phase's completion.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase A:** the token-refresh-on-grant/revoke mechanics (`revokeRefreshTokens` + `checkRevoked: true`) are MEDIUM-confidence general Firebase platform behavior, not yet exercised in this codebase the way claim-sync itself has been — worth a research pass or at least explicit UAT design before planning.
-- **Phase C:** the per-knob fail-open/fail-closed default table (Pitfall 5) and the differentiated-caching design (TTL vs. always-fresh, Pitfall 3/4) are both named as required PLAN.md-level design decisions, not implementation details — treat as needing explicit design documentation during `/gsd-plan-phase`, even if not full external research.
+- None flagged as needing a dedicated --research-phase pass — every item in every phase already has a direct, cited in-repo precedent (roles subcollection, deleteQuarter, orgSlugs rules idiom, preservesLifecycleFields()), and the one external-ops item (Resend domain verification) has vendor-doc-sourced HIGH-confidence steps already captured in STACK.md/PITFALLS.md.
 
-Phases with standard patterns (skip research-phase):
-- **Phase B:** directly mirrors the existing `aiUsage`/`aiRateLimits` top-level-collection + claim-based-rule precedent already proven in this codebase.
-- **Phase D:** directly mirrors `SettingsView.vue`'s existing form/save/validation pattern and `auth.ts`'s existing `onSnapshot`-in-a-Pinia-store pattern; no new UI library or pattern needed.
-- **Phase E:** the dry-run code path already exists in all four v1.8 cleanup handlers; this phase exposes it on-demand, it doesn't invent new logic.
+Phases with standard, well-documented patterns (skip research-phase):
+- Phase 1 (Teams): Direct structural copy of RolesConfigPanel.vue/roster.ts — the pattern is proven and already shipped in this codebase.
+- Phase 2 (Rules hardening): Direct structural copy of the orgSlugs/orgNames/shareTokens create-gate idiom and the preservesLifecycleFields() immutable-field idiom, both already deployed and tested elsewhere in firestore.rules.
+- Phase 3 (deleteService revocation): Direct structural copy of deleteQuarter, adapted per the one documented cardinality difference (query vs single-field) already fully specified in ARCHITECTURE.md's Data Flow section.
+- Phase 4 (Pending-render guard): A single-field read in one component; PENDING-VERIFICATION.md already rejected the one plausible alternative approach (index-pairing), so the direction is settled.
+- Phase 5 (a11y and Resend): The a11y rule set is the standard W3C ARIA APG Tabs pattern plus WCAG 1.3.1/4.1.2, and Resend's verification steps are sourced directly from Resend's own current dashboard docs — both are stable, well-established external references, not areas of genuine uncertainty for this codebase.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Every recommendation verified directly against this repo's installed package manifests and source, cross-checked against live npm registry queries this session |
-| Features | MEDIUM (HIGH for codebase-grounded complexity/dependency claims) | Table-stakes/differentiator framing is well-grounded in PROJECT.md/SEED-001; general admin-UX comparables (kill-switch confirmation conventions) are LOW-confidence aggregated blog consensus, used only as corroboration |
-| Architecture | HIGH for codebase-derived findings; MEDIUM for general Firebase best-practice patterns | Component/rules/build-order recommendations read directly from `functions/src/index.ts`, `orgMembershipClaims.ts`, `firestore.rules`, `storage.rules`, `router/index.ts`; caching-across-instances reasoning corroborated by official Firebase docs |
-| Pitfalls | HIGH | Grounded directly in this repo's existing code and its own documented incident history (the `storage.rules` deny-everyone bug in CLAUDE.md); only token-revocation semantics are MEDIUM (general platform knowledge, not yet repo-proven) |
+| Stack | HIGH | 5 of 6 items are "use what's already installed," verified by direct repo/package.json inspection; the one new dependency's peer-compatibility was verified via npm view; Resend steps sourced from Resend's own current docs |
+| Features | HIGH | Cross-checked against this codebase's own RolesConfigPanel.vue/roster.ts precedent and PENDING-VERIFICATION.md C4/C5, not speculative industry patterns |
+| Architecture | HIGH | Every recommendation is grounded in direct source reads of the exact files/lines involved (firestore.rules, stores/quarters.ts, stores/services.ts, roster.ts), not inference |
+| Pitfalls | HIGH | Every finding traced against current firestore.rules, functions/src/index.ts, and the relevant stores/views — one seed-catalog claim (VW_TYPE_LABELS count) was explicitly caught as stale and corrected rather than repeated |
 
-**Overall confidence:** HIGH
+Overall confidence: HIGH
 
 ### Gaps to Address
 
-- **`*_MAX_INSTANCES` console treatment:** whether to surface these read-only in the console at all, or omit them entirely — needs an explicit requirements-stage decision, not left to phase-planning discretion.
-- **Storage retention/versioning as a safety net:** whether Cloud Storage Object Versioning or bucket-level retention is enabled before live deletion toggles ship — an owner-side infrastructure check, not something this milestone's code can verify or enforce; flag for the owner explicitly before Phase E's toggles go live in production.
-- **`superAdmin` claim survival on last-org-membership removal:** `syncOrgMembershipClaimHandler`'s clear-path (`setCustomUserClaims(uid, null)` today) needs an explicit decision — recommended: preserve `superAdmin` when a user's last org membership is removed, since a super-admin isn't required to belong to any org to administer the app. Resolve this as part of Phase A's design, not left implicit.
-- **Bootstrap script scope:** confirmed as the right shape (mirrors `backfillOrgClaims.ts`, dry-run-by-default, `--apply`-gated, owner-run-once) — no open question, but worth restating in Phase A's plan as an explicit owner-handoff step, not an autonomously-run script.
+- VW_TYPE_LABELS de-dup status: SEED-002 claims 6+ duplicate files; direct grep as of 2026-08-23 shows exactly one source file and one consumer. Treat this item as already resolved — do NOT schedule work for it — but re-confirm with a fresh grep at phase-plan time in case anything has changed since this research pass, per Pitfall 1's general caution about trusting seed numbers unverified.
+- Team-list backfill seed-race: seedDefaultRolesIfEmpty() (the precedent Teams will copy) has a known, never-fixed double-seed race if two editors open a brand-new org simultaneously. Decide explicitly during Phase 1 planning whether to accept this low-blast-radius race as-is (matching roles) or close it with an existence-check-then-batch-write — either is acceptable, but the decision must be made deliberately and documented, not defaulted silently.
+- Ordinal-rule replacement UX: Dropping B1 needs an explicit decision (not left implicit) on what a new-service dialog defaults teams to afterward — no pre-selection at all, or the org's own saved default from A1. Surface this as a discussion-phase question, not something the phase plan should assume.
+- Resend verification is unverifiable from inside the app: there is no automated check the app can perform to confirm DNS records are propagated/verified before a send is attempted; the phase deliverable is necessarily a documented manual runbook plus optional warning copy, not an automated guarantee. Flag this to the owner explicitly as an operational dependency outside the coding phase's control.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct repo inspection: `functions/package.json`, `package.json`, `functions/src/index.ts`, `functions/src/orgMembershipClaims.ts`, `functions/src/backfillOrgClaims.ts`, `src/stores/auth.ts`, `firestore.rules`, `storage.rules`, `src/router/index.ts`, `src/components/AppSidebar.vue`, `src/views/SettingsView.vue`, `.planning/PROJECT.md`, `.planning/seeds/SEED-001-admin-settings-interface.md`, `CLAUDE.md` (this repo's own incident record)
-- `npm view <pkg> version` live registry queries (2026-08-20): `firebase-admin`, `firebase-functions`, `firebase`, `resend`, `zod`, `node-cache`, `lru-cache`, `firebase-functions-test`
-- [Tips & tricks — Cloud Functions for Firebase](https://firebase.google.com/docs/functions/tips) — global-scope caching, `onInit()`
-- [Extend Cloud Firestore with Cloud Functions (2nd gen)](https://firebase.google.com/docs/firestore/extend-with-functions-2nd-gen) — gen2 trigger shape
-- [Control Access with Custom Claims and Security Rules | Firebase Authentication](https://firebase.google.com/docs/auth/admin/custom-claims) — 1000-byte claims limit, refresh behavior
-- `.planning/milestones/v1.5-phases/40-custom-auth-claim-for-org-membership/40-RESEARCH.md` — prior in-repo verified research on `setCustomUserClaims`
+- Direct repo inspection: firestore.rules, src/stores/roster.ts, src/stores/quarters.ts, src/stores/services.ts, src/views/ServiceEditorView.vue, src/components/NewServiceDialog.vue, src/views/OwnerConsoleView.vue, src/views/TeamView.vue, src/types/organization.ts, src/types/song.ts, src/components/slides/EditSlideDrawer.vue, src/types/slide.ts, functions/src/index.ts, functions/src/appConfig.ts, functions/src/orgProvisioning.ts, functions/src/orgTemplateSeed.ts, package.json, functions/package.json, eslint.config.ts — verified 2026-08-23
+- npm view eslint-plugin-vuejs-accessibility peerDependencies, npm view resend version — npm registry ground truth, verified 2026-08-23
+- Resend's own current docs: resend.com/docs/dashboard/domains/introduction, resend.com/docs/dashboard/domains/dmarc — fetched 2026-08-23
+- .planning/PROJECT.md, .planning/PENDING-VERIFICATION.md (C2/C4/C5), .planning/seeds/SEED-002-church-specific-rules-configurability.md — this project's own planning record
+- W3C ARIA Authoring Practices Guide (Tabs pattern), WCAG 2.1 SC 1.3.1 / 4.1.2 — stable, standard web-accessibility references
 
 ### Secondary (MEDIUM confidence)
-- [Resend — Verified Domains](https://resend.com/docs/dashboard/domains/introduction) — corroborates existing codebase comment on DNS/domain verification requirements
-- [Firebase Remote Config](https://firebase.google.com/docs/remote-config) — reviewed to support the explicit reject-and-explain decision against it
-- General Cloud Functions v2 instance warm-reuse / cold-start / module-load timing and `revokeRefreshTokens`/`checkRevoked` semantics (community sources, corroborating official docs)
+- Third-party corroboration of Resend's SPF/DKIM/MX/DMARC record shape (dmarcdkim.com, dmarc.wiki/resend, phishfence.io) — used only to corroborate vendor docs, not as primary source
+- eslint-plugin-vuejs-accessibility project docs site (vue-a11y.github.io) — corroborated directly by the npm peerDependencies field
 
 ### Tertiary (LOW confidence)
-- General feature-flag/kill-switch UX guidance (Harness, LaunchDarkly, Unleash, Flagsmith blogs) — used only for general "confirm destructive toggles, log who/when" pattern, which this project's own dry-run-preview requirement already exceeds
+- None — no findings in this milestone's research rest on a single unverified source; the one instance of a stale secondary claim (SEED-002's VW_TYPE_LABELS file count) was caught and corrected against a direct primary-source grep rather than carried forward.
 
 ---
-*Research completed: 2026-08-20*
-*Ready for roadmap: yes*
+Research completed: 2026-08-23
+Ready for roadmap: yes
