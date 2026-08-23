@@ -60,7 +60,7 @@ REQ-IDs continue from v2.0 (last R211).
 - [x] **R219**: Deletion removes all Cloud Storage objects under the org's path (`orgs/{orgId}/…` — media,
       backgrounds, pptx-imports, rendered), leaving no orphaned files.
 
-- [ ] **R220**: Deleting requires an explicit extra confirmation (e.g. typing the church name) that echoes
+- [x] **R220**: Deleting requires an explicit extra confirmation (e.g. typing the church name) that echoes
       what will be destroyed, and the action is clearly labeled irreversible; a mistaken click cannot delete
       an org.
 
@@ -128,7 +128,7 @@ REQ-IDs continue from v2.0 (last R211).
 | R217 | Phase 77 | Complete |
 | R218 | Phase 77 | Complete |
 | R219 | Phase 77 | Complete |
-| R220 | Phase 77 | Pending |
+| R220 | Phase 77 | Complete |
 | R221 | Phase 77 | Complete |
 | R222 | Phase 75 | Complete |
 | R223 | Phase 75 | Complete |

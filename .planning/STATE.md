@@ -5,16 +5,16 @@ milestone_name: Organization Lifecycle & Super-Admin Access
 current_phase: 76
 current_phase_name: Church Deactivation & Reactivation
 status: executing
-stopped_at: Completed 76-02-PLAN.md
-last_updated: "2026-08-23T00:37:30.187Z"
+stopped_at: Completed 77-02-PLAN.md
+last_updated: "2026-08-23T03:22:03.862Z"
 last_activity: 2026-08-22
 last_activity_desc: Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim helper
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
-  percent: 50
+  completed_phases: 3
+  total_plans: 5
+  completed_plans: 5
+  percent: 75
 ---
 
 # ▶ ACTIVE MILESTONE — v2.1 Organization Lifecycle & Super-Admin Access (started 2026-08-22)
@@ -2482,6 +2482,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 74 P02 | 55min | 2 tasks | 3 files |
 | Phase 75-pending-invite-visibility P01 | 17min | 2 tasks | 4 files |
 | Phase 76 P02 | 1h | 3 tasks | 6 files |
+| Phase 77 P02 | 35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2880,6 +2881,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: OrganizationsTab.vue is a pure httpsCallable consumer (no firestore writes); friendlyCallableError extended inline with already-exists -> 'That church name is taken.'
 - [Phase ?]: OwnerConsoleView.test.ts's generic httpsCallable mock extended to resolve organizations:[] since OrganizationsTab now calls listOrganizations unconditionally on mount
 - [Phase 75]: pendingCount always explicit 0 rather than omitted/undefined; badge is a Members-cell suffix, not a new column
+- [Phase ?]: R220's client type-to-confirm dialog reuses CleanupEnableConfirmDialog's Teleport/focus-trap shell but not its hard-block dual-button pattern
 
 ### Roadmap Evolution
 
@@ -3200,8 +3202,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-23T00:37:30.129Z
-Stopped at: Completed 76-02-PLAN.md
+Last session: 2026-08-23T03:22:02.918Z
+Stopped at: Completed 77-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
