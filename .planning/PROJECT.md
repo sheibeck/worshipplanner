@@ -315,6 +315,11 @@ working for a newly-onboarded second-org admin (999.5). Full list in `.planning/
       tab semantics (`role="tablist"`/`aria-selected`) to the Configuration/Organizations tab strip (and the
       matching `ServiceEditorView` tab strip). Inherited console debt surfaced by the v2.0 UI reviews
       (Phase 72 tab strip 23/24, Phase 74 forms 22/24); best done as one cross-surface pass (backlog 999.7)
+- [ ] Extract church-specific hard-coded worship rules into per-org config (or drop the too-specific ones) —
+      full per-rule catalog + verdicts in `seeds/SEED-002-church-specific-rules-configurability.md`. Recommended
+      first slice "Configurable Teams": per-org team list (like roster roles) + generalized per-team song-tag
+      filter + drop the ordinal-Sunday auto-team rule. Kills the owner-named "team list" + "orchestra checkbox"
+      tailoring (backlog 999.8)
 
 ### Out of Scope
 

@@ -53,12 +53,22 @@ Owner decided (2026-08-12) to FINISH the migration. What was done this session:
 single-org). Before any user ever joins a second real org, widen the claim — see
 ROADMAP backlog **999.5**.
 
-## C2 — Phase 40.1 prod exercises undone + 2 known-open rules findings
+## C2 — 2 known-open rules findings (onboarding half CONFIRMED 2026-08-23)
 
-Tightened `firestore.rules` deployed 2026-08-10, but (archived 781–803):
-- **Exercise the one real pending invite in production** — not done.
-- **Create a genuinely new organization through a real signup** — not done; this is the failure mode most likely to silently block new-church onboarding. No new org verified since deploy.
-- Recorded but **NOT fixed** (future-phase candidates): (1) `organizations/{orgId}` `allow write: if isOrgEditor` lets an editor rewrite `createdBy` (`firestore.rules:31`); (2) `inviteLookup/{email}` `allow create: if isSignedIn()` is a self-invite vector (`firestore.rules:173`).
+Tightened `firestore.rules` deployed 2026-08-10 (archived 781–803).
+
+**✅ New-org onboarding + access isolation — CONFIRMED IN PRODUCTION 2026-08-23 (owner).**
+The v2.1 super-admin Owner Console (Organizations tab → `onboardOrganization` /
+`assignOrgAdmin` callables) is deployed. Owner verified end-to-end: onboard a new
+church, assign an admin, log in as that admin and see **only** that church (no rogue
+churches — claim isolation holds); and logging in as a user assigned to **no** church
+hits the "not assigned to a church" gate and cannot proceed further. This retires the
+original "create a genuinely new organization" / new-church-onboarding risk.
+
+**🔴 Still open — 2 recorded-but-unfixed rules findings** (future-phase candidates, NOT
+addressed by the Owner Console):
+1. `organizations/{orgId}` `allow write: if isOrgEditor` lets an editor rewrite `createdBy` (`firestore.rules:31`);
+2. `inviteLookup/{email}` `allow create: if isSignedIn()` is a self-invite vector (`firestore.rules:173`).
 
 ## C3 — Phase 37 render-service: package sign-off + cleanup-job safety gate
 
