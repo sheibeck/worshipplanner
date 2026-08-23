@@ -26,25 +26,36 @@ interface OrgSummaryFixture {
   createdAt: unknown
   memberCount: number
   pendingCount: number
+  active: boolean
 }
 
-const { mockListOrganizations, mockOnboardOrganization, mockAssignOrgAdmin } = vi.hoisted(() => ({
-  mockListOrganizations: vi.fn<() => Promise<{ data: { organizations: OrgSummaryFixture[] } }>>(() =>
-    Promise.resolve({ data: { organizations: [] } }),
-  ),
-  mockOnboardOrganization: vi.fn<
-    () => Promise<{ data: { status: 'added' | 'invited'; orgId: string; name: string } }>
-  >(() => Promise.resolve({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } })),
-  mockAssignOrgAdmin: vi.fn<() => Promise<{ data: { status: 'added' | 'invited'; uid?: string } }>>(() =>
-    Promise.resolve({ data: { status: 'added', uid: 'uid-1' } }),
-  ),
-}))
+const { mockListOrganizations, mockOnboardOrganization, mockAssignOrgAdmin, mockSetOrgActive } =
+  vi.hoisted(() => ({
+    mockListOrganizations: vi.fn<() => Promise<{ data: { organizations: OrgSummaryFixture[] } }>>(
+      () => Promise.resolve({ data: { organizations: [] } }),
+    ),
+    mockOnboardOrganization: vi.fn<
+      () => Promise<{ data: { status: 'added' | 'invited'; orgId: string; name: string } }>
+    >(() => Promise.resolve({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } })),
+    mockAssignOrgAdmin: vi.fn<() => Promise<{ data: { status: 'added' | 'invited'; uid?: string } }>>(
+      () => Promise.resolve({ data: { status: 'added', uid: 'uid-1' } }),
+    ),
+    // R212/R214 (Phase 76) — mirrors setOrgActiveHandler's response shape.
+    mockSetOrgActive: vi.fn<
+      () => Promise<{
+        data: { orgId: string; active: boolean; memberCount: number; claimFailures: number }
+      }>
+    >(() =>
+      Promise.resolve({ data: { orgId: 'org-1', active: false, memberCount: 3, claimFailures: 0 } }),
+    ),
+  }))
 
 vi.mock('firebase/functions', () => ({
   httpsCallable: vi.fn((_fns: unknown, name: string) => {
     if (name === 'listOrganizations') return mockListOrganizations
     if (name === 'onboardOrganization') return mockOnboardOrganization
     if (name === 'assignOrgAdmin') return mockAssignOrgAdmin
+    if (name === 'setOrgActive') return mockSetOrgActive
     throw new Error(`Unexpected callable name: ${name}`)
   }),
 }))
@@ -65,11 +76,15 @@ beforeEach(() => {
   mockListOrganizations.mockClear()
   mockOnboardOrganization.mockClear()
   mockAssignOrgAdmin.mockClear()
+  mockSetOrgActive.mockClear()
   mockListOrganizations.mockImplementation(() => Promise.resolve({ data: { organizations: [] } }))
   mockOnboardOrganization.mockImplementation(() =>
     Promise.resolve({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } }),
   )
   mockAssignOrgAdmin.mockImplementation(() => Promise.resolve({ data: { status: 'added', uid: 'uid-1' } }))
+  mockSetOrgActive.mockImplementation(() =>
+    Promise.resolve({ data: { orgId: 'org-1', active: false, memberCount: 3, claimFailures: 0 } }),
+  )
 })
 
 async function mountTab() {
@@ -85,6 +100,7 @@ function makeOrg(
     createdAt: unknown
     memberCount: number
     pendingCount: number
+    active: boolean
   }> = {},
 ) {
   return {
@@ -93,6 +109,7 @@ function makeOrg(
     createdAt: { toDate: () => new Date('2026-08-01T00:00:00Z') },
     memberCount: 3,
     pendingCount: 0,
+    active: true,
     ...overrides,
   }
 }
@@ -463,6 +480,98 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
 
     expect(wrapper.find('input[placeholder="Admin email"]').exists()).toBe(false)
     expect(mockAssignOrgAdmin).not.toHaveBeenCalled()
+  })
+})
+
+describe('OrganizationsTab -- deactivate/reactivate (R212, R214)', () => {
+  async function mountWithOneOrg(overrides: Partial<{ active: boolean }> = {}) {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: { organizations: [makeOrg({ orgId: 'org-1', name: 'Grace Church', ...overrides })] },
+      }),
+    )
+    return mountTab()
+  }
+
+  it('clicking Deactivate on an active org calls setOrgActive with {orgId, active:false}', async () => {
+    const wrapper = await mountWithOneOrg({ active: true })
+
+    const deactivateButton = wrapper.findAll('button').find((b) => b.text() === 'Deactivate')!
+    await deactivateButton.trigger('click')
+    await flushPromises()
+
+    expect(mockSetOrgActive).toHaveBeenCalledWith({ orgId: 'org-1', active: false })
+  })
+
+  it('clicking Reactivate on a deactivated org calls setOrgActive with {orgId, active:true}', async () => {
+    mockSetOrgActive.mockImplementation(() =>
+      Promise.resolve({ data: { orgId: 'org-1', active: true, memberCount: 3, claimFailures: 0 } }),
+    )
+    const wrapper = await mountWithOneOrg({ active: false })
+
+    const reactivateButton = wrapper.findAll('button').find((b) => b.text() === 'Reactivate')!
+    await reactivateButton.trigger('click')
+    await flushPromises()
+
+    expect(mockSetOrgActive).toHaveBeenCalledWith({ orgId: 'org-1', active: true })
+  })
+
+  it('WR-03: a second click while a toggle is in flight fires the callable exactly once', async () => {
+    let resolveFn: (v: {
+      data: { orgId: string; active: boolean; memberCount: number; claimFailures: number }
+    }) => void = () => {}
+    mockSetOrgActive.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFn = resolve
+        }),
+    )
+    const wrapper = await mountWithOneOrg({ active: true })
+
+    const deactivateButton = wrapper.findAll('button').find((b) => b.text() === 'Deactivate')!
+    await deactivateButton.trigger('click')
+    expect(mockSetOrgActive).toHaveBeenCalledTimes(1)
+
+    // A fast second click while togglingOrgId is set must be a no-op.
+    await deactivateButton.trigger('click')
+    expect(mockSetOrgActive).toHaveBeenCalledTimes(1)
+
+    resolveFn({ data: { orgId: 'org-1', active: false, memberCount: 3, claimFailures: 0 } })
+    await flushPromises()
+  })
+
+  it('shows a Deactivated badge and Reactivate label for a deactivated org row; neither for an active org row', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [
+            makeOrg({ orgId: 'org-1', name: 'Grace Church', active: true }),
+            makeOrg({ orgId: 'org-2', name: 'Hope Church', active: false }),
+          ],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows.length).toBe(2)
+    expect(rows[0]!.text()).not.toContain('Deactivated')
+    expect(rows[0]!.findAll('button').some((b) => b.text() === 'Deactivate')).toBe(true)
+    expect(rows[1]!.text()).toContain('Deactivated')
+    expect(rows[1]!.findAll('button').some((b) => b.text() === 'Reactivate')).toBe(true)
+  })
+
+  it('a failed toggle shows the friendly error message and does NOT call refreshOrgs()', async () => {
+    const wrapper = await mountWithOneOrg({ active: true })
+    mockListOrganizations.mockClear()
+    mockSetOrgActive.mockImplementation(() => Promise.reject(new Error('server exploded')))
+
+    const deactivateButton = wrapper.findAll('button').find((b) => b.text() === 'Deactivate')!
+    await deactivateButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('server exploded')
+    expect(mockListOrganizations).not.toHaveBeenCalled()
   })
 })
 

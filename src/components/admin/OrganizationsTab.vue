@@ -51,7 +51,15 @@
           </thead>
           <tbody class="divide-y divide-gray-800">
             <tr v-for="org in orgs" :key="org.orgId" class="hover:bg-gray-800/20 transition-colors">
-              <td class="px-4 py-3 text-gray-200">{{ org.name }}</td>
+              <td class="px-4 py-3 text-gray-200">
+                {{ org.name }}
+                <span
+                  v-if="org.active === false"
+                  class="ml-1 inline-flex items-center rounded-full bg-red-900/40 text-red-300 border border-red-800/50 px-1.5 py-0.5 text-xs font-medium"
+                >
+                  Deactivated
+                </span>
+              </td>
               <td class="px-4 py-3 text-gray-500 text-xs font-mono">{{ org.orgId }}</td>
               <td class="px-4 py-3 text-gray-400 text-sm">{{ formatDate(org.createdAt) }}</td>
               <td class="px-4 py-3 text-gray-400 text-sm">
@@ -102,6 +110,34 @@
                     Assign admin
                   </button>
                 </template>
+
+                <!-- R212/R214 (Phase 76) — Deactivate/Reactivate control, the
+                     only channel this component uses to flip an org's status
+                     (no direct Firestore write, mirrors T-74-07). -->
+                <div class="mt-2">
+                  <button
+                    type="button"
+                    @click="onToggleActive(org)"
+                    :disabled="togglingOrgId !== null"
+                    class="text-xs text-red-300 hover:text-red-200 disabled:opacity-60 transition-colors"
+                  >
+                    {{
+                      togglingOrgId === org.orgId
+                        ? org.active
+                          ? 'Deactivating...'
+                          : 'Reactivating...'
+                        : org.active
+                          ? 'Deactivate'
+                          : 'Reactivate'
+                    }}
+                  </button>
+                  <p v-if="toggleError[org.orgId]" class="text-red-400 text-xs mt-1">
+                    {{ toggleError[org.orgId] }}
+                  </p>
+                  <p v-if="toggleFeedback[org.orgId]" class="text-green-400 text-xs mt-1">
+                    {{ toggleFeedback[org.orgId] }}
+                  </p>
+                </div>
               </td>
             </tr>
 
@@ -137,6 +173,21 @@ interface OrgSummary {
   createdAt: unknown
   memberCount: number
   pendingCount: number
+  active: boolean
+}
+
+// R212/R214 (Phase 76) — mirrors functions/src/orgProvisioning.ts's
+// setOrgActiveHandler request/response contract exactly.
+interface SetOrgActiveRequest {
+  orgId: string
+  active: boolean
+}
+
+interface SetOrgActiveResponse {
+  orgId: string
+  active: boolean
+  memberCount: number
+  claimFailures: number
 }
 
 interface ListOrganizationsResponse {
@@ -185,6 +236,12 @@ const assignEmail = ref('')
 const isAssigning = ref(false)
 const assignError = ref<Record<string, string>>({})
 const assignFeedback = ref<Record<string, string>>({})
+
+// ── Deactivate/Reactivate state (R212/R214), keyed per orgId ──────────────
+
+const togglingOrgId = ref<string | null>(null)
+const toggleError = ref<Record<string, string>>({})
+const toggleFeedback = ref<Record<string, string>>({})
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 // Copied from ConfigurationTab.vue verbatim (Plan 74-02 instructions).
@@ -353,6 +410,42 @@ async function onConfirmAssign(org: OrgSummary) {
     assignError.value = { ...assignError.value, [orgId]: friendlyCallableError(err) }
   } finally {
     isAssigning.value = false
+  }
+}
+
+// ── Deactivate/Reactivate action (R212/R214) ──────────────────────────────
+// Pure httpsCallable consumer — this component writes NO organizations
+// document directly (T-74-07); setOrgActive is the only channel.
+
+async function onToggleActive(org: OrgSummary) {
+  // WR-03: same double-submit guard shape as isOnboarding/isAssigning above.
+  if (togglingOrgId.value) return
+
+  const orgId = org.orgId
+  const nextActive = !org.active
+  togglingOrgId.value = orgId
+  delete toggleError.value[orgId]
+  try {
+    const setOrgActive = httpsCallable<SetOrgActiveRequest, SetOrgActiveResponse>(
+      functions,
+      'setOrgActive',
+    )
+    await setOrgActive({ orgId, active: nextActive })
+    toggleFeedback.value = {
+      ...toggleFeedback.value,
+      [orgId]: nextActive ? 'Reactivated.' : 'Deactivated.',
+    }
+    await refreshOrgs()
+    // Clear success feedback after 2 seconds (mirrors onboard/assign's 2s auto-dismiss).
+    setTimeout(() => {
+      const { [orgId]: _removed, ...rest } = toggleFeedback.value
+      toggleFeedback.value = rest
+    }, 2000)
+  } catch (err) {
+    console.error('[OrganizationsTab] setOrgActive error:', err)
+    toggleError.value = { ...toggleError.value, [orgId]: friendlyCallableError(err) }
+  } finally {
+    togglingOrgId.value = null
   }
 }
 
