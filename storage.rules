@@ -48,16 +48,30 @@ service firebase.storage {
     function isOrgMemberByClaim(orgId) {
       return request.auth != null
         && (
-          // NEW — multi-org arm (R209): the claim's orgs map carries an entry for this
-          // org. Guard orgs != null BEFORE indexing it -- indexing into an absent orgs
-          // key is a rules evaluation error (hard deny), not a clean false.
-          (request.auth.token.orgs != null && request.auth.token.orgs[orgId] != null)
-          // Legacy arm (R211 backward-compat): pre-widening / not-yet-backfilled tokens
-          // still carry only the primary orgId/role — kept unchanged, unconditionally
-          // ORed (never ANDed) with the new arm above.
-          || (request.auth.token.orgId == orgId && request.auth.token.role != null)
-        )
-        && (!isOrgDeactivatedForCaller(orgId) || request.auth.token.superAdmin == true);
+          // Phase 78 (R225): checked first -- a super-admin gets Storage
+          // read/write on ANY org's path with NO orgId/orgs/role claim
+          // entry at all, and regardless of deactivatedOrgs (mirrors the
+          // Phase 76 deactivation exemption, now unconditional rather than
+          // membership-gated). The old `|| request.auth.token.superAdmin ==
+          // true` that lived ONLY inside the deactivation sub-clause below
+          // is removed as dead code -- this outer arm already subsumes it.
+          request.auth.token.superAdmin == true
+          ||
+          (
+            (
+              // NEW — multi-org arm (R209): the claim's orgs map carries an entry for
+              // this org. Guard orgs != null BEFORE indexing it -- indexing into an
+              // absent orgs key is a rules evaluation error (hard deny), not a clean
+              // false.
+              (request.auth.token.orgs != null && request.auth.token.orgs[orgId] != null)
+              // Legacy arm (R211 backward-compat): pre-widening / not-yet-backfilled
+              // tokens still carry only the primary orgId/role — kept unchanged,
+              // unconditionally ORed (never ANDed) with the new arm above.
+              || (request.auth.token.orgId == orgId && request.auth.token.role != null)
+            )
+            && !isOrgDeactivatedForCaller(orgId)
+          )
+        );
     }
 
     // Membership is CLAIM-ONLY as of Deploy 2 (2026-08-12). Do NOT re-introduce a

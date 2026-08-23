@@ -288,6 +288,60 @@ describe('storage.rules — deactivatedOrgs claim (R213, Phase 76)', () => {
   })
 })
 
+// Phase 78 (R225): isOrgMemberByClaim now ORs `request.auth.token.superAdmin
+// == true` in FRONT of the whole membership-and-deactivation clause, not
+// merely into the deactivation sub-clause (that narrower form is the
+// pre-existing test at line ~225 above, "ALLOWS a super-admin with
+// deactivatedOrgs set for the org, plus a valid membership claim" -- it
+// required a valid membership claim alongside superAdmin:true; it still
+// passes here, now trivially via this new outer arm). This block proves
+// the OUTER arm: a super-admin with NO orgId/orgs/role claim entry at all
+// still gets full Storage read/write, including on a deactivated org.
+// The ordinary-editor ALLOW tests in the "storage.rules — org membership"
+// describe block above are the unaffected-regression proof and are not
+// duplicated here.
+describe('Super-admin Storage access without a membership claim (R225, Phase 78)', () => {
+  it('ALLOWS a super-admin with NO orgId/orgs/role claim at all to write under any org path', async () => {
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/superadmin-enter/source.pptx')
+
+    await assertSucceeds(uploadBytes(fileRef, SMALL_BYTES))
+  })
+
+  it('ALLOWS a super-admin with NO orgId/orgs/role claim at all to read an object seeded under that path', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const storage = context.storage()
+      await uploadBytes(ref(storage, 'orgs/orgA/pptx-imports/superadmin-read/source.pptx'), SMALL_BYTES)
+    })
+
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/superadmin-read/source.pptx')
+
+    await assertSucceeds(getBytes(fileRef))
+  })
+
+  it('ALLOWS a super-admin with NO membership claim, on a DEACTIVATED org -- proves the outer arm bypasses BOTH the membership clause AND the deactivation clause', async () => {
+    const context = testEnv.authenticatedContext('superAdminUid', {
+      superAdmin: true,
+      deactivatedOrgs: { orgA: true },
+    })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/superadmin-deactivated/source.pptx')
+
+    await assertSucceeds(uploadBytes(fileRef, SMALL_BYTES))
+  })
+
+  it('DENIES a non-member, non-super-admin caller (no claims at all) -- R225 negative case', async () => {
+    const context = testEnv.authenticatedContext('randomUid')
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/random/source.pptx')
+
+    await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
+})
+
 describe('storage.rules — media path', () => {
   // Phase 40: claim-arm proof, no members document seeded -- see the comment above
   // the org-membership describe block's allow-cases for why.
