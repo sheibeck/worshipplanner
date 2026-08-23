@@ -435,8 +435,8 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
       expect(store.memberships).toEqual([
-        { id: 'org-1', name: 'Org One' },
-        { id: 'org-2', name: 'Org Two' },
+        { id: 'org-1', name: 'Org One', active: true },
+        { id: 'org-2', name: 'Org Two', active: true },
       ])
       expect(store.orgId).toBeNull()
       expect(store.needsOrgSelection).toBe(true)
@@ -512,10 +512,178 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
       expect(store.memberships).toEqual([
-        { id: 'org-1', name: 'Org One' },
-        { id: 'org-2', name: 'org-2' },
+        { id: 'org-1', name: 'Org One', active: true },
+        { id: 'org-2', name: 'org-2', active: false },
       ])
       expect(store.needsOrgSelection).toBe(true)
+    })
+  })
+
+  // ── 76-02 (R213) ─────────────────────────────────────────────────────────
+  // Client login-block: once 76-01-PLAN.md's firestore.rules ship, a
+  // deactivated org's own (non-super-admin) member has the org-doc read
+  // DENIED (rejects) rather than handed back `{active:false}` data. These
+  // tests simulate that rejection directly, mirroring the "falls back to the
+  // org id" fixture pattern above.
+  describe('deactivated org login-block (R213, Phase 76)', () => {
+    /** A single-org user whose sole org's doc read REJECTS (simulated deactivation). */
+    function mockSingleOrgDeactivated() {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: ['org-1'] }),
+          }) as never
+        }
+        if (path === 'organizations/org-1') {
+          return Promise.reject(new Error('permission-denied')) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+    }
+
+    /**
+     * A multi-org user where org-1's doc read REJECTS (deactivated) and
+     * org-2's succeeds (active) — drives selectOrg between the two.
+     */
+    function mockMultiOrgWithDeactivation() {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: ['org-1', 'org-2'] }),
+          }) as never
+        }
+        if (path === 'organizations/org-1') {
+          return Promise.reject(new Error('permission-denied')) as never
+        }
+        if (path === 'organizations/org-2') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ name: 'Org Two', active: true }),
+          }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+    }
+
+    it('a single-org user whose org-doc read is denied ends with orgId null and deactivatedOrgMessage set', async () => {
+      mockSingleOrgDeactivated()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.orgId).toBeNull()
+      expect(store.deactivatedOrgMessage).toBe(
+        'This church is deactivated — contact your administrator.',
+      )
+    })
+
+    it('resets every other org-context field to its no-org default on a denied org-doc read', async () => {
+      mockSingleOrgDeactivated()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.orgName).toBeNull()
+      expect(store.orgSlug).toBeNull()
+      expect(store.userRole).toBeNull()
+      expect(store.pcAppId).toBeNull()
+      expect(store.pcSecret).toBeNull()
+      expect(store.vwModeEnabled).toBe(true)
+      expect(store.settings).toEqual(DEFAULT_ORG_SETTINGS)
+    })
+
+    it('requiresOrgSelection is true for the single-org-deactivated case even though memberships.length === 1', async () => {
+      mockSingleOrgDeactivated()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.memberships.length).toBe(1)
+      expect(store.needsOrgSelection).toBe(false)
+      expect(store.hasNoOrg).toBe(false)
+      expect(store.requiresOrgSelection).toBe(true)
+    })
+
+    it('a multi-org user with one deactivated org gets {active:false} for it and {active:true} for the active one', async () => {
+      mockMultiOrgWithDeactivation()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.memberships).toEqual([
+        { id: 'org-1', name: 'org-1', active: false },
+        { id: 'org-2', name: 'Org Two', active: true },
+      ])
+    })
+
+    it('deactivatedOrgMessage clears to null after selectOrg successfully switches to a different, active org', async () => {
+      mockMultiOrgWithDeactivation()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+
+      await store.selectOrg('org-1')
+      expect(store.orgId).toBeNull()
+      expect(store.deactivatedOrgMessage).toBe(
+        'This church is deactivated — contact your administrator.',
+      )
+
+      await store.selectOrg('org-2')
+      expect(store.orgId).toBe('org-2')
+      expect(store.deactivatedOrgMessage).toBeNull()
+    })
+
+    it('a super-admin whose own read of a deactivated org succeeds is NOT blocked', async () => {
+      mockOrgDocPath({ name: 'Test Org', active: false })
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
+        claims: { orgId: 'org-1', superAdmin: true },
+      } as never)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.orgId).toBe('org-1')
+      expect(store.orgName).toBe('Test Org')
+      expect(store.deactivatedOrgMessage).toBeNull()
+    })
+
+    it('(defensive layer) treats a successfully-read active:false org as deactivated for a non-super-admin', async () => {
+      mockOrgDocPath({ name: 'Test Org', active: false })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.orgId).toBeNull()
+      expect(store.deactivatedOrgMessage).toBe(
+        'This church is deactivated — contact your administrator.',
+      )
+    })
+
+    it('resets deactivatedOrgMessage to null on logout', async () => {
+      mockSingleOrgDeactivated()
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.deactivatedOrgMessage).not.toBeNull()
+
+      await store.logout()
+      expect(store.deactivatedOrgMessage).toBeNull()
+    })
+
+    it('resets deactivatedOrgMessage to null on a sign-out onAuthStateChanged event', async () => {
+      mockSingleOrgDeactivated()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.deactivatedOrgMessage).not.toBeNull()
+
+      await triggerAuthStateChange(null)
+      expect(store.deactivatedOrgMessage).toBeNull()
     })
   })
 

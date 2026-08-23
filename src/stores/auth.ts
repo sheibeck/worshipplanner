@@ -75,6 +75,13 @@ function clearRememberedOrg(): void {
   }
 }
 
+// R213 (Phase 76) — the client login-block copy shown when a member's
+// active/selected org has been deactivated. Generic by design (T-76-08): the
+// same copy covers a genuine deactivation, an orphaned membership, or any
+// other denied/failed org-doc read — never leaking a raw Firebase error code
+// or message to the end user.
+const DEACTIVATED_ORG_MESSAGE = 'This church is deactivated — contact your administrator.'
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const isReady = ref(false)
@@ -110,10 +117,20 @@ export const useAuthStore = defineStore('auth', () => {
   // nothing can mutate the default object.
   const settings = ref<OrgSettings>({ ...DEFAULT_ORG_SETTINGS })
 
-  // The organizations the signed-in user belongs to ({id, name}) — the source
-  // the login church-picker renders when a user belongs to more than one.
-  // Populated by loadOrgContext.
-  const memberships = ref<{ id: string; name: string }[]>([])
+  // The organizations the signed-in user belongs to ({id, name, active}) — the
+  // source the login church-picker renders when a user belongs to more than
+  // one. Populated by loadOrgContext. `active` defaults to `true` for a
+  // readable org doc with no `active` field (legacy orgs); a caught read
+  // failure (deactivation OR a stale/orphaned membership) conservatively
+  // defaults to `false` (R213/T-76-08).
+  const memberships = ref<{ id: string; name: string; active: boolean }[]>([])
+
+  // R213 (Phase 76) — set by loadOrgContext when the active/selected org's
+  // doc read is denied (post-76-01 rules shape) or explicitly `active:
+  // false`. Null means no deactivation is in effect. Never treat this as the
+  // security boundary — see auth.ts's header comment / 76-02-PLAN.md.
+  const deactivatedOrgMessage = ref<string | null>(null)
+  const hasDeactivatedOrg = computed(() => deactivatedOrgMessage.value !== null)
 
   const isAuthenticated = computed(() => user.value !== null)
   const isEditor = computed(() => userRole.value === 'editor')
@@ -132,7 +149,12 @@ export const useAuthStore = defineStore('auth', () => {
   const hasNoOrg = computed(
     () => isReady.value && isAuthenticated.value && memberships.value.length === 0,
   )
-  const requiresOrgSelection = computed(() => needsOrgSelection.value || hasNoOrg.value)
+  // R213 (Phase 76) — a lone deactivated org fits neither needsOrgSelection
+  // (>1) nor hasNoOrg (===0): hasDeactivatedOrg widens the gate to also
+  // redirect that single-org-deactivated case to /select-church.
+  const requiresOrgSelection = computed(
+    () => needsOrgSelection.value || hasNoOrg.value || hasDeactivatedOrg.value,
+  )
 
   const hasPcCredentials = computed(
     () =>
@@ -257,25 +279,51 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // R213 (Phase 76) — the SAME full org-context reset the pre-existing
+  // `activeId === null` branch performs, factored out so the two new
+  // deactivation-detection branches below share it exactly rather than
+  // drifting from that branch's field list over time.
+  function resetOrgContext(): void {
+    memberUnsub?.()
+    memberUnsub = null
+    orgId.value = null
+    orgName.value = null
+    orgSlug.value = null
+    userRole.value = null
+    pcAppId.value = null
+    pcSecret.value = null
+    vwModeEnabled.value = true
+    settings.value = { ...DEFAULT_ORG_SETTINGS }
+  }
+
   async function loadOrgContext(uid: string, membershipJustCreated = false): Promise<void> {
+    // R213 — clear any stale deactivation message from a prior org-context
+    // load BEFORE any branch below, so it never lingers across an org switch.
+    deactivatedOrgMessage.value = null
+
     const userRef = doc(db, 'users', uid)
     const userSnap = await getDoc(userRef)
     const userData = userSnap.exists() ? userSnap.data() : null
     const ids: string[] = userData?.orgIds ?? []
 
-    // Build the membership list ({id, name}) the church picker renders. Each
-    // org name is read individually and guarded: an org the user has an orgIds
-    // entry for but can't cleanly read (e.g. a stale/orphaned id with no member
-    // doc — a data inconsistency) falls back to its id instead of rejecting the
-    // whole list, so one bad membership never blanks or breaks the picker.
+    // Build the membership list ({id, name, active}) the church picker
+    // renders. Each org doc is read individually and guarded: an org the user
+    // has an orgIds entry for but can't cleanly read (e.g. a stale/orphaned id
+    // with no member doc, or — post-76-01 — a deactivated org's own member
+    // being denied) falls back to its id and `active: false` instead of
+    // rejecting the whole list, so one bad membership never blanks or breaks
+    // the picker (R213/T-76-08).
     memberships.value = await Promise.all(
       ids.map(async (id) => {
         try {
           const snap = await getDoc(doc(db, 'organizations', id))
-          const name = snap.exists() ? (snap.data().name as string) || id : id
-          return { id, name }
+          if (!snap.exists()) return { id, name: id, active: true }
+          const data = snap.data()
+          const name = (data.name as string) || id
+          const active = (data.active as boolean | undefined) ?? true
+          return { id, name, active }
         } catch {
-          return { id, name: id }
+          return { id, name: id, active: false }
         }
       }),
     )
@@ -291,16 +339,7 @@ export const useAuthStore = defineStore('auth', () => {
       remembered && ids.includes(remembered) ? remembered : ids.length === 1 ? ids[0]! : null
 
     if (activeId === null) {
-      memberUnsub?.()
-      memberUnsub = null
-      orgId.value = null
-      orgName.value = null
-      orgSlug.value = null
-      userRole.value = null
-      pcAppId.value = null
-      pcSecret.value = null
-      vwModeEnabled.value = true
-      settings.value = { ...DEFAULT_ORG_SETTINGS }
+      resetOrgContext()
       return
     }
 
@@ -309,13 +348,40 @@ export const useAuthStore = defineStore('auth', () => {
     // R075/P-01 — force the claim onto the token now that we know which org
     // this session belongs to. Scoped retry only when membershipJustCreated
     // is true (see refreshOrgClaim above and the onAuthStateChanged call
-    // site for why).
+    // site for why). Also the source of isSuperAdmin.value used by the
+    // deactivation exemption check just below.
     await refreshOrgClaim(activeId, membershipJustCreated)
 
+    // R213 (Phase 76) — once 76-01-PLAN.md's firestore.rules ship, this read
+    // is DENIED (rejects) for a deactivated org's ordinary (non-super-admin)
+    // member. An uncaught rejection here would propagate out of the
+    // onAuthStateChanged handler and leave isReady never set to true —
+    // exactly the "blank app" R213 forbids (T-76-09). Treat the denial
+    // itself as the deactivation signal.
     const orgRef = doc(db, 'organizations', activeId)
-    const orgSnap = await getDoc(orgRef)
+    let orgSnap
+    try {
+      orgSnap = await getDoc(orgRef)
+    } catch {
+      resetOrgContext()
+      deactivatedOrgMessage.value = DEACTIVATED_ORG_MESSAGE
+      return
+    }
     if (orgSnap.exists()) {
       const orgData = orgSnap.data()
+
+      // Defensive second layer (structurally unreachable for a genuine
+      // non-super-admin today, since the rules deny the read outright): a
+      // successful read carrying `active: false` is still treated as
+      // deactivated unless the caller is a super-admin (the rules' narrow
+      // exemption for a super-admin with a genuine membership doc).
+      const isActive = (orgData.active as boolean | undefined) ?? true
+      if (isActive === false && !isSuperAdmin.value) {
+        resetOrgContext()
+        deactivatedOrgMessage.value = DEACTIVATED_ORG_MESSAGE
+        return
+      }
+
       orgName.value = (orgData.name as string) ?? null
       orgSlug.value = (orgData.slug as string) ?? null
       pcAppId.value = (orgData.pcAppId as string) ?? null
@@ -452,6 +518,7 @@ export const useAuthStore = defineStore('auth', () => {
       vwModeEnabled.value = true
       settings.value = { ...DEFAULT_ORG_SETTINGS }
       memberships.value = []
+      deactivatedOrgMessage.value = null
       memberUnsub?.()
       memberUnsub = null
     }
@@ -587,6 +654,7 @@ export const useAuthStore = defineStore('auth', () => {
     pcSecret.value = null
     vwModeEnabled.value = true
     settings.value = { ...DEFAULT_ORG_SETTINGS }
+    deactivatedOrgMessage.value = null
     memberUnsub?.()
     memberUnsub = null
     await signOut(auth)
@@ -611,6 +679,8 @@ export const useAuthStore = defineStore('auth', () => {
     memberships,
     needsOrgSelection,
     hasNoOrg,
+    deactivatedOrgMessage,
+    hasDeactivatedOrg,
     requiresOrgSelection,
     selectOrg,
     isEditor,
