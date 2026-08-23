@@ -598,6 +598,11 @@ export const useAuthStore = defineStore('auth', () => {
     if (!currentUser) return
     if (!memberships.value.some((m) => m.id === targetOrgId)) return
     rememberOrg(currentUser.uid, targetOrgId)
+    // Quick 260823-switch-church-cache: clear stale org-scoped store data before
+    // loading the newly-selected church so nothing from the previous church
+    // flashes during the switch.
+    const { resetOrgScopedStores } = await import('./orgScopedStores')
+    resetOrgScopedStores()
     await loadOrgContext(currentUser.uid, false)
   }
 
@@ -623,6 +628,11 @@ export const useAuthStore = defineStore('auth', () => {
   async function enterOrgAsSuperAdmin(targetOrgId: string): Promise<boolean> {
     if (!user.value || !isSuperAdmin.value) return false
     resetOrgContext()
+    // Quick 260823-switch-church-cache: clear all org-scoped store data so the
+    // church being entered never briefly shows the previous church's services/
+    // songs/roster while their listeners re-point.
+    const { resetOrgScopedStores } = await import('./orgScopedStores')
+    resetOrgScopedStores()
     let orgSnap
     try {
       orgSnap = await getDoc(doc(db, 'organizations', targetOrgId))
@@ -645,6 +655,11 @@ export const useAuthStore = defineStore('auth', () => {
     // IN-01 (78-REVIEW.md): resetOrgContext() below already sets
     // viewingAsSuperAdmin.value = null -- no separate clear needed here.
     resetOrgContext()
+    // Quick 260823-switch-church-cache: clear the visited church's store data
+    // before restoring the super-admin's own church so its services/songs/etc.
+    // don't linger during the switch back.
+    const { resetOrgScopedStores } = await import('./orgScopedStores')
+    resetOrgScopedStores()
     // Quick 260823: restore the super-admin's OWN church context so exiting a
     // visited church returns them to their normal nav (own church + Owner
     // Console) instead of the partial no-org state that left only a stray
