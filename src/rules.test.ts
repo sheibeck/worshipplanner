@@ -394,6 +394,77 @@ describe('isOrgActive — deactivation gate (R213, Phase 76)', () => {
   })
 })
 
+// T-76-10/T-76-06 (Phase 76 SECURITY follow-up): `organizations/{orgId}`'s
+// `allow write` used to grant an ordinary editor unrestricted field access --
+// no restriction on the 5 lifecycle fields (`active`, `deactivatedAt`,
+// `deactivatedBy`, `reactivatedAt`, `reactivatedBy`), which are supposed to be
+// Admin-SDK-only (written exclusively by the setOrgActive Cloud Function).
+// An ordinary editor could forge any of them directly via updateDoc, bypassing
+// the super-admin-gated callable, the deactivatedOrgs claim fan-out, and
+// revokeRefreshTokens (T-76-10), and forge the deactivatedBy audit field
+// (T-76-06). These tests prove the new `preservesLifecycleFields()` guard
+// closes the hole without regressing legitimate editor writes.
+describe('Org lifecycle field guard (T-76-10/T-76-06)', () => {
+  it('DENIES an ordinary editor from setting active:false directly on their own org', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church" })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { active: false }),
+    )
+  })
+
+  it('DENIES an ordinary editor from forging deactivatedBy on their own org', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church" })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { deactivatedBy: 'forged-uid' }),
+    )
+  })
+
+  it('DENIES an ordinary editor from forging deactivatedAt/reactivatedAt/reactivatedBy on their own org', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church" })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { deactivatedAt: new Date() }),
+    )
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { reactivatedAt: new Date() }),
+    )
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { reactivatedBy: 'forged-uid' }),
+    )
+  })
+
+  it('ALLOWS the same editor to update a non-lifecycle field (name) -- no regression', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church" })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'organizations', 'orgA'), { name: 'Renamed Church', updatedAt: new Date() }),
+    )
+  })
+
+  it('DENIES a viewer from writing any field at all, lifecycle or not', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'viewer')
+    await seedDoc('organizations/orgA', { name: "UserA's Church" })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { name: 'Renamed Church' }),
+    )
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { active: false }),
+    )
+  })
+})
+
 describe('Catch-all deny', () => {
   it('denies access to undefined paths', async () => {
     const context = testEnv.authenticatedContext('userA')

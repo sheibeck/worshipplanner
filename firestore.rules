@@ -73,12 +73,48 @@ service cloud.firestore {
 
     // Organizations
     match /organizations/{orgId} {
+      // T-76-10/T-76-06 (Phase 76 SECURITY follow-up): `active`, `deactivatedAt`,
+      // `deactivatedBy`, `reactivatedAt`, `reactivatedBy` are written ONLY by the
+      // setOrgActive Cloud Function via the Admin SDK, which bypasses these rules
+      // entirely -- no legitimate client write (an ordinary editor's org-settings
+      // update, or the legacy client-side org-create path below) ever needs to
+      // touch any of them. Without this guard, an ordinary EDITOR (not a
+      // super-admin) could `updateDoc(organizations/{orgId}, {active: false,
+      // deactivatedAt: ..., deactivatedBy: 'forged'})` directly from the client --
+      // bypassing the super-admin-gated setOrgActive callable, the
+      // deactivatedOrgs claim fan-out, and revokeRefreshTokens (T-76-10), and
+      // forging the deactivatedBy audit field (T-76-06). Mirrors the
+      // diff().affectedKeys() idiom already used by the services/{docId} block
+      // below. Exempted for a genuine super-admin (same narrow OR pattern used
+      // by isOrgActive/isOrgMember/isOrgEditor above) -- a super-admin already
+      // sits above this boundary elsewhere in this file (appConfig, superAdmins),
+      // so this is not a new escalation surface; T-76-10's exploit is
+      // specifically an ORDINARY editor forging these fields.
+      function lifecycleFields() {
+        return ['active', 'deactivatedAt', 'deactivatedBy', 'reactivatedAt', 'reactivatedBy'];
+      }
+      function preservesLifecycleFields() {
+        return request.resource == null
+          // Delete: nothing being written, nothing to restrict.
+          ? true
+          : (resource == null
+              // Create (no prior doc): check the incoming doc's own keys.
+              ? !request.resource.data.keys().hasAny(lifecycleFields())
+              // Update (prior doc exists): diff against the stored doc, exactly
+              // like the services/{docId} block's keys() helper below.
+              : !request.resource.data.diff(resource.data).affectedKeys().hasAny(lifecycleFields()));
+      }
+
       // Members can read; editors can write
       allow read: if isOrgMember(orgId);
-      // Editors can update/delete existing orgs
-      allow write: if isOrgEditor(orgId);
-      // Allow authenticated users to create a new org if they are the creator
-      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+      // Editors can update/delete existing orgs -- but never the 5 lifecycle fields.
+      allow write: if isOrgEditor(orgId) && (preservesLifecycleFields() || isSuperAdmin());
+      // Allow authenticated users to create a new org if they are the creator.
+      // Same lifecycle-field guard applies (defense-in-depth) -- no legitimate
+      // client-side org-creation flow sets these fields; org provisioning
+      // (orgProvisioning.ts) always writes via the Admin SDK, bypassing rules.
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid
+        && preservesLifecycleFields();
 
       // Members subcollection
       match /members/{uid} {
