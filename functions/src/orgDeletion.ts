@@ -120,10 +120,14 @@ export async function deleteOrganizationHandler(
   }
 
   // T-77-02: the client's echoed confirmName proves nothing on its own --
-  // compare against the SERVER's own stored name, strict === (case-sensitive,
-  // 77-RESEARCH.md Assumption A1).
+  // compare against the SERVER's own stored name, case-sensitive (77-RESEARCH.md
+  // Assumption A1). WR-02 (77-REVIEW.md): trim BOTH sides -- onboardOrganizationHandler
+  // stores `name` verbatim, untrimmed, so a stray leading/trailing space on a
+  // legacy/foreign-written org must not permanently strand it: the dialog's
+  // own `.trim()` on typed input makes it structurally impossible to type a
+  // trailing/leading space back in.
   const orgName = orgData?.name ?? "";
-  if (confirmName !== orgName) {
+  if (confirmName.trim() !== orgName.trim()) {
     throw new HttpsError("invalid-argument", "Typed name does not match the church name.");
   }
 

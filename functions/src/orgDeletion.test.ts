@@ -291,6 +291,32 @@ describe("deleteOrganizationHandler: eligibility gates", () => {
     expect(fake.recursiveDeleteSpy).not.toHaveBeenCalled();
   });
 
+  // WR-02 (77-REVIEW.md): a legacy/foreign write path could persist `name`
+  // with stray surrounding whitespace (onboardOrganizationHandler stores it
+  // verbatim). The dialog's own `.trim()` on typed input makes it
+  // structurally impossible to type that whitespace back in, so the SERVER
+  // compare must trim both sides -- otherwise such an org could never be
+  // deleted through the sanctioned UI path.
+  it("accepts a confirmName that matches the stored name only after trimming stored-side whitespace", async () => {
+    const fake = setup({ active: false, name: `  ${ORG_NAME}  ` });
+    mockBucket();
+
+    const result = await deleteOrganizationHandler(fakeRequest({ data: { confirmName: ORG_NAME } }));
+
+    expect(result.name).toBe(`  ${ORG_NAME}  `);
+    expect(fake.recursiveDeleteSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("still refuses a confirmName differing only in case after trimming -- trimming does not weaken case-sensitivity", async () => {
+    const fake = setup({ active: false, name: `  ${ORG_NAME}  ` });
+    mockBucket();
+
+    await expect(
+      deleteOrganizationHandler(fakeRequest({ data: { confirmName: ORG_NAME.toLowerCase() } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(fake.recursiveDeleteSpy).not.toHaveBeenCalled();
+  });
+
   it("rejects invalid-argument for a blank orgId or confirmName", async () => {
     setup();
     mockBucket();
