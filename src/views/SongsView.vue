@@ -16,7 +16,7 @@
           <div>
             <h1 class="text-xl font-semibold text-gray-100">Songs</h1>
             <p class="text-sm text-gray-400 mt-1">
-              {{ songStore.isLoading ? 'Loading...' : `${songStore.visibleSongs.length} song${songStore.visibleSongs.length !== 1 ? 's' : ''}` }}
+              {{ songStore.isLoading ? 'Loading...' : `${songStore.filteredSongs.length} song${songStore.filteredSongs.length !== 1 ? 's' : ''}` }}
             </p>
           </div>
           <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
