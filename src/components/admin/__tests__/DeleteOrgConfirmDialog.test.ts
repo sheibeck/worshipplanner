@@ -69,6 +69,19 @@ describe('DeleteOrgConfirmDialog', () => {
     expect(deleteButton.attributes('disabled')).toBeDefined()
   })
 
+  // 77 WR-02 (client mirror): a stored org name with stray surrounding
+  // whitespace must still be confirmable — both sides are trimmed, mirroring
+  // the server-side compare in orgDeletion.ts. Otherwise the button could
+  // never enable for a value the server would accept.
+  it('enables Delete when the trimmed typed value matches a padded orgName', async () => {
+    const wrapper = mountDialog({ orgName: '  Grace Church  ' })
+    const input = wrapper.find('input[type="text"]')
+    await input.setValue('Grace Church')
+    const buttons = wrapper.findAll('button')
+    const deleteButton = buttons[buttons.length - 1]!
+    expect(deleteButton.attributes('disabled')).toBeUndefined()
+  })
+
   it('enables the Delete button when the typed value exactly matches orgName (trimmed)', async () => {
     const wrapper = mountDialog({ orgName: 'Grace Church' })
     const input = wrapper.find('input[type="text"]')

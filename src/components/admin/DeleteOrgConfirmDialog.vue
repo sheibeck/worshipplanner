@@ -140,7 +140,14 @@ const typedName = ref('')
 // 77-RESEARCH.md Assumption A1/Pitfall 3: "grace church" must NOT satisfy
 // "Grace Church"). Structurally disabled, not just visually -- there is no
 // code path that can click through this button with a non-matching value.
-const isDeleteDisabled = computed(() => props.confirming || typedName.value.trim() !== props.orgName)
+// Trim BOTH sides so a stored org name with stray leading/trailing whitespace
+// (not reachable via the onboarding UI today, but possible via a future/foreign
+// write path) can still be confirmed — mirrors the server-side both-sides trim
+// in orgDeletion.ts (77 WR-02), which would otherwise accept a value this
+// button could never enable.
+const isDeleteDisabled = computed(
+  () => props.confirming || typedName.value.trim() !== props.orgName.trim(),
+)
 
 // The element that had focus immediately before the dialog opened --
 // captured on open, restored on close (mirrors CleanupEnableConfirmDialog's
