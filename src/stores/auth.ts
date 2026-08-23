@@ -618,8 +618,9 @@ export const useAuthStore = defineStore('auth', () => {
   // its pre-visit (no-org) state.
   function exitSuperAdminView(): void {
     if (viewingAsSuperAdmin.value === null) return
+    // IN-01 (78-REVIEW.md): resetOrgContext() below already sets
+    // viewingAsSuperAdmin.value = null -- no separate clear needed here.
     resetOrgContext()
-    viewingAsSuperAdmin.value = null
   }
 
   async function ensureUserDocument(firebaseUser: User): Promise<{ membershipCreated: boolean }> {
