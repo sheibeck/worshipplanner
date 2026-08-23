@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import OrganizationsTab from '../OrganizationsTab.vue'
+import DeleteOrgConfirmDialog from '../DeleteOrgConfirmDialog.vue'
 
 enableAutoUnmount(afterEach)
 
@@ -29,8 +30,13 @@ interface OrgSummaryFixture {
   active: boolean
 }
 
-const { mockListOrganizations, mockOnboardOrganization, mockAssignOrgAdmin, mockSetOrgActive } =
-  vi.hoisted(() => ({
+const {
+  mockListOrganizations,
+  mockOnboardOrganization,
+  mockAssignOrgAdmin,
+  mockSetOrgActive,
+  mockDeleteOrganization,
+} = vi.hoisted(() => ({
     mockListOrganizations: vi.fn<() => Promise<{ data: { organizations: OrgSummaryFixture[] } }>>(
       () => Promise.resolve({ data: { organizations: [] } }),
     ),
@@ -48,6 +54,32 @@ const { mockListOrganizations, mockOnboardOrganization, mockAssignOrgAdmin, mock
     >(() =>
       Promise.resolve({ data: { orgId: 'org-1', active: false, memberCount: 3, claimFailures: 0 } }),
     ),
+    // R220/R221 (Phase 77) — mirrors deleteOrganizationHandler's response shape.
+    mockDeleteOrganization: vi.fn<
+      () => Promise<{
+        data: {
+          orgId: string
+          name: string
+          membersUnlinked: number
+          invitesDeleted: number
+          orgNameDeleted: boolean
+          shareDocsDeleted: number
+          storageObjectsDeleted: number
+        }
+      }>
+    >(() =>
+      Promise.resolve({
+        data: {
+          orgId: 'org-1',
+          name: 'Grace Church',
+          membersUnlinked: 3,
+          invitesDeleted: 1,
+          orgNameDeleted: true,
+          shareDocsDeleted: 2,
+          storageObjectsDeleted: 4,
+        },
+      }),
+    ),
   }))
 
 vi.mock('firebase/functions', () => ({
@@ -56,6 +88,7 @@ vi.mock('firebase/functions', () => ({
     if (name === 'onboardOrganization') return mockOnboardOrganization
     if (name === 'assignOrgAdmin') return mockAssignOrgAdmin
     if (name === 'setOrgActive') return mockSetOrgActive
+    if (name === 'deleteOrganization') return mockDeleteOrganization
     throw new Error(`Unexpected callable name: ${name}`)
   }),
 }))
@@ -77,6 +110,7 @@ beforeEach(() => {
   mockOnboardOrganization.mockClear()
   mockAssignOrgAdmin.mockClear()
   mockSetOrgActive.mockClear()
+  mockDeleteOrganization.mockClear()
   mockListOrganizations.mockImplementation(() => Promise.resolve({ data: { organizations: [] } }))
   mockOnboardOrganization.mockImplementation(() =>
     Promise.resolve({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } }),
@@ -85,12 +119,37 @@ beforeEach(() => {
   mockSetOrgActive.mockImplementation(() =>
     Promise.resolve({ data: { orgId: 'org-1', active: false, memberCount: 3, claimFailures: 0 } }),
   )
+  mockDeleteOrganization.mockImplementation(() =>
+    Promise.resolve({
+      data: {
+        orgId: 'org-1',
+        name: 'Grace Church',
+        membersUnlinked: 3,
+        invitesDeleted: 1,
+        orgNameDeleted: true,
+        shareDocsDeleted: 2,
+        storageObjectsDeleted: 4,
+      },
+    }),
+  )
 })
 
 async function mountTab() {
-  const wrapper = mount(OrganizationsTab)
+  const wrapper = mount(OrganizationsTab, {
+    global: {
+      // R220 (Phase 77) — DeleteOrgConfirmDialog Teleports to body; same stub
+      // used by CleanupConfigCard.test.ts for its own confirm dialog, renders
+      // the teleported content inline so VTU's find/findAll/findComponent can
+      // see it.
+      stubs: { Teleport: { template: '<div><slot /></div>' } },
+    },
+  })
   await flushPromises()
   return wrapper
+}
+
+function deleteDialogOf(wrapper: Awaited<ReturnType<typeof mountTab>>) {
+  return wrapper.findComponent(DeleteOrgConfirmDialog)
 }
 
 function makeOrg(
@@ -597,6 +656,134 @@ describe('OrganizationsTab -- deactivate/reactivate (R212, R214)', () => {
 
     expect(wrapper.text()).toContain('server exploded')
     expect(mockListOrganizations).not.toHaveBeenCalled()
+  })
+})
+
+describe('OrganizationsTab -- delete (R220/R221)', () => {
+  async function mountWithOneOrg(overrides: Partial<{ active: boolean }> = {}) {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [
+            makeOrg({ orgId: 'org-1', name: 'Grace Church', memberCount: 5, pendingCount: 2, ...overrides }),
+          ],
+        },
+      }),
+    )
+    return mountTab()
+  }
+
+  it('disables the Delete button for an active org row and enables it for a deactivated row', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [
+            makeOrg({ orgId: 'org-1', name: 'Grace Church', active: true }),
+            makeOrg({ orgId: 'org-2', name: 'Hope Church', active: false }),
+          ],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows.length).toBe(2)
+    const activeDelete = rows[0]!.findAll('button').find((b) => b.text() === 'Delete')!
+    const deactivatedDelete = rows[1]!.findAll('button').find((b) => b.text() === 'Delete')!
+    expect(activeDelete.attributes('disabled')).toBeDefined()
+    expect(deactivatedDelete.attributes('disabled')).toBeUndefined()
+  })
+
+  it('clicking Delete opens the dialog with the org name and member/pending counts as props', async () => {
+    const wrapper = await mountWithOneOrg({ active: false })
+
+    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
+    await deleteButton.trigger('click')
+
+    const dialog = deleteDialogOf(wrapper)
+    expect(dialog.props('open')).toBe(true)
+    expect(dialog.props('orgName')).toBe('Grace Church')
+    expect(dialog.props('memberCount')).toBe(5)
+    expect(dialog.props('pendingCount')).toBe(2)
+  })
+
+  it('confirming with the correct typed name calls deleteOrganization, closes the dialog, shows a success banner, and refetches the list', async () => {
+    const wrapper = await mountWithOneOrg({ active: false })
+    mockListOrganizations.mockClear()
+
+    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
+    await deleteButton.trigger('click')
+
+    const dialog = deleteDialogOf(wrapper)
+    await dialog.find('input[type="text"]').setValue('Grace Church')
+    const confirmButtons = dialog.findAll('button')
+    const confirmButton = confirmButtons[confirmButtons.length - 1]!
+    await confirmButton.trigger('click')
+    await flushPromises()
+
+    expect(mockDeleteOrganization).toHaveBeenCalledWith({ orgId: 'org-1', confirmName: 'Grace Church' })
+    expect(deleteDialogOf(wrapper).props('open')).toBe(false)
+    expect(wrapper.text()).toContain('Deleted Grace Church')
+    expect(wrapper.text()).toContain('3 member(s) unlinked')
+    expect(wrapper.text()).toContain('1 invite(s) removed')
+    expect(wrapper.text()).toContain('4 file(s) removed')
+    expect(mockListOrganizations).toHaveBeenCalledTimes(1)
+  })
+
+  it('on a rejected call (failed-precondition), the dialog stays open and shows the mapped error message', async () => {
+    const err = Object.assign(new Error('not deactivated'), { code: 'failed-precondition' })
+    mockDeleteOrganization.mockImplementation(() => Promise.reject(err))
+    const wrapper = await mountWithOneOrg({ active: false })
+    mockListOrganizations.mockClear()
+
+    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
+    await deleteButton.trigger('click')
+
+    const dialog = deleteDialogOf(wrapper)
+    await dialog.find('input[type="text"]').setValue('Grace Church')
+    let confirmButtons = dialog.findAll('button')
+    let confirmButton = confirmButtons[confirmButtons.length - 1]!
+    await confirmButton.trigger('click')
+    await flushPromises()
+
+    const dialogAfter = deleteDialogOf(wrapper)
+    expect(dialogAfter.props('open')).toBe(true)
+    expect(dialogAfter.props('confirmError')).toBe('Deactivate the church first.')
+    expect(wrapper.text()).toContain('Deactivate the church first.')
+    expect(mockListOrganizations).not.toHaveBeenCalled()
+  })
+
+  it('a rejected call with a name-mismatch code shows the mismatch error, not a generic one', async () => {
+    const err = Object.assign(new Error('mismatch'), { code: 'invalid-argument' })
+    mockDeleteOrganization.mockImplementation(() => Promise.reject(err))
+    const wrapper = await mountWithOneOrg({ active: false })
+
+    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
+    await deleteButton.trigger('click')
+
+    const dialog = deleteDialogOf(wrapper)
+    await dialog.find('input[type="text"]').setValue('Grace Church')
+    const confirmButtons = dialog.findAll('button')
+    const confirmButton = confirmButtons[confirmButtons.length - 1]!
+    await confirmButton.trigger('click')
+    await flushPromises()
+
+    expect(deleteDialogOf(wrapper).props('confirmError')).toBe("The name doesn't match.")
+  })
+
+  it('Cancel closes the dialog and calls deleteOrganization zero times', async () => {
+    const wrapper = await mountWithOneOrg({ active: false })
+
+    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
+    await deleteButton.trigger('click')
+    expect(deleteDialogOf(wrapper).props('open')).toBe(true)
+
+    const dialog = deleteDialogOf(wrapper)
+    const cancelButton = dialog.findAll('button')[0]!
+    await cancelButton.trigger('click')
+
+    expect(deleteDialogOf(wrapper).props('open')).toBe(false)
+    expect(mockDeleteOrganization).not.toHaveBeenCalled()
   })
 })
 

@@ -31,6 +31,11 @@
       Onboarded {{ onboardedFeedback.name }} — admin {{ onboardedFeedback.status }}.
     </p>
 
+    <!-- R220 (Phase 77) — page-level success banner after a successful
+         delete: the row is gone from the list, so there is no per-row spot
+         left to attach this feedback to (unlike Deactivate/Reactivate/Assign). -->
+    <p v-if="deleteFeedback" class="text-green-400 text-sm mt-2">{{ deleteFeedback }}</p>
+
     <!-- Loading state -->
     <div v-if="!loaded" class="text-sm text-gray-400 py-8 text-center">
       Loading organizations...
@@ -142,6 +147,24 @@
                     {{ toggleFeedback[org.orgId] }}
                   </p>
                 </div>
+
+                <!-- R220 (Phase 77) — Delete control, enabled ONLY for an
+                     explicitly deactivated org (mirrors the "Deactivated"
+                     badge's org.active === false convention above). The only
+                     channel this component uses to permanently remove a
+                     church is deleteOrganization -- no direct Firestore
+                     writes/deletes to organizations/*, orgNames/*, or
+                     inviteLookup/*. -->
+                <div class="mt-2">
+                  <button
+                    type="button"
+                    @click="openDeleteDialog(org)"
+                    :disabled="org.active !== false"
+                    class="text-xs text-red-500 hover:text-red-400 disabled:opacity-60 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
 
@@ -159,6 +182,19 @@
     <p v-if="listError" class="text-red-400 text-sm mt-3">
       Couldn't load organizations. Refresh the page and try again.
     </p>
+
+    <!-- R220 (Phase 77) — rendered once at the component root (outside the
+         v-for), Teleported to body regardless of table position. -->
+    <DeleteOrgConfirmDialog
+      :open="!!deleteDialogOrg"
+      :org-name="deleteDialogOrg?.name ?? ''"
+      :member-count="deleteDialogOrg?.memberCount ?? 0"
+      :pending-count="deleteDialogOrg?.pendingCount ?? 0"
+      :confirming="isDeleting"
+      :confirm-error="deleteDialogError"
+      @confirm="onConfirmDelete"
+      @cancel="closeDeleteDialog"
+    />
   </div>
 </template>
 
@@ -166,6 +202,7 @@
 import { ref, onMounted } from 'vue'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/firebase'
+import DeleteOrgConfirmDialog from './DeleteOrgConfirmDialog.vue'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 // Mirrors functions/src/orgProvisioning.ts's OrgSummary/ListOrganizationsResponse
@@ -220,6 +257,23 @@ interface AssignOrgAdminResponse {
   uid?: string
 }
 
+// R220/R221 (Phase 77) — mirrors functions/src/orgDeletion.ts's
+// deleteOrganizationHandler request/response contract exactly.
+interface DeleteOrganizationRequest {
+  orgId: string
+  confirmName: string
+}
+
+interface DeleteOrganizationResponse {
+  orgId: string
+  name: string
+  membersUnlinked: number
+  invitesDeleted: number
+  orgNameDeleted: boolean
+  shareDocsDeleted: number
+  storageObjectsDeleted: number
+}
+
 // ── List state (R196) ─────────────────────────────────────────────────────
 
 const orgs = ref<OrgSummary[]>([])
@@ -252,6 +306,17 @@ const toggleFeedback = ref<Record<string, string>>({})
 // clean success, so the template can style it distinctly (amber, not green).
 const toggleFeedbackIsWarning = ref<Record<string, boolean>>({})
 
+// ── Delete state (R220/R221) ──────────────────────────────────────────────
+// deleteDialogOrg doubles as the dialog's `open` flag via
+// `!!deleteDialogOrg.value` -- the row currently targeted for deletion.
+const deleteDialogOrg = ref<OrgSummary | null>(null)
+const isDeleting = ref(false)
+const deleteDialogError = ref<string | null>(null)
+// Page-level success banner: the row is gone from the list after a
+// successful delete, so there is no row left to attach per-row feedback to
+// (unlike Deactivate/Reactivate/Assign).
+const deleteFeedback = ref<string | null>(null)
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 // Copied from ConfigurationTab.vue verbatim (Plan 74-02 instructions).
 
@@ -282,13 +347,21 @@ function formatDate(ts: unknown): string {
 }
 
 // Extended with an already-exists branch (R201) beyond ConfigurationTab's
-// original permission-denied/not-found mapping.
+// original permission-denied/not-found mapping. R220 (Phase 77) added
+// failed-precondition (not deactivated) and invalid-argument (name mismatch
+// or blank input) branches for deleteOrganization's error codes.
 function friendlyCallableError(err: unknown): string {
   const code = (err as { code?: string })?.code ?? ''
   if (code.includes('already-exists')) {
     return 'That church name is taken.'
   }
-  if (code.includes('permission-denied')) {
+  if (code.includes('failed-precondition')) {
+    return 'Deactivate the church first.'
+  }
+  if (code.includes('invalid-argument')) {
+    return "The name doesn't match."
+  }
+  if (code.includes('permission-denied') || code.includes('unauthenticated')) {
     return 'You do not have permission to perform this action.'
   }
   if (code.includes('not-found')) {
@@ -473,6 +546,54 @@ async function onToggleActive(org: OrgSummary) {
     toggleError.value = { ...toggleError.value, [orgId]: friendlyCallableError(err) }
   } finally {
     togglingOrgId.value = null
+  }
+}
+
+// ── Delete action (R220/R221) ─────────────────────────────────────────────
+// Pure httpsCallable consumer — this component never writes organizations/*,
+// orgNames/*, or inviteLookup/* directly; deleteOrganization is the only
+// channel (mirrors T-74-07/T-77-09).
+
+function openDeleteDialog(org: OrgSummary) {
+  deleteDialogOrg.value = org
+  deleteDialogError.value = null
+}
+
+function closeDeleteDialog() {
+  // Never closable mid-request, mirrors CleanupEnableConfirmDialog's
+  // in-flight guard.
+  if (isDeleting.value) return
+  deleteDialogOrg.value = null
+}
+
+async function onConfirmDelete(typedName: string) {
+  if (isDeleting.value || !deleteDialogOrg.value) return
+
+  const orgId = deleteDialogOrg.value.orgId
+  isDeleting.value = true
+  deleteDialogError.value = null
+  try {
+    const deleteOrganization = httpsCallable<DeleteOrganizationRequest, DeleteOrganizationResponse>(
+      functions,
+      'deleteOrganization',
+    )
+    const result = await deleteOrganization({ orgId, confirmName: typedName })
+    deleteFeedback.value = `Deleted ${result.data.name} — ${result.data.membersUnlinked} member(s) unlinked, ${result.data.invitesDeleted} invite(s) removed, ${result.data.storageObjectsDeleted} file(s) removed.`
+    deleteDialogOrg.value = null
+    await refreshOrgs()
+
+    // Auto-clear after 5s -- longer than the 2s onboard/assign pattern,
+    // since this is a bigger deal to read.
+    setTimeout(() => {
+      deleteFeedback.value = null
+    }, 5000)
+  } catch (err) {
+    console.error('[OrganizationsTab] deleteOrganization error:', err)
+    // Keep the dialog open on failure so the user sees the error inline and
+    // can retry or cancel -- do NOT clear deleteDialogOrg.value here.
+    deleteDialogError.value = friendlyCallableError(err)
+  } finally {
+    isDeleting.value = false
   }
 }
 
