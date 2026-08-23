@@ -46,7 +46,7 @@
             @keydown.enter="onSaveSlug"
           />
           <p class="text-xs text-gray-500 mt-1">
-            yourapp.com/{{ liveSlugPreview }}/quarter1-2026 — used in every quarterly share link
+            {{ shareUrlHost }}/{{ liveSlugPreview }}/quarter1-2026 — used in every quarterly share link
           </p>
         </div>
 
@@ -740,6 +740,13 @@ const isSaveDisabled = computed(() => {
 // Sanitized live preview so the helper text's {slug} segment updates as the user types,
 // before any save/claim happens.
 const liveSlugPreview = computed(() => deriveSlug(editSlug.value) || 'your-church')
+
+// The real origin the app is served from, so the slug helper text shows the
+// actual share-link host (matches QuarterView's buildShareUrl) instead of a
+// hard-coded "yourapp.com" placeholder. Strip the protocol for a cleaner hint.
+const shareUrlHost = computed(() =>
+  window.location.origin.replace(/^https?:\/\//, ''),
+)
 
 const isSlugSaveDisabled = computed(() => {
   const candidate = deriveSlug(editSlug.value)
