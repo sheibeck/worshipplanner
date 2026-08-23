@@ -481,7 +481,7 @@ describe("deleteOrganizationHandler: extra orgId-keyed collections", () => {
 
 describe("deleteOrganizationHandler: Storage cleanup", () => {
   it("calls bucket.deleteFiles with { prefix: 'orgs/${orgId}/', force: true }; storageObjectsDeleted reflects the preceding getFiles count", async () => {
-    const fake = setup({ active: false });
+    setup({ active: false });
     const { getFilesSpy, deleteFilesSpy } = mockBucket([
       { name: `orgs/${ORG_ID}/media/a.png` },
       { name: `orgs/${ORG_ID}/media/b.png` },
