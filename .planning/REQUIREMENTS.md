@@ -83,7 +83,7 @@ REQ-IDs continue from v2.0 (last R211).
 - [ ] **R224**: Each Organizations row has a "Sign in" / "Enter church" action that switches the
       super-admin's active org context to that church for support/setup.
 
-- [ ] **R225**: A super-admin can read and write a church's Firestore data and Storage **without** a
+- [x] **R225**: A super-admin can read and write a church's Firestore data and Storage **without** a
       membership document, via a super-admin arm added to `firestore.rules` and `storage.rules` — proven by
       genuine emulator tests: ALLOW for a super-admin on any org, and continued DENY for a non-member
       non-super-admin.
@@ -133,7 +133,7 @@ REQ-IDs continue from v2.0 (last R211).
 | R222 | Phase 75 | Complete |
 | R223 | Phase 75 | Complete |
 | R224 | Phase 78 | Pending |
-| R225 | Phase 78 | Pending |
+| R225 | Phase 78 | Complete |
 | R226 | Phase 78 | Pending |
 | R227 | Phase 78 | Pending |
 

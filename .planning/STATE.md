@@ -5,15 +5,15 @@ milestone_name: Organization Lifecycle & Super-Admin Access
 current_phase: 76
 current_phase_name: Church Deactivation & Reactivation
 status: executing
-stopped_at: Completed 77-02-PLAN.md
-last_updated: "2026-08-23T03:22:03.862Z"
+stopped_at: Completed 78-01-PLAN.md
+last_updated: "2026-08-23T04:55:46.087Z"
 last_activity: 2026-08-22
 last_activity_desc: Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim helper
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 75
 ---
 
@@ -2484,6 +2484,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 75-pending-invite-visibility P01 | 17min | 2 tasks | 4 files |
 | Phase 76 P02 | 1h | 3 tasks | 6 files |
 | Phase 77 P02 | 35min | 2 tasks | 4 files |
+| Phase 78 P01 | 30min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2883,6 +2884,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: OwnerConsoleView.test.ts's generic httpsCallable mock extended to resolve organizations:[] since OrganizationsTab now calls listOrganizations unconditionally on mount
 - [Phase 75]: pendingCount always explicit 0 rather than omitted/undefined; badge is a Members-cell suffix, not a new column
 - [Phase ?]: R220's client type-to-confirm dialog reuses CleanupEnableConfirmDialog's Teleport/focus-trap shell but not its hard-block dual-button pattern
+- [Phase ?]: R225: OR isSuperAdmin()/token.superAdmin in FRONT of the whole membership check in isOrgMember/isOrgEditor/isOrgMemberByClaim (not into a sub-clause), replacing the membership requirement entirely for a super-admin
+- [Phase ?]: Deleted the org-doc allow-update's '|| isSuperAdmin()' lifecycle-guard disjunct in the SAME commit as the isOrgEditor widening -- closes the CR-01/T-76-10 composition hazard the widening alone would reopen
 
 ### Roadmap Evolution
 
@@ -3203,8 +3206,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-23T03:22:02.918Z
-Stopped at: Completed 77-02-PLAN.md
+Last session: 2026-08-23T04:55:46.027Z
+Stopped at: Completed 78-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
