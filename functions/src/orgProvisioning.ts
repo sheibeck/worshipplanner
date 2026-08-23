@@ -35,8 +35,12 @@ import { DEACTIVATED_ORGS_CLAIM_KEY } from "./orgMembershipClaims";
  * uniqueness KEY (for the `orgNames/{key}` registry). Ported byte-for-byte
  * from `src/utils/orgName.ts::normalizeOrgName` (pure, no Firestore imports)
  * -- do not reimplement its slug-fallback differently.
+ *
+ * Exported (Phase 77, R217/R218) so `orgDeletion.ts` can compute the same
+ * `orgNames/{nameKey}` id when guarding the deletion cascade's `orgNames`
+ * cleanup -- imported, never duplicated.
  */
-function normalizeOrgName(name: string): string {
+export function normalizeOrgName(name: string): string {
   const key = name
     .trim()
     .toLowerCase()
@@ -83,8 +87,12 @@ function assertValidEmailFormat(email: string): void {
  * (R200/R204) -- mirrors setSuperAdminClaimHandler (superAdminClaims.ts:106-128)
  * exactly. Factoring it into one function keeps the dual re-verification from
  * drifting between handlers. Returns the verified caller uid.
+ *
+ * Exported (Phase 77, R216) so `deleteOrganizationHandler` (orgDeletion.ts)
+ * reuses this SAME gate verbatim rather than forking a second implementation
+ * -- T-77-01.
  */
-async function assertSuperAdminCaller(request: CallableRequest<unknown>): Promise<string> {
+export async function assertSuperAdminCaller(request: CallableRequest<unknown>): Promise<string> {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in required.");
   }
