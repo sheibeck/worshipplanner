@@ -13,12 +13,9 @@ service cloud.firestore {
     // backward-compatible) -- only an EXPLICIT `active: false` denies. A
     // live get() (not a claim) is used because firestore.rules, unlike
     // storage.rules, CAN read a sibling document -- no propagation lag on
-    // this side (76-RESEARCH.md). Composed into isOrgMember/isOrgEditor
-    // below, ORed with isSuperAdmin() -- the exemption is NARROW: it only
-    // waives the active check for a super-admin who is ALREADY a genuine
-    // member (the exists() checks in both functions are untouched). A
-    // super-admin with no membership doc still gets no access from this
-    // exemption alone -- that is Phase 78's explicit deliverable (R225).
+    // this side (76-RESEARCH.md). isOrgActive itself carries no super-admin
+    // awareness; the super-admin arm lives one level up, in isOrgMember/
+    // isOrgEditor below (Phase 78, R225).
     //
     // exists()-guarded FIRST, mirroring isOrgEditor's own established
     // Null-value-error avoidance immediately below: an unguarded
@@ -34,9 +31,22 @@ service cloud.firestore {
     }
 
     function isOrgMember(orgId) {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
-        (isOrgActive(orgId) || isSuperAdmin());
+      return isSignedIn() && (
+        // Phase 78 (R225): checked FIRST, before the exists() cross-document
+        // read, both for correctness (no membership doc will ever exist for
+        // a super-admin entering a church they don't belong to) and for
+        // cost (Firestore rules short-circuit && / ||, so this skips the
+        // billed exists() read entirely on the super-admin path).
+        // Deliberately unconditional on isOrgActive() too -- a super-admin
+        // can enter a DEACTIVATED org for support (same posture Phase 76
+        // already granted a super-admin WITH a membership doc; R225 extends
+        // it to one without). The old inner `|| isSuperAdmin()` that used
+        // to sit beside isOrgActive() is removed as dead code -- this outer
+        // arm already subsumes it.
+        isSuperAdmin() ||
+        (exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+          isOrgActive(orgId))
+      );
     }
 
     function isOrgEditor(orgId) {
@@ -46,10 +56,20 @@ service cloud.firestore {
       // surfacing at this call site — is what blocked the slideGroups delete rule
       // (evaluation error @ L153) from ever reaching its own conditions. Now it
       // resolves to a clean false instead of erroring.
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('role', '') in ['editor', 'admin'] &&
-        (isOrgActive(orgId) || isSuperAdmin());
+      return isSignedIn() && (
+        // Phase 78 (R225): same outer-arm shape as isOrgMember above -- a
+        // super-admin is granted editor-tier access on ANY org with zero
+        // membership doc, replacing the exists()+role check entirely (not
+        // merely waiving isOrgActive()). The old inner `|| isSuperAdmin()`
+        // is removed as dead code for the same reason. NOTE: this makes
+        // isOrgEditor(orgId) true for every super-admin on every org --
+        // see the org-doc `allow update` rule below, which had to drop its
+        // OWN `|| isSuperAdmin()` disjunct as a direct consequence.
+        isSuperAdmin() ||
+        (exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('role', '') in ['editor', 'admin'] &&
+          isOrgActive(orgId))
+      );
     }
 
     // Phase 68 (R178): super-admin gate. Deliberately CLAIM-ONLY — NO
@@ -121,7 +141,24 @@ service cloud.firestore {
       // governing delete on this document -- without this narrowing, that
       // DENY would have zero effect (Firestore OR-evaluates every matching
       // `allow` clause for an operation; the old `write` grant would still win).
-      allow update: if isOrgEditor(orgId) && (preservesLifecycleFields() || isSuperAdmin());
+      //
+      // Phase 78 (R225 composition fix): the `|| isSuperAdmin()` disjunct
+      // that used to live here is DELETED, not preserved. Before Phase 78,
+      // isOrgEditor(orgId) required a genuine membership doc, so a
+      // super-admin without one could never reach this line -- the
+      // exemption was safe. Phase 78's super-admin arm (see isOrgEditor
+      // above) makes isOrgEditor(orgId) true for EVERY super-admin on EVERY
+      // org, so keeping `|| isSuperAdmin()` here would let ANY super-admin
+      // client-write active/deactivatedAt/deactivatedBy/reactivatedAt/
+      // reactivatedBy directly, skipping setOrgActive's deactivatedOrgs
+      // claim fan-out and revokeRefreshTokens -- the CR-01/T-76-10 class of
+      // bug, reopened by composition. Lifecycle fields are now
+      // Admin-SDK-only for LITERALLY EVERYONE, super-admins included;
+      // setOrgActive/deleteOrganization (both Admin SDK, bypassing rules
+      // entirely) remain the only path. Proven by src/rules.test.ts: a
+      // super-admin client updateDoc({active:false}) is DENIED and must use
+      // the setOrgActive callable.
+      allow update: if isOrgEditor(orgId) && preservesLifecycleFields();
       // Allow authenticated users to create a new org if they are the creator.
       // Same lifecycle-field guard applies (defense-in-depth) -- no legitimate
       // client-side org-creation flow sets these fields; org provisioning

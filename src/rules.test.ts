@@ -382,8 +382,17 @@ describe('isOrgActive — deactivation gate (R213, Phase 76)', () => {
     await seedDoc('organizations/orgA', { active: false })
     const context = testEnv.authenticatedContext('adminUid', { superAdmin: true })
     const db = context.firestore()
+    // Phase 78 (R225 composition fix): updateDoc, not setDoc -- a non-merged
+    // setDoc replaces the WHOLE document, which implicitly strips the stored
+    // `active: false` field (it is absent from the replacement payload),
+    // tripping preservesLifecycleFields()'s diff() the moment Phase 78
+    // removed the org-doc allow-update rule's `|| isSuperAdmin()` disjunct.
+    // updateDoc merges, leaving `active` untouched, so this test proves what
+    // it always intended to prove -- a super-admin can write a NON-lifecycle
+    // field to a deactivated org (the isOrgActive() bypass) -- without
+    // incidentally exercising the (correctly tightened) lifecycle guard.
     await assertSucceeds(
-      setDoc(doc(db, 'organizations', 'orgA'), { name: 'About to reactivate', updatedAt: new Date() }),
+      updateDoc(doc(db, 'organizations', 'orgA'), { name: 'About to reactivate', updatedAt: new Date() }),
     )
   })
 
@@ -499,6 +508,73 @@ describe('Org deletion DENY (Phase 77, R216/T-77-04) — Admin-SDK-only', () => 
     const db = context.firestore()
     await assertFails(deleteDoc(doc(db, 'organizations', 'orgA')))
   })
+})
+
+// Phase 78 (R225): isOrgMember/isOrgEditor now OR isSuperAdmin() in FRONT of
+// the exists()-based membership check (not merely into the isOrgActive
+// sub-clause, as the Phase 76 exemption above at lines 372-388 did) -- a
+// super-admin with NO membership doc at all gets full content read/write on
+// ANY org. The lifecycle-field guard (org-doc `allow update`) had its own
+// `|| isSuperAdmin()` disjunct DELETED in the same commit as this widening,
+// so a super-admin's client SDK still cannot write active/deactivatedAt/
+// deactivatedBy/reactivatedAt/reactivatedBy directly -- see the CRITICAL
+// test below. The existing super-admin-client-delete-DENY test immediately
+// above (Phase 77, lines 496-501) is NOT duplicated here -- it already
+// covers the org-doc delete boundary and requires no changes.
+describe('Super-admin content access without a membership doc (R225, Phase 78)', () => {
+  it('ALLOWS a super-admin with NO membership doc to read organizations/{orgId}', async () => {
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church", createdBy: 'someoneElse' })
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA')))
+  })
+
+  it('ALLOWS a super-admin with NO membership doc to write a content collection (songs)', async () => {
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church" })
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'songs', 'song1'), { title: 'Amazing Grace' }),
+    )
+  })
+
+  it('ALLOWS a super-admin with NO membership doc to enter a DEACTIVATED org (Phase 76 exemption extended)', async () => {
+    await seedDoc('organizations/orgA', { name: 'Deactivated Church', active: false })
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA')))
+  })
+
+  it('DENIES a non-member, non-super-admin from reading organizations/{orgId} -- R225 negative case', async () => {
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church" })
+    // No membership doc, no superAdmin claim.
+    const context = testEnv.authenticatedContext('randomUid')
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA')))
+  })
+
+  it('DOES NOT REGRESS an ordinary member of that same org', async () => {
+    await seedMembershipDoc('orgA', 'realMemberUid', 'viewer')
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church" })
+    const context = testEnv.authenticatedContext('realMemberUid')
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA')))
+  })
+
+  it('CRITICAL -- DENIES a super-admin from writing a lifecycle field directly (must use setOrgActive)', async () => {
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church" })
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { active: false }),
+    )
+  })
+
+  // Org-doc DELETE for a super-admin using the client SDK is already covered
+  // verbatim by the "Org deletion DENY" describe block immediately above
+  // (src/rules.test.ts:496-501) -- cited here, not duplicated. That test
+  // requires no changes for Phase 78: `allow delete: if false;` was never
+  // touched by this widening.
 })
 
 describe('Catch-all deny', () => {
