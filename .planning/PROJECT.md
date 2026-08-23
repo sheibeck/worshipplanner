@@ -8,38 +8,50 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Last Shipped: v2.1 Organization Lifecycle & Super-Admin Access (deployed 2026-08-23)
+## Current Milestone: v2.2 Configurability, Hardening & Cleanup
 
-> No active milestone. v1.9, v2.0, v2.1 shipped together to production 2026-08-23 (in order:
-> v1.9 → v2.0 → v2.1). Start the next with `/gsd-new-milestone`.
-
-**Goal (delivered):** Give the super-admin full lifecycle control over churches from the Organizations tab —
-deactivate, delete-with-full-cleanup, see pending invites, and drop into any church to help — without
-leaking cross-tenant access to ordinary users.
+**Goal:** Make the app fit churches other than Berean, and close accumulated security, data-integrity, and
+polish debt from the v1.x–v2.1 backlog (999.x carry-forwards).
 
 **Target features:**
-- **Deactivate / reactivate a church** — a reversible off-switch that blocks all of that org's members from
-  logging in (a super-admin can still enter it).
-- **Delete a deactivated church** — only after deactivation; cascade-cleans every Firestore relationship
-  (members, invites, services, songs, slideGroups, share tokens, quarters/roster, the org doc, plus
-  `orgNames/*`, `inviteLookup/*`, and each member's `users/{uid}.orgIds`) **and** all Storage under the org
-  (media, backgrounds, pptx-imports, rendered). Extra confirmations; irreversible; super-admin-gated
-  callable (the client never bulk-deletes directly).
-- **Pending-invite visibility** — the Organizations list flags invited-but-not-yet-logged-in admins as
-  "pending login," distinct from active members (no more confusing "0 members").
-- **Super-admin "enter any church"** — a per-row Sign-in action switches the super-admin's active org to any
-  church for support/setup, granted via a super-admin arm in `firestore.rules`/`storage.rules` (no member
-  doc → invisible in that church's member list), with a clear "viewing as super-admin" banner.
+- **Per-org worship configuration (999.8 / SEED-002)** — lift church-specific hard-coded rules into per-org
+  config or drop the too-specific ones. First slice "Configurable Teams": a per-org team list (modeled like
+  roster roles), a generalized per-team song-tag filter (replacing the hard-coded Orchestra→Orchestra-tagged
+  rule), dropping the ordinal-Sunday auto-team rule, and collapsing duplicated constants (esp. `VW_TYPE_LABELS`).
+- **Security & data-integrity hardening** — gate `inviteLookup` creation to the target org's editor
+  (self-invite fix) and verify/close the `createdBy` finding (999.11); revoke a service's share tokens on
+  `deleteService` (999.10); guard against per-entry customization of a pending deck slide lost on
+  pending→ready (999.9); clear a song's slides when the song is cleared, even when reprised (999.2).
+- **Polish & ops** — harden the messaging From address to a verified sending domain so real volunteers
+  receive mail (999.6); export non-song/non-scripture slots in all Planning Center export modes (999.4);
+  Owner Console a11y retrofit — real labels + ARIA tab semantics (999.7); extract a shared song-browse
+  component used by both the Songs page and the service-plan picker (999.1).
 
-**Key context (owner, 2026-08-22):** v2.1 minor increment · **stacks on v2.0** (code-complete; its deploy +
-UAT + milestone-complete remain parked with the owner — v2.0 phases archive as-is). Church rename +
-invite→first-login claim already exist (not re-scoped). Features 2 (destructive cascade) and 4 (privileged
-cross-tenant access) are security-critical → STRIDE + genuine rules ALLOW/DENY tests. Built with
-**gsd-autonomous**, human verification deferred to the end. All auth-claim / `firestore.rules` /
-`storage.rules` / new-callable changes are **hand-over** deploys per the standing grant — built + tested +
-UNDEPLOYED with exact `firebase deploy` commands handed over; secrets stay server-side.
+**Key context:** Composed from backlog review + open carry-forwards (audit 2026-08-23). Full per-rule catalog
+and A/B/C verdicts for 999.8 live in `seeds/SEED-002-church-specific-rules-configurability.md`. Excluded as
+non-build owner verification: `999.3` (prod draft-lock hand-check) and the deferred `/gsd-verify-work` UAT
+items in `PENDING-VERIFICATION.md`. 999.11 is ~1.5 findings — the self-invite rule is fully open; the
+`createdBy` finding needs re-verification since the rules were reworked in v2.1. Follow the standing deploy
+discipline: auth-claim / `firestore.rules` / `storage.rules` / new-callable changes ship built + tested +
+UNDEPLOYED with exact `firebase deploy` commands handed to the owner.
 
 Requirements defined in `.planning/REQUIREMENTS.md`; roadmap in `.planning/ROADMAP.md`.
+
+<details>
+<summary>Shipped milestone — v2.1 Organization Lifecycle & Super-Admin Access (Phases 75–78, deployed 2026-08-23)</summary>
+
+Gave the super-admin full lifecycle control over churches from the Organizations tab — deactivate/reactivate
+(a reversible off-switch blocking that org's members from logging in), delete-with-full-cascade-cleanup (every
+Firestore relationship + all Storage under the org; deactivation-gated, irreversible, super-admin-gated
+callable), pending-invite visibility ("pending login" vs active members), and super-admin "enter any church"
+(per-row Sign-in switches active org; granted via a super-admin arm in `firestore.rules`/`storage.rules`, no
+member doc, "viewing as super-admin" banner). v1.9 → v2.0 → v2.1 shipped together to production 2026-08-23 (in
+that order — each depends on the prior's auth-claim widening). Features 2 (destructive cascade) and 4
+(privileged cross-tenant access) were security-critical → STRIDE + rules ALLOW/DENY tests. Human UAT
+(`/gsd-verify-work 75–78`) deferred and preserved in `PENDING-VERIFICATION.md`. Requirements: R193–R211
+(v2.1 range).
+
+</details>
 
 <details>
 <summary>Code-complete milestone — v2.0 Multi-Church Onboarding & Owner Console Tabs (Phases 72–74, code-complete 2026-08-21; deploy + UAT + milestone lifecycle parked with owner)</summary>

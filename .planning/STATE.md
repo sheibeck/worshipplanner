@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: Organization Lifecycle & Super-Admin Access
-current_phase: 78
-current_phase_name: Super-Admin Enter-Any-Church
-status: Awaiting next milestone
-stopped_at: v1.9 + v2.0 + v2.1 DEPLOYED to production 2026-08-23 (in order: functions → rules → hosting; first super-admin bootstrapped; multi-org claim backfill applied, 3 accounts). All three closed on owner acceptance and archived. Human UAT (/gsd-verify-work 68-71, 72-74, 75-78) deferred and preserved in PENDING-VERIFICATION.md.
-last_updated: "2026-08-23T20:45:40.350Z"
+milestone: v2.2
+milestone_name: Configurability, Hardening & Cleanup
+status: planning
+last_updated: "2026-08-23T22:28:12.862Z"
 last_activity: 2026-08-23
-last_activity_desc: Deployed + closed + archived v1.9, v2.0, v2.1 (three stacked milestones shipped together)
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # ✔ SHIPPED MILESTONE — v2.1 Organization Lifecycle & Super-Admin Access (started 2026-08-22, deployed + closed 2026-08-23)
@@ -846,17 +842,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 76 of 78 (Church Deactivation & Reactivation) — 76-01 (server enforcement) executed, code-complete, undeployed
-Plan: 76-01 complete; 76-02 (client login-block/UX) not yet planned
-Status: Phase 76 server half code-complete — setOrgActive callable + deactivatedOrgs claim fan-out +
-firestore.rules/storage.rules deactivation gates shipped, awaiting owner deploy hand-over
-(`firebase deploy --only firestore:rules,storage,functions:setOrgActive`). See
-.planning/phases/76-church-deactivation-reactivation/76-01-SUMMARY.md for the two auto-fixed
-rules-engine deviations found and resolved during execution (firestore.rules isOrgActive() Null-value
-guard; storage.rules deactivatedOrgs `.get(key, default)` accessor).
-Last activity: 2026-08-22 — Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim helper
-
-+ firestore.rules isOrgActive + storage.rules deactivatedOrgs guard + emulator ALLOW/DENY suites)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-23 — Milestone v2.2 started
 
 ## ★ v2.1 ROADMAP.md phase breakdown (created 2026-08-22)
 
