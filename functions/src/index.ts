@@ -31,6 +31,17 @@ import {
   type RecipientSelection,
 } from "./serviceRoles";
 import { getAppConfig, DEFAULT_APP_CONFIG, type AppConfig } from "./appConfig";
+// Shared secret + From-header helpers + share-base-url param. MOVED to the
+// dependency-free ./params so orgProvisioning.ts/adminEmail.ts can reuse them
+// without a circular import (index.ts imports orgProvisioning.ts). Re-exported
+// below so index.ts's public surface is unchanged.
+import {
+  RESEND_API_KEY,
+  SERVICE_SHARE_BASE_URL,
+  fromDisplayName,
+  bareEmailAddress,
+} from "./params";
+export { RESEND_API_KEY, SERVICE_SHARE_BASE_URL, fromDisplayName, bareEmailAddress };
 
 // Server-held secrets (Google Secret Manager). Set once with:
 //   firebase functions:secrets:set CLAUDE_API_KEY
@@ -43,14 +54,9 @@ const CLAUDE_API_KEY = defineSecret("CLAUDE_API_KEY");
 const ESV_API_KEY = defineSecret("ESV_API_KEY");
 const NLT_API_KEY = defineSecret("NLT_API_KEY");
 
-// The Resend email provider key for the send path (59-02/59-03). DECLARED here
-// alongside the other secrets so the whole secret list lives in one place, but
-// bound to NO Function in this plan: it attaches ONLY to sendQueuedMessage
-// (59-03), the single Function that ever holds it — the smallest key-holding
-// surface (R131). queueServiceMessage below carries no secrets: array at all.
-// Exported (unlike the proxy secrets) only so noUnusedLocals does not flag it
-// while it is declared-but-unbound this plan; 59-03 references it in-file.
-export const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
+// The Resend email provider key (RESEND_API_KEY) now lives in ./params (moved
+// so orgProvisioning.ts can bind it too without a circular import) -- imported
+// and re-exported at the top of this file.
 
 // The Resend/Svix webhook SIGNING secret (whsec_-prefixed base64) — DISTINCT
 // from RESEND_API_KEY. It is the HMAC key verifySvixSignature checks the raw
@@ -2637,19 +2643,9 @@ export const queueServiceMessage = onCall(queueServiceMessageHandler);
 // is a failed recipient, not an aborted batch), writes one recipients/{id} doc
 // per recipient, rolls up deliveryCounts, and flips the message status.
 
-/**
- * The public share-link base origin — the APPLICATION's own base domain, shared
- * by ALL orgs (churches never get their own domain; the org is identified by the
- * URL slug in the path, not the host). Config, not a secret — defineString,
- * mirroring PPTX_RENDER_SERVICE_URL. Defaults to the app's hosting domain so
- * {{service_link}} always renders a real link; override at deploy time only to
- * point at a custom app domain, or locally (e.g. http://localhost:5173) for
- * dev links. A blank value still renders {{service_link}} as '' (A1 empty
- * substitution) rather than a broken URL.
- */
-export const SERVICE_SHARE_BASE_URL = defineString("SERVICE_SHARE_BASE_URL", {
-  default: "https://worship-planner-bc515.web.app",
-});
+// SERVICE_SHARE_BASE_URL (the app's public share-link base origin) now lives in
+// ./params -- imported and re-exported at the top of this file (moved so
+// adminEmail.ts can reuse it without a circular import).
 
 // R181: the bare From *address* Resend sends as used to live here as a
 // deploy-time defineString param -- REMOVED outright (not layered as a
@@ -2670,30 +2666,9 @@ export const SERVICE_SHARE_BASE_URL = defineString("SERVICE_SHARE_BASE_URL", {
 // deploy-time param. A `*.web.app` address can never be verified
 // (Google-managed, no DNS access).
 
-/**
- * Build a header-safe RFC 5322 display name from an org-supplied name. The org
- * name is user-controlled and flows into the From header, so CR/LF (email
- * header-injection vectors) and quote/backslash chars are stripped; the caller
- * wraps the result in a quoted-string. Empty in → empty out (caller omits the
- * display name and sends the bare address).
- */
-export function fromDisplayName(name: string | null | undefined): string {
-  return (name ?? "").replace(/[\r\n]+/g, " ").replace(/["\\]/g, "").trim();
-}
-
-/**
- * Extract the bare email address from a configured From value. config.sender.fromAddress
- * may be a plain `email@x` OR an already-decorated `Display Name <email@x>` form
- * (e.g. a legacy value carried over from the old defineString-based sender param). We
- * always re-apply the org name as the display name, so we must peel any existing
- * `<…>` off first — otherwise wrapping produces an invalid nested
- * `"Org" <Name <email>>` and Resend 422s. Returns the inner address when
- * angle-bracketed, else the trimmed input.
- */
-export function bareEmailAddress(configured: string): string {
-  const m = configured.match(/<([^>]*)>/);
-  return (m ? m[1] : configured).trim();
-}
+// fromDisplayName + bareEmailAddress (the pure From-header helpers) now live in
+// ./params -- imported and re-exported at the top of this file (moved so
+// adminEmail.ts can reuse them without a circular import).
 
 /** Resend tag names AND values allow only these chars (59-RESEARCH.md Pitfall 3). */
 const RESEND_TAG_SAFE = /^[A-Za-z0-9_-]+$/;

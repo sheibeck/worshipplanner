@@ -9,6 +9,8 @@ import {
 import { buildDefaultOrgSettings } from "./orgTemplateSeed";
 import { patchNestedClaimKey } from "./claimsHelpers";
 import { DEACTIVATED_ORGS_CLAIM_KEY } from "./orgMembershipClaims";
+import { RESEND_API_KEY } from "./params";
+import { sendAdminOnboardingEmail } from "./adminEmail";
 
 // --- orgProvisioning (Phase 74, R196-R206: the owner-console org-provisioning
 // callables) ----------------------------------------------------------------
@@ -227,6 +229,11 @@ export interface OnboardOrganizationResponse {
   status: "added" | "invited";
   orgId: string;
   name: string;
+  /** True iff the best-effort admin-onboarding notification email resolved
+   * (quick task 260823). A false value NEVER means onboarding failed -- the
+   * org is already created; the email is best-effort and its failure is
+   * swallowed (logged) so the console could surface delivery status later. */
+  emailSent: boolean;
 }
 
 /**
@@ -291,10 +298,34 @@ export async function onboardOrganizationHandler(
     writeAdminAssignment(tx, db, orgId, target, callerUid);
   });
 
-  return { status: target.kind === "existing" ? "added" : "invited", orgId, name };
+  // Best-effort admin-onboarding email (quick task 260823) -- ALWAYS after the
+  // transaction commits, NEVER inside it. A send failure MUST NOT fail
+  // onboarding: the org is already created, so we swallow + log any error and
+  // report it via `emailSent: false`. Maps the resolved target kind to the
+  // notification copy ('existing' account -> 'added'; no account -> 'invited').
+  let emailSent = false;
+  try {
+    await sendAdminOnboardingEmail({
+      db,
+      to: target.email,
+      orgName: name,
+      kind: target.kind === "existing" ? "added" : "invited",
+    });
+    emailSent = true;
+  } catch (err) {
+    console.error(
+      `[orgProvisioning] onboardOrganization: admin email failed for orgId=${orgId}, to=${target.email} (onboarding still succeeded):`,
+      err,
+    );
+  }
+
+  return { status: target.kind === "existing" ? "added" : "invited", orgId, name, emailSent };
 }
 
-export const onboardOrganization = onCall(onboardOrganizationHandler);
+// onboardOrganization binds RESEND_API_KEY (moved to ./params so this module can
+// hold it without a circular import) -- the ONLY new key-holding surface this
+// task adds; the send happens post-transaction, best-effort.
+export const onboardOrganization = onCall({ secrets: [RESEND_API_KEY] }, onboardOrganizationHandler);
 
 // --- assignOrgAdmin (R203-R206) ---------------------------------------------
 

@@ -27,6 +27,16 @@ vi.mock("firebase-admin/firestore", () => ({
     arrayUnion: vi.fn((v: unknown) => ({ __arrayUnion: v })),
   },
 }));
+// Quick task 260823: the best-effort admin-onboarding email is fully mocked at
+// the module seam so onboardOrganizationHandler tests never load Resend/params
+// or send a real email. The dedicated unit tests for the helper itself (the
+// real from/to/subject construction) live in adminEmail.test.ts.
+const { mockSendAdminOnboardingEmail } = vi.hoisted(() => ({
+  mockSendAdminOnboardingEmail: vi.fn(async () => undefined),
+}));
+vi.mock("./adminEmail", () => ({
+  sendAdminOnboardingEmail: mockSendAdminOnboardingEmail,
+}));
 
 const CALLER_UID = "callerUid";
 const TARGET_UID = "targetUid";
@@ -190,6 +200,8 @@ function fakeRequest<T>(
 afterEach(() => {
   vi.mocked(getAuth).mockReset();
   vi.mocked(getFirestore).mockReset();
+  mockSendAdminOnboardingEmail.mockReset();
+  mockSendAdminOnboardingEmail.mockResolvedValue(undefined);
 });
 
 const ONBOARD_DEFAULTS: OnboardOrganizationRequest = { name: "Grace Church", adminEmail: TARGET_EMAIL };
@@ -536,6 +548,72 @@ describe("onboardOrganizationHandler", () => {
     ).rejects.toMatchObject({ code: "invalid-argument" });
     expect(fake.runTransactionSpy).not.toHaveBeenCalled();
     expect(fake.txSetSpy).not.toHaveBeenCalled();
+  });
+
+  // --- admin-onboarding email (quick task 260823) ---------------------------
+
+  it("emails the assigned admin with kind='added' for an EXISTING account, after the org is created", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await onboardOrganizationHandler(onboardRequest());
+
+    expect(result.status).toBe("added");
+    expect(result.emailSent).toBe(true);
+    expect(mockSendAdminOnboardingEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendAdminOnboardingEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: TARGET_EMAIL,
+        orgName: "Grace Church",
+        kind: "added",
+        db: expect.anything(),
+      }),
+    );
+    // The send fires only AFTER the transaction committed (org already exists).
+    expect(fake.runTransactionSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("emails the assigned admin with kind='invited' when no account exists yet", async () => {
+    mockAuth(async () => {
+      const err: { code?: string } & Error = Object.assign(new Error("no user"), {
+        code: "auth/user-not-found",
+      });
+      throw err;
+    });
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await onboardOrganizationHandler(onboardRequest());
+
+    expect(result.status).toBe("invited");
+    expect(result.emailSent).toBe(true);
+    expect(mockSendAdminOnboardingEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendAdminOnboardingEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: TARGET_EMAIL,
+        orgName: "Grace Church",
+        kind: "invited",
+      }),
+    );
+  });
+
+  it("best-effort: an email-send rejection does NOT throw out of onboarding; org is still created, emailSent=false", async () => {
+    mockAuth();
+    mockSendAdminOnboardingEmail.mockRejectedValueOnce(new Error("resend 500"));
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await onboardOrganizationHandler(onboardRequest());
+
+    // Onboarding still succeeded -- the org write happened, only the email failed.
+    expect(result.status).toBe("added");
+    expect(result.orgId).toBeTruthy();
+    expect(result.emailSent).toBe(false);
+    expect(fake.txSetSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ __path: `organizations/${result.orgId}` }),
+      expect.objectContaining({ name: "Grace Church" }),
+    );
   });
 });
 
