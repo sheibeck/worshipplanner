@@ -1435,4 +1435,132 @@ describe('useAuthStore', () => {
       expect(store.hasPcCredentials).toBe(true)
     })
   })
+
+  // ── 78-02 (R224/R226/R227) ────────────────────────────────────────────────
+  // enterOrgAsSuperAdmin / exitSuperAdminView — a super-admin with zero
+  // memberships switches active org context to ANY org, editor-equivalent,
+  // WITHOUT a membership document. See 78-RESEARCH.md Pattern 4.
+  describe('enterOrgAsSuperAdmin / exitSuperAdminView (R224/R226/R227, Phase 78)', () => {
+    /** A super-admin with zero memberships (memberships.value === []). */
+    function mockSuperAdminNoMemberships() {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: [] }),
+          }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+    }
+
+    async function signInSuperAdminNoMemberships() {
+      mockSuperAdminNoMemberships()
+      vi.mocked(getIdTokenResult).mockResolvedValue({
+        claims: { superAdmin: true },
+      } as never)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      store.isSuperAdmin = true
+      return store
+    }
+
+    /** Registers the org-doc getDoc response entering() reads for targetOrgId. */
+    function mockTargetOrgDoc(targetOrgId: string, orgData: Record<string, unknown> | null) {
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: [] }),
+          }) as never
+        }
+        if (path === `organizations/${targetOrgId}`) {
+          return Promise.resolve({
+            exists: () => orgData !== null,
+            data: () => orgData,
+          }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+    }
+
+    it('sets orgId/orgName/userRole/viewingAsSuperAdmin while leaving memberships empty (R226 — picker never grows)', async () => {
+      const store = await signInSuperAdminNoMemberships()
+      mockTargetOrgDoc('church-x', { name: 'Church X', slug: 'church-x' })
+
+      await store.enterOrgAsSuperAdmin('church-x')
+
+      expect(store.orgId).toBe('church-x')
+      expect(store.orgName).toBe('Church X')
+      expect(store.orgSlug).toBe('church-x')
+      expect(store.userRole).toBe('editor')
+      expect(store.viewingAsSuperAdmin).toBe('church-x')
+      expect(store.memberships).toEqual([])
+    })
+
+    it('hasNoOrg is false and requiresOrgSelection is false after entering (Pitfall 1 router-strand fix)', async () => {
+      const store = await signInSuperAdminNoMemberships()
+      mockTargetOrgDoc('church-x', { name: 'Church X' })
+
+      expect(store.hasNoOrg).toBe(true)
+      await store.enterOrgAsSuperAdmin('church-x')
+
+      expect(store.hasNoOrg).toBe(false)
+      expect(store.requiresOrgSelection).toBe(false)
+    })
+
+    it('never calls setDoc/writeBatch (R226 — no member doc is created)', async () => {
+      const { setDoc, writeBatch } = await import('firebase/firestore')
+      const store = await signInSuperAdminNoMemberships()
+      mockTargetOrgDoc('church-x', { name: 'Church X' })
+      vi.mocked(setDoc).mockClear()
+      vi.mocked(writeBatch).mockClear()
+
+      await store.enterOrgAsSuperAdmin('church-x')
+
+      expect(setDoc).not.toHaveBeenCalled()
+      expect(writeBatch).not.toHaveBeenCalled()
+    })
+
+    it('leaves orgId/viewingAsSuperAdmin at null when the target org doc does not exist', async () => {
+      const store = await signInSuperAdminNoMemberships()
+      mockTargetOrgDoc('church-missing', null)
+
+      await store.enterOrgAsSuperAdmin('church-missing')
+
+      expect(store.orgId).toBeNull()
+      expect(store.viewingAsSuperAdmin).toBeNull()
+    })
+
+    it('exitSuperAdminView clears orgId/userRole/viewingAsSuperAdmin back to null', async () => {
+      const store = await signInSuperAdminNoMemberships()
+      mockTargetOrgDoc('church-x', { name: 'Church X' })
+      await store.enterOrgAsSuperAdmin('church-x')
+      expect(store.orgId).toBe('church-x')
+
+      store.exitSuperAdminView()
+
+      expect(store.orgId).toBeNull()
+      expect(store.userRole).toBeNull()
+      expect(store.viewingAsSuperAdmin).toBeNull()
+    })
+
+    it('viewingAsSuperAdmin is cleared to null after logout (Pitfall 4 — not left stale across sign-out)', async () => {
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const store = await signInSuperAdminNoMemberships()
+      mockTargetOrgDoc('church-x', { name: 'Church X' })
+      await store.enterOrgAsSuperAdmin('church-x')
+      expect(store.viewingAsSuperAdmin).toBe('church-x')
+
+      await store.logout()
+
+      expect(store.viewingAsSuperAdmin).toBeNull()
+    })
+  })
 })

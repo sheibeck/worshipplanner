@@ -132,6 +132,16 @@ export const useAuthStore = defineStore('auth', () => {
   const deactivatedOrgMessage = ref<string | null>(null)
   const hasDeactivatedOrg = computed(() => deactivatedOrgMessage.value !== null)
 
+  // R224/R226 (Phase 78) — the org id a super-admin is temporarily VIEWING
+  // via enterOrgAsSuperAdmin, with NO membership document of their own.
+  // Null means no such visit is in effect. Purely client/UI-gating state —
+  // never the security boundary; every Firestore/Storage op made while set
+  // is independently re-checked by firestore.rules/storage.rules' own
+  // super-admin arm (78-01-PLAN.md). Must be cleared alongside orgId/etc. in
+  // ALL THREE places that reset org context inline: resetOrgContext, logout,
+  // and the onAuthStateChanged null-user branch (Pitfall 4).
+  const viewingAsSuperAdmin = ref<string | null>(null)
+
   const isAuthenticated = computed(() => user.value !== null)
   const isEditor = computed(() => userRole.value === 'editor')
 
@@ -146,8 +156,18 @@ export const useAuthStore = defineStore('auth', () => {
       memberships.value.length > 1 &&
       orgId.value === null,
   )
+  // R226/T-78-05 (Phase 78) — `&& viewingAsSuperAdmin.value === null` keeps a
+  // super-admin who just entered a church (zero real memberships, the
+  // expected account shape) from bouncing straight back to /select-church on
+  // the very next navigation. Do NOT "fix" this by pushing the viewed org
+  // into `memberships` instead — that array is what the church-picker
+  // renders, and R226 requires the super-admin's own picker to stay empty.
   const hasNoOrg = computed(
-    () => isReady.value && isAuthenticated.value && memberships.value.length === 0,
+    () =>
+      isReady.value &&
+      isAuthenticated.value &&
+      memberships.value.length === 0 &&
+      viewingAsSuperAdmin.value === null,
   )
   // R213 (Phase 76) — a lone deactivated org fits neither needsOrgSelection
   // (>1) nor hasNoOrg (===0): hasDeactivatedOrg widens the gate to also
@@ -294,6 +314,99 @@ export const useAuthStore = defineStore('auth', () => {
     pcSecret.value = null
     vwModeEnabled.value = true
     settings.value = { ...DEFAULT_ORG_SETTINGS }
+    viewingAsSuperAdmin.value = null
+  }
+
+  // Extracted from loadOrgContext (78-02, R224) so enterOrgAsSuperAdmin below
+  // can reuse the SAME org-snapshot -> store-state hydration without
+  // duplicating the settings-merge logic — a future settings-shape change
+  // would otherwise only land in one of the two call sites. Pure extraction,
+  // no behavior change: `orgData` is typed as `Record<string, unknown>` to
+  // match this block's existing `as` casts.
+  function applyOrgSnapshot(orgData: Record<string, unknown>): void {
+    orgName.value = (orgData.name as string) ?? null
+    orgSlug.value = (orgData.slug as string) ?? null
+    pcAppId.value = (orgData.pcAppId as string) ?? null
+    pcSecret.value = (orgData.pcSecret as string) ?? null
+
+    // R073 — the ONE defaults-merge point for the whole application. A
+    // pre-v1.5 org document has no `settings` key at all; the optional
+    // chain below is mandatory because noUncheckedIndexedAccess is on.
+    const orgSettings = (orgData.settings as Partial<OrgSettings> | undefined) ?? {}
+
+    // Dual-read migration (R073): nested settings value first, then the
+    // legacy flat field, then the hardcoded default. This is live
+    // production data — do NOT collapse this to `orgSettings.vwModeEnabled
+    // ?? true`, which would silently turn Vertical Worship back ON for a
+    // church that deliberately turned it off via the flat field. No
+    // read-triggered backfill is performed here; the backfill is
+    // write-triggered, delivered by the Settings toggle's save handler
+    // switching its write target to the `settings.vwModeEnabled` dot-path.
+    // Computed once and applied to BOTH `settings.value.vwModeEnabled` and
+    // the standalone `vwModeEnabled` ref so they can never disagree.
+    const resolvedVwModeEnabled =
+      orgSettings.vwModeEnabled ?? (orgData.vwModeEnabled as boolean | undefined) ?? true
+
+    // WR-01 (46-REVIEW.md): `slideTypography` is deep-merged specifically
+    // — the plain `...orgSettings` spread above is shallow, so a
+    // partial/legacy stored value (e.g. a hand-edited Firestore document,
+    // or any future write path that persists fewer than all three leaf
+    // keys) would otherwise replace the whole nested object wholesale,
+    // leaving `fontWeight`/`fontScale` `undefined` rather than falling
+    // back to the per-field defaults. `cssVarsFor` already tolerates this
+    // at render time, but `SettingsView.vue`'s local refs are initialized
+    // directly from this object with no equivalent guard.
+    // messaging (R130/R132/R133, Phase 58) is deep-merged for the same
+    // reason as slideTypography above: the outer `...orgSettings` spread
+    // is shallow, so a partial stored `messaging` object (e.g. only
+    // `{ enabled: true }`) would otherwise leave sibling leaves
+    // (`reminderDaysBefore`, `lockNotifyDefault`, ...) `undefined` rather
+    // than falling back to their per-field defaults. `timezone` needs no
+    // equivalent deep-merge — it's a flat string already covered by the
+    // outer `...orgSettings` spread, same as `bibleVersion`. Brand-new
+    // fields with no legacy flat-field precedent, so no dual-read.
+    settings.value = {
+      ...DEFAULT_ORG_SETTINGS,
+      ...orgSettings,
+      vwModeEnabled: resolvedVwModeEnabled,
+      slideTypography: {
+        ...DEFAULT_ORG_SETTINGS.slideTypography,
+        ...orgSettings.slideTypography,
+      },
+      messaging: {
+        ...DEFAULT_ORG_SETTINGS.messaging,
+        ...orgSettings.messaging,
+      },
+    }
+    vwModeEnabled.value = resolvedVwModeEnabled
+
+    // CR-01 (46-REVIEW.md) — eager-load the org's actual chosen slide
+    // face here, the ONE point every render site's settings flow
+    // through. Without this, SlideGrid.vue and EditSlideDrawer.vue (the
+    // grid and the Edit Slide drawer preview — soft-gate surfaces per
+    // 46-UI-SPEC.md, font-display: swap) bind `--slide-font-family` to a
+    // family whose @font-face rule was never registered, so the browser
+    // silently falls through to its generic fallback instead of the
+    // chosen font for any org whose choice differs from main.ts's eager
+    // Inter default — until something ELSE (Settings, or the Presenter)
+    // happens to load it first in that session. Fire-and-forget: a
+    // rejected dynamic import degrades to the CSS stack's native
+    // fallback, never a user-visible error (same posture as WR-03's
+    // SettingsView.vue fix).
+    const resolvedTypographyFamily = SLIDE_FONTS[settings.value.slideTypography.fontFamily]
+      ? settings.value.slideTypography.fontFamily
+      : DEFAULT_ORG_SETTINGS.slideTypography.fontFamily
+    if (resolvedTypographyFamily !== DEFAULT_ORG_SETTINGS.slideTypography.fontFamily) {
+      const resolvedTypographyWeight = snapWeight(
+        resolvedTypographyFamily,
+        settings.value.slideTypography.fontWeight,
+      )
+      loadFontCss(resolvedTypographyFamily, resolvedTypographyWeight).catch(() => {
+        // A failed dynamic import here must never surface as an
+        // unhandled rejection — the grid/drawer's font-display: swap
+        // fallback already covers this case visually.
+      })
+    }
   }
 
   async function loadOrgContext(uid: string, membershipJustCreated = false): Promise<void> {
@@ -382,89 +495,7 @@ export const useAuthStore = defineStore('auth', () => {
         return
       }
 
-      orgName.value = (orgData.name as string) ?? null
-      orgSlug.value = (orgData.slug as string) ?? null
-      pcAppId.value = (orgData.pcAppId as string) ?? null
-      pcSecret.value = (orgData.pcSecret as string) ?? null
-
-      // R073 — the ONE defaults-merge point for the whole application. A
-      // pre-v1.5 org document has no `settings` key at all; the optional
-      // chain below is mandatory because noUncheckedIndexedAccess is on.
-      const orgSettings = (orgData.settings as Partial<OrgSettings> | undefined) ?? {}
-
-      // Dual-read migration (R073): nested settings value first, then the
-      // legacy flat field, then the hardcoded default. This is live
-      // production data — do NOT collapse this to `orgSettings.vwModeEnabled
-      // ?? true`, which would silently turn Vertical Worship back ON for a
-      // church that deliberately turned it off via the flat field. No
-      // read-triggered backfill is performed here; the backfill is
-      // write-triggered, delivered by the Settings toggle's save handler
-      // switching its write target to the `settings.vwModeEnabled` dot-path.
-      // Computed once and applied to BOTH `settings.value.vwModeEnabled` and
-      // the standalone `vwModeEnabled` ref so they can never disagree.
-      const resolvedVwModeEnabled =
-        orgSettings.vwModeEnabled ?? (orgData.vwModeEnabled as boolean | undefined) ?? true
-
-      // WR-01 (46-REVIEW.md): `slideTypography` is deep-merged specifically
-      // — the plain `...orgSettings` spread above is shallow, so a
-      // partial/legacy stored value (e.g. a hand-edited Firestore document,
-      // or any future write path that persists fewer than all three leaf
-      // keys) would otherwise replace the whole nested object wholesale,
-      // leaving `fontWeight`/`fontScale` `undefined` rather than falling
-      // back to the per-field defaults. `cssVarsFor` already tolerates this
-      // at render time, but `SettingsView.vue`'s local refs are initialized
-      // directly from this object with no equivalent guard.
-      // messaging (R130/R132/R133, Phase 58) is deep-merged for the same
-      // reason as slideTypography above: the outer `...orgSettings` spread
-      // is shallow, so a partial stored `messaging` object (e.g. only
-      // `{ enabled: true }`) would otherwise leave sibling leaves
-      // (`reminderDaysBefore`, `lockNotifyDefault`, ...) `undefined` rather
-      // than falling back to their per-field defaults. `timezone` needs no
-      // equivalent deep-merge — it's a flat string already covered by the
-      // outer `...orgSettings` spread, same as `bibleVersion`. Brand-new
-      // fields with no legacy flat-field precedent, so no dual-read.
-      settings.value = {
-        ...DEFAULT_ORG_SETTINGS,
-        ...orgSettings,
-        vwModeEnabled: resolvedVwModeEnabled,
-        slideTypography: {
-          ...DEFAULT_ORG_SETTINGS.slideTypography,
-          ...orgSettings.slideTypography,
-        },
-        messaging: {
-          ...DEFAULT_ORG_SETTINGS.messaging,
-          ...orgSettings.messaging,
-        },
-      }
-      vwModeEnabled.value = resolvedVwModeEnabled
-
-      // CR-01 (46-REVIEW.md) — eager-load the org's actual chosen slide
-      // face here, the ONE point every render site's settings flow
-      // through. Without this, SlideGrid.vue and EditSlideDrawer.vue (the
-      // grid and the Edit Slide drawer preview — soft-gate surfaces per
-      // 46-UI-SPEC.md, font-display: swap) bind `--slide-font-family` to a
-      // family whose @font-face rule was never registered, so the browser
-      // silently falls through to its generic fallback instead of the
-      // chosen font for any org whose choice differs from main.ts's eager
-      // Inter default — until something ELSE (Settings, or the Presenter)
-      // happens to load it first in that session. Fire-and-forget: a
-      // rejected dynamic import degrades to the CSS stack's native
-      // fallback, never a user-visible error (same posture as WR-03's
-      // SettingsView.vue fix).
-      const resolvedTypographyFamily = SLIDE_FONTS[settings.value.slideTypography.fontFamily]
-        ? settings.value.slideTypography.fontFamily
-        : DEFAULT_ORG_SETTINGS.slideTypography.fontFamily
-      if (resolvedTypographyFamily !== DEFAULT_ORG_SETTINGS.slideTypography.fontFamily) {
-        const resolvedTypographyWeight = snapWeight(
-          resolvedTypographyFamily,
-          settings.value.slideTypography.fontWeight,
-        )
-        loadFontCss(resolvedTypographyFamily, resolvedTypographyWeight).catch(() => {
-          // A failed dynamic import here must never surface as an
-          // unhandled rejection — the grid/drawer's font-display: swap
-          // fallback already covers this case visually.
-        })
-      }
+      applyOrgSnapshot(orgData)
     }
 
     // Unsubscribe from previous listener if any
@@ -519,6 +550,7 @@ export const useAuthStore = defineStore('auth', () => {
       settings.value = { ...DEFAULT_ORG_SETTINGS }
       memberships.value = []
       deactivatedOrgMessage.value = null
+      viewingAsSuperAdmin.value = null
       memberUnsub?.()
       memberUnsub = null
     }
@@ -534,6 +566,44 @@ export const useAuthStore = defineStore('auth', () => {
     if (!memberships.value.some((m) => m.id === targetOrgId)) return
     rememberOrg(currentUser.uid, targetOrgId)
     await loadOrgContext(currentUser.uid, false)
+  }
+
+  // R224/R226/R227 (Phase 78, 78-RESEARCH.md Pattern 4) — switches active org
+  // context to `targetOrgId` for a super-admin who does NOT belong to it,
+  // WITHOUT creating a membership document. `isSuperAdmin`/`user.value` are
+  // guarded here only as a LOCAL convenience (mirrors isSuperAdmin's own
+  // documented "must never be treated as access control on its own" posture)
+  // — the real boundary is firestore.rules'/storage.rules' super-admin arm
+  // (78-01-PLAN.md). Writes NOTHING to Firestore (R226): no setDoc/writeBatch,
+  // no members/{uid} onSnapshot subscription (there is no member doc for it
+  // to find — if started, its first callback would immediately null userRole
+  // back out). Deliberately performs NO isOrgActive/deactivation check,
+  // unlike loadOrgContext — the rules layer already grants a super-admin
+  // unconditional access to a deactivated org's doc, and entering one for
+  // support is intended, not a bug to guard against.
+  async function enterOrgAsSuperAdmin(targetOrgId: string): Promise<void> {
+    if (!user.value || !isSuperAdmin.value) return
+    resetOrgContext()
+    let orgSnap
+    try {
+      orgSnap = await getDoc(doc(db, 'organizations', targetOrgId))
+    } catch (err) {
+      console.error('[auth] enterOrgAsSuperAdmin:', err)
+      return
+    }
+    if (!orgSnap.exists()) return
+    orgId.value = targetOrgId
+    viewingAsSuperAdmin.value = targetOrgId
+    applyOrgSnapshot(orgSnap.data())
+    userRole.value = 'editor'
+  }
+
+  // R227 — ends a super-admin's cross-tenant visit, restoring the store to
+  // its pre-visit (no-org) state.
+  function exitSuperAdminView(): void {
+    if (viewingAsSuperAdmin.value === null) return
+    resetOrgContext()
+    viewingAsSuperAdmin.value = null
   }
 
   async function ensureUserDocument(firebaseUser: User): Promise<{ membershipCreated: boolean }> {
@@ -655,6 +725,7 @@ export const useAuthStore = defineStore('auth', () => {
     vwModeEnabled.value = true
     settings.value = { ...DEFAULT_ORG_SETTINGS }
     deactivatedOrgMessage.value = null
+    viewingAsSuperAdmin.value = null
     memberUnsub?.()
     memberUnsub = null
     await signOut(auth)
@@ -683,6 +754,9 @@ export const useAuthStore = defineStore('auth', () => {
     hasDeactivatedOrg,
     requiresOrgSelection,
     selectOrg,
+    viewingAsSuperAdmin,
+    enterOrgAsSuperAdmin,
+    exitSuperAdminView,
     isEditor,
     isSuperAdmin,
     refreshSuperAdminClaim,
