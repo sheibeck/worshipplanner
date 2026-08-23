@@ -165,6 +165,19 @@
                     Delete
                   </button>
                 </div>
+
+                <!-- R224 (Phase 78) — Enter-church support action. Not gated
+                     on org.active: a super-admin can enter a deactivated org
+                     to verify state before Reactivate. -->
+                <div class="mt-2">
+                  <button
+                    type="button"
+                    @click="onEnterChurch(org)"
+                    class="text-xs text-indigo-300 hover:text-indigo-200 transition-colors"
+                  >
+                    Enter church
+                  </button>
+                </div>
               </td>
             </tr>
 
@@ -200,9 +213,18 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/firebase'
+import { useAuthStore } from '@/stores/auth'
 import DeleteOrgConfirmDialog from './DeleteOrgConfirmDialog.vue'
+
+// R224 (Phase 78) — useRouter() returns undefined in this file's existing
+// router-less mount harness (OrganizationsTab.test.ts mounts with no
+// global.plugins router). Guard every use with router?., mirroring
+// OwnerConsoleView.vue's own established router?.replace(...) pattern.
+const router = useRouter()
+const authStore = useAuthStore()
 
 // ── Types ──────────────────────────────────────────────────────────────────
 // Mirrors functions/src/orgProvisioning.ts's OrgSummary/ListOrganizationsResponse
@@ -595,6 +617,19 @@ async function onConfirmDelete(typedName: string) {
   } finally {
     isDeleting.value = false
   }
+}
+
+// ── Enter-church action (R224) ────────────────────────────────────────────
+// Pure authStore consumer -- no direct Firestore reads/writes here; all
+// authorization lives in enterOrgAsSuperAdmin (auth.ts) + firestore.rules'
+// super-admin arm (78-01-PLAN.md). Not gated on org.active -- entering a
+// deactivated org is an explicit, intended support scenario.
+
+async function onEnterChurch(org: OrgSummary): Promise<void> {
+  await authStore.enterOrgAsSuperAdmin(org.orgId)
+  // 'services' has no requiresEditor gate (unlike 'dashboard'), so it is the
+  // safer universal landing route regardless of the forced 'editor' role.
+  router?.push({ name: 'services' })
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────

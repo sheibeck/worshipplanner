@@ -36,10 +36,13 @@ const {
   mockAssignOrgAdmin,
   mockSetOrgActive,
   mockDeleteOrganization,
+  mockEnterOrgAsSuperAdmin,
 } = vi.hoisted(() => ({
     mockListOrganizations: vi.fn<() => Promise<{ data: { organizations: OrgSummaryFixture[] } }>>(
       () => Promise.resolve({ data: { organizations: [] } }),
     ),
+    // R224 (Phase 78) — spy-able so tests can assert on the Enter-church row action.
+    mockEnterOrgAsSuperAdmin: vi.fn().mockResolvedValue(undefined),
     mockOnboardOrganization: vi.fn<
       () => Promise<{ data: { status: 'added' | 'invited'; orgId: string; name: string } }>
     >(() => Promise.resolve({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } })),
@@ -101,6 +104,7 @@ vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     isSuperAdmin: true,
     user: { uid: 'owner-uid', email: 'owner@example.com' },
+    enterOrgAsSuperAdmin: mockEnterOrgAsSuperAdmin,
   }),
 }))
 
@@ -111,6 +115,7 @@ beforeEach(() => {
   mockAssignOrgAdmin.mockClear()
   mockSetOrgActive.mockClear()
   mockDeleteOrganization.mockClear()
+  mockEnterOrgAsSuperAdmin.mockClear()
   mockListOrganizations.mockImplementation(() => Promise.resolve({ data: { organizations: [] } }))
   mockOnboardOrganization.mockImplementation(() =>
     Promise.resolve({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } }),
@@ -815,5 +820,34 @@ describe('OrganizationsTab -- no direct writes (R200/R204)', () => {
     await confirmButton.trigger('click')
     await flushPromises()
     expect(mockAssignOrgAdmin).toHaveBeenCalled()
+  })
+})
+
+describe('OrganizationsTab -- enter church (R224, Phase 78)', () => {
+  async function mountWithOneOrg(overrides: Partial<{ active: boolean }> = {}) {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: { organizations: [makeOrg({ orgId: 'org-1', name: 'Grace Church', ...overrides })] },
+      }),
+    )
+    return mountTab()
+  }
+
+  it('clicking "Enter church" calls authStore.enterOrgAsSuperAdmin with that row\'s orgId', async () => {
+    const wrapper = await mountWithOneOrg({ active: true })
+
+    const enterButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    await enterButton.trigger('click')
+    await flushPromises()
+
+    expect(mockEnterOrgAsSuperAdmin).toHaveBeenCalledWith('org-1')
+  })
+
+  it('the "Enter church" button is present and NOT disabled for a deactivated row', async () => {
+    const wrapper = await mountWithOneOrg({ active: false })
+
+    const enterButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    expect(enterButton.exists()).toBe(true)
+    expect(enterButton.attributes('disabled')).toBeUndefined()
   })
 })
