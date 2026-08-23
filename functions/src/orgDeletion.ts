@@ -208,4 +208,19 @@ export async function deleteOrganizationHandler(
   };
 }
 
-export const deleteOrganization = onCall(deleteOrganizationHandler);
+// WR-01 (77-REVIEW.md): this cascade is comparably or more expensive than
+// parsePptx (functions/src/index.ts's { memory: "1GiB", timeoutSeconds: 120 })
+// -- 5 concurrent READ queries, N sequential batch commits, a full Storage
+// prefix sweep, and a recursiveDelete over every subcollection at every
+// depth. timeoutSeconds: 540 is the v2 callable maximum, giving the sweep
+// generous headroom to complete well within budget for a single church.
+//
+// Resumability boundary (documented, not solved here -- WR-01 scope):
+// the cross-ref batch deletes + Storage sweep are each idempotent, so a
+// retry against that same state re-runs cleanly WHILE the org doc still
+// exists (see "idempotent retry" in orgDeletion.test.ts). A timeout that
+// fires mid-recursiveDelete, AFTER the org doc itself is gone, is NOT
+// resumable -- there is no code path to resume a cascade once the parent
+// doc no longer exists. A generous timeout is the mitigation; building a
+// not-found-parent resume path is out of scope for this phase.
+export const deleteOrganization = onCall({ timeoutSeconds: 540, memory: "512MiB" }, deleteOrganizationHandler);
