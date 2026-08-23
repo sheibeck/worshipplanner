@@ -40,31 +40,31 @@ REQ-IDs continue from v2.0 (last R211).
 
 ### Church deletion (deactivate-gated, full cascade)
 
-- [ ] **R215**: An organization can be deleted **only while it is deactivated** — a delete attempt on an
+- [x] **R215**: An organization can be deleted **only while it is deactivated** — a delete attempt on an
       active org is refused with a clear message (the deactivate-first requirement is the first delete
       guardrail).
 
-- [ ] **R216**: Deletion runs through a super-admin-gated server callable that independently re-verifies the
+- [x] **R216**: Deletion runs through a super-admin-gated server callable that independently re-verifies the
       caller's `superAdmin` claim; the client never bulk-deletes `organizations/*`, its subcollections,
       `orgNames/*`, or `inviteLookup/*` directly.
 
-- [ ] **R217**: Deleting an organization cascade-removes all of its Firestore data — the org doc and every
+- [x] **R217**: Deleting an organization cascade-removes all of its Firestore data — the org doc and every
       subcollection (members, invites, services, songs, slideGroups, shareTokens/quarter shares,
       quarters/roster, and any other org subcollection) — leaving no orphaned documents under
       `organizations/{orgId}`.
 
-- [ ] **R218**: Deletion also removes the org's cross-collection references — `orgNames/{normalizedName}`,
+- [x] **R218**: Deletion also removes the org's cross-collection references — `orgNames/{normalizedName}`,
       every `inviteLookup/{email}` pointing at the org, and the org's id from each member's
       `users/{uid}.orgIds` (via `arrayRemove`, preserving that user's other org memberships).
 
-- [ ] **R219**: Deletion removes all Cloud Storage objects under the org's path (`orgs/{orgId}/…` — media,
+- [x] **R219**: Deletion removes all Cloud Storage objects under the org's path (`orgs/{orgId}/…` — media,
       backgrounds, pptx-imports, rendered), leaving no orphaned files.
 
 - [ ] **R220**: Deleting requires an explicit extra confirmation (e.g. typing the church name) that echoes
       what will be destroyed, and the action is clearly labeled irreversible; a mistaken click cannot delete
       an org.
 
-- [ ] **R221**: A partial/interrupted deletion can be safely retried and completes without leaving
+- [x] **R221**: A partial/interrupted deletion can be safely retried and completes without leaving
       cross-tenant orphans (idempotent/resumable, batched cleanup), returning a clear summary of what was
       removed.
 
@@ -123,13 +123,13 @@ REQ-IDs continue from v2.0 (last R211).
 | R212 | Phase 76 | Complete |
 | R213 | Phase 76 | Complete |
 | R214 | Phase 76 | Complete |
-| R215 | Phase 77 | Pending |
-| R216 | Phase 77 | Pending |
-| R217 | Phase 77 | Pending |
-| R218 | Phase 77 | Pending |
-| R219 | Phase 77 | Pending |
+| R215 | Phase 77 | Complete |
+| R216 | Phase 77 | Complete |
+| R217 | Phase 77 | Complete |
+| R218 | Phase 77 | Complete |
+| R219 | Phase 77 | Complete |
 | R220 | Phase 77 | Pending |
-| R221 | Phase 77 | Pending |
+| R221 | Phase 77 | Complete |
 | R222 | Phase 75 | Complete |
 | R223 | Phase 75 | Complete |
 | R224 | Phase 78 | Pending |

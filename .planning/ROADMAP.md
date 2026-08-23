@@ -666,11 +666,11 @@ extra confirmation and a STRIDE threat model proving the destructive path is saf
      clearly labeled irreversible; retrying an interrupted deletion completes safely with no cross-tenant
      orphans and returns a clear summary of what was removed (R220, R221).
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
 
-- [ ] 77-01-PLAN.md — Server: `deleteOrganization` cascade callable (`recursiveDelete` + cross-refs +
+- [x] 77-01-PLAN.md — Server: `deleteOrganization` cascade callable (`recursiveDelete` + cross-refs +
       the 5 orgId-keyed top-level collections + Storage `deleteFiles`) + `firestore.rules` unconditional
       delete DENY on `organizations/{orgId}` (R215, R216, R217, R218, R219, R221) — Wave 1
 - [ ] 77-02-PLAN.md — Client: `DeleteOrgConfirmDialog` type-to-confirm dialog + `OrganizationsTab` Delete
