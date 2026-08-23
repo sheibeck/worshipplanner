@@ -184,6 +184,21 @@ service cloud.firestore {
       allow delete: if false;
 
       // Members subcollection
+      //
+      // IN-02 (78-REVIEW.md) / T-78-03 accepted residual: Phase 78's
+      // super-admin arm makes isOrgEditor(orgId) true for EVERY super-admin
+      // on EVERY org (see isOrgEditor above), which means `allow write`
+      // below legally permits a super-admin's client SDK to `create` its
+      // own membership doc for any org. R226 ("entering a church as a
+      // super-admin creates NO member doc") therefore holds only as a
+      // CLIENT-CODE contract -- enterOrgAsSuperAdmin (src/stores/auth.ts)
+      // deliberately calls no setDoc/writeBatch -- not as a rules
+      // invariant. Deliberately accepted, not a functional gap: this
+      // matches the phase's documented posture that a super-admin is fully
+      // trusted, and the residual is tracked in both 78-01-PLAN.md and
+      // 78-02-PLAN.md's threat models. Do NOT "fix" this by narrowing
+      // isOrgEditor here -- see the organizations/{orgId} comments above
+      // for why the super-admin arm is placed exactly where it is.
       match /members/{uid} {
         allow read: if isOrgMember(orgId);
         allow write: if isOrgEditor(orgId);
