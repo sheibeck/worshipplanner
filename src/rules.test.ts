@@ -121,6 +121,15 @@ describe('User profile isolation', () => {
 describe('Editor vs viewer write permissions', () => {
   it('allows editor to write org doc', async () => {
     await seedMembershipDoc('orgA', 'userA', 'editor')
+    // Phase 77 (R216/T-77-04): `organizations/{orgId}`'s `allow write` was
+    // narrowed to `allow update` (delete is now its own explicit DENY --
+    // see the "Org deletion DENY" describe block below). A `setDoc` against
+    // a doc that does not yet exist is a Firestore CREATE, not an update --
+    // seed the org doc first (bypassing rules) so this exercises the update
+    // path this test is actually about, mirroring real usage (the org
+    // already exists, created via orgProvisioning.ts's Admin-SDK path, by
+    // the time any editor writes to it).
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
     await assertSucceeds(
@@ -133,6 +142,7 @@ describe('Editor vs viewer write permissions', () => {
 
   it('denies viewer from writing org doc', async () => {
     await seedMembershipDoc('orgA', 'userA', 'viewer')
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'someoneElse' })
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
     await assertFails(
@@ -462,6 +472,32 @@ describe('Org lifecycle field guard (T-76-10/T-76-06)', () => {
     await assertFails(
       updateDoc(doc(db, 'organizations', 'orgA'), { active: false }),
     )
+  })
+})
+
+// Phase 77 (R216/T-77-04): `organizations/{orgId}`'s `allow write` used to
+// bundle create+update+DELETE, and `preservesLifecycleFields()` short-
+// circuits to `true` on delete (`request.resource == null`) -- so an ordinary
+// editor could `deleteDoc(organizations/{orgId})` directly, bypassing the
+// super-admin-gated `deleteOrganization` callable and its entire cascade
+// (cross-reference cleanup, Storage sweep, audit log) entirely. These two
+// tests prove the `write`->`update` narrowing + explicit `allow delete: if
+// false;` closes that hole for BOTH an ordinary editor AND a super-admin
+// using the client SDK -- deletion is Admin-SDK-only, with NO exemption.
+describe('Org deletion DENY (Phase 77, R216/T-77-04) — Admin-SDK-only', () => {
+  it('DENIES an ordinary editor from deleting organizations/{orgId} directly', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church", active: false })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'organizations', 'orgA')))
+  })
+
+  it('DENIES a super-admin using the client SDK from deleting organizations/{orgId} -- no exemption', async () => {
+    await seedDoc('organizations/orgA', { name: "UserA's Church", active: false })
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'organizations', 'orgA')))
   })
 })
 
@@ -1392,6 +1428,11 @@ describe('Editor/Viewer RBAC', () => {
 
   it('editor can write to org doc (update name)', async () => {
     await seedMembershipDoc('orgA', 'userA', 'editor')
+    // Phase 77 (R216/T-77-04): see the sibling "allows editor to write org
+    // doc" test's comment above -- `write` was narrowed to `update`, so a
+    // `setDoc` needs the org doc to already exist to exercise the update
+    // path this test is about, not the separately-tested create path.
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
     await assertSucceeds(
@@ -1404,6 +1445,7 @@ describe('Editor/Viewer RBAC', () => {
 
   it('viewer cannot write to org doc', async () => {
     await seedMembershipDoc('orgA', 'userA', 'viewer')
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'someoneElse' })
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
     await assertFails(

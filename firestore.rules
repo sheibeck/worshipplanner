@@ -107,14 +107,44 @@ service cloud.firestore {
 
       // Members can read; editors can write
       allow read: if isOrgMember(orgId);
-      // Editors can update/delete existing orgs -- but never the 5 lifecycle fields.
-      allow write: if isOrgEditor(orgId) && (preservesLifecycleFields() || isSuperAdmin());
+      // Editors can update existing orgs -- but never the 5 lifecycle fields.
+      // NOTE (Phase 77, R216/T-77-04): this used to be `allow write`, which
+      // bundles create+update+DELETE. `preservesLifecycleFields()` short-
+      // circuits to `true` specifically on delete (`request.resource == null`
+      // -- its own comment above reads "Delete: nothing being written,
+      // nothing to restrict"), so under the old `write` rule an ordinary
+      // editor could delete the org doc outright. Narrowing this to `update`
+      // removes delete from this rule's coverage entirely -- `updateDoc(...)`
+      // calls map exactly to Firestore's `update` operation, so every
+      // existing T-76-10/T-76-06 test exercising this line is unaffected.
+      // The explicit `allow delete: if false;` below is the ONLY rule now
+      // governing delete on this document -- without this narrowing, that
+      // DENY would have zero effect (Firestore OR-evaluates every matching
+      // `allow` clause for an operation; the old `write` grant would still win).
+      allow update: if isOrgEditor(orgId) && (preservesLifecycleFields() || isSuperAdmin());
       // Allow authenticated users to create a new org if they are the creator.
       // Same lifecycle-field guard applies (defense-in-depth) -- no legitimate
       // client-side org-creation flow sets these fields; org provisioning
       // (orgProvisioning.ts) always writes via the Admin SDK, bypassing rules.
       allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid
         && preservesLifecycleFields();
+
+      // Phase 77 (R216/T-77-04): deletion is Admin-SDK-only. The
+      // deleteOrganization callable (orgDeletion.ts) uses the Admin SDK,
+      // which bypasses rules entirely -- this DENY has zero effect on that
+      // legitimate deletion path. It exists solely to close the client-side
+      // gap the `write`->`update` narrowing above just opened up: before
+      // that narrowing, `preservesLifecycleFields()`'s `request.resource ==
+      // null -> true` branch meant the old `allow write` rule granted an
+      // ordinary editor unconditional delete access to the org doc.
+      // Deliberately UNCONDITIONAL -- NO `isSuperAdmin()` exemption
+      // (77-RESEARCH.md Pitfall 5): writing this as `allow delete: if
+      // isSuperAdmin()` would re-open a client-side deletion path for any
+      // super-admin using the client SDK directly, which conflicts with the
+      // design intent that deletion is Admin-SDK-only. Proven by an emulator
+      // DENY for both an ordinary editor and a super-admin client context
+      // (src/rules.test.ts).
+      allow delete: if false;
 
       // Members subcollection
       match /members/{uid} {
