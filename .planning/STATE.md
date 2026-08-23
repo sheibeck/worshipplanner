@@ -5,16 +5,16 @@ milestone_name: Organization Lifecycle & Super-Admin Access
 current_phase: 76
 current_phase_name: Church Deactivation & Reactivation
 status: executing
-stopped_at: Completed 76-01-PLAN.md
-last_updated: "2026-08-22T20:09:03.000Z"
+stopped_at: Completed 76-02-PLAN.md
+last_updated: "2026-08-23T00:37:30.187Z"
 last_activity: 2026-08-22
-last_activity_desc: Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim fan-out + firestore.rules/storage.rules deactivation gates)
+last_activity_desc: Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim helper
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 1
-  percent: 31
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
+  percent: 50
 ---
 
 # ▶ ACTIVE MILESTONE — v2.1 Organization Lifecycle & Super-Admin Access (started 2026-08-22)
@@ -845,6 +845,7 @@ firestore.rules/storage.rules deactivation gates shipped, awaiting owner deploy 
 rules-engine deviations found and resolved during execution (firestore.rules isOrgActive() Null-value
 guard; storage.rules deactivatedOrgs `.get(key, default)` accessor).
 Last activity: 2026-08-22 — Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim helper
+
 + firestore.rules isOrgActive + storage.rules deactivatedOrgs guard + emulator ALLOW/DENY suites)
 
 ## ★ v2.1 ROADMAP.md phase breakdown (created 2026-08-22)
@@ -2479,6 +2480,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 74 P01 | 15min | 3 tasks | 5 files |
 | Phase 74 P02 | 55min | 2 tasks | 3 files |
 | Phase 75-pending-invite-visibility P01 | 17min | 2 tasks | 4 files |
+| Phase 76 P02 | 1h | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3197,8 +3199,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-22T19:24:22.128Z
-Stopped at: Completed 75-01-PLAN.md
+Last session: 2026-08-23T00:37:30.129Z
+Stopped at: Completed 76-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

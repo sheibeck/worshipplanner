@@ -29,7 +29,7 @@ REQ-IDs continue from v2.0 (last R211).
       deactivated status on the org record (e.g. `active: false` / `deactivatedAt` + `deactivatedBy`), via a
       super-admin-gated server callable — the client never flips another org's status directly.
 
-- [ ] **R213**: While an org is deactivated, all of its members are blocked from using it — enforced both in
+- [x] **R213**: While an org is deactivated, all of its members are blocked from using it — enforced both in
       the client sign-in/org-load flow AND by `firestore.rules`/`storage.rules` (a deactivated org's members
       are denied org-scoped reads/writes) — surfaced as a clear "this church is deactivated" message, never a
       silent failure or a blank app. (Server half — `firestore.rules`/`storage.rules` — shipped in 76-01;
@@ -121,7 +121,7 @@ REQ-IDs continue from v2.0 (last R211).
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R212 | Phase 76 | Complete |
-| R213 | Phase 76 | In Progress (server half complete, client half pending 76-02) |
+| R213 | Phase 76 | Complete |
 | R214 | Phase 76 | Complete |
 | R215 | Phase 77 | Pending |
 | R216 | Phase 77 | Pending |
