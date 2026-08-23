@@ -80,7 +80,7 @@ REQ-IDs continue from v2.0 (last R211).
 
 ### Super-admin "enter any church"
 
-- [ ] **R224**: Each Organizations row has a "Sign in" / "Enter church" action that switches the
+- [x] **R224**: Each Organizations row has a "Sign in" / "Enter church" action that switches the
       super-admin's active org context to that church for support/setup.
 
 - [x] **R225**: A super-admin can read and write a church's Firestore data and Storage **without** a
@@ -88,11 +88,11 @@ REQ-IDs continue from v2.0 (last R211).
       genuine emulator tests: ALLOW for a super-admin on any org, and continued DENY for a non-member
       non-super-admin.
 
-- [ ] **R226**: A super-admin operating inside a church does **not** appear in that church's member/team
+- [x] **R226**: A super-admin operating inside a church does **not** appear in that church's member/team
       list or member count — no member doc is created for the super-admin, and the team list excludes any
       super-admin identity.
 
-- [ ] **R227**: While a super-admin is viewing a church they do not belong to, the UI shows a persistent,
+- [x] **R227**: While a super-admin is viewing a church they do not belong to, the UI shows a persistent,
       clear "viewing as super-admin" indicator with a one-click way to exit back to the owner console.
 
 ---
@@ -132,9 +132,9 @@ REQ-IDs continue from v2.0 (last R211).
 | R221 | Phase 77 | Complete |
 | R222 | Phase 75 | Complete |
 | R223 | Phase 75 | Complete |
-| R224 | Phase 78 | Pending |
+| R224 | Phase 78 | Complete |
 | R225 | Phase 78 | Complete |
-| R226 | Phase 78 | Pending |
-| R227 | Phase 78 | Pending |
+| R226 | Phase 78 | Complete |
+| R227 | Phase 78 | Complete |
 
 **Coverage:** 16/16 v2.1 requirements (R212–R227) mapped — Phase 75 (R222-R223), Phase 76 (R212-R214), Phase 77 (R215-R221), Phase 78 (R224-R227). 100% coverage, no orphans, no duplicates.
