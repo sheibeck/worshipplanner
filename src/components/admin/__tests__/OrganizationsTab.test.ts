@@ -850,4 +850,33 @@ describe('OrganizationsTab -- enter church (R224, Phase 78)', () => {
     expect(enterButton.exists()).toBe(true)
     expect(enterButton.attributes('disabled')).toBeUndefined()
   })
+
+  // WR-02 (78-REVIEW.md) — mirrors the double-submit guard convention this
+  // file uses for Onboard/Assign/Deactivate/Delete: the button disables and
+  // a second click while entering is a no-op.
+  it('disables the button while entering and re-enables it once resolved', async () => {
+    let resolveEnter!: () => void
+    mockEnterOrgAsSuperAdmin.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (resolveEnter = resolve)),
+    )
+    const wrapper = await mountWithOneOrg({ active: true })
+
+    const enterButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    void enterButton.trigger('click')
+    await flushPromises()
+
+    const pendingButton = wrapper.findAll('button').find((b) => b.text() === 'Entering...')!
+    expect(pendingButton.attributes('disabled')).toBeDefined()
+
+    // A second click while in-flight must not fire a second call.
+    await pendingButton.trigger('click')
+    await flushPromises()
+    expect(mockEnterOrgAsSuperAdmin).toHaveBeenCalledTimes(1)
+
+    resolveEnter()
+    await flushPromises()
+
+    const settledButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    expect(settledButton.attributes('disabled')).toBeUndefined()
+  })
 })

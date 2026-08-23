@@ -173,9 +173,10 @@
                   <button
                     type="button"
                     @click="onEnterChurch(org)"
-                    class="text-xs text-indigo-300 hover:text-indigo-200 transition-colors"
+                    :disabled="enteringOrgId !== null"
+                    class="text-xs text-indigo-300 hover:text-indigo-200 disabled:opacity-60 transition-colors"
                   >
-                    Enter church
+                    {{ enteringOrgId === org.orgId ? 'Entering...' : 'Enter church' }}
                   </button>
                 </div>
               </td>
@@ -625,11 +626,26 @@ async function onConfirmDelete(typedName: string) {
 // super-admin arm (78-01-PLAN.md). Not gated on org.active -- entering a
 // deactivated org is an explicit, intended support scenario.
 
+// WR-02 (78-REVIEW.md): mirrors this file's other row-action in-flight
+// guards (isOnboarding/isAssigning/togglingOrgId/isDeleting) -- previously
+// this button had no double-submit guard at all, so a rapid double-click
+// (or two different rows in quick succession) could fire two overlapping
+// enterOrgAsSuperAdmin calls that interleave.
+const enteringOrgId = ref<string | null>(null)
+
 async function onEnterChurch(org: OrgSummary): Promise<void> {
-  await authStore.enterOrgAsSuperAdmin(org.orgId)
-  // 'services' has no requiresEditor gate (unlike 'dashboard'), so it is the
-  // safer universal landing route regardless of the forced 'editor' role.
-  router?.push({ name: 'services' })
+  if (enteringOrgId.value !== null) return
+
+  enteringOrgId.value = org.orgId
+  try {
+    await authStore.enterOrgAsSuperAdmin(org.orgId)
+    // 'services' has no requiresEditor gate (unlike 'dashboard'), so it is
+    // the safer universal landing route regardless of the forced 'editor'
+    // role.
+    router?.push({ name: 'services' })
+  } finally {
+    enteringOrgId.value = null
+  }
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────
