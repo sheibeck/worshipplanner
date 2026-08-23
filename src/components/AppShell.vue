@@ -30,6 +30,28 @@
         <span class="ml-3 text-sm font-semibold text-gray-100">Worship Planner</span>
       </div>
 
+      <!-- R227 (Phase 78) — persistent "viewing as super-admin" mode
+           indicator. Visible above <main> regardless of sidebar state, on
+           both mobile and desktop. This banner is the ENTIRE R227 UX
+           contract, so it uses a visually distinct (amber) treatment rather
+           than ordinary chrome. -->
+      <div
+        v-if="authStore.viewingAsSuperAdmin"
+        class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-amber-900/40 border-b border-amber-700/60 text-amber-200 text-sm shrink-0"
+      >
+        <span>
+          Viewing <strong class="font-semibold">{{ authStore.orgName || authStore.viewingAsSuperAdmin }}</strong>
+          as super-admin
+        </span>
+        <button
+          type="button"
+          @click="onExitSuperAdminView"
+          class="text-xs font-medium text-amber-100 hover:text-white underline underline-offset-2 transition-colors"
+        >
+          Exit to owner console
+        </button>
+      </div>
+
       <!-- Page content -->
       <main class="flex-1 overflow-y-auto">
         <slot />
@@ -42,8 +64,18 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import ToastHost from '@/components/ToastHost.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const sidebarOpen = ref(false)
+
+const router = useRouter()
+const authStore = useAuthStore()
+
+function onExitSuperAdminView(): void {
+  authStore.exitSuperAdminView()
+  router?.push('/owner-console')
+}
 </script>
