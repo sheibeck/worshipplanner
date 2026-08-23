@@ -148,6 +148,52 @@ export async function computeOrgsClaimForUid(uid: string): Promise<Record<string
   return buildOrgsMapClaim(memberships);
 }
 
+/**
+ * CR-01 fix (76-REVIEW.md): recomputes the FULL `deactivatedOrgs` claim map
+ * for a set of surviving org memberships, reading each org's live `active`
+ * field. This is the self-heal that closes the gap `setOrgActive`'s one-time
+ * member fan-out (orgProvisioning.ts) cannot: a member who joins an
+ * ALREADY-deactivated org AFTER that fan-out ran (via pending-invite
+ * acceptance or assignOrgAdminHandler) never had `deactivatedOrgs[orgId]`
+ * set for them. Calling this on EVERY `syncOrgMembershipClaim` write (any
+ * members/{uid} create/update/delete) means the very write that adds the new
+ * member also computes their deactivatedOrgs entry from the org's CURRENT
+ * active state -- no dependency on `setOrgActive` having run again.
+ *
+ * `orgIds` should be exactly the keys of the freshly-computed `orgs` map
+ * (computeOrgsClaimForUid's result) -- i.e. every org this uid currently has
+ * a resolved role in. Reads run concurrently via Promise.all, one
+ * `organizations/{orgId}` get per org (the same read shape firestore.rules'
+ * isOrgActive() and orgProvisioning.ts's setOrgActiveHandler/
+ * listOrganizationsHandler already use).
+ *
+ * A missing org doc, or a present doc with no `active` field, resolves to
+ * ACTIVE (default-true, backward-compatible -- mirrors isOrgActive() and
+ * setOrgActiveHandler's own `?? true`) -- such an org contributes NO entry to
+ * the returned map, exactly like `buildOrgsMapClaim` never fabricates a key
+ * that shouldn't be there. Only an org doc that explicitly reads
+ * `active === false` gets a `{ [orgId]: true }` entry.
+ */
+export async function computeDeactivatedOrgsClaimForUid(
+  orgIds: string[],
+): Promise<DeactivatedOrgsClaim> {
+  const db = getFirestore();
+  const states = await Promise.all(
+    orgIds.map(async (orgId) => {
+      const orgSnap = await db.collection("organizations").doc(orgId).get();
+      const active = orgSnap.exists
+        ? ((orgSnap.data() as { active?: boolean } | undefined)?.active ?? true)
+        : true;
+      return { orgId, active };
+    }),
+  );
+  const deactivatedOrgs: DeactivatedOrgsClaim = {};
+  for (const { orgId, active } of states) {
+    if (active === false) deactivatedOrgs[orgId] = true;
+  }
+  return deactivatedOrgs;
+}
+
 export interface DecideMembershipClaimParams {
   uid: string;
   orgId: string;
@@ -295,6 +341,23 @@ export function orgsMapsEqual(
 }
 
 /**
+ * The `deactivatedOrgs`-map counterpart to orgsMapsEqual, same undefined-as-{}
+ * treatment (CR-01, 76-REVIEW.md): a legacy token with no `deactivatedOrgs`
+ * key at all compares equal to a freshly-computed empty map, so a member of
+ * zero deactivated orgs never triggers a spurious claim write.
+ */
+export function deactivatedOrgsMapsEqual(
+  current: DeactivatedOrgsClaim | undefined,
+  next: DeactivatedOrgsClaim,
+): boolean {
+  const currentMap = current ?? {};
+  const currentKeys = Object.keys(currentMap);
+  const nextKeys = Object.keys(next);
+  if (currentKeys.length !== nextKeys.length) return false;
+  return currentKeys.every((key) => currentMap[key] === next[key]);
+}
+
+/**
  * The testable handler body, exported separately from the onDocumentWritten
  * wrapper below -- mirrors requestPptxRenderHandler/requestPptxRender
  * (index.ts). Applies decideMembershipClaim's PRIMARY decision AND a
@@ -314,6 +377,22 @@ export function orgsMapsEqual(
  * The whole body is wrapped in try/catch and resolves with a failure
  * outcome rather than rethrowing -- a throw out of a Firestore trigger
  * causes Cloud Functions retries that would hammer the Auth API (T-40-08).
+ *
+ * CR-01 fix (76-REVIEW.md): ALSO recomputes the `deactivatedOrgs` claim on
+ * every write that reaches computeOrgsClaimForUid (i.e. every write except
+ * the two fully-conservative skips below), from the SAME surviving-orgs list
+ * `orgs` is built from. This is the self-heal that closes the gap in
+ * `setOrgActive`'s one-time member fan-out (orgProvisioning.ts): a member who
+ * joins an ALREADY-deactivated org (pending-invite acceptance, or
+ * assignOrgAdminHandler) fires THIS trigger, which now independently reads
+ * that org's live `active` field and sets `deactivatedOrgs[orgId]`
+ * accordingly -- no dependency on `setOrgActive` running again after they
+ * join. It is also the WR-03 fix: a member removed then re-added mid-
+ * deactivation recomputes fresh on rejoin rather than keeping a stale
+ * fan-out-time value. `computeDeactivatedOrgsClaimForUid` reads ONLY the
+ * orgs the recomputed `orgs` map actually lists (never a stale prior claim),
+ * so a genuinely-active org always yields NO entry -- deactivatedOrgs never
+ * grows a phantom key for a normal/reactivated membership.
  */
 export async function syncOrgMembershipClaimHandler(
   params: SyncOrgMembershipClaimParams,
@@ -330,12 +409,16 @@ export async function syncOrgMembershipClaimHandler(
 
     // Fully-conservative skips: the write is too ambiguous to act on at
     // all (no user doc, or a create/update with no role field -- WR-01).
-    // Never touch orgs here either -- identical to pre-widening behaviour.
+    // Never touch orgs/deactivatedOrgs here either -- identical to
+    // pre-widening behaviour.
     if (decision.action === "skip" && (decision.reason === "no-user-doc" || decision.reason === "missing-role")) {
       return { action: "skip", reason: decision.reason };
     }
 
     const desiredOrgs = await computeOrgsClaimForUid(uid);
+    // CR-01: recomputed from the SAME surviving-org list `orgs` was just
+    // built from -- every org this uid currently has a resolved role in.
+    const desiredDeactivatedOrgs = await computeDeactivatedOrgsClaimForUid(Object.keys(desiredOrgs));
 
     switch (decision.action) {
       case "set":
@@ -343,8 +426,15 @@ export async function syncOrgMembershipClaimHandler(
         // orgs map, preserving superAdmin (or any other unrelated claim).
         // Spread decision.claims into a fresh object literal: OrgMembershipClaim
         // has no index signature, so passing it directly fails TS2345
-        // against Record<string, unknown>.
-        await mergeAndSetCustomClaims(uid, { ...decision.claims, orgs: desiredOrgs });
+        // against Record<string, unknown>. CR-01: deactivatedOrgs rides along
+        // in this SAME write -- the write that creates/updates this member's
+        // primary claim is exactly the moment their deactivated-org status
+        // (if any) must also be established.
+        await mergeAndSetCustomClaims(uid, {
+          ...decision.claims,
+          orgs: desiredOrgs,
+          deactivatedOrgs: desiredDeactivatedOrgs,
+        });
         return { action: "set" };
       case "clear": {
         // A genuine primary-membership delete. Clearing the primary keys and
@@ -360,23 +450,36 @@ export async function syncOrgMembershipClaimHandler(
         // (claimsHelpers.ts), which reads current claims once and applies the
         // clear+set in memory before the single write -- preserving
         // everything it doesn't explicitly touch (e.g. superAdmin).
-        await mergeSetAndClearCustomClaims(uid, { set: { orgs: desiredOrgs }, clear: ORG_CLAIM_KEYS });
+        // CR-01: deactivatedOrgs is recomputed from the survivors here too,
+        // so a primary-org delete that leaves the user still a member of a
+        // deactivated second org keeps that entry, and drops the deleted
+        // org's entry (if any) since it's no longer in desiredOrgs' keys.
+        await mergeSetAndClearCustomClaims(uid, {
+          set: { orgs: desiredOrgs, deactivatedOrgs: desiredDeactivatedOrgs },
+          clear: ORG_CLAIM_KEYS,
+        });
         return { action: "clear" };
       }
       case "skip": {
         // Primary keys are unaffected ("not-primary-org" or
-        // "already-current"), but `orgs` still needs recomputing -- this is
-        // what makes a non-primary-org join/leave update orgs even though
-        // the primary decision never fires for it. Only write if orgs
-        // actually changed; otherwise this is a genuine no-op skip.
+        // "already-current"), but `orgs`/`deactivatedOrgs` still need
+        // recomputing -- this is what makes a non-primary-org join/leave (or
+        // an org's active flag flipping) update either claim even though the
+        // primary decision never fires for it. Only write if either actually
+        // changed; otherwise this is a genuine no-op skip.
         const existingUser = await getAuth().getUser(uid);
-        const existingOrgs = (
-          existingUser.customClaims as { orgs?: Record<string, OrgMembershipRole> } | undefined
-        )?.orgs;
-        if (orgsMapsEqual(existingOrgs, desiredOrgs)) {
+        const existingClaims = existingUser.customClaims as
+          | { orgs?: Record<string, OrgMembershipRole>; deactivatedOrgs?: DeactivatedOrgsClaim }
+          | undefined;
+        const ordersUnchanged = orgsMapsEqual(existingClaims?.orgs, desiredOrgs);
+        const deactivatedUnchanged = deactivatedOrgsMapsEqual(
+          existingClaims?.deactivatedOrgs,
+          desiredDeactivatedOrgs,
+        );
+        if (ordersUnchanged && deactivatedUnchanged) {
           return { action: "skip", reason: decision.reason };
         }
-        await mergeAndSetCustomClaims(uid, { orgs: desiredOrgs });
+        await mergeAndSetCustomClaims(uid, { orgs: desiredOrgs, deactivatedOrgs: desiredDeactivatedOrgs });
         return { action: "set" };
       }
     }

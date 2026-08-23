@@ -5,8 +5,10 @@ import {
   ORG_CLAIM_KEYS,
   buildOrgMembershipClaim,
   buildOrgsMapClaim,
+  computeDeactivatedOrgsClaimForUid,
   computeOrgsClaimForUid,
   decideMembershipClaim,
+  deactivatedOrgsMapsEqual,
   resolveOrgId,
   syncOrgMembershipClaimHandler,
 } from "./orgMembershipClaims";
@@ -71,20 +73,39 @@ function fakeMemberDoc(opts: FakeMemberDocOptions) {
 
 /**
  * A combined getFirestore() mock: `collection("users")` for
- * decideMembershipClaim's primary-org lookup, and `collectionGroup("members")`
- * for computeOrgsClaimForUid's multi-org survivors scan -- mirrors
+ * decideMembershipClaim's primary-org lookup, `collectionGroup("members")`
+ * for computeOrgsClaimForUid's multi-org survivors scan, and (CR-01, Phase
+ * 76) `collection("organizations").doc(orgId).get()` for
+ * computeDeactivatedOrgsClaimForUid's per-org active reads -- mirrors
  * backfillOrgClaims.test.ts's mockFirestore shape so both test files wire the
- * two Firestore read surfaces identically. `memberDocs` defaults to an empty
- * array so every pre-existing call site that only cares about the primary-org
- * decision keeps working unchanged (computeOrgsClaimForUid resolves to {}).
+ * shared Firestore read surfaces identically. `memberDocs` defaults to an
+ * empty array so every pre-existing call site that only cares about the
+ * primary-org decision keeps working unchanged (computeOrgsClaimForUid
+ * resolves to {}). `orgActiveByOrgId` defaults to {} -- every org id not
+ * listed resolves to a NOT-EXISTS org doc, which computeDeactivatedOrgsClaimForUid
+ * treats as active (default-true), so every pre-CR-01 test keeps its
+ * original "nothing is deactivated" behaviour without being touched.
  */
 function mockFirestore(
   userDoc: ReturnType<typeof fakeUserDoc>,
   memberDocs: ReturnType<typeof fakeMemberDoc>[] = [],
+  orgActiveByOrgId: Record<string, boolean> = {},
 ) {
   const usersCollection = { doc: vi.fn(() => userDoc) };
+  const organizationsCollection = {
+    doc: vi.fn((orgId: string) => ({
+      get: vi.fn(async () => {
+        const hasEntry = Object.prototype.hasOwnProperty.call(orgActiveByOrgId, orgId);
+        return {
+          exists: hasEntry,
+          data: () => (hasEntry ? { active: orgActiveByOrgId[orgId] } : undefined),
+        };
+      }),
+    })),
+  };
   const collectionSpy = vi.fn((name: string) => {
     if (name === "users") return usersCollection;
+    if (name === "organizations") return organizationsCollection;
     throw new Error(`mockFirestore: unexpected collection "${name}"`);
   });
   const collectionGroupSpy = vi.fn((name: string) => {
@@ -95,7 +116,7 @@ function mockFirestore(
     collection: collectionSpy,
     collectionGroup: collectionGroupSpy,
   } as never);
-  return { usersCollection, collectionSpy, collectionGroupSpy };
+  return { usersCollection, organizationsCollection, collectionSpy, collectionGroupSpy };
 }
 
 function mockAuth(opts: {
@@ -373,6 +394,7 @@ describe("syncOrgMembershipClaimHandler", () => {
       orgId: ORG_A,
       role: "editor",
       orgs: { orgA: "editor" },
+      deactivatedOrgs: {},
     });
     expect(outcome).toEqual({ action: "set" });
   });
@@ -391,6 +413,7 @@ describe("syncOrgMembershipClaimHandler", () => {
       orgId: ORG_A,
       role: "viewer",
       orgs: { orgA: "viewer" },
+      deactivatedOrgs: {},
     });
     expect(outcome).toEqual({ action: "set" });
   });
@@ -409,6 +432,7 @@ describe("syncOrgMembershipClaimHandler", () => {
       orgId: ORG_A,
       role: "editor",
       orgs: { orgA: "editor" },
+      deactivatedOrgs: {},
     });
   });
 
@@ -433,6 +457,7 @@ describe("syncOrgMembershipClaimHandler", () => {
       orgId: ORG_A,
       role: "editor",
       orgs: { orgA: "editor", orgB: "viewer" },
+      deactivatedOrgs: {},
     });
     expect(outcome).toEqual({ action: "set" });
   });
@@ -559,7 +584,7 @@ describe("syncOrgMembershipClaimHandler", () => {
     // (proves the primary-clear and orgs-recompute are independent, not a
     // blanket clear, while happening in a single write).
     expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
-    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgs: { orgB: "viewer" } });
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgs: { orgB: "viewer" }, deactivatedOrgs: {} });
     expect(outcome).toEqual({ action: "clear" });
   });
 
@@ -574,7 +599,7 @@ describe("syncOrgMembershipClaimHandler", () => {
     });
 
     expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
-    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgs: {} });
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgs: {}, deactivatedOrgs: {} });
     expect(outcome).toEqual({ action: "clear" });
   });
 
@@ -594,6 +619,7 @@ describe("syncOrgMembershipClaimHandler", () => {
       orgId: ORG_A,
       role: "editor",
       orgs: { orgA: "editor" },
+      deactivatedOrgs: {},
     });
     expect(outcome).toEqual({ action: "set" });
   });
@@ -615,7 +641,7 @@ describe("syncOrgMembershipClaimHandler", () => {
     // WR-01: exactly ONE claim write for the delete path -- no orgId/role, no
     // stale org left in `orgs`, superAdmin still intact.
     expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
-    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { superAdmin: true, orgs: {} });
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { superAdmin: true, orgs: {}, deactivatedOrgs: {} });
     const [, writtenClaims] = setCustomUserClaims.mock.calls[0]!;
     expect(writtenClaims).not.toHaveProperty("orgId");
     expect(writtenClaims).not.toHaveProperty("role");
@@ -674,5 +700,162 @@ describe("syncOrgMembershipClaimHandler", () => {
       expect.any(Error),
     );
     consoleErrorSpy.mockRestore();
+  });
+
+  // --- CR-01 (76-REVIEW.md): the trigger self-heal ---------------------------
+  // A member who joins an ALREADY-deactivated org after setOrgActive's
+  // one-time fan-out ran (pending-invite acceptance, or assignOrgAdminHandler)
+  // still fires THIS trigger -- it must independently compute deactivatedOrgs
+  // from the org's live active state, not rely on setOrgActive running again.
+
+  it("CR-01: a brand-new member of an ALREADY-deactivated org gets deactivatedOrgs[orgId] set on the SAME write that grants their primary claim", async () => {
+    mockFirestore(
+      fakeUserDoc(true, [ORG_A]),
+      [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })],
+      { [ORG_A]: false },
+    );
+    const { setCustomUserClaims } = mockAuth({ existingClaims: undefined });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: { role: "editor" },
+    });
+
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor" },
+      deactivatedOrgs: { orgA: true },
+    });
+    expect(outcome).toEqual({ action: "set" });
+  });
+
+  it("CR-01: a member joining a SECOND, deactivated org (non-primary write) gets deactivatedOrgs[orgB] set, orgA's active status is unaffected", async () => {
+    mockFirestore(
+      fakeUserDoc(true, [ORG_A]),
+      [
+        fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A }),
+        fakeMemberDoc({ uid: UID, role: "viewer", orgId: ORG_B }),
+      ],
+      { [ORG_B]: false },
+    );
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", orgs: { orgA: "editor" }, deactivatedOrgs: {} },
+    });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_B,
+      uid: UID,
+      after: { role: "viewer" },
+    });
+
+    // Skip branch: the write merges onto the EXISTING claims via
+    // mergeAndSetCustomClaims -- orgId/role survive untouched (this write
+    // never decided to clear or reset them), only orgs/deactivatedOrgs change.
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor", orgB: "viewer" },
+      deactivatedOrgs: { orgB: true },
+    });
+    expect(outcome).toEqual({ action: "set" });
+  });
+
+  it("CR-01: an org whose doc has no `active` field at all (pre-Phase-76) never gets a deactivatedOrgs entry", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })]);
+    const { setCustomUserClaims } = mockAuth({ existingClaims: undefined });
+
+    await syncOrgMembershipClaimHandler({ orgId: ORG_A, uid: UID, after: { role: "editor" } });
+
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor" },
+      deactivatedOrgs: {},
+    });
+  });
+
+  // --- WR-03 (76-REVIEW.md): reactivate-fan-out / rejoin symmetry -------------
+  // Same self-heal closes the reactivate-side gap: a member removed then
+  // re-added mid-deactivation, or an org reactivated after a member rejoined,
+  // recomputes fresh from the org's CURRENT active state on every write.
+
+  it("WR-03: a member re-added to an org that has since been REACTIVATED gets NO deactivatedOrgs entry, even though a stale claim from before still carried one", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })], {
+      [ORG_A]: true,
+    });
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", orgs: { orgA: "editor" }, deactivatedOrgs: { orgA: true } },
+    });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: { role: "editor" },
+    });
+
+    // Primary orgId/role are already current (and survive the merge
+    // untouched), but deactivatedOrgs changed (stale {orgA:true} -> fresh
+    // {}), so this is NOT a no-op skip.
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor" },
+      deactivatedOrgs: {},
+    });
+    expect(outcome).toEqual({ action: "set" });
+  });
+
+  it("idempotency: a re-fired write with orgs AND deactivatedOrgs both already current issues no redundant setCustomUserClaims call", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })], {
+      [ORG_A]: false,
+    });
+    const { setCustomUserClaims } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", orgs: { orgA: "editor" }, deactivatedOrgs: { orgA: true } },
+    });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: { role: "editor" },
+    });
+
+    expect(setCustomUserClaims).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ action: "skip", reason: "already-current" });
+  });
+});
+
+describe("computeDeactivatedOrgsClaimForUid", () => {
+  it("returns { [orgId]: true } only for orgs whose doc explicitly reads active: false", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [], { [ORG_A]: false, [ORG_B]: true });
+
+    expect(await computeDeactivatedOrgsClaimForUid([ORG_A, ORG_B])).toEqual({ orgA: true });
+  });
+
+  it("treats a MISSING org doc as active -- no entry, mirrors isOrgActive()'s default-true", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [], {});
+
+    expect(await computeDeactivatedOrgsClaimForUid([ORG_A])).toEqual({});
+  });
+
+  it("returns {} for an empty orgIds list", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [], {});
+
+    expect(await computeDeactivatedOrgsClaimForUid([])).toEqual({});
+  });
+});
+
+describe("deactivatedOrgsMapsEqual", () => {
+  it("treats undefined as equivalent to {}", () => {
+    expect(deactivatedOrgsMapsEqual(undefined, {})).toBe(true);
+  });
+
+  it("returns false when a key's presence differs", () => {
+    expect(deactivatedOrgsMapsEqual({}, { orgA: true })).toBe(false);
+  });
+
+  it("returns true for an identical single-entry map", () => {
+    expect(deactivatedOrgsMapsEqual({ orgA: true }, { orgA: true })).toBe(true);
   });
 });
