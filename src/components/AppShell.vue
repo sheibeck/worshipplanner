@@ -74,8 +74,10 @@ const sidebarOpen = ref(false)
 const router = useRouter()
 const authStore = useAuthStore()
 
-function onExitSuperAdminView(): void {
-  authStore.exitSuperAdminView()
+async function onExitSuperAdminView(): Promise<void> {
+  // Quick 260823: exitSuperAdminView is now async (it reloads the super-admin's
+  // own church context). Await it so the nav has settled before we navigate.
+  await authStore.exitSuperAdminView()
   router?.push('/owner-console')
 }
 </script>

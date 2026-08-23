@@ -140,7 +140,9 @@ router.beforeEach(async (to) => {
       const authStore = useAuthStore()
       await authStore.waitForReady()
       if (authStore.requiresOrgSelection) {
-        return { name: 'select-church' }
+        // Quick 260823: a churchless super-admin has no church to pick — send
+        // them to the Owner Console instead of the empty /select-church picker.
+        return { name: authStore.isChurchlessSuperAdmin ? 'owner-console' : 'select-church' }
       }
     }
   }
@@ -150,6 +152,12 @@ router.beforeEach(async (to) => {
     const { useAuthStore } = await import('../stores/auth')
     const authStore = useAuthStore()
     await authStore.waitForReady()
+    // Quick 260823: a churchless super-admin would otherwise be stuck here
+    // (requiresOrgSelection stays true with zero memberships) — route them to
+    // the Owner Console, their real home.
+    if (authStore.isChurchlessSuperAdmin) {
+      return { name: 'owner-console' }
+    }
     if (!authStore.requiresOrgSelection) {
       await authStore.waitForRole()
       return { name: authStore.isEditor ? 'dashboard' : 'services' }
@@ -194,7 +202,8 @@ router.beforeEach(async (to) => {
       const authStore = useAuthStore()
       await authStore.waitForReady()
       if (authStore.requiresOrgSelection) {
-        return { name: 'select-church' }
+        // Quick 260823: churchless super-admin lands on the Owner Console.
+        return { name: authStore.isChurchlessSuperAdmin ? 'owner-console' : 'select-church' }
       }
       await authStore.waitForRole()
       return { name: authStore.isEditor ? 'dashboard' : 'services' }

@@ -12,9 +12,21 @@
       </div>
     </div>
 
-    <!-- Org name -->
-    <div v-if="authStore.orgName" class="px-5 py-2 border-b border-gray-800">
-      <p class="text-xs text-gray-500 truncate">{{ authStore.orgName }}</p>
+    <!-- Org name / super-admin location indicator -->
+    <div
+      v-if="authStore.orgName || authStore.superAdminOutsideOwnChurch"
+      class="px-5 py-2 border-b border-gray-800"
+    >
+      <template v-if="authStore.orgName">
+        <p class="text-xs text-gray-500 truncate">{{ authStore.orgName }}</p>
+        <!-- Quick 260823: make it clear this church is being viewed as a
+             super-admin, not the super-admin's own church. -->
+        <p v-if="authStore.viewingAsSuperAdmin" class="text-[10px] text-amber-400 truncate">
+          viewing as super-admin
+        </p>
+      </template>
+      <!-- Super-admin sitting at the Owner Console with no active church. -->
+      <p v-else class="text-xs text-amber-400 truncate">Super Admin · not in a church</p>
     </div>
 
     <!-- Nav -->
@@ -94,14 +106,21 @@ const navItems = computed(() => {
     })
   }
 
-  // Group A: Services (visible for all roles), Songs
-  items.push({
-    label: 'Services',
-    to: '/services',
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>`,
-  })
+  // Group A: Services (visible for all roles), Songs — but only when there is
+  // an active church context. Quick 260823: previously pushed unconditionally,
+  // which left a stray "Services" link at the Owner Console after a super-admin
+  // exited a visited church (userRole null hid every isEditor item but not this
+  // one). Gate it on orgId so a super-admin with no active church sees only the
+  // Owner Console.
+  if (authStore.orgId) {
+    items.push({
+      label: 'Services',
+      to: '/services',
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>`,
+    })
+  }
 
   if (authStore.isEditor) {
     items.push({

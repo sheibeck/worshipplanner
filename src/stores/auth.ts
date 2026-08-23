@@ -176,6 +176,23 @@ export const useAuthStore = defineStore('auth', () => {
     () => needsOrgSelection.value || hasNoOrg.value || hasDeactivatedOrg.value,
   )
 
+  // Quick 260823 (Phase 78 UAT follow-up) — a super-admin who belongs to NO
+  // church. Such a session has no Services / own-church nav to land on, so the
+  // router sends it to the Owner Console rather than the (empty) /select-church
+  // picker. Distinct from `hasNoOrg`, which stays viewingAsSuperAdmin-guarded
+  // for the enter-a-church flow; this one keys purely on real memberships.
+  const isChurchlessSuperAdmin = computed(
+    () => isSuperAdmin.value && memberships.value.length === 0,
+  )
+  // True whenever a super-admin is NOT currently inside their own church —
+  // either viewing another church via enterOrgAsSuperAdmin, or sitting at the
+  // Owner Console with no active own-church context. Drives the sidebar's
+  // "not in a church" clarity indicator so the super-admin always knows where
+  // they are (owner UAT ask, 2026-08-23).
+  const superAdminOutsideOwnChurch = computed(
+    () => isSuperAdmin.value && (viewingAsSuperAdmin.value !== null || orgId.value === null),
+  )
+
   const hasPcCredentials = computed(
     () =>
       pcAppId.value !== null &&
@@ -623,11 +640,20 @@ export const useAuthStore = defineStore('auth', () => {
 
   // R227 — ends a super-admin's cross-tenant visit, restoring the store to
   // its pre-visit (no-org) state.
-  function exitSuperAdminView(): void {
+  async function exitSuperAdminView(): Promise<void> {
     if (viewingAsSuperAdmin.value === null) return
     // IN-01 (78-REVIEW.md): resetOrgContext() below already sets
     // viewingAsSuperAdmin.value = null -- no separate clear needed here.
     resetOrgContext()
+    // Quick 260823: restore the super-admin's OWN church context so exiting a
+    // visited church returns them to their normal nav (own church + Owner
+    // Console) instead of the partial no-org state that left only a stray
+    // "Services" link. A churchless super-admin resolves to no active org
+    // (loadOrgContext's activeId === null branch); the router then lands them
+    // on the Owner Console via isChurchlessSuperAdmin.
+    if (user.value) {
+      await loadOrgContext(user.value.uid, false)
+    }
   }
 
   async function ensureUserDocument(firebaseUser: User): Promise<{ membershipCreated: boolean }> {
@@ -777,6 +803,8 @@ export const useAuthStore = defineStore('auth', () => {
     deactivatedOrgMessage,
     hasDeactivatedOrg,
     requiresOrgSelection,
+    isChurchlessSuperAdmin,
+    superAdminOutsideOwnChurch,
     selectOrg,
     viewingAsSuperAdmin,
     enterOrgAsSuperAdmin,
