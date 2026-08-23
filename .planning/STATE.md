@@ -4,11 +4,11 @@ milestone: v2.1
 milestone_name: Organization Lifecycle & Super-Admin Access
 current_phase: 78
 current_phase_name: Super-Admin Enter-Any-Church
-status: milestone-code-complete
-stopped_at: v2.1 ALL 4 phases (75-78) code-complete + auto-verified + (76/77/78) SECURED; STOPPED before milestone lifecycle per the v2.1 grant — owner runs /gsd-verify-work 75-78 + the owner-gated deploys, then audit→complete→cleanup
-last_updated: "2026-08-23T05:14:06.996Z"
-last_activity: 2026-08-22
-last_activity_desc: Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim helper
+status: Awaiting next milestone
+stopped_at: v1.9 + v2.0 + v2.1 DEPLOYED to production 2026-08-23 (in order: functions → rules → hosting; first super-admin bootstrapped; multi-org claim backfill applied, 3 accounts). All three closed on owner acceptance and archived. Human UAT (/gsd-verify-work 68-71, 72-74, 75-78) deferred and preserved in PENDING-VERIFICATION.md.
+last_updated: "2026-08-23T20:45:40.350Z"
+last_activity: 2026-08-23
+last_activity_desc: Deployed + closed + archived v1.9, v2.0, v2.1 (three stacked milestones shipped together)
 progress:
   total_phases: 4
   completed_phases: 4
@@ -17,7 +17,14 @@ progress:
   percent: 100
 ---
 
-# ▶ ACTIVE MILESTONE — v2.1 Organization Lifecycle & Super-Admin Access (started 2026-08-22)
+# ✔ SHIPPED MILESTONE — v2.1 Organization Lifecycle & Super-Admin Access (started 2026-08-22, deployed + closed 2026-08-23)
+
+> **Shipped 2026-08-23** as the last of three stacked milestones (v1.9 → v2.0 → v2.1) deployed together
+> in one production session: `firebase deploy --only functions` (widened claim writer + 8 new
+> functions), `firebase deploy --only firestore:rules,storage` (all additive), `firebase deploy --only
+> hosting`, first super-admin bootstrapped, multi-org claim backfill applied (3 accounts,
+> idempotent-verified). Audit PASSED (16/16). Closed on owner acceptance; human UAT deferred to
+> PENDING-VERIFICATION.md. Archived: MILESTONES.md entries + milestones/v{1.9,2.0,2.1}-* + git tags.
 
 **Goal:** Give the super-admin full lifecycle control over churches from the Organizations tab —
 deactivate, delete-with-full-cleanup, see pending invites, and drop into any church to help — without

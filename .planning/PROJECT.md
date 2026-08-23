@@ -8,9 +8,12 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.1 Organization Lifecycle & Super-Admin Access
+## Last Shipped: v2.1 Organization Lifecycle & Super-Admin Access (deployed 2026-08-23)
 
-**Goal:** Give the super-admin full lifecycle control over churches from the Organizations tab —
+> No active milestone. v1.9, v2.0, v2.1 shipped together to production 2026-08-23 (in order:
+> v1.9 → v2.0 → v2.1). Start the next with `/gsd-new-milestone`.
+
+**Goal (delivered):** Give the super-admin full lifecycle control over churches from the Organizations tab —
 deactivate, delete-with-full-cleanup, see pending invites, and drop into any church to help — without
 leaking cross-tenant access to ordinary users.
 

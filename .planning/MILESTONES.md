@@ -1,5 +1,110 @@
 # Milestones
 
+## v2.1 Organization Lifecycle & Super-Admin Access (Shipped: 2026-08-23)
+
+**Phases completed:** 4 phases (75–78), 7 plans
+
+**Audit:** [v2.1-MILESTONE-AUDIT.md](milestones/v2.1-MILESTONE-AUDIT.md) — PASSED (16/16 reqs, 5/5
+integration seams WIRED, 3/3 security-critical phases SECURED).
+
+**Deployed to production 2026-08-23** as the third of three stacked milestones (v1.9 → v2.0 → v2.1,
+deployed in that order because each depends on the prior's auth-claim widening). Closed on owner
+acceptance with human UAT (`/gsd-verify-work 75–78`) deferred and preserved in
+`PENDING-VERIFICATION.md`, mirroring the v1.4–v1.7 close pattern (and, unlike those, deployed at close).
+
+**Key accomplishments:**
+
+- **Phase 75 — Pending-Invite Visibility:** the super-admin Organizations list distinguishes active
+  (logged-in) members from invited-but-pending ones, computed server-side by the existing
+  `listOrganizations` callable.
+- **Phase 76 — Church Deactivation & Reactivation (SECURED 11/11):** a super-admin-gated `setOrgActive`
+  callable flips an org's `active` status, `firestore.rules`/`storage.rules` deny a deactivated org's
+  members org-scoped access (Firestore via a live `get()`, Storage via a fanned-out `deactivatedOrgs`
+  claim since cross-service reads are inert there), and reactivation restores it; lifecycle fields are
+  callable-write-only.
+- **Phase 77 — Church Deletion, Cascade Cleanup (SECURED 11/11):** deletion is gated on prior
+  deactivation, runs through a re-verifying super-admin-gated `deleteOrganization` callable that
+  cascades every Firestore subcollection + cross-reference + Storage object, requires typed
+  confirmation, and is safely retriable; `allow delete: if false` keeps clients out entirely.
+- **Phase 78 — Super-Admin Enter-Any-Church (SECURED 7/7):** an additive super-admin arm in
+  `firestore.rules`/`storage.rules` grants a super-admin editor-equivalent read/write on any church
+  with no membership doc (invisible to that church's member list), with a persistent "viewing as
+  super-admin" banner and exit; the "no member doc" contract is enforced client-side (accepted
+  residual T-78-03, documented inline).
+
+**Deploy (owner-run 2026-08-23):** `firebase deploy --only firestore:rules,storage,functions` (added
+`setOrgActive`, `deleteOrganization`, `listOrganizations`; `onboardOrganization` from v2.0) + hosting
+(client UI). First super-admin bootstrapped via `node lib/bootstrapSuperAdmin.js --apply`.
+
+---
+
+## v2.0 Multi-Church Onboarding & Owner Console Tabs (Shipped: 2026-08-23)
+
+**Phases completed:** 3 phases (72–74), 6 plans
+
+**Delivered:** Turned the owner console into a tabbed Configuration/Organizations shell and added
+platform-level multi-tenancy — onboard a new church end-to-end and assign its first admin — while
+closing the multi-org Storage auth-claim gap (backlog 999.5) that onboarding a second-org admin would
+otherwise trip. **Deployed to production 2026-08-23** (second of the three stacked milestones). Closed
+on owner acceptance; human UAT (`/gsd-verify-work 72–74`) deferred and preserved in
+`PENDING-VERIFICATION.md`. Requirements R193–R211 (19, 100% mapped).
+
+**Key accomplishments:**
+
+- **Phase 72 — Owner Console Tabs:** restructured `OwnerConsoleView` into a query-driven tabbed shell
+  (Configuration = the pre-v2.0 console body relocated byte-for-byte; Organizations = the new tab),
+  super-admin-gated, with the open tab reflected in the route query.
+- **Phase 73 — Multi-Org Storage Auth Claim (SECURED 6/6, backlog 999.5):** widened the org-membership
+  claim to an additive `orgs: {[orgId]: role}` map (recomputed from `collectionGroup('members')`,
+  superAdmin-preserving), widened `storage.rules`' `isOrgMemberByClaim` with a null-guarded `orgs` arm
+  ORed with the legacy primary-only arm (no access gap during rollout), plus an idempotent
+  dry-run/`--apply` backfill.
+- **Phase 74 — Organizations: List, Onboard & Admin Assignment (SECURED 8/8):** three super-admin-gated
+  callables — `listOrganizations` (server `count()` summaries), `onboardOrganization` (atomic org +
+  default `OrgSettings` + seeded service template + first admin at editor tier, plus a Resend
+  onboarding email), and `assignOrgAdmin` (additive `arrayUnion` membership or invite) — plus the
+  Organizations tab UI; the client never writes `organizations/*`, `orgNames/*`, or another org's
+  `members/*` directly.
+
+**Deploy (owner-run 2026-08-23):** widened `syncOrgMembershipClaim` + the three callables via
+`firebase deploy --only functions`; `storage.rules` via `firebase deploy --only storage`; multi-org
+claim backfill `node lib/backfillOrgClaims.js --apply` (3 accounts, idempotent-verified).
+
+---
+
+## v1.9 Owner Admin Console (Shipped: 2026-08-23)
+
+**Phases completed:** 4 phases (68–71), 12 plans
+
+**Delivered:** A super-admin owner console lifting the v1.8 cost/cleanup levers and the no-reply sender
+into Firestore-backed runtime config, with a dry-run blast-radius preview gating every cleanup-toggle
+flip. **Deployed to production 2026-08-23** (first of the three stacked milestones — its super-admin
+claim + claim-merge fix are the foundation v2.0's multi-org claim and v2.1's lifecycle logic build on).
+Closed on owner acceptance; human UAT (`/gsd-verify-work 68–71`) deferred and preserved in
+`PENDING-VERIFICATION.md`. Requirements R175–R192.
+
+**Key accomplishments:**
+
+- **Phase 68 — Super-Admin Access Gate & Claim-Merge Fix:** an end-to-end `superAdmin` custom-claim
+  gate — grantable via `superAdmins/{uid}`, enforced by both the client route and claim-only Firestore
+  rules — with the shared `mergeAndSetCustomClaims`/`clearClaimKeys` helper closing the claim-replace
+  hazard (a claim write no longer wipes `orgId`/`role`).
+- **Phase 69 — Firestore Runtime Config:** every v1.8 cost/cleanup/messaging knob moved out of
+  `process.env` into an admin-only `appConfig/global` doc that 7 Cloud Functions read at runtime, with
+  safe deep-merged defaults so an absent/empty doc reproduces prior behavior byte-for-byte.
+- **Phase 70 — Admin Console UI & No-Reply Sender:** a super-admin console showing/editing every
+  managed setting with validation and provenance, plus the app's no-reply sender configuration.
+- **Phase 71 — Cleanup Deletion-Toggle Safety:** a dry-run blast-radius preview (`previewCleanupDryRun`
+  callable) and explicit confirm step gate every `*_CLEANUP_ENABLED` flip, with the song-linked
+  background fail-safes proven intact.
+
+**Deploy (owner-run 2026-08-23):** `firebase deploy --only firestore:rules,functions` (added
+`syncSuperAdminClaim`, `setSuperAdminClaim`, `previewCleanupDryRun`; swapped 7 functions to the
+`appConfig` read) + hosting. First super-admin granted via
+`node lib/bootstrapSuperAdmin.js --email sheibeck@gmail.com --apply`.
+
+---
+
 ## v1.8 Cost & Billing Hardening (Shipped: 2026-08-20)
 
 **Phases completed:** 3 phases, 6 plans, 13 tasks
