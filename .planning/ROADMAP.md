@@ -707,7 +707,17 @@ tests that a super-admin gets in and an ordinary non-member does not.
   4. While viewing a church they don't belong to, the super-admin sees a persistent "viewing as
      super-admin" indicator with a one-click way to exit back to the owner console (R227).
 
-**Plans**: TBD
+**Plans**: 2/2 plans planned
+
+Plans:
+
+- [ ] 78-01-PLAN.md — Rules: `isOrgMember`/`isOrgEditor` super-admin arm + org-doc lifecycle-guard
+      composition fix (firestore.rules); `isOrgMemberByClaim` super-admin arm (storage.rules); genuine
+      emulator ALLOW/DENY suite (R225)
+- [ ] 78-02-PLAN.md — Client: `enterOrgAsSuperAdmin`/`exitSuperAdminView` + `hasNoOrg` router-guard fix
+      (auth.ts); per-row "Enter church" action (OrganizationsTab.vue, R224); persistent "viewing as
+      super-admin" banner + exit (AppShell.vue, R227); R226 no-member-doc unit test coverage
+
 **UI hint**: yes
 **Deploy**: A super-admin arm added to `firestore.rules` and `storage.rules` (composed on top of Phase
 76's deactivation-aware rules). Ships built + tested + UNDEPLOYED, with the exact
