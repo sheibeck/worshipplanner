@@ -320,6 +320,17 @@ working for a newly-onboarded second-org admin (999.5). Full list in `.planning/
       first slice "Configurable Teams": per-org team list (like roster roles) + generalized per-team song-tag
       filter + drop the ordinal-Sunday auto-team rule. Kills the owner-named "team list" + "orchestra checkbox"
       tailoring (backlog 999.8)
+- [ ] Warn/guard against per-entry customization of a PENDING deck slide that is lost when the render flips
+      pending→ready (`EditSlideDrawer.vue` has no `renderState` awareness) — carry-forward C4, owner-decision
+      on a follow-up phase. Detail in `PENDING-VERIFICATION.md` C4 (backlog 999.9)
+- [ ] `deleteService` should revoke the service's `shareTokens`/`serviceShares`/`serviceShareLinks` (as
+      `deleteQuarter` already does) so a deleted service's public share token isn't permanent — carry-forward
+      C5; `allow delete` rules already in place, no rules change needed. Detail in `PENDING-VERIFICATION.md` C5
+      (backlog 999.10)
+- [ ] Harden 2 known-open `firestore.rules` findings — (1) `organizations/{orgId}` `allow write: if
+      isOrgEditor` lets an editor rewrite `createdBy` (`firestore.rules:31`); (2) `inviteLookup/{email}` `allow
+      create: if isSignedIn()` self-invite vector (`firestore.rules:173`) — carry-forward C2 residual. Detail
+      in `PENDING-VERIFICATION.md` C2 (backlog 999.11)
 
 ### Out of Scope
 
