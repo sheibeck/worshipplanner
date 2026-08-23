@@ -10,6 +10,16 @@
       </div>
 
       <div class="bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-6 space-y-4">
+        <!-- R213 (Phase 76) — store-driven deactivation message, distinct
+             from this view's own selectOrg-try/catch errorMessage below. -->
+        <p
+          v-if="authStore.deactivatedOrgMessage"
+          data-testid="deactivated-message"
+          class="text-sm text-amber-400 bg-amber-950 border border-amber-800 rounded-lg px-3 py-2"
+        >
+          {{ authStore.deactivatedOrgMessage }}
+        </p>
+
         <!-- Church picker (multi-org user) -->
         <template v-if="hasChurches">
           <button
@@ -17,11 +27,14 @@
             :key="m.id"
             type="button"
             @click="choose(m.id)"
-            :disabled="isSelecting"
+            :disabled="isSelecting || m.active === false"
             data-testid="church-option"
             class="w-full flex items-center justify-between gap-3 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-sm font-medium text-gray-100 hover:bg-gray-700 hover:border-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left"
           >
-            <span class="truncate">{{ m.name }}</span>
+            <span class="truncate">
+              {{ m.name }}
+              <span v-if="m.active === false" class="text-gray-500 text-xs ml-1">(deactivated)</span>
+            </span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-4 w-4 shrink-0 text-gray-500"
