@@ -625,11 +625,11 @@ of Phase 78, whose rules arm composes on top of this phase's rules change)
   4. A super-admin can reactivate a deactivated org, and its members regain normal access on their next
      load with no manual per-user fix-up (R214).
 
-**Plans**: 0/2 plans executed
+**Plans**: 1/2 plans executed
 
 Plans:
 
-- [ ] 76-01-PLAN.md — Server: `setOrgActive` callable + `deactivatedOrgs` claim fan-out (R212, R214); `firestore.rules` `isOrgActive()` + `storage.rules` `isOrgDeactivatedForCaller()` guards with emulator ALLOW/DENY suites (R213)
+- [x] 76-01-PLAN.md — Server: `setOrgActive` callable + `deactivatedOrgs` claim fan-out (R212, R214); `firestore.rules` `isOrgActive()` + `storage.rules` `isOrgDeactivatedForCaller()` guards with emulator ALLOW/DENY suites (R213)
 - [ ] 76-02-PLAN.md — Client: `auth.ts` login-block for a deactivated org (R213); church picker greys out deactivated orgs (R213); Deactivate/Reactivate control on the Organizations tab (R212, R214)
 
 **UI hint**: yes
@@ -726,7 +726,7 @@ tests that a super-admin gets in and an ordinary non-member does not.
 | 73 | v2.0 | 3/3 | Code-complete + SECURED (deploy UAT deferred) | 2026-08-21 |
 | 74 | v2.0 | 2/2 | Code-complete + SECURED (deploy/UAT deferred) | 2026-08-21 |
 | 75 | v2.1 | 1/1 | Code-complete (UAT deferred) | 2026-08-22 |
-| 76 | v2.1 | 0/TBD | Not started | - |
+| 76 | v2.1 | 1/2 | In Progress|  |
 | 77 | v2.1 | 0/TBD | Not started | - |
 | 78 | v2.1 | 0/TBD | Not started | - |
 

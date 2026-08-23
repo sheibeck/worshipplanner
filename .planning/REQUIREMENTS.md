@@ -25,16 +25,17 @@ REQ-IDs continue from v2.0 (last R211).
 
 ### Church deactivation
 
-- [ ] **R212**: A super-admin can deactivate an organization from the Organizations tab, persisting a
+- [x] **R212**: A super-admin can deactivate an organization from the Organizations tab, persisting a
       deactivated status on the org record (e.g. `active: false` / `deactivatedAt` + `deactivatedBy`), via a
       super-admin-gated server callable — the client never flips another org's status directly.
 
 - [ ] **R213**: While an org is deactivated, all of its members are blocked from using it — enforced both in
       the client sign-in/org-load flow AND by `firestore.rules`/`storage.rules` (a deactivated org's members
       are denied org-scoped reads/writes) — surfaced as a clear "this church is deactivated" message, never a
-      silent failure or a blank app.
+      silent failure or a blank app. (Server half — `firestore.rules`/`storage.rules` — shipped in 76-01;
+      client sign-in/org-load block remains, planned for 76-02.)
 
-- [ ] **R214**: A super-admin can reactivate a deactivated organization, restoring its members' normal
+- [x] **R214**: A super-admin can reactivate a deactivated organization, restoring its members' normal
       access on their next load.
 
 ### Church deletion (deactivate-gated, full cascade)
@@ -119,9 +120,9 @@ REQ-IDs continue from v2.0 (last R211).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R212 | Phase 76 | Pending |
-| R213 | Phase 76 | Pending |
-| R214 | Phase 76 | Pending |
+| R212 | Phase 76 | Complete |
+| R213 | Phase 76 | In Progress (server half complete, client half pending 76-02) |
+| R214 | Phase 76 | Complete |
 | R215 | Phase 77 | Pending |
 | R216 | Phase 77 | Pending |
 | R217 | Phase 77 | Pending |

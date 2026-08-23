@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Organization Lifecycle & Super-Admin Access
-current_phase: 75
-current_phase_name: Pending-Invite Visibility
+current_phase: 76
+current_phase_name: Church Deactivation & Reactivation
 status: executing
-stopped_at: Completed 75-01-PLAN.md
-last_updated: "2026-08-22T19:24:22.189Z"
+stopped_at: Completed 76-01-PLAN.md
+last_updated: "2026-08-22T20:09:03.000Z"
 last_activity: 2026-08-22
-last_activity_desc: Executed 75-01-PLAN.md (pendingCount server aggregate + Members-cell badge)
+last_activity_desc: Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim fan-out + firestore.rules/storage.rules deactivation gates)
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 1
+  total_plans: 2
   completed_plans: 1
-  percent: 25
+  percent: 31
 ---
 
 # ▶ ACTIVE MILESTONE — v2.1 Organization Lifecycle & Super-Admin Access (started 2026-08-22)
@@ -826,7 +826,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 75 — pending-invite-visibility (75-01 executed, code-complete + undeployed)
+**Current focus:** Phase 76 — church-deactivation-reactivation (76-01 server enforcement executed, code-complete + undeployed; 76-02 client login-block remains)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -836,10 +836,16 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 75 of 78 (Pending-Invite Visibility) — 75-01 executed (code-complete, undeployed)
-Plan: 75-01 complete
-Status: Phase 75 code-complete — pendingCount server + UI shipped, awaiting owner deploy hand-over
-Last activity: 2026-08-22 — Executed 75-01-PLAN.md (pendingCount server aggregate + Members-cell badge)
+Phase: 76 of 78 (Church Deactivation & Reactivation) — 76-01 (server enforcement) executed, code-complete, undeployed
+Plan: 76-01 complete; 76-02 (client login-block/UX) not yet planned
+Status: Phase 76 server half code-complete — setOrgActive callable + deactivatedOrgs claim fan-out +
+firestore.rules/storage.rules deactivation gates shipped, awaiting owner deploy hand-over
+(`firebase deploy --only firestore:rules,storage,functions:setOrgActive`). See
+.planning/phases/76-church-deactivation-reactivation/76-01-SUMMARY.md for the two auto-fixed
+rules-engine deviations found and resolved during execution (firestore.rules isOrgActive() Null-value
+guard; storage.rules deactivatedOrgs `.get(key, default)` accessor).
+Last activity: 2026-08-22 — Executed 76-01-PLAN.md (setOrgActive callable + deactivatedOrgs claim helper
++ firestore.rules isOrgActive + storage.rules deactivatedOrgs guard + emulator ALLOW/DENY suites)
 
 ## ★ v2.1 ROADMAP.md phase breakdown (created 2026-08-22)
 
