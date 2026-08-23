@@ -254,6 +254,38 @@ describe('storage.rules — deactivatedOrgs claim (R213, Phase 76)', () => {
 
     await assertSucceeds(uploadBytes(fileRef, SMALL_BYTES))
   })
+
+  // CR-01 regression (76-REVIEW.md): a member CREATED in an ALREADY-deactivated
+  // org. Before the fix, `setOrgActive`'s member fan-out only reached uids
+  // present at deactivation time -- a member added afterward (invite
+  // acceptance, or assignOrgAdmin) got orgId/role/orgs from
+  // syncOrgMembershipClaim but NO deactivatedOrgs entry, so THIS rule (which
+  // is unchanged -- Storage cannot read Firestore live) granted access
+  // indefinitely. The fix lives in the trigger (orgMembershipClaims.ts's
+  // syncOrgMembershipClaimHandler now also computes deactivatedOrgs on every
+  // membership write), so it cannot be exercised by a rules-only emulator
+  // test (no Cloud Functions run here) -- see
+  // functions/src/orgMembershipClaims.test.ts's "CR-01" describe block for
+  // the authoritative regression proof that the trigger sets this claim.
+  // This test instead pins the CONTRACT the fix relies on: a token shaped
+  // exactly as the self-healed trigger now produces for a brand-new member of
+  // a deactivated org (orgId/role AND deactivatedOrgs set in the SAME write)
+  // is denied -- the pre-fix vulnerable shape (orgId/role with NO
+  // deactivatedOrgs entry) is the "ALLOWS (regression)" case immediately
+  // above, which must stay ALLOWED for a genuinely-active org but is exactly
+  // what the trigger no longer produces for a deactivated one.
+  it('CR-01 regression: DENIES a caller whose token has the shape a NEW member of an already-deactivated org gets from the self-healed trigger', async () => {
+    const context = testEnv.authenticatedContext('newMemberUid', {
+      orgId: 'orgA',
+      role: 'editor',
+      orgs: { orgA: 'editor' },
+      deactivatedOrgs: { orgA: true },
+    })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/cr01-regression/source.pptx')
+
+    await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
 })
 
 describe('storage.rules — media path', () => {
