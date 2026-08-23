@@ -673,3 +673,16 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 2. **Real-browser visual** of the Deactivate/Reactivate control on the Organizations tab and the greyed-out/labeled deactivated entry in the church picker.
 
 **Ships built + tested + UNDEPLOYED** — the owner-gated deploy above is the single hand-over for the server+rules half; the client half needs no deploy beyond normal hosting.
+
+---
+
+## Phase 77 — Church Deletion — Cascade Cleanup (v2.1) — `verification_deferred_human`
+
+**Code-complete + auto-verified + SECURED 2026-08-23** (verifier ran gates independently: `cd functions && npm run build` exit 0; `cd functions && npx vitest run` 544/544; rules-emulator `npx vitest run --config vitest.rules.config.ts` 203/203 incl. both new `organizations/{orgId}` client-delete-DENY tests; `npm run type-check` clean; full app suite at the documented 2-file baseline). 5/5 SC verified (R215–R221): a super-admin-gated `deleteOrganization({orgId, confirmName})` callable — refuses an ACTIVE org (deactivate-first) and a name-mismatch — cascades the org doc + all subcollections (`recursiveDelete`), the 5 orgId-keyed top-level collections (shareTokens/serviceShareLinks/orgSlugs/quarterShares/serviceShares), `orgNames`, all `inviteLookup`, each member's `users/{uid}.orgIds` (arrayRemove, other orgs preserved), and all Storage under `orgs/{orgId}/`; read-before-delete ordering + ≤500-op chunked idempotent retry + a summary. `firestore.rules` denies ALL client deletes of `organizations/{orgId}` (`allow write`→`update` + unconditional `allow delete: if false`). Client type-to-confirm dialog (type the exact church name; irreversible). Security: `77-SECURITY.md` SECURED, 11/11 threats closed — code review caught a functions build-break (an unused local tripping `noUnusedLocals`, invisible to vitest + the root type-check) + timeout/confirmName-trim warnings, all fixed; the security audit independently confirmed no unauthorized-delete / wrong-org / cross-tenant-arrayRemove / orphan path and the residual WR-02 client-trim mirror was then closed.
+
+**What only the owner at `/gsd-verify-work 77` can confirm — do NOT mark passed:**
+
+1. **Owner-gated deploy + real cascade confirmation.** Run `firebase deploy --only functions:deleteOrganization,firestore:rules --project worship-planner-bc515`, then as a super-admin deactivate + delete a real TEST church by typing its name, and confirm in production Firestore + Storage that the org doc, all subcollections, `orgNames`, all `inviteLookup`, the members' `users.orgIds` entries, the 5 orgId-keyed collections, and every `orgs/{orgId}/` Storage object are gone — and NO other org was affected. Also confirm an ACTIVE org's delete is refused and a non-super-admin cannot delete.
+2. **Real-browser visual** of the type-to-confirm dialog + the Delete control (enabled only for a deactivated org).
+
+**Ships built + tested + UNDEPLOYED** — the owner-gated deploy above is the single hand-over; the client dialog/control needs no deploy beyond normal hosting.
