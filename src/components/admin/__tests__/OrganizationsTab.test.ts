@@ -561,6 +561,31 @@ describe('OrganizationsTab -- deactivate/reactivate (R212, R214)', () => {
     expect(rows[1]!.findAll('button').some((b) => b.text() === 'Reactivate')).toBe(true)
   })
 
+  it('WR-01: a deactivate with claimFailures > 0 surfaces a non-blocking retry warning instead of an unqualified success message', async () => {
+    mockSetOrgActive.mockImplementation(() =>
+      Promise.resolve({ data: { orgId: 'org-1', active: false, memberCount: 3, claimFailures: 2, revokeFailures: 0 } }),
+    )
+    const wrapper = await mountWithOneOrg({ active: true })
+
+    const deactivateButton = wrapper.findAll('button').find((b) => b.text() === 'Deactivate')!
+    await deactivateButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Deactivated, but 2 member claim updates failed')
+    expect(wrapper.text()).toContain('click again to retry')
+  })
+
+  it('WR-01: a deactivate with claimFailures: 0 still shows the plain success message, unchanged', async () => {
+    const wrapper = await mountWithOneOrg({ active: true })
+
+    const deactivateButton = wrapper.findAll('button').find((b) => b.text() === 'Deactivate')!
+    await deactivateButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Deactivated.')
+    expect(wrapper.text()).not.toContain('failed')
+  })
+
   it('a failed toggle shows the friendly error message and does NOT call refreshOrgs()', async () => {
     const wrapper = await mountWithOneOrg({ active: true })
     mockListOrganizations.mockClear()

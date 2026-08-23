@@ -134,7 +134,11 @@
                   <p v-if="toggleError[org.orgId]" class="text-red-400 text-xs mt-1">
                     {{ toggleError[org.orgId] }}
                   </p>
-                  <p v-if="toggleFeedback[org.orgId]" class="text-green-400 text-xs mt-1">
+                  <p
+                    v-if="toggleFeedback[org.orgId]"
+                    :class="toggleFeedbackIsWarning[org.orgId] ? 'text-amber-400' : 'text-green-400'"
+                    class="text-xs mt-1"
+                  >
                     {{ toggleFeedback[org.orgId] }}
                   </p>
                 </div>
@@ -188,6 +192,7 @@ interface SetOrgActiveResponse {
   active: boolean
   memberCount: number
   claimFailures: number
+  revokeFailures: number
 }
 
 interface ListOrganizationsResponse {
@@ -242,6 +247,10 @@ const assignFeedback = ref<Record<string, string>>({})
 const togglingOrgId = ref<string | null>(null)
 const toggleError = ref<Record<string, string>>({})
 const toggleFeedback = ref<Record<string, string>>({})
+// WR-01 (76-REVIEW.md): tracks whether a given org's current toggleFeedback
+// message is a partial-failure warning (claimFailures > 0) rather than a
+// clean success, so the template can style it distinctly (amber, not green).
+const toggleFeedbackIsWarning = ref<Record<string, boolean>>({})
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 // Copied from ConfigurationTab.vue verbatim (Plan 74-02 instructions).
@@ -430,17 +439,35 @@ async function onToggleActive(org: OrgSummary) {
       functions,
       'setOrgActive',
     )
-    await setOrgActive({ orgId, active: nextActive })
+    const result = await setOrgActive({ orgId, active: nextActive })
+    // WR-01 (76-REVIEW.md): claimFailures is the resilience signal
+    // 76-RESEARCH.md's Pitfall 4 designs around ("calling setOrgActive again
+    // is a safe, idempotent retry") -- previously dropped on the floor, so an
+    // operator had no way to know Storage enforcement never reached anyone.
+    // Surface it as a non-blocking warning instead of an unqualified success.
+    const claimFailures = result.data.claimFailures
+    const verb = nextActive ? 'Reactivated' : 'Deactivated'
+    const hasFailures = claimFailures > 0
     toggleFeedback.value = {
       ...toggleFeedback.value,
-      [orgId]: nextActive ? 'Reactivated.' : 'Deactivated.',
+      [orgId]: hasFailures
+        ? `${verb}, but ${claimFailures} member claim update${claimFailures === 1 ? '' : 's'} failed — click again to retry.`
+        : `${verb}.`,
     }
+    toggleFeedbackIsWarning.value = { ...toggleFeedbackIsWarning.value, [orgId]: hasFailures }
     await refreshOrgs()
-    // Clear success feedback after 2 seconds (mirrors onboard/assign's 2s auto-dismiss).
-    setTimeout(() => {
-      const { [orgId]: _removed, ...rest } = toggleFeedback.value
-      toggleFeedback.value = rest
-    }, 2000)
+    // Clear feedback after a delay (mirrors onboard/assign's 2s auto-dismiss)
+    // -- a failure warning gets longer on-screen time since it demands a
+    // follow-up action (retry) rather than just confirming success.
+    setTimeout(
+      () => {
+        const { [orgId]: _removed, ...rest } = toggleFeedback.value
+        toggleFeedback.value = rest
+        const { [orgId]: _removedWarning, ...restWarning } = toggleFeedbackIsWarning.value
+        toggleFeedbackIsWarning.value = restWarning
+      },
+      hasFailures ? 8000 : 2000,
+    )
   } catch (err) {
     console.error('[OrganizationsTab] setOrgActive error:', err)
     toggleError.value = { ...toggleError.value, [orgId]: friendlyCallableError(err) }
