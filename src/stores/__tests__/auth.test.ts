@@ -1562,5 +1562,25 @@ describe('useAuthStore', () => {
 
       expect(store.viewingAsSuperAdmin).toBeNull()
     })
+
+    // WR-01 (78-REVIEW.md) — a stale non-null deactivatedOrgMessage (from an
+    // earlier deactivated-org bounce in the same session) used to survive
+    // enterOrgAsSuperAdmin's resetOrgContext(), keeping hasDeactivatedOrg (and
+    // therefore requiresOrgSelection) true and stranding the super-admin at
+    // /select-church on the very next navigation.
+    it('clears a stale deactivatedOrgMessage on enter, keeping requiresOrgSelection false (Pitfall 1 sibling-flag fix)', async () => {
+      const store = await signInSuperAdminNoMemberships()
+      // Seed a stale deactivation message directly -- simulates the super-admin
+      // having earlier hit a deactivated-org read on some other org.
+      store.deactivatedOrgMessage = 'This church is deactivated — contact your administrator.'
+      expect(store.hasDeactivatedOrg).toBe(true)
+
+      mockTargetOrgDoc('church-x', { name: 'Church X' })
+      await store.enterOrgAsSuperAdmin('church-x')
+
+      expect(store.deactivatedOrgMessage).toBeNull()
+      expect(store.hasDeactivatedOrg).toBe(false)
+      expect(store.requiresOrgSelection).toBe(false)
+    })
   })
 })

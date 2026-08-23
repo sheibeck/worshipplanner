@@ -303,6 +303,21 @@ export const useAuthStore = defineStore('auth', () => {
   // `activeId === null` branch performs, factored out so the two new
   // deactivation-detection branches below share it exactly rather than
   // drifting from that branch's field list over time.
+  //
+  // WR-01 (78-REVIEW.md): `deactivatedOrgMessage` is cleared HERE, not just
+  // by loadOrgContext's own unconditional clear at its top. Before this,
+  // `enterOrgAsSuperAdmin`/`exitSuperAdminView` were the first callers of
+  // resetOrgContext() that bypass loadOrgContext entirely, so a stale
+  // non-null deactivatedOrgMessage from an earlier deactivated-org bounce
+  // survived a super-admin's enter/exit and kept `hasDeactivatedOrg` (and
+  // therefore `requiresOrgSelection`) true — stranding them at
+  // /select-church on the very next navigation, the same router-strand
+  // class `hasNoOrg`'s viewingAsSuperAdmin guard was written to close.
+  // Clearing it in this single shared reset point means every caller
+  // (loadOrgContext's own branches included) stays in sync automatically;
+  // loadOrgContext's genuine-deactivation branches set it back to non-null
+  // on the line immediately AFTER their resetOrgContext() call, so this
+  // does not mask a real deactivation.
   function resetOrgContext(): void {
     memberUnsub?.()
     memberUnsub = null
@@ -315,6 +330,7 @@ export const useAuthStore = defineStore('auth', () => {
     vwModeEnabled.value = true
     settings.value = { ...DEFAULT_ORG_SETTINGS }
     viewingAsSuperAdmin.value = null
+    deactivatedOrgMessage.value = null
   }
 
   // Extracted from loadOrgContext (78-02, R224) so enterOrgAsSuperAdmin below
