@@ -334,6 +334,20 @@ export async function assignOrgAdminHandler(
     throw new HttpsError("not-found", `No organization found for id "${orgId}".`);
   }
 
+  // CR-01 belt-and-suspenders (76-REVIEW.md): refuse to grow membership on a
+  // deactivated org at all. The PRIMARY fix (orgMembershipClaims.ts's
+  // syncOrgMembershipClaim trigger self-heal) already ensures that IF this
+  // write goes through, the new member's deactivatedOrgs claim is set
+  // correctly -- but rejecting the assignment outright here is both simpler
+  // to reason about for the super-admin (the org row's Deactivate/Reactivate
+  // control is right there) and avoids creating a membership doc for an org
+  // its own admin cannot use. Same default-true posture as isOrgActive()/
+  // setOrgActiveHandler -- only an EXPLICIT active:false refuses.
+  const orgActive = (orgSnap.data() as { active?: boolean } | undefined)?.active ?? true;
+  if (!orgActive) {
+    throw new HttpsError("failed-precondition", "Reactivate the church before assigning admins.");
+  }
+
   const target = await resolveAdminTarget(email);
 
   // WR-01: if this admin is already a member of this org, preserve their
@@ -435,10 +449,27 @@ export interface SetOrgActiveResponse {
   orgId: string;
   active: boolean;
   memberCount: number;
-  /** Count of member claim-fan-out writes that rejected (76-RESEARCH.md
-   * Pitfall 4) -- the org-doc write (the authoritative, firestore.rules-
-   * enforced source of truth) always succeeds independently of this. */
+  /** Count of members whose `deactivatedOrgs[orgId]` claim PATCH rejected
+   * (76-RESEARCH.md Pitfall 4) -- the org-doc write (the authoritative,
+   * firestore.rules-enforced source of truth) always succeeds independently
+   * of this. A nonzero count means Storage enforcement did NOT reach that
+   * member; retrying `setOrgActive` is a safe, idempotent way to finish the
+   * job (patchNestedClaimKey is itself idempotent per-key).
+   *
+   * WR-02 (76-REVIEW.md): this NEVER counts a `revokeRefreshTokens` failure
+   * -- that outcome is tracked separately in `revokeFailures` below, since
+   * the two are not equivalent: a claim-patch failure means the Storage-side
+   * deny never took effect (needs a retry), while a revoke failure only
+   * means the bounded-exposure token-revocation step didn't fire (the deny
+   * IS in place; cosmetic, self-heals within the token's remaining
+   * lifetime). Conflating them (as the pre-fix single `claimFailures` count
+   * did) made a retry decision impossible to make correctly.
+   */
   claimFailures: number;
+  /** Count of members whose `revokeRefreshTokens` call rejected on the
+   * deactivate branch (never populated on reactivate, which never revokes).
+   * See `claimFailures`'s doc for why this is tracked separately (WR-02). */
+  revokeFailures: number;
 }
 
 /**
@@ -458,7 +489,13 @@ export interface SetOrgActiveResponse {
  *   4. a `Promise.allSettled` fan-out patching each member's
  *      `deactivatedOrgs[orgId]` claim key (Task 1 `patchNestedClaimKey`) --
  *      PLUS `revokeRefreshTokens` on the deactivate branch only (bounded
- *      exposure, not an instant cutoff -- 76-RESEARCH.md Pitfall 2).
+ *      exposure, not an instant cutoff -- 76-RESEARCH.md Pitfall 2). WR-02
+ *      (76-REVIEW.md): the two steps are tracked as INDEPENDENT outcomes
+ *      per member (`claimFailed`/`revokeFailed`) rather than one shared
+ *      try/catch, so a revoke failure is never miscounted as a claim
+ *      failure or vice versa. A claim-patch failure skips the revoke
+ *      attempt entirely for that member (same as the original sequential
+ *      await order: revoke was never reached past a thrown patch).
  *
  * Same-state short-circuit: when the org's CURRENT active status (default
  * `true` when absent) already equals the requested `active`, the org-doc
@@ -501,15 +538,44 @@ export async function setOrgActiveHandler(
   const results = await Promise.allSettled(
     membersSnap.docs.map(async (memberDoc) => {
       const uid = memberDoc.id;
-      await patchNestedClaimKey(uid, DEACTIVATED_ORGS_CLAIM_KEY, orgId, active ? undefined : true);
-      if (!active) {
-        await getAuth().revokeRefreshTokens(uid);
+      let claimFailed = false;
+      let revokeFailed = false;
+      try {
+        await patchNestedClaimKey(uid, DEACTIVATED_ORGS_CLAIM_KEY, orgId, active ? undefined : true);
+      } catch (err) {
+        claimFailed = true;
+        console.error(`[orgProvisioning] setOrgActive: claim patch failed for uid=${uid}, orgId=${orgId}:`, err);
       }
+      // WR-02: never attempt the revoke after a failed claim patch -- mirrors
+      // the original sequential-await behavior (a thrown patch never reached
+      // the revoke call either), and a claim-patch retry is the correct next
+      // step regardless of what revoke would have done.
+      if (!active && !claimFailed) {
+        try {
+          await getAuth().revokeRefreshTokens(uid);
+        } catch (err) {
+          revokeFailed = true;
+          console.error(`[orgProvisioning] setOrgActive: revokeRefreshTokens failed for uid=${uid}:`, err);
+        }
+      }
+      return { claimFailed, revokeFailed };
     }),
   );
-  const claimFailures = results.filter((r) => r.status === "rejected").length;
+  let claimFailures = 0;
+  let revokeFailures = 0;
+  for (const result of results) {
+    if (result.status === "rejected") {
+      // Not expected in practice (both awaits above are individually
+      // try/caught), but fail closed: count an unexpected outer rejection
+      // toward claimFailures so it is never silently dropped.
+      claimFailures += 1;
+      continue;
+    }
+    if (result.value.claimFailed) claimFailures += 1;
+    if (result.value.revokeFailed) revokeFailures += 1;
+  }
 
-  return { orgId, active, memberCount: membersSnap.size, claimFailures };
+  return { orgId, active, memberCount: membersSnap.size, claimFailures, revokeFailures };
 }
 
 export const setOrgActive = onCall(setOrgActiveHandler);

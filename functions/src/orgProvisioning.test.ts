@@ -633,6 +633,34 @@ describe("assignOrgAdminHandler", () => {
     expect(fake.batchCommitSpy).not.toHaveBeenCalled();
   });
 
+  // CR-01 belt-and-suspenders (76-REVIEW.md): assignOrgAdmin must refuse to
+  // grow membership on a deactivated org, closing one of the two paths that
+  // could otherwise add a member after setOrgActive's one-time fan-out ran.
+  it("CR-01: refuses to assign an admin into a DEACTIVATED org (failed-precondition), never resolves the target or writes", async () => {
+    const { getUserByEmail } = mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: { name: "Grace Church", active: false } });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(assignOrgAdminHandler(assignRequest())).rejects.toMatchObject({
+      code: "failed-precondition",
+    });
+    expect(getUserByEmail).not.toHaveBeenCalled();
+    expect(fake.batchSetSpy).not.toHaveBeenCalled();
+    expect(fake.batchCommitSpy).not.toHaveBeenCalled();
+  });
+
+  it("CR-01: an org doc with no `active` field at all (pre-Phase-76) is treated as active -- assignment proceeds normally", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: { name: "Grace Church" } });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await assignOrgAdminHandler(assignRequest());
+
+    expect(result).toEqual({ status: "added", uid: TARGET_UID });
+  });
+
   it("rejects invalid-argument for a blank orgId or email", async () => {
     mockAuth();
     const fake = withCallerGate(new FakeFirestore());
@@ -807,7 +835,7 @@ describe("setOrgActiveHandler", () => {
 
     const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
 
-    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 2, claimFailures: 0 });
+    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 2, claimFailures: 0, revokeFailures: 0 });
     expect(fake.docSetSpy).toHaveBeenCalledWith(
       `organizations/${ORG_ID}`,
       { active: false, deactivatedAt: "SERVER_TIMESTAMP_SENTINEL", deactivatedBy: CALLER_UID },
@@ -840,7 +868,7 @@ describe("setOrgActiveHandler", () => {
 
     const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: true } }));
 
-    expect(result).toEqual({ orgId: ORG_ID, active: true, memberCount: 2, claimFailures: 0 });
+    expect(result).toEqual({ orgId: ORG_ID, active: true, memberCount: 2, claimFailures: 0, revokeFailures: 0 });
     expect(fake.docSetSpy).toHaveBeenCalledWith(
       `organizations/${ORG_ID}`,
       { active: true, reactivatedAt: "SERVER_TIMESTAMP_SENTINEL", reactivatedBy: CALLER_UID },
@@ -861,7 +889,7 @@ describe("setOrgActiveHandler", () => {
 
     const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
 
-    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 1, claimFailures: 0 });
+    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 1, claimFailures: 0, revokeFailures: 0 });
     expect(fake.docSetSpy).not.toHaveBeenCalled();
     expect(setCustomUserClaims).toHaveBeenCalledWith("m1", { deactivatedOrgs: { [ORG_ID]: true } });
   });
@@ -875,7 +903,7 @@ describe("setOrgActiveHandler", () => {
 
     const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: true } }));
 
-    expect(result).toEqual({ orgId: ORG_ID, active: true, memberCount: 1, claimFailures: 0 });
+    expect(result).toEqual({ orgId: ORG_ID, active: true, memberCount: 1, claimFailures: 0, revokeFailures: 0 });
     expect(fake.docSetSpy).not.toHaveBeenCalled();
   });
 
@@ -895,7 +923,11 @@ describe("setOrgActiveHandler", () => {
 
     const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
 
-    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 2, claimFailures: 1 });
+    // WR-02: m2's rejection is a claim-patch failure (setCustomUserClaims
+    // threw INSIDE patchNestedClaimKey), so it counts toward claimFailures,
+    // never revokeFailures -- and its revoke is never attempted (see the
+    // dedicated revoke-only-failure test below for the inverse case).
+    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 2, claimFailures: 1, revokeFailures: 0 });
     expect(fake.docSetSpy).toHaveBeenCalledWith(
       `organizations/${ORG_ID}`,
       { active: false, deactivatedAt: "SERVER_TIMESTAMP_SENTINEL", deactivatedBy: CALLER_UID },
@@ -903,6 +935,29 @@ describe("setOrgActiveHandler", () => {
     );
     expect(revokeRefreshTokens).toHaveBeenCalledWith("m1");
     expect(revokeRefreshTokens).not.toHaveBeenCalledWith("m2");
+  });
+
+  it("WR-02: a revokeRefreshTokens-only failure counts toward revokeFailures, NEVER claimFailures -- the claim patch (the Storage-side deny) already landed", async () => {
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: {} });
+    fake.setMembers(ORG_ID, ["m1", "m2"]);
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+    const { setCustomUserClaims } = mockClaimsAuth({ m1: {}, m2: {} });
+    vi.mocked(getAuth).mockReturnValue({
+      getUser: vi.fn(async (uid: string) => ({ customClaims: uid === "m1" ? {} : {} })),
+      setCustomUserClaims,
+      revokeRefreshTokens: vi.fn(async (uid: string) => {
+        if (uid === "m2") throw new Error("internal-error");
+      }),
+      getUserByEmail: vi.fn(async () => ({ uid: TARGET_UID, displayName: "Target Person" })),
+    } as never);
+
+    const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 2, claimFailures: 0, revokeFailures: 1 });
+    // Both members' claim patches still landed -- only the revoke for m2 failed.
+    expect(setCustomUserClaims).toHaveBeenCalledWith("m1", { deactivatedOrgs: { [ORG_ID]: true } });
+    expect(setCustomUserClaims).toHaveBeenCalledWith("m2", { deactivatedOrgs: { [ORG_ID]: true } });
   });
 
   it("scoped query: reads organizations/{orgId}/members ONLY, never a global collectionGroup scan -- an org with zero members is a clean no-op fan-out", async () => {
@@ -914,6 +969,6 @@ describe("setOrgActiveHandler", () => {
 
     const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
 
-    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 0, claimFailures: 0 });
+    expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 0, claimFailures: 0, revokeFailures: 0 });
   });
 });
