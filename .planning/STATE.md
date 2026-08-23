@@ -95,6 +95,7 @@ re-entry these phases are dropped from the run queue and resumed only via the re
 | Phase | State | Resume |
 |-------|-------|--------|
 | 75 | verification_deferred_human | /gsd-verify-work 75 |
+| 76 | verification_deferred_human | /gsd-verify-work 76 |
 
 ---
 

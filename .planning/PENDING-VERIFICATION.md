@@ -660,3 +660,16 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 2. **Real-browser visual of the pending badge** — contrast/spacing of the amber "N pending" pill against the live dark table.
 
 **Ships built + tested + UNDEPLOYED** — the client badge half needs no deploy; the `listOrganizations` server change is the single owner-gated deploy above.
+
+---
+
+## Phase 76 — Church Deactivation & Reactivation (v2.1) — `verification_deferred_human`
+
+**Code-complete + auto-verified + SECURED 2026-08-22** (verifier ran gates independently: `cd functions && npx vitest run` 520/520; rules-emulator `npx vitest run --config vitest.rules.config.ts` 201/201 incl. the deactivation ALLOW/DENY + CR-01 new-member-self-heal + T-76-10 editor-lifecycle-field-DENY regression tests; `npm run type-check` clean; full app suite at the documented 2-file baseline). 4/4 SC verified (R212–R214): a super-admin-gated `setOrgActive` callable persists `active`/`deactivatedAt`/`deactivatedBy`; `firestore.rules` `isOrgActive()` + a field-level lifecycle-write guard (ordinary editors can't forge status/audit fields) + `storage.rules` `isOrgDeactivatedForCaller()` (wrapping the whole `isOrgMemberByClaim` OR) + the trigger-computed `deactivatedOrgs` claim independently deny a deactivated org's members while a super-admin-member stays in; the client login-block shows a clear message (no blank app); reactivate fully restores. Security: `76-SECURITY.md` SECURED, 11/11 threats closed — code review caught CR-01 (a member joining an already-deactivated org kept Storage access), fixed by having `syncOrgMembershipClaim` recompute `deactivatedOrgs` on every member write + `assignOrgAdmin` refusing deactivated orgs; the security audit caught + closed T-76-10/T-76-06 (an ordinary editor could directly write org status/audit fields via `updateDoc`) with a field-level `firestore.rules` write guard + regression tests.
+
+**What only the owner at `/gsd-verify-work 76` can confirm — do NOT mark passed:**
+
+1. **Owner-gated deploy + production confirmation.** Run `firebase deploy --only firestore:rules,storage,functions:setOrgActive --project worship-planner-bc515`, then confirm: a super-admin deactivates a real church → that church's real member is blocked at login with the "deactivated" message AND denied Storage access (not just Firestore); a super-admin can still enter the deactivated church; reactivate restores the member's access with no manual fix-up; and an ordinary editor CANNOT deactivate via a direct client write (T-76-10).
+2. **Real-browser visual** of the Deactivate/Reactivate control on the Organizations tab and the greyed-out/labeled deactivated entry in the church picker.
+
+**Ships built + tested + UNDEPLOYED** — the owner-gated deploy above is the single hand-over for the server+rules half; the client half needs no deploy beyond normal hosting.

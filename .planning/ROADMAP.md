@@ -558,7 +558,7 @@ and privileged super-admin cross-tenant access (Phase 78) — each get their own
 model and genuine emulator ALLOW/DENY rules tests.
 
 - [x] **Phase 75: Pending-Invite Visibility** - The Organizations list distinguishes active (logged-in) members from invited-but-pending ones, computed server-side by the existing `listOrganizations` callable ✅ code-complete + auto-verified 2026-08-22 (3/3 SC; human UAT + `firebase deploy --only functions:listOrganizations` deferred to `/gsd-verify-work 75`)
-- [ ] **Phase 76: Church Deactivation & Reactivation** - A reversible off-switch: a super-admin-gated callable flips an org's active status, `firestore.rules`/`storage.rules` deny a deactivated org's members org-scoped access, and reactivation restores it
+- [x] **Phase 76: Church Deactivation & Reactivation** - A reversible off-switch: a super-admin-gated callable flips an org's active status, `firestore.rules`/`storage.rules` deny a deactivated org's members org-scoped access, and reactivation restores it ✅ code-complete + auto-verified + SECURED 2026-08-22 (4/4 SC; 11/11 threats closed incl. CR-01 + T-76-10; human UAT + `firebase deploy --only firestore:rules,storage,functions:setOrgActive` deferred to `/gsd-verify-work 76`)
 - [ ] **Phase 77: Church Deletion — Cascade Cleanup** - Deletion is gated on deactivation, runs through a re-verifying super-admin-gated callable, cascades every Firestore subcollection + cross-reference + Storage object, requires a typed confirmation, and is safely retriable
 - [ ] **Phase 78: Super-Admin Enter-Any-Church** - A super-admin arm in `firestore.rules`/`storage.rules` lets a super-admin read/write any church without a membership doc, invisibly to that church's member list, with a persistent "viewing as super-admin" banner and exit
 
@@ -726,7 +726,7 @@ tests that a super-admin gets in and an ordinary non-member does not.
 | 73 | v2.0 | 3/3 | Code-complete + SECURED (deploy UAT deferred) | 2026-08-21 |
 | 74 | v2.0 | 2/2 | Code-complete + SECURED (deploy/UAT deferred) | 2026-08-21 |
 | 75 | v2.1 | 1/1 | Code-complete (UAT deferred) | 2026-08-22 |
-| 76 | v2.1 | 2/2 | In Progress|  |
+| 76 | v2.1 | 2/2 | Code-complete + SECURED (deploy/UAT deferred) | 2026-08-22 |
 | 77 | v2.1 | 0/TBD | Not started | - |
 | 78 | v2.1 | 0/TBD | Not started | - |
 
