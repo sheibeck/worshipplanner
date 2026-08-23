@@ -681,7 +681,7 @@ describe('OrganizationsTab -- delete (R220/R221)', () => {
     return mountTab()
   }
 
-  it('disables the Delete button for an active org row and enables it for a deactivated row', async () => {
+  it('renders the Delete button ONLY for a deactivated org row (hidden for an active row)', async () => {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({
         data: {
@@ -696,10 +696,13 @@ describe('OrganizationsTab -- delete (R220/R221)', () => {
 
     const rows = wrapper.findAll('tbody tr')
     expect(rows.length).toBe(2)
-    const activeDelete = rows[0]!.findAll('button').find((b) => b.text() === 'Delete')!
-    const deactivatedDelete = rows[1]!.findAll('button').find((b) => b.text() === 'Delete')!
-    expect(activeDelete.attributes('disabled')).toBeDefined()
-    expect(deactivatedDelete.attributes('disabled')).toBeUndefined()
+    const activeDelete = rows[0]!.findAll('button').find((b) => b.text() === 'Delete')
+    const deactivatedDelete = rows[1]!.findAll('button').find((b) => b.text() === 'Delete')
+    // Active org: no Delete button at all (not merely disabled).
+    expect(activeDelete).toBeUndefined()
+    // Deactivated org: Delete button present and enabled.
+    expect(deactivatedDelete).toBeDefined()
+    expect(deactivatedDelete!.attributes('disabled')).toBeUndefined()
   })
 
   it('clicking Delete opens the dialog with the org name and member/pending counts as props', async () => {

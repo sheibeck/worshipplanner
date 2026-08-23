@@ -76,55 +76,60 @@
                   {{ org.pendingCount }} pending
                 </span>
               </td>
-              <td class="px-4 py-3">
-                <template v-if="assigningOrgId === org.orgId">
-                  <div class="flex items-center gap-2">
-                    <input
-                      v-model="assignEmail"
-                      type="email"
-                      placeholder="Admin email"
-                      class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1 text-xs w-40 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-                      @keydown.enter="onConfirmAssign(org)"
-                    />
+              <td class="px-4 py-3 align-top">
+                <!-- Assign-admin inline form (this row only). -->
+                <div
+                  v-if="assigningOrgId === org.orgId"
+                  class="flex flex-col gap-2 sm:flex-row sm:items-center"
+                >
+                  <input
+                    v-model="assignEmail"
+                    type="email"
+                    placeholder="Admin email"
+                    class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-xs w-full sm:w-44 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                    @keydown.enter="onConfirmAssign(org)"
+                  />
+                  <div class="flex gap-2">
                     <button
                       type="button"
                       @click="onConfirmAssign(org)"
                       :disabled="isAssigning"
-                      class="text-xs text-indigo-300 hover:text-indigo-200 transition-colors"
+                      class="inline-flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium transition-colors"
                     >
                       {{ isAssigning ? 'Assigning...' : 'Assign' }}
                     </button>
                     <button
                       type="button"
                       @click="cancelAssign"
-                      class="text-xs text-gray-400 hover:text-gray-200 transition-colors"
+                      class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 text-xs font-medium transition-colors"
                     >
                       Cancel assign
                     </button>
                   </div>
-                  <p v-if="assignError[org.orgId]" class="text-red-400 text-xs mt-1">{{ assignError[org.orgId] }}</p>
-                  <p v-if="assignFeedback[org.orgId]" class="text-green-400 text-xs mt-1">{{ assignFeedback[org.orgId] }}</p>
-                </template>
+                </div>
 
-                <template v-else>
+                <!-- Row actions — side by side on >= sm, stacked only on mobile.
+                     Consistent with the app's button family (bg-gray-800
+                     secondary / bg-indigo-600 primary / bg-red-600 destructive).
+                     Delete (Phase 77) is RENDERED only for an already-deactivated
+                     org. All state changes go through the callables — no direct
+                     Firestore writes. -->
+                <div
+                  v-else
+                  class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+                >
                   <button
                     type="button"
                     @click="startAssign(org.orgId)"
-                    class="text-sm text-indigo-300 hover:text-indigo-200 transition-colors"
+                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 text-xs font-medium transition-colors"
                   >
                     Assign admin
                   </button>
-                </template>
-
-                <!-- R212/R214 (Phase 76) — Deactivate/Reactivate control, the
-                     only channel this component uses to flip an org's status
-                     (no direct Firestore write, mirrors T-74-07). -->
-                <div class="mt-2">
                   <button
                     type="button"
                     @click="onToggleActive(org)"
                     :disabled="togglingOrgId !== null"
-                    class="text-xs text-red-300 hover:text-red-200 disabled:opacity-60 transition-colors"
+                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium transition-colors"
                   >
                     {{
                       togglingOrgId === org.orgId
@@ -136,52 +141,36 @@
                           : 'Reactivate'
                     }}
                   </button>
-                  <p v-if="toggleError[org.orgId]" class="text-red-400 text-xs mt-1">
-                    {{ toggleError[org.orgId] }}
-                  </p>
-                  <p
-                    v-if="toggleFeedback[org.orgId]"
-                    :class="toggleFeedbackIsWarning[org.orgId] ? 'text-amber-400' : 'text-green-400'"
-                    class="text-xs mt-1"
-                  >
-                    {{ toggleFeedback[org.orgId] }}
-                  </p>
-                </div>
-
-                <!-- R220 (Phase 77) — Delete control, enabled ONLY for an
-                     explicitly deactivated org (mirrors the "Deactivated"
-                     badge's org.active === false convention above). The only
-                     channel this component uses to permanently remove a
-                     church is deleteOrganization -- no direct Firestore
-                     writes/deletes to organizations/*, orgNames/*, or
-                     inviteLookup/*. -->
-                <div class="mt-2">
                   <button
                     type="button"
+                    @click="onEnterChurch(org)"
+                    :disabled="enteringOrgId !== null"
+                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium transition-colors"
+                  >
+                    {{ enteringOrgId === org.orgId ? 'Entering...' : 'Enter church' }}
+                  </button>
+                  <button
+                    v-if="org.active === false"
+                    type="button"
                     @click="openDeleteDialog(org)"
-                    :disabled="org.active !== false"
-                    class="text-xs text-red-500 hover:text-red-400 disabled:opacity-60 transition-colors"
+                    class="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 text-xs font-medium transition-colors"
                   >
                     Delete
                   </button>
                 </div>
 
-                <!-- R224 (Phase 78) — Enter-church support action. Not gated
-                     on org.active: a super-admin can enter a deactivated org
-                     to verify state before Reactivate. -->
-                <div class="mt-2">
-                  <button
-                    type="button"
-                    @click="onEnterChurch(org)"
-                    :disabled="enteringOrgId !== null"
-                    class="text-xs text-indigo-300 hover:text-indigo-200 disabled:opacity-60 transition-colors"
-                  >
-                    {{ enteringOrgId === org.orgId ? 'Entering...' : 'Enter church' }}
-                  </button>
-                  <p v-if="enterError[org.orgId]" class="text-red-400 text-xs mt-1">
-                    {{ enterError[org.orgId] }}
-                  </p>
-                </div>
+                <!-- Per-row feedback / errors (below the button row). -->
+                <p v-if="assignError[org.orgId]" class="text-red-400 text-xs mt-1">{{ assignError[org.orgId] }}</p>
+                <p v-if="assignFeedback[org.orgId]" class="text-green-400 text-xs mt-1">{{ assignFeedback[org.orgId] }}</p>
+                <p v-if="toggleError[org.orgId]" class="text-red-400 text-xs mt-1">{{ toggleError[org.orgId] }}</p>
+                <p
+                  v-if="toggleFeedback[org.orgId]"
+                  :class="toggleFeedbackIsWarning[org.orgId] ? 'text-amber-400' : 'text-green-400'"
+                  class="text-xs mt-1"
+                >
+                  {{ toggleFeedback[org.orgId] }}
+                </p>
+                <p v-if="enterError[org.orgId]" class="text-red-400 text-xs mt-1">{{ enterError[org.orgId] }}</p>
               </td>
             </tr>
 
