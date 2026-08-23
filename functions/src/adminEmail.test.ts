@@ -10,7 +10,7 @@ import { sendAdminOnboardingEmail } from "./adminEmail";
 //   bareEmailAddress/fromDisplayName helpers in params.ts stay REAL),
 // - getAppConfig is mocked so each case injects its own sender.fromAddress.
 
-const { mockSend } = vi.hoisted(() => ({ mockSend: vi.fn(async () => ({ data: { id: "m1" } })) }));
+const { mockSend } = vi.hoisted(() => ({ mockSend: vi.fn(async (_payload: unknown) => ({ data: { id: "m1" } })) }));
 
 // Per-test seam the mocked defineString reads for SERVICE_SHARE_BASE_URL.
 let fakeShareBaseUrl = "https://app.example.com";
