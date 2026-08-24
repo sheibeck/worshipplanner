@@ -99,13 +99,13 @@ status: complete
 
 Each task was committed atomically:
 
-1. **Task 1 (R237): Re-confirm PC-export slot coverage and exhaustive SlotKind dispatch** - (verification-only; committed with this SUMMARY, see below)
-2. **Task 2 (R238): Write the owner email-domain runbook and PENDING-VERIFICATION entry** - (see Files Created/Modified)
-3. **Task 3 (R238): Re-confirm both live send paths read config.sender.fromAddress** - (verification-only, no files modified)
+1. **Task 1 (R237): Re-confirm PC-export slot coverage and exhaustive SlotKind dispatch** - `9a3a99f4` (docs)
+2. **Task 2 (R238): Write the owner email-domain runbook and PENDING-VERIFICATION entry** - `20df99b9` (docs)
+3. **Task 3 (R238): Re-confirm both live send paths read config.sender.fromAddress** - verification-only, no files modified (evidence: passing `functions/src/index.test.ts -t "config.sender.fromAddress"` (2 tests) and `functions/src/adminEmail.test.ts` (6 tests) runs recorded in `coverage:` D3 above)
 
-**Plan metadata:** (docs: complete plan — final commit)
+**Plan metadata:** (docs: complete plan — final commit, recorded after this update)
 
-_Note: Tasks 1 and 3 are verification-only (no source files touched); their evidence is the passing test runs recorded above and in `coverage:`. Commit hashes for the SUMMARY/PENDING-VERIFICATION changes are recorded once all tasks land._
+_Note: Task 3 is verification-only (no source files touched); its evidence is the passing test runs recorded above and in `coverage:`._
 
 ## Files Created/Modified
 - `functions/DEPLOY-EMAIL-DOMAIN.md` - New owner runbook: Resend domain add, SPF/DKIM/MX/DMARC DNS records, verify-before-flip sequencing, setting `fromAddress` in the Owner Console, real external-inbox test send.
