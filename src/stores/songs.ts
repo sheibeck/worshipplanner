@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/firebase'
 import type { Song, UpsertSongInput, VWType } from '@/types/song'
-import { songMatchesQuery } from '@/utils/songSearch'
+import { songMatchesQuery, filterSongsByTags } from '@/utils/songSearch'
 import { useAuthStore } from '@/stores/auth'
 
 type SongInput = Omit<Song, 'id' | 'createdAt' | 'updatedAt'>
@@ -53,7 +53,7 @@ export const useSongStore = defineStore('songs', () => {
 
   const filteredSongs = computed(() => {
     const authStore = useAuthStore()
-    return songs.value.filter((song) => {
+    const result = songs.value.filter((song) => {
       // Exclude hidden songs (treat undefined as false for legacy docs)
       if (song.hidden === true) return false
       // D-16: gate the `type:` search prefix on VW mode so it hides app-wide when off.
@@ -72,24 +72,13 @@ export const useSongStore = defineStore('songs', () => {
         !filterKey.value ||
         song.arrangements.some((a) => a.key === filterKey.value)
 
-      const include = tagFilterInclude.value
-      const exclude = tagFilterExclude.value
-      let matchesUserTags = true
-      if (exclude.size > 0) {
-        const carriesExcluded =
-          (song.themes ?? []).some((t) => exclude.has(t)) ||
-          (song.tags ?? []).some((t) => exclude.has(t))
-        if (carriesExcluded) matchesUserTags = false
-      }
-      if (matchesUserTags && include.size > 0) {
-        const carriesIncluded =
-          (song.themes ?? []).some((t) => include.has(t)) ||
-          (song.tags ?? []).some((t) => include.has(t))
-        matchesUserTags = carriesIncluded
-      }
-
-      return matchesSearch && matchesVwType && matchesKey && matchesUserTags
+      return matchesSearch && matchesVwType && matchesKey
     })
+    // R240: tag include/exclude is an independent ANDed step, applied as a
+    // final pass over the search/vwType/key-filtered list — delegated to the
+    // shared filterSongsByTags() (also used by SongBrowser.vue). .filter()
+    // preserves order, so the resulting set and order are unchanged.
+    return filterSongsByTags(result, tagFilterInclude.value, tagFilterExclude.value)
   })
 
   // Distinct USER tags (song.tags only) across non-hidden songs, sorted — powers

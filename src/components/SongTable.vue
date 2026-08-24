@@ -369,7 +369,7 @@ function sortKey(song: Song): string | number {
 // songMatchesQuery multi-term AND behavior (no parallel filter path) so successive
 // clicks keep narrowing the list. Free text the user already typed is preserved;
 // re-clicking the same pill is a no-op (de-duped). searchQuery is bound to
-// SongFilters' input via SongsView's v-model.
+// SongBrowser's search input via SongsView's v-model (R240 — moved from SongFilters).
 function filterByPill(field: 'type' | 'tag' | 'theme', value: string | number) {
   const term = `${field}:${value}`
   const current = songStore.searchQuery.trim()

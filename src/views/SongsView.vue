@@ -61,63 +61,71 @@
           </div>
         </div>
 
-        <!-- Filters -->
-        <div class="mb-4">
-          <SongFilters
-            v-model:searchQuery="songStore.searchQuery"
-            v-model:filterVwType="songStore.filterVwType"
-            v-model:filterKey="songStore.filterKey"
-            v-model:tagFilterInclude="songStore.tagFilterInclude"
-            v-model:tagFilterExclude="songStore.tagFilterExclude"
-            @clearTagFilter="songStore.clearTagFilter()"
-            :availableKeys="availableKeys"
-            :availableUserTags="availableUserTags"
-          />
-        </div>
+        <!-- Filters + song table, browsed through the shared SongBrowser shell (R240) -->
+        <SongBrowser
+          v-model:searchQuery="songStore.searchQuery"
+          v-model:includeTags="songStore.tagFilterInclude"
+          v-model:excludeTags="songStore.tagFilterExclude"
+          @clearTagFilter="songStore.clearTagFilter()"
+          :songs="songStore.visibleSongs"
+          :availableUserTags="availableUserTags"
+          align="right"
+          layout="inline"
+          searchPlaceholder="Search title, CCLI, theme, tag, category..."
+        >
+          <template #filters>
+            <SongFilters
+              v-model:filterVwType="songStore.filterVwType"
+              v-model:filterKey="songStore.filterKey"
+              :availableKeys="availableKeys"
+            />
+          </template>
+          <template #default>
+            <!-- Bulk tag action bar (visible when songs are selected) -->
+            <div v-if="selectedSongIds.size > 0" class="mb-4 flex items-center gap-3 p-3 rounded-lg border border-indigo-700 bg-indigo-900/20">
+              <span class="text-sm text-indigo-300 font-medium">{{ selectedSongIds.size }} selected</span>
+              <input
+                v-model="bulkTagInput"
+                type="text"
+                list="sv-existing-user-tags"
+                placeholder="Tag name"
+                class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-40"
+                @keydown.enter="applyBulkTag"
+              />
+              <datalist id="sv-existing-user-tags">
+                <option v-for="t in songStore.allUserTags" :key="t" :value="t" />
+              </datalist>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                :disabled="!bulkTagInput.trim()"
+                @click="applyBulkTag"
+              >Apply to selected</button>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-md text-sm font-medium text-red-300 bg-red-900/20 border border-red-800 hover:bg-red-900/40 transition-colors disabled:opacity-50"
+                :disabled="!bulkTagInput.trim()"
+                @click="removeBulkTag"
+              >Remove from selected</button>
+              <button
+                type="button"
+                class="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                @click="clearBulkSelection"
+              >Clear selection</button>
+            </div>
 
-        <!-- Bulk tag action bar (visible when songs are selected) -->
-        <div v-if="selectedSongIds.size > 0" class="mb-4 flex items-center gap-3 p-3 rounded-lg border border-indigo-700 bg-indigo-900/20">
-          <span class="text-sm text-indigo-300 font-medium">{{ selectedSongIds.size }} selected</span>
-          <input
-            v-model="bulkTagInput"
-            type="text"
-            list="sv-existing-user-tags"
-            placeholder="Tag name"
-            class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-40"
-            @keydown.enter="applyBulkTag"
-          />
-          <datalist id="sv-existing-user-tags">
-            <option v-for="t in songStore.allUserTags" :key="t" :value="t" />
-          </datalist>
-          <button
-            type="button"
-            class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
-            :disabled="!bulkTagInput.trim()"
-            @click="applyBulkTag"
-          >Apply to selected</button>
-          <button
-            type="button"
-            class="px-3 py-1.5 rounded-md text-sm font-medium text-red-300 bg-red-900/20 border border-red-800 hover:bg-red-900/40 transition-colors disabled:opacity-50"
-            :disabled="!bulkTagInput.trim()"
-            @click="removeBulkTag"
-          >Remove from selected</button>
-          <button
-            type="button"
-            class="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
-            @click="clearBulkSelection"
-          >Clear selection</button>
-        </div>
-
-        <!-- Song table -->
-        <SongTable
-          ref="songTableRef"
-          :songs="songStore.filteredSongs"
-          :loading="songStore.isLoading"
-          @select="onSelectSong"
-          @add="onAddSong"
-          @import="importModalOpen = true"
-          @update:selectedIds="onSelectionUpdate"
-        />
+            <!-- Song table -->
+            <SongTable
+              ref="songTableRef"
+              :songs="songStore.filteredSongs"
+              :loading="songStore.isLoading"
+              @select="onSelectSong"
+              @add="onAddSong"
+              @import="importModalOpen = true"
+              @update:selectedIds="onSelectionUpdate"
+            />
+          </template>
+        </SongBrowser>
 
         <!-- Hidden songs panel -->
         <div v-if="showHidden" class="mt-8 border border-gray-700 rounded-xl overflow-hidden">
@@ -212,6 +220,7 @@ import { useSongStore } from '@/stores/songs'
 import type { Song } from '@/types/song'
 import { parseSongEditRequest, clearSongEditRequest, type SongEditTab } from '@/utils/songEditLink'
 import AppShell from '@/components/AppShell.vue'
+import SongBrowser from '@/components/SongBrowser.vue'
 import SongFilters from '@/components/SongFilters.vue'
 import SongTable from '@/components/SongTable.vue'
 import SongSlideOver from '@/components/SongSlideOver.vue'

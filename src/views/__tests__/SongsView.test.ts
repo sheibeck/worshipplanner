@@ -94,6 +94,7 @@ function mountSongsView() {
     global: {
       stubs: {
         AppShell: { template: '<div><slot /></div>' },
+        SongBrowser: { template: '<div><slot name="filters" /><slot /></div>' },
         SongFilters: { template: '<div />' },
         SongTable: { template: '<div />' },
         SongSlideOver: { template: '<div />' },
