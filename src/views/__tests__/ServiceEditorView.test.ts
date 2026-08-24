@@ -616,6 +616,34 @@ vi.mock('@/stores/quarters', () => ({
   }),
 }))
 
+// Phase 79 (R229/R241/RESEARCH Pitfall 6): the team checkbox row (and the
+// song-tag filter helper) now read the shared teams store instead of a
+// hard-coded array. Seeded with the same 4 default team names/tags the old
+// hard-coded team-list constant carried, so the existing "Orchestra"
+// checkbox-label test below keeps finding it. `songFilterTag` left unset by
+// default (mirrors the seed — CONTEXT.md: seeding the tag is left to the
+// admin) so existing AI-suggestion tests keep exercising the full,
+// unfiltered pool; individual song-tag-filter tests override this array's
+// contents directly.
+let mockTeams: { id: string; name: string; order: number; songFilterTag?: string }[] = [
+  { id: 'team-choir', name: 'Choir', order: 0 },
+  { id: 'team-orchestra', name: 'Orchestra', order: 1 },
+  { id: 'team-communion', name: 'Communion', order: 2 },
+  { id: 'team-special', name: 'Special', order: 3 },
+]
+let mockTeamsOrgId: string | null = null
+const mockTeamsSubscribe = vi.fn()
+const mockSeedDefaultTeamsIfEmpty = vi.fn()
+
+vi.mock('@/stores/teams', () => ({
+  useTeamsStore: () => ({
+    teams: mockTeams,
+    orgId: mockTeamsOrgId,
+    subscribe: mockTeamsSubscribe,
+    seedDefaultTeamsIfEmpty: mockSeedDefaultTeamsIfEmpty,
+  }),
+}))
+
 // 60-03: the delivery-history panel subscribes this store on the Service Order
 // tab. Stub it like the other store mocks so no real onSnapshot/getDocs runs.
 const mockSubscribeServiceMessages = vi.fn()
@@ -645,6 +673,18 @@ beforeEach(() => {
   mockServiceStoreOrgId = null
   mockCreateShareToken.mockClear()
   mockCreateShareToken.mockImplementation(() => Promise.resolve('mock-share-token'))
+  // Phase 79: reset the teams mock to its default 4-team seed (no
+  // songFilterTag set) so a song-tag-filter test mutating it never leaks
+  // into an unrelated later test.
+  mockTeams = [
+    { id: 'team-choir', name: 'Choir', order: 0 },
+    { id: 'team-orchestra', name: 'Orchestra', order: 1 },
+    { id: 'team-communion', name: 'Communion', order: 2 },
+    { id: 'team-special', name: 'Special', order: 3 },
+  ]
+  mockTeamsOrgId = null
+  mockTeamsSubscribe.mockClear()
+  mockSeedDefaultTeamsIfEmpty.mockClear()
 })
 
 /** Reads the real useSaveStatus store's entry for `service:{id}` — the

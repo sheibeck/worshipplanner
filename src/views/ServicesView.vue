@@ -193,10 +193,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
+import { useTeamsStore } from '@/stores/teams'
 import AppShell from '@/components/AppShell.vue'
 import ServiceCard from '@/components/ServiceCard.vue'
 import NewServiceDialog from '@/components/NewServiceDialog.vue'
@@ -212,6 +213,7 @@ const MONTH_NAMES = [
 const router = useRouter()
 const authStore = useAuthStore()
 const serviceStore = useServiceStore()
+const teamsStore = useTeamsStore()
 
 const activeTab = ref<'services' | 'rotation' | 'scripture-rotation'>('services')
 const dialogOpen = ref(false)
@@ -363,6 +365,20 @@ function initStore() {
   const orgId = authStore.orgId
   if (!orgId) return
   serviceStore.subscribe(orgId)
+  // Phase 79 (R229/R241): this view mounts NewServiceDialog, whose team
+  // checkbox row now reads the shared teams store — subscribe (and,
+  // idempotently, seed) it here so that row is populated. Editor-guarded
+  // because seeding writes to Firestore and reads require isOrgEditor.
+  if (authStore.isEditor && !teamsStore.orgId) {
+    teamsStore.subscribe(orgId)
+    const stopTeamsSeedWatch = watch(
+      () => teamsStore.teams,
+      () => {
+        teamsStore.seedDefaultTeamsIfEmpty()
+        stopTeamsSeedWatch()
+      },
+    )
+  }
 }
 
 onMounted(() => {

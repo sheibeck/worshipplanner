@@ -760,19 +760,19 @@
                `:disabled="canEditService"` would have disabled the controls
                exactly when editing IS allowed. Their orphaned
                `disabled:opacity-50` classes go with them. -->
-          <div v-if="canEditService" class="flex flex-wrap items-center gap-4">
+          <div v-if="canEditService && teamsStore.teams.length > 0" class="flex flex-wrap items-center gap-4">
             <label
-              v-for="team in AVAILABLE_TEAMS"
-              :key="team"
+              v-for="team in teamsStore.teams"
+              :key="team.id"
               class="flex items-center gap-2 cursor-pointer"
             >
               <input
                 type="checkbox"
-                :checked="localService.teams.includes(team)"
-                @change="toggleTeam(team)"
+                :checked="localService.teams.includes(team.name)"
+                @change="toggleTeam(team.name)"
                 class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
               />
-              <span class="text-sm text-gray-200">{{ team }}</span>
+              <span class="text-sm text-gray-200">{{ team.name }}</span>
             </label>
             <input
               v-if="localService.teams.includes('Special')"
@@ -782,6 +782,10 @@
               class="rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-48"
             />
           </div>
+          <p
+            v-else-if="canEditService"
+            class="text-xs text-gray-500"
+          >No teams configured — add teams in Volunteers → Teams.</p>
           <!-- Viewer: read-only text list -->
           <div v-else class="flex flex-wrap items-center gap-2">
             <span
@@ -1604,6 +1608,7 @@ import { useServiceStore, ServiceLockedError, buildServiceSnapshot, type Service
 import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
+import { useTeamsStore } from '@/stores/teams'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useSaveStatus, hasVisibleSaveStatus } from '@/stores/saveStatus'
 import { slotLabel, kindBadgeClass, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
@@ -1652,6 +1657,7 @@ const serviceStore = useServiceStore()
 const songStore = useSongStore()
 const rosterStore = useRosterStore()
 const quartersStore = useQuartersStore()
+const teamsStore = useTeamsStore()
 const serviceMessagesStore = useServiceMessagesStore()
 // R029/D-03 cascade target — the group delete cascade's scoped write action.
 // Reads for the delete-warning copy go through useSlideshowAssembly's
@@ -1671,8 +1677,6 @@ const saveStatus = useSaveStatus()
 const activeTab = ref<'service-order' | 'roles' | 'slides' | 'messages'>('service-order')
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-const AVAILABLE_TEAMS = ['Choir', 'Orchestra', 'Communion', 'Special']
 
 // Teams that should be pre-checked in the PC export dialog every time, regardless
 // of what the service has flagged. Matched as case-insensitive substrings against
@@ -2731,6 +2735,25 @@ function initStores() {
     }
     if (!quartersStore.orgId) {
       quartersStore.subscribe(orgId)
+    }
+    // Phase 79 (R229/R241): the checkbox row now reads the shared teams
+    // store instead of a hard-coded array, so it needs subscribing +
+    // (idempotently) seeding here too — editor-guarded because seeding
+    // writes to Firestore and reads require isOrgEditor, same as
+    // roster/quarters above.
+    if (!teamsStore.orgId) {
+      teamsStore.subscribe(orgId)
+      // seedDefaultTeamsIfEmpty() checks teams.value.length synchronously,
+      // but onSnapshot always resolves asynchronously — wait for the first
+      // teams snapshot before seeding, mirroring RosterView.vue's
+      // seed-watch pattern (never double-seeds an org that already has data).
+      const stopTeamsSeedWatch = watch(
+        () => teamsStore.teams,
+        () => {
+          teamsStore.seedDefaultTeamsIfEmpty()
+          stopTeamsSeedWatch()
+        },
+      )
     }
   }
 }

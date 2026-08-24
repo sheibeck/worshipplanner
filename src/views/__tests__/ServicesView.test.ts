@@ -98,6 +98,39 @@ vi.mock('@/stores/services', () => ({
   }),
 }))
 
+// Phase 79 (R229/R241): ServicesView mounts NewServiceDialog unconditionally
+// (not behind a v-if), and both it and ServicesView itself now read the
+// shared teams store — without this mock, `useTeamsStore()` throws "no
+// active Pinia" the instant the view sets up (no test in this file installs
+// a Pinia instance; every store is vi.mock-ed, same convention as
+// @/stores/services above). Seeded with the default 4 team names so any
+// future test asserting on NewServiceDialog's checkbox row inside this view
+// keeps finding them.
+const mockTeamsState = reactive<{ teams: { id: string; name: string; order: number }[]; orgId: string | null }>({
+  teams: [
+    { id: 'team-choir', name: 'Choir', order: 0 },
+    { id: 'team-orchestra', name: 'Orchestra', order: 1 },
+    { id: 'team-communion', name: 'Communion', order: 2 },
+    { id: 'team-special', name: 'Special', order: 3 },
+  ],
+  orgId: null,
+})
+const mockTeamsSubscribe = vi.fn()
+const mockSeedDefaultTeamsIfEmpty = vi.fn()
+
+vi.mock('@/stores/teams', () => ({
+  useTeamsStore: () => ({
+    get teams() {
+      return mockTeamsState.teams
+    },
+    get orgId() {
+      return mockTeamsState.orgId
+    },
+    subscribe: mockTeamsSubscribe,
+    seedDefaultTeamsIfEmpty: mockSeedDefaultTeamsIfEmpty,
+  }),
+}))
+
 function mountServicesView() {
   return mount(ServicesView, {
     global: {
@@ -118,6 +151,9 @@ beforeEach(() => {
   mockSubscribe.mockClear()
   mockUnsubscribeAll.mockClear()
   mockCreateService.mockClear()
+  mockTeamsState.orgId = null
+  mockTeamsSubscribe.mockClear()
+  mockSeedDefaultTeamsIfEmpty.mockClear()
 })
 
 describe('ServicesView default-template cog (R113)', () => {
