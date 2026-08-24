@@ -187,6 +187,16 @@ describe('TeamsConfigPanel', () => {
     expect(deleteButtons.map((b) => b.attributes('aria-label'))).toEqual(['Delete Choir team', 'Delete Orchestra team'])
   })
 
+  it('R245: the per-row Delete button renders as a real destructive button', () => {
+    const wrapper = mountPanel()
+    const deleteButtons = wrapper.findAll('button').filter((b) => b.text() === 'Delete')
+    for (const btn of deleteButtons) {
+      const classes = btn.classes()
+      expect(classes).toContain('bg-red-900/20')
+      expect(classes).toContain('text-red-400')
+    }
+  })
+
   it('renders the empty state above the always-visible Add Team row when there are zero teams', () => {
     mockTeams = []
     const wrapper = mountPanel()
