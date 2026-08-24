@@ -400,8 +400,53 @@ export const useServiceStore = defineStore('services', () => {
   // the UI warns about an orphaned Planning Center plan instead of locking.
   // `firestore.rules`' `allow delete` carries no status condition for the same
   // reason; keep the two in step.
+  //
+  // R234 (80-02): a deleted service must not leave a live, unauthenticated
+  // share URL behind — revoke every public share artifact FIRST, then delete
+  // the service doc LAST, mirroring `deleteQuarter`'s precedent
+  // (`quarters.ts`). Unlike a quarter's single denormalized `shareToken`
+  // field, a service can accumulate MULTIPLE `shareTokens` docs (adoption/
+  // re-share via `ensureShareLink`), so that step is a QUERY, not a
+  // single-doc lookup — and unlike `deleteQuarter`'s one outer
+  // `if (quarter.shareToken)` gate, each of the three artifact types here is
+  // independently possibly-present, so each is checked/queried on its own
+  // rather than behind one shared flag.
   async function deleteService(id: string) {
     if (!orgId.value) return
+    // Looked up BEFORE any delete — the serviceShares key below needs
+    // service.date, which is unrecoverable once the service doc is gone.
+    const service = services.value.find((s) => s.id === id)
+
+    // 1. shareTokens — query-based (a service can have 2+ via adoption).
+    // A query's result set is already known to exist; no existence guard
+    // needed the way the direct-keyed deletes below require one.
+    const tokensSnap = await getDocs(query(collection(db, 'shareTokens'), where('serviceId', '==', id)))
+    for (const tokenDoc of tokensSnap.docs) {
+      await deleteDoc(doc(db, 'shareTokens', tokenDoc.id))
+    }
+
+    // 2. serviceShareLinks/{id} — direct-keyed identity doc. Existence-guarded:
+    // an unconditional deleteDoc against a doc that was never created
+    // evaluates the delete rule against a null `resource`, which Firestore
+    // treats as DENY, not a no-op (the common never-shared-service case).
+    const linkRef = doc(db, 'serviceShareLinks', id)
+    const linkSnap = await getDoc(linkRef)
+    if (linkSnap.exists()) await deleteDoc(linkRef)
+
+    // 3. serviceShares/{slug}__service-{date} — needs the org's slug plus
+    // this service's own date, so it's only attempted when the service was
+    // actually found in the in-memory cache above.
+    if (service) {
+      const orgSnap = await getDoc(doc(db, 'organizations', orgId.value))
+      const slug = orgSnap.exists() ? (orgSnap.data().slug as string | undefined) : undefined
+      if (slug) {
+        const shareRef = doc(db, 'serviceShares', `${slug}__service-${service.date}`)
+        const shareSnap = await getDoc(shareRef)
+        if (shareSnap.exists()) await deleteDoc(shareRef)
+      }
+    }
+
+    // 4. The service doc itself, LAST.
     await deleteDoc(doc(db, 'organizations', orgId.value, 'services', id))
     // WR-03 (41-REVIEW): drop the deleted service's shareLinkCache entry so
     // it cannot accumulate as a dead entry, and so a same-session, same-org

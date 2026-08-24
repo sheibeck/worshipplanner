@@ -771,8 +771,16 @@ describe('useServiceStore', () => {
   })
 
   describe('deleteService', () => {
-    it('calls deleteDoc with the correct doc reference', async () => {
-      const { deleteDoc } = await import('firebase/firestore')
+    // R234 (80-02): the module-level getDoc mock defaults to `exists: () =>
+    // true`, which — now that deleteService existence-checks two direct-keyed
+    // artifacts before deleting the service doc — would otherwise make every
+    // test in this block delete phantom artifacts unless explicitly overridden.
+    // This test targets the never-shared-service case: no service is in the
+    // store (no triggerSnapshot) and getDoc is forced to report absence, so
+    // deleteDoc is called exactly once, for the service doc itself.
+    it('calls deleteDoc with the correct doc reference (never-shared service)', async () => {
+      const { deleteDoc, getDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValue({ exists: () => false, data: () => ({}) } as never)
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
       store.subscribe('org-1')
@@ -780,6 +788,129 @@ describe('useServiceStore', () => {
       await store.deleteService('service-1')
 
       expect(deleteDoc).toHaveBeenCalledOnce()
+      expect((vi.mocked(deleteDoc).mock.calls[0]![0] as { path: string }).path).toBe(
+        'organizations/org-1/services/service-1',
+      )
+    })
+
+    // R234 (80-02): a never-shared service (no tokens, no link, no share doc)
+    // must delete cleanly — no permission-denied from an unconditional delete
+    // against a doc that was never created (Pitfall 3).
+    it('R234: a never-shared service deletes without throwing (no shareTokens, serviceShareLinks, or serviceShares)', async () => {
+      const { deleteDoc, getDoc, getDocs } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValue({ exists: () => false, data: () => ({}) } as never)
+      vi.mocked(getDocs).mockResolvedValue({ empty: true, docs: [] } as never)
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      await expect(store.deleteService('service-1')).resolves.not.toThrow()
+
+      expect(deleteDoc).toHaveBeenCalledOnce()
+    })
+
+    // R234: a service can accumulate MULTIPLE shareTokens docs via adoption/
+    // re-share — every matching doc must be deleted, not just the first.
+    it('R234: deletes every shareTokens doc whose serviceId matches, including 2+', async () => {
+      const { deleteDoc, getDoc, getDocs, where } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValue({ exists: () => false, data: () => ({}) } as never)
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          { id: 'token-a', data: () => ({ serviceId: 'service-1', orgId: 'org-1' }) },
+          { id: 'token-b', data: () => ({ serviceId: 'service-1', orgId: 'org-1' }) },
+        ],
+      } as never)
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await store.deleteService('service-1')
+
+      expect(vi.mocked(where)).toHaveBeenCalledWith('serviceId', '==', 'service-1')
+      const deletedIds = vi.mocked(deleteDoc).mock.calls.map((call) => (call[0] as { id: string }).id)
+      expect(deletedIds).toContain('token-a')
+      expect(deletedIds).toContain('token-b')
+      // Both tokens plus the service doc itself.
+      expect(deleteDoc).toHaveBeenCalledTimes(3)
+    })
+
+    // R234: serviceShareLinks/{id} — present is deleted, absent is a no-op (not a throw).
+    it('R234: deletes serviceShareLinks/{id} when present', async () => {
+      const { deleteDoc, getDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockImplementation(async (ref: unknown) => {
+        const path = (ref as { path?: string }).path ?? ''
+        if (path === 'serviceShareLinks/service-1') {
+          return { exists: () => true, data: () => ({ token: 'tok', orgId: 'org-1' }) } as never
+        }
+        return { exists: () => false, data: () => ({}) } as never
+      })
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await store.deleteService('service-1')
+
+      const deletedPaths = vi.mocked(deleteDoc).mock.calls.map((call) => (call[0] as { path: string }).path)
+      expect(deletedPaths).toContain('serviceShareLinks/service-1')
+    })
+
+    it('R234: does not call deleteDoc for serviceShareLinks/{id} when absent, and does not throw', async () => {
+      const { deleteDoc, getDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValue({ exists: () => false, data: () => ({}) } as never)
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await expect(store.deleteService('service-1')).resolves.not.toThrow()
+
+      const deletedPaths = vi.mocked(deleteDoc).mock.calls.map((call) => (call[0] as { path: string }).path)
+      expect(deletedPaths).not.toContain('serviceShareLinks/service-1')
+    })
+
+    // R234: serviceShares/{slug}__service-{date} — present is deleted, absent is a no-op.
+    it('R234: deletes serviceShares/{slug}__service-{date} when present', async () => {
+      const { deleteDoc, getDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockImplementation(async (ref: unknown) => {
+        const path = (ref as { path?: string }).path ?? ''
+        if (path === 'organizations/org-1') {
+          return { exists: () => true, data: () => ({ name: 'Grace Church', slug: 'grace-church' }) } as never
+        }
+        if (path === 'serviceShares/grace-church__service-2026-03-08') {
+          return { exists: () => true, data: () => ({ orgId: 'org-1', orgSlug: 'grace-church' }) } as never
+        }
+        return { exists: () => false, data: () => ({}) } as never
+      })
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      await store.deleteService('service-1')
+
+      const deletedPaths = vi.mocked(deleteDoc).mock.calls.map((call) => (call[0] as { path: string }).path)
+      expect(deletedPaths).toContain('serviceShares/grace-church__service-2026-03-08')
+    })
+
+    it('R234: does not call deleteDoc for serviceShares/{slug}__service-{date} when absent, and does not throw', async () => {
+      const { deleteDoc, getDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockImplementation(async (ref: unknown) => {
+        const path = (ref as { path?: string }).path ?? ''
+        if (path === 'organizations/org-1') {
+          return { exists: () => true, data: () => ({ name: 'Grace Church', slug: 'grace-church' }) } as never
+        }
+        return { exists: () => false, data: () => ({}) } as never
+      })
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      await expect(store.deleteService('service-1')).resolves.not.toThrow()
+
+      const deletedPaths = vi.mocked(deleteDoc).mock.calls.map((call) => (call[0] as { path: string }).path)
+      expect(deletedPaths).not.toContain('serviceShares/grace-church__service-2026-03-08')
     })
 
     // WR-03 (41-REVIEW): shareLinkCache is private closure state, so this is
@@ -1914,12 +2045,17 @@ describe('useServiceStore', () => {
     // Keep in step with firestore.rules' unconditional `allow delete`.
     for (const status of ['draft', 'planned', 'exported'] as const) {
       it(`allows delete while the stored status is ${status} (D-15)`, async () => {
-        const { deleteDoc } = await import('firebase/firestore')
+        // R234 (80-02): getDoc is forced to report absence so this test's focus
+        // (delete is allowed regardless of status) isn't entangled with the
+        // share-artifact revocation this same call now performs.
+        const { deleteDoc, getDoc } = await import('firebase/firestore')
+        vi.mocked(getDoc).mockResolvedValue({ exists: () => false, data: () => ({}) } as never)
         const store = await storeAtStatus(status)
 
         await store.deleteService('service-1')
 
-        expect(deleteDoc).toHaveBeenCalledOnce()
+        const deletedPaths = vi.mocked(deleteDoc).mock.calls.map((call) => (call[0] as { path: string }).path)
+        expect(deletedPaths).toContain('organizations/org-1/services/service-1')
       })
     }
 
