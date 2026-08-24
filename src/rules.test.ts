@@ -6,7 +6,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch } from 'firebase/firestore'
 
 let testEnv: RulesTestEnvironment
 
@@ -177,6 +177,24 @@ describe('Editor vs viewer write permissions', () => {
     await assertFails(
       updateDoc(doc(db, 'organizations', 'orgA'), {
         createdBy: 'someoneElse',
+      }),
+    )
+  })
+
+  // IN-01 (80-REVIEW): the DENY test above only proves reassignment is
+  // rejected. preservesCreatedBy()'s diff().affectedKeys() check also denies
+  // REMOVING the field entirely -- deleteField() puts createdBy in
+  // affectedKeys() the same way an ordinary write does -- but nothing
+  // exercised that path, so a future refactor of the helper could silently
+  // regress field-removal without the suite catching it.
+  it('DENIES an editor removing createdBy via updateDoc + deleteField()', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), {
+        createdBy: deleteField(),
       }),
     )
   })
