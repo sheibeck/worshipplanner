@@ -1,0 +1,108 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import RolesConfigPanel from '../RolesConfigPanel.vue'
+import type { Role } from '@/types/roster'
+
+const mockAddRole = vi.fn(() => Promise.resolve('new-id'))
+const mockUpdateRole = vi.fn(() => Promise.resolve())
+const mockDeleteRole = vi.fn(() => Promise.resolve())
+
+let mockRoles: Role[] = []
+
+vi.mock('@/stores/roster', () => ({
+  useRosterStore: () => ({
+    roles: mockRoles,
+    addRole: mockAddRole,
+    updateRole: mockUpdateRole,
+    deleteRole: mockDeleteRole,
+  }),
+}))
+
+function mountPanel() {
+  return mount(RolesConfigPanel)
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  mockAddRole.mockClear()
+  mockUpdateRole.mockClear()
+  mockDeleteRole.mockClear()
+  mockRoles = [
+    { id: 'r-1', name: 'Guitar', group: 'band', defaultCount: 2, order: 0 },
+    { id: 'r-2', name: 'Sound', group: 'tech', defaultCount: 1, order: 1 },
+  ]
+})
+
+describe('RolesConfigPanel', () => {
+  it('R246: header copy states the scheduler auto-fills the count each service, dropping the old soft-target framing', () => {
+    const wrapper = mountPanel()
+    const text = wrapper.text().toLowerCase()
+    expect(text).toContain('auto-fill')
+    expect(text).toContain('each service')
+    // <!-- planner-discipline-allow: soft planning target -->
+    expect(text).not.toContain('soft planning target')
+    // <!-- planner-discipline-allow: not a hard cap -->
+    expect(text).not.toContain('not a hard cap')
+  })
+
+  it('R245: the per-row Delete button renders as a real destructive button at compact row sizing', () => {
+    const wrapper = mountPanel()
+    const deleteButtons = wrapper.findAll('button').filter((b) => b.text() === 'Delete')
+    expect(deleteButtons.length).toBe(2)
+    for (const btn of deleteButtons) {
+      const classes = btn.classes()
+      expect(classes).toContain('bg-red-900/20')
+      expect(classes).toContain('text-red-400')
+      expect(classes).toContain('text-xs')
+      expect(classes).toContain('px-3')
+      expect(classes).toContain('py-1.5')
+    }
+  })
+
+  it('clicking Delete reveals an inline soft-warn confirm; Cancel dismisses without deleting; confirming calls deleteRole with that role id', async () => {
+    const wrapper = mountPanel()
+    const deleteButtons = wrapper.findAll('button').filter((b) => b.text() === 'Delete')
+    await deleteButtons[0]!.trigger('click')
+
+    expect(wrapper.text()).toContain("Delete the 'Guitar' role?")
+    expect(wrapper.text()).toContain('This cannot be undone.')
+
+    const cancelBtn = wrapper.findAll('button').find((b) => b.text() === 'Cancel')!
+    await cancelBtn.trigger('click')
+    expect(mockDeleteRole).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain("Delete the 'Guitar' role?")
+
+    const deleteButtonsAgain = wrapper.findAll('button').filter((b) => b.text() === 'Delete')
+    await deleteButtonsAgain[0]!.trigger('click')
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text() === 'Delete Role')!
+    await confirmBtn.trigger('click')
+    expect(mockDeleteRole).toHaveBeenCalledWith('r-1')
+  })
+
+  it('editing a row name then clicking Save Role calls updateRole once with the trimmed draft, not on every keystroke', async () => {
+    const wrapper = mountPanel()
+    const nameInput = wrapper.findAll('input[type="text"]')[0]!
+    await nameInput.setValue('Lead Guitar')
+
+    expect(mockUpdateRole).not.toHaveBeenCalled()
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Role')
+    await saveButtons[0]!.trigger('click')
+
+    expect(mockUpdateRole).toHaveBeenCalledTimes(1)
+    expect(mockUpdateRole).toHaveBeenCalledWith('r-1', { name: 'Lead Guitar', defaultCount: 2 })
+  })
+
+  it('Add-Role row calls addRole with name/group/defaultCount/order', async () => {
+    const wrapper = mountPanel()
+    const addNameInput = wrapper.find('input[placeholder="Role name"]')
+    await addNameInput.setValue('Bass')
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Role' || b.text() === 'Added ✓')
+    const addButton = saveButtons[saveButtons.length - 1]!
+    await addButton.trigger('click')
+
+    expect(mockAddRole).toHaveBeenCalledWith({ name: 'Bass', group: 'band', defaultCount: 1, order: 2 })
+  })
+})
