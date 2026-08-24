@@ -48,6 +48,28 @@ vi.mock('@/stores/roster', () => ({
   }),
 }))
 
+// 79-02: RosterView.vue now also calls useTeamsStore()/useSongStore() directly
+// (Teams tab subscribe + seed) — mocked for the same reason as RosterView.test.ts.
+vi.mock('@/stores/teams', () => ({
+  useTeamsStore: () => ({
+    teams: [],
+    subscribe: vi.fn(),
+    unsubscribeAll: vi.fn(),
+    seedDefaultTeamsIfEmpty: vi.fn(() => Promise.resolve()),
+    addTeam: vi.fn(() => Promise.resolve('new-team-id')),
+    updateTeam: vi.fn(() => Promise.resolve()),
+    deleteTeam: vi.fn(() => Promise.resolve()),
+  }),
+}))
+
+vi.mock('@/stores/songs', () => ({
+  useSongStore: () => ({
+    allUserTags: [],
+    subscribe: vi.fn(),
+    unsubscribeAll: vi.fn(),
+  }),
+}))
+
 function makePerson(overrides: Partial<Person> & { id: string; name: string }): Person {
   return {
     id: overrides.id,
@@ -68,6 +90,7 @@ function mountRosterView() {
       stubs: {
         AppShell: { template: '<div><slot /></div>' },
         RolesConfigPanel: { template: '<div />' },
+        TeamsConfigPanel: { template: '<div />' },
         RosterImportModal: { template: '<div />' },
         Teleport: { template: '<div><slot /></div>' },
       },

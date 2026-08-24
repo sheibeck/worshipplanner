@@ -59,6 +59,30 @@ vi.mock('@/stores/roster', () => ({
   }),
 }))
 
+// 79-02: RosterView.vue now also calls useTeamsStore()/useSongStore() directly
+// (Teams tab subscribe + seed) — mocked here (not stubbed via TeamsConfigPanel
+// alone) because those calls live in RosterView's own script setup, not just
+// inside the stubbed child component.
+vi.mock('@/stores/teams', () => ({
+  useTeamsStore: () => ({
+    teams: [],
+    subscribe: vi.fn(),
+    unsubscribeAll: vi.fn(),
+    seedDefaultTeamsIfEmpty: vi.fn(() => Promise.resolve()),
+    addTeam: vi.fn(() => Promise.resolve('new-team-id')),
+    updateTeam: vi.fn(() => Promise.resolve()),
+    deleteTeam: vi.fn(() => Promise.resolve()),
+  }),
+}))
+
+vi.mock('@/stores/songs', () => ({
+  useSongStore: () => ({
+    allUserTags: [],
+    subscribe: vi.fn(),
+    unsubscribeAll: vi.fn(),
+  }),
+}))
+
 // Cast via `unknown` — the Person type still carries its (deprecated, to be
 // removed in plan 16-11) standing-frequency field, but this roles-only-form
 // test suite never constructs or asserts on it (D-07/D-04).
@@ -82,6 +106,7 @@ function mountRosterView() {
       stubs: {
         AppShell: { template: '<div><slot /></div>' },
         RolesConfigPanel: { template: '<div />' },
+        TeamsConfigPanel: { template: '<div />' },
         RosterImportModal: { template: '<div />' },
         Teleport: { template: '<div><slot /></div>' },
       },

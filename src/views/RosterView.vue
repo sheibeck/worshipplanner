@@ -54,6 +54,16 @@
         >
           Roles
         </button>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+          :class="activeTab === 'teams'
+            ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+            : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+          @click="activeTab = 'teams'"
+        >
+          Teams
+        </button>
       </div>
 
       <!-- Volunteers tab -->
@@ -233,6 +243,11 @@
       <!-- Roles config tab -->
       <div v-show="activeTab === 'roles'">
         <RolesConfigPanel />
+      </div>
+
+      <!-- Teams config tab -->
+      <div v-show="activeTab === 'teams'">
+        <TeamsConfigPanel />
       </div>
     </div>
 
@@ -435,10 +450,13 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
+import { useTeamsStore } from '@/stores/teams'
+import { useSongStore } from '@/stores/songs'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import type { Person, RoleGroup } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
 import RolesConfigPanel from '@/components/RolesConfigPanel.vue'
+import TeamsConfigPanel from '@/components/TeamsConfigPanel.vue'
 import RosterImportModal from '@/components/RosterImportModal.vue'
 
 // `useRoute()` returns undefined when RosterView is mounted without a router
@@ -447,9 +465,11 @@ import RosterImportModal from '@/components/RosterImportModal.vue'
 const route = useRoute()
 const authStore = useAuthStore()
 const rosterStore = useRosterStore()
+const teamsStore = useTeamsStore()
+const songStore = useSongStore()
 
 // ── Tabbed layout ────────────────────────────────────────────────────────────
-const activeTab = ref<'volunteers' | 'roles'>('volunteers')
+const activeTab = ref<'volunteers' | 'roles' | 'teams'>('volunteers')
 
 // ── Import modal ─────────────────────────────────────────────────────────────
 const importModalOpen = ref(false)
@@ -665,11 +685,15 @@ const displayedPeople = computed(() => {
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 let stopSeedWatch: (() => void) | null = null
+let stopTeamsSeedWatch: (() => void) | null = null
 
 function initStore() {
   const orgId = authStore.orgId
   if (!orgId) return
   rosterStore.subscribe(orgId)
+  teamsStore.subscribe(orgId)
+  // The song-tag filter <select> on the Teams tab reads songStore.allUserTags.
+  songStore.subscribe(orgId)
   // seedDefaultRolesIfEmpty() checks roles.value.length synchronously, but
   // Firestore's onSnapshot always resolves asynchronously — calling it
   // immediately after subscribe() would race with an org that already has
@@ -680,6 +704,15 @@ function initStore() {
       rosterStore.seedDefaultRolesIfEmpty()
       stopSeedWatch?.()
       stopSeedWatch = null
+    },
+  )
+  // Same first-snapshot-guard rationale as above, for the teams subcollection.
+  stopTeamsSeedWatch = watch(
+    () => teamsStore.teams,
+    () => {
+      teamsStore.seedDefaultTeamsIfEmpty()
+      stopTeamsSeedWatch?.()
+      stopTeamsSeedWatch = null
     },
   )
 }
@@ -698,6 +731,14 @@ watch(() => rosterStore.people.length, () => applyEditQuery())
 onUnmounted(() => {
   stopSeedWatch?.()
   stopSeedWatch = null
+  stopTeamsSeedWatch?.()
+  stopTeamsSeedWatch = null
   rosterStore.unsubscribeAll()
+  // Mirrors rosterStore's teardown above — teams are RosterView-owned config,
+  // same as roles. songStore is intentionally left subscribed: it is a
+  // broadly shared org-scoped store (Songs page, Service editor, Dashboard),
+  // and its lifecycle is managed by resetOrgScopedStores() on church switch,
+  // not by any single view's unmount.
+  teamsStore.unsubscribeAll()
 })
 </script>
