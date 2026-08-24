@@ -37,6 +37,7 @@
                 <button
                   type="button"
                   @click="confirmDeleteId = row.team.id"
+                  :aria-label="`Delete ${row.team.name} team`"
                   class="text-xs text-red-400 hover:text-red-300 transition-colors"
                 >Delete</button>
               </div>

@@ -181,6 +181,12 @@ describe('TeamsConfigPanel', () => {
     })
   })
 
+  it('IN-02: each row Delete button carries a per-row aria-label naming the team', () => {
+    const wrapper = mountPanel()
+    const deleteButtons = wrapper.findAll('button').filter((b) => b.text() === 'Delete')
+    expect(deleteButtons.map((b) => b.attributes('aria-label'))).toEqual(['Delete Choir team', 'Delete Orchestra team'])
+  })
+
   it('renders the empty state above the always-visible Add Team row when there are zero teams', () => {
     mockTeams = []
     const wrapper = mountPanel()
