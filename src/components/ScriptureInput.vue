@@ -1,7 +1,9 @@
 <template>
   <div class="space-y-2">
     <!-- AI Scripture Search (only for reading slots) -->
-    <div v-if="showAiSuggest && authStore.settings.aiEnabled" class="space-y-2">
+    <!-- WR-02 (82-REVIEW): two-gate authStore.isAiEnabled, not the bare
+         church setting alone. -->
+    <div v-if="showAiSuggest && authStore.isAiEnabled" class="space-y-2">
       <div class="flex gap-2">
         <input
           v-model="aiQuery"

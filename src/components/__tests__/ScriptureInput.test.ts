@@ -122,6 +122,11 @@ vi.mock('@/utils/claudeApi', () => ({
 // every pre-45-04 preview-fetch test asserts against the ESV mock.
 let mockAiEnabled = true
 let mockBibleVersion: 'ESV' | 'NLT' = 'ESV'
+// WR-02 (82-REVIEW): the master gate, mocked separately from the church's
+// own settings.aiEnabled toggle above. Defaults to true so every
+// pre-existing (pre-82) test in this file keeps its current behavior;
+// the dedicated master-gate-off test below flips it false.
+let mockAiMasterEnabled = true
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     settings: {
@@ -131,6 +136,15 @@ vi.mock('@/stores/auth', () => ({
       get bibleVersion() {
         return mockBibleVersion
       },
+    },
+    get aiMasterEnabled() {
+      return mockAiMasterEnabled
+    },
+    // WR-02 (82-REVIEW): ScriptureInput.vue now reads the two-gate
+    // isAiEnabled instead of the bare settings.aiEnabled, mirroring the
+    // real store's `isAiEnabled` computed.
+    get isAiEnabled() {
+      return mockAiMasterEnabled && mockAiEnabled
     },
   }),
 }))
@@ -143,6 +157,7 @@ beforeEach(() => {
 
 afterEach(() => {
   mockAiEnabled = true
+  mockAiMasterEnabled = true
   mockBibleVersion = 'ESV'
 })
 
@@ -528,6 +543,16 @@ describe('AI toggle (39-04)', () => {
     expect(wrapper.find('input[placeholder^="Search passages"]').exists()).toBe(false)
     const firstInput = wrapper.find('input')
     expect(firstInput.attributes('placeholder')).not.toMatch(/^Search passages/)
+  })
+
+  // WR-02 (82-REVIEW): proves the master gate is respected too, not just
+  // settings.aiEnabled -- a super-admin-disabled org must hide the AI block
+  // even when the church's own settings.aiEnabled reads true.
+  it('hides the AI block when the master gate (aiMasterEnabled) is off, even though settings.aiEnabled is true', () => {
+    mockAiEnabled = true
+    mockAiMasterEnabled = false
+    const wrapper = mount(ScriptureInput, { props: readingSlotProps })
+    expect(wrapper.find('input[placeholder^="Search passages"]').exists()).toBe(false)
   })
 })
 

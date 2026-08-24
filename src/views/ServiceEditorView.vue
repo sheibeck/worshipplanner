@@ -2543,7 +2543,10 @@ const activeActionItems = computed(() =>
     canEditService: canEditService.value,
     hasSermonContext: hasSermonContext.value,
     aiSuggestingAll: aiSuggestingAll.value,
-    aiEnabled: authStore.settings.aiEnabled,
+    // WR-02 (82-REVIEW): two-gate authStore.isAiEnabled, not the bare
+    // church setting alone -- so a super-admin-disabled org hides the
+    // action-bar AI item too.
+    aiEnabled: authStore.isAiEnabled,
     hasPcCredentials: authStore.hasPcCredentials,
     pcEnabled: authStore.settings.pcEnabled,
     isExporting: isExporting.value,

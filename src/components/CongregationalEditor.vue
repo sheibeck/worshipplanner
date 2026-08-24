@@ -58,7 +58,7 @@
         All
       </button>
       <button
-        v-if="authStore.settings.aiEnabled"
+        v-if="authStore.isAiEnabled"
         type="button"
         data-testid="ai-split-btn"
         :disabled="isFetching || isSplitting || !hasPassageToSplit"

@@ -73,10 +73,25 @@ async function applySettings(overrides: Partial<{ aiEnabled: boolean; bibleVersi
 }
 
 describe('CongregationalEditor', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
     mockFetchPassageText.mockResolvedValue(DEFAULT_PASSAGE_TEXT)
     mockFetchNltPassageText.mockResolvedValue(DEFAULT_PASSAGE_TEXT)
+    // WR-02 (82-REVIEW): the AI split button now gates on the two-gate
+    // authStore.isAiEnabled (master gate AND settings.aiEnabled), not
+    // settings.aiEnabled alone. The real store's aiMasterEnabled ref
+    // defaults to false (R242, off-by-default), so it must be set true here
+    // to preserve every pre-existing test's assumed "AI on" baseline. The
+    // negative master-gate-off case gets its own dedicated test below.
+    // Mirrors applySettings' own comment below: the store's
+    // onAuthStateChanged listener resets settings/aiMasterEnabled to
+    // defaults on the null user asynchronously. Trigger store creation
+    // FIRST (registers the listener), THEN let it settle (flushPromises),
+    // THEN set aiMasterEnabled -- otherwise the still-pending reset fires
+    // after this synchronous assignment and clobbers it back to false.
+    const store = useAuthStore()
+    await flushPromises()
+    store.aiMasterEnabled = true
   })
 
   // ── Auto-fetch on open (no sections) ────────────────────────────────────
@@ -250,6 +265,17 @@ describe('CongregationalEditor', () => {
 
   it('hides the AI split button when aiEnabled is false', async () => {
     await applySettings({ aiEnabled: false })
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
+  })
+
+  // WR-02 (82-REVIEW): proves the master gate is respected too, not just
+  // settings.aiEnabled -- a super-admin-disabled org must hide this
+  // affordance even when the church's own settings.aiEnabled reads true.
+  it('hides the AI split button when the master gate (aiMasterEnabled) is off, even though settings.aiEnabled is true', async () => {
+    useAuthStore().aiMasterEnabled = false
     const wrapper = mountEditor()
     await flushPromises()
 

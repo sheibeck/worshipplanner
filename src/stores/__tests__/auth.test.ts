@@ -799,6 +799,42 @@ describe('useAuthStore', () => {
     })
   })
 
+  // WR-02 (82-REVIEW): the single shared two-gate AI-affordance computed
+  // that every UI site (SongSlotPicker, ScriptureInput, CongregationalEditor,
+  // ServiceEditorView's action bar) must read instead of the bare
+  // settings.aiEnabled -- mirrors src/utils/claudeApi.ts's isAiEnabled().
+  describe('isAiEnabled (Phase 82 WR-02, R242/R243)', () => {
+    it('is false when aiMasterEnabled is true but settings.aiEnabled is false', async () => {
+      mockOrgDocPath({ name: 'Test Org', aiMasterEnabled: true, settings: { aiEnabled: false } })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.aiMasterEnabled).toBe(true)
+      expect(store.settings.aiEnabled).toBe(false)
+      expect(store.isAiEnabled).toBe(false)
+    })
+
+    it('is false when aiMasterEnabled is false even though settings.aiEnabled is true', async () => {
+      mockOrgDocPath({ name: 'Test Org', aiMasterEnabled: false, settings: { aiEnabled: true } })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.aiMasterEnabled).toBe(false)
+      expect(store.settings.aiEnabled).toBe(true)
+      expect(store.isAiEnabled).toBe(false)
+    })
+
+    it('is true only when BOTH aiMasterEnabled and settings.aiEnabled are true', async () => {
+      mockOrgDocPath({ name: 'Test Org', aiMasterEnabled: true, settings: { aiEnabled: true } })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.aiMasterEnabled).toBe(true)
+      expect(store.settings.aiEnabled).toBe(true)
+      expect(store.isAiEnabled).toBe(true)
+    })
+  })
+
   describe('OrgSettings (R073)', () => {
     it('resolves full OrgSettings from defaults when the org document has no settings key', async () => {
       mockOrgDocPath({ name: 'Test Org' })

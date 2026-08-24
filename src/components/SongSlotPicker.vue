@@ -55,7 +55,10 @@
         <div v-if="!searchQuery">
 
           <!-- AI Picks section -->
-          <div v-if="authStore.settings.aiEnabled && hasSermonContext !== false">
+          <!-- WR-02 (82-REVIEW): gate on the two-gate authStore.isAiEnabled
+               (master gate AND church setting), not the bare church setting
+               alone, so a super-admin-disabled org hides this affordance too. -->
+          <div v-if="authStore.isAiEnabled && hasSermonContext !== false">
             <!-- Loading shimmer -->
             <div v-if="aiLoading" class="px-3 py-2">
               <p class="px-0 pt-1 pb-1 text-xs font-semibold text-indigo-400 uppercase tracking-wider">AI Picks</p>

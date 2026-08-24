@@ -521,6 +521,12 @@ const mockAuthState = reactive<{
       reminderDaysBefore: number
     }
   }
+  // WR-02 (82-REVIEW): activeActionItems now threads authStore.isAiEnabled
+  // (the two-gate master-AND-settings check) into buildActionBarItems,
+  // instead of the bare settings.aiEnabled. Defaults to true so every
+  // pre-existing test in this file keeps its current behavior -- no test
+  // in this file toggles the AI action-bar item today.
+  isAiEnabled: boolean
 }>({
   user: { uid: 'user-1' },
   isEditor: false,
@@ -541,6 +547,7 @@ const mockAuthState = reactive<{
       reminderDaysBefore: 3,
     },
   },
+  isAiEnabled: true,
 })
 
 vi.mock('@/stores/auth', () => ({

@@ -156,6 +156,15 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => user.value !== null)
   const isEditor = computed(() => userRole.value === 'editor')
 
+  // WR-02 (82-REVIEW): the single shared two-gate AI-affordance check --
+  // mirrors src/utils/claudeApi.ts's isAiEnabled() exactly (master gate AND
+  // church setting). Every UI site that decides whether to SHOW an AI
+  // affordance (not just claudeApi.ts's functions that actually CALL the
+  // proxy) must read this computed instead of the bare `settings.aiEnabled`,
+  // so a super-admin disabling AI for an org hides those affordances
+  // consistently, not just the Settings card.
+  const isAiEnabled = computed(() => aiMasterEnabled.value && settings.value.aiEnabled)
+
   // Org-selection gates consumed by the router. A signed-in user with more than
   // one church and no active choice must pick one; a signed-in user with zero
   // churches has nothing to enter. Both cases route to /select-church. Guarded
@@ -863,5 +872,6 @@ export const useAuthStore = defineStore('auth', () => {
     vwModeEnabled,
     settings,
     aiMasterEnabled,
+    isAiEnabled,
   }
 })

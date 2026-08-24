@@ -179,6 +179,10 @@ describe('SongSlotPicker (WR-02, 81-REVIEW)', () => {
   })
 
   it('renders an AI Picks row from resolvedAiSuggestions when AI is enabled, and selecting it emits select', async () => {
+    // WR-02 (82-REVIEW): the AI Picks section now gates on the two-gate
+    // authStore.isAiEnabled, so the master gate must be flipped on too --
+    // it defaults to false (R242, off-by-default).
+    useAuthStore().aiMasterEnabled = true
     useAuthStore().settings.aiEnabled = true
     const wrapper = mountPicker({
       hasSermonContext: true,
@@ -196,6 +200,7 @@ describe('SongSlotPicker (WR-02, 81-REVIEW)', () => {
   })
 
   it('omits an AI suggestion whose songId resolves to a hidden song', async () => {
+    useAuthStore().aiMasterEnabled = true
     useAuthStore().settings.aiEnabled = true
     const hiddenSong = makeSong({ id: 'song-hidden', title: 'Hidden Song', hidden: true })
     const wrapper = mountPicker({
@@ -207,5 +212,21 @@ describe('SongSlotPicker (WR-02, 81-REVIEW)', () => {
 
     expect(wrapper.text()).not.toContain('Hidden Song')
     expect(wrapper.text()).not.toContain('Should not show')
+  })
+
+  // WR-02 (82-REVIEW): proves the master gate is respected too, not just
+  // settings.aiEnabled -- a super-admin-disabled org must hide the AI Picks
+  // section even when the church's own settings.aiEnabled reads true.
+  it('hides the AI Picks section when the master gate (aiMasterEnabled) is off, even though settings.aiEnabled is true', async () => {
+    useAuthStore().aiMasterEnabled = false
+    useAuthStore().settings.aiEnabled = true
+    const wrapper = mountPicker({
+      hasSermonContext: true,
+      aiSuggestions: [{ songId: 'song-a', reason: 'Fits the sermon theme' }],
+    })
+    await openDropdown(wrapper)
+
+    expect(wrapper.text()).not.toContain('AI Picks')
+    expect(wrapper.text()).not.toContain('Fits the sermon theme')
   })
 })
