@@ -50,6 +50,7 @@ import {
   enforceModelAndTokens,
   checkAndConsumeRateLimit,
   checkAndConsumeOrgEmailQuota,
+  checkOrgAiEnablement,
   buildUsageEntry,
   writeUsageLedger,
   api,
@@ -4040,6 +4041,77 @@ describe("checkAndConsumeOrgEmailQuota", () => {
   });
 });
 
+// R242/R243: the org AI-enablement gate -- the real server-side half of the
+// per-org master AI switch. Mirrors checkAndConsumeRateLimit's harness above
+// (a mocked Firestore, no live emulator), but a plain get() rather than a
+// transaction -- checkOrgAiEnablement never writes.
+describe("checkOrgAiEnablement (org AI enablement gate, R242/R243)", () => {
+  function mockOrgDb(orgData: Record<string, unknown> | undefined, opts: { throwOnGet?: boolean } = {}) {
+    const getSpy = vi.fn(async () => {
+      if (opts.throwOnGet) throw new Error("Firestore unavailable");
+      return { exists: orgData !== undefined, data: () => orgData };
+    });
+    const doc = vi.fn((id: string) => ({ id, get: getSpy }));
+    const collection = vi.fn((name: string) => {
+      if (name !== "organizations") throw new Error(`unexpected collection "${name}"`);
+      return { doc };
+    });
+    return { db: { collection } as never, getSpy, doc };
+  }
+
+  it("ALLOW: an org with aiMasterEnabled:true returns an ok verdict", async () => {
+    const { db } = mockOrgDb({ aiMasterEnabled: true });
+    const result = await checkOrgAiEnablement(db, "org1");
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("DENY (403): an org with aiMasterEnabled:false returns a not-ok verdict with a user-facing message", async () => {
+    const { db } = mockOrgDb({ aiMasterEnabled: false });
+    const result = await checkOrgAiEnablement(db, "org1");
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      error: { error: "AI features are disabled for your organization." },
+    });
+  });
+
+  it("DENY (403): an org doc with the field entirely ABSENT (every pre-Phase-82 org) also denies -- OFF by default", async () => {
+    const { db } = mockOrgDb({ name: "Grace Church" });
+    const result = await checkOrgAiEnablement(db, "org1");
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      error: { error: "AI features are disabled for your organization." },
+    });
+  });
+
+  it("DENY (403): a nonexistent org doc also denies, never throws", async () => {
+    const { db } = mockOrgDb(undefined);
+    const result = await checkOrgAiEnablement(db, "org1");
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      error: { error: "AI features are disabled for your organization." },
+    });
+  });
+
+  it("FAIL-CLOSED (503): a Firestore read error denies with a distinct status/message, the deliberate departure from the rate limiter's fail-open posture", async () => {
+    const { db } = mockOrgDb(undefined, { throwOnGet: true });
+    const result = await checkOrgAiEnablement(db, "org1");
+    expect(result).toEqual({
+      ok: false,
+      status: 503,
+      error: { error: "Could not verify AI availability. Try again shortly." },
+    });
+  });
+
+  it("reads exactly organizations/{orgId} -- the exact orgId argument, no other collection", async () => {
+    const { db, doc } = mockOrgDb({ aiMasterEnabled: true });
+    await checkOrgAiEnablement(db, "org42");
+    expect(doc).toHaveBeenCalledWith("org42");
+  });
+});
+
 describe("buildUsageEntry", () => {
   it("returns the exact documented shape, reading input/output tokens from usage", () => {
     const entry = buildUsageEntry("uid1", "org1", "claude-haiku-4-5-20251001", {
@@ -4156,10 +4228,19 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
     return typed;
   }
 
-  function mockCombinedDb() {
+  // Phase 82 (R242/R243): every WR-04 test below authenticates as uid1/org1
+  // (see the beforeEach verifyIdToken mock), so `organizations/org1` must
+  // resolve to an ENABLED org here -- these tests exercise the PRE-EXISTING
+  // appConfig/rate-limit/enforceModelAndTokens wiring, not the new gate
+  // (which has its own dedicated describe block above). aiMasterEnabled
+  // defaults to true so the new gate never interferes with these assertions;
+  // override via `orgDoc` when a test needs a specific org state.
+  function mockCombinedDb(orgDoc: Record<string, unknown> | undefined = { aiMasterEnabled: true }) {
     const addSpy = vi.fn(async (_entry: unknown) => ({ id: "ledger-doc" }));
     const setSpy = vi.fn();
     const doc = vi.fn((id: string) => ({ id, _docId: id }));
+    const orgGetSpy = vi.fn(async () => ({ exists: orgDoc !== undefined, data: () => orgDoc }));
+    const orgDocRef = vi.fn((id: string) => ({ id, get: orgGetSpy }));
     const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
         get: vi.fn(async () => ({ exists: false, data: () => undefined })),
@@ -4172,6 +4253,7 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
     const collection = vi.fn((name: string) => {
       if (name === "aiRateLimits") return { doc };
       if (name === "aiUsage") return { add: addSpy };
+      if (name === "organizations") return { doc: orgDocRef };
       throw new Error(`unexpected collection "${name}"`);
     });
     return { db: { collection, runTransaction } as never, addSpy, setSpy };
@@ -4246,6 +4328,48 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
     expect(ledgerEntry.outputTokens).toBe(34);
 
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  // Phase 82 (R242/R243): proves the org-AI-enablement gate is actually WIRED
+  // into the anthropic branch -- ahead of appConfig/rate-limit/
+  // enforceModelAndTokens, none of which fire for a disabled org.
+  it("R242/R243: a disabled org (aiMasterEnabled:false) is denied 403 before fetch, before appConfig is even read", async () => {
+    const { db } = mockCombinedDb({ aiMasterEnabled: false });
+    vi.mocked(getFirestore).mockReturnValue(db);
+    const req = fakeReq({ model: ALLOWED_MODEL, max_tokens: 100, messages: [] });
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ error: "AI features are disabled for your organization." });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getAppConfig).not.toHaveBeenCalled();
+  });
+
+  it("R242/R243: an org-doc read error fails CLOSED with 503 before fetch, unlike the rate limiter's fail-open posture", async () => {
+    // No aiRateLimits/aiUsage collection support needed here -- the gate
+    // throws and returns BEFORE any other Firestore-touching control fires.
+    const throwingCollection = (name: string) => {
+      if (name === "organizations") {
+        return {
+          doc: () => ({
+            get: vi.fn(async () => {
+              throw new Error("Firestore unavailable");
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected collection "${name}"`);
+    };
+    vi.mocked(getFirestore).mockReturnValue({ collection: throwingCollection } as never);
+    const req = fakeReq({ model: ALLOWED_MODEL, max_tokens: 100, messages: [] });
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("WR-01 (69-REVIEW.md): a non-anthropic service (esv) never calls getAppConfig, and succeeds even if getAppConfig would reject", async () => {

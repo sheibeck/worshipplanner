@@ -2,7 +2,7 @@
 phase: 82
 slug: per-org-ai-enablement
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-24
 ---
@@ -38,9 +38,9 @@ created: 2026-08-24
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
 |---------|------|------|-------------|-----------|-------------------|--------|
-| 82-01 · T1 — rules lifecycle guard + ALLOW/DENY | 82-01 | 1 | R242 | rules (emulator) | `npx vitest run --config vitest.rules.config.ts -t "aiMasterEnabled"` | ⬜ pending |
-| 82-01 · T2 — `setOrgAiEnabled` callable + forced-off disable + OrgSummary field | 82-01 | 1 | R242, R243 | functions unit | `cd functions && npx vitest run src/orgProvisioning.test.ts -t "setOrgAiEnabled"` | ⬜ pending |
-| 82-01 · T3 — AI-proxy fail-closed gate helper | 82-01 | 1 | R243 (server enforcement) | functions unit | `cd functions && npx vitest run src/index.test.ts -t "org AI"` | ⬜ pending |
+| 82-01 · T1 — rules lifecycle guard + ALLOW/DENY | 82-01 | 1 | R242 | rules (emulator) | `npx vitest run --config vitest.rules.config.ts -t "aiMasterEnabled"` | ✅ done |
+| 82-01 · T2 — `setOrgAiEnabled` callable + forced-off disable + OrgSummary field | 82-01 | 1 | R242, R243 | functions unit | `cd functions && npx vitest run src/orgProvisioning.test.ts -t "setOrgAiEnabled"` | ✅ done |
+| 82-01 · T3 — AI-proxy fail-closed gate helper | 82-01 | 1 | R243 (server enforcement) | functions unit | `cd functions && npx vitest run src/index.test.ts -t "org AI"` | ✅ done |
 | 82-02 · T1 — Organization type + auth-store ref/read/reset + two-gate `isAiEnabled()` | 82-02 | 1 | R242, R243 | store + unit | `npx vitest run src/stores/__tests__/auth.test.ts src/utils/claudeApi.test.ts` | ⬜ pending |
 | 82-02 · T2 — Settings "AI Features" card hidden when master gate off | 82-02 | 1 | R243 | component | `npx vitest run src/views/__tests__/SettingsView.test.ts -t "AI"` | ⬜ pending |
 | 82-02 · T3 — Owner Console per-row AI toggle | 82-02 | 1 | R242 | component | `npx vitest run src/components/admin/__tests__/OrganizationsTab.test.ts -t "AI"` | ⬜ pending |
@@ -51,9 +51,9 @@ created: 2026-08-24
 
 ## Wave 0 Requirements
 
-- [ ] Rules ALLOW/DENY for `aiMasterEnabled` in the `lifecycleFields()` allow-list (R242) — `src/rules.test.ts`. → **82-01 · T1**
-- [ ] `functions` test for the new `setOrgAiEnabled` super-admin callable incl. the disable-branch `settings.aiEnabled:false` forced-off write + sibling-settings preservation + `listOrganizations` field (R242, R243). → **82-01 · T2**
-- [ ] `functions` test for the extracted AI-proxy gate helper: fail-closed 403 (disabled) / allow / 503 (read error) (R243 server enforcement — **IN SCOPE this phase**). → **82-01 · T3**
+- [x] Rules ALLOW/DENY for `aiMasterEnabled` in the `lifecycleFields()` allow-list (R242) — `src/rules.test.ts`. → **82-01 · T1**
+- [x] `functions` test for the new `setOrgAiEnabled` super-admin callable incl. the disable-branch `settings.aiEnabled:false` forced-off write + sibling-settings preservation + `listOrganizations` field (R242, R243). → **82-01 · T2**
+- [x] `functions` test for the extracted AI-proxy gate helper: fail-closed 403 (disabled) / allow / 503 (read error) (R243 server enforcement — **IN SCOPE this phase**). → **82-01 · T3**
 - [ ] Store + unit test: `authStore.aiMasterEnabled` defaults OFF / reads snapshot / resets; two-gate `isAiEnabled()` blocks when either gate is off (R242, R243). → **82-02 · T1**
 - [ ] Component test: Settings "AI Features" card hidden when `aiMasterEnabled` is off (R243). → **82-02 · T2**
 - [ ] Owner Console `OrganizationsTab` per-row AI toggle test (calls the mocked callable, reflects state, friendly error) (R242). → **82-02 · T3**
@@ -73,11 +73,11 @@ created: 2026-08-24
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 120s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 120s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** pending — 82-01 (T1-T3) automated gates confirmed green 2026-08-24 (see 82-01-SUMMARY.md); 82-02 not yet executed.

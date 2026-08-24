@@ -817,3 +817,85 @@ external DNS/Resend ops that no automated gate in this repo can perform or verif
 - **R238** — the actual Resend verified-domain send: follow `functions/DEPLOY-EMAIL-DOMAIN.md` (add domain, SPF/DKIM/DMARC, set `fromAddress` in the Owner Console), then a real external-inbox test send. (This is the standing R238 owner entry above.)
 - **R237** — a live Planning Center export to a real account showing prayers/message/announcements land as items.
 - **R239** — a real screen-reader pass over the Owner Console (inputs announced, tab strip behaves as WAI-ARIA tabs with arrow-key nav).
+
+---
+
+## Phase 82 Plan 01 — Per-Org AI Enablement: backend master gate (v2.2) — OWNER, PRE-DEPLOY
+
+**Code-complete + automatically verified 2026-08-24.** Plan 82-01 shipped the security boundary
+half of the super-admin per-org AI gate (R242/R243) — three composable pieces, each mirroring an
+existing, tested twin:
+
+1. **`firestore.rules` — `aiMasterEnabled` added to `lifecycleFields()`.** The new top-level
+   `organizations/{orgId}.aiMasterEnabled` boolean (deliberately NOT a bare `aiEnabled` — that
+   would collide with the pre-existing `settings.aiEnabled`) is now Admin-SDK-write-only, denied
+   to an ordinary org editor AND a super-admin's own client SDK alike — mirrors the `active` field
+   guard exactly, including the "no super-admin exemption" posture (the CRITICAL test at
+   `src/rules.test.ts:682`'s twin). Absence reads as OFF (`?? false`), so every existing org
+   (including Berean) goes dark on deploy until a super-admin re-enables it — the owner's stated
+   intent.
+2. **`setOrgAiEnabled` super-admin callable** (`functions/src/orgProvisioning.ts`) — mirrors
+   `setOrgActiveHandler`'s shape (`assertSuperAdminCaller` gate, input validation, org-existence
+   check, same-state short-circuit, Admin SDK merge write) without the member-claim fan-out (AI
+   enablement carries no Storage-side enforcement or refresh-token revocation requirement). The
+   DISABLE branch writes BOTH `aiMasterEnabled: false` AND the dot-path `'settings.aiEnabled':
+   false` in the SAME merge write (R243 forced-off) — the explicit dot-path key form, never a
+   nested `{ settings: {...} }` object literal, so sibling `settings` fields (e.g. `bibleVersion`)
+   are never clobbered. The same-state short-circuit for a DISABLE call requires BOTH
+   `aiMasterEnabled` AND `settings.aiEnabled` to already read false — never `aiMasterEnabled`
+   alone — so a repeat disable call still re-forces `settings.aiEnabled` off if it somehow drifted
+   back on. `OrgSummary`/`listOrganizations` extended with `aiMasterEnabled` (defaults false) so
+   the Owner Console table can render current state once Plan 02 lands.
+3. **AI-proxy fail-closed gate** (`functions/src/index.ts`'s `api` onRequest, anthropic branch) —
+   a new exported `checkOrgAiEnablement` helper (mirrors `enforceModelAndTokens`'s result-object
+   shape so it is unit-testable without an HTTP harness) does a LIVE `organizations/{orgId}` read
+   on every anthropic request, using the caller's `orgId` custom claim ONLY as a pointer to which
+   org (never trusted for the enablement value itself — claims are stale until the next token
+   mint). Wired in FIRST, before appConfig/rate-limit/`enforceModelAndTokens`: a disabled org gets
+   403 before any billed work; a Firestore read error fails CLOSED with 503 — a deliberate
+   departure from the rate limiter's fail-open posture, because this IS the security control, not
+   a cost guardrail. This is the REAL enforcement — the client-side gating in Plan 02 is UX on top
+   of it, not a substitute.
+
+**Proven automated (2026-08-24):**
+- Rules: `npx vitest run --config vitest.rules.config.ts -t "aiMasterEnabled"` — 3/3 green against
+  a running Firestore emulator; full rules suite `npx vitest run --config vitest.rules.config.ts`
+  222/222 green (no regression).
+- Functions: `cd functions && npx vitest run src/orgProvisioning.test.ts -t "setOrgAiEnabled"` —
+  11/11 green; `cd functions && npx vitest run src/index.test.ts -t "org AI"` — 8/8 green
+  (including two full `api()` end-to-end wiring tests proving the 403/503 verdicts fire before
+  `fetch`); full functions suite `cd functions && npx vitest run` — 574/574 green (no regression);
+  `cd functions && npm run build` (`tsc`) clean.
+- Type gate: `npm run type-check` (`vue-tsc --build`) clean.
+- App suite: `npx vitest run` at the documented 2-file known-failing baseline, no new regressions
+  (confirmed separately from this record).
+
+**Ships BUILT + TESTED + UNDEPLOYED** per the standing v1.5+ deploy discipline. No deploy was run
+by this plan.
+
+**OWNER — the exact command to deploy the master gate + callable + proxy enforcement together:**
+```
+firebase deploy --only firestore:rules,functions:setOrgAiEnabled,functions:api --project worship-planner-bc515
+```
+
+**Post-deploy Berean re-enable (the owner's stated intent, NOT a bug):** because
+`aiMasterEnabled` is absent on every existing org today, deploying this plan turns AI OFF for
+Berean and any other org currently using it — that is the correct behavior, matching R242's
+"OFF by default for every organization." The super-admin (via a Plan 02 Owner Console toggle, or
+directly through the `setOrgAiEnabled` callable before Plan 02 ships a UI) must explicitly
+re-enable AI for Berean after this deploy, or Berean's AI features silently go dark.
+
+**What only the owner can confirm after deploy (`verification_deferred_human`) — do NOT mark
+passed here:**
+1. Attempt an ordinary editor `updateDoc(organizations/{orgId}, {aiMasterEnabled: true})` as a
+   direct client write — expect deny.
+2. As a super-admin, call `setOrgAiEnabled({orgId, aiEnabled: true})` for Berean and confirm the
+   org doc's `aiMasterEnabled` flips true; call it with `aiEnabled: false` and confirm
+   `settings.aiEnabled` is ALSO forced false in the same write.
+3. As a member of a disabled org, attempt a direct fetch to the deployed `api` proxy's anthropic
+   route with a valid ID token and confirm a 403 "AI features are disabled for your organization."
+   response — the real security boundary, not merely a hidden UI panel.
+
+**This plan ships no client-side UI** — the Owner Console toggle and the Settings-panel gate land
+in Plan 02 (still to be executed as of this record). See `82-01-SUMMARY.md` for the full
+task-by-task record.

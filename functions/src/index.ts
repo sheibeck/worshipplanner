@@ -330,6 +330,62 @@ export function enforceModelAndTokens(
   return { ok: true, body: record };
 }
 
+export interface OrgAiEnablementOk {
+  ok: true;
+}
+export interface OrgAiEnablementReject {
+  ok: false;
+  status: number;
+  error: { error: string };
+}
+export type OrgAiEnablementResult = OrgAiEnablementOk | OrgAiEnablementReject;
+
+/**
+ * R242/R243: the real, server-side half of the per-org master AI gate --
+ * a live `organizations/{orgId}` read on EVERY anthropic call, extracted so
+ * it is unit-testable without an HTTP harness (the `api` onRequest has none,
+ * see the "AI proxy cost controls" describe block below). The caller's
+ * `orgId` custom claim (resolved via `resolveOrgId`) is used ONLY as a
+ * pointer to WHICH org to read -- never trusted for the enablement VALUE
+ * itself, since claims are stale until the next ID-token mint (sign-in, org
+ * switch, or an explicit revoke). A live get() here is fresh on every
+ * request, closing the gap a claims-embedded flag would leave open for
+ * however long a disabled org's members' tokens happen to still be valid.
+ *
+ * FAIL CLOSED on a read error -- a DELIBERATE departure from the rate
+ * limiter's fail-open posture a few lines below (`checkAndConsumeRateLimit`'s
+ * caller, "the limiter is a cost guardrail, not a security control"). This
+ * check IS the security control the owner asked to be "real" (not just UI
+ * hiding, 82-RESEARCH.md Assumption A2): a Firestore hiccup here must never
+ * silently let a disabled org spend money on Anthropic.
+ */
+export async function checkOrgAiEnablement(
+  db: Firestore,
+  orgId: string,
+): Promise<OrgAiEnablementResult> {
+  try {
+    const orgSnap = await db.collection("organizations").doc(orgId).get();
+    const aiMasterEnabled = (orgSnap.data() as { aiMasterEnabled?: boolean } | undefined)?.aiMasterEnabled ?? false;
+    if (aiMasterEnabled !== true) {
+      return {
+        ok: false,
+        status: 403,
+        error: { error: "AI features are disabled for your organization." },
+      };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.warn("[api] org AI-enablement read failed; failing closed:", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return {
+      ok: false,
+      status: 503,
+      error: { error: "Could not verify AI availability. Try again shortly." },
+    };
+  }
+}
+
 export interface RateLimitResult {
   allowed: boolean;
   scope?: "minute" | "day";
@@ -554,6 +610,23 @@ export const api = onRequest(
     // fetch below with `outboundBody` left as `req.body`, byte-unchanged.
     let outboundBody: unknown = req.body;
     if (service === "anthropic") {
+      // R242/R243: the org-AI-enablement gate runs FIRST, before any other
+      // anthropic control (appConfig read, rate limit, enforceModelAndTokens)
+      // -- a disabled org must never reach even the cheapest of those checks.
+      // decodedCaller is always non-null here (anthropic is in
+      // SECRET_INJECTED, so the auth gate above already returned 401 for a
+      // null caller). resolveOrgId is used ONLY as a pointer to which org --
+      // see checkOrgAiEnablement's own doc comment for why the live get()
+      // inside it, not the claim payload, is the enforcement source.
+      const callerOrgId = resolveOrgId(decodedCaller!);
+      if (callerOrgId) {
+        const enablementVerdict = await checkOrgAiEnablement(getFirestore(), callerOrgId);
+        if (!enablementVerdict.ok) {
+          res.status(enablementVerdict.status).json(enablementVerdict.error);
+          return;
+        }
+      }
+
       // Cached form (no {fresh:true}) -- the api handler is a hot request
       // path (R183); getFirestore() is already called later in this same
       // handler (checkAndConsumeRateLimit/writeUsageLedger), so this is no
