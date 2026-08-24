@@ -683,14 +683,47 @@ describe('rebuildSongGroup', () => {
     expect(chorusEntry?.notes).toBe('Old note')
   })
 
-  it('a song plan item with no song assigned returns the unchanged result', () => {
+  it('R235: a removed song (songId cleared) empties a non-empty stored group', () => {
     const slot = songSlot({ id: 'slot-1', songId: null })
     const group = makeStoredSongGroup(twoSectionStoredSlides)
     const inputs = makeInputs()
 
     const result = rebuildSongGroup(group, slot, inputs)
 
-    expect(result).toEqual({ changed: false, slides: group.slides })
+    expect(result).toEqual({ changed: true, slides: [] })
+  })
+
+  it('R235: clearing an already-empty group is idempotent (changed: false)', () => {
+    const slot = songSlot({ id: 'slot-1', songId: null })
+    const group = makeStoredSongGroup([])
+    const inputs = makeInputs()
+
+    const result = rebuildSongGroup(group, slot, inputs)
+
+    expect(result).toEqual({ changed: false, slides: [] })
+  })
+
+  it('R235: reprise-safe — clearing one slot\'s song leaves the other slot\'s group (same songId) untouched', () => {
+    // Two slots both reference the same songId ('song-1'), each with its OWN
+    // group document, keyed by its own slot.id (SlideGroup.id === slot.id
+    // per the invariant documented on SlideGroup). Clearing slot-a's song
+    // must empty ONLY slot-a's group; slot-b's group, still assigned, is
+    // rebuilt independently and must remain intact.
+    const groupA = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: twoSectionStoredSlides })
+    const groupB = makeGroup({ id: 'slot-b', slotId: 'slot-b', slides: twoSectionStoredSlides })
+    expect(groupA).not.toBe(groupB)
+
+    const clearedSlotA = songSlot({ id: 'slot-a', songId: null })
+    const stillAssignedSlotB = songSlot({ id: 'slot-b', songId: 'song-1' })
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const resultA = rebuildSongGroup(groupA, clearedSlotA, inputs)
+    const resultB = rebuildSongGroup(groupB, stillAssignedSlotB, inputs)
+
+    expect(resultA).toEqual({ changed: true, slides: [] })
+    expect(resultB.changed).toBe(false)
+    expect(resultB.slides).toEqual(groupB.slides)
   })
 
   it('reconciling an already-in-sync group returns changed: false and an entry list deep-equal to the stored one', () => {

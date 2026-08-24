@@ -602,7 +602,18 @@ function isCopyrightEntry(
  */
 export function rebuildSongGroup(group: SlideGroup, slot: SongSlot, inputs: AssemblyInputs): RebuildResult {
   const songId = slot.songId
-  if (!songId) return { changed: false, slides: group.slides }
+  if (!songId) {
+    // R235/999.2: the song was cleared from THIS slot. Its group must empty,
+    // even when the same song is still assigned to another slot elsewhere in
+    // the service — that other slot has its OWN group doc, keyed by its own
+    // slot.id, and is untouched by this write. Gate on there actually being
+    // something to clear so a second reactive pass over an already-empty
+    // group stays idempotent (changed: false), matching every other
+    // rebuild*'s contract (see rebuildScriptureGroup's CLEARED REFERENCE
+    // branch below for the same idiom).
+    if (group.slides.length === 0) return { changed: false, slides: group.slides }
+    return { changed: true, slides: [] }
+  }
 
   const storedSongIds = new Set(
     group.slides
