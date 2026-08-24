@@ -117,6 +117,17 @@ export const useAuthStore = defineStore('auth', () => {
   // nothing can mutate the default object.
   const settings = ref<OrgSettings>({ ...DEFAULT_ORG_SETTINGS })
 
+  // Phase 82 (R242/R243) — the super-admin MASTER AI gate, read from the org
+  // doc's top-level `aiMasterEnabled` field (distinct from
+  // `settings.aiEnabled` above). Absent/false => OFF (default) — DELIBERATELY
+  // the inverse of vwModeEnabled's `?? true` default, since AI must be off by
+  // default for every org (R242). Mirror-written from applyOrgSnapshot, NOT
+  // live-synced via onSnapshot — same latency posture as vwModeEnabled/
+  // settings (Pitfall 2, 82-RESEARCH.md). Consumed as the first AND-gate leg
+  // in `src/utils/claudeApi.ts`'s isAiEnabled() and as SettingsView.vue's AI
+  // Features card v-if.
+  const aiMasterEnabled = ref(false)
+
   // The organizations the signed-in user belongs to ({id, name, active}) — the
   // source the login church-picker renders when a user belongs to more than
   // one. Populated by loadOrgContext. `active` defaults to `true` for a
@@ -346,6 +357,7 @@ export const useAuthStore = defineStore('auth', () => {
     pcSecret.value = null
     vwModeEnabled.value = true
     settings.value = { ...DEFAULT_ORG_SETTINGS }
+    aiMasterEnabled.value = false
     viewingAsSuperAdmin.value = null
     deactivatedOrgMessage.value = null
   }
@@ -412,6 +424,12 @@ export const useAuthStore = defineStore('auth', () => {
       },
     }
     vwModeEnabled.value = resolvedVwModeEnabled
+
+    // Phase 82 (R242) — DEFAULT OFF: absent field reads as false, deliberately
+    // NOT the `?? true` vwModeEnabled uses above, since AI must default off
+    // for every org. No dual-read/legacy-field precedent exists for this
+    // field (brand new this phase), so a plain `?? false` is sufficient.
+    aiMasterEnabled.value = (orgData.aiMasterEnabled as boolean | undefined) ?? false
 
     // CR-01 (46-REVIEW.md) — eager-load the org's actual chosen slide
     // face here, the ONE point every render site's settings flow
@@ -581,6 +599,7 @@ export const useAuthStore = defineStore('auth', () => {
       isSuperAdmin.value = false
       vwModeEnabled.value = true
       settings.value = { ...DEFAULT_ORG_SETTINGS }
+      aiMasterEnabled.value = false
       memberships.value = []
       deactivatedOrgMessage.value = null
       viewingAsSuperAdmin.value = null
@@ -789,6 +808,7 @@ export const useAuthStore = defineStore('auth', () => {
     pcSecret.value = null
     vwModeEnabled.value = true
     settings.value = { ...DEFAULT_ORG_SETTINGS }
+    aiMasterEnabled.value = false
     deactivatedOrgMessage.value = null
     viewingAsSuperAdmin.value = null
     memberUnsub?.()
@@ -842,5 +862,6 @@ export const useAuthStore = defineStore('auth', () => {
     setPcCredentials,
     vwModeEnabled,
     settings,
+    aiMasterEnabled,
   }
 })

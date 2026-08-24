@@ -67,7 +67,15 @@ export interface AiScriptureSuggestion {
  * home for gating AI behind a paywall, should that ever become necessary.
  */
 function isAiEnabled(): boolean {
-  return useAuthStore().settings.aiEnabled
+  const authStore = useAuthStore()
+  // R243: the super-admin master gate is checked FIRST and independently of
+  // the church's own preference -- an org with the master gate off must
+  // never call the proxy even if a stale `settings.aiEnabled: true` somehow
+  // survives (defense-in-depth; the callable also force-writes
+  // settings.aiEnabled: false on disable, so this branch should be
+  // structurally unreachable in steady state, but the check costs nothing
+  // and closes any write-ordering race). See 82-RESEARCH.md.
+  return authStore.aiMasterEnabled && authStore.settings.aiEnabled
 }
 
 // ─── System Prompts ──────────────────────────────────────────────────────────

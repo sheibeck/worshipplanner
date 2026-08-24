@@ -23,6 +23,12 @@ vi.mock('@/utils/appAuth', () => ({
 // toggle mid-suite without re-importing the module under test. Defaults to
 // true so every pre-existing test in this file keeps its current behavior.
 let mockAiEnabled = true
+// Phase 82 (R242/R243) — the super-admin master gate, mocked separately from
+// the church's own settings.aiEnabled toggle above. Defaults to true so
+// every pre-existing (pre-Phase-82) test in this file keeps its current
+// behavior; individual tests flip it false to exercise the master-gate-off
+// blocking case.
+let mockAiMasterEnabled = true
 // WR-03 (39-REVIEW) regression hook: when true, `useAuthStore()` itself
 // throws (simulating "no active Pinia"), so a test can prove the isAiEnabled
 // guard's own never-throw contract — the guard now runs INSIDE each gated
@@ -40,6 +46,9 @@ vi.mock('@/stores/auth', () => ({
           return mockAiEnabled
         },
       },
+      get aiMasterEnabled() {
+        return mockAiMasterEnabled
+      },
     }
   },
 }))
@@ -48,6 +57,7 @@ vi.mock('@/stores/auth', () => ({
 // block can never leak into an unrelated test regardless of run order.
 afterEach(() => {
   mockAiEnabled = true
+  mockAiMasterEnabled = true
   mockAuthStoreThrows = false
 })
 
@@ -1057,6 +1067,121 @@ describe('pure helpers remain callable with AI off (aiEnabled)', () => {
         boundaries,
       ),
     ).toEqual([{ speaker: 'LEADER', startBoundary: 0, endBoundary: 2 }])
+  })
+})
+
+// ─── Phase 82 (R242/R243): two-gate isAiEnabled() — master gate AND church
+// setting ─────────────────────────────────────────────────────────────────
+//
+// isAiEnabled() now ANDs authStore.aiMasterEnabled (super-admin master gate)
+// with authStore.settings.aiEnabled (the church's own preference), master
+// gate checked first. These cases return before any fetch, so no network
+// mock is needed — the assertion is simply that the SDK is never invoked.
+describe('isAiEnabled() two-gate AND (Phase 82, R242/R243)', () => {
+  beforeEach(() => {
+    mockCreate.mockReset()
+    mockParse.mockReset()
+  })
+
+  // The last test in this block ("allows AI when both...") deliberately
+  // exercises the real mockCreate call path, unlike every other test here —
+  // without an afterEach reset, that recorded call would otherwise leak into
+  // the WR-03 block immediately below, which asserts mockCreate/mockParse
+  // were NEVER called and has no beforeEach of its own (by original design,
+  // nothing before it was expected to invoke either mock).
+  afterEach(() => {
+    mockCreate.mockReset()
+    mockParse.mockReset()
+  })
+
+  it('blocks AI (master gate off) even when the church setting is on: getSongSuggestions resolves null without calling the proxy', async () => {
+    mockAiMasterEnabled = false
+    mockAiEnabled = true
+
+    const result = await getSongSuggestions({
+      sermonTopic: 'Grace',
+      sermonPassage: null,
+      slotVwType: 1,
+      alreadySelectedSongIds: [],
+      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
+      recentServiceSongIds: [],
+    })
+
+    expect(result).toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('blocks AI (church setting off) even when the master gate is on: getSongSuggestions resolves null without calling the proxy', async () => {
+    mockAiMasterEnabled = true
+    mockAiEnabled = false
+
+    const result = await getSongSuggestions({
+      sermonTopic: 'Grace',
+      sermonPassage: null,
+      slotVwType: 1,
+      alreadySelectedSongIds: [],
+      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
+      recentServiceSongIds: [],
+    })
+
+    expect(result).toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('blocks AI (master gate off) even when the church setting is on: getScriptureSuggestions resolves null without calling the proxy', async () => {
+    mockAiMasterEnabled = false
+    mockAiEnabled = true
+
+    const result = await getScriptureSuggestions({
+      sermonTopic: 'Forgiveness',
+      sermonPassage: null,
+      query: 'passages about forgiveness',
+      recentScriptures: [],
+    })
+
+    expect(result).toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('blocks AI (master gate off) even when the church setting is on: splitCongregationalReading resolves null without calling the proxy', async () => {
+    mockAiMasterEnabled = false
+    mockAiEnabled = true
+
+    const result = await splitCongregationalReading(
+      '[1] The Lord is my shepherd; I shall not want. [2] He makes me lie down in green pastures.',
+    )
+
+    expect(result).toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('allows AI when both the master gate and the church setting are on', async () => {
+    mockAiMasterEnabled = true
+    mockAiEnabled = true
+    mockCreate.mockResolvedValueOnce({
+      content: [
+        {
+          type: 'text',
+          text: '[{"songId":"song-1","reason":"Matches grace theme"}]',
+        },
+      ],
+    })
+
+    const result = await getSongSuggestions({
+      sermonTopic: 'Grace',
+      sermonPassage: null,
+      slotVwType: 1,
+      alreadySelectedSongIds: [],
+      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
+      recentServiceSongIds: [],
+    })
+
+    expect(result).not.toBeNull()
+    expect(mockCreate).toHaveBeenCalledTimes(1)
   })
 })
 
