@@ -342,7 +342,11 @@ working for a newly-onboarded second-org admin (999.5). Full list in `.planning/
 - [ ] Harden 2 known-open `firestore.rules` findings — (1) `organizations/{orgId}` `allow write: if
       isOrgEditor` lets an editor rewrite `createdBy` (`firestore.rules:31`); (2) `inviteLookup/{email}` `allow
       create: if isSignedIn()` self-invite vector (`firestore.rules:173`) — carry-forward C2 residual. Detail
-      in `PENDING-VERIFICATION.md` C2 (backlog 999.11)
+      in `PENDING-VERIFICATION.md` C2 (backlog 999.11) — **DONE in v2.2 Phase 80 (R232+R233), ships UNDEPLOYED**
+- [ ] `deleteService` orphans the service's `messages` and `lockSnapshots` subcollections — client `deleteDoc`
+      does not cascade (Phase 80 code-review WR-02, deferred as out-of-scope for R234's share-artifact
+      revocation). A future fix should cascade-delete those subcollections (mirror the server-side org-deletion
+      cascade), likely via a Cloud Function since client bulk subcollection deletes are unbounded (backlog 999.12)
 
 ### Out of Scope
 
