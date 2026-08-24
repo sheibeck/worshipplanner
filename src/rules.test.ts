@@ -603,6 +603,37 @@ describe('Org lifecycle field guard (T-76-10/T-76-06)', () => {
     )
   })
 
+  // WR-01 (82-REVIEW): aiMasterEnabled's own audit-trail siblings
+  // (aiEnabledAt/aiEnabledBy/aiDisabledAt/aiDisabledBy, written by
+  // setOrgAiEnabledHandler) must ride along in lifecycleFields() too --
+  // otherwise an ordinary editor could forge them directly, the same
+  // T-76-06 audit-forgery class already closed for `active`'s siblings.
+  it('DENIES an ordinary editor from forging aiEnabledBy/aiEnabledAt directly on their own org', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church" })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), {
+        aiEnabledAt: new Date(),
+        aiEnabledBy: 'forged-uid',
+      }),
+    )
+  })
+
+  it('DENIES an ordinary editor from forging aiDisabledBy/aiDisabledAt directly on their own org', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church" })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), {
+        aiDisabledAt: new Date(),
+        aiDisabledBy: 'forged-uid',
+      }),
+    )
+  })
+
   // Phase 82 Pitfall 3 regression guard: `preservesLifecycleFields()`'s array
   // is shared between the update-time diff check (above) and the create-time
   // "keys absent" check -- a normal org-create payload (no aiMasterEnabled

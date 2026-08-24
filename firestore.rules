@@ -125,7 +125,13 @@ service cloud.firestore {
       // forced-off side effect on `settings.aiEnabled`, reopening the same
       // partial-state hole Phase 78 closed for `active`.
       function lifecycleFields() {
-        return ['active', 'deactivatedAt', 'deactivatedBy', 'reactivatedAt', 'reactivatedBy', 'aiMasterEnabled'];
+        // WR-01 (82-REVIEW): aiMasterEnabled's own audit-trail siblings
+        // (aiEnabledAt/aiEnabledBy/aiDisabledAt/aiDisabledBy, written by
+        // setOrgAiEnabledHandler) must ride along in this same allow-list --
+        // otherwise an ordinary editor can forge them directly, the exact
+        // T-76-06 audit-forgery class already closed for `active`'s siblings.
+        return ['active', 'deactivatedAt', 'deactivatedBy', 'reactivatedAt', 'reactivatedBy',
+                'aiMasterEnabled', 'aiEnabledAt', 'aiEnabledBy', 'aiDisabledAt', 'aiDisabledBy'];
       }
       function preservesLifecycleFields() {
         return request.resource == null
