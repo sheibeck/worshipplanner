@@ -8745,3 +8745,91 @@ describe('ServiceEditorView - ARIA tab semantics (R239)', () => {
     expect(wrapper.get('#svc-tab-slides').attributes('role')).toBe('tab')
   })
 })
+
+describe('ServiceEditorView - tab strip keyboard navigation (WR-01, 81-REVIEW)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    // Editor with messaging ON so all four tab buttons (Service Order,
+    // Slides, Roles, Messages) render — the widest surface for this suite.
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockAuthState.settings.messaging = {
+      enabled: true,
+      lockNotifyDefault: false,
+      reminderEnabled: false,
+      reminderDaysBefore: 3,
+    }
+  })
+
+  it('keeps the active tab at tabindex 0 and every other tab at tabindex -1 (roving tabindex)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('#svc-tab-service-order').attributes('tabindex')).toBe('0')
+    expect(wrapper.get('#svc-tab-slides').attributes('tabindex')).toBe('-1')
+    expect(wrapper.get('#svc-tab-roles').attributes('tabindex')).toBe('-1')
+    expect(wrapper.get('#svc-tab-messages').attributes('tabindex')).toBe('-1')
+  })
+
+  it('ArrowRight steps through Service Order -> Slides -> Roles -> Messages -> wraps to Service Order', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const tablist = wrapper.get('[role="tablist"]')
+    const order = ['svc-tab-slides', 'svc-tab-roles', 'svc-tab-messages', 'svc-tab-service-order']
+    for (const nextId of order) {
+      await tablist.trigger('keydown', { key: 'ArrowRight' })
+      expect(wrapper.get(`#${nextId}`).attributes('aria-selected')).toBe('true')
+    }
+  })
+
+  it('ArrowLeft from the first tab wraps to the last VISIBLE tab', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowLeft' })
+
+    expect(wrapper.get('#svc-tab-messages').attributes('aria-selected')).toBe('true')
+  })
+
+  it('Home and End jump to the first and last visible tab respectively', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'End' })
+    expect(wrapper.get('#svc-tab-messages').attributes('aria-selected')).toBe('true')
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'Home' })
+    expect(wrapper.get('#svc-tab-service-order').attributes('aria-selected')).toBe('true')
+  })
+
+  it('skips the hidden Roles/Messages tabs for a non-editor viewer (navigation order matches what is rendered)', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowLeft' })
+
+    // Only Service Order + Slides are visible for a non-editor, so
+    // ArrowLeft from Service Order wraps straight to Slides.
+    expect(wrapper.get('#svc-tab-slides').attributes('aria-selected')).toBe('true')
+  })
+})

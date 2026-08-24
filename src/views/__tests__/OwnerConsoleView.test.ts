@@ -370,3 +370,61 @@ describe('OwnerConsoleView — ARIA tab semantics (R239)', () => {
     expect(isVShowHidden(orgsPanel)).toBe(true)
   })
 })
+
+describe('OwnerConsoleView — tab strip keyboard navigation (WR-01, 81-REVIEW)', () => {
+  it('keeps the active tab at tabindex 0 and the inactive tab at tabindex -1 (roving tabindex)', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.get('#owner-tab-configuration').attributes('tabindex')).toBe('0')
+    expect(wrapper.get('#owner-tab-organizations').attributes('tabindex')).toBe('-1')
+  })
+
+  it('ArrowRight moves focus + activation from Configuration to Organizations', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowRight' })
+
+    expect(wrapper.get('#owner-tab-organizations').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('#owner-tab-configuration').attributes('aria-selected')).toBe('false')
+    expect(wrapper.get('#owner-tab-organizations').attributes('tabindex')).toBe('0')
+    expect(wrapper.get('#owner-tab-configuration').attributes('tabindex')).toBe('-1')
+    const orgsPanel = wrapper.get('[data-testid="organizations-panel"]')
+    expect(isVShowHidden(orgsPanel)).toBe(false)
+  })
+
+  it('ArrowRight wraps from the last tab back to the first', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper.get('#owner-tab-organizations').attributes('aria-selected')).toBe('true')
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper.get('#owner-tab-configuration').attributes('aria-selected')).toBe('true')
+  })
+
+  it('ArrowLeft wraps from the first tab to the last', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowLeft' })
+
+    expect(wrapper.get('#owner-tab-organizations').attributes('aria-selected')).toBe('true')
+  })
+
+  it('Home and End jump to the first and last tab respectively', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'End' })
+    expect(wrapper.get('#owner-tab-organizations').attributes('aria-selected')).toBe('true')
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'Home' })
+    expect(wrapper.get('#owner-tab-configuration').attributes('aria-selected')).toBe('true')
+  })
+
+  it('ignores unrelated keys', async () => {
+    const wrapper = await mountView()
+
+    await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'a' })
+
+    expect(wrapper.get('#owner-tab-configuration').attributes('aria-selected')).toBe('true')
+  })
+})

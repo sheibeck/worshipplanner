@@ -693,9 +693,13 @@
              Service Order and Roles — a reposition of the existing three
              buttons, not a restyle; each button keeps its own class strings,
              `:class` expression and `@click` assignment unchanged. -->
-        <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0">
+        <!-- WR-01 (81-REVIEW): roving tabindex requires the companion
+             arrow-key handler per the WAI-ARIA APG Tabs pattern, so
+             @keydown moves focus + activates the adjacent VISIBLE tab. -->
+        <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
           <button
             id="svc-tab-service-order"
+            ref="serviceOrderTabButtonRef"
             role="tab"
             type="button"
             :aria-selected="activeTab === 'service-order'"
@@ -716,6 +720,7 @@
                "Service Order" in Phase 27 (UI-SPEC Mockup Correction 5). -->
           <button
             id="svc-tab-slides"
+            ref="slidesTabButtonRef"
             role="tab"
             type="button"
             :aria-selected="activeTab === 'slides'"
@@ -732,6 +737,7 @@
           <button
             v-if="authStore.isEditor"
             id="svc-tab-roles"
+            ref="rolesTabButtonRef"
             role="tab"
             type="button"
             :aria-selected="activeTab === 'roles'"
@@ -751,6 +757,7 @@
           <button
             v-if="authStore.isEditor && isMessagingEnabled()"
             id="svc-tab-messages"
+            ref="messagesTabButtonRef"
             role="tab"
             type="button"
             :aria-selected="activeTab === 'messages'"
@@ -1718,6 +1725,67 @@ const saveStatus = useSaveStatus()
 // Phase 27, D-03); D-05's auto-selection is about which GROUP is selected
 // once the Slides tab itself is opened, not about which tab opens first.
 const activeTab = ref<'service-order' | 'roles' | 'slides' | 'messages'>('service-order')
+
+// WR-01 (81-REVIEW): roving tabindex on the tab bar (above) removes inactive
+// tabs from the Tab key order per the WAI-ARIA APG Tabs pattern, which
+// requires arrow-key navigation to compensate. Roles/Messages are
+// conditionally rendered (authStore.isEditor / isMessagingEnabled()), so the
+// order used for Arrow/Home/End navigation is recomputed from what is
+// actually visible rather than a static list.
+type ServiceEditorTabId = 'service-order' | 'roles' | 'slides' | 'messages'
+const visibleTabOrder = computed<ServiceEditorTabId[]>(() => {
+  const tabs: ServiceEditorTabId[] = ['service-order', 'slides']
+  if (authStore.isEditor) tabs.push('roles')
+  if (authStore.isEditor && isMessagingEnabled()) tabs.push('messages')
+  return tabs
+})
+const serviceOrderTabButtonRef = ref<HTMLButtonElement | null>(null)
+const slidesTabButtonRef = ref<HTMLButtonElement | null>(null)
+const rolesTabButtonRef = ref<HTMLButtonElement | null>(null)
+const messagesTabButtonRef = ref<HTMLButtonElement | null>(null)
+
+function tabButtonRef(tab: ServiceEditorTabId) {
+  switch (tab) {
+    case 'service-order':
+      return serviceOrderTabButtonRef
+    case 'slides':
+      return slidesTabButtonRef
+    case 'roles':
+      return rolesTabButtonRef
+    case 'messages':
+      return messagesTabButtonRef
+  }
+}
+
+function focusAndActivateTab(tab: ServiceEditorTabId) {
+  activeTab.value = tab
+  tabButtonRef(tab).value?.focus()
+}
+
+function handleTabKeydown(event: KeyboardEvent) {
+  const tabs = visibleTabOrder.value
+  const currentIndex = tabs.indexOf(activeTab.value)
+  if (currentIndex === -1) return
+  let nextIndex: number | null = null
+  switch (event.key) {
+    case 'ArrowRight':
+      nextIndex = (currentIndex + 1) % tabs.length
+      break
+    case 'ArrowLeft':
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
+      break
+    case 'Home':
+      nextIndex = 0
+      break
+    case 'End':
+      nextIndex = tabs.length - 1
+      break
+    default:
+      return
+  }
+  event.preventDefault()
+  focusAndActivateTab(tabs[nextIndex]!)
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

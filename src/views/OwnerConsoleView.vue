@@ -10,10 +10,13 @@
       <!-- Tab bar: Configuration / Organizations (Phase 72). WAI-ARIA APG
            Tabs semantics (R239) — role/aria-* are additive attributes bound
            to the existing activeTab/setTab state; the v-show mount strategy
-           below is unchanged. -->
-      <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0">
+           below is unchanged. WR-01 (81-REVIEW): roving tabindex requires the
+           companion arrow-key handler per the APG Tabs pattern, so
+           @keydown moves focus + activates the adjacent tab. -->
+      <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
         <button
           id="owner-tab-configuration"
+          ref="configurationTabButtonRef"
           role="tab"
           type="button"
           :aria-selected="activeTab === 'configuration'"
@@ -29,6 +32,7 @@
         </button>
         <button
           id="owner-tab-organizations"
+          ref="organizationsTabButtonRef"
           role="tab"
           type="button"
           :aria-selected="activeTab === 'organizations'"
@@ -105,5 +109,45 @@ function setTab(tab: OwnerConsoleTab) {
   if (activeTab.value === tab) return
   activeTab.value = tab
   router?.replace({ query: { ...route?.query, tab } })
+}
+
+// WR-01 (81-REVIEW): roving tabindex (above) removes inactive tabs from the
+// Tab key order per the WAI-ARIA APG Tabs pattern, which requires arrow-key
+// navigation to compensate. ArrowLeft/ArrowRight move + activate the
+// adjacent tab (wrapping); Home/End jump to the first/last tab.
+const TAB_ORDER: OwnerConsoleTab[] = ['configuration', 'organizations']
+const configurationTabButtonRef = ref<HTMLButtonElement | null>(null)
+const organizationsTabButtonRef = ref<HTMLButtonElement | null>(null)
+
+function tabButtonRef(tab: OwnerConsoleTab) {
+  return tab === 'configuration' ? configurationTabButtonRef : organizationsTabButtonRef
+}
+
+function focusAndActivateTab(tab: OwnerConsoleTab) {
+  setTab(tab)
+  tabButtonRef(tab).value?.focus()
+}
+
+function handleTabKeydown(event: KeyboardEvent) {
+  const currentIndex = TAB_ORDER.indexOf(activeTab.value)
+  let nextIndex: number | null = null
+  switch (event.key) {
+    case 'ArrowRight':
+      nextIndex = (currentIndex + 1) % TAB_ORDER.length
+      break
+    case 'ArrowLeft':
+      nextIndex = (currentIndex - 1 + TAB_ORDER.length) % TAB_ORDER.length
+      break
+    case 'Home':
+      nextIndex = 0
+      break
+    case 'End':
+      nextIndex = TAB_ORDER.length - 1
+      break
+    default:
+      return
+  }
+  event.preventDefault()
+  focusAndActivateTab(TAB_ORDER[nextIndex]!)
 }
 </script>
