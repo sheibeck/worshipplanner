@@ -806,3 +806,14 @@ write with no redeploy. The full step-by-step runbook is `functions/DEPLOY-EMAIL
 
 Do **not** treat this item as passed — it is `verification_deferred_human`, entirely owner-run,
 external DNS/Resend ops that no automated gate in this repo can perform or verify.
+
+---
+
+## ⏳ Phase 81 (v2.2) — Polish & Ops live/owner UAT — DEFERRED (owner at /gsd-verify-work 81)
+
+**Code-complete + auto-verified 2026-08-24** (4/4 must-haves verified in source; type-check clean; app suite at the 2-file baseline). R237 PC-export slot coverage + R238 send-path sender wiring were already-shipped and re-confirmed; R239 Owner-Console a11y (labels + WAI-ARIA tabs + arrow-key handler, panels stay mounted); R240 shared `SongBrowser`. Code review 0 Critical; 3 warnings + 2 info fixed (WR-01 keyboard-nav regression, WR-02 SongSlotPicker coverage, WR-03 comment, IN-01/02). Client-only.
+
+**Owner-run / live items (`verification_deferred_human`):**
+- **R238** — the actual Resend verified-domain send: follow `functions/DEPLOY-EMAIL-DOMAIN.md` (add domain, SPF/DKIM/DMARC, set `fromAddress` in the Owner Console), then a real external-inbox test send. (This is the standing R238 owner entry above.)
+- **R237** — a live Planning Center export to a real account showing prayers/message/announcements land as items.
+- **R239** — a real screen-reader pass over the Owner Console (inputs announced, tab strip behaves as WAI-ARIA tabs with arrow-key nav).

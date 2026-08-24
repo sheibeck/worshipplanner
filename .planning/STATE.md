@@ -4,11 +4,11 @@ milestone: v2.2
 milestone_name: Configurability, Hardening & Cleanup
 current_phase: 81
 current_phase_name: Polish & Ops Close-Out
-status: planning
+status: completed
 stopped_at: Completed 81-04-PLAN.md
-last_updated: "2026-08-24T15:31:47.405Z"
+last_updated: "2026-08-24T16:50:46.886Z"
 last_activity: 2026-08-24
-last_activity_desc: Phase 80 complete, transitioned to Phase 81
+last_activity_desc: Phase 81 complete
 progress:
   total_phases: 3
   completed_phases: 3
@@ -869,8 +869,8 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 81 of 81 (Polish & Ops Close-Out)
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-08-24 — Phase 80 complete, transitioned to Phase 81
+Status: All phases complete
+Last activity: 2026-08-24 — Phase 81 complete
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
