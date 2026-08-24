@@ -1,7 +1,7 @@
 <template>
   <div :class="rootClass">
     <!-- Search input -->
-    <div :class="layout === 'inline' ? 'flex-1' : ''">
+    <div :class="layout === 'inline' ? 'flex-1' : undefined">
       <div class="relative">
         <div
           v-if="layout === 'inline'"
