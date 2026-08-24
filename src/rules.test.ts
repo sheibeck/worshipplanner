@@ -588,6 +588,40 @@ describe('Org lifecycle field guard (T-76-10/T-76-06)', () => {
     )
   })
 
+  // Phase 82 (R242/R243): `aiMasterEnabled` -- the super-admin-only master AI
+  // gate -- is appended to the SAME lifecycleFields() allow-list `active`
+  // etc. already use. This test proves an ordinary org editor (not a
+  // super-admin) is DENIED writing it directly via updateDoc, mirroring the
+  // `active` DENY immediately above it.
+  it('DENIES an ordinary editor from setting aiMasterEnabled:true directly on their own org', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church" })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { aiMasterEnabled: true }),
+    )
+  })
+
+  // Phase 82 Pitfall 3 regression guard: `preservesLifecycleFields()`'s array
+  // is shared between the update-time diff check (above) and the create-time
+  // "keys absent" check -- a normal org-create payload (no aiMasterEnabled
+  // key at all) must still succeed. onboardOrganizationHandler writes via the
+  // Admin SDK (bypasses rules) and never sets this field, so absence at
+  // create time IS the OFF-by-default posture (R242) -- this proves the
+  // client-side create path is unaffected by the new allow-list entry.
+  it('ALLOWS a normal org-create payload with no aiMasterEnabled key -- no regression (Pitfall 3)', async () => {
+    const context = testEnv.authenticatedContext('founder', { email: 'founder@example.com' })
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'freshOrg'), {
+        name: "Founder's Fresh Church",
+        createdAt: new Date(),
+        createdBy: 'founder',
+      }),
+    )
+  })
+
   it('DENIES a viewer from writing any field at all, lifecycle or not', async () => {
     await seedMembershipDoc('orgA', 'userA', 'viewer')
     await seedDoc('organizations/orgA', { name: "UserA's Church" })
@@ -685,6 +719,22 @@ describe('Super-admin content access without a membership doc (R225, Phase 78)',
     const db = context.firestore()
     await assertFails(
       updateDoc(doc(db, 'organizations', 'orgA'), { active: false }),
+    )
+  })
+
+  // Phase 82 (R242/T-82-02) -- the aiMasterEnabled twin of the CRITICAL test
+  // immediately above. A super-admin's OWN client SDK must be denied writing
+  // the new master AI gate directly too: `lifecycleFields()` is shared, not
+  // duplicated, so this is the SAME guard, but it is worth its own explicit
+  // proof because skipping the callable here would skip setOrgAiEnabled's
+  // R243 forced-off side effect on settings.aiEnabled -- the exact
+  // partial-state hole Phase 78 closed for `active`.
+  it('CRITICAL -- DENIES a super-admin client SDK from writing aiMasterEnabled directly (must use setOrgAiEnabled)', async () => {
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church" })
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { aiMasterEnabled: true }),
     )
   })
 

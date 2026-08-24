@@ -110,8 +110,22 @@ service cloud.firestore {
       // sits above this boundary elsewhere in this file (appConfig, superAdmins),
       // so this is not a new escalation surface; T-76-10's exploit is
       // specifically an ORDINARY editor forging these fields.
+      // Phase 82 (R242/R243): `aiMasterEnabled` -- the super-admin-only master
+      // AI gate -- is appended to this SAME allow-list, not given its own
+      // guard function. It is a DISTINCT top-level field from the pre-existing
+      // `settings.aiEnabled` (the church's own AI preference, editor-writable
+      // via the settings map) -- never a bare `aiEnabled` at this depth, to
+      // avoid the exact name collision 82-RESEARCH.md's Pitfall 1 warns
+      // against. Written ONLY by the setOrgAiEnabled Cloud Function via the
+      // Admin SDK (functions/src/orgProvisioning.ts), which bypasses these
+      // rules entirely -- mirrors `active`'s posture verbatim, INCLUDING the
+      // "no exemption for a super-admin's own client SDK" posture (see the
+      // CRITICAL test at src/rules.test.ts:682 and its aiMasterEnabled twin):
+      // a super-admin client write here would skip setOrgAiEnabled's R243
+      // forced-off side effect on `settings.aiEnabled`, reopening the same
+      // partial-state hole Phase 78 closed for `active`.
       function lifecycleFields() {
-        return ['active', 'deactivatedAt', 'deactivatedBy', 'reactivatedAt', 'reactivatedBy'];
+        return ['active', 'deactivatedAt', 'deactivatedBy', 'reactivatedAt', 'reactivatedBy', 'aiMasterEnabled'];
       }
       function preservesLifecycleFields() {
         return request.resource == null
