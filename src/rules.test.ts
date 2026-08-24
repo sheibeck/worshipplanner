@@ -1608,11 +1608,21 @@ describe('Editor/Viewer RBAC', () => {
     // doc" test's comment above -- `write` was narrowed to `update`, so a
     // `setDoc` needs the org doc to already exist to exercise the update
     // path this test is about, not the separately-tested create path.
+    //
+    // Phase 80 (R233/T-80-02): this test also used a full-overwrite `setDoc`
+    // with NO merge, which OMITS `createdBy` from the payload -- a dropped
+    // key is an "affected key" under diff().affectedKeys(), so the new
+    // preservesCreatedBy() guard now correctly DENIES that write. Switched to
+    // `updateDoc` (a partial update -- the representative real-app path) so
+    // this test continues to prove an ORDINARY edit succeeds. Same
+    // deliberate, necessary adjustment as the sibling test above, caught by
+    // the full rules-suite run rather than called out individually in
+    // 80-01-PLAN.md.
     await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
     await assertSucceeds(
-      setDoc(doc(db, 'organizations', 'orgA'), {
+      updateDoc(doc(db, 'organizations', 'orgA'), {
         name: 'Grace Community Church',
         updatedAt: new Date(),
       }),
