@@ -1,9 +1,9 @@
 ---
 phase: 81
 slug: polish-ops-close-out
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: planned
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-08-24
 ---
 
@@ -38,7 +38,17 @@ created: 2026-08-24
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
 |---------|------|------|-------------|-----------|-------------------|--------|
-| _planner fills rows_ | | | R237–R240 | unit / component / doc-gate | `npx vitest run …` / grep | ⬜ pending |
+| 81-01 T1 | 81-01 | 1 | R237 | component + compile (re-run existing; no rebuild) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts -t "IMPORTED\|previously dropped" && npm run type-check` | ⬜ pending |
+| 81-01 T2 | 81-01 | 1 | R238 | doc-gate | `test -f functions/DEPLOY-EMAIL-DOMAIN.md && grep -qi 'DKIM' functions/DEPLOY-EMAIL-DOMAIN.md && grep -qi 'DMARC' functions/DEPLOY-EMAIL-DOMAIN.md && grep -qi 'from address' functions/DEPLOY-EMAIL-DOMAIN.md && grep -qi 'R238' .planning/PENDING-VERIFICATION.md` | ⬜ pending |
+| 81-01 T3 | 81-01 | 1 | R238 | unit (re-run existing; no rebuild) | `cd functions && npx vitest run src/index.test.ts -t "config.sender.fromAddress" && npx vitest run src/adminEmail.test.ts` | ⬜ pending |
+| 81-02 T1 | 81-02 | 1 | R239 | component (new file) | `npx vitest run src/components/admin/__tests__/ConfigurationTab.test.ts` | ⬜ pending |
+| 81-02 T2 | 81-02 | 1 | R239 | component (extend) | `npx vitest run src/components/admin/__tests__/OrganizationsTab.test.ts` | ⬜ pending |
+| 81-02 T3 | 81-02 | 1 | R239 | component (extend) + compile | `npx vitest run src/components/admin/__tests__/ConfigTextField.test.ts && npm run type-check` | ⬜ pending |
+| 81-03 T1 | 81-03 | 1 | R239 | component (extend) + onSnapshot regression | `npx vitest run src/views/__tests__/OwnerConsoleView.test.ts` | ⬜ pending |
+| 81-03 T2 | 81-03 | 1 | R239 | component (extend) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts -t "tab"` | ⬜ pending |
+| 81-04 T1 | 81-04 | 1 | R240 | unit (new) + compile | `npx vitest run src/utils/__tests__/songSearch.test.ts && npm run type-check` | ⬜ pending |
+| 81-04 T2 | 81-04 | 1 | R240 | component regression + compile | `npx vitest run src/views/__tests__/SongsView.test.ts src/components/__tests__/SongTable.test.ts && npm run type-check` | ⬜ pending |
+| 81-04 T3 | 81-04 | 1 | R240 | component regression + compile | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts -t "song-tag filter" && npm run type-check` | ⬜ pending |
 
 *Coverage the planner must map: R237 → the EXISTING `planningCenterApi.ts`/`ServiceEditorView.vue` export tests re-confirmed green (already-shipped; a traceability/verification task, NOT a rebuild — add a coverage assertion only if a gap is found); R238 → a doc-gate that the owner runbook file exists + a test/inspection that the send path reads `appConfig.sender.fromAddress` (already wired); R239 → component tests that the 4 Owner-Console inputs + the ConfigTextField label carry accessible names and both tab strips expose `role="tablist"/tab"/aria-selected` WITHOUT converting v-show→v-if (assert the panels stay mounted); R240 → a unit test for the extracted `filterSongsByTags()` util + tests proving both `SongsView`/store and `SongSlotPicker` still filter identically after the refactor.*
 
@@ -46,12 +56,14 @@ created: 2026-08-24
 
 ## Wave 0 Requirements
 
-- [ ] R237 — re-run existing PC-export tests (all `SlotKind`s exported; `IMPORTED` excluded by design); add an assertion only if a gap surfaces.
-- [ ] R238 — owner runbook doc exists (`functions/DEPLOY-EMAIL-DOMAIN.md` or similar); send-path-reads-config assertion.
-- [ ] R239 — component tests: accessible names on the 4 inputs + label; ARIA tab roles on both strips; panels still mounted under v-show.
-- [ ] R240 — `filterSongsByTags()` util unit test + both-consumers-unchanged tests.
+No separate Wave-0 scaffolding plan is required. Every requirement's test infrastructure already exists except one file, which is created inline by the task that produces its code (test-alongside):
 
-*Existing vitest infrastructure covers all phase requirements; every Wave 0 item is a new/rewritten test in an existing suite. R237/R238 are largely already-shipped — scope them as verification + documentation.*
+- [x] R237 — no gap: existing `ServiceEditorView.test.ts` R237 block (3 tests) + the `never`-typed exhaustive dispatch are the coverage; 81-01 T1 re-runs them (verification, not rebuild).
+- [x] R238 — no gap: existing `functions/src/index.test.ts` + `adminEmail.test.ts` cover the send path; 81-01 T3 re-runs them. The runbook + PENDING-VERIFICATION entry are doc deliverables (81-01 T2, doc-gate).
+- [~] R239 — `ConfigurationTab.test.ts` does NOT exist and is created inside 81-02 T1 (its verify runs the new file). `OrganizationsTab.test.ts`, `ConfigTextField.test.ts`, `OwnerConsoleView.test.ts`, `ServiceEditorView.test.ts` exist and are extended in place (81-02 T2/T3, 81-03 T1/T2), including the onSnapshot-survives-`setTab` regression in 81-03 T1.
+- [x] R240 — `songSearch.test.ts` exists and gains a `filterSongsByTags` block (81-04 T1); `SongsView.test.ts` / `SongTable.test.ts` / `ServiceEditorView.test.ts` (song-tag-filter block) are the existing behavior-preservation regression nets (81-04 T2/T3).
+
+*R237/R238 are already-shipped — scoped as verification + documentation. The only missing test file (`ConfigurationTab.test.ts`) is scaffolded within its own task, so every task carries a runnable `<automated>` verify (no `MISSING` placeholder needed).*
 
 ---
 
@@ -67,11 +79,11 @@ created: 2026-08-24
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 120s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (only new file `ConfigurationTab.test.ts` — scaffolded inline in 81-02 T1)
+- [x] No watch-mode flags
+- [x] Feedback latency < 120s (single-file scoped runs; functions tests run in their own workspace)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved (planner)
