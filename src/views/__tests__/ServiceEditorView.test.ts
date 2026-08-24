@@ -447,10 +447,37 @@ const mockUpdateSong = vi.fn((_id: string, _data: unknown) => Promise.resolve())
 vi.mock('@/stores/songs', () => ({
   useSongStore: () => ({
     songs: mockSongs,
+    // Phase 79 (R230): suggestAllSongs()/fetchAiForSlot() read this computed
+    // (mirrors the real store's `songs.filter(s => s.hidden !== true)`) to
+    // build the AI candidate pool before the song-tag filter helper narrows it.
+    get aiCandidateSongs() {
+      return mockSongs.filter((s) => s.hidden !== true)
+    },
     orgId: null,
     subscribe: vi.fn(),
     updateSong: mockUpdateSong,
   }),
+}))
+
+// Phase 79 (R230/R241): suggestAllSongs()/fetchAiForSlot() call the real
+// getSongSuggestions() through the union-of-team-tags filter helper. Mocked
+// so no real Anthropic/network call happens; the "song-tag filter" describe
+// block below asserts against the `songLibrary` this spy was called with.
+// getScriptureSuggestions/splitCongregationalReading are stubbed too (safe
+// no-op defaults) so any OTHER real child component sharing this module
+// (ScriptureInput, CongregationalEditor) keeps its existing never-called
+// contract intact — this file never un-stubs ScriptureInput and never
+// exercises CongregationalEditor's Split action.
+const { mockGetSongSuggestions } = vi.hoisted(() => ({
+  mockGetSongSuggestions: vi.fn<
+    (params: unknown) => Promise<{ songId: string; reason: string }[] | null>
+  >(() => Promise.resolve(null)),
+}))
+
+vi.mock('@/utils/claudeApi', () => ({
+  getSongSuggestions: mockGetSongSuggestions,
+  getScriptureSuggestions: vi.fn(() => Promise.resolve(null)),
+  splitCongregationalReading: vi.fn(() => Promise.resolve(null)),
 }))
 
 // ── Roles tab (Phase 17-04) — mutable per-test mocks ────────────────────────────
@@ -685,6 +712,8 @@ beforeEach(() => {
   mockTeamsOrgId = null
   mockTeamsSubscribe.mockClear()
   mockSeedDefaultTeamsIfEmpty.mockClear()
+  mockGetSongSuggestions.mockClear()
+  mockGetSongSuggestions.mockImplementation(() => Promise.resolve(null))
 })
 
 /** Reads the real useSaveStatus store's entry for `service:{id}` — the
@@ -793,6 +822,112 @@ describe('ServiceEditorView - Print button', () => {
     const wrapper = await mountView()
     expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
+  })
+})
+
+// R230/R241 — the generic union-of-selected-team-tags AI filter helper
+// (filterSongsByTeamTags) replaces the two duplicated Orchestra-only blocks
+// that used to live inline in suggestAllSongs()/fetchAiForSlot(). Exercised
+// here via fetchAiForSlot() (single call per test, simpler to assert against
+// than suggestAllSongs()'s one-call-per-SONG-slot loop) and asserted against
+// the `songLibrary` argument the mocked getSongSuggestions() receives.
+describe('ServiceEditorView - song-tag filter (R230/R241)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: true,
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  // Three fixture songs, each carrying a distinct tag signature, added to the
+  // shared `mockSongs` array only for the lifetime of this describe block
+  // (pushed in beforeEach, spliced back out in afterEach) so no other test
+  // in this file sees a changed song count.
+  const songOrchestra: Song = { ...mockSongs[0]!, id: 'song-orchestra', title: 'Orchestra Song', tags: ['Orchestra'] }
+  const songChoir: Song = { ...mockSongs[0]!, id: 'song-choir', title: 'Choir Song', tags: ['ChoirTag'] }
+  const songUntagged: Song = { ...mockSongs[0]!, id: 'song-untagged', title: 'Untagged Song', tags: [] }
+
+  // A single-SONG-slot service fixture — fetchAiForSlot(0) then fires exactly
+  // one getSongSuggestions() call, keeping each assertion a single-call check.
+  function singleSlotService(teams: string[]): Service {
+    return {
+      ...mockService,
+      teams,
+      slots: [
+        { kind: 'SONG', id: 'slot-only', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null },
+      ],
+    }
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockSongs.push(songOrchestra, songChoir, songUntagged)
+  })
+
+  afterEach(() => {
+    mockSongs.splice(mockSongs.indexOf(songOrchestra), 1)
+    mockSongs.splice(mockSongs.indexOf(songChoir), 1)
+    mockSongs.splice(mockSongs.indexOf(songUntagged), 1)
+  })
+
+  /** Reads the `songLibrary` id list from the mock's most recent call. */
+  function librarySongIds(): string[] {
+    const calls = mockGetSongSuggestions.mock.calls
+    const call = calls[calls.length - 1]
+    const params = call?.[0] as { songLibrary: { id: string }[] } | undefined
+    return (params?.songLibrary ?? []).map((s) => s.id)
+  }
+
+  it('a single selected team with a filter tag narrows the pool to that tag (legacy Orchestra case)', async () => {
+    mockTeams = mockTeams.map((t) =>
+      t.name === 'Orchestra' ? { ...t, songFilterTag: 'Orchestra' } : t,
+    )
+    mockServicesList = [singleSlotService(['Orchestra'])]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as { fetchAiForSlot: (i: number) => Promise<void> }
+    await vm.fetchAiForSlot(0)
+    await flushPromises()
+    expect(librarySongIds()).toEqual(['song-orchestra'])
+  })
+
+  it('two selected teams each with a filter tag UNION (OR) their tags, never intersect', async () => {
+    mockTeams = mockTeams.map((t) => {
+      if (t.name === 'Orchestra') return { ...t, songFilterTag: 'Orchestra' }
+      if (t.name === 'Choir') return { ...t, songFilterTag: 'ChoirTag' }
+      return t
+    })
+    mockServicesList = [singleSlotService(['Orchestra', 'Choir'])]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as { fetchAiForSlot: (i: number) => Promise<void> }
+    await vm.fetchAiForSlot(0)
+    await flushPromises()
+    expect(librarySongIds().sort()).toEqual(['song-choir', 'song-orchestra'])
+  })
+
+  it('zero selected teams carrying a filter tag uses the full candidate pool', async () => {
+    // Default mockTeams seed carries no songFilterTag (R228: seeding the tag
+    // is left to the admin) — selecting an untagged team must not narrow the pool.
+    mockServicesList = [singleSlotService(['Choir'])]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as { fetchAiForSlot: (i: number) => Promise<void> }
+    await vm.fetchAiForSlot(0)
+    await flushPromises()
+    expect(librarySongIds().sort()).toEqual([
+      'song-1',
+      'song-choir',
+      'song-orchestra',
+      'song-untagged',
+    ])
   })
 })
 

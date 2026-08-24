@@ -1619,7 +1619,7 @@ import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/servi
 import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
 import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, ScriptureRef, SlotKind, ServiceSection } from '@/types/service'
-import type { VWType } from '@/types/song'
+import type { VWType, Song } from '@/types/song'
 import type { Person } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
 import SaveStatusIndicator from '@/components/SaveStatusIndicator.vue'
@@ -3424,6 +3424,25 @@ function onClearSong(index: number) {
   }
 }
 
+// ── Song-tag filter (R230/R241) ─────────────────────────────────────────────────
+
+// Generalizes the old single-Orchestra-only filter: unions (OR) the
+// `songFilterTag` of every currently-selected team that has one set, reading
+// from the shared teams store. Zero selected teams with a filter tag returns
+// the full candidate pool unchanged (today's non-Orchestra behavior
+// preserved); the legacy single-Orchestra case is preserved exactly when
+// Orchestra's songFilterTag is set to 'Orchestra'. This is the ONE place
+// that reads team filter tags — both call sites below share it.
+function filterSongsByTeamTags(base: Song[], selectedTeamNames: string[]): Song[] {
+  const activeTags = new Set(
+    selectedTeamNames
+      .map((name) => teamsStore.teams.find((t) => t.name === name)?.songFilterTag)
+      .filter((tag): tag is string => !!tag),
+  )
+  if (activeTags.size === 0) return base
+  return base.filter((s) => s.tags.some((t) => activeTags.has(t)))
+}
+
 // ── AI cache key ───────────────────────────────────────────────────────────────
 
 function aiCacheKey(slotVwType: number): string {
@@ -3444,13 +3463,10 @@ async function suggestAllSongs() {
   try {
     const sermonTopic = localService.value.sermonTopic ?? null
     const sermonPassage = localService.value.sermonPassage ?? null
-    // Orchestra AI filter (D-06, D-09): when service is orchestra, only include orchestra-tagged songs
-    // D-18: exclude hidden (soft-deleted) songs from AI base
-    const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
+    // R230/R241: union-of-selected-team-tags AI filter (generalizes the old
+    // Orchestra-only rule) — D-18: exclude hidden (soft-deleted) songs from AI base
     const base = songStore.aiCandidateSongs
-    const librarySource = isOrchestraService
-      ? base.filter((s) => s.tags.includes('Orchestra'))
-      : base
+    const librarySource = filterSongsByTeamTags(base, localService.value?.teams ?? [])
     const songLibrary = librarySource.map((s) => ({
       id: s.id,
       title: s.title,
@@ -3556,12 +3572,10 @@ async function fetchAiForSlot(slotIndex: number) {
       }
     }
 
-    // D-18: exclude hidden (soft-deleted) songs from AI base
-    const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
+    // R230/R241: union-of-selected-team-tags AI filter — D-18: exclude
+    // hidden (soft-deleted) songs from AI base
     const base = songStore.aiCandidateSongs
-    const librarySource = isOrchestraService
-      ? base.filter((s) => s.tags.includes('Orchestra'))
-      : base
+    const librarySource = filterSongsByTeamTags(base, localService.value?.teams ?? [])
     const result = await getSongSuggestions({
       sermonTopic: localService.value.sermonTopic ?? null,
       sermonPassage: localService.value.sermonPassage ?? null,
