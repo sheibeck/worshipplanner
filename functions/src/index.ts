@@ -618,13 +618,21 @@ export const api = onRequest(
       // null caller). resolveOrgId is used ONLY as a pointer to which org --
       // see checkOrgAiEnablement's own doc comment for why the live get()
       // inside it, not the claim payload, is the enforcement source.
+      // CR-01 (82-REVIEW): an unresolvable org context must be a DENIAL, not
+      // a skip. This proxy is a paid, per-org-gated resource -- a caller
+      // whose token carries no `orgId` claim (an org-less authenticated
+      // user, or a super-admin who entered an org with no synced membership
+      // doc, R226) must never fall through to the Anthropic fetch below
+      // un-gated.
       const callerOrgId = resolveOrgId(decodedCaller!);
-      if (callerOrgId) {
-        const enablementVerdict = await checkOrgAiEnablement(getFirestore(), callerOrgId);
-        if (!enablementVerdict.ok) {
-          res.status(enablementVerdict.status).json(enablementVerdict.error);
-          return;
-        }
+      if (!callerOrgId) {
+        res.status(403).json({ error: "AI features require an organization." });
+        return;
+      }
+      const enablementVerdict = await checkOrgAiEnablement(getFirestore(), callerOrgId);
+      if (!enablementVerdict.ok) {
+        res.status(enablementVerdict.status).json(enablementVerdict.error);
+        return;
       }
 
       // Cached form (no {fresh:true}) -- the api handler is a hot request

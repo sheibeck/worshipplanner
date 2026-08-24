@@ -4372,6 +4372,25 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("CR-01 (82-REVIEW): a caller whose token has NO orgId claim is denied 403 before the enablement check, before fetch", async () => {
+    // Regression for the fail-open bug: previously `if (callerOrgId)` wrapped
+    // the ENTIRE enablement check, so a null orgId (org-less authenticated
+    // user, or a super-admin who entered an org with no synced membership
+    // doc) skipped the gate and fell through to the billed Anthropic fetch.
+    vi.mocked(getAuth).mockReturnValue({
+      verifyIdToken: vi.fn(async () => ({ uid: "uid1" })), // no orgId claim
+      getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+    } as never);
+    const req = fakeReq({ model: ALLOWED_MODEL, max_tokens: 100, messages: [] });
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getFirestore).not.toHaveBeenCalled();
+  });
+
   it("WR-01 (69-REVIEW.md): a non-anthropic service (esv) never calls getAppConfig, and succeeds even if getAppConfig would reject", async () => {
     // Proves the fix: getAppConfig() is now scoped inside the `service ===
     // "anthropic"` branch, so esv/nlt/planningcenter stay Firestore-
