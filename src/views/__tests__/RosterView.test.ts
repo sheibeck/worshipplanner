@@ -387,3 +387,22 @@ describe('RosterView — pcEnabled (39-05, R089)', () => {
     expect(buttons.some((t) => t.includes('Import from Planning Center'))).toBe(true)
   })
 })
+
+describe('RosterView — tab-panel width (R244)', () => {
+  it('R244: roles and teams tab wrappers are width-constrained but volunteers is not', () => {
+    mockPeople = []
+    const wrapper = mountRosterView()
+
+    const widthConstrained = wrapper.findAll('.max-w-4xl')
+    expect(widthConstrained.length).toBe(2)
+
+    // Identify the volunteers tab wrapper by its distinctive empty-state copy
+    // (the max-w-sm class on the inner <p> is unrelated to the wrapper-level
+    // max-w-4xl constraint under test) and assert it is not among the
+    // width-constrained set.
+    const volunteersWrapper = wrapper.findAll('div').find((d) => d.text().includes('No volunteers yet'))
+    expect(volunteersWrapper).toBeTruthy()
+    expect(volunteersWrapper!.classes()).not.toContain('max-w-4xl')
+    expect(widthConstrained.some((el) => el.element === volunteersWrapper!.element)).toBe(false)
+  })
+})

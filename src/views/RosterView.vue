@@ -241,12 +241,12 @@
       </div>
 
       <!-- Roles config tab -->
-      <div v-show="activeTab === 'roles'">
+      <div v-show="activeTab === 'roles'" class="max-w-4xl">
         <RolesConfigPanel />
       </div>
 
       <!-- Teams config tab -->
-      <div v-show="activeTab === 'teams'">
+      <div v-show="activeTab === 'teams'" class="max-w-4xl">
         <TeamsConfigPanel />
       </div>
     </div>
