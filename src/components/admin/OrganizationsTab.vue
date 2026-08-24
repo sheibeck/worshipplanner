@@ -152,6 +152,22 @@
                   </button>
                   <button
                     type="button"
+                    @click="onToggleAi(org)"
+                    :disabled="togglingAiOrgId !== null"
+                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
+                  >
+                    {{
+                      togglingAiOrgId === org.orgId
+                        ? org.aiMasterEnabled
+                          ? 'Disabling AI...'
+                          : 'Enabling AI...'
+                        : org.aiMasterEnabled
+                          ? 'Disable AI'
+                          : 'Enable AI'
+                    }}
+                  </button>
+                  <button
+                    type="button"
                     @click="onEnterChurch(org)"
                     :disabled="enteringOrgId !== null"
                     class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
@@ -180,6 +196,7 @@
                   {{ toggleFeedback[org.orgId] }}
                 </p>
                 <p v-if="enterError[org.orgId]" class="text-red-400 text-xs mt-1">{{ enterError[org.orgId] }}</p>
+                <p v-if="aiToggleError[org.orgId]" class="text-red-400 text-xs mt-1">{{ aiToggleError[org.orgId] }}</p>
               </td>
             </tr>
 
@@ -239,6 +256,11 @@ interface OrgSummary {
   memberCount: number
   pendingCount: number
   active: boolean
+  // Phase 82 (R242) — mirrors the server OrgSummary's new field
+  // (functions/src/orgProvisioning.ts's listOrganizationsHandler, Plan 01).
+  // Optional/absent reads as OFF, matching the org doc's own
+  // aiMasterEnabled?: boolean default (src/types/organization.ts).
+  aiMasterEnabled?: boolean
 }
 
 // R212/R214 (Phase 76) — mirrors functions/src/orgProvisioning.ts's
@@ -258,6 +280,20 @@ interface SetOrgActiveResponse {
 
 interface ListOrganizationsResponse {
   organizations: OrgSummary[]
+}
+
+// Phase 82 (R242) — mirrors functions/src/orgProvisioning.ts's
+// setOrgAiEnabledHandler request/response contract exactly (Plan 01). The
+// callable ships UNDEPLOYED with Plan 01 (client-only this plan); tests mock
+// httpsCallable, so an undeployed target does not block this plan.
+interface SetOrgAiEnabledRequest {
+  orgId: string
+  aiEnabled: boolean
+}
+
+interface SetOrgAiEnabledResponse {
+  orgId: string
+  aiEnabled: boolean
 }
 
 interface OnboardOrganizationRequest {
@@ -329,6 +365,11 @@ const toggleFeedback = ref<Record<string, string>>({})
 // message is a partial-failure warning (claimFailures > 0) rather than a
 // clean success, so the template can style it distinctly (amber, not green).
 const toggleFeedbackIsWarning = ref<Record<string, boolean>>({})
+
+// ── AI on/off toggle state (R242), keyed per orgId — mirrors the
+// Deactivate/Reactivate state block above exactly. ──
+const togglingAiOrgId = ref<string | null>(null)
+const aiToggleError = ref<Record<string, string>>({})
 
 // ── Delete state (R220/R221) ──────────────────────────────────────────────
 // deleteDialogOrg doubles as the dialog's `open` flag via
@@ -570,6 +611,36 @@ async function onToggleActive(org: OrgSummary) {
     toggleError.value = { ...toggleError.value, [orgId]: friendlyCallableError(err) }
   } finally {
     togglingOrgId.value = null
+  }
+}
+
+// ── AI on/off toggle action (R242) ────────────────────────────────────────
+// Pure httpsCallable consumer — this component writes NO organizations
+// document directly (mirrors T-74-07/onToggleActive above); setOrgAiEnabled
+// is the only channel. The callable ships UNDEPLOYED with Plan 01, which is
+// fine for this client-only plan: a rejection surfaces the same friendly
+// error path any other undeployed-callable failure would.
+
+async function onToggleAi(org: OrgSummary) {
+  // Same double-submit guard shape as togglingOrgId/isAssigning above.
+  if (togglingAiOrgId.value) return
+
+  const orgId = org.orgId
+  const nextEnabled = !org.aiMasterEnabled
+  togglingAiOrgId.value = orgId
+  delete aiToggleError.value[orgId]
+  try {
+    const setOrgAiEnabled = httpsCallable<SetOrgAiEnabledRequest, SetOrgAiEnabledResponse>(
+      functions,
+      'setOrgAiEnabled',
+    )
+    await setOrgAiEnabled({ orgId, aiEnabled: nextEnabled })
+    await refreshOrgs()
+  } catch (err) {
+    console.error('[OrganizationsTab] setOrgAiEnabled error:', err)
+    aiToggleError.value = { ...aiToggleError.value, [orgId]: friendlyCallableError(err) }
+  } finally {
+    togglingAiOrgId.value = null
   }
 }
 

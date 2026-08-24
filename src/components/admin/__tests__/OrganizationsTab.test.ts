@@ -28,6 +28,8 @@ interface OrgSummaryFixture {
   memberCount: number
   pendingCount: number
   active: boolean
+  // Phase 82 (R242) — mirrors the server OrgSummary's new field.
+  aiMasterEnabled?: boolean
 }
 
 const {
@@ -37,6 +39,7 @@ const {
   mockSetOrgActive,
   mockDeleteOrganization,
   mockEnterOrgAsSuperAdmin,
+  mockSetOrgAiEnabled,
 } = vi.hoisted(() => ({
     mockListOrganizations: vi.fn<() => Promise<{ data: { organizations: OrgSummaryFixture[] } }>>(
       () => Promise.resolve({ data: { organizations: [] } }),
@@ -86,6 +89,12 @@ const {
         },
       }),
     ),
+    // Phase 82 (R242) — mirrors setOrgAiEnabledHandler's response shape
+    // (Plan 01). The callable ships UNDEPLOYED with Plan 01; this test only
+    // mocks httpsCallable, so an undeployed real target does not matter here.
+    mockSetOrgAiEnabled: vi.fn<() => Promise<{ data: { orgId: string; aiEnabled: boolean } }>>(
+      () => Promise.resolve({ data: { orgId: 'org-1', aiEnabled: true } }),
+    ),
   }))
 
 vi.mock('firebase/functions', () => ({
@@ -95,6 +104,7 @@ vi.mock('firebase/functions', () => ({
     if (name === 'assignOrgAdmin') return mockAssignOrgAdmin
     if (name === 'setOrgActive') return mockSetOrgActive
     if (name === 'deleteOrganization') return mockDeleteOrganization
+    if (name === 'setOrgAiEnabled') return mockSetOrgAiEnabled
     throw new Error(`Unexpected callable name: ${name}`)
   }),
 }))
@@ -119,6 +129,7 @@ beforeEach(() => {
   mockSetOrgActive.mockClear()
   mockDeleteOrganization.mockClear()
   mockEnterOrgAsSuperAdmin.mockClear()
+  mockSetOrgAiEnabled.mockClear()
   mockListOrganizations.mockImplementation(() => Promise.resolve({ data: { organizations: [] } }))
   mockOnboardOrganization.mockImplementation(() =>
     Promise.resolve({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } }),
@@ -139,6 +150,9 @@ beforeEach(() => {
         storageObjectsDeleted: 4,
       },
     }),
+  )
+  mockSetOrgAiEnabled.mockImplementation(() =>
+    Promise.resolve({ data: { orgId: 'org-1', aiEnabled: true } }),
   )
 })
 
@@ -168,6 +182,7 @@ function makeOrg(
     memberCount: number
     pendingCount: number
     active: boolean
+    aiMasterEnabled: boolean
   }> = {},
 ) {
   return {
@@ -177,6 +192,9 @@ function makeOrg(
     memberCount: 3,
     pendingCount: 0,
     active: true,
+    // Phase 82 (R242) — DEFAULT OFF, matching aiMasterEnabled's absent=false
+    // org-doc default (src/types/organization.ts).
+    aiMasterEnabled: false,
     ...overrides,
   }
 }
@@ -721,6 +739,126 @@ describe('OrganizationsTab -- deactivate/reactivate (R212, R214)', () => {
 
     expect(wrapper.text()).toContain('server exploded')
     expect(mockListOrganizations).not.toHaveBeenCalled()
+  })
+})
+
+describe('OrganizationsTab -- AI on/off toggle (R242, Phase 82)', () => {
+  async function mountWithOneOrg(overrides: Partial<{ aiMasterEnabled: boolean }> = {}) {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: { organizations: [makeOrg({ orgId: 'org-1', name: 'Grace Church', ...overrides })] },
+      }),
+    )
+    return mountTab()
+  }
+
+  it('AI: shows "Enable AI" for an org with the master gate off, and "Disable AI" for one with it on', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [
+            makeOrg({ orgId: 'org-1', name: 'Grace Church', aiMasterEnabled: false }),
+            makeOrg({ orgId: 'org-2', name: 'Hope Church', aiMasterEnabled: true }),
+          ],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows.length).toBe(2)
+    expect(rows[0]!.findAll('button').some((b) => b.text() === 'Enable AI')).toBe(true)
+    expect(rows[1]!.findAll('button').some((b) => b.text() === 'Disable AI')).toBe(true)
+  })
+
+  it('AI: clicking "Enable AI" on an org with the master gate off calls setOrgAiEnabled with {orgId, aiEnabled:true}', async () => {
+    const wrapper = await mountWithOneOrg({ aiMasterEnabled: false })
+
+    const enableButton = wrapper.findAll('button').find((b) => b.text() === 'Enable AI')!
+    await enableButton.trigger('click')
+    await flushPromises()
+
+    expect(mockSetOrgAiEnabled).toHaveBeenCalledWith({ orgId: 'org-1', aiEnabled: true })
+  })
+
+  it('AI: clicking "Disable AI" on an org with the master gate on calls setOrgAiEnabled with {orgId, aiEnabled:false}', async () => {
+    mockSetOrgAiEnabled.mockImplementation(() =>
+      Promise.resolve({ data: { orgId: 'org-1', aiEnabled: false } }),
+    )
+    const wrapper = await mountWithOneOrg({ aiMasterEnabled: true })
+
+    const disableButton = wrapper.findAll('button').find((b) => b.text() === 'Disable AI')!
+    await disableButton.trigger('click')
+    await flushPromises()
+
+    expect(mockSetOrgAiEnabled).toHaveBeenCalledWith({ orgId: 'org-1', aiEnabled: false })
+  })
+
+  it('AI: a successful toggle refreshes the org list so the row reflects the new state', async () => {
+    const wrapper = await mountWithOneOrg({ aiMasterEnabled: false })
+    mockListOrganizations.mockClear()
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: { organizations: [makeOrg({ orgId: 'org-1', name: 'Grace Church', aiMasterEnabled: true })] },
+      }),
+    )
+
+    const enableButton = wrapper.findAll('button').find((b) => b.text() === 'Enable AI')!
+    await enableButton.trigger('click')
+    await flushPromises()
+
+    expect(mockListOrganizations).toHaveBeenCalledTimes(1)
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Disable AI')).toBe(true)
+  })
+
+  it('AI: a second click while a toggle is in flight fires the callable exactly once', async () => {
+    let resolveFn: (v: { data: { orgId: string; aiEnabled: boolean } }) => void = () => {}
+    mockSetOrgAiEnabled.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFn = resolve
+        }),
+    )
+    const wrapper = await mountWithOneOrg({ aiMasterEnabled: false })
+
+    const enableButton = wrapper.findAll('button').find((b) => b.text() === 'Enable AI')!
+    await enableButton.trigger('click')
+    expect(mockSetOrgAiEnabled).toHaveBeenCalledTimes(1)
+
+    // A fast second click while togglingAiOrgId is set must be a no-op.
+    await enableButton.trigger('click')
+    expect(mockSetOrgAiEnabled).toHaveBeenCalledTimes(1)
+
+    resolveFn({ data: { orgId: 'org-1', aiEnabled: true } })
+    await flushPromises()
+  })
+
+  it('AI: a rejected callable surfaces the friendly error message and does not crash the tab, and does NOT call refreshOrgs()', async () => {
+    const wrapper = await mountWithOneOrg({ aiMasterEnabled: false })
+    mockListOrganizations.mockClear()
+    mockSetOrgAiEnabled.mockImplementation(() => Promise.reject(new Error('server exploded')))
+
+    const enableButton = wrapper.findAll('button').find((b) => b.text() === 'Enable AI')!
+    await enableButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('server exploded')
+    expect(mockListOrganizations).not.toHaveBeenCalled()
+    // Tab is still functional -- the row and its other actions still render.
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Enable AI')).toBe(true)
+  })
+
+  it('AI: a permission-denied rejection maps to the shared friendly-error string', async () => {
+    const wrapper = await mountWithOneOrg({ aiMasterEnabled: false })
+    mockSetOrgAiEnabled.mockImplementation(() =>
+      Promise.reject(Object.assign(new Error('denied'), { code: 'functions/permission-denied' })),
+    )
+
+    const enableButton = wrapper.findAll('button').find((b) => b.text() === 'Enable AI')!
+    await enableButton.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('You do not have permission to perform this action.')
   })
 })
 
