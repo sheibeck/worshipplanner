@@ -417,45 +417,72 @@ export const useServiceStore = defineStore('services', () => {
     // service.date, which is unrecoverable once the service doc is gone.
     const service = services.value.find((s) => s.id === id)
 
+    // WR-01 (80-REVIEW): each revocation step below is independently
+    // try/caught. Before this, a single mid-sequence failure (permission-
+    // denied on a stale/cross-org doc, a transient network error) would
+    // throw out of deleteService entirely, skipping BOTH the remaining
+    // revocation steps AND the actual service-doc delete — leaving the
+    // service partially-revoked yet still fully present, while the caller
+    // (ServiceEditorView.vue's onDelete) silently closed the confirm dialog
+    // with no error surfaced. Revocation is now best-effort: a failure here
+    // is logged and does not block the other artifacts' revocation or the
+    // service-doc delete below, which is what the user actually asked for
+    // and is left UNGUARDED so a genuine failure to delete the service
+    // itself still throws and reaches the caller.
+
     // 1. shareTokens — query-based (a service can have 2+ via adoption).
     // A query's result set is already known to exist; no existence guard
     // needed the way the direct-keyed deletes below require one.
-    const tokensSnap = await getDocs(query(collection(db, 'shareTokens'), where('serviceId', '==', id)))
-    for (const tokenDoc of tokensSnap.docs) {
-      await deleteDoc(doc(db, 'shareTokens', tokenDoc.id))
+    try {
+      const tokensSnap = await getDocs(query(collection(db, 'shareTokens'), where('serviceId', '==', id)))
+      for (const tokenDoc of tokensSnap.docs) {
+        await deleteDoc(doc(db, 'shareTokens', tokenDoc.id))
+      }
+    } catch (err) {
+      console.error(`deleteService: failed to revoke shareTokens for service ${id} — continuing`, err)
     }
 
     // 2. serviceShareLinks/{id} — direct-keyed identity doc. Existence-guarded:
     // an unconditional deleteDoc against a doc that was never created
     // evaluates the delete rule against a null `resource`, which Firestore
     // treats as DENY, not a no-op (the common never-shared-service case).
-    const linkRef = doc(db, 'serviceShareLinks', id)
-    const linkSnap = await getDoc(linkRef)
-    if (linkSnap.exists()) await deleteDoc(linkRef)
+    try {
+      const linkRef = doc(db, 'serviceShareLinks', id)
+      const linkSnap = await getDoc(linkRef)
+      if (linkSnap.exists()) await deleteDoc(linkRef)
+    } catch (err) {
+      console.error(`deleteService: failed to revoke serviceShareLinks/${id} — continuing`, err)
+    }
 
     // 3. serviceShares/{slug}__service-{date} — needs the org's slug plus
     // this service's own date, so it's only attempted when the service was
     // actually found in the in-memory cache above.
     if (service) {
-      const orgSnap = await getDoc(doc(db, 'organizations', orgId.value))
-      const slug = orgSnap.exists() ? (orgSnap.data().slug as string | undefined) : undefined
-      if (slug) {
-        const shareRef = doc(db, 'serviceShares', `${slug}__service-${service.date}`)
-        const shareSnap = await getDoc(shareRef)
-        // CR-01 (80-REVIEW): this doc is keyed by slug+date, NOT serviceId —
-        // two services on the same date share one serviceShares doc. Only
-        // delete it if it still records THIS service as owner; otherwise a
-        // same-date sibling service's live public share page would be
-        // silently destroyed. A doc written before this guard existed (no
-        // serviceId field) is treated as "not mine" and left alone rather
-        // than deleted on an undefined === id false match.
-        if (shareSnap.exists() && shareSnap.data().serviceId === id) {
-          await deleteDoc(shareRef)
+      try {
+        const orgSnap = await getDoc(doc(db, 'organizations', orgId.value))
+        const slug = orgSnap.exists() ? (orgSnap.data().slug as string | undefined) : undefined
+        if (slug) {
+          const shareRef = doc(db, 'serviceShares', `${slug}__service-${service.date}`)
+          const shareSnap = await getDoc(shareRef)
+          // CR-01 (80-REVIEW): this doc is keyed by slug+date, NOT serviceId —
+          // two services on the same date share one serviceShares doc. Only
+          // delete it if it still records THIS service as owner; otherwise a
+          // same-date sibling service's live public share page would be
+          // silently destroyed. A doc written before this guard existed (no
+          // serviceId field) is treated as "not mine" and left alone rather
+          // than deleted on an undefined === id false match.
+          if (shareSnap.exists() && shareSnap.data().serviceId === id) {
+            await deleteDoc(shareRef)
+          }
         }
+      } catch (err) {
+        console.error(`deleteService: failed to revoke serviceShares for service ${id} — continuing`, err)
       }
     }
 
-    // 4. The service doc itself, LAST.
+    // 4. The service doc itself, LAST — deliberately NOT wrapped: this is
+    // the actual delete the user asked for, so a failure here must throw
+    // and reach the caller rather than being swallowed like steps 1-3 above.
     await deleteDoc(doc(db, 'organizations', orgId.value, 'services', id))
     // WR-03 (41-REVIEW): drop the deleted service's shareLinkCache entry so
     // it cannot accumulate as a dead entry, and so a same-session, same-org

@@ -383,6 +383,10 @@ const mockBuildServiceSnapshot = vi.fn((svc: Service) => ({
 const mockAssignSongToSlot = vi.fn<
   (id: string, index: number, song: { id: string; title: string; key: string }) => Promise<void>
 >(() => Promise.resolve())
+// WR-01 (80-REVIEW): hoisted so the delete-error-surfacing regression test
+// can make it reject and assert onDelete's new catch branch renders the
+// error and leaves the confirm dialog open, instead of silently closing it.
+const mockDeleteService = vi.fn<(id: string) => Promise<void>>(() => Promise.resolve())
 
 // WR-01 (48-REVIEW): mutable so the Share in-flight regression test can give
 // the store a real orgId (the module default below stays `null`, preserving
@@ -427,6 +431,7 @@ vi.mock('@/stores/services', () => ({
     markAsPlanned: mockMarkAsPlanned,
     reopenService: mockReopenService,
     assignSongToSlot: mockAssignSongToSlot,
+    deleteService: mockDeleteService,
     clearSongFromSlot: vi.fn(() => Promise.resolve()),
     setRoleOverride: mockSetRoleOverride,
     clearRoleOverride: mockClearRoleOverride,
@@ -714,6 +719,10 @@ beforeEach(() => {
   mockSeedDefaultTeamsIfEmpty.mockClear()
   mockGetSongSuggestions.mockClear()
   mockGetSongSuggestions.mockImplementation(() => Promise.resolve(null))
+  // WR-01 (80-REVIEW): reset to the pre-existing default (resolves) so a
+  // test that makes it reject never leaks into a later, unrelated test.
+  mockDeleteService.mockClear()
+  mockDeleteService.mockImplementation(() => Promise.resolve())
 })
 
 /** Reads the real useSaveStatus store's entry for `service:{id}` — the
@@ -6054,6 +6063,35 @@ describe('ServiceEditorView - service lifecycle transitions (R036, R037)', () =>
     const wrapper = await mountView()
 
     expect(wrapper.findAll('button').some((b) => b.text() === 'Delete')).toBe(true)
+  })
+
+  // WR-01 (80-REVIEW): before this fix, onDelete had no catch — a
+  // deleteService failure (e.g. a mid-sequence revocation error) closed the
+  // confirm dialog silently via the old bare `finally`, looking like success
+  // while the service was never actually deleted. Now a failure surfaces an
+  // error and leaves the dialog open instead.
+  it('a deleteService failure surfaces an error and keeps the confirm dialog open, instead of silently closing it', async () => {
+    mockServicesList = [mockService]
+    mockDeleteService.mockImplementationOnce(() => Promise.reject(new Error('permission-denied')))
+    const wrapper = await mountView()
+
+    const deleteBtn = wrapper.findAll('button').find((b) => b.text() === 'Delete')
+    await deleteBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const confirmDeleteBtn = body().findAll('button').find((b) => b.text() === 'Delete')
+    await confirmDeleteBtn!.trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(mockDeleteService).toHaveBeenCalledWith('service-1')
+    // Dialog is still open (the confirm body is still present) and the error
+    // is visible — this is the "coherent outcome" WR-01 requires instead of
+    // a silent, misleading close.
+    expect(body().find('[data-testid="delete-service-confirm-body"]').exists()).toBe(true)
+    expect(body().find('[data-testid="delete-service-error"]').text()).toBe(
+      'Failed to delete service. Please try again.',
+    )
   })
 
   // ---- The Suggest All Songs disabled binding is COMPOUND --------------------

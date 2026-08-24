@@ -380,6 +380,7 @@
             <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
               <h2 class="text-base font-semibold text-gray-100 mb-2">Delete service?</h2>
               <p class="text-sm text-gray-400 mb-6" data-testid="delete-service-confirm-body">{{ deleteServiceConfirmBody }}</p>
+              <p v-if="deleteError" class="text-red-400 text-sm mb-4" data-testid="delete-service-error">{{ deleteError }}</p>
               <div class="flex justify-end gap-3">
                 <button
                   type="button"
@@ -1732,6 +1733,12 @@ const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 const isDeleting = ref(false)
+// WR-01 (80-REVIEW): deleteService's revocation steps are now best-effort,
+// but the service-doc delete itself (the last step) is unguarded and can
+// still throw. Before this, onDelete had no catch — a failure closed the
+// confirm dialog silently, looking like success while the service was NOT
+// actually deleted.
+const deleteError = ref<string | null>(null)
 // R136 (59-04): the ✉ Messages composer's open state, toggled by the
 // action-bar item's onMessages handler.
 const messageComposerOpen = ref(false)
@@ -4408,12 +4415,20 @@ function onChangeReminderDaysBefore(rawValue: string): void {
 async function onDelete() {
   if (!localService.value) return
   isDeleting.value = true
+  deleteError.value = null
   try {
     await serviceStore.deleteService(serviceId.value)
+    showDeleteConfirm.value = false
     router.push('/services')
+  } catch (err) {
+    // WR-01 (80-REVIEW): mirrors TeamView.vue's onCancelInvite pattern —
+    // surface the failure and keep the confirm dialog open (do NOT close it
+    // here) so the user can see the error and retry, instead of the dialog
+    // silently closing while the service was never actually deleted.
+    console.error('[ServiceEditorView] delete service error:', err)
+    deleteError.value = 'Failed to delete service. Please try again.'
   } finally {
     isDeleting.value = false
-    showDeleteConfirm.value = false
   }
 }
 
