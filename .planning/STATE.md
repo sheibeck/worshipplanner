@@ -5,15 +5,15 @@ milestone_name: Configurability, Hardening & Cleanup
 current_phase: 81
 current_phase_name: Polish & Ops Close-Out
 status: planning
-stopped_at: Completed 81-02-PLAN.md
-last_updated: "2026-08-24T14:34:17.278Z"
+stopped_at: Completed 81-03-PLAN.md
+last_updated: "2026-08-24T15:00:25.397Z"
 last_activity: 2026-08-24
 last_activity_desc: Phase 80 complete, transitioned to Phase 81
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 67
 ---
 
@@ -2539,6 +2539,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 80 P01 | 22min | 3 tasks | 3 files |
 | Phase 80 P03 | 25min | 2 tasks | 4 files |
 | Phase 81 P01 | 25min | 3 tasks | 3 files |
+| Phase 81 P03 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2953,6 +2954,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R235 fix stays entirely inside rebuildSongGroup's !songId branch — no cross-slot query needed since SlideGroup.id === slot.id already isolates a reprise's two occurrences
 - [Phase ?]: R236: isPendingRender composes into BOTH canMutate and canMutateBackground — a background attach/remove/override is a per-slide customization the locked notice's wording covers too
 - [Phase ?]: R237/R238 closed as verification+documentation (no rebuild); IMPORTED slides intentionally stay excluded from PC export
+- [Phase ?]: Bound ARIA aria-selected/tabindex to the existing activeTab reactive expression (no new state) on both Owner Console and Service Editor tab strips (R239 part 2)
 
 ### Roadmap Evolution
 
@@ -3277,8 +3279,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-24T14:34:17.209Z
-Stopped at: Completed 81-02-PLAN.md
+Last session: 2026-08-24T15:00:25.236Z
+Stopped at: Completed 81-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
