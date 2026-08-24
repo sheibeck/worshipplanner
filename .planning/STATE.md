@@ -2,14 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Configurability, Hardening & Cleanup
+current_phase: 79
+current_phase_name: Dedup & Configurable Teams
 status: planning
-last_updated: "2026-08-23T23:15:00.000Z"
+stopped_at: Completed 79-01-PLAN.md
+last_updated: "2026-08-24T02:16:09.928Z"
 last_activity: 2026-08-23
+last_activity_desc: v2.2 ROADMAP.md created (Phases 79-81, R228-R241 100% mapped)
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
   percent: 0
 ---
 
@@ -863,10 +867,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 79 of 81 (Dedup & Configurable Teams) — not yet planned
-Plan: — (roadmap created; ready for /gsd-plan-phase 79)
-Status: Roadmap created — ready to plan
-Last activity: 2026-08-23 — v2.2 ROADMAP.md created (Phases 79-81, R228-R241 100% mapped)
+Phase: 79 of 81 (Dedup & Configurable Teams) — Wave 1 (79-01) complete, Wave 2 (79-02, 79-03) pending
+Plan: 79-01 of 3 complete (teams store foundation) — see 79-01-SUMMARY.md
+Status: In progress — 79-01 executed (teams type + store + church-switch teardown), gates green
+Last activity: 2026-08-23 — 79-01-PLAN.md executed (commits deeabd89, 35111430)
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -2529,6 +2533,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 77 P02 | 35min | 2 tasks | 4 files |
 | Phase 78 P01 | 30min | 2 tasks | 4 files |
 | Phase 78 P02 | 20min | 3 tasks | 6 files |
+| Phase 79 P01 | 12min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2933,6 +2938,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 78-02: applyOrgSnapshot extracted from loadOrgContext (pure, no behavior change) so enterOrgAsSuperAdmin reuses the same settings-merge logic
 - [Phase ?]: 78-02: hasNoOrg gained '&& viewingAsSuperAdmin.value === null' rather than pushing the viewed org into memberships, keeping the super-admin's own church picker empty (R226)
 - [Phase ?]: 78-02: enterOrgAsSuperAdmin skips the isOrgActive/deactivation check loadOrgContext performs -- entering a deactivated org for support is intended, and the rules layer already grants unconditional super-admin access
+- [Phase ?]: 79-01: teams store mirrors roster.ts roles half exactly; DEFAULT_TEAMS byte-matches today's hard-coded list; teams store registered in resetOrgScopedStores()
 
 ### Roadmap Evolution
 
@@ -3257,8 +3263,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-23T05:13:43.637Z
-Stopped at: Completed 78-02-PLAN.md
+Last session: 2026-08-24T02:16:09.428Z
+Stopped at: Completed 79-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
