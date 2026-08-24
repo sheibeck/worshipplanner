@@ -1,11 +1,12 @@
 <template>
   <div>
-    <label class="text-xs text-gray-400 mb-1 flex items-center gap-1">
+    <label :for="fieldId" class="text-xs text-gray-400 mb-1 flex items-center gap-1">
       {{ label }}
       <span v-if="isDefault" class="text-xs text-gray-500 italic">(default)</span>
     </label>
     <div class="flex flex-col sm:flex-row gap-2">
       <input
+        :id="fieldId"
         v-model="inputValue"
         type="text"
         class="flex-1 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -29,7 +30,7 @@
 // Phase 70 (R187/R191/R192) — text-field equivalent of ConfigNumberField.vue,
 // used by the Sender card's fromName/fromAddress and the AI Proxy card's
 // comma-separated allowedModels field.
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, useId } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -72,6 +73,12 @@ const emit = defineEmits<{
   // above are unchanged for every existing consumer.
   'update:modelValue': [value: string]
 }>()
+
+// R239 (81-02) — a unique, render-stable id so the <label>'s `for` targets
+// this instance's <input> specifically. useId() guarantees per-instance
+// uniqueness with zero call-site changes (no id prop to plumb through every
+// caller, no label-text slugification that could collide across cards).
+const fieldId = useId()
 
 const inputValue = ref<string>(props.modelValue)
 

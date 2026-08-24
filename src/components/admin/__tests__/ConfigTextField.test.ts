@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { defineComponent, h } from 'vue'
 import ConfigTextField from '../ConfigTextField.vue'
 
 function mountField(props: Partial<InstanceType<typeof ConfigTextField>['$props']> = {}) {
@@ -99,5 +100,41 @@ describe('ConfigTextField', () => {
     const emitted = wrapper.emitted('update:modelValue')
     expect(emitted).toBeTruthy()
     expect(emitted![emitted!.length - 1]).toEqual(['owner@example.com'])
+  })
+
+  // R239 (81-02) — the label was previously a sibling <label> with no `for`,
+  // so the input had no programmatic accessible name despite looking
+  // "labeled" to a sighted user.
+  it('associates the <label> with the <input> via a non-empty, matching for/id pair', () => {
+    const wrapper = mountField()
+    const label = wrapper.find('label')
+    const input = wrapper.find('input')
+
+    expect(label.attributes('for')).toBeTruthy()
+    expect(input.attributes('id')).toBeTruthy()
+    expect(label.attributes('for')).toBe(input.attributes('id'))
+  })
+
+  it('produces distinct input ids across two instances on one page (no collision between e.g. Sender fromName/fromAddress)', () => {
+    // useId() scopes uniqueness to the owning Vue app instance -- two
+    // separate mount() calls each create their own app, so this must mount
+    // both ConfigTextField instances under one host component to prove
+    // real-page uniqueness (e.g. SenderConfigCard's fromName + fromAddress
+    // cards both rendering on the Configuration tab at once).
+    const Host = defineComponent({
+      render() {
+        return h('div', [
+          h(ConfigTextField, { label: 'Display name', modelValue: 'Grace Church', required: false }),
+          h(ConfigTextField, { label: 'From address', modelValue: 'noreply@example.com', required: false }),
+        ])
+      },
+    })
+    const wrapper = mount(Host)
+    const inputs = wrapper.findAllComponents(ConfigTextField).map((c) => c.find('input').attributes('id'))
+
+    expect(inputs.length).toBe(2)
+    expect(inputs[0]).toBeTruthy()
+    expect(inputs[1]).toBeTruthy()
+    expect(inputs[0]).not.toBe(inputs[1])
   })
 })
