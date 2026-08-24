@@ -4,17 +4,17 @@ milestone: v2.2
 milestone_name: Configurability, Hardening & Cleanup
 current_phase: 80
 current_phase_name: Security & Data-Integrity Hardening
-status: planning
-stopped_at: Completed 79-03-PLAN.md
-last_updated: "2026-08-24T04:13:14.330Z"
+status: in-progress
+stopped_at: Completed 80-01-PLAN.md
+last_updated: "2026-08-24T05:07:33.000Z"
 last_activity: 2026-08-24
-last_activity_desc: Phase 79 complete, transitioned to Phase 80
+last_activity_desc: 80-01-PLAN.md executed (firestore.rules R232/R233 hardening, UNDEPLOYED)
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 33
+  total_plans: 6
+  completed_plans: 5
+  percent: 67
 ---
 
 # ▶ ACTIVE MILESTONE — v2.2 Configurability, Hardening & Cleanup (roadmap created 2026-08-23)
@@ -867,10 +867,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 80 of 81 (Security & Data-Integrity Hardening)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-08-24 — Phase 79 complete, transitioned to Phase 80
+Phase: 80 of 81 (Security & Data-Integrity Hardening) — 80-01 complete, 80-02/80-03 pending
+Plan: 80-01 of 3 complete (firestore.rules hardening: R232 inviteLookup create gate + R233 createdBy immutability) — see 80-01-SUMMARY.md
+Status: In progress — 80-01 executed (rules changes + emulator tests), gates green, ships UNDEPLOYED
+Last activity: 2026-08-24 — 80-01-PLAN.md executed (commits 04dba036, da94ac16, 45f85071, 7969593c)
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -2536,6 +2536,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 79 P01 | 12min | 2 tasks | 4 files |
 | Phase 79 P02 | 55min | 2 tasks | 5 files |
 | Phase 79 P03 | 27min | 3 tasks | 6 files |
+| Phase 80 P01 | 22min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -2944,6 +2945,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: TeamsConfigPanel.vue mirrors RolesConfigPanel.vue's shape exactly (flat list, draft+Save, soft-warn delete-confirm, Add row) with real aria-labels from the start; teamsStore is unsubscribed on RosterView unmount but songStore is left subscribed (shared org-scoped store managed by resetOrgScopedStores).
 - [Phase ?]: R231: removed ordinal-Sunday auto-team-selection entirely — new services start with no teams pre-selected on any Sunday.
 - [Phase ?]: R230: replaced the twice-duplicated Orchestra-only AI song filter with one filterSongsByTeamTags() helper that unions selected teams' songFilterTag values.
+- [Phase ?]: 80-01: R233's preservesCreatedBy() is a NEW sibling helper, not folded into lifecycleFields()'s shared array -- that array is also read on CREATE to assert absence, but createdBy is required on create.
+- [Phase ?]: 80-01: found a second, plan-unnamed regression (a full-overwrite setDoc dropping createdBy) via the full rules-suite run, not the task-scoped -t filter -- fixed identically to the plan's named sibling instance (switched to updateDoc).
 
 ### Roadmap Evolution
 
@@ -3268,10 +3271,11 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-24T03:17:47.785Z
-Stopped at: Completed 79-03-PLAN.md
+Last session: 2026-08-24T05:07:33.000Z
+Stopped at: Completed 80-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Continue Phase 80 with 80-02 (R234 deleteService share-artifact revocation) and 80-03 (R235 reprise-safe slide clear + R236 pending-render edit guard)
+- Owner pre-deploy step recorded for 80-01: `firebase deploy --only firestore:rules` (see .planning/PENDING-VERIFICATION.md)
