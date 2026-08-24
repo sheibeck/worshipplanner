@@ -772,3 +772,37 @@ here:**
 
 **Everything in this plan ships built, tested, and UNDEPLOYED** — no `firebase deploy` was run, per the
 standing deploy discipline. See `80-01-SUMMARY.md` for the full task-by-task record.
+
+---
+
+## Phase 81 — R238 verified-domain email: owner-run DNS/Resend setup — OWNER, EXTERNAL OPS
+
+**Code + docs complete 2026-08-24 (Plan 81-01).** R237 and R238 were re-confirmed as
+already-shipped (R237 by quick/260809-vvq commit `8c602bc0`; R238's send-path wiring across
+Phases 69-70) — this plan was verification + documentation only, no source rebuild. Both live
+send paths (`sendQueuedMessageHandler` in `functions/src/index.ts`,
+`sendAdminOnboardingEmail` in `functions/src/adminEmail.ts`) re-confirmed to read
+`config.sender.fromAddress` live via `getAppConfig()` — `onboarding@resend.dev` exists only as
+`DEFAULT_APP_CONFIG.sender.fromAddress`'s fallback, never a hard-coded override on either send
+path. See `81-01-SUMMARY.md` for the full task-by-task record.
+
+**This item is NOT app-deployable — it is owner-run external DNS/Resend-dashboard
+configuration.** There is no `firebase deploy` step; the sender address is a live Firestore
+write with no redeploy. The full step-by-step runbook is `functions/DEPLOY-EMAIL-DOMAIN.md`.
+
+**OWNER, at your convenience — do NOT mark passed here:**
+1. Choose a real domain (or dedicated sending subdomain) you control DNS for — `*.web.app`/
+   `*.firebaseapp.com` cannot be verified.
+2. Add the domain in the Resend dashboard and publish the generated SPF/DKIM/MX/DMARC DNS
+   records at your DNS provider.
+3. Wait for **ALL** records to show Verified in Resend (not Pending) before proceeding — see
+   the runbook's "Why sequencing matters" section for why a premature cutover degrades silently
+   to a `partial`/`failed` message status instead of a visible error.
+4. Set the Owner Console → Configuration tab → Sender card "From address" to the verified
+   address. `SERVICE_SHARE_BASE_URL` stays on the Firebase default (locked decision — unrelated
+   to the sending domain).
+5. Send a real test message to a genuinely external inbox (not the Resend account owner's own
+   address) and confirm no `partial`/`failed` delivery status.
+
+Do **not** treat this item as passed — it is `verification_deferred_human`, entirely owner-run,
+external DNS/Resend ops that no automated gate in this repo can perform or verify.
