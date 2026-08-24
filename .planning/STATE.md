@@ -3,14 +3,35 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Configurability, Hardening & Cleanup
 status: planning
-last_updated: "2026-08-23T22:28:12.862Z"
+last_updated: "2026-08-23T23:15:00.000Z"
 last_activity: 2026-08-23
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
   percent: 0
+---
+
+# ▶ ACTIVE MILESTONE — v2.2 Configurability, Hardening & Cleanup (roadmap created 2026-08-23)
+
+**Goal:** Make the app fit churches other than Berean, and close accumulated security, data-integrity, and
+polish debt from the v1.x–v2.1 backlog (999.x carry-forwards). Requirements R228–R241 in REQUIREMENTS.md.
+Phase numbering continues from v2.1 (75–78, ended at Phase 78); this milestone is Phases 79–81.
+
+**Roadmap (3 phases, `coarse` granularity):** Phase 79 Dedup & Configurable Teams (R241, R228-R231) →
+Phase 80 Security & Data-Integrity Hardening (R232-R236) → Phase 81 Polish & Ops Close-Out (R237-R240).
+All three phases are independent of each other (no cross-phase dependency) — see `.planning/ROADMAP.md` §
+v2.2 for full phase detail and the `★ v2.2 ROADMAP.md phase breakdown` below for the derivation rationale.
+
+**Deploy discipline carried forward:** Phase 80's two `firestore.rules` changes (R232 `inviteLookup`
+create gate, R233 `createdBy` immutability) ship built + tested + UNDEPLOYED with the exact `firebase
+deploy --only firestore:rules` command handed to the owner, per the standing v1.5+ deploy policy. R238
+(Phase 81, Resend verified domain) is an owner-run DNS/dashboard runbook, not an app-verifiable deploy.
+Every other change in this milestone is client-only.
+
+Next step: `/gsd-plan-phase 79` (optionally preceded by `/gsd-discuss-phase 79`).
+
 ---
 
 # ✔ SHIPPED MILESTONE — v2.1 Organization Lifecycle & Super-Admin Access (started 2026-08-22, deployed + closed 2026-08-23)
@@ -832,7 +853,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 76 — church-deactivation-reactivation (76-01 server enforcement executed, code-complete + undeployed; 76-02 client login-block remains)
+**Current focus:** Phase 79 — Dedup & Configurable Teams (v2.2 roadmap created 2026-08-23; not yet planned)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -842,10 +863,35 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-23 — Milestone v2.2 started
+Phase: 79 of 81 (Dedup & Configurable Teams) — not yet planned
+Plan: — (roadmap created; ready for /gsd-plan-phase 79)
+Status: Roadmap created — ready to plan
+Last activity: 2026-08-23 — v2.2 ROADMAP.md created (Phases 79-81, R228-R241 100% mapped)
+
+## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
+
+3 phases (79-81), derived directly from R228-R241 with this project's `coarse` granularity setting
+applied: research recommended five phases (dedup+teams, rules hardening, deleteService revocation,
+pending-render guard, polish/a11y/Resend), but two of those five — R234 deleteService revocation and R236
+pending-render guard — are single-requirement, client-only, independent fixes that read as internal tasks
+rather than standalone user-observable phases at this project's granularity, so they fold into one
+Security & Data-Integrity Hardening phase alongside the two rules changes (R232, R233) and the song-clear
+fix (R235); all five are independent, small, correctness-hardening changes with no cross-dependency.
+Dedup & Configurable Teams stays its own phase (R241 dedup is a hard prerequisite for R228's editable
+list; R229 and R230 depend on R228; R231 is only safe to drop once R228's editable list ships — a
+genuinely sequenced, single-feature phase). Polish & Ops Close-Out groups the four remaining independent
+debt items (R237-R240). **Numbering continues from v2.1, which ended at Phase 78** — v2.2 starts at Phase
+79, not reset.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 79 Dedup & Configurable Teams | Collapse the duplicated team-list/Orchestra-filter constants to one source, then let a church admin define their own team list with an optional per-team song-tag filter, and drop the ordinal-Sunday auto-select rule | R241, R228-R231 | Nothing (first) | yes |
+| 80 Security & Data-Integrity Hardening | Gate inviteLookup creation to the target org's editor, lock createdBy after creation, revoke a deleted service's share links, clear a reprised song's orphaned slides, and warn before losing edits to a pending-render slide | R232-R236 | Nothing (independent) | yes |
+| 81 Polish & Ops Close-Out | Cover every slot type in Planning Center export, move messaging to a Resend-verified domain, retrofit Owner Console accessibility, and unify song browsing into one shared component | R237-R240 | Nothing (independent) | yes |
+
+See `.planning/ROADMAP.md` § v2.2 Configurability, Hardening & Cleanup for the full phase detail table
+(goals, dependencies, success criteria). Next step: `/gsd-plan-phase 79` (optionally preceded by
+`/gsd-discuss-phase 79`).
 
 ## ★ v2.1 ROADMAP.md phase breakdown (created 2026-08-22)
 

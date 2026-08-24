@@ -14,6 +14,7 @@
 - ✅ **v1.9 — Owner Admin Console** — Phases 68-71 (shipped 2026-08-23; super-admin console lifting the v1.8 cost/cleanup levers + no-reply sender into Firestore-backed runtime config, with a dry-run blast-radius preview gating every cleanup-toggle flip — deployed to production 2026-08-23 as the first of three stacked milestones; owner acceptance, human UAT deferred)
 - ✅ **v2.0 — Multi-Church Onboarding & Owner Console Tabs** — Phases 72-74 (shipped 2026-08-23; tabbed Configuration/Organizations shell, org onboarding (org + settings + seeded template + first admin), and the multi-org Storage auth-claim widening (backlog 999.5) — deployed to production 2026-08-23; owner acceptance, human UAT deferred)
 - ✅ **v2.1 — Organization Lifecycle & Super-Admin Access** — Phases 75-78 (shipped 2026-08-23; church deactivate/reactivate, deactivation-gated deletion with full cascade cleanup, pending-invite visibility, and a super-admin "enter any church" rules arm — deployed to production 2026-08-23; audit PASSED 16/16; owner acceptance, human UAT deferred)
+- 📋 **v2.2 — Configurability, Hardening & Cleanup** — Phases 79-81 (planned; per-org configurable teams + generalized song-tag filter + drop the ordinal-Sunday auto-select, replacing hard-coded Berean-specific rules (R228-R231, R241 dedup prerequisite); security & data-integrity hardening — inviteLookup create gate, createdBy immutability, deleteService share-token revocation, song-clear slide cleanup, pending-render edit guard (R232-R236); and polish/ops close-out — full Planning Center export coverage, Resend verified-sending-domain runbook, Owner Console a11y retrofit, shared song-browse component (R237-R240))
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -324,3 +325,70 @@ Full details: [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) · requir
 > Deployed to production 2026-08-23 (third of three stacked milestones). Audit PASSED (16/16 reqs, 5/5 seams, 3/3 SECURED). Closed on owner acceptance; human UAT `/gsd-verify-work 75–78` deferred (PENDING-VERIFICATION.md).
 
 </details>
+
+
+## v2.2 Configurability, Hardening & Cleanup (Phases 79-81)
+
+**Milestone Goal:** Make the app fit churches other than Berean, and close accumulated security,
+data-integrity, and polish debt from the v1.x–v2.1 backlog (999.x carry-forwards). Phase numbering
+continues from v2.1 (75–78, ended at Phase 78); this milestone is Phases 79–81.
+
+**Deploy policy:** per the standing v1.5+ deploy discipline, Phase 80's two `firestore.rules` changes
+(R232 `inviteLookup` create gate, R233 `createdBy` immutability) ship built + tested + **UNDEPLOYED**
+with the exact `firebase deploy --only firestore:rules` command handed to the owner. R238 (Phase 81,
+Resend verified sending domain) is an owner-run DNS/dashboard runbook — not something the app can deploy
+or self-verify. Every other change in this milestone is client-only.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R228–R241 (14 mapped)
+
+- [ ] **Phase 79: Dedup & Configurable Teams** - Collapse the duplicated team-list/Orchestra-filter constants to one source, then let a church admin define their own team list with an optional per-team song-tag filter, and drop the hard-coded ordinal-Sunday auto-team-select rule
+- [ ] **Phase 80: Security & Data-Integrity Hardening** - Gate `inviteLookup` creation to the target org's editor, lock `createdBy` after creation, revoke a deleted service's share links, clear a reprised song's orphaned slides, and warn before losing edits to a pending-render slide
+- [ ] **Phase 81: Polish & Ops Close-Out** - Cover every slot type in every Planning Center export mode, move messaging to a Resend-verified sending domain, retrofit Owner Console accessibility, and unify song browsing into one shared component
+
+### Phase 79: Dedup & Configurable Teams
+
+**Goal**: A church admin configures their own team/ministry list — driving every service-planning surface that shows teams — with every hard-coded, Berean-specific team rule replaced by per-org configuration.
+**Depends on**: Nothing (first phase of v2.2)
+**Requirements**: R241, R228, R229, R230, R231
+**Success Criteria** (what must be TRUE):
+
+  1. A church admin can add, rename, and remove teams/ministries on the Settings page, seeded with sensible defaults, instead of the hard-coded `['Choir','Orchestra','Communion','Special']` list — and the team-list duplicated across `ServiceEditorView.vue`/`NewServiceDialog.vue` now reads from one shared source (R228, R241).
+  2. The team checkboxes on both the new-service dialog and the service editor are driven by the org's configured team list, so two different churches see two different lists (R229).
+  3. A church admin can attach a song-tag filter to a team via a form field, so selecting that team on a service constrains AI song suggestions to songs carrying that tag — generalizing the old hard-coded "Orchestra team → Orchestra-tagged songs" rule to any team (R230).
+  4. Creating a new service no longer auto-selects teams by the Sunday's ordinal position (1st Sunday → Orchestra+Communion, 3rd Sunday → Choir) — a planner picks every service's teams manually (R231).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 80: Security & Data-Integrity Hardening
+
+**Goal**: Known security and data-integrity gaps around invite creation, org identity, service deletion, song clearing, and pending slide renders are closed.
+**Depends on**: Nothing (independent of Phase 79)
+**Requirements**: R232, R233, R234, R235, R236
+**Success Criteria** (what must be TRUE):
+
+  1. Only an editor of the target org can create an `inviteLookup` record for that org — a signed-in user can no longer forge an invite into a church they don't administer — while the legitimate invite → first-login acceptance flow still works (R232).
+  2. An organization's `createdBy` field cannot be changed after creation by an org editor (R233).
+  3. Deleting a service revokes every one of its public share artifacts (`shareTokens`, `serviceShares`, `serviceShareLinks`, found by query since a service can accumulate more than one across re-shares), so a deleted service's share URL no longer resolves (R234).
+  4. Removing a song from a service clears that song's slides even when the song is reprised elsewhere in the same service — no orphaned slides remain (R235).
+  5. When a deck slide's render is still pending, the edit UI warns or prevents the user from customizing that slide, so a per-entry change is never silently discarded when the render flips pending → ready (R236).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy note**: R232 and R233 are `firestore.rules` changes — ship built + tested + UNDEPLOYED with the exact `firebase deploy --only firestore:rules` command handed to the owner. R234, R235, and R236 are client-only, no deploy hand-over needed.
+
+### Phase 81: Polish & Ops Close-Out
+
+**Goal**: Remaining polish and operational debt is closed — Planning Center export is complete, volunteer messaging email is deliverable, the Owner Console meets baseline accessibility, and song browsing is unified across the app.
+**Depends on**: Nothing (independent of Phases 79-80)
+**Requirements**: R237, R238, R239, R240
+**Success Criteria** (what must be TRUE):
+
+  1. Every Planning Center export mode includes non-song/non-scripture service slots — no item is silently dropped from any export (R237).
+  2. Real volunteers reliably receive messaging email sent from a Resend-verified sending domain (SPF/DKIM/DMARC), replacing the test-mode `onboarding@resend.dev` sender, with a documented owner DNS runbook since domain verification is owner-run and not app-verifiable (R238).
+  3. The Owner Console's form inputs carry real labels/aria-labels, and its tab navigation (Configuration/Organizations, and the matching Service Editor tab strip) exposes proper ARIA tab semantics — without breaking the always-mounted `onSnapshot` panels (R239).
+  4. The Songs page and the service-plan song picker are both powered by one shared song-browse component (R240).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy note**: R238 is an owner-run Resend-dashboard/DNS runbook, not an app deploy — the coding deliverable is the documented runbook plus the code path that reads the verified sender once the owner flips it. R237, R239, and R240 are client-only.

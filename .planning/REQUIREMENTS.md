@@ -48,4 +48,23 @@ REQ-IDs continue from v2.1 (last: R227).
 - Migrating the Bible-version union (ESV/NLT) or the Protestant-canon assumption — platform scope, engineering not config.
 
 ## Traceability
-_(filled by roadmap — each requirement maps to exactly one phase)_
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| R228 | Phase 79 | Pending |
+| R229 | Phase 79 | Pending |
+| R230 | Phase 79 | Pending |
+| R231 | Phase 79 | Pending |
+| R241 | Phase 79 | Pending |
+| R232 | Phase 80 | Pending |
+| R233 | Phase 80 | Pending |
+| R234 | Phase 80 | Pending |
+| R235 | Phase 80 | Pending |
+| R236 | Phase 80 | Pending |
+| R237 | Phase 81 | Pending |
+| R238 | Phase 81 | Pending |
+| R239 | Phase 81 | Pending |
+| R240 | Phase 81 | Pending |
+
+Coverage: 14/14 v2.2 requirements mapped (100%).
+
