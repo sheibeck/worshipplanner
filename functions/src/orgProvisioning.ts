@@ -432,6 +432,11 @@ export interface OrgSummary {
    * read as active -- default-true, backward-compatible (see setOrgActive
    * and firestore.rules' isOrgActive for the same default). */
   active: boolean;
+  /** Phase 82 (R242): the super-admin-only master AI gate. `false` when
+   * absent -- the INVERSE default from `active` above, matching R242's "AI
+   * is OFF by default for every organization (including newly-onboarded
+   * ones)" -- only an EXPLICIT `aiMasterEnabled: true` reads as enabled. */
+  aiMasterEnabled: boolean;
 }
 
 export interface ListOrganizationsResponse {
@@ -460,7 +465,12 @@ export async function listOrganizationsHandler(
         orgDoc.ref.collection("members").count().get(),
         orgDoc.ref.collection("invites").count().get(),
       ]);
-      const data = orgDoc.data() as { name?: string; createdAt?: unknown; active?: boolean };
+      const data = orgDoc.data() as {
+        name?: string;
+        createdAt?: unknown;
+        active?: boolean;
+        aiMasterEnabled?: boolean;
+      };
       return {
         orgId: orgDoc.id,
         name: data.name ?? "(unnamed)",
@@ -468,6 +478,7 @@ export async function listOrganizationsHandler(
         memberCount: membersCountSnap.data().count,
         pendingCount: invitesCountSnap.data().count,
         active: data.active ?? true,
+        aiMasterEnabled: data.aiMasterEnabled ?? false,
       };
     }),
   );
@@ -618,3 +629,96 @@ export async function setOrgActiveHandler(
 }
 
 export const setOrgActive = onCall(setOrgActiveHandler);
+
+// --- setOrgAiEnabled (R242/R243: per-org master AI gate) --------------------
+
+export interface SetOrgAiEnabledRequest {
+  orgId: string;
+  aiEnabled: boolean;
+}
+
+export interface SetOrgAiEnabledResponse {
+  orgId: string;
+  aiEnabled: boolean;
+}
+
+/**
+ * The testable handler body, exported separately from the onCall wrapper
+ * below -- mirrors setOrgActiveHandler's shape (caller gate, input
+ * validation, org-existence check, same-state-aware merge write) but WITHOUT
+ * the member-claim fan-out: AI enablement carries no Storage-side
+ * enforcement or refresh-token revocation requirement (unlike deactivation,
+ * which must cut off a member's live Storage access), so there is nothing
+ * analogous to patch per member here.
+ *
+ * R243 forced-off (the one real behavioral difference from setOrgActive):
+ * the DISABLE branch writes BOTH `aiMasterEnabled: false` AND
+ * `settings.aiEnabled: false` in the SAME merge write, using the EXPLICIT
+ * dot-path key form (`'settings.aiEnabled': false`), never a nested
+ * `{ settings: { aiEnabled: false } }` object literal -- the dot-path form is
+ * unambiguously a single-field merge and matches SettingsView.vue:1047's own
+ * client-side save shape, so a sibling settings field (bibleVersion, etc.)
+ * can never be clobbered (82-RESEARCH.md Pitfall 4).
+ *
+ * EDGE-CASE short-circuit (plan-checker warning #3): a DISABLE call short-
+ * circuits ONLY when BOTH `aiMasterEnabled` is already false AND
+ * `settings.aiEnabled` is already false -- never on `aiMasterEnabled` alone.
+ * A repeat disable call must still re-force `settings.aiEnabled` off if it
+ * somehow drifted back on (e.g. write-ordering with a concurrent settings
+ * save), so the forced-off write is never silently skipped. ENABLE keeps the
+ * plain same-state short-circuit -- there is no forced-on side effect to
+ * worry about there.
+ */
+export async function setOrgAiEnabledHandler(
+  request: CallableRequest<SetOrgAiEnabledRequest>,
+): Promise<SetOrgAiEnabledResponse> {
+  const callerUid = await assertSuperAdminCaller(request);
+
+  const { orgId, aiEnabled } = request.data ?? ({} as SetOrgAiEnabledRequest);
+  if (typeof orgId !== "string" || orgId.trim() === "") {
+    throw new HttpsError("invalid-argument", "orgId is required.");
+  }
+  if (typeof aiEnabled !== "boolean") {
+    throw new HttpsError("invalid-argument", "aiEnabled (boolean) is required.");
+  }
+
+  const db = getFirestore();
+  const orgRef = db.collection("organizations").doc(orgId);
+  const orgSnap = await orgRef.get();
+  if (!orgSnap.exists) {
+    throw new HttpsError("not-found", `No organization found for id "${orgId}".`);
+  }
+
+  const orgData = orgSnap.data() as
+    | { aiMasterEnabled?: boolean; settings?: { aiEnabled?: boolean } }
+    | undefined;
+  const currentAiMasterEnabled = orgData?.aiMasterEnabled ?? false;
+  const currentSettingsAiEnabled = orgData?.settings?.aiEnabled ?? false;
+
+  const alreadyInEffect = aiEnabled
+    ? currentAiMasterEnabled === true
+    : currentAiMasterEnabled === false && currentSettingsAiEnabled === false;
+
+  if (!alreadyInEffect) {
+    if (aiEnabled) {
+      await orgRef.set(
+        { aiMasterEnabled: true, aiEnabledAt: FieldValue.serverTimestamp(), aiEnabledBy: callerUid },
+        { merge: true },
+      );
+    } else {
+      await orgRef.set(
+        {
+          aiMasterEnabled: false,
+          aiDisabledAt: FieldValue.serverTimestamp(),
+          aiDisabledBy: callerUid,
+          "settings.aiEnabled": false,
+        },
+        { merge: true },
+      );
+    }
+  }
+
+  return { orgId, aiEnabled };
+}
+
+export const setOrgAiEnabled = onCall(setOrgAiEnabledHandler);

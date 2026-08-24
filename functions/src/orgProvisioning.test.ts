@@ -7,9 +7,11 @@ import {
   assignOrgAdminHandler,
   listOrganizationsHandler,
   setOrgActiveHandler,
+  setOrgAiEnabledHandler,
   type OnboardOrganizationRequest,
   type AssignOrgAdminRequest,
   type SetOrgActiveRequest,
+  type SetOrgAiEnabledRequest,
 } from "./orgProvisioning";
 
 // Mirrors functions/src/superAdminClaims.test.ts's established mocking seams,
@@ -207,6 +209,7 @@ afterEach(() => {
 const ONBOARD_DEFAULTS: OnboardOrganizationRequest = { name: "Grace Church", adminEmail: TARGET_EMAIL };
 const ASSIGN_DEFAULTS: AssignOrgAdminRequest = { orgId: ORG_ID, email: TARGET_EMAIL };
 const SET_ACTIVE_DEFAULTS: SetOrgActiveRequest = { orgId: ORG_ID, active: false };
+const SET_AI_ENABLED_DEFAULTS: SetOrgAiEnabledRequest = { orgId: ORG_ID, aiEnabled: true };
 
 /**
  * Phase 76: a distinct getAuth() mock seam for setOrgActiveHandler's claim
@@ -253,6 +256,13 @@ function setActiveRequest(overrides: {
   data?: Partial<SetOrgActiveRequest>;
 } = {}) {
   return fakeRequest<SetOrgActiveRequest>(overrides, SET_ACTIVE_DEFAULTS);
+}
+
+function setAiEnabledRequest(overrides: {
+  auth?: { uid: string; token?: Record<string, unknown> } | null;
+  data?: Partial<SetOrgAiEnabledRequest>;
+} = {}) {
+  return fakeRequest<SetOrgAiEnabledRequest>(overrides, SET_AI_ENABLED_DEFAULTS);
 }
 
 // --- CALLER GATE (R200/R204, T-74-01/T-74-02) -------------------------------
@@ -386,6 +396,40 @@ describe("caller gate", () => {
     vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
 
     await expect(setOrgActiveHandler(setActiveRequest())).rejects.toMatchObject({
+      code: "permission-denied",
+    });
+  });
+
+  // Phase 82 (R242/R243): setOrgAiEnabled's caller gate mirrors setOrgActive's
+  // three cases exactly -- assertSuperAdminCaller is the SAME shared helper.
+  it("setOrgAiEnabled: rejects an unauthenticated caller", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(setOrgAiEnabledHandler(setAiEnabledRequest({ auth: null }))).rejects.toMatchObject({
+      code: "unauthenticated",
+    });
+  });
+
+  it("setOrgAiEnabled: rejects a token without superAdmin, never reads Firestore", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    const dbSpy = vi.fn(() => fake.db().collection("superAdmins"));
+    vi.mocked(getFirestore).mockReturnValue({ collection: dbSpy } as never);
+
+    await expect(
+      setOrgAiEnabledHandler(setAiEnabledRequest({ auth: { uid: CALLER_UID, token: {} } })),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    expect(dbSpy).not.toHaveBeenCalled();
+  });
+
+  it("setOrgAiEnabled: rejects when superAdmins/{callerUid} does not exist", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore(), false);
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(setOrgAiEnabledHandler(setAiEnabledRequest())).rejects.toMatchObject({
       code: "permission-denied",
     });
   });
@@ -805,8 +849,8 @@ describe("listOrganizationsHandler", () => {
 
     expect(result).toEqual({
       organizations: [
-        { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 0, active: true },
-        { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 0, active: true },
+        { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 0, active: true, aiMasterEnabled: false },
+        { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 0, active: true, aiMasterEnabled: false },
       ],
     });
   });
@@ -833,8 +877,8 @@ describe("listOrganizationsHandler", () => {
     const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
 
     expect(result.organizations).toEqual([
-      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 2, active: true },
-      { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 1, active: true },
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 2, active: true, aiMasterEnabled: false },
+      { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 1, active: true, aiMasterEnabled: false },
     ]);
   });
 
@@ -849,7 +893,7 @@ describe("listOrganizationsHandler", () => {
     const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
 
     expect(result.organizations).toEqual([
-      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 5, pendingCount: 0, active: true },
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 5, pendingCount: 0, active: true, aiMasterEnabled: false },
     ]);
   });
 
@@ -864,7 +908,57 @@ describe("listOrganizationsHandler", () => {
     const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
 
     expect(result.organizations).toEqual([
-      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 2, pendingCount: 0, active: false },
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 2, pendingCount: 0, active: false, aiMasterEnabled: false },
+    ]);
+  });
+
+  // Phase 82 (R242): aiMasterEnabled surfaces per org so the Owner Console
+  // table can render current state -- an org with the field explicitly true
+  // reads true, and an org with the field ABSENT (every pre-Phase-82 org,
+  // including a fresh onboard) reads false (OFF by default).
+  it("Phase 82 (R242): aiMasterEnabled reads true when the org doc carries it explicitly", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.orgsListDocs = [
+      { id: "org1", data: { name: "Grace Church", createdAt: "ts1", aiMasterEnabled: true }, memberCount: 2 },
+    ];
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
+
+    expect(result.organizations).toEqual([
+      {
+        orgId: "org1",
+        name: "Grace Church",
+        createdAt: "ts1",
+        memberCount: 2,
+        pendingCount: 0,
+        active: true,
+        aiMasterEnabled: true,
+      },
+    ]);
+  });
+
+  it("Phase 82 (R242): a fresh org with no aiMasterEnabled field reads false (AI OFF by default)", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.orgsListDocs = [
+      { id: "org1", data: { name: "Grace Church", createdAt: "ts1" }, memberCount: 0 },
+    ];
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
+
+    expect(result.organizations).toEqual([
+      {
+        orgId: "org1",
+        name: "Grace Church",
+        createdAt: "ts1",
+        memberCount: 0,
+        pendingCount: 0,
+        active: true,
+        aiMasterEnabled: false,
+      },
     ]);
   });
 });
@@ -1048,5 +1142,141 @@ describe("setOrgActiveHandler", () => {
     const result = await setOrgActiveHandler(setActiveRequest({ data: { orgId: ORG_ID, active: false } }));
 
     expect(result).toEqual({ orgId: ORG_ID, active: false, memberCount: 0, claimFailures: 0, revokeFailures: 0 });
+  });
+});
+
+// --- setOrgAiEnabled (R242/R243: per-org master AI gate) --------------------
+
+describe("setOrgAiEnabledHandler", () => {
+  it("rejects invalid-argument for a blank/non-string orgId", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(
+      setOrgAiEnabledHandler(setAiEnabledRequest({ data: { orgId: "" } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("rejects invalid-argument for a non-boolean aiEnabled", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(
+      setOrgAiEnabledHandler(setAiEnabledRequest({ data: { aiEnabled: "true" as unknown as boolean } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("rejects not-found for an orgId with no matching organizations/{orgId} doc", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: false });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(setOrgAiEnabledHandler(setAiEnabledRequest())).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("ENABLE: an org whose master gate was off gets aiMasterEnabled:true + audit fields via the Admin SDK", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: {} }); // no aiMasterEnabled -- absent/OFF
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await setOrgAiEnabledHandler(setAiEnabledRequest({ data: { orgId: ORG_ID, aiEnabled: true } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, aiEnabled: true });
+    expect(fake.docSetSpy).toHaveBeenCalledWith(
+      `organizations/${ORG_ID}`,
+      { aiMasterEnabled: true, aiEnabledAt: "SERVER_TIMESTAMP_SENTINEL", aiEnabledBy: CALLER_UID },
+      { merge: true },
+    );
+  });
+
+  it("DISABLE (R243 forced-off): writes aiMasterEnabled:false AND the dot-path settings.aiEnabled:false in the SAME merge, preserving a sibling settings field (Pitfall 4)", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, {
+      exists: true,
+      data: { aiMasterEnabled: true, settings: { aiEnabled: true, bibleVersion: "NLT" } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await setOrgAiEnabledHandler(setAiEnabledRequest({ data: { orgId: ORG_ID, aiEnabled: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, aiEnabled: false });
+    // The explicit dot-path key form (`'settings.aiEnabled'`), NOT a nested
+    // `{ settings: { aiEnabled: false } }` object literal -- this is what
+    // guarantees `settings.bibleVersion` is never clobbered: a dot-path merge
+    // touches exactly one leaf field, never the whole `settings` map.
+    expect(fake.docSetSpy).toHaveBeenCalledWith(
+      `organizations/${ORG_ID}`,
+      {
+        aiMasterEnabled: false,
+        aiDisabledAt: "SERVER_TIMESTAMP_SENTINEL",
+        aiDisabledBy: CALLER_UID,
+        "settings.aiEnabled": false,
+      },
+      { merge: true },
+    );
+    const [, writtenData] = fake.docSetSpy.mock.calls[0] as [string, Record<string, unknown>];
+    expect(writtenData).not.toHaveProperty("settings");
+    expect(writtenData.bibleVersion).toBeUndefined();
+  });
+
+  it("SHORT-CIRCUIT (ENABLE): calling with aiEnabled:true on an org already enabled performs no write", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: { aiMasterEnabled: true } });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await setOrgAiEnabledHandler(setAiEnabledRequest({ data: { orgId: ORG_ID, aiEnabled: true } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, aiEnabled: true });
+    expect(fake.docSetSpy).not.toHaveBeenCalled();
+  });
+
+  it("SHORT-CIRCUIT (DISABLE): calling with aiEnabled:false on an org already off (both aiMasterEnabled AND settings.aiEnabled false) performs no write", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, {
+      exists: true,
+      data: { aiMasterEnabled: false, settings: { aiEnabled: false } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await setOrgAiEnabledHandler(setAiEnabledRequest({ data: { orgId: ORG_ID, aiEnabled: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, aiEnabled: false });
+    expect(fake.docSetSpy).not.toHaveBeenCalled();
+  });
+
+  // EDGE-CASE GUARD (plan-checker warning #3): aiMasterEnabled already false
+  // is NOT sufficient on its own to short-circuit a DISABLE call -- if
+  // settings.aiEnabled somehow still reads true (e.g. a stale/out-of-order
+  // write), a repeat disable call MUST still re-force it off. Proves the
+  // short-circuit is a conjunction of BOTH fields, not aiMasterEnabled alone.
+  it("EDGE CASE: a DISABLE call re-forces settings.aiEnabled off even when aiMasterEnabled is already false, if settings.aiEnabled still reads true", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, {
+      exists: true,
+      data: { aiMasterEnabled: false, settings: { aiEnabled: true } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await setOrgAiEnabledHandler(setAiEnabledRequest({ data: { orgId: ORG_ID, aiEnabled: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, aiEnabled: false });
+    expect(fake.docSetSpy).toHaveBeenCalledWith(
+      `organizations/${ORG_ID}`,
+      {
+        aiMasterEnabled: false,
+        aiDisabledAt: "SERVER_TIMESTAMP_SENTINEL",
+        aiDisabledBy: CALLER_UID,
+        "settings.aiEnabled": false,
+      },
+      { merge: true },
+    );
   });
 });
