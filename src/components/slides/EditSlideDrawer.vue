@@ -56,21 +56,31 @@
                D-06's "one banner". This drawer is a fixed overlay that COVERS the
                sticky page banner, so without a notice a locked drawer is a
                stripped body with no explanation anywhere on screen.
-               ★ Never two notices stacked: when both restrictions hold the
-               song-group message wins, because it names the more specific and
-               more actionable one (a song's slides stay non-editable here even
-               after a reopen).
+               ★ Never two notices stacked: when multiple restrictions hold,
+               precedence is pending-render > song-group > serviceLocked.
+               Pending-render (R236) wins over serviceLocked because it is the
+               more specific and more actionable warning (an in-flight render
+               that will discard any edit made now); isSongGroup and
+               isPendingRender cannot co-occur (mutually exclusive slot kinds),
+               so between song-group and serviceLocked the song-group message
+               still wins, exactly as before (it names the more specific and
+               more actionable restriction — a song's slides stay non-editable
+               here even after a reopen).
                ★ The `:data-testid` is DYNAMIC so `drawer-song-readonly-notice`
                keeps its exact meaning: present for a song group, absent
                otherwise. Both existing assertions in EditSlideDrawer.test.ts stay
                green with zero test churn — do not rename it. -->
           <div
-            v-if="isSongGroup || serviceLocked"
-            class="rounded-md border border-gray-700 bg-gray-800/50 px-3 py-2 text-[12px] text-gray-400"
-            :data-testid="isSongGroup ? 'drawer-song-readonly-notice' : 'drawer-service-locked-notice'"
-          >{{ isSongGroup
-              ? "This song's slides come from the song itself — edit them on the Song Lyrics screen."
-              : 'This service is locked — reopen it for editing to change this slide.' }}</div>
+            v-if="isPendingRender || isSongGroup || serviceLocked"
+            class="rounded-md border px-3 py-2 text-[12px]"
+            :class="isPendingRender ? 'border-amber-800 bg-amber-950 text-amber-200' : 'border-gray-700 bg-gray-800/50 text-gray-400'"
+            :data-testid="isPendingRender ? 'drawer-pending-render-notice' : (isSongGroup ? 'drawer-song-readonly-notice' : 'drawer-service-locked-notice')"
+            :aria-live="isPendingRender ? 'polite' : undefined"
+          >{{ isPendingRender
+              ? "This slide is still rendering. Wait until it's ready before customizing — changes made now would be lost when the render finishes."
+              : isSongGroup
+                ? "This song's slides come from the song itself — edit them on the Song Lyrics screen."
+                : 'This service is locked — reopen it for editing to change this slide.' }}</div>
 
           <div class="flex items-center gap-1.5" data-testid="drawer-context-line">
             <span
@@ -622,7 +632,9 @@ const isSongGroup = computed(() => props.planItem?.kind === 'SONG')
  * vanish together, while the preview, kind badge, context line, attached-audio
  * row and player all stay.
  */
-const canMutate = computed(() => props.isEditor && !props.serviceLocked && !isSongGroup.value)
+const canMutate = computed(
+  () => props.isEditor && !props.serviceLocked && !isSongGroup.value && !isPendingRender.value,
+)
 
 // WR-04: `confirmDiscard()` is instantiated below (`unsavedGuard`, Task 3),
 // but this is the point where its ONLY still-real usage site is missing —
@@ -698,6 +710,14 @@ const previewText = computed(() =>
  */
 const resolvedBackgroundUrl = computed(() => props.assembledSlide?.slide.backgroundImageUrl)
 const backgroundSource = computed(() => props.assembledSlide?.slide.backgroundSource)
+/**
+ * R236 — a slide sourced from a PPTX deck whose server-side render hasn't
+ * produced a usable page yet. Composed into BOTH `canMutate` and
+ * `canMutateBackground` below (a background is a per-slide customization
+ * too) so an edit made now is never silently discarded when the render
+ * flips pending -> ready.
+ */
+const isPendingRender = computed(() => props.assembledSlide?.slide.renderState === 'pending')
 
 // ── Phase 26-07 Task 1: Slide Text, keyed on the STORED entry's sourceRef.kind ──
 // (see the template comment above the section for why this must never branch
@@ -1002,16 +1022,18 @@ const backgroundFileName = computed(() => (ownBackgroundUrl.value ? backgroundIm
 
 /**
  * ★ Deliberately NOT `canMutate` — omits the song-group exclusion.
- * `canMutate` (`isEditor && !serviceLocked && !isSongGroup`, above) governs
- * label/notes/audio/duplicate/delete, all of which R054 keeps
+ * `canMutate` (`isEditor && !serviceLocked && !isSongGroup && !isPendingRender`,
+ * above) governs label/notes/audio/duplicate/delete, all of which R054 keeps
  * song-slide-canonical. A per-slide background is a genuinely new,
  * independent property R054's "canonical, edited only from Song Lyrics" rule
  * was never written to cover — 33-CONTEXT.md explicitly states a song
  * group's reduced menu still offers background-setting. This is the ONE
- * mutation gate in this drawer that is not `canMutate` — do not "fix" it to
- * match the surrounding pattern.
+ * mutation gate in this drawer that omits `isSongGroup` — do not "fix" it to
+ * match the surrounding pattern. It DOES still compose `!isPendingRender`
+ * (R236): a background attached to a not-yet-rendered slide is exactly the
+ * kind of customization the locked pending-render copy warns would be lost.
  */
-const canMutateBackground = computed(() => props.isEditor && !props.serviceLocked)
+const canMutateBackground = computed(() => props.isEditor && !props.serviceLocked && !isPendingRender.value)
 
 /**
  * ★ Phase 33 UI-audit fix (previously a known, scoped gap documented in

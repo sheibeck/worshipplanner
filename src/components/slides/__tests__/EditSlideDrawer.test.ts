@@ -2359,3 +2359,58 @@ describe('EditSlideDrawer (Phase 33-07 Task 3 — pendingAction seam for Duplica
     expect(body().find('[data-testid="drawer-delete-confirm"]').exists()).toBe(false)
   })
 })
+
+// ── 80-03: pending-render edit guard (R236) ─────────────────────────────────
+describe('EditSlideDrawer - pending-render edit guard (R236)', () => {
+  function makePendingAssembled() {
+    return makeAssembled({
+      slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Hello world', renderState: 'pending' } as never,
+    })
+  }
+
+  it('renders the amber aria-live pending-render notice with the locked copy', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const assembledSlide = makePendingAssembled()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    const notice = body().find('[data-testid="drawer-pending-render-notice"]')
+    expect(notice.exists()).toBe(true)
+    expect(notice.attributes('aria-live')).toBe('polite')
+    expect(notice.text()).toBe(
+      "This slide is still rendering. Wait until it's ready before customizing — changes made now would be lost when the render finishes.",
+    )
+  })
+
+  it('disables customization (canMutate-gated AND canMutateBackground-gated controls) while pending', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const assembledSlide = makePendingAssembled()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    // canMutate-gated control.
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(false)
+    // canMutateBackground-gated control — the background gate must be exercised too (Pitfall 6).
+    expect(body().find('[data-testid="background-attach"]').exists()).toBe(false)
+  })
+
+  it('pending-render wins the single notice slot when serviceLocked also holds', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const assembledSlide = makePendingAssembled()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), serviceLocked: true })
+
+    expect(body().find('[data-testid="drawer-pending-render-notice"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-service-locked-notice"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-song-readonly-notice"]').exists()).toBe(false)
+  })
+
+  it('a ready (renderState undefined) slide shows no pending-render notice and behaves exactly as today', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const assembledSlide = makeAssembled({
+      slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Hello world' } as never,
+    })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-pending-render-notice"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(true)
+    expect(body().find('[data-testid="background-attach"]').exists()).toBe(true)
+  })
+})
