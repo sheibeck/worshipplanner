@@ -5,15 +5,15 @@ milestone_name: Configurability, Hardening & Cleanup
 current_phase: 79
 current_phase_name: Dedup & Configurable Teams
 status: planning
-stopped_at: Completed 79-01-PLAN.md
-last_updated: "2026-08-24T02:16:09.928Z"
+stopped_at: Completed 79-02-PLAN.md
+last_updated: "2026-08-24T02:38:14.211Z"
 last_activity: 2026-08-23
-last_activity_desc: v2.2 ROADMAP.md created (Phases 79-81, R228-R241 100% mapped)
+last_activity_desc: 79-01-PLAN.md executed (commits deeabd89, 35111430)
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -2534,6 +2534,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 78 P01 | 30min | 2 tasks | 4 files |
 | Phase 78 P02 | 20min | 3 tasks | 6 files |
 | Phase 79 P01 | 12min | 2 tasks | 4 files |
+| Phase 79 P02 | 55min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -2939,6 +2940,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 78-02: hasNoOrg gained '&& viewingAsSuperAdmin.value === null' rather than pushing the viewed org into memberships, keeping the super-admin's own church picker empty (R226)
 - [Phase ?]: 78-02: enterOrgAsSuperAdmin skips the isOrgActive/deactivation check loadOrgContext performs -- entering a deactivated org for support is intended, and the rules layer already grants unconditional super-admin access
 - [Phase ?]: 79-01: teams store mirrors roster.ts roles half exactly; DEFAULT_TEAMS byte-matches today's hard-coded list; teams store registered in resetOrgScopedStores()
+- [Phase ?]: TeamsConfigPanel.vue mirrors RolesConfigPanel.vue's shape exactly (flat list, draft+Save, soft-warn delete-confirm, Add row) with real aria-labels from the start; teamsStore is unsubscribed on RosterView unmount but songStore is left subscribed (shared org-scoped store managed by resetOrgScopedStores).
 
 ### Roadmap Evolution
 
@@ -3263,8 +3265,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-24T02:16:09.428Z
-Stopped at: Completed 79-01-PLAN.md
+Last session: 2026-08-24T02:38:14.149Z
+Stopped at: Completed 79-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
