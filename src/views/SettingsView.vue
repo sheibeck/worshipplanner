@@ -251,8 +251,15 @@
         <p v-if="vwSaveError" class="text-red-400 text-sm mt-2">{{ vwSaveError }}</p>
       </div>
 
-      <!-- AI Features section (R073/R088) — explains before offering the switch. -->
-      <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
+      <!-- AI Features section (R073/R088) — explains before offering the switch.
+           Phase 82 (R242/R243): the entire card is v-if-gated on the
+           super-admin master gate (authStore.aiMasterEnabled) — when a
+           super-admin has disabled AI for this org, the church's own AI
+           panel is not rendered at all, not merely disabled. -->
+      <div
+        v-if="authStore.aiMasterEnabled"
+        class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6"
+      >
         <h2 class="text-sm font-semibold text-gray-300 mb-3">AI Features</h2>
 
         <!-- Explanatory copy FIRST -->

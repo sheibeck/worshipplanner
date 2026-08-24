@@ -104,6 +104,11 @@ let mockPcSecret: string | null = null
 let mockVwModeEnabled = true
 let mockAiEnabled = true
 let mockPcEnabled = true
+// Phase 82 (R242/R243) — the super-admin master AI gate. Defaults true so
+// every pre-existing (pre-Phase-82) test in this file keeps seeing the AI
+// Features card; the new describe block below flips it false to prove the
+// card disappears.
+let mockAiMasterEnabled = true
 let mockSettingsVwModeEnabled = true
 // 44-02: R086 Services card summary + ServiceTemplateEditor.vue (mounted as a
 // child, which also calls useAuthStore() directly) both read this field.
@@ -152,6 +157,12 @@ vi.mock('@/stores/auth', () => ({
     },
     get vwModeEnabled() {
       return mockVwModeEnabled
+    },
+    // Phase 82 (R242/R243) — read-only in the component (no mirror-write
+    // path exists for the master gate from SettingsView.vue; it is written
+    // only by the super-admin Owner Console callable), so no setter needed.
+    get aiMasterEnabled() {
+      return mockAiMasterEnabled
     },
     // Setter required (Task 3 — 39-03) so onToggleVwMode's mirror-write
     // (`authStore.vwModeEnabled = newValue`) does not throw a TypeError on a
@@ -279,6 +290,7 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockPcSecret = null
     mockVwModeEnabled = true
     mockAiEnabled = true
+    mockAiMasterEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
@@ -328,6 +340,7 @@ describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
     mockPcSecret = null
     mockVwModeEnabled = true
     mockAiEnabled = true
+    mockAiMasterEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
@@ -435,6 +448,7 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     mockPcSecret = 'secret-1'
     mockVwModeEnabled = true
     mockAiEnabled = true
+    mockAiMasterEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
@@ -514,6 +528,7 @@ describe('SettingsView — no Services template card (R113)', () => {
     mockPcSecret = null
     mockVwModeEnabled = true
     mockAiEnabled = true
+    mockAiMasterEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
@@ -547,6 +562,7 @@ describe('SettingsView Bible Translation card (R090) — 45-02', () => {
     mockPcSecret = null
     mockVwModeEnabled = true
     mockAiEnabled = true
+    mockAiMasterEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
@@ -650,6 +666,7 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
     mockPcSecret = null
     mockVwModeEnabled = true
     mockAiEnabled = true
+    mockAiMasterEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
@@ -806,6 +823,7 @@ describe('SettingsView Messaging card — kill-switch + automatic email defaults
     mockPcSecret = null
     mockVwModeEnabled = true
     mockAiEnabled = true
+    mockAiMasterEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
@@ -973,6 +991,7 @@ describe('SettingsView organization timezone select (R133) — 58-04', () => {
     mockPcSecret = null
     mockVwModeEnabled = true
     mockAiEnabled = true
+    mockAiMasterEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
@@ -1028,5 +1047,50 @@ describe('SettingsView organization timezone select (R133) — 58-04', () => {
     const select = wrapper.get('[data-testid="messaging-timezone-select"]').element as HTMLSelectElement
     expect(select.value).toBe('America/Chicago')
     expect(mockTimezone).toBe('America/Chicago')
+  })
+})
+
+// Phase 82 (R242/R243) — the AI Features card is v-if-gated on the
+// super-admin master gate (authStore.aiMasterEnabled), distinct from the
+// church's own settings.aiEnabled toggle inside the card.
+describe('SettingsView AI Features card visibility (Phase 82, R242/R243)', () => {
+  beforeEach(() => {
+    mockOrgId = 'org-1'
+    mockOrgName = 'Test Church'
+    mockOrgSlug = 'test-church'
+    mockIsEditor = true
+    mockHasPcCredentials = false
+    mockPcAppId = null
+    mockPcSecret = null
+    mockVwModeEnabled = true
+    mockAiEnabled = true
+    mockAiMasterEnabled = true
+    mockPcEnabled = true
+    mockSettingsVwModeEnabled = true
+    mockDefaultServiceTemplate = []
+    mockBibleVersion = 'NLT'
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockMessagingEnabled = false
+    mockLockNotifyDefault = false
+    mockReminderEnabled = false
+    mockReminderDaysBefore = 7
+    mockTimezone = 'America/Chicago'
+    mockUpdateDoc.mockClear()
+    mockGetDoc.mockClear()
+    mockSetPcCredentials.mockClear()
+  })
+
+  it('AI: is not rendered in the DOM at all when the master gate is off', () => {
+    mockAiMasterEnabled = false
+    const wrapper = mountSettingsView()
+    expect(wrapper.text()).not.toContain('AI Features')
+    expect(wrapper.text()).not.toContain('Enable AI features')
+  })
+
+  it('AI: renders normally when the master gate is on', () => {
+    mockAiMasterEnabled = true
+    const wrapper = mountSettingsView()
+    expect(wrapper.text()).toContain('AI Features')
+    expect(wrapper.text()).toContain('Enable AI features')
   })
 })
