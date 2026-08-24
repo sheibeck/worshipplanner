@@ -870,7 +870,7 @@ describe('useServiceStore', () => {
     })
 
     // R234: serviceShares/{slug}__service-{date} — present is deleted, absent is a no-op.
-    it('R234: deletes serviceShares/{slug}__service-{date} when present', async () => {
+    it('R234: deletes serviceShares/{slug}__service-{date} when present and it belongs to this service', async () => {
       const { deleteDoc, getDoc } = await import('firebase/firestore')
       vi.mocked(getDoc).mockImplementation(async (ref: unknown) => {
         const path = (ref as { path?: string }).path ?? ''
@@ -878,7 +878,12 @@ describe('useServiceStore', () => {
           return { exists: () => true, data: () => ({ name: 'Grace Church', slug: 'grace-church' }) } as never
         }
         if (path === 'serviceShares/grace-church__service-2026-03-08') {
-          return { exists: () => true, data: () => ({ orgId: 'org-1', orgSlug: 'grace-church' }) } as never
+          // CR-01: serviceId must match the service being deleted for the
+          // delete to proceed.
+          return {
+            exists: () => true,
+            data: () => ({ serviceId: 'service-1', orgId: 'org-1', orgSlug: 'grace-church' }),
+          } as never
         }
         return { exists: () => false, data: () => ({}) } as never
       })
@@ -891,6 +896,41 @@ describe('useServiceStore', () => {
 
       const deletedPaths = vi.mocked(deleteDoc).mock.calls.map((call) => (call[0] as { path: string }).path)
       expect(deletedPaths).toContain('serviceShares/grace-church__service-2026-03-08')
+    })
+
+    // CR-01 (80-REVIEW): the serviceShares doc is keyed by slug+date, not
+    // serviceId — two services on the same date share ONE doc. Deleting
+    // service A must not destroy service B's live public share page just
+    // because it happens to be the doc found at that shared key.
+    it('CR-01: does NOT delete serviceShares/{slug}__service-{date} when it belongs to a different (still-live) service sharing the same date', async () => {
+      const { deleteDoc, getDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockImplementation(async (ref: unknown) => {
+        const path = (ref as { path?: string }).path ?? ''
+        if (path === 'organizations/org-1') {
+          return { exists: () => true, data: () => ({ name: 'Grace Church', slug: 'grace-church' }) } as never
+        }
+        if (path === 'serviceShares/grace-church__service-2026-03-08') {
+          // Owned by service-2 (the sibling on the same date), NOT service-1
+          // (the one being deleted).
+          return {
+            exists: () => true,
+            data: () => ({ serviceId: 'service-2', orgId: 'org-1', orgSlug: 'grace-church' }),
+          } as never
+        }
+        return { exists: () => false, data: () => ({}) } as never
+      })
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      // Two services, same date, same org — the collision precondition.
+      triggerSnapshot([makeService({ id: 'service-1', date: '2026-03-08' }), makeService({ id: 'service-2', date: '2026-03-08' })])
+
+      await store.deleteService('service-1')
+
+      const deletedPaths = vi.mocked(deleteDoc).mock.calls.map((call) => (call[0] as { path: string }).path)
+      expect(deletedPaths).not.toContain('serviceShares/grace-church__service-2026-03-08')
+      // The deleted service's own doc must still go away.
+      expect(deletedPaths).toContain('organizations/org-1/services/service-1')
     })
 
     it('R234: does not call deleteDoc for serviceShares/{slug}__service-{date} when absent, and does not throw', async () => {

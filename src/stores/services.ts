@@ -442,7 +442,16 @@ export const useServiceStore = defineStore('services', () => {
       if (slug) {
         const shareRef = doc(db, 'serviceShares', `${slug}__service-${service.date}`)
         const shareSnap = await getDoc(shareRef)
-        if (shareSnap.exists()) await deleteDoc(shareRef)
+        // CR-01 (80-REVIEW): this doc is keyed by slug+date, NOT serviceId —
+        // two services on the same date share one serviceShares doc. Only
+        // delete it if it still records THIS service as owner; otherwise a
+        // same-date sibling service's live public share page would be
+        // silently destroyed. A doc written before this guard existed (no
+        // serviceId field) is treated as "not mine" and left alone rather
+        // than deleted on an undefined === id false match.
+        if (shareSnap.exists() && shareSnap.data().serviceId === id) {
+          await deleteDoc(shareRef)
+        }
       }
     }
 
@@ -672,6 +681,13 @@ export const useServiceStore = defineStore('services', () => {
       }
 
       await setDoc(doc(db, 'serviceShares', `${slug}__service-${service.date}`), {
+        // CR-01 (80-REVIEW): this doc is keyed purely by slug+date, and the
+        // app enforces no per-org date uniqueness, so two services can share
+        // one serviceShares doc. serviceId lets deleteService tell "this doc
+        // is mine" from "this doc belongs to a same-date sibling service"
+        // before deleting it — without this field the doc has no way to
+        // disambiguate ownership.
+        serviceId: service.id,
         orgId: orgIdValue,
         orgSlug: slug,
         serviceSnapshot,
