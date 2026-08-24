@@ -287,6 +287,63 @@ describe('OrganizationsTab -- list (R196)', () => {
   })
 })
 
+describe('OrganizationsTab -- accessible names (R239, 81-02)', () => {
+  it('associates the "Church name" and "First admin email" onboard inputs with real labels', async () => {
+    const wrapper = await mountTab()
+
+    const nameLabel = wrapper.find('label[for="onboard-church-name"]')
+    const nameInput = wrapper.find('input[placeholder="Church name"]')
+    expect(nameLabel.exists()).toBe(true)
+    expect(nameLabel.text().trim().length).toBeGreaterThan(0)
+    expect(nameInput.attributes('id')).toBe('onboard-church-name')
+    expect(nameLabel.attributes('for')).toBe(nameInput.attributes('id'))
+
+    const emailLabel = wrapper.find('label[for="onboard-admin-email"]')
+    const emailInput = wrapper.find('input[placeholder="First admin email"]')
+    expect(emailLabel.exists()).toBe(true)
+    expect(emailLabel.text().trim().length).toBeGreaterThan(0)
+    expect(emailInput.attributes('id')).toBe('onboard-admin-email')
+    expect(emailLabel.attributes('for')).toBe(emailInput.attributes('id'))
+  })
+
+  it('exposes the per-row assign input via aria-label, with no static id, across a two-org list', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [
+            makeOrg({ orgId: 'org-1', name: 'Grace Church' }),
+            makeOrg({ orgId: 'org-2', name: 'Hope Church' }),
+          ],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+
+    const startButtons = wrapper.findAll('button').filter((b) => b.text() === 'Assign admin')
+    expect(startButtons.length).toBe(2)
+
+    // Open the first row's assign form: aria-label is present, no static id.
+    await startButtons[0]!.trigger('click')
+    let assignInput = wrapper.find('input[aria-label="Admin email"]')
+    expect(assignInput.exists()).toBe(true)
+    expect(assignInput.attributes('id')).toBeUndefined()
+
+    // Switch to the second row's assign form: same aria-label, still no id --
+    // proves neither row's per-row input was retrofitted with a static
+    // id/for pair that would collide across rows (RESEARCH Pitfall 5).
+    const secondStartButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
+    await secondStartButton.trigger('click')
+    assignInput = wrapper.find('input[aria-label="Admin email"]')
+    expect(assignInput.exists()).toBe(true)
+    expect(assignInput.attributes('id')).toBeUndefined()
+
+    // Only one assign form is ever open at a time (single assigningOrgId
+    // ref), so there is exactly one aria-labeled input in the DOM -- never a
+    // duplicate id, by construction.
+    expect(wrapper.findAll('input[aria-label="Admin email"]').length).toBe(1)
+  })
+})
+
 describe('OrganizationsTab -- onboard form (R197/R201/R202)', () => {
   it('surfaces the validation error without calling onboardOrganization when name is blank', async () => {
     const wrapper = await mountTab()

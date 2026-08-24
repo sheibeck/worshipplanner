@@ -4,24 +4,32 @@
 
     <!-- Onboard form -->
     <div class="flex flex-col sm:flex-row gap-3">
-      <input
-        v-model="churchName"
-        type="text"
-        placeholder="Church name"
-        class="flex-1 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-      />
-      <input
-        v-model="adminEmail"
-        type="email"
-        placeholder="First admin email"
-        class="flex-1 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-        @keydown.enter="onOnboard"
-      />
+      <div class="flex-1">
+        <label for="onboard-church-name" class="text-xs text-gray-400 mb-1 block">Church name</label>
+        <input
+          id="onboard-church-name"
+          v-model="churchName"
+          type="text"
+          placeholder="Church name"
+          class="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+        />
+      </div>
+      <div class="flex-1">
+        <label for="onboard-admin-email" class="text-xs text-gray-400 mb-1 block">First admin email</label>
+        <input
+          id="onboard-admin-email"
+          v-model="adminEmail"
+          type="email"
+          placeholder="First admin email"
+          class="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+          @keydown.enter="onOnboard"
+        />
+      </div>
       <button
         type="button"
         @click="onOnboard"
         :disabled="isOnboarding"
-        class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
+        class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors sm:self-end"
       >
         {{ isOnboarding ? 'Onboarding...' : onboardedFeedback ? 'Onboarded!' : 'Onboard church' }}
       </button>
@@ -85,6 +93,7 @@
                   <input
                     v-model="assignEmail"
                     type="email"
+                    aria-label="Admin email"
                     placeholder="Admin email"
                     class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-xs w-full sm:w-44 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
                     @keydown.enter="onConfirmAssign(org)"
