@@ -356,11 +356,11 @@ or self-verify. Every other change in this milestone is client-only.
   3. A church admin can attach a song-tag filter to a team via a form field, so selecting that team on a service constrains AI song suggestions to songs carrying that tag — generalizing the old hard-coded "Orchestra team → Orchestra-tagged songs" rule to any team (R230).
   4. Creating a new service no longer auto-selects teams by the Sunday's ordinal position (1st Sunday → Orchestra+Communion, 3rd Sunday → Choir) — a planner picks every service's teams manually (R231).
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 - [x] 79-01-PLAN.md — Teams store foundation: `Team` type + `DEFAULT_TEAMS`, `useTeamsStore()` (per-org subcollection CRUD + idempotent seed) mirroring `roster.ts`, registered in `resetOrgScopedStores()` (R228, R241 single source) [wave 1]
 - [x] 79-02-PLAN.md — Teams editor: `TeamsConfigPanel.vue` (flat editable list, per-team song-tag select, aria-labels) mounted as a new "Teams" tab in `RosterView.vue`, subscribing+seeding teams/songs (R228, R230) [wave 2]
-- [ ] 79-03-PLAN.md — Consumer rewiring + de-dup: store-driven checkboxes in `NewServiceDialog.vue`/`ServiceEditorView.vue`, ordinal auto-select removed, one union-of-team-tags AI filter helper replacing the two Orchestra blocks (R229, R230, R231, R241) [wave 2]
+- [x] 79-03-PLAN.md — Consumer rewiring + de-dup: store-driven checkboxes in `NewServiceDialog.vue`/`ServiceEditorView.vue`, ordinal auto-select removed, one union-of-team-tags AI filter helper replacing the two Orchestra blocks (R229, R230, R231, R241) [wave 2]
 
 **UI hint**: yes
 
