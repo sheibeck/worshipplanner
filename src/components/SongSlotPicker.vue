@@ -36,27 +36,21 @@
         class="fixed z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-[600px] overflow-y-auto"
         :style="dropdownStyle"
       >
-        <!-- Search + tag filter bar -->
-        <div class="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 p-2 space-y-1.5">
-          <input
-            ref="searchInputRef"
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search songs..."
-            :title="searchFieldHint"
-            class="w-full rounded-md bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
-          <!-- Tag filter (D-14: shared checklist bound to songStore) -->
-          <TagFilterChecklist
-            :availableUserTags="availableTags"
-            :includeTags="songStore.tagFilterInclude"
-            :excludeTags="songStore.tagFilterExclude"
-            @update:includeTags="songStore.tagFilterInclude = $event"
-            @update:excludeTags="songStore.tagFilterExclude = $event"
-            @clear="songStore.clearTagFilter()"
-          />
-        </div>
-
+        <!-- Search + tag filter bar, owned by the shared SongBrowser shell (R240) -->
+        <SongBrowser
+          ref="songBrowserRef"
+          layout="stacked"
+          v-model:searchQuery="searchQuery"
+          v-model:includeTags="songStore.tagFilterInclude"
+          v-model:excludeTags="songStore.tagFilterExclude"
+          @clearTagFilter="songStore.clearTagFilter()"
+          :songs="visibleSongs"
+          :availableUserTags="availableTags"
+          searchPlaceholder="Search songs..."
+          :searchTitle="searchFieldHint"
+          autofocus
+        >
+        <template #default>
         <!-- Non-search content (AI Picks + Rotation suggestions) -->
         <div v-if="!searchQuery">
 
@@ -192,6 +186,8 @@
           Showing {{ currentlyShowing }} of {{ totalVisible }}
           <span v-if="hasMore"> — scroll for more</span>
         </div>
+        </template>
+        </SongBrowser>
       </div>
     </template>
   </Teleport>
@@ -200,13 +196,13 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { rankSongsForSlot } from '@/utils/suggestions'
-import { songMatchesQuery, getPrimaryKey } from '@/utils/songSearch'
+import { songMatchesQuery, getPrimaryKey, filterSongsByTags } from '@/utils/songSearch'
 import type { Song, VWType } from '@/types/song'
 import type { SuggestionResult } from '@/utils/suggestions'
 import type { AiSongSuggestion } from '@/utils/claudeApi'
 import SongBadge from '@/components/SongBadge.vue'
 import TeamTagPill from '@/components/TeamTagPill.vue'
-import TagFilterChecklist from '@/components/TagFilterChecklist.vue'
+import SongBrowser from '@/components/SongBrowser.vue'
 import { useSongStore } from '@/stores/songs'
 import { useAuthStore } from '@/stores/auth'
 
@@ -236,7 +232,7 @@ const authStore = useAuthStore()
 const isOpen = ref(false)
 const searchQuery = ref('')
 const triggerRef = ref<HTMLElement | null>(null)
-const searchInputRef = ref<HTMLInputElement | null>(null)
+const songBrowserRef = ref<InstanceType<typeof SongBrowser> | null>(null)
 
 // IN-01: omit the `type:` prefix from the tooltip when VW mode is off, since
 // it's gated to match nothing in that state (songSearch.ts).
@@ -268,27 +264,17 @@ const availableTags = computed<string[]>(() => {
 /**
  * Visible songs filtered by the shared store tag-filter state (D-09/D-10: independent
  * per-tag Show/Hide sets — exclusion always wins; include set OR-combines when non-empty).
+ * R240: delegates to the same shared filterSongsByTags() used by SongBrowser's own
+ * filteredSongs computed (with the same visibleSongs/tagFilterInclude/tagFilterExclude
+ * inputs SongBrowser is bound to below), so this is provably identical to the shared
+ * shell's slot value. Kept as a script-level computed (rather than read from the slot
+ * scope) because suggestions/searchResults below feed the IntersectionObserver
+ * load-more machinery (visibleCount, hasMore, loadMore), which runs outside the
+ * template's render/slot context and needs synchronous script access.
  */
-const tagFilteredSongs = computed<Song[]>(() => {
-  const include = songStore.tagFilterInclude
-  const exclude = songStore.tagFilterExclude
-  if (include.size === 0 && exclude.size === 0) return visibleSongs.value
-  return visibleSongs.value.filter((s) => {
-    if (exclude.size > 0) {
-      const carriesExcluded =
-        (s.themes ?? []).some((t) => exclude.has(t)) ||
-        (s.tags ?? []).some((t) => exclude.has(t))
-      if (carriesExcluded) return false
-    }
-    if (include.size > 0) {
-      const carriesIncluded =
-        (s.themes ?? []).some((t) => include.has(t)) ||
-        (s.tags ?? []).some((t) => include.has(t))
-      return carriesIncluded
-    }
-    return true
-  })
-})
+const tagFilteredSongs = computed<Song[]>(() =>
+  filterSongsByTags(visibleSongs.value, songStore.tagFilterInclude, songStore.tagFilterExclude),
+)
 
 // ── Computed — full ranked/search lists ───────────────────────────────────────
 
@@ -438,7 +424,7 @@ function openDropdown() {
 
   // Focus search input after DOM update
   nextTick(() => {
-    searchInputRef.value?.focus()
+    songBrowserRef.value?.focusSearch()
     // Re-observe sentinel after DOM update (teleported, so it's only in DOM when isOpen)
     if (sentinelRef.value && observer) {
       observer.observe(sentinelRef.value)
