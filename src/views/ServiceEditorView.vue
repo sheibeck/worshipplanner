@@ -693,9 +693,14 @@
              Service Order and Roles — a reposition of the existing three
              buttons, not a restyle; each button keeps its own class strings,
              `:class` expression and `@click` assignment unchanged. -->
-        <div class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0">
+        <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0">
           <button
+            id="svc-tab-service-order"
+            role="tab"
             type="button"
+            :aria-selected="activeTab === 'service-order'"
+            aria-controls="svc-panel-service-order"
+            :tabindex="activeTab === 'service-order' ? 0 : -1"
             class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
             :class="activeTab === 'service-order'
               ? 'text-indigo-300 border-indigo-500 bg-gray-900'
@@ -710,7 +715,12 @@
                stays "Slides" here; the first tab was renamed to
                "Service Order" in Phase 27 (UI-SPEC Mockup Correction 5). -->
           <button
+            id="svc-tab-slides"
+            role="tab"
             type="button"
+            :aria-selected="activeTab === 'slides'"
+            aria-controls="svc-panel-slides"
+            :tabindex="activeTab === 'slides' ? 0 : -1"
             class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
             :class="activeTab === 'slides'
               ? 'text-indigo-300 border-indigo-500 bg-gray-900'
@@ -721,7 +731,12 @@
           </button>
           <button
             v-if="authStore.isEditor"
+            id="svc-tab-roles"
+            role="tab"
             type="button"
+            :aria-selected="activeTab === 'roles'"
+            aria-controls="svc-panel-roles"
+            :tabindex="activeTab === 'roles' ? 0 : -1"
             class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
             :class="activeTab === 'roles'
               ? 'text-indigo-300 border-indigo-500 bg-gray-900'
@@ -735,7 +750,12 @@
                Roles editor check PLUS the messaging kill-switch. -->
           <button
             v-if="authStore.isEditor && isMessagingEnabled()"
+            id="svc-tab-messages"
+            role="tab"
             type="button"
+            :aria-selected="activeTab === 'messages'"
+            aria-controls="svc-panel-messages"
+            :tabindex="activeTab === 'messages' ? 0 : -1"
             class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
             :class="activeTab === 'messages'
               ? 'text-indigo-300 border-indigo-500 bg-gray-900'
@@ -746,7 +766,13 @@
           </button>
         </div>
 
-        <div v-show="activeTab === 'service-order'" data-testid="service-order-panel">
+        <div
+          v-show="activeTab === 'service-order'"
+          id="svc-panel-service-order"
+          role="tabpanel"
+          aria-labelledby="svc-tab-service-order"
+          data-testid="service-order-panel"
+        >
         <!-- Teams configuration -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
           <div class="flex items-center gap-4">
@@ -1332,7 +1358,12 @@
         </div>
 
         <!-- Roles tab: seeded from the quarterly schedule for this service's date, editor-only data (CR-01/02/03/05) -->
-        <div v-show="activeTab === 'roles'">
+        <div
+          v-show="activeTab === 'roles'"
+          id="svc-panel-roles"
+          role="tabpanel"
+          aria-labelledby="svc-tab-roles"
+        >
           <!-- Non-editor: no roster/quarters data was ever subscribed to (Pitfall 4) — read-only note only -->
           <div v-if="!authStore.isEditor" class="rounded-lg bg-gray-900 border border-gray-800 p-6 text-center">
             <p class="text-sm text-gray-400">Who's serving is visible via the shared service link.</p>
@@ -1419,7 +1450,12 @@
              "▶ Present" CTA (D-05) sets the `presenting` flag below, reusing
              the same PresentationViewer mount the Service Order tab used to
              own via SlideshowPreview (removed, 27-05). -->
-        <div v-show="activeTab === 'slides'">
+        <div
+          v-show="activeTab === 'slides'"
+          id="svc-panel-slides"
+          role="tabpanel"
+          aria-labelledby="svc-tab-slides"
+        >
           <SlidesTab
             v-if="localService"
             ref="slidesTabRef"
@@ -1449,7 +1485,13 @@
              "Sent on this service" delivery history, relocated verbatim out of the
              Service Order tab. v-show (not v-if) so the moved selects keep their
              state across tab switches, consistent with the sibling panels. -->
-        <div v-show="activeTab === 'messages'" data-testid="messages-panel">
+        <div
+          v-show="activeTab === 'messages'"
+          id="svc-panel-messages"
+          role="tabpanel"
+          aria-labelledby="svc-tab-messages"
+          data-testid="messages-panel"
+        >
         <!-- Messaging defaults (58-05, R132) — per-service overrides that inherit
              from OrgSettings.messaging until explicitly changed. Same shell/tier
              as Teams and Sermon Context above; reuses the exact inherit-or-

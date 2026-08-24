@@ -8640,3 +8640,108 @@ describe('ServiceEditorView - Messages tab R150 locked-service regression (63-01
     expect(wrapper.find('[data-testid="service-message-history"]').exists()).toBe(false)
   })
 })
+
+describe('ServiceEditorView - ARIA tab semantics (R239)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    // Editor with messaging ON so all four tab buttons (Service Order,
+    // Slides, Roles, Messages) render — the widest surface for this suite.
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockAuthState.settings.messaging = {
+      enabled: true,
+      lockNotifyDefault: false,
+      reminderEnabled: false,
+      reminderDaysBefore: 3,
+    }
+  })
+
+  it('exposes role=tablist on the container, role=tab on the always-present buttons, and aria-selected reflecting the default active tab', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const tablist = wrapper.find('[role="tablist"]')
+    expect(tablist.exists()).toBe(true)
+
+    const serviceOrderTab = wrapper.get('#svc-tab-service-order')
+    const slidesTab = wrapper.get('#svc-tab-slides')
+    expect(serviceOrderTab.attributes('role')).toBe('tab')
+    expect(slidesTab.attributes('role')).toBe('tab')
+
+    // Service Order is the default active tab.
+    expect(serviceOrderTab.attributes('aria-selected')).toBe('true')
+    expect(slidesTab.attributes('aria-selected')).toBe('false')
+
+    // aria-controls on each button matches a role=tabpanel element's id.
+    const serviceOrderPanelId = serviceOrderTab.attributes('aria-controls')!
+    const slidesPanelId = slidesTab.attributes('aria-controls')!
+    const serviceOrderPanel = wrapper.get(`#${serviceOrderPanelId}`)
+    const slidesPanel = wrapper.get(`#${slidesPanelId}`)
+    expect(serviceOrderPanel.attributes('role')).toBe('tabpanel')
+    expect(slidesPanel.attributes('role')).toBe('tabpanel')
+    expect(serviceOrderPanel.attributes('aria-labelledby')).toBe('svc-tab-service-order')
+    expect(slidesPanel.attributes('aria-labelledby')).toBe('svc-tab-slides')
+  })
+
+  it('exposes role=tab + aria-selected + aria-controls on the conditionally-rendered Roles and Messages buttons (editor + messaging on)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const rolesTab = wrapper.get('#svc-tab-roles')
+    const messagesTab = wrapper.get('#svc-tab-messages')
+    expect(rolesTab.attributes('role')).toBe('tab')
+    expect(messagesTab.attributes('role')).toBe('tab')
+    expect(rolesTab.attributes('aria-selected')).toBe('false')
+    expect(messagesTab.attributes('aria-selected')).toBe('false')
+
+    const rolesPanelId = rolesTab.attributes('aria-controls')!
+    const messagesPanelId = messagesTab.attributes('aria-controls')!
+    const rolesPanel = wrapper.get(`#${rolesPanelId}`)
+    const messagesPanel = wrapper.get(`#${messagesPanelId}`)
+    expect(rolesPanel.attributes('role')).toBe('tabpanel')
+    expect(messagesPanel.attributes('role')).toBe('tabpanel')
+    expect(rolesPanel.attributes('aria-labelledby')).toBe('svc-tab-roles')
+    expect(messagesPanel.attributes('aria-labelledby')).toBe('svc-tab-messages')
+  })
+
+  it('updates aria-selected on the corresponding buttons after clicking the Slides tab (bound to the existing activeTab state)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')!
+    await slidesBtn.trigger('click')
+
+    expect(wrapper.get('#svc-tab-service-order').attributes('aria-selected')).toBe('false')
+    expect(wrapper.get('#svc-tab-slides').attributes('aria-selected')).toBe('true')
+  })
+
+  it('does not render Roles/Messages tab roles for a non-editor viewer (v-if gates preserved)', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('#svc-tab-roles').exists()).toBe(false)
+    expect(wrapper.find('#svc-tab-messages').exists()).toBe(false)
+    // The always-present tabs are unaffected.
+    expect(wrapper.get('#svc-tab-service-order').attributes('role')).toBe('tab')
+    expect(wrapper.get('#svc-tab-slides').attributes('role')).toBe('tab')
+  })
+})
