@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import OwnerConsoleView from '../OwnerConsoleView.vue'
+import OrganizationsTab from '@/components/admin/OrganizationsTab.vue'
 import { DEFAULT_APP_CONFIG } from '@/config/appConfigDefaults'
 
 enableAutoUnmount(afterEach)
@@ -313,5 +314,59 @@ describe('OwnerConsoleView — tabs (Phase 72)', () => {
     // and remounted by a tab switch), so its onMounted subscriptions
     // (superAdmins onSnapshot + appConfigStore.subscribe) never re-fire.
     expect(mockOnSnapshot).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('OwnerConsoleView — ARIA tab semantics (R239)', () => {
+  it('exposes role=tablist on the tab strip and role=tab + aria-selected + aria-controls on each button', async () => {
+    const wrapper = await mountView()
+
+    const tablist = wrapper.get('[role="tablist"]')
+    const tabs = tablist.findAll('[role="tab"]')
+    expect(tabs).toHaveLength(2)
+
+    const configTab = wrapper.get('#owner-tab-configuration')
+    const orgsTab = wrapper.get('#owner-tab-organizations')
+    expect(configTab.attributes('role')).toBe('tab')
+    expect(orgsTab.attributes('role')).toBe('tab')
+
+    // Default tab is Configuration — aria-selected reflects activeTab.
+    expect(configTab.attributes('aria-selected')).toBe('true')
+    expect(orgsTab.attributes('aria-selected')).toBe('false')
+
+    // aria-controls on each button matches a role=tabpanel element's id.
+    const configPanelId = configTab.attributes('aria-controls')!
+    const orgsPanelId = orgsTab.attributes('aria-controls')!
+    const configPanel = wrapper.get(`#${configPanelId}`)
+    const orgsPanel = wrapper.get(`#${orgsPanelId}`)
+    expect(configPanel.attributes('role')).toBe('tabpanel')
+    expect(orgsPanel.attributes('role')).toBe('tabpanel')
+    expect(configPanel.attributes('aria-labelledby')).toBe('owner-tab-configuration')
+    expect(orgsPanel.attributes('aria-labelledby')).toBe('owner-tab-organizations')
+  })
+
+  it('updates aria-selected on both buttons after clicking the Organizations tab', async () => {
+    const wrapper = await mountView()
+
+    const orgsButton = wrapper.findAll('button').find((b) => b.text() === 'Organizations')!
+    await orgsButton.trigger('click')
+
+    expect(wrapper.get('#owner-tab-configuration').attributes('aria-selected')).toBe('false')
+    expect(wrapper.get('#owner-tab-organizations').attributes('aria-selected')).toBe('true')
+  })
+
+  it('never unmounts OrganizationsTab across a setTab switch back to Configuration (onSnapshot-survives regression, T-81-03-01)', async () => {
+    mockRouteQuery = { tab: 'organizations' }
+    const wrapper = await mountView()
+    expect(wrapper.findComponent(OrganizationsTab).exists()).toBe(true)
+
+    const configButton = wrapper.findAll('button').find((b) => b.text() === 'Configuration')!
+    await configButton.trigger('click')
+
+    // The Organizations panel is now v-show-hidden, but the component itself
+    // must never be unmounted — that's what keeps its onSnapshot listener live.
+    expect(wrapper.findComponent(OrganizationsTab).exists()).toBe(true)
+    const orgsPanel = wrapper.get('[data-testid="organizations-panel"]')
+    expect(isVShowHidden(orgsPanel)).toBe(true)
   })
 })

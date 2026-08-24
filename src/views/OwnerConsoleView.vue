@@ -7,12 +7,18 @@
         <p class="text-sm text-gray-400 mt-1">Platform-level super-admin access and configuration</p>
       </div>
 
-      <!-- Tab bar: Configuration / Organizations (Phase 72). Mirrors
-           ServiceEditorView.vue's tab-strip pattern exactly — plain buttons,
-           no ARIA tab roles (UI-SPEC "Component Spec: Tab Strip"). -->
-      <div class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0">
+      <!-- Tab bar: Configuration / Organizations (Phase 72). WAI-ARIA APG
+           Tabs semantics (R239) — role/aria-* are additive attributes bound
+           to the existing activeTab/setTab state; the v-show mount strategy
+           below is unchanged. -->
+      <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0">
         <button
+          id="owner-tab-configuration"
+          role="tab"
           type="button"
+          :aria-selected="activeTab === 'configuration'"
+          aria-controls="owner-panel-configuration"
+          :tabindex="activeTab === 'configuration' ? 0 : -1"
           class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
           :class="activeTab === 'configuration'
             ? 'text-indigo-300 border-indigo-500 bg-gray-900'
@@ -22,7 +28,12 @@
           Configuration
         </button>
         <button
+          id="owner-tab-organizations"
+          role="tab"
           type="button"
+          :aria-selected="activeTab === 'organizations'"
+          aria-controls="owner-panel-organizations"
+          :tabindex="activeTab === 'organizations' ? 0 : -1"
           class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
           :class="activeTab === 'organizations'
             ? 'text-indigo-300 border-indigo-500 bg-gray-900'
@@ -37,10 +48,23 @@
            and appConfigStore subscribe()/unsubscribe() are not
            idempotency-guarded, so it must stay permanently mounted for the
            life of this console regardless of which tab is active. -->
-      <div v-show="activeTab === 'configuration'" data-testid="configuration-panel" class="max-w-4xl">
+      <div
+        v-show="activeTab === 'configuration'"
+        id="owner-panel-configuration"
+        role="tabpanel"
+        aria-labelledby="owner-tab-configuration"
+        data-testid="configuration-panel"
+        class="max-w-4xl"
+      >
         <ConfigurationTab />
       </div>
-      <div v-show="activeTab === 'organizations'" data-testid="organizations-panel">
+      <div
+        v-show="activeTab === 'organizations'"
+        id="owner-panel-organizations"
+        role="tabpanel"
+        aria-labelledby="owner-tab-organizations"
+        data-testid="organizations-panel"
+      >
         <OrganizationsTab />
       </div>
     </div>
