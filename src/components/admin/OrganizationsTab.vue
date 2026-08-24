@@ -119,12 +119,13 @@
 
                 <!-- Row actions — side by side on >= sm, stacked only on mobile.
                      Consistent with the app's button family (bg-gray-800
-                     secondary / bg-indigo-600 primary / bg-red-600 destructive).
-                     Delete (Phase 77) is RENDERED only for an already-deactivated
-                     org. All state changes go through the callables — no direct
-                     Firestore writes. Quick task 260824: Deactivate/Reactivate and
-                     Enable/Disable AI moved into the OrgConfigDrawer slideout
-                     behind a single Configure entry point (below). -->
+                     secondary / bg-indigo-600 primary). All state changes go
+                     through the callables — no direct Firestore writes.
+                     Quick task 260824: Deactivate/Reactivate and Enable/Disable
+                     AI moved into the OrgConfigDrawer slideout behind a `>`
+                     chevron entry point (below). Owner testing follow-up:
+                     Delete (Phase 77, deactivated-only) also moved into the
+                     slideout, so it no longer lives here. -->
                 <div
                   v-else
                   class="flex flex-col gap-2 sm:flex-row sm:items-center"
@@ -138,14 +139,13 @@
                   </button>
                   <button
                     type="button"
+                    :aria-label="`Configure ${org.name}`"
                     @click="configOrgId = org.orgId"
-                    class="inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
+                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 p-1.5 shrink-0 transition-colors"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
-                    Configure
                   </button>
                   <button
                     type="button"
@@ -154,14 +154,6 @@
                     class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
                   >
                     {{ enteringOrgId === org.orgId ? 'Entering...' : 'Enter church' }}
-                  </button>
-                  <button
-                    v-if="org.active === false"
-                    type="button"
-                    @click="openDeleteDialog(org)"
-                    class="inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
-                  >
-                    Delete
                   </button>
                 </div>
 
@@ -190,23 +182,13 @@
       Couldn't load organizations. Refresh the page and try again.
     </p>
 
-    <!-- R220 (Phase 77) — rendered once at the component root (outside the
-         v-for), Teleported to body regardless of table position. -->
-    <DeleteOrgConfirmDialog
-      :open="!!deleteDialogOrg"
-      :org-name="deleteDialogOrg?.name ?? ''"
-      :member-count="deleteDialogOrg?.memberCount ?? 0"
-      :pending-count="deleteDialogOrg?.pendingCount ?? 0"
-      :confirming="isDeleting"
-      :confirm-error="deleteDialogError"
-      @confirm="onConfirmDelete"
-      @cancel="closeDeleteDialog"
-    />
-
-    <!-- Quick task 260824 — rendered once at the component root, next to
-         DeleteOrgConfirmDialog above. `configOrg` is a COMPUTED lookup into
-         `orgs.value` by id (not a captured snapshot), so the open drawer
-         reflects post-refreshOrgs() state without needing to be reopened. -->
+    <!-- Quick task 260824 — rendered once at the component root (outside the
+         v-for). `configOrg` is a COMPUTED lookup into `orgs.value` by id (not
+         a captured snapshot), so the open drawer reflects post-refreshOrgs()
+         state without needing to be reopened. Declared BEFORE the
+         Delete/Deactivate confirm dialogs below so those Teleported dialogs
+         stack visually on top of an open drawer (matches the established
+         Deactivate-over-drawer order). -->
     <OrgConfigDrawer
       :org="configOrg"
       :ai-toggling="togglingAiOrgId === configOrg?.orgId"
@@ -219,11 +201,28 @@
       @toggle-ai="() => configOrg && onToggleAi(configOrg)"
       @reactivate="() => configOrg && onToggleActive(configOrg)"
       @request-deactivate="deactivateDialogOrg = configOrg"
+      @request-delete="() => configOrg && openDeleteDialog(configOrg)"
+    />
+
+    <!-- R220 (Phase 77) — rendered once at the component root, Teleported to
+         body regardless of table position. Owner testing follow-up: Delete
+         now opens exclusively from the drawer's request-delete emit above
+         (deactivated-only), reusing openDeleteDialog/onConfirmDelete
+         unchanged. -->
+    <DeleteOrgConfirmDialog
+      :open="!!deleteDialogOrg"
+      :org-name="deleteDialogOrg?.name ?? ''"
+      :member-count="deleteDialogOrg?.memberCount ?? 0"
+      :pending-count="deleteDialogOrg?.pendingCount ?? 0"
+      :confirming="isDeleting"
+      :confirm-error="deleteDialogError"
+      @confirm="onConfirmDelete"
+      @cancel="closeDeleteDialog"
     />
 
     <!-- Quick task 260824 — deactivate confirmation, gated in front of
-         onToggleActive(org) whenever the drawer's Active checkbox is
-         unchecked (deactivate). Reactivate applies directly (no dialog). -->
+         onToggleActive(org) whenever the drawer's Active button is clicked
+         while the org is active. Reactivate applies directly (no dialog). -->
     <DeactivateOrgConfirmDialog
       :open="!!deactivateDialogOrg"
       :org-name="deactivateDialogOrg?.name ?? ''"

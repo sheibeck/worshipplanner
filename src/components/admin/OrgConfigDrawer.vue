@@ -73,22 +73,34 @@
 
           <!-- Active -->
           <section class="border-t border-gray-800 pt-5">
-            <label class="inline-flex items-center gap-2 text-sm text-gray-200">
-              <input
-                type="checkbox"
-                data-testid="org-config-active-checkbox"
-                :checked="org.active"
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-sm text-gray-200 font-medium">
+                  {{ org.active ? 'Active' : 'Deactivated' }}
+                </p>
+                <p class="text-xs text-gray-400 mt-1">
+                  {{ activeToggling
+                    ? (org.active ? 'Deactivating...' : 'Reactivating...')
+                    : (org.active
+                        ? "Deactivating blocks all members from logging in until it is reactivated."
+                        : "Reactivating restores member access immediately.") }}
+                </p>
+              </div>
+              <button
+                type="button"
+                data-testid="org-config-active-button"
                 :disabled="activeToggling"
-                class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
-                @change="onActiveChange"
-              />
-              Active
-            </label>
-            <p class="text-xs text-gray-400 mt-1.5">
-              {{ activeToggling
-                ? (org.active ? 'Deactivating...' : 'Reactivating...')
-                : "Unchecking deactivates the church — members can't log in until it is reactivated." }}
-            </p>
+                class="shrink-0 inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                :class="org.active
+                  ? 'bg-red-600 hover:bg-red-500 text-white'
+                  : 'bg-gray-800 hover:bg-gray-700 text-gray-200'"
+                @click="onActiveClick"
+              >
+                {{ activeToggling
+                  ? (org.active ? 'Deactivating...' : 'Reactivating...')
+                  : (org.active ? 'Deactivate' : 'Reactivate') }}
+              </button>
+            </div>
             <p v-if="activeError" class="text-red-400 text-xs mt-1.5">{{ activeError }}</p>
             <p
               v-if="activeFeedback"
@@ -97,6 +109,27 @@
             >
               {{ activeFeedback }}
             </p>
+          </section>
+
+          <!-- Delete — rendered only for an already-deactivated org (Phase 77
+               gates deletion to deactivated orgs). Moved in from the per-row
+               Actions cell during owner testing feedback; irreversible, so no
+               inline confirmation here -- clicking emits request-delete and
+               the parent opens the existing type-to-confirm
+               DeleteOrgConfirmDialog. -->
+          <section v-if="!org.active" class="border-t border-gray-800 pt-5">
+            <p class="text-sm text-gray-200 font-medium">Delete church</p>
+            <p class="text-xs text-gray-400 mt-1.5">
+              Permanently deletes this church and all of its data. This cannot be undone.
+            </p>
+            <button
+              type="button"
+              data-testid="org-config-delete-button"
+              class="mt-3 inline-flex items-center justify-center rounded-md bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors"
+              @click="emit('request-delete')"
+            >
+              Delete church
+            </button>
           </section>
 
         </div>
@@ -144,6 +177,7 @@ const emit = defineEmits<{
   'toggle-ai': []
   'request-deactivate': []
   reactivate: []
+  'request-delete': []
 }>()
 
 const panelRef = ref<HTMLElement | null>(null)
@@ -159,13 +193,15 @@ function onKeydown(event: KeyboardEvent): void {
   }
 }
 
-// The Active checkbox never toggles state itself (one-way :checked binding
-// driven by org.active) — it only signals INTENT. Deactivating (currently
-// active, box unchecked) routes through the parent's confirm dialog;
-// reactivating (currently inactive, box checked) applies directly. The
-// parent derives the desired boolean from current state, so no payload is
-// needed on either emit (this plan's key_links).
-function onActiveChange(): void {
+// Owner testing feedback (follow-up to quick 260824): Active is an ACTION,
+// not a setting, so it is a button (not a checkbox) -- clicking it never
+// toggles state itself, it only signals INTENT. Deactivating (currently
+// active) routes through the parent's confirm dialog; reactivating (currently
+// inactive) applies directly. The parent derives the desired boolean from
+// current state, so no payload is needed on either emit (this plan's
+// key_links). Because there is no local checked state to get out of sync,
+// cancelling the deactivate confirm leaves no stuck UI state behind.
+function onActiveClick(): void {
   if (!props.org) return
   if (props.org.active) {
     emit('request-deactivate')

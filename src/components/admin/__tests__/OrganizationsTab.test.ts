@@ -176,13 +176,18 @@ function deleteDialogOf(wrapper: Awaited<ReturnType<typeof mountTab>>) {
   return wrapper.findComponent(DeleteOrgConfirmDialog)
 }
 
-// Quick task 260824 — the Configure entry point + slideout replace the old
-// per-row Deactivate/Reactivate and Enable/Disable AI buttons. This helper
-// opens the drawer for a given row index (default: the first/only row) and
-// asserts it actually opened before returning, matching this file's existing
-// mountWithOneOrg helper conventions.
+// Quick task 260824 (owner testing follow-up) — the `>` chevron entry point +
+// slideout replace the old per-row Deactivate/Reactivate and Enable/Disable
+// AI buttons. The chevron carries no visible text (mirrors SongTable.vue's
+// row-open affordance), so it is queried by its `aria-label="Configure ..."`
+// rather than by button text. This helper opens the drawer for a given row
+// index (default: the first/only row) and asserts it actually opened before
+// returning, matching this file's existing mountWithOneOrg helper
+// conventions.
 async function openConfigDrawer(wrapper: Awaited<ReturnType<typeof mountTab>>, rowIndex = 0) {
-  const configButtons = wrapper.findAll('button').filter((b) => b.text().includes('Configure'))
+  const configButtons = wrapper
+    .findAll('button')
+    .filter((b) => (b.attributes('aria-label') ?? '').startsWith('Configure '))
   await configButtons[rowIndex]!.trigger('click')
   const drawer = wrapper.find('[data-testid="org-config-drawer"]')
   expect(drawer.exists()).toBe(true)
@@ -658,13 +663,13 @@ describe('OrganizationsTab -- deactivate/reactivate via drawer (R212, R214, quic
     return mountTab()
   }
 
-  it('unchecking Active on an ACTIVE org opens DeactivateOrgConfirmDialog and does NOT call setOrgActive yet', async () => {
+  it('clicking Deactivate on an ACTIVE org opens DeactivateOrgConfirmDialog and does NOT call setOrgActive yet', async () => {
     const wrapper = await mountWithOneOrg({ active: true })
     await openConfigDrawer(wrapper)
 
-    const activeCheckbox = wrapper.find('[data-testid="org-config-active-checkbox"]')
-    expect((activeCheckbox.element as HTMLInputElement).checked).toBe(true)
-    await activeCheckbox.trigger('change')
+    const activeButton = wrapper.find('[data-testid="org-config-active-button"]')
+    expect(activeButton.text()).toBe('Deactivate')
+    await activeButton.trigger('click')
 
     const dialog = deactivateDialogOf(wrapper)
     expect(dialog.props('open')).toBe(true)
@@ -677,7 +682,7 @@ describe('OrganizationsTab -- deactivate/reactivate via drawer (R212, R214, quic
     const wrapper = await mountWithOneOrg({ active: true })
     await openConfigDrawer(wrapper)
 
-    await wrapper.find('[data-testid="org-config-active-checkbox"]').trigger('change')
+    await wrapper.find('[data-testid="org-config-active-button"]').trigger('click')
     const dialog = deactivateDialogOf(wrapper)
     const confirmButtons = dialog.findAll('button')
     const confirmButton = confirmButtons[confirmButtons.length - 1]!
@@ -688,29 +693,34 @@ describe('OrganizationsTab -- deactivate/reactivate via drawer (R212, R214, quic
     expect(deactivateDialogOf(wrapper).props('open')).toBe(false)
   })
 
-  it('cancelling the deactivate dialog calls setOrgActive zero times', async () => {
+  it('cancelling the deactivate dialog calls setOrgActive zero times and leaves the org active with the button unchanged (no lingering state)', async () => {
     const wrapper = await mountWithOneOrg({ active: true })
     await openConfigDrawer(wrapper)
 
-    await wrapper.find('[data-testid="org-config-active-checkbox"]').trigger('change')
+    await wrapper.find('[data-testid="org-config-active-button"]').trigger('click')
     const dialog = deactivateDialogOf(wrapper)
     const cancelButton = dialog.findAll('button')[0]!
     await cancelButton.trigger('click')
 
     expect(deactivateDialogOf(wrapper).props('open')).toBe(false)
     expect(mockSetOrgActive).not.toHaveBeenCalled()
+    // No checkbox exists to get stuck out of sync; the button itself still
+    // reads the org's untouched active state.
+    const activeButton = wrapper.find('[data-testid="org-config-active-button"]')
+    expect(activeButton.text()).toBe('Deactivate')
+    expect(configDrawerOf(wrapper).props('org')).toMatchObject({ orgId: 'org-1', active: true })
   })
 
-  it('checking Active on a DEACTIVATED org calls setOrgActive with {orgId, active:true} directly, no confirm dialog', async () => {
+  it('clicking Reactivate on a DEACTIVATED org calls setOrgActive with {orgId, active:true} directly, no confirm dialog', async () => {
     mockSetOrgActive.mockImplementation(() =>
       Promise.resolve({ data: { orgId: 'org-1', active: true, memberCount: 3, claimFailures: 0 } }),
     )
     const wrapper = await mountWithOneOrg({ active: false })
     await openConfigDrawer(wrapper)
 
-    const activeCheckbox = wrapper.find('[data-testid="org-config-active-checkbox"]')
-    expect((activeCheckbox.element as HTMLInputElement).checked).toBe(false)
-    await activeCheckbox.trigger('change')
+    const activeButton = wrapper.find('[data-testid="org-config-active-button"]')
+    expect(activeButton.text()).toBe('Reactivate')
+    await activeButton.trigger('click')
     await flushPromises()
 
     expect(mockSetOrgActive).toHaveBeenCalledWith({ orgId: 'org-1', active: true })
@@ -729,7 +739,7 @@ describe('OrganizationsTab -- deactivate/reactivate via drawer (R212, R214, quic
     )
     const wrapper = await mountWithOneOrg({ active: true })
     await openConfigDrawer(wrapper)
-    await wrapper.find('[data-testid="org-config-active-checkbox"]').trigger('change')
+    await wrapper.find('[data-testid="org-config-active-button"]').trigger('click')
 
     const dialog = deactivateDialogOf(wrapper)
     const confirmButtons = dialog.findAll('button')
@@ -746,7 +756,7 @@ describe('OrganizationsTab -- deactivate/reactivate via drawer (R212, R214, quic
     await flushPromises()
   })
 
-  it('shows a Deactivated badge in the row; the drawer Active checkbox is unchecked for a deactivated org and checked for an active org', async () => {
+  it('shows a Deactivated badge in the row; the drawer Active button reads Deactivate for an active org and Reactivate for a deactivated org', async () => {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({
         data: {
@@ -765,16 +775,16 @@ describe('OrganizationsTab -- deactivate/reactivate via drawer (R212, R214, quic
     expect(rows[1]!.text()).toContain('Deactivated')
 
     // No per-row Deactivate/Reactivate button remains — both rows show only
-    // "Configure" for lifecycle/config actions.
+    // the `>` Configure chevron for lifecycle/config actions.
     expect(rows[0]!.findAll('button').some((b) => b.text() === 'Deactivate')).toBe(false)
     expect(rows[1]!.findAll('button').some((b) => b.text() === 'Reactivate')).toBe(false)
 
     await openConfigDrawer(wrapper, 0)
-    expect((wrapper.find('[data-testid="org-config-active-checkbox"]').element as HTMLInputElement).checked).toBe(true)
+    expect(wrapper.find('[data-testid="org-config-active-button"]').text()).toBe('Deactivate')
     await wrapper.find('button[aria-label="Close"]').trigger('click')
 
     await openConfigDrawer(wrapper, 1)
-    expect((wrapper.find('[data-testid="org-config-active-checkbox"]').element as HTMLInputElement).checked).toBe(false)
+    expect(wrapper.find('[data-testid="org-config-active-button"]').text()).toBe('Reactivate')
   })
 
   it('WR-01: a deactivate with claimFailures > 0 surfaces a non-blocking retry warning (drawer activeFeedback) instead of an unqualified success message', async () => {
@@ -783,7 +793,7 @@ describe('OrganizationsTab -- deactivate/reactivate via drawer (R212, R214, quic
     )
     const wrapper = await mountWithOneOrg({ active: true })
     await openConfigDrawer(wrapper)
-    await wrapper.find('[data-testid="org-config-active-checkbox"]').trigger('change')
+    await wrapper.find('[data-testid="org-config-active-button"]').trigger('click')
     const dialog = deactivateDialogOf(wrapper)
     const confirmButtons = dialog.findAll('button')
     await confirmButtons[confirmButtons.length - 1]!.trigger('click')
@@ -797,7 +807,7 @@ describe('OrganizationsTab -- deactivate/reactivate via drawer (R212, R214, quic
   it('WR-01: a deactivate with claimFailures: 0 still shows the plain success message, unchanged', async () => {
     const wrapper = await mountWithOneOrg({ active: true })
     await openConfigDrawer(wrapper)
-    await wrapper.find('[data-testid="org-config-active-checkbox"]').trigger('change')
+    await wrapper.find('[data-testid="org-config-active-button"]').trigger('click')
     const dialog = deactivateDialogOf(wrapper)
     const confirmButtons = dialog.findAll('button')
     await confirmButtons[confirmButtons.length - 1]!.trigger('click')
@@ -813,7 +823,7 @@ describe('OrganizationsTab -- deactivate/reactivate via drawer (R212, R214, quic
     mockSetOrgActive.mockImplementation(() => Promise.reject(new Error('server exploded')))
 
     await openConfigDrawer(wrapper)
-    await wrapper.find('[data-testid="org-config-active-checkbox"]').trigger('change')
+    await wrapper.find('[data-testid="org-config-active-button"]').trigger('click')
     const dialog = deactivateDialogOf(wrapper)
     const confirmButtons = dialog.findAll('button')
     await confirmButtons[confirmButtons.length - 1]!.trigger('click')
@@ -966,7 +976,7 @@ describe('OrganizationsTab -- Configure drawer shell (quick 260824)', () => {
     return mountTab()
   }
 
-  it('each row renders exactly one Configure button, and no AI or Deactivate/Reactivate buttons remain', async () => {
+  it('each row renders exactly one `>` Configure chevron (no visible text, aria-labeled), and no AI, Deactivate/Reactivate, or Delete buttons remain', async () => {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({
         data: {
@@ -981,18 +991,26 @@ describe('OrganizationsTab -- Configure drawer shell (quick 260824)', () => {
 
     const rows = wrapper.findAll('tbody tr')
     expect(rows.length).toBe(2)
-    for (const row of rows) {
-      const configureButtons = row.findAll('button').filter((b) => b.text().includes('Configure'))
+    const expectedLabels = ['Configure Grace Church', 'Configure Hope Church']
+    rows.forEach((row, i) => {
+      const configureButtons = row
+        .findAll('button')
+        .filter((b) => (b.attributes('aria-label') ?? '').startsWith('Configure '))
       expect(configureButtons.length).toBe(1)
+      expect(configureButtons[0]!.attributes('aria-label')).toBe(expectedLabels[i])
+      // No visible text on the chevron itself -- an icon-only affordance
+      // mirroring SongTable.vue's row-open chevron.
+      expect(configureButtons[0]!.text()).toBe('')
       expect(row.findAll('button').some((b) => b.text() === 'Enable AI' || b.text() === 'Disable AI')).toBe(false)
       expect(row.findAll('button').some((b) => b.text() === 'Deactivate' || b.text() === 'Reactivate')).toBe(false)
-    }
+      expect(row.findAll('button').some((b) => b.text() === 'Delete')).toBe(false)
+    })
     // Assign admin, Enter church remain for both rows.
     expect(wrapper.findAll('button').filter((b) => b.text() === 'Assign admin').length).toBe(2)
     expect(wrapper.findAll('button').filter((b) => b.text() === 'Enter church').length).toBe(2)
   })
 
-  it('clicking Configure opens the drawer for that org', async () => {
+  it('clicking the `>` chevron opens the drawer for that org', async () => {
     const wrapper = await mountWithOneOrg()
     expect(wrapper.find('[data-testid="org-config-drawer"]').exists()).toBe(false)
 
@@ -1027,7 +1045,7 @@ describe('OrganizationsTab -- Configure drawer shell (quick 260824)', () => {
   })
 })
 
-describe('OrganizationsTab -- delete (R220/R221)', () => {
+describe('OrganizationsTab -- delete via drawer (R220/R221, owner testing follow-up)', () => {
   async function mountWithOneOrg(overrides: Partial<{ active: boolean }> = {}) {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({
@@ -1041,35 +1059,27 @@ describe('OrganizationsTab -- delete (R220/R221)', () => {
     return mountTab()
   }
 
-  it('renders the Delete button ONLY for a deactivated org row (hidden for an active row)', async () => {
-    mockListOrganizations.mockImplementation(() =>
-      Promise.resolve({
-        data: {
-          organizations: [
-            makeOrg({ orgId: 'org-1', name: 'Grace Church', active: true }),
-            makeOrg({ orgId: 'org-2', name: 'Hope Church', active: false }),
-          ],
-        },
-      }),
-    )
-    const wrapper = await mountTab()
+  it('the drawer renders a Delete button ONLY for a deactivated org (hidden while active)', async () => {
+    const wrapper = await mountWithOneOrg({ active: true })
+    await openConfigDrawer(wrapper)
 
-    const rows = wrapper.findAll('tbody tr')
-    expect(rows.length).toBe(2)
-    const activeDelete = rows[0]!.findAll('button').find((b) => b.text() === 'Delete')
-    const deactivatedDelete = rows[1]!.findAll('button').find((b) => b.text() === 'Delete')
-    // Active org: no Delete button at all (not merely disabled).
-    expect(activeDelete).toBeUndefined()
-    // Deactivated org: Delete button present and enabled.
-    expect(deactivatedDelete).toBeDefined()
-    expect(deactivatedDelete!.attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-testid="org-config-delete-button"]').exists()).toBe(false)
   })
 
-  it('clicking Delete opens the dialog with the org name and member/pending counts as props', async () => {
+  it('the drawer Delete button appears once the org is deactivated', async () => {
     const wrapper = await mountWithOneOrg({ active: false })
+    await openConfigDrawer(wrapper)
 
-    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
-    await deleteButton.trigger('click')
+    const deleteButton = wrapper.find('[data-testid="org-config-delete-button"]')
+    expect(deleteButton.exists()).toBe(true)
+    expect(deleteButton.attributes('disabled')).toBeUndefined()
+  })
+
+  it('clicking the drawer Delete button opens DeleteOrgConfirmDialog with the org name and member/pending counts as props', async () => {
+    const wrapper = await mountWithOneOrg({ active: false })
+    await openConfigDrawer(wrapper)
+
+    await wrapper.find('[data-testid="org-config-delete-button"]').trigger('click')
 
     const dialog = deleteDialogOf(wrapper)
     expect(dialog.props('open')).toBe(true)
@@ -1078,12 +1088,14 @@ describe('OrganizationsTab -- delete (R220/R221)', () => {
     expect(dialog.props('pendingCount')).toBe(2)
   })
 
-  it('confirming with the correct typed name calls deleteOrganization, closes the dialog, shows a success banner, and refetches the list', async () => {
+  it('confirming with the correct typed name calls deleteOrganization (reusing openDeleteDialog/onConfirmDelete unchanged), closes the dialog, shows a success banner, refetches the list, and the drawer closes as the org drops out of the refreshed list', async () => {
     const wrapper = await mountWithOneOrg({ active: false })
     mockListOrganizations.mockClear()
+    // After a successful delete, the org is gone from the refreshed list.
+    mockListOrganizations.mockImplementation(() => Promise.resolve({ data: { organizations: [] } }))
 
-    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
-    await deleteButton.trigger('click')
+    await openConfigDrawer(wrapper)
+    await wrapper.find('[data-testid="org-config-delete-button"]').trigger('click')
 
     const dialog = deleteDialogOf(wrapper)
     await dialog.find('input[type="text"]').setValue('Grace Church')
@@ -1099,6 +1111,10 @@ describe('OrganizationsTab -- delete (R220/R221)', () => {
     expect(wrapper.text()).toContain('1 invite(s) removed')
     expect(wrapper.text()).toContain('4 file(s) removed')
     expect(mockListOrganizations).toHaveBeenCalledTimes(1)
+    // configOrg is a computed lookup into the refreshed orgs list -- the
+    // deleted org is gone, so the drawer's `org` prop goes null and it closes.
+    expect(configDrawerOf(wrapper).props('org')).toBe(null)
+    expect(wrapper.find('[data-testid="org-config-drawer"]').exists()).toBe(false)
   })
 
   it('on a rejected call (failed-precondition), the dialog stays open and shows the mapped error message', async () => {
@@ -1107,13 +1123,13 @@ describe('OrganizationsTab -- delete (R220/R221)', () => {
     const wrapper = await mountWithOneOrg({ active: false })
     mockListOrganizations.mockClear()
 
-    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
-    await deleteButton.trigger('click')
+    await openConfigDrawer(wrapper)
+    await wrapper.find('[data-testid="org-config-delete-button"]').trigger('click')
 
     const dialog = deleteDialogOf(wrapper)
     await dialog.find('input[type="text"]').setValue('Grace Church')
-    let confirmButtons = dialog.findAll('button')
-    let confirmButton = confirmButtons[confirmButtons.length - 1]!
+    const confirmButtons = dialog.findAll('button')
+    const confirmButton = confirmButtons[confirmButtons.length - 1]!
     await confirmButton.trigger('click')
     await flushPromises()
 
@@ -1129,8 +1145,8 @@ describe('OrganizationsTab -- delete (R220/R221)', () => {
     mockDeleteOrganization.mockImplementation(() => Promise.reject(err))
     const wrapper = await mountWithOneOrg({ active: false })
 
-    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
-    await deleteButton.trigger('click')
+    await openConfigDrawer(wrapper)
+    await wrapper.find('[data-testid="org-config-delete-button"]').trigger('click')
 
     const dialog = deleteDialogOf(wrapper)
     await dialog.find('input[type="text"]').setValue('Grace Church')
@@ -1145,8 +1161,8 @@ describe('OrganizationsTab -- delete (R220/R221)', () => {
   it('Cancel closes the dialog and calls deleteOrganization zero times', async () => {
     const wrapper = await mountWithOneOrg({ active: false })
 
-    const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
-    await deleteButton.trigger('click')
+    await openConfigDrawer(wrapper)
+    await wrapper.find('[data-testid="org-config-delete-button"]').trigger('click')
     expect(deleteDialogOf(wrapper).props('open')).toBe(true)
 
     const dialog = deleteDialogOf(wrapper)
