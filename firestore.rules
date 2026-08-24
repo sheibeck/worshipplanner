@@ -125,6 +125,24 @@ service cloud.firestore {
               : !request.resource.data.diff(resource.data).affectedKeys().hasAny(lifecycleFields()));
       }
 
+      // R233/T-80-02/T-80-03: `createdBy` is a provenance/audit field that must
+      // be settable exactly once (at create) and frozen forever after -- an
+      // editor rewriting it is authorship tampering (Tampering) and destroys
+      // the audit trail of who actually provisioned the org (Repudiation).
+      // Deliberately a SIBLING helper, not folded into lifecycleFields()'s
+      // array (80-RESEARCH.md Pitfall 2): that array is also consulted on
+      // CREATE to assert those keys are ABSENT from the incoming doc, but
+      // createdBy is REQUIRED on create (see the `allow create` clause below,
+      // `request.resource.data.createdBy == request.auth.uid`) -- widening the
+      // shared list would deny every legitimate org-create. This helper is
+      // scoped to update only: the only call site below is `allow update`,
+      // which is reached only when `resource` (the stored doc) already exists,
+      // so no `resource == null` branch is needed here (unlike
+      // preservesLifecycleFields(), which is also reachable from create).
+      function preservesCreatedBy() {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy']);
+      }
+
       // Members can read; editors can write
       allow read: if isOrgMember(orgId);
       // Editors can update existing orgs -- but never the 5 lifecycle fields.
@@ -158,7 +176,7 @@ service cloud.firestore {
       // entirely) remain the only path. Proven by src/rules.test.ts: a
       // super-admin client updateDoc({active:false}) is DENIED and must use
       // the setOrgActive callable.
-      allow update: if isOrgEditor(orgId) && preservesLifecycleFields();
+      allow update: if isOrgEditor(orgId) && preservesLifecycleFields() && preservesCreatedBy();
       // Allow authenticated users to create a new org if they are the creator.
       // Same lifecycle-field guard applies (defense-in-depth) -- no legitimate
       // client-side org-creation flow sets these fields; org provisioning

@@ -129,11 +129,22 @@ describe('Editor vs viewer write permissions', () => {
     // path this test is actually about, mirroring real usage (the org
     // already exists, created via orgProvisioning.ts's Admin-SDK path, by
     // the time any editor writes to it).
+    //
+    // Phase 80 (R233/T-80-02): this test used to issue a full-overwrite
+    // `setDoc` with NO merge, which OMITS `createdBy` from the payload -- a
+    // dropped key is an "affected key" under diff().affectedKeys(), so the
+    // new preservesCreatedBy() guard now correctly DENIES that write.
+    // Switched to `updateDoc` (a partial update -- the representative
+    // real-app path, since TeamView/Settings edits are partial updates that
+    // never touch createdBy) so this test continues to prove an ORDINARY
+    // edit succeeds, not the now-rejected implicit-createdBy-deletion shape.
+    // Deliberate, necessary adjustment for the new immutability guard, not a
+    // scope reduction of what this test proves.
     await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
     await assertSucceeds(
-      setDoc(doc(db, 'organizations', 'orgA'), {
+      updateDoc(doc(db, 'organizations', 'orgA'), {
         name: "UserA's Church",
         updatedAt: new Date(),
       }),
@@ -148,6 +159,36 @@ describe('Editor vs viewer write permissions', () => {
     await assertFails(
       setDoc(doc(db, 'organizations', 'orgA'), {
         name: "UserA's Church",
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  // R233/T-80-02/T-80-03: createdBy is a one-time provenance/audit field --
+  // settable only at create, frozen forever after. preservesCreatedBy()
+  // (a sibling helper, NOT folded into lifecycleFields() -- 80-RESEARCH.md
+  // Pitfall 2) denies any update that changes it, while leaving ordinary
+  // partial edits (which never list createdBy in affectedKeys()) untouched.
+  it('DENIES an editor changing createdBy via updateDoc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), {
+        createdBy: 'someoneElse',
+      }),
+    )
+  })
+
+  it('ALLOWS an editor to make an ordinary edit that leaves createdBy unchanged', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'organizations', 'orgA'), {
+        name: "UserA's Renamed Church",
         updatedAt: new Date(),
       }),
     )
