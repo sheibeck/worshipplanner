@@ -122,7 +122,9 @@
                      secondary / bg-indigo-600 primary / bg-red-600 destructive).
                      Delete (Phase 77) is RENDERED only for an already-deactivated
                      org. All state changes go through the callables — no direct
-                     Firestore writes. -->
+                     Firestore writes. Quick task 260824: Deactivate/Reactivate and
+                     Enable/Disable AI moved into the OrgConfigDrawer slideout
+                     behind a single Configure entry point (below). -->
                 <div
                   v-else
                   class="flex flex-col gap-2 sm:flex-row sm:items-center"
@@ -136,35 +138,14 @@
                   </button>
                   <button
                     type="button"
-                    @click="onToggleActive(org)"
-                    :disabled="togglingOrgId !== null"
-                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
+                    @click="configOrgId = org.orgId"
+                    class="inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
                   >
-                    {{
-                      togglingOrgId === org.orgId
-                        ? org.active
-                          ? 'Deactivating...'
-                          : 'Reactivating...'
-                        : org.active
-                          ? 'Deactivate'
-                          : 'Reactivate'
-                    }}
-                  </button>
-                  <button
-                    type="button"
-                    @click="onToggleAi(org)"
-                    :disabled="togglingAiOrgId !== null"
-                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
-                  >
-                    {{
-                      togglingAiOrgId === org.orgId
-                        ? org.aiMasterEnabled
-                          ? 'Disabling AI...'
-                          : 'Enabling AI...'
-                        : org.aiMasterEnabled
-                          ? 'Disable AI'
-                          : 'Enable AI'
-                    }}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Configure
                   </button>
                   <button
                     type="button"
@@ -184,19 +165,13 @@
                   </button>
                 </div>
 
-                <!-- Per-row feedback / errors (below the button row). -->
+                <!-- Per-row feedback / errors (below the button row). Deactivate/
+                     Reactivate (toggleError/toggleFeedback) and AI (aiToggleError)
+                     surfaces now live in the drawer's own activeError/
+                     activeFeedback/aiError props instead of here. -->
                 <p v-if="assignError[org.orgId]" class="text-red-400 text-xs mt-1">{{ assignError[org.orgId] }}</p>
                 <p v-if="assignFeedback[org.orgId]" class="text-green-400 text-xs mt-1">{{ assignFeedback[org.orgId] }}</p>
-                <p v-if="toggleError[org.orgId]" class="text-red-400 text-xs mt-1">{{ toggleError[org.orgId] }}</p>
-                <p
-                  v-if="toggleFeedback[org.orgId]"
-                  :class="toggleFeedbackIsWarning[org.orgId] ? 'text-amber-400' : 'text-green-400'"
-                  class="text-xs mt-1"
-                >
-                  {{ toggleFeedback[org.orgId] }}
-                </p>
                 <p v-if="enterError[org.orgId]" class="text-red-400 text-xs mt-1">{{ enterError[org.orgId] }}</p>
-                <p v-if="aiToggleError[org.orgId]" class="text-red-400 text-xs mt-1">{{ aiToggleError[org.orgId] }}</p>
               </td>
             </tr>
 
@@ -227,16 +202,49 @@
       @confirm="onConfirmDelete"
       @cancel="closeDeleteDialog"
     />
+
+    <!-- Quick task 260824 — rendered once at the component root, next to
+         DeleteOrgConfirmDialog above. `configOrg` is a COMPUTED lookup into
+         `orgs.value` by id (not a captured snapshot), so the open drawer
+         reflects post-refreshOrgs() state without needing to be reopened. -->
+    <OrgConfigDrawer
+      :org="configOrg"
+      :ai-toggling="togglingAiOrgId === configOrg?.orgId"
+      :ai-error="configOrg ? (aiToggleError[configOrg.orgId] ?? null) : null"
+      :active-toggling="togglingOrgId === configOrg?.orgId"
+      :active-error="configOrg ? (toggleError[configOrg.orgId] ?? null) : null"
+      :active-feedback="configOrg ? (toggleFeedback[configOrg.orgId] ?? null) : null"
+      :active-feedback-is-warning="configOrg ? !!toggleFeedbackIsWarning[configOrg.orgId] : false"
+      @close="configOrgId = null"
+      @toggle-ai="() => configOrg && onToggleAi(configOrg)"
+      @reactivate="() => configOrg && onToggleActive(configOrg)"
+      @request-deactivate="deactivateDialogOrg = configOrg"
+    />
+
+    <!-- Quick task 260824 — deactivate confirmation, gated in front of
+         onToggleActive(org) whenever the drawer's Active checkbox is
+         unchecked (deactivate). Reactivate applies directly (no dialog). -->
+    <DeactivateOrgConfirmDialog
+      :open="!!deactivateDialogOrg"
+      :org-name="deactivateDialogOrg?.name ?? ''"
+      :member-count="deactivateDialogOrg?.memberCount ?? 0"
+      :confirming="togglingOrgId === deactivateDialogOrg?.orgId"
+      :confirm-error="deactivateDialogOrg ? (toggleError[deactivateDialogOrg.orgId] ?? null) : null"
+      @confirm="onConfirmDeactivate"
+      @cancel="closeDeactivateDialog"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import DeleteOrgConfirmDialog from './DeleteOrgConfirmDialog.vue'
+import OrgConfigDrawer from './OrgConfigDrawer.vue'
+import DeactivateOrgConfirmDialog from './DeactivateOrgConfirmDialog.vue'
 
 // R224 (Phase 78) — useRouter() returns undefined in this file's existing
 // router-less mount harness (OrganizationsTab.test.ts mounts with no
@@ -381,6 +389,18 @@ const deleteDialogError = ref<string | null>(null)
 // successful delete, so there is no row left to attach per-row feedback to
 // (unlike Deactivate/Reactivate/Assign).
 const deleteFeedback = ref<string | null>(null)
+
+// ── Configure drawer state (quick task 260824) ────────────────────────────
+// configOrgId doubles as the drawer's open flag; configOrg is a COMPUTED
+// lookup into orgs.value by id (never a captured snapshot) so the open
+// drawer reflects post-refreshOrgs() state without needing to be reopened
+// (this plan's key_links).
+const configOrgId = ref<string | null>(null)
+const configOrg = computed(() => orgs.value.find((o) => o.orgId === configOrgId.value) ?? null)
+
+// deactivateDialogOrg doubles as DeactivateOrgConfirmDialog's `open` flag,
+// mirroring deleteDialogOrg above.
+const deactivateDialogOrg = ref<OrgSummary | null>(null)
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 // Copied from ConfigurationTab.vue verbatim (Plan 74-02 instructions).
@@ -611,6 +631,37 @@ async function onToggleActive(org: OrgSummary) {
     toggleError.value = { ...toggleError.value, [orgId]: friendlyCallableError(err) }
   } finally {
     togglingOrgId.value = null
+  }
+}
+
+// ── Deactivate confirm dialog (quick task 260824) ─────────────────────────
+// Gates onToggleActive(org) when the drawer's Active checkbox is unchecked
+// (deactivating). Reactivating (checkbox re-checked) calls onToggleActive
+// directly from the drawer's @reactivate handler in the template — no
+// dialog, no function here.
+
+function closeDeactivateDialog() {
+  // Never closable mid-request, mirrors closeDeleteDialog's in-flight guard.
+  if (togglingOrgId.value !== null && togglingOrgId.value === deactivateDialogOrg.value?.orgId) return
+  deactivateDialogOrg.value = null
+}
+
+async function onConfirmDeactivate() {
+  if (!deactivateDialogOrg.value) return
+  if (togglingOrgId.value !== null) return
+
+  const org = deactivateDialogOrg.value
+  const orgId = org.orgId
+  // org is active (that's the only state that opens this dialog), so
+  // onToggleActive issues setOrgActive({ active: false }) — same callable,
+  // claimFailures handling, and refreshOrgs() as every other toggle.
+  await onToggleActive(org)
+
+  // Success closes the dialog; the drawer stays open and its Active checkbox
+  // re-renders unchecked from the refreshed configOrg. On failure, leave the
+  // dialog open so its confirmError (read from toggleError) shows.
+  if (!toggleError.value[orgId]) {
+    deactivateDialogOrg.value = null
   }
 }
 
