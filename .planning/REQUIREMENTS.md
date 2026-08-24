@@ -27,8 +27,8 @@ REQ-IDs continue from v2.1 (last: R227).
 
 ### Polish & Ops (999.4 / 999.6 / 999.7 / 999.1)
 
-- [ ] **R237**: Non-song / non-scripture service slots are included in all Planning Center export modes (no dropped items).
-- [ ] **R238**: Real volunteers reliably receive email — the messaging From address uses a verified sending domain (Resend domain verification + SPF/DKIM/DMARC), replacing the test-mode `onboarding@resend.dev` sender. Deliverable includes a documented owner runbook (DNS is owner-run and not app-verifiable).
+- [x] **R237**: Non-song / non-scripture service slots are included in all Planning Center export modes (no dropped items).
+- [x] **R238**: Real volunteers reliably receive email — the messaging From address uses a verified sending domain (Resend domain verification + SPF/DKIM/DMARC), replacing the test-mode `onboarding@resend.dev` sender. Deliverable includes a documented owner runbook (DNS is owner-run and not app-verifiable).
 - [ ] **R239**: The Owner Console meets baseline accessibility — real `<label>`/`aria-label` on its text inputs and ARIA tab semantics (`role="tablist"`/`aria-selected`) on the Configuration/Organizations tab strip (and the matching `ServiceEditorView` tab strip) — without breaking the always-mounted `onSnapshot` panels.
 - [ ] **R240**: A single shared song-browse component powers both the Songs page and the service-plan song picker (extract the shared component).
 
@@ -69,8 +69,8 @@ REQ-IDs continue from v2.1 (last: R227).
 | R234 | Phase 80 | Complete |
 | R235 | Phase 80 | Complete |
 | R236 | Phase 80 | Complete |
-| R237 | Phase 81 | Pending |
-| R238 | Phase 81 | Pending |
+| R237 | Phase 81 | Complete |
+| R238 | Phase 81 | Complete |
 | R239 | Phase 81 | Pending |
 | R240 | Phase 81 | Pending |
 

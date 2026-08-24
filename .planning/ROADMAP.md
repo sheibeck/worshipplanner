@@ -398,9 +398,9 @@ or self-verify. Every other change in this milestone is client-only.
   3. The Owner Console's form inputs carry real labels/aria-labels, and its tab navigation (Configuration/Organizations, and the matching Service Editor tab strip) exposes proper ARIA tab semantics — without breaking the always-mounted `onSnapshot` panels (R239).
   4. The Songs page and the service-plan song picker are both powered by one shared song-browse component (R240).
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
-- [ ] 81-01-PLAN.md — R237 + R238 verification & ops close-out: re-confirm shipped PC-export slot coverage + exhaustive SlotKind dispatch; write the Resend email-domain owner runbook + PENDING-VERIFICATION entry; re-confirm both send paths read the configured sender [wave 1]
+- [x] 81-01-PLAN.md — R237 + R238 verification & ops close-out: re-confirm shipped PC-export slot coverage + exhaustive SlotKind dispatch; write the Resend email-domain owner runbook + PENDING-VERIFICATION entry; re-confirm both send paths read the configured sender [wave 1]
 - [ ] 81-02-PLAN.md — R239 Owner Console form labels: real associated `<label>`s on the grant + onboard inputs, `aria-label` on the per-row assign input (no duplicate ids), and `useId()`-based label/input association in the shared ConfigTextField [wave 1]
 - [ ] 81-03-PLAN.md — R239 tab-strip ARIA: WAI-ARIA tab semantics on the Owner Console AND ServiceEditorView tab strips, bound to the existing `activeTab`, keeping panels `v-show`-mounted (onSnapshot-survives-switch regression) [wave 1]
 - [ ] 81-04-PLAN.md — R240 shared song-browse: extract the duplicated tag include/exclude logic into one `filterSongsByTags()` util consumed by both `stores/songs.ts` and `SongSlotPicker.vue`, behavior preserved [wave 1]

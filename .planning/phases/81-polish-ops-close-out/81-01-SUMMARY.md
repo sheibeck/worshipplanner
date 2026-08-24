@@ -143,3 +143,11 @@ R237 and R238 are closed for this milestone from a code-and-test-coverage standp
 ---
 *Phase: 81-polish-ops-close-out*
 *Completed: 2026-08-24*
+
+## Self-Check: PASSED
+
+- FOUND: `functions/DEPLOY-EMAIL-DOMAIN.md`
+- FOUND: `.planning/phases/81-polish-ops-close-out/81-01-SUMMARY.md`
+- FOUND: commit `9a3a99f4` (Task 1)
+- FOUND: commit `20df99b9` (Task 2)
+- FOUND: commit `a2a97eaa` (Task 3 / SUMMARY finalize)
