@@ -29,6 +29,7 @@
           @input="onSearchInput"
           :placeholder="searchPlaceholder ?? defaultPlaceholder"
           :title="searchTitle"
+          aria-label="Search songs"
           :class="inputClass"
         />
         <button
