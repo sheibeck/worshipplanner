@@ -5,16 +5,16 @@ milestone_name: Configurability, Hardening & Cleanup
 current_phase: 81
 current_phase_name: Polish & Ops Close-Out
 status: planning
-stopped_at: Completed 81-03-PLAN.md
-last_updated: "2026-08-24T15:00:25.397Z"
+stopped_at: Completed 81-04-PLAN.md
+last_updated: "2026-08-24T15:31:47.405Z"
 last_activity: 2026-08-24
 last_activity_desc: Phase 80 complete, transitioned to Phase 81
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 10
-  completed_plans: 9
-  percent: 67
+  completed_plans: 10
+  percent: 100
 ---
 
 # ▶ ACTIVE MILESTONE — v2.2 Configurability, Hardening & Cleanup (roadmap created 2026-08-23)
@@ -2540,6 +2540,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 80 P03 | 25min | 2 tasks | 4 files |
 | Phase 81 P01 | 25min | 3 tasks | 3 files |
 | Phase 81 P03 | 25min | 2 tasks | 4 files |
+| Phase 81-polish-ops-close-out P04 | 25min | 4 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -3279,8 +3280,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-24T15:00:25.236Z
-Stopped at: Completed 81-03-PLAN.md
+Last session: 2026-08-24T15:31:47.344Z
+Stopped at: Completed 81-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
