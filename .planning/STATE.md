@@ -5,16 +5,16 @@ milestone_name: Configurability, Hardening & Cleanup
 current_phase: 80
 current_phase_name: Security & Data-Integrity Hardening
 status: in-progress
-stopped_at: Completed 80-01-PLAN.md
-last_updated: "2026-08-24T05:07:33.000Z"
+stopped_at: Completed 80-02-PLAN.md
+last_updated: "2026-08-24T12:06:43.296Z"
 last_activity: 2026-08-24
-last_activity_desc: 80-01-PLAN.md executed (firestore.rules R232/R233 hardening, UNDEPLOYED)
+last_activity_desc: 80-02-PLAN.md executed (commit 9ff7ed85)
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 6
   completed_plans: 5
-  percent: 67
+  percent: 33
 ---
 
 # ▶ ACTIVE MILESTONE — v2.2 Configurability, Hardening & Cleanup (roadmap created 2026-08-23)
@@ -867,10 +867,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 80 of 81 (Security & Data-Integrity Hardening) — 80-01 complete, 80-02/80-03 pending
-Plan: 80-01 of 3 complete (firestore.rules hardening: R232 inviteLookup create gate + R233 createdBy immutability) — see 80-01-SUMMARY.md
-Status: In progress — 80-01 executed (rules changes + emulator tests), gates green, ships UNDEPLOYED
-Last activity: 2026-08-24 — 80-01-PLAN.md executed (commits 04dba036, da94ac16, 45f85071, 7969593c)
+Phase: 80 of 81 (Security & Data-Integrity Hardening) — 80-01/80-02 complete, 80-03 pending
+Plan: 80-02 of 3 complete (deleteService share-artifact revocation: R234) — see 80-02-SUMMARY.md
+Status: In progress — 80-02 executed (deleteService revokes shareTokens/serviceShareLinks/serviceShares), gates green, client-only (no deploy)
+Last activity: 2026-08-24 — 80-02-PLAN.md executed (commit 9ff7ed85)
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -2947,6 +2947,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R230: replaced the twice-duplicated Orchestra-only AI song filter with one filterSongsByTeamTags() helper that unions selected teams' songFilterTag values.
 - [Phase ?]: 80-01: R233's preservesCreatedBy() is a NEW sibling helper, not folded into lifecycleFields()'s shared array -- that array is also read on CREATE to assert absence, but createdBy is required on create.
 - [Phase ?]: 80-01: found a second, plan-unnamed regression (a full-overwrite setDoc dropping createdBy) via the full rules-suite run, not the task-scoped -t filter -- fixed identically to the plan's named sibling instance (switched to updateDoc).
+- [Phase 80]: R234: deleteService revokes shareTokens (query-based, handles 2+), serviceShareLinks/{id}, and serviceShares/{slug}__service-{date} before deleting the service doc, mirroring deleteQuarter's guarded-delete precedent.
 
 ### Roadmap Evolution
 
@@ -3271,8 +3272,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-24T05:07:33.000Z
-Stopped at: Completed 80-01-PLAN.md
+Last session: 2026-08-24T12:06:43.233Z
+Stopped at: Completed 80-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

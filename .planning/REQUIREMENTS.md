@@ -18,7 +18,7 @@ REQ-IDs continue from v2.1 (last: R227).
 
 - [x] **R232**: Creating an `inviteLookup` record is restricted to an editor of the *target* org, so a signed-in user cannot forge an invite into a church they don't administer (self-invite fix) — while the legitimate invite → first-login acceptance flow still works.
 - [x] **R233**: An organization's `createdBy` field cannot be changed after creation by an org editor (immutability guard, extending the existing `preservesLifecycleFields` pattern).
-- [ ] **R234**: Deleting a service revokes all of its public share artifacts (`shareTokens` / `serviceShares` / `serviceShareLinks`, query-based since a service can hold multiple) so a deleted service's share URL no longer resolves.
+- [x] **R234**: Deleting a service revokes all of its public share artifacts (`shareTokens` / `serviceShares` / `serviceShareLinks`, query-based since a service can hold multiple) so a deleted service's share URL no longer resolves.
 - [ ] **R235**: Removing a song from a service clears that song's slides, even when the song was reprised elsewhere in the service (no orphaned slides).
 
 ### Pending-Render Edit Guard (999.9 / C4)
@@ -66,7 +66,7 @@ REQ-IDs continue from v2.1 (last: R227).
 | R241 | Phase 79 | Complete |
 | R232 | Phase 80 | Complete |
 | R233 | Phase 80 | Complete |
-| R234 | Phase 80 | Pending |
+| R234 | Phase 80 | Complete |
 | R235 | Phase 80 | Pending |
 | R236 | Phase 80 | Pending |
 | R237 | Phase 81 | Pending |
