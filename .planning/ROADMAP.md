@@ -341,7 +341,7 @@ or self-verify. Every other change in this milestone is client-only.
 **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R228–R241 (14 mapped)
 
 - [x] **Phase 79: Dedup & Configurable Teams** - Collapse the duplicated team-list/Orchestra-filter constants to one source, then let a church admin define their own team list with an optional per-team song-tag filter, and drop the hard-coded ordinal-Sunday auto-team-select rule (completed 2026-08-24)
-- [ ] **Phase 80: Security & Data-Integrity Hardening** - Gate `inviteLookup` creation to the target org's editor, lock `createdBy` after creation, revoke a deleted service's share links, clear a reprised song's orphaned slides, and warn before losing edits to a pending-render slide
+- [x] **Phase 80: Security & Data-Integrity Hardening** - Gate `inviteLookup` creation to the target org's editor, lock `createdBy` after creation, revoke a deleted service's share links, clear a reprised song's orphaned slides, and warn before losing edits to a pending-render slide (completed 2026-08-24)
 - [ ] **Phase 81: Polish & Ops Close-Out** - Cover every slot type in every Planning Center export mode, move messaging to a Resend-verified sending domain, retrofit Owner Console accessibility, and unify song browsing into one shared component
 
 ### Phase 79: Dedup & Configurable Teams

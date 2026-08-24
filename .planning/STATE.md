@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Configurability, Hardening & Cleanup
-current_phase: 80
-current_phase_name: Security & Data-Integrity Hardening
-status: in-progress
+current_phase: 81
+current_phase_name: Polish & Ops Close-Out
+status: planning
 stopped_at: Completed 80-03-PLAN.md
-last_updated: "2026-08-24T12:17:14.075Z"
+last_updated: "2026-08-24T13:23:13.956Z"
 last_activity: 2026-08-24
-last_activity_desc: 80-02-PLAN.md executed (commit 9ff7ed85)
+last_activity_desc: Phase 80 complete, transitioned to Phase 81
 progress:
   total_phases: 3
   completed_phases: 2
@@ -867,10 +867,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 80 of 81 (Security & Data-Integrity Hardening) — 80-01/80-02 complete, 80-03 pending
-Plan: 80-02 of 3 complete (deleteService share-artifact revocation: R234) — see 80-02-SUMMARY.md
-Status: In progress — 80-02 executed (deleteService revokes shareTokens/serviceShareLinks/serviceShares), gates green, client-only (no deploy)
-Last activity: 2026-08-24 — 80-02-PLAN.md executed (commit 9ff7ed85)
+Phase: 81 of 81 (Polish & Ops Close-Out)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-24 — Phase 80 complete, transitioned to Phase 81
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
