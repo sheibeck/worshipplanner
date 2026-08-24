@@ -45,9 +45,9 @@ REQ-IDs continue from v2.1 (last: R227).
 
 ### Roles/Teams Tab UX & Copy (Phase 83)
 
-- [ ] **R244**: The Roles and Teams configuration tabs constrain their input/content width (matching how the admin section is constrained) instead of stretching inputs full-width.
-- [ ] **R245**: The Roles/Teams save & delete controls follow an existing app UX pattern — at minimum a real Delete **button** (rather than the current inline text affordance), optionally a three-dot menu or `>`-into-slideout consistent with similar save/delete surfaces elsewhere.
-- [ ] **R246**: The schedulable-roles description ("Default count is a soft planning target, not a hard cap") is corrected to accurately describe the scheduler's actual behavior (it targets the configured count), so the copy matches what scheduling does.
+- [x] **R244**: The Roles and Teams configuration tabs constrain their input/content width (matching how the admin section is constrained) instead of stretching inputs full-width.
+- [x] **R245**: The Roles/Teams save & delete controls follow an existing app UX pattern — at minimum a real Delete **button** (rather than the current inline text affordance), optionally a three-dot menu or `>`-into-slideout consistent with similar save/delete surfaces elsewhere.
+- [x] **R246**: The schedulable-roles description ("Default count is a soft planning target, not a hard cap") is corrected to accurately describe the scheduler's actual behavior (it targets the configured count), so the copy matches what scheduling does.
 
 ## Open Design Decisions (resolve at discuss/plan/UI-spec time — not blocking requirements)
 
@@ -88,8 +88,8 @@ REQ-IDs continue from v2.1 (last: R227).
 | R240 | Phase 81 | Complete |
 | R242 | Phase 82 | Complete |
 | R243 | Phase 82 | Complete |
-| R244 | Phase 83 | Pending |
-| R245 | Phase 83 | Pending |
-| R246 | Phase 83 | Pending |
+| R244 | Phase 83 | Complete |
+| R245 | Phase 83 | Complete |
+| R246 | Phase 83 | Complete |
 
 Coverage: 19/19 v2.2 requirements mapped (100%). Phases 82–83 added 2026-08-24 from owner testing feedback.

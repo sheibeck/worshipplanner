@@ -5,16 +5,16 @@ milestone_name: Configurability, Hardening & Cleanup
 current_phase: 83
 current_phase_name: Roles/Teams Tab UX & Copy
 status: planning
-stopped_at: Completed 82-02-PLAN.md
-last_updated: "2026-08-24T19:10:41.530Z"
+stopped_at: Completed 83-01-PLAN.md
+last_updated: "2026-08-24T20:24:09.607Z"
 last_activity: 2026-08-24
 last_activity_desc: Phase 82 complete, transitioned to Phase 83
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
-  percent: 80
+  completed_phases: 5
+  total_plans: 13
+  completed_plans: 13
+  percent: 100
 ---
 
 # ▶ ACTIVE MILESTONE — v2.2 Configurability, Hardening & Cleanup (roadmap created 2026-08-23)
@@ -2543,6 +2543,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 81-polish-ops-close-out P04 | 25min | 4 tasks | 10 files |
 | Phase 82 P01 | 22min | 3 tasks | 8 files |
 | Phase 82-per-org-ai-enablement P02 | 55min | 3 tasks | 9 files |
+| Phase 83 P01 | 25min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -2961,6 +2962,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Phase 82 Plan 01: aiMasterEnabled field + setOrgAiEnabled callable + fail-closed AI-proxy gate, mirroring active/setOrgActive pattern
 - [Phase ?]: [Phase 82 P02]: aiMasterEnabled reset extended to all three org-context-clearing points (resetOrgContext, logout, onAuthStateChanged null branch), not just resetOrgContext, mirroring vwModeEnabled/settings' existing three-point invariant
 - [Phase ?]: [Phase 82 P02]: isAiEnabled() two-gate AND checks authStore.aiMasterEnabled before authStore.settings.aiEnabled, so a disabled org never calls the AI proxy even with a stale settings.aiEnabled true
+- [Phase ?]: R246 copy: 'Default count is the number of volunteers the scheduler auto-fills for this role each service' — confirmed accurate against scheduler.ts's fill loop; scheduler behavior itself unchanged
+- [Phase ?]: Delete button in RolesConfigPanel/TeamsConfigPanel: class swap only to bg-red-900/20 hover:bg-red-900/40 text-red-400 at compact row sizing; click handler and confirm blocks unchanged
 
 ### Roadmap Evolution
 
@@ -3286,8 +3289,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-24T18:04:23.609Z
-Stopped at: Completed 82-02-PLAN.md
+Last session: 2026-08-24T20:24:09.477Z
+Stopped at: Completed 83-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -443,8 +443,9 @@ Plans:
   2. The Roles/Teams save & delete controls follow an existing app pattern — at minimum a real Delete button (optionally three-dot menu or `>`-into-slideout) instead of the current inline text affordance (R245).
   3. The schedulable-roles description no longer calls the default count a "soft planning target, not a hard cap"; the copy accurately describes that scheduling targets the configured count (R246).
 
-**Plans**: 1 plan
-- [ ] 83-01-PLAN.md — R246 copy + R245 destructive Delete button (both panels) + new RolesConfigPanel test + roster.ts comment; R244 max-w-4xl on Roles/Teams tab wrappers + scoped RosterView test
+**Plans**: 1/1 plans executed
+
+- [x] 83-01-PLAN.md — R246 copy + R245 destructive Delete button (both panels) + new RolesConfigPanel test + roster.ts comment; R244 max-w-4xl on Roles/Teams tab wrappers + scoped RosterView test
 
 **UI hint**: yes
 **Deploy note**: client-only (UI layout + copy). No deploy hand-over.
