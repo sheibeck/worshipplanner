@@ -39,10 +39,12 @@ REQ-IDs continue from v2.1 (last: R227).
 ## Testing-Feedback Additions (owner, 2026-08-24 — Phases 82–83)
 
 ### Per-Org AI Enablement (Phase 82)
-- [ ] **R242**: A super-admin can enable/disable AI functionality per organization from the Owner Console, and AI is **OFF by default** for every organization (including newly-onboarded ones).
-- [ ] **R243**: When AI is disabled for an organization, that org's Settings page does not show the AI panel at all; and if a super-admin disables AI for an org while that org currently has AI enabled in its own settings, the org's AI setting is forced off and the panel is hidden.
+
+- [x] **R242**: A super-admin can enable/disable AI functionality per organization from the Owner Console, and AI is **OFF by default** for every organization (including newly-onboarded ones).
+- [x] **R243**: When AI is disabled for an organization, that org's Settings page does not show the AI panel at all; and if a super-admin disables AI for an org while that org currently has AI enabled in its own settings, the org's AI setting is forced off and the panel is hidden.
 
 ### Roles/Teams Tab UX & Copy (Phase 83)
+
 - [ ] **R244**: The Roles and Teams configuration tabs constrain their input/content width (matching how the admin section is constrained) instead of stretching inputs full-width.
 - [ ] **R245**: The Roles/Teams save & delete controls follow an existing app UX pattern — at minimum a real Delete **button** (rather than the current inline text affordance), optionally a three-dot menu or `>`-into-slideout consistent with similar save/delete surfaces elsewhere.
 - [ ] **R246**: The schedulable-roles description ("Default count is a soft planning target, not a hard cap") is corrected to accurately describe the scheduler's actual behavior (it targets the configured count), so the copy matches what scheduling does.
@@ -84,8 +86,8 @@ REQ-IDs continue from v2.1 (last: R227).
 | R238 | Phase 81 | Complete |
 | R239 | Phase 81 | Complete |
 | R240 | Phase 81 | Complete |
-| R242 | Phase 82 | Pending |
-| R243 | Phase 82 | Pending |
+| R242 | Phase 82 | Complete |
+| R243 | Phase 82 | Complete |
 | R244 | Phase 83 | Pending |
 | R245 | Phase 83 | Pending |
 | R246 | Phase 83 | Pending |

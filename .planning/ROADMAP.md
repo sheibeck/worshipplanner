@@ -422,10 +422,11 @@ or self-verify. Every other change in this milestone is client-only.
   2. When AI is disabled for an org, that org's Settings page does not render the AI panel at all (R243).
   3. If a super-admin disables AI for an org while that org currently has AI enabled in its own settings, the org's AI setting is forced off and the panel is hidden (R243).
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
-- [ ] 82-01-PLAN.md — Backend master gate: `aiMasterEnabled` lifecycle-field guard (firestore.rules) + `setOrgAiEnabled` super-admin callable (forced-off on disable) + `listOrganizations` field + fail-closed AI-proxy enforcement (ships UNDEPLOYED)
+
+- [x] 82-01-PLAN.md — Backend master gate: `aiMasterEnabled` lifecycle-field guard (firestore.rules) + `setOrgAiEnabled` super-admin callable (forced-off on disable) + `listOrganizations` field + fail-closed AI-proxy enforcement (ships UNDEPLOYED)
 - [ ] 82-02-PLAN.md — Client gating: Organization type + auth-store master-gate ref + two-gate `isAiEnabled()` + Settings AI-panel `v-if` hide + Owner Console per-row AI toggle
 
 **UI hint**: yes
