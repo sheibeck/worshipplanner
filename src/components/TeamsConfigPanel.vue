@@ -107,11 +107,11 @@
           </select>
           <button
             type="button"
-            :disabled="!newTeamName.trim() && !teamAdded"
+            :disabled="adding || !newTeamName.trim()"
             @click="onAddTeam"
             class="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             :class="teamAdded ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-500'"
-          >{{ teamAdded ? 'Added ✓' : 'Save Team' }}</button>
+          >{{ adding ? 'Saving…' : teamAdded ? 'Added ✓' : 'Save Team' }}</button>
         </div>
       </div>
     </div>
@@ -232,9 +232,14 @@ async function onConfirmDelete(teamId: string) {
 const newTeamName = ref('')
 const newTeamSongFilterTag = ref('')
 const teamAdded = ref(false)
+// WR-04: in-flight guard mirroring onSaveTeam's savingTeamId — blocks a fast
+// double-click from calling addTeam twice with the same name/order before the
+// first request resolves.
+const adding = ref(false)
 let addedTimer: ReturnType<typeof setTimeout> | null = null
 
 async function onAddTeam() {
+  if (adding.value) return
   const name = newTeamName.value.trim()
   if (!name) return
 
@@ -245,19 +250,24 @@ async function onAddTeam() {
     return
   }
 
-  const maxOrder = teamsStore.teams.reduce((max, t) => Math.max(max, t.order), -1)
-  await teamsStore.addTeam({
-    name,
-    order: maxOrder + 1,
-    songFilterTag: newTeamSongFilterTag.value,
-  })
-  newTeamName.value = ''
-  newTeamSongFilterTag.value = ''
-  teamAdded.value = true
-  if (addedTimer) clearTimeout(addedTimer)
-  addedTimer = setTimeout(() => {
-    teamAdded.value = false
-  }, 1800)
+  adding.value = true
+  try {
+    const maxOrder = teamsStore.teams.reduce((max, t) => Math.max(max, t.order), -1)
+    await teamsStore.addTeam({
+      name,
+      order: maxOrder + 1,
+      songFilterTag: newTeamSongFilterTag.value,
+    })
+    newTeamName.value = ''
+    newTeamSongFilterTag.value = ''
+    teamAdded.value = true
+    if (addedTimer) clearTimeout(addedTimer)
+    addedTimer = setTimeout(() => {
+      teamAdded.value = false
+    }, 1800)
+  } finally {
+    adding.value = false
+  }
 }
 
 onUnmounted(() => {

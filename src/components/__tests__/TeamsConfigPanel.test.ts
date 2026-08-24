@@ -213,4 +213,29 @@ describe('TeamsConfigPanel', () => {
 
     expect(mockAddTeam).not.toHaveBeenCalled()
   })
+
+  it('WR-04: a second Add-Team click while the first request is in flight does not call addTeam twice', async () => {
+    let resolveAdd: (() => void) | undefined
+    mockAddTeam.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveAdd = () => resolve('new-id')
+        }),
+    )
+    const wrapper = mountPanel()
+    const addNameInput = wrapper.find('input[aria-label="New team name"]')
+    await addNameInput.setValue('Kids Team')
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team' || b.text() === 'Added ✓' || b.text() === 'Saving…')
+    const addButton = saveButtons[saveButtons.length - 1]!
+
+    // Fire the click handler twice back-to-back before the first await resolves.
+    await addButton.trigger('click')
+    await addButton.trigger('click')
+
+    expect(mockAddTeam).toHaveBeenCalledTimes(1)
+
+    resolveAdd?.()
+    await Promise.resolve()
+  })
 })
