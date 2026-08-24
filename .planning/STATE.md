@@ -5,16 +5,16 @@ milestone_name: Configurability, Hardening & Cleanup
 current_phase: 81
 current_phase_name: Polish & Ops Close-Out
 status: completed
-stopped_at: Completed 82-01-PLAN.md
-last_updated: "2026-08-24T17:40:37.578Z"
+stopped_at: Completed 82-02-PLAN.md
+last_updated: "2026-08-24T18:04:23.699Z"
 last_activity: 2026-08-24
 last_activity_desc: Phase 81 complete
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
-  percent: 60
+  completed_plans: 12
+  percent: 80
 ---
 
 # ▶ ACTIVE MILESTONE — v2.2 Configurability, Hardening & Cleanup (roadmap created 2026-08-23)
@@ -2542,6 +2542,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 81 P03 | 25min | 2 tasks | 4 files |
 | Phase 81-polish-ops-close-out P04 | 25min | 4 tasks | 10 files |
 | Phase 82 P01 | 22min | 3 tasks | 8 files |
+| Phase 82-per-org-ai-enablement P02 | 55min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -2958,6 +2959,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R237/R238 closed as verification+documentation (no rebuild); IMPORTED slides intentionally stay excluded from PC export
 - [Phase ?]: Bound ARIA aria-selected/tabindex to the existing activeTab reactive expression (no new state) on both Owner Console and Service Editor tab strips (R239 part 2)
 - [Phase ?]: Phase 82 Plan 01: aiMasterEnabled field + setOrgAiEnabled callable + fail-closed AI-proxy gate, mirroring active/setOrgActive pattern
+- [Phase ?]: [Phase 82 P02]: aiMasterEnabled reset extended to all three org-context-clearing points (resetOrgContext, logout, onAuthStateChanged null branch), not just resetOrgContext, mirroring vwModeEnabled/settings' existing three-point invariant
+- [Phase ?]: [Phase 82 P02]: isAiEnabled() two-gate AND checks authStore.aiMasterEnabled before authStore.settings.aiEnabled, so a disabled org never calls the AI proxy even with a stale settings.aiEnabled true
 
 ### Roadmap Evolution
 
@@ -3282,8 +3285,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-24T17:40:37.482Z
-Stopped at: Completed 82-01-PLAN.md
+Last session: 2026-08-24T18:04:23.609Z
+Stopped at: Completed 82-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
