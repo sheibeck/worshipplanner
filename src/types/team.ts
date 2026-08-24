@@ -16,9 +16,14 @@ export interface Team {
 
 // D-79 default team list — byte-identical to the pre-Phase-79 hard-coded
 // `['Choir', 'Orchestra', 'Communion', 'Special']` so existing orgs (Berean)
-// see zero behavior change on first load post-deploy (RESEARCH Pitfall 4).
-// DEFAULT_TEAMS omits `id` (assigned by Firestore on seed). No songFilterTag
-// is seeded — CONTEXT.md: "seeding the tag is optional and left to the admin".
+// see the same team names in the checkboxes on first load post-deploy
+// (RESEARCH Pitfall 4). This "zero behavior change" is scoped to the team
+// *list* only — the Orchestra AI-filter behavior is NOT auto-preserved: no
+// songFilterTag is seeded here (CONTEXT.md: "seeding the tag is optional and
+// left to the admin"), so `filterSongsByTeamTags` returns the unfiltered pool
+// for Orchestra-selecting services until an admin manually re-sets the tag
+// via Volunteers → Teams. DEFAULT_TEAMS omits `id` (assigned by Firestore on
+// seed).
 export const DEFAULT_TEAMS: Array<Omit<Team, 'id'>> = [
   { name: 'Choir', order: 0 },
   { name: 'Orchestra', order: 1 },
