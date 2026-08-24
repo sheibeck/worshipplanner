@@ -5,16 +5,16 @@ milestone_name: Configurability, Hardening & Cleanup
 current_phase: 80
 current_phase_name: Security & Data-Integrity Hardening
 status: in-progress
-stopped_at: Completed 80-02-PLAN.md
-last_updated: "2026-08-24T12:06:43.296Z"
+stopped_at: Completed 80-03-PLAN.md
+last_updated: "2026-08-24T12:17:14.075Z"
 last_activity: 2026-08-24
 last_activity_desc: 80-02-PLAN.md executed (commit 9ff7ed85)
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 33
+  completed_plans: 6
+  percent: 67
 ---
 
 # ▶ ACTIVE MILESTONE — v2.2 Configurability, Hardening & Cleanup (roadmap created 2026-08-23)
@@ -2537,6 +2537,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 79 P02 | 55min | 2 tasks | 5 files |
 | Phase 79 P03 | 27min | 3 tasks | 6 files |
 | Phase 80 P01 | 22min | 3 tasks | 3 files |
+| Phase 80 P03 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2948,6 +2949,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 80-01: R233's preservesCreatedBy() is a NEW sibling helper, not folded into lifecycleFields()'s shared array -- that array is also read on CREATE to assert absence, but createdBy is required on create.
 - [Phase ?]: 80-01: found a second, plan-unnamed regression (a full-overwrite setDoc dropping createdBy) via the full rules-suite run, not the task-scoped -t filter -- fixed identically to the plan's named sibling instance (switched to updateDoc).
 - [Phase 80]: R234: deleteService revokes shareTokens (query-based, handles 2+), serviceShareLinks/{id}, and serviceShares/{slug}__service-{date} before deleting the service doc, mirroring deleteQuarter's guarded-delete precedent.
+- [Phase ?]: R235 fix stays entirely inside rebuildSongGroup's !songId branch — no cross-slot query needed since SlideGroup.id === slot.id already isolates a reprise's two occurrences
+- [Phase ?]: R236: isPendingRender composes into BOTH canMutate and canMutateBackground — a background attach/remove/override is a per-slide customization the locked notice's wording covers too
 
 ### Roadmap Evolution
 
@@ -3272,8 +3275,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-24T12:06:43.233Z
-Stopped at: Completed 80-02-PLAN.md
+Last session: 2026-08-24T12:17:14.017Z
+Stopped at: Completed 80-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

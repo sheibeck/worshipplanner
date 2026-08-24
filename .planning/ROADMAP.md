@@ -377,11 +377,11 @@ or self-verify. Every other change in this milestone is client-only.
   4. Removing a song from a service clears that song's slides even when the song is reprised elsewhere in the same service — no orphaned slides remain (R235).
   5. When a deck slide's render is still pending, the edit UI warns or prevents the user from customizing that slide, so a per-entry change is never silently discarded when the render flips pending → ready (R236).
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 - [x] 80-01-PLAN.md — Rules hardening: `inviteLookup` create gated to the target-org editor (R232) + org `createdBy` immutability on update (R233); emulator ALLOW/DENY + acceptance/edit regressions; ships UNDEPLOYED with the `firebase deploy --only firestore:rules` hand-over
 - [x] 80-02-PLAN.md — `deleteService` revokes all three share artifacts — `shareTokens` (query, multiple) / `serviceShareLinks` / `serviceShares`, existence-guarded, never-shared no-throw (R234, client-only)
-- [ ] 80-03-PLAN.md — Reprise-safe clear of a removed song's slides in `rebuildSongGroup` (R235) + pending-render edit guard (amber notice + disabled customization) in `EditSlideDrawer.vue` (R236), both client-only
+- [x] 80-03-PLAN.md — Reprise-safe clear of a removed song's slides in `rebuildSongGroup` (R235) + pending-render edit guard (amber notice + disabled customization) in `EditSlideDrawer.vue` (R236), both client-only
 
 **UI hint**: yes
 **Deploy note**: R232 and R233 are `firestore.rules` changes — ship built + tested + UNDEPLOYED with the exact `firebase deploy --only firestore:rules` command handed to the owner. R234, R235, and R236 are client-only, no deploy hand-over needed.
