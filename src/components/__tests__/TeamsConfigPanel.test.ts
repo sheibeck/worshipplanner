@@ -143,4 +143,40 @@ describe('TeamsConfigPanel', () => {
     expect(wrapper.text()).toContain('Add your first team below.')
     expect(wrapper.find('input[aria-label="New team name"]').exists()).toBe(true)
   })
+
+  it('WR-01: renaming a team to a name that collides with another team (case/whitespace-insensitive) is rejected, not saved', async () => {
+    const wrapper = mountPanel()
+    const nameInput = wrapper
+      .findAll('input[type="text"]')
+      .find((i) => i.attributes('aria-label') === 'Team name for Choir')!
+    await nameInput.setValue('  orchestra  ')
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team')
+    await saveButtons[0]!.trigger('click')
+
+    expect(mockUpdateTeam).not.toHaveBeenCalled()
+  })
+
+  it('WR-01: adding a team whose name collides with an existing team (case/whitespace-insensitive) is rejected, not added', async () => {
+    const wrapper = mountPanel()
+    const addNameInput = wrapper.find('input[aria-label="New team name"]')
+    await addNameInput.setValue(' CHOIR ')
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team' || b.text() === 'Added ✓')
+    const addButton = saveButtons[saveButtons.length - 1]!
+    await addButton.trigger('click')
+
+    expect(mockAddTeam).not.toHaveBeenCalled()
+  })
+
+  it('WR-01: saving a row without changing its name never collides with itself', async () => {
+    const wrapper = mountPanel()
+    const select = wrapper.find('select[aria-label="Song-tag filter for Choir"]')
+    await select.setValue('Christmas')
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team')
+    await saveButtons[0]!.trigger('click')
+
+    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { name: 'Choir', songFilterTag: 'Christmas' })
+  })
 })

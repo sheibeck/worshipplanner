@@ -103,10 +103,23 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useTeamsStore } from '@/stores/teams'
 import { useSongStore } from '@/stores/songs'
+import { useToasts } from '@/stores/toasts'
 import type { Team } from '@/types/team'
 
 const teamsStore = useTeamsStore()
 const songStore = useSongStore()
+const toasts = useToasts()
+
+// ── Duplicate-name guard (WR-01) ─────────────────────────────────────────────
+// Teams are consumed by NAME everywhere a service selects them (checkboxes,
+// filterSongsByTeamTags), unlike Roles which key off role.id — so two teams
+// sharing a name break checkbox independence and AI-filter matching. Compare
+// trimmed + case-insensitive, excluding the row being edited (so saving a row
+// without changing its name never collides with itself).
+function isDuplicateName(name: string, excludeId?: string): boolean {
+  const normalized = name.trim().toLowerCase()
+  return teamsStore.teams.some((t) => t.id !== excludeId && t.name.trim().toLowerCase() === normalized)
+}
 
 // ── Per-row edit drafts ──────────────────────────────────────────────────────
 // Local editable copies, committed to the store only on "Save Team" click —
@@ -148,10 +161,18 @@ let savedTimer: ReturnType<typeof setTimeout> | null = null
 async function onSaveTeam(teamId: string) {
   const draft = teamDrafts.value[teamId]
   if (!draft) return
+  const trimmedName = draft.name.trim()
+
+  // WR-01: reject a save whose name collides with another existing team.
+  if (isDuplicateName(trimmedName, teamId)) {
+    toasts.push(`A team named "${trimmedName}" already exists. Choose a different name.`)
+    return
+  }
+
   savingTeamId.value = teamId
   try {
     await teamsStore.updateTeam(teamId, {
-      name: draft.name.trim(),
+      name: trimmedName,
       songFilterTag: draft.songFilterTag,
     })
     savedTeamId.value = teamId
@@ -181,6 +202,14 @@ let addedTimer: ReturnType<typeof setTimeout> | null = null
 async function onAddTeam() {
   const name = newTeamName.value.trim()
   if (!name) return
+
+  // WR-01: reject a duplicate name before creating a second team that shares
+  // it (breaks checkbox independence + AI-filter matching downstream).
+  if (isDuplicateName(name)) {
+    toasts.push(`A team named "${name}" already exists. Choose a different name.`)
+    return
+  }
+
   const maxOrder = teamsStore.teams.reduce((max, t) => Math.max(max, t.order), -1)
   await teamsStore.addTeam({
     name,
