@@ -326,11 +326,12 @@ Full details: [milestones/v2.1-ROADMAP.md](milestones/v2.1-ROADMAP.md) · requir
 
 </details>
 
-## v2.2 Configurability, Hardening & Cleanup (Phases 79-81)
+## v2.2 Configurability, Hardening & Cleanup (Phases 79-83)
 
 **Milestone Goal:** Make the app fit churches other than Berean, and close accumulated security,
 data-integrity, and polish debt from the v1.x–v2.1 backlog (999.x carry-forwards). Phase numbering
-continues from v2.1 (75–78, ended at Phase 78); this milestone is Phases 79–81.
+continues from v2.1 (75–78, ended at Phase 78); this milestone is Phases 79–83 (82–83 added 2026-08-24
+from owner testing feedback).
 
 **Deploy policy:** per the standing v1.5+ deploy discipline, Phase 80's two `firestore.rules` changes
 (R232 `inviteLookup` create gate, R233 `createdBy` immutability) ship built + tested + **UNDEPLOYED**
@@ -338,11 +339,13 @@ with the exact `firebase deploy --only firestore:rules` command handed to the ow
 Resend verified sending domain) is an owner-run DNS/dashboard runbook — not something the app can deploy
 or self-verify. Every other change in this milestone is client-only.
 
-**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R228–R241 (14 mapped)
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R228–R246 (19 mapped)
 
 - [x] **Phase 79: Dedup & Configurable Teams** - Collapse the duplicated team-list/Orchestra-filter constants to one source, then let a church admin define their own team list with an optional per-team song-tag filter, and drop the hard-coded ordinal-Sunday auto-team-select rule (completed 2026-08-24)
 - [x] **Phase 80: Security & Data-Integrity Hardening** - Gate `inviteLookup` creation to the target org's editor, lock `createdBy` after creation, revoke a deleted service's share links, clear a reprised song's orphaned slides, and warn before losing edits to a pending-render slide (completed 2026-08-24)
 - [x] **Phase 81: Polish & Ops Close-Out** - Cover every slot type in every Planning Center export mode, move messaging to a Resend-verified sending domain, retrofit Owner Console accessibility, and unify song browsing into one shared component (completed 2026-08-24)
+- [ ] **Phase 82: Per-Org AI Enablement** - Let a super-admin turn AI on/off per organization from the Owner Console (OFF by default), and hide an org's AI settings panel whenever AI is disabled for it — forcing it off if a super-admin disables it while the org had it on (R242, R243)
+- [ ] **Phase 83: Roles/Teams Tab UX & Copy** - Constrain the Roles and Teams tabs' width like the admin section, adopt an existing save/delete UX pattern (real Delete button / three-dot / slideout), and correct the "soft planning target" schedulable-roles description to match the scheduler's actual behavior (R244, R245, R246)
 
 ### Phase 79: Dedup & Configurable Teams
 
@@ -407,3 +410,35 @@ or self-verify. Every other change in this milestone is client-only.
 
 **UI hint**: yes
 **Deploy note**: R238 is an owner-run Resend-dashboard/DNS runbook, not an app deploy — the coding deliverable is the documented runbook plus the code path that reads the verified sender once the owner flips it. R237, R239, and R240 are client-only.
+
+### Phase 82: Per-Org AI Enablement
+
+**Goal**: A super-admin controls AI functionality per organization from the Owner Console, AI is OFF by default for every org, and an org's Settings hides the AI panel whenever AI is disabled for it (including auto-off when a super-admin disables it while the org had it on).
+**Depends on**: Nothing (independent; builds on the existing super-admin Owner Console + per-org settings)
+**Requirements**: R242, R243
+**Success Criteria** (what must be TRUE):
+
+  1. A super-admin can toggle AI on/off for a specific organization from the Owner Console; a newly-onboarded org has AI OFF by default (R242).
+  2. When AI is disabled for an org, that org's Settings page does not render the AI panel at all (R243).
+  3. If a super-admin disables AI for an org while that org currently has AI enabled in its own settings, the org's AI setting is forced off and the panel is hidden (R243).
+
+**Plans**: not yet planned
+
+**UI hint**: yes
+**Deploy note**: TBD at planning — the per-org AI flag is a super-admin-gated write; if it requires a `firestore.rules` change it ships built + tested + UNDEPLOYED with a `firebase deploy --only firestore:rules` hand-over (standing discipline). Otherwise client-only.
+
+### Phase 83: Roles/Teams Tab UX & Copy
+
+**Goal**: The Roles and Teams configuration tabs use constrained (non-full-width) layouts matching the admin section and adopt an existing app save/delete UX pattern, and the schedulable-roles "soft planning target" description accurately reflects the scheduler's actual behavior.
+**Depends on**: Phase 79 (the Teams tab/`TeamsConfigPanel` and the Roles panel exist)
+**Requirements**: R244, R245, R246
+**Success Criteria** (what must be TRUE):
+
+  1. The Roles and Teams tabs constrain their input/content width like the admin section — inputs no longer stretch full-width (R244).
+  2. The Roles/Teams save & delete controls follow an existing app pattern — at minimum a real Delete button (optionally three-dot menu or `>`-into-slideout) instead of the current inline text affordance (R245).
+  3. The schedulable-roles description no longer calls the default count a "soft planning target, not a hard cap"; the copy accurately describes that scheduling targets the configured count (R246).
+
+**Plans**: not yet planned
+
+**UI hint**: yes
+**Deploy note**: client-only (UI layout + copy). No deploy hand-over.
