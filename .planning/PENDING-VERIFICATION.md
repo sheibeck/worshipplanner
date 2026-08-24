@@ -65,10 +65,10 @@ churches — claim isolation holds); and logging in as a user assigned to **no**
 hits the "not assigned to a church" gate and cannot proceed further. This retires the
 original "create a genuinely new organization" / new-church-onboarding risk.
 
-**🔴 Still open — 2 recorded-but-unfixed rules findings** (future-phase candidates, NOT
-addressed by the Owner Console):
-1. `organizations/{orgId}` `allow write: if isOrgEditor` lets an editor rewrite `createdBy` (`firestore.rules:31`);
-2. `inviteLookup/{email}` `allow create: if isSignedIn()` is a self-invite vector (`firestore.rules:173`).
+**✅ Both findings FIXED — Phase 80 (2026-08-24), BUILT + TESTED + UNDEPLOYED.** See the Phase 80
+entry at the end of this file for the exact deploy hand-over:
+1. `organizations/{orgId}` `allow write: if isOrgEditor` lets an editor rewrite `createdBy` (`firestore.rules:31`) — closed by R233's `preservesCreatedBy()` guard.
+2. `inviteLookup/{email}` `allow create: if isSignedIn()` is a self-invite vector (`firestore.rules:173`) — closed by R232's `isOrgEditor(request.resource.data.orgId)` create gate.
 
 ## C3 — Phase 37 render-service: package sign-off + cleanup-job safety gate
 
@@ -722,3 +722,53 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 - **Song-tag filter behavior in the live app:** set a team's song-tag filter, select that team on a service, confirm AI suggestions constrain to that tag; multiple filtered teams union (OR).
 
 Do **not** treat this item as passed — it is `verification_deferred_human`, gated to the owner.
+
+---
+
+## Phase 80 — Security & Data-Integrity Hardening: R232/R233 rules hardening (v2.2) — OWNER, PRE-DEPLOY
+
+**Code-complete + automatically verified 2026-08-24.** Plan 80-01 closed the 2 recorded-but-unfixed
+rules findings tracked above in C2 (both re-confirmed by Phase 80's own research against live
+`firestore.rules`, byte-for-byte, before this plan touched anything):
+
+1. **R232 — `inviteLookup` self-invite privilege-forgery gap.** `match /inviteLookup/{email}`'s
+   `allow create` was `if isSignedIn()` alone — no relationship to the `orgId` the payload targets,
+   letting ANY signed-in user forge an invite into a church they do not administer and accept it via
+   the first-login flow at a role of their own choosing. Now
+   `if isSignedIn() && isOrgEditor(request.resource.data.orgId)`, mirroring the existing
+   `orgSlugs`/`orgNames` create-gate idiom. `allow read`/`allow delete` are unchanged. No client code
+   change — `TeamView.vue`'s `onInvite()` already writes `orgId` onto this payload.
+2. **R233 — org `createdBy` provenance-tampering gap.** `organizations/{orgId}`'s `allow update` guarded
+   5 lifecycle fields (`preservesLifecycleFields()`) but not `createdBy` — an editor could rewrite an
+   org's authorship/audit trail via a plain `updateDoc`. A new sibling helper, `preservesCreatedBy()`
+   (deliberately NOT folded into `lifecycleFields()`'s array — that array is also consulted on CREATE to
+   assert those keys are ABSENT, and `createdBy` is REQUIRED on create), is now ANDed onto `allow update`.
+   The `allow create` clause (`createdBy == request.auth.uid`) is untouched.
+
+**Proven under the Firestore emulator** (`npx vitest run --config vitest.rules.config.ts`): new ALLOW
+(target-org editor creates an inviteLookup) + 2 new DENY (non-editor; mismatched-orgId payload — the
+core self-invite-forgery case) for R232; new DENY (createdBy change) + new ALLOW (ordinary edit leaving
+createdBy unchanged) for R233; the pre-existing invite→first-login acceptance regressions (Test B/D)
+re-confirmed green under the new create rule; the pre-existing "allows editor to write org doc"
+regression was adjusted from a full-overwrite `setDoc` (which dropped `createdBy` from the payload and
+would now be correctly DENIED by the new guard) to a `createdBy`-preserving `updateDoc` — a deliberate,
+necessary test change, not a scope reduction. `npm run type-check` (`vue-tsc --build`) clean.
+
+**Ships BUILT + TESTED + UNDEPLOYED** per the standing v1.5+ `firestore.rules` deploy discipline. No
+deploy was run by this plan.
+
+**OWNER — the exact command to deploy both fixes:**
+```
+firebase deploy --only firestore:rules
+```
+
+**Both behaviors are enforced in production ONLY after that deploy runs** — until then, the
+pre-Phase-80 ruleset (the self-invite create gap and the mutable `createdBy` field) remains live.
+
+**What only the owner can confirm after deploy (`verification_deferred_human`) — do NOT mark passed
+here:**
+1. Attempt a forged `inviteLookup` create as a signed-in non-editor of the target org — expect deny.
+2. Attempt an editor `createdBy` rewrite on a real org doc via a direct client write — expect deny.
+
+**Everything in this plan ships built, tested, and UNDEPLOYED** — no `firebase deploy` was run, per the
+standing deploy discipline. See `80-01-SUMMARY.md` for the full task-by-task record.
