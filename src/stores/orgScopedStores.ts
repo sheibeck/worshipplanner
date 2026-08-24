@@ -1,6 +1,7 @@
 import { useServiceStore } from './services'
 import { useSongStore } from './songs'
 import { useRosterStore } from './roster'
+import { useTeamsStore } from './teams'
 import { useQuartersStore } from './quarters'
 import { useSlideGroups } from './slideGroups'
 import { useScriptureSlides } from './scriptureSlides'
@@ -30,6 +31,7 @@ export function resetOrgScopedStores(): void {
   useServiceStore().unsubscribeAll()
   useSongStore().unsubscribeAll()
   useRosterStore().unsubscribeAll()
+  useTeamsStore().unsubscribeAll()
   useQuartersStore().unsubscribeAll()
   useSlideGroups().unsubscribeGroups()
   useScriptureSlides().unsubscribeReadings()
