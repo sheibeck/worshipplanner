@@ -899,3 +899,19 @@ passed here:**
 **This plan ships no client-side UI** — the Owner Console toggle and the Settings-panel gate land
 in Plan 02 (still to be executed as of this record). See `82-01-SUMMARY.md` for the full
 task-by-task record.
+
+---
+
+## ⏳ Phase 83 (v2.2) — Roles/Teams tab UX & copy visual UAT — DEFERRED (owner at /gsd-verify-work 83)
+
+**Code-complete + auto-verified 2026-08-24** (3/3 must-haves verified in source; type-check clean; app suite at the 2-file baseline). R244 `max-w-4xl` on the Roles/Teams tab wrappers (Volunteers stays full-width); R245 destructive Delete buttons in both panels; R246 corrected the schedulable-roles copy to the scheduler's real auto-fill behavior (+ the `roster.ts:9` stale comment). Client-only.
+
+**Visual confirmations (`verification_deferred_human`):**
+- Roles/Teams tabs read as width-constrained like the admin section (Volunteers still full-width).
+- The Delete affordance reads as a real destructive button (filled red), not a text link.
+
+## ⏳ Quick task 260824-org-config-slideout — Owner Console org-config slideout UAT — DEFERRED
+
+Owner Console Organizations screen reworked (quick task + owner testing-feedback follow-up, both 2026-08-24, client-only, all tests green): per-row **`>` caret** opens a right-side **slideout**; AI enablement is a **checkbox** (setting), Deactivate/Reactivate is a **button** (action) with a confirm dialog, and **Delete** lives in the slideout for **deactivated orgs only** (existing confirm). Reuses the Phase 82 `setOrgAiEnabled` (UNDEPLOYED) + `setOrgActive` + `deleteOrganization` callables unchanged.
+
+**Owner UAT:** open the Owner Console, click a row's `>` caret, confirm: the AI checkbox toggles (surfaces the friendly error until the Phase 82 deploy hand-over runs); Deactivate prompts a confirm and Cancel leaves the org active with no stuck state; Delete appears only for a deactivated org and routes through the delete confirm.
