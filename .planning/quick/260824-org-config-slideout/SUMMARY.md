@@ -98,3 +98,63 @@ baseline check from the "Verification (gates)" section).
 
 All created/modified files verified present on disk; both task commits (`d5db3eba`, `738c2b85`)
 verified present in git history.
+
+## Follow-up fix pass (2026-08-24) — owner testing feedback
+
+Applied a client-only follow-up pass addressing owner UAT feedback on the just-shipped slideout.
+Commit: `176274fa`
+(`fix(quick-260824): owner testing follow-up for org-config slideout`)
+
+### Fixes applied
+
+1. **Active is now a Deactivate/Reactivate BUTTON, not a checkbox** — `OrgConfigDrawer.vue`.
+   The owner's read: deactivate/reactivate is an *action*, not a *setting*. `onActiveChange`
+   (checkbox `@change`) became `onActiveClick` (button `@click`) with identical intent-signaling
+   logic (deactivating routes through the confirm dialog, reactivating applies directly);
+   `onToggleActive`/`setOrgActive` are reused unchanged. AI enablement **stays a checkbox** — it
+   is genuinely a setting.
+2. **Cancel-state bug fixed by construction** — with no local `:checked` state left behind by a
+   button (unlike a checkbox), cancelling the deactivate confirm cannot leave a stuck/out-of-sync
+   UI state. Verified with a rewritten test asserting the org stays active and the button still
+   reads "Deactivate" after Cancel.
+3. **Delete moved into the slideout, deactivated-orgs-only** — removed from the per-row Actions
+   cell entirely; added to `OrgConfigDrawer.vue` behind `v-if="!org.active"` (Phase 77's gate).
+   The drawer emits `request-delete`; `OrganizationsTab.vue` wires it to the existing
+   `openDeleteDialog`/`DeleteOrgConfirmDialog` flow unchanged. Reordered the drawer/dialog
+   markup so `OrgConfigDrawer` renders before `DeleteOrgConfirmDialog` (matching the existing
+   Deactivate-over-drawer stacking convention) so the confirm dialog paints above an open drawer.
+   After a successful delete, `configOrg`'s computed lookup returns `null` once the org drops out
+   of the refreshed list, so the drawer auto-closes with no extra wiring.
+4. **`>` chevron replaces the "Configure" text button** — `OrganizationsTab.vue`'s row action
+   now mirrors `SongTable.vue`'s row-open affordance (`d="M9 5l7 7-7 7"`), icon-only with
+   `aria-label="Configure {org name}"` for accessibility.
+
+### Files modified
+
+- `src/components/admin/OrgConfigDrawer.vue` — Active checkbox → button; added the
+  deactivated-only Delete section and `request-delete` emit.
+- `src/components/admin/OrganizationsTab.vue` — per-row Delete button removed; "Configure" text
+  button replaced with an aria-labeled `>` chevron; `OrgConfigDrawer`'s `@request-delete` wired to
+  the existing `openDeleteDialog`; reordered the drawer/dialog block for correct stacking.
+- `src/components/admin/__tests__/OrganizationsTab.test.ts` — rewrote the `openConfigDrawer`
+  helper and all affected suites (deactivate/reactivate, Configure drawer shell, delete) to target
+  the button/chevron instead of the removed checkbox/text button; delete tests now open the drawer
+  first, then click the drawer's own Delete button.
+
+### Gates
+
+- `npx vitest run src/components/admin/__tests__/OrganizationsTab.test.ts src/components/admin/__tests__/DeactivateOrgConfirmDialog.test.ts src/components/admin/__tests__/DeleteOrgConfirmDialog.test.ts` —
+  87/87 passing (57 + 14 + 16).
+- `npm run type-check` (`vue-tsc --build`) — clean.
+- Bare `npx vitest run` (full app suite) — 4286/4312 passing; the only 2 failing files are the
+  documented known-failing baseline (`src/storage.rules.test.ts`, `src/views/__tests__/RosterView.test.ts`).
+  No new failures introduced.
+
+### Deviations from instructions
+
+None — all four fixes applied exactly as specified; no architectural changes, no rules/functions
+changes, no callable signature changes.
+
+### Self-Check: PASSED
+
+All modified files verified present on disk; commit `176274fa` verified present in git history.
