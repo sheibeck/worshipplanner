@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import NewServiceDialog from '../NewServiceDialog.vue'
 
 // R038: the dialog's default date is "the nearest FUTURE Sunday with no plan yet".
@@ -8,9 +9,25 @@ import NewServiceDialog from '../NewServiceDialog.vue'
 //
 // Reference calendar used throughout (verified against quarterDates.test.ts):
 //   Sundays: 2026-08-16, -23, -30 | 2026-09-06, -13, -20, -27
-//   Sunday-of-month ordinals: 08-30 -> 5, 09-06 -> 1, 09-13 -> 2, 09-20 -> 3
-//   Team defaults by ordinal: 1 -> ['Orchestra','Communion'], 3 -> ['Choir'], else []
 const THURSDAY_BEFORE_AUG_30 = new Date(2026, 7, 27, 10, 0, 0)
+
+// Phase 79 (R229/R241/RESEARCH Pitfall 2): the dialog now reads the shared
+// teams store directly instead of a hard-coded `availableTeams` array, so it
+// is no longer Pinia-free. Seeded with the same 4 default teams the old
+// hard-coded array carried, so every existing checkbox-label assertion below
+// keeps finding the same names.
+const mockTeams = [
+  { id: 'team-choir', name: 'Choir', order: 0 },
+  { id: 'team-orchestra', name: 'Orchestra', order: 1 },
+  { id: 'team-communion', name: 'Communion', order: 2 },
+  { id: 'team-special', name: 'Special', order: 3 },
+]
+
+vi.mock('@/stores/teams', () => ({
+  useTeamsStore: () => ({
+    teams: mockTeams,
+  }),
+}))
 
 function mountDialog(props: { open?: boolean; takenDates?: string[] } = {}) {
   return mount(NewServiceDialog, {
@@ -35,6 +52,13 @@ async function clickCreate(wrapper: VueWrapper) {
   expect(emitted).toBeTruthy()
   return emitted![0]![0] as { date: string; name: string; teams: string[] }
 }
+
+// A fresh Pinia before every test — `useTeamsStore()` is mocked above so no
+// real store logic runs, but `defineStore()`-backed composables still throw
+// "no active Pinia" at setup() without an installed instance.
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
 
 describe('NewServiceDialog default date (R038)', () => {
   beforeEach(() => {
@@ -115,11 +139,14 @@ describe('NewServiceDialog default date (R038)', () => {
   })
 })
 
-// ★ Task 3 — the team side effect. sundayOrdinal() drives the default TEAM selection,
-// so changing the default date changes the default teams. This is a real, deliberate
-// behaviour change introduced by R038; these tests pin it so it cannot surface later
-// as a surprise (or be "fixed" by someone who does not know it was intended).
-describe('NewServiceDialog default teams follow the chosen Sunday (R038 side effect)', () => {
+// ★ R231 — the ordinal-Sunday auto-team-selection is REMOVED. This block used
+// to pin sundayOrdinal()'s side effect (a taken-Sunday skip changing which
+// teams were pre-checked); that function is now deleted entirely, and
+// `form.teams` initializes to `[]` unconditionally regardless of which
+// Sunday ends up chosen. Rewritten (not deleted — RESEARCH Pitfall 5) to
+// assert the new empty-default behaviour so a future regression reintroducing
+// auto-selection would be caught here.
+describe('NewServiceDialog default teams (R231 — no ordinal auto-selection)', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -128,45 +155,71 @@ describe('NewServiceDialog default teams follow the chosen Sunday (R038 side eff
     vi.useRealTimers()
   })
 
-  it('★ skipping a taken Sunday selects the SECOND Sunday\'s ordinal teams (5th -> 1st)', async () => {
+  it('starts with no teams pre-selected on the 5th-Sunday-skip-to-1st-Sunday date pair', async () => {
     vi.setSystemTime(THURSDAY_BEFORE_AUG_30)
 
-    // Baseline: nothing taken -> 2026-08-30, the 5th Sunday -> no default teams.
+    // Baseline: nothing taken -> 2026-08-30 (the 5th Sunday) -> no teams.
     const baseline = mountDialog({ takenDates: [] })
     const baselinePayload = await clickCreate(baseline)
     expect(baselinePayload.date).toBe('2026-08-30')
     expect(baselinePayload.teams).toEqual([])
 
-    // First candidate taken -> 2026-09-06, the 1st Sunday -> Orchestra + Communion.
+    // First candidate taken -> 2026-09-06 (the 1st Sunday) -> still no teams
+    // (the OLD behaviour pre-selected Orchestra + Communion here; R231 removes that).
     const wrapper = mountDialog({ takenDates: ['2026-08-30'] })
     const payload = await clickCreate(wrapper)
     expect(payload.date).toBe('2026-09-06')
-    expect(payload.teams).toEqual(['Orchestra', 'Communion'])
+    expect(payload.teams).toEqual([])
   })
 
-  it('★ the same effect with a different ordinal pair (2nd -> 3rd Sunday -> Choir)', async () => {
+  it('starts with no teams pre-selected on the 2nd-Sunday-skip-to-3rd-Sunday date pair', async () => {
     vi.setSystemTime(new Date(2026, 8, 10, 10, 0, 0)) // Thursday 2026-09-10
 
-    // Baseline: 2026-09-13, the 2nd Sunday -> no default teams.
+    // Baseline: 2026-09-13 (the 2nd Sunday) -> no teams.
     const baseline = mountDialog({ takenDates: [] })
     const baselinePayload = await clickCreate(baseline)
     expect(baselinePayload.date).toBe('2026-09-13')
     expect(baselinePayload.teams).toEqual([])
 
-    // First candidate taken -> 2026-09-20, the 3rd Sunday -> Choir.
+    // First candidate taken -> 2026-09-20 (the 3rd Sunday) -> still no teams
+    // (the OLD behaviour pre-selected Choir here; R231 removes that).
     const wrapper = mountDialog({ takenDates: ['2026-09-13'] })
     const payload = await clickCreate(wrapper)
     expect(payload.date).toBe('2026-09-20')
-    expect(payload.teams).toEqual(['Choir'])
+    expect(payload.teams).toEqual([])
   })
 
-  it('renders the skipped-to Sunday\'s teams as checked in the UI', () => {
+  it('renders no checkbox as checked in the UI regardless of the chosen Sunday', () => {
     vi.setSystemTime(THURSDAY_BEFORE_AUG_30)
     const wrapper = mountDialog({ takenDates: ['2026-08-30'] })
     const checked = wrapper
       .findAll('input[type="checkbox"]')
       .filter((c) => (c.element as HTMLInputElement).checked)
       .map((c) => (c.element as HTMLInputElement).value)
-    expect(checked).toEqual(['Orchestra', 'Communion'])
+    expect(checked).toEqual([])
+  })
+
+  it('renders one checkbox pill per configured team, store-driven (R229/R241)', () => {
+    const wrapper = mountDialog({ takenDates: [] })
+    const labels = wrapper
+      .findAll('input[type="checkbox"]')
+      .map((c) => (c.element as HTMLInputElement).value)
+    expect(labels).toEqual(['Choir', 'Orchestra', 'Communion', 'Special'])
+  })
+})
+
+describe('NewServiceDialog empty-state (R229 — zero configured teams)', () => {
+  it('renders the empty-state hint in place of the checkbox row when the org has no teams', () => {
+    mockTeams.length = 0
+    const wrapper = mountDialog({ takenDates: [] })
+    expect(wrapper.findAll('input[type="checkbox"]').length).toBe(0)
+    expect(wrapper.text()).toContain('No teams configured — add teams in Volunteers → Teams.')
+    // Restore the default seed for every other test in this file.
+    mockTeams.push(
+      { id: 'team-choir', name: 'Choir', order: 0 },
+      { id: 'team-orchestra', name: 'Orchestra', order: 1 },
+      { id: 'team-communion', name: 'Communion', order: 2 },
+      { id: 'team-special', name: 'Special', order: 3 },
+    )
   })
 })

@@ -74,24 +74,25 @@
             <!-- Teams -->
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-2">Teams</label>
-              <div class="flex flex-wrap gap-2">
+              <div v-if="teamsStore.teams.length > 0" class="flex flex-wrap gap-2">
                 <label
-                  v-for="team in availableTeams"
-                  :key="team"
+                  v-for="team in teamsStore.teams"
+                  :key="team.id"
                   class="flex items-center gap-2 px-3 py-1.5 rounded-md border cursor-pointer transition-colors text-sm"
-                  :class="form.teams.includes(team)
+                  :class="form.teams.includes(team.name)
                     ? 'bg-indigo-900/30 border-indigo-600 text-indigo-300'
                     : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-300'"
                 >
                   <input
                     type="checkbox"
-                    :value="team"
+                    :value="team.name"
                     v-model="form.teams"
                     class="accent-indigo-500"
                   />
-                  {{ team }}
+                  {{ team.name }}
                 </label>
               </div>
+              <p v-else class="text-xs text-gray-500">No teams configured — add teams in Volunteers → Teams.</p>
             </div>
           </div>
 
@@ -121,6 +122,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { nextFreeSunday } from '@/utils/quarterDates'
+import { useTeamsStore } from '@/stores/teams'
 
 const props = withDefaults(
   defineProps<{
@@ -128,8 +130,10 @@ const props = withDefaults(
     /**
      * R038 / D-14: dates (YYYY-MM-DD) that already have a service plan, so the default
      * date can skip them. A PROP, not a store read — `ServicesView` is the only mount
-     * site and already subscribes to the service list, and keeping this component
-     * store-free is what lets it be unit-tested without a Pinia instance.
+     * site and already subscribes to the service list, so this one value stays a prop
+     * rather than a second read of the same data. (Phase 79: the component now also
+     * reads `useTeamsStore()` directly for the team checkboxes, so it is no longer
+     * Pinia-free — its test file installs a Pinia instance + store mock.)
      * Defaults to empty so any other mount site keeps the plain next-Sunday behaviour.
      */
     takenDates?: readonly string[]
@@ -142,15 +146,7 @@ const emit = defineEmits<{
   create: [data: { date: string; name: string; teams: string[] }]
 }>()
 
-const availableTeams = ['Choir', 'Orchestra', 'Communion', 'Special']
-
-/** Returns which Sunday of the month (1-5) a date falls on, or 0 if not a Sunday */
-function sundayOrdinal(dateStr: string): number {
-  const [year, month, day] = dateStr.split('-').map(Number) as [number, number, number]
-  const d = new Date(year, month - 1, day)
-  if (d.getDay() !== 0) return 0 // not a Sunday
-  return Math.ceil(day / 7)
-}
+const teamsStore = useTeamsStore()
 
 interface FormState {
   date: string
@@ -164,14 +160,10 @@ function defaultForm(): FormState {
   // date source — the old private nextSunday() (and its inline copy of the date
   // formatter) is gone deliberately; do not reintroduce a second one.
   const date = nextFreeSunday(new Date(), props.takenDates)
-  // ★ Known, deliberate side effect of R038: the default TEAM selection below is
-  // derived from the date's ordinal-of-month, so skipping a taken Sunday can change
-  // which teams are pre-checked. Covered by NewServiceDialog.test.ts.
-  const ordinal = sundayOrdinal(date)
-  let teams: string[] = []
-  if (ordinal === 1) teams = ['Orchestra', 'Communion']
-  else if (ordinal === 3) teams = ['Choir']
-  return { date, name: '', teams }
+  // R231: no ordinal-based team pre-selection — every new service starts with
+  // no teams checked, regardless of which Sunday is chosen. The planner picks
+  // teams manually. (Formerly derived from sundayOrdinal(); deleted.)
+  return { date, name: '', teams: [] }
 }
 
 const form = ref<FormState>(defaultForm())
@@ -182,21 +174,6 @@ watch(
   (isOpen) => {
     if (isOpen) {
       form.value = defaultForm()
-    }
-  },
-)
-
-// Apply Sunday-based team defaults when date changes
-watch(
-  () => form.value.date,
-  (newDate) => {
-    const ordinal = sundayOrdinal(newDate)
-    if (ordinal === 1) {
-      form.value.teams = ['Orchestra', 'Communion']
-    } else if (ordinal === 3) {
-      form.value.teams = ['Choir']
-    } else {
-      form.value.teams = []
     }
   },
 )
