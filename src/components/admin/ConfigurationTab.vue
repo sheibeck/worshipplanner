@@ -9,8 +9,10 @@
     </p>
 
     <!-- Grant form -->
+    <label for="grant-email" class="text-xs text-gray-400 mb-1 block">Email address</label>
     <div class="flex flex-col sm:flex-row gap-3">
       <input
+        id="grant-email"
         v-model="grantEmail"
         type="email"
         placeholder="Enter email address"
