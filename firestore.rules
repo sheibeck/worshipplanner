@@ -467,7 +467,14 @@ service cloud.firestore {
     // inviteLookup — stores pending invite records keyed by normalized email
     match /inviteLookup/{email} {
       allow read: if isSignedIn() && request.auth.token.email.lower() == email;
-      allow create: if isSignedIn();
+      // R232/T-80-01: was `isSignedIn()` alone, which let ANY signed-in user
+      // create an inviteLookup doc whose `orgId` targets a church they do
+      // not administer -- a self-invite privilege-forgery vector (accept the
+      // invite via the first-login flow at a role of the attacker's own
+      // choosing). Mirrors the orgSlugs/orgNames create-gate idiom verbatim.
+      // TeamView.vue's onInvite() already writes `orgId` onto this payload in
+      // the same batch as the invite doc, so no client change is needed.
+      allow create: if isSignedIn() && isOrgEditor(request.resource.data.orgId);
       allow delete: if isSignedIn() && (
         request.auth.token.email.lower() == email ||
         isOrgEditor(resource.data.orgId)

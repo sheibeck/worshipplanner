@@ -277,6 +277,65 @@ describe('Members create — R104 self-service membership hole', () => {
   })
 })
 
+// -- R232/T-80-01 -- inviteLookup create gated to the target-org editor -----
+//
+// `allow create` on inviteLookup/{email} used to read only `isSignedIn()` --
+// no relationship to the `orgId` the payload targets at all, letting ANY
+// signed-in user forge an invite into a church they do not administer
+// (self-invite privilege forgery). Mirrors the orgSlugs/orgNames create-gate
+// idiom: `isOrgEditor(request.resource.data.orgId)`.
+//
+// These tests exercise ONLY the create clause. `allow read`/`allow delete`
+// are untouched by this change, and the invite -> first-login acceptance
+// flow (Test B/D above) never calls `create` on inviteLookup at all -- it is
+// re-confirmed green by the existing, unmodified tests in the block above
+// (Pitfall 1 / 80-RESEARCH.md): a create-gate change cannot regress a
+// read+delete flow by rules syntax, but the flow most likely to be assumed
+// broken by a reviewer must still be seen passing under the new rule.
+describe('inviteLookup create — R232 target-org-editor gate', () => {
+  it('ALLOWS an editor of the target org to create an inviteLookup doc for that org', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'inviteLookup', 'invitee@example.com'), {
+        orgId: 'orgA',
+        role: 'viewer',
+        invitedAt: new Date(),
+      }),
+    )
+  })
+
+  it('DENIES a signed-in user with no membership anywhere from creating an inviteLookup doc', async () => {
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
+    const context = testEnv.authenticatedContext('attacker', { email: 'attacker@example.com' })
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'inviteLookup', 'invitee@example.com'), {
+        orgId: 'orgA',
+        role: 'editor',
+        invitedAt: new Date(),
+      }),
+    )
+  })
+
+  it('DENIES an editor of orgA from creating an inviteLookup doc whose payload orgId targets orgB (mismatched orgId, the self-invite-forgery case)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church", createdBy: 'userA' })
+    await seedDoc('organizations/orgB', { name: "Someone Else's Church", createdBy: 'someoneElse' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'inviteLookup', 'invitee@example.com'), {
+        orgId: 'orgB',
+        role: 'editor',
+        invitedAt: new Date(),
+      }),
+    )
+  })
+})
+
 // Phase 68 Plan 03 (68-03, R178): claim-based isSuperAdmin() gate for
 // appConfig/* and superAdmins/*. isSuperAdmin() is deliberately claim-only
 // (request.auth.token.superAdmin == true, NO get()/exists()) — this repo has
