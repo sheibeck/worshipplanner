@@ -27,6 +27,9 @@ vi.mock("firebase-admin/firestore", () => ({
   FieldValue: {
     serverTimestamp: vi.fn(() => "SERVER_TIMESTAMP_SENTINEL"),
     arrayUnion: vi.fn((v: unknown) => ({ __arrayUnion: v })),
+    // IN-01 (82-REVIEW): setOrgAiEnabledHandler now clears the opposite
+    // transition's audit fields via FieldValue.delete() on each toggle.
+    delete: vi.fn(() => "DELETE_SENTINEL"),
   },
 }));
 // Quick task 260823: the best-effort admin-onboarding email is fully mocked at
@@ -1188,7 +1191,15 @@ describe("setOrgAiEnabledHandler", () => {
     expect(result).toEqual({ orgId: ORG_ID, aiEnabled: true });
     expect(fake.docSetSpy).toHaveBeenCalledWith(
       `organizations/${ORG_ID}`,
-      { aiMasterEnabled: true, aiEnabledAt: "SERVER_TIMESTAMP_SENTINEL", aiEnabledBy: CALLER_UID },
+      {
+        aiMasterEnabled: true,
+        aiEnabledAt: "SERVER_TIMESTAMP_SENTINEL",
+        aiEnabledBy: CALLER_UID,
+        // IN-01 (82-REVIEW): a stale opposite-transition audit pair is
+        // cleared on every toggle, so it can't be misread as still current.
+        aiDisabledAt: "DELETE_SENTINEL",
+        aiDisabledBy: "DELETE_SENTINEL",
+      },
       { merge: true },
     );
   });
@@ -1216,6 +1227,10 @@ describe("setOrgAiEnabledHandler", () => {
         aiDisabledAt: "SERVER_TIMESTAMP_SENTINEL",
         aiDisabledBy: CALLER_UID,
         "settings.aiEnabled": false,
+        // IN-01 (82-REVIEW): a stale opposite-transition audit pair is
+        // cleared on every toggle, so it can't be misread as still current.
+        aiEnabledAt: "DELETE_SENTINEL",
+        aiEnabledBy: "DELETE_SENTINEL",
       },
       { merge: true },
     );
@@ -1275,6 +1290,8 @@ describe("setOrgAiEnabledHandler", () => {
         aiDisabledAt: "SERVER_TIMESTAMP_SENTINEL",
         aiDisabledBy: CALLER_UID,
         "settings.aiEnabled": false,
+        aiEnabledAt: "DELETE_SENTINEL",
+        aiEnabledBy: "DELETE_SENTINEL",
       },
       { merge: true },
     );

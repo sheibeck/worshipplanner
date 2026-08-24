@@ -702,7 +702,16 @@ export async function setOrgAiEnabledHandler(
   if (!alreadyInEffect) {
     if (aiEnabled) {
       await orgRef.set(
-        { aiMasterEnabled: true, aiEnabledAt: FieldValue.serverTimestamp(), aiEnabledBy: callerUid },
+        {
+          aiMasterEnabled: true,
+          aiEnabledAt: FieldValue.serverTimestamp(),
+          aiEnabledBy: callerUid,
+          // IN-01 (82-REVIEW): clear the opposite transition's audit fields
+          // so a stale aiDisabledBy/aiDisabledAt from an earlier disable
+          // can't be misread as "still disabled by X" once re-enabled.
+          aiDisabledAt: FieldValue.delete(),
+          aiDisabledBy: FieldValue.delete(),
+        },
         { merge: true },
       );
     } else {
@@ -712,6 +721,9 @@ export async function setOrgAiEnabledHandler(
           aiDisabledAt: FieldValue.serverTimestamp(),
           aiDisabledBy: callerUid,
           "settings.aiEnabled": false,
+          // IN-01 (82-REVIEW): clear the opposite transition's audit fields.
+          aiEnabledAt: FieldValue.delete(),
+          aiEnabledBy: FieldValue.delete(),
         },
         { merge: true },
       );
