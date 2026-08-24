@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { songMatchesQuery, getPrimaryArrangement, getPrimaryKey } from '@/utils/songSearch'
+import { songMatchesQuery, getPrimaryArrangement, getPrimaryKey, filterSongsByTags } from '@/utils/songSearch'
 import type { Song, VWType } from '@/types/song'
 
 function makeSong(overrides: Partial<Song> = {}): Song {
@@ -238,6 +238,57 @@ describe('songMatchesQuery — field-scoped + phrases (Phase 12)', () => {
     const song = makeSong({ title: 'Silent Night', tags: ['Christmas Eve'] })
     expect(songMatchesQuery(song, 'silent tag: christmas eve')).toBe(true)
     expect(songMatchesQuery(song, 'xylophone tag: christmas eve')).toBe(false)
+  })
+})
+
+describe('filterSongsByTags (R240)', () => {
+  it('returns the list unchanged when both include and exclude are empty', () => {
+    const songs = [makeSong({ id: 'a' }), makeSong({ id: 'b', themes: [], tags: [] })]
+    expect(filterSongsByTags(songs, new Set(), new Set())).toBe(songs)
+  })
+
+  it('removes a song carrying an excluded theme', () => {
+    const songs = [
+      makeSong({ id: 'a', themes: ['grace'] }),
+      makeSong({ id: 'b', themes: ['worship'] }),
+    ]
+    const result = filterSongsByTags(songs, new Set(), new Set(['grace']))
+    expect(result.map((s) => s.id)).toEqual(['b'])
+  })
+
+  it('removes a song carrying an excluded tag', () => {
+    const songs = [
+      makeSong({ id: 'a', tags: ['Christmas'] }),
+      makeSong({ id: 'b', tags: ['Easter'] }),
+    ]
+    const result = filterSongsByTags(songs, new Set(), new Set(['Christmas']))
+    expect(result.map((s) => s.id)).toEqual(['b'])
+  })
+
+  it('exclude wins even when the song also carries an included tag', () => {
+    const songs = [makeSong({ id: 'a', tags: ['Christmas', 'Choir'] })]
+    const result = filterSongsByTags(songs, new Set(['Choir']), new Set(['Christmas']))
+    expect(result).toEqual([])
+  })
+
+  it('with a non-empty include set and empty exclude, only songs carrying an included theme OR tag survive', () => {
+    const songs = [
+      makeSong({ id: 'a', themes: ['grace'], tags: [] }),
+      makeSong({ id: 'b', themes: [], tags: ['Choir'] }),
+      makeSong({ id: 'c', themes: ['worship'], tags: ['Easter'] }),
+    ]
+    const result = filterSongsByTags(songs, new Set(['grace', 'Choir']), new Set())
+    expect(result.map((s) => s.id).sort()).toEqual(['a', 'b'])
+  })
+
+  it('treats undefined themes/tags as empty arrays without throwing', () => {
+    const songs = [
+      { ...makeSong({ id: 'a' }), themes: undefined, tags: undefined } as unknown as Song,
+    ]
+    expect(() => filterSongsByTags(songs, new Set(['grace']), new Set())).not.toThrow()
+    expect(filterSongsByTags(songs, new Set(['grace']), new Set())).toEqual([])
+    expect(() => filterSongsByTags(songs, new Set(), new Set(['grace']))).not.toThrow()
+    expect(filterSongsByTags(songs, new Set(), new Set(['grace']))).toEqual(songs)
   })
 })
 

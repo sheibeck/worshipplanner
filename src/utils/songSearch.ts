@@ -129,6 +129,38 @@ export function songMatchesQuery(song: Song, query: string, vwModeEnabled = true
 }
 
 /**
+ * Filters a song list by the shared per-tag Show/Hide include/exclude sets
+ * (D-08/D-09/D-10, R240 extraction). Both sets empty returns `songs` unchanged.
+ * Exclude always wins: a song carrying any excluded theme or tag is removed,
+ * even if it also carries an included one. When include is non-empty, only
+ * songs carrying an included theme OR tag (across both fields) survive.
+ * `themes`/`tags` are treated as empty arrays when undefined (legacy docs) —
+ * this never throws. This is a pure function — no Vue, no store imports —
+ * lifted byte-for-byte from the two prior duplicated call sites
+ * (`stores/songs.ts`'s `filteredSongs`, `SongSlotPicker.vue`'s `tagFilteredSongs`).
+ */
+export function filterSongsByTags(
+  songs: Song[],
+  include: Set<string>,
+  exclude: Set<string>,
+): Song[] {
+  if (include.size === 0 && exclude.size === 0) return songs
+  return songs.filter((s) => {
+    if (exclude.size > 0) {
+      const carriesExcluded =
+        (s.themes ?? []).some((t) => exclude.has(t)) || (s.tags ?? []).some((t) => exclude.has(t))
+      if (carriesExcluded) return false
+    }
+    if (include.size > 0) {
+      const carriesIncluded =
+        (s.themes ?? []).some((t) => include.has(t)) || (s.tags ?? []).some((t) => include.has(t))
+      return carriesIncluded
+    }
+    return true
+  })
+}
+
+/**
  * The arrangement designated as the song's "play key" for transitions.
  * Falls back to the first arrangement when no primary is set (legacy songs).
  */
