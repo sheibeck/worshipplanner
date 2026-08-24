@@ -75,7 +75,7 @@ describe('TeamsConfigPanel', () => {
     expect(firstSelect.attributes('disabled')).toBeUndefined()
   })
 
-  it('editing a name then clicking Save Team calls updateTeam with the draft — not on every keystroke', async () => {
+  it('editing a name then clicking Save Team does not save on every keystroke', async () => {
     const wrapper = mountPanel()
     const nameInput = wrapper
       .findAll('input[type="text"]')
@@ -83,12 +83,57 @@ describe('TeamsConfigPanel', () => {
     await nameInput.setValue('Choir Renamed')
 
     expect(mockUpdateTeam).not.toHaveBeenCalled()
+  })
+
+  it('WR-02: renaming a team surfaces a soft-warn confirm instead of saving immediately; confirming calls updateTeam with the draft', async () => {
+    const wrapper = mountPanel()
+    const nameInput = wrapper
+      .findAll('input[type="text"]')
+      .find((i) => i.attributes('aria-label') === 'Team name for Choir')!
+    await nameInput.setValue('Choir Renamed')
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team')
+    await saveButtons[0]!.trigger('click')
+
+    // First click surfaces the rename warning — does not save yet.
+    expect(mockUpdateTeam).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain("Rename the 'Choir' team to 'Choir Renamed'?")
+
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text() === 'Rename Team')!
+    await confirmBtn.trigger('click')
+
+    expect(mockUpdateTeam).toHaveBeenCalledTimes(1)
+    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { name: 'Choir Renamed', songFilterTag: '' })
+  })
+
+  it('WR-02: Cancel on the rename warning dismisses it without saving', async () => {
+    const wrapper = mountPanel()
+    const nameInput = wrapper
+      .findAll('input[type="text"]')
+      .find((i) => i.attributes('aria-label') === 'Team name for Choir')!
+    await nameInput.setValue('Choir Renamed')
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team')
+    await saveButtons[0]!.trigger('click')
+    expect(wrapper.text()).toContain("Rename the 'Choir' team to 'Choir Renamed'?")
+
+    const cancelBtn = wrapper.findAll('button').filter((b) => b.text() === 'Cancel')[0]!
+    await cancelBtn.trigger('click')
+
+    expect(mockUpdateTeam).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain("Rename the 'Choir' team")
+  })
+
+  it('WR-02: saving a song-tag-only edit (no name change) does not require rename confirmation', async () => {
+    const wrapper = mountPanel()
+    const select = wrapper.find('select[aria-label="Song-tag filter for Choir"]')
+    await select.setValue('Christmas')
 
     const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team')
     await saveButtons[0]!.trigger('click')
 
     expect(mockUpdateTeam).toHaveBeenCalledTimes(1)
-    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { name: 'Choir Renamed', songFilterTag: '' })
+    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { name: 'Choir', songFilterTag: 'Christmas' })
   })
 
   it('clicking Delete reveals an inline soft-warn confirm; Cancel dismisses without deleting; confirming calls deleteTeam', async () => {
@@ -167,16 +212,5 @@ describe('TeamsConfigPanel', () => {
     await addButton.trigger('click')
 
     expect(mockAddTeam).not.toHaveBeenCalled()
-  })
-
-  it('WR-01: saving a row without changing its name never collides with itself', async () => {
-    const wrapper = mountPanel()
-    const select = wrapper.find('select[aria-label="Song-tag filter for Choir"]')
-    await select.setValue('Christmas')
-
-    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team')
-    await saveButtons[0]!.trigger('click')
-
-    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { name: 'Choir', songFilterTag: 'Christmas' })
   })
 })

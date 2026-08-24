@@ -41,6 +41,25 @@
                 >Delete</button>
               </div>
 
+              <div v-if="confirmRenameId === row.team.id" class="mt-2 rounded-md bg-amber-900/20 border border-amber-800 p-3">
+                <p class="text-sm text-amber-300">
+                  Rename the '{{ row.team.name }}' team to '{{ row.draft.name.trim() }}'? Any service that already
+                  selected '{{ row.team.name }}' will no longer show it as checked. This cannot be undone.
+                </p>
+                <div class="flex items-center gap-3 mt-2">
+                  <button
+                    type="button"
+                    @click="onSaveTeam(row.team.id)"
+                    class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-amber-700 hover:bg-amber-600 transition-colors"
+                  >Rename Team</button>
+                  <button
+                    type="button"
+                    @click="confirmRenameId = null"
+                    class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                  >Cancel</button>
+                </div>
+              </div>
+
               <div v-if="confirmDeleteId === row.team.id" class="mt-2 rounded-md bg-red-900/20 border border-red-800 p-3">
                 <p class="text-sm text-red-300">
                   Delete the '{{ row.team.name }}' team? It will no longer appear as a choice for new or edited services, but any service that already selected it keeps that reference. This cannot be undone.
@@ -158,9 +177,14 @@ const savingTeamId = ref<string | null>(null)
 const savedTeamId = ref<string | null>(null)
 let savedTimer: ReturnType<typeof setTimeout> | null = null
 
+// ── Rename soft-warn (WR-02) ─────────────────────────────────────────────────
+const confirmRenameId = ref<string | null>(null)
+
 async function onSaveTeam(teamId: string) {
   const draft = teamDrafts.value[teamId]
   if (!draft) return
+  const team = teamsStore.teams.find((t) => t.id === teamId)
+  if (!team) return
   const trimmedName = draft.name.trim()
 
   // WR-01: reject a save whose name collides with another existing team.
@@ -168,6 +192,17 @@ async function onSaveTeam(teamId: string) {
     toasts.push(`A team named "${trimmedName}" already exists. Choose a different name.`)
     return
   }
+
+  // WR-02: renaming orphans the name-keyed reference on every service that
+  // already selected the old name (same practical consequence as delete) —
+  // require the same soft-warn confirm step before committing the rename.
+  // Non-rename saves (song-tag-only edits) skip this and save immediately.
+  const isRename = trimmedName !== team.name
+  if (isRename && confirmRenameId.value !== teamId) {
+    confirmRenameId.value = teamId
+    return
+  }
+  confirmRenameId.value = null
 
   savingTeamId.value = teamId
   try {
