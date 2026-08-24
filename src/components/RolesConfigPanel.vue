@@ -3,7 +3,8 @@
     <div class="px-4 py-3 bg-gray-900/50 border-b border-gray-800">
       <h2 class="text-sm font-medium text-gray-300">Roles</h2>
       <p class="text-xs text-gray-500 mt-0.5">
-        Schedulable roles grouped by Band, Tech, and Other. Default count is a soft planning target, not a hard cap.
+        Schedulable roles grouped by Band, Tech, and Other. Default count is the number of volunteers the
+        scheduler auto-fills for this role each service.
       </p>
     </div>
 
@@ -43,7 +44,7 @@
                 <button
                   type="button"
                   @click="confirmDeleteId = row.role.id"
-                  class="text-xs text-red-400 hover:text-red-300 transition-colors"
+                  class="text-xs px-3 py-1.5 rounded-md font-medium bg-red-900/20 hover:bg-red-900/40 text-red-400 transition-colors"
                 >Delete</button>
               </div>
 

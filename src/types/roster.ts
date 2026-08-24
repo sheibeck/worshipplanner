@@ -6,7 +6,7 @@ export interface Role {
   id: string
   name: string // e.g. "guitar", "sound", "scripture reader"
   group: RoleGroup
-  defaultCount: number // default role-count template value (D-02) — a soft planning default, NOT a hard cap
+  defaultCount: number // per-role auto-fill target: volunteers the scheduler fills for this role each service (D-02)
   order: number // stable ascending order for the scheduler's inner role loop
 }
 
