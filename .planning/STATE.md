@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Configurability, Hardening & Cleanup
-current_phase: 79
-current_phase_name: Dedup & Configurable Teams
+current_phase: 80
+current_phase_name: Security & Data-Integrity Hardening
 status: planning
 stopped_at: Completed 79-03-PLAN.md
-last_updated: "2026-08-24T03:17:56.355Z"
-last_activity: 2026-08-23
-last_activity_desc: 79-01-PLAN.md executed (commits deeabd89, 35111430)
+last_updated: "2026-08-24T04:13:14.330Z"
+last_activity: 2026-08-24
+last_activity_desc: Phase 79 complete, transitioned to Phase 80
 progress:
   total_phases: 3
   completed_phases: 1
@@ -867,10 +867,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 79 of 81 (Dedup & Configurable Teams) — Wave 1 (79-01) complete, Wave 2 (79-02, 79-03) pending
-Plan: 79-01 of 3 complete (teams store foundation) — see 79-01-SUMMARY.md
-Status: In progress — 79-01 executed (teams type + store + church-switch teardown), gates green
-Last activity: 2026-08-23 — 79-01-PLAN.md executed (commits deeabd89, 35111430)
+Phase: 80 of 81 (Security & Data-Integrity Hardening)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-24 — Phase 79 complete, transitioned to Phase 80
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 

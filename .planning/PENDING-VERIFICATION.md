@@ -709,3 +709,16 @@ Do **not** treat this item as passed — the composer end-to-end visual UAT is d
 2. **Real-browser visual** of the Enter-church control + the "viewing as super-admin" banner + its exit to the owner console.
 
 **Ships built + tested + UNDEPLOYED** — the owner-gated `firebase deploy --only firestore:rules,storage` is the single hand-over; the client half needs no deploy beyond normal hosting.
+
+---
+
+## ⏳ Phase 79 (v2.2) — Configurable Teams visual/cross-tenant UAT — DEFERRED (owner at /gsd-verify-work 79)
+
+**Code-complete + auto-verified 2026-08-24** (5/5 must-haves verified directly against source: `teams` store + `TeamsConfigPanel.vue` + Teams tab in `RosterView.vue`; both consumers repointed to the store — `AVAILABLE_TEAMS`/`availableTeams=['Choir'…]` grep = 0; `isOrchestraService` grep = 0, replaced by the union `filterSongsByTeamTags` helper; ordinal-Sunday auto-select removed; review-fix duplicate-name guard + rename soft-warn + add-in-flight guard + Delete aria-label all confirmed in source. `npm run type-check` clean; `npx vitest run` at the documented 2-file baseline, nothing new failing.) **Client-only — no rules/functions/deploy.**
+
+**What only a human at `/gsd-verify-work 79` can confirm (`verification_deferred_human`):**
+- **Teams editor visual parity + round-trip:** open Volunteers → **Teams**; add / rename / delete a team; confirm the panel matches the Roles panel's look, the soft-warn confirmations appear on delete AND rename, a duplicate name is rejected with the inline error, and the changes drive the service-plan team checkboxes.
+- **Two-church isolation:** two orgs with different team lists see two different service-plan checkbox lists (no cross-tenant bleed).
+- **Song-tag filter behavior in the live app:** set a team's song-tag filter, select that team on a service, confirm AI suggestions constrain to that tag; multiple filtered teams union (OR).
+
+Do **not** treat this item as passed — it is `verification_deferred_human`, gated to the owner.
