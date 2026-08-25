@@ -34,6 +34,15 @@ deploy --only firestore:rules` command handed to the owner, per the standing v1.
 (Phase 81, Resend verified domain) is an owner-run DNS/dashboard runbook, not an app-verifiable deploy.
 Every other change in this milestone is client-only.
 
+**⚠ POST-MILESTONE SCOPE CHANGE (2026-08-25, owner decision — milestone still held open):** **R230 was
+removed.** The per-team song-tag AI filter delivered in Phase 79 (the `songFilterTag` dropdown on
+Volunteers → Teams) only ever fed the AI song-suggestion filter, did nothing when AI was off, and added
+user-facing confusion for no real benefit. The control and its `filterSongsByTeamTags()` logic were
+removed entirely (commit `951ffe80`); team selection no longer narrows the AI candidate pool. R241's
+team-list single-source still stands, but its Orchestra-filter dedup half is now moot. REQUIREMENTS.md
+traceability + the v2.2 audit are updated to match. Client-only — needs a rebuild + `firebase deploy
+--only hosting` to reach prod.
+
 Next step: `/gsd-plan-phase 79` (optionally preceded by `/gsd-discuss-phase 79`).
 
 ---
@@ -2952,6 +2961,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: TeamsConfigPanel.vue mirrors RolesConfigPanel.vue's shape exactly (flat list, draft+Save, soft-warn delete-confirm, Add row) with real aria-labels from the start; teamsStore is unsubscribed on RosterView unmount but songStore is left subscribed (shared org-scoped store managed by resetOrgScopedStores).
 - [Phase ?]: R231: removed ordinal-Sunday auto-team-selection entirely — new services start with no teams pre-selected on any Sunday.
 - [Phase ?]: R230: replaced the twice-duplicated Orchestra-only AI song filter with one filterSongsByTeamTags() helper that unions selected teams' songFilterTag values.
+- [2026-08-25, post-milestone owner decision]: **R230 REMOVED.** Deleted the per-team songFilterTag dropdown + filterSongsByTeamTags() entirely (team.ts field, TeamsConfigPanel selects, both ServiceEditorView call sites, and the now-dead songStore subscription in RosterView). Team selection no longer narrows the AI pool. Rationale: the filter only fed AI suggestions, was inert with AI off, and confused users. Commit 951ffe80. Supersedes the two entries above insofar as the filter no longer exists (R231's ordinal-Sunday removal is unaffected).
 - [Phase ?]: 80-01: R233's preservesCreatedBy() is a NEW sibling helper, not folded into lifecycleFields()'s shared array -- that array is also read on CREATE to assert absence, but createdBy is required on create.
 - [Phase ?]: 80-01: found a second, plan-unnamed regression (a full-overwrite setDoc dropping createdBy) via the full rules-suite run, not the task-scoped -t filter -- fixed identically to the plan's named sibling instance (switched to updateDoc).
 - [Phase 80]: R234: deleteService revokes shareTokens (query-based, handles 2+), serviceShareLinks/{id}, and serviceShares/{slug}__service-{date} before deleting the service doc, mirroring deleteQuarter's guarded-delete precedent.

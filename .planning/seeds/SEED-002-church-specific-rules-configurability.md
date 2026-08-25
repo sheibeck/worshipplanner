@@ -35,6 +35,9 @@ is GLOBAL ops config; church worship rules need PER-ORG config.)
 - **A2. Per-team song-tag filter** (generalize the Orchestra rule) — `ServiceEditorView.vue:3426`, `:3537`.
   Turn "Orchestra team → only `Orchestra`-tagged songs" into an optional per-team setting: "when this team is
   selected, limit song suggestions to tag ___." (Alternative: drop — see B.)
+  > **OUTCOME (2026-08-25): the "drop" alternative won.** A2 shipped as R230 in Phase 79, but the owner
+  > later removed it entirely — it only fed AI suggestions, was inert with AI off, and confused users
+  > (commit `951ffe80`). See REQUIREMENTS.md R230.
 - **A3. Planning Center team names** `DEFAULT_PC_TEAM_NAMES` (9 literals) — `ServiceEditorView.vue:1681`,
   preselect matcher `:1700`. Don't make churches retype these — **fetch teams live from the org's connected PC
   account** and remember their pre-select choices.

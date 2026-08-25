@@ -11,7 +11,7 @@ REQ-IDs continue from v2.1 (last: R227).
 
 - [x] **R228**: A church admin can define their own list of teams/ministries — add, rename, and remove teams in Settings, seeded with sensible defaults — instead of the hard-coded `['Choir','Orchestra','Communion','Special']` list.
 - [x] **R229**: The service-plan team checkboxes (both the new-service dialog and the service editor) are driven by the org's configured team list, so each church sees its own teams.
-- [x] **R230**: A church admin can optionally attach a song-tag filter to a team so that selecting that team on a service constrains AI song suggestions to songs carrying that tag — generalizing the hard-coded "Orchestra → Orchestra-tagged" rule to any team/tag.
+- [~] **R230** — *REMOVED 2026-08-25 (owner decision, post-milestone).* Originally: a church admin could attach a song-tag filter to a team so selecting it constrained AI song suggestions to that tag (generalizing the hard-coded "Orchestra → Orchestra-tagged" rule). It was delivered in Phase 79, but the per-team `songFilterTag` dropdown only ever fed the AI suggestion filter, did nothing when AI was off, and added user-facing confusion for no real benefit. The control and its `filterSongsByTeamTags()` logic were removed entirely; team selection no longer narrows the AI candidate pool. Commit `951ffe80`.
 - [x] **R231**: The hard-coded ordinal-Sunday automatic team pre-selection (1st Sunday → Orchestra+Communion, 3rd Sunday → Choir) is removed; a planner chooses teams manually per service.
 
 ### Security & Data-Integrity Hardening (999.11 / 999.10 / 999.2)
@@ -34,7 +34,7 @@ REQ-IDs continue from v2.1 (last: R227).
 
 ## Non-Functional / Technical
 
-- [x] **R241**: The still-live duplicated church-rule constants (the team list across `ServiceEditorView.vue`/`NewServiceDialog.vue`, and the Orchestra filter duplicated within `ServiceEditorView.vue`) are collapsed to a single source as a prerequisite for R228–R231. (Note: `VW_TYPE_LABELS` is already single-source — do NOT re-dedup it.)
+- [x] **R241**: The still-live duplicated church-rule constants (the team list across `ServiceEditorView.vue`/`NewServiceDialog.vue`, and the Orchestra filter duplicated within `ServiceEditorView.vue`) are collapsed to a single source as a prerequisite for R228–R231. (Note: `VW_TYPE_LABELS` is already single-source — do NOT re-dedup it.) *(Update 2026-08-25: the team-list single-source stands; the Orchestra-filter half of this dedup was subsequently made moot when R230's song-tag filter was removed entirely — see R230.)*
 
 ## Testing-Feedback Additions (owner, 2026-08-24 — Phases 82–83)
 
@@ -74,7 +74,7 @@ REQ-IDs continue from v2.1 (last: R227).
 |-------------|-------|--------|
 | R228 | Phase 79 | Complete |
 | R229 | Phase 79 | Complete |
-| R230 | Phase 79 | Complete |
+| R230 | Phase 79 | Removed 2026-08-25 (delivered, then descoped by owner — commit 951ffe80) |
 | R231 | Phase 79 | Complete |
 | R241 | Phase 79 | Complete |
 | R232 | Phase 80 | Complete |
