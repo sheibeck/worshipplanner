@@ -59,11 +59,22 @@
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Org ID</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Members</th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+              <!-- Trailing chevron column (owner UX follow-up, 260824): mirrors
+                   SongTable.vue's row-open pattern -- the row is data-only, and
+                   every per-org action (Assign admin, Enter church, AI,
+                   Deactivate/Reactivate, Delete) now lives exclusively in the
+                   OrgConfigDrawer slideout opened by this chevron OR by
+                   clicking anywhere else on the row. -->
+              <th class="px-4 py-3 w-8"><span class="sr-only">Configure</span></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-800">
-            <tr v-for="org in orgs" :key="org.orgId" class="hover:bg-gray-800/20 transition-colors">
+            <tr
+              v-for="org in orgs"
+              :key="org.orgId"
+              class="cursor-pointer hover:bg-gray-800/20 transition-colors"
+              @click="configOrgId = org.orgId"
+            >
               <td class="px-4 py-3 text-gray-200">
                 {{ org.name }}
                 <span
@@ -84,86 +95,20 @@
                   {{ org.pendingCount }} pending
                 </span>
               </td>
-              <td class="px-4 py-3 align-top">
-                <!-- Assign-admin inline form (this row only). -->
-                <div
-                  v-if="assigningOrgId === org.orgId"
-                  class="flex flex-col gap-2 sm:flex-row sm:items-center"
+              <!-- Trailing chevron (opens the configure drawer for this org).
+                   @click.stop avoids a double-trigger with the row's own
+                   @click (harmless either way since both set the same id). -->
+              <td class="px-4 py-3 text-right">
+                <button
+                  type="button"
+                  :aria-label="`Configure ${org.name}`"
+                  @click.stop="configOrgId = org.orgId"
+                  class="inline-flex items-center justify-center text-gray-500 hover:text-gray-300 p-1 transition-colors"
                 >
-                  <input
-                    v-model="assignEmail"
-                    type="email"
-                    aria-label="Admin email"
-                    placeholder="Admin email"
-                    class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-xs w-full sm:w-44 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-                    @keydown.enter="onConfirmAssign(org)"
-                  />
-                  <div class="flex gap-2">
-                    <button
-                      type="button"
-                      @click="onConfirmAssign(org)"
-                      :disabled="isAssigning"
-                      class="inline-flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
-                    >
-                      {{ isAssigning ? 'Assigning...' : 'Assign' }}
-                    </button>
-                    <button
-                      type="button"
-                      @click="cancelAssign"
-                      class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
-                    >
-                      Cancel assign
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Row actions — side by side on >= sm, stacked only on mobile.
-                     Consistent with the app's button family (bg-gray-800
-                     secondary / bg-indigo-600 primary). All state changes go
-                     through the callables — no direct Firestore writes.
-                     Quick task 260824: Deactivate/Reactivate and Enable/Disable
-                     AI moved into the OrgConfigDrawer slideout behind a `>`
-                     chevron entry point (below). Owner testing follow-up:
-                     Delete (Phase 77, deactivated-only) also moved into the
-                     slideout, so it no longer lives here. -->
-                <div
-                  v-else
-                  class="flex flex-col gap-2 sm:flex-row sm:items-center"
-                >
-                  <button
-                    type="button"
-                    @click="startAssign(org.orgId)"
-                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
-                  >
-                    Assign admin
-                  </button>
-                  <button
-                    type="button"
-                    :aria-label="`Configure ${org.name}`"
-                    @click="configOrgId = org.orgId"
-                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 p-1.5 shrink-0 transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    @click="onEnterChurch(org)"
-                    :disabled="enteringOrgId !== null"
-                    class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
-                  >
-                    {{ enteringOrgId === org.orgId ? 'Entering...' : 'Enter church' }}
-                  </button>
-                </div>
-
-                <!-- Per-row feedback / errors (below the button row). Deactivate/
-                     Reactivate (toggleError/toggleFeedback) and AI (aiToggleError)
-                     surfaces now live in the drawer's own activeError/
-                     activeFeedback/aiError props instead of here. -->
-                <p v-if="assignError[org.orgId]" class="text-red-400 text-xs mt-1">{{ assignError[org.orgId] }}</p>
-                <p v-if="assignFeedback[org.orgId]" class="text-green-400 text-xs mt-1">{{ assignFeedback[org.orgId] }}</p>
-                <p v-if="enterError[org.orgId]" class="text-red-400 text-xs mt-1">{{ enterError[org.orgId] }}</p>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </td>
             </tr>
 
@@ -197,11 +142,24 @@
       :active-error="configOrg ? (toggleError[configOrg.orgId] ?? null) : null"
       :active-feedback="configOrg ? (toggleFeedback[configOrg.orgId] ?? null) : null"
       :active-feedback-is-warning="configOrg ? !!toggleFeedbackIsWarning[configOrg.orgId] : false"
-      @close="configOrgId = null"
+      :assigning="assigningOrgId === configOrg?.orgId"
+      :assign-email="assignEmail"
+      :is-assigning="isAssigning"
+      :assign-error="configOrg ? (assignError[configOrg.orgId] ?? null) : null"
+      :assign-feedback="configOrg ? (assignFeedback[configOrg.orgId] ?? null) : null"
+      :entering="enteringOrgId === configOrg?.orgId"
+      :enter-disabled="enteringOrgId !== null"
+      :enter-error="configOrg ? (enterError[configOrg.orgId] ?? null) : null"
+      @close="onCloseDrawer"
       @toggle-ai="() => configOrg && onToggleAi(configOrg)"
       @reactivate="() => configOrg && onToggleActive(configOrg)"
       @request-deactivate="deactivateDialogOrg = configOrg"
       @request-delete="() => configOrg && openDeleteDialog(configOrg)"
+      @start-assign="() => configOrg && startAssign(configOrg.orgId)"
+      @cancel-assign="cancelAssign"
+      @update:assign-email="assignEmail = $event"
+      @confirm-assign="() => configOrg && onConfirmAssign(configOrg)"
+      @enter-church="() => configOrg && onEnterChurch(configOrg)"
     />
 
     <!-- R220 (Phase 77) — rendered once at the component root, Teleported to
@@ -396,6 +354,16 @@ const deleteFeedback = ref<string | null>(null)
 // (this plan's key_links).
 const configOrgId = ref<string | null>(null)
 const configOrg = computed(() => orgs.value.find((o) => o.orgId === configOrgId.value) ?? null)
+
+// Owner UX follow-up (260824): Assign admin now lives inside the drawer
+// instead of the row, so closing the drawer must also collapse an
+// in-progress assign form -- otherwise reopening the drawer (even for a
+// different org) would show a stale expanded email input from whichever
+// org was last being assigned.
+function onCloseDrawer() {
+  configOrgId.value = null
+  cancelAssign()
+}
 
 // deactivateDialogOrg doubles as DeactivateOrgConfirmDialog's `open` flag,
 // mirroring deleteDialogOrg above.

@@ -352,7 +352,7 @@ describe('OrganizationsTab -- accessible names (R239, 81-02)', () => {
     expect(emailLabel.attributes('for')).toBe(emailInput.attributes('id'))
   })
 
-  it('exposes the per-row assign input via aria-label, with no static id, across a two-org list', async () => {
+  it('exposes the per-org assign input via aria-label, with no static id, across a two-org list (assign now lives in the drawer)', async () => {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({
         data: {
@@ -365,26 +365,29 @@ describe('OrganizationsTab -- accessible names (R239, 81-02)', () => {
     )
     const wrapper = await mountTab()
 
-    const startButtons = wrapper.findAll('button').filter((b) => b.text() === 'Assign admin')
-    expect(startButtons.length).toBe(2)
-
-    // Open the first row's assign form: aria-label is present, no static id.
-    await startButtons[0]!.trigger('click')
+    // Open the first org's drawer and its assign form: aria-label is
+    // present, no static id.
+    await openConfigDrawer(wrapper, 0)
+    const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
+    await startButton.trigger('click')
     let assignInput = wrapper.find('input[aria-label="Admin email"]')
     expect(assignInput.exists()).toBe(true)
     expect(assignInput.attributes('id')).toBeUndefined()
 
-    // Switch to the second row's assign form: same aria-label, still no id --
-    // proves neither row's per-row input was retrofitted with a static
-    // id/for pair that would collide across rows (RESEARCH Pitfall 5).
+    // Close, then open the second org's drawer and its assign form: same
+    // aria-label, still no id -- proves neither org's assign input was
+    // retrofitted with a static id/for pair that would collide (RESEARCH
+    // Pitfall 5).
+    await wrapper.find('button[aria-label="Close"]').trigger('click')
+    await openConfigDrawer(wrapper, 1)
     const secondStartButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
     await secondStartButton.trigger('click')
     assignInput = wrapper.find('input[aria-label="Admin email"]')
     expect(assignInput.exists()).toBe(true)
     expect(assignInput.attributes('id')).toBeUndefined()
 
-    // Only one assign form is ever open at a time (single assigningOrgId
-    // ref), so there is exactly one aria-labeled input in the DOM -- never a
+    // Only one drawer (and thus one assign form) is ever open at a time, so
+    // there is exactly one aria-labeled input in the DOM -- never a
     // duplicate id, by construction.
     expect(wrapper.findAll('input[aria-label="Admin email"]').length).toBe(1)
   })
@@ -489,7 +492,7 @@ describe('OrganizationsTab -- onboard form (R197/R201/R202)', () => {
   })
 })
 
-describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
+describe('OrganizationsTab -- per-org assign admin via drawer (R203/R205, owner UX follow-up)', () => {
   async function mountWithOneOrg() {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({ data: { organizations: [makeOrg({ orgId: 'org-1', name: 'Grace Church' })] } }),
@@ -497,8 +500,9 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
     return mountTab()
   }
 
-  it('opens the row assign control, calls assignOrgAdmin with {orgId, email}, and shows Added feedback', async () => {
+  it('opens the drawer assign control, calls assignOrgAdmin with {orgId, email}, and shows Added feedback', async () => {
     const wrapper = await mountWithOneOrg()
+    await openConfigDrawer(wrapper)
 
     const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
     await startButton.trigger('click')
@@ -513,10 +517,11 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
     expect(wrapper.text()).toContain('Added as admin.')
   })
 
-  it('auto-collapses the assign row and clears the email 2s after a successful assign (UI review 74)', async () => {
+  it('auto-collapses the drawer assign control and clears the email 2s after a successful assign (UI review 74)', async () => {
     vi.useFakeTimers()
     try {
       const wrapper = await mountWithOneOrg()
+      await openConfigDrawer(wrapper)
 
       const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
       await startButton.trigger('click')
@@ -526,11 +531,11 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
       await confirmButton.trigger('click')
       await flushPromises()
 
-      // Immediately after success: row still open, success shown, email cleared (no stale value).
+      // Immediately after success: form still open, success shown, email cleared (no stale value).
       expect(wrapper.text()).toContain('Added as admin.')
       expect((wrapper.find('input[placeholder="Admin email"]').element as HTMLInputElement).value).toBe('')
 
-      // After the 2s auto-dismiss: row collapses back to its trigger and the feedback is gone.
+      // After the 2s auto-dismiss: form collapses back to its trigger and the feedback is gone.
       vi.advanceTimersByTime(2000)
       await flushPromises()
       expect(wrapper.findAll('button').some((b) => b.text() === 'Assign')).toBe(false)
@@ -544,6 +549,7 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
   it('shows the invited message when assignOrgAdmin returns status invited', async () => {
     mockAssignOrgAdmin.mockImplementation(() => Promise.resolve({ data: { status: 'invited' } }))
     const wrapper = await mountWithOneOrg()
+    await openConfigDrawer(wrapper)
 
     const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
     await startButton.trigger('click')
@@ -557,6 +563,7 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
 
   it('surfaces "Enter a valid email address." without calling assignOrgAdmin on invalid email', async () => {
     const wrapper = await mountWithOneOrg()
+    await openConfigDrawer(wrapper)
 
     const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
     await startButton.trigger('click')
@@ -572,6 +579,7 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
   it('surfaces a friendly error on rejection', async () => {
     mockAssignOrgAdmin.mockImplementation(() => Promise.reject(new Error('server exploded')))
     const wrapper = await mountWithOneOrg()
+    await openConfigDrawer(wrapper)
 
     const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
     await startButton.trigger('click')
@@ -583,7 +591,7 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
     expect(wrapper.text()).toContain('server exploded')
   })
 
-  it('scopes feedback/error per-row: two orgs, assigning in one never leaks into the other', async () => {
+  it("scopes feedback/error per-org: assigning in one org never leaks into another org's drawer", async () => {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({
         data: {
@@ -596,10 +604,10 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
     )
     const wrapper = await mountTab()
 
-    // Assign in org-1's row only.
-    const startButtons = wrapper.findAll('button').filter((b) => b.text() === 'Assign admin')
-    expect(startButtons.length).toBe(2)
-    await startButtons[0]!.trigger('click')
+    // Assign in org-1's drawer only.
+    await openConfigDrawer(wrapper, 0)
+    const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
+    await startButton.trigger('click')
     await wrapper.find('input[placeholder="Admin email"]').setValue('admin1@example.com')
     const confirmButton = wrapper.findAll('button').find((b) => b.text() === 'Assign')!
     await confirmButton.trigger('click')
@@ -608,18 +616,21 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
     expect(mockAssignOrgAdmin).toHaveBeenCalledWith({ orgId: 'org-1', email: 'admin1@example.com' })
     expect(wrapper.text()).toContain('Added as admin.')
 
-    // org-2's row should still show its collapsed "Assign admin" trigger,
-    // with no feedback text bleeding into it.
-    const remainingStart = wrapper.findAll('button').filter((b) => b.text() === 'Assign admin')
-    expect(remainingStart.length).toBe(1)
+    // Close org-1's drawer and open org-2's -- its assign control should be
+    // collapsed with no feedback text bleeding in.
+    await wrapper.find('button[aria-label="Close"]').trigger('click')
+    await openConfigDrawer(wrapper, 1)
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Assign admin')).toBe(true)
+    expect(wrapper.text()).not.toContain('Added as admin.')
   })
 
-  it('WR-03: a second Enter on the row admin-email input while assigning is in flight does not double-submit', async () => {
+  it('WR-03: a second Enter on the drawer admin-email input while assigning is in flight does not double-submit', async () => {
     let resolveFn: (v: { data: { status: 'added' | 'invited'; uid?: string } }) => void = () => {}
     mockAssignOrgAdmin.mockImplementation(
       () => new Promise((resolve) => { resolveFn = resolve }),
     )
     const wrapper = await mountWithOneOrg()
+    await openConfigDrawer(wrapper)
 
     const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
     await startButton.trigger('click')
@@ -638,8 +649,9 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
     await flushPromises()
   })
 
-  it('cancelAssign closes the row control without calling assignOrgAdmin', async () => {
+  it('cancelAssign closes the drawer assign control without calling assignOrgAdmin', async () => {
     const wrapper = await mountWithOneOrg()
+    await openConfigDrawer(wrapper)
 
     const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
     await startButton.trigger('click')
@@ -650,6 +662,32 @@ describe('OrganizationsTab -- per-org assign admin (R203/R205)', () => {
 
     expect(wrapper.find('input[placeholder="Admin email"]').exists()).toBe(false)
     expect(mockAssignOrgAdmin).not.toHaveBeenCalled()
+  })
+
+  it('closing the drawer collapses an in-progress assign form so reopening (even for a different org) starts fresh', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [
+            makeOrg({ orgId: 'org-1', name: 'Grace Church' }),
+            makeOrg({ orgId: 'org-2', name: 'Hope Church' }),
+          ],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+
+    await openConfigDrawer(wrapper, 0)
+    const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
+    await startButton.trigger('click')
+    await wrapper.find('input[placeholder="Admin email"]').setValue('partial@example.com')
+
+    // Close without confirming/cancelling explicitly.
+    await wrapper.find('button[aria-label="Close"]').trigger('click')
+
+    await openConfigDrawer(wrapper, 1)
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Assign admin')).toBe(true)
+    expect(wrapper.find('input[placeholder="Admin email"]').exists()).toBe(false)
   })
 })
 
@@ -966,7 +1004,7 @@ describe('OrganizationsTab -- AI on/off toggle via drawer (R242, Phase 82, quick
   })
 })
 
-describe('OrganizationsTab -- Configure drawer shell (quick 260824)', () => {
+describe('OrganizationsTab -- Configure drawer shell (quick 260824, owner UX follow-up: row is data-only + trailing chevron)', () => {
   async function mountWithOneOrg(overrides: Partial<{ active: boolean; aiMasterEnabled: boolean }> = {}) {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({
@@ -976,7 +1014,7 @@ describe('OrganizationsTab -- Configure drawer shell (quick 260824)', () => {
     return mountTab()
   }
 
-  it('each row renders exactly one `>` Configure chevron (no visible text, aria-labeled), and no AI, Deactivate/Reactivate, or Delete buttons remain', async () => {
+  it('each row renders exactly one `>` Configure chevron (no visible text, aria-labeled) and NO other buttons -- every action (Assign admin, Enter church, AI, Deactivate/Reactivate, Delete) now lives in the drawer', async () => {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({
         data: {
@@ -993,21 +1031,13 @@ describe('OrganizationsTab -- Configure drawer shell (quick 260824)', () => {
     expect(rows.length).toBe(2)
     const expectedLabels = ['Configure Grace Church', 'Configure Hope Church']
     rows.forEach((row, i) => {
-      const configureButtons = row
-        .findAll('button')
-        .filter((b) => (b.attributes('aria-label') ?? '').startsWith('Configure '))
-      expect(configureButtons.length).toBe(1)
-      expect(configureButtons[0]!.attributes('aria-label')).toBe(expectedLabels[i])
+      const rowButtons = row.findAll('button')
+      expect(rowButtons.length).toBe(1)
+      expect(rowButtons[0]!.attributes('aria-label')).toBe(expectedLabels[i])
       // No visible text on the chevron itself -- an icon-only affordance
       // mirroring SongTable.vue's row-open chevron.
-      expect(configureButtons[0]!.text()).toBe('')
-      expect(row.findAll('button').some((b) => b.text() === 'Enable AI' || b.text() === 'Disable AI')).toBe(false)
-      expect(row.findAll('button').some((b) => b.text() === 'Deactivate' || b.text() === 'Reactivate')).toBe(false)
-      expect(row.findAll('button').some((b) => b.text() === 'Delete')).toBe(false)
+      expect(rowButtons[0]!.text()).toBe('')
     })
-    // Assign admin, Enter church remain for both rows.
-    expect(wrapper.findAll('button').filter((b) => b.text() === 'Assign admin').length).toBe(2)
-    expect(wrapper.findAll('button').filter((b) => b.text() === 'Enter church').length).toBe(2)
   })
 
   it('clicking the `>` chevron opens the drawer for that org', async () => {
@@ -1016,6 +1046,27 @@ describe('OrganizationsTab -- Configure drawer shell (quick 260824)', () => {
 
     await openConfigDrawer(wrapper)
     expect(configDrawerOf(wrapper).props('org')).toMatchObject({ orgId: 'org-1', name: 'Grace Church' })
+  })
+
+  it('clicking anywhere else on the row also opens the drawer for that org (SongTable-style whole-row click)', async () => {
+    const wrapper = await mountWithOneOrg()
+    expect(wrapper.find('[data-testid="org-config-drawer"]').exists()).toBe(false)
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    // Click a plain data cell (not the trailing chevron button) -- the whole
+    // row is clickable, not just the chevron.
+    await row.findAll('td')[0]!.trigger('click')
+
+    expect(wrapper.find('[data-testid="org-config-drawer"]').exists()).toBe(true)
+    expect(configDrawerOf(wrapper).props('org')).toMatchObject({ orgId: 'org-1', name: 'Grace Church' })
+  })
+
+  it('opening the drawer surfaces Assign admin and Enter church actions (moved in from the row)', async () => {
+    const wrapper = await mountWithOneOrg()
+    await openConfigDrawer(wrapper)
+
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Assign admin')).toBe(true)
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Enter church')).toBe(true)
   })
 
   it('the backdrop click closes the drawer (org -> null)', async () => {
@@ -1195,6 +1246,8 @@ describe('OrganizationsTab -- no direct writes (R200/R204)', () => {
     await flushPromises()
     expect(mockOnboardOrganization).toHaveBeenCalled()
 
+    // Assign admin now lives in the drawer (owner UX follow-up) -- open it first.
+    await openConfigDrawer(wrapper)
     const startButton = wrapper.findAll('button').find((b) => b.text() === 'Assign admin')!
     await startButton.trigger('click')
     await wrapper.find('input[placeholder="Admin email"]').setValue('another@example.com')
@@ -1205,7 +1258,7 @@ describe('OrganizationsTab -- no direct writes (R200/R204)', () => {
   })
 })
 
-describe('OrganizationsTab -- enter church (R224, Phase 78)', () => {
+describe('OrganizationsTab -- enter church via drawer (R224, Phase 78, owner UX follow-up)', () => {
   async function mountWithOneOrg(overrides: Partial<{ active: boolean }> = {}) {
     mockListOrganizations.mockImplementation(() =>
       Promise.resolve({
@@ -1215,20 +1268,22 @@ describe('OrganizationsTab -- enter church (R224, Phase 78)', () => {
     return mountTab()
   }
 
-  it('clicking "Enter church" calls authStore.enterOrgAsSuperAdmin with that row\'s orgId', async () => {
+  it('clicking "Enter church" in the drawer calls authStore.enterOrgAsSuperAdmin with that org\'s orgId', async () => {
     const wrapper = await mountWithOneOrg({ active: true })
+    await openConfigDrawer(wrapper)
 
-    const enterButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    const enterButton = wrapper.find('[data-testid="org-config-enter-church-button"]')
     await enterButton.trigger('click')
     await flushPromises()
 
     expect(mockEnterOrgAsSuperAdmin).toHaveBeenCalledWith('org-1')
   })
 
-  it('the "Enter church" button is present and NOT disabled for a deactivated row', async () => {
+  it('the "Enter church" button is present and NOT disabled for a deactivated org', async () => {
     const wrapper = await mountWithOneOrg({ active: false })
+    await openConfigDrawer(wrapper)
 
-    const enterButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    const enterButton = wrapper.find('[data-testid="org-config-enter-church-button"]')
     expect(enterButton.exists()).toBe(true)
     expect(enterButton.attributes('disabled')).toBeUndefined()
   })
@@ -1242,12 +1297,14 @@ describe('OrganizationsTab -- enter church (R224, Phase 78)', () => {
       () => new Promise<boolean>((resolve) => (resolveEnter = resolve)),
     )
     const wrapper = await mountWithOneOrg({ active: true })
+    await openConfigDrawer(wrapper)
 
-    const enterButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    const enterButton = wrapper.find('[data-testid="org-config-enter-church-button"]')
     void enterButton.trigger('click')
     await flushPromises()
 
-    const pendingButton = wrapper.findAll('button').find((b) => b.text() === 'Entering...')!
+    const pendingButton = wrapper.find('[data-testid="org-config-enter-church-button"]')
+    expect(pendingButton.text()).toBe('Entering...')
     expect(pendingButton.attributes('disabled')).toBeDefined()
 
     // A second click while in-flight must not fire a second call.
@@ -1258,7 +1315,8 @@ describe('OrganizationsTab -- enter church (R224, Phase 78)', () => {
     resolveEnter(true)
     await flushPromises()
 
-    const settledButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    const settledButton = wrapper.find('[data-testid="org-config-enter-church-button"]')
+    expect(settledButton.text()).toBe('Enter church')
     expect(settledButton.attributes('disabled')).toBeUndefined()
   })
 
@@ -1269,15 +1327,16 @@ describe('OrganizationsTab -- enter church (R224, Phase 78)', () => {
   it('shows an inline error and does not navigate when enterOrgAsSuperAdmin resolves false', async () => {
     mockEnterOrgAsSuperAdmin.mockResolvedValueOnce(false)
     const wrapper = await mountWithOneOrg({ active: true })
+    await openConfigDrawer(wrapper)
 
-    const enterButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    const enterButton = wrapper.find('[data-testid="org-config-enter-church-button"]')
     await enterButton.trigger('click')
     await flushPromises()
 
     expect(mockEnterOrgAsSuperAdmin).toHaveBeenCalledWith('org-1')
     expect(wrapper.text()).toContain("Couldn't enter this church. Refresh and try again.")
     // Guard re-enabled after the failed attempt (not left stuck disabled).
-    const settledButton = wrapper.findAll('button').find((b) => b.text() === 'Enter church')!
+    const settledButton = wrapper.find('[data-testid="org-config-enter-church-button"]')
     expect(settledButton.attributes('disabled')).toBeUndefined()
   })
 })

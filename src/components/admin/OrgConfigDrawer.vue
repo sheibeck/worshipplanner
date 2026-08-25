@@ -111,6 +111,80 @@
             </p>
           </section>
 
+          <!-- Assign admin — moved in from the per-row Actions cell during the
+               owner UX follow-up (row is now data-only + trailing chevron).
+               Reuses OrganizationsTab's existing startAssign/onConfirmAssign/
+               cancelAssign handlers unchanged; this drawer only surfaces the
+               expand/collapse toggle + the email input's local value via
+               props/emits, matching the AI/Active sections' one-way binding
+               convention. -->
+          <section class="border-t border-gray-800 pt-5">
+            <p class="text-sm text-gray-200 font-medium">Admin access</p>
+            <p class="text-xs text-gray-400 mt-1.5">
+              Assign an existing account (or invite a new one) as an admin of this church.
+            </p>
+            <div v-if="assigning" class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                :value="assignEmail"
+                type="email"
+                aria-label="Admin email"
+                placeholder="Admin email"
+                class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-xs w-full sm:w-44 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                @input="emit('update:assign-email', ($event.target as HTMLInputElement).value)"
+                @keydown.enter="emit('confirm-assign')"
+              />
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  :disabled="isAssigning"
+                  class="inline-flex items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
+                  @click="emit('confirm-assign')"
+                >
+                  {{ isAssigning ? 'Assigning...' : 'Assign' }}
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 text-xs font-medium whitespace-nowrap shrink-0 transition-colors"
+                  @click="emit('cancel-assign')"
+                >
+                  Cancel assign
+                </button>
+              </div>
+            </div>
+            <button
+              v-else
+              type="button"
+              class="mt-3 inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors"
+              @click="emit('start-assign')"
+            >
+              Assign admin
+            </button>
+            <p v-if="assignError" class="text-red-400 text-xs mt-1.5">{{ assignError }}</p>
+            <p v-if="assignFeedback" class="text-green-400 text-xs mt-1.5">{{ assignFeedback }}</p>
+          </section>
+
+          <!-- Enter church — moved in from the per-row Actions cell during the
+               owner UX follow-up. Reuses OrganizationsTab's existing
+               onEnterChurch unchanged; enterDisabled covers BOTH "this org is
+               entering" and "a different org is entering" (mirrors the row
+               button's old cross-row double-submit guard). -->
+          <section class="border-t border-gray-800 pt-5">
+            <p class="text-sm text-gray-200 font-medium">Enter as this church</p>
+            <p class="text-xs text-gray-400 mt-1.5">
+              Sign in as a member of this church for support or troubleshooting.
+            </p>
+            <button
+              type="button"
+              data-testid="org-config-enter-church-button"
+              :disabled="enterDisabled"
+              class="mt-3 inline-flex items-center justify-center rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors"
+              @click="emit('enter-church')"
+            >
+              {{ entering ? 'Entering...' : 'Enter church' }}
+            </button>
+            <p v-if="enterError" class="text-red-400 text-xs mt-1.5">{{ enterError }}</p>
+          </section>
+
           <!-- Delete — rendered only for an already-deactivated org (Phase 77
                gates deletion to deactivated orgs). Moved in from the per-row
                Actions cell during owner testing feedback; irreversible, so no
@@ -170,6 +244,22 @@ const props = defineProps<{
   activeError: string | null
   activeFeedback: string | null
   activeFeedbackIsWarning: boolean
+  // Assign admin (owner UX follow-up, moved in from the row) — mirrors
+  // OrganizationsTab's assigningOrgId/assignEmail/isAssigning/assignError/
+  // assignFeedback state exactly, scoped to whichever org this drawer is
+  // currently showing.
+  assigning: boolean
+  assignEmail: string
+  isAssigning: boolean
+  assignError: string | null
+  assignFeedback: string | null
+  // Enter church (owner UX follow-up, moved in from the row) — entering is
+  // true only when THIS org is being entered; enterDisabled also covers "a
+  // different org is currently being entered" (cross-row double-submit
+  // guard, mirrored from the old row button).
+  entering: boolean
+  enterDisabled: boolean
+  enterError: string | null
 }>()
 
 const emit = defineEmits<{
@@ -178,6 +268,11 @@ const emit = defineEmits<{
   'request-deactivate': []
   reactivate: []
   'request-delete': []
+  'start-assign': []
+  'cancel-assign': []
+  'update:assign-email': [email: string]
+  'confirm-assign': []
+  'enter-church': []
 }>()
 
 const panelRef = ref<HTMLElement | null>(null)
