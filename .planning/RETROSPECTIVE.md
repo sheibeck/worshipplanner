@@ -121,6 +121,60 @@ cleanup crons live in dry-run. Follow-up made the retention windows env-tunable 
 
 ---
 
+## Milestone: v2.2 — Configurability, Hardening & Cleanup
+
+**Shipped:** 2026-08-25 | **Phases:** 5 (79–83) | **Plans:** 13 | **Tasks:** 35
+
+### What Was Built
+Made the app fit churches other than Berean and cleared v1.x–v2.1 backlog debt. Per-org configurable
+**Teams** (own team list modeled on roster roles) replacing the hard-coded Berean list + dropped the
+ordinal-Sunday auto-select (79); security/data-integrity hardening — `inviteLookup` create gate,
+`createdBy` immutability, `deleteService` share revocation, reprise-safe slide clear, pending-render guard
+(80); polish/ops — PC-export coverage, Resend domain runbook, Owner Console a11y, shared `SongBrowser`
+(81); per-org **AI enablement** OFF-by-default behind a super-admin master gate + fail-closed proxy (82);
+Roles/Teams tab width + real Delete button + corrected copy (83). Phases 82–83 were added mid-milestone
+from owner testing feedback. Hosting deployed to production at close; Phase 80 + 82 backend owner-gated.
+
+### What Worked
+- **Modeling new config on a proven sibling.** Teams copied the roster-Roles store/UX/seed patterns almost
+  verbatim — low-risk, fast, and its tests fell out of the existing shape.
+- **Two-gate AI enablement with a fail-closed proxy.** `isAiEnabled = aiMasterEnabled && church setting`
+  put the on/off decision in exactly one computed, and the proxy defaulting to deny meant a missing field
+  reads as OFF — the safe direction for a metered cost.
+- **Audit → owner-decision → reconcile discipline at close.** The pre-close artifact audit surfaced real
+  dormant items; closing them (harvested/deferred/resolved frontmatter) gave a genuinely clean slate.
+
+### What Was Inefficient
+- **A feature shipped, then removed days later.** The per-team song-tag filter (R230) was built in Phase 79,
+  then removed at close when owner testing showed it only fed AI suggestions, did nothing with AI off, and
+  presented a live-looking control with no effect. The signal ("what does this actually do when AI is off?")
+  was answerable at scoping — a "does this affordance do anything in every state?" check would have caught it
+  before it was built. Removal was clean, but it was build-then-delete churn across 8 files + tests + docs.
+- **Post-milestone UI-copy leaks.** Turning AI off still left "AI" mentions in two static strings and a dead
+  dropdown — found only by an explicit "where do we still mention AI?" sweep after the toggle shipped.
+
+### Patterns Established
+- **Reconcile a post-close scope reversal across every layer.** When R230 was removed after the audit
+  passed, the fix touched REQUIREMENTS traceability, STATE decisions log, the audit banner, the seed, and
+  MILESTONES — a shipped-then-removed requirement is honest only if every record says so.
+- **Close-time artifact hygiene.** `audit-open` flags dormant seeds and un-frontmattered debug files;
+  `status: harvested|deferred|resolved` is the lever that clears them without losing the idea.
+
+### Key Lessons
+- **An affordance that does nothing in a reachable state is a scoping bug, not a polish bug.** R230's filter
+  was inert whenever AI was off; that was knowable before building it. Ask "what does this control do in
+  every on/off combination?" at scope time.
+- Removing a delivered requirement is fine — but the milestone only closes *honestly* if the delivered
+  record is amended in the same breath, not left claiming 19/19 with no asterisk.
+
+### Cost Observations
+- Model mix: orchestration + close-out on the session model (opus); the autonomous phase chain
+  (discuss→plan→check→execute→verify→review→fix) on sonnet with opus fallback when sonnet timed out.
+- Notable: the most expensive churn this milestone was building R230 and then unwinding it — a scoping
+  check would have been far cheaper than the build+remove+reconcile cycle.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -131,6 +185,7 @@ cleanup crons live in dry-run. Follow-up made the retention windows env-tunable 
 | v1.5 | 13 | Autonomous run with deferred human-verify; deploy-gated security work (custom auth claim) built undeployed |
 | v1.6 | 7 | Client-side reliability milestone; owner-attributed close, deployed same day |
 | v1.7 | 7 | First messaging/backend-send milestone; deploy-gated Functions built against a mocked provider, one owner deploy at close; two stacked milestones combined at archive |
+| v2.2 | 5 | Phases added mid-milestone from owner testing feedback; a delivered requirement (R230) removed at close and reconciled across all records; hosting deployed at close with backend owner-gated |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -143,3 +198,7 @@ cleanup crons live in dry-run. Follow-up made the retention windows env-tunable 
 3. **Close on owner acceptance with deferrals preserved, never self-approved** (v1.4→v1.7). Deferred
    human-UAT lives in `PENDING-VERIFICATION.md` so any later defect traces to the check that would have
    caught it.
+4. **An affordance that does nothing in a reachable state is a scoping bug** (v2.2 R230). Ask "what does
+   this control do in every on/off combination?" before building it — and if a delivered requirement is
+   later removed, amend every record (requirements, audit, decisions log) in the same breath so the close
+   stays honest.
