@@ -297,10 +297,11 @@ requirements are created fresh via `/gsd-new-milestone`.
 
 **Standing owner-run hand-overs (carry until run):**
 
-- [ ] **v2.2 backend deploys** (undeployed at close): `firebase deploy --only firestore:rules` (Phase 80 —
-      `inviteLookup` create gate + `createdBy` immutability) and `firebase deploy --only
-      firestore:rules,functions:setOrgAiEnabled,functions:api` (Phase 82 — per-org AI), then re-enable AI for
-      Berean (OFF by default at cutover). Detail in `PENDING-VERIFICATION.md`.
+- [x] **v2.2 backend deploys — DONE (owner, 2026-08-25):** `firebase deploy --only firestore:rules` (Phase 80
+      — `inviteLookup` create gate + `createdBy` immutability) and `firebase deploy --only
+      firestore:rules,functions:setOrgAiEnabled,functions:api` (Phase 82 — per-org AI) are deployed to
+      production. Per-org AI defaults OFF; re-enabling it for any church (incl. Berean) is at owner discretion
+      via the Owner Console.
 - [ ] **Deferred human UAT** for shipped-but-owner-attributed milestones — `/gsd-verify-work` for phases
       68–83 (v1.9–v2.2), preserved in `PENDING-VERIFICATION.md`.
 - [ ] Activate storage deletion after reviewing dry-run logs, and deploy the Phase 65 `firestore.rules`

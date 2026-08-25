@@ -17,7 +17,21 @@ current_phase: 83
 current_phase_name: Roles/Teams Tab UX & Copy
 ---
 
-# ▶ ACTIVE MILESTONE — v2.2 Configurability, Hardening & Cleanup (roadmap created 2026-08-23)
+## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
+
+**Supersedes the prior "build + hand over UNDEPLOYED, owner runs every deploy" discipline** that appears
+throughout this file and the milestone records. The owner authorized Claude to run production deploys
+(`firebase deploy …`, `gcloud run deploy`, hosting, etc.) **directly, provided Claude confirms with the
+owner immediately before each deploy** — stating exactly what will be deployed and waiting for a yes. This
+is a **per-deploy** confirmation, not a blanket grant (a yes for one deploy does not authorize the next).
+All prior deploy *hygiene* still holds (build/test first; rebuild functions + re-export new ones from
+`functions/src/index.ts`; scope `--only`; `.env.local` present for a valid build). Also in ~/.claude
+memory as `deploy-policy-confirm-then-deploy`. Owner words: *"It's ok for you to deploy so long as you
+confirm with me before doing so."*
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.2 Configurability, Hardening & Cleanup (completed & archived 2026-08-25)
 
 **Goal:** Make the app fit churches other than Berean, and close accumulated security, data-integrity, and
 polish debt from the v1.x–v2.1 backlog (999.x carry-forwards). Requirements R228–R241 in REQUIREMENTS.md.
