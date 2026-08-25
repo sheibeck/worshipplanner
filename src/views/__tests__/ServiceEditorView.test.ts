@@ -655,16 +655,13 @@ vi.mock('@/stores/quarters', () => ({
   }),
 }))
 
-// Phase 79 (R229/R241/RESEARCH Pitfall 6): the team checkbox row (and the
-// song-tag filter helper) now read the shared teams store instead of a
-// hard-coded array. Seeded with the same 4 default team names/tags the old
-// hard-coded team-list constant carried, so the existing "Orchestra"
-// checkbox-label test below keeps finding it. `songFilterTag` left unset by
-// default (mirrors the seed — CONTEXT.md: seeding the tag is left to the
-// admin) so existing AI-suggestion tests keep exercising the full,
-// unfiltered pool; individual song-tag-filter tests override this array's
-// contents directly.
-let mockTeams: { id: string; name: string; order: number; songFilterTag?: string }[] = [
+// Phase 79 (R229/R241/RESEARCH Pitfall 6): the team checkbox row now reads the
+// shared teams store instead of a hard-coded array. Seeded with the same 4
+// default team names the old hard-coded team-list constant carried, so the
+// existing "Orchestra" checkbox-label test below keeps finding it. (The former
+// per-team `songFilterTag` AI-suggestion filter was removed 2026-08-25, so team
+// selection no longer narrows the AI candidate pool at all.)
+let mockTeams: { id: string; name: string; order: number }[] = [
   { id: 'team-choir', name: 'Choir', order: 0 },
   { id: 'team-orchestra', name: 'Orchestra', order: 1 },
   { id: 'team-communion', name: 'Communion', order: 2 },
@@ -712,9 +709,8 @@ beforeEach(() => {
   mockServiceStoreOrgId = null
   mockCreateShareToken.mockClear()
   mockCreateShareToken.mockImplementation(() => Promise.resolve('mock-share-token'))
-  // Phase 79: reset the teams mock to its default 4-team seed (no
-  // songFilterTag set) so a song-tag-filter test mutating it never leaks
-  // into an unrelated later test.
+  // Phase 79: reset the teams mock to its default 4-team seed so a test
+  // mutating it never leaks into an unrelated later test.
   mockTeams = [
     { id: 'team-choir', name: 'Choir', order: 0 },
     { id: 'team-orchestra', name: 'Orchestra', order: 1 },
@@ -841,13 +837,11 @@ describe('ServiceEditorView - Print button', () => {
   })
 })
 
-// R230/R241 — the generic union-of-selected-team-tags AI filter helper
-// (filterSongsByTeamTags) replaces the two duplicated Orchestra-only blocks
-// that used to live inline in suggestAllSongs()/fetchAiForSlot(). Exercised
-// here via fetchAiForSlot() (single call per test, simpler to assert against
-// than suggestAllSongs()'s one-call-per-SONG-slot loop) and asserted against
-// the `songLibrary` argument the mocked getSongSuggestions() receives.
-describe('ServiceEditorView - song-tag filter (R230/R241)', () => {
+// Regression guard for the 2026-08-25 removal of the per-team song-tag filter:
+// selecting teams on a service must NOT narrow the AI candidate pool. The
+// `songLibrary` argument the mocked getSongSuggestions() receives should carry
+// the full candidate set regardless of which teams are selected.
+describe('ServiceEditorView - team selection does not narrow the AI pool', () => {
   async function mountView() {
     const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
     return shallowMount(ServiceEditorView, {
@@ -865,16 +859,16 @@ describe('ServiceEditorView - song-tag filter (R230/R241)', () => {
     })
   }
 
-  // Three fixture songs, each carrying a distinct tag signature, added to the
-  // shared `mockSongs` array only for the lifetime of this describe block
-  // (pushed in beforeEach, spliced back out in afterEach) so no other test
-  // in this file sees a changed song count.
+  // Three fixture songs with distinct tag signatures, added to the shared
+  // `mockSongs` array only for the lifetime of this describe block (pushed in
+  // beforeEach, spliced back out in afterEach) so no other test sees a changed
+  // song count.
   const songOrchestra: Song = { ...mockSongs[0]!, id: 'song-orchestra', title: 'Orchestra Song', tags: ['Orchestra'] }
   const songChoir: Song = { ...mockSongs[0]!, id: 'song-choir', title: 'Choir Song', tags: ['ChoirTag'] }
   const songUntagged: Song = { ...mockSongs[0]!, id: 'song-untagged', title: 'Untagged Song', tags: [] }
 
   // A single-SONG-slot service fixture — fetchAiForSlot(0) then fires exactly
-  // one getSongSuggestions() call, keeping each assertion a single-call check.
+  // one getSongSuggestions() call, keeping the assertion a single-call check.
   function singleSlotService(teams: string[]): Service {
     return {
       ...mockService,
@@ -904,36 +898,8 @@ describe('ServiceEditorView - song-tag filter (R230/R241)', () => {
     return (params?.songLibrary ?? []).map((s) => s.id)
   }
 
-  it('a single selected team with a filter tag narrows the pool to that tag (legacy Orchestra case)', async () => {
-    mockTeams = mockTeams.map((t) =>
-      t.name === 'Orchestra' ? { ...t, songFilterTag: 'Orchestra' } : t,
-    )
-    mockServicesList = [singleSlotService(['Orchestra'])]
-    const wrapper = await mountView()
-    const vm = wrapper.vm as unknown as { fetchAiForSlot: (i: number) => Promise<void> }
-    await vm.fetchAiForSlot(0)
-    await flushPromises()
-    expect(librarySongIds()).toEqual(['song-orchestra'])
-  })
-
-  it('two selected teams each with a filter tag UNION (OR) their tags, never intersect', async () => {
-    mockTeams = mockTeams.map((t) => {
-      if (t.name === 'Orchestra') return { ...t, songFilterTag: 'Orchestra' }
-      if (t.name === 'Choir') return { ...t, songFilterTag: 'ChoirTag' }
-      return t
-    })
+  it('selecting teams passes the full candidate pool to getSongSuggestions (no tag narrowing)', async () => {
     mockServicesList = [singleSlotService(['Orchestra', 'Choir'])]
-    const wrapper = await mountView()
-    const vm = wrapper.vm as unknown as { fetchAiForSlot: (i: number) => Promise<void> }
-    await vm.fetchAiForSlot(0)
-    await flushPromises()
-    expect(librarySongIds().sort()).toEqual(['song-choir', 'song-orchestra'])
-  })
-
-  it('zero selected teams carrying a filter tag uses the full candidate pool', async () => {
-    // Default mockTeams seed carries no songFilterTag (R228: seeding the tag
-    // is left to the admin) — selecting an untagged team must not narrow the pool.
-    mockServicesList = [singleSlotService(['Choir'])]
     const wrapper = await mountView()
     const vm = wrapper.vm as unknown as { fetchAiForSlot: (i: number) => Promise<void> }
     await vm.fetchAiForSlot(0)

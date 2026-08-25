@@ -33,7 +33,7 @@
 //   organizations/{orgId}                    functions/src/orgProvisioning.ts:290-295 + src/types/organization.ts:157-197
 //   organizations/{orgId}.settings           src/types/organization.ts:52-149,208-240 + functions/src/orgTemplateSeed.ts:111-131
 //   organizations/{orgId}/members/{uid}      functions/src/orgProvisioning.ts:199-205  (role/joinedAt/displayName/email)
-//   organizations/{orgId}/teams/{id}         src/stores/teams.ts:59-65 + src/types/team.ts:6-32  (name/order/songFilterTag?)
+//   organizations/{orgId}/teams/{id}         src/stores/teams.ts:59-65 + src/types/team.ts:6-32  (name/order)
 //   organizations/{orgId}/roles/{id}         src/stores/roster.ts:243-248 + src/types/roster.ts:5-11,99-108
 //   organizations/{orgId}/people/{id}        src/stores/roster.ts:96-106 + src/types/roster.ts:13-25
 //   organizations/{orgId}/songs/{id}         src/stores/songs.ts:281-285 + src/types/song.ts:12-42

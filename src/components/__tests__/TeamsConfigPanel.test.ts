@@ -9,7 +9,6 @@ const mockUpdateTeam = vi.fn(() => Promise.resolve())
 const mockDeleteTeam = vi.fn(() => Promise.resolve())
 
 let mockTeams: Team[] = []
-let mockAllUserTags: string[] = []
 
 vi.mock('@/stores/teams', () => ({
   useTeamsStore: () => ({
@@ -17,12 +16,6 @@ vi.mock('@/stores/teams', () => ({
     addTeam: mockAddTeam,
     updateTeam: mockUpdateTeam,
     deleteTeam: mockDeleteTeam,
-  }),
-}))
-
-vi.mock('@/stores/songs', () => ({
-  useSongStore: () => ({
-    allUserTags: mockAllUserTags,
   }),
 }))
 
@@ -37,9 +30,8 @@ beforeEach(() => {
   mockDeleteTeam.mockClear()
   mockTeams = [
     { id: 't-1', name: 'Choir', order: 0 },
-    { id: 't-2', name: 'Orchestra', order: 1, songFilterTag: 'Orchestra' },
+    { id: 't-2', name: 'Orchestra', order: 1 },
   ]
-  mockAllUserTags = ['Orchestra', 'Christmas']
 })
 
 describe('TeamsConfigPanel', () => {
@@ -51,28 +43,6 @@ describe('TeamsConfigPanel', () => {
     expect(nameInputs.length).toBe(2)
     expect((nameInputs[0]!.element as HTMLInputElement).value).toBe('Choir')
     expect((nameInputs[1]!.element as HTMLInputElement).value).toBe('Orchestra')
-  })
-
-  it('song-tag select shows "No filter" + one option per allUserTags entry and reflects the team songFilterTag', () => {
-    const wrapper = mountPanel()
-    const selects = wrapper.findAll('select')
-    // 2 team rows + 1 add-row select
-    expect(selects.length).toBe(3)
-    const orchestraSelect = selects[1]!
-    const options = orchestraSelect.findAll('option').map((o) => o.text())
-    expect(options).toEqual(['No filter', 'Orchestra', 'Christmas'])
-    expect((orchestraSelect.element as HTMLSelectElement).value).toBe('Orchestra')
-
-    const choirSelect = selects[0]!
-    expect((choirSelect.element as HTMLSelectElement).value).toBe('')
-  })
-
-  it('the song-tag select still renders (only "No filter") and is never disabled when there are zero song tags', () => {
-    mockAllUserTags = []
-    const wrapper = mountPanel()
-    const firstSelect = wrapper.findAll('select')[0]!
-    expect(firstSelect.findAll('option').map((o) => o.text())).toEqual(['No filter'])
-    expect(firstSelect.attributes('disabled')).toBeUndefined()
   })
 
   it('editing a name then clicking Save Team does not save on every keystroke', async () => {
@@ -103,7 +73,7 @@ describe('TeamsConfigPanel', () => {
     await confirmBtn.trigger('click')
 
     expect(mockUpdateTeam).toHaveBeenCalledTimes(1)
-    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { name: 'Choir Renamed', songFilterTag: '' })
+    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { name: 'Choir Renamed' })
   })
 
   it('WR-02: Cancel on the rename warning dismisses it without saving', async () => {
@@ -122,18 +92,6 @@ describe('TeamsConfigPanel', () => {
 
     expect(mockUpdateTeam).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain("Rename the 'Choir' team")
-  })
-
-  it('WR-02: saving a song-tag-only edit (no name change) does not require rename confirmation', async () => {
-    const wrapper = mountPanel()
-    const select = wrapper.find('select[aria-label="Song-tag filter for Choir"]')
-    await select.setValue('Christmas')
-
-    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team')
-    await saveButtons[0]!.trigger('click')
-
-    expect(mockUpdateTeam).toHaveBeenCalledTimes(1)
-    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { name: 'Choir', songFilterTag: 'Christmas' })
   })
 
   it('clicking Delete reveals an inline soft-warn confirm; Cancel dismisses without deleting; confirming calls deleteTeam', async () => {
@@ -155,29 +113,23 @@ describe('TeamsConfigPanel', () => {
     expect(mockDeleteTeam).toHaveBeenCalledWith('t-1')
   })
 
-  it('Add-Team row calls addTeam with name/order/songFilterTag and clears the inputs afterward', async () => {
+  it('Add-Team row calls addTeam with name/order and clears the input afterward', async () => {
     const wrapper = mountPanel()
     const addNameInput = wrapper.find('input[aria-label="New team name"]')
     await addNameInput.setValue('Kids Team')
-
-    const addSelect = wrapper.find('select[aria-label="Song-tag filter for new team"]')
-    await addSelect.setValue('Christmas')
 
     const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Team' || b.text() === 'Added ✓')
     const addButton = saveButtons[saveButtons.length - 1]!
     await addButton.trigger('click')
 
-    expect(mockAddTeam).toHaveBeenCalledWith({ name: 'Kids Team', order: 2, songFilterTag: 'Christmas' })
+    expect(mockAddTeam).toHaveBeenCalledWith({ name: 'Kids Team', order: 2 })
     expect((addNameInput.element as HTMLInputElement).value).toBe('')
   })
 
-  it('every team name input and song-tag select has a non-empty aria-label', () => {
+  it('every team name input has a non-empty aria-label', () => {
     const wrapper = mountPanel()
     wrapper.findAll('input[type="text"]').forEach((input) => {
       expect(input.attributes('aria-label')).toBeTruthy()
-    })
-    wrapper.findAll('select').forEach((select) => {
-      expect(select.attributes('aria-label')).toBeTruthy()
     })
   })
 

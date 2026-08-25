@@ -39,7 +39,6 @@ function makeTeam(overrides: Partial<{
   id: string
   name: string
   order: number
-  songFilterTag: string
 }> = {}) {
   return {
     id: 'team-1',
@@ -126,7 +125,7 @@ describe('useTeamsStore', () => {
   })
 
   describe('seedDefaultTeamsIfEmpty (R228, RESEARCH Pitfall 4 — byte-match today\'s list)', () => {
-    it('writes exactly 4 default teams (Choir/Orchestra/Communion/Special, order 0-3, no songFilterTag) when the org has zero teams', async () => {
+    it('writes exactly 4 default teams (Choir/Orchestra/Communion/Special, order 0-3) when the org has zero teams', async () => {
       const { addDoc } = await import('firebase/firestore')
       const { useTeamsStore } = await import('../teams')
       const store = useTeamsStore()
@@ -140,7 +139,6 @@ describe('useTeamsStore', () => {
       expect(written.map((w) => w.name)).toEqual(['Choir', 'Orchestra', 'Communion', 'Special'])
       expect(written.map((w) => w.order)).toEqual([0, 1, 2, 3])
       for (const w of written) {
-        expect(w.songFilterTag).toBeUndefined()
         expect(w.createdAt).toBeDefined()
         expect(w.updatedAt).toBeDefined()
       }
@@ -178,19 +176,18 @@ describe('useTeamsStore', () => {
       expect(serverTimestamp).toHaveBeenCalled()
     })
 
-    it('updateTeam calls updateDoc with serverTimestamp for updatedAt, allowing songFilterTag to be set to empty string', async () => {
+    it('updateTeam calls updateDoc with serverTimestamp for updatedAt', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useTeamsStore } = await import('../teams')
       const store = useTeamsStore()
       store.subscribe('org-1')
 
-      await store.updateTeam('team-1', { name: 'Renamed Team', songFilterTag: '' })
+      await store.updateTeam('team-1', { name: 'Renamed Team' })
 
       expect(updateDoc).toHaveBeenCalledOnce()
       const callArgs = vi.mocked(updateDoc).mock.calls[0]!
       const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.name).toBe('Renamed Team')
-      expect(data.songFilterTag).toBe('')
       expect(data.updatedAt).toBeDefined()
     })
 

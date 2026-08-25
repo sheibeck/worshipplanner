@@ -3,8 +3,7 @@
     <div class="px-4 py-3 bg-gray-900/50 border-b border-gray-800">
       <h2 class="text-sm font-medium text-gray-300">Teams</h2>
       <p class="text-xs text-gray-500 mt-0.5">
-        Teams your church uses for service planning.<span v-if="authStore.isAiEnabled">
-        Attach a song-tag filter to constrain AI suggestions when that team is selected.</span>
+        Teams your church uses for service planning.
       </p>
     </div>
 
@@ -20,14 +19,6 @@
                   :aria-label="`Team name for ${row.team.name}`"
                   class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                 />
-                <select
-                  v-model="row.draft.songFilterTag"
-                  :aria-label="`Song-tag filter for ${row.team.name}`"
-                  class="w-40 sm:w-48 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="">No filter</option>
-                  <option v-for="tag in songStore.allUserTags" :key="tag" :value="tag">{{ tag }}</option>
-                </select>
                 <button
                   type="button"
                   @click="onSaveTeam(row.team.id)"
@@ -99,14 +90,6 @@
             aria-label="New team name"
             class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
           />
-          <select
-            v-model="newTeamSongFilterTag"
-            aria-label="Song-tag filter for new team"
-            class="w-40 sm:w-48 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="">No filter</option>
-            <option v-for="tag in songStore.allUserTags" :key="tag" :value="tag">{{ tag }}</option>
-          </select>
           <button
             type="button"
             :disabled="adding || !newTeamName.trim()"
@@ -123,22 +106,18 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useTeamsStore } from '@/stores/teams'
-import { useSongStore } from '@/stores/songs'
 import { useToasts } from '@/stores/toasts'
-import { useAuthStore } from '@/stores/auth'
 import type { Team } from '@/types/team'
 
 const teamsStore = useTeamsStore()
-const songStore = useSongStore()
 const toasts = useToasts()
-const authStore = useAuthStore()
 
 // ── Duplicate-name guard (WR-01) ─────────────────────────────────────────────
-// Teams are consumed by NAME everywhere a service selects them (checkboxes,
-// filterSongsByTeamTags), unlike Roles which key off role.id — so two teams
-// sharing a name break checkbox independence and AI-filter matching. Compare
-// trimmed + case-insensitive, excluding the row being edited (so saving a row
-// without changing its name never collides with itself).
+// Teams are consumed by NAME everywhere a service selects them (the service
+// checkboxes), unlike Roles which key off role.id — so two teams sharing a
+// name break checkbox independence. Compare trimmed + case-insensitive,
+// excluding the row being edited (so saving a row without changing its name
+// never collides with itself).
 function isDuplicateName(name: string, excludeId?: string): boolean {
   const normalized = name.trim().toLowerCase()
   return teamsStore.teams.some((t) => t.id !== excludeId && t.name.trim().toLowerCase() === normalized)
@@ -148,14 +127,14 @@ function isDuplicateName(name: string, excludeId?: string): boolean {
 // Local editable copies, committed to the store only on "Save Team" click —
 // keeps the Firestore-driven teams list from clobbering in-progress edits
 // (mirrors RolesConfigPanel.vue's roleDrafts pattern exactly).
-const teamDrafts = ref<Record<string, { name: string; songFilterTag: string }>>({})
+const teamDrafts = ref<Record<string, { name: string }>>({})
 
 watch(
   () => teamsStore.teams,
   (teams) => {
     for (const team of teams) {
       if (!teamDrafts.value[team.id]) {
-        teamDrafts.value[team.id] = { name: team.name, songFilterTag: team.songFilterTag ?? '' }
+        teamDrafts.value[team.id] = { name: team.name }
       }
     }
     for (const id of Object.keys(teamDrafts.value)) {
@@ -167,7 +146,7 @@ watch(
 
 interface TeamRow {
   team: Team
-  draft: { name: string; songFilterTag: string } | undefined
+  draft: { name: string } | undefined
 }
 
 // Teams are a single flat list (no group badges, unlike Roles) — iterate
@@ -199,8 +178,7 @@ async function onSaveTeam(teamId: string) {
 
   // WR-02: renaming orphans the name-keyed reference on every service that
   // already selected the old name (same practical consequence as delete) —
-  // require the same soft-warn confirm step before committing the rename.
-  // Non-rename saves (song-tag-only edits) skip this and save immediately.
+  // require a soft-warn confirm step before committing the rename.
   const isRename = trimmedName !== team.name
   if (isRename && confirmRenameId.value !== teamId) {
     confirmRenameId.value = teamId
@@ -212,7 +190,6 @@ async function onSaveTeam(teamId: string) {
   try {
     await teamsStore.updateTeam(teamId, {
       name: trimmedName,
-      songFilterTag: draft.songFilterTag,
     })
     savedTeamId.value = teamId
     if (savedTimer) clearTimeout(savedTimer)
@@ -234,7 +211,6 @@ async function onConfirmDelete(teamId: string) {
 
 // ── Add team ─────────────────────────────────────────────────────────────────
 const newTeamName = ref('')
-const newTeamSongFilterTag = ref('')
 const teamAdded = ref(false)
 // WR-04: in-flight guard mirroring onSaveTeam's savingTeamId — blocks a fast
 // double-click from calling addTeam twice with the same name/order before the
@@ -248,7 +224,7 @@ async function onAddTeam() {
   if (!name) return
 
   // WR-01: reject a duplicate name before creating a second team that shares
-  // it (breaks checkbox independence + AI-filter matching downstream).
+  // it (breaks checkbox independence downstream).
   if (isDuplicateName(name)) {
     toasts.push(`A team named "${name}" already exists. Choose a different name.`)
     return
@@ -260,10 +236,8 @@ async function onAddTeam() {
     await teamsStore.addTeam({
       name,
       order: maxOrder + 1,
-      songFilterTag: newTeamSongFilterTag.value,
     })
     newTeamName.value = ''
-    newTeamSongFilterTag.value = ''
     teamAdded.value = true
     if (addedTimer) clearTimeout(addedTimer)
     addedTimer = setTimeout(() => {

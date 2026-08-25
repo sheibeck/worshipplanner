@@ -451,7 +451,6 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useTeamsStore } from '@/stores/teams'
-import { useSongStore } from '@/stores/songs'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import type { Person, RoleGroup } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
@@ -466,7 +465,6 @@ const route = useRoute()
 const authStore = useAuthStore()
 const rosterStore = useRosterStore()
 const teamsStore = useTeamsStore()
-const songStore = useSongStore()
 
 // ── Tabbed layout ────────────────────────────────────────────────────────────
 const activeTab = ref<'volunteers' | 'roles' | 'teams'>('volunteers')
@@ -692,8 +690,6 @@ function initStore() {
   if (!orgId) return
   rosterStore.subscribe(orgId)
   teamsStore.subscribe(orgId)
-  // The song-tag filter <select> on the Teams tab reads songStore.allUserTags.
-  songStore.subscribe(orgId)
   // seedDefaultRolesIfEmpty() checks roles.value.length synchronously, but
   // Firestore's onSnapshot always resolves asynchronously — calling it
   // immediately after subscribe() would race with an org that already has
@@ -735,10 +731,7 @@ onUnmounted(() => {
   stopTeamsSeedWatch = null
   rosterStore.unsubscribeAll()
   // Mirrors rosterStore's teardown above — teams are RosterView-owned config,
-  // same as roles. songStore is intentionally left subscribed: it is a
-  // broadly shared org-scoped store (Songs page, Service editor, Dashboard),
-  // and its lifecycle is managed by resetOrgScopedStores() on church switch,
-  // not by any single view's unmount.
+  // same as roles.
   teamsStore.unsubscribeAll()
 })
 </script>
