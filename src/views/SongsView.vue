@@ -131,7 +131,7 @@
         <div v-if="showHidden" class="mt-8 border border-gray-700 rounded-xl overflow-hidden">
           <div class="px-4 py-3 bg-gray-800 border-b border-gray-700">
             <h2 class="text-sm font-medium text-gray-300">Hidden Songs ({{ hiddenSongs.length }})</h2>
-            <p class="text-xs text-gray-500 mt-0.5">Hidden from the song list and AI planning. Restore to make them visible again.</p>
+            <p class="text-xs text-gray-500 mt-0.5">Hidden from the song list{{ authStore.isAiEnabled ? ' and AI planning' : '' }}. Restore to make them visible again.</p>
           </div>
           <div v-if="hiddenSongs.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
             No hidden songs

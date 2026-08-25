@@ -3,7 +3,8 @@
     <div class="px-4 py-3 bg-gray-900/50 border-b border-gray-800">
       <h2 class="text-sm font-medium text-gray-300">Teams</h2>
       <p class="text-xs text-gray-500 mt-0.5">
-        Teams your church uses for service planning. Attach a song-tag filter to constrain AI suggestions when that team is selected.
+        Teams your church uses for service planning.<span v-if="authStore.isAiEnabled">
+        Attach a song-tag filter to constrain AI suggestions when that team is selected.</span>
       </p>
     </div>
 
@@ -124,11 +125,13 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import { useTeamsStore } from '@/stores/teams'
 import { useSongStore } from '@/stores/songs'
 import { useToasts } from '@/stores/toasts'
+import { useAuthStore } from '@/stores/auth'
 import type { Team } from '@/types/team'
 
 const teamsStore = useTeamsStore()
 const songStore = useSongStore()
 const toasts = useToasts()
+const authStore = useAuthStore()
 
 // ── Duplicate-name guard (WR-01) ─────────────────────────────────────────────
 // Teams are consumed by NAME everywhere a service selects them (checkboxes,
