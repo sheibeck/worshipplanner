@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Configurability, Hardening & Cleanup
-current_phase: 83
-current_phase_name: Roles/Teams Tab UX & Copy
-status: completed
+status: Awaiting next milestone
 stopped_at: Completed 83-01-PLAN.md
-last_updated: "2026-08-24T21:01:01.472Z"
-last_activity: 2026-08-24
-last_activity_desc: Phase 83 complete
+last_updated: "2026-08-25T19:57:16.733Z"
+last_activity: 2026-08-25
+last_activity_desc: Milestone v2.2 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
   total_plans: 13
   completed_plans: 13
   percent: 100
+current_phase: 83
+current_phase_name: Roles/Teams Tab UX & Copy
 ---
 
 # ▶ ACTIVE MILESTONE — v2.2 Configurability, Hardening & Cleanup (roadmap created 2026-08-23)
@@ -876,10 +876,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 83 of 81 (Roles/Teams Tab UX & Copy)
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-08-24 — Phase 83 complete
+Phase: Milestone v2.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-25 — Milestone v2.2 completed and archived
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -3305,5 +3305,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Continue Phase 80 with 80-02 (R234 deleteService share-artifact revocation) and 80-03 (R235 reprise-safe slide clear + R236 pending-render edit guard)
-- Owner pre-deploy step recorded for 80-01: `firebase deploy --only firestore:rules` (see .planning/PENDING-VERIFICATION.md)
+- Start the next milestone with /gsd-new-milestone

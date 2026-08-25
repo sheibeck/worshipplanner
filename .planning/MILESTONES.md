@@ -1,5 +1,31 @@
 # Milestones
 
+## v2.2 Configurability, Hardening & Cleanup (Shipped: 2026-08-25)
+
+**Phases completed:** 5 phases, 13 plans, 35 tasks
+
+**Key accomplishments:**
+
+- Per-org `teams` Firestore subcollection + `useTeamsStore()` Pinia store, mirroring `roster.ts`'s roles half exactly, with an idempotent 4-team default seed and church-switch teardown registration
+- New accessible-from-the-start Teams tab in RosterView.vue — TeamsConfigPanel.vue mirrors RolesConfigPanel.vue's draft+Save+soft-warn-delete UX as a flat list, adds a per-team song-tag filter select, and RosterView seeds/subscribes it on first load.
+- Both service-plan team-checkbox surfaces and the AI song-suggestion filter now read the shared teams store instead of a hard-coded `['Choir','Orchestra','Communion','Special']` array and a twice-duplicated Orchestra-only filter — the ordinal-Sunday auto-team-selection is deleted outright.
+- Closed two server-side Firestore rules gaps — the inviteLookup self-invite privilege-forgery vector and the mutable org createdBy provenance field — both mirroring idioms already live in the same rules file, shipped BUILT + TESTED + UNDEPLOYED.
+- deleteService now revokes every public share artifact a service can accumulate — shareTokens (query-based, handles multiples), serviceShareLinks, and serviceShares — before deleting the service doc, closing the stale-share-URL information-disclosure gap.
+- Fixed `rebuildSongGroup`'s stale-slides-on-removal bug (R235, reprise-safe by construction) and added a pending-render customization block in `EditSlideDrawer.vue` (R236), both client-only.
+- Re-confirmed already-shipped R237 PC-export coverage and R238 sender wiring via existing tests; delivered the R238 owner runbook (`functions/DEPLOY-EMAIL-DOMAIN.md`) and a PENDING-VERIFICATION.md entry — no source rebuild.
+- Real `<label for>` and `aria-label` accessible names added to all 4 previously placeholder-only Owner Console inputs, plus `useId()`-based label/input association in the shared `ConfigTextField.vue`.
+- WAI-ARIA APG Tabs pattern (role=tablist/tab/tabpanel, aria-selected, aria-controls, aria-labelledby) added to both the Owner Console and Service Editor tab strips, bound to each view's existing activeTab state, with a regression test proving the Owner Console panels' always-mounted onSnapshot listeners survive the retrofit.
+- Extracted the duplicated tag include/exclude Set-intersection logic into `filterSongsByTags()` and built a real `SongBrowser.vue` shell (search + tag checklist + shared filtered-song computed) that now powers both the Songs page and the service-plan song picker, leaving both consumers' row markup untouched.
+- Super-admin-only `aiMasterEnabled` field + `setOrgAiEnabled` callable + fail-closed AI-proxy enforcement, all mirroring the existing `active`/`setOrgActive` pattern — ships BUILT + TESTED + UNDEPLOYED
+- authStore.aiMasterEnabled ref (default OFF) two-gates claudeApi.ts's isAiEnabled(), hides SettingsView's AI Features card, and drives a new Owner Console per-row AI toggle against the (Plan-01, still-undeployed) setOrgAiEnabled callable.
+- Constrained the Roles/Teams config tabs to max-w-4xl, restyled both panels' Delete text-link into a real destructive button matching SettingsView's Clear Credentials, and corrected the schedulable-roles copy (plus a matching stale type doc-comment) to accurately describe the scheduler's real per-role auto-fill behavior.
+
+**Post-close scope change (2026-08-25):** The per-team song-tag AI filter (R230) — referenced in the Teams-tab and AI-filter accomplishments above — was **delivered in Phase 79 and then removed** by owner decision on the same day the milestone closed. It only fed AI song suggestions, did nothing when AI was off, and presented a live-looking control that had no effect — confusing for no benefit. `songFilterTag` and `filterSongsByTeamTags()` were deleted (commit `951ffe80`); team selection no longer narrows the AI candidate pool. REQUIREMENTS.md marks R230 as removed; the team-list dedup (R241) stands.
+
+**Deploy status at close:** Hosting deployed to production 2026-08-25 (client changes live). Phase 80 rules (`inviteLookup` gate + `createdBy` immutability) and Phase 82 rules+functions (per-org AI enablement) ship UNDEPLOYED as owner-gated hand-overs, then re-enable AI for Berean (OFF by default at cutover). Audit PASSED 19/19; human UAT `/gsd-verify-work 79–83` deferred (`PENDING-VERIFICATION.md`).
+
+---
+
 ## v2.1 Organization Lifecycle & Super-Admin Access (Shipped: 2026-08-23)
 
 **Phases completed:** 4 phases (75–78), 7 plans
@@ -17,15 +43,18 @@ acceptance with human UAT (`/gsd-verify-work 75–78`) deferred and preserved in
 - **Phase 75 — Pending-Invite Visibility:** the super-admin Organizations list distinguishes active
   (logged-in) members from invited-but-pending ones, computed server-side by the existing
   `listOrganizations` callable.
+
 - **Phase 76 — Church Deactivation & Reactivation (SECURED 11/11):** a super-admin-gated `setOrgActive`
   callable flips an org's `active` status, `firestore.rules`/`storage.rules` deny a deactivated org's
   members org-scoped access (Firestore via a live `get()`, Storage via a fanned-out `deactivatedOrgs`
   claim since cross-service reads are inert there), and reactivation restores it; lifecycle fields are
   callable-write-only.
+
 - **Phase 77 — Church Deletion, Cascade Cleanup (SECURED 11/11):** deletion is gated on prior
   deactivation, runs through a re-verifying super-admin-gated `deleteOrganization` callable that
   cascades every Firestore subcollection + cross-reference + Storage object, requires typed
   confirmation, and is safely retriable; `allow delete: if false` keeps clients out entirely.
+
 - **Phase 78 — Super-Admin Enter-Any-Church (SECURED 7/7):** an additive super-admin arm in
   `firestore.rules`/`storage.rules` grants a super-admin editor-equivalent read/write on any church
   with no membership doc (invisible to that church's member list), with a persistent "viewing as
@@ -54,11 +83,13 @@ on owner acceptance; human UAT (`/gsd-verify-work 72–74`) deferred and preserv
 - **Phase 72 — Owner Console Tabs:** restructured `OwnerConsoleView` into a query-driven tabbed shell
   (Configuration = the pre-v2.0 console body relocated byte-for-byte; Organizations = the new tab),
   super-admin-gated, with the open tab reflected in the route query.
+
 - **Phase 73 — Multi-Org Storage Auth Claim (SECURED 6/6, backlog 999.5):** widened the org-membership
   claim to an additive `orgs: {[orgId]: role}` map (recomputed from `collectionGroup('members')`,
   superAdmin-preserving), widened `storage.rules`' `isOrgMemberByClaim` with a null-guarded `orgs` arm
   ORed with the legacy primary-only arm (no access gap during rollout), plus an idempotent
   dry-run/`--apply` backfill.
+
 - **Phase 74 — Organizations: List, Onboard & Admin Assignment (SECURED 8/8):** three super-admin-gated
   callables — `listOrganizations` (server `count()` summaries), `onboardOrganization` (atomic org +
   default `OrgSettings` + seeded service template + first admin at editor tier, plus a Resend
@@ -89,11 +120,14 @@ Closed on owner acceptance; human UAT (`/gsd-verify-work 68–71`) deferred and 
   gate — grantable via `superAdmins/{uid}`, enforced by both the client route and claim-only Firestore
   rules — with the shared `mergeAndSetCustomClaims`/`clearClaimKeys` helper closing the claim-replace
   hazard (a claim write no longer wipes `orgId`/`role`).
+
 - **Phase 69 — Firestore Runtime Config:** every v1.8 cost/cleanup/messaging knob moved out of
   `process.env` into an admin-only `appConfig/global` doc that 7 Cloud Functions read at runtime, with
   safe deep-merged defaults so an absent/empty doc reproduces prior behavior byte-for-byte.
+
 - **Phase 70 — Admin Console UI & No-Reply Sender:** a super-admin console showing/editing every
   managed setting with validation and provenance, plus the app's no-reply sender configuration.
+
 - **Phase 71 — Cleanup Deletion-Toggle Safety:** a dry-run blast-radius preview (`previewCleanupDryRun`
   callable) and explicit confirm step gate every `*_CLEANUP_ENABLED` flip, with the song-linked
   background fail-safes proven intact.

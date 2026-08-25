@@ -8,34 +8,34 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.2 Configurability, Hardening & Cleanup
+## Current State — no active milestone
 
-**Goal:** Make the app fit churches other than Berean, and close accumulated security, data-integrity, and
-polish debt from the v1.x–v2.1 backlog (999.x carry-forwards).
+All milestones through **v2.2** have shipped and are archived under `.planning/milestones/`. The next
+milestone is scoped via `/gsd-new-milestone`, which also creates a fresh `.planning/REQUIREMENTS.md`
+(intentionally absent between milestones). Roadmap: `.planning/ROADMAP.md`.
 
-**Target features:**
-- **Per-org worship configuration (999.8 / SEED-002)** — lift church-specific hard-coded rules into per-org
-  config or drop the too-specific ones. First slice "Configurable Teams": a per-org team list (modeled like
-  roster roles), a generalized per-team song-tag filter (replacing the hard-coded Orchestra→Orchestra-tagged
-  rule), dropping the ordinal-Sunday auto-team rule, and collapsing duplicated constants (esp. `VW_TYPE_LABELS`).
-- **Security & data-integrity hardening** — gate `inviteLookup` creation to the target org's editor
-  (self-invite fix) and verify/close the `createdBy` finding (999.11); revoke a service's share tokens on
-  `deleteService` (999.10); guard against per-entry customization of a pending deck slide lost on
-  pending→ready (999.9); clear a song's slides when the song is cleared, even when reprised (999.2).
-- **Polish & ops** — harden the messaging From address to a verified sending domain so real volunteers
-  receive mail (999.6); export non-song/non-scripture slots in all Planning Center export modes (999.4);
-  Owner Console a11y retrofit — real labels + ARIA tab semantics (999.7); extract a shared song-browse
-  component used by both the Songs page and the service-plan picker (999.1).
+<details>
+<summary>Shipped milestone — v2.2 Configurability, Hardening & Cleanup (Phases 79–83, shipped 2026-08-25)</summary>
 
-**Key context:** Composed from backlog review + open carry-forwards (audit 2026-08-23). Full per-rule catalog
-and A/B/C verdicts for 999.8 live in `seeds/SEED-002-church-specific-rules-configurability.md`. Excluded as
-non-build owner verification: `999.3` (prod draft-lock hand-check) and the deferred `/gsd-verify-work` UAT
-items in `PENDING-VERIFICATION.md`. 999.11 is ~1.5 findings — the self-invite rule is fully open; the
-`createdBy` finding needs re-verification since the rules were reworked in v2.1. Follow the standing deploy
-discipline: auth-claim / `firestore.rules` / `storage.rules` / new-callable changes ship built + tested +
-UNDEPLOYED with exact `firebase deploy` commands handed to the owner.
+Made the app fit churches other than Berean and closed accumulated security/data-integrity/polish debt.
+**Delivered:** per-org configurable **Teams** (each church's own team list, modeled like roster roles)
+replacing the hard-coded `['Choir','Orchestra','Communion','Special']` list, plus dropping the
+ordinal-Sunday auto-team rule (R228–R231, R241 dedup); security & data-integrity hardening —
+`inviteLookup` create gate + org `createdBy` immutability (firestore.rules), `deleteService`
+share-artifact revocation, reprise-safe song-slide clear, pending-render edit guard (R232–R236);
+polish/ops — full Planning Center export slot coverage, Resend verified-domain owner runbook, Owner
+Console accessibility (labels + ARIA tabs), one shared `SongBrowser` component (R237–R240); per-org **AI
+enablement** OFF-by-default behind a super-admin master gate + fail-closed proxy (R242–R243); and
+Roles/Teams tab width + real Delete button + corrected schedulable-roles copy (R244–R246). Hosting
+deployed to production 2026-08-25; the Phase 80 rules and Phase 82 rules+functions ship UNDEPLOYED as
+owner-gated hand-overs. Audit PASSED (19/19). **R230 (the per-team song-tag AI filter) was delivered in
+Phase 79 then removed 2026-08-25 by owner decision** — it only fed AI suggestions and confused users.
+Human UAT (`/gsd-verify-work 79–83`) deferred (`PENDING-VERIFICATION.md`). Full record:
+[milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md) ·
+[milestones/v2.2-REQUIREMENTS.md](milestones/v2.2-REQUIREMENTS.md) ·
+[milestones/v2.2-MILESTONE-AUDIT.md](milestones/v2.2-MILESTONE-AUDIT.md).
 
-Requirements defined in `.planning/REQUIREMENTS.md`; roadmap in `.planning/ROADMAP.md`.
+</details>
 
 <details>
 <summary>Shipped milestone — v2.1 Organization Lifecycle & Super-Admin Access (Phases 75–78, deployed 2026-08-23)</summary>
@@ -246,6 +246,8 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Validated
 
+- ✓ Per-org configurable Teams + security/data-integrity hardening + polish/ops + per-org AI enablement (OFF by default) + Roles/Teams tab UX — own team list replacing hard-coded Berean rules & dropped ordinal-Sunday auto-select (R228–R231, R241); inviteLookup gate, createdBy immutability, deleteService share revocation, reprise-safe slide clear, pending-render guard (R232–R236); PC-export coverage, Resend domain runbook, Owner Console a11y, shared SongBrowser (R237–R240); super-admin AI master gate + fail-closed proxy (R242–R243); tab width/Delete button/copy (R244–R246) — **v2.2** (shipped 2026-08-25, hosting live; rules/functions owner-gated; audit PASSED 19/19). **R230 (per-team song-tag AI filter) delivered then removed 2026-08-25 by owner decision.**
+- ✓ Super-admin Owner Console + multi-church onboarding + org lifecycle — super-admin claim gate & claim-merge, Firestore runtime config with dry-run blast-radius preview, tabbed Configuration/Organizations shell, org onboarding (org + settings + seeded template + first admin), multi-org Storage auth-claim widening, deactivate/reactivate, deactivation-gated cascade delete, pending-invite visibility, super-admin enter-any-church — **v1.9–v2.1** (R174–R211; all deployed to production 2026-08-23; v2.1 audit PASSED 16/16; archived).
 - ✓ Fan-out, cron & instance guardrails — gated the unused daily `sendScheduledReminders` cross-org scan OFF by default (`SCHEDULED_MESSAGING_CRON_ENABLED`), Resend send-loop caps (per-message recipient reject + per-org daily quota, fail-open), project-wide `setGlobalOptions({maxInstances})` (api keeps its tighter cap), and Cloud Run render-service `--max-instances=3`/`--concurrency=1` (R170–R173) — v1.8 Phase 67 (code-complete + verified 2026-08-20; **UNDEPLOYED, all bounded/reversible → autonomous deploy**). Note: gating the cron also pauses composer "schedule-for-later" dispatch until the flag is enabled (disclosed, reversible).
 - ✓ Storage retention — proved+hardened the media & orphan-render sweeps (delete-branch tests, per-run delete cap + bytes logging) and added two new sweeps: `cleanupOrphanBackgrounds` (orphan+age, 3-tier reference detection with `referencesComplete` + floor-guard fail-safes → dry-run) and `cleanupPptxSources` (prune consumed+aged source `.pptx`/`images/`, keep `rendered/`); all four DRY-RUN by default (R165–R168) — v1.8 Phase 66 (code-complete + verified 2026-08-20; **UNDEPLOYED, dry-run** — orchestrator deploys the four dry-run cron functions, owner sets each `*_CLEANUP_ENABLED=true` to activate real deletion).
 - ✓ AI proxy cost controls — per-uid rate limit (429, fail-open), server-side model allow-list (400) + max_tokens clamp, `aiUsage` ledger via Admin SDK, `maxInstances` cap on the `api` proxy; all gated to the anthropic upstream only (R161–R164) — v1.8 Phase 65 (code-complete + verified 2026-08-20; **UNDEPLOYED** — orchestrator deploys `functions:api`, owner deploys the `firestore.rules` deny).
@@ -290,63 +292,39 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-<!-- Milestone v2.0 Multi-Church Onboarding & Owner Console Tabs. Requirements defined in
-     .planning/REQUIREMENTS.md (R193+), grouped: tabbed owner console, organizations list + onboard,
-     church-admin assignment (reuse editor role), multi-org Storage auth claim (999.5). Traceability
-     filled by the roadmap. -->
+**No active milestone.** v2.0, v2.1, and v2.2 have all shipped and archived. The next milestone's
+requirements are created fresh via `/gsd-new-milestone`.
 
-**v2.0 Multi-Church Onboarding & Owner Console Tabs (R193+)** — restructure `OwnerConsoleView` into a
-Configuration tab (super-admins roster + the four v1.9 platform-config cards) and a new Organizations tab
-that lists all churches and onboards a new one (org record + default `OrgSettings` + seeded default service
-template + first admin assigned by email at editor tier via the server-verified membership path), and widen
-the org-membership custom claim to carry all of a user's orgs+roles so `storage.rules` keeps Storage access
-working for a newly-onboarded second-org admin (999.5). Full list in `.planning/REQUIREMENTS.md`.
+**Standing owner-run hand-overs (carry until run):**
 
-*(Backlog 999.5 pulled into scope as a hard prerequisite for onboarding, 2026-08-21.)*
-
-**v1.9 standing follow-ups (owner-run; carried until v1.9 lifecycle completes)**
-
-- [ ] Run v1.9's `/gsd-verify-work 68..71` human UAT and the owner-gated v1.9 deploys (super-admin bootstrap
-      script, `firestore.rules`/`storage.rules`, functions), then audit → complete → cleanup for v1.9
-
-**Carried forward / backlog (promote with `/gsd-review-backlog` when ready)**
-
+- [ ] **v2.2 backend deploys** (undeployed at close): `firebase deploy --only firestore:rules` (Phase 80 —
+      `inviteLookup` create gate + `createdBy` immutability) and `firebase deploy --only
+      firestore:rules,functions:setOrgAiEnabled,functions:api` (Phase 82 — per-org AI), then re-enable AI for
+      Berean (OFF by default at cutover). Detail in `PENDING-VERIFICATION.md`.
+- [ ] **Deferred human UAT** for shipped-but-owner-attributed milestones — `/gsd-verify-work` for phases
+      68–83 (v1.9–v2.2), preserved in `PENDING-VERIFICATION.md`.
 - [ ] Activate storage deletion after reviewing dry-run logs, and deploy the Phase 65 `firestore.rules`
-      deny — v1.8 standing owner follow-ups (may be superseded once v1.9's live cleanup toggles ship)
+      deny — v1.8 standing follow-ups (may be superseded once v1.9's live cleanup toggles ship).
 
-- [ ] Harden the messaging From address to a Resend-verified domain so real volunteers receive mail —
-      email is still test-mode `onboarding@resend.dev` (backlog 999.6)
-- [ ] Confirm the production draft lock by hand and re-run the devtools bypass check (backlog 999.3 —
-      `firestore.rules` is deployed; the hand-check is outstanding)
-- [ ] Clearing a song should clear its slides, even when the song is reprised (backlog 999.2)
-- [ ] Extract a shared song-browse component used by both the Songs page and the service-plan picker
-      (backlog 999.1)
-- [ ] Export non-song/non-scripture slots in ALL Planning Center export modes (backlog 999.4)
-- [ ] Owner Console a11y retrofit — add real `<label>`/`aria-label` to the console's text inputs
-      (super-admins grant form, Organizations onboard + assign forms — currently placeholder-only) and ARIA
-      tab semantics (`role="tablist"`/`aria-selected`) to the Configuration/Organizations tab strip (and the
-      matching `ServiceEditorView` tab strip). Inherited console debt surfaced by the v2.0 UI reviews
-      (Phase 72 tab strip 23/24, Phase 74 forms 22/24); best done as one cross-surface pass (backlog 999.7)
-- [ ] Extract church-specific hard-coded worship rules into per-org config (or drop the too-specific ones) —
-      full per-rule catalog + verdicts in `seeds/SEED-002-church-specific-rules-configurability.md`. Recommended
-      first slice "Configurable Teams": per-org team list (like roster roles) + generalized per-team song-tag
-      filter + drop the ordinal-Sunday auto-team rule. Kills the owner-named "team list" + "orchestra checkbox"
-      tailoring (backlog 999.8)
-- [ ] Warn/guard against per-entry customization of a PENDING deck slide that is lost when the render flips
-      pending→ready (`EditSlideDrawer.vue` has no `renderState` awareness) — carry-forward C4, owner-decision
-      on a follow-up phase. Detail in `PENDING-VERIFICATION.md` C4 (backlog 999.9)
-- [ ] `deleteService` should revoke the service's `shareTokens`/`serviceShares`/`serviceShareLinks` (as
-      `deleteQuarter` already does) so a deleted service's public share token isn't permanent — carry-forward
-      C5; `allow delete` rules already in place, no rules change needed. Detail in `PENDING-VERIFICATION.md` C5
-      (backlog 999.10)
-- [ ] Harden 2 known-open `firestore.rules` findings — (1) `organizations/{orgId}` `allow write: if
-      isOrgEditor` lets an editor rewrite `createdBy` (`firestore.rules:31`); (2) `inviteLookup/{email}` `allow
-      create: if isSignedIn()` self-invite vector (`firestore.rules:173`) — carry-forward C2 residual. Detail
-      in `PENDING-VERIFICATION.md` C2 (backlog 999.11) — **DONE in v2.2 Phase 80 (R232+R233), ships UNDEPLOYED**
-- [ ] `deleteService` orphans the service's `messages` and `lockSnapshots` subcollections — client `deleteDoc`
-      does not cascade (Phase 80 code-review WR-02, deferred as out-of-scope for R234's share-artifact
-      revocation). A future fix should cascade-delete those subcollections (mirror the server-side org-deletion
-      cascade), likely via a Cloud Function since client bulk subcollection deletes are unbounded (backlog 999.12)
+**Backlog (promote with `/gsd-review-backlog` when ready):**
+
+- [ ] Confirm the production draft lock by hand and re-run the devtools bypass check (backlog 999.3)
+- [ ] `deleteService` orphans the service's `messages`/`lockSnapshots` subcollections — client `deleteDoc`
+      does not cascade; needs a cascade delete (likely a Cloud Function, since client bulk subcollection
+      deletes are unbounded). Phase 80 code-review WR-02, deferred (backlog 999.12)
+- [ ] Harden the messaging From address to a Resend-verified sending domain so real volunteers receive mail
+      — the R238 owner runbook shipped in v2.2 (`functions/DEPLOY-EMAIL-DOMAIN.md`); DNS is owner-run and not
+      yet done, and the owner is not yet committed to a domain (backlog 999.6)
+- [ ] SEED-002 remainder (not taken in v2.2): fetch Planning Center team names/times live instead of the
+      hard-coded lists (A3/A4), and the Vertical-Worship-model configurability items (C1). Catalog in
+      `seeds/SEED-002-church-specific-rules-configurability.md` (status: harvested)
+- [ ] SEED-001: owner-only admin UI for the v1.8 cost/cleanup env knobs, so guardrails are adjustable
+      without a redeploy (status: deferred) — `seeds/SEED-001-admin-settings-interface.md`
+
+> **Closed in v2.2 (2026-08-25):** 999.1 shared song-browse (R240), 999.2 song-clear slides (R235), 999.4
+> PC-export slot coverage (R237), 999.7 Owner Console a11y (R239), 999.8 configurable teams (R228–R231),
+> 999.9 pending-render guard (R236), 999.10 deleteService share revocation (R234), 999.11 the two
+> firestore.rules findings (R232+R233). 999.5 multi-org Storage claim closed in v2.0.
 
 ### Out of Scope
 
@@ -453,6 +431,9 @@ Administrative, Communication, Rehearsal, Service time, Training, Physical setup
 | v1.7 tracks sent + hard bounces, not opens | Bounce surfacing (via a provider webhook) is what actually prevents silently-lost mail; open-tracking adds pixels/webhook complexity and privacy questions for little planning value — deferred | ✓ Good — HMAC-verified bounce webhook live in production v1.7 |
 | Email provider chosen by research, owner-approved | Provider selection is a cost + deliverability + Firebase-fit decision with a real recurring bill and a secret the owner must add to `.env.local`; the research pass surfaces options and the owner picks | ✓ Good — Resend chosen; deployed v1.7 (email still test-mode until domain verified, backlog 999.6) |
 | Send path is a backend Cloud Function, deploy owner-gated | Provider API keys cannot ship to the client; mail sends through Firebase Functions holding the secret, and per the standing grant every such deploy is handed to the owner, not run autonomously | ✓ Good — key confined to `sendQueuedMessage`; owner deployed 2026-08-17 |
+| Per-org Teams modeled on roster Roles (own subcollection + store) | Churches differ in their team lists; mirroring the proven roles half kept the store/UX/seed patterns identical and low-risk | ✓ Good — v2.2; replaced the hard-coded Berean team list |
+| Removed the per-team song-tag AI filter (R230) after shipping it | It only fed AI song suggestions, was inert when AI was off, and presented a live-looking control that did nothing — confusing for no real benefit | ✓ Good — v2.2 (2026-08-25); team selection no longer narrows the AI pool |
+| Per-org AI is OFF by default behind a super-admin master gate | AI is a metered cost the platform owner controls per church; `aiMasterEnabled` two-gates every affordance (`isAiEnabled = master && church setting`) and the proxy fails closed | ✓ Good — v2.2 (R242–R243); mirrors the `active`/`setOrgActive` pattern |
 
 ## Evolution
 
@@ -472,4 +453,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-21 — started milestone v2.0 Multi-Church Onboarding & Owner Console Tabs (tabbed owner console + Organizations onboarding: org record + settings + seeded default template + first admin by email; widen org-membership claim for multi-org Storage, backlog 999.5 pulled in). Decisions: v2.0 major, stacks on v1.9 (code-complete, lifecycle parked with owner), church admin = existing editor role, milestone research skipped, run autonomous w/ verification deferred. Next: defining requirements → roadmap.*
+*Last updated: 2026-08-25 after v2.2 milestone — completed & archived v2.2 Configurability, Hardening & Cleanup (Phases 79–83): per-org configurable Teams replacing hard-coded Berean rules, security/data-integrity hardening, polish/ops close-out, per-org AI enablement OFF-by-default, and Roles/Teams tab UX. Hosting deployed to production 2026-08-25; Phase 80 rules + Phase 82 rules/functions remain owner-gated hand-overs. R230 (per-team song-tag filter) delivered then removed by owner decision. Audit PASSED 19/19. No active milestone — next is scoped via `/gsd-new-milestone`.*
