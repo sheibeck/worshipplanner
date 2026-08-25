@@ -158,3 +158,99 @@ changes, no callable signature changes.
 ### Self-Check: PASSED
 
 All modified files verified present on disk; commit `176274fa` verified present in git history.
+
+## Second follow-up pass (2026-08-25) — full SongTable-style row + drawer relocation
+
+Owner testing feedback continued: the row still carried Assign admin, Configure (chevron), and
+Enter church side by side. This pass makes the Organizations table match `SongTable.vue`'s pattern
+exactly — the row is now data-only, a trailing right-aligned `>` chevron sits at the end of the
+row, the whole row is clickable to open the slideout, and **every** per-org action (Assign admin,
+Enter church, AI, Deactivate/Reactivate, Delete) lives inside `OrgConfigDrawer.vue`.
+Commit: `7ec35cff` (`fix(quick-260824): move Assign admin + Enter church into the org config drawer`)
+
+### Changes applied
+
+1. **Table row is now data-only + trailing chevron** — `OrganizationsTab.vue`. Removed the entire
+   Actions column (`<th>Actions</th>` + its `<td>` holding the Assign-admin inline form,
+   Configure button, and Enter-church button). Columns are now Church | Org ID | Created |
+   Members | trailing chevron. Added a trailing `<th class="px-4 py-3 w-8"><span
+   class="sr-only">Configure</span></th>` and a matching trailing `<td class="px-4 py-3
+   text-right">` per row holding the `>` chevron (SongTable's `d="M9 5l7 7-7 7"` icon, gray-500,
+   `h-4 w-4`). The chevron stays an icon-only `aria-label="Configure {org name}"` button (so the
+   existing aria-label-based test query keeps working) with `@click.stop`. The whole `<tr>` is now
+   clickable (`@click="configOrgId = org.orgId"`, `cursor-pointer` class), mirroring SongTable's
+   `@click="$emit('select', song)"` row pattern. Empty-state colspan stays `5` (unchanged column
+   count).
+2. **Assign admin moved into `OrgConfigDrawer.vue`** — new "Admin access" section, presentational:
+   collapsed state shows an "Assign admin" trigger button (emits `start-assign`); expanded state
+   shows the email input (`:value="assignEmail"` + `@input` emits `update:assign-email`, one-way —
+   never `v-model`, matching the AI/Active sections' established convention) plus Assign (emits
+   `confirm-assign`, disabled while `isAssigning`) and Cancel assign (emits `cancel-assign`)
+   buttons; renders `assignError`/`assignFeedback` props. `OrganizationsTab.vue` still owns
+   `assigningOrgId`/`assignEmail`/`isAssigning`/`assignError`/`assignFeedback` and the unchanged
+   `startAssign`/`onConfirmAssign`/`cancelAssign` handlers — only the markup and its
+   emit-driven triggers moved.
+3. **Enter church moved into `OrgConfigDrawer.vue`** — new "Enter as this church" section with a
+   single button (`data-testid="org-config-enter-church-button"` — queried by testid rather than
+   text since the label flips to "Entering..."), disabled via `enterDisabled` prop (covers both
+   "this org is entering" and "a different org is entering", preserving the old row button's
+   cross-row double-submit guard), emits `enter-church`. `OrganizationsTab.vue` still owns
+   `enteringOrgId`/`enterError` and the unchanged `onEnterChurch` handler.
+4. **Drawer-close now resets in-progress assign state** — added `onCloseDrawer()` in
+   `OrganizationsTab.vue` (`configOrgId = null; cancelAssign()`), wired to the drawer's `@close`.
+   Without this, closing the drawer mid-assign-form and reopening it (even for a different org)
+   would show a stale expanded email input — a Rule 1 bug caught while building this feature, not
+   part of the original directives.
+5. **New drawer props/emits**: `assigning`, `assignEmail`, `isAssigning`, `assignError`,
+   `assignFeedback`, `entering`, `enterDisabled`, `enterError` (props); `start-assign`,
+   `cancel-assign`, `update:assign-email`, `confirm-assign`, `enter-church` (emits). All additive —
+   no existing prop/emit renamed or removed.
+
+### Files modified
+
+- `src/components/admin/OrganizationsTab.vue` — table template reworked (data-only row + trailing
+  chevron, whole-row click); removed the Actions column entirely; added `onCloseDrawer()`; wired
+  8 new drawer props + 5 new drawer emits reusing existing state/handlers unchanged.
+- `src/components/admin/OrgConfigDrawer.vue` — added the "Admin access" (Assign admin) and "Enter
+  as this church" sections between Active and Delete; added the corresponding props/emits.
+- `src/components/admin/__tests__/OrganizationsTab.test.ts` — rewrote every suite that used to
+  interact with row-level Assign admin / Enter church buttons directly to open the drawer first
+  (`openConfigDrawer` helper, unchanged since it already targeted the aria-labeled chevron); added
+  a whole-row-click test, a "drawer surfaces Assign admin/Enter church" test, and a
+  close-resets-assign-state regression test. 60 tests total (was 57), all passing.
+- `src/components/admin/__tests__/OrgConfigDrawer.test.ts` — **new** (the drawer's first standalone
+  test file; previously only exercised indirectly via OrganizationsTab.test.ts). 25 tests covering
+  shell/focus, AI checkbox, Active button, the new Assign admin section, the new Enter church
+  section, and Delete — all presentational prop-in/event-out assertions, no callables.
+
+### Deviations from instructions
+
+- **[Rule 1 - Bug] Drawer close now resets the in-progress assign form.** Not explicitly requested,
+  but without it, closing mid-assign and reopening (same or different org) showed a stale expanded
+  email input. Fixed via `onCloseDrawer()` calling the existing `cancelAssign()`; covered by a new
+  regression test.
+
+No other deviations — the row-to-drawer relocation, chevron placement, and whole-row click all
+follow the SongTable.vue reference pattern and the task's directives exactly; every existing
+callable (`assignOrgAdmin`, `onEnterChurch`/`enterOrgAsSuperAdmin`, `setOrgAiEnabled`,
+`setOrgActive`, `deleteOrganization`) is reused unchanged.
+
+### Gates
+
+- `npx vitest run src/components/admin/__tests__/OrganizationsTab.test.ts
+  src/components/admin/__tests__/OrgConfigDrawer.test.ts
+  src/components/admin/__tests__/DeactivateOrgConfirmDialog.test.ts
+  src/components/admin/__tests__/DeleteOrgConfirmDialog.test.ts` — 115/115 passing
+  (60 + 25 + 14 + 16).
+- `npm run type-check` (`vue-tsc --build`, full form per CLAUDE.md) — clean.
+- Bare `npx vitest run` (full app suite) — 4314/4340 passing; the only 2 failing files are the
+  documented known-failing baseline (`src/storage.rules.test.ts` — Storage-emulator
+  `firestore.exists()` limitation, and `src/views/__tests__/RosterView.test.ts` — stale assertion),
+  same 26 failing tests as the prior baseline (4286/4312). No new failures; the +28 new passing
+  tests are this pass's additions (3 in OrganizationsTab.test.ts, 25 in the new
+  OrgConfigDrawer.test.ts).
+
+### Self-Check: PASSED
+
+All modified/created files verified present on disk; commit `7ec35cff` verified present in git
+history.
