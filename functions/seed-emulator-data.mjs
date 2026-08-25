@@ -37,6 +37,7 @@
 //   organizations/{orgId}/roles/{id}         src/stores/roster.ts:243-248 + src/types/roster.ts:5-11,99-108
 //   organizations/{orgId}/people/{id}        src/stores/roster.ts:96-106 + src/types/roster.ts:13-25
 //   organizations/{orgId}/songs/{id}         src/stores/songs.ts:281-285 + src/types/song.ts:12-42
+//   organizations/{orgId}/songs/{id}/lyrics  src/stores/songLyrics.ts:71-84 + src/types/songLyrics.ts:14-71
 //   organizations/{orgId}/services/{id}      src/stores/services.ts:251-261 + src/types/service.ts:63-188
 //   organizations/{orgId}/quarters/{id}      src/stores/quarters.ts:133-145 + src/types/roster.ts:66-79
 // The super-admin's custom claims (merge-preserving superAdmin):
@@ -182,6 +183,55 @@ const SONGS = [
   { id: 'song-10', title: 'O Come to the Altar', ccliNumber: '7051511', author: 'Elevation Worship', themes: ['repentance', 'invitation'], vwTypes: [2], tags: ['communion'], arrangements: [arr('arr-10a', 'Default', 'B', 72)] },
 ]
 
+// Song lyrics: src/types/songLyrics.ts:14-71 (LyricSection + SongLyrics), stored
+// in the songs/{songId}/lyrics subcollection and read newest-first by
+// src/stores/songLyrics.ts:37-57. Seeded with a fixed doc id ('lyrics-seed') so
+// re-running the seed overwrites the same version instead of piling up new ones.
+//
+// COPYRIGHT NOTE: to avoid committing copyrighted contemporary-worship lyrics,
+// only the public-domain hymn text (Amazing Grace — John Newton, 1779) is
+// reproduced verbatim. Every other entry below is SHORT, ORIGINAL sample text
+// written just to exercise the multi-section + repeated-chorus slide flow — it
+// is deliberately NOT the real song's lyrics. Replace with a real CCLI paste in
+// the app when you need exact text.
+function sec(id, label, lines) {
+  return { id, label, lines }
+}
+function sampleCopyright(title) {
+  return { title, authors: [], ccliSongNumber: '', copyrightLines: ['Sample lyrics — not the real song'], ccliLicenseNumber: '' }
+}
+// Reusable original placeholder sections (verse + chorus) for the copyrighted
+// contemporary songs. performanceOrder repeats the chorus to exercise the
+// reference/repeat behaviour (D-02).
+function samplePlaceholder(title) {
+  return {
+    sections: [
+      sec('verse-1', 'Verse 1', ['Sample verse one, line one', 'Sample verse one, line two', 'Sample verse one, line three']),
+      sec('chorus', 'Chorus', ['Sample chorus, line one', 'Sample chorus, line two']),
+      sec('verse-2', 'Verse 2', ['Sample verse two, line one', 'Sample verse two, line two', 'Sample verse two, line three']),
+    ],
+    performanceOrder: ['verse-1', 'chorus', 'verse-2', 'chorus'],
+    copyright: sampleCopyright(title),
+  }
+}
+const LYRICS = {
+  // Public-domain hymn — real text (John Newton, 1779).
+  'song-1': {
+    sections: [
+      sec('verse-1', 'Verse 1', ['Amazing grace, how sweet the sound', 'That saved a wretch like me', 'I once was lost, but now am found', 'Was blind, but now I see']),
+      sec('verse-2', 'Verse 2', ["'Twas grace that taught my heart to fear", 'And grace my fears relieved', 'How precious did that grace appear', 'The hour I first believed']),
+      sec('verse-3', 'Verse 3', ['Through many dangers, toils and snares', 'I have already come', "'Tis grace hath brought me safe thus far", 'And grace will lead me home']),
+    ],
+    performanceOrder: ['verse-1', 'verse-2', 'verse-3'],
+    copyright: { title: 'Amazing Grace', authors: ['John Newton'], ccliSongNumber: '', copyrightLines: ['Public Domain'], ccliLicenseNumber: '' },
+  },
+  'song-2': samplePlaceholder('How Great Is Our God'),
+  'song-5': samplePlaceholder('Great Are You Lord'),
+  'song-6': samplePlaceholder('Build My Life'),
+  'song-8': samplePlaceholder('Living Hope'),
+  'song-10': samplePlaceholder('O Come to the Altar'),
+}
+
 // Service slots — a valid subset of the ServiceSlot union (src/types/service.ts:63-146).
 // One SONG slot references a seeded song so the editor renders a chosen song.
 function serviceSlots() {
@@ -270,6 +320,21 @@ async function seedOrg(orgId, name, uid, { aiMasterEnabled }) {
       createdAt: now(),
       updatedAt: now(),
     })
+
+    // lyrics for songs that have a seeded entry (songLyrics.ts:71-84). Fixed
+    // doc id 'lyrics-seed' keeps re-seeding idempotent (overwrite, not a new
+    // version). Slides resolve LIVE from this doc (slideGroup.ts:22-26).
+    const lyric = LYRICS[s.id]
+    if (lyric) {
+      await db.collection('organizations').doc(orgId).collection('songs').doc(s.id)
+        .collection('lyrics').doc('lyrics-seed').set({
+          sections: lyric.sections,
+          copyright: lyric.copyright,
+          performanceOrder: lyric.performanceOrder,
+          createdAt: now(),
+          updatedAt: now(),
+        })
+    }
   }
 
   // one draft service (services.ts:251-261 + service.ts:155-188)
@@ -312,7 +377,8 @@ async function seedOrg(orgId, name, uid, { aiMasterEnabled }) {
     updatedAt: now(),
   })
 
-  console.log(`  ✓ seeded church "${name}" (${orgId}) — aiMasterEnabled=${aiMasterEnabled}`)
+  const lyricCount = SONGS.filter((s) => LYRICS[s.id]).length
+  console.log(`  ✓ seeded church "${name}" (${orgId}) — aiMasterEnabled=${aiMasterEnabled}, ${SONGS.length} songs (${lyricCount} with lyrics)`)
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
