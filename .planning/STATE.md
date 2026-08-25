@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.2
-milestone_name: Configurability, Hardening & Cleanup
-status: Awaiting next milestone
-stopped_at: Completed 83-01-PLAN.md
-last_updated: "2026-08-25T19:57:16.733Z"
+milestone: v2.3
+milestone_name: Scheduling Accuracy & Song/Team Refinements
+status: planning
+last_updated: "2026-08-25T23:11:04.119Z"
 last_activity: 2026-08-25
-last_activity_desc: Milestone v2.2 completed and archived
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
-current_phase: 83
-current_phase_name: Roles/Teams Tab UX & Copy
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -890,10 +886,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v2.2 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-25 — Milestone v2.2 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-25 — Milestone v2.3 started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 

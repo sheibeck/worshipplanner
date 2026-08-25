@@ -8,11 +8,35 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current State — no active milestone
+## Current Milestone: v2.3 Scheduling Accuracy & Song/Team Refinements
 
-All milestones through **v2.2** have shipped and are archived under `.planning/milestones/`. The next
-milestone is scoped via `/gsd-new-milestone`, which also creates a fresh `.planning/REQUIREMENTS.md`
-(intentionally absent between milestones). Roadmap: `.planning/ROADMAP.md`.
+**Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — so
+last-used dates are right (and backfilled), song keys are editable, no volunteer is double-booked across
+teams on one date, scripture rotation reflects only the plan (not the sermon), consistent teams schedule
+themselves, and the scheduler's UI copy tells the truth.
+
+**Target features:**
+- **Last-used date correctness + backfill** — fix the bug where a song's last-scheduled date lags reality
+  (e.g. "His Mercy Is More" showed Aug 11 despite a locked/exported Sep 6 service), then a one-time script
+  to recompute every song's last-used date from all services it was ever added to, retroactive to before
+  the fix.
+- **Editable song Key** — update/edit the Key on each song.
+- **One-team-per-date conflict rule** — a volunteer can't serve on two teams on the same date. Vocals is
+  folded into Band; Vocals becomes the sole role that allows multiple people and can combine with one
+  Band instrument (sing + play at once). This is the only special-case rule.
+- **Scripture rotation excludes sermon scripture** — the Scripture rotation tab lists only scripture items
+  added to the service plan, never the sermon/teaching passage.
+- **Recurring team scheduling (pattern-based)** — schedule a team on a consistent pattern (every Nth week,
+  or the Nth Sunday of the month); a service falling on a matching date auto-selects that team. Configured
+  in Volunteer → Teams via a `>` slideout like the Song table has.
+- **Accurate "soft planning target" copy** — scheduling hard-targets the default count (behavior stays);
+  correct the description so it no longer calls it a "soft planning target."
+
+## Current State — v2.3 milestone active (scoping)
+
+All milestones through **v2.2** have shipped and are archived under `.planning/milestones/`. v2.3 is being
+scoped via `/gsd-new-milestone`; requirements land in `.planning/REQUIREMENTS.md` and phases in
+`.planning/ROADMAP.md`.
 
 <details>
 <summary>Shipped milestone — v2.2 Configurability, Hardening & Cleanup (Phases 79–83, shipped 2026-08-25)</summary>
@@ -292,8 +316,8 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-**No active milestone.** v2.0, v2.1, and v2.2 have all shipped and archived. The next milestone's
-requirements are created fresh via `/gsd-new-milestone`.
+**v2.3 Scheduling Accuracy & Song/Team Refinements** is being scoped (see Current Milestone above).
+Requirements are defined fresh in `.planning/REQUIREMENTS.md`. v2.0–v2.2 have all shipped and archived.
 
 **Standing owner-run hand-overs (carry until run):**
 
@@ -454,4 +478,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-25 after v2.2 milestone — completed & archived v2.2 Configurability, Hardening & Cleanup (Phases 79–83): per-org configurable Teams replacing hard-coded Berean rules, security/data-integrity hardening, polish/ops close-out, per-org AI enablement OFF-by-default, and Roles/Teams tab UX. Hosting deployed to production 2026-08-25; Phase 80 rules + Phase 82 rules/functions remain owner-gated hand-overs. R230 (per-team song-tag filter) delivered then removed by owner decision. Audit PASSED 19/19. No active milestone — next is scoped via `/gsd-new-milestone`.*
+*Last updated: 2026-08-25 — started milestone v2.3 Scheduling Accuracy & Song/Team Refinements: last-used date correctness + backfill script, editable song Key, one-team-per-date conflict rule (Vocals folded into Band), sermon-free scripture rotation, pattern-based recurring team scheduling (Nth week / Nth Sunday) with a Volunteer→Teams slideout, and corrected "soft planning target" copy. Research skipped (brownfield refinements). Prior: v2.2 completed & archived (Audit PASSED 19/19).*
