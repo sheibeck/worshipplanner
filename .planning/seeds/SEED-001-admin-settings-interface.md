@@ -1,9 +1,16 @@
 ---
+status: deferred
 trigger_when: next milestone is scoped, or any work touches admin/settings UI, or the v1.8 cost-control env knobs need changing
 planted_during: v1.8 Cost & Billing Hardening (phases 65–67)
 planted_date: 2026-08-20
+deferred_date: 2026-08-25
 ---
 # SEED-001: Owner-only admin interface for the v1.8 cost/cleanup settings
+
+> **DEFERRED (2026-08-25).** Not taken in v2.2 (which scoped to configurability + hardening cleanup, not
+> the cost/cleanup admin surface). Parked so the v2.2 close audit starts from a clean slate — the idea is
+> preserved in full below. **Revisit when any admin/settings-surface work is scoped**, or when a v1.8
+> cost-control lever needs to change without a redeploy. To reactivate, flip `status:` back to `dormant`.
 
 ## When to Surface
 - The owner starts scoping the milestone AFTER v1.8 (this is the owner's stated next-milestone plan, 2026-08-20).

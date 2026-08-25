@@ -1,9 +1,20 @@
 ---
+status: harvested
 trigger_when: next milestone is scoped, or any work touches teams / service-plan setup / song filtering / Planning Center export / the VW model
 planted_during: v2.1 close-out audit (gsd-next carry-forward triage)
 planted_date: 2026-08-23
+harvested_during: v2.2 Configurability, Hardening & Cleanup
+harvested_date: 2026-08-25
 ---
 # SEED-002: Extract church-specific hard-coded rules into per-org configuration (or drop them)
+
+> **RESOLVED (harvested into v2.2, 2026-08-25).** v2.2 delivered the highest-value subset as
+> **Configurable Teams**: A1 (per-org team list, R228/R229) and B1 (drop the ordinal-Sunday auto-select,
+> R231). A2 (per-team song-tag filter, R230) was delivered in Phase 79 and then **removed** on 2026-08-25
+> (owner decision — it only fed AI suggestions and confused users; see REQUIREMENTS.md R230). The
+> remaining ideas — A3/A4 (fetch Planning Center team names/times live) and the C1 VW-model items — were
+> **not** taken and now live in the PROJECT.md 999.x backlog for a future milestone. Closing this seed so
+> the next milestone starts from a clean audit; the backlog carries the leftovers.
 
 ## When to Surface
 - The owner scopes the milestone after v2.1 and wants the app to fit churches other than Berean.

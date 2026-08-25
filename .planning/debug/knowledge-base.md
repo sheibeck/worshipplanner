@@ -1,3 +1,9 @@
+---
+slug: knowledge-base
+status: resolved
+type: knowledge-base
+note: Permanent curated index of resolved debug patterns (read by gsd-debugger), NOT an open investigation. Kept status:resolved so the milestone-close audit does not flag it.
+---
 # GSD Debug Knowledge Base
 
 Resolved debug sessions. Used by `gsd-debugger` to surface known-pattern hypotheses at the start of new investigations.
