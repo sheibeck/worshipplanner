@@ -16,7 +16,7 @@ import { parsePptxBuffer, type MappedSlide } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
 import { syncOrgMembershipClaim } from "./orgMembershipClaims";
 import { syncSuperAdminClaim, setSuperAdminClaim } from "./superAdminClaims";
-import { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive } from "./orgProvisioning";
+import { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive, setOrgAiEnabled } from "./orgProvisioning";
 import { deleteOrganization } from "./orgDeletion";
 import { Resend } from "resend";
 import { renderMessageTokens } from "./messageTokens";
@@ -3386,12 +3386,13 @@ export { syncSuperAdminClaim, setSuperAdminClaim };
 //
 // Implementation lives in ./orgProvisioning so its testable handlers
 // (onboardOrganizationHandler/assignOrgAdminHandler/listOrganizationsHandler/
-// setOrgActiveHandler) can be imported directly by tests without going
-// through the deployed wrappers. Only the four deployed Functions are
-// re-exported here -- mirrors syncOrgMembershipClaim/setSuperAdminClaim
-// above. Ship built + tested + UNDEPLOYED per 74-01-PLAN.md's/
-// 76-01-PLAN.md's hand-over deploy notes.
-export { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive };
+// setOrgActiveHandler/setOrgAiEnabledHandler) can be imported directly by tests
+// without going through the deployed wrappers. The deployed Functions are
+// re-exported here so Firebase discovers them from the entry point -- mirrors
+// syncOrgMembershipClaim/setSuperAdminClaim above. Ship built + tested +
+// UNDEPLOYED per 74-01-PLAN.md's/76-01-PLAN.md's hand-over deploy notes
+// (setOrgAiEnabled added Phase 82, R242-R243).
+export { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive, setOrgAiEnabled };
 
 // --- orgDeletion (Phase 77: deleteOrganization, R215-R219, R221 -- the
 // super-admin-gated permanent church deletion cascade). Implementation lives
