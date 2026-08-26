@@ -54,6 +54,13 @@ function makeRoleGroupOf(map: Record<string, RoleGroup>) {
   return (roleId: string): RoleGroup => map[roleId] ?? 'other'
 }
 
+// roleId -> isVocal lookup helper, mirroring makeRoleGroupOf's shape. Unknown roleIds default to
+// false (safe/non-exempt default), matching proposeQuarterSchedule's own default.
+function makeIsVocal(vocalRoleIds: string[]) {
+  const set = new Set(vocalRoleIds)
+  return (roleId: string): boolean => set.has(roleId)
+}
+
 describe('proposeQuarterSchedule', () => {
   it('blackout: never assigns a person on a blacked-out date, leaving the slot unfilled if they were the only candidate', () => {
     const people = [makePerson({ id: 'p1', roles: ['guitar'] })]
@@ -381,7 +388,7 @@ describe('proposeQuarterSchedule', () => {
 
   // --- D-10/D-12 group co-occurrence enforcement + D-05 per-role cadence/tier (Phase 15) ---
 
-  it('group TECH exclusivity: a person already on a TECH role that date is ineligible for a same-date BAND role (D-10)', () => {
+  it('group Band<->Tech exclusivity: a person already on a TECH role that date is ineligible for a same-date BAND role (R251)', () => {
     const people = [makePerson({ id: 'p1', roles: ['sound', 'guitar'] })]
     const dates = ['2026-01-04']
     const resolver = makeResolver([
@@ -389,15 +396,16 @@ describe('proposeQuarterSchedule', () => {
       { roleId: 'guitar', count: 1 },
     ])
     const roleGroupOf = makeRoleGroupOf({ sound: 'tech', guitar: 'band' })
+    const isVocal = makeIsVocal([])
 
-    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf, isVocal)
 
     expect(result.calendar['2026-01-04']?.['sound']).toEqual(['p1'])
     expect(result.calendar['2026-01-04']?.['guitar'] ?? []).not.toContain('p1')
     expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'guitar' })
   })
 
-  it('group TECH exclusivity (vice versa): a person already on a BAND role that date is ineligible for a same-date TECH role (D-10)', () => {
+  it('group Band<->Tech exclusivity (vice versa): a person already on a BAND role that date is ineligible for a same-date TECH role (R251)', () => {
     const people = [makePerson({ id: 'p1', roles: ['guitar', 'sound'] })]
     const dates = ['2026-01-04']
     const resolver = makeResolver([
@@ -405,15 +413,48 @@ describe('proposeQuarterSchedule', () => {
       { roleId: 'sound', count: 1 },
     ])
     const roleGroupOf = makeRoleGroupOf({ guitar: 'band', sound: 'tech' })
+    const isVocal = makeIsVocal([])
 
-    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf, isVocal)
 
     expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
     expect(result.calendar['2026-01-04']?.['sound'] ?? []).not.toContain('p1')
     expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'sound' })
   })
 
-  it('group cardinality: a person already holding one BAND role that date is not given a second BAND role (D-10)', () => {
+  it('group relaxation: TECH + OTHER is allowed for the same person on one date (relaxes the old TECH-exclusive-of-all rule)', () => {
+    const people = [makePerson({ id: 'p1', roles: ['sound', 'other_role'] })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'sound', count: 1 },
+      { roleId: 'other_role', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ sound: 'tech', other_role: 'other' })
+    const isVocal = makeIsVocal([])
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf, isVocal)
+
+    expect(result.calendar['2026-01-04']?.['sound']).toEqual(['p1'])
+    expect(result.calendar['2026-01-04']?.['other_role']).toEqual(['p1'])
+  })
+
+  it('group relaxation: BAND + OTHER is allowed for the same person on one date', () => {
+    const people = [makePerson({ id: 'p1', roles: ['guitar', 'other_role'] })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'guitar', count: 1 },
+      { roleId: 'other_role', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', other_role: 'other' })
+    const isVocal = makeIsVocal([])
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf, isVocal)
+
+    expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
+    expect(result.calendar['2026-01-04']?.['other_role']).toEqual(['p1'])
+  })
+
+  it('group cardinality: a person already holding one Band instrument role that date is not given a second Band instrument role (two instruments blocked, D-10)', () => {
     const people = [makePerson({ id: 'p1', roles: ['guitar', 'bass'] })]
     const dates = ['2026-01-04']
     const resolver = makeResolver([
@@ -421,28 +462,13 @@ describe('proposeQuarterSchedule', () => {
       { roleId: 'bass', count: 1 },
     ])
     const roleGroupOf = makeRoleGroupOf({ guitar: 'band', bass: 'band' })
+    const isVocal = makeIsVocal([])
 
-    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf, isVocal)
 
     expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
     expect(result.calendar['2026-01-04']?.['bass'] ?? []).not.toContain('p1')
     expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'bass' })
-  })
-
-  it('group cardinality: a person already holding one VOCALS role that date is not given a second VOCALS role (D-10)', () => {
-    const people = [makePerson({ id: 'p1', roles: ['vocals1', 'vocals2'] })]
-    const dates = ['2026-01-04']
-    const resolver = makeResolver([
-      { roleId: 'vocals1', count: 1 },
-      { roleId: 'vocals2', count: 1 },
-    ])
-    const roleGroupOf = makeRoleGroupOf({ vocals1: 'vocals', vocals2: 'vocals' })
-
-    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
-
-    expect(result.calendar['2026-01-04']?.['vocals1']).toEqual(['p1'])
-    expect(result.calendar['2026-01-04']?.['vocals2'] ?? []).not.toContain('p1')
-    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'vocals2' })
   })
 
   it('group cardinality: OTHER group is uncapped — a person can hold two OTHER roles the same date (D-10)', () => {
@@ -460,19 +486,54 @@ describe('proposeQuarterSchedule', () => {
     expect(result.calendar['2026-01-04']?.['other2']).toEqual(['p1'])
   })
 
-  it('group allowed combo: 1 BAND + 1 VOCALS for the same person on one date IS produced when that is the fair assignment (D-10)', () => {
+  it('group allowed combo: 1 Band instrument + Vocals (sing and play) for the same person on one date IS produced when that is the fair assignment (R252)', () => {
     const people = [makePerson({ id: 'p1', roles: ['guitar', 'vocals'] })]
     const dates = ['2026-01-04']
     const resolver = makeResolver([
       { roleId: 'guitar', count: 1 },
       { roleId: 'vocals', count: 1 },
     ])
-    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', vocals: 'vocals' })
+    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', vocals: 'band' })
+    const isVocal = makeIsVocal(['vocals'])
 
-    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf, isVocal)
 
     expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
     expect(result.calendar['2026-01-04']?.['vocals']).toEqual(['p1'])
+  })
+
+  it('group Band<->Tech exclusivity via vocals: a vocalist (vocal Band role) already assigned that date is ineligible for a same-date TECH role — Vocals folds into Band (R250/R251)', () => {
+    const people = [makePerson({ id: 'p1', roles: ['vocals', 'sound'] })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'vocals', count: 1 },
+      { roleId: 'sound', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ vocals: 'band', sound: 'tech' })
+    const isVocal = makeIsVocal(['vocals'])
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf, isVocal)
+
+    expect(result.calendar['2026-01-04']?.['vocals']).toEqual(['p1'])
+    expect(result.calendar['2026-01-04']?.['sound'] ?? []).not.toContain('p1')
+    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'sound' })
+  })
+
+  it('group vocals multi-person: multiple different people can each hold Vocals for the same date (R252)', () => {
+    const people = [
+      makePerson({ id: 'p1', roles: ['vocals'] }),
+      makePerson({ id: 'p2', roles: ['vocals'] }),
+    ]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([{ roleId: 'vocals', count: 2 }])
+    const roleGroupOf = makeRoleGroupOf({ vocals: 'band' })
+    const isVocal = makeIsVocal(['vocals'])
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf, isVocal)
+
+    const vocalsAssignees = result.calendar['2026-01-04']?.['vocals'] ?? []
+    expect(vocalsAssignees).toHaveLength(2)
+    expect(new Set(vocalsAssignees)).toEqual(new Set(['p1', 'p2']))
   })
 
   it('propagatePairing group case (Pitfall 2, D-12): a partner pulled in via pairing to a TECH role is correctly excluded from a later conflicting BAND role, never producing an illegal combo', () => {
@@ -496,8 +557,9 @@ describe('proposeQuarterSchedule', () => {
       makePQD({ personId: 'b', pairedWith: ['a'] }),
     ]
     const roleGroupOf = makeRoleGroupOf({ other_role: 'other', sound: 'tech', guitar: 'band' })
+    const isVocal = makeIsVocal([])
 
-    const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf)
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf, isVocal)
 
     expect(result.calendar['2026-01-04']?.['other_role']).toEqual(['a'])
     // 'b' was pulled into 'sound' (TECH) via propagatePairing.
@@ -529,9 +591,10 @@ describe('proposeQuarterSchedule', () => {
       }),
       makePQD({ personId: 'p4', roleFrequency: freq('vocals', 'regular', 4) }),
     ]
-    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', vocals: 'vocals' })
+    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', vocals: 'band' })
+    const isVocal = makeIsVocal(['vocals'])
 
-    const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf)
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf, isVocal)
 
     expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
     // Per-role tracking: p1's vocals-specific served count is still 0 going into the vocals
@@ -553,9 +616,10 @@ describe('proposeQuarterSchedule', () => {
         roleFrequency: { guitar: { tier: 'out', n: 4 }, vocals: { tier: 'regular', n: 4 } },
       }),
     ]
-    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', vocals: 'vocals' })
+    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', vocals: 'band' })
+    const isVocal = makeIsVocal(['vocals'])
 
-    const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf)
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf, isVocal)
 
     expect(result.calendar['2026-01-04']?.['guitar'] ?? []).not.toContain('p1')
     expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'guitar' })

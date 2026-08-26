@@ -10,31 +10,37 @@ import type {
 } from '@/types/roster'
 
 /**
- * Pure group co-occurrence rule (D-10, derived purely from group, NOT configurable):
- * - TECH is exclusive: a person holding a TECH role that date cannot also hold any
- *   BAND/VOCALS/OTHER role that date, and vice versa.
- * - Cardinality per person per date: at most 1 BAND role, at most 1 VOCALS role. OTHER is
- *   uncapped. The canonical allowed combo is "1 BAND + 1 VOCALS (+ OTHER)".
- * Exported so QuarterGrid.vue (plan 15-06) can reuse the exact same evaluation for its
- * manual-grid warning badge, since it cannot import scheduler.ts's internal closures.
+ * Pure group co-occurrence rule (D-10, derived purely from group + the vocal flag, NOT
+ * configurable). Rewritten for R250/R251/R252 — Vocals folded into Band:
+ * - Band and Tech are mutually exclusive: a person holding a 'band'-group role that date cannot
+ *   also hold a 'tech'-group role that date, and vice versa.
+ * - Other combines freely with either Band or Tech (relaxes the old TECH-exclusive-of-all rule).
+ * - Cardinality: at most one Band-group role that is NOT vocal (the one-instrument cap) per
+ *   person per date. Vocals is EXEMPT from that cap (sing and play, R252) — and vocals folds
+ *   into Band for exclusivity purposes, so a vocalist cannot also run Tech that date. No new cap
+ *   on Vocals itself or on Other — multiplicity elsewhere stays governed by per-role counts.
+ * Exported so QuarterGrid.vue (D-11) can reuse the exact same evaluation for its manual-grid
+ * warning badge, since it cannot import scheduler.ts's internal closures.
  */
 export function evaluateGroupCombo(
   roleIds: string[],
   roleGroupOf: (roleId: string) => RoleGroup,
+  isVocal: (roleId: string) => boolean,
 ): { ok: boolean; reason?: string } {
   const groups = roleIds.map((id) => roleGroupOf(id))
+  const hasBand = groups.includes('band')
   const hasTech = groups.includes('tech')
-  const hasNonTech = groups.some((g) => g !== 'tech')
-  if (hasTech && hasNonTech) {
-    return { ok: false, reason: 'TECH is exclusive of all other role groups on the same date' }
+  if (hasBand && hasTech) {
+    return { ok: false, reason: 'Band and Tech are mutually exclusive on the same date' }
   }
-  const bandCount = groups.filter((g) => g === 'band').length
-  if (bandCount > 1) {
-    return { ok: false, reason: 'at most 1 BAND role per person per date' }
-  }
-  const vocalsCount = groups.filter((g) => g === 'vocals').length
-  if (vocalsCount > 1) {
-    return { ok: false, reason: 'at most 1 VOCALS role per person per date' }
+  const bandInstrumentCount = roleIds.filter(
+    (id, i) => groups[i] === 'band' && !isVocal(id),
+  ).length
+  if (bandInstrumentCount > 1) {
+    return {
+      ok: false,
+      reason: 'at most 1 Band instrument role per person per date (Vocals is exempt)',
+    }
   }
   return { ok: true }
 }
@@ -49,8 +55,9 @@ export function isGroupCompatible(
   assignedRoleIdsThisDate: string[],
   candidateRoleId: string,
   roleGroupOf: (roleId: string) => RoleGroup,
+  isVocal: (roleId: string) => boolean,
 ): boolean {
-  return evaluateGroupCombo([...assignedRoleIdsThisDate, candidateRoleId], roleGroupOf).ok
+  return evaluateGroupCombo([...assignedRoleIdsThisDate, candidateRoleId], roleGroupOf, isVocal).ok
 }
 
 /**
@@ -81,6 +88,10 @@ export function proposeQuarterSchedule(
   // (safe default) so existing call-sites that omit this param keep compiling and behave as
   // "everything combines" (RESEARCH Pitfall 1).
   roleGroupOf: (roleId: string) => RoleGroup = () => 'other',
+  // Caller (quarters.ts) builds this from rosterStore.roles alongside roleGroupOf (buildIsVocal).
+  // Unknown roleIds default to false (safe/non-exempt default) so existing call-sites that omit
+  // this param keep compiling and behave as "nothing is vocal" (R252).
+  isVocal: (roleId: string) => boolean = () => false,
 ): ProposeResult {
   const pqdById = new Map(personQuarterData.map((p) => [p.personId, p]))
   const isBlackedOut = (personId: string, date: string) =>
@@ -193,7 +204,7 @@ export function proposeQuarterSchedule(
         // role-selection path. It MUST apply the exact same shared group-compatibility check as
         // the main loop below, or a paired partner can silently be pulled into an illegal combo.
         const eligibleRoles = regularRoles.filter((r) =>
-          isGroupCompatible(rolesHeldThisDate(partnerId), r.roleId, roleGroupOf),
+          isGroupCompatible(rolesHeldThisDate(partnerId), r.roleId, roleGroupOf, isVocal),
         )
         if (eligibleRoles.length === 0) {
           pairingConflicts.push({ date, personId, partnerId, reason: 'group rule violation for partner today' })
@@ -252,7 +263,7 @@ export function proposeQuarterSchedule(
             tierOf(p.id, roleId) === 'regular' &&
             withinCadence(p.id, roleId, dateIndex) &&
             // D-10/D-12 — same shared helper as propagatePairing above.
-            isGroupCompatible(rolesHeldThisDate(p.id), roleId, roleGroupOf),
+            isGroupCompatible(rolesHeldThisDate(p.id), roleId, roleGroupOf, isVocal),
         )
 
         if (candidates.length === 0) {
