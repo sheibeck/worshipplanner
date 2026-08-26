@@ -95,6 +95,13 @@ vi.mock('firebase/firestore', () => {
       },
     ),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
+    // R247 (84-01): the lock/unlock lastUsedAt recompute writes a real
+    // Timestamp via Timestamp.fromMillis(serviceDateToMillis(date)). The
+    // stand-in mirrors the real class shape closely enough for assertions
+    // (`toHaveBeenCalledWith(millis)`) without pulling in the real SDK.
+    Timestamp: {
+      fromMillis: vi.fn((ms: number) => ({ seconds: Math.floor(ms / 1000), nanoseconds: 0, toMillis: () => ms })),
+    },
   }
 })
 
@@ -2220,6 +2227,78 @@ describe('useServiceStore', () => {
       // hand-set "Exported" defect D-01 deletes.
       expect(store).not.toHaveProperty('setStatus')
       expect(store).not.toHaveProperty('toggleStatus')
+    })
+  })
+
+  // ── R247 (84-01) — lastUsedAt reflects the most recent LOCKED service a
+  // song is in, not the wall-clock moment it was assigned. See
+  // src/utils/lastUsed.ts for the canonical derivation these assertions
+  // exercise through the store's lock/unlock lifecycle.
+  describe('lastUsedAt recompute (R247)', () => {
+    function songSlot(songId: string | null) {
+      return {
+        kind: 'SONG',
+        position: 0,
+        requiredVwType: 1,
+        songId,
+        songTitle: songId ? 'Song X' : null,
+        songKey: songId ? 'G' : null,
+      }
+    }
+
+    it('assignSongToSlot on a DRAFT service does NOT call songStore.updateSong (no wall-clock stamp)', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status: 'draft', slots: [songSlot(null)] })])
+
+      await store.assignSongToSlot('service-1', 0, { id: 'song-x', title: 'Song X', key: 'G' })
+
+      expect(mockUpdateSong).not.toHaveBeenCalled()
+    })
+
+    it('markAsPlanned writes lastUsedAt as the Timestamp for the service date, for each song in the service', async () => {
+      const { Timestamp } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeService({ id: 'service-1', date: '2026-09-06', status: 'draft', slots: [songSlot('song-x')] }),
+      ])
+
+      await store.markAsPlanned('service-1')
+
+      expect(mockUpdateSong).toHaveBeenCalledWith('song-x', { lastUsedAt: expect.anything() })
+      expect(Timestamp.fromMillis).toHaveBeenCalledWith(new Date('2026-09-06T00:00:00').getTime())
+    })
+
+    it('locking a later-dated service advances lastUsedAt beyond an already-locked earlier service', async () => {
+      const { Timestamp } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeService({ id: 'service-1', date: '2026-08-11', status: 'planned', slots: [songSlot('song-x')] }),
+        makeService({ id: 'service-2', date: '2026-09-06', status: 'draft', slots: [songSlot('song-x')] }),
+      ])
+
+      await store.markAsPlanned('service-2')
+
+      expect(Timestamp.fromMillis).toHaveBeenLastCalledWith(new Date('2026-09-06T00:00:00').getTime())
+      expect(mockUpdateSong).toHaveBeenLastCalledWith('song-x', { lastUsedAt: expect.anything() })
+    })
+
+    it('reopenService on the only locked service containing a song recomputes its lastUsedAt to null', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeService({ id: 'service-1', date: '2026-09-06', status: 'planned', slots: [songSlot('song-x')] }),
+      ])
+
+      await store.reopenService('service-1')
+
+      expect(mockUpdateSong).toHaveBeenCalledWith('song-x', { lastUsedAt: null })
     })
   })
 })
