@@ -1037,7 +1037,12 @@ describe('useServiceStore', () => {
       expect(slot0?.songKey).toBe('G')
     })
 
-    it('calls useSongStore().updateSong with lastUsedAt serverTimestamp (cross-store link)', async () => {
+    // R247 (84-01): the old serverTimestamp() stamp on assign is the root
+    // cause the whole phase exists to fix — a draft assignment must NOT
+    // touch lastUsedAt at all. See the 'lastUsedAt recompute (R247)' describe
+    // block below for the full lock/unlock recompute coverage this test used
+    // to (incorrectly) assert the opposite of.
+    it('does NOT call useSongStore().updateSong on a draft assignment (no wall-clock stamp)', async () => {
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
       store.subscribe('org-1')
@@ -1053,10 +1058,7 @@ describe('useServiceStore', () => {
         key: 'G',
       })
 
-      expect(mockUpdateSong).toHaveBeenCalledOnce()
-      const [songId, data] = mockUpdateSong.mock.calls[0] as unknown as [string, Record<string, unknown>]
-      expect(songId).toBe('song-abc')
-      expect((data as Record<string, unknown>).lastUsedAt).toBeDefined()
+      expect(mockUpdateSong).not.toHaveBeenCalled()
     })
   })
 

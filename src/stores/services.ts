@@ -12,6 +12,7 @@ import {
   getDocs,
   setDoc,
   serverTimestamp,
+  Timestamp,
   query,
   orderBy,
   where,
@@ -28,6 +29,12 @@ import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { buildSlotsFromTemplate, buildSuggestedTemplateEntries, orderSlotsBySection } from '@/utils/slotTypes'
 import { stripUndefined } from '@/utils/stripUndefined'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
+import {
+  computeLastUsedDate,
+  serviceDateToMillis,
+  serviceToLastUsedInput,
+  type LastUsedServiceInput,
+} from '@/utils/lastUsed'
 import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot } from '@/types/service'
 import type { SongSlot } from '@/types/service'
 import type { RoleGroup } from '@/types/roster'
@@ -307,6 +314,53 @@ export const useServiceStore = defineStore('services', () => {
     return services.value.find((s) => s.id === id)?.status ?? 'draft'
   }
 
+  // ── R247 (84-01) — lastUsedAt recompute on lock/unlock ──────────────────────
+  //
+  // A song's lastUsedAt reflects MAX(service.date) over the LOCKED (non-draft)
+  // services it's in — never the wall-clock moment it was assigned to a draft
+  // (see src/utils/lastUsed.ts for the canonical derivation and rationale).
+
+  /**
+   * Builds the pure snapshot `computeLastUsedDate` consumes, with the ONE
+   * service that triggered this recompute forced to its post-transition
+   * status. The Firestore status write above lands asynchronously through
+   * `onSnapshot`, so `services.value` at call time can still report the OLD
+   * status — the override makes the recompute deterministic and
+   * timing-independent instead of racing the snapshot listener.
+   */
+  function buildLastUsedSnapshot(overrideServiceId: string, overrideStatus: ServiceStatus): LastUsedServiceInput[] {
+    return services.value.map((s) =>
+      serviceToLastUsedInput(s.id === overrideServiceId ? { ...s, status: overrideStatus } : s),
+    )
+  }
+
+  /**
+   * For each affected songId, derives MAX(locked service date) via the
+   * canonical `computeLastUsedDate` and writes it through
+   * `songStore.updateSong`. A non-null date becomes a `Timestamp` at local
+   * midnight (the same parse convention the 84-02 backfill mirrors); no
+   * remaining locked service writes `lastUsedAt: null` — an intentional
+   * blank, since the song IS in a service, just none currently locked.
+   */
+  async function recomputeLastUsedFor(
+    affectedSongIds: string[],
+    servicesSnapshot: LastUsedServiceInput[],
+  ): Promise<void> {
+    const songStore = useSongStore()
+    for (const songId of affectedSongIds) {
+      const maxDate = computeLastUsedDate(songId, servicesSnapshot)
+      const lastUsedAt = maxDate === null ? null : Timestamp.fromMillis(serviceDateToMillis(maxDate))
+      await songStore.updateSong(songId, { lastUsedAt })
+    }
+  }
+
+  /** SONG-slot songIds present in a service, deduped source for both lock/unlock hooks. */
+  function songIdsInService(service: Service): string[] {
+    return service.slots
+      .filter((slot): slot is SongSlot => slot.kind === 'SONG' && !!slot.songId)
+      .map((slot) => slot.songId as string)
+  }
+
   // D-09 — the Planning Center export write, the one mutation that must survive
   // the lock or `exported` becomes unreachable and the primary workflow breaks.
   // ★ Do not "simplify" this carve-out away.
@@ -375,6 +429,19 @@ export const useServiceStore = defineStore('services', () => {
       status: 'planned',
       updatedAt: serverTimestamp(),
     })
+
+    // R247 — this service is now locked; recompute lastUsedAt for its songs
+    // so they pick up this service's date (advancing to MAX over every
+    // locked service that contains them). See buildLastUsedSnapshot's doc
+    // comment for why the snapshot below overrides THIS service's status
+    // rather than relying on services.value, which still shows 'draft' here.
+    const service = services.value.find((s) => s.id === id)
+    if (service) {
+      const songIds = songIdsInService(service)
+      if (songIds.length > 0) {
+        await recomputeLastUsedFor(songIds, buildLastUsedSnapshot(id, 'planned'))
+      }
+    }
   }
 
   /**
@@ -390,16 +457,38 @@ export const useServiceStore = defineStore('services', () => {
    */
   async function reopenService(id: string): Promise<void> {
     if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
+
+    // R247 — capture the songIds BEFORE the status write: they must still be
+    // recomputed even though the service's slots may be edited/removed once
+    // it's back in draft. This is the only point that reliably knows which
+    // songs this service is unlocking.
+    const service = services.value.find((s) => s.id === id)
+    const songIds = service ? songIdsInService(service) : []
+
     await updateDoc(doc(db, 'organizations', orgId.value, 'services', id), {
       status: 'draft',
       updatedAt: serverTimestamp(),
     })
+
+    // Those songs fall back to their remaining locked MAX (or null if this
+    // was their only locked service) — see buildLastUsedSnapshot's doc
+    // comment for the status-override rationale.
+    if (songIds.length > 0) {
+      await recomputeLastUsedFor(songIds, buildLastUsedSnapshot(id, 'draft'))
+    }
   }
 
   // D-15: deliberately NOT guarded. Delete stays available at every status —
   // the UI warns about an orphaned Planning Center plan instead of locking.
   // `firestore.rules`' `allow delete` carries no status condition for the same
   // reason; keep the two in step.
+  //
+  // R247 (84-01) scope note: deleteService deliberately does NOT trigger a
+  // lastUsedAt recompute. Per 84-CONTEXT.md, the recompute triggers are the
+  // lock/unlock lifecycle (markAsPlanned/reopenService) and locked-service
+  // song-membership changes only — a deleted-locked-service correction, if
+  // ever needed, is a job for the one-time 84-02 backfill, not this delete
+  // path. This is a deliberate scope boundary, not an oversight.
   //
   // R234 (80-02): a deleted service must not leave a live, unauthenticated
   // share URL behind — revoke every public share artifact FIRST, then delete
@@ -514,9 +603,13 @@ export const useServiceStore = defineStore('services', () => {
 
     await updateService(serviceId, { slots: updatedSlots })
 
-    // Cross-store write: update lastUsedAt on the song document
-    const songStore = useSongStore()
-    await songStore.updateSong(song.id, { lastUsedAt: serverTimestamp() as never })
+    // R247 (84-01) — deliberately NO lastUsedAt write here. assignSongToSlot
+    // only ever runs on a draft service (assertWritable rejects a `slots`
+    // payload on a locked service), and a draft assignment must not stamp a
+    // date — only locking the service (markAsPlanned) advances lastUsedAt.
+    // This replaces the old `serverTimestamp()` stamp, which was the root
+    // cause of the reported bug (a service planned weeks ahead stamped the
+    // add date, never the service date). See src/utils/lastUsed.ts.
   }
 
   async function clearSongFromSlot(serviceId: string, slotIndex: number) {
