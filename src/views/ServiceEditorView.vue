@@ -3020,50 +3020,18 @@ function applyTransitionLocally(status: 'draft' | 'planned'): void {
 }
 
 /**
- * The `lastUsedAt` bump that used to live inside `onSave`, keyed on
- * `originalService.status === 'draft' && data.status === 'planned'`. Status no
- * longer moves through `onSave`, so that branch became unreachable; the
- * behaviour it implemented is not obsolete and moves here.
- *
- * A song counts as "used" only once the service it belongs to is actually
- * scheduled; merely editing songs on a draft, or the AI selector *showing* a
- * suggestion, must not age them.
- *
- * ★ ME-02 — this writes the SONG documents and nothing else. It used to route
- * each song through `serviceStore.assignSongToSlot`, which re-stamps the song
- * fields on a slot and writes the WHOLE `slots` array back. That was safe in the
- * pre-Phase-31 code because the bump ran BEFORE the normalizing write. Wave 3
- * moved it AFTER `onSave()` — which persists
- * `reindexSlots(orderSlotsBySection(...))` and syncs that normalized array into
- * `localService` — and `assignSongToSlot` does not read `localService` at all:
- * it reads the STORE's copy and writes it back, at an index derived from
- * `localService`. The two agree only once the snapshot for `onSave`'s write has
- * landed, so a drag-then-Mark-as-Planned could write the pre-drag array back
- * over the reorder that had just been persisted, and stamp the song fields at an
- * index computed against the NEW order. Latency compensation usually closes the
- * window, which made it intermittent rather than absent. Bumping the songs
- * directly removes the hazard rather than narrowing it, and drops N redundant
- * full-`slots` service writes (one per distinct song) that existed purely to
- * touch `lastUsedAt`.
- *
- * ★ ME-03 — because this no longer writes `slots`, it no longer has to precede
- * the status write. `/songs` is role-gated only (`firestore.rules:124-125`), so
- * a song write is legal at any service status. See `onMarkAsPlanned` for why
- * that lets the whole compensating-restore problem be deleted instead of solved.
+ * R247 (84-01) — `lastUsedAt` for a service's scheduled songs is now
+ * recomputed by `serviceStore.markAsPlanned` itself (lock-gated
+ * `MAX(locked service date)`, see `src/utils/lastUsed.ts`), not by a
+ * view-level `serverTimestamp()` stamp. A `bumpScheduledSongsLastUsed`
+ * helper used to run here immediately after the transition and re-stamp
+ * every scheduled song with wall-clock `now()` — unconditionally clobbering
+ * the store's correct recompute on every single "Mark as Planned" click, and
+ * silently reproducing the root-cause bug 84-01 exists to fix (the service
+ * date was never being used). Deleted rather than delegated: the store
+ * already owns this write, and a second write path racing/overwriting the
+ * first is exactly the hazard, not a redundancy worth preserving.
  */
-async function bumpScheduledSongsLastUsed(): Promise<void> {
-  const svc = localService.value
-  if (!svc) return
-  const scheduledSongIds = new Set(
-    svc.slots.filter((s) => s.kind === 'SONG' && (s as SongSlot).songId).map((s) => (s as SongSlot).songId!),
-  )
-  await Promise.all(
-    [...scheduledSongIds].map((songId) =>
-      songStore.updateSong(songId, { lastUsedAt: serverTimestamp() as never }),
-    ),
-  )
-}
-
 async function onMarkAsPlanned(): Promise<void> {
   if (!localService.value || isTransitioning.value) return
   lifecycleError.value = null
@@ -3088,30 +3056,12 @@ async function onMarkAsPlanned(): Promise<void> {
     await serviceStore.markAsPlanned(localService.value.id)
     applyTransitionLocally('planned')
 
-    // ★ ME-03 — the bump runs AFTER the transition has landed, not before it.
-    //
-    // It had to precede the status write only because it wrote `slots`, which
-    // is illegal once locked; ME-02 removed that, and `/songs` is role-gated
-    // only, so a song write is legal at any status. The two therefore still
-    // cannot be atomic — but they no longer need to be, because the failure
-    // that mattered is now unreachable rather than compensated: a rejected
-    // `markAsPlanned` never reaches this line, so no song is ever aged for a
-    // service that was never scheduled. `lastUsedAt` feeds the AI rotation
-    // heuristics (`recentServiceSongIds`, the `songLibrary` payload), and a
-    // wrongly-aged song is invisible to the user and has no undo — so deleting
-    // the window beats capturing prior values and restoring them in a `catch`,
-    // which would itself have to survive a second failure.
-    //
-    // Its own try/catch, and deliberately NOT re-raised: the transition the
-    // user asked for has already succeeded and is already reflected on screen.
-    // Reporting "Couldn't mark this service as Planned" here would be false.
-    // The cost of a silent failure is one song looking less recently used than
-    // it is, which self-corrects the next time it is scheduled.
-    try {
-      await bumpScheduledSongsLastUsed()
-    } catch (bumpErr) {
-      console.error('[ServiceEditorView] lastUsedAt bump failed after a successful transition:', bumpErr)
-    }
+    // R247 (84-01) — the `lastUsedAt` recompute for this service's scheduled
+    // songs already happened inside `serviceStore.markAsPlanned` above, gated
+    // on the service's locked date. There is deliberately no second write
+    // here (see the doc comment where `bumpScheduledSongsLastUsed` used to
+    // live) — a view-level re-stamp would clobber the store's correct value
+    // with wall-clock time on every click.
 
     // ★ R144 (61-04) — first-lock auto-notification + lockSnapshots write.
     //
@@ -4541,11 +4491,12 @@ async function onSave() {
   try {
     const { id, createdAt, updatedAt, ...data } = localService.value
 
-    // The draft -> planned `lastUsedAt` bump that used to sit here has moved to
-    // `bumpScheduledSongsLastUsed`, called by `onMarkAsPlanned`. D-01/D-02 took
-    // status changes off this path entirely, so the `data.status === 'planned'`
-    // condition this branch keyed on became unreachable — it would have looked
-    // live while silently never firing again.
+    // The draft -> planned `lastUsedAt` bump that used to sit here moved to a
+    // view-level `bumpScheduledSongsLastUsed` (D-01/D-02), then — per R247
+    // (84-01) — into `serviceStore.markAsPlanned`'s own lock-gated recompute,
+    // which is now the sole writer of `lastUsedAt` on this transition. Status
+    // changes are off this path entirely, so the `data.status === 'planned'`
+    // condition this branch used to key on stays unreachable here.
 
     // Persist the full slot array (reindexed) and other fields
     const normalizedSlots = reindexSlots(orderSlotsBySection(data.slots))

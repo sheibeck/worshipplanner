@@ -7496,26 +7496,25 @@ describe('ServiceEditorView - ME-01: export failure copy and the pre-flight stat
   })
 })
 
-// ── ME-02 / ME-03: the relocated lastUsedAt bump ──────────────────────────────
+// ── ME-02 / ME-03 / R247 (84-01 CR-01): the retired lastUsedAt bump ───────────
 //
-// Wave 3 moved the draft->planned `lastUsedAt` bump out of `onSave` and into
-// `onMarkAsPlanned`. The move is faithful but landed the bump AFTER `onSave`
-// had just persisted `reindexSlots(orderSlotsBySection(...))` and synced the
-// normalized array back into `localService` — and the bump routed each song
-// through `assignSongToSlot`, which does not read `localService` at all. It
-// reads the STORE's copy and writes the whole `slots` array back, at an index
-// derived from `localService`. The two agree only once the snapshot for
-// `onSave`'s write has landed, so a drag-then-Mark-as-Planned could write the
-// pre-drag array back over the reorder that had just been persisted. Firestore's
-// latency compensation usually closes the window, which makes it intermittent
-// rather than absent. In the pre-Phase-31 code the bump ran BEFORE the
-// normalizing write, so this ordering hazard is new.
-//
-// ME-03: the bump also had to precede the status write (it wrote `slots`, which
-// is illegal once locked), so a failed `markAsPlanned` left every scheduled song
-// aged for a service that was never scheduled — feeding the AI rotation
-// heuristics with no way for the user to know or undo it.
-describe('ServiceEditorView - ME-02/ME-03: the lastUsedAt bump on Mark as Planned', () => {
+// Wave 3 moved the draft->planned `lastUsedAt` bump out of `onSave` and into a
+// view-level `bumpScheduledSongsLastUsed`, called by `onMarkAsPlanned` right
+// after the transition. That view-level bump wrote `serverTimestamp()` (i.e.
+// wall-clock "now") directly onto every scheduled song, unconditionally — and
+// once `services.ts::markAsPlanned` (R247, 84-01) started doing its OWN correct
+// lock-gated recompute (`MAX(locked service date)`), the two writes raced, with
+// the view's wall-clock stamp landing after and clobbering the store's correct
+// value. This reproduced the exact "stamps the add date, not the service date"
+// bug 84-01 exists to fix, on every single "Mark as Planned" click, in
+// production. Fixed by deleting `bumpScheduledSongsLastUsed` and its call site
+// entirely (CR-01, 84-REVIEW.md): `serviceStore.markAsPlanned` is now the SOLE
+// writer of `lastUsedAt` on this transition. The tests below assert the absence
+// of the second write path, not its correctness — the store's own recompute is
+// exercised end-to-end in `src/stores/__tests__/services.test.ts`'s "lastUsedAt
+// recompute (R247)" suite, which this view's tests cannot reach because
+// `serviceStore.markAsPlanned` is mocked here (see `mockMarkAsPlanned`).
+describe('ServiceEditorView - ME-02/ME-03/R247: lastUsedAt on Mark as Planned', () => {
   async function mountView() {
     const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
     return shallowMount(ServiceEditorView, {
@@ -7568,7 +7567,7 @@ describe('ServiceEditorView - ME-02/ME-03: the lastUsedAt bump on Mark as Planne
     mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
   })
 
-  it('bumps the SONG documents directly and never re-writes the service slots array', async () => {
+  it('CR-01 regression: does NOT bump SONG documents directly — serviceStore.markAsPlanned is the only lastUsedAt writer', async () => {
     mockServicesList = [{ ...mockService, status: 'draft' }]
     const wrapper = await mountView()
     const vm = wrapper.vm as unknown as LifecycleVm
@@ -7576,9 +7575,22 @@ describe('ServiceEditorView - ME-02/ME-03: the lastUsedAt bump on Mark as Planne
     await vm.onMarkAsPlanned()
     await flushPromises()
 
-    // mockService schedules exactly one song (song-1 in slot-0).
-    expect(mockUpdateSong).toHaveBeenCalledTimes(1)
-    expect(mockUpdateSong).toHaveBeenCalledWith('song-1', expect.objectContaining({ lastUsedAt: expect.anything() }))
+    // The store call happened — this is where the real, lock-gated
+    // `lastUsedAt` recompute now lives (see services.test.ts's "lastUsedAt
+    // recompute (R247)" suite for proof it stamps the SERVICE date, not
+    // wall-clock time).
+    expect(mockMarkAsPlanned).toHaveBeenCalledTimes(1)
+    expect(vm.localService.status).toBe('planned')
+
+    // CR-01: the view must NOT also write `lastUsedAt` on any song directly.
+    // A `songStore.updateSong({ lastUsedAt: ... })` call here would be the
+    // deleted `bumpScheduledSongsLastUsed` conflicting write path reappearing
+    // and clobbering the store's correct recompute with wall-clock time.
+    const lastUsedAtCalls = mockUpdateSong.mock.calls.filter(
+      ([, patch]) => (patch as Record<string, unknown> | undefined)?.lastUsedAt !== undefined,
+    )
+    expect(lastUsedAtCalls).toHaveLength(0)
+    expect(mockUpdateSong).not.toHaveBeenCalled()
 
     // ME-02: `assignSongToSlot` is the round trip that rewrote `slots` from the
     // store snapshot — the reorder-clobbering hazard. It must not be used here.
