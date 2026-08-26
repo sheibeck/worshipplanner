@@ -78,12 +78,30 @@ export function computeLastUsedDate(songId: string, services: LastUsedServiceInp
 
 /**
  * The single shared calendar-date parse convention for a `Service.date`
- * `"YYYY-MM-DD"` string (local midnight). BOTH the live store adapter
- * (`services.ts`) and the 84-02 backfill must use this exact expression so
- * the `Timestamp` each environment writes is identical.
+ * `"YYYY-MM-DD"` string. BOTH the live store adapter (`services.ts`) and the
+ * 84-02 backfill must use this exact expression so the `Timestamp` each
+ * environment writes is identical.
+ *
+ * WR-03 (84-REVIEW): parses as UTC midnight (`Date.UTC`) rather than the
+ * previous `new Date(\`${date}T00:00:00\`)`, which resolved "local midnight"
+ * against whichever timezone the running process defaulted to -- the end
+ * user's browser on the client, but the HOST MACHINE's ambient `TZ` for this
+ * Admin-SDK script (a CI runner, cloud shell, or Docker container commonly
+ * defaults to UTC). Two environments computing a different midnight for the
+ * identical `"YYYY-MM-DD"` string would make `Timestamp.isEqual` never
+ * converge -- the idempotency check would "correct" an already-correct
+ * song's `lastUsedAt` forever, off by a fixed offset, with no error raised.
+ * `Date.UTC` is timezone-explicit and process-independent, so both
+ * environments now compute byte-identical millis for the same date. Keep
+ * BYTE-IDENTICAL with src/utils/lastUsed.ts's copy -- the parity tests
+ * enforce this.
  */
 export function serviceDateToMillis(date: string): number {
-  return new Date(`${date}T00:00:00`).getTime()
+  const parts = date.split("-");
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  return Date.UTC(year, month - 1, day);
 }
 
 // --- end mirrored section ---

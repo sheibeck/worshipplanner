@@ -85,12 +85,19 @@ describe('computeLastUsedDate', () => {
 })
 
 describe('serviceDateToMillis', () => {
-  it('matches the local-midnight parse convention', () => {
-    expect(serviceDateToMillis('2026-09-06')).toBe(new Date('2026-09-06T00:00:00').getTime())
+  // WR-03 (84-REVIEW): UTC-midnight, not local-midnight — deterministic
+  // regardless of the executing process's ambient timezone.
+  it('matches the UTC-midnight parse convention', () => {
+    expect(serviceDateToMillis('2026-09-06')).toBe(Date.UTC(2026, 8, 6))
   })
 
   it('is monotonic with calendar order', () => {
     expect(serviceDateToMillis('2026-08-11')).toBeLessThan(serviceDateToMillis('2026-09-06'))
+  })
+
+  it('is independent of the host process TZ (no local-time parse remains)', () => {
+    expect(serviceDateToMillis('2026-01-01')).toBe(Date.UTC(2026, 0, 1))
+    expect(serviceDateToMillis('2026-12-31')).toBe(Date.UTC(2026, 11, 31))
   })
 })
 

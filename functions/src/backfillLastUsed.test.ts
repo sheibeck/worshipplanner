@@ -332,11 +332,19 @@ describe("mirrored derivation parity with src/utils/lastUsed.ts (84-01)", () => 
     expect(computeLastUsedDate("song-1", services)).toBe("2026-08-11");
   });
 
-  it("serviceDateToMillis: matches the local-midnight parse convention", () => {
-    expect(serviceDateToMillis("2026-09-06")).toBe(new Date("2026-09-06T00:00:00").getTime());
+  // WR-03 (84-REVIEW): UTC-midnight, not local-midnight -- deterministic
+  // regardless of the host machine's ambient TZ this Admin-SDK script runs
+  // under.
+  it("serviceDateToMillis: matches the UTC-midnight parse convention", () => {
+    expect(serviceDateToMillis("2026-09-06")).toBe(Date.UTC(2026, 8, 6));
   });
 
   it("serviceDateToMillis: monotonic with calendar order", () => {
     expect(serviceDateToMillis("2026-08-11")).toBeLessThan(serviceDateToMillis("2026-09-06"));
+  });
+
+  it("serviceDateToMillis: matches src/utils/lastUsed.ts's UTC-midnight value byte-for-byte (mirrored-copy parity)", () => {
+    expect(serviceDateToMillis("2026-01-01")).toBe(Date.UTC(2026, 0, 1));
+    expect(serviceDateToMillis("2026-12-31")).toBe(Date.UTC(2026, 11, 31));
   });
 });

@@ -2271,7 +2271,8 @@ describe('useServiceStore', () => {
       await store.markAsPlanned('service-1')
 
       expect(mockUpdateSong).toHaveBeenCalledWith('song-x', { lastUsedAt: expect.anything() })
-      expect(Timestamp.fromMillis).toHaveBeenCalledWith(new Date('2026-09-06T00:00:00').getTime())
+      // WR-03 (84-REVIEW): UTC-midnight parse, not local-midnight.
+      expect(Timestamp.fromMillis).toHaveBeenCalledWith(Date.UTC(2026, 8, 6))
     })
 
     // WR-01 (84-REVIEW): a song repeated across multiple SONG slots in the
@@ -2291,8 +2292,10 @@ describe('useServiceStore', () => {
 
       await store.markAsPlanned('service-1')
 
-      const songXCalls = mockUpdateSong.mock.calls.filter(([songId]) => songId === 'song-x')
-      expect(songXCalls).toHaveLength(1)
+      // song-x occupies TWO slots in this service — a plain filter+map (no
+      // dedup) would call updateSong twice for the same songId.
+      expect(mockUpdateSong).toHaveBeenCalledTimes(1)
+      expect(mockUpdateSong).toHaveBeenCalledWith('song-x', { lastUsedAt: expect.anything() })
     })
 
     it('locking a later-dated service advances lastUsedAt beyond an already-locked earlier service', async () => {
@@ -2307,7 +2310,8 @@ describe('useServiceStore', () => {
 
       await store.markAsPlanned('service-2')
 
-      expect(Timestamp.fromMillis).toHaveBeenLastCalledWith(new Date('2026-09-06T00:00:00').getTime())
+      // WR-03 (84-REVIEW): UTC-midnight parse, not local-midnight.
+      expect(Timestamp.fromMillis).toHaveBeenLastCalledWith(Date.UTC(2026, 8, 6))
       expect(mockUpdateSong).toHaveBeenLastCalledWith('song-x', { lastUsedAt: expect.anything() })
     })
 
