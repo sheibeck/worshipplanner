@@ -28,12 +28,28 @@
                   type="text"
                   class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                 />
+                <select
+                  v-model="row.draft.group"
+                  class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="band">Band</option>
+                  <option value="tech">Tech</option>
+                  <option value="other">Other</option>
+                </select>
                 <input
                   v-model.number="row.draft.defaultCount"
                   type="number"
                   min="1"
                   class="w-20 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                 />
+                <label v-if="row.draft.group === 'band'" class="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
+                  <input
+                    v-model="row.draft.vocal"
+                    type="checkbox"
+                    class="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Vocal role (can sing &amp; play)
+                </label>
                 <button
                   type="button"
                   @click="onSaveRole(row.role.id)"
@@ -72,7 +88,7 @@
       </div>
 
       <!-- Add Role row -->
-      <div class="px-4 py-4">
+      <div class="px-4 py-4" data-testid="add-role">
         <h3 class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Add Role</h3>
         <div class="flex items-center gap-3">
           <input
@@ -143,14 +159,27 @@ const groupedRoles = computed(() => ({
 // ── Per-row edit drafts ──────────────────────────────────────────────────────
 // Local editable copies, committed to the store only on "Save Role" click —
 // keeps the Firestore-driven roles list from clobbering in-progress edits.
-const roleDrafts = ref<Record<string, { name: string; defaultCount: number }>>({})
+// Includes group/vocal (WR-01, 85-REVIEW.md) so a mis-checked "sing & play" box
+// or wrong group no longer requires destructive delete+re-add to correct.
+interface RoleDraft {
+  name: string
+  defaultCount: number
+  group: RoleGroup
+  vocal: boolean
+}
+const roleDrafts = ref<Record<string, RoleDraft>>({})
 
 watch(
   () => rosterStore.roles,
   (roles) => {
     for (const role of roles) {
       if (!roleDrafts.value[role.id]) {
-        roleDrafts.value[role.id] = { name: role.name, defaultCount: role.defaultCount }
+        roleDrafts.value[role.id] = {
+          name: role.name,
+          defaultCount: role.defaultCount,
+          group: role.group,
+          vocal: role.vocal ?? false,
+        }
       }
     }
     for (const id of Object.keys(roleDrafts.value)) {
@@ -162,7 +191,7 @@ watch(
 
 interface RoleRow {
   role: Role
-  draft: { name: string; defaultCount: number } | undefined
+  draft: RoleDraft | undefined
 }
 
 function rowsForGroup(group: RoleGroup): RoleRow[] {
@@ -182,6 +211,8 @@ async function onSaveRole(roleId: string) {
     await rosterStore.updateRole(roleId, {
       name: draft.name.trim(),
       defaultCount: draft.defaultCount,
+      group: draft.group,
+      vocal: draft.group === 'band' ? draft.vocal : false,
     })
     savedRoleId.value = roleId
     if (savedTimer) clearTimeout(savedTimer)

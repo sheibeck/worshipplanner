@@ -23,6 +23,18 @@ function mountPanel() {
   return mount(RolesConfigPanel)
 }
 
+// Row selects/checkboxes are visually identical to the Add-Role ones (both render
+// band/tech/other + a vocal checkbox) — scope queries to elements OUTSIDE the
+// `data-testid="add-role"` section to target a specific row's controls.
+function rowSelects(wrapper: ReturnType<typeof mountPanel>) {
+  const addRoleEl = wrapper.get('[data-testid="add-role"]').element
+  return wrapper.findAll('select').filter((s) => !addRoleEl.contains(s.element))
+}
+function rowVocalCheckboxes(wrapper: ReturnType<typeof mountPanel>) {
+  const addRoleEl = wrapper.get('[data-testid="add-role"]').element
+  return wrapper.findAll('input[type="checkbox"]').filter((c) => !addRoleEl.contains(c.element))
+}
+
 beforeEach(() => {
   setActivePinia(createPinia())
   mockAddRole.mockClear()
@@ -91,7 +103,51 @@ describe('RolesConfigPanel', () => {
     await saveButtons[0]!.trigger('click')
 
     expect(mockUpdateRole).toHaveBeenCalledTimes(1)
-    expect(mockUpdateRole).toHaveBeenCalledWith('r-1', { name: 'Lead Guitar', defaultCount: 2 })
+    expect(mockUpdateRole).toHaveBeenCalledWith('r-1', {
+      name: 'Lead Guitar',
+      defaultCount: 2,
+      group: 'band',
+      vocal: false,
+    })
+  })
+
+  it('WR-01: the per-row edit draft can change group and (for Band) the vocal flag, and Save Role persists both', async () => {
+    const wrapper = mountPanel()
+    // r-1 is a Band role (Guitar) — its row select should default to 'band' and
+    // reveal the vocal checkbox, mirroring the Add-Role form's fields.
+    const rowSelect = rowSelects(wrapper)[0]!
+    expect(rowSelect.findAll('option').map((o) => o.attributes('value'))).toEqual(['band', 'tech', 'other'])
+
+    const rowVocalCheckbox = rowVocalCheckboxes(wrapper)[0]!
+    await rowVocalCheckbox.setValue(true)
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Role')
+    await saveButtons[0]!.trigger('click')
+
+    expect(mockUpdateRole).toHaveBeenCalledWith('r-1', {
+      name: 'Guitar',
+      defaultCount: 2,
+      group: 'band',
+      vocal: true,
+    })
+  })
+
+  it('WR-01: changing a row group away from Band hides its vocal checkbox and forces vocal:false on save', async () => {
+    const wrapper = mountPanel()
+    const rowSelect = rowSelects(wrapper)[0]!
+    await rowSelect.setValue('tech')
+
+    expect(rowVocalCheckboxes(wrapper)).toHaveLength(0)
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Role')
+    await saveButtons[0]!.trigger('click')
+
+    expect(mockUpdateRole).toHaveBeenCalledWith('r-1', {
+      name: 'Guitar',
+      defaultCount: 2,
+      group: 'tech',
+      vocal: false,
+    })
   })
 
   it('Add-Role row calls addRole with name/group/defaultCount/order', async () => {
@@ -118,22 +174,23 @@ describe('RolesConfigPanel', () => {
 
   it('R250: selecting the Band group reveals the "sing & play" vocal checkbox; checking it and adding a role calls addRole with vocal:true', async () => {
     const wrapper = mountPanel()
-    const groupSelect = wrapper.findAll('select').find((s) =>
+    const addRoleSection = wrapper.get('[data-testid="add-role"]')
+    const groupSelect = addRoleSection.findAll('select').find((s) =>
       s.findAll('option').some((o) => o.attributes('value') === 'band'),
     )!
 
     // Default group is 'band' — the checkbox is visible without switching first.
-    expect(wrapper.text()).toContain('Vocal role (can sing & play)')
+    expect(addRoleSection.text()).toContain('Vocal role (can sing & play)')
 
     // Switching away from Band hides it; switching back reveals it again.
     await groupSelect.setValue('tech')
-    expect(wrapper.text()).not.toContain('Vocal role (can sing & play)')
+    expect(addRoleSection.text()).not.toContain('Vocal role (can sing & play)')
     await groupSelect.setValue('band')
-    expect(wrapper.text()).toContain('Vocal role (can sing & play)')
+    expect(addRoleSection.text()).toContain('Vocal role (can sing & play)')
 
     const addNameInput = wrapper.find('input[placeholder="Role name"]')
     await addNameInput.setValue('Lead Vocal')
-    const vocalCheckbox = wrapper.find('input[type="checkbox"]')
+    const vocalCheckbox = addRoleSection.find('input[type="checkbox"]')
     await vocalCheckbox.setValue(true)
 
     const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Role' || b.text() === 'Added ✓')
