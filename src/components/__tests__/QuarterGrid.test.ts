@@ -253,8 +253,9 @@ describe('QuarterGrid — live group co-occurrence warning (D-11)', () => {
     return [
       { id: 'role-guitar', name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
       { id: 'role-bass', name: 'bass', group: 'band', defaultCount: 1, order: 1 },
-      { id: 'role-vocals', name: 'vocals', group: 'vocals', defaultCount: 1, order: 2 },
+      { id: 'role-vocals', name: 'vocals', group: 'band', vocal: true, defaultCount: 1, order: 2 },
       { id: 'role-sound', name: 'sound', group: 'tech', defaultCount: 1, order: 3 },
+      { id: 'role-other', name: 'scripture reader', group: 'other', defaultCount: 1, order: 4 },
     ]
   }
 
@@ -321,5 +322,24 @@ describe('QuarterGrid — live group co-occurrence warning (D-11)', () => {
 
     expect(guitarCell.text()).not.toContain('group')
     expect(vocalsCell.text()).not.toContain('group')
+  })
+
+  it('shows NO group conflict marker for a TECH + OTHER combo (relaxed rule)', () => {
+    const quarter = makeQuarter({
+      serviceDates: [DATE],
+      calendar: {
+        [DATE]: {
+          'role-sound': ['person-regular'],
+          'role-other': ['person-regular'],
+        },
+      },
+    })
+    const wrapper = mountGrid({ quarter, roles: makeRolesFull(), lastProposeResult: null })
+
+    const soundCell = cellFor(wrapper, 'role-sound')
+    const otherCell = cellFor(wrapper, 'role-other')
+
+    expect(soundCell.text()).not.toContain('group')
+    expect(otherCell.text()).not.toContain('group')
   })
 })

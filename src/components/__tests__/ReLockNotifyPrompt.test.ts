@@ -92,9 +92,14 @@ const entries: ChangeEntry[] = [
   { type: 'NOTES', description: 'Service notes changed', affectedTeams: ['band', 'tech'] },
 ]
 
-// A single vocals-only entry — vocals has no assigned role → zero reachable.
-const vocalsOnlyEntries: ChangeEntry[] = [
-  { type: 'ROLE', description: 'backing vocal assignment changed', affectedTeams: ['vocals'] },
+// A single entry for a team with no assigned role in the `roles`/`roleAssignmentOverrides`
+// fixtures above (which only cover 'band' and 'tech') → zero reachable. Vocals folded into
+// Band (R250) removed 'vocals' as a RoleGroup, so this uses 'other' — still unassigned in
+// these fixtures — to preserve the original "reaches 0 people" test intent (deviation from a
+// literal vocals->band swap, which would have made this reach 1 person via the shared 'band'
+// role fixture and broken the zero-reachable assertions below).
+const unassignedTeamEntries: ChangeEntry[] = [
+  { type: 'ROLE', description: 'special assignment changed', affectedTeams: ['other'] },
 ]
 
 function mountPrompt(props?: Record<string, unknown>) {
@@ -220,8 +225,8 @@ describe('ReLockNotifyPrompt', () => {
   })
 
   it('reads "Reaches 0 people" when the checked union reaches no one', () => {
-    mountPrompt({ entries: vocalsOnlyEntries })
-    // vocals has no assigned role → 0 reachable.
+    mountPrompt({ entries: unassignedTeamEntries })
+    // 'other' has no assigned role in these fixtures → 0 reachable.
     expect(q('reaches-count').text()).toContain('Reaches 0 people')
   })
 
@@ -288,7 +293,7 @@ describe('ReLockNotifyPrompt', () => {
     })
 
     it('Send is disabled with an explanatory title when the selection reaches zero people', () => {
-      mountPrompt({ entries: vocalsOnlyEntries })
+      mountPrompt({ entries: unassignedTeamEntries })
       const btn = q('send-btn').element as HTMLButtonElement
       expect(btn.disabled).toBe(true)
       expect(btn.getAttribute('title')).toContain('anyone with an email')
@@ -347,7 +352,7 @@ describe('ReLockNotifyPrompt', () => {
     })
 
     it('Lock quietly stays enabled and emits cancel even when the selection reaches zero people', async () => {
-      const wrapper = mountPrompt({ entries: vocalsOnlyEntries })
+      const wrapper = mountPrompt({ entries: unassignedTeamEntries })
       // Send is blocked (zero reachable), but Lock quietly is never disabled.
       expect((q('send-btn').element as HTMLButtonElement).disabled).toBe(true)
       const lock = q('lock-quietly-btn').element as HTMLButtonElement

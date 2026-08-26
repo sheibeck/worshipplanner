@@ -585,7 +585,7 @@ vi.mock('@/utils/planningCenterApi', () => ({
 }))
 
 const mockRoles: Role[] = [
-  { id: 'role-vox', name: 'Vocals', group: 'vocals', defaultCount: 1, order: 0 },
+  { id: 'role-vox', name: 'Vocals', group: 'band', vocal: true, defaultCount: 1, order: 0 },
   { id: 'role-drums', name: 'Drums', group: 'band', defaultCount: 1, order: 1 },
 ]
 

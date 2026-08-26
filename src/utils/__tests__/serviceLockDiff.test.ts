@@ -377,13 +377,14 @@ describe('diffServiceSnapshots', () => {
     const assignments = [
       makeAssignment({ roleId: 'r1', group: 'band', personNames: ['Alice'] }),
       makeAssignment({ roleId: 'r2', roleName: 'sound', group: 'tech', personNames: [] }),
-      makeAssignment({ roleId: 'r3', roleName: 'lead vocal', group: 'vocals', personNames: ['Dan'] }),
+      makeAssignment({ roleId: 'r3', roleName: 'lead vocal', group: 'band', personNames: ['Dan'] }),
     ]
     const prev = makeSnapshot({ slots: [makeSongSlot('slot-1', { songTitle: 'Old' })], roleAssignments: assignments })
     const curr = makeSnapshot({ slots: [makeSongSlot('slot-1', { songTitle: 'New' })], roleAssignments: assignments })
     const diff = diffServiceSnapshots(prev, curr, null, null)
     expect(typesOf(diff)).toEqual(['SONG'])
-    expect([...diff[0]!.affectedTeams].sort()).toEqual(['band', 'vocals'])
+    // Both assignments are now Band (vocals folded into Band, R250) — deduped to one team.
+    expect([...diff[0]!.affectedTeams].sort()).toEqual(['band'])
   })
 
   it('returns [] for two identical snapshots with identical fingerprints (empty-diff branch)', () => {

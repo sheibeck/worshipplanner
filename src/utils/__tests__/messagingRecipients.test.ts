@@ -85,7 +85,6 @@ describe('MESSAGING_TEAM_LABELS', () => {
     expect(MESSAGING_TEAM_LABELS).toEqual({
       band: 'Band',
       tech: 'Tech',
-      vocals: 'Vocals',
       other: 'Other',
     })
   })

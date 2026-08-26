@@ -128,15 +128,15 @@ describe('MessageComposer', () => {
     mockQueueServiceMessage.mockResolvedValue({ data: { messageId: 'msg-1' } })
   })
 
-  it('renders the four team chips + Everyone + the Individuals panel', () => {
+  it('renders the three team chips (Band/Tech/Other — vocals folded into Band, R250) + Everyone + the Individuals panel', () => {
     mountComposer()
     expect(q('team-chip-band').exists()).toBe(true)
     expect(q('team-chip-tech').exists()).toBe(true)
-    expect(q('team-chip-vocals').exists()).toBe(true)
+    expect(q('team-chip-vocals').exists()).toBe(false)
     expect(q('team-chip-other').exists()).toBe(true)
     expect(q('everyone-chip').exists()).toBe(true)
     expect(q('add-someone-select').exists()).toBe(true)
-    // Team labels come from MESSAGING_TEAM_LABELS (Band/Tech/Vocals/Other).
+    // Team labels come from MESSAGING_TEAM_LABELS (Band/Tech/Other).
     expect(q('team-chip-band').text()).toContain('Band')
     expect(q('team-chip-other').text()).toContain('Other')
   })
@@ -170,8 +170,6 @@ describe('MessageComposer', () => {
     expect(q('team-chip-band').text()).toMatch(/Band\s*·\s*1/)
     // tech → 1 reachable (Cara; Ed has no email)
     expect(q('team-chip-tech').text()).toMatch(/Tech\s*·\s*1/)
-    // vocals → 0 assigned
-    expect(q('team-chip-vocals').text()).toMatch(/Vocals\s*·\s*0/)
   })
 
   it('adding an individual writes individualPersonIds; the added person is excluded from the picker', async () => {

@@ -71,7 +71,8 @@ function makePerson(overrides: Partial<{
 function makeRole(overrides: Partial<{
   id: string
   name: string
-  group: 'band' | 'tech' | 'vocals' | 'other'
+  group: 'band' | 'tech' | 'other'
+  vocal: boolean
   defaultCount: number
   order: number
 }> = {}) {
@@ -573,46 +574,34 @@ describe('useRosterStore', () => {
     })
   })
 
-  describe('patch-on-read migrations (D-09 vocals group)', () => {
-    it('D-09: patches a "vocals" role doc from group band to group vocals', async () => {
+  describe('read-time vocals compat shim (R250 — no write migration)', () => {
+    it('coerces a legacy role doc stored with group "vocals" to group "band" + vocal:true on read, and issues NO updateDoc write', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useRosterStore } = await import('../roster')
       const store = useRosterStore()
       store.subscribe('org-1')
 
-      triggerRolesSnapshot([makeRole({ id: 'role-vocals', name: 'vocals', group: 'band' })])
-
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const ref = callArgs[0] as unknown as { id: string }
-      const data = callArgs[1] as unknown as Record<string, unknown>
-      expect(ref.id).toBe('role-vocals')
-      expect(data).toEqual({ group: 'vocals' })
-    })
-
-    it('D-09: name match is case-insensitive', async () => {
-      const { updateDoc } = await import('firebase/firestore')
-      const { useRosterStore } = await import('../roster')
-      const store = useRosterStore()
-      store.subscribe('org-1')
-
-      triggerRolesSnapshot([makeRole({ id: 'role-vocals', name: 'VOCALS', group: 'band' })])
-
-      expect(updateDoc).toHaveBeenCalledOnce()
-    })
-
-    it('D-09: is idempotent — does not patch a role already in group vocals, or an unrelated role', async () => {
-      const { updateDoc } = await import('firebase/firestore')
-      const { useRosterStore } = await import('../roster')
-      const store = useRosterStore()
-      store.subscribe('org-1')
-
+      // Legacy stored shape predates the narrowed RoleGroup — cast past the (now-narrower)
+      // makeRole override type to simulate the raw Firestore doc shape.
       triggerRolesSnapshot([
-        makeRole({ id: 'role-vocals', name: 'vocals', group: 'vocals' }),
-        makeRole({ id: 'role-guitar', name: 'guitar', group: 'band' }),
+        makeRole({ id: 'role-vocals', name: 'vocals', group: 'vocals' as unknown as 'band' }),
       ])
 
+      expect(store.roles).toHaveLength(1)
+      expect(store.roles[0]).toMatchObject({ id: 'role-vocals', group: 'band', vocal: true })
+      // Read-time-only coercion — no Firestore write migration.
       expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('leaves a non-vocals role doc unchanged on read', async () => {
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      triggerRolesSnapshot([makeRole({ id: 'role-guitar', name: 'guitar', group: 'band' })])
+
+      expect(store.roles[0]).toMatchObject({ id: 'role-guitar', group: 'band' })
+      expect(store.roles[0]!.vocal).toBeUndefined()
     })
   })
 })

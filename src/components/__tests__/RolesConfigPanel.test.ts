@@ -105,4 +105,47 @@ describe('RolesConfigPanel', () => {
 
     expect(mockAddRole).toHaveBeenCalledWith({ name: 'Bass', group: 'band', defaultCount: 1, order: 2 })
   })
+
+  it('R250: the group select has no standalone Vocals option (band/tech/other only)', () => {
+    const wrapper = mountPanel()
+    const groupSelect = wrapper.findAll('select').find((s) =>
+      s.findAll('option').some((o) => o.attributes('value') === 'band'),
+    )!
+    const optionValues = groupSelect.findAll('option').map((o) => o.attributes('value'))
+    expect(optionValues).toEqual(['band', 'tech', 'other'])
+    expect(optionValues).not.toContain('vocals')
+  })
+
+  it('R250: selecting the Band group reveals the "sing & play" vocal checkbox; checking it and adding a role calls addRole with vocal:true', async () => {
+    const wrapper = mountPanel()
+    const groupSelect = wrapper.findAll('select').find((s) =>
+      s.findAll('option').some((o) => o.attributes('value') === 'band'),
+    )!
+
+    // Default group is 'band' — the checkbox is visible without switching first.
+    expect(wrapper.text()).toContain('Vocal role (can sing & play)')
+
+    // Switching away from Band hides it; switching back reveals it again.
+    await groupSelect.setValue('tech')
+    expect(wrapper.text()).not.toContain('Vocal role (can sing & play)')
+    await groupSelect.setValue('band')
+    expect(wrapper.text()).toContain('Vocal role (can sing & play)')
+
+    const addNameInput = wrapper.find('input[placeholder="Role name"]')
+    await addNameInput.setValue('Lead Vocal')
+    const vocalCheckbox = wrapper.find('input[type="checkbox"]')
+    await vocalCheckbox.setValue(true)
+
+    const saveButtons = wrapper.findAll('button').filter((b) => b.text() === 'Save Role' || b.text() === 'Added ✓')
+    const addButton = saveButtons[saveButtons.length - 1]!
+    await addButton.trigger('click')
+
+    expect(mockAddRole).toHaveBeenCalledWith({
+      name: 'Lead Vocal',
+      group: 'band',
+      defaultCount: 1,
+      order: 2,
+      vocal: true,
+    })
+  })
 })
