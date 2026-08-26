@@ -394,7 +394,10 @@ one, it follows the same confirm-then-deploy discipline.
   3. Vocals may be filled by multiple people on the same date, and a person on Vocals may simultaneously hold one Band instrument role on that date (sing and play at once) without tripping the conflict rule (R252).
   4. Vocals is the only exception — every other cross-team pairing on one date is still blocked (R251, R252).
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+- [ ] 85-01-PLAN.md — Fold Vocals into Band and enforce one-team-per-date: narrow the RoleGroup union + add a Role.vocal flag (R250), rewrite the ONE shared evaluateGroupCombo rule to Band↔Tech exclusivity + one-instrument cap with Vocals exempt (R251/R252), add the read-time compat shim + isVocal projection, update the roles UI, and the full test set — all landing together (the type change is atomically coupled to every consumer)
+
 **UI hint**: yes
 **Deploy note**: Client + Firestore-via-app (roster/scheduler model + logic + UI). Any data migration of historical Vocals assignments is out of scope as a committed requirement (decided during phase planning).
 
