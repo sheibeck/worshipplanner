@@ -375,7 +375,9 @@ one, it follows the same confirm-then-deploy discipline.
   2. Adding the same song to a later-dated service advances its last-used date to that later service's date (R247).
   3. After the one-time backfill runs, every song's last-used date equals the most recent service it was ever added to, correcting records created before the R247 fix landed (R248).
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 84-01-PLAN.md — R247 live fix: canonical pure helper (`src/utils/lastUsed.ts`) + remove the assignment stamp + recompute at lock/unlock (`markAsPlanned`/`reopenService`) + unit & store tests (wave 1)
+- [ ] 84-02-PLAN.md — R248 single-org Admin-SDK backfill (`functions/src/backfillLastUsed.ts`), dry-run default + `--apply`, conservative write-only-if-locked / never-blank, idempotent + tests (wave 2, depends on 84-01)
 **Deploy note**: R247 is a client/Firestore-via-app fix. R248 is a one-time Node/Admin-SDK backfill script run once, owner-confirmed before it runs (it writes production data) — not a `firebase deploy`.
 
 ### Phase 85: Team Conflicts — Vocals into Band & One-Team-Per-Date
