@@ -2,14 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
-status: planning
-last_updated: "2026-08-25T23:59:00.000Z"
+current_phase: 84
+current_phase_name: Last-Used Date Correctness & Backfill
+status: executing
+stopped_at: Completed 84-01-PLAN.md
+last_updated: "2026-08-26T03:07:47.450Z"
 last_activity: 2026-08-25
+last_activity_desc: Phase 84 execution started
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -27,10 +31,9 @@ confirm with me before doing so."*
 
 ---
 
-
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** planning — roadmap done; next is `/gsd-plan-phase 84`. Phase numbering continues from v2.2
+**Status:** Ready to execute
 (79–83, ended at Phase 83); this milestone is **Phases 84–87**.
 
 **Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — last-used
@@ -43,12 +46,15 @@ themselves, and the scheduler's UI copy tells the truth. Requirements R247–R25
 - **Phase 84 — Last-Used Date Correctness & Backfill (R247, R248):** fix the lagging last-scheduled date
   (must reflect the most recent service a song was actually added to, incl. locked/exported) + a one-time
   backfill script recomputing every song's last-used date retroactively. Sequenced first (live reported bug).
+
 - **Phase 85 — Team Conflicts: Vocals into Band & One-Team-Per-Date (R250, R251, R252):** fold Vocals
   into Band (data-model change), block a volunteer serving two teams on one date, with Vocals the sole
   multi-person, sing-and-play-at-once exception. The R250 model change precedes the R251/R252 conflict logic.
+
 - **Phase 86 — Recurring Team Scheduling (R254, R255):** a `>` slideout on Volunteer → Teams (mirroring
   the Song table's slideout) sets a team's every-Nth-week / Nth-Sunday pattern; a matching service date
   auto-selects the team. Sequenced after Phase 85 (shared Volunteer → Teams surface).
+
 - **Phase 87 — Song & Rotation Refinements (R249, R253, R256):** editable song Key, a Scripture rotation
   tab that excludes the sermon passage, and corrected "soft planning target" schedulable-roles copy.
   Small/independent items bundled, sequenced last (lowest risk, incl. the copy fix).
@@ -912,7 +918,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 79 — Dedup & Configurable Teams (v2.2 roadmap created 2026-08-23; not yet planned)
+**Current focus:** Phase 84 — Last-Used Date Correctness & Backfill
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -922,10 +928,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-25 — Milestone v2.3 started
+Phase: 84 (Last-Used Date Correctness & Backfill) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-08-25 — Phase 84 execution started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -2599,6 +2605,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 82 P01 | 22min | 3 tasks | 8 files |
 | Phase 82-per-org-ai-enablement P02 | 55min | 3 tasks | 9 files |
 | Phase 83 P01 | 25min | 3 tasks | 7 files |
+| Phase 84 P01 | 42min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3020,6 +3027,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 82 P02]: isAiEnabled() two-gate AND checks authStore.aiMasterEnabled before authStore.settings.aiEnabled, so a disabled org never calls the AI proxy even with a stale settings.aiEnabled true
 - [Phase ?]: R246 copy: 'Default count is the number of volunteers the scheduler auto-fills for this role each service' — confirmed accurate against scheduler.ts's fill loop; scheduler behavior itself unchanged
 - [Phase ?]: Delete button in RolesConfigPanel/TeamsConfigPanel: class swap only to bg-red-900/20 hover:bg-red-900/40 text-red-400 at compact row sizing; click handler and confirm blocks unchanged
+- [Phase ?]: R247 fix: lastUsedAt = MAX(service.date) over LOCKED (non-draft) services containing the song, derived by a canonical framework-free src/utils/lastUsed.ts mirrored (not imported) by the 84-02 backfill
 
 ### Roadmap Evolution
 
@@ -3345,8 +3353,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-24T20:24:09.477Z
-Stopped at: Completed 83-01-PLAN.md
+Last session: 2026-08-26T03:07:47.398Z
+Stopped at: Completed 84-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

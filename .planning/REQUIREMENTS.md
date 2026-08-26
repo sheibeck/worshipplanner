@@ -9,7 +9,7 @@ REQ-IDs continue the project's sequential `R###` numbering from the last shipped
 
 ### Scheduling Data Integrity — Last-Used Dates
 
-- [ ] **R247**: A song's "last used" / "last scheduled" date reflects the most recent service the song was actually added to — including services that are locked and/or exported — rather than lagging behind reality (the reported bug: "His Mercy Is More" showed Aug 11 despite a locked & exported Sep 6 service). — **Phase 84**
+- [x] **R247**: A song's "last used" / "last scheduled" date reflects the most recent service the song was actually added to — including services that are locked and/or exported — rather than lagging behind reality (the reported bug: "His Mercy Is More" showed Aug 11 despite a locked & exported Sep 6 service). — **Phase 84**
 - [ ] **R248**: A one-time backfill script recomputes every song's last-used date from all services the song has ever been added to, correcting records created before the R247 fix landed. — **Phase 84**
 
 ### Song Editing
@@ -56,7 +56,7 @@ Deferred; not in the v2.3 roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R247 | Phase 84 | Pending |
+| R247 | Phase 84 | Complete |
 | R248 | Phase 84 | Pending |
 | R249 | Phase 87 | Pending |
 | R250 | Phase 85 | Pending |
@@ -68,11 +68,13 @@ Deferred; not in the v2.3 roadmap.
 | R256 | Phase 87 | Pending |
 
 **Coverage:**
+
 - v2.3 requirements: 10 total
 - Mapped to phases: 10 (Phases 84–87)
 - Unmapped: 0 ✓
 
 **Phase rollup:**
+
 - Phase 84 — Last-Used Date Correctness & Backfill: R247, R248
 - Phase 85 — Team Conflicts (Vocals into Band & One-Team-Per-Date): R250, R251, R252
 - Phase 86 — Recurring Team Scheduling: R254, R255
