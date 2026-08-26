@@ -86,7 +86,6 @@
             class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option value="band">Band</option>
-            <option value="vocals">Vocals</option>
             <option value="tech">Tech</option>
             <option value="other">Other</option>
           </select>
@@ -96,6 +95,14 @@
             min="1"
             class="w-20 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
           />
+          <label v-if="newRoleGroup === 'band'" class="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
+            <input
+              v-model="newRoleVocal"
+              type="checkbox"
+              class="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-indigo-500"
+            />
+            Vocal role (can sing &amp; play)
+          </label>
           <button
             type="button"
             :disabled="!newRoleName.trim() && !roleAdded"
@@ -116,22 +123,20 @@ import type { Role, RoleGroup } from '@/types/roster'
 
 const rosterStore = useRosterStore()
 
-const groupOrder: RoleGroup[] = ['band', 'vocals', 'tech', 'other']
-const groupLabels: Record<RoleGroup, string> = { band: 'Band', tech: 'Tech', vocals: 'Vocals', other: 'Other' }
+const groupOrder: RoleGroup[] = ['band', 'tech', 'other']
+const groupLabels: Record<RoleGroup, string> = { band: 'Band', tech: 'Tech', other: 'Other' }
 
 // Static class map — never dynamically constructed Tailwind class strings, so
 // classes survive Tailwind v4 purge (mirrors SongBadge.vue / TeamTagPill.vue).
 const groupBadgeClasses: Record<RoleGroup, string> = {
   band: 'bg-blue-900/50 text-blue-300 border-blue-800',
   tech: 'bg-purple-900/50 text-purple-300 border-purple-800',
-  vocals: 'bg-pink-900/50 text-pink-300 border-pink-800',
   other: 'bg-gray-800 text-gray-400 border-gray-700',
 }
 
 const groupedRoles = computed(() => ({
   band: rosterStore.roles.filter((r) => r.group === 'band'),
   tech: rosterStore.roles.filter((r) => r.group === 'tech'),
-  vocals: rosterStore.roles.filter((r) => r.group === 'vocals'),
   other: rosterStore.roles.filter((r) => r.group === 'other'),
 }))
 
@@ -200,8 +205,15 @@ async function onConfirmDelete(roleId: string) {
 const newRoleName = ref('')
 const newRoleGroup = ref<RoleGroup>('band')
 const newRoleCount = ref(1)
+const newRoleVocal = ref(false)
 const roleAdded = ref(false)
 let addedTimer: ReturnType<typeof setTimeout> | null = null
+
+// Reset the vocal checkbox whenever the group changes away from 'band' — it's only
+// meaningful (and only shown) for a Band role.
+watch(newRoleGroup, (group) => {
+  if (group !== 'band') newRoleVocal.value = false
+})
 
 async function onAddRole() {
   const name = newRoleName.value.trim()
@@ -212,10 +224,12 @@ async function onAddRole() {
     group: newRoleGroup.value,
     defaultCount: newRoleCount.value || 1,
     order: maxOrder + 1,
+    ...(newRoleVocal.value ? { vocal: true } : {}),
   })
   newRoleName.value = ''
   newRoleGroup.value = 'band'
   newRoleCount.value = 1
+  newRoleVocal.value = false
   roleAdded.value = true
   if (addedTimer) clearTimeout(addedTimer)
   addedTimer = setTimeout(() => {

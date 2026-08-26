@@ -263,11 +263,10 @@ const rosterStore = useRosterStore()
 const groupHeaderBg: Record<RoleGroup, string> = {
   band: 'bg-blue-900/50',
   tech: 'bg-purple-900/50',
-  vocals: 'bg-pink-900/50',
   other: 'bg-gray-800',
 } as const
 
-const GROUP_ORDER: RoleGroup[] = ['band', 'vocals', 'tech', 'other']
+const GROUP_ORDER: RoleGroup[] = ['band', 'tech', 'other']
 
 // ── Roles grouped Band/Tech/Other, ordered within group ────────────────────────
 const sortedRoles = computed<Role[]>(() => {
@@ -320,6 +319,18 @@ function roleGroupOf(roleId: string): RoleGroup {
   return roleGroupById.value.get(roleId) ?? 'other'
 }
 
+// R252/D-11: roleId -> vocal lookup, threaded into evaluateGroupCombo alongside roleGroupOf so
+// the warn badge uses the exact same rule as the scheduler (Vocals exempt from the instrument cap).
+const isVocalById = computed(() => {
+  const m = new Map<string, boolean>()
+  for (const r of props.roles) m.set(r.id, r.vocal === true)
+  return m
+})
+
+function isVocal(roleId: string): boolean {
+  return isVocalById.value.get(roleId) ?? false
+}
+
 // Live-computed from props.quarter.calendar + props.roles (NOT props.lastProposeResult) —
 // works for a loaded historical calendar, not only immediately after a fresh propose.
 function cellHasGroupViolation(date: string, roleId: string): boolean {
@@ -330,7 +341,7 @@ function cellHasGroupViolation(date: string, roleId: string): boolean {
     const roleIdsThisDate = Object.entries(calendarForDate)
       .filter(([, ids]) => ids.includes(personId))
       .map(([rId]) => rId)
-    return !evaluateGroupCombo(roleIdsThisDate, roleGroupOf).ok
+    return !evaluateGroupCombo(roleIdsThisDate, roleGroupOf, isVocal).ok
   })
 }
 

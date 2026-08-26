@@ -256,12 +256,20 @@ export const useQuartersStore = defineStore('quarters', () => {
   }
 
   // D-12: projects Role[]→roleId→RoleGroup lookup so the scheduler's group co-occurrence
-  // rules (TECH exclusivity, 1-BAND/1-VOCALS cap) are actually enforced in production, not just
-  // at the unit level inside scheduler.ts. Unknown/stale roleIds default to 'other' (the
+  // rules (Band<->Tech exclusivity, 1-Band-instrument cap) are actually enforced in production,
+  // not just at the unit level inside scheduler.ts. Unknown/stale roleIds default to 'other' (the
   // least-restrictive group) so a missing lookup entry never crashes or silently blocks a slot.
   function buildRoleGroupOf(roles: Role[]): (roleId: string) => RoleGroup {
     const groupById = new Map(roles.map((r) => [r.id, r.group]))
     return (roleId: string) => groupById.get(roleId) ?? 'other'
+  }
+
+  // R252: projects Role[]→roleId→vocal lookup, paired with buildRoleGroupOf, so the scheduler's
+  // Vocals-is-exempt-from-the-instrument-cap rule is enforced in production. Unknown roleIds
+  // default to false (the safe, non-exempt default).
+  function buildIsVocal(roles: Role[]): (roleId: string) => boolean {
+    const vocalById = new Map(roles.map((r) => [r.id, r.vocal === true]))
+    return (roleId: string) => vocalById.get(roleId) ?? false
   }
 
   async function generateProposal(
@@ -280,6 +288,7 @@ export const useQuartersStore = defineStore('quarters', () => {
       personQuarterData,
       mode === 'fillGaps' ? quarter.calendar : undefined,
       buildRoleGroupOf(rosterStore.roles),
+      buildIsVocal(rosterStore.roles),
     )
 
     // Diff the previous calendar against the freshly proposed one so the UI can
@@ -498,6 +507,7 @@ export const useQuartersStore = defineStore('quarters', () => {
     setPersonAvailability,
     buildResolveRolesForDate,
     buildRoleGroupOf,
+    buildIsVocal,
     generateProposal,
     assignPerson,
     clearAssignment,

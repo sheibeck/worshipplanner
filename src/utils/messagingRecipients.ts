@@ -17,7 +17,6 @@ import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 export const MESSAGING_TEAM_LABELS: Record<RoleGroup, string> = {
   band: 'Band',
   tech: 'Tech',
-  vocals: 'Vocals',
   other: 'Other',
 }
 

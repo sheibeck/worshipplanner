@@ -63,17 +63,19 @@ export const useRosterStore = defineStore('roster', () => {
       orderBy('order'),
     )
     unsubscribeRolesFn = onSnapshot(rolesQuery, (snap) => {
-      roles.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Role)
-
-      // One-time migration (D-09): the seeded 'vocals' role predates the dedicated
-      // 'vocals' RoleGroup and was originally classified under 'band'. Guarded,
-      // case-insensitive name check, idempotent — never touches any other role.
-      for (const d of snap.docs) {
-        const data = d.data()
-        if (String(data.name).toLowerCase() === 'vocals' && data.group === 'band') {
-          void updateDoc(d.ref, { group: 'vocals' })
+      // Read-time compat shim (R250): the narrowed RoleGroup drops 'vocals' as a team
+      // identity, but existing per-org roles may still be stored with group 'vocals' from
+      // before this phase. Coerce those to { group: 'band', vocal: true } on read ONLY —
+      // no Firestore write migration (per CONTEXT: avoid a one-time data migration). This
+      // is the single read boundary, so every downstream consumer of rosterStore.roles
+      // always sees the narrowed union.
+      roles.value = snap.docs.map((d) => {
+        const data = d.data() as Role
+        if ((data.group as string) === 'vocals') {
+          return { ...data, id: d.id, group: 'band', vocal: data.vocal ?? true } as Role
         }
-      }
+        return { ...data, id: d.id } as Role
+      })
     })
   }
 
