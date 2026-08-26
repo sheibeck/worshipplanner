@@ -137,7 +137,7 @@ function orgSettings() {
 const ROLES = [
   { id: 'role-guitar', name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
   { id: 'role-drums', name: 'drums', group: 'band', defaultCount: 1, order: 1 },
-  { id: 'role-vocals', name: 'vocals', group: 'vocals', defaultCount: 1, order: 2 },
+  { id: 'role-vocals', name: 'vocals', group: 'band', vocal: true, defaultCount: 1, order: 2 },
   { id: 'role-bass', name: 'bass', group: 'band', defaultCount: 1, order: 3 },
   { id: 'role-sound', name: 'sound', group: 'tech', defaultCount: 1, order: 4 },
   { id: 'role-livestream', name: 'livestream', group: 'tech', defaultCount: 1, order: 5 },
