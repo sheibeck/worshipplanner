@@ -4,17 +4,17 @@ milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
 current_phase: 84
 current_phase_name: Last-Used Date Correctness & Backfill
-status: executing
-stopped_at: Completed 84-01-PLAN.md
-last_updated: "2026-08-26T03:07:47.450Z"
+status: verifying
+stopped_at: Completed 84-02-PLAN.md
+last_updated: "2026-08-26T03:16:30.573Z"
 last_activity: 2026-08-25
 last_activity_desc: Phase 84 execution started
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 25
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 (79–83, ended at Phase 83); this milestone is **Phases 84–87**.
 
 **Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — last-used
@@ -930,7 +930,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 84 (Last-Used Date Correctness & Backfill) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-25 — Phase 84 execution started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
@@ -2606,6 +2606,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 82-per-org-ai-enablement P02 | 55min | 3 tasks | 9 files |
 | Phase 83 P01 | 25min | 3 tasks | 7 files |
 | Phase 84 P01 | 42min | 2 tasks | 4 files |
+| Phase 84 P02 | 12min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -3028,6 +3029,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R246 copy: 'Default count is the number of volunteers the scheduler auto-fills for this role each service' — confirmed accurate against scheduler.ts's fill loop; scheduler behavior itself unchanged
 - [Phase ?]: Delete button in RolesConfigPanel/TeamsConfigPanel: class swap only to bg-red-900/20 hover:bg-red-900/40 text-red-400 at compact row sizing; click handler and confirm blocks unchanged
 - [Phase ?]: R247 fix: lastUsedAt = MAX(service.date) over LOCKED (non-draft) services containing the song, derived by a canonical framework-free src/utils/lastUsed.ts mirrored (not imported) by the 84-02 backfill
+- [Phase ?]: 84-02: mirrored computeLastUsedDate/serviceDateToMillis byte-identical (incl. quote/semicolon style) from src/utils/lastUsed.ts into functions/src/backfillLastUsed.ts, verified via scripted diff
 
 ### Roadmap Evolution
 
@@ -3353,8 +3355,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-26T03:07:47.398Z
-Stopped at: Completed 84-01-PLAN.md
+Last session: 2026-08-26T03:16:30.484Z
+Stopped at: Completed 84-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
