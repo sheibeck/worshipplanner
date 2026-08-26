@@ -360,7 +360,7 @@ one, it follows the same confirm-then-deploy discipline.
 **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R247–R256 (10 mapped, 100% coverage)
 
 - [x] **Phase 84: Last-Used Date Correctness & Backfill** - Fix the lagging last-scheduled date so it reflects the most recent service a song was actually added to (incl. locked/exported), then a one-time script to recompute every song's last-used date retroactively (R247, R248) (completed 2026-08-26)
-- [ ] **Phase 85: Team Conflicts — Vocals into Band & One-Team-Per-Date** - Fold Vocals into the Band team, block a volunteer from serving on two teams on one date, with Vocals as the sole multi-person, sing-and-play-at-once exception (R250, R251, R252)
+- [x] **Phase 85: Team Conflicts — Vocals into Band & One-Team-Per-Date** - Fold Vocals into the Band team, block a volunteer from serving on two teams on one date, with Vocals as the sole multi-person, sing-and-play-at-once exception (R250, R251, R252) (completed 2026-08-26)
 - [ ] **Phase 86: Recurring Team Scheduling** - Configure a team's recurring pattern (every Nth week / Nth Sunday) from a `>` slideout on the Volunteer → Teams tab, and auto-select that team on any service whose date matches (R254, R255)
 - [ ] **Phase 87: Song & Rotation Refinements** - Editable song Key, a Scripture rotation tab that lists only planned scripture (never the sermon passage), and corrected "soft planning target" schedulable-roles copy (R249, R253, R256)
 
@@ -399,7 +399,7 @@ one, it follows the same confirm-then-deploy discipline.
 - [x] 85-01-PLAN.md — Fold Vocals into Band and enforce one-team-per-date: narrow the RoleGroup union + add a Role.vocal flag (R250), rewrite the ONE shared evaluateGroupCombo rule to Band↔Tech exclusivity + one-instrument cap with Vocals exempt (R251/R252), add the read-time compat shim + isVocal projection, update the roles UI, and the full test set — all landing together (the type change is atomically coupled to every consumer)
 
 **UI hint**: yes
-**Deploy note**: Client + Firestore-via-app (roster/scheduler model + logic + UI). Any data migration of historical Vocals assignments is out of scope as a committed requirement (decided during phase planning).
+**Deploy note**: Mostly client + Firestore-via-app (roster/scheduler model + logic + UI, read-time compat shim, no data migration). **PLUS an owner-gated Cloud Functions deploy** added at code-review: the CR-01 fix updated the server-side messaging resolver (`functions/src/serviceRoles.ts` + `sendQueuedMessageHandler`) to fold legacy `group:'vocals'` into Band so a "Band"-targeted message reaches vocalists — `firebase deploy --only functions:sendQueuedMessage` needed for it to take effect (recorded in PENDING-VERIFICATION.md).
 
 ### Phase 86: Recurring Team Scheduling
 

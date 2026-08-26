@@ -932,3 +932,24 @@ baseline; functions 590/590). Two items are owner-only and were deferred (owner 
 - [ ] **Visual click-through (owner).** In the live app: open a draft service, add a song, click
       "Mark as Planned", and confirm the song's last-used date reads the SERVICE date (not today);
       reopen and confirm it recomputes. Store logic is already fully proven by automated tests.
+
+---
+
+## v2.3 — Phase 85 Team Conflicts (Vocals into Band & One-Team-Per-Date) (deferred 2026-08-26)
+
+Phase 85 is code-complete and auto-verified 10/10 (client type-check clean; app suite at the 2-file
+baseline; scheduler 33/33; functions 594/594 incl. 4 CR-01 regression tests). Two items deferred (owner
+"Defer & continue" during the /gsd-autonomous run) — NOT code gaps:
+
+- [ ] **⚠ Cloud Functions deploy required (owner-gated).** The CR-01 fix (commit `f4c9648e`) updates the
+      SERVER-SIDE messaging resolver (`functions/src/serviceRoles.ts` + `functions/src/index.ts`
+      `sendQueuedMessageHandler`) so a legacy `group:'vocals'` role reaches recipients under the "Band"
+      selection — matching the client's folded model. Until deployed, a message targeted at Band would
+      still drop a vocalist stored as the old group server-side. Deploy: `cd functions && npm run build`
+      then `firebase deploy --only functions:sendQueuedMessage` (and any co-changed messaging functions).
+      Owner-confirmed per the confirm-then-deploy policy. This is the first v2.3 change that isn't
+      client-only.
+- [ ] **Live-app scheduling spot-check (owner).** In the running app with real org data, confirm the
+      auto-scheduler + QuarterGrid honor the new rule: a Tech volunteer isn't also placed in Band on the
+      same date; a vocalist can sing AND play one instrument; "Other" combines freely; the manual grid
+      shows a warn badge (not a hard block) on a conflict. Rule logic is fully proven by automated tests.
