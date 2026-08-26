@@ -2302,5 +2302,56 @@ describe('useServiceStore', () => {
 
       expect(mockUpdateSong).toHaveBeenCalledWith('song-x', { lastUsedAt: null })
     })
+
+    // CR-02 (84-REVIEW): the recompute must be soft-failed — the status write
+    // already landed before it runs, so a transient recompute failure must
+    // not reject the whole markAsPlanned/reopenService call and make the
+    // caller believe the transition itself failed.
+    it('CR-02: markAsPlanned still resolves and writes the status transition even when the lastUsedAt recompute fails', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeService({ id: 'service-1', date: '2026-09-06', status: 'draft', slots: [songSlot('song-x')] }),
+      ])
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockUpdateSong.mockRejectedValueOnce(new Error('transient recompute failure'))
+
+      await expect(store.markAsPlanned('service-1')).resolves.toBeUndefined()
+
+      // The status write already landed — this is the part that must survive.
+      expect(vi.mocked(updateDoc)).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: 'planned' }),
+      )
+      expect(consoleErrorSpy).toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('CR-02: reopenService still resolves and writes the status transition even when the lastUsedAt recompute fails', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeService({ id: 'service-1', date: '2026-09-06', status: 'planned', slots: [songSlot('song-x')] }),
+      ])
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockUpdateSong.mockRejectedValueOnce(new Error('transient recompute failure'))
+
+      await expect(store.reopenService('service-1')).resolves.toBeUndefined()
+
+      expect(vi.mocked(updateDoc)).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ status: 'draft' }),
+      )
+      expect(consoleErrorSpy).toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
   })
 })

@@ -435,11 +435,24 @@ export const useServiceStore = defineStore('services', () => {
     // locked service that contains them). See buildLastUsedSnapshot's doc
     // comment for why the snapshot below overrides THIS service's status
     // rather than relying on services.value, which still shows 'draft' here.
+    //
+    // CR-02 (84-REVIEW): soft-fail, mirroring maybeRefreshShareLink's pattern
+    // in this same file. The status write above already landed — a transient
+    // recompute failure (permission edge case, network blip, quota) must not
+    // reject the whole transition and make the caller report "it didn't
+    // save" for a service that is now genuinely planned.
     const service = services.value.find((s) => s.id === id)
     if (service) {
       const songIds = songIdsInService(service)
       if (songIds.length > 0) {
-        await recomputeLastUsedFor(songIds, buildLastUsedSnapshot(id, 'planned'))
+        try {
+          await recomputeLastUsedFor(songIds, buildLastUsedSnapshot(id, 'planned'))
+        } catch (err) {
+          console.error(
+            `markAsPlanned: lastUsedAt recompute failed for service ${id} — the status transition already succeeded`,
+            err,
+          )
+        }
       }
     }
   }
@@ -473,8 +486,20 @@ export const useServiceStore = defineStore('services', () => {
     // Those songs fall back to their remaining locked MAX (or null if this
     // was their only locked service) — see buildLastUsedSnapshot's doc
     // comment for the status-override rationale.
+    //
+    // CR-02 (84-REVIEW): soft-fail, mirroring markAsPlanned's identical guard
+    // above and maybeRefreshShareLink's pattern in this same file — the
+    // status write already landed, so a transient recompute failure must not
+    // reject the reopen itself.
     if (songIds.length > 0) {
-      await recomputeLastUsedFor(songIds, buildLastUsedSnapshot(id, 'draft'))
+      try {
+        await recomputeLastUsedFor(songIds, buildLastUsedSnapshot(id, 'draft'))
+      } catch (err) {
+        console.error(
+          `reopenService: lastUsedAt recompute failed for service ${id} — the status transition already succeeded`,
+          err,
+        )
+      }
     }
   }
 
