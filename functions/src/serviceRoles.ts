@@ -18,18 +18,54 @@
  * The ONLY behavioral addition over the client resolver is per-recipient roleNames
  * (resolveMessageRecipients), which the send trigger needs to render {{their_roles}}
  * correctly for each recipient (R139).
+ *
+ * Phase 85 (R250): the client narrowed RoleGroup to "band" | "tech" | "other" and
+ * folded vocals into Band via a `vocal` flag, with a read-time compat shim
+ * (src/stores/roster.ts) coercing any legacy `group: 'vocals'` doc to
+ * `{ group: 'band', vocal: true }`. This file's RoleGroup is narrowed to match, and
+ * the equivalent coercion is applied where roles are Admin-SDK-loaded
+ * (functions/src/index.ts, sendQueuedMessageHandler) — the ONE read boundary on the
+ * server side, mirroring the client's ONE read boundary in roster.ts's onSnapshot.
  */
 
 // Minimal functions-local domain types, hand-mirrored from the app's canonical
 // types (src/types/roster.ts, src/types/service.ts). Only the fields the algorithm
 // touches are declared — not the full Firestore document shapes.
-export type RoleGroup = "band" | "tech" | "vocals" | "other";
+export type RoleGroup = "band" | "tech" | "other";
 
 export interface PortedRole {
   id: string;
   name: string;
   group: RoleGroup;
+  /** true for a singing role — a Band role exempt from the one-instrument cap
+   *  (R250/R252). Not used by resolveMessageRecipients' team matching (a vocal
+   *  role already carries group: 'band'), but ported for shape parity with the
+   *  client Role type and to keep the read-time coercion below self-describing. */
+  vocal?: boolean;
   order: number;
+}
+
+/**
+ * Read-time compat shim (R250, mirrors src/stores/roster.ts's onSnapshot shim):
+ * coerces a legacy role doc stored with `group: 'vocals'` to `{ group: 'band',
+ * vocal: true }`. Read-time ONLY — no Firestore write migration is performed (same
+ * "no data migration" decision as the client). Exported (rather than inlined at the
+ * call site) so the server's one role-load boundary
+ * (functions/src/index.ts, sendQueuedMessageHandler) and this file's own tests share
+ * exactly one coercion implementation — the drift this function exists to close was
+ * that a raw, un-shimmed Admin SDK read let a legacy vocalist silently drop out of a
+ * "Band" team send while the client's "Reaches N" estimate still counted them
+ * (CR-01, 85-REVIEW.md).
+ */
+export function coerceLegacyRoleGroup(data: {
+  group?: string;
+  vocal?: boolean;
+  [key: string]: unknown;
+}): { group: RoleGroup; vocal?: boolean } {
+  if (data.group === "vocals") {
+    return { group: "band", vocal: data.vocal ?? true };
+  }
+  return { group: data.group as RoleGroup, vocal: data.vocal };
 }
 
 export interface PortedService {

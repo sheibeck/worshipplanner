@@ -3,6 +3,7 @@ import {
   findQuarterForDate,
   resolveServiceRoleAssignments,
   resolveMessageRecipients,
+  coerceLegacyRoleGroup,
   type PortedRole,
   type PortedService,
   type PortedQuarter,
@@ -312,5 +313,55 @@ describe("resolveMessageRecipients", () => {
     expect(byId["person-b"]).toEqual(["sound", "livestream"]);
     // the whole point of R139: A's roles are NOT B's roles
     expect(byId["person-a"]).not.toEqual(byId["person-b"]);
+  });
+});
+
+describe("coerceLegacyRoleGroup (R250 read-time compat shim, CR-01 regression)", () => {
+  it("coerces a legacy role doc stored with group 'vocals' to { group: 'band', vocal: true }", () => {
+    expect(coerceLegacyRoleGroup({ group: "vocals" })).toEqual({ group: "band", vocal: true });
+  });
+
+  it("preserves an explicit vocal:false on a legacy doc rather than forcing true", () => {
+    expect(coerceLegacyRoleGroup({ group: "vocals", vocal: false })).toEqual({
+      group: "band",
+      vocal: false,
+    });
+  });
+
+  it("leaves a non-vocals role doc's group/vocal unchanged", () => {
+    expect(coerceLegacyRoleGroup({ group: "band", vocal: true })).toEqual({
+      group: "band",
+      vocal: true,
+    });
+    expect(coerceLegacyRoleGroup({ group: "tech" })).toEqual({ group: "tech", vocal: undefined });
+  });
+
+  it("CR-01 regression: a role doc raw-read with group:'vocals' resolves under a 'band' team selection, matching the client's Reaches-N estimate", () => {
+    // Simulates the exact drop bug: a Firestore role doc that has never been
+    // migrated off the pre-Phase-85 shape (group: 'vocals'), fed through the
+    // functions/src/index.ts role-load boundary's coercion before reaching
+    // resolveMessageRecipients — proving the server send list now agrees with
+    // the client's shim-coerced "Reaches N" estimate for the same org data.
+    const legacyVocalsRoleDoc = { group: "vocals", name: "vocals" };
+    const vocals = makeRole({
+      id: "role-vocals",
+      name: "vocals",
+      order: 0,
+      ...coerceLegacyRoleGroup(legacyVocalsRoleDoc),
+    });
+    const quarter = makeQuarter({
+      serviceDates: ["2026-08-02"],
+      calendar: { "2026-08-02": { "role-vocals": ["person-1"] } },
+    });
+    const service = makeService({ date: "2026-08-02" });
+    const alice = makePerson({ id: "person-1", name: "Alice", email: "alice@example.com" });
+
+    const assignments = resolveServiceRoleAssignments(service, [quarter], [vocals]);
+    const result = resolveMessageRecipients(assignments, [alice], makeSelection({ teams: ["band"] }));
+
+    expect(result.reachable).toEqual([
+      { id: "person-1", name: "Alice", email: "alice@example.com", roleNames: ["vocals"] },
+    ]);
+    expect(result.unreachableCount).toBe(0);
   });
 });

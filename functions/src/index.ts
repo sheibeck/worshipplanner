@@ -24,6 +24,7 @@ import { verifySvixSignature } from "./webhookSignature";
 import {
   resolveServiceRoleAssignments,
   resolveMessageRecipients,
+  coerceLegacyRoleGroup,
   type PortedQuarter,
   type PortedRole,
   type PortedPerson,
@@ -2947,7 +2948,15 @@ export async function sendQueuedMessageHandler(params: {
   ]);
   const orgName = fromDisplayName((orgSnap.data() as { name?: string | null } | undefined)?.name);
   const quarters = quartersSnap.docs.map((d) => d.data() as PortedQuarter);
-  const roles = rolesSnap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as PortedRole);
+  // Read-time compat shim (R250, mirrors src/stores/roster.ts's onSnapshot shim): the
+  // narrowed RoleGroup drops 'vocals' as a team identity, but existing per-org roles may
+  // still be stored with group 'vocals' from before Phase 85. Coerce those to
+  // { group: 'band', vocal: true } on read ONLY — no Firestore write migration — so the
+  // server send list agrees with the client's "Reaches N" estimate (CR-01, 85-REVIEW.md).
+  const roles = rolesSnap.docs.map((d) => {
+    const data = d.data() as { group?: string; vocal?: boolean; [k: string]: unknown };
+    return { id: d.id, ...data, ...coerceLegacyRoleGroup(data) } as PortedRole;
+  });
   const people = peopleSnap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as PortedPerson);
 
   const assignments = resolveServiceRoleAssignments(
