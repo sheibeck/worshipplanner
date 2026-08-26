@@ -124,6 +124,15 @@ export interface BackfillSummary {
   processed: number;
   skipped: number;
   failed: BackfillFailure[];
+  /**
+   * WR-02 (84-REVIEW): service doc ids excluded from the MAX computation
+   * because `date` was missing or not a `YYYY-MM-DD` string -- distinct from
+   * `failed` (which is per-SONG). A non-empty list here is a materially
+   * different, worth-investigating condition ("this org has a service with
+   * no/bad date") that a human should see before `--apply`, not something
+   * that should silently fall through to a per-song NaN Timestamp failure.
+   */
+  malformedServices: string[];
 }
 
 /**
@@ -147,14 +156,31 @@ export async function backfillLastUsedForOrg(options: BackfillOptions): Promise<
     orgRef.collection("songs").get(),
   ]);
 
-  const serviceInputs: LastUsedServiceInput[] = servicesSnap.docs.map((doc) => {
+  // WR-02 (84-REVIEW): a missing/malformed `date` used to fall through as
+  // `data.date ?? ""`, letting a bogus service silently feed
+  // `serviceDateToMillis("")` -> NaN -> a `Timestamp.fromMillis(NaN)`
+  // attempt, "safely" caught only incidentally by the per-song try/catch
+  // below and indistinguishable from an unrelated song-doc read failure.
+  // Explicitly excluded and reported here instead, BEFORE any song is
+  // classified against it.
+  const malformedServices: string[] = [];
+  const serviceInputs: LastUsedServiceInput[] = [];
+  for (const doc of servicesSnap.docs) {
     const data = doc.data() as ServiceDocData;
-    return {
+    const date = data.date;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      malformedServices.push(doc.id);
+      console.warn(
+        `[backfillLastUsed] service ${doc.id}: missing/malformed date "${date ?? ""}" -- excluded from MAX computation`,
+      );
+      continue;
+    }
+    serviceInputs.push({
       status: data.status ?? "draft",
-      date: data.date ?? "",
+      date,
       songIds: songIdsFromSlots(data.slots),
-    };
-  });
+    });
+  }
 
   let processed = 0;
   let skipped = 0;
@@ -194,7 +220,7 @@ export async function backfillLastUsedForOrg(options: BackfillOptions): Promise<
     }
   }
 
-  const summary: BackfillSummary = { processed, skipped, failed };
+  const summary: BackfillSummary = { processed, skipped, failed, malformedServices };
   console.log("[backfillLastUsed] summary:", summary);
   return summary;
 }
@@ -265,6 +291,11 @@ export async function runBackfillCli(): Promise<void> {
     console.log(`[backfillLastUsed] target org: ${orgId}`);
 
     const summary = await backfillLastUsedForOrg({ orgId, apply });
+    if (summary.malformedServices.length > 0) {
+      console.warn(
+        `[backfillLastUsed] ${summary.malformedServices.length} service(s) had a missing/malformed date and were excluded from MAX computation -- review before --apply: ${summary.malformedServices.join(", ")}`,
+      );
+    }
     if (summary.failed.length > 0) {
       console.error(`[backfillLastUsed] ${summary.failed.length} song(s) failed -- see summary above.`);
       process.exitCode = 1;

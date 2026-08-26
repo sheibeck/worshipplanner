@@ -125,7 +125,7 @@ describe("backfillLastUsedForOrg", () => {
 
     // songA: has a locked MAX and no current value -> would be processed.
     // songB: draft-only -> skipped. songC: no service -> skipped. songD: already-current -> skipped.
-    expect(summary).toEqual({ processed: 1, skipped: 3, failed: [] });
+    expect(summary).toEqual({ processed: 1, skipped: 3, failed: [], malformedServices: [] });
     for (const spy of updateSpies.values()) {
       expect(spy).not.toHaveBeenCalled();
     }
@@ -136,7 +136,7 @@ describe("backfillLastUsedForOrg", () => {
 
     const summary = await backfillLastUsedForOrg({ orgId: ORG_ID, apply: true });
 
-    expect(summary).toEqual({ processed: 1, skipped: 3, failed: [] });
+    expect(summary).toEqual({ processed: 1, skipped: 3, failed: [], malformedServices: [] });
     expect(updateSpies.get("songA")).toHaveBeenCalledTimes(1);
     expect(updateSpies.get("songA")).toHaveBeenCalledWith({
       lastUsedAt: Timestamp.fromMillis(serviceDateToMillis("2026-09-06")),
@@ -164,7 +164,7 @@ describe("backfillLastUsedForOrg", () => {
     buildOrg(SERVICES, records);
 
     const firstRun = await backfillLastUsedForOrg({ orgId: ORG_ID, apply: true });
-    expect(firstRun).toEqual({ processed: 1, skipped: 3, failed: [] });
+    expect(firstRun).toEqual({ processed: 1, skipped: 3, failed: [], malformedServices: [] });
 
     // Re-mock against the SAME (now-mutated) records -- songA's record was updated
     // in place by the first run's .update() spy, so this genuinely re-derives from
@@ -173,7 +173,7 @@ describe("backfillLastUsedForOrg", () => {
 
     const secondRun = await backfillLastUsedForOrg({ orgId: ORG_ID, apply: true });
 
-    expect(secondRun).toEqual({ processed: 0, skipped: 4, failed: [] });
+    expect(secondRun).toEqual({ processed: 0, skipped: 4, failed: [], malformedServices: [] });
     for (const spy of secondRunSpies.values()) {
       expect(spy).not.toHaveBeenCalled();
     }
@@ -237,6 +237,56 @@ describe("backfillLastUsedForOrg", () => {
     expect(summary.failed).toEqual([{ songId: "songD", error: expect.stringContaining("corrupt document") }]);
     // songA is still processed despite songD's failure.
     expect(summary.processed).toBe(1);
+  });
+
+  it("WR-02: a service with a missing date is excluded from MAX computation and reported in malformedServices, not silently NaN'd", async () => {
+    vi.mocked(getFirestore).mockReturnValue({
+      collection: vi.fn((name: string) => {
+        if (name !== "organizations") throw new Error(`unexpected collection "${name}"`);
+        return {
+          doc: vi.fn(() => ({
+            collection: vi.fn((sub: string) => {
+              if (sub === "services") {
+                return {
+                  get: vi.fn(async () => ({
+                    docs: [
+                      {
+                        id: "service-bad-date",
+                        data: () => ({
+                          status: "planned",
+                          date: undefined,
+                          slots: [{ kind: "SONG", songId: "songE" }],
+                        }),
+                      },
+                    ],
+                  })),
+                };
+              }
+              if (sub === "songs") {
+                return {
+                  get: vi.fn(async () => ({
+                    docs: [{ id: "songE", data: () => ({ lastUsedAt: null }), ref: { update: vi.fn() } }],
+                  })),
+                };
+              }
+              throw new Error(`unexpected sub-collection "${sub}"`);
+            }),
+          })),
+        };
+      }),
+    } as never);
+
+    const summary = await backfillLastUsedForOrg({ orgId: ORG_ID, apply: true });
+
+    expect(summary.malformedServices).toEqual(["service-bad-date"]);
+    // songE's only containing service was excluded as malformed -- it is
+    // treated exactly like "no locked service contains this song": a
+    // conservative SKIP, never a NaN Timestamp write and never a `failed`
+    // entry (that would conflate a bad-service-doc condition with a
+    // genuinely unreadable song doc).
+    expect(summary.skipped).toBe(1);
+    expect(summary.processed).toBe(0);
+    expect(summary.failed).toEqual([]);
   });
 });
 
