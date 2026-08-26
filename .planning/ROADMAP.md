@@ -15,6 +15,7 @@
 - ✅ **v2.0 — Multi-Church Onboarding & Owner Console Tabs** — Phases 72-74 (shipped 2026-08-23; tabbed Configuration/Organizations shell, org onboarding (org + settings + seeded template + first admin), and the multi-org Storage auth-claim widening (backlog 999.5) — deployed to production 2026-08-23; owner acceptance, human UAT deferred)
 - ✅ **v2.1 — Organization Lifecycle & Super-Admin Access** — Phases 75-78 (shipped 2026-08-23; church deactivate/reactivate, deactivation-gated deletion with full cascade cleanup, pending-invite visibility, and a super-admin "enter any church" rules arm — deployed to production 2026-08-23; audit PASSED 16/16; owner acceptance, human UAT deferred)
 - ✅ **v2.2 — Configurability, Hardening & Cleanup** — Phases 79-83 (shipped 2026-08-25; per-org configurable teams replacing hard-coded Berean rules + dropped ordinal-Sunday auto-select (R228-R231, R241), security & data-integrity hardening — inviteLookup create gate, createdBy immutability, deleteService share revocation, song-clear slide cleanup, pending-render edit guard (R232-R236), polish/ops close-out — PC export coverage, Resend verified-domain runbook, Owner Console a11y, shared song-browse component (R237-R240), per-org AI enablement OFF-by-default (R242-R243), and Roles/Teams tab UX/copy (R244-R246); hosting deployed 2026-08-25, backend rules/functions owner-gated; audit PASSED 19/19. **The per-team song-tag filter (R230) was delivered then removed 2026-08-25 by owner decision.**)
+- 📋 **v2.3 — Scheduling Accuracy & Song/Team Refinements** — Phases 84-87 (planning; last-used date correctness + one-time backfill (R247-R248), team conflict rules — Vocals folds into Band, one-team-per-date with the Vocals sing-and-play exception (R250-R252), pattern-based recurring team scheduling via a Volunteer → Teams `>` slideout with auto-select on matching dates (R254-R255), and song & rotation refinements — editable song Key, sermon-free Scripture rotation, corrected "soft planning target" copy (R249, R253, R256))
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -340,3 +341,86 @@ Full details: [milestones/v2.2-ROADMAP.md](milestones/v2.2-ROADMAP.md) · requir
 > Hosting deployed to production 2026-08-25 (client changes live); Phase 80 rules (inviteLookup gate + createdBy immutability) and Phase 82 rules+functions (per-org AI enablement) ship UNDEPLOYED as owner-gated hand-overs. Audit PASSED (19/19 reqs, 9/9 seams). **R230 (per-team song-tag AI filter) was delivered in Phase 79 and then removed 2026-08-25 by owner decision** — it only fed AI suggestions and confused users; see milestones/v2.2-REQUIREMENTS.md. Closed on owner acceptance; human UAT `/gsd-verify-work 79–83` deferred (PENDING-VERIFICATION.md).
 
 </details>
+
+## v2.3 Scheduling Accuracy & Song/Team Refinements (Phases 84-87)
+
+**Milestone Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling
+— last-used dates are right (and backfilled), song keys are editable, no volunteer is double-booked
+across teams on one date, Scripture rotation reflects only the plan (not the sermon), consistent teams
+schedule themselves, and the scheduler's UI copy tells the truth. Phase numbering continues from v2.2
+(79–83, ended at Phase 83); this milestone is **Phases 84–87**.
+
+**Deploy policy (standing, per the 2026-08-25 policy change in STATE.md):** Claude MAY run production
+deploys directly but must confirm with the owner immediately before each one (per-deploy). Every v2.3
+change is expected to be client-only (Vue + Firestore data written through the app) except the R248
+one-time backfill, which is an owner-confirmed Node/Admin-SDK script run — not a `firebase deploy`. No
+`firestore.rules` / `storage.rules` / Cloud Functions changes are anticipated; if phase planning surfaces
+one, it follows the same confirm-then-deploy discipline.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R247–R256 (10 mapped, 100% coverage)
+
+- [ ] **Phase 84: Last-Used Date Correctness & Backfill** - Fix the lagging last-scheduled date so it reflects the most recent service a song was actually added to (incl. locked/exported), then a one-time script to recompute every song's last-used date retroactively (R247, R248)
+- [ ] **Phase 85: Team Conflicts — Vocals into Band & One-Team-Per-Date** - Fold Vocals into the Band team, block a volunteer from serving on two teams on one date, with Vocals as the sole multi-person, sing-and-play-at-once exception (R250, R251, R252)
+- [ ] **Phase 86: Recurring Team Scheduling** - Configure a team's recurring pattern (every Nth week / Nth Sunday) from a `>` slideout on the Volunteer → Teams tab, and auto-select that team on any service whose date matches (R254, R255)
+- [ ] **Phase 87: Song & Rotation Refinements** - Editable song Key, a Scripture rotation tab that lists only planned scripture (never the sermon passage), and corrected "soft planning target" schedulable-roles copy (R249, R253, R256)
+
+### Phase 84: Last-Used Date Correctness & Backfill
+
+**Goal**: A song's last-used / last-scheduled date always reflects the most recent service the song was actually added to — including locked and exported services — and every existing song's date is corrected retroactively by a one-time backfill.
+**Depends on**: Nothing (first phase of v2.3; independent — sequenced first because it fixes a live, reported data-correctness bug)
+**Requirements**: R247, R248
+**Success Criteria** (what must be TRUE):
+
+  1. A song added to a service shows a last-used / last-scheduled date matching that service's date, including when the service is locked and/or exported — no lag behind reality (the "His Mercy Is More showed Aug 11 despite a locked & exported Sep 6 service" bug no longer reproduces) (R247).
+  2. Adding the same song to a later-dated service advances its last-used date to that later service's date (R247).
+  3. After the one-time backfill runs, every song's last-used date equals the most recent service it was ever added to, correcting records created before the R247 fix landed (R248).
+
+**Plans**: TBD
+**Deploy note**: R247 is a client/Firestore-via-app fix. R248 is a one-time Node/Admin-SDK backfill script run once, owner-confirmed before it runs (it writes production data) — not a `firebase deploy`.
+
+### Phase 85: Team Conflicts — Vocals into Band & One-Team-Per-Date
+
+**Goal**: The roster/scheduler models Vocals as a Band role and prevents any volunteer from serving on two teams on the same service date, with Vocals as the single special-case exception (multiple people; a vocalist may also hold one Band instrument at once).
+**Depends on**: Nothing (independent data-model + conflict-logic phase; within the phase the R250 Vocals-into-Band model change precedes the R251/R252 conflict logic that reads it)
+**Requirements**: R250, R251, R252
+**Success Criteria** (what must be TRUE):
+
+  1. A vocals assignment is a Band role rather than a separate Vocals team — the roster and scheduler treat singing as part of Band (R250).
+  2. Scheduling a volunteer onto a second team for a date they already serve (e.g. Tech and also Band) is prevented — the scheduler blocks the cross-team double-booking (R251).
+  3. Vocals may be filled by multiple people on the same date, and a person on Vocals may simultaneously hold one Band instrument role on that date (sing and play at once) without tripping the conflict rule (R252).
+  4. Vocals is the only exception — every other cross-team pairing on one date is still blocked (R251, R252).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy note**: Client + Firestore-via-app (roster/scheduler model + logic + UI). Any data migration of historical Vocals assignments is out of scope as a committed requirement (decided during phase planning).
+
+### Phase 86: Recurring Team Scheduling
+
+**Goal**: A planner configures a team's recurring schedule pattern (every Nth week, or the Nth Sunday of the month) from a `>` slideout on the Volunteer → Teams tab, and any service whose date matches a team's pattern auto-selects that team.
+**Depends on**: Nothing (independent feature; sequenced after Phase 85 because both edit the Volunteer → Teams / scheduling surface, so they do not land concurrently)
+**Requirements**: R254, R255
+**Success Criteria** (what must be TRUE):
+
+  1. From a `>` slideout on the Volunteer → Teams tab (matching the slideout pattern the Song table already uses), a planner can give a team a recurring pattern — every Nth week, or the Nth Sunday of the month (R254).
+  2. A team's saved recurring pattern is shown when its slideout is reopened (R254).
+  3. Creating or opening a service whose date matches a team's configured pattern auto-pre-selects that team on the service (R255).
+  4. A service whose date matches no team's pattern has no team auto-selected by this feature — the planner still picks teams manually (R255).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy note**: Client + Firestore-via-app (new slideout config UI + pattern-match auto-select).
+
+### Phase 87: Song & Rotation Refinements
+
+**Goal**: Planners can edit a song's Key on the song record, the Scripture rotation reflects only scripture placed in the service plan (never the sermon passage), and the schedulable-roles "default count" copy accurately describes the scheduler's real behavior.
+**Depends on**: Nothing (independent; three small refinements bundled — sequenced last as the lowest-risk items, including the R256 copy fix)
+**Requirements**: R249, R253, R256
+**Success Criteria** (what must be TRUE):
+
+  1. A planner can update/edit the Key on a song record directly and the new Key persists (R249).
+  2. The Scripture rotation tab lists only scripture items added to the service plan and never includes the sermon/teaching passage (R253).
+  3. The schedulable-roles description no longer calls the default count a "soft planning target"; it accurately states the scheduler targets that configured count (R256).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy note**: Client-only (song edit form, Scripture rotation tab query, schedulable-roles copy).

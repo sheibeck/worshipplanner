@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
 status: planning
-last_updated: "2026-08-25T23:11:04.119Z"
+last_updated: "2026-08-25T23:59:00.000Z"
 last_activity: 2026-08-25
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -24,6 +24,42 @@ All prior deploy *hygiene* still holds (build/test first; rebuild functions + re
 `functions/src/index.ts`; scope `--only`; `.env.local` present for a valid build). Also in ~/.claude
 memory as `deploy-policy-confirm-then-deploy`. Owner words: *"It's ok for you to deploy so long as you
 confirm with me before doing so."*
+
+---
+
+
+# ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
+
+**Status:** planning — roadmap done; next is `/gsd-plan-phase 84`. Phase numbering continues from v2.2
+(79–83, ended at Phase 83); this milestone is **Phases 84–87**.
+
+**Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — last-used
+dates are right (and backfilled), song keys are editable, no volunteer is double-booked across teams on
+one date, Scripture rotation reflects only the plan (not the sermon), consistent teams schedule
+themselves, and the scheduler's UI copy tells the truth. Requirements R247–R256 in REQUIREMENTS.md.
+
+**Roadmap (4 phases, `coarse` granularity — see `.planning/ROADMAP.md` § v2.3 for full phase detail):**
+
+- **Phase 84 — Last-Used Date Correctness & Backfill (R247, R248):** fix the lagging last-scheduled date
+  (must reflect the most recent service a song was actually added to, incl. locked/exported) + a one-time
+  backfill script recomputing every song's last-used date retroactively. Sequenced first (live reported bug).
+- **Phase 85 — Team Conflicts: Vocals into Band & One-Team-Per-Date (R250, R251, R252):** fold Vocals
+  into Band (data-model change), block a volunteer serving two teams on one date, with Vocals the sole
+  multi-person, sing-and-play-at-once exception. The R250 model change precedes the R251/R252 conflict logic.
+- **Phase 86 — Recurring Team Scheduling (R254, R255):** a `>` slideout on Volunteer → Teams (mirroring
+  the Song table's slideout) sets a team's every-Nth-week / Nth-Sunday pattern; a matching service date
+  auto-selects the team. Sequenced after Phase 85 (shared Volunteer → Teams surface).
+- **Phase 87 — Song & Rotation Refinements (R249, R253, R256):** editable song Key, a Scripture rotation
+  tab that excludes the sermon passage, and corrected "soft planning target" schedulable-roles copy.
+  Small/independent items bundled, sequenced last (lowest risk, incl. the copy fix).
+
+**Coverage:** 10/10 v2.3 requirements mapped, each to exactly one phase; no orphans, no duplicates.
+
+**Deploy expectation:** every v2.3 change is expected client-only (Vue + Firestore-via-app) except the
+R248 backfill, an owner-confirmed Node/Admin-SDK script run (not a `firebase deploy`). Per the standing
+2026-08-25 policy above, any deploy is confirm-then-deploy. No rules/functions changes anticipated.
+
+**Next step:** `/gsd-plan-phase 84` (optionally preceded by `/gsd-discuss-phase 84`).
 
 ---
 
