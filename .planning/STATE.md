@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
-current_phase: 84
-current_phase_name: Last-Used Date Correctness & Backfill
-status: verifying
+current_phase: 85
+current_phase_name: Team Conflicts — Vocals into Band & One-Team-Per-Date
+status: planning
 stopped_at: Completed 84-02-PLAN.md
-last_updated: "2026-08-26T03:16:30.573Z"
-last_activity: 2026-08-25
-last_activity_desc: Phase 84 execution started
+last_updated: "2026-08-26T13:06:23.825Z"
+last_activity: 2026-08-26
+last_activity_desc: Phase 84 complete, transitioned to Phase 85
 progress:
   total_phases: 4
   completed_phases: 1
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to plan
 (79–83, ended at Phase 83); this milestone is **Phases 84–87**.
 
 **Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — last-used
@@ -928,10 +928,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 84 (Last-Used Date Correctness & Backfill) — EXECUTING
-Plan: 2 of 2
+Phase: 85 — Team Conflicts — Vocals into Band & One-Team-Per-Date
+Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-08-25 — Phase 84 execution started
+Last activity: 2026-08-26 — Phase 84 complete, transitioned to Phase 85
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 

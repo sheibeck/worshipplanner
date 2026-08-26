@@ -359,7 +359,7 @@ one, it follows the same confirm-then-deploy discipline.
 
 **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R247–R256 (10 mapped, 100% coverage)
 
-- [ ] **Phase 84: Last-Used Date Correctness & Backfill** - Fix the lagging last-scheduled date so it reflects the most recent service a song was actually added to (incl. locked/exported), then a one-time script to recompute every song's last-used date retroactively (R247, R248)
+- [x] **Phase 84: Last-Used Date Correctness & Backfill** - Fix the lagging last-scheduled date so it reflects the most recent service a song was actually added to (incl. locked/exported), then a one-time script to recompute every song's last-used date retroactively (R247, R248) (completed 2026-08-26)
 - [ ] **Phase 85: Team Conflicts — Vocals into Band & One-Team-Per-Date** - Fold Vocals into the Band team, block a volunteer from serving on two teams on one date, with Vocals as the sole multi-person, sing-and-play-at-once exception (R250, R251, R252)
 - [ ] **Phase 86: Recurring Team Scheduling** - Configure a team's recurring pattern (every Nth week / Nth Sunday) from a `>` slideout on the Volunteer → Teams tab, and auto-select that team on any service whose date matches (R254, R255)
 - [ ] **Phase 87: Song & Rotation Refinements** - Editable song Key, a Scripture rotation tab that lists only planned scripture (never the sermon passage), and corrected "soft planning target" schedulable-roles copy (R249, R253, R256)

@@ -915,3 +915,20 @@ task-by-task record.
 Owner Console Organizations screen reworked (quick task + owner testing-feedback follow-up, both 2026-08-24, client-only, all tests green): per-row **`>` caret** opens a right-side **slideout**; AI enablement is a **checkbox** (setting), Deactivate/Reactivate is a **button** (action) with a confirm dialog, and **Delete** lives in the slideout for **deactivated orgs only** (existing confirm). Reuses the Phase 82 `setOrgAiEnabled` (UNDEPLOYED) + `setOrgActive` + `deleteOrganization` callables unchanged.
 
 **Owner UAT:** open the Owner Console, click a row's `>` caret, confirm: the AI checkbox toggles (surfaces the friendly error until the Phase 82 deploy hand-over runs); Deactivate prompts a confirm and Cancel leaves the org active with no stuck state; Delete appears only for a deactivated org and routes through the delete confirm.
+
+---
+
+## v2.3 — Phase 84 Last-Used Date Correctness & Backfill (deferred 2026-08-26)
+
+Phase 84 is code-complete and auto-verified 8/8 (type-check clean; app suite at the 2-file
+baseline; functions 590/590). Two items are owner-only and were deferred (owner decision
+2026-08-26, "Defer & continue" during the /gsd-autonomous run) — NOT code gaps:
+
+- [ ] **Run the R248 backfill against production (owner).** `cd functions && npm run build`, then
+      `node functions/lib/backfillLastUsed.js` (dry-run) to review, then `node
+      functions/lib/backfillLastUsed.js --apply` with Admin credentials against the Berean prod org.
+      Conservative: writes `lastUsedAt = MAX(locked-service date)` only for songs in ≥1 locked
+      service; never blanks a no-service song. Owner-confirmed data write, not a `firebase deploy`.
+- [ ] **Visual click-through (owner).** In the live app: open a draft service, add a song, click
+      "Mark as Planned", and confirm the song's last-used date reads the SERVICE date (not today);
+      reopen and confirm it recomputes. Store logic is already fully proven by automated tests.
