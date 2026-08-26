@@ -354,11 +354,17 @@ export const useServiceStore = defineStore('services', () => {
     }
   }
 
-  /** SONG-slot songIds present in a service, deduped source for both lock/unlock hooks. */
+  /**
+   * SONG-slot songIds present in a service, deduped source for both
+   * lock/unlock hooks. WR-01 (84-REVIEW): a song repeated across multiple
+   * SONG slots (e.g. a repeated chorus) must trigger exactly ONE recompute
+   * per `markAsPlanned`/`reopenService` call, not one per occurrence.
+   */
   function songIdsInService(service: Service): string[] {
-    return service.slots
+    const ids = service.slots
       .filter((slot): slot is SongSlot => slot.kind === 'SONG' && !!slot.songId)
       .map((slot) => slot.songId as string)
+    return [...new Set(ids)]
   }
 
   // D-09 — the Planning Center export write, the one mutation that must survive

@@ -2274,6 +2274,27 @@ describe('useServiceStore', () => {
       expect(Timestamp.fromMillis).toHaveBeenCalledWith(new Date('2026-09-06T00:00:00').getTime())
     })
 
+    // WR-01 (84-REVIEW): a song repeated across multiple SONG slots in the
+    // same service must trigger exactly ONE recompute, not one per slot.
+    it('WR-01: a song scheduled in TWO SONG slots of the same service triggers only ONE recompute', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeService({
+          id: 'service-1',
+          date: '2026-09-06',
+          status: 'draft',
+          slots: [songSlot('song-x'), songSlot('song-x')],
+        }),
+      ])
+
+      await store.markAsPlanned('service-1')
+
+      const songXCalls = mockUpdateSong.mock.calls.filter(([songId]) => songId === 'song-x')
+      expect(songXCalls).toHaveLength(1)
+    })
+
     it('locking a later-dated service advances lastUsedAt beyond an already-locked earlier service', async () => {
       const { Timestamp } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
