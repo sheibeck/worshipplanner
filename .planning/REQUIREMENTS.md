@@ -18,9 +18,9 @@ REQ-IDs continue the project's sequential `R###` numbering from the last shipped
 
 ### Volunteer Scheduling — Team Conflicts
 
-- [ ] **R250**: Vocals is folded into the Band team — a vocals assignment is a Band role rather than a separate team — so the roster/scheduler treats singing as part of Band. — **Phase 85**
-- [ ] **R251**: A volunteer cannot be scheduled on two different teams on the same service date (e.g. running Tech and also playing in the Band); the scheduler prevents the cross-team double-booking. — **Phase 85**
-- [ ] **R252**: Vocals is the single special-case exception to R251 — Vocals may be filled by multiple people, and a person assigned to Vocals may simultaneously hold one Band instrument role on the same date (sing and play at once). — **Phase 85**
+- [x] **R250**: Vocals is folded into the Band team — a vocals assignment is a Band role rather than a separate team — so the roster/scheduler treats singing as part of Band. — **Phase 85**
+- [x] **R251**: A volunteer cannot be scheduled on two different teams on the same service date (e.g. running Tech and also playing in the Band); the scheduler prevents the cross-team double-booking. — **Phase 85**
+- [x] **R252**: Vocals is the single special-case exception to R251 — Vocals may be filled by multiple people, and a person assigned to Vocals may simultaneously hold one Band instrument role on the same date (sing and play at once). — **Phase 85**
 
 ### Scripture Rotation Accuracy
 
@@ -59,9 +59,9 @@ Deferred; not in the v2.3 roadmap.
 | R247 | Phase 84 | Complete |
 | R248 | Phase 84 | Complete |
 | R249 | Phase 87 | Pending |
-| R250 | Phase 85 | Pending |
-| R251 | Phase 85 | Pending |
-| R252 | Phase 85 | Pending |
+| R250 | Phase 85 | Complete |
+| R251 | Phase 85 | Complete |
+| R252 | Phase 85 | Complete |
 | R253 | Phase 87 | Pending |
 | R254 | Phase 86 | Pending |
 | R255 | Phase 86 | Pending |

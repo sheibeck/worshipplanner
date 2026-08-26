@@ -4,17 +4,17 @@ milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
 current_phase: 85
 current_phase_name: Team Conflicts — Vocals into Band & One-Team-Per-Date
-status: planning
-stopped_at: Completed 84-02-PLAN.md
-last_updated: "2026-08-26T13:06:23.825Z"
+status: verifying
+stopped_at: Completed 85-01-PLAN.md
+last_updated: "2026-08-26T20:41:39.901Z"
 last_activity: 2026-08-26
-last_activity_desc: Phase 84 complete, transitioned to Phase 85
+last_activity_desc: Phase 85 execution started
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 25
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
+  percent: 50
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** Ready to plan
+**Status:** Phase complete — ready for verification
 (79–83, ended at Phase 83); this milestone is **Phases 84–87**.
 
 **Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — last-used
@@ -918,7 +918,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 84 — Last-Used Date Correctness & Backfill
+**Current focus:** Phase 85 — Team Conflicts — Vocals into Band & One-Team-Per-Date
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -928,10 +928,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 85 — Team Conflicts — Vocals into Band & One-Team-Per-Date
-Plan: Not started
+Phase: 85 (Team Conflicts — Vocals into Band & One-Team-Per-Date) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
-Last activity: 2026-08-26 — Phase 84 complete, transitioned to Phase 85
+Last activity: 2026-08-26 — Phase 85 execution started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -2607,6 +2607,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 83 P01 | 25min | 3 tasks | 7 files |
 | Phase 84 P01 | 42min | 2 tasks | 4 files |
 | Phase 84 P02 | 12min | 2 tasks | 3 files |
+| Phase 85 P01 | 30min | 3 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -3030,6 +3031,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Delete button in RolesConfigPanel/TeamsConfigPanel: class swap only to bg-red-900/20 hover:bg-red-900/40 text-red-400 at compact row sizing; click handler and confirm blocks unchanged
 - [Phase ?]: R247 fix: lastUsedAt = MAX(service.date) over LOCKED (non-draft) services containing the song, derived by a canonical framework-free src/utils/lastUsed.ts mirrored (not imported) by the 84-02 backfill
 - [Phase ?]: 84-02: mirrored computeLastUsedDate/serviceDateToMillis byte-identical (incl. quote/semicolon style) from src/utils/lastUsed.ts into functions/src/backfillLastUsed.ts, verified via scripted diff
+- [Phase ?]: Vocals folds into Band for exclusivity but is exempt from the one-instrument cap; Other now combines freely with Band or Tech (relaxed rule); legacy group:'vocals' data coerced at read time only, no Firestore write migration
 
 ### Roadmap Evolution
 
@@ -3355,8 +3357,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-26T03:16:30.484Z
-Stopped at: Completed 84-02-PLAN.md
+Last session: 2026-08-26T20:41:39.818Z
+Stopped at: Completed 85-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
