@@ -478,10 +478,10 @@ Plans:
   3. When a person holds several multi-role roles, the quarterly scheduler places them on the **same date(s)** — anchored on the person's rarest multi-role, with higher-cadence roles riding along there and filling their extra occurrences on other dates (R260).
   4. The bundling is a strong preference bounded by coverage + per-role cadence: when it can't bundle, the role is filled solo rather than left empty, and no role exceeds its cadence cap (R260).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 - [x] 89-01-PLAN.md — R259: rename `Role.vocal`→`Role.multiRole`, rewrite `evaluateGroupCombo` (filter-multi-first, cross-type), read-time compat shim, generalized RoleSlideOver "Multi-role" control + helper text, badges/warn, all fixtures (Wave 1)
-- [ ] 89-02-PLAN.md — R260: `propagateMultiRole` same-date bundling pass in `proposeQuarterSchedule` (rarest-anchor emergent via `withinCadence`, coverage-bounded, deterministic) + canonical/competition test fixtures (Wave 2, depends on 89-01)
+- [x] 89-02-PLAN.md — R260: `propagateMultiRole` same-date bundling pass in `proposeQuarterSchedule` (rarest-anchor emergent via `withinCadence`, coverage-bounded, deterministic) + canonical/competition test fixtures (Wave 2, depends on 89-01)
 
 **UI hint**: yes
 **Deploy note**: Client-only. RESEARCH A.6 confirmed the server field `functions/src/serviceRoles.ts:vocal` is carried for shape parity only and is NEVER read server-side — it is left untouched and there is NO Cloud Functions deploy this phase.
