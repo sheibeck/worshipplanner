@@ -18,9 +18,8 @@
     </div>
 
     <!-- Column headers (grid tracks MUST match the row grid below) -->
-    <div data-testid="roles-columns" class="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5rem_1rem] items-center gap-3 px-7 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-800 bg-gray-900/30">
+    <div data-testid="roles-columns" class="grid grid-cols-[minmax(0,1fr)_5rem_5rem_1rem] items-center gap-3 px-7 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-800 bg-gray-900/30">
       <span>Role</span>
-      <span>Group</span>
       <span class="text-center">Positions</span>
       <span class="text-center">Multi-role</span>
       <span aria-hidden="true"></span>
@@ -43,18 +42,10 @@
             :key="role.id"
             type="button"
             :aria-label="`Edit ${role.name} role`"
-            class="w-full grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_5rem_1rem] items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-gray-800/50 transition-colors"
+            class="w-full grid grid-cols-[minmax(0,1fr)_5rem_5rem_1rem] items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-gray-800/50 transition-colors"
             @click="emit('edit', role)"
           >
             <span class="truncate text-sm font-medium text-gray-100">{{ role.name }}</span>
-            <span>
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border"
-                :class="groupBadgeClasses[role.group]"
-              >
-                {{ groupLabels[role.group] }}
-              </span>
-            </span>
             <span class="text-center text-xs text-gray-500">{{ role.defaultCount }}</span>
             <span class="text-center text-xs">
               <span v-if="role.multiRole" class="font-medium text-indigo-300">Yes</span>
