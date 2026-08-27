@@ -21,7 +21,7 @@ beforeEach(() => {
   mockRoles = [
     { id: 'r-1', name: 'Guitar', group: 'band', defaultCount: 2, order: 0 },
     { id: 'r-2', name: 'Sound', group: 'tech', defaultCount: 1, order: 1 },
-    { id: 'r-3', name: 'Vocals', group: 'band', vocal: true, defaultCount: 1, order: 2 },
+    { id: 'r-3', name: 'Vocals', group: 'band', multiRole: true, defaultCount: 1, order: 2 },
   ]
 })
 
@@ -85,14 +85,14 @@ describe('RolesConfigPanel', () => {
     expect(wrapper.emitted('add')!.length).toBe(1)
   })
 
-  it('a role with vocal:true shows the Vocal marker and one without does not', () => {
+  it('a role with multiRole:true shows the Multi-role marker and one without does not', () => {
     const wrapper = mountPanel()
     const vocalRow = wrapper.find('[aria-label="Edit Vocals role"]')
-    expect(vocalRow.text()).toContain('Vocal')
+    expect(vocalRow.text()).toContain('Multi-role')
 
     const guitarRow = wrapper.find('[aria-label="Edit Guitar role"]')
-    // Guitar is not vocal — its row must not carry the Vocal marker pill.
+    // Guitar is not multi-role — its row must not carry the Multi-role marker pill.
     const guitarText = guitarRow.text()
-    expect(guitarText).not.toContain('Vocal')
+    expect(guitarText).not.toContain('Multi-role')
   })
 })

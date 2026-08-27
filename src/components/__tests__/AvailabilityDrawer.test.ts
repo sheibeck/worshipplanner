@@ -84,7 +84,7 @@ const mockPeople: Person[] = [
 // role ON via the drawer's roles checklist (D-09).
 const mockRoles: Role[] = [
   { id: 'sound', name: 'Sound', group: 'tech', defaultCount: 1, order: 0 },
-  { id: 'vocals', name: 'Vocals', group: 'band', vocal: true, defaultCount: 1, order: 1 },
+  { id: 'vocals', name: 'Vocals', group: 'band', multiRole: true, defaultCount: 1, order: 1 },
   { id: 'guitar', name: 'Guitar', group: 'band', defaultCount: 1, order: 2 },
 ]
 

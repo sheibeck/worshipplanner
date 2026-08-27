@@ -103,16 +103,21 @@
             />
           </div>
 
-          <div v-if="form.group === 'band'">
+          <div>
             <label class="flex items-center gap-1.5 text-sm text-gray-300">
               <input
-                v-model="form.vocal"
+                v-model="form.multiRole"
                 type="checkbox"
-                data-testid="role-vocal-checkbox"
+                data-testid="role-multirole-checkbox"
                 class="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-indigo-500"
               />
-              Vocal role (can sing &amp; play)
+              Multi-role
             </label>
+            <p class="text-xs text-gray-500 mt-1">
+              This person can serve this role alongside their other roles on the same date, and
+              the scheduler tries to put their roles on the same day (e.g. sing + play bass +
+              lead together) instead of spreading them out.
+            </p>
           </div>
 
           <!-- Delete button (edit mode only) -->
@@ -178,11 +183,11 @@ interface FormState {
   name: string
   group: RoleGroup
   defaultCount: number
-  vocal: boolean
+  multiRole: boolean
 }
 
 function emptyForm(): FormState {
-  return { name: '', group: 'band', defaultCount: 1, vocal: false }
+  return { name: '', group: 'band', defaultCount: 1, multiRole: false }
 }
 
 function roleToForm(role: Role): FormState {
@@ -190,7 +195,7 @@ function roleToForm(role: Role): FormState {
     name: role.name,
     group: role.group,
     defaultCount: role.defaultCount,
-    vocal: role.vocal ?? false,
+    multiRole: role.multiRole ?? false,
   }
 }
 
@@ -243,14 +248,14 @@ async function onSave() {
         group: form.value.group,
         defaultCount: normalizedDefaultCount(form.value.defaultCount),
         order: maxOrder + 1,
-        ...(form.value.group === 'band' && form.value.vocal ? { vocal: true } : {}),
+        ...(form.value.multiRole ? { multiRole: true } : {}),
       })
     } else {
       await rosterStore.updateRole(props.role!.id, {
         name,
         group: form.value.group,
         defaultCount: normalizedDefaultCount(form.value.defaultCount),
-        vocal: form.value.group === 'band' ? form.value.vocal : false,
+        multiRole: form.value.multiRole,
       })
     }
     emit('saved')

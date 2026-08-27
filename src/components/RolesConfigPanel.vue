@@ -46,10 +46,10 @@
             </span>
             <span class="text-xs text-gray-500">Default {{ role.defaultCount }}</span>
             <span
-              v-if="role.vocal"
+              v-if="role.multiRole"
               class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-indigo-900/40 text-indigo-300 border-indigo-800"
             >
-              Vocal
+              Multi-role
             </span>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />

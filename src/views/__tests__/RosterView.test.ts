@@ -19,7 +19,7 @@ const mockUnsubscribeAll = vi.fn()
 const mockRoles: Role[] = [
   { id: 'r-drums', name: 'drums', group: 'band', defaultCount: 1, order: 1 },
   { id: 'r-guitar', name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
-  { id: 'r-vocals', name: 'vocals', group: 'band', vocal: true, defaultCount: 1, order: 2 },
+  { id: 'r-vocals', name: 'vocals', group: 'band', multiRole: true, defaultCount: 1, order: 2 },
 ]
 
 let mockPeople: Person[] = []

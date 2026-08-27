@@ -319,16 +319,17 @@ function roleGroupOf(roleId: string): RoleGroup {
   return roleGroupById.value.get(roleId) ?? 'other'
 }
 
-// R252/D-11: roleId -> vocal lookup, threaded into evaluateGroupCombo alongside roleGroupOf so
-// the warn badge uses the exact same rule as the scheduler (Vocals exempt from the instrument cap).
-const isVocalById = computed(() => {
+// R259/D-11: roleId -> multiRole lookup, threaded into evaluateGroupCombo alongside roleGroupOf
+// so the warn badge uses the exact same rule as the scheduler (a multi-role role never
+// conflicts and may cross Band/Tech/Other).
+const isMultiRoleById = computed(() => {
   const m = new Map<string, boolean>()
-  for (const r of props.roles) m.set(r.id, r.vocal === true)
+  for (const r of props.roles) m.set(r.id, r.multiRole === true)
   return m
 })
 
-function isVocal(roleId: string): boolean {
-  return isVocalById.value.get(roleId) ?? false
+function isMultiRole(roleId: string): boolean {
+  return isMultiRoleById.value.get(roleId) ?? false
 }
 
 // Live-computed from props.quarter.calendar + props.roles (NOT props.lastProposeResult) —
@@ -341,7 +342,7 @@ function cellHasGroupViolation(date: string, roleId: string): boolean {
     const roleIdsThisDate = Object.entries(calendarForDate)
       .filter(([, ids]) => ids.includes(personId))
       .map(([rId]) => rId)
-    return !evaluateGroupCombo(roleIdsThisDate, roleGroupOf, isVocal).ok
+    return !evaluateGroupCombo(roleIdsThisDate, roleGroupOf, isMultiRole).ok
   })
 }
 

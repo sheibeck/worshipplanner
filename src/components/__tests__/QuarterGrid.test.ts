@@ -253,7 +253,7 @@ describe('QuarterGrid — live group co-occurrence warning (D-11)', () => {
     return [
       { id: 'role-guitar', name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
       { id: 'role-bass', name: 'bass', group: 'band', defaultCount: 1, order: 1 },
-      { id: 'role-vocals', name: 'vocals', group: 'band', vocal: true, defaultCount: 1, order: 2 },
+      { id: 'role-vocals', name: 'vocals', group: 'band', multiRole: true, defaultCount: 1, order: 2 },
       { id: 'role-sound', name: 'sound', group: 'tech', defaultCount: 1, order: 3 },
       { id: 'role-other', name: 'scripture reader', group: 'other', defaultCount: 1, order: 4 },
     ]
@@ -341,5 +341,27 @@ describe('QuarterGrid — live group co-occurrence warning (D-11)', () => {
 
     expect(soundCell.text()).not.toContain('group')
     expect(otherCell.text()).not.toContain('group')
+  })
+
+  it('shows NO group conflict marker for a multi-role BAND role (vocals) + a TECH role — R259 cross-type allowance', () => {
+    // Behavior change from R250/R251: vocals is now multi-role, so it is filtered out of the
+    // group-compat check entirely, leaving a tech-only remainder. The warn badge must track the
+    // exact same rule as the scheduler (evaluateGroupCombo), so this must no longer warn.
+    const quarter = makeQuarter({
+      serviceDates: [DATE],
+      calendar: {
+        [DATE]: {
+          'role-vocals': ['person-regular'],
+          'role-sound': ['person-regular'],
+        },
+      },
+    })
+    const wrapper = mountGrid({ quarter, roles: makeRolesFull(), lastProposeResult: null })
+
+    const vocalsCell = cellFor(wrapper, 'role-vocals')
+    const soundCell = cellFor(wrapper, 'role-sound')
+
+    expect(vocalsCell.text()).not.toContain('group')
+    expect(soundCell.text()).not.toContain('group')
   })
 })

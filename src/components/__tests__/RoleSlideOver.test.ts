@@ -61,12 +61,20 @@ describe('RoleSlideOver', () => {
     expect(wrapper.find('[data-testid="role-name-input"]').exists()).toBe(false)
   })
 
-  it('create mode: filling name and clicking Save calls addRole with vocal only when Band+checked, then emits saved', async () => {
+  it('renders the Multi-role label and owner helper text explaining same-date bundling', async () => {
+    const wrapper = await mountDrawer(null)
+    expect(wrapper.text()).toContain('Multi-role')
+    expect(wrapper.text()).toContain(
+      'This person can serve this role alongside their other roles on the same date',
+    )
+  })
+
+  it('create mode: filling name and clicking Save calls addRole with multiRole when checked, then emits saved', async () => {
     const wrapper = await mountDrawer(null)
     expect(wrapper.text()).toContain('New Role')
 
     await wrapper.get('[data-testid="role-name-input"]').setValue('Bass')
-    await wrapper.get('[data-testid="role-vocal-checkbox"]').setValue(true)
+    await wrapper.get('[data-testid="role-multirole-checkbox"]').setValue(true)
 
     const saveBtn = wrapper.findAll('button').find((b) => b.text().startsWith('Save'))!
     await saveBtn.trigger('click')
@@ -77,12 +85,12 @@ describe('RoleSlideOver', () => {
       group: 'band',
       defaultCount: 1,
       order: 2,
-      vocal: true,
+      multiRole: true,
     })
     expect(wrapper.emitted('saved')).toBeTruthy()
   })
 
-  it('create mode: leaving the vocal checkbox unchecked omits vocal from the payload', async () => {
+  it('create mode: leaving the multi-role checkbox unchecked omits multiRole from the payload', async () => {
     const wrapper = await mountDrawer(null)
     await wrapper.get('[data-testid="role-name-input"]').setValue('Bass')
 
@@ -106,10 +114,10 @@ describe('RoleSlideOver', () => {
     expect((wrapper.get('[data-testid="role-count-input"]').element as HTMLInputElement).value).toBe('2')
   })
 
-  it('edit mode: changing fields and Save calls updateRole with trimmed name and vocal, then emits saved', async () => {
+  it('edit mode: changing fields and Save calls updateRole with trimmed name and multiRole, then emits saved', async () => {
     const wrapper = await mountDrawer(makeRole())
     await wrapper.get('[data-testid="role-name-input"]').setValue('  Lead Guitar  ')
-    await wrapper.get('[data-testid="role-vocal-checkbox"]').setValue(true)
+    await wrapper.get('[data-testid="role-multirole-checkbox"]').setValue(true)
 
     const saveBtn = wrapper.findAll('button').find((b) => b.text().startsWith('Save'))!
     await saveBtn.trigger('click')
@@ -119,7 +127,7 @@ describe('RoleSlideOver', () => {
       name: 'Lead Guitar',
       group: 'band',
       defaultCount: 2,
-      vocal: true,
+      multiRole: true,
     })
     expect(wrapper.emitted('saved')).toBeTruthy()
   })
@@ -156,7 +164,7 @@ describe('RoleSlideOver', () => {
       name: 'Guitar',
       group: 'band',
       defaultCount: 1,
-      vocal: false,
+      multiRole: false,
     })
   })
 
@@ -172,16 +180,17 @@ describe('RoleSlideOver', () => {
       name: 'Guitar',
       group: 'band',
       defaultCount: 1,
-      vocal: false,
+      multiRole: false,
     })
   })
 
-  it('vocal checkbox is present only while group===band; switching away hides it and forces vocal:false on save', async () => {
-    const wrapper = await mountDrawer(makeRole({ vocal: true }))
-    expect(wrapper.find('[data-testid="role-vocal-checkbox"]').exists()).toBe(true)
+  it('multi-role checkbox is present for ANY group (R259 generalization), not only band; switching group keeps it visible', async () => {
+    const wrapper = await mountDrawer(makeRole({ multiRole: true }))
+    expect(wrapper.find('[data-testid="role-multirole-checkbox"]').exists()).toBe(true)
 
     await wrapper.get('[data-testid="role-group-select"]').setValue('tech')
-    expect(wrapper.find('[data-testid="role-vocal-checkbox"]').exists()).toBe(false)
+    // R259: the control is no longer Band-only — it stays visible for a non-band group.
+    expect(wrapper.find('[data-testid="role-multirole-checkbox"]').exists()).toBe(true)
 
     const saveBtn = wrapper.findAll('button').find((b) => b.text().startsWith('Save'))!
     await saveBtn.trigger('click')
@@ -191,7 +200,7 @@ describe('RoleSlideOver', () => {
       name: 'Guitar',
       group: 'tech',
       defaultCount: 2,
-      vocal: false,
+      multiRole: true,
     })
   })
 
