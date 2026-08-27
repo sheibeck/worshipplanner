@@ -214,16 +214,22 @@
             </div>
           </div>
 
-          <!-- Key (always visible — bound to the primary/first arrangement's key value, R249) -->
+          <!-- Key (always visible — bound to the primary/first arrangement's key value, R249).
+               R258: native <input list>+<datalist> typeahead suggesting the 14 major keys —
+               a free-typed value (e.g. an imported "Am") is still accepted and persists. -->
           <div>
             <label class="block text-xs font-medium text-gray-400 mb-1">Key</label>
             <input
               v-model="primaryArrangementKey"
               type="text"
               data-testid="song-key-input"
+              list="ss-key-options"
               placeholder="e.g. G, Am, D/F#"
               class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
             />
+            <datalist id="ss-key-options">
+              <option v-for="k in MAJOR_KEYS" :key="k" :value="k" />
+            </datalist>
           </div>
 
           <!-- Primary key (only when the song has multiple arrangements/keys) -->
@@ -303,6 +309,7 @@ import { ref, computed, watch } from 'vue'
 import { useSongStore } from '@/stores/songs'
 import { useAuthStore } from '@/stores/auth'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
+import { MAJOR_KEYS } from '@/constants/keys'
 import SongLyricEditor from './SongLyricEditor.vue'
 import type { Song, Arrangement, VWType } from '@/types/song'
 import type { SongEditTab } from '@/utils/songEditLink'
