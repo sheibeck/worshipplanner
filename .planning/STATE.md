@@ -5,15 +5,15 @@ milestone_name: Scheduling Accuracy & Song/Team Refinements
 current_phase: 88
 current_phase_name: Editing-UX Polish (Roles/Teams slideout + song Key typeahead
 status: executing
-stopped_at: Completed 88-01-PLAN.md
-last_updated: "2026-08-27T04:48:05.392Z"
+stopped_at: Completed 88-02-PLAN.md
+last_updated: "2026-08-27T05:20:10.261Z"
 last_activity: 2026-08-27
 last_activity_desc: Phase 88 execution started
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 67
 ---
 
@@ -944,7 +944,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 88 (Editing-UX Polish (Roles/Teams slideout + song Key typeahead)) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-08-27 — Phase 88 execution started
 
@@ -2627,6 +2627,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 86 P02 | 11min | 3 tasks | 3 files |
 | Phase 87 P01 | 25min | 3 tasks | 5 files |
 | Phase 88 P01 | 12min | 2 tasks | 6 files |
+| Phase 88 P02 | 35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3057,6 +3058,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R256: verify-first per plan — grep found no straggler .vue surface with the deprecated soft-target phrasing, so RolesConfigPanel.vue was left unchanged; only the test was strengthened.
 - [Phase ?]: 88-01: extracted MAJOR_KEYS/MINOR_KEYS into src/constants/keys.ts (byte-identical, shared by ArrangementAccordion + new SongSlideOver Key datalist)
 - [Phase ?]: 88-01: SongSlideOver Key field converted to native input+datalist typeahead over MAJOR_KEYS; free-typed keys still accepted and persist via the unchanged R249 onSave path
+- [Phase ?]: RoleSlideOver's vocal checkbox moved verbatim from RolesConfigPanel — no rename/generalization (multi-role deferred to Phase 89)
+- [Phase ?]: TeamSlideOver absorbs TeamRecurrenceSlideOver's ordinal multi-select into one drawer; TeamRecurrenceSlideOver.vue itself left in place until Plan 03 rewires the consumer
+- [Phase ?]: WR-01 duplicate-name guard and WR-02 rename soft-warn ported into TeamSlideOver with save order: trim -> empty-check -> duplicate-name -> rename soft-warn (edit only) -> write
 
 ### Roadmap Evolution
 
@@ -3382,8 +3386,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-27T04:48:05.335Z
-Stopped at: Completed 88-01-PLAN.md
+Last session: 2026-08-27T05:20:10.182Z
+Stopped at: Completed 88-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
