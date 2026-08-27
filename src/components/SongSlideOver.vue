@@ -214,6 +214,18 @@
             </div>
           </div>
 
+          <!-- Key (always visible — bound to the primary/first arrangement's key value, R249) -->
+          <div>
+            <label class="block text-xs font-medium text-gray-400 mb-1">Key</label>
+            <input
+              v-model="primaryArrangementKey"
+              type="text"
+              data-testid="song-key-input"
+              placeholder="e.g. G, Am, D/F#"
+              class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+            />
+          </div>
+
           <!-- Primary key (only when the song has multiple arrangements/keys) -->
           <div v-if="form.arrangements.length > 1">
             <label class="block text-xs font-medium text-gray-400 mb-1">
@@ -395,6 +407,42 @@ watch(
 )
 
 const isCreateMode = computed(() => props.song === null)
+
+// ── Key (R249) ───────────────────────────────────────────────────────────────
+// Always-visible editable Key bound to the primary/first arrangement's key
+// VALUE — distinct from the "Primary key" select above, which only picks
+// WHICH arrangement is primary. Resolution mirrors onSave's own fallback:
+// primaryArrangementId ?? arrangements[0].
+const primaryArrangementKey = computed<string>({
+  get() {
+    if (form.value.arrangements.length === 0) return ''
+    const target =
+      form.value.arrangements.find((a) => a.id === form.value.primaryArrangementId) ??
+      form.value.arrangements[0]
+    return target?.key ?? ''
+  },
+  set(value: string) {
+    if (form.value.arrangements.length === 0) {
+      const newArrangement: Arrangement = {
+        id: crypto.randomUUID(),
+        name: 'Default',
+        key: value,
+        bpm: null,
+        lengthSeconds: null,
+        chordChartUrl: '',
+        notes: '',
+        teamTags: [],
+      }
+      form.value.arrangements.push(newArrangement)
+      form.value.primaryArrangementId = newArrangement.id
+      return
+    }
+    const target =
+      form.value.arrangements.find((a) => a.id === form.value.primaryArrangementId) ??
+      form.value.arrangements[0]
+    if (target) target.key = value
+  },
+})
 
 // ── Available tags ─────────────────────────────────────────────────────────────
 
