@@ -4,17 +4,17 @@ milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
 current_phase: 88
 current_phase_name: Editing-UX Polish (Roles/Teams slideout + song Key typeahead
-status: executing
-stopped_at: Completed 88-02-PLAN.md
-last_updated: "2026-08-27T05:20:10.261Z"
+status: verifying
+stopped_at: Completed 88-03-PLAN.md
+last_updated: "2026-08-27T05:58:07.938Z"
 last_activity: 2026-08-27
 last_activity_desc: Phase 88 execution started
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 9
-  completed_plans: 8
-  percent: 67
+  completed_plans: 9
+  percent: 83
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 > ⚠ **Milestone NOT closed.** Phases 84–87 are code-complete, auto-verified, and code-reviewed; the
 > integration audit passed (10/10 reqs WIRED). Their human UAT is PENDING owner verification (not accepted)
@@ -945,7 +945,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 88 (Editing-UX Polish (Roles/Teams slideout + song Key typeahead)) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-27 — Phase 88 execution started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
@@ -2628,6 +2628,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 87 P01 | 25min | 3 tasks | 5 files |
 | Phase 88 P01 | 12min | 2 tasks | 6 files |
 | Phase 88 P02 | 35min | 2 tasks | 4 files |
+| Phase 88 P03 | 32min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -3061,6 +3062,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: RoleSlideOver's vocal checkbox moved verbatim from RolesConfigPanel — no rename/generalization (multi-role deferred to Phase 89)
 - [Phase ?]: TeamSlideOver absorbs TeamRecurrenceSlideOver's ordinal multi-select into one drawer; TeamRecurrenceSlideOver.vue itself left in place until Plan 03 rewires the consumer
 - [Phase ?]: WR-01 duplicate-name guard and WR-02 rename soft-warn ported into TeamSlideOver with save order: trim -> empty-check -> duplicate-name -> rename soft-warn (edit only) -> write
+- [Phase ?]: Roles keeps Band/Tech/Other grouping (owner decision); rows became read-only, only the row body changed
+- [Phase ?]: TeamsConfigPanel's formatRecurrence() is a local display-only helper, distinct from TeamSlideOver's raw-ordinals editing UI
+- [Phase ?]: Rule 3: fixed RosterViewEditQuery.test.ts (non-plan file) by stubbing RoleSlideOver/TeamSlideOver, a regression this plan's RosterView.vue change caused
 
 ### Roadmap Evolution
 
@@ -3386,8 +3390,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-27T05:20:10.182Z
-Stopped at: Completed 88-02-PLAN.md
+Last session: 2026-08-27T05:58:07.880Z
+Stopped at: Completed 88-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

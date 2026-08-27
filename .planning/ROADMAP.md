@@ -455,13 +455,13 @@ Plans:
   3. No editing affordance remains inline in either table (the always-live inputs are gone) — add/edit/delete happen only through the slideout (R257).
   4. In the song edit slideout, the Key field is a searchable type-ahead dropdown of available musical keys; a planner can filter by typing and pick a key, and the chosen key persists to the primary/first arrangement (R258).
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 
 - [x] 88-01-PLAN.md — R258 song Key type-ahead: shared `src/constants/keys.ts`, `<input list>`+`<datalist>` in SongSlideOver, ArrangementAccordion onto the shared constant (wave 1)
 - [x] 88-02-PLAN.md — R257 slideouts: build RoleSlideOver + TeamSlideOver (TeamSlideOver absorbs the Phase-86 recurrence UI) mirroring SongSlideOver's shell (wave 1)
-- [ ] 88-03-PLAN.md — R257 wiring: RolesConfigPanel/TeamsConfigPanel become read-only rows + chevron, RosterView owns/mounts the slideouts, remove TeamRecurrenceSlideOver, fix stale RosterView test (wave 2, depends on 88-02)
+- [x] 88-03-PLAN.md — R257 wiring: RolesConfigPanel/TeamsConfigPanel become read-only rows + chevron, RosterView owns/mounts the slideouts, remove TeamRecurrenceSlideOver, fix stale RosterView test (wave 2, depends on 88-02)
 
 **UI hint**: yes
 **Deploy note**: Client-only (Vue components + Firestore-via-app; no rules/functions changes anticipated).
