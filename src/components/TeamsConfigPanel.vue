@@ -32,6 +32,16 @@
                   :aria-label="`Delete ${row.team.name} team`"
                   class="text-xs px-3 py-1.5 rounded-md font-medium bg-red-900/20 hover:bg-red-900/40 text-red-400 transition-colors"
                 >Delete</button>
+                <button
+                  type="button"
+                  @click="slideoverTeam = row.team"
+                  :aria-label="`Edit recurring schedule for ${row.team.name}`"
+                  class="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
 
               <div v-if="confirmRenameId === row.team.id" class="mt-2 rounded-md bg-amber-900/20 border border-amber-800 p-3">
@@ -100,6 +110,13 @@
         </div>
       </div>
     </div>
+
+    <TeamRecurrenceSlideOver
+      :open="!!slideoverTeam"
+      :team="slideoverTeam"
+      @close="slideoverTeam = null"
+      @saved="slideoverTeam = null"
+    />
   </div>
 </template>
 
@@ -107,6 +124,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useTeamsStore } from '@/stores/teams'
 import { useToasts } from '@/stores/toasts'
+import TeamRecurrenceSlideOver from './TeamRecurrenceSlideOver.vue'
 import type { Team } from '@/types/team'
 
 const teamsStore = useTeamsStore()
@@ -162,6 +180,12 @@ let savedTimer: ReturnType<typeof setTimeout> | null = null
 
 // ── Rename soft-warn (WR-02) ─────────────────────────────────────────────────
 const confirmRenameId = ref<string | null>(null)
+
+// ── Recurring schedule slide-over (R254) ─────────────────────────────────────
+// Mounted once outside the row loop; the > chevron on each row sets the team
+// to edit. Closing or saving clears the selection (the store's onSnapshot
+// refreshes rows.team automatically, so no manual reconciliation is needed).
+const slideoverTeam = ref<Team | null>(null)
 
 async function onSaveTeam(teamId: string) {
   const draft = teamDrafts.value[teamId]
