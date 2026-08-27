@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
 current_phase: 89
-current_phase_name: generalized combinable flag + same-date bundling
-status: planning
-stopped_at: Completed 88-03-PLAN.md
-last_updated: "2026-08-27T11:23:12.794Z"
+current_phase_name: Multi-Role Scheduling
+status: executing
+stopped_at: Completed 89-01-PLAN.md
+last_updated: "2026-08-27T12:03:38.570Z"
 last_activity: 2026-08-27
-last_activity_desc: Phase 88 complete, transitioned to Phase 89
+last_activity_desc: Phase 89 execution started
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
   percent: 83
 ---
 
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 
 > ⚠ **Milestone NOT closed.** Phases 84–87 are code-complete, auto-verified, and code-reviewed; the
 > integration audit passed (10/10 reqs WIRED). Their human UAT is PENDING owner verification (not accepted)
@@ -933,7 +933,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 88 — Editing-UX Polish (Roles/Teams slideout + song Key typeahead)
+**Current focus:** Phase 89 — Multi-Role Scheduling
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -943,10 +943,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 89 — Multi-Role Scheduling (generalized combinable flag + same-date bundling)
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-08-27 — Phase 88 complete, transitioned to Phase 89
+Phase: 89 (Multi-Role Scheduling) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-08-27 — Phase 89 execution started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -2629,6 +2629,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 88 P01 | 12min | 2 tasks | 6 files |
 | Phase 88 P02 | 35min | 2 tasks | 4 files |
 | Phase 88 P03 | 32min | 3 tasks | 8 files |
+| Phase 89 P01 | 55min | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -3065,6 +3066,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Roles keeps Band/Tech/Other grouping (owner decision); rows became read-only, only the row body changed
 - [Phase ?]: TeamsConfigPanel's formatRecurrence() is a local display-only helper, distinct from TeamSlideOver's raw-ordinals editing UI
 - [Phase ?]: Rule 3: fixed RosterViewEditQuery.test.ts (non-plan file) by stubbing RoleSlideOver/TeamSlideOver, a regression this plan's RosterView.vue change caused
+- [Phase ?]: R259: multiRole flag (owner's term) replaces vocals-only exemption; evaluateGroupCombo filters multi-role roles out first, then applies Band<->Tech + cap rule to the remainder (vocalist can now also run Tech — deliberate behavior change)
+- [Phase ?]: roster.ts compat shim normalizes multiRole for every role with branch-specific defaulting (vocals-group branch defaults true, others default false), read-time only, no Firestore write migration
 
 ### Roadmap Evolution
 
@@ -3390,8 +3393,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-27T05:58:07.880Z
-Stopped at: Completed 88-03-PLAN.md
+Last session: 2026-08-27T12:03:38.511Z
+Stopped at: Completed 89-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
