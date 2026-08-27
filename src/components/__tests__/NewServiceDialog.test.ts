@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { ref, nextTick } from 'vue'
 import NewServiceDialog from '../NewServiceDialog.vue'
 
 // R038: the dialog's default date is "the nearest FUTURE Sunday with no plan yet".
@@ -29,9 +30,21 @@ const mockTeams = [
   { id: 'team-special', name: 'Special', order: 3 },
 ]
 
+// WR-1: exposed as a real Vue `ref` (not a plain property) so the
+// WR-1-regression describe block below can reassign `.value` to a brand-new
+// array and have the component's `watch(() => teamsStore.teams, ...)` (which
+// tracks the array REFERENCE, mirroring `teams.ts`'s onSnapshot reassigning
+// `teams.value` on every emission) actually fire. Every other test in this
+// file only mutates the shared `mockTeams` array in place (push/length=0)
+// and always mounts a FRESH wrapper afterward, so it never depended on — and
+// is unaffected by — this reactivity.
+const mockTeamsRef = ref(mockTeams)
+
 vi.mock('@/stores/teams', () => ({
   useTeamsStore: () => ({
-    teams: mockTeams,
+    get teams() {
+      return mockTeamsRef.value
+    },
   }),
 }))
 
@@ -323,6 +336,76 @@ describe('NewServiceDialog recurring auto-select (R255)', () => {
   it('a non-matching date auto-selects nothing', () => {
     vi.setSystemTime(THURSDAY_BEFORE_AUG_30) // -> default 2026-08-30, the 5th Sunday
     const wrapper = mountDialog({ takenDates: [] })
+    expect(checkedTeamNames(wrapper)).toEqual([])
+  })
+})
+
+// WR-1: the teams store's `onSnapshot` subscription is async — if the dialog
+// mounts/opens before the first snapshot lands, `teamsStore.teams` reads as
+// `[]` at the moment auto-select runs. These tests pin that exact race:
+// mount with an empty store, THEN populate it, and confirm auto-select
+// recomputes for the still-open dialog rather than silently missing its
+// window.
+describe('NewServiceDialog auto-select recomputes once the teams store finishes loading (WR-1)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 8, 10, 10, 0, 0)) // Thursday -> default 2026-09-13 (2nd Sunday)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    // Restore the shared team list so every other test in this file keeps
+    // seeing the default 4-team seed.
+    mockTeamsRef.value = mockTeams
+  })
+
+  function checkedTeamNames(wrapper: VueWrapper): string[] {
+    return wrapper
+      .findAll('input[type="checkbox"]')
+      .filter((c) => (c.element as HTMLInputElement).checked)
+      .map((c) => (c.element as HTMLInputElement).value)
+  }
+
+  it('teams arriving after the dialog is already open pre-checks the newly-matching team', async () => {
+    mockTeamsRef.value = []
+    const wrapper = mountDialog({ takenDates: [] })
+    // Store hasn't loaded yet — empty-state hint, no checkboxes to check.
+    expect(wrapper.findAll('input[type="checkbox"]').length).toBe(0)
+
+    // The first real snapshot lands late, with Choir's 2nd-Sunday recurrence.
+    mockTeamsRef.value = [
+      { id: 'team-choir', name: 'Choir', order: 0, recurrence: { ordinals: [2] } },
+      { id: 'team-orchestra', name: 'Orchestra', order: 1 },
+    ]
+    await nextTick()
+
+    expect(checkedTeamNames(wrapper)).toEqual(['Choir'])
+  })
+
+  it('a team manually unchecked before a later snapshot re-emits stays unchecked', async () => {
+    mockTeamsRef.value = [
+      { id: 'team-choir', name: 'Choir', order: 0, recurrence: { ordinals: [2] } },
+      { id: 'team-orchestra', name: 'Orchestra', order: 1 },
+    ]
+    const wrapper = mountDialog({ takenDates: [] })
+    expect(checkedTeamNames(wrapper)).toEqual(['Choir'])
+
+    const choirCheckbox = wrapper
+      .findAll('input[type="checkbox"]')
+      .find((c) => (c.element as HTMLInputElement).value === 'Choir')!
+    await choirCheckbox.setValue(false)
+    expect(checkedTeamNames(wrapper)).toEqual([])
+
+    // A later snapshot re-emits (e.g. an unrelated team edited elsewhere) —
+    // Choir's pattern still matches the current date, but the manual
+    // uncheck must survive this recompute too, not just a date change.
+    mockTeamsRef.value = [
+      { id: 'team-choir', name: 'Choir', order: 0, recurrence: { ordinals: [2] } },
+      { id: 'team-orchestra', name: 'Orchestra', order: 1 },
+      { id: 'team-communion', name: 'Communion', order: 2 },
+    ]
+    await nextTick()
+
     expect(checkedTeamNames(wrapper)).toEqual([])
   })
 })
