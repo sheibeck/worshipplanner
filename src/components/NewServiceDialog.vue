@@ -57,6 +57,7 @@
                 v-model="form.date"
                 type="date"
                 class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                @change="onDateChange"
               />
             </div>
 
@@ -88,6 +89,7 @@
                     :value="team.name"
                     v-model="form.teams"
                     class="accent-indigo-500"
+                    @change="onTeamCheckboxChange(team.name)"
                   />
                   {{ team.name }}
                 </label>
@@ -123,6 +125,7 @@
 import { ref, watch } from 'vue'
 import { nextFreeSunday } from '@/utils/quarterDates'
 import { useTeamsStore } from '@/stores/teams'
+import { teamMatchesDate } from '@/utils/teamRecurrence'
 
 const props = withDefaults(
   defineProps<{
@@ -160,13 +163,61 @@ function defaultForm(): FormState {
   // date source — the old private nextSunday() (and its inline copy of the date
   // formatter) is gone deliberately; do not reintroduce a second one.
   const date = nextFreeSunday(new Date(), props.takenDates)
-  // R231: no ordinal-based team pre-selection — every new service starts with
-  // no teams checked, regardless of which Sunday is chosen. The planner picks
-  // teams manually. (Formerly derived from sundayOrdinal(); deleted.)
+  // R231's hard-coded ordinal rule stays gone — every new service still starts
+  // with no teams checked here. Phase 86 (R255) reintroduces a CONFIGURABLE,
+  // per-team pre-check, but it runs as a separate step after the form is reset
+  // (see applyRecurrenceAutoSelect + the open watcher below), never inline here.
   return { date, name: '', teams: [] }
 }
 
+// R255: team names auto-added by the current recurrence match, so the next
+// recompute knows which checkboxes it owns and can safely clear/replace them.
+const autoAddedTeams = ref<string[]>([])
+// R255: team names the planner has manually checked or unchecked (in either
+// direction) during this dialog session — once touched, auto-select must
+// never add or remove them again, even if a later date matches/un-matches
+// their configured pattern (CONTEXT: "fully overridable ... never clobbering
+// manual check/uncheck choices").
+const manuallyTouchedTeams = ref<string[]>([])
+
+// R255: creation-only auto-select. Pre-checks every team whose configured
+// recurrence pattern matches `date`, without disturbing any team the planner
+// has manually toggled. Invoked once at setup (so an initially-open dialog
+// auto-selects too), on dialog open (after the form reset), and from the
+// Service Date's @change handler — never as a form.date watcher, so the
+// recompute point stays deterministic.
+function applyRecurrenceAutoSelect(date: string) {
+  for (const name of autoAddedTeams.value) {
+    const idx = form.value.teams.indexOf(name)
+    if (idx !== -1) form.value.teams.splice(idx, 1)
+  }
+  autoAddedTeams.value = []
+  for (const team of teamsStore.teams) {
+    if (manuallyTouchedTeams.value.includes(team.name)) continue
+    if (teamMatchesDate(team, date) && !form.value.teams.includes(team.name)) {
+      form.value.teams.push(team.name)
+      autoAddedTeams.value.push(team.name)
+    }
+  }
+}
+
 const form = ref<FormState>(defaultForm())
+applyRecurrenceAutoSelect(form.value.date)
+
+function onDateChange() {
+  applyRecurrenceAutoSelect(form.value.date)
+}
+
+// R255: any manual toggle (check OR uncheck) permanently promotes a team out
+// of auto-management for the remainder of this dialog session, so a later
+// date change can never re-add it (if unchecked) or remove it (if checked).
+function onTeamCheckboxChange(name: string) {
+  if (!manuallyTouchedTeams.value.includes(name)) {
+    manuallyTouchedTeams.value.push(name)
+  }
+  const idx = autoAddedTeams.value.indexOf(name)
+  if (idx !== -1) autoAddedTeams.value.splice(idx, 1)
+}
 
 // Reset form when dialog opens
 watch(
@@ -174,6 +225,9 @@ watch(
   (isOpen) => {
     if (isOpen) {
       form.value = defaultForm()
+      autoAddedTeams.value = []
+      manuallyTouchedTeams.value = []
+      applyRecurrenceAutoSelect(form.value.date)
     }
   },
 )
