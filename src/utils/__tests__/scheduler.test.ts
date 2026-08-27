@@ -816,4 +816,154 @@ describe('proposeQuarterSchedule', () => {
       expect(result.pairingConflicts.filter((c) => c.partnerId === 'casey')).toHaveLength(0)
     })
   })
+
+  // --- R260: same-date bundling of a person's multi-role assignments (RESEARCH B.7) ---
+  describe('multi-role bundling (R260)', () => {
+    it('canonical: rarest multi-role anchors bundling; higher-cadence roles ride along on the anchor dates AND fill their extra occurrences elsewhere', () => {
+      // wl holds bass (rarest, n=4), vocals (n=2), lead (n=2, cross-group 'other') — all
+      // multi-role and wl is the SOLE candidate for each, so this fixture proves the emergent
+      // rarity-anchoring/cadence-bound/determinism shape (it does NOT alone prove propagation —
+      // see the competition fixture below for that load-bearing proof, per RESEARCH B.3).
+      const dates = Array.from({ length: 8 }, (_, i) => {
+        const d = new Date('2026-01-04T00:00:00Z')
+        d.setUTCDate(d.getUTCDate() + i * 7)
+        return d.toISOString().slice(0, 10)
+      })
+      const people = [makePerson({ id: 'wl', name: 'Worship Leader', roles: ['bass', 'vocals', 'lead'] })]
+      const resolver = makeResolver([
+        { roleId: 'bass', count: 1 },
+        { roleId: 'vocals', count: 1 },
+        { roleId: 'lead', count: 1 },
+      ])
+      const pqd = [
+        makePQD({
+          personId: 'wl',
+          roleFrequency: {
+            bass: { tier: 'regular', n: 4 },
+            vocals: { tier: 'regular', n: 2 },
+            lead: { tier: 'regular', n: 2 },
+          },
+        }),
+      ]
+      const roleGroupOf = makeRoleGroupOf({ bass: 'band', vocals: 'band', lead: 'other' })
+      const isMultiRole = makeIsMultiRole(['bass', 'vocals', 'lead'])
+
+      const result1 = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf, isMultiRole)
+      const result2 = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf, isMultiRole)
+
+      // (1) ride-along: bass lands on indices {0,4}; vocals+lead ride along on those same dates.
+      for (const i of [0, 4]) {
+        const date = dates[i]!
+        expect(result1.calendar[date]?.['bass']).toContain('wl')
+        expect(result1.calendar[date]?.['vocals']).toContain('wl')
+        expect(result1.calendar[date]?.['lead']).toContain('wl')
+      }
+
+      // (2) extras elsewhere: vocals+lead also serve on {2,6} WITHOUT bass (bass not withinCadence).
+      for (const i of [2, 6]) {
+        const date = dates[i]!
+        expect(result1.calendar[date]?.['vocals']).toContain('wl')
+        expect(result1.calendar[date]?.['lead']).toContain('wl')
+        expect(result1.calendar[date]?.['bass'] ?? []).not.toContain('wl')
+      }
+
+      // (3) never exceeds cadence: per-role served counts match ceil(8/n) exactly.
+      const countServed = (roleId: string) =>
+        dates.filter((d) => (result1.calendar[d]?.[roleId] ?? []).includes('wl')).length
+      expect(countServed('bass')).toBe(2)
+      expect(countServed('vocals')).toBe(4)
+      expect(countServed('lead')).toBe(4)
+
+      // (4) determinism: two runs of identical input produce identical calendars.
+      expect(result2.calendar).toEqual(result1.calendar)
+    })
+
+    it('competition (LOAD-BEARING): bundling wins wl the shared vocals slot on the bass date ahead of a competitor who would otherwise win the name.localeCompare tie-break directly', () => {
+      // wl holds bass (sole bassist) + vocals (both multi-role); 'ava' competes for vocals only
+      // and sorts BEFORE 'wl' alphabetically, so absent propagation she wins the tied-deficit
+      // vocals slot on the tie-break. Resolver orders bass before vocals so the main loop fills
+      // bass first (only wl holds it) -> propagateMultiRole fires -> wl pre-claims the still-empty
+      // vocals slot before the main loop's own vocals scoring pass ever runs. This is the fixture
+      // that is genuinely RED before propagateMultiRole exists (RESEARCH B.3) — the sole-wl
+      // canonical fixture above passes via the main loop alone and does NOT prove propagation.
+      const dates = ['2026-01-04']
+      const people = [
+        makePerson({ id: 'wl', name: 'wl', roles: ['bass', 'vocals'] }),
+        makePerson({ id: 'ava', name: 'Ava', roles: ['vocals'] }),
+      ]
+      const resolver = makeResolver([
+        { roleId: 'bass', count: 1 },
+        { roleId: 'vocals', count: 1 },
+      ])
+      const pqd = [
+        makePQD({
+          personId: 'wl',
+          roleFrequency: { bass: { tier: 'regular', n: 4 }, vocals: { tier: 'regular', n: 2 } },
+        }),
+        makePQD({ personId: 'ava', roleFrequency: freq('vocals', 'regular', 2) }),
+      ]
+      const roleGroupOf = makeRoleGroupOf({ bass: 'band', vocals: 'band' })
+      const isMultiRole = makeIsMultiRole(['bass', 'vocals'])
+
+      const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf, isMultiRole)
+
+      expect(result.calendar['2026-01-04']?.['vocals']).toContain('wl')
+    })
+
+    it('coverage-bounded solo (Pitfall 5/8): when the bundled role is already at its own cadence cap, the anchor role still fills solo and the capped role is never exceeded', () => {
+      // wl's vocals is pre-locked (seeded, no live bass row that date) on date0, consuming its
+      // n=2 cadence budget for the 2-date window. On date1 bass is freshly eligible and fills
+      // solo; propagateMultiRole must skip pulling vocals in because wl is no longer withinCadence
+      // for vocals — proving the "fills solo not empty, never exceeds cadence" coverage-bounded yield.
+      const dates = ['2026-01-04', '2026-01-11']
+      const people = [makePerson({ id: 'wl', name: 'Worship Leader', roles: ['bass', 'vocals'] })]
+      const resolver = makeResolver(
+        [
+          { roleId: 'bass', count: 1 },
+          { roleId: 'vocals', count: 1 },
+        ],
+        { '2026-01-04': [{ roleId: 'vocals', count: 1 }] }, // no bass row on the seed date
+      )
+      const pqd = [
+        makePQD({
+          personId: 'wl',
+          roleFrequency: { bass: { tier: 'regular', n: 4 }, vocals: { tier: 'regular', n: 2 } },
+        }),
+      ]
+      const roleGroupOf = makeRoleGroupOf({ bass: 'band', vocals: 'band' })
+      const isMultiRole = makeIsMultiRole(['bass', 'vocals'])
+      const existingCalendar: QuarterCalendar = { '2026-01-04': { vocals: ['wl'] } }
+
+      const result = proposeQuarterSchedule(people, dates, resolver, pqd, existingCalendar, roleGroupOf, isMultiRole)
+
+      // bass fills solo on date1 even though vocals cannot bundle.
+      expect(result.calendar['2026-01-11']?.['bass']).toEqual(['wl'])
+      // vocals is NOT pulled in on date1 — wl already at cadence cap from the seeded date0 lock.
+      expect(result.calendar['2026-01-11']?.['vocals'] ?? []).not.toContain('wl')
+      // Total vocals serves never exceed the n=2 cadence budget over this 2-date window (1, not 2).
+      expect(dates.filter((d) => (result.calendar[d]?.['vocals'] ?? []).includes('wl')).length).toBe(1)
+    })
+
+    it('cross-type (Pitfall 3): a person\'s multi-role sound (tech) + vocals (band) bundle onto the same date with no group violation', () => {
+      const dates = ['2026-01-04']
+      const people = [makePerson({ id: 'p1', name: 'P1', roles: ['sound', 'vocals'] })]
+      const resolver = makeResolver([
+        { roleId: 'sound', count: 1 },
+        { roleId: 'vocals', count: 1 },
+      ])
+      const pqd = [
+        makePQD({
+          personId: 'p1',
+          roleFrequency: { sound: { tier: 'regular', n: 2 }, vocals: { tier: 'regular', n: 2 } },
+        }),
+      ]
+      const roleGroupOf = makeRoleGroupOf({ sound: 'tech', vocals: 'band' })
+      const isMultiRole = makeIsMultiRole(['sound', 'vocals'])
+
+      const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf, isMultiRole)
+
+      expect(result.calendar['2026-01-04']?.['sound']).toContain('p1')
+      expect(result.calendar['2026-01-04']?.['vocals']).toContain('p1')
+    })
+  })
 })
