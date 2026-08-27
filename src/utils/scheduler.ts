@@ -327,8 +327,12 @@ export function proposeQuarterSchedule(
         const chosen = scored[0]!.p
         assignToRole(roleId, chosen.id)
         propagatePairing(chosen.id, new Set([chosen.id]))
-        // R260 — fire after propagatePairing so a pulled partner is already present; order does
-        // not affect the final bundled set (commutative, RESEARCH B.4).
+        // R260 — fire after propagatePairing so a pulled partner is already present. Deterministic for a
+        // FIXED role order (no wall-clock/randomness), but NOT order-independent: because a bundling pull
+        // pre-claims a slot before that role's own fill loop runs, changing the role-template order can
+        // change who wins a contested slot (bundling can beat a competitor that direct deficit-scoring
+        // would otherwise pick — the intended R260 behavior). `resolveRolesForDate`'s order is stable, so
+        // the schedule is reproducible; do not assume roles can be freely reordered without effect.
         if (isMultiRole(roleId)) propagateMultiRole(chosen.id)
       }
     }

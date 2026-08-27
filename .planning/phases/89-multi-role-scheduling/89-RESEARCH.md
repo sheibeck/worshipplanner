@@ -291,6 +291,20 @@ So **no explicit rarity sort and no scoring change are needed.** The rare role n
 `[VERIFIED: analysis]`
 
 - **Commutativity ⇒ order-independence:** two of a person's multi-roles are distinct roleIds with independent slots and independent `servedByRole` keys (`${personId}::${roleId}`). Multi-roles never group-conflict (A.3), so adding one never blocks another. Assigning role `r2` mutates only `servedByRole[person::r2]`, which does not affect `r3`'s `withinCadence`. Therefore the final set of a person's roles on a date = `{ all their regular multi-roles that are withinCadence at dateIndex and have remaining capacity }`, **independent of trigger order and template order**.
+
+> ⚠ **CORRECTION (2026-08-27, from 89-REVIEW WR-01 — empirically verified).** The "independent of
+> template order" claim above is **too strong and is wrong for CONTESTED slots**. It holds for a single
+> person's *own* bundle in isolation, but NOT once other people compete for the same slot: a bundling
+> pull *pre-claims* a slot before that role's own fill loop runs, so it can beat a competitor that direct
+> deficit-scoring would otherwise pick (exactly the "edge out a marginally-higher-deficit peer" residual
+> admitted in the B.3 trade-off table). Whether that pre-claim happens depends on which multi-role fired
+> the bundle first — i.e. on `resolveRolesForDate`'s role order. A live repro confirmed it: swapping the
+> resolver order `[bass, vocals]` → `[vocals, bass]` flips the contested vocals winner between `wl`
+> (bundles) and `ava` (direct score). **This does not violate the owner's requirement** — bundling
+> winning a contested slot is the intended, tested R260 behavior. The correct guarantee is: **deterministic
+> for a FIXED role order (no wall-clock/randomness), reproducible because `resolveRolesForDate` is stable —
+> but NOT order-independent.** The code comment at `scheduler.ts` (the `propagateMultiRole` call site) was
+> corrected to say this.
 - **No wall-clock / no randomness:** the pass adds none; it reuses `assignToRole`, `withinCadence`, and stable `rolesForDate` iteration. Existing tie-breaks (deficit, `servedByRole`, `name.localeCompare`) are untouched.
 - **Fairness bound:** the `withinCadence` gate on each *pulled* role is the fairness limiter — a person can only bundle a role they are genuinely behind on, so they cannot hoard beyond their own cadence. Capacity bound prevents overfill. This is the same containment `propagatePairing` uses (`[VERIFIED: scheduler.ts:220-236]`), so bundling inherits its accepted asymmetry rather than inventing a new fairness model.
 - **`assignToRole` idempotency (lines 165-172):** dedupes (`if (!includes)`) and increments served only on an actual push — reusing it is what prevents double-counting (Pitfall 1).
