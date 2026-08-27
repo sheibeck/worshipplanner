@@ -273,4 +273,31 @@ describe('TeamsConfigPanel', () => {
 
     expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { recurrence: { ordinals: [] } })
   })
+
+  it('WR-02: a duplicate ordinal from a direct Firestore edit is de-duplicated on open, so one click fully deselects it, and Save persists no duplicate', async () => {
+    mockTeams = [
+      { id: 't-1', name: 'Choir', order: 0, recurrence: { ordinals: [1, 1, 3] } },
+      { id: 't-2', name: 'Orchestra', order: 1 },
+    ]
+    const wrapper = mountPanel()
+    const chevron = wrapper.find('[aria-label="Edit recurring schedule for Choir"]')
+    await chevron.trigger('click')
+
+    const firstSunday = wrapper.findAll('button').find((b) => b.text() === '1st Sunday')!
+    // Read-side dedupe: starts pressed (the duplicate collapsed to one entry).
+    expect(firstSunday.attributes('aria-pressed')).toBe('true')
+
+    // A single click fully deselects it — with the pre-fix undeduped seed,
+    // toggleOrdinal's indexOf/splice would only remove ONE copy, leaving the
+    // button stuck showing as pressed.
+    await firstSunday.trigger('click')
+    expect(firstSunday.attributes('aria-pressed')).toBe('false')
+
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
+    await saveButton.trigger('click')
+    await Promise.resolve()
+
+    // Write-side dedupe: persists exactly [3], never [1, 3] or a stray duplicate.
+    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { recurrence: { ordinals: [3] } })
+  })
 })

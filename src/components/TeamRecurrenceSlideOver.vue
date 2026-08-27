@@ -141,7 +141,12 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) {
-      localOrdinals.value = [...(props.team?.recurrence?.ordinals ?? [])].sort((a, b) => a - b)
+      // WR-2: dedupe on read. `Team.recurrence.ordinals` is a plain
+      // un-validated `number[]` on the Firestore doc — a duplicate entering
+      // via a direct console edit/migration/future writer would otherwise
+      // leave `toggleOrdinal` splicing only one copy per click, so the
+      // button never renders as deselected.
+      localOrdinals.value = Array.from(new Set(props.team?.recurrence?.ordinals ?? [])).sort((a, b) => a - b)
     }
   },
 )
@@ -164,8 +169,11 @@ async function onSave() {
   if (!props.team) return
   isSaving.value = true
   try {
+    // WR-2: dedupe on write too, in case a duplicate slipped past the
+    // read-side seed (e.g. this component instance stayed open across a
+    // direct Firestore edit landing mid-session).
     await teamsStore.updateTeam(props.team.id, {
-      recurrence: { ordinals: [...localOrdinals.value].sort((a, b) => a - b) },
+      recurrence: { ordinals: Array.from(new Set(localOrdinals.value)).sort((a, b) => a - b) },
     })
     emit('saved')
   } finally {
