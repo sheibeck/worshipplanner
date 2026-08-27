@@ -16,15 +16,15 @@
       </button>
     </div>
 
-    <!-- Column headers -->
+    <!-- Column headers (grid tracks MUST match the row grid below) -->
     <div
       v-if="teamsStore.teams.length > 0"
       data-testid="teams-columns"
-      class="flex items-center gap-3 px-7 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-800 bg-gray-900/30"
+      class="grid grid-cols-[minmax(0,1fr)_11rem_1rem] items-center gap-3 px-7 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-800 bg-gray-900/30"
     >
-      <span class="flex-1">Name</span>
+      <span>Name</span>
       <span>Schedule</span>
-      <span class="w-4 shrink-0" aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
     </div>
 
     <div class="divide-y divide-gray-800">
@@ -35,12 +35,12 @@
             :key="team.id"
             type="button"
             :aria-label="`Edit ${team.name} team`"
-            class="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-gray-800/50 transition-colors"
+            class="w-full grid grid-cols-[minmax(0,1fr)_11rem_1rem] items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-gray-800/50 transition-colors"
             @click="emit('edit', team)"
           >
-            <span class="flex-1 text-sm font-medium text-gray-100">{{ team.name }}</span>
-            <span class="text-xs text-gray-500">{{ formatRecurrence(team.recurrence?.ordinals) }}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <span class="truncate text-sm font-medium text-gray-100">{{ team.name }}</span>
+            <span class="truncate text-xs text-gray-500">{{ formatRecurrence(team.recurrence?.ordinals) }}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 justify-self-end shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>

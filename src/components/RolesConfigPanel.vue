@@ -17,13 +17,13 @@
       </button>
     </div>
 
-    <!-- Column headers -->
-    <div data-testid="roles-columns" class="flex items-center gap-3 px-7 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-800 bg-gray-900/30">
-      <span class="flex-1">Role</span>
+    <!-- Column headers (grid tracks MUST match the row grid below) -->
+    <div data-testid="roles-columns" class="grid grid-cols-[minmax(0,1fr)_5.5rem_4rem_6.5rem_1rem] items-center gap-3 px-7 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-800 bg-gray-900/30">
+      <span>Role</span>
       <span>Group</span>
-      <span>Default</span>
+      <span class="text-right">Default</span>
       <span>Multi-role</span>
-      <span class="w-4 shrink-0" aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
     </div>
 
     <div class="divide-y divide-gray-800">
@@ -43,24 +43,29 @@
             :key="role.id"
             type="button"
             :aria-label="`Edit ${role.name} role`"
-            class="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-gray-800/50 transition-colors"
+            class="w-full grid grid-cols-[minmax(0,1fr)_5.5rem_4rem_6.5rem_1rem] items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-gray-800/50 transition-colors"
             @click="emit('edit', role)"
           >
-            <span class="flex-1 text-sm font-medium text-gray-100">{{ role.name }}</span>
-            <span
-              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border"
-              :class="groupBadgeClasses[role.group]"
-            >
-              {{ groupLabels[role.group] }}
+            <span class="truncate text-sm font-medium text-gray-100">{{ role.name }}</span>
+            <span>
+              <span
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border"
+                :class="groupBadgeClasses[role.group]"
+              >
+                {{ groupLabels[role.group] }}
+              </span>
             </span>
-            <span class="text-xs text-gray-500">Default {{ role.defaultCount }}</span>
-            <span
-              v-if="role.multiRole"
-              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-indigo-900/40 text-indigo-300 border-indigo-800"
-            >
-              Multi-role
+            <span class="text-right text-xs text-gray-500">{{ role.defaultCount }}</span>
+            <span>
+              <span
+                v-if="role.multiRole"
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-indigo-900/40 text-indigo-300 border-indigo-800"
+              >
+                Multi-role
+              </span>
+              <span v-else class="text-gray-600">—</span>
             </span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 justify-self-end shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>
