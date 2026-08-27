@@ -33,16 +33,17 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** All phases code-complete + auto-verified — **MILESTONE HELD OPEN (NOT closed)**
+**Status:** Phases 84–87 code-complete + auto-verified (held for owner UAT) · **Phase 88 ACTIVE** (added from UAT)
 
-> ⚠ **Held open at owner request (2026-08-26).** All 4 phases (84–87) are code-complete, auto-verified,
-> and code-reviewed; the integration audit passed (10/10 reqs WIRED). But the owner **paused the lifecycle
-> to run human UAT before close** — `gsd-complete-milestone` / `gsd-cleanup` have NOT been run. Human UAT
-> is PENDING (not owner-accepted); the "defer & continue" note on phases 85/86/87 was extended from the
-> owner's Phase-84 choice without per-phase confirmation and has been corrected. See
-> `.planning/v2.3-MILESTONE-AUDIT.md` for the pending owner actions (Phase 84 backfill `--apply`, Phase 85
-> Functions deploy) and the four UAT spot-checks. Resume close with `/gsd-complete-milestone v2.3` once the
-> owner confirms.
+> ⚠ **Milestone NOT closed.** Phases 84–87 are code-complete, auto-verified, and code-reviewed; the
+> integration audit passed (10/10 reqs WIRED). Their human UAT is PENDING owner verification (not accepted)
+> — see `.planning/v2.3-MILESTONE-AUDIT.md` for the pending owner actions (Phase 84 backfill `--apply`,
+> Phase 85 Functions deploy) and the four UAT spot-checks.
+>
+> **Phase 88 added 2026-08-26 from v2.3 UAT** (Editing-UX polish, R257/R258): the Volunteer → Roles and
+> Teams tabs become read-only rows opening a slideout (mirroring Songs), and the song Key becomes a
+> searchable type-ahead dropdown. This phase is now in the discuss→plan→execute flow. Milestone close
+> (`/gsd-complete-milestone v2.3`) waits on Phase 88 completing AND the owner's UAT/deploys above.
 
 (v2.2 ended at Phase 83); this milestone is **Phases 84–87**.
 

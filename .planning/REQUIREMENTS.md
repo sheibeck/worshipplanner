@@ -35,6 +35,11 @@ REQ-IDs continue the project's sequential `R###` numbering from the last shipped
 
 - [x] **R256**: The schedulable-roles "default count" description accurately reflects the scheduler's real behavior (it targets that count) and no longer describes it as a "soft planning target." — **Phase 87**
 
+### Editing-UX Polish (added 2026-08-26 from v2.3 UAT)
+
+- [ ] **R257**: The Volunteer → Roles and Teams tabs present read-only rows that open a right-side slideout on click for editing (mirroring the Songs table + SongSlideOver pattern), with add/edit/delete performed in the slideout and a header "+ Add" for create mode — replacing the current always-inline-editable rows. — **Phase 88**
+- [ ] **R258**: A song's Key is chosen from a searchable type-ahead dropdown of available musical keys (rather than the free-text input from R249). — **Phase 88**
+
 ## Future Requirements
 
 Deferred; not in the v2.3 roadmap.
@@ -66,11 +71,13 @@ Deferred; not in the v2.3 roadmap.
 | R254 | Phase 86 | Complete |
 | R255 | Phase 86 | Complete |
 | R256 | Phase 87 | Complete |
+| R257 | Phase 88 | Pending |
+| R258 | Phase 88 | Pending |
 
 **Coverage:**
 
-- v2.3 requirements: 10 total
-- Mapped to phases: 10 (Phases 84–87)
+- v2.3 requirements: 12 total
+- Mapped to phases: 12 (Phases 84–88)
 - Unmapped: 0 ✓
 
 **Phase rollup:**
@@ -79,7 +86,8 @@ Deferred; not in the v2.3 roadmap.
 - Phase 85 — Team Conflicts (Vocals into Band & One-Team-Per-Date): R250, R251, R252
 - Phase 86 — Recurring Team Scheduling: R254, R255
 - Phase 87 — Song & Rotation Refinements: R249, R253, R256
+- Phase 88 — Editing-UX Polish (Roles/Teams slideout + song Key typeahead): R257, R258
 
 ---
 *Requirements defined: 2026-08-25*
-*Last updated: 2026-08-25 — roadmap created; R247–R256 mapped to Phases 84–87 (100% coverage)*
+*Last updated: 2026-08-26 — added R257 (Roles/Teams slideout) + R258 (song Key typeahead) from v2.3 UAT, mapped to new Phase 88.*

@@ -15,7 +15,7 @@
 - ✅ **v2.0 — Multi-Church Onboarding & Owner Console Tabs** — Phases 72-74 (shipped 2026-08-23; tabbed Configuration/Organizations shell, org onboarding (org + settings + seeded template + first admin), and the multi-org Storage auth-claim widening (backlog 999.5) — deployed to production 2026-08-23; owner acceptance, human UAT deferred)
 - ✅ **v2.1 — Organization Lifecycle & Super-Admin Access** — Phases 75-78 (shipped 2026-08-23; church deactivate/reactivate, deactivation-gated deletion with full cascade cleanup, pending-invite visibility, and a super-admin "enter any church" rules arm — deployed to production 2026-08-23; audit PASSED 16/16; owner acceptance, human UAT deferred)
 - ✅ **v2.2 — Configurability, Hardening & Cleanup** — Phases 79-83 (shipped 2026-08-25; per-org configurable teams replacing hard-coded Berean rules + dropped ordinal-Sunday auto-select (R228-R231, R241), security & data-integrity hardening — inviteLookup create gate, createdBy immutability, deleteService share revocation, song-clear slide cleanup, pending-render edit guard (R232-R236), polish/ops close-out — PC export coverage, Resend verified-domain runbook, Owner Console a11y, shared song-browse component (R237-R240), per-org AI enablement OFF-by-default (R242-R243), and Roles/Teams tab UX/copy (R244-R246); hosting deployed 2026-08-25, backend rules/functions owner-gated; audit PASSED 19/19. **The per-team song-tag filter (R230) was delivered then removed 2026-08-25 by owner decision.**)
-- 📋 **v2.3 — Scheduling Accuracy & Song/Team Refinements** — Phases 84-87 (planning; last-used date correctness + one-time backfill (R247-R248), team conflict rules — Vocals folds into Band, one-team-per-date with the Vocals sing-and-play exception (R250-R252), pattern-based recurring team scheduling via a Volunteer → Teams `>` slideout with auto-select on matching dates (R254-R255), and song & rotation refinements — editable song Key, sermon-free Scripture rotation, corrected "soft planning target" copy (R249, R253, R256))
+- 📋 **v2.3 — Scheduling Accuracy & Song/Team Refinements** — Phases 84-88 (Phases 84–87 code-complete + auto-verified, held open for owner UAT; Phase 88 — Editing-UX polish (Roles/Teams slideout + song Key typeahead, R257/R258) — added 2026-08-26 from UAT; last-used date correctness + one-time backfill (R247-R248), team conflict rules — Vocals folds into Band, one-team-per-date with the Vocals sing-and-play exception (R250-R252), pattern-based recurring team scheduling via a Volunteer → Teams `>` slideout with auto-select on matching dates (R254-R255), and song & rotation refinements — editable song Key, sermon-free Scripture rotation, corrected "soft planning target" copy (R249, R253, R256))
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -363,6 +363,7 @@ one, it follows the same confirm-then-deploy discipline.
 - [x] **Phase 85: Team Conflicts — Vocals into Band & One-Team-Per-Date** - Fold Vocals into the Band team, block a volunteer from serving on two teams on one date, with Vocals as the sole multi-person, sing-and-play-at-once exception (R250, R251, R252) (completed 2026-08-26)
 - [x] **Phase 86: Recurring Team Scheduling** - Configure a team's recurring pattern (every Nth week / Nth Sunday) from a `>` slideout on the Volunteer → Teams tab, and auto-select that team on any service whose date matches (R254, R255) (completed 2026-08-26)
 - [x] **Phase 87: Song & Rotation Refinements** - Editable song Key, a Scripture rotation tab that lists only planned scripture (never the sermon passage), and corrected "soft planning target" schedulable-roles copy (R249, R253, R256) (completed 2026-08-26)
+- [ ] **Phase 88: Editing-UX Polish** - Volunteer → Roles and Teams tabs become read-only rows that open a right-side slideout on click (mirroring the Songs table + SongSlideOver), and the song Key becomes a searchable type-ahead dropdown of available keys (R257, R258) — added 2026-08-26 from v2.3 UAT
 
 ### Phase 84: Last-Used Date Correctness & Backfill
 
@@ -440,3 +441,19 @@ Plans:
 
 **UI hint**: yes
 **Deploy note**: Client-only (song edit form, Scripture rotation tab query, schedulable-roles copy).
+
+### Phase 88: Editing-UX Polish (Roles/Teams slideout + song Key typeahead)
+
+**Goal**: The Volunteer → Roles and Teams tabs match the Songs editing pattern (read-only rows that open a right-side slideout on click for add/edit/delete, replacing the always-inline-editable rows), and the song Key control becomes a searchable type-ahead dropdown of available musical keys instead of free text.
+**Depends on**: Nothing (independent UI-polish phase; added 2026-08-26 from v2.3 UAT). Builds on the existing SongSlideOver create/edit pattern and the Phase 86 TeamRecurrenceSlideOver.
+**Requirements**: R257, R258
+**Success Criteria** (what must be TRUE):
+
+  1. The Roles tab renders read-only rows; clicking a row opens a slideout to edit that role's name/group/default-count/vocal and delete it; a header "+ Add role" opens the same slideout in create mode (R257).
+  2. The Teams tab renders read-only rows; clicking a row opens a slideout to edit that team's name + recurrence and delete it; a header "+ Add team" opens create mode; the Phase 86 recurrence config lives inside this slideout (R257).
+  3. No editing affordance remains inline in either table (the always-live inputs are gone) — add/edit/delete happen only through the slideout (R257).
+  4. In the song edit slideout, the Key field is a searchable type-ahead dropdown of available musical keys; a planner can filter by typing and pick a key, and the chosen key persists to the primary/first arrangement (R258).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy note**: Client-only (Vue components + Firestore-via-app; no rules/functions changes anticipated).
