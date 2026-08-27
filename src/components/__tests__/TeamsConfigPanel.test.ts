@@ -20,7 +20,9 @@ vi.mock('@/stores/teams', () => ({
 }))
 
 function mountPanel() {
-  return mount(TeamsConfigPanel)
+  return mount(TeamsConfigPanel, {
+    global: { stubs: { Teleport: { template: '<div><slot /></div>' } } },
+  })
 }
 
 beforeEach(() => {
@@ -29,7 +31,7 @@ beforeEach(() => {
   mockUpdateTeam.mockClear()
   mockDeleteTeam.mockClear()
   mockTeams = [
-    { id: 't-1', name: 'Choir', order: 0 },
+    { id: 't-1', name: 'Choir', order: 0, recurrence: { ordinals: [1, 3] } },
     { id: 't-2', name: 'Orchestra', order: 1 },
   ]
 })
@@ -205,5 +207,70 @@ describe('TeamsConfigPanel', () => {
 
     resolveAdd?.()
     await Promise.resolve()
+  })
+
+  // ── R254: recurring-schedule slide-over ──────────────────────────────────
+
+  it('R254: each team row exposes a > chevron with a per-team aria-label', () => {
+    const wrapper = mountPanel()
+    const chevron = wrapper.find('[aria-label="Edit recurring schedule for Choir"]')
+    expect(chevron.exists()).toBe(true)
+  })
+
+  it('R254: clicking a chevron opens the slide-over with that team\'s saved ordinals pre-selected', async () => {
+    const wrapper = mountPanel()
+    const chevron = wrapper.find('[aria-label="Edit recurring schedule for Choir"]')
+    await chevron.trigger('click')
+
+    const firstSunday = wrapper.findAll('button').find((b) => b.text() === '1st Sunday')!
+    const secondSunday = wrapper.findAll('button').find((b) => b.text() === '2nd Sunday')!
+    const thirdSunday = wrapper.findAll('button').find((b) => b.text() === '3rd Sunday')!
+
+    expect(firstSunday.attributes('aria-pressed')).toBe('true')
+    expect(secondSunday.attributes('aria-pressed')).toBe('false')
+    expect(thirdSunday.attributes('aria-pressed')).toBe('true')
+  })
+
+  it('R254: a team opened with no recurrence starts with nothing selected', async () => {
+    const wrapper = mountPanel()
+    const chevron = wrapper.find('[aria-label="Edit recurring schedule for Orchestra"]')
+    await chevron.trigger('click')
+
+    for (const label of ['1st Sunday', '2nd Sunday', '3rd Sunday', '4th Sunday', '5th Sunday']) {
+      const btn = wrapper.findAll('button').find((b) => b.text() === label)!
+      expect(btn.attributes('aria-pressed')).toBe('false')
+    }
+  })
+
+  it('R254: toggling ordinals and clicking Save calls updateTeam with the sorted selection', async () => {
+    const wrapper = mountPanel()
+    const chevron = wrapper.find('[aria-label="Edit recurring schedule for Orchestra"]')
+    await chevron.trigger('click')
+
+    const fourthSunday = wrapper.findAll('button').find((b) => b.text() === '4th Sunday')!
+    const secondSunday = wrapper.findAll('button').find((b) => b.text() === '2nd Sunday')!
+    await fourthSunday.trigger('click')
+    await secondSunday.trigger('click')
+
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
+    await saveButton.trigger('click')
+    await Promise.resolve()
+
+    expect(mockUpdateTeam).toHaveBeenCalledWith('t-2', { recurrence: { ordinals: [2, 4] } })
+  })
+
+  it('R254: clearing to none then Save persists an empty ordinals array', async () => {
+    const wrapper = mountPanel()
+    const chevron = wrapper.find('[aria-label="Edit recurring schedule for Choir"]')
+    await chevron.trigger('click')
+
+    const clearButton = wrapper.findAll('button').find((b) => b.text() === 'Clear selection')!
+    await clearButton.trigger('click')
+
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
+    await saveButton.trigger('click')
+    await Promise.resolve()
+
+    expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { recurrence: { ordinals: [] } })
   })
 })
