@@ -57,12 +57,12 @@ describe('RolesConfigPanel', () => {
     expect(wrapper.findAll('input, select, textarea').length).toBe(0)
   })
 
-  it('renders a labeled column header row (Role, Group, Default, Multi-role)', () => {
+  it('renders a labeled column header row (Role, Group, Positions, Multi-role)', () => {
     const wrapper = mountPanel()
     const header = wrapper.get('[data-testid="roles-columns"]')
     expect(header.text()).toContain('Role')
     expect(header.text()).toContain('Group')
-    expect(header.text()).toContain('Default')
+    expect(header.text()).toContain('Positions')
     expect(header.text()).toContain('Multi-role')
   })
 
@@ -94,14 +94,16 @@ describe('RolesConfigPanel', () => {
     expect(wrapper.emitted('add')!.length).toBe(1)
   })
 
-  it('a role with multiRole:true shows the Multi-role marker and one without does not', () => {
+  it('shows "Yes" in the Multi-role column for a multi-role role and not for a non-multi-role one', () => {
     const wrapper = mountPanel()
+    // The Multi-role column data reads "Yes" when true (the "Multi-role" text lives only in the header).
     const vocalRow = wrapper.find('[aria-label="Edit Vocals role"]')
-    expect(vocalRow.text()).toContain('Multi-role')
+    expect(vocalRow.text()).toContain('Yes')
 
     const guitarRow = wrapper.find('[aria-label="Edit Guitar role"]')
-    // Guitar is not multi-role — its row must not carry the Multi-role marker pill.
+    // Guitar is not multi-role — its Multi-role cell shows the muted em dash, not "Yes".
     const guitarText = guitarRow.text()
-    expect(guitarText).not.toContain('Multi-role')
+    expect(guitarText).not.toContain('Yes')
+    expect(guitarText).toContain('—')
   })
 })
