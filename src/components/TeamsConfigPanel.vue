@@ -1,279 +1,65 @@
 <template>
   <div class="rounded-lg border border-gray-800 overflow-hidden">
-    <div class="px-4 py-3 bg-gray-900/50 border-b border-gray-800">
-      <h2 class="text-sm font-medium text-gray-300">Teams</h2>
-      <p class="text-xs text-gray-500 mt-0.5">
-        Teams your church uses for service planning.
-      </p>
+    <div class="px-4 py-3 bg-gray-900/50 border-b border-gray-800 flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-medium text-gray-300">Teams</h2>
+        <p class="text-xs text-gray-500 mt-0.5">
+          Teams your church uses for service planning.
+        </p>
+      </div>
+      <button
+        type="button"
+        @click="emit('add')"
+        class="shrink-0 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+      >
+        + Add team
+      </button>
     </div>
 
     <div class="divide-y divide-gray-800">
       <div class="px-4 py-4">
-        <div class="space-y-2">
-          <div v-for="row in rows" :key="row.team.id">
-            <template v-if="row.draft">
-              <div class="flex items-center gap-3">
-                <input
-                  v-model="row.draft.name"
-                  type="text"
-                  :aria-label="`Team name for ${row.team.name}`"
-                  class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-                <button
-                  type="button"
-                  @click="onSaveTeam(row.team.id)"
-                  :disabled="savingTeamId === row.team.id"
-                  class="text-xs px-3 py-1.5 rounded-md font-medium text-white transition-colors disabled:opacity-80"
-                  :class="savedTeamId === row.team.id ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-500'"
-                >{{ savingTeamId === row.team.id ? 'Saving…' : savedTeamId === row.team.id ? 'Saved ✓' : 'Save Team' }}</button>
-                <button
-                  type="button"
-                  @click="confirmDeleteId = row.team.id"
-                  :aria-label="`Delete ${row.team.name} team`"
-                  class="text-xs px-3 py-1.5 rounded-md font-medium bg-red-900/20 hover:bg-red-900/40 text-red-400 transition-colors"
-                >Delete</button>
-                <button
-                  type="button"
-                  @click="slideoverTeam = row.team"
-                  :aria-label="`Edit recurring schedule for ${row.team.name}`"
-                  class="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-
-              <div v-if="confirmRenameId === row.team.id" class="mt-2 rounded-md bg-amber-900/20 border border-amber-800 p-3">
-                <p class="text-sm text-amber-300">
-                  Rename the '{{ row.team.name }}' team to '{{ row.draft.name.trim() }}'? Any service that already
-                  selected '{{ row.team.name }}' will no longer show it as checked. This cannot be undone.
-                </p>
-                <div class="flex items-center gap-3 mt-2">
-                  <button
-                    type="button"
-                    @click="onSaveTeam(row.team.id)"
-                    class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-amber-700 hover:bg-amber-600 transition-colors"
-                  >Rename Team</button>
-                  <button
-                    type="button"
-                    @click="confirmRenameId = null"
-                    class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-                  >Cancel</button>
-                </div>
-              </div>
-
-              <div v-if="confirmDeleteId === row.team.id" class="mt-2 rounded-md bg-red-900/20 border border-red-800 p-3">
-                <p class="text-sm text-red-300">
-                  Delete the '{{ row.team.name }}' team? It will no longer appear as a choice for new or edited services, but any service that already selected it keeps that reference. This cannot be undone.
-                </p>
-                <div class="flex items-center gap-3 mt-2">
-                  <button
-                    type="button"
-                    @click="onConfirmDelete(row.team.id)"
-                    class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
-                  >Delete Team</button>
-                  <button
-                    type="button"
-                    @click="confirmDeleteId = null"
-                    class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-                  >Cancel</button>
-                </div>
-              </div>
-            </template>
-          </div>
-          <div v-if="teamsStore.teams.length === 0" class="text-xs text-gray-600">
-            <p>No teams yet.</p>
-            <p>Add your first team below.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Add Team row -->
-      <div class="px-4 py-4">
-        <h3 class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Add Team</h3>
-        <div class="flex items-center gap-3">
-          <input
-            v-model="newTeamName"
-            type="text"
-            placeholder="Team name"
-            aria-label="New team name"
-            class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-          />
+        <div class="space-y-1">
           <button
+            v-for="team in teamsStore.teams"
+            :key="team.id"
             type="button"
-            :disabled="adding || !newTeamName.trim()"
-            @click="onAddTeam"
-            class="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            :class="teamAdded ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-500'"
-          >{{ adding ? 'Saving…' : teamAdded ? 'Added ✓' : 'Save Team' }}</button>
+            :aria-label="`Edit ${team.name} team`"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-gray-800/50 transition-colors"
+            @click="emit('edit', team)"
+          >
+            <span class="flex-1 text-sm font-medium text-gray-100">{{ team.name }}</span>
+            <span class="text-xs text-gray-500">{{ formatRecurrence(team.recurrence?.ordinals) }}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          <div v-if="teamsStore.teams.length === 0" class="text-xs text-gray-600 px-3">
+            <p>No teams yet.</p>
+            <p>Add your first team above.</p>
+          </div>
         </div>
       </div>
     </div>
-
-    <TeamRecurrenceSlideOver
-      :open="!!slideoverTeam"
-      :team="slideoverTeam"
-      @close="slideoverTeam = null"
-      @saved="slideoverTeam = null"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
 import { useTeamsStore } from '@/stores/teams'
-import { useToasts } from '@/stores/toasts'
-import TeamRecurrenceSlideOver from './TeamRecurrenceSlideOver.vue'
 import type { Team } from '@/types/team'
 
 const teamsStore = useTeamsStore()
-const toasts = useToasts()
 
-// ── Duplicate-name guard (WR-01) ─────────────────────────────────────────────
-// Teams are consumed by NAME everywhere a service selects them (the service
-// checkboxes), unlike Roles which key off role.id — so two teams sharing a
-// name break checkbox independence. Compare trimmed + case-insensitive,
-// excluding the row being edited (so saving a row without changing its name
-// never collides with itself).
-function isDuplicateName(name: string, excludeId?: string): boolean {
-  const normalized = name.trim().toLowerCase()
-  return teamsStore.teams.some((t) => t.id !== excludeId && t.name.trim().toLowerCase() === normalized)
+const emit = defineEmits<{ edit: [team: Team]; add: [] }>()
+
+const ORDINAL_LABELS: Record<number, string> = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: '5th' }
+
+// Formats a team's recurring-Sunday ordinals into a compact summary, e.g.
+// [1,3] -> '1st & 3rd Sun', [1,2,3] -> '1st, 2nd & 3rd Sun'. Absent/empty -> '—'.
+function formatRecurrence(ordinals?: number[]): string {
+  if (!ordinals || ordinals.length === 0) return '—'
+  const sorted = Array.from(new Set(ordinals)).sort((a, b) => a - b)
+  const labels = sorted.map((o) => ORDINAL_LABELS[o] ?? `${o}th`)
+  if (labels.length === 1) return `${labels[0]} Sun`
+  return `${labels.slice(0, -1).join(', ')} & ${labels[labels.length - 1]} Sun`
 }
-
-// ── Per-row edit drafts ──────────────────────────────────────────────────────
-// Local editable copies, committed to the store only on "Save Team" click —
-// keeps the Firestore-driven teams list from clobbering in-progress edits
-// (mirrors RolesConfigPanel.vue's roleDrafts pattern exactly).
-const teamDrafts = ref<Record<string, { name: string }>>({})
-
-watch(
-  () => teamsStore.teams,
-  (teams) => {
-    for (const team of teams) {
-      if (!teamDrafts.value[team.id]) {
-        teamDrafts.value[team.id] = { name: team.name }
-      }
-    }
-    for (const id of Object.keys(teamDrafts.value)) {
-      if (!teams.some((t) => t.id === id)) delete teamDrafts.value[id]
-    }
-  },
-  { immediate: true, deep: true },
-)
-
-interface TeamRow {
-  team: Team
-  draft: { name: string } | undefined
-}
-
-// Teams are a single flat list (no group badges, unlike Roles) — iterate
-// teamsStore.teams directly.
-const rows = computed<TeamRow[]>(() =>
-  teamsStore.teams.map((team) => ({ team, draft: teamDrafts.value[team.id] })),
-)
-
-// ── Save feedback (transient "Saving…" → "Saved ✓") ──────────────────────────
-const savingTeamId = ref<string | null>(null)
-const savedTeamId = ref<string | null>(null)
-let savedTimer: ReturnType<typeof setTimeout> | null = null
-
-// ── Rename soft-warn (WR-02) ─────────────────────────────────────────────────
-const confirmRenameId = ref<string | null>(null)
-
-// ── Recurring schedule slide-over (R254) ─────────────────────────────────────
-// Mounted once outside the row loop; the > chevron on each row sets the team
-// to edit. Closing or saving clears the selection (the store's onSnapshot
-// refreshes rows.team automatically, so no manual reconciliation is needed).
-const slideoverTeam = ref<Team | null>(null)
-
-async function onSaveTeam(teamId: string) {
-  const draft = teamDrafts.value[teamId]
-  if (!draft) return
-  const team = teamsStore.teams.find((t) => t.id === teamId)
-  if (!team) return
-  const trimmedName = draft.name.trim()
-
-  // WR-01: reject a save whose name collides with another existing team.
-  if (isDuplicateName(trimmedName, teamId)) {
-    toasts.push(`A team named "${trimmedName}" already exists. Choose a different name.`)
-    return
-  }
-
-  // WR-02: renaming orphans the name-keyed reference on every service that
-  // already selected the old name (same practical consequence as delete) —
-  // require a soft-warn confirm step before committing the rename.
-  const isRename = trimmedName !== team.name
-  if (isRename && confirmRenameId.value !== teamId) {
-    confirmRenameId.value = teamId
-    return
-  }
-  confirmRenameId.value = null
-
-  savingTeamId.value = teamId
-  try {
-    await teamsStore.updateTeam(teamId, {
-      name: trimmedName,
-    })
-    savedTeamId.value = teamId
-    if (savedTimer) clearTimeout(savedTimer)
-    savedTimer = setTimeout(() => {
-      if (savedTeamId.value === teamId) savedTeamId.value = null
-    }, 1800)
-  } finally {
-    savingTeamId.value = null
-  }
-}
-
-// ── Delete (inline soft-warn confirm, NOT a hard block) ─────────────────────
-const confirmDeleteId = ref<string | null>(null)
-
-async function onConfirmDelete(teamId: string) {
-  await teamsStore.deleteTeam(teamId)
-  confirmDeleteId.value = null
-}
-
-// ── Add team ─────────────────────────────────────────────────────────────────
-const newTeamName = ref('')
-const teamAdded = ref(false)
-// WR-04: in-flight guard mirroring onSaveTeam's savingTeamId — blocks a fast
-// double-click from calling addTeam twice with the same name/order before the
-// first request resolves.
-const adding = ref(false)
-let addedTimer: ReturnType<typeof setTimeout> | null = null
-
-async function onAddTeam() {
-  if (adding.value) return
-  const name = newTeamName.value.trim()
-  if (!name) return
-
-  // WR-01: reject a duplicate name before creating a second team that shares
-  // it (breaks checkbox independence downstream).
-  if (isDuplicateName(name)) {
-    toasts.push(`A team named "${name}" already exists. Choose a different name.`)
-    return
-  }
-
-  adding.value = true
-  try {
-    const maxOrder = teamsStore.teams.reduce((max, t) => Math.max(max, t.order), -1)
-    await teamsStore.addTeam({
-      name,
-      order: maxOrder + 1,
-    })
-    newTeamName.value = ''
-    teamAdded.value = true
-    if (addedTimer) clearTimeout(addedTimer)
-    addedTimer = setTimeout(() => {
-      teamAdded.value = false
-    }, 1800)
-  } finally {
-    adding.value = false
-  }
-}
-
-onUnmounted(() => {
-  if (savedTimer) clearTimeout(savedTimer)
-  if (addedTimer) clearTimeout(addedTimer)
-})
 </script>
