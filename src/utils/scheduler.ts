@@ -244,7 +244,35 @@ export function proposeQuarterSchedule(
         )
         const target = withCapacity ?? spaced[0]!
         assignToRole(target.roleId, partnerId)
+        // R260 — a pulled-in paired partner who is themselves a multi-role holder also bundles
+        // their own other multi-roles onto this date (RESEARCH Open Question 1: implement the
+        // consistent version). Composes cleanly since propagateMultiRole is independent per
+        // person (RESEARCH Pitfall 4).
+        if (isMultiRole(target.roleId)) propagateMultiRole(partnerId)
         propagatePairing(partnerId, visited) // handle chained pairings (e.g. two kids, one parent)
+      }
+    }
+
+    // R260 — same-date bundling of a person's OTHER multi-role assignments (RESEARCH B.2). A
+    // NON-recursive single sweep (Pitfall 2: no infinite propagation) over the person's whole
+    // role set for this date, triggered after every multi-role assignment (both here and inside
+    // propagatePairing above). Each pulled role is gated by its OWN withinCadence + slot
+    // capacity + isGroupCompatible via the shared assignToRole (never a parallel writer —
+    // Pitfall 1, dedupes and increments servedByRole exactly once). No rarity sort, no deficit
+    // scoring change — rarity-anchoring is emergent from withinCadence's even-spread gate (B.3).
+    const propagateMultiRole = (personId: string) => {
+      const person = people.find((p) => p.id === personId)
+      if (!person) return
+      for (const { roleId, count } of rolesForDate) {
+        if (!isMultiRole(roleId)) continue // only bundle multi-role roles
+        if (!person.roles.includes(roleId)) continue // must actually hold it
+        if (calendar[date]![roleId]?.includes(personId)) continue // already on it today
+        if (tierOf(personId, roleId) !== 'regular') continue // fill-in/out never auto
+        if (!withinCadence(personId, roleId, dateIndex)) continue // consume, never exceed cadence
+        if ((calendar[date]![roleId]?.length ?? 0) >= count) continue // no slot capacity -> yield
+        // Group-compat is always true for a multi-role role, but call it for uniformity/safety.
+        if (!isGroupCompatible(rolesHeldThisDate(personId), roleId, roleGroupOf, isMultiRole)) continue
+        assignToRole(roleId, personId)
       }
     }
 
@@ -299,6 +327,9 @@ export function proposeQuarterSchedule(
         const chosen = scored[0]!.p
         assignToRole(roleId, chosen.id)
         propagatePairing(chosen.id, new Set([chosen.id]))
+        // R260 — fire after propagatePairing so a pulled partner is already present; order does
+        // not affect the final bundled set (commutative, RESEARCH B.4).
+        if (isMultiRole(roleId)) propagateMultiRole(chosen.id)
       }
     }
   })
