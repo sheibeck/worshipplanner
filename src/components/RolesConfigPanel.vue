@@ -1,11 +1,20 @@
 <template>
   <div class="rounded-lg border border-gray-800 overflow-hidden">
-    <div class="px-4 py-3 bg-gray-900/50 border-b border-gray-800">
-      <h2 class="text-sm font-medium text-gray-300">Roles</h2>
-      <p class="text-xs text-gray-500 mt-0.5">
-        Schedulable roles grouped by Band, Tech, and Other. Default count is the number of volunteers the
-        scheduler auto-fills for this role each service.
-      </p>
+    <div class="px-4 py-3 bg-gray-900/50 border-b border-gray-800 flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-medium text-gray-300">Roles</h2>
+        <p class="text-xs text-gray-500 mt-0.5">
+          Schedulable roles grouped by Band, Tech, and Other. Default count is the number of volunteers the
+          scheduler auto-fills for this role each service.
+        </p>
+      </div>
+      <button
+        type="button"
+        @click="emit('add')"
+        class="shrink-0 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+      >
+        + Add role
+      </button>
     </div>
 
     <div class="divide-y divide-gray-800">
@@ -19,113 +28,34 @@
           </span>
         </div>
 
-        <div class="space-y-2">
-          <div v-for="row in rowsForGroup(group)" :key="row.role.id">
-            <template v-if="row.draft">
-              <div class="flex items-center gap-3">
-                <input
-                  v-model="row.draft.name"
-                  type="text"
-                  class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-                <select
-                  v-model="row.draft.group"
-                  class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="band">Band</option>
-                  <option value="tech">Tech</option>
-                  <option value="other">Other</option>
-                </select>
-                <input
-                  v-model.number="row.draft.defaultCount"
-                  type="number"
-                  min="1"
-                  class="w-20 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-                <label v-if="row.draft.group === 'band'" class="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
-                  <input
-                    v-model="row.draft.vocal"
-                    type="checkbox"
-                    class="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  Vocal role (can sing &amp; play)
-                </label>
-                <button
-                  type="button"
-                  @click="onSaveRole(row.role.id)"
-                  :disabled="savingRoleId === row.role.id"
-                  class="text-xs px-3 py-1.5 rounded-md font-medium text-white transition-colors disabled:opacity-80"
-                  :class="savedRoleId === row.role.id ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-500'"
-                >{{ savingRoleId === row.role.id ? 'Saving…' : savedRoleId === row.role.id ? 'Saved ✓' : 'Save Role' }}</button>
-                <button
-                  type="button"
-                  @click="confirmDeleteId = row.role.id"
-                  class="text-xs px-3 py-1.5 rounded-md font-medium bg-red-900/20 hover:bg-red-900/40 text-red-400 transition-colors"
-                >Delete</button>
-              </div>
-
-              <div v-if="confirmDeleteId === row.role.id" class="mt-2 rounded-md bg-red-900/20 border border-red-800 p-3">
-                <p class="text-sm text-red-300">
-                  Delete the '{{ row.role.name }}' role? Existing assignments to this role across all quarters will be cleared. This cannot be undone.
-                </p>
-                <div class="flex items-center gap-3 mt-2">
-                  <button
-                    type="button"
-                    @click="onConfirmDelete(row.role.id)"
-                    class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
-                  >Delete Role</button>
-                  <button
-                    type="button"
-                    @click="confirmDeleteId = null"
-                    class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-                  >Cancel</button>
-                </div>
-              </div>
-            </template>
-          </div>
-          <div v-if="groupedRoles[group].length === 0" class="text-xs text-gray-600">No roles in this group yet.</div>
-        </div>
-      </div>
-
-      <!-- Add Role row -->
-      <div class="px-4 py-4" data-testid="add-role">
-        <h3 class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Add Role</h3>
-        <div class="flex items-center gap-3">
-          <input
-            v-model="newRoleName"
-            type="text"
-            placeholder="Role name"
-            class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-          <select
-            v-model="newRoleGroup"
-            class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="band">Band</option>
-            <option value="tech">Tech</option>
-            <option value="other">Other</option>
-          </select>
-          <input
-            v-model.number="newRoleCount"
-            type="number"
-            min="1"
-            class="w-20 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-          <label v-if="newRoleGroup === 'band'" class="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
-            <input
-              v-model="newRoleVocal"
-              type="checkbox"
-              class="rounded bg-gray-800 border-gray-700 text-indigo-600 focus:ring-indigo-500"
-            />
-            Vocal role (can sing &amp; play)
-          </label>
+        <div class="space-y-1">
           <button
+            v-for="role in groupedRoles[group]"
+            :key="role.id"
             type="button"
-            :disabled="!newRoleName.trim() && !roleAdded"
-            @click="onAddRole"
-            class="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            :class="roleAdded ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-500'"
-          >{{ roleAdded ? 'Added ✓' : 'Save Role' }}</button>
+            :aria-label="`Edit ${role.name} role`"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-gray-800/50 transition-colors"
+            @click="emit('edit', role)"
+          >
+            <span class="flex-1 text-sm font-medium text-gray-100">{{ role.name }}</span>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border"
+              :class="groupBadgeClasses[role.group]"
+            >
+              {{ groupLabels[role.group] }}
+            </span>
+            <span class="text-xs text-gray-500">Default {{ role.defaultCount }}</span>
+            <span
+              v-if="role.vocal"
+              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-indigo-900/40 text-indigo-300 border-indigo-800"
+            >
+              Vocal
+            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+          <div v-if="groupedRoles[group].length === 0" class="text-xs text-gray-600 px-3">No roles in this group yet.</div>
         </div>
       </div>
     </div>
@@ -133,11 +63,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import { useRosterStore } from '@/stores/roster'
 import type { Role, RoleGroup } from '@/types/roster'
 
 const rosterStore = useRosterStore()
+
+const emit = defineEmits<{ edit: [role: Role]; add: [] }>()
 
 const groupOrder: RoleGroup[] = ['band', 'tech', 'other']
 const groupLabels: Record<RoleGroup, string> = { band: 'Band', tech: 'Tech', other: 'Other' }
@@ -155,121 +87,4 @@ const groupedRoles = computed(() => ({
   tech: rosterStore.roles.filter((r) => r.group === 'tech'),
   other: rosterStore.roles.filter((r) => r.group === 'other'),
 }))
-
-// ── Per-row edit drafts ──────────────────────────────────────────────────────
-// Local editable copies, committed to the store only on "Save Role" click —
-// keeps the Firestore-driven roles list from clobbering in-progress edits.
-// Includes group/vocal (WR-01, 85-REVIEW.md) so a mis-checked "sing & play" box
-// or wrong group no longer requires destructive delete+re-add to correct.
-interface RoleDraft {
-  name: string
-  defaultCount: number
-  group: RoleGroup
-  vocal: boolean
-}
-const roleDrafts = ref<Record<string, RoleDraft>>({})
-
-watch(
-  () => rosterStore.roles,
-  (roles) => {
-    for (const role of roles) {
-      if (!roleDrafts.value[role.id]) {
-        roleDrafts.value[role.id] = {
-          name: role.name,
-          defaultCount: role.defaultCount,
-          group: role.group,
-          vocal: role.vocal ?? false,
-        }
-      }
-    }
-    for (const id of Object.keys(roleDrafts.value)) {
-      if (!roles.some((r) => r.id === id)) delete roleDrafts.value[id]
-    }
-  },
-  { immediate: true, deep: true },
-)
-
-interface RoleRow {
-  role: Role
-  draft: RoleDraft | undefined
-}
-
-function rowsForGroup(group: RoleGroup): RoleRow[] {
-  return groupedRoles.value[group].map((role) => ({ role, draft: roleDrafts.value[role.id] }))
-}
-
-// ── Save feedback (transient "Saving…" → "Saved ✓") ──────────────────────────
-const savingRoleId = ref<string | null>(null)
-const savedRoleId = ref<string | null>(null)
-let savedTimer: ReturnType<typeof setTimeout> | null = null
-
-async function onSaveRole(roleId: string) {
-  const draft = roleDrafts.value[roleId]
-  if (!draft) return
-  savingRoleId.value = roleId
-  try {
-    await rosterStore.updateRole(roleId, {
-      name: draft.name.trim(),
-      defaultCount: draft.defaultCount,
-      group: draft.group,
-      vocal: draft.group === 'band' ? draft.vocal : false,
-    })
-    savedRoleId.value = roleId
-    if (savedTimer) clearTimeout(savedTimer)
-    savedTimer = setTimeout(() => {
-      if (savedRoleId.value === roleId) savedRoleId.value = null
-    }, 1800)
-  } finally {
-    savingRoleId.value = null
-  }
-}
-
-// ── Delete ───────────────────────────────────────────────────────────────────
-const confirmDeleteId = ref<string | null>(null)
-
-async function onConfirmDelete(roleId: string) {
-  await rosterStore.deleteRole(roleId)
-  confirmDeleteId.value = null
-}
-
-// ── Add role ─────────────────────────────────────────────────────────────────
-const newRoleName = ref('')
-const newRoleGroup = ref<RoleGroup>('band')
-const newRoleCount = ref(1)
-const newRoleVocal = ref(false)
-const roleAdded = ref(false)
-let addedTimer: ReturnType<typeof setTimeout> | null = null
-
-// Reset the vocal checkbox whenever the group changes away from 'band' — it's only
-// meaningful (and only shown) for a Band role.
-watch(newRoleGroup, (group) => {
-  if (group !== 'band') newRoleVocal.value = false
-})
-
-async function onAddRole() {
-  const name = newRoleName.value.trim()
-  if (!name) return
-  const maxOrder = rosterStore.roles.reduce((max, r) => Math.max(max, r.order), -1)
-  await rosterStore.addRole({
-    name,
-    group: newRoleGroup.value,
-    defaultCount: newRoleCount.value || 1,
-    order: maxOrder + 1,
-    ...(newRoleVocal.value ? { vocal: true } : {}),
-  })
-  newRoleName.value = ''
-  newRoleGroup.value = 'band'
-  newRoleCount.value = 1
-  newRoleVocal.value = false
-  roleAdded.value = true
-  if (addedTimer) clearTimeout(addedTimer)
-  addedTimer = setTimeout(() => {
-    roleAdded.value = false
-  }, 1800)
-}
-
-onUnmounted(() => {
-  if (savedTimer) clearTimeout(savedTimer)
-  if (addedTimer) clearTimeout(addedTimer)
-})
 </script>
