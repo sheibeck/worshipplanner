@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SongSlideOver from '../SongSlideOver.vue'
+import { MAJOR_KEYS } from '@/constants/keys'
 import type { Song } from '@/types/song'
 
 // Mirrors SongTable.test.ts's pattern: mock the store modules directly rather
@@ -253,6 +254,35 @@ describe('SongSlideOver — key (R249)', () => {
     expect(arrangements.length).toBe(1)
     expect(arrangements[0]!.key).toBe('A')
     expect(data.primaryArrangementId).toBe(arrangements[0]!.id)
+  })
+
+  // R258: the Key input gains a native datalist typeahead sourced from the
+  // shared MAJOR_KEYS constant — it suggests but does not restrict entry.
+  it('renders a datalist of the 14 major keys for the Key input', async () => {
+    const song = makeSong({ arrangements: [makeArrangement({ id: 'a1', key: 'G' })], primaryArrangementId: null })
+    const wrapper = await mountDrawer(song)
+
+    const keyInput = wrapper.find('[data-testid="song-key-input"]')
+    expect(keyInput.attributes('list')).toBe('ss-key-options')
+
+    const datalist = wrapper.find('datalist#ss-key-options')
+    expect(datalist.exists()).toBe(true)
+    const optionValues = datalist.findAll('option').map((o) => o.attributes('value'))
+    expect(optionValues).toEqual(MAJOR_KEYS as unknown as string[])
+  })
+
+  it('accepts and persists a free-typed key not present in MAJOR_KEYS', async () => {
+    const song = makeSong({ arrangements: [makeArrangement({ id: 'a1', key: 'G' })], primaryArrangementId: null })
+    const wrapper = await mountDrawer(song)
+
+    const keyInput = wrapper.find('[data-testid="song-key-input"]')
+    await keyInput.setValue('Am')
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
+    await saveButton.trigger('click')
+
+    expect(mockUpdateSong).toHaveBeenCalledTimes(1)
+    const [, data] = mockUpdateSong.mock.calls[0]!
+    expect((data.arrangements as { key: string }[])[0]!.key).toBe('Am')
   })
 })
 
