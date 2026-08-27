@@ -166,6 +166,11 @@ function onClear() {
 }
 
 async function onSave() {
+  // IN-1: explicit re-entrancy guard, matching the sibling `onAddTeam`
+  // pattern (TeamsConfigPanel.vue) — the `:disabled="isSaving"` binding
+  // alone doesn't cover a fast double-click firing before the DOM
+  // re-renders the disabled attribute.
+  if (isSaving.value) return
   if (!props.team) return
   isSaving.value = true
   try {

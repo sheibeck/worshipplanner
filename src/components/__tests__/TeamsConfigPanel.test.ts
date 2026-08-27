@@ -300,4 +300,28 @@ describe('TeamsConfigPanel', () => {
     // Write-side dedupe: persists exactly [3], never [1, 3] or a stray duplicate.
     expect(mockUpdateTeam).toHaveBeenCalledWith('t-1', { recurrence: { ordinals: [3] } })
   })
+
+  it('IN-01: a second Save click while the first save is in flight does not call updateTeam twice', async () => {
+    let resolveSave: (() => void) | undefined
+    mockUpdateTeam.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = () => resolve()
+        }),
+    )
+    const wrapper = mountPanel()
+    const chevron = wrapper.find('[aria-label="Edit recurring schedule for Orchestra"]')
+    await chevron.trigger('click')
+
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save' || b.text() === 'Saving...')!
+
+    // Fire the click handler twice back-to-back before the first await resolves.
+    await saveButton.trigger('click')
+    await saveButton.trigger('click')
+
+    expect(mockUpdateTeam).toHaveBeenCalledTimes(1)
+
+    resolveSave?.()
+    await Promise.resolve()
+  })
 })
