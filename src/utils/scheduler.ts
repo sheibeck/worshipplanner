@@ -10,36 +10,44 @@ import type {
 } from '@/types/roster'
 
 /**
- * Pure group co-occurrence rule (D-10, derived purely from group + the vocal flag, NOT
- * configurable). Rewritten for R250/R251/R252 — Vocals folded into Band:
- * - Band and Tech are mutually exclusive: a person holding a 'band'-group role that date cannot
- *   also hold a 'tech'-group role that date, and vice versa.
+ * Pure group co-occurrence rule (D-10, derived purely from group + the multi-role flag, NOT
+ * configurable). Rewritten for R259 — the flag generalizes from vocals-only to any role in any
+ * group: filter the person's roleIds down to the NON-multi-role ones first, then apply the
+ * existing rule to just that remainder:
+ * - Band and Tech are mutually exclusive on the non-multi remainder: holding a non-multi
+ *   'band'-group role that date rules out a non-multi 'tech'-group role that date, and vice
+ *   versa.
  * - Other combines freely with either Band or Tech (relaxes the old TECH-exclusive-of-all rule).
- * - Cardinality: at most one Band-group role that is NOT vocal (the one-instrument cap) per
- *   person per date. Vocals is EXEMPT from that cap (sing and play, R252) — and vocals folds
- *   into Band for exclusivity purposes, so a vocalist cannot also run Tech that date. No new cap
- *   on Vocals itself or on Other — multiplicity elsewhere stays governed by per-role counts.
+ * - Cardinality: at most one non-multi Band-group role (the one-instrument cap) per person per
+ *   date.
+ * A multi-role role NEVER causes a conflict — it may co-occur with anything, crossing
+ * Band/Tech/Other (R259). This is a deliberate behavior change from the Phase-85 rule: a
+ * multi-role vocalist can now also run a Tech role the same date (filtered out of the
+ * remainder), where previously vocals folded into Band and blocked it.
  * Exported so QuarterGrid.vue (D-11) can reuse the exact same evaluation for its manual-grid
  * warning badge, since it cannot import scheduler.ts's internal closures.
  */
 export function evaluateGroupCombo(
   roleIds: string[],
   roleGroupOf: (roleId: string) => RoleGroup,
-  isVocal: (roleId: string) => boolean,
+  isMultiRole: (roleId: string) => boolean,
 ): { ok: boolean; reason?: string } {
-  const groups = roleIds.map((id) => roleGroupOf(id))
+  // Multi-role roles never cause a conflict and may cross Band/Tech/Other. Filter them out;
+  // apply the existing rule only to the non-multi remainder (R259).
+  const nonMulti = roleIds.filter((id) => !isMultiRole(id))
+  const groups = nonMulti.map((id) => roleGroupOf(id))
   const hasBand = groups.includes('band')
   const hasTech = groups.includes('tech')
   if (hasBand && hasTech) {
     return { ok: false, reason: 'Band and Tech are mutually exclusive on the same date' }
   }
-  const bandInstrumentCount = roleIds.filter(
-    (id, i) => groups[i] === 'band' && !isVocal(id),
-  ).length
+  // At most one non-multi Band role (the one-instrument cap). Multi-role band roles (e.g.
+  // vocals) are already excluded above, so they never count here.
+  const bandInstrumentCount = groups.filter((g) => g === 'band').length
   if (bandInstrumentCount > 1) {
     return {
       ok: false,
-      reason: 'at most 1 Band instrument role per person per date (Vocals is exempt)',
+      reason: 'at most 1 Band instrument role per person per date (multi-role exempt)',
     }
   }
   return { ok: true }
@@ -55,9 +63,10 @@ export function isGroupCompatible(
   assignedRoleIdsThisDate: string[],
   candidateRoleId: string,
   roleGroupOf: (roleId: string) => RoleGroup,
-  isVocal: (roleId: string) => boolean,
+  isMultiRole: (roleId: string) => boolean,
 ): boolean {
-  return evaluateGroupCombo([...assignedRoleIdsThisDate, candidateRoleId], roleGroupOf, isVocal).ok
+  return evaluateGroupCombo([...assignedRoleIdsThisDate, candidateRoleId], roleGroupOf, isMultiRole)
+    .ok
 }
 
 /**
@@ -88,10 +97,10 @@ export function proposeQuarterSchedule(
   // (safe default) so existing call-sites that omit this param keep compiling and behave as
   // "everything combines" (RESEARCH Pitfall 1).
   roleGroupOf: (roleId: string) => RoleGroup = () => 'other',
-  // Caller (quarters.ts) builds this from rosterStore.roles alongside roleGroupOf (buildIsVocal).
-  // Unknown roleIds default to false (safe/non-exempt default) so existing call-sites that omit
-  // this param keep compiling and behave as "nothing is vocal" (R252).
-  isVocal: (roleId: string) => boolean = () => false,
+  // Caller (quarters.ts) builds this from rosterStore.roles alongside roleGroupOf
+  // (buildIsMultiRole). Unknown roleIds default to false (safe/non-exempt default) so existing
+  // call-sites that omit this param keep compiling and behave as "nothing is multi-role" (R259).
+  isMultiRole: (roleId: string) => boolean = () => false,
 ): ProposeResult {
   const pqdById = new Map(personQuarterData.map((p) => [p.personId, p]))
   const isBlackedOut = (personId: string, date: string) =>
@@ -204,7 +213,7 @@ export function proposeQuarterSchedule(
         // role-selection path. It MUST apply the exact same shared group-compatibility check as
         // the main loop below, or a paired partner can silently be pulled into an illegal combo.
         const eligibleRoles = regularRoles.filter((r) =>
-          isGroupCompatible(rolesHeldThisDate(partnerId), r.roleId, roleGroupOf, isVocal),
+          isGroupCompatible(rolesHeldThisDate(partnerId), r.roleId, roleGroupOf, isMultiRole),
         )
         if (eligibleRoles.length === 0) {
           pairingConflicts.push({ date, personId, partnerId, reason: 'group rule violation for partner today' })
@@ -263,7 +272,7 @@ export function proposeQuarterSchedule(
             tierOf(p.id, roleId) === 'regular' &&
             withinCadence(p.id, roleId, dateIndex) &&
             // D-10/D-12 — same shared helper as propagatePairing above.
-            isGroupCompatible(rolesHeldThisDate(p.id), roleId, roleGroupOf, isVocal),
+            isGroupCompatible(rolesHeldThisDate(p.id), roleId, roleGroupOf, isMultiRole),
         )
 
         if (candidates.length === 0) {

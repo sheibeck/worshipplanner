@@ -6,9 +6,11 @@ export interface Role {
   id: string
   name: string // e.g. "guitar", "sound", "scripture reader"
   group: RoleGroup
-  /** true for a singing role — a Band role exempt from the one-instrument cap; distinguishes
-   *  vocals from an instrument without relying on the role name (R250/R252). */
-  vocal?: boolean
+  /** true when this role may co-occur with a person's other roles on the same date, crossing
+   *  Band/Tech/Other — excluded from the one-instrument cap and the Band<->Tech exclusivity
+   *  rule. Generalizes the Phase-85 vocals-only "sing & play" exemption to any role in any
+   *  group (R259). */
+  multiRole?: boolean
   defaultCount: number // per-role auto-fill target: volunteers the scheduler fills for this role each service (D-02)
   order: number // stable ascending order for the scheduler's inner role loop
 }
@@ -102,7 +104,7 @@ export interface UpsertPersonInput {
 export const DEFAULT_ROLES: Array<Omit<Role, 'id'>> = [
   { name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
   { name: 'drums', group: 'band', defaultCount: 1, order: 1 },
-  { name: 'vocals', group: 'band', vocal: true, defaultCount: 1, order: 2 },
+  { name: 'vocals', group: 'band', multiRole: true, defaultCount: 1, order: 2 },
   { name: 'bass', group: 'band', defaultCount: 1, order: 3 },
   { name: 'sound', group: 'tech', defaultCount: 1, order: 4 },
   { name: 'livestream', group: 'tech', defaultCount: 1, order: 5 },
