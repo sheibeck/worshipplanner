@@ -15,7 +15,7 @@
 - ✅ **v2.0 — Multi-Church Onboarding & Owner Console Tabs** — Phases 72-74 (shipped 2026-08-23; tabbed Configuration/Organizations shell, org onboarding (org + settings + seeded template + first admin), and the multi-org Storage auth-claim widening (backlog 999.5) — deployed to production 2026-08-23; owner acceptance, human UAT deferred)
 - ✅ **v2.1 — Organization Lifecycle & Super-Admin Access** — Phases 75-78 (shipped 2026-08-23; church deactivate/reactivate, deactivation-gated deletion with full cascade cleanup, pending-invite visibility, and a super-admin "enter any church" rules arm — deployed to production 2026-08-23; audit PASSED 16/16; owner acceptance, human UAT deferred)
 - ✅ **v2.2 — Configurability, Hardening & Cleanup** — Phases 79-83 (shipped 2026-08-25; per-org configurable teams replacing hard-coded Berean rules + dropped ordinal-Sunday auto-select (R228-R231, R241), security & data-integrity hardening — inviteLookup create gate, createdBy immutability, deleteService share revocation, song-clear slide cleanup, pending-render edit guard (R232-R236), polish/ops close-out — PC export coverage, Resend verified-domain runbook, Owner Console a11y, shared song-browse component (R237-R240), per-org AI enablement OFF-by-default (R242-R243), and Roles/Teams tab UX/copy (R244-R246); hosting deployed 2026-08-25, backend rules/functions owner-gated; audit PASSED 19/19. **The per-team song-tag filter (R230) was delivered then removed 2026-08-25 by owner decision.**)
-- 📋 **v2.3 — Scheduling Accuracy & Song/Team Refinements** — Phases 84-88 (Phases 84–87 code-complete + auto-verified, held open for owner UAT; Phase 88 — Editing-UX polish (Roles/Teams slideout + song Key typeahead, R257/R258) — added 2026-08-26 from UAT; last-used date correctness + one-time backfill (R247-R248), team conflict rules — Vocals folds into Band, one-team-per-date with the Vocals sing-and-play exception (R250-R252), pattern-based recurring team scheduling via a Volunteer → Teams `>` slideout with auto-select on matching dates (R254-R255), and song & rotation refinements — editable song Key, sermon-free Scripture rotation, corrected "soft planning target" copy (R249, R253, R256))
+- 📋 **v2.3 — Scheduling Accuracy & Song/Team Refinements** — Phases 84-89 (Phases 84–87 code-complete + auto-verified, held open for owner UAT; Phase 89 — Multi-Role Scheduling (R259/R260) — added 2026-08-27 from UAT; Phase 88 — Editing-UX polish (Roles/Teams slideout + song Key typeahead, R257/R258) — added 2026-08-26 from UAT; last-used date correctness + one-time backfill (R247-R248), team conflict rules — Vocals folds into Band, one-team-per-date with the Vocals sing-and-play exception (R250-R252), pattern-based recurring team scheduling via a Volunteer → Teams `>` slideout with auto-select on matching dates (R254-R255), and song & rotation refinements — editable song Key, sermon-free Scripture rotation, corrected "soft planning target" copy (R249, R253, R256))
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -364,6 +364,7 @@ one, it follows the same confirm-then-deploy discipline.
 - [x] **Phase 86: Recurring Team Scheduling** - Configure a team's recurring pattern (every Nth week / Nth Sunday) from a `>` slideout on the Volunteer → Teams tab, and auto-select that team on any service whose date matches (R254, R255) (completed 2026-08-26)
 - [x] **Phase 87: Song & Rotation Refinements** - Editable song Key, a Scripture rotation tab that lists only planned scripture (never the sermon passage), and corrected "soft planning target" schedulable-roles copy (R249, R253, R256) (completed 2026-08-26)
 - [ ] **Phase 88: Editing-UX Polish** - Volunteer → Roles and Teams tabs become read-only rows that open a right-side slideout on click (mirroring the Songs table + SongSlideOver), and the song Key becomes a searchable type-ahead dropdown of available keys (R257, R258) — added 2026-08-26 from v2.3 UAT
+- [ ] **Phase 89: Multi-Role Scheduling** - Generalize the vocals exemption into a per-role multi-role flag (any group; vocals default-on; cross-type co-occurrence) and weight the quarterly scheduler to bundle a person's multi-role assignments onto the same date, anchored on their rarest role (R259, R260) — added 2026-08-27 from v2.3 UAT
 
 ### Phase 84: Last-Used Date Correctness & Backfill
 
@@ -457,3 +458,19 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 **Deploy note**: Client-only (Vue components + Firestore-via-app; no rules/functions changes anticipated).
+
+### Phase 89: Multi-Role Scheduling (generalized combinable flag + same-date bundling)
+
+**Goal**: A church can mark any role "multi-role" (vocals default-on); a person can serve multiple multi-role roles on one date crossing Band/Tech/Other; and the quarterly scheduler actively weights a person's multi-role assignments onto the same date (anchored on their rarest role, cadence-respecting), so someone who leads worship + sings + plays bass is scheduled for all three together rather than on scattered days.
+**Depends on**: Phase 88 (the RoleSlideOver control that surfaces the flag; Phase 89 renames/generalizes it). Builds on the Phase-85 rule (`evaluateGroupCombo`) and the Phase-85 scheduler (`proposeQuarterSchedule`).
+**Requirements**: R259, R260
+**Success Criteria** (what must be TRUE):
+
+  1. A church can toggle a per-role **multi-role** flag on any role in any group from the role slideout; helper text explains it; vocals ships with it ON (replacing the Phase-85 vocals-specific exemption) (R259).
+  2. A person may hold multiple multi-role roles on the same date, **crossing Band/Tech/Other**; a non-multi-role role still can't be double-booked with another role that date, and the one-instrument-per-Band cap still applies to non-multi-role band roles (R259).
+  3. When a person holds several multi-role roles, the quarterly scheduler places them on the **same date(s)** — anchored on the person's rarest multi-role, with higher-cadence roles riding along there and filling their extra occurrences on other dates (R260).
+  4. The bundling is a strong preference bounded by coverage + per-role cadence: when it can't bundle, the role is filled solo rather than left empty, and no role exceeds its cadence cap (R260).
+
+**Plans**: TBD
+**UI hint**: yes
+**Deploy note**: Client + Firestore-via-app (roster type + scheduler). NOTE: the multi-role flag rename also touches the server-side messaging resolver (`functions/src/serviceRoles.ts`, which currently coerces the `vocal`/group model) — if so, that carries an owner-gated Cloud Functions deploy like Phase 85's.

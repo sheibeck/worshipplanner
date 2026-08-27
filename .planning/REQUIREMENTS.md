@@ -40,6 +40,11 @@ REQ-IDs continue the project's sequential `R###` numbering from the last shipped
 - [ ] **R257**: The Volunteer → Roles and Teams tabs present read-only rows that open a right-side slideout on click for editing (mirroring the Songs table + SongSlideOver pattern), with add/edit/delete performed in the slideout and a header "+ Add" for create mode — replacing the current always-inline-editable rows. — **Phase 88**
 - [ ] **R258**: A song's Key is chosen from a searchable type-ahead dropdown of available musical keys (rather than the free-text input from R249). — **Phase 88**
 
+### Multi-Role Scheduling (added 2026-08-27 from v2.3 UAT)
+
+- [ ] **R259**: Generalize the Phase-85 vocals "sing & play" exemption into a per-role **multi-role** flag settable on any role in any group (vocals ships with it ON by default; helper text explains it). A person may hold multiple multi-role roles on the same date **crossing Band/Tech/Other**; non-multi-role roles keep the normal one-role-per-date exclusivity (and the one-instrument-per-Band cap still applies to non-multi-role band roles). — **Phase 89**
+- [ ] **R260**: The quarterly scheduler **weights a person's multi-role assignments to fall on the same date** — anchored on the person's rarest multi-role, with higher-cadence roles riding along on those dates and filling their extra occurrences elsewhere — as a strong preference that still yields to coverage and per-role cadence caps (a role fills solo rather than being left empty when it can't bundle). — **Phase 89**
+
 ## Future Requirements
 
 Deferred; not in the v2.3 roadmap.
@@ -73,11 +78,13 @@ Deferred; not in the v2.3 roadmap.
 | R256 | Phase 87 | Complete |
 | R257 | Phase 88 | Pending |
 | R258 | Phase 88 | Pending |
+| R259 | Phase 89 | Pending |
+| R260 | Phase 89 | Pending |
 
 **Coverage:**
 
-- v2.3 requirements: 12 total
-- Mapped to phases: 12 (Phases 84–88)
+- v2.3 requirements: 14 total
+- Mapped to phases: 14 (Phases 84–89)
 - Unmapped: 0 ✓
 
 **Phase rollup:**
@@ -87,7 +94,8 @@ Deferred; not in the v2.3 roadmap.
 - Phase 86 — Recurring Team Scheduling: R254, R255
 - Phase 87 — Song & Rotation Refinements: R249, R253, R256
 - Phase 88 — Editing-UX Polish (Roles/Teams slideout + song Key typeahead): R257, R258
+- Phase 89 — Multi-Role Scheduling (generalized combinable flag + same-date bundling): R259, R260
 
 ---
 *Requirements defined: 2026-08-25*
-*Last updated: 2026-08-26 — added R257 (Roles/Teams slideout) + R258 (song Key typeahead) from v2.3 UAT, mapped to new Phase 88.*
+*Last updated: 2026-08-27 — added R259/R260 (multi-role flag + same-date bundling) from v2.3 UAT, mapped to new Phase 89; R257/R258 → Phase 88.*

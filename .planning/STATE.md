@@ -40,10 +40,14 @@ confirm with me before doing so."*
 > — see `.planning/v2.3-MILESTONE-AUDIT.md` for the pending owner actions (Phase 84 backfill `--apply`,
 > Phase 85 Functions deploy) and the four UAT spot-checks.
 >
-> **Phase 88 added 2026-08-26 from v2.3 UAT** (Editing-UX polish, R257/R258): the Volunteer → Roles and
-> Teams tabs become read-only rows opening a slideout (mirroring Songs), and the song Key becomes a
-> searchable type-ahead dropdown. This phase is now in the discuss→plan→execute flow. Milestone close
-> (`/gsd-complete-milestone v2.3`) waits on Phase 88 completing AND the owner's UAT/deploys above.
+> **Phases 88–89 added from v2.3 UAT.** **Phase 88** (2026-08-26, R257/R258): Roles/Teams tabs → read-only
+> rows opening a slideout (mirroring Songs) + song Key type-ahead dropdown. **Phase 89** (2026-08-27,
+> R259/R260, design settled with owner): generalize the vocals exemption into a per-role **multi-role**
+> flag (any group; vocals default-on; cross-type co-occurrence) and weight the quarterly scheduler to
+> **bundle a person's multi-role assignments onto the same date** (anchored on their rarest role) — the
+> scheduler-algorithm work; likely needs a RESEARCH pass. Both are in the discuss→plan→execute flow.
+> Milestone close (`/gsd-complete-milestone v2.3`) waits on 88 + 89 completing AND the owner's UAT/deploys
+> above — do NOT auto-close; the owner paused for UAT.
 
 (v2.2 ended at Phase 83); this milestone is **Phases 84–87**.
 
