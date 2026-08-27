@@ -62,10 +62,10 @@
           >
             <option value="">No key</option>
             <optgroup label="Major">
-              <option v-for="k in majorKeys" :key="k" :value="k">{{ k }}</option>
+              <option v-for="k in MAJOR_KEYS" :key="k" :value="k">{{ k }}</option>
             </optgroup>
             <optgroup label="Minor">
-              <option v-for="k in minorKeys" :key="k" :value="k">{{ k }}</option>
+              <option v-for="k in MINOR_KEYS" :key="k" :value="k">{{ k }}</option>
             </optgroup>
           </select>
         </div>
@@ -152,6 +152,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { Arrangement } from '@/types/song'
+import { MAJOR_KEYS, MINOR_KEYS } from '@/constants/keys'
 
 const props = defineProps<{
   arrangement: Arrangement
@@ -175,9 +176,6 @@ watch(
   },
   { deep: true },
 )
-
-const majorKeys = ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
-const minorKeys = ['Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'Abm', 'Am', 'Bbm', 'Bm']
 
 function formatLength(seconds: number | null): string {
   if (!seconds || seconds <= 0) return ''
