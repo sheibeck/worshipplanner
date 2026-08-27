@@ -16,6 +16,17 @@
       </button>
     </div>
 
+    <!-- Column headers -->
+    <div
+      v-if="teamsStore.teams.length > 0"
+      data-testid="teams-columns"
+      class="flex items-center gap-3 px-7 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-800 bg-gray-900/30"
+    >
+      <span class="flex-1">Name</span>
+      <span>Schedule</span>
+      <span class="w-4 shrink-0" aria-hidden="true"></span>
+    </div>
+
     <div class="divide-y divide-gray-800">
       <div class="px-4 py-4">
         <div class="space-y-1">

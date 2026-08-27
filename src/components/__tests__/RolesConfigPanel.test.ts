@@ -57,6 +57,15 @@ describe('RolesConfigPanel', () => {
     expect(wrapper.findAll('input, select, textarea').length).toBe(0)
   })
 
+  it('renders a labeled column header row (Role, Group, Default, Multi-role)', () => {
+    const wrapper = mountPanel()
+    const header = wrapper.get('[data-testid="roles-columns"]')
+    expect(header.text()).toContain('Role')
+    expect(header.text()).toContain('Group')
+    expect(header.text()).toContain('Default')
+    expect(header.text()).toContain('Multi-role')
+  })
+
   it('still groups roles under Band/Tech/Other headers', () => {
     const wrapper = mountPanel()
     const text = wrapper.text()

@@ -35,6 +35,13 @@ describe('TeamsConfigPanel', () => {
     expect(rows[1]!.text()).toContain('Orchestra')
   })
 
+  it('renders a labeled column header row (Name, Schedule)', () => {
+    const wrapper = mountPanel()
+    const header = wrapper.get('[data-testid="teams-columns"]')
+    expect(header.text()).toContain('Name')
+    expect(header.text()).toContain('Schedule')
+  })
+
   it('shows the recurrence summary "1st & 3rd Sun" for ordinals [1,3] and "—" for none', () => {
     const wrapper = mountPanel()
     const choirRow = wrapper.find('[aria-label="Edit Choir team"]')
