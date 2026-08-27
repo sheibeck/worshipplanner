@@ -403,17 +403,19 @@ one, it follows the same confirm-then-deploy discipline.
 
 ### Phase 86: Recurring Team Scheduling
 
-**Goal**: A planner configures a team's recurring schedule pattern (every Nth week, or the Nth Sunday of the month) from a `>` slideout on the Volunteer → Teams tab, and any service whose date matches a team's pattern auto-selects that team.
+**Goal**: A planner configures a team's recurring Nth-Sunday-of-the-month pattern (multi-select 1st–5th Sunday) from a `>` slideout on the Volunteer → Teams tab, and a newly created service whose date matches a team's pattern auto-pre-selects that team. (Scope locked in 86-CONTEXT.md: only Nth-Sunday-of-month; "every N weeks" dropped; auto-select at creation only, never retroactive.)
 **Depends on**: Nothing (independent feature; sequenced after Phase 85 because both edit the Volunteer → Teams / scheduling surface, so they do not land concurrently)
 **Requirements**: R254, R255
 **Success Criteria** (what must be TRUE):
 
-  1. From a `>` slideout on the Volunteer → Teams tab (matching the slideout pattern the Song table already uses), a planner can give a team a recurring pattern — every Nth week, or the Nth Sunday of the month (R254).
+  1. From a `>` slideout on the Volunteer → Teams tab (matching the slideout pattern the Song table already uses), a planner can give a team a recurring Nth-Sunday-of-the-month pattern, multi-selecting 1st–5th Sunday (R254).
   2. A team's saved recurring pattern is shown when its slideout is reopened (R254).
-  3. Creating or opening a service whose date matches a team's configured pattern auto-pre-selects that team on the service (R255).
+  3. Creating a service whose date matches a team's configured pattern auto-pre-selects that team on the service, overridably (R255).
   4. A service whose date matches no team's pattern has no team auto-selected by this feature — the planner still picks teams manually (R255).
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 86-01-PLAN.md — Recurrence model, UTC-stable matching helper (ordinalOfMonth/teamMatchesDate), and creation-only auto-select in NewServiceDialog (R254 storage + R255)
+- [ ] 86-02-PLAN.md — Per-row `>` chevron + Teleported recurrence slide-over on the Teams tab, persisting via teamsStore.updateTeam (R254)
 **UI hint**: yes
 **Deploy note**: Client + Firestore-via-app (new slideout config UI + pattern-match auto-select).
 
