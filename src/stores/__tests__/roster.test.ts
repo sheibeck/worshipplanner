@@ -72,7 +72,7 @@ function makeRole(overrides: Partial<{
   id: string
   name: string
   group: 'band' | 'tech' | 'other'
-  vocal: boolean
+  multiRole: boolean
   defaultCount: number
   order: number
 }> = {}) {
@@ -574,8 +574,8 @@ describe('useRosterStore', () => {
     })
   })
 
-  describe('read-time vocals compat shim (R250 — no write migration)', () => {
-    it('coerces a legacy role doc stored with group "vocals" to group "band" + vocal:true on read, and issues NO updateDoc write', async () => {
+  describe('read-time multi-role compat shim (R259 — no write migration)', () => {
+    it('coerces a legacy role doc stored with group "vocals" to group "band" + multiRole:true on read, and issues NO updateDoc write', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useRosterStore } = await import('../roster')
       const store = useRosterStore()
@@ -588,20 +588,62 @@ describe('useRosterStore', () => {
       ])
 
       expect(store.roles).toHaveLength(1)
-      expect(store.roles[0]).toMatchObject({ id: 'role-vocals', group: 'band', vocal: true })
+      expect(store.roles[0]).toMatchObject({ id: 'role-vocals', group: 'band', multiRole: true })
       // Read-time-only coercion — no Firestore write migration.
       expect(updateDoc).not.toHaveBeenCalled()
     })
 
-    it('leaves a non-vocals role doc unchanged on read', async () => {
+    it('a pre-Phase-85 legacy vocals-group doc with NEITHER multiRole NOR vocal field still surfaces as multiRole:true (vocals-group branch defaults to true)', async () => {
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      // No multiRole field, no vocal field at all — the oldest possible persisted shape.
+      triggerRolesSnapshot([
+        makeRole({ id: 'role-vocals', name: 'vocals', group: 'vocals' as unknown as 'band' }),
+      ])
+
+      expect(store.roles[0]).toMatchObject({ id: 'role-vocals', group: 'band', multiRole: true })
+    })
+
+    it('a doc persisted with the legacy vocal:true field (group already "band", from Phase-85/88) surfaces as multiRole:true', async () => {
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      // Legacy field name predates the R259 rename — build the raw doc shape directly (still on
+      // disk for any role saved before this phase) since makeRole's type only knows multiRole.
+      const legacyVocalFieldDoc = {
+        id: 'role-vocals',
+        name: 'vocals',
+        group: 'band',
+        defaultCount: 1,
+        order: 0,
+        vocal: true,
+      } as unknown as ReturnType<typeof makeRole>
+      triggerRolesSnapshot([legacyVocalFieldDoc])
+
+      expect(store.roles[0]).toMatchObject({ id: 'role-vocals', group: 'band', multiRole: true })
+    })
+
+    it('a non-vocals role doc with neither field defaults to multiRole:false (default branch has no ?? true)', async () => {
       const { useRosterStore } = await import('../roster')
       const store = useRosterStore()
       store.subscribe('org-1')
 
       triggerRolesSnapshot([makeRole({ id: 'role-guitar', name: 'guitar', group: 'band' })])
 
-      expect(store.roles[0]).toMatchObject({ id: 'role-guitar', group: 'band' })
-      expect(store.roles[0]!.vocal).toBeUndefined()
+      expect(store.roles[0]).toMatchObject({ id: 'role-guitar', group: 'band', multiRole: false })
+    })
+
+    it('a role doc already stored with multiRole:true stays multiRole:true (multiRole wins over vocal)', async () => {
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      triggerRolesSnapshot([makeRole({ id: 'role-bass', name: 'bass', group: 'band', multiRole: true })])
+
+      expect(store.roles[0]).toMatchObject({ id: 'role-bass', group: 'band', multiRole: true })
     })
   })
 })

@@ -264,12 +264,13 @@ export const useQuartersStore = defineStore('quarters', () => {
     return (roleId: string) => groupById.get(roleId) ?? 'other'
   }
 
-  // R252: projects Role[]→roleId→vocal lookup, paired with buildRoleGroupOf, so the scheduler's
-  // Vocals-is-exempt-from-the-instrument-cap rule is enforced in production. Unknown roleIds
-  // default to false (the safe, non-exempt default).
-  function buildIsVocal(roles: Role[]): (roleId: string) => boolean {
-    const vocalById = new Map(roles.map((r) => [r.id, r.vocal === true]))
-    return (roleId: string) => vocalById.get(roleId) ?? false
+  // R259: projects Role[]→roleId→multiRole lookup, paired with buildRoleGroupOf, so the
+  // scheduler's multi-role co-occurrence rule (a multi-role role never conflicts and may cross
+  // Band/Tech/Other) is enforced in production. Unknown roleIds default to false (the safe,
+  // non-exempt default).
+  function buildIsMultiRole(roles: Role[]): (roleId: string) => boolean {
+    const multiRoleById = new Map(roles.map((r) => [r.id, r.multiRole === true]))
+    return (roleId: string) => multiRoleById.get(roleId) ?? false
   }
 
   async function generateProposal(
@@ -288,7 +289,7 @@ export const useQuartersStore = defineStore('quarters', () => {
       personQuarterData,
       mode === 'fillGaps' ? quarter.calendar : undefined,
       buildRoleGroupOf(rosterStore.roles),
-      buildIsVocal(rosterStore.roles),
+      buildIsMultiRole(rosterStore.roles),
     )
 
     // Diff the previous calendar against the freshly proposed one so the UI can
@@ -507,7 +508,7 @@ export const useQuartersStore = defineStore('quarters', () => {
     setPersonAvailability,
     buildResolveRolesForDate,
     buildRoleGroupOf,
-    buildIsVocal,
+    buildIsMultiRole,
     generateProposal,
     assignPerson,
     clearAssignment,

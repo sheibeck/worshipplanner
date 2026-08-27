@@ -63,18 +63,38 @@ export const useRosterStore = defineStore('roster', () => {
       orderBy('order'),
     )
     unsubscribeRolesFn = onSnapshot(rolesQuery, (snap) => {
-      // Read-time compat shim (R250): the narrowed RoleGroup drops 'vocals' as a team
-      // identity, but existing per-org roles may still be stored with group 'vocals' from
-      // before this phase. Coerce those to { group: 'band', vocal: true } on read ONLY —
-      // no Firestore write migration (per CONTEXT: avoid a one-time data migration). This
-      // is the single read boundary, so every downstream consumer of rosterStore.roles
-      // always sees the narrowed union.
+      // Read-time compat shim — normalizes TWO legacy persisted shapes to the current
+      // `multiRole` flag on EVERY role, with NO Firestore write migration (per CONTEXT: avoid
+      // a one-time data migration; this is the single read boundary, so every downstream
+      // consumer of rosterStore.roles always sees the normalized flag):
+      //   1. Legacy group 'vocals' (R250, pre-Phase-85 docs) — the narrowed RoleGroup dropped
+      //      'vocals' as a team identity; existing docs may still carry it and are coerced to
+      //      group 'band' here.
+      //   2. Legacy field name `vocal` (Phase-85/88 docs persisted before the R259 rename) —
+      //      docs on disk still carry `vocal`, not `multiRole`, since there is no data
+      //      migration; every role (not just the vocals-group branch) must map it or a live
+      //      pre-Phase-89 role would silently lose its flag (RESEARCH Pitfall R1).
+      // Branch-specific defaulting (R259 — the plan-checker BLOCKER fix):
+      //   - vocals-group branch: (data.multiRole ?? data.vocal ?? true) === true — the `?? true`
+      //     preserves the pre-existing `vocal: data.vocal ?? true` default so a pre-Phase-85
+      //     legacy vocals doc with NEITHER field still surfaces as multiRole:true.
+      //   - default branch: (data.multiRole ?? data.vocal) === true — NO `?? true`; a
+      //     non-vocals role with neither field is multiRole:false.
       roles.value = snap.docs.map((d) => {
-        const data = d.data() as Role
+        const data = d.data() as Role & { vocal?: boolean }
         if ((data.group as string) === 'vocals') {
-          return { ...data, id: d.id, group: 'band', vocal: data.vocal ?? true } as Role
+          return {
+            ...data,
+            id: d.id,
+            group: 'band',
+            multiRole: (data.multiRole ?? data.vocal ?? true) === true,
+          } as Role
         }
-        return { ...data, id: d.id } as Role
+        return {
+          ...data,
+          id: d.id,
+          multiRole: (data.multiRole ?? data.vocal) === true,
+        } as Role
       })
     })
   }
