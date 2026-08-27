@@ -997,3 +997,20 @@ AskUserQuestion 2026-08-27). Five live-app spot-checks pending owner:
       free-typed value (e.g. "Am"), persisting to the primary/first arrangement.
 - [ ] **Read-only tables** — no inline editing remains in either Roles or Teams table (edits happen only in
       the slideout), matching the Songs table UX.
+
+---
+
+## v2.3 — Phase 89 Multi-Role Scheduling (PENDING owner UAT 2026-08-27)
+
+Phase 89 code-complete + auto-verified 8/8; review clean of blockers (WR-01 order-independence doc overclaim
+corrected — behavior unchanged). Client-only — NO deploy (functions/serviceRoles.ts never reads the flag).
+Owner "record as pending, keep going". Three live-app spot-checks pending owner:
+
+- [ ] **Mark a role multi-role** — in the Roles slideout, toggle Multi-role on some role in any group; confirm
+      the helper text reads clearly and it saves. Confirm vocals is multi-role by default.
+- [ ] **Same-date bundling** — set up a person with 2-3 multi-roles at differing cadence (e.g. bass 1×/mo,
+      vocals 2×/mo, worship-lead 2×/mo), run a quarter proposal, and confirm all their multi-roles land
+      TOGETHER on the rarer role's date(s) rather than scattered — yielding to coverage when it can't bundle.
+- [ ] **Cross-type co-occurrence** — confirm a vocalist can now also be scheduled onto a Tech role on the same
+      date with no conflict warning (multi-role crosses Band↔Tech), while a NON-multi-role Band+Tech pairing
+      still warns.

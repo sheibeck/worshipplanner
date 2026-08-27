@@ -364,7 +364,7 @@ one, it follows the same confirm-then-deploy discipline.
 - [x] **Phase 86: Recurring Team Scheduling** - Configure a team's recurring pattern (every Nth week / Nth Sunday) from a `>` slideout on the Volunteer → Teams tab, and auto-select that team on any service whose date matches (R254, R255) (completed 2026-08-26)
 - [x] **Phase 87: Song & Rotation Refinements** - Editable song Key, a Scripture rotation tab that lists only planned scripture (never the sermon passage), and corrected "soft planning target" schedulable-roles copy (R249, R253, R256) (completed 2026-08-26)
 - [x] **Phase 88: Editing-UX Polish** - Volunteer → Roles and Teams tabs become read-only rows that open a right-side slideout on click (mirroring the Songs table + SongSlideOver), and the song Key becomes a searchable type-ahead dropdown of available keys (R257, R258) — added 2026-08-26 from v2.3 UAT (completed 2026-08-27)
-- [ ] **Phase 89: Multi-Role Scheduling** - Generalize the vocals exemption into a per-role multi-role flag (any group; vocals default-on; cross-type co-occurrence) and weight the quarterly scheduler to bundle a person's multi-role assignments onto the same date, anchored on their rarest role (R259, R260) — added 2026-08-27 from v2.3 UAT
+- [x] **Phase 89: Multi-Role Scheduling** - Generalize the vocals exemption into a per-role multi-role flag (any group; vocals default-on; cross-type co-occurrence) and weight the quarterly scheduler to bundle a person's multi-role assignments onto the same date, anchored on their rarest role (R259, R260) — added 2026-08-27 from v2.3 UAT (completed 2026-08-27)
 
 ### Phase 84: Last-Used Date Correctness & Backfill
 
