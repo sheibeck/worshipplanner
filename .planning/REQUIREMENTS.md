@@ -38,7 +38,7 @@ REQ-IDs continue the project's sequential `R###` numbering from the last shipped
 ### Editing-UX Polish (added 2026-08-26 from v2.3 UAT)
 
 - [ ] **R257**: The Volunteer → Roles and Teams tabs present read-only rows that open a right-side slideout on click for editing (mirroring the Songs table + SongSlideOver pattern), with add/edit/delete performed in the slideout and a header "+ Add" for create mode — replacing the current always-inline-editable rows. — **Phase 88**
-- [ ] **R258**: A song's Key is chosen from a searchable type-ahead dropdown of available musical keys (rather than the free-text input from R249). — **Phase 88**
+- [x] **R258**: A song's Key is chosen from a searchable type-ahead dropdown of available musical keys (rather than the free-text input from R249). — **Phase 88**
 
 ### Multi-Role Scheduling (added 2026-08-27 from v2.3 UAT)
 
@@ -77,7 +77,7 @@ Deferred; not in the v2.3 roadmap.
 | R255 | Phase 86 | Complete |
 | R256 | Phase 87 | Complete |
 | R257 | Phase 88 | Pending |
-| R258 | Phase 88 | Pending |
+| R258 | Phase 88 | Complete |
 | R259 | Phase 89 | Pending |
 | R260 | Phase 89 | Pending |
 

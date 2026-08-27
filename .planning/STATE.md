@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
-current_phase: 87
-status: completed
-stopped_at: Completed 87-01-PLAN.md
-last_updated: "2026-08-27T03:20:55.211Z"
-last_activity: 2026-08-26
-last_activity_desc: Phase 87 complete
+current_phase: 88
+current_phase_name: Editing-UX Polish (Roles/Teams slideout + song Key typeahead
+status: executing
+stopped_at: Completed 88-01-PLAN.md
+last_updated: "2026-08-27T04:48:05.392Z"
+last_activity: 2026-08-27
+last_activity_desc: Phase 88 execution started
 progress:
-  total_phases: 4
+  total_phases: 6
   completed_phases: 4
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
-current_phase_name: Song & Rotation Refinements
+  total_plans: 9
+  completed_plans: 7
+  percent: 67
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** Phases 84–87 code-complete + auto-verified (held for owner UAT) · **Phase 88 ACTIVE** (added from UAT)
+**Status:** Ready to execute
 
 > ⚠ **Milestone NOT closed.** Phases 84–87 are code-complete, auto-verified, and code-reviewed; the
 > integration audit passed (10/10 reqs WIRED). Their human UAT is PENDING owner verification (not accepted)
@@ -933,7 +933,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 87 — Song & Rotation Refinements
+**Current focus:** Phase 88 — Editing-UX Polish (Roles/Teams slideout + song Key typeahead)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -943,10 +943,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 87
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-08-26 — Phase 87 complete
+Phase: 88 (Editing-UX Polish (Roles/Teams slideout + song Key typeahead)) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-08-27 — Phase 88 execution started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -2626,6 +2626,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 86 P01 | 17min | 3 tasks | 5 files |
 | Phase 86 P02 | 11min | 3 tasks | 3 files |
 | Phase 87 P01 | 25min | 3 tasks | 5 files |
+| Phase 88 P01 | 12min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3054,6 +3055,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: TeamRecurrenceSlideOver.vue mirrors SongSlideOver's Teleport/scrim/translate-x-full shell for a per-team Nth-Sunday-of-month recurrence editor, with a local editable ordinals copy seeded from team.recurrence on open (R254 round-trip)
 - [Phase ?]: R249: resolved the target arrangement identically to onSave's existing primaryArrangementId ?? arrangements[0] fallback, so onSave needed no changes.
 - [Phase ?]: R256: verify-first per plan — grep found no straggler .vue surface with the deprecated soft-target phrasing, so RolesConfigPanel.vue was left unchanged; only the test was strengthened.
+- [Phase ?]: 88-01: extracted MAJOR_KEYS/MINOR_KEYS into src/constants/keys.ts (byte-identical, shared by ArrangementAccordion + new SongSlideOver Key datalist)
+- [Phase ?]: 88-01: SongSlideOver Key field converted to native input+datalist typeahead over MAJOR_KEYS; free-typed keys still accepted and persist via the unchanged R249 onSave path
 
 ### Roadmap Evolution
 
@@ -3379,8 +3382,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-27T03:07:12.352Z
-Stopped at: Completed 87-01-PLAN.md
+Last session: 2026-08-27T04:48:05.335Z
+Stopped at: Completed 88-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
