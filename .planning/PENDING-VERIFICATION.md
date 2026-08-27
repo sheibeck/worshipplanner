@@ -953,3 +953,17 @@ baseline; scheduler 33/33; functions 594/594 incl. 4 CR-01 regression tests). Tw
       auto-scheduler + QuarterGrid honor the new rule: a Tech volunteer isn't also placed in Band on the
       same date; a vocalist can sing AND play one instrument; "Other" combines freely; the manual grid
       shows a warn badge (not a hard block) on a conflict. Rule logic is fully proven by automated tests.
+
+---
+
+## v2.3 — Phase 86 Recurring Team Scheduling (deferred 2026-08-26)
+
+Phase 86 is code-complete and auto-verified 8/8 (type-check clean; scoped tests 56/56; app suite at the
+2-file baseline). Client-only — NO deploy hand-over. Two owner-only spot-checks deferred (NOT code gaps):
+
+- [ ] **Live-app round-trip (owner).** In the running app: open Volunteer → Teams, click a team's `>`
+      chevron, set an Nth-Sunday pattern (e.g. 1st & 3rd), Save; reopen to confirm it round-trips. Then
+      create a New Service dated on a matching Sunday and confirm that team is pre-checked (and that
+      unchecking it sticks across a date change). Automated coverage mocks the teams store.
+- [ ] **Slideout visual parity (owner).** Confirm the TeamRecurrenceSlideOver looks/behaves like the
+      Song table's slide-over (the `>` pattern the owner referenced).
