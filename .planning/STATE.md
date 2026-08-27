@@ -4,16 +4,16 @@ milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
 current_phase: 86
 current_phase_name: Recurring Team Scheduling
-status: planning
-stopped_at: Completed 85-01-PLAN.md
-last_updated: "2026-08-26T21:22:07.769Z"
+status: executing
+stopped_at: Completed 86-01-PLAN.md
+last_updated: "2026-08-27T01:34:44.045Z"
 last_activity: 2026-08-26
-last_activity_desc: Phase 85 complete, transitioned to Phase 86
+last_activity_desc: Phase 86 execution started
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
   percent: 50
 ---
 
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 (79–83, ended at Phase 83); this milestone is **Phases 84–87**.
 
 **Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — last-used
@@ -918,7 +918,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 85 — Team Conflicts — Vocals into Band & One-Team-Per-Date
+**Current focus:** Phase 86 — Recurring Team Scheduling
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -928,10 +928,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 86 — Recurring Team Scheduling
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-08-26 — Phase 85 complete, transitioned to Phase 86
+Phase: 86 (Recurring Team Scheduling) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-08-26 — Phase 86 execution started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -2608,6 +2608,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 84 P01 | 42min | 2 tasks | 4 files |
 | Phase 84 P02 | 12min | 2 tasks | 3 files |
 | Phase 85 P01 | 30min | 3 tasks | 20 files |
+| Phase 86 P01 | 17min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -3032,6 +3033,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R247 fix: lastUsedAt = MAX(service.date) over LOCKED (non-draft) services containing the song, derived by a canonical framework-free src/utils/lastUsed.ts mirrored (not imported) by the 84-02 backfill
 - [Phase ?]: 84-02: mirrored computeLastUsedDate/serviceDateToMillis byte-identical (incl. quote/semicolon style) from src/utils/lastUsed.ts into functions/src/backfillLastUsed.ts, verified via scripted diff
 - [Phase ?]: Vocals folds into Band for exclusivity but is exempt from the one-instrument cap; Other now combines freely with Band or Tech (relaxed rule); legacy group:'vocals' data coerced at read time only, no Firestore write migration
+- [Phase ?]: Two tracking sets (autoAddedTeams + manuallyTouchedTeams) needed for NewServiceDialog recurring auto-select, not the plan's literal single-set design — required so manual check/uncheck permanently survives later date recomputes
 
 ### Roadmap Evolution
 
@@ -3357,8 +3359,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-26T20:41:39.818Z
-Stopped at: Completed 85-01-PLAN.md
+Last session: 2026-08-27T01:34:43.966Z
+Stopped at: Completed 86-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
