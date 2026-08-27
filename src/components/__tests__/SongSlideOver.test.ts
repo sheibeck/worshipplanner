@@ -55,6 +55,20 @@ function makeSong(overrides: Partial<Song> = {}): Song {
   }
 }
 
+function makeArrangement(overrides: Partial<Song['arrangements'][number]> = {}): Song['arrangements'][number] {
+  return {
+    id: 'a1',
+    name: 'Default',
+    key: 'G',
+    bpm: null,
+    lengthSeconds: null,
+    chordChartUrl: '',
+    notes: '',
+    teamTags: [],
+    ...overrides,
+  }
+}
+
 // The drawer's watch(() => props.open, ...) seeds form state from a false->true
 // transition (mirrors real usage — SongsView mounts it once with open=false and
 // flips it true on edit-click). Mount closed, then open it so that seeding runs.
@@ -145,6 +159,100 @@ describe('SongSlideOver — save', () => {
     expect(mockUpdateSong).toHaveBeenCalledTimes(1)
     const [, data] = mockUpdateSong.mock.calls[0]!
     expect(data.removedThemes).toEqual(['Old'])
+  })
+})
+
+describe('SongSlideOver — key (R249)', () => {
+  beforeEach(() => {
+    mockVwModeEnabled = true
+    mockAddSong.mockClear()
+    mockUpdateSong.mockClear()
+    mockDeleteSong.mockClear()
+  })
+
+  it('shows the single arrangement key and persists an edit onto it via updateSong', async () => {
+    const song = makeSong({ arrangements: [makeArrangement({ id: 'a1', key: 'G' })], primaryArrangementId: null })
+    const wrapper = await mountDrawer(song)
+
+    const keyInput = wrapper.find('[data-testid="song-key-input"]')
+    expect(keyInput.exists()).toBe(true)
+    expect((keyInput.element as HTMLInputElement).value).toBe('G')
+
+    await keyInput.setValue('D')
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
+    await saveButton.trigger('click')
+
+    expect(mockUpdateSong).toHaveBeenCalledTimes(1)
+    const [, data] = mockUpdateSong.mock.calls[0]!
+    expect((data.arrangements as { key: string }[])[0]!.key).toBe('D')
+  })
+
+  it('edits the primary arrangement (second one) and leaves the first untouched', async () => {
+    const song = makeSong({
+      arrangements: [
+        makeArrangement({ id: 'a1', key: 'G' }),
+        makeArrangement({ id: 'a2', key: 'C' }),
+      ],
+      primaryArrangementId: 'a2',
+    })
+    const wrapper = await mountDrawer(song)
+
+    const keyInput = wrapper.find('[data-testid="song-key-input"]')
+    expect((keyInput.element as HTMLInputElement).value).toBe('C')
+
+    await keyInput.setValue('E')
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
+    await saveButton.trigger('click')
+
+    expect(mockUpdateSong).toHaveBeenCalledTimes(1)
+    const [, data] = mockUpdateSong.mock.calls[0]!
+    const arrangements = data.arrangements as { id: string; key: string }[]
+    expect(arrangements.find((a) => a.id === 'a2')!.key).toBe('E')
+    expect(arrangements.find((a) => a.id === 'a1')!.key).toBe('G')
+  })
+
+  it('falls back to arrangements[0] when primaryArrangementId is null with multiple arrangements', async () => {
+    const song = makeSong({
+      arrangements: [
+        makeArrangement({ id: 'a1', key: 'G' }),
+        makeArrangement({ id: 'a2', key: 'C' }),
+      ],
+      primaryArrangementId: null,
+    })
+    const wrapper = await mountDrawer(song)
+
+    const keyInput = wrapper.find('[data-testid="song-key-input"]')
+    expect((keyInput.element as HTMLInputElement).value).toBe('G')
+
+    await keyInput.setValue('A')
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
+    await saveButton.trigger('click')
+
+    expect(mockUpdateSong).toHaveBeenCalledTimes(1)
+    const [, data] = mockUpdateSong.mock.calls[0]!
+    const arrangements = data.arrangements as { id: string; key: string }[]
+    expect(arrangements.find((a) => a.id === 'a1')!.key).toBe('A')
+    expect(arrangements.find((a) => a.id === 'a2')!.key).toBe('C')
+  })
+
+  it('mints a default arrangement without crashing when a zero-arrangement song gets a key edit', async () => {
+    const song = makeSong({ arrangements: [], primaryArrangementId: null })
+    const wrapper = await mountDrawer(song)
+
+    const keyInput = wrapper.find('[data-testid="song-key-input"]')
+    expect(keyInput.exists()).toBe(true)
+    expect((keyInput.element as HTMLInputElement).value).toBe('')
+
+    await keyInput.setValue('A')
+    const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
+    await saveButton.trigger('click')
+
+    expect(mockUpdateSong).toHaveBeenCalledTimes(1)
+    const [, data] = mockUpdateSong.mock.calls[0]!
+    const arrangements = data.arrangements as { id: string; key: string }[]
+    expect(arrangements.length).toBe(1)
+    expect(arrangements[0]!.key).toBe('A')
+    expect(data.primaryArrangementId).toBe(arrangements[0]!.id)
   })
 })
 
