@@ -413,10 +413,10 @@ one, it follows the same confirm-then-deploy discipline.
   3. Creating a service whose date matches a team's configured pattern auto-pre-selects that team on the service, overridably (R255).
   4. A service whose date matches no team's pattern has no team auto-selected by this feature — the planner still picks teams manually (R255).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 - [x] 86-01-PLAN.md — Recurrence model, UTC-stable matching helper (ordinalOfMonth/teamMatchesDate), and creation-only auto-select in NewServiceDialog (R254 storage + R255)
-- [ ] 86-02-PLAN.md — Per-row `>` chevron + Teleported recurrence slide-over on the Teams tab, persisting via teamsStore.updateTeam (R254)
+- [x] 86-02-PLAN.md — Per-row `>` chevron + Teleported recurrence slide-over on the Teams tab, persisting via teamsStore.updateTeam (R254)
 
 **UI hint**: yes
 **Deploy note**: Client + Firestore-via-app (new slideout config UI + pattern-match auto-select).

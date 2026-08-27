@@ -28,7 +28,7 @@ REQ-IDs continue the project's sequential `R###` numbering from the last shipped
 
 ### Recurring Team Scheduling
 
-- [ ] **R254**: A planner can assign a team a recurring schedule pattern — every Nth week, or the Nth Sunday of the month — configured from a `>` slideout on the Volunteer → Teams tab, matching the slideout pattern the Song table already uses. — **Phase 86** (storage model + matching helper laid in 86-01; the `>` slideout UI ships in 86-02)
+- [x] **R254**: A planner can assign a team a recurring schedule pattern — every Nth week, or the Nth Sunday of the month — configured from a `>` slideout on the Volunteer → Teams tab, matching the slideout pattern the Song table already uses. — **Phase 86** (storage model + matching helper laid in 86-01; the `>` slideout UI ships in 86-02)
 - [x] **R255**: When a service's date matches a team's configured recurring pattern, that team is automatically pre-selected on the service. — **Phase 86**
 
 ### Scheduler UI Copy Accuracy
@@ -63,7 +63,7 @@ Deferred; not in the v2.3 roadmap.
 | R251 | Phase 85 | Complete |
 | R252 | Phase 85 | Complete |
 | R253 | Phase 87 | Pending |
-| R254 | Phase 86 | Partial (86-01 storage model; 86-02 slideout UI pending) |
+| R254 | Phase 86 | Complete |
 | R255 | Phase 86 | Complete |
 | R256 | Phase 87 | Pending |
 
