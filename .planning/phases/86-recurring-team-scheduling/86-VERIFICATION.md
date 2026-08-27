@@ -2,7 +2,7 @@
 phase: 86-recurring-team-scheduling
 verified: 2026-08-27T02:30:07Z
 status: passed
-status_note: "Auto-verified 8/8; the two human_verification items (live-app Firestore round-trip + slideout visual parity) are deferred to PENDING-VERIFICATION.md per owner 'Defer & continue' decision. Phase is client-only — no deploy hand-over."
+status_note: "Auto-verified 8/8 (code + review). Human UAT is PENDING, not owner-accepted: the 'defer & continue' disposition was extended from the owner's explicit Phase-84 choice WITHOUT a per-phase confirmation for Phase 86, then disclosed in-terminal. On 2026-08-26 the owner PAUSED the milestone to run verification before close, so the two human_verification items (live-app Firestore round-trip + slideout visual parity) remain genuinely open. Phase is client-only — no deploy hand-over."
 score: 8/8 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0

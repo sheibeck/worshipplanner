@@ -918,7 +918,7 @@ Owner Console Organizations screen reworked (quick task + owner testing-feedback
 
 ---
 
-## v2.3 — Phase 84 Last-Used Date Correctness & Backfill (deferred 2026-08-26)
+## v2.3 — Phase 84 Last-Used Date Correctness & Backfill (PENDING owner UAT — milestone held open 2026-08-26)
 
 Phase 84 is code-complete and auto-verified 8/8 (type-check clean; app suite at the 2-file
 baseline; functions 590/590). Two items are owner-only and were deferred (owner decision
@@ -935,7 +935,7 @@ baseline; functions 590/590). Two items are owner-only and were deferred (owner 
 
 ---
 
-## v2.3 — Phase 85 Team Conflicts (Vocals into Band & One-Team-Per-Date) (deferred 2026-08-26)
+## v2.3 — Phase 85 Team Conflicts (Vocals into Band & One-Team-Per-Date) (PENDING owner UAT — milestone held open 2026-08-26)
 
 Phase 85 is code-complete and auto-verified 10/10 (client type-check clean; app suite at the 2-file
 baseline; scheduler 33/33; functions 594/594 incl. 4 CR-01 regression tests). Two items deferred (owner
@@ -956,7 +956,7 @@ baseline; scheduler 33/33; functions 594/594 incl. 4 CR-01 regression tests). Tw
 
 ---
 
-## v2.3 — Phase 86 Recurring Team Scheduling (deferred 2026-08-26)
+## v2.3 — Phase 86 Recurring Team Scheduling (PENDING owner UAT — milestone held open 2026-08-26)
 
 Phase 86 is code-complete and auto-verified 8/8 (type-check clean; scoped tests 56/56; app suite at the
 2-file baseline). Client-only — NO deploy hand-over. Two owner-only spot-checks deferred (NOT code gaps):
@@ -970,7 +970,7 @@ Phase 86 is code-complete and auto-verified 8/8 (type-check clean; scoped tests 
 
 ---
 
-## v2.3 — Phase 87 Song & Rotation Refinements (deferred 2026-08-26)
+## v2.3 — Phase 87 Song & Rotation Refinements (PENDING owner UAT — milestone held open 2026-08-26)
 
 Phase 87 is code-complete, auto-verified 3/3, and code-review clean (0 findings; R249 persistence traced
 to real Firestore writes). Client-only — NO deploy hand-over. Two owner-only spot-checks deferred:

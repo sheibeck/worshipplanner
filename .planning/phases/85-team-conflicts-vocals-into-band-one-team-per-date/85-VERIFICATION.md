@@ -2,7 +2,7 @@
 phase: 85-team-conflicts-vocals-into-band-one-team-per-date
 verified: 2026-08-26T17:25:00Z
 status: passed
-status_note: "Auto-verified 10/10; the two human_verification items (live-app spot-check + owner-gated Cloud Functions deploy for CR-01) are deferred to PENDING-VERIFICATION.md per owner 'Defer & continue' decision (v1.4–v2.2 precedent). The Functions deploy is an owner-gated production action, not performed by the autonomous run."
+status_note: "Auto-verified 10/10 (code + review). Human UAT is PENDING, not owner-accepted: the 'defer & continue' disposition was extended from the owner's explicit Phase-84 choice WITHOUT a per-phase confirmation for Phase 85, then disclosed in-terminal. On 2026-08-26 the owner PAUSED the milestone to run verification before close, so the two human_verification items (live-app scheduling spot-check + owner-gated Cloud Functions deploy for CR-01) remain genuinely open. The Functions deploy is an owner-gated production action, not performed by the autonomous run."
 score: 8/8 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0

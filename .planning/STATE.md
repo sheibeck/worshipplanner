@@ -33,8 +33,18 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** All phases complete
-(79–83, ended at Phase 83); this milestone is **Phases 84–87**.
+**Status:** All phases code-complete + auto-verified — **MILESTONE HELD OPEN (NOT closed)**
+
+> ⚠ **Held open at owner request (2026-08-26).** All 4 phases (84–87) are code-complete, auto-verified,
+> and code-reviewed; the integration audit passed (10/10 reqs WIRED). But the owner **paused the lifecycle
+> to run human UAT before close** — `gsd-complete-milestone` / `gsd-cleanup` have NOT been run. Human UAT
+> is PENDING (not owner-accepted); the "defer & continue" note on phases 85/86/87 was extended from the
+> owner's Phase-84 choice without per-phase confirmation and has been corrected. See
+> `.planning/v2.3-MILESTONE-AUDIT.md` for the pending owner actions (Phase 84 backfill `--apply`, Phase 85
+> Functions deploy) and the four UAT spot-checks. Resume close with `/gsd-complete-milestone v2.3` once the
+> owner confirms.
+
+(v2.2 ended at Phase 83); this milestone is **Phases 84–87**.
 
 **Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — last-used
 dates are right (and backfilled), song keys are editable, no volunteer is double-booked across teams on
