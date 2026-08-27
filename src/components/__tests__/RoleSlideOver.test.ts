@@ -124,6 +124,58 @@ describe('RoleSlideOver', () => {
     expect(wrapper.emitted('saved')).toBeTruthy()
   })
 
+  // WR-01 (Phase 88 review fix): Save is a plain button, so the number
+  // input's min="1" never runs HTML5 constraint validation. Clearing the
+  // Default count field must not persist an empty string / NaN to Firestore.
+  it('create mode: clearing Default count before Save persists defaultCount as 1, not ""', async () => {
+    const wrapper = await mountDrawer(null)
+    await wrapper.get('[data-testid="role-name-input"]').setValue('Bass')
+    await wrapper.get('[data-testid="role-count-input"]').setValue('')
+
+    const saveBtn = wrapper.findAll('button').find((b) => b.text().startsWith('Save'))!
+    await saveBtn.trigger('click')
+    await Promise.resolve()
+
+    expect(mockAddRole).toHaveBeenCalledWith({
+      name: 'Bass',
+      group: 'band',
+      defaultCount: 1,
+      order: 2,
+    })
+  })
+
+  it('edit mode: clearing Default count before Save persists defaultCount as 1, not ""', async () => {
+    const wrapper = await mountDrawer(makeRole())
+    await wrapper.get('[data-testid="role-count-input"]').setValue('')
+
+    const saveBtn = wrapper.findAll('button').find((b) => b.text().startsWith('Save'))!
+    await saveBtn.trigger('click')
+    await Promise.resolve()
+
+    expect(mockUpdateRole).toHaveBeenCalledWith('r-1', {
+      name: 'Guitar',
+      group: 'band',
+      defaultCount: 1,
+      vocal: false,
+    })
+  })
+
+  it('edit mode: setting Default count to a value below 1 (e.g. 0) floors it to 1 on Save', async () => {
+    const wrapper = await mountDrawer(makeRole())
+    await wrapper.get('[data-testid="role-count-input"]').setValue('0')
+
+    const saveBtn = wrapper.findAll('button').find((b) => b.text().startsWith('Save'))!
+    await saveBtn.trigger('click')
+    await Promise.resolve()
+
+    expect(mockUpdateRole).toHaveBeenCalledWith('r-1', {
+      name: 'Guitar',
+      group: 'band',
+      defaultCount: 1,
+      vocal: false,
+    })
+  })
+
   it('vocal checkbox is present only while group===band; switching away hides it and forces vocal:false on save', async () => {
     const wrapper = await mountDrawer(makeRole({ vocal: true }))
     expect(wrapper.find('[data-testid="role-vocal-checkbox"]').exists()).toBe(true)

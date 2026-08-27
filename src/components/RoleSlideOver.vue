@@ -210,6 +210,19 @@ watch(
 
 const isCreateMode = computed(() => props.role === null)
 
+// WR-01 (Phase 88 review): the pre-Phase-88 inline "Add Role" flow guarded its
+// payload with `defaultCount: newRoleCount.value || 1`. Save here is a plain
+// button (not a native form submit), so the input's `min="1"` never runs HTML5
+// constraint validation — clearing the field leaves `form.value.defaultCount`
+// as an empty string (v-model.number's looseToNumber falls back to the raw
+// string when parseFloat is NaN), which would otherwise write straight to
+// Firestore and corrupt scheduler auto-fill math. Coerce to a valid positive
+// number, floored to 1 when empty/NaN/less than 1.
+function normalizedDefaultCount(value: unknown): number {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 1 ? n : 1
+}
+
 async function onSave() {
   if (isSaving.value) return
   const name = form.value.name.trim()
@@ -222,7 +235,7 @@ async function onSave() {
       await rosterStore.addRole({
         name,
         group: form.value.group,
-        defaultCount: form.value.defaultCount,
+        defaultCount: normalizedDefaultCount(form.value.defaultCount),
         order: maxOrder + 1,
         ...(form.value.group === 'band' && form.value.vocal ? { vocal: true } : {}),
       })
@@ -230,7 +243,7 @@ async function onSave() {
       await rosterStore.updateRole(props.role!.id, {
         name,
         group: form.value.group,
-        defaultCount: form.value.defaultCount,
+        defaultCount: normalizedDefaultCount(form.value.defaultCount),
         vocal: form.value.group === 'band' ? form.value.vocal : false,
       })
     }
