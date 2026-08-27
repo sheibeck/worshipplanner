@@ -33,7 +33,16 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** ALL 6 phases (84–89) code-complete + auto-verified — **MILESTONE HELD OPEN for owner UAT (NOT closed)**
+**Status:** v2.3 owner-approved (UAT) + **DEPLOYED TO PRODUCTION 2026-08-27** — ready for milestone close (audit → complete → cleanup)
+
+> ✅ **Deployed 2026-08-27** (owner-approved). Hosting (client) + all Cloud Functions deployed to
+> `worship-planner-bc515` (`firebase deploy --only hosting` then `--only functions`); the Phase 85 vocals→Band
+> messaging fix (`serviceRoles.ts` + `sendQueuedMessage`) is now LIVE. No `firestore.rules`/`storage.rules`
+> changes in v2.3. Committed + pushed to origin/master (`efae5add`). **One owner data-op remains, non-blocking:**
+> the R248 last-used **backfill** (`node functions/lib/backfillLastUsed.js` dry-run → `--apply` against the
+> Berean prod org) corrects HISTORICAL song last-used dates — the R247 live fix is already deployed, so new
+> locks are correct without it. Milestone close (`/gsd-complete-milestone v2.3`, after `/gsd-audit-milestone`
+> re-run to fold in phases 88–89) is now unblocked.
 
 > ⚠ **Milestone NOT closed — held for owner UAT.** All 6 phases (84–89) are code-complete, auto-verified,
 > and code-reviewed (14/14 requirements R247–R260). The lifecycle (audit → complete → cleanup) has NOT been
