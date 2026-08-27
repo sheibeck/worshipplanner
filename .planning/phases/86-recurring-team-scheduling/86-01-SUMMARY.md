@@ -157,3 +157,15 @@ None - no external service configuration required.
 ---
 *Phase: 86-recurring-team-scheduling*
 *Completed: 2026-08-26*
+
+## Self-Check: PASSED
+
+- FOUND: src/utils/teamRecurrence.ts
+- FOUND: src/utils/__tests__/teamRecurrence.test.ts
+- FOUND: .planning/phases/86-recurring-team-scheduling/86-01-SUMMARY.md
+- FOUND commit: d6cd003a (feat: Team.recurrence field)
+- FOUND commit: 35d5edd4 (test: teamRecurrence RED)
+- FOUND commit: 3aa94f55 (feat: teamRecurrence GREEN)
+- FOUND commit: 06ddda94 (test: NewServiceDialog auto-select RED)
+- FOUND commit: d01304da (feat: NewServiceDialog auto-select GREEN)
+- FOUND commit: cd70fd6d (docs: SUMMARY)
