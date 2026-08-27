@@ -71,8 +71,12 @@ plan or phase is type-clean.
   harness scopes to projectId `test-project` while the app uses `worship-planner-bc515`, so both the
   rules install and the per-test `clearFirestore()` leave real data alone.
 
-Known-failing baseline: `src/storage.rules.test.ts` and `src/views/__tests__/RosterView.test.ts`
-(stale assertion).
+Known-failing baseline: `src/storage.rules.test.ts` only (Storage-emulator dependent — see below).
+
+> **Updated 2026-08-27 (v2.3 Phase 88):** `src/views/__tests__/RosterView.test.ts`'s stale "Roles config"
+> assertion was fixed when the Roles/Teams tabs moved to the slideout UX, so it is **no longer** a baseline
+> failure. The baseline is now the single `storage.rules.test.ts` file. A bare `npx vitest run` should show
+> exactly one failing file.
 
 > ### ⚠ `src/storage.rules.test.ts` IS A REAL DEFECT — corrected 2026-08-06
 >
