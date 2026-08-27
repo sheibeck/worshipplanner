@@ -979,3 +979,21 @@ to real Firestore writes). Client-only — NO deploy hand-over. Two owner-only s
       persists (writes to the primary/first arrangement's key).
 - [ ] **Live Scripture Rotation (owner).** Open the Scripture rotation tab for a service that has BOTH a
       scripture slot and a sermon passage — confirm the sermon passage no longer appears as a rotation row.
+
+---
+
+## v2.3 — Phase 88 Editing-UX Polish (Roles/Teams slideout + song Key typeahead) (PENDING owner UAT 2026-08-27)
+
+Phase 88 code-complete + auto-verified 8/8; review clean of criticals (WR-01 default-count floor + IN-01
+unsaved-guard fixed). Client-only — NO deploy. Owner chose "record as pending, keep going" (explicit
+AskUserQuestion 2026-08-27). Five live-app spot-checks pending owner:
+
+- [ ] **Roles tab** — click a role row → RoleSlideOver opens; edit name/group/count/vocal + Save persists;
+      "+ Add role" creates a new role; delete confirm clears assignments as before.
+- [ ] **Teams tab** — click a team row → TeamSlideOver opens; edit name + Nth-Sunday recurrence + Save
+      round-trips; "+ Add team" creates; delete confirm as before.
+- [ ] **Rename soft-warn (WR-02)** — renaming an existing team shows the two-click confirm before it commits.
+- [ ] **Song Key dropdown** — the Key field filters as you type over the key list AND still accepts a
+      free-typed value (e.g. "Am"), persisting to the primary/first arrangement.
+- [ ] **Read-only tables** — no inline editing remains in either Roles or Teams table (edits happen only in
+      the slideout), matching the Songs table UX.
