@@ -16,8 +16,14 @@ const THURSDAY_BEFORE_AUG_30 = new Date(2026, 7, 27, 10, 0, 0)
 // is no longer Pinia-free. Seeded with the same 4 default teams the old
 // hard-coded array carried, so every existing checkbox-label assertion below
 // keeps finding the same names.
+//
+// Phase 86 (R254/R255): Choir carries a configured recurrence (2nd Sunday of
+// the month) so the recurring-auto-select tests below have a real matching
+// team to exercise. Orchestra/Communion/Special deliberately carry NO
+// recurrence, so the R231 principle (no un-configured team is ever
+// auto-picked) stays covered by the same mock list.
 const mockTeams = [
-  { id: 'team-choir', name: 'Choir', order: 0 },
+  { id: 'team-choir', name: 'Choir', order: 0, recurrence: { ordinals: [2] } },
   { id: 'team-orchestra', name: 'Orchestra', order: 1 },
   { id: 'team-communion', name: 'Communion', order: 2 },
   { id: 'team-special', name: 'Special', order: 3 },
@@ -175,14 +181,18 @@ describe('NewServiceDialog default teams (R231 — no ordinal auto-selection)', 
   it('starts with no teams pre-selected on the 2nd-Sunday-skip-to-3rd-Sunday date pair', async () => {
     vi.setSystemTime(new Date(2026, 8, 10, 10, 0, 0)) // Thursday 2026-09-10
 
-    // Baseline: 2026-09-13 (the 2nd Sunday) -> no teams.
+    // Baseline: 2026-09-13 (the 2nd Sunday) -> the OLD hard-coded R231 rule is gone,
+    // but Phase 86 gives Choir a CONFIGURED 2nd-Sunday recurrence in this mock, so
+    // Choir (and only Choir) auto-selects here — see the recurring-auto-select
+    // describe block below for dedicated coverage of that new behaviour.
     const baseline = mountDialog({ takenDates: [] })
     const baselinePayload = await clickCreate(baseline)
     expect(baselinePayload.date).toBe('2026-09-13')
-    expect(baselinePayload.teams).toEqual([])
+    expect(baselinePayload.teams).toEqual(['Choir'])
 
-    // First candidate taken -> 2026-09-20 (the 3rd Sunday) -> still no teams
-    // (the OLD behaviour pre-selected Choir here; R231 removes that).
+    // First candidate taken -> 2026-09-20 (the 3rd Sunday) -> no teams: Choir's
+    // pattern is 2nd Sunday only, so it does not match the 3rd Sunday, and no
+    // other configured team carries a recurrence in this mock.
     const wrapper = mountDialog({ takenDates: ['2026-09-13'] })
     const payload = await clickCreate(wrapper)
     expect(payload.date).toBe('2026-09-20')
@@ -216,10 +226,103 @@ describe('NewServiceDialog empty-state (R229 — zero configured teams)', () => 
     expect(wrapper.text()).toContain('No teams configured — add teams in Volunteers → Teams.')
     // Restore the default seed for every other test in this file.
     mockTeams.push(
-      { id: 'team-choir', name: 'Choir', order: 0 },
+      { id: 'team-choir', name: 'Choir', order: 0, recurrence: { ordinals: [2] } },
       { id: 'team-orchestra', name: 'Orchestra', order: 1 },
       { id: 'team-communion', name: 'Communion', order: 2 },
       { id: 'team-special', name: 'Special', order: 3 },
     )
+  })
+})
+
+// Phase 86 (R254/R255): creation-only recurring auto-select. Choir carries a
+// configured 2nd-Sunday-of-month recurrence in mockTeams (see above); the
+// other three teams carry none, so they must never auto-select regardless of
+// date (the R231 principle — no auto-selection without an explicit,
+// per-team, user-configured pattern).
+describe('NewServiceDialog recurring auto-select (R255)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function checkedTeamNames(wrapper: VueWrapper): string[] {
+    return wrapper
+      .findAll('input[type="checkbox"]')
+      .filter((c) => (c.element as HTMLInputElement).checked)
+      .map((c) => (c.element as HTMLInputElement).value)
+  }
+
+  it('opening the dialog on a date matching a configured team pre-checks that team', () => {
+    // Thursday 2026-09-10 -> default date 2026-09-13, the 2nd Sunday -> matches Choir.
+    vi.setSystemTime(new Date(2026, 8, 10, 10, 0, 0))
+    const wrapper = mountDialog({ takenDates: [] })
+    expect(checkedTeamNames(wrapper)).toEqual(['Choir'])
+  })
+
+  it('changing the Service Date to a different matching date swaps the auto-picked set', async () => {
+    vi.setSystemTime(new Date(2026, 8, 10, 10, 0, 0)) // -> default 2026-09-13 (matches Choir)
+    const wrapper = mountDialog({ takenDates: [] })
+    expect(checkedTeamNames(wrapper)).toEqual(['Choir'])
+
+    // 2026-09-20 is the 3rd Sunday of September — does not match Choir's [2].
+    const dateInput = wrapper.find('input[type="date"]')
+    await dateInput.setValue('2026-09-20')
+    await dateInput.trigger('change')
+    expect(checkedTeamNames(wrapper)).toEqual([])
+
+    // 2026-10-11 is the 2nd Sunday of October — matches Choir again.
+    await dateInput.setValue('2026-10-11')
+    await dateInput.trigger('change')
+    expect(checkedTeamNames(wrapper)).toEqual(['Choir'])
+  })
+
+  it('a team the planner manually unchecks is not re-added when the date changes to another of its matching dates', async () => {
+    vi.setSystemTime(new Date(2026, 8, 10, 10, 0, 0)) // -> default 2026-09-13 (matches Choir)
+    const wrapper = mountDialog({ takenDates: [] })
+    expect(checkedTeamNames(wrapper)).toEqual(['Choir'])
+
+    const choirCheckbox = wrapper
+      .findAll('input[type="checkbox"]')
+      .find((c) => (c.element as HTMLInputElement).value === 'Choir')!
+    await choirCheckbox.setValue(false)
+    expect(checkedTeamNames(wrapper)).toEqual([])
+
+    // 2026-10-11 is the 2nd Sunday of October — would match Choir again, but the
+    // manual uncheck must survive the recompute.
+    const dateInput = wrapper.find('input[type="date"]')
+    await dateInput.setValue('2026-10-11')
+    await dateInput.trigger('change')
+    expect(checkedTeamNames(wrapper)).toEqual([])
+
+    const payload = await clickCreate(wrapper)
+    expect(payload.teams).toEqual([])
+  })
+
+  it('a team the planner manually checks stays checked across a later non-matching date change', async () => {
+    vi.setSystemTime(THURSDAY_BEFORE_AUG_30) // -> default 2026-08-30 (5th Sunday, matches nothing)
+    const wrapper = mountDialog({ takenDates: [] })
+    expect(checkedTeamNames(wrapper)).toEqual([])
+
+    const orchestraCheckbox = wrapper
+      .findAll('input[type="checkbox"]')
+      .find((c) => (c.element as HTMLInputElement).value === 'Orchestra')!
+    await orchestraCheckbox.setValue(true)
+    expect(checkedTeamNames(wrapper)).toEqual(['Orchestra'])
+
+    // 2026-09-20 is the 3rd Sunday — matches nothing, but Orchestra was a manual
+    // choice and must survive the recompute.
+    const dateInput = wrapper.find('input[type="date"]')
+    await dateInput.setValue('2026-09-20')
+    await dateInput.trigger('change')
+    expect(checkedTeamNames(wrapper)).toEqual(['Orchestra'])
+  })
+
+  it('a non-matching date auto-selects nothing', () => {
+    vi.setSystemTime(THURSDAY_BEFORE_AUG_30) // -> default 2026-08-30, the 5th Sunday
+    const wrapper = mountDialog({ takenDates: [] })
+    expect(checkedTeamNames(wrapper)).toEqual([])
   })
 })
