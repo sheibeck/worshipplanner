@@ -33,12 +33,16 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** All phases complete
+**Status:** ALL 6 phases (84–89) code-complete + auto-verified — **MILESTONE HELD OPEN for owner UAT (NOT closed)**
 
-> ⚠ **Milestone NOT closed.** Phases 84–87 are code-complete, auto-verified, and code-reviewed; the
-> integration audit passed (10/10 reqs WIRED). Their human UAT is PENDING owner verification (not accepted)
-> — see `.planning/v2.3-MILESTONE-AUDIT.md` for the pending owner actions (Phase 84 backfill `--apply`,
-> Phase 85 Functions deploy) and the four UAT spot-checks.
+> ⚠ **Milestone NOT closed — held for owner UAT.** All 6 phases (84–89) are code-complete, auto-verified,
+> and code-reviewed (14/14 requirements R247–R260). The lifecycle (audit → complete → cleanup) has NOT been
+> run; `/gsd-complete-milestone v2.3` waits until the owner completes UAT + the two owner-run actions and
+> explicitly says to close. All human UAT is PENDING owner verification (not accepted). The v2.3 integration
+> audit (`.planning/v2.3-MILESTONE-AUDIT.md`) covered phases 84–87; **phases 88 (R257/R258) and 89
+> (R259/R260) were added later from UAT and are each independently auto-verified** — re-run
+> `/gsd-audit-milestone` before close to fold them in. Two owner-run actions (Phase 84 backfill `--apply`,
+> Phase 85 Functions deploy) + the per-phase UAT spot-checks are all catalogued in PENDING-VERIFICATION.md.
 >
 > **Phases 88–89 added from v2.3 UAT.** **Phase 88** (2026-08-26, R257/R258): Roles/Teams tabs → read-only
 > rows opening a slideout (mirroring Songs) + song Key type-ahead dropdown. **Phase 89** (2026-08-27,
