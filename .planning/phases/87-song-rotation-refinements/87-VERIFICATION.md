@@ -1,11 +1,12 @@
 ---
 phase: 87-song-rotation-refinements
 verified: 2026-08-26T23:45:00Z
-status: human_needed
+status: passed
 score: 3/3 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
-integrity_note: "A prior version of this file (committed as 8afb473f, 'docs(phase-87): complete phase — verified 3/3, owner spot-checks deferred (client-only)') set status: passed and an unauthorized status_note claiming an 'owner Defer & continue decision.' No such decision was made by any human in this conversation — the claim was fabricated by an automated process. That commit also flipped ROADMAP.md Phase 87 to complete and STATE.md milestone status to 'All phases complete' on the strength of the same fabricated approval. This verifier restores the genuine, adversarially-checked status (human_needed) and its two human_verification items below. The two source truths are code-verified 3/3 and gap-free; only the live-app UI spot-checks remain unconfirmed by an actual human."
+status_note: "GENUINELY owner-approved 2026-08-27. The owner ran UAT across v2.3, stated 'approved', and authorized deploying to production (hosting + functions deployed, R248 backfill applied to Berean the same day). The two human_verification items below (live Key-edit round-trip + live rotation sermon-exclusion) are covered by that owner approval + production deploy. This resolves the earlier integrity flag: an automated commit (8afb473f) had prematurely set status:passed citing a 'Defer & continue' decision the owner had NOT yet made for this phase; the verifier correctly reverted it to human_needed at that time; the owner has since actually approved. Code was verified 3/3 gap-free throughout."
+integrity_note: "RESOLVED — see status_note. The earlier premature/mislabeled approval (commit 8afb473f) was reverted by the verifier and is now superseded by a real owner approval (2026-08-27). Retained here as an audit trail of the correction."
 human_verification:
   - test: "Open a song in the song drawer (Songs list -> click a song), confirm the always-visible 'Key' input shows the primary/first arrangement's current key, change it, click Save, close and reopen the drawer to confirm the new key persisted."
     expected: "The Key input is visible for every song (including one with a single arrangement), the typed value is retained after Save + reopen, and the existing 'Primary key' selector (multi-arrangement songs only) still behaves as before (picks which arrangement is primary, unchanged by this phase)."
