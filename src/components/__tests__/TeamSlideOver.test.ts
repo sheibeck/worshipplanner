@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import TeamSlideOver from '../TeamSlideOver.vue'
 import type { Team } from '@/types/team'
@@ -265,5 +265,57 @@ describe('TeamSlideOver', () => {
     await closeBtn.trigger('click')
     expect(wrapper.emitted('close')).toBeTruthy()
     expect(mockUpdateTeam).not.toHaveBeenCalled()
+  })
+
+  // IN-01 (Phase 88 review fix): mirrors SongSlideOver.vue's useUnsavedGuard
+  // wiring — a dirty form must prompt before discarding, a clean one must not.
+  describe('unsaved-changes guard (IN-01)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('with an unsaved name edit, the × button prompts, and cancelling the prompt keeps the drawer open', async () => {
+      const wrapper = await mountDrawer(makeTeam())
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+      await wrapper.get('[data-testid="team-name-input"]').setValue('Choir Renamed')
+      await wrapper.find('[aria-label="Close"]').trigger('click')
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('close')).toBeUndefined()
+    })
+
+    it('with an unsaved name edit, confirming the prompt lets the × button close the drawer', async () => {
+      const wrapper = await mountDrawer(makeTeam())
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+      await wrapper.get('[data-testid="team-name-input"]').setValue('Choir Renamed')
+      await wrapper.find('[aria-label="Close"]').trigger('click')
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('close')).toBeTruthy()
+    })
+
+    it('an unsaved ordinal toggle (name unchanged) also prompts on close', async () => {
+      const wrapper = await mountDrawer(makeTeam({ id: 't-2', name: 'Orchestra' }))
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+      const secondSunday = wrapper.findAll('button').find((b) => b.text() === '2nd Sunday')!
+      await secondSunday.trigger('click')
+      await wrapper.find('[aria-label="Close"]').trigger('click')
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('close')).toBeUndefined()
+    })
+
+    it('with no unsaved edits, closing never calls window.confirm at all', async () => {
+      const wrapper = await mountDrawer(makeTeam())
+      const confirmSpy = vi.spyOn(window, 'confirm')
+
+      await wrapper.find('[aria-label="Close"]').trigger('click')
+
+      expect(confirmSpy).not.toHaveBeenCalled()
+      expect(wrapper.emitted('close')).toBeTruthy()
+    })
   })
 })

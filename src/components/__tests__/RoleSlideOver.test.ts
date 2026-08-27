@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import RoleSlideOver from '../RoleSlideOver.vue'
 import type { Role } from '@/types/roster'
@@ -235,5 +235,45 @@ describe('RoleSlideOver', () => {
     await closeBtn.trigger('click')
     expect(wrapper.emitted('close')).toBeTruthy()
     expect(mockUpdateRole).not.toHaveBeenCalled()
+  })
+
+  // IN-01 (Phase 88 review fix): mirrors SongSlideOver.vue's useUnsavedGuard
+  // wiring — a dirty form must prompt before discarding, a clean one must not.
+  describe('unsaved-changes guard (IN-01)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('with an unsaved name edit, the × button prompts, and cancelling the prompt keeps the drawer open', async () => {
+      const wrapper = await mountDrawer(makeRole())
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+      await wrapper.get('[data-testid="role-name-input"]').setValue('Lead Guitar')
+      await wrapper.find('[aria-label="Close"]').trigger('click')
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('close')).toBeUndefined()
+    })
+
+    it('with an unsaved name edit, confirming the prompt lets the × button close the drawer', async () => {
+      const wrapper = await mountDrawer(makeRole())
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+      await wrapper.get('[data-testid="role-name-input"]').setValue('Lead Guitar')
+      await wrapper.find('[aria-label="Close"]').trigger('click')
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('close')).toBeTruthy()
+    })
+
+    it('with no unsaved edits, closing never calls window.confirm at all', async () => {
+      const wrapper = await mountDrawer(makeRole())
+      const confirmSpy = vi.spyOn(window, 'confirm')
+
+      await wrapper.find('[aria-label="Close"]').trigger('click')
+
+      expect(confirmSpy).not.toHaveBeenCalled()
+      expect(wrapper.emitted('close')).toBeTruthy()
+    })
   })
 })

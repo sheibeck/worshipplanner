@@ -181,6 +181,7 @@
 import { ref, computed, watch } from 'vue'
 import { useTeamsStore } from '@/stores/teams'
 import { useToasts } from '@/stores/toasts'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import type { Team } from '@/types/team'
 
 const props = defineProps<{
@@ -224,6 +225,11 @@ const isDeleting = ref(false)
 const showDeleteConfirm = ref(false)
 const pendingRenameConfirm = ref(false)
 
+// IN-01 (Phase 88 review): unsaved-changes guard, mirroring SongSlideOver.vue
+// — prompts before a dirty form is discarded via Cancel/backdrop/×. Snapshot
+// covers both the name field and the recurrence ordinals.
+const unsavedGuard = useUnsavedGuard(() => ({ form: form.value, ordinals: localOrdinals.value }))
+
 watch(
   () => props.open,
   (isOpen) => {
@@ -235,6 +241,7 @@ watch(
       localOrdinals.value = Array.from(new Set(props.team?.recurrence?.ordinals ?? [])).sort((a, b) => a - b)
       showDeleteConfirm.value = false
       pendingRenameConfirm.value = false
+      unsavedGuard.capture()
     }
   },
 )
@@ -326,6 +333,7 @@ async function onSave() {
 }
 
 function onCancel() {
+  if (!unsavedGuard.confirmDiscard()) return
   emit('close')
 }
 

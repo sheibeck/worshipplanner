@@ -158,6 +158,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRosterStore } from '@/stores/roster'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import type { Role, RoleGroup } from '@/types/roster'
 
 const props = defineProps<{
@@ -198,12 +199,17 @@ const isSaving = ref(false)
 const isDeleting = ref(false)
 const showDeleteConfirm = ref(false)
 
+// IN-01 (Phase 88 review): unsaved-changes guard, mirroring SongSlideOver.vue
+// — prompts before a dirty form is discarded via Cancel/backdrop/×.
+const unsavedGuard = useUnsavedGuard(() => ({ ...form.value }))
+
 watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) {
       form.value = props.role ? roleToForm(props.role) : emptyForm()
       showDeleteConfirm.value = false
+      unsavedGuard.capture()
     }
   },
 )
@@ -254,6 +260,7 @@ async function onSave() {
 }
 
 function onCancel() {
+  if (!unsavedGuard.confirmDiscard()) return
   emit('close')
 }
 
