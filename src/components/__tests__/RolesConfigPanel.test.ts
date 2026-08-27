@@ -58,6 +58,21 @@ describe('RolesConfigPanel', () => {
     expect(text).not.toContain('not a hard cap')
   })
 
+  // R256 (87-01): verify-first — a repo-wide grep found no straggler UI surface
+  // still using the deprecated soft-target phrasing, so no production change was
+  // made here. This test locks the accurate copy in place: a positive assertion
+  // on the real "auto-fill … each service" wording plus the negative assertions
+  // above, so a future edit reintroducing soft-target framing fails loudly.
+  it('R256: the default-count copy is verified accurate and locked against soft-target framing regressing', () => {
+    const wrapper = mountPanel()
+    const text = wrapper.text().toLowerCase()
+    expect(text).toContain('default count is the number of volunteers the scheduler auto-fills for this role each service')
+    // <!-- planner-discipline-allow: soft planning target -->
+    expect(text).not.toContain('soft planning target')
+    // <!-- planner-discipline-allow: not a hard cap -->
+    expect(text).not.toContain('not a hard cap')
+  })
+
   it('R245: the per-row Delete button renders as a real destructive button at compact row sizing', () => {
     const wrapper = mountPanel()
     const deleteButtons = wrapper.findAll('button').filter((b) => b.text() === 'Delete')
