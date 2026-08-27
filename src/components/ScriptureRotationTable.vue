@@ -16,7 +16,7 @@
       class="rounded-lg border border-dashed border-gray-700 py-10 text-center"
     >
       <p class="text-sm text-gray-400">
-        No scripture passages found in these services. Add scripture slots or a sermon passage to see rotation patterns.
+        No scripture passages found in these services. Add scripture slots to see rotation patterns.
       </p>
     </div>
 
@@ -102,7 +102,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { Service, ScriptureSlot, ScriptureRef } from '@/types/service'
+import type { Service, ScriptureSlot } from '@/types/service'
 
 const props = defineProps<{
   services: Service[]
@@ -145,13 +145,6 @@ const rotationEntries = computed((): ScriptureRotationEntry[] => {
       const s = slot as ScriptureSlot
       if (s.book == null || s.chapter == null) continue
       const key = formatPassageKey(s.book, s.chapter, s.verseStart, s.verseEnd)
-      keysForService.add(key)
-    }
-
-    // Sermon passage
-    if (service.sermonPassage != null) {
-      const sp: ScriptureRef = service.sermonPassage
-      const key = formatPassageKey(sp.book, sp.chapter, sp.verseStart ?? null, sp.verseEnd ?? null)
       keysForService.add(key)
     }
 
