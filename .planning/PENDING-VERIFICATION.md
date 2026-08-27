@@ -967,3 +967,15 @@ Phase 86 is code-complete and auto-verified 8/8 (type-check clean; scoped tests 
       unchecking it sticks across a date change). Automated coverage mocks the teams store.
 - [ ] **Slideout visual parity (owner).** Confirm the TeamRecurrenceSlideOver looks/behaves like the
       Song table's slide-over (the `>` pattern the owner referenced).
+
+---
+
+## v2.3 — Phase 87 Song & Rotation Refinements (deferred 2026-08-26)
+
+Phase 87 is code-complete, auto-verified 3/3, and code-review clean (0 findings; R249 persistence traced
+to real Firestore writes). Client-only — NO deploy hand-over. Two owner-only spot-checks deferred:
+
+- [ ] **Live song Key edit (owner).** Open a song in the app, edit the Key, Save, reopen — confirm it
+      persists (writes to the primary/first arrangement's key).
+- [ ] **Live Scripture Rotation (owner).** Open the Scripture rotation tab for a service that has BOTH a
+      scripture slot and a sermon passage — confirm the sermon passage no longer appears as a rotation row.
