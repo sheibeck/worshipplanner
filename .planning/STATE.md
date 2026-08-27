@@ -4,17 +4,17 @@ milestone: v2.3
 milestone_name: Scheduling Accuracy & Song/Team Refinements
 current_phase: 87
 current_phase_name: Song & Rotation Refinements
-status: planning
-stopped_at: Completed 86-02-PLAN.md
-last_updated: "2026-08-27T02:31:41.380Z"
+status: verifying
+stopped_at: Completed 87-01-PLAN.md
+last_updated: "2026-08-27T03:07:12.408Z"
 last_activity: 2026-08-26
-last_activity_desc: Phase 86 complete, transitioned to Phase 87
+last_activity_desc: Phase 87 execution started
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
-  percent: 75
+  completed_phases: 4
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
 
-**Status:** Ready to plan
+**Status:** Phase complete — ready for verification
 (79–83, ended at Phase 83); this milestone is **Phases 84–87**.
 
 **Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — last-used
@@ -918,7 +918,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 86 — Recurring Team Scheduling
+**Current focus:** Phase 87 — Song & Rotation Refinements
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -928,10 +928,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 87 — Song & Rotation Refinements
-Plan: Not started
+Phase: 87 (Song & Rotation Refinements) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
-Last activity: 2026-08-26 — Phase 86 complete, transitioned to Phase 87
+Last activity: 2026-08-26 — Phase 87 execution started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 
@@ -2610,6 +2610,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 85 P01 | 30min | 3 tasks | 20 files |
 | Phase 86 P01 | 17min | 3 tasks | 5 files |
 | Phase 86 P02 | 11min | 3 tasks | 3 files |
+| Phase 87 P01 | 25min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -3036,6 +3037,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Vocals folds into Band for exclusivity but is exempt from the one-instrument cap; Other now combines freely with Band or Tech (relaxed rule); legacy group:'vocals' data coerced at read time only, no Firestore write migration
 - [Phase ?]: Two tracking sets (autoAddedTeams + manuallyTouchedTeams) needed for NewServiceDialog recurring auto-select, not the plan's literal single-set design — required so manual check/uncheck permanently survives later date recomputes
 - [Phase ?]: TeamRecurrenceSlideOver.vue mirrors SongSlideOver's Teleport/scrim/translate-x-full shell for a per-team Nth-Sunday-of-month recurrence editor, with a local editable ordinals copy seeded from team.recurrence on open (R254 round-trip)
+- [Phase ?]: R249: resolved the target arrangement identically to onSave's existing primaryArrangementId ?? arrangements[0] fallback, so onSave needed no changes.
+- [Phase ?]: R256: verify-first per plan — grep found no straggler .vue surface with the deprecated soft-target phrasing, so RolesConfigPanel.vue was left unchanged; only the test was strengthened.
 
 ### Roadmap Evolution
 
@@ -3361,8 +3364,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-27T01:49:31.886Z
-Stopped at: Completed 86-02-PLAN.md
+Last session: 2026-08-27T03:07:12.352Z
+Stopped at: Completed 87-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

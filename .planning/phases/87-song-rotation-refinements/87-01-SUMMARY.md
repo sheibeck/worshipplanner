@@ -129,3 +129,7 @@ None - no external service configuration required. Client-only Vue changes; noth
 ---
 *Phase: 87-song-rotation-refinements*
 *Completed: 2026-08-26*
+
+## Self-Check: PASSED
+
+All created/modified files exist on disk; all task/plan commit hashes (38f27e11, 5e0811dc, 1e2cf73a, 39d20d75, 5fc571bb, 87fec8b0) found in git log.

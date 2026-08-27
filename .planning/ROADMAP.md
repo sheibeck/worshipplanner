@@ -432,10 +432,11 @@ one, it follows the same confirm-then-deploy discipline.
   2. The Scripture rotation tab lists only scripture items added to the service plan and never includes the sermon/teaching passage (R253).
   3. The schedulable-roles description no longer calls the default count a "soft planning target"; it accurately states the scheduler targets that configured count (R256).
 
-**Plans**: 1 plan
+**Plans**: 1/1 plans executed
 
 Plans:
-- [ ] 87-01-PLAN.md — Editable song Key (R249), sermon-free Scripture rotation (R253), and verified schedulable-roles copy (R256)
+
+- [x] 87-01-PLAN.md — Editable song Key (R249), sermon-free Scripture rotation (R253), and verified schedulable-roles copy (R256)
 
 **UI hint**: yes
 **Deploy note**: Client-only (song edit form, Scripture rotation tab query, schedulable-roles copy).

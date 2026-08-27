@@ -14,7 +14,7 @@ REQ-IDs continue the project's sequential `R###` numbering from the last shipped
 
 ### Song Editing
 
-- [ ] **R249**: A planner can update/edit the Key of a song directly on the song record. — **Phase 87**
+- [x] **R249**: A planner can update/edit the Key of a song directly on the song record. — **Phase 87**
 
 ### Volunteer Scheduling — Team Conflicts
 
@@ -24,7 +24,7 @@ REQ-IDs continue the project's sequential `R###` numbering from the last shipped
 
 ### Scripture Rotation Accuracy
 
-- [ ] **R253**: The Scripture rotation tab lists only scripture items that were added to the service plan, and never includes the sermon/teaching passage. — **Phase 87**
+- [x] **R253**: The Scripture rotation tab lists only scripture items that were added to the service plan, and never includes the sermon/teaching passage. — **Phase 87**
 
 ### Recurring Team Scheduling
 
@@ -33,7 +33,7 @@ REQ-IDs continue the project's sequential `R###` numbering from the last shipped
 
 ### Scheduler UI Copy Accuracy
 
-- [ ] **R256**: The schedulable-roles "default count" description accurately reflects the scheduler's real behavior (it targets that count) and no longer describes it as a "soft planning target." — **Phase 87**
+- [x] **R256**: The schedulable-roles "default count" description accurately reflects the scheduler's real behavior (it targets that count) and no longer describes it as a "soft planning target." — **Phase 87**
 
 ## Future Requirements
 
@@ -58,14 +58,14 @@ Deferred; not in the v2.3 roadmap.
 |-------------|-------|--------|
 | R247 | Phase 84 | Complete |
 | R248 | Phase 84 | Complete |
-| R249 | Phase 87 | Pending |
+| R249 | Phase 87 | Complete |
 | R250 | Phase 85 | Complete |
 | R251 | Phase 85 | Complete |
 | R252 | Phase 85 | Complete |
-| R253 | Phase 87 | Pending |
+| R253 | Phase 87 | Complete |
 | R254 | Phase 86 | Complete |
 | R255 | Phase 86 | Complete |
-| R256 | Phase 87 | Pending |
+| R256 | Phase 87 | Complete |
 
 **Coverage:**
 
