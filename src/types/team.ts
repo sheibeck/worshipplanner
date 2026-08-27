@@ -8,6 +8,14 @@ export interface Team {
   id: string
   name: string
   order: number // stable ascending order, mirrors Role.order
+  // Optional Nth-Sunday-of-month recurring pattern (Phase 86 — R254/R255).
+  // `ordinals` holds integer values 1-5, each meaning the Nth occurrence of
+  // the service date's own weekday within its month (a Sunday service on
+  // the pattern's date is the "Nth Sunday" for a Sunday-scheduled team; a
+  // 5th ordinal only exists in months where that weekday occurs 5 times).
+  // Absent or empty `ordinals` means "no recurring pattern, no auto-select"
+  // — existing team docs with no `recurrence` remain valid and untouched.
+  recurrence?: { ordinals: number[] }
 }
 
 // D-79 default team list — byte-identical to the pre-Phase-79 hard-coded
