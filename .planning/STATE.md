@@ -38,11 +38,12 @@ confirm with me before doing so."*
 > ✅ **Deployed 2026-08-27** (owner-approved). Hosting (client) + all Cloud Functions deployed to
 > `worship-planner-bc515` (`firebase deploy --only hosting` then `--only functions`); the Phase 85 vocals→Band
 > messaging fix (`serviceRoles.ts` + `sendQueuedMessage`) is now LIVE. No `firestore.rules`/`storage.rules`
-> changes in v2.3. Committed + pushed to origin/master (`efae5add`). **One owner data-op remains, non-blocking:**
-> the R248 last-used **backfill** (`node functions/lib/backfillLastUsed.js` dry-run → `--apply` against the
-> Berean prod org) corrects HISTORICAL song last-used dates — the R247 live fix is already deployed, so new
-> locks are correct without it. Milestone close (`/gsd-complete-milestone v2.3`, after `/gsd-audit-milestone`
-> re-run to fold in phases 88–89) is now unblocked.
+> changes in v2.3. Committed + pushed to origin/master. **R248 backfill DONE (2026-08-27):** ran
+> `node functions/lib/backfillLastUsed.js --org 6vyK2… --apply` against the Berean prod org (owner-confirmed
+> after a clean dry-run) — 62 songs corrected, 215 left untouched (no locked service), 0 failed. Note: prod
+> now has a **second org** (`A3x2XPOKUx61YWnTShCt`); owner chose to backfill **Berean only**, second org
+> intentionally skipped. **v2.3 is fully shipped.** Only the GSD milestone-close lifecycle remains
+> (`/gsd-audit-milestone` to fold in phases 88–89, then `/gsd-complete-milestone v2.3` → `/gsd-cleanup`).
 
 > ⚠ **Milestone NOT closed — held for owner UAT.** All 6 phases (84–89) are code-complete, auto-verified,
 > and code-reviewed (14/14 requirements R247–R260). The lifecycle (audit → complete → cleanup) has NOT been
