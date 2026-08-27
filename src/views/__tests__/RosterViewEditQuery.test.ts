@@ -92,6 +92,10 @@ function mountRosterView() {
         RolesConfigPanel: { template: '<div />' },
         TeamsConfigPanel: { template: '<div />' },
         RosterImportModal: { template: '<div />' },
+        // 88-03: RosterView now mounts these real (unmocked useToasts) components —
+        // stub them here too so this deep-link-only suite never entangles with them.
+        RoleSlideOver: { template: '<div />' },
+        TeamSlideOver: { template: '<div />' },
         Teleport: { template: '<div><slot /></div>' },
       },
     },

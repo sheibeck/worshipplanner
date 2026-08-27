@@ -242,12 +242,12 @@
 
       <!-- Roles config tab -->
       <div v-show="activeTab === 'roles'" class="max-w-4xl">
-        <RolesConfigPanel />
+        <RolesConfigPanel @edit="onEditRole" @add="onAddRole" />
       </div>
 
       <!-- Teams config tab -->
       <div v-show="activeTab === 'teams'" class="max-w-4xl">
-        <TeamsConfigPanel />
+        <TeamsConfigPanel @edit="onEditTeam" @add="onAddTeam" />
       </div>
     </div>
 
@@ -256,6 +256,22 @@
       :open="importModalOpen"
       @close="importModalOpen = false"
       @imported="onImported"
+    />
+
+    <!-- Role / Team slideouts (88-03) -->
+    <RoleSlideOver
+      :open="roleSlideOpen"
+      :role="selectedRole"
+      @close="roleSlideOpen = false"
+      @saved="roleSlideOpen = false"
+      @deleted="roleSlideOpen = false"
+    />
+    <TeamSlideOver
+      :open="teamSlideOpen"
+      :team="selectedTeam"
+      @close="teamSlideOpen = false"
+      @saved="teamSlideOpen = false"
+      @deleted="teamSlideOpen = false"
     />
   </AppShell>
 
@@ -452,11 +468,14 @@ import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useTeamsStore } from '@/stores/teams'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
-import type { Person, RoleGroup } from '@/types/roster'
+import type { Person, Role, RoleGroup } from '@/types/roster'
+import type { Team } from '@/types/team'
 import AppShell from '@/components/AppShell.vue'
 import RolesConfigPanel from '@/components/RolesConfigPanel.vue'
 import TeamsConfigPanel from '@/components/TeamsConfigPanel.vue'
 import RosterImportModal from '@/components/RosterImportModal.vue'
+import RoleSlideOver from '@/components/RoleSlideOver.vue'
+import TeamSlideOver from '@/components/TeamSlideOver.vue'
 
 // `useRoute()` returns undefined when RosterView is mounted without a router
 // (some unit tests do this); every read below is optional-chained so the
@@ -468,6 +487,30 @@ const teamsStore = useTeamsStore()
 
 // ── Tabbed layout ────────────────────────────────────────────────────────────
 const activeTab = ref<'volunteers' | 'roles' | 'teams'>('volunteers')
+
+// ── Role / Team slideouts (88-03) — parent owns selection, mirrors SongsView's
+// selectedSong/slideOverOpen pattern for SongSlideOver. ─────────────────────
+const selectedRole = ref<Role | null>(null)
+const roleSlideOpen = ref(false)
+const selectedTeam = ref<Team | null>(null)
+const teamSlideOpen = ref(false)
+
+function onAddRole() {
+  selectedRole.value = null
+  roleSlideOpen.value = true
+}
+function onEditRole(role: Role) {
+  selectedRole.value = role
+  roleSlideOpen.value = true
+}
+function onAddTeam() {
+  selectedTeam.value = null
+  teamSlideOpen.value = true
+}
+function onEditTeam(team: Team) {
+  selectedTeam.value = team
+  teamSlideOpen.value = true
+}
 
 // ── Import modal ─────────────────────────────────────────────────────────────
 const importModalOpen = ref(false)

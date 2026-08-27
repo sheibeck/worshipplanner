@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import RosterView from '../RosterView.vue'
 import type { Person, Role } from '@/types/roster'
+import type { Team } from '@/types/team'
 
 const mockAddPerson = vi.fn(() => Promise.resolve('new-id'))
 const mockUpdatePerson = vi.fn((_id: string, _input: Record<string, unknown>) => Promise.resolve())
@@ -108,6 +109,39 @@ function mountRosterView() {
         RolesConfigPanel: { template: '<div />' },
         TeamsConfigPanel: { template: '<div />' },
         RosterImportModal: { template: '<div />' },
+        RoleSlideOver: { template: '<div />' },
+        TeamSlideOver: { template: '<div />' },
+        Teleport: { template: '<div><slot /></div>' },
+      },
+    },
+  })
+}
+
+// 88-03: wiring stubs for RolesConfigPanel/TeamsConfigPanel that can $emit
+// 'edit'/'add', and RoleSlideOver/TeamSlideOver stubs that surface their
+// :open/:role/:team props for assertion — proves RosterView owns and opens
+// the slideouts in response to panel events.
+const rolesConfigPanelWiringStub = { template: '<div />', emits: ['edit', 'add'] }
+const teamsConfigPanelWiringStub = { template: '<div />', emits: ['edit', 'add'] }
+const roleSlideOverWiringStub = {
+  props: ['open', 'role'],
+  template: '<div data-testid="role-slideover" :data-open="open" :data-role-id="role?.id ?? \'\'" />',
+}
+const teamSlideOverWiringStub = {
+  props: ['open', 'team'],
+  template: '<div data-testid="team-slideover" :data-open="open" :data-team-id="team?.id ?? \'\'" />',
+}
+
+function mountRosterViewForWiring() {
+  return mount(RosterView, {
+    global: {
+      stubs: {
+        AppShell: { template: '<div><slot /></div>' },
+        RolesConfigPanel: rolesConfigPanelWiringStub,
+        TeamsConfigPanel: teamsConfigPanelWiringStub,
+        RosterImportModal: { template: '<div />' },
+        RoleSlideOver: roleSlideOverWiringStub,
+        TeamSlideOver: teamSlideOverWiringStub,
         Teleport: { template: '<div><slot /></div>' },
       },
     },
@@ -204,14 +238,80 @@ describe('RosterView — roles-only Volunteer form (D-07)', () => {
 })
 
 describe('RosterView — collapsible dense sections (R-11)', () => {
-  it('wraps Roles config in CollapsibleSection', () => {
+  // 88-03: the prior assertion here checked for the literal text 'Roles config',
+  // which was never true once RolesConfigPanel became a stub (its own "Roles"
+  // header text lives inside the (stubbed) child component) — a knowingly-stale
+  // case. Replaced with an accurate assertion: the Roles tab button itself renders.
+  it('renders a Roles tab button', () => {
     mockPeople = [
       makePerson({ id: 'p-active', name: 'Alice', active: true, roles: [] }),
     ]
 
     const wrapper = mountRosterView()
 
-    expect(wrapper.text()).toContain('Roles config')
+    const rolesTabButton = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    expect(rolesTabButton).toBeTruthy()
+  })
+})
+
+describe('RosterView — Role/Team slideout ownership (88-03, R257)', () => {
+  it('RoleSlideOver and TeamSlideOver start closed', () => {
+    mockPeople = []
+    const wrapper = mountRosterViewForWiring()
+
+    const roleSlideover = wrapper.find('[data-testid="role-slideover"]')
+    const teamSlideover = wrapper.find('[data-testid="team-slideover"]')
+    expect(roleSlideover.attributes('data-open')).toBe('false')
+    expect(teamSlideover.attributes('data-open')).toBe('false')
+  })
+
+  it('RolesConfigPanel "add" opens RoleSlideOver in create mode (no role)', async () => {
+    mockPeople = []
+    const wrapper = mountRosterViewForWiring()
+
+    const rolesPanel = wrapper.findComponent(rolesConfigPanelWiringStub)
+    await rolesPanel.vm.$emit('add')
+
+    const roleSlideover = wrapper.find('[data-testid="role-slideover"]')
+    expect(roleSlideover.attributes('data-open')).toBe('true')
+    expect(roleSlideover.attributes('data-role-id')).toBe('')
+  })
+
+  it('RolesConfigPanel "edit" opens RoleSlideOver with that role', async () => {
+    mockPeople = []
+    const wrapper = mountRosterViewForWiring()
+
+    const rolesPanel = wrapper.findComponent(rolesConfigPanelWiringStub)
+    await rolesPanel.vm.$emit('edit', mockRoles[0])
+
+    const roleSlideover = wrapper.find('[data-testid="role-slideover"]')
+    expect(roleSlideover.attributes('data-open')).toBe('true')
+    expect(roleSlideover.attributes('data-role-id')).toBe(mockRoles[0]!.id)
+  })
+
+  it('TeamsConfigPanel "add" opens TeamSlideOver in create mode (no team)', async () => {
+    mockPeople = []
+    const wrapper = mountRosterViewForWiring()
+
+    const teamsPanel = wrapper.findComponent(teamsConfigPanelWiringStub)
+    await teamsPanel.vm.$emit('add')
+
+    const teamSlideover = wrapper.find('[data-testid="team-slideover"]')
+    expect(teamSlideover.attributes('data-open')).toBe('true')
+    expect(teamSlideover.attributes('data-team-id')).toBe('')
+  })
+
+  it('TeamsConfigPanel "edit" opens TeamSlideOver with that team', async () => {
+    mockPeople = []
+    const wrapper = mountRosterViewForWiring()
+
+    const team: Team = { id: 'team-1', name: 'Choir', order: 0 }
+    const teamsPanel = wrapper.findComponent(teamsConfigPanelWiringStub)
+    await teamsPanel.vm.$emit('edit', team)
+
+    const teamSlideover = wrapper.find('[data-testid="team-slideover"]')
+    expect(teamSlideover.attributes('data-open')).toBe('true')
+    expect(teamSlideover.attributes('data-team-id')).toBe('team-1')
   })
 })
 
