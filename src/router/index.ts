@@ -113,6 +113,21 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      // R261/R275 — the standalone Run/Control operator screen. requiresAuth
+      // ONLY (any authenticated org member, editor or viewer; running is
+      // presentation-only, no editor tier — mirrors /present/audience and
+      // /monitor-setup, NOT /settings). The org travels in the ?org= query so
+      // the screen self-bootstraps and self-scopes (useServiceAssembly); this
+      // view is the SINGLE WRITER of the wp-run-{serviceId} channel. Opened by
+      // the ServiceEditor Run button yet also directly loadable. Placed among
+      // the static authed routes, before /owner-console and the trailing public
+      // dynamic slug routes, so Vue Router never shadows it.
+      path: '/run/:serviceId',
+      name: 'run-control',
+      component: () => import('../views/RunControlView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       // R177 — deliberately NOT /admins (owned by TeamView.vue, per-org roles).
       // This is the platform-level, super-admin-only console.
       path: '/owner-console',
