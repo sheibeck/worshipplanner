@@ -21,12 +21,10 @@
  * plus one inert preview. Each view builds `currentSlide` (and confidence's
  * `nextSlide`) locally from the returned `index` + `assembledSlideshow`.
  */
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import type { Service } from '@/types/service'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
-import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
+import { useServiceAssembly } from '@/composables/useServiceAssembly'
 import { openRunChannel, type BroadcastChannelFactory, type RunChannelHandle } from '@/utils/runChannel'
 import { SLIDE_FONTS } from '@/config/slideFonts'
 import { cssVarsFor, snapWeight, waitForSlideFont, loadFontCss, FONT_LOAD_TIMEOUT_MS } from '@/utils/slideTypography'
@@ -42,34 +40,19 @@ export interface UseOutputWindowOptions {
 }
 
 export function useOutputWindow(options: UseOutputWindowOptions = {}) {
-  const route = useRoute()
   const authStore = useAuthStore()
   const serviceStore = useServiceStore()
 
-  // ── Org + service scoping ──────────────────────────────────────────────────
-  // serviceId from the route param; org from the ?org= query (the self-scoping
-  // convention per 93-CONTEXT), falling back to the auth store's active org.
-  const serviceId = computed(() => route.params.serviceId as string)
-  const orgIdRef = computed(() => (route.query.org as string | undefined) ?? authStore.orgId ?? null)
-
-  // Read-only viewer: the initial-load branch ONLY — no backfillSlotIds, no
-  // JSON clone, no dirty tracking, no remote-merge (all editor machinery).
-  const localService = ref<Service | null>(null)
-  watch(
-    () => serviceStore.services,
-    (services) => {
-      if (localService.value) return // initial-load only
-      const found = services.find((s) => s.id === serviceId.value)
-      if (found) {
-        localService.value = found
-      }
-    },
-    { immediate: true },
-  )
-
-  // In-window assembly — canWrite OMITTED so it stays its false default: a viewer
-  // never attempts a materialize/rebuild write its Firestore rules would deny.
-  const { assembledSlideshow } = useSlideshowAssembly(localService, orgIdRef)
+  // ── Shared service-load + read-only assembly slice (Phase 95) ───────────────
+  // useServiceAssembly owns the serviceId/org scoping, the localService
+  // initial-load watch, the read-only useSlideshowAssembly (canWrite omitted),
+  // and the WR-02 org-mismatch subscribe gate (in ITS onMounted). It is called
+  // FIRST here so that onMounted registers BEFORE this composable's onMounted —
+  // preserving the subscribe-before-channel ordering (the subscribe fires before
+  // the run channel opens). This composable keeps the output-only lifecycle
+  // (channel, font gate, cursor, fullscreen recovery, wake lock, and the
+  // onUnmounted serviceStore.unsubscribeAll()).
+  const { serviceId, assembledSlideshow } = useServiceAssembly()
 
   // ── Run channel (receive-only) ─────────────────────────────────────────────
   const index = ref<number | null>(null)
@@ -140,26 +123,11 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // NOTE: the WR-02 org-mismatch subscribe gate now lives in useServiceAssembly's
+  // onMounted, which — because useServiceAssembly() is called first in this
+  // setup — registers and fires BEFORE this onMounted. So the service source is
+  // (re)keyed to the resolved org before this handler opens the run channel.
   onMounted(async () => {
-    // Service subscription — key the service source off the SAME resolved orgId
-    // useSlideshowAssembly subscribes content to, not off "is the store fresh?".
-    //
-    // WR-02 (93-REVIEW): the old `!serviceStore.orgId` gate assumed a fresh Pinia
-    // singleton (the standalone window.open path). But this is also a directly-
-    // loadable SPA route: on a same-tab navigation where the store is ALREADY
-    // subscribed to org X while this URL's `?org=` is Y, that gate skipped the
-    // re-subscribe, leaving `services` sourced from X while the assembly reads Y —
-    // a silent cross-org desync on the congregation surface (never-found service →
-    // permanent black, or an X service assembled against Y's content maps). Gate on
-    // an org MISMATCH instead: subscribe() is idempotent (it tears down the prior
-    // listener first), so re-subscribing when the requested org differs re-keys the
-    // service source to `orgIdRef` and eliminates the bleed. Skipping when the org
-    // already matches preserves the existing subscription (no redundant re-listen).
-    const orgId = orgIdRef.value
-    if (orgId && serviceStore.orgId !== orgId) {
-      serviceStore.subscribe(orgId)
-    }
-
     // Receive-only channel: set the index from control's state, announce our
     // (re)mount so control re-sends current state, and NEVER post state ourselves.
     handle = openRunChannel(serviceId.value, options.channelFactory)
