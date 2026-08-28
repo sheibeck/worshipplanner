@@ -1,156 +1,137 @@
 # Stack Research
 
-**Domain:** Vue 3 + Firebase worship-planning SPA — v2.2 Configurability, Hardening & Cleanup
-**Researched:** 2026-08-23
-**Confidence:** HIGH (5 of 6 items are "use what's already installed"; the Resend domain-verification item is externally-sourced from Resend's own docs, also HIGH)
+**Domain:** Browser-based live worship-service presentation/projection ("Run the Service") — multi-monitor delivery from a single Chrome/Edge tab
+**Researched:** 2026-08-28
+**Confidence:** MEDIUM-HIGH (all core APIs verified against MDN, Chrome for Developers, and the W3C `window-management` spec repo; two facts — long-run `id` persistence across browser *restarts*, and exact Edge version parity — could not be pinned to a single authoritative sentence and are flagged below)
 
 ## Recommended Stack
 
-### Core Technologies
+### Core Technologies — all native browser APIs, zero new npm dependencies
 
-No new core technology is warranted for v2.2. Every item in this milestone is either (a) a data-model/UI extension on the existing Firestore + Vue 3 + Pinia stack, (b) a `firestore.rules` edit, (c) a Cloud Functions code change, or (d) an external DNS/dashboard configuration step. Adding a new core dependency for any of these would be over-engineering relative to the existing stack's capabilities.
-
-| Technology | Version (already in repo) | Purpose | Why it covers this milestone |
+| Technology | Version / Support | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| Firebase (`firebase` client SDK) | `^12.0.0` (installed) | Firestore reads/writes for `OrgSettings`, security rules enforcement | `OrgSettings` already exists as a per-org Firestore doc; extending it with a `teams` array is a schema addition, not a new integration |
-| `firebase-admin` / `firebase-functions` | `^13.10.0` / `^7.3.2` (functions/) | Cloud Functions runtime for `deleteService`, token revocation, admin email | Same runtime already used by `deleteQuarter`'s existing cascade-delete pattern — the share-token revocation item reuses that pattern, not a new one |
-| `resend` (Node SDK) | `6.19.0` installed → `6.22.0` latest | Transactional email send from Cloud Functions | Already the chosen provider (v1.7 decision, ADR in PROJECT.md); the v2.2 work is **domain verification** (a Resend dashboard + DNS operation), not an SDK/API change |
-| Vue 3 + Pinia + Vue Router | `^3.5.29` / `^3.0.4` / `^5.0.3` | UI for team config, shared song-browse component, Owner Console labels/ARIA | Component extraction (item 6) and per-team filter UI (item 1) are ordinary Vue composition-API work — no new UI framework or state library needed |
+| **Window Management API** (`window.getScreenDetails()`, `ScreenDetails`, `ScreenDetailed`, `screen.isExtended`) | Chromium 100+ (Chrome & Edge; Edge policy docs confirm control as of Edge 123, API itself ships wherever Chromium 100+ ships since Edge tracks Chromium releases). **Not Baseline** — Chromium-only, no Firefox/Safari support. `caniuse.com/mdn-api_window_getscreendetails` is the live source of truth. | Enumerate every connected monitor (position, size, `isPrimary`, `label`, `id`) so the monitor-config screen can list real displays and place output windows on the correct one | This is the *only* web API that exposes multi-screen topology at all. The project's constraint (Chrome/Edge only, per PROJECT.md) removes the "not Baseline" objection — it's a hard requirement here, not a nice-to-have polyfilled elsewhere |
+| **`window-management` permission** | Same Chromium 100+ gate | Gates `getScreenDetails()`; user sees a one-time OS-level "Know when windows are open on other displays / manage windows" prompt | Required — `getScreenDetails()` throws `NotAllowedError` if not granted. Chrome **persists the grant per-origin across sessions** (visible/revocable in the site's lock-icon → Site settings → "Additional permissions"), so the "remembered per device" requirement (R: persistent monitor config) is satisfied by the browser itself, not just app storage |
+| **Fullscreen API with `screen` option** (`element.requestFullscreen({ screen })`) | Chromium 100+ alongside Window Management (Fullscreen API core is Baseline widely-available since ~2018; the `screen` option is the new, Chromium-only part, spec'd together with Window Management) | Puts the audience/confidence `<div>` into true chrome-free fullscreen **on a specific monitor**, in one call, without first moving/resizing a windowed popup | Avoids the flicker/race of "open window → moveTo → resize → requestFullscreen" — `requestFullscreen({screen: targetScreen})` is spec'd to open directly full-screen on that screen. This is the single biggest quality win over the old drag-then-F11 pattern |
+| **`window.open()` with `left/top/width/height`** | Universal (all browsers, all versions) | Fallback/bootstrap: opens the two output windows as ordinary popups, positioned onto a target screen's coordinates (from `ScreenDetailed.left/top/availWidth/availHeight`) before fullscreening them | Needed regardless of Window Management support — it's how you get *any* second window open at all (Window Management only tells you *where* screens are; it doesn't open windows). Also the entire fallback path when permission is denied: user manually drags the popup to the second monitor, then presses F11 |
+| **BroadcastChannel** | Baseline **widely available** since March 2022 (all evergreen browsers) | Cross-window state sync: control window → audience window + confidence window, "go to slide N / blank / next" | See "Cross-window sync" analysis below — this is the correct primitive for this job, not Firestore and not a shared Pinia store |
+| **Screen Wake Lock API** (`navigator.wakeLock.request('screen')`) | Baseline **2025** (shipped across evergreen browsers as of March 2025; secure-context/HTTPS required) | Keep the audience and confidence displays from sleeping/dimming during a 60–90 min service | Native, zero-dependency, exactly matches the need. Must be re-acquired per output window on `visibilitychange` (see gotchas) |
 
-### Supporting Libraries — additions actually warranted
+### Supporting Libraries — none required
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `eslint-plugin-vuejs-accessibility` | `^2.6.0` | Static ESLint rules for `.vue` templates: missing `alt`, missing form `<label>`/`aria-label` association, invalid/missing ARIA roles, `role="tablist"` child-role mismatches, tabindex misuse | **Only new dependency this milestone actually needs.** Add it as a dev-time linter pass over `OwnerConsoleView.vue` and its child forms/tab-strip components before/alongside the manual a11y retrofit (item 5, backlog 999.7) — it catches the exact defect class already found by the Phase 72/74 UI reviews (placeholder-only inputs, missing tab semantics) and prevents regression once fixed |
-
-**Peer-dependency check (verified via `npm view`):** `eslint-plugin-vuejs-accessibility@2.6.0` declares `"eslint": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0"` — compatible with this repo's `eslint@^10.0.2`. It ships a flat-config export (`flat/recommended`), so it drops into `eslint.config.ts` alongside `pluginVue`/`vueTsConfigs` with no config-format migration.
-
-### Development Tools
-
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| `eslint-plugin-vuejs-accessibility` (flat config) | Lint-time a11y audit, not runtime | Run once as a repo-wide report to scope the retrofit (`npx eslint --rule ...` or add to `eslint.config.ts` scoped to `src/views/OwnerConsoleView.vue` + related components first, then widen), then keep it enabled generally — it is a **linter**, so it never touches the shipped bundle or runtime behavior |
-| Resend Dashboard (web UI, no package) | Domain verification, DNS record generation, verification status | See "Resend Domain Verification" section below — this is 100% external configuration, not code |
-
-## Per-Item Analysis
-
-### 1. Extend `OrgSettings` with a configurable team list + per-team song-tag filter
-
-**No new dependency.** This is a Firestore schema extension to the existing `OrgSettings` doc (which already carries `defaultServiceTemplate`, `bibleVersion`, `vwModeEnabled`, `slideTypography`, `timezone`, `messaging`) plus ordinary Vue form/store code, modeled directly on the existing `DEFAULT_ROLES`-seed-then-edit-per-org pattern already used for roster roles. Add a `teams: { id, name, songTagFilter? }[]` field (or similar), seed it from the current hard-coded `['Choir','Orchestra','Communion','Special']` list on first read (same deep-merge-onto-default pattern `appConfig.ts`'s `coerceSender`/`coerceConfigNumber` already use for the global config doc), and collapse the two duplicated literal arrays (`ServiceEditorView.vue:1675`, `NewServiceDialog.vue:145`) to one source. `firestore.rules` for `organizations/{orgId}/settings` already gates writes to org editors — no rules change needed for this item beyond the schema addition.
-
-### 2. Harden `firestore.rules` — gate `inviteLookup` create to the target org's editor
-
-**No new dependency.** Pure `firestore.rules` change plus the existing rules-emulator test harness (`@firebase/rules-unit-testing@^5.0.0`, already a devDependency, exercised via `npm run test:rules`). Current rule (`firestore.rules:173`, `allow create: if isSignedIn()`) needs to check that `request.auth`'s custom claim grants editor on the `orgId` embedded in the invite payload — the same `orgs:{orgId:role}` claim-reading pattern already used elsewhere in the rules file (post-v2.1 widened claim). Write new ALLOW/DENY cases in `src/rules.test.ts` mirroring the STRIDE-style tests already used for the v2.1 cascade-delete and cross-tenant-access rules. Per standing project discipline, ship this rules change **built + tested + UNDEPLOYED** with the exact `firebase deploy --only firestore:rules` command handed to the owner (per CLAUDE.md and the v1.8/v1.9 precedent).
-
-### 3. Revoke a service's share tokens on `deleteService`
-
-**No new dependency.** `deleteQuarter` already implements this cascade (per PROJECT.md's carry-forward note: "as `deleteQuarter` already does"). This is a Cloud Functions code change — extend `deleteService`'s existing transaction/batch-delete logic to also delete the associated `shareTokens`/`serviceShares`/`serviceShareLinks` documents, using the same `firebase-admin` Firestore batch-delete APIs already in use. `allow delete` rules are already in place (per the backlog note), so no `firestore.rules` change is required for this item specifically.
-
-### 4. Migrate Resend from `onboarding@resend.dev` to a verified sending domain (the main ops item)
-
-**No new npm dependency** — the `resend` package (`6.19.0` → optionally bump to `6.22.0`, a minor/patch-level bump, not required for verification to work) already handles sending; domain verification is entirely a **Resend dashboard + DNS** operation plus two `firebase functions:config`/`defineString` value changes already wired into the code (`SERVICE_SHARE_BASE_URL`, and a new/updated `MESSAGE_FROM_ADDRESS`-equivalent value — currently `DEFAULT_APP_CONFIG.sender.fromAddress` in `functions/src/appConfig.ts:102`, editable at runtime via the existing owner-console-driven `appConfig/global` doc, no redeploy needed for the sender address itself).
-
-**Concrete steps (from Resend's own docs, HIGH confidence):**
-
-1. **Choose a real domain the owner controls.** `*.web.app` / `*.firebaseapp.com` (Firebase Hosting defaults) **cannot** be verified — they're Google-managed with no DNS access (already noted in `params.ts`'s comment). The owner needs a domain they hold DNS for (e.g. their church's own domain, or a domain purchased for the app).
-2. **Add the domain in the Resend dashboard:** Dashboard → Domains → "Add Domain" → enter the domain (Resend recommends a dedicated sending subdomain such as `send.yourdomain.com` to isolate sending reputation from the root domain's other mail).
-3. **Publish the generated DNS records** at the domain's DNS provider (exact values are generated per-domain by Resend at add-time — do not hand-type generic ones):
-   - **SPF** — a TXT record on the sending subdomain authorizing Resend's sending infrastructure.
-   - **DKIM** — a TXT record at `resend._domainkey.<subdomain>` containing the public key Resend generates (this is a literal value to paste, not a CNAME).
-   - **MX** (Resend also issues an MX record for the sending subdomain to receive bounce/complaint feedback).
-   - **DMARC** — a TXT record at `_dmarc.<yourdomain>` with value `v=DMARC1; p=none; rua=mailto:<owner-address>;` to start in monitoring mode. Recommended progression: `p=none` → `p=quarantine` → `p=reject` once the owner confirms all legitimate mail (including this app's) passes for a few weeks. DMARC isn't strictly required for Resend to send, but it's Resend's own recommendation to prevent spoofing and build mailbox-provider trust (an email needs to pass **either** SPF or DKIM, not both, to be DMARC-compliant).
-4. **Click Verify** in the Resend dashboard. Propagation + verification is typically 5–10 minutes but can take longer depending on the DNS provider's TTL; Resend's dashboard shows per-record status (SPF/DKIM/MX validated vs pending) so partial failures are visible immediately rather than as an opaque "unverified" state.
-5. **Update app config once verified — two values, no code deploy required for either:**
-   - `appConfig/global`'s `sender.fromAddress` (read live by `getAppConfig()`; already owner-editable via the Owner Console config UI shipped in v1.9) → set to something like `noreply@send.yourdomain.com` or `worship@yourdomain.com`.
-   - `SERVICE_SHARE_BASE_URL` (a `defineString` param, defaults to `https://worship-planner-bc515.web.app`) → only change this if the owner also wants share links to originate from a custom domain; it is **independent** of the email-sending domain and does not need to match it. If left as the Firebase default, this is a **redeploy-required** Functions param change (`firebase deploy --only functions` after setting the param value), unlike the Firestore-backed sender address.
-6. **No `resend` SDK code change is required** for verification itself — `resend.emails.send({ from, ... })` (`adminEmail.ts:108`) already sends from whatever `config.sender.fromAddress` resolves to. The only reason to touch `functions/src/adminEmail.ts` or `index.ts`'s equivalent send path is if the owner wants the display-name/from construction logic changed, which is unrelated to verification.
-7. **Verify delivery to a real (non-Resend-account) recipient** post-verification — the entire reason for this milestone item is that `onboarding@resend.dev` only delivers to the Resend account owner's own inbox; a verified domain is what unlocks sending to arbitrary volunteer emails.
-
-This is real external ops work (owner must have DNS access, and DNS propagation is outside the app's control) — flag it as an owner-dependency item in the roadmap, not something a coding phase can complete unilaterally, similar to the standing `firebase deploy` handoff discipline already in place for rules/claims changes.
-
-### 5. Accessibility — lightweight ARIA/label audit tooling for the Owner Console
-
-**One new dev dependency: `eslint-plugin-vuejs-accessibility@^2.6.0`.** Rationale for recommending a static linter over a runtime tool:
-- The defects already identified (Phase 72 tab-strip review 23/24, Phase 74 forms review 22/24 — placeholder-only inputs, missing `role="tablist"`/`aria-selected`) are exactly the class of **static template** defects this plugin's rule set targets (`label-has-for`, `form-control-has-label`, ARIA-role/attribute validity rules) — no runtime DOM inspection is needed to find them.
-- It integrates into the **existing** ESLint flat-config pipeline (`eslint.config.ts`, `eslint@^10.0.2`, flat-config already the project's format) with zero config-format migration, unlike `vue-axe` (a runtime devtools panel requiring the app to be running in a browser and manual visual triage) or `@axe-core/playwright` (requires a Playwright test harness the project does not have — vitest + `@vue/test-utils` is the current test stack, not Playwright).
-- It runs in CI/pre-commit alongside the project's existing `lint:eslint` script, giving a repeatable, versionable "before/after" count for the retrofit rather than a one-time manual pass.
-- **What NOT to add:** `vue-axe` or `@axe-core/playwright` — both are legitimate a11y tools in general, but both require either a running browser session or a new E2E test runner (Playwright) this project doesn't have; that's disproportionate tooling investment for a scoped console-page retrofit. If the project later wants continuous runtime a11y regression coverage across the whole app, that's a candidate for a future milestone, not v2.2.
-
-Installation:
-```bash
-npm install -D eslint-plugin-vuejs-accessibility@^2.6.0
-```
-Integration (flat config, add to `eslint.config.ts`):
-```ts
-import pluginVueA11y from 'eslint-plugin-vuejs-accessibility'
-// ...
-export default defineConfigWithVueTs(
-  // ...existing entries...
-  ...pluginVueA11y.configs['flat/recommended'],
-  // ...
-)
-```
-
-### 6. Extract a shared Vue song-browse component
-
-**No new dependency.** This is a component-extraction refactor within the existing Vue 3 + Pinia + TypeScript stack — pull the shared list/filter/search UI currently duplicated between the Songs page and the service-plan song picker into one component (e.g. `SongBrowser.vue`) with props/emits for the two call sites' differing selection behavior (navigate-to-edit vs. pick-into-slot). No component library, state library, or virtualization library is needed unless the song stable is large enough to need list virtualization — nothing in the codebase or backlog note (999.1) suggests that's the case; if it later becomes one, `vue-virtual-scroller`-class libraries would be the option to evaluate then, not now.
+| Library | Verdict |
+|---------|---------|
+| screenfull.js / any fullscreen-shim | **Do not add.** Its entire purpose is normalizing vendor-prefixed Fullscreen API calls across Safari/Firefox/old-Chrome. This project is Chromium-only by explicit constraint (PROJECT.md: "Chrome/Edge target confirmed"), and the native unprefixed API has covered Chromium fully since Chrome 71+ — a shim adds a dependency to solve a problem that doesn't exist for this target |
+| Any "multi-window state management" package (e.g. broadcast-channel npm wrapper, workbox-broadcast-update) | **Do not add.** The native `BroadcastChannel` constructor is ~10 lines to wrap in a composable; a wrapper library buys nothing extra here (no IE11 need, no cross-tab-without-BroadcastChannel fallback need since target is evergreen Chromium) |
+| A "presentation remote control" framework (e.g. reveal.js's multiplex plugin) | **Do not add.** Those solve *networked* remote-control (phone controls a projector over the internet); this milestone is same-machine, same-origin, same-browser-profile — BroadcastChannel already solves it for free |
 
 ## Installation
 
 ```bash
-# The only new dependency for this milestone
-npm install -D eslint-plugin-vuejs-accessibility@^2.6.0
-
-# Optional, not required: bump the existing Resend SDK to latest patch/minor
-cd functions && npm install resend@^6.22.0
+# No installation required — every recommended technology is a native
+# browser API already available in the project's target browsers
+# (Chrome/Edge, Chromium 100+). Zero new npm dependencies for this milestone.
 ```
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|--------------------------|
-| `eslint-plugin-vuejs-accessibility` (static lint) | `vue-axe` (runtime devtools panel) | If the team wants live, click-through a11y feedback during manual dev/QA sessions rather than a CI-checkable rule set — heavier setup (must mount in dev build), better for exploratory audits of dynamic/JS-driven ARIA state the static linter can't see (e.g. `aria-expanded` toggled at runtime) |
-| `eslint-plugin-vuejs-accessibility` | `@axe-core/playwright` (E2E a11y assertions) | Only if the project adopts Playwright/E2E testing generally — introducing a whole new test runner solely for one console-page a11y pass is disproportionate |
-| Extend `OrgSettings` doc in place | A new `teams` sub-collection per org | Sub-collection would make sense if team configs grow large/independently-queried (e.g. hundreds of teams per org with per-team audit history); at the current scale (a handful of named teams per church, edited rarely) an array field on the existing settings doc matches the `DEFAULT_ROLES` precedent and avoids an extra read |
-| Resend dashboard domain verification | A different email provider (SES, Postmark, SendGrid) | Only reconsider if Resend's deliverability or pricing becomes a problem — provider choice was already researched and decided in v1.7 (see PROJECT.md Key Decisions); nothing in this milestone's scope motivates re-opening that decision |
+| Window Management API + fullscreen `screen` option | Manual drag + F11 only (no Window Management API at all) | If the app ever needs to support Firefox/Safari — those browsers have **no** multi-screen enumeration API at all as of 2026. Since PROJECT.md fixes the target to Chrome/Edge, this alternative is only the *fallback path within* Chrome/Edge (permission denied), not a parallel primary path |
+| BroadcastChannel for control→output sync | Firestore `onSnapshot` (already used elsewhere in the app for real-time cross-device sync) | Firestore is the right tool when sync must cross **devices/networks** (e.g., a phone remote from another room). It is the *wrong* tool here: same-machine same-origin windows going through a server round-trip adds 100–300ms+ of network latency and a Firestore write-quota cost *per slide change*, for zero benefit — BroadcastChannel delivers synchronously in the same process with no network hop. Firestore may still be worth it later only for a genuinely remote control device, out of scope this milestone |
+| BroadcastChannel | `window.postMessage()` with retained window references | Only if the control window needs guaranteed delivery to windows it does NOT still hold a reference to (e.g. a reopened window after the original reference was lost), or needs per-recipient targeting/handshake. Here the control window opens and owns both output windows, but BroadcastChannel is still simpler: no `targetOrigin` bookkeeping, and if an output window is closed and reopened it just resubscribes to the same channel name with no re-wiring needed on the sender side |
+| BroadcastChannel | A shared Pinia store | Pinia state does **not** cross `window.open()` boundaries — each popup window loads its own JS bundle and gets its own isolated Pinia instance (separate JS realm). A shared store only works within one window/tab; it cannot be the sync primitive across 3 physical windows. (Pinia is still fine, even ideal, as the *local* state container inside each window, fed by BroadcastChannel messages) |
+| Native `requestFullscreen({screen})` | Moving a fullscreen window with `moveTo` + refullscreen | The moved-then-fullscreened pattern is the *only* option in browsers without the `screen` fullscreen option (i.e., permission denied / API unsupported) — that's exactly the fallback path, not a general alternative |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|--------------|
-| Firebase Hosting default domain (`*.web.app`/`*.firebaseapp.com`) as the Resend sending domain | Google-managed DNS zone — the owner has no DNS access to add SPF/DKIM/DMARC/MX records, so verification is structurally impossible | A domain the owner actually controls DNS for, ideally a dedicated sending subdomain (`send.yourdomain.com`) to isolate sending reputation |
-| Relaxing `inviteLookup`'s create rule to something broader instead of narrowing it to the target org's editor | Defeats the purpose of hardening item 2 — the whole point is closing the self-invite vector, not papering over it | Check the invite payload's `orgId` against `request.auth`'s `orgs:{orgId:role}` custom claim for editor-or-above |
-| A new state-management or component library for the song-browse extraction | Nothing about this refactor needs new client-side infrastructure — it's a props/emits extraction of existing markup/logic | Plain Vue 3 composition-API component + existing Pinia song store |
-| `vue-axe` / Playwright a11y suite as the *first* a11y tool adopted here | Disproportionate setup cost for a scoped console retrofit; the defects found so far are all static-template issues a linter catches | `eslint-plugin-vuejs-accessibility` first; revisit runtime tooling only if a future milestone needs broader, dynamic-state a11y coverage |
+| **Presentation API** (`navigator.presentation`, `PresentationRequest`) | This is a *wireless casting* API (Chromecast/DIAL/Miracast-style "second screen" presentation to a separate device), not a local multi-monitor windowing API. It solves a different problem (no browser window exists on the receiving display at all) and doesn't apply when both outputs are ordinary monitors cabled/HDMI'd into the same machine running the browser | Window Management API + `requestFullscreen({screen})` |
+| **Relying on `ScreenDetailed.id` as a long-term stable device fingerprint across browser reinstalls/profile resets** | The W3C spec text (confirmed via MDN/spec documentation) describes `id` as a **per-origin, session-scoped identifier that resets when the user clears cookies/site data** — it is *not* a hardware serial number. It IS stable across ordinary reloads and browser restarts within the same profile (that's the common case for a church's dedicated projection laptop), but a cache-clear or new browser profile invalidates it silently | Persist the mapping keyed by `id`, but always **re-validate against `label` + `left/top/width/height` on load**, and gracefully fall back to "re-detect and ask" (see Pitfalls flag below) rather than assuming a saved `id` will always resolve |
+| **`window.open()` calls made asynchronously (after an `await`, inside a `setTimeout`, or inside a Firestore `.then()`)** | Chromium's popup blocker requires the call to be synchronous within the original user-gesture call stack (a trusted `click` event). An `await` before the second `window.open()` call breaks that chain and the second popup is silently blocked | Resolve all data needed (screen list, service data) **before** the button click if possible, or open both popups synchronously in direct response to the click and only *then* do async work (fetch/position) inside each already-open window |
+| **A generic fullscreen-shim / cross-browser polyfill library** | Solves Safari/Firefox vendor prefixing, which this Chromium-only target does not need | Native unprefixed `element.requestFullscreen()` |
+| **IndexedDB for the monitor→role mapping** | Massive overkill for a single small per-device key/value record (which screen `id`/label plays Audience vs Confidence) | `localStorage` — see Persistence section below |
+
+## Cross-Window State Sync — the decision in detail
+
+The control window needs to push, with minimum latency and zero flicker: **go to slide N, blank/black, next/prev**, to two dependent windows it opened and (normally) still holds live references to.
+
+**Recommended: `BroadcastChannel`, same-origin, one named channel (e.g. `"worship-run-service"`), JSON messages `{ type: 'goto', slideIndex } | { type: 'blank' } | { type: 'sync-state', ... }`.**
+
+Rationale:
+- **Latency:** in-process, same-origin, no network — effectively synchronous (microtask-scheduled), the lowest latency available to web content. Firestore `onSnapshot` round-trips through the network even on localhost-adjacent setups and is not designed for sub-100ms UI-critical fan-out.
+- **No flicker:** because it doesn't depend on a server ack, the output window can apply the new slide index the instant the message arrives — no loading/pending state needed for the common case (all slide images are already resident, per the app's existing `slideshowAssembler`/render-pending model).
+- **No new infrastructure:** doesn't touch Firestore reads/writes or quota (the run window shouldn't burn a Firestore write on every keypress a projectionist makes — a nervous operator hitting Next/Prev/Next/Prev rapidly during a live service should not be metered against the app's Firestore/Functions cost controls, which v1.8's cost-hardening milestone specifically built to prevent runaway spend).
+- **Resilience to a reopened output window:** if the confidence monitor's window is accidentally closed and reopened (e.g. crashed or the projectionist fat-fingered it), it just needs to subscribe to the same channel name again — no handshake or reference re-wiring on the control window's side. (It will, however, miss whatever slide is "current" until the next change event — mitigate by having the control window periodically rebroadcast full state, or by having a newly-opened output window request a "hello, what's current" message and having the control window answer it once on `message` receipt — a tiny request/response layered on top of the same channel.)
+- **Direct `window.open()`-returned references + `postMessage`** remains a reasonable secondary/defense-in-depth channel (e.g., to push an initial full-state payload immediately after `open()` returns, before the new window's own `BroadcastChannel` listener has necessarily attached) but should not replace BroadcastChannel as the primary channel, since it requires the sender to track live references and re-wire if a window is closed/reopened.
+- **Firestore `onSnapshot`** remains the right tool if this milestone later needs a genuinely remote control surface (e.g. a phone on the church Wi-Fi acting as a clicker from across the room) — explicitly out of scope for this milestone's three-window-same-machine model, but worth flagging as the natural extension point if "remote clicker" becomes a future requirement.
+
+## Screen Wake Lock — integration detail
+
+- Request `navigator.wakeLock.request('screen')` **separately in each output window** (audience and confidence), not just the control window — a wake lock only keeps *that document's* screen awake; it does not prevent a different browsing context's display from sleeping.
+- Chromium releases the lock automatically when a document becomes hidden/inactive (`document.visibilityState !== 'visible'`) — for an unattended fullscreen output window this is rarely triggered by the user, but can happen from OS-level display-sleep policy interactions; re-acquire on the `visibilitychange` listener as MDN's documented pattern shows.
+- Secure context (HTTPS) required — already satisfied (Firebase Hosting serves HTTPS).
+- Cheap to add defensively; no reason to omit it given the milestone's explicit goal is an unattended multi-hour live service.
+
+## Persistence of the Monitor → Role Mapping (per-device "remembered" config)
+
+- **Use `localStorage`**, keyed to the app's origin (already per-device/per-browser-profile, which is exactly the desired scope — "remembered per device" per PROJECT.md, not per-user-account/synced). A single small JSON blob is sufficient: `{ screens: [{ id, label, left, top, width, height, role: 'audience'|'confidence' }], savedAt }`.
+- **Do not rely on `id` alone to resolve the saved mapping on next launch.** Per the "What NOT to Use" row above, `id` is stable across page reloads/restarts within the same browser profile — the expected common case for a fixed projection laptop — but is not guaranteed permanently stable (cookie/site-data clear resets it). The robust re-detect algorithm on the monitor-config screen's load:
+  1. Call `getScreenDetails()` (or fall back to the permission-denied flow) and get the current live screen list.
+  2. Try to match each saved entry by `id` first; if no match, fall back to matching by `(left, top, width, height)` (a monitor plugged into the same port at the same resolution reports identical bounds even after an `id` reset).
+  3. If neither matches (monitor count/arrangement genuinely changed — a cable was moved, a new display attached), **surface the "physical layout changed, please reassign" prompt** the milestone description already anticipates ("re-prompt only if the physical monitor layout changed") rather than silently guessing.
+- No IndexedDB needed — this is not blob/file storage and there is no query requirement beyond a lookup by device.
 
 ## Stack Patterns by Variant
 
-**If the owner wants share links to also originate from the new custom domain (not just email):**
-- Also update `SERVICE_SHARE_BASE_URL` (a Functions `defineString` param) to the new domain and redeploy Functions (`firebase deploy --only functions`)
-- Because unlike the Firestore-backed `sender.fromAddress` (live, no redeploy), `defineString` params are baked in at deploy time
+**If `window-management` permission is granted (the primary path):**
+- On the monitor-config screen: call `getScreenDetails()`, render each `ScreenDetailed` (label/position/size) as a clickable card, let the user assign Audience/Confidence, persist to `localStorage`.
+- On Run: open two `window.open()` popups (audience, confidence) positioned via each target screen's `left/top/availWidth/availHeight`, immediately synchronously (same click handler, no `await` between the two calls), then in each popup call `element.requestFullscreen({ screen: targetScreenDetailed })`.
+- Because `ScreenDetailed` objects are only valid within the `ScreenDetails` instance/session they came from, **pass screen identity (not the live object) across the `window.open()` boundary** — e.g. via a query string or `localStorage` read on the new window's own load, then re-resolve to a live `ScreenDetailed` by calling `getScreenDetails()` again inside that new window and matching by `id`/bounds, since a raw JS object reference cannot cross to the new window's separate realm anyway.
 
-**If DMARC enforcement (`p=quarantine`/`p=reject`) is applied before mail volume/legitimacy is confirmed:**
-- Start `p=none` and monitor `rua` reports for at least a few send cycles before tightening
-- Because a too-early strict policy can silently reject legitimate transactional mail (invite/onboarding emails) if any record is subtly misconfigured, with no visible in-app error — DMARC failures happen at the receiving mail server, invisible to the sending Cloud Function
+**If permission is denied, the API is unavailable, or `screen.isExtended === false` (single-display machine, e.g. testing/dev):**
+- Fall back to plain `window.open()` positioned with `left`/`top` offset (best-effort, using `screen.availWidth` heuristics since no second-screen bounds are knowable) and instruct the operator to drag the popup to the correct physical monitor, then press F11 (native browser fullscreen) or trigger `requestFullscreen()` without the `screen` option (fullscreens whichever screen the window is currently on — validated, non-Chromium-only baseline behavior).
+- Detect this path via the standard feature-detect: `if (!('getScreenDetails' in window)) { /* single-screen/manual fallback */ }` combined with a `try/catch` around the `getScreenDetails()` call itself for the denied-permission case (`NotAllowedError`).
 
 ## Version Compatibility
 
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `eslint-plugin-vuejs-accessibility@2.6.0` | `eslint@^10.0.2` (installed) | Peer range `^5.0.0 \|\| ^6.0.0 \|\| ^7.0.0 \|\| ^8.0.0 \|\| ^9.0.0 \|\| ^10.0.0` — verified via `npm view eslint-plugin-vuejs-accessibility peerDependencies` |
-| `eslint-plugin-vuejs-accessibility` flat config | `eslint.config.ts` (this repo's format, via `defineConfigWithVueTs`) | Ships a `flat/recommended` export — no legacy `.eslintrc` bridge needed |
-| `resend@6.22.0` | `resend@6.19.0` (installed, functions/) | Minor/patch bump, no verification-related API surface change — domain verification is a dashboard/DNS operation independent of SDK version |
-| `@firebase/rules-unit-testing@^5.0.0` (installed) | Firestore/Storage emulator, `firebase-tools` | Already the harness for `src/rules.test.ts`; new `inviteLookup` ALLOW/DENY cases slot into the existing suite, run via `npm run test:rules` per CLAUDE.md's documented emulator-port caveat |
+| Package/API | Compatible With | Notes |
+|---|---|---|
+| Window Management API | Chrome/Edge 100+ | Project already targets modern evergreen Chrome/Edge; no lower bound concern given the constraint is "Chrome/Edge" generally, not a pinned old version |
+| `requestFullscreen({screen})` | Same Chromium 100+ gate as Window Management (shipped together as part of the same spec effort) | Do not call with the `screen` option unless `getScreenDetails()` already succeeded — passing a `ScreenDetailed` from a stale/mismatched session is undefined; always fetch fresh before use |
+| BroadcastChannel | All evergreen browsers since ~2022, far below this project's Chrome/Edge 100+ floor | No compatibility risk |
+| Screen Wake Lock | Baseline 2025, HTTPS required | Firebase Hosting already serves HTTPS in this project — no gap |
+| Vue 3 + Pinia (existing stack) | Each `window.open()`'d popup is a separate JS realm/bundle load — Pinia store instances do NOT share state across windows automatically | Feed each window's local Pinia store via BroadcastChannel message handlers, not by assuming shared reactivity |
+
+## Integration Points With Existing Code
+
+- **`src/components/PresentationViewer.vue`** — the existing single-window in-app preview (`Teleport to="body"`, `fixed inset-0 z-50 bg-black`, background layer + scrim, keyboard nav, loading/render-pending states) is the template for the **audience output window's** slide-rendering logic. The new audience output route/component should reuse this rendering core (background image + scrim + slide canvas) but strip all chrome (no exit button, no counters) since "zero chrome" is an explicit requirement. Likely refactor path: extract the pure slide-canvas rendering (background + content, no controls) into a shared composable/sub-component consumed by both the existing in-app preview and the new fullscreen-output windows, rather than duplicating the background/scrim/typography logic.
+- **`src/utils/slideshowAssembler.ts`** (`assembleSlideshow(service, inputs): AssembledSlide[]`) — this is the existing single source of truth for the ordered slide array (including PPTX-rendered images, backgrounds resolved at slide/group/song level, scripture congregational splits). The Run/control window should call this exactly as `PresentationViewer` does today to build the slide list once, then broadcast **only the current index** (and derived current/next slide data) to the output windows over `BroadcastChannel` — not the whole assembled array repeatedly. The confidence monitor's "current + upcoming" requirement is a pure derivation (`slides[index]`, `slides[index+1]`) from data the control window already holds.
+- **Background suppression on the confidence monitor** — reuse the same background-resolution output from `slideshowAssembler`/`PresentationViewer`'s existing per-slide background logic, but the confidence-monitor renderer simply never applies the `backgroundImage` style (render text-only on black) — no new background-resolution logic needed, only a rendering-mode flag.
+
+## Biggest Feasibility Risk — flag for roadmap
+
+**Permission UX + the synchronous-popup constraint are the two risks a phase should explicitly own:**
+
+1. **Permission prompt UX**: `getScreenDetails()` triggers a real, one-time-per-origin OS-style permission prompt that a non-technical projectionist must accept. If they dismiss/deny it (common for unfamiliar prompts), the app must gracefully degrade to the drag+F11 fallback described above — this fallback path is not optional polish, it is a required primary flow for any church volunteer who clicks "block" by reflex. Budget explicit UAT time for both the granted and denied paths on the monitor-config screen.
+2. **Two windows, one click, zero `await` in between**: opening both the audience and confidence windows must happen synchronously within the same click handler (see "What NOT to Use" — async `window.open()` gets silently blocked). Any pre-flight async work (permission checks, screen resolution, Firestore reads for the service data) must complete **before** the "Run" button's click handler fires the two `window.open()` calls, or be restructured so both calls happen first and data loads inside the already-open windows afterward.
+3. **Screen `id` instability across data/cookie clears** (see "What NOT to Use") is a secondary, lower-probability risk — mitigated by the bounds-matching fallback described in Persistence above, but should still be explicitly tested by clearing site data and confirming the re-prompt flow behaves per the milestone's stated "re-prompt only if physical layout changed" intent.
 
 ## Sources
 
-- Live repo inspection: `package.json`, `functions/package.json`, `functions/src/params.ts`, `functions/src/adminEmail.ts`, `functions/src/appConfig.ts`, `eslint.config.ts` — confidence HIGH (primary source, this codebase)
-- `npm view eslint-plugin-vuejs-accessibility peerDependencies` / `npm view resend version` — confidence HIGH (npm registry ground truth, verified 2026-08-23)
-- Resend docs, `https://resend.com/docs/dashboard/domains/introduction` and `https://resend.com/docs/dashboard/domains/dmarc` (fetched 2026-08-23) — confidence HIGH (vendor's own current documentation)
-- Web search corroboration on Resend's SPF/DKIM/MX/DMARC record pattern (dmarcdkim.com, dmarc.wiki/resend, phishfence.io) — confidence MEDIUM (third-party summaries, used only to corroborate the vendor docs' record-type shape, not as primary source)
-- `eslint-plugin-vuejs-accessibility` GitHub/docs site (vue-a11y.github.io) — confidence MEDIUM-HIGH (project's own docs site, corroborated by the npm peerDependencies field directly)
-- `.planning/PROJECT.md`, `.planning/seeds/SEED-002-church-specific-rules-configurability.md` — confidence HIGH (primary source, this project's own planning record)
+- MDN — [Window Management API](https://developer.mozilla.org/en-US/docs/Web/API/Window_Management_API) — HIGH confidence (official docs; verified overview, interfaces, permission name, experimental/non-Baseline status)
+- MDN — [ScreenDetailed](https://developer.mozilla.org/en-US/docs/Web/API/ScreenDetailed) — HIGH confidence (property definitions: label, left, top, isPrimary, isInternal, devicePixelRatio)
+- MDN — [Fullscreen API](https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API) — HIGH confidence (core `requestFullscreen()`/`exitFullscreen()`/events, Baseline status)
+- MDN — [Screen Wake Lock API](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API) — HIGH confidence (request/release lifecycle, visibilitychange re-acquire pattern, Baseline 2025, HTTPS requirement)
+- MDN — [BroadcastChannel](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel) — HIGH confidence (same-origin cross-context messaging, Baseline widely available since March 2022, sender-excluded-from-own-message behavior)
+- Chrome for Developers — [Manage several displays with the Window Management API](https://developer.chrome.com/docs/capabilities/web-apis/window-management) — HIGH confidence (Chrome 100+ ship version, permission-prompt-on-first-use behavior, feature-detect shim example)
+- W3C `window-management` spec repo — [HOWTO.md](https://github.com/w3c/window-management/blob/main/HOWTO.md) and [EXPLAINER.md](https://github.com/w3c/window-management/blob/main/EXPLAINER.md) — HIGH confidence (canonical code patterns for `getScreenDetails()`, window placement onto a specific screen, `requestFullscreen({screen})`, feature-detection with `try/catch` fallback)
+- W3C `window-management` GitHub Issue #80 ("Does getScreenDetails() always resolve with the same object?") — MEDIUM confidence (confirms `id`/object-identity stability was an open spec-clarity question during standardization; used as corroboration, not as the sole source, for the `id`-instability caution)
+- caniuse.com — [`mdn-api_window_getscreendetails`](https://caniuse.com/mdn-api_window_getscreendetails) — cited as the live/current source of truth for exact per-browser support percentages; treat as authoritative over any single snapshot captured during this research pass
+- Cross-checked web search (MEDIUM confidence, multiple corroborating results per claim): Edge Chromium-parity/policy documentation (Edge 123 `DefaultWindowManagementSetting` policy existing confirms the underlying API ships in that Edge generation, consistent with Chrome 100+ parity); synchronous-vs-asynchronous `window.open()` popup-blocker behavior within a single click handler; `window-management` permission grant persistence across sessions via Chrome's per-site "Additional permissions"
+- Existing codebase, read directly (HIGH confidence — primary source): `src/components/PresentationViewer.vue` (single-window slide-canvas rendering pattern: Teleport-to-body, background layer + scrim, keyboard nav, loading/render-pending states) and `src/utils/slideshowAssembler.ts` (`assembleSlideshow(service, inputs): AssembledSlide[]` — existing ordered-slide data source to reuse, not rebuild)
 
 ---
-*Stack research for: WorshipPlanner v2.2 (Configurability, Hardening & Cleanup)*
-*Researched: 2026-08-23*
+*Stack research for: browser-based live worship-service presentation/projection mode (v2.4 "Run the Service")*
+*Researched: 2026-08-28*

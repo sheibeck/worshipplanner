@@ -1,294 +1,422 @@
-# Architecture Patterns
+# Architecture Research
 
-**Domain:** Per-org worship configurability + hardening/cleanup integration (v2.2)
-**Researched:** 2026-08-23
+**Domain:** Multi-window live presentation ("Run the Service") integrated into an existing Vue 3 +
+Firebase worship-planning app
+**Researched:** 2026-08-28
+**Confidence:** HIGH (all claims verified against live source in this repo; the two external-API
+claims — Firebase Auth default persistence, Window Management API shape — are well-established,
+stable browser/SDK behavior, cited below)
 
-## Recommended Architecture
+## Standard Architecture
 
-v2.2 is **pure integration work on an existing, mature architecture** — no new architectural layer,
-no new Firebase service. Every one of the five asks slots into a pattern the codebase already uses
-at least once. The job is: (1) reuse the `organizations/{orgId}/roles` subcollection pattern for a
-new `teams` subcollection, (2) tighten one `firestore.rules` clause to the exact idiom already used
-three times (`orgSlugs`, `orgNames`, `shareTokens`), (3) copy `deleteQuarter`'s share-revocation
-block into `deleteService`, (4) add a client-only guard in one drawer component, (5) dedupe a
-constant that is already correctly defined in one place and wrongly re-declared in six others.
+### System Overview
+
+This is **pure integration work on top of an already-correct slide engine** (same posture as the
+prior v2.2 ARCHITECTURE.md — see that file's opening line). `slideshowAssembler.ts` is untouched.
+`PresentationViewer.vue` is refactored (not forked) to expose its slide-rendering guts as a reusable
+piece. Everything new is a thin per-role wrapper plus two small client-only utility modules (a
+BroadcastChannel protocol, a localStorage-backed device config) — no new Firebase surface, no new
+Firestore collection, no Cloud Function.
 
 ```
-organizations/{orgId}
-  .settings                     OrgSettings doc field — aiEnabled, pcEnabled, vwModeEnabled,
-                                 defaultServiceTemplate, bibleVersion, slideTypography, messaging,
-                                 timezone. NOT where the new team list goes (see below).
-  /roles/{roleId}                existing subcollection — CRUD via stores/roster.ts,
-                                 seeded via seedDefaultRolesIfEmpty() called from RosterView.vue
-                                 on first mount. Rules: falls through the generic per-org
-                                 wildcard (isOrgEditor read+write). <- exact precedent for teams
-  /teams/{teamId}                NEW subcollection, same shape of precedent as /roles
-  /services/{serviceId}          service.teams: string[] (denormalized team NAMES, unaffected
-                                 by the new subcollection's existence — no migration needed)
-  /invites/{email}               existing, org-scoped, editor-only (already correctly gated)
+┌───────────────────────────────────────────────────────────────────────────┐
+│  Browser window #1 — RUN CONTROL  (/run/:serviceId)                       │
+│  ┌─────────────┐  ┌────────────────────────┐  ┌─────────────────────┐    │
+│  │ RunOrderRail│  │ SlideCanvas (current)   │  │ SlideCanvas (next,  │    │
+│  │ (highlight, │  │  + keyboard/click nav   │  │  static preview)    │    │
+│  │  click-jump)│  └────────────────────────┘  └─────────────────────┘    │
+│  └─────────────┘            │  currentIndex / blackout state (owned here) │
+│         useSlideshowAssembly(service, orgId, {canWrite:false})            │
+│         window.open() → placed via Window Management API + monitorConfig  │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                     │ BroadcastChannel('wp-run-{serviceId}')
+                                     │  { type:'state', index, blackout, seq }
+                    ┌────────────────┴────────────────┐
+                    ▼                                  ▼
+┌────────────────────────────────────┐  ┌────────────────────────────────────┐
+│ Browser window #2 — AUDIENCE        │  │ Browser window #3 — CONFIDENCE     │
+│ (/present/audience/:serviceId)      │  │ (/present/confidence/:serviceId)   │
+│ SlideCanvas fullscreen, chromeless, │  │ SlideCanvas(current)+SlideCanvas   │
+│ background ON                       │  │ (next), suppressBackground=true,   │
+│ useSlideshowAssembly (own instance, │  │ chromeless. Own useSlideshowAssembly│
+│ read-only) + BroadcastChannel       │  │ instance + BroadcastChannel        │
+│ (listener only)                     │  │ (listener only)                    │
+└────────────────────────────────────┘  └────────────────────────────────────┘
 
-inviteLookup/{email}             TOP-LEVEL collection (org-agnostic key), 1:1 shadow of the
-                                 org-scoped invite above, used for O(1) email->org lookup at
-                                 sign-in. THIS is the rules change target (§2 below).
-
-shareTokens/{token}              service.id      + = the 3 collections deleteQuarter already
-serviceShares/{slug}__service-*  service.date    |   revokes on quarter delete; deleteService
-serviceShareLinks/{serviceId}    service.id      + = must revoke the same 3 (§3 below)
+  Standalone, service-independent:  /monitor-setup  →  MonitorSetupView.vue
+  → getScreenDetails() → fingerprint each screen → localStorage (per device,
+    NOT Firestore, NOT keyed by uid/orgId)
 ```
 
-### Component Boundaries
+All three windows are **separate JS realms** (separate tabs/windows = separate Pinia instances,
+separate Firestore listener sets). They are NOT sharing in-memory state — the only cross-window
+wire is the BroadcastChannel. Each independently subscribes to the SAME Firestore-backed
+`useSlideshowAssembly(service, orgId)` and therefore independently computes the SAME
+`AssembledSlide[]` array from the same underlying documents — this is what keeps "control's slide N"
+and "audience's slide N" guaranteed identical without ever transmitting slide content over the wire,
+only a cheap integer index.
 
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| `src/types/team.ts` (NEW) | `Team` shape: `{ id, name, order, songTagFilter?: string, allowsFreeTextName?: boolean }`. `DEFAULT_TEAMS` seed array (mirrors `DEFAULT_ROLES` in `roster.ts`) | `stores/teams.ts` |
-| `stores/teams.ts` (NEW) | `onSnapshot` subscribe to `organizations/{orgId}/teams`; `addTeam`/`updateTeam`/`deleteTeam`; `seedDefaultTeamsIfEmpty()` (verbatim structural mirror of `roster.ts`'s `seedDefaultRolesIfEmpty`) | Firestore `organizations/{orgId}/teams`; consumed by `ServiceEditorView.vue`, `NewServiceDialog.vue`, a new Settings teams panel |
-| Settings "Teams" panel (NEW, mirrors the existing Roles editor UI in `RosterView.vue`) | CRUD UI for team name + optional song-tag filter + optional "allows free-text service name" flag | `stores/teams.ts` |
-| `ServiceEditorView.vue` (MODIFIED) | Reads `teamsStore.teams` instead of the local `AVAILABLE_TEAMS` const (line 1675); replaces the two hardcoded Orchestra-filter blocks (lines 3426-3429, 3537-3540) with one helper that reads each selected team's `songTagFilter` | `stores/teams.ts` (new dependency); `stores/songs.ts` (unchanged) |
-| `NewServiceDialog.vue` (MODIFIED) | Reads `teamsStore.teams` instead of the local `availableTeams` const (line 145); **deletes** `sundayOrdinal()` (line 148) and the two ordinal-based auto-select blocks (lines 170-201) — B1 drop, no replacement | `stores/teams.ts` (new dependency) |
-| `ServiceCard.vue` (MODIFIED, minor) | The `'Special'` free-text-name special-case (line ~87) generalizes to "does the service's team set include any team with `allowsFreeTextName`" | `stores/teams.ts` |
-| `src/types/song.ts` (UNCHANGED, becomes the single source) | `VW_TYPE_LABELS` already lives here correctly | `ShareView.vue`, `SongSlideOver.vue`, `BatchQuickAssign.vue`, `VwExplainer.vue`, `SettingsView.vue`, `claudeApi.ts` (all MODIFIED to import instead of re-declare) |
-| `firestore.rules` `inviteLookup` block (MODIFIED) | `allow create` narrowed from `isSignedIn()` to `isOrgEditor(request.resource.data.orgId)`, mirroring `orgSlugs`/`orgNames`/`shareTokens` | Firestore rules engine only — no client code change required (see §2) |
-| `stores/services.ts` `deleteService` (MODIFIED) | Revoke `shareTokens` + `serviceShares` + `serviceShareLinks` before/with the service doc delete — same 3 docs `deleteQuarter` already revokes, addressed differently (service has a direct-keyed `serviceShareLinks/{serviceId}` identity doc; quarter has a denormalized `quarter.shareToken` field) | Firestore `shareTokens`, `serviceShares`, `serviceShareLinks` — all already `allow delete: if isOrgEditor(...)`, no rules change |
-| `EditSlideDrawer.vue` (MODIFIED) | Add `renderState` awareness: when the active entry's slide carries `renderState === 'pending'` (`src/types/slide.ts`), disable/warn on per-entry customization (label/notes/body/audio/background) instead of silently accepting edits that vanish on pending→ready | No new store; reads a field (`renderState`) the slide type already carries but the drawer never inspects today |
+### Component Responsibilities
 
-### Data Flow
+| Component | Responsibility | Typical Implementation |
+|-----------|----------------|------------------------|
+| `slideshowAssembler.ts` (UNCHANGED) | Pure `service + content maps → AssembledSlide[]` | Reused verbatim by all three windows via `useSlideshowAssembly` |
+| `useSlideshowAssembly` composable (UNCHANGED) | Reactive Firestore wiring around the assembler; already supports `canWrite: false` for read-only consumers | Instantiated once per window (control, audience, confidence), each with `canWrite: false` — the run flow never writes slide groups |
+| `SlideCanvas.vue` (NEW — extracted from `PresentationViewer.vue`) | Renders ONE `AssembledSlide`'s content (lyric/copyright/scripture/text/image/video) + owns that slide's own audio/video playback | Presentational; takes `slide`, `suppressBackground?`, `interactive?` (gates autoplay-affordance buttons for a non-interactive "next" preview) |
+| `PresentationViewer.vue` (MODIFIED) | Existing single-window "Present" preview — chrome, arrows, counter, fullscreen, keyboard, font gate | Refactored to compose `SlideCanvas` internally; zero behavior change at its one existing call site (`ServiceEditorView.vue`'s Slides tab) |
+| `RunOrderRail.vue` (NEW) | Order-of-service list, current-item highlighted, click-to-jump | Consumes `service.slots` + a slot-index↔first-slide lookup (see Pattern 3) |
+| `RunControlView.vue` (NEW) | Owns `currentIndex`/`blackout`; composes `SlideCanvas`×2 (current+next) + `RunOrderRail`; opens/positions the two output windows; broadcasts state | New route `/run/:serviceId` |
+| `AudienceOutputView.vue` (NEW) | Thin: fullscreen `SlideCanvas`, chromeless, background on, listens only | New route `/present/audience/:serviceId` |
+| `ConfidenceOutputView.vue` (NEW) | Thin: `SlideCanvas`×2 (current+next), `suppressBackground` forced true, chromeless, listens only | New route `/present/confidence/:serviceId` |
+| `MonitorSetupView.vue` (NEW) | Standalone, service-independent: enumerate screens, assign roles, persist per device | New route `/monitor-setup` |
+| `runChannel.ts` (NEW) | Typed `BroadcastChannel` wrapper — the control→output command protocol | `src/utils/runChannel.ts` |
+| `monitorConfig.ts` (NEW) | Screen fingerprinting + localStorage read/write, mirroring the existing `wp:tagFilter:v2:...` precedent's try/catch discipline | `src/utils/monitorConfig.ts` |
+| `serviceSlots.ts` (NEW) | Slot-ordering + first-assembled-slide-index lookup, shared by the rail and (optionally) the assembler | `src/utils/serviceSlots.ts` |
 
-**Configurable Teams (1):** `stores/teams.ts` subscribes to `organizations/{orgId}/teams`
-exactly like `stores/roster.ts` subscribes to `.../roles` — same lifecycle (subscribe on org
-context load, unsubscribe on org switch, per the CLAUDE.md org-switch cache-clearing fix).
-`ServiceEditorView.vue`/`NewServiceDialog.vue` read `teamsStore.teams` reactively instead of a
-module-level const array, so a Settings-panel edit to the team list is live everywhere without a
-reload. The per-team `songTagFilter` field flows: team selected on service → helper looks up that
-team's `songTagFilter` in `teamsStore.teams` → filters `songStore`'s song list by `tags.includes(filter)`
-— a straight generalization of the existing `isOrchestraService ? base.filter(s => s.tags.includes('Orchestra')) : base` inline logic, replacing the hardcoded string with the configured one (or no filtering if the team has none set).
+## Recommended Project Structure
 
-**inviteLookup gate (2):** No data-flow change. `TeamView.vue`'s `onInvite()` already writes
-`{ orgId, role, invitedAt }` into `inviteLookup/{email}` inside the SAME `writeBatch` as the
-`organizations/{orgId}/invites/{email}` doc — `orgId` is already present on the payload today, so
-`request.resource.data.orgId` is available to the tightened rule with zero client-code change. The
-only OTHER writer of `inviteLookup` is `assignOrgAdmin` (Cloud Function, Admin SDK) — Admin SDK
-writes bypass `firestore.rules` entirely, so that path is unaffected by this change and needs no
-functions redeploy.
+```
+src/
+├── components/
+│   ├── PresentationViewer.vue      # MODIFIED — now composes SlideCanvas
+│   ├── slides/
+│   │   └── SlideCanvas.vue         # NEW — extracted per-slide render + media
+│   └── run/                        # NEW folder — Run-mode-only components
+│       ├── RunOrderRail.vue        # NEW
+│       └── MonitorScreenPicker.vue # NEW — the assign-role UI used by MonitorSetupView
+├── views/
+│   ├── RunControlView.vue          # NEW — /run/:serviceId
+│   ├── AudienceOutputView.vue      # NEW — /present/audience/:serviceId
+│   ├── ConfidenceOutputView.vue    # NEW — /present/confidence/:serviceId
+│   └── MonitorSetupView.vue        # NEW — /monitor-setup
+├── utils/
+│   ├── slideshowAssembler.ts       # UNCHANGED
+│   ├── serviceSlots.ts             # NEW — sortedSlotsWithIndex(), firstAssembledIndexBySlot()
+│   ├── runChannel.ts               # NEW — BroadcastChannel protocol
+│   └── monitorConfig.ts            # NEW — localStorage device config + screen fingerprinting
+├── composables/
+│   └── useSlideshowAssembly.ts     # UNCHANGED — reused by all 3 Run windows
+└── router/
+    └── index.ts                    # MODIFIED — 4 new routes
+```
 
-**deleteService revocation (3):** `deleteQuarter`'s pattern (`stores/quarters.ts:460-483`) is:
-read `quarter.shareToken` (denormalized on the doc) → if present, delete `shareTokens/{token}` →
-compute the deterministic `quarterShares/{slug}__q{N}-{year}` key from the org's slug → delete it
-if present → delete the quarter doc. `deleteService` needs the SAME 3-collection cleanup but the
-service side has no denormalized token field on the service doc itself — instead
-`serviceShareLinks/{serviceId}` (keyed directly by serviceId, written by `ensureShareLink`) IS the
-identity doc holding `{ token, orgId, serviceId }`. So the mirrored sequence is: read
-`serviceShareLinks/{serviceId}` → if it exists, delete `shareTokens/{that token}` and delete
-`serviceShareLinks/{serviceId}` itself → compute `serviceShares/{slug}__service-{service.date}` from
-the org's slug + the service's own `date` field (exact key `writeSharePayload` already uses at
-`services.ts:629`) → delete it if present → then delete the service doc. All three collections
-already have `allow delete: if isOrgEditor(resource.data.orgId)` — **zero rules change**, per the
-carry-forward note in `PENDING-VERIFICATION.md` C5.
+### Structure Rationale
 
-**Pending-slide guard (4):** No new data flow — `slide.ts`'s `renderState?: 'pending' | 'failed'`
-already exists on the entry the drawer edits; the drawer's `sourceKind === 'imported'` branch
-(where a PPTX-render entry surfaces) simply never reads it today. Adding the check is a pure
-UI-layer read of a field already streamed down via the assembled slideshow prop.
+- **`components/run/`:** groups the Run-mode-only presentational pieces separately from the
+  existing `components/slides/` (which is the Slides-tab editing surface) — nothing in Run mode
+  writes, so keeping it visually and physically distinct from the editing components avoids any
+  temptation to reach for editor-only stores/composables from a live-projection screen.
+- **`SlideCanvas.vue` lives in `components/slides/`, not `components/run/`:** it is consumed by
+  BOTH the pre-existing `PresentationViewer.vue` (editor-side "Present" preview) and the three new
+  Run views — it belongs with the engine, not with either consumer.
+- **`utils/` for `runChannel.ts`/`monitorConfig.ts`/`serviceSlots.ts`:** all three are pure,
+  framework-agnostic modules with no Firestore/Pinia dependency, matching the existing convention
+  (`slideshowAssembler.ts`, `slotTypes.ts`, `scripture.ts` all live in `utils/` for the same reason)
+  — easy to unit test in isolation, exactly as the existing assembler test suite does.
 
-## Patterns to Follow
+## Architectural Patterns
 
-### Pattern 1: Per-org subcollection with lazy "seed defaults if empty" (roles → teams)
-**What:** A per-org configurable list is its own top-level subcollection
-(`organizations/{orgId}/teams`), not a field on `OrgSettings`. `OrgSettings` is reserved for
-single-valued/nested-object settings (toggles, one template array, one font choice); anything that
-is itself a growing/editable **list of records with CRUD, ordering, and per-item fields** (roles
-today, teams tomorrow) gets a subcollection.
-**When:** Any new per-org configurable list.
-**Example (existing, `stores/roster.ts`):**
+### Pattern 1: Extract a shared `SlideCanvas` rather than fork `PresentationViewer`
+
+**What:** `PresentationViewer.vue` today is one ~600-line component that inlines both "chrome"
+(exit button, prev/next, progress pill, fullscreen, keyboard, font-load gate) and "slide content"
+(the six `slideKind` branches, the background layer, the `AudioPlayer`/`VideoPlayer` refs and their
+autoplay-blocked/error state). Only the SECOND half is what the three new windows need, and each
+needs it in a different chrome: control wants nav+rail+preview, audience wants zero chrome, confidence
+wants current+next with the background suppressed. Extract that second half into
+`SlideCanvas.vue` — props `slide: AssembledSlide | null`, `suppressBackground?: boolean`,
+`interactive?: boolean` (gates the "tap to unmute"/"tap to play" affordances, which make no sense on
+a confidence-monitor "next slide" preview nobody touches) — and have `PresentationViewer.vue` keep
+everything else, rendering `<SlideCanvas :slide="currentSlide" />` in place of its old inline markup.
+**When:** Any time three-plus call sites need the identical "how do I paint one AssembledSlide"
+logic with different surrounding chrome.
+**Trade-offs:** A one-time refactor risk to the one existing, well-tested call site
+(`ServiceEditorView.vue`'s Slides tab) — mitigated by `PresentationViewer.test.ts` already existing
+and asserting on the same `data-testid` markers, which the extraction must preserve verbatim. The
+payoff is that `slideshowAssembler.ts` (pure) + `SlideCanvas.vue` (presentational) together become
+the WHOLE reusable engine — nothing about lyric/scripture/copyright/image/video rendering, media
+playback, or the R055–R057 background cascade is ever duplicated.
+
+**Example (shape, not literal diff):**
+```vue
+<!-- SlideCanvas.vue -->
+<script setup lang="ts">
+const props = defineProps<{
+  slide: AssembledSlide | null
+  suppressBackground?: boolean
+  interactive?: boolean
+}>()
+// owns audioRef/videoRef, mediaFailed/audioBlocked/videoBlocked, play/pause —
+// verbatim logic moved from PresentationViewer.vue, unchanged.
+</script>
+```
+```vue
+<!-- PresentationViewer.vue, after -->
+<SlideCanvas :slide="currentSlide" interactive />
+<!-- background layer, chrome bar, keyboard/fullscreen handling: unchanged, stay here -->
+```
+
+### Pattern 2: The "suppress background → black" transform is ONE prop, not a second render path
+
+**What:** `SlideCanvas`'s background layer (today, `PresentationViewer.vue` lines 27–38) reads
+`currentBackgroundUrl` and renders it as a CSS `background-image` behind the slide content, else the
+root's own `bg-black` shows through unchanged. The confidence monitor's "current+upcoming... with
+background images suppressed to black" requirement is satisfied by making that one computed
+conditional on a prop: `const currentBackgroundUrl = computed(() => props.suppressBackground ? null
+: (!currentVideoUrl.value ? props.slide?.slide.backgroundImageUrl ?? null : null))`. No separate
+"confidence renderer" branch exists anywhere — the confidence window is simply
+`<SlideCanvas :slide="current" suppress-background />` + `<SlideCanvas :slide="next"
+suppress-background />` side by side.
+**When:** Any per-role visual variation that is a strict subset/transform of the base render (never
+introduce a new content path for it).
+**Trade-offs:** None significant — this is exactly what the existing R070 background-cascade comment
+already documents as "the single winning value already sitting on the current slide," which is
+naturally prop-gateable.
+
+### Pattern 3: `AssembledSlide.slotIndex` is the load-bearing service-item↔slide join
+
+**What:** `assembleSlideshow` already stamps every emitted slide with `slotIndex` — the **original
+array index into `service.slots`, independent of `position`** (verified in
+`slideshowAssembler.ts:373–377`: slots are paired with their array index BEFORE being sorted by
+`position` for assembly, specifically so `slotIndex` reflects provenance regardless of reorder). This
+is the exact join the Run Control rail needs and already exists — no new field, no schema change.
+**When:** Any UI that needs to answer "which service item does the on-screen slide belong to" or
+"jump to this item's first slide."
+**Trade-offs:** The rail must independently re-derive the SAME position-sort the assembler uses
+internally (`service.slots` sorted by `.position`, paired with original array index) to render items
+in on-screen order while still keying off `slotIndex`. Recommend extracting this sort into a small
+shared helper (`serviceSlots.ts`, see Data Flow) rather than re-implementing it a second time and
+risking drift between the rail's display order and the assembler's own.
+
+**Example:**
 ```ts
-export const DEFAULT_ROLES: Array<Omit<Role, 'id'>> = [
-  { name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
-  // ...
-]
+// serviceSlots.ts
+export function sortedSlotsWithIndex(service: Service) {
+  return service.slots
+    .map((slot, index) => ({ slot, index }))
+    .sort((a, b) => a.slot.position - b.slot.position)
+}
 
-async function seedDefaultRolesIfEmpty(): Promise<void> {
-  if (!orgId.value) return
-  if (roles.value.length !== 0) return   // idempotent — no-op once anything exists
-  for (const role of DEFAULT_ROLES) {
-    await addDoc(collection(db, 'organizations', orgId.value, 'roles'), {
-      ...role, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-    })
-  }
+export function firstAssembledIndexBySlot(slides: AssembledSlide[]): Map<number, number> {
+  const map = new Map<number, number>()
+  slides.forEach((s, i) => { if (!map.has(s.slotIndex)) map.set(s.slotIndex, i) })
+  return map
 }
 ```
-`RosterView.vue` calls `seedDefaultRolesIfEmpty()` once on mount after roles have had a chance to
-load. A new `stores/teams.ts` + `seedDefaultTeamsIfEmpty()` is a structural copy of this, called
-from wherever the Settings teams panel (or `ServiceEditorView`/`NewServiceDialog`, whichever mounts
-first for a given org) first needs the list. **No server-side (Cloud Functions) seeding needed** —
-note that `functions/src/orgTemplateSeed.ts` (the v2.0 onboarding seed) hand-mirrors `OrgSettings` +
-the suggested template for brand-new orgs, but deliberately does NOT seed roles server-side; roles
-seed lazily client-side regardless of org age. Teams should follow the SAME simpler precedent, not
-the onboarding-seed one — avoids touching `functions/` or `orgProvisioning.ts` at all for this
-feature.
+The rail renders `sortedSlotsWithIndex(service)`; clicking an item looks up
+`firstAssembledIndexBySlot(assembledSlideshow.value).get(index)` and, if present, jumps there (a slot
+absent from the map has zero assembled slides — e.g. an empty SONG slot — and renders non-clickable).
+Highlighting reads the inverse: `assembledSlideshow.value[currentIndex.value]?.slotIndex` tells the
+rail which item is "current."
 
-### Pattern 2: Rules gate mirrors an established create-only idiom (orgSlugs/orgNames/shareTokens → inviteLookup)
-**What:** `allow create: if isOrgEditor(request.resource.data.orgId)`, unaffected read/update/delete.
-**When:** A top-level, org-agnostic-keyed collection whose only legitimate writer is an editor of the
-org named in its own payload.
-**Example (existing, `firestore.rules:539-543`):**
+### Pattern 4: BroadcastChannel as the control→output command bus, one-directional by construction
+
+**What:** A single `BroadcastChannel(\`wp-run-${serviceId}\`)` per running service. The control
+window posts `{ type: 'state', index: number, blackout: boolean, seq: number }` on every navigation
+change; output windows are pure listeners — **they never post `state` messages**, only an optional
+`{ type: 'hello' }` announcement on mount, to which the control window replies with its current
+state (so a reloaded/reopened output window re-syncs immediately instead of waiting for the next
+nav event). This is not just a convention — `BroadcastChannel` (like `postMessage`) never delivers a
+context's own message back to itself, so the control window structurally cannot react to a `state`
+message it just sent, which rules out an entire class of self-feedback bugs by platform behavior
+rather than by application-level bookkeeping.
+**When:** Any same-origin, multi-window, one-owner/many-renderers state fan-out where latency and
+simplicity both matter more than durability (this state has zero value once the service ends — it is
+never written to Firestore, never needs to survive a full app restart).
+**Trade-offs:** BroadcastChannel requires no reference to the target windows (unlike `postMessage`,
+which needs a live handle to each output `Window` object — awkward if a monitor's window is closed
+and reopened mid-service, since the control window would need to detect that and re-acquire a
+reference). Its downside — same-origin-only, in this browser tab's lifetime only — is a non-issue
+here: every window in this feature is the same app, same origin, same live session.
+
+## Data Flow
+
+### Live navigation flow (the steady-state loop during a service)
+
 ```
-match /orgSlugs/{slug} {
-  allow read: if true;
-  allow create: if isOrgEditor(request.resource.data.orgId);
-  allow update, delete: if false;
-}
-```
-Apply the identical `create` clause to `inviteLookup` (read/delete stay exactly as they are today —
-self-read-by-email and self-or-editor-delete are both still correct and untouched):
-```
-match /inviteLookup/{email} {
-  allow read: if isSignedIn() && request.auth.token.email.lower() == email;
-  allow create: if isOrgEditor(request.resource.data.orgId);   // was isSignedIn()
-  allow delete: if isSignedIn() && (
-    request.auth.token.email.lower() == email ||
-    isOrgEditor(resource.data.orgId)
-  );
-}
+Projectionist clicks a rail item, or presses → / space in the control window
+    ↓
+RunControlView's local currentIndex updates (control OWNS this state)
+    ↓
+runChannel.postState({ index, blackout, seq: seq++ })  — BroadcastChannel, same-tick, in-process
+    ↓                                              ↓
+Control's own SlideCanvas re-renders    AudienceOutputView / ConfidenceOutputView receive
+(current + next preview)                the message, set THEIR OWN local currentIndex, and
+                                          SlideCanvas re-renders from THEIR OWN independently-
+                                          assembled `AssembledSlide[]` at that index
 ```
 
-### Pattern 3: Store-level cascade revocation on delete (deleteQuarter → deleteService)
-**What:** Before/alongside deleting the primary doc, delete every derived public-share artifact the
-entity minted, scoped by `isOrgEditor` on each artifact's own `orgId` — never a Cloud Function, this
-runs entirely in the client store (Firestore rules already authorize it, no Admin SDK bypass
-needed).
-**When:** Any entity that mints a public share link must revoke it on delete.
-**Example (existing, `stores/quarters.ts:460-483`, shown in full in Data Flow above)** — `deleteService`
-in `stores/services.ts` copies this shape, substituting the `serviceShareLinks/{serviceId}`
-direct-key lookup for `quarter.shareToken`'s denormalized field, and the
-`serviceShares/{slug}__service-${service.date}` key for `quarterShares`'s
-`${slug}__q${N}-${year}` key.
+Crucially, **no slide content crosses the channel** — only two integers and a boolean. Each window
+already has the full `AssembledSlide[]` resident (via its own live `useSlideshowAssembly` Firestore
+subscription), so "jump to slide 14" is a local array index into data every window already holds
+identically.
 
-### Pattern 4: Single-source constant import (VW_TYPE_LABELS)
-**What:** `src/types/song.ts` already exports the canonical `VW_TYPE_LABELS: Record<VWType, string>`.
-Six other files re-declare the same three string literals locally instead of importing it:
-`ShareView.vue`, `SongSlideOver.vue`, `BatchQuickAssign.vue`, `VwExplainer.vue`, `SettingsView.vue`,
-`claudeApi.ts` (`src/utils/songSearch.ts` already imports it correctly — proof the pattern works
-once wired).
-**When:** Immediately, as the cross-cutting prerequisite the seed itself names ("duplication is the
-real liability... whatever gets configured, step one is collapsing each rule to a single source").
-Zero behavior change, pure refactor — do this FIRST so no other v2.2 work touches a file that still
-has a stale local copy.
+### Bootstrap flow (opening the three windows)
 
-## Anti-Patterns to Avoid
+```
+User clicks "Run" on a LOCKED service (ServiceCard.vue / ServiceEditorView.vue header — MODIFIED)
+    ↓
+router.push('/run/' + serviceId)   — ordinary SPA navigation, same tab, no window.open needed
+    ↓
+RunControlView.vue mounts:
+  - subscribes to the service doc (organizations/{authStore.orgId}/services/{serviceId})
+  - guards: redirect back to /services/:id if service.status === 'draft' (Run is locked-only,
+    mirroring ServiceEditorView's existing `isLocked` computed)
+  - reads monitorConfig from localStorage; calls getScreenDetails() (permission-gated) to test
+    whether the saved fingerprints still match currently-connected screens
+  - IF matched: window.open() both output URLs with `left`/`top` from the matched screens'
+    geometry, THEN calls .moveTo()/.requestFullscreen() on each (Chrome/Edge only, confirmed
+    target) — the "one click" path
+  - IF NOT matched (no permission, no saved config, or a fingerprint miss): opens both windows
+    un-positioned (pop-out fallback) and shows a "make fullscreen" prompt per window, OR routes
+    the projectionist to /monitor-setup first
+    ↓
+window.open('/present/audience/' + serviceId + '?org=' + orgId, 'wp-audience', features)
+window.open('/present/confidence/' + serviceId + '?org=' + orgId, 'wp-confidence', features)
+```
 
-### Anti-Pattern 1: Folding the team list into `OrgSettings.settings`
-**What:** Adding `settings.teams: Team[]` as a new `OrgSettings` field instead of a subcollection.
-**Why bad:** `OrgSettings` already carries a documented, deliberately-flat contract
-(`organization.ts`'s own JSDoc: "nothing else" beyond one field per phase) merged once at
-`auth.ts::loadOrgContext` under `DEFAULT_ORG_SETTINGS` — every consumer reads it as a plain,
-already-defaulted value with no further `?? default` anywhere. A growing, independently-CRUD'd list
-of records with per-item `order`/id churn does not fit that single-document-merge contract, and
-would force `DEFAULT_ORG_SETTINGS` to special-case an array of objects rather than a scalar/small
-nested object like every existing field.
-**Instead:** A subcollection, per Pattern 1 — this is exactly why roles are already NOT part of
-`OrgSettings` despite `OrgSettings` existing.
+### Auth/org bootstrap in the two output windows — verified, not assumed
 
-### Anti-Pattern 2: A dedicated `firestore.rules` block for `teams`
-**What:** Writing an explicit `match /organizations/{orgId}/teams/{teamId} { allow read, write: if
-isOrgEditor(orgId); }` block.
-**Why bad:** Unnecessary — `roles` has NO dedicated block today and needs none; both fall through
-the generic `match /{collection}/{docId}` wildcard at the bottom of the per-org rules
-(`firestore.rules:458-464`), which already grants `isOrgEditor` read+write to any single-segment
-nested collection except the three explicitly excluded (`services`, `slideGroups`, `pptxRenders`).
-Adding a redundant explicit block for `teams` is dead weight that could silently diverge from the
-wildcard over time.
-**Instead:** Add nothing to `firestore.rules` for the teams feature. Confirm this in the rules test
-suite with one new ALLOW/DENY pair exercising `organizations/{orgId}/teams/{docId}` through the
-wildcard, the same way `roles` is (or should be) covered.
+Two independent mechanisms both help here, and the design should not rely on either alone:
 
-### Anti-Pattern 3: "Fixing" the pending-slide gap by pairing entries on the render index
-**What:** Trying to reattach a pending slide's customization to its eventual rendered counterpart by
-positional/index matching once the render flips `pending → ready`.
-**Why bad:** Already tried and rejected — per `PENDING-VERIFICATION.md` C4, "Not fixable by index
-pairing (would mis-attach)": a PPTX render can add/remove/reorder slides between the placeholder
-count and the final rendered count, so there is no reliable correspondence to re-pair against.
-**Instead:** Disable or warn on customization of a slide whose `renderState === 'pending'` in
-`EditSlideDrawer.vue`, so the UI never invites an edit it will silently discard — this is the
-owner-endorsed direction in the same carry-forward entry.
+1. **Firebase Auth itself needs nothing new.** `src/firebase/index.ts` calls `getAuth(app)` with no
+   explicit `setPersistence()` call, so it uses the SDK default —
+   `indexedDBLocalPersistence` in a browser context — which is genuinely shared storage across
+   **every** same-origin tab/window, not merely ones opened via `window.open`. A signed-in user's
+   session is already resolvable via `onAuthStateChanged` the instant a new window loads the app
+   bundle, with no network round trip (it is reading local IndexedDB). No code change needed for
+   auth itself to "survive" a popped-out window.
+2. **Org selection (`authStore.orgId`) is the one piece that is NOT automatically durable across a
+   fresh window load in the general case.** `stores/auth.ts` deliberately keys the multi-org "which
+   church did I pick" choice in `sessionStorage` (`SELECTED_ORG_STORAGE_KEY`), not `localStorage`
+   — by design, so a super-admin viewing two churches in two tabs never leaks one tab's choice into
+   the other. Per the HTML living standard, a new browsing context opened via `window.open()`
+   receives a **copy of the opener's `sessionStorage`** at open time (this does NOT happen for a
+   window opened by typing a URL, a bookmark, or `rel="noopener"`) — so as long as `RunControlView`
+   opens the output windows via a plain `window.open(url, name, features)` call (never setting
+   `noopener` and never doing it from, e.g., a right-click "open in new window"), the picked org
+   rides along automatically. **Do not rely on this alone** — it is a spec-guaranteed snapshot, but
+   it is fragile to reason about and invisible when debugging ("why is this window showing the
+   wrong church"). **Recommendation:** also pass `?org=<authStore.orgId>` explicitly on both output
+   URLs (shown in the bootstrap flow above). Each output view reads `route.query.org` and, if
+   present and the signed-in user is actually a member of that org, sets it directly — bypassing the
+   `/select-church` picker path entirely and making the org an explicit, debuggable, self-documenting
+   part of the URL rather than an implicit inherited side-channel. This is strictly additive to the
+   existing `authStore.loadOrgContext` machinery, not a new auth surface.
 
-### Anti-Pattern 4: Making `deleteService`'s revocation a Cloud Function
-**What:** Routing the 3-collection share cleanup through a new `onCall`/`onDocumentDeleted` Cloud
-Function instead of the existing client store method.
-**Why bad:** `deleteQuarter` (the direct precedent) does this entirely client-side with no Function
-involved, and `PENDING-VERIFICATION.md` C5 explicitly notes "`allow delete` rules already in place,
-no rules change needed" — the existing `isOrgEditor`-gated delete rules on all three collections
-already authorize exactly this client-side sequence. Introducing a Function adds a deploy
-dependency and an Admin-SDK code path for something the client can already do safely and atomically
-enough (a same-session sequence of deletes, same risk profile as `deleteQuarter` already ships in
-production).
-**Instead:** Mirror `deleteQuarter` verbatim — client-only, ships with the rest of the app bundle,
-no `firebase deploy --only functions` needed for this piece.
+## Scaling Considerations
 
-## Scalability Considerations
+Not a scaling concern in the traditional sense — this is a single-service, single-session, local
+(same-machine, same-browser) feature with at most 3 windows and no new Firestore read/write pattern
+beyond what `useSlideshowAssembly` already does 1–3× concurrently (once per window, each a normal
+read-only subscription set — no different in kind from a viewer opening the same service in three
+browser tabs today, which the app already supports since `/services/:id` has no editor guard).
 
-Not a scaling milestone — no new collection is queried in an unbounded way, no new function adds
-cold-start surface, and team lists are small (a handful of rows per org, same order of magnitude as
-roles). The one thing worth flagging: `deleteService`'s revocation adds up to 3 extra
-`getDoc`/`deleteDoc` round-trips to an already-multi-step delete, mirroring `deleteQuarter`'s
-existing cost — negligible at this app's per-org document counts (services numbering in the
-hundreds, not millions).
+| Scale | Architecture Adjustments |
+|-------|--------------------------|
+| One projectionist, one service, one Sunday | Exactly the design above — no adjustment needed |
+| A church running two simultaneous services (rare — e.g. two campuses sharing this org) | The `BroadcastChannel` name is scoped per `serviceId` (`wp-run-{serviceId}`), so two Run sessions never cross-talk even in the same browser profile; two independent `monitorConfig` entries could theoretically be wanted per physical device pair, but a device only has one physical monitor pair, so this is a non-issue |
+| Firestore read volume | Each window's `useSlideshowAssembly` opens the same handful of listeners (`slideGroups`, `scriptureSlides`, `importedSlides`, `pptxRenders`) already used everywhere else in the app; running 3 windows for the length of one service (minutes, not hours) is negligible against this app's existing per-org document counts |
 
-## Build Order (dependency-aware)
+## Anti-Patterns
 
-1. **VW_TYPE_LABELS dedup (Pattern 4)** — zero-risk, zero-dependency, touches 6 files. Do this
-   first so nothing built afterward inherits a stale local copy. **Client-only.**
-2. **Configurable Teams (1)** — `types/team.ts` → `stores/teams.ts` (+ `seedDefaultTeamsIfEmpty`) →
-   Settings teams panel (mirrors the Roles editor UI) → `ServiceEditorView.vue` +
-   `NewServiceDialog.vue` + `ServiceCard.vue` consume the store instead of their local consts →
-   generalize the Orchestra filter to read each team's `songTagFilter` → delete
-   `sundayOrdinal()`/the ordinal auto-select blocks (B1). Internally ordered: type → store → UI
-   editor → consumers, because the two hardcoded-array call sites can't be replaced until the store
-   exists to replace them with. **Client-only** — confirmed no rules change needed (falls through
-   the existing wildcard, Anti-Pattern 2).
-3. **`inviteLookup` rules gate (2)** — independent of everything else; can run in parallel with
-   step 2. Add the rules-test ALLOW/DENY pair (editor-of-target-org create allowed;
-   non-editor/wrong-org create denied) against the existing `TeamView.vue` write path (no client
-   code change required — confirmed `orgId` is already on the payload). **Rules-only,
-   deploy-hand-over**: ships built + tested + UNDEPLOYED per the standing deploy discipline;
-   hand the owner `firebase deploy --only firestore:rules`.
-4. **`deleteService` revocation (3)** — independent; can run in parallel with 2/3. Copy
-   `deleteQuarter`'s shape into `stores/services.ts`'s `deleteService`, substituting the
-   `serviceShareLinks/{serviceId}` direct lookup and the `serviceShares` date-keyed lookup as
-   described in Data Flow. **Client-only** — no rules change (delete rules already permit it).
-5. **Pending-slide guard (4)** — independent; smallest, most isolated change, touches only
-   `EditSlideDrawer.vue`. **Client-only.**
+### Anti-Pattern 1: Forking `PresentationViewer.vue` into three near-duplicate components
 
-Steps 2-5 have no cross-dependencies on each other and can be sequenced in any order or built in
-parallel; step 1 should land before step 2 only because step 2's new Settings panel is a natural
-place to also import the now-deduped `VW_TYPE_LABELS` if the panel surfaces VW-related copy, and
-because touching `SettingsView.vue` twice (once for dedup, once for teams) in the same phase is
-cheaper done together.
+**What people do:** Copy the ~600-line `PresentationViewer.vue` three times (audience, confidence,
+control) and hand-edit each copy's chrome.
+**Why it's wrong:** Every future slide-kind change (a new content type, a new background rule, a
+media-playback fix) would need to land in three drifting copies instead of one. This is the exact
+failure mode the extraction in Pattern 1 exists to prevent, and it is the literal opposite of this
+milestone's own framing ("reusing vs forking the slide engine").
+**Do this instead:** Extract `SlideCanvas.vue` once; every window composes it with different chrome.
 
-## Deploy-Hand-Over Summary
+### Anti-Pattern 2: Routing slide content or navigation state through Firestore
 
-| Change | Surface | Deploy needed? |
-|---|---|---|
-| VW_TYPE_LABELS dedup | `src/` only | No — client bundle only |
-| Configurable Teams (list + tag filter + drop ordinal rule) | `src/` only (new subcollection covered by existing wildcard rule) | No — client bundle only |
-| `inviteLookup` create gate | `firestore.rules` | **Yes** — `firebase deploy --only firestore:rules`, owner hand-over per standing deploy discipline |
-| `deleteService` share revocation | `src/` only (existing delete rules already permit it) | No — client bundle only |
-| Pending-slide (`renderState`) guard | `src/` only | No — client bundle only |
+**What people do:** Since the app is "already realtime" via Firestore `onSnapshot`, write
+`currentSlideIndex`/`blackout` onto the service doc (or a new subcollection) and let every window
+subscribe to that field.
+**Why it's wrong:** Round-trips to Firestore's servers and back (typically 100s of ms, worse on a
+church's guest Wi-Fi) are perceptible lag on a live confidence monitor a musician is timing their cue
+off of — the entire point of a dedicated control channel is to beat that latency. It also writes
+high-frequency, zero-durability, purely-ephemeral UI state into the same document model used for
+real service data, mixing concerns that have never been mixed anywhere else in this codebase,
+and risks tripping the write path's rules/lock semantics on a document that is otherwise
+correctly treated as read-only once `status !== 'draft'`.
+**Instead:** BroadcastChannel (Pattern 4) — in-process, same-tick, and this state is by design
+never persisted anywhere; when the browser windows close, it is simply gone, exactly as it should be.
 
-Only ONE of the five v2.2 architectural changes touches `firestore.rules`. It is small (one `allow
-create` clause, mirroring an idiom already deployed three times), independently testable against
-the emulator, and independent of every other change in this milestone — it can ship in its own
-plan/phase without blocking or being blocked by the Teams work.
+### Anti-Pattern 3: Storing the monitor→role assignment in Firestore
+
+**What people do:** Add a `monitorConfig` field to `OrgSettings` or a per-user preferences doc so it
+"syncs" like everything else in this app.
+**Why it's wrong:** The assignment describes which PHYSICAL cable is plugged into which PHYSICAL
+port on THIS machine — it has no meaning for any other device, and syncing it to the org (or even to
+the signed-in user) would actively cause bugs: a different volunteer signing into the same fixed
+church laptop next week would see a stale/foreign assignment, and the SAME volunteer signing into a
+laptop at home would incorrectly inherit a church-projector layout that doesn't exist there. This
+mirrors the milestone brief's own framing precisely ("device-specific, not org-specific — so NOT
+Firestore") and the existing `OrgSettings` design discipline already established in the v2.2
+research (`OrgSettings` is reserved for org-scoped, not device-scoped, values).
+**Instead:** `localStorage`, unscoped by uid/orgId (Pattern in Data Flow / device config below),
+mirroring the existing `wp:tagFilter:v2:...`/`wp:songTableColumns:v1:...` client-only-preference
+precedent already in `stores/songs.ts`.
+
+### Anti-Pattern 4: Assuming Window Management API `ScreenDetailed` objects have a stable hardware id
+
+**What people do:** Persist the raw object (or an object reference / index) returned by
+`getScreenDetails()` across sessions, assuming "screen 2" is always the same physical monitor.
+**Why it's wrong:** The API deliberately exposes no persistent hardware identifier (privacy-motivated
+— MDN/Chrome docs confirm `ScreenDetailed` carries only `label`, `isPrimary`, `isInternal`, and
+geometry, no id), and Chrome's own documentation notes `label` can be empty depending on GPU/driver.
+Enumeration ORDER across `getScreenDetails().screens` is also not contractually stable session to
+session.
+**Instead:** Synthesize a fingerprint from what IS available and reasonably stable for a fixed
+church setup — `${label || 'unlabeled'}:${width}x${height}:${isPrimary}` — and treat a fingerprint
+MISS on next launch as the explicit, expected trigger to re-prompt via `/monitor-setup`, exactly as
+the milestone brief specifies ("re-prompt only if the physical monitor layout changed").
+
+## Integration Points
+
+### External Services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| Window Management API (`window.getScreenDetails()`) | Chrome/Edge only (confirmed target), permission-gated (`window-management`), must be invoked from a user gesture (transient activation) | No fetch/SDK — plain browser API. `screenschange`/`currentscreenchange` events exist for live reconfiguration but are NOT required for v1 (re-prompt-on-launch is sufficient per the milestone's explicit deferral of "instant... auto-detection" refinements) |
+| BroadcastChannel API | Native browser API, same-origin only | No polyfill needed — full support in Chrome/Edge, the confirmed target browsers; not usable cross-origin, irrelevant here since every window is this app |
+| Firebase Auth (existing) | No change — default `indexedDBLocalPersistence` already covers cross-window session sharing | See Data Flow's Auth/org bootstrap section |
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `RunControlView` ↔ `AudienceOutputView`/`ConfidenceOutputView` | `BroadcastChannel` (Pattern 4), one-directional `state` broadcast + `hello`/reply handshake | No Pinia/store sharing possible or attempted — separate JS realms |
+| `PresentationViewer.vue` ↔ `SlideCanvas.vue` | Parent-owned `currentIndex`/props, unchanged prop contract at the existing call site | `PresentationViewer.vue`'s existing `slides`/`isLoading`/`initialIndex` props and `exit` emit are untouched |
+| `RunControlView`/output views ↔ `useSlideshowAssembly` | Each window instantiates its own composable instance with `canWrite: false` | Already-supported option (`UseSlideshowAssemblyOptions.canWrite`, default `false`) — no composable change needed. The composable's dev-mode "single call site" tripwire (`activeSlideshowAssemblyInstances`) is scoped PER JS REALM (per tab), so 3 windows × 1 instance each is safe; the discipline that must hold is still "exactly one `useSlideshowAssembly()` call per window" |
+| `RunOrderRail` ↔ service data | Reads `service.slots` + `assembledSlideshow` via the new `serviceSlots.ts` helpers (Pattern 3) | No new store — pure derivation from data already flowing into the view |
+| "Run" entry point ↔ router | New button on the locked service surface (`ServiceCard.vue` and/or `ServiceEditorView.vue` header, MODIFIED), gated on the same `status !== 'draft'` predicate `ServiceEditorView.vue`'s `isLocked` already computes | `router.push({ name: 'run', params: { serviceId } })` — ordinary same-tab navigation; the multi-window fan-out only begins once `RunControlView` itself mounts |
 
 ## Sources
 
-- `C:\projects\worshipplanner\.planning\seeds\SEED-002-church-specific-rules-configurability.md`
-  (HIGH — owner-authored catalog with exact file:line references, 2026-08-23)
-- `C:\projects\worshipplanner\.planning\PENDING-VERIFICATION.md` C2/C4/C5 (HIGH — carried-forward,
-  owner-reviewed findings)
-- Direct source inspection (HIGH — read against the live repo, 2026-08-23):
-  `src/types/roster.ts`, `src/stores/roster.ts`, `src/views/RosterView.vue`,
-  `firestore.rules` (lines 1-100, 380-465, 534-556), `src/types/organization.ts`,
-  `functions/src/orgTemplateSeed.ts`, `functions/src/orgProvisioning.ts`,
-  `src/views/TeamView.vue`, `src/stores/quarters.ts` (`deleteQuarter`),
-  `src/stores/services.ts` (`deleteService`, `ensureShareLink`, `writeSharePayload`),
-  `src/components/slides/EditSlideDrawer.vue`, `src/types/slide.ts`, `src/types/song.ts`,
-  `src/views/ServiceEditorView.vue`, `src/components/NewServiceDialog.vue`
+- Direct source inspection (HIGH — read against the live repo, 2026-08-28): `src/utils/slideshowAssembler.ts`,
+  `src/components/PresentationViewer.vue`, `src/composables/useSlideshowAssembly.ts`,
+  `src/router/index.ts`, `src/types/slide.ts`, `src/types/service.ts`, `src/stores/auth.ts`,
+  `src/firebase/index.ts`, `src/views/ServiceEditorView.vue` (isLocked, PresentationViewer mount,
+  orgId/serviceId resolution), `src/stores/songs.ts` (localStorage precedent).
+- `C:\projects\worshipplanner\.planning\PROJECT.md` (HIGH — v2.4 milestone scope, owner decisions:
+  Chrome/Edge-only target, projectionist role concept, locked-only gate, deferred blackout button
+  and non-Chromium detection).
+- `C:\projects\worshipplanner\.planning\research\ARCHITECTURE.md` (v2.2, read for codebase-shape
+  conventions only — e.g. `OrgSettings` vs subcollection discipline, per-user/org localStorage
+  precedent naming).
+- [MDN: ScreenDetailed](https://developer.mozilla.org/en-US/docs/Web/API/ScreenDetailed) and
+  [ScreenDetailed.isPrimary](https://developer.mozilla.org/en-US/docs/Web/API/ScreenDetailed/isPrimary)
+  (HIGH — official browser API reference, confirms `label`/`isPrimary`/no persistent id).
+- [Chrome for Developers: Manage several displays with the Window Management API](https://developer.chrome.com/docs/capabilities/web-apis/window-management)
+  (HIGH — official vendor docs, confirms permission gating, `label` can be empty, Chrome/Edge scope).
+- Firebase Auth default web persistence (`indexedDBLocalPersistence`, shared across all same-origin
+  tabs/windows) and the HTML living standard's `sessionStorage`-copy-on-`window.open()` behavior
+  (HIGH — stable, well-documented platform/SDK behavior, not project-specific).
+
+---
+*Architecture research for: multi-window live presentation mode integration (v2.4 Run the Service)*
+*Researched: 2026-08-28*

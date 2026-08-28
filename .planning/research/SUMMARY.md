@@ -1,155 +1,175 @@
 # Project Research Summary
 
-**Project:** WorshipPlanner
-**Domain:** Multi-tenant Vue 3 + Firebase worship-planning SPA — v2.2 Configurability, Hardening & Cleanup
-**Researched:** 2026-08-23
-**Confidence:** HIGH
+**Project:** WorshipPlanner — v2.4 "Run the Service (Live Presentation)"
+**Domain:** Browser-based live worship-service presentation/projection — multi-monitor delivery from a single Chrome/Edge tab, integrated into an existing Vue 3 + Firebase app
+**Researched:** 2026-08-28
+**Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-v2.2 is integration work on a mature, already-conventioned codebase, not new-product work. All six milestone items — configurable per-org Teams, a generalized per-team song-tag filter, dropping a Berean-specific ordinal-Sunday auto-select rule, firestore.rules hardening (inviteLookup create gate + createdBy immutability), deleteService share-token revocation, an Owner Console a11y retrofit, and the Resend verified-sending-domain migration — each has a working precedent already in the repo to copy rather than a pattern to invent. Five of six need zero new dependencies; the sixth (a11y) needs exactly one dev-only lint plugin (eslint-plugin-vuejs-accessibility). Only one of the five architectural changes touches firestore.rules, and it is a narrow, mirrorable allow create clause — everything else is client-only.
+This milestone is pure integration work on top of an already-correct slide engine, not a new product. `slideshowAssembler.ts` (the pure `service → AssembledSlide[]` builder) is untouched, and `PresentationViewer.vue` already contains every piece of rendering logic the new run/control, audience, and confidence-monitor windows need — it just needs its slide-canvas guts extracted into a reusable `SlideCanvas.vue` so three thin per-role windows can compose it instead of forking it. The recommended stack is zero new npm dependencies: the Window Management API + `requestFullscreen({screen})` for multi-monitor placement (Chromium 100+, matching the project's confirmed Chrome/Edge-only target), `BroadcastChannel` for low-latency same-machine control→output sync (not Firestore — a server round-trip is the wrong tool for sub-100ms slide-advance), `localStorage` for the per-device monitor→role mapping (never Firestore — this describes a physical cable, not an org/user preference), and the Screen Wake Lock API to keep the projector and confidence monitor from sleeping during a 60-90 minute service.
 
-The recommended approach is: dedupe first (the team-list literals still duplicated in ServiceEditorView.vue/NewServiceDialog.vue, and VW_TYPE_LABELS, which turned out to already be deduped — verify before "fixing" it), then build Configurable Teams as a teams subcollection modeled exactly on the existing roles subcollection (not an OrgSettings array field — that would fork the read pattern across two call sites and reintroduce drift), then land the independent hardening/hygiene items (rules gate, createdBy guard, share-token revocation) in parallel since none of them depend on Teams or each other, then close with the Owner Console a11y pass and the Resend domain-verification runbook (the latter is owner-run DNS ops, not a coding task the app can complete or self-verify).
+The feature shape converges strongly across every reference tool researched (ProPresenter, EasyWorship, Proclaim, OpenLP, FreeShow): an order-of-service list with a current-item highlight, a large current-slide preview, click-to-jump, standard keyboard nav (Right/Space=next, Left=prev, Up/Down=next/prev item, Escape=exit — carefully re-scoped for a multi-window world), a chrome-free fullscreen audience output, and a black-background current+next confidence monitor. WorshipPlanner should deliberately follow Proclaim's simpler single-selection model (no Preview/Live pane split) rather than ProPresenter's more powerful-but-heavier pattern, matching the explicit "non-technical projectionist" target user. All of this is a client-side derivation over data the app already has — `AssembledSlide.slotIndex` is the pre-existing service-item↔slide join, so no new Firestore schema is needed for the core Run experience.
 
-The main risks are all "looks done but isn't" traps rather than unknowns: porting deleteQuarter's single-token revocation shape onto deleteService naively misses that a service can accumulate multiple shareTokens docs across re-shares, so a query-based delete-all is required, not a single-doc lookup; the inviteLookup rules tightening needs a companion regression test proving first-login invite acceptance still works, not just a new DENY case, because the "obviously safe" narrowing has three distinct write/read actors and only one is the target of the fix; and the Owner Console tab strips deliberately use v-show (never v-if) to keep an onSnapshot roster listener alive across tab switches — a generic ARIA-tabs retrofit copied from a tutorial commonly swaps that to conditional rendering and silently kills the listener. Each of these is well-understood and cheaply avoided once named, which is why overall confidence is HIGH rather than the usual "hardening work is risky" caveat.
+The two biggest risks are both about the permission/gesture model, not the UI: (1) the `window-management` permission grant AND denial are both primary, must-be-built paths — a volunteer clicking "block" by reflex must land on a fully-supported pop-out+drag+F11 fallback, not a dead end — and (2) every `window.open()`/`getScreenDetails()`/`requestFullscreen()` call must fire synchronously inside the original click handler with zero `await` in between, or the popup blocker silently kills the flow. Beyond that, live-operation robustness (monitor replug, output-window crash/close recovery, fullscreen-loss not cascading into a full session teardown, wake-lock re-acquisition, preloading images to avoid flash) needs a dedicated hardening pass, and requirements must resolve one open design question the architecture researcher flagged: who is authorized to Run a service (existing editor role, vs. a new "projectionist" role tier hinted at in PROJECT.md).
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new core technology. The only new dependency for the whole milestone is eslint-plugin-vuejs-accessibility@^2.6.0 (dev-only, flat-config compatible with the installed eslint@^10.0.2, drops into the existing eslint.config.ts with no config-format migration) — a static linter chosen over vue-axe/@axe-core/playwright because the known a11y defects (placeholder-only inputs, missing tab ARIA) are static-template issues a linter catches, and the project has no Playwright/E2E harness to justify a runtime tool. The Resend verified-domain item needs no SDK change at all — it is 100% Resend-dashboard + DNS configuration plus flipping two already-wired, already-owner-editable config values (appConfig/global.sender.fromAddress, live no-redeploy; SERVICE_SHARE_BASE_URL, a defineString param requiring firebase deploy --only functions only if the owner wants share links on the new domain too).
+Every recommended technology is a native browser API already available in Chrome/Edge 100+; the project's explicit Chrome/Edge-only constraint removes the usual "not Baseline" objection to the Window Management API, since there is no cross-browser fallback to build beyond the pop-out/manual path that's needed anyway. No fullscreen-shim, no BroadcastChannel wrapper package, no Presentation API (that's wireless casting, a different problem).
 
-**Core technologies (all already installed, reused as-is):**
-- Firebase client SDK (^12.0.0) + firebase-admin/firebase-functions — Firestore schema extension + Cloud Functions cascade-delete pattern reuse, no new integration
-- resend (6.19.0, optional bump to 6.22.0) — already the chosen provider (v1.7 ADR); this milestone is domain verification, not an API change
-- Vue 3 + Pinia + Vue Router — ordinary composition-API work for the Teams editor, song-browse extraction, and a11y retrofit
+**Core technologies:**
+- **Window Management API** (`window.getScreenDetails()`, `ScreenDetailed`) — enumerate connected monitors for the monitor-config screen — the only web API that exposes multi-screen topology at all
+- **Fullscreen API with `{screen}` option** (`element.requestFullscreen({screen})`) — places a window fullscreen on a specific monitor in one call, avoiding the flicker of moveTo-then-fullscreen
+- **`window.open()`** — bootstraps the two output windows (both the primary placement path and the universal fallback)
+- **BroadcastChannel** — control→output state sync (`{type:'state', index, blackout, seq}`); in-process, same-tick, zero network cost, zero Firestore write volume per keypress
+- **Screen Wake Lock API** (`navigator.wakeLock.request('screen')`) — keeps audience/confidence displays awake through a 60-90 min service; must be requested independently per output window and re-acquired on `visibilitychange`
+- **`localStorage`** — per-device monitor→role mapping, keyed by a synthesized screen fingerprint, not Firestore
 
 ### Expected Features
 
-**Must have (table stakes) — all P1, all scoped for v2.2:**
-- Per-org editable Team list (add/edit/delete, seeded defaults), modeled exactly on the existing RolesConfigPanel.vue/roster.ts pattern — an inconsistent exception here would be more surprising than building it
-- Single source of truth for the team list, collapsing the ServiceEditorView.vue:1675 / NewServiceDialog.vue:145 duplication — a precondition, not optional polish
-- Per-team song-tag filter as an optional field on the Team row (generalizes the hard-coded Orchestra-to-Orchestra-tag rule)
-- Dropping the ordinal-Sunday auto-team-preselect rule entirely (once Teams are user-editable, manual selection already exists as the replacement — no new UI needed)
-- deleteService revokes all of a service's shareTokens/serviceShareLinks/serviceShares docs, mirroring deleteQuarter's already-shipped cascade
-- EditSlideDrawer.vue gains renderState awareness (warn/disable customization while a PPTX-render slide is pending) to close a known silent-data-loss gap
-- Real label/aria-label on Owner Console + new Teams-editor inputs, and role=tablist/aria-selected ARIA-tabs semantics on both the Owner Console and Service Editor tab strips (named, already-scored a11y debt from Phase 72/74 reviews)
+**Must have (table stakes) — v2.4 launch:**
+- Order-of-service list (grouped by `slotIndex`) with current-item highlight
+- Large current-slide preview on the run/control screen (reuses `PresentationViewer.vue`'s rendering)
+- Click an order-of-service item to jump to its first slide (reuses the existing `initialIndex`/R061 mechanic)
+- Standard keyboard nav: Right/Space=next, Left=prev, Escape=exit (already implemented, extend don't replace), NEW Down/Up=next/prev order-of-service item
+- Audience output: fullscreen slide + background, zero operator chrome, routed to a real second display
+- Confidence monitor: current + next slide, background suppressed to black, no chrome
+- Locked-service gate on the Run entry point (existing app invariant, just wire behind it)
+- Standalone, persistent per-device monitor-role assignment (Audience vs Confidence) — the concrete translation of the "one-click start" usability finding
 
-**Should have (differentiators):** the per-team song-tag filter generalized beyond the single Orchestra rule (the actual payoff of this milestone — lets a second church define its own team/song-pool rule with no code change); a disable-and-explain (not just warn) pending-render guard, which signals more maturity than either "block editing entirely" or "allow silent loss."
+**Should have (differentiators):**
+- Single-selection model (no Preview/Live split) — a deliberate simplicity choice, not a feature to build
+- Calm, minimal operator chrome tuned for a first-time volunteer
+- Section/label (e.g. "Verse 2") on the confidence monitor — trivial reuse of existing `section` metadata
+- Countdown/elapsed timer on the confidence monitor — no slide-model dependency, purely additive
 
-**Explicitly defer / drop, not build (anti-features named by both FEATURES.md and SEED-002):**
-- Making the ordinal-Sunday rule configurable instead of dropping it — a disproportionate mini-recurrence-rule editor to save Berean two clicks a month, meaningless to every other church
-- A fully generic boolean-expression "rule builder" for per-team filters — the observed need is a single-tag filter; build that, not a speculative general case
-- Configurable VW_TYPE_LABELS / org-editable Vertical Worship taxonomy labels — platform-scope concept, not a per-org one; only real defect here was duplication (see Gaps below — already resolved)
-- A grace window / soft-delete TTL on revoked share links — contradicts the security intent of immediate revocation and mirrors the no-grace-period posture already used for org deactivation
-- A generic "disable inputs during any pending async job" framework — solve the one concrete case (EditSlideDrawer.vue + renderState) narrowly; generalize only if a second case appears
+**Defer (v2.4.x / v3+):**
+- Instant blackout/logo-cut button — explicitly deferred by PROJECT.md; reserve a UI slot and key (e.g. `B`) now
+- Non-Chromium monitor auto-detection — explicitly deferred
+- Slide transitions/fades — conflicts with the existing `goToIndex` instant-swap media-lifecycle invariant (T-23-08); not requested by any reference tool as baseline
+- Full Preview/Live two-pane operator model — explicit anti-feature, adds complexity for the non-technical target user
+- Remote/mobile companion control app — materially larger scope than this milestone's single-browser-window model
 
 ### Architecture Approach
 
-Every one of the five architectural changes slots into an existing pattern: (1) a new organizations/{orgId}/teams subcollection, structurally identical to the existing roles subcollection (seed-defaults-if-empty, per-row CRUD store, no dedicated firestore.rules block needed — it falls through the same generic per-org wildcard roles already uses); (2) one firestore.rules clause on inviteLookup's allow create, mirroring the exact orgSlugs/orgNames/shareTokens idiom (isOrgEditor(request.resource.data.orgId)) already deployed three times; (3) a client-side cascade-delete in deleteService copying deleteQuarter's shape, adapted for services' query-based (not single-field) share-token cardinality; (4) a narrow read-only renderState check added to EditSlideDrawer.vue; (5) a VW_TYPE_LABELS dedup that turns out to already be done (verify, don't re-implement).
+Everything new is a thin per-role wrapper around the existing slide engine, plus two small client-only utility modules (a BroadcastChannel protocol, a localStorage device-config store) — no new Firebase surface, no new Firestore collection, no Cloud Function. `SlideCanvas.vue` is extracted from `PresentationViewer.vue` to hold pure per-slide rendering (lyric/scripture/copyright/image/video + media playback), while `PresentationViewer.vue` keeps its chrome (exit button, nav, fullscreen, keyboard, font gate) and now composes `SlideCanvas` internally with zero behavior change at its one existing call site. Three new thin windows — `RunControlView.vue`, `AudienceOutputView.vue`, `ConfidenceOutputView.vue` — each independently instantiate `useSlideshowAssembly(service, orgId, {canWrite:false})` and therefore independently compute the identical `AssembledSlide[]` from the same Firestore documents; only a cheap integer index (plus a blackout flag) crosses via BroadcastChannel — never slide content. `AssembledSlide.slotIndex` (already stamped by `assembleSlideshow`) is the load-bearing join between the order-of-service rail and the flat slide array; a new `serviceSlots.ts` utility centralizes the sort/lookup so the rail's display order never drifts from the assembler's own. A standalone, service-independent `/monitor-setup` route persists the monitor→role mapping to `localStorage`, keyed by a synthesized fingerprint (`label:widthxheight:isPrimary`), never Firestore.
 
 **Major components:**
-1. src/types/team.ts + stores/teams.ts (NEW) — Team shape, DEFAULT_TEAMS seed, CRUD + seedDefaultTeamsIfEmpty(), structural copy of roster.ts
-2. Settings "Teams" panel (NEW, mirrors RosterView.vue's Roles editor) — CRUD UI for name + optional song-tag filter + optional free-text-name flag
-3. ServiceEditorView.vue / NewServiceDialog.vue / ServiceCard.vue (MODIFIED) — read teamsStore.teams instead of local hard-coded arrays; delete sundayOrdinal() and its call sites
-4. firestore.rules inviteLookup block (MODIFIED) — narrowed allow create, read/delete untouched
-5. stores/services.ts deleteService (MODIFIED) — query-based multi-doc share-token revocation before deleting the service doc
+1. `SlideCanvas.vue` (new, in `components/slides/`) — pure per-slide render + media playback, consumed by both `PresentationViewer.vue` and the three new Run windows
+2. `RunControlView.vue` + `RunOrderRail.vue` (new) — owns `currentIndex`/`blackout`, opens/positions the two output windows, broadcasts state, renders the order-of-service rail
+3. `AudienceOutputView.vue` / `ConfidenceOutputView.vue` (new, thin) — chromeless listeners; confidence forces `suppressBackground` and renders current+next
+4. `MonitorSetupView.vue` (new, standalone route `/monitor-setup`) — screen enumeration, role assignment, localStorage persistence
+5. `runChannel.ts` / `monitorConfig.ts` / `serviceSlots.ts` (new utils) — BroadcastChannel protocol, device-config fingerprinting, slot↔slide lookup — all pure, framework-agnostic, unit-testable in isolation
 
 ### Critical Pitfalls
 
-1. SEED-002's catalog is partially stale — it claims VW_TYPE_LABELS is duplicated in "6+ files"; a direct grep shows it is already down to one source file with one consumer. Re-verify every SEED-002 file/line claim by grep before scoping a phase off it; the team-list duplication (2 files) and the a11y tab-strip debt are still live and confirmed.
-2. deleteService share-token revocation must be query-based, not single-doc — unlike deleteQuarter (one shareToken field), a service can accumulate multiple shareTokens docs across re-shares (pickAdoptableToken already queries where serviceId equals the service id for this reason). Porting deleteQuarter's single-reference lookup verbatim orphans older tokens, leaving a deleted service's data publicly viewable via a stale link — a real data-exposure bug, not cosmetic debt.
-3. inviteLookup tightening needs a regression test, not just a DENY case — the collection has three distinct actors (client create via TeamView.vue, client read+delete at first login via ensureUserDocument, Admin-SDK create via orgProvisioning.ts which bypasses rules entirely). Ship ALLOW (editor-of-target-org create), DENY (non-editor/wrong-org create), AND a third test proving the existing first-login invite-acceptance read+delete path is unaffected.
-4. createdBy is still unprotected post-v2.1 — preservesLifecycleFields() guards exactly 5 fields (active/deactivatedAt/deactivatedBy/reactivatedAt/reactivatedBy); createdBy was never added despite PROJECT.md flagging it as "needs re-verification since v2.1." Fix by extending the same diff().affectedKeys() pattern, verified by quoting the literal current field array, not the v2.1 changelog narrative.
-5. A11y retrofit must not swap v-show for conditional rendering — OwnerConsoleView.vue deliberately keeps panels always-mounted (v-show) so a roster onSnapshot listener survives tab switches; generic ARIA-tabs tutorials commonly bundle a switch to v-if/unmount semantics that would silently kill that listener. Add ARIA attributes without changing mount/hide mechanics, and verify the listener is still firing after the change.
-6. Team-list backfill must follow the subcollection (roles) pattern, not the OrgSettings array pattern — SEED-002 explicitly specifies "model exactly like DEFAULT_ROLES." Bolting teams onto OrgSettings as an array would fork the merge logic across the two still-hard-coded read sites and require both to be repointed to the exact same merged value in the same commit — miss one and the 2-copy drift this feature exists to kill reappears.
+1. **Permission-grant and permission-denied are both primary paths, not happy-path-vs-error-state** — `getScreenDetails()` must be called synchronously inside the click handler with no prior `await`; denial must route to a fully-built pop-out+drag+F11 fallback shipped in the SAME phase as auto-detect, not deferred as "polish."
+2. **Synchronous dual `window.open()`** — both output windows must open in direct response to the same click, before any async work; an `await` in between silently trips the popup blocker, and a non-technical operator gets no visible error.
+3. **Monitor→role mapping instability on replug** — persist a composite fingerprint (label + width/height + position), never array index or label alone; re-validate against the live screen list on every Run launch and force re-prompt only on a genuine mismatch, exactly as PROJECT.md specifies.
+4. **Fullscreen-loss cascading into a full session teardown** — the existing `PresentationViewer.vue` pattern (`fullscreenchange` → `exitPresentation()`) is explicitly wrong to copy per-window; each output window must offer a local "click to re-enter fullscreen" affordance on loss, never tear down the session or the other windows.
+5. **Auth/org context in popped-out windows** — a `window.open()` child is a separate JS realm with no automatic Pinia/store sharing; Firebase Auth persistence covers session survival for free, but org selection (sessionStorage-scoped by design) must also be passed explicitly via `?org=` query param, not relied on implicitly.
+6. **Un-preloaded images causing a flash** — background images and PPTX-rendered PNGs must be preloaded 2-3 slides ahead, independently in each output window, or a live click-jump into a large deck shows a visible pop-in/flash-to-black, undermining the "calm" UX goal.
 
 ## Implications for Roadmap
 
-Based on combined research, suggested phase structure (5 phases, largely parallelizable after phase 1):
+### Phase 1: SlideCanvas Extraction (foundation)
+**Rationale:** Every downstream phase (control preview, audience output, confidence output) depends on a working, tested `SlideCanvas.vue`; doing this first isolates the one refactor risk to the existing, well-tested `PresentationViewer.vue` call site before any new surface is built on top of it.
+**Delivers:** `SlideCanvas.vue` extracted with `slide`/`suppressBackground`/`interactive` props; `PresentationViewer.vue` refactored to compose it with zero behavior change (verified against its existing test file's `data-testid` markers).
+**Avoids:** Anti-Pattern 1 (forking `PresentationViewer.vue` three times) — establishes the single-source-of-truth rendering discipline the rest of the milestone depends on.
 
-### Phase 1: Dedup and Configurable Teams (A1 + A2 + B1)
-Rationale: SEED-002, FEATURES.md, and ARCHITECTURE.md all treat de-dup as a hard prerequisite — building config against one copy of the team-list literal while the other stays hard-coded reintroduces the exact drift this milestone exists to fix. B1 (dropping the ordinal rule) is only a safe UX change once A1 gives users an editable list to select from manually, so it must land in the same phase, sequenced after A1's store/UI exist.
-Delivers: src/types/team.ts + stores/teams.ts (seeded subcollection, mirrors roster.ts), Settings Teams panel, both ServiceEditorView.vue/NewServiceDialog.vue repointed to the single store, per-team songTagFilter field replacing the hard-coded Orchestra rule, sundayOrdinal() and its call sites deleted with NewServiceDialog.test.ts updated to assert the deliberate new default-team behavior (not gutted).
-Addresses: Table-stakes per-org Team list, per-row Save/delete-confirm UX, the milestone's stated differentiator (generalized song-tag filter), and the B1 anti-feature cut.
-Avoids: Pitfall 1 (stale seed numbers — re-grep first), Pitfall 2 (backfill pattern choice + read-site repoint), Pitfall 3 (test-gutting on B1 removal).
+### Phase 2: Config + Channel Utilities
+**Rationale:** `runChannel.ts`, `monitorConfig.ts`, and `serviceSlots.ts` are pure, framework-agnostic, independently unit-testable modules with no UI dependency — building and testing the sync/persistence primitives before any window consumes them catches the highest-consequence pitfalls (fingerprint instability, feedback loops, single-writer discipline) in isolation.
+**Delivers:** A typed BroadcastChannel protocol (`state`/`hello` messages), the screen-fingerprint diff/match algorithm, and the `slotIndex`↔first-assembled-slide-index lookup.
+**Uses:** BroadcastChannel, localStorage fingerprinting per STACK.md; `AssembledSlide.slotIndex` per ARCHITECTURE.md Pattern 3.
+**Avoids:** Pitfall 2 (stale monitor mapping), Pitfall 12 (feedback loop on shared channel) — get the single-writer/fingerprint-diff design right before any window depends on it.
 
-### Phase 2: Security and Data-Integrity Hardening (rules)
-Rationale: Independent of Teams; both sub-items are organizations-collection rule tightenings that belong in one rules-review pass sharing the same test file. Small, narrow, and mirrors an idiom (allow create if isOrgEditor) already deployed three times elsewhere.
-Delivers: inviteLookup create gate narrowed to the target org's editor (ALLOW/DENY/regression-test triad); createdBy added to an immutable-fields guard extending preservesLifecycleFields()'s pattern.
-Uses: Existing @firebase/rules-unit-testing harness (src/rules.test.ts, run via npm run test:rules).
-Implements: ARCHITECTURE.md Pattern 2 (create-only idiom mirror).
-Ships: Built + tested + UNDEPLOYED, per standing project deploy discipline — hand the owner the exact firebase deploy --only firestore:rules command.
+### Phase 3: Monitor Configuration Screen
+**Rationale:** This is the single riskiest user-gesture flow in the whole milestone (permission prompt UX) and must be built and manually tested — both granted and denied paths — before the Run flow that depends on it exists.
+**Delivers:** Standalone `/monitor-setup` route: screen enumeration via `getScreenDetails()`, Audience/Confidence role assignment UI, persistence to `localStorage`, and the pop-out+drag+F11 fallback as an equally-supported primary path (not an error state).
+**Addresses:** "Standalone, persistent monitor configuration" (table stakes, FEATURES.md).
+**Avoids:** Pitfall 1 (permission requested at the wrong moment), Pitfall 3 (no fallback when API absent/unsupported), Pitfall 7 (fullscreen on wrong screen).
 
-### Phase 3: deleteService Share-Token Revocation
-Rationale: Independent of Teams and rules hardening; a client-only store change with zero rules impact (existing allow delete already permits it).
-Delivers: deleteService queries and deletes ALL shareTokens docs matching serviceId (not a single-field lookup), plus serviceShareLinks/{serviceId} and the deterministic serviceShares/{slug}__service-{date} doc, ordered before the service doc delete itself.
-Uses: ARCHITECTURE.md Pattern 3 (cascade revocation), adapted per Pitfall 6 for services' multi-token cardinality.
-Implements: A unit test seeding 2+ shareTokens docs for one serviceId (simulating re-share) asserting all are removed.
+### Phase 4: Audience Output Window
+**Rationale:** Builds directly on Phases 1-3; the simpler of the two output windows (single `SlideCanvas`, background on) — validates the window-open/position/fullscreen/BroadcastChannel-listener pipeline before adding the confidence monitor's extra current+next complexity.
+**Delivers:** `AudienceOutputView.vue` — fullscreen, chrome-free, listens-only, own `useSlideshowAssembly` instance, own Wake Lock, own preload-ahead logic, own font-load gate reuse (`slideTypography.ts`).
+**Addresses:** "Audience output: fullscreen + background, zero chrome" (table stakes).
+**Avoids:** Pitfall 5 (fullscreen gesture-origin failure), Pitfall 6 (fullscreen-loss cascade), Pitfall 16 (un-preloaded images), Pitfall 17 (font gate not shared), Pitfall 19 (operator chrome/cursor leaking).
 
-### Phase 4: Pending-Render Edit Guard
-Rationale: Smallest, most isolated change; independent of everything else in the milestone.
-Delivers: EditSlideDrawer.vue reads the already-existing renderState field and disables/warns on customization of a slide whose render is still pending, closing a known silent-data-loss gap (previously ruled out as fixable by index-pairing).
-Uses: No new data flow — a read of an existing field already streamed to the drawer.
+### Phase 5: Confidence Monitor Output Window
+**Rationale:** A rendering-mode fork of the same audience-window pattern (Pattern 2: suppress-background is one prop, not a second render path) — sequenced after Audience so the shared window-lifecycle/Wake Lock/preload patterns are already proven once.
+**Delivers:** `ConfidenceOutputView.vue` — current+next `SlideCanvas` pair, `suppressBackground` forced true, chrome-free.
+**Addresses:** "Confidence monitor: current+next, black background, no chrome" (table stakes).
+**Avoids:** Same pitfall set as Phase 4, plus confirms the black-background transform stays a prop, not a duplicated content path.
 
-### Phase 5: Owner Console A11y Retrofit and Resend Domain Verification
-Rationale: Both are cross-cutting, dependency-free polish/ops items that can land in any order relative to the rest; grouping them keeps the "closing-out" phase focused on debt and owner-facing runbook items rather than new capability.
-Delivers: eslint-plugin-vuejs-accessibility added to eslint.config.ts; real label/aria-label on Owner Console (super-admin grant, Organizations onboard/assign) and the new Teams-editor inputs; role=tablist/role=tab/aria-selected/aria-controls added to BOTH OwnerConsoleView.vue and ServiceEditorView.vue tab strips without changing v-show mount semantics; a documented manual runbook for Resend domain verification (owner adds a controlled domain plus SPF/DKIM/DMARC/MX records, verifies fully in Resend's dashboard, only then flips appConfig/global.sender.fromAddress, then sends a real test message to a real external inbox).
-Avoids: Pitfall 5/8 (a11y retrofit must not swap v-show to v-if, must cover both tab strips in one pass, must not desync ARIA state from the existing route-query tab sync); Pitfall 7 (Resend: never a web.app domain, never flip the config before DNS shows fully Verified).
+### Phase 6: Run/Control Screen + Run Entry Point
+**Rationale:** The most complex phase — owns the sync architecture decision (BroadcastChannel primary, resolved in Phase 2), the order-of-service rail, the "one click" Run bootstrap that opens both output windows synchronously, and the locked-service gate. Sequenced last among the "core delivery" phases because it depends on all four prior phases (SlideCanvas, utilities, monitor config, both output windows) being in place to open/position/sync against.
+**Delivers:** `RunControlView.vue` + `RunOrderRail.vue`; new "Run" button on locked services (`ServiceCard.vue`/`ServiceEditorView.vue`); keyboard nav (Right/Space/Left existing, NEW Up/Down for item-jump); click-to-jump; window-open orchestration with the matched/unmatched monitor-config branches.
+**Addresses:** "Run button on locked service," "order-of-service list with current-item highlight," "click to jump," "standard keyboard nav" (all table stakes).
+**Avoids:** Pitfall 9 (popup blocker), Pitfall 10 (race condition on window open), Pitfall 18 (operator can't tell windows apart in fallback), Pitfall 20 ("you are here" indicator), Pitfall 21 (accidental exit).
+**Owns the requirements-level decision:** who may click Run — resolve the editor-only vs. new "projectionist" role tier question here (see Gaps below) before this phase is planned in detail.
+
+### Phase 7: Live-Ops Hardening
+**Rationale:** Sequenced last — these are cross-cutting robustness concerns (monitor replug mid-service, closed-window recovery, wake-lock re-acquisition over a realistic 60-90 min session, Firestore-rules coverage for any new state) that only matter once the core three-window flow already works end-to-end, and several require real-length manual testing that's wasteful to run before the core flow stabilizes.
+**Delivers:** `screenschange`/`resize` listener + control-window banner for mid-service monitor changes; `window.closed` polling + one-click reopen for a closed output window; Wake Lock re-acquisition on `visibilitychange`; `firestore.rules` coverage (if any new run-state document is introduced) verified via `npm run test:rules`.
+**Avoids:** Pitfall 4 (monitor unplug mid-service), Pitfall 13 (closed output window, no recovery), Pitfall 14 (machine sleep/screensaver).
 
 ### Phase Ordering Rationale
 
-- Phase 1 must come first only because its new Settings panel is a natural place to also confirm/import the already-deduped VW_TYPE_LABELS if the panel surfaces VW-related copy, and because it establishes the teams subcollection every later reference to "team" (a11y retrofit of the Teams editor's own inputs) builds on.
-- Phases 2, 3, and 4 have no cross-dependencies and can be planned/executed in parallel — ARCHITECTURE.md's Build Order confirms this explicitly ("Steps 2-5 have no cross-dependencies on each other and can be sequenced in any order or built in parallel").
-- Phase 5 is scheduled last only for narrative/cleanup reasons (it's genuinely dependency-free); the a11y half could equally run first or in parallel — the Resend half is gated on owner DNS action outside the app's control regardless of phase order, so scheduling it doesn't block or accelerate anything else.
-- Only Phase 2 touches firestore.rules; it is deliberately isolated so its owner deploy-hand-over doesn't gate any other phase's completion.
+- Foundation-first sequencing (SlideCanvas → utilities → monitor config) isolates the highest-blast-radius refactor and the riskiest permission/fingerprint logic before any new UI depends on them, matching both the architecture researcher's "reuse not fork" framing and the pitfalls researcher's "test the riskiest gesture call first, isolated" recommendation.
+- Output windows before the control screen lets the simpler, independently-testable consumer of `SlideCanvas` + BroadcastChannel-listening validate the pattern before the control screen's more complex orchestration (window-open sequencing, rail, keyboard nav) is layered on top.
+- Live-Ops Hardening is deliberately last and separable — FEATURES.md's dependency graph confirms multi-monitor delivery is orthogonal to slide-rendering work, and PITFALLS.md explicitly scopes several of these (replug, closed-window recovery, long-run wake-lock) to a dedicated hardening phase distinct from the initial builds.
+- This order avoids Anti-Pattern 2 (routing state through Firestore) and Anti-Pattern 3 (storing monitor config in Firestore) by settling the sync/persistence architecture (Phase 2) before any window that would be tempted to reach for the app's familiar Firestore-realtime default instead.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- None flagged as needing a dedicated --research-phase pass — every item in every phase already has a direct, cited in-repo precedent (roles subcollection, deleteQuarter, orgSlugs rules idiom, preservesLifecycleFields()), and the one external-ops item (Resend domain verification) has vendor-doc-sourced HIGH-confidence steps already captured in STACK.md/PITFALLS.md.
+- **Phase 3 (Monitor Configuration Screen):** the permission-prompt UX and pop-out fallback need real-device testing (mixed-DPI monitors, actual permission-denial flow) that this research pass could not fully simulate — flag for `--research-phase` if the plan needs concrete UI copy/flow validation beyond what STACK.md/PITFALLS.md already specify.
+- **Phase 6 (Run/Control Screen):** the projectionist-role decision (below) is a requirements gap, not just an implementation detail — plan-phase should not proceed until requirements resolves it, since it affects the Run entry point's auth/RBAC gating.
 
-Phases with standard, well-documented patterns (skip research-phase):
-- Phase 1 (Teams): Direct structural copy of RolesConfigPanel.vue/roster.ts — the pattern is proven and already shipped in this codebase.
-- Phase 2 (Rules hardening): Direct structural copy of the orgSlugs/orgNames/shareTokens create-gate idiom and the preservesLifecycleFields() immutable-field idiom, both already deployed and tested elsewhere in firestore.rules.
-- Phase 3 (deleteService revocation): Direct structural copy of deleteQuarter, adapted per the one documented cardinality difference (query vs single-field) already fully specified in ARCHITECTURE.md's Data Flow section.
-- Phase 4 (Pending-render guard): A single-field read in one component; PENDING-VERIFICATION.md already rejected the one plausible alternative approach (index-pairing), so the direction is settled.
-- Phase 5 (a11y and Resend): The a11y rule set is the standard W3C ARIA APG Tabs pattern plus WCAG 1.3.1/4.1.2, and Resend's verification steps are sourced directly from Resend's own current dashboard docs — both are stable, well-established external references, not areas of genuine uncertainty for this codebase.
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (SlideCanvas Extraction):** a well-documented, low-risk Vue component-extraction pattern; ARCHITECTURE.md already provides the exact prop shape and migration approach.
+- **Phase 2 (Config + Channel Utilities):** BroadcastChannel and fingerprint-diff patterns are fully spec'd in STACK.md/ARCHITECTURE.md/PITFALLS.md with code-shape examples already provided.
+- **Phases 4-5 (Output Windows):** the rendering-fork pattern (Pattern 2) and font/preload reuse are already concretely specified against this exact codebase.
+- **Phase 7 (Live-Ops Hardening):** each item has a documented MDN/Chrome-for-Developers pattern (visibilitychange re-acquire, screenschange listener, window.closed polling) — implementation is standard, though verification needs real-length manual testing.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | 5 of 6 items are "use what's already installed," verified by direct repo/package.json inspection; the one new dependency's peer-compatibility was verified via npm view; Resend steps sourced from Resend's own current docs |
-| Features | HIGH | Cross-checked against this codebase's own RolesConfigPanel.vue/roster.ts precedent and PENDING-VERIFICATION.md C4/C5, not speculative industry patterns |
-| Architecture | HIGH | Every recommendation is grounded in direct source reads of the exact files/lines involved (firestore.rules, stores/quarters.ts, stores/services.ts, roster.ts), not inference |
-| Pitfalls | HIGH | Every finding traced against current firestore.rules, functions/src/index.ts, and the relevant stores/views — one seed-catalog claim (VW_TYPE_LABELS count) was explicitly caught as stale and corrected rather than repeated |
+| Stack | MEDIUM-HIGH | All core APIs verified against MDN/Chrome-for-Developers/W3C spec repo; two facts (long-run `id` persistence across browser restarts, exact Edge version parity) could not be pinned to a single authoritative source |
+| Features | MEDIUM | Cross-checked across ≥2 independent sources per claim (vendor docs + trade press), but no Context7/Ref-authoritative doc provider was available; exact keystrokes are a strong convention to imitate, verify via UAT once built |
+| Architecture | HIGH | All claims verified against live source in this repo; the two external-API claims (Firebase Auth default persistence, Window Management API shape) are well-established, stable platform behavior |
+| Pitfalls | MEDIUM-HIGH | Window Management/Fullscreen/Wake Lock/BroadcastChannel mechanics are HIGH confidence (official docs); live-operation and non-technical-UX pitfalls are MEDIUM — synthesized from platform behavior + this project's own existing code, not a published post-mortem of church presentation software specifically |
 
-Overall confidence: HIGH
+**Overall confidence:** MEDIUM-HIGH
 
 ### Gaps to Address
 
-- VW_TYPE_LABELS de-dup status: SEED-002 claims 6+ duplicate files; direct grep as of 2026-08-23 shows exactly one source file and one consumer. Treat this item as already resolved — do NOT schedule work for it — but re-confirm with a fresh grep at phase-plan time in case anything has changed since this research pass, per Pitfall 1's general caution about trusting seed numbers unverified.
-- Team-list backfill seed-race: seedDefaultRolesIfEmpty() (the precedent Teams will copy) has a known, never-fixed double-seed race if two editors open a brand-new org simultaneously. Decide explicitly during Phase 1 planning whether to accept this low-blast-radius race as-is (matching roles) or close it with an existence-check-then-batch-write — either is acceptable, but the decision must be made deliberately and documented, not defaulted silently.
-- Ordinal-rule replacement UX: Dropping B1 needs an explicit decision (not left implicit) on what a new-service dialog defaults teams to afterward — no pre-selection at all, or the org's own saved default from A1. Surface this as a discussion-phase question, not something the phase plan should assume.
-- Resend verification is unverifiable from inside the app: there is no automated check the app can perform to confirm DNS records are propagated/verified before a send is attempted; the phase deliverable is necessarily a documented manual runbook plus optional warning copy, not an automated guarantee. Flag this to the owner explicitly as an operational dependency outside the coding phase's control.
+- **WHO may run a service** (flagged explicitly by the architecture researcher): PROJECT.md introduces a "new projectionist role concept" but does not specify whether this is (a) the existing editor role simply gaining a new "Run" affordance, or (b) a genuinely new, narrower RBAC tier distinct from editor/viewer. This directly determines the auth-gating logic on the Run entry point (Phase 6) and possibly `firestore.rules` scope — **requirements must resolve this before Phase 6 is planned in detail.**
+- **Exact keyboard shortcut map:** the researched convention (Right/Space=next, Left=prev, Up/Down=item-jump, Escape=exit-with-confirmation) is a synthesis across tools, not a single documented spec for this app — validate the final binding set with the milestone's own planned UI-research/UAT pass before treating it as final.
+- **Edge browser version parity:** Window Management API support in Edge is corroborated via policy-documentation cross-referencing (Edge 123 `DefaultWindowManagementSetting`) rather than a single authoritative "ships since Edge X" statement — low risk given the project already targets modern evergreen Edge, but worth a quick manual smoke-test on the actual church's Edge version if known.
+- **Screen `id` stability across a cookie/data clear:** documented as an edge case (Pitfall/Stack), mitigated by the fingerprint-based re-validation design — but has not been exercised against this specific app; include an explicit "clear site data, confirm re-prompt" test in Phase 3's or Phase 7's verification.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct repo inspection: firestore.rules, src/stores/roster.ts, src/stores/quarters.ts, src/stores/services.ts, src/views/ServiceEditorView.vue, src/components/NewServiceDialog.vue, src/views/OwnerConsoleView.vue, src/views/TeamView.vue, src/types/organization.ts, src/types/song.ts, src/components/slides/EditSlideDrawer.vue, src/types/slide.ts, functions/src/index.ts, functions/src/appConfig.ts, functions/src/orgProvisioning.ts, functions/src/orgTemplateSeed.ts, package.json, functions/package.json, eslint.config.ts — verified 2026-08-23
-- npm view eslint-plugin-vuejs-accessibility peerDependencies, npm view resend version — npm registry ground truth, verified 2026-08-23
-- Resend's own current docs: resend.com/docs/dashboard/domains/introduction, resend.com/docs/dashboard/domains/dmarc — fetched 2026-08-23
-- .planning/PROJECT.md, .planning/PENDING-VERIFICATION.md (C2/C4/C5), .planning/seeds/SEED-002-church-specific-rules-configurability.md — this project's own planning record
-- W3C ARIA Authoring Practices Guide (Tabs pattern), WCAG 2.1 SC 1.3.1 / 4.1.2 — stable, standard web-accessibility references
+- MDN — Window Management API, ScreenDetailed, Fullscreen API, Screen Wake Lock API, BroadcastChannel (official docs)
+- Chrome for Developers — "Manage several displays with the Window Management API," "Stay awake with the Screen Wake Lock API"
+- W3C `window-management` spec repo — HOWTO.md, EXPLAINER.md
+- Direct source inspection of this repo: `src/components/PresentationViewer.vue`, `src/utils/slideshowAssembler.ts`, `src/composables/useSlideshowAssembly.ts`, `src/types/slide.ts`, `src/stores/auth.ts`, `src/firebase/index.ts`, `src/router/index.ts`
+- `.planning/PROJECT.md` — v2.4 milestone scope and owner decisions
 
 ### Secondary (MEDIUM confidence)
-- Third-party corroboration of Resend's SPF/DKIM/MX/DMARC record shape (dmarcdkim.com, dmarc.wiki/resend, phishfence.io) — used only to corroborate vendor docs, not as primary source
-- eslint-plugin-vuejs-accessibility project docs site (vue-a11y.github.io) — corroborated directly by the npm peerDependencies field
+- Renewed Vision (ProPresenter official support docs), EasyWorship official help, Faithlife Proclaim official features/support, OpenLP official manual, FreeShow official docs, Church Presenter blog, Church Production Magazine, Igniter Media, MediaShout/The Lead Pastor — cross-checked feature/keyboard/confidence-monitor convention claims
+- caniuse.com (`mdn-api_window_getscreendetails`) — live browser-support source of truth
+- Scott Logic (multi-window browser apps), community cross-window-communication write-ups — BroadcastChannel/noopener behavior corroboration
 
 ### Tertiary (LOW confidence)
-- None — no findings in this milestone's research rest on a single unverified source; the one instance of a stale secondary claim (SEED-002's VW_TYPE_LABELS file count) was caught and corrected against a direct primary-source grep rather than carried forward.
+- W3C `window-management` GitHub Issue #80 (`ScreenDetailed` object-identity stability) — used as corroboration only, not sole source
+- Edge Chromium-parity via policy documentation cross-reference — treat exact version boundary as approximate
 
 ---
-Research completed: 2026-08-23
-Ready for roadmap: yes
+*Research completed: 2026-08-28*
+*Ready for roadmap: yes*
