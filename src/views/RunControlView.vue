@@ -237,6 +237,14 @@ import {
   type RunChannelHandle,
 } from '@/utils/runChannel'
 import { sortedSlotsWithIndex, firstAssembledIndexBySlot } from '@/utils/serviceSlots'
+import {
+  loadMapping,
+  matchMapping,
+  computeFingerprint,
+  type MonitorMapping,
+  type MonitorRole,
+  type ScreenLike,
+} from '@/utils/monitorConfig'
 import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { SERVICE_SECTION_LABELS, type ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
@@ -255,7 +263,7 @@ const props = defineProps<{
 // scoping, the localService initial-load watch, the read-only assembly, and the
 // WR-02 subscribe gate — do NOT re-do any of it here, and (deliberately) it
 // registers NO unsubscribeAll, so this in-app route never tears down peers.
-const { serviceId, localService, assembledSlideshow } = useServiceAssembly()
+const { serviceId, orgIdRef, localService, assembledSlideshow } = useServiceAssembly()
 const router = useRouter()
 
 // ── Single-writer channel + navigation model (R266) ──────────────────────────
@@ -406,6 +414,161 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
+// ── Output-window orchestration (R261 / R266) ────────────────────────────────
+// The Go live gesture opens BOTH standalone output windows and (when the live
+// monitors match a saved mapping) places each on its assigned screen. This runs
+// ONLY from the run-go-live-btn click — NEVER onMounted. window.open (pop-up
+// blocker) + requestFullscreen({ screen }) require a live transient activation
+// traceable to a gesture task; after the Run click's router.push + the lazy
+// route-chunk import() + the async auth/org beforeEach guard + the mount tick,
+// Chrome/Edge no longer honor that activation on mount, so an onMounted open
+// would silently open ZERO windows on a cold first Run while claiming success.
+// The operator clicks Go live on the control screen to supply a FRESH, live
+// activation for both window.open and requestFullscreen.
+//
+// HANDSHAKE (95-03): the channel is the single writer from mount and postIndex
+// drives state whether or not a display is open; when Go live opens a window it
+// postHellos and the control's onHello (resendCurrent) resends the current
+// index — so the operator may click Go live at ANY time (even after navigating
+// several slides) and the freshly-opened output syncs to the live slide.
+type OutputStatus = 'idle' | 'opening' | 'placed' | 'fallback' | 'blocked'
+const outputStatus = ref<OutputStatus>('idle')
+const readyAudienceLabel = ref<string | null>(null)
+const readyConfidenceLabel = ref<string | null>(null)
+
+// Raw window handles (NOT reactive), keyed by stable window name.
+const outputWindows: Record<string, Window | null> = {}
+
+/**
+ * Opens ONE output window and (when a target screen is given) best-effort places
+ * it there. Returns the ACTUAL window.open handle so callers gate their
+ * "opened" claim on a real non-null window — a blocked pop-out (or jsdom)
+ * returns null and must never be treated as opened, and must never throw.
+ * PLAIN window.open (NO noopener/noreferrer): the HTML spec copies the opener's
+ * sessionStorage — carrying the picked org — to the child only when the opener
+ * relationship is preserved.
+ */
+function openWindow(url: string, name: string, screen: ScreenLike | null): Window | null {
+  const features = screen
+    ? `left=${screen.left},top=${screen.top},width=${screen.width},height=${screen.height}`
+    : ''
+  const win = window.open(url, name, screen ? features : '')
+  outputWindows[name] = win
+  if (!win) return null
+  if (screen) {
+    try {
+      win.moveTo(screen.left, screen.top)
+    } catch {
+      // best-effort placement — never throw
+    }
+    try {
+      // The non-standard `screen` fullscreen option is not in the base TS lib;
+      // cast + guard. Real reliable fullscreen is each output window's OWN
+      // affordance, so a rejection here is silent (never tear down).
+      win.document?.documentElement?.requestFullscreen?.({
+        screen,
+      } as unknown as FullscreenOptions)
+    } catch {
+      // activation lost / embedding / unsupported — silent, best-effort
+    }
+  }
+  return win
+}
+
+/** Resolve a role → its saved fingerprint → the live screen with that fingerprint. */
+function resolveScreen(saved: MonitorMapping, role: MonitorRole, screens: ScreenLike[]): ScreenLike | null {
+  const fingerprint = saved.assignments.find((a) => a.role === role)?.fingerprint
+  if (!fingerprint) return null
+  return screens.find((s) => computeFingerprint(s) === fingerprint) ?? null
+}
+
+function screenLabel(screen: ScreenLike | null): string {
+  return screen?.label && screen.label.length > 0 ? screen.label : 'display'
+}
+
+/** MATCHED path — open + place each output on its assigned monitor. */
+function openPlaced(saved: MonitorMapping, screens: ScreenLike[]) {
+  const audienceScreen = resolveScreen(saved, 'audience', screens)
+  const confidenceScreen = resolveScreen(saved, 'confidence', screens)
+  const aWin = openWindow(audienceUrl(), 'wp-audience', audienceScreen)
+  const cWin = openWindow(confidenceUrl(), 'wp-confidence', confidenceScreen)
+  // Gate the success claim on a real window: both null → pop-ups blocked.
+  if (!aWin && !cWin) {
+    outputStatus.value = 'blocked'
+    return
+  }
+  readyAudienceLabel.value = screenLabel(audienceScreen)
+  readyConfidenceLabel.value = screenLabel(confidenceScreen)
+  outputStatus.value = 'placed'
+}
+
+/** FALLBACK path — open both outputs un-positioned (operator drags + fullscreens). */
+function openUnplaced() {
+  const aWin = openWindow(audienceUrl(), 'wp-audience', null)
+  const cWin = openWindow(confidenceUrl(), 'wp-confidence', null)
+  // A pop-up blocker in a gesture is all-or-nothing, so both-null is the
+  // load-bearing blocked case; ≥1 non-null handle means windows opened.
+  if (!aWin && !cWin) {
+    outputStatus.value = 'blocked'
+    return
+  }
+  outputStatus.value = 'fallback'
+}
+
+// URLs computed at open time so they read the CURRENT serviceId/org.
+function audienceUrl(): string {
+  return `/present/audience/${serviceId.value}?org=${orgIdRef.value ?? ''}`
+}
+function confidenceUrl(): string {
+  return `/present/confidence/${serviceId.value}?org=${orgIdRef.value ?? ''}`
+}
+
+/**
+ * The Go-live gesture entry — bound to the run-go-live-btn click, run
+ * SYNCHRONOUSLY. getScreenDetails() is the FIRST statement after the plain
+ * feature-detect (the only line before it is a synchronous ref set), with NO
+ * await/store/router before it, so its .then runs while the click's transient
+ * activation is still live and window.open + requestFullscreen({ screen })
+ * inside openPlaced act within the sanctioned one-gesture window (Pitfall 1/5).
+ * Mirrors MonitorSetupView.onDetectClick.
+ */
+function openOutputs() {
+  outputStatus.value = 'opening'
+  if (!('getScreenDetails' in window)) {
+    openUnplaced()
+    return
+  }
+  ;(window as unknown as { getScreenDetails: () => Promise<{ screens: ScreenLike[] }> })
+    .getScreenDetails()
+    .then((details) => {
+      const saved = loadMapping()
+      if (!saved) {
+        openUnplaced()
+        return
+      }
+      const result = matchMapping(saved, details.screens)
+      if (result.status !== 'matched') {
+        openUnplaced()
+        return
+      }
+      openPlaced(saved, details.screens)
+    })
+    .catch(() => {
+      openUnplaced()
+    })
+}
+
+/** Guarded teardown of every opened output window — called first on exit. */
+function closeOutputs() {
+  for (const name of Object.keys(outputWindows)) {
+    try {
+      outputWindows[name]?.close()
+    } catch {
+      // a closed/cross-origin window .close() can throw — never propagate
+    }
+  }
+}
+
 // ── Exit confirm ─────────────────────────────────────────────────────────────
 function openExitConfirm() {
   confirmOpen.value = true
@@ -414,8 +577,9 @@ function cancelExit() {
   confirmOpen.value = false
 }
 function confirmExit() {
-  // 95-04 SEAM: closeOutputs() belongs HERE, before the channel close, once the
-  // window orchestration wave wires the real output teardown.
+  // Blank the projector FIRST — close the output windows before the channel
+  // close + router.push, so ending run mode tears down the real displays (R266).
+  closeOutputs()
   handle?.close()
   router.push({ name: 'service-editor', params: { id: serviceId.value } })
 }
