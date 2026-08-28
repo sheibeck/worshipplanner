@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-08-28T12:40:40.413Z"
 last_activity: 2026-08-28
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -27,7 +27,57 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (roadmap created 2026-08-25)
+# ▶ ACTIVE MILESTONE — v2.4 Run the Service (Live Presentation) (roadmap created 2026-08-28)
+
+**Status:** Roadmap created; no phases started.
+
+**Goal:** Give a non-technical projectionist a clean, standalone way to run a locked service's slide
+deck live during a church service — driving a fullscreen audience projector and a band confidence
+monitor from one Chrome/Edge browser. Requirements R261–R275 in REQUIREMENTS.md.
+
+(v2.3 ended at Phase 89); this milestone is **Phases 90–96**.
+
+**Roadmap (7 phases — this milestone's roadmapping instruction directed following
+`research/SUMMARY.md`'s 7-phase dependency-aware build order directly, rather than compressing to this
+project's `coarse` granularity setting's usual 2-4; the dependency chain — a shared rendering component
+must exist before three consumer windows, sync/persistence primitives must be proven before the windows
+that use them, both output windows must exist before the control screen that orchestrates them — argued
+against further compression; see `.planning/ROADMAP.md` § v2.4 for full phase detail):**
+
+- **Phase 90 — SlideCanvas Extraction (no requirement; enabling refactor):** extract
+  `PresentationViewer.vue`'s slide-rendering guts into a reusable `SlideCanvas.vue` with zero behavior
+  change, so every downstream window composes one rendering source of truth instead of forking it.
+- **Phase 91 — Config + Channel Utilities (no requirement; enabling infrastructure):** pure,
+  framework-agnostic modules — a typed BroadcastChannel control→output protocol, a per-device monitor
+  fingerprint/localStorage config, and a slotIndex↔slide lookup — built and unit-tested before any
+  window depends on them.
+- **Phase 92 — Monitor Configuration Screen (R267–R269):** standalone `/monitor-setup` route —
+  screen enumeration, Audience/Confidence role assignment, per-device persistence, and the
+  pop-out+drag+fullscreen fallback as an equally-supported primary path.
+- **Phase 93 — Audience Output Window (R270–R271):** fullscreen, chrome-free slide output with
+  background, Screen Wake Lock, and graceful fullscreen-loss recovery.
+- **Phase 94 — Confidence Monitor Output Window (R272):** current+next slide output with background
+  suppressed to black, no chrome — a rendering-mode fork of Phase 93's pattern.
+- **Phase 95 — Run/Control Screen + Run Entry Point (R261–R266, R275):** the Run button on a locked
+  service, the order-of-service rail with current-item highlight, click-to-jump, keyboard nav, the
+  single-selection model, and any-authenticated-member authorization.
+- **Phase 96 — Live-Ops Hardening (R273–R274):** closed-output-window recovery, monitor-replug
+  detection, and control↔output sync robustness over a realistic service length.
+
+**Coverage:** 15/15 v2.4 requirements mapped, each to exactly one phase; no orphans, no duplicates.
+Phases 90–91 carry no direct requirement by design (enabling refactor + pure infrastructure) — flagged
+explicitly rather than folded, per the milestone-roadmapping instruction.
+
+**Deploy expectation:** this milestone is CLIENT-SIDE ONLY per `research/SUMMARY.md` — zero new
+Firestore schema, zero Cloud Functions, no new npm dependency. No `firestore.rules`/`storage.rules`
+change is anticipated; Phase 96 re-confirms this rather than assuming it (only adds rules coverage if a
+new run-state document turns out to be needed, which research says it is not).
+
+**Next step:** `/gsd-plan-phase 90` (optionally preceded by `/gsd-discuss-phase 90`).
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.3 Scheduling Accuracy & Song/Team Refinements (shipped & deployed to production 2026-08-27, archived 2026-08-28)
 
 **Status:** v2.3 milestone complete
 
@@ -943,7 +993,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 89 — Multi-Role Scheduling
+**Current focus:** Phase 90 — SlideCanvas Extraction (v2.4 Run the Service)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -953,10 +1003,51 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-28 — Milestone v2.4 started
+Phase: 90 — SlideCanvas Extraction (v2.4 roadmap created, ready to plan)
+Plan: — (not yet planned)
+Status: Roadmap complete, ready to plan
+Last activity: 2026-08-28 — v2.4 ROADMAP.md created (Phases 90-96), REQUIREMENTS.md traceability filled (15/15 mapped), STATE.md updated
+
+## ★ v2.4 ROADMAP.md phase breakdown (created 2026-08-28)
+
+7 phases (90-96), following `research/SUMMARY.md`'s "Implications for Roadmap" dependency-aware build
+order directly, per the roadmapping instruction's explicit request to honor the researched 7-phase shape
+rather than compress to this project's usual `coarse` granularity (2-4 phases): SlideCanvas extraction is
+sequenced first because every downstream window (control preview, audience, confidence) depends on a
+working, tested shared rendering component, isolating the one refactor risk before any new surface is
+built on top of it; Config + Channel Utilities is pure, framework-agnostic, and independently
+unit-testable, so the sync/persistence primitives (BroadcastChannel protocol, monitor fingerprint,
+slotIndex lookup) are proven in isolation before any window consumes them; Monitor Configuration is the
+riskiest user-gesture flow (screen-permission prompt UX, both grant and denial paths) and must exist
+before the Run flow that depends on it; the two output windows are sequenced before the control screen
+so the simpler, independently-testable window-open/position/fullscreen/BroadcastChannel-listener pipeline
+is validated once (Audience) then forked once (Confidence, suppress-background as a prop) before the
+control screen's heavier orchestration lands on top; Run/Control is sequenced last among "core delivery"
+phases because it depends on all four prior phases being in place to open/position/sync against, and it
+owns the Run-entry authorization decision (R275: any authenticated org member, editor or viewer); Live-Ops
+Hardening is deliberately last and separable — cross-cutting robustness (monitor replug, closed-window
+recovery, long-run wake-lock) only matters once the core three-window flow already works end-to-end.
+**Numbering continues from v2.3, which ended at Phase 89** — v2.4 starts at Phase 90, not reset.
+
+Phases 90 (SlideCanvas Extraction) and 91 (Config + Channel Utilities) carry no directly-mapped
+requirement — both are enabling refactor/infrastructure work the milestone's user-facing requirements
+depend on, not user-observable features in themselves; kept as their own phases (not folded into a
+neighbor) because each isolates a distinct, independently-verifiable risk per the research's explicit
+"build and test in isolation before consumers depend on it" rationale.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 90 SlideCanvas Extraction | Extract `PresentationViewer.vue`'s slide-rendering logic into a reusable `SlideCanvas.vue` with zero behavior change | (none — enabling refactor) | Nothing (first) | yes |
+| 91 Config + Channel Utilities | Pure BroadcastChannel control→output protocol, per-device monitor fingerprint/localStorage config, and slotIndex↔slide lookup, unit-tested in isolation | (none — enabling infrastructure) | Nothing (independently buildable; sequenced before 92-96) | no |
+| 92 Monitor Configuration Screen | Standalone `/monitor-setup` route detects connected monitors, assigns Audience/Confidence roles, persists per device, with a first-class fallback when screen-permission is denied | R267-R269 | Phase 91 | yes |
+| 93 Audience Output Window | Fullscreen, chrome-free audience output with background, Screen Wake Lock, and graceful fullscreen-loss recovery | R270-R271 | Phase 90, Phase 91, Phase 92 | yes |
+| 94 Confidence Monitor Output Window | Current+next slide output with background suppressed to black, no chrome | R272 | Phase 90, Phase 91, Phase 93 | yes |
+| 95 Run/Control Screen + Run Entry Point | Run button on a locked service opens a standalone control screen — order-of-service rail with current-item highlight, click-to-jump, keyboard nav, single-selection model; any authenticated org member may Run | R261-R266, R275 | Phase 92, Phase 93, Phase 94 | yes |
+| 96 Live-Ops Hardening | Closed-output-window one-click recovery, monitor-unplug detection, and control↔output sync robustness with no perceptible lag, verified over a realistic service length | R273-R274 | Phase 95 | yes |
+
+See `.planning/ROADMAP.md` § v2.4 Run the Service (Live Presentation) for the full phase detail table
+(goals, dependencies, success criteria). Next step: `/gsd-plan-phase 90` (optionally preceded by
+`/gsd-discuss-phase 90`).
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 

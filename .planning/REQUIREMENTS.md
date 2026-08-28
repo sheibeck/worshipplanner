@@ -72,27 +72,31 @@ Which phase covers which requirement. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R261 | Phase [N] | Pending |
-| R262 | Phase [N] | Pending |
-| R263 | Phase [N] | Pending |
-| R264 | Phase [N] | Pending |
-| R265 | Phase [N] | Pending |
-| R266 | Phase [N] | Pending |
-| R267 | Phase [N] | Pending |
-| R268 | Phase [N] | Pending |
-| R269 | Phase [N] | Pending |
-| R270 | Phase [N] | Pending |
-| R271 | Phase [N] | Pending |
-| R272 | Phase [N] | Pending |
-| R273 | Phase [N] | Pending |
-| R274 | Phase [N] | Pending |
-| R275 | Phase [N] | Pending |
+| R261 | Phase 95 | Pending |
+| R262 | Phase 95 | Pending |
+| R263 | Phase 95 | Pending |
+| R264 | Phase 95 | Pending |
+| R265 | Phase 95 | Pending |
+| R266 | Phase 95 | Pending |
+| R267 | Phase 92 | Pending |
+| R268 | Phase 92 | Pending |
+| R269 | Phase 92 | Pending |
+| R270 | Phase 93 | Pending |
+| R271 | Phase 93 | Pending |
+| R272 | Phase 94 | Pending |
+| R273 | Phase 96 | Pending |
+| R274 | Phase 96 | Pending |
+| R275 | Phase 95 | Pending |
 
 **Coverage:**
 - v1 requirements: 15 total (R261–R275)
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 15 ⚠️ (roadmapper will resolve)
+- Mapped to phases: 15/15 ✓
+- Unmapped: 0 ✓
+
+**Note:** Phases 90 (SlideCanvas Extraction) and 91 (Config + Channel Utilities) carry no directly-mapped
+requirement by design — both are enabling refactor/infrastructure work every requirement above depends on
+(see `.planning/ROADMAP.md` § v2.4 Basis note), not user-facing requirements in themselves.
 
 ---
 *Requirements defined: 2026-08-28*
-*Last updated: 2026-08-28 after initial definition (milestone v2.4)*
+*Last updated: 2026-08-28 after roadmap creation (v2.4) — 15/15 requirements mapped across Phases 90-96, 0 orphaned*
