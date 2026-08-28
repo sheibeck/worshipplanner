@@ -46,7 +46,7 @@ vi.mock('vue-router', () => ({
 // A stable, Firestore-free services store: the view watches `services` (initial-
 // load only), reads `orgId` to gate subscribe(), and calls unsubscribeAll() on
 // unmount. Hoisted so the vi.mock factory can reference it.
-const { serviceStoreMock, fakeSlides } = vi.hoisted(() => {
+const { serviceStoreMock, fakeSlides, slideCanvasSpies } = vi.hoisted(() => {
   function fakeSlide(id: string): unknown {
     return {
       slide: {
@@ -71,6 +71,10 @@ const { serviceStoreMock, fakeSlides } = vi.hoisted(() => {
       unsubscribeAll: vi.fn(),
     },
     fakeSlides: [fakeSlide('a'), fakeSlide('b'), fakeSlide('c')],
+    // WR-01 (93-REVIEW): real spies for the play/pause handles the SlideCanvas
+    // stub exposes, so the T-23-08 pause→nextTick→play ordering is assertable —
+    // matching how the real SlideCanvas exposes play/pause via defineExpose.
+    slideCanvasSpies: { play: vi.fn(), pause: vi.fn() },
   }
 })
 
@@ -111,7 +115,9 @@ vi.mock('@/components/slides/SlideCanvas.vue', async () => {
         interactive: { type: Boolean, default: false },
       },
       setup(props, { expose }) {
-        expose({ play: () => {}, pause: () => {} })
+        // WR-01: expose the shared spies (not bare no-ops) so the parent's
+        // slideCanvasRef.pause()/play() calls land on inspectable mocks.
+        expose({ play: slideCanvasSpies.play, pause: slideCanvasSpies.pause })
         return () =>
           h(
             'div',
@@ -187,6 +193,14 @@ beforeEach(() => {
   })
   serviceStoreMock.subscribe.mockClear()
   serviceStoreMock.unsubscribeAll.mockClear()
+  // Reset state the org-scoping tests (WR-02) mutate, so each test starts from
+  // the fresh-store / org-1 baseline the other suites assume.
+  serviceStoreMock.orgId = null
+  mockRoute.params.serviceId = 'service-1'
+  mockRoute.query.org = 'org-1'
+  // WR-01: fresh invocationCallOrder per test for the pause→play ordering check.
+  slideCanvasSpies.play.mockClear()
+  slideCanvasSpies.pause.mockClear()
 })
 
 afterEach(() => {
@@ -228,6 +242,34 @@ describe('AudienceOutputView — channel-driven slide (R270/R271)', () => {
     fake.emitState(0, 3)
     await flushPromises()
     expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('c')
+  })
+})
+
+describe('AudienceOutputView — media pause→nextTick→play invariant (T-23-08)', () => {
+  it('pauses the outgoing slide before playing the incoming on a slide change (pause → tick → play)', async () => {
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    // null → 0: the canvas mounts and play() runs; there is no outgoing media to
+    // pause yet (slideCanvasRef is still null when the pre-flush watcher fires).
+    fake.emitState(0, 1)
+    await flushPromises()
+
+    // 0 → 1: the default pre-flush watcher pauses the outgoing slide's media,
+    // then after nextTick the canvas holds slide 1 and play() starts it.
+    fake.emitState(1, 2)
+    await flushPromises()
+
+    expect(slideCanvasSpies.pause).toHaveBeenCalled()
+    expect(slideCanvasSpies.play).toHaveBeenCalled()
+    // The pause on the outgoing slide is invoked before the play on the incoming.
+    // A regression that dropped `await nextTick()` or reordered the two would
+    // play the outgoing slide's media (or a black frame) and fail here.
+    const playOrder = slideCanvasSpies.play.mock.invocationCallOrder
+    expect(slideCanvasSpies.pause.mock.invocationCallOrder[0]!).toBeLessThan(
+      playOrder[playOrder.length - 1]!,
+    )
   })
 })
 
@@ -339,6 +381,27 @@ describe('AudienceOutputView — Screen Wake Lock (R271)', () => {
     expect(request).toHaveBeenCalledTimes(2)
   })
 
+  it('releases the acquired wake-lock sentinel on unmount (R271 released-on-unmount)', async () => {
+    const sentinel = { release: vi.fn().mockResolvedValue(undefined) }
+    const request = vi.fn().mockResolvedValue(sentinel)
+    Object.defineProperty(navigator, 'wakeLock', {
+      value: { request },
+      configurable: true,
+      writable: true,
+    })
+
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+    // Sentinel acquired on mount.
+    expect(request).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+    await flushPromises()
+    // onUnmounted awaits wakeLock.value?.release() — the held sentinel is freed.
+    expect(sentinel.release).toHaveBeenCalledTimes(1)
+  })
+
   it('does not throw on mount when navigator.wakeLock is absent', async () => {
     expect('wakeLock' in navigator).toBe(false)
     const fake = createFakeChannel()
@@ -403,5 +466,44 @@ describe('AudienceOutputView — fullscreen-loss recovery (R271; Pitfall 6)', ()
     await affordance.trigger('click')
 
     expect(Element.prototype.requestFullscreen).toHaveBeenCalled()
+  })
+})
+
+describe('AudienceOutputView — org-scoped service subscription (WR-02)', () => {
+  it('subscribes the services store to the requested ?org= on a fresh (unsubscribed) store', async () => {
+    serviceStoreMock.orgId = null
+    mockRoute.query.org = 'org-1'
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(serviceStoreMock.subscribe).toHaveBeenCalledWith('org-1')
+  })
+
+  it('re-subscribes to the requested ?org= when the store is already on a DIFFERENT org (no cross-org bleed)', async () => {
+    // Same-tab navigation: the services store is still subscribed to org-other
+    // (the operator was elsewhere in the SPA), but this audience URL requests
+    // org-1. The view must re-key the service source to the SAME org
+    // useSlideshowAssembly subscribes content to, or the congregation surface
+    // silently desyncs (X's service assembled against Y's content maps).
+    serviceStoreMock.orgId = 'org-other'
+    mockRoute.query.org = 'org-1'
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(serviceStoreMock.subscribe).toHaveBeenCalledWith('org-1')
+  })
+
+  it('does NOT re-subscribe when the store is already on the requested org', async () => {
+    // A matching org means the existing subscription already targets the right
+    // content — re-subscribing would tear down and re-listen for no reason.
+    serviceStoreMock.orgId = 'org-1'
+    mockRoute.query.org = 'org-1'
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(serviceStoreMock.subscribe).not.toHaveBeenCalled()
   })
 })
