@@ -1,0 +1,98 @@
+# Requirements: WorshipPlanner — v2.4 Run the Service (Live Presentation)
+
+**Defined:** 2026-08-28
+**Core Value:** Smart weekly service planning that follows the Vertical Worship methodology while rotating through the full song stable and respecting team configurations.
+**Milestone goal:** Give a non-technical projectionist a clean, standalone way to *run* a locked service's slide deck live during a church service — driving a fullscreen audience projector and a band confidence monitor from one Chrome/Edge browser.
+
+> REQ-ID numbering continues the project's global `R###` sequence from v2.3 (last: R260). This milestone: **R261–R275**.
+
+## v1 Requirements
+
+Requirements for this milestone. Each maps to exactly one roadmap phase (see Traceability).
+
+### Run Entry & Control Screen
+
+- [ ] **R261**: A projectionist can start running a **locked** service via a **Run** button that opens a dedicated standalone Run/control screen (not the service editor); the button is absent/disabled on draft services.
+- [ ] **R262**: On the Run/control screen, the projectionist sees the **order of service** as a list with the item containing the current slide clearly highlighted as "you are here."
+- [ ] **R263**: The projectionist can **click an order-of-service item to jump** the live output to that item's first slide.
+- [ ] **R264**: The Run/control screen shows a **large current-slide preview** (what the audience sees) alongside a smaller **next-slide** preview.
+- [ ] **R265**: The projectionist can navigate with **standard keyboard keys**: Right Arrow / Space = next slide, Left Arrow = previous slide, Down / Up Arrow = next / previous order-of-service item, Escape = exit run mode (with a confirmation so a stray Escape cannot tear down a live service).
+- [ ] **R266**: The Run/control screen uses a **single-selection model** — the current/selected slide **is** what is live, with no separate "push to live" step.
+
+### Monitor Configuration (standalone & persistent)
+
+- [ ] **R267**: A projectionist can open a **standalone monitor-setup screen** (its own route, separate from the Run flow) that detects the connected monitors and lets them assign **Audience** and **Confidence** roles.
+- [ ] **R268**: The monitor→role assignment is **saved and remembered per device**, so running a service is effectively one click once configured; on each Run the app re-validates the saved mapping against the live screens and only re-prompts when the physical monitor layout has actually changed.
+- [ ] **R269**: When the browser's screen-management permission is denied or unavailable, the projectionist gets a **first-class fallback** path (open the output window, drag it to the target monitor, go fullscreen) — never a dead end.
+
+### Audience Output
+
+- [ ] **R270**: The audience output opens on the assigned monitor as a **fullscreen slide with its background image and zero operator chrome** (no arrows, slide counts, organizational labels, or visible cursor).
+- [ ] **R271**: The audience display **stays awake for the duration of the service** (Screen Wake Lock) and **recovers gracefully if it loses fullscreen** (offers to re-enter fullscreen; never tears down the running session or the other output).
+
+### Confidence Monitor Output
+
+- [ ] **R272**: The confidence output opens on the assigned monitor showing the **current slide and the upcoming slide**, with **background images suppressed to a plain black background** and no operator chrome.
+
+### Live-Operation Robustness
+
+- [ ] **R273**: The Run/control screen is the **single source of truth**; the audience and confidence outputs stay **in sync** with the operator's navigation with no perceptible lag.
+- [ ] **R274**: If an output window is **closed** or a monitor is **unplugged mid-service**, the control screen detects it and offers **one-click recovery** (reopen/reassign) without losing the current slide position.
+
+### Authorization
+
+- [ ] **R275**: **Any authenticated member** of the service's organization (editor **or** viewer) can Run a locked service; running is presentation-only and requires no new RBAC role tier and no ability to edit the plan.
+
+## Future Requirements
+
+Acknowledged but deferred — not in this milestone's roadmap.
+
+### Confidence Monitor Enhancements
+
+- **R-future**: Show the current slide's **section label** (e.g. "Verse 2") on the confidence monitor — trivial reuse of existing `section` / `SERVICE_SECTION_LABELS` data; add once the core confidence view is validated with a real projectionist.
+- **R-future**: A **countdown / elapsed timer** on the confidence monitor — no slide-model dependency, purely additive.
+
+## Out of Scope
+
+Explicitly excluded this milestone. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Instant **blackout / clear / logo-cut** button | Explicitly deferred by owner for v2.4. Reserve a UI slot + spare key (e.g. `B`) so a later retrofit is additive, but build no blackout logic now. |
+| **Slide transitions / fades** on the audience output | Not table stakes (reference tools default to hard cuts, which the app already does); conflicts with the existing `goToIndex` instant-swap media-lifecycle invariant (T-23-08). Revisit only with a dedicated future phase. |
+| **Non-Chromium** monitor auto-detection (Safari/Firefox) | Explicitly deferred; the project targets Chrome/Edge, where the Window Management API is available. Other browsers get the manual pop-out + fullscreen fallback only. |
+| Full **Preview / Live two-pane** operator model (à la ProPresenter/EasyWorship) | Adds a staged-then-push concept that fights the non-technical single-operator target; the single-selection model (R266) is the deliberate simpler choice. |
+| **Rich, customizable stage-display** layouts (widgets/messages/objects) | The confidence-monitor need is narrow and fully specified (current + next, black background); a general layout editor is a much larger, unrequested surface. |
+| **Remote / mobile companion** control app | Materially larger scope (second client, second-device real-time sync, responsive layout) than v2.4's single-browser-window, two-monitor model. |
+| **Auto-advance / timed** slide progression for the live service | A live worship service is human-paced; auto-advance fights the operator. (Out of scope; unrelated pre-service loops are a different feature.) |
+
+## Traceability
+
+Which phase covers which requirement. Populated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| R261 | Phase [N] | Pending |
+| R262 | Phase [N] | Pending |
+| R263 | Phase [N] | Pending |
+| R264 | Phase [N] | Pending |
+| R265 | Phase [N] | Pending |
+| R266 | Phase [N] | Pending |
+| R267 | Phase [N] | Pending |
+| R268 | Phase [N] | Pending |
+| R269 | Phase [N] | Pending |
+| R270 | Phase [N] | Pending |
+| R271 | Phase [N] | Pending |
+| R272 | Phase [N] | Pending |
+| R273 | Phase [N] | Pending |
+| R274 | Phase [N] | Pending |
+| R275 | Phase [N] | Pending |
+
+**Coverage:**
+- v1 requirements: 15 total (R261–R275)
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 15 ⚠️ (roadmapper will resolve)
+
+---
+*Requirements defined: 2026-08-28*
+*Last updated: 2026-08-28 after initial definition (milestone v2.4)*
