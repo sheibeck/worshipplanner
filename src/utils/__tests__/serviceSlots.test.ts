@@ -116,7 +116,7 @@ describe('assembler agreement', () => {
     for (const { index: originalIndex } of sorted) {
       const firstSlideArrayIndex = firstIndexBySlot.get(originalIndex)
       expect(firstSlideArrayIndex).toBeDefined()
-      const firstSlide = slides[firstSlideArrayIndex as number]
+      const firstSlide = slides[firstSlideArrayIndex as number]!
       expect(firstSlide.slotIndex).toBe(originalIndex)
       // It must be the FIRST occurrence — no earlier slide in the array shares this slotIndex.
       const earlierMatch = slides.slice(0, firstSlideArrayIndex as number).some((s) => s.slotIndex === originalIndex)
