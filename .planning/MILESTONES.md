@@ -1,5 +1,25 @@
 # Milestones
 
+## v2.3 Scheduling Accuracy & Song/Team Refinements (Shipped: 2026-08-27)
+
+**Phases completed:** 6 phases, 11 plans, 28 tasks
+
+**Key accomplishments:**
+
+- Fixed `lastUsedAt` to derive from `MAX(service.date)` over a song's LOCKED (non-draft) services via a new canonical, firebase/vue-free `src/utils/lastUsed.ts` helper, wired into `services.ts`'s lock/unlock lifecycle — removing the old `serverTimestamp()` stamp on draft assignment that caused the reported "His Mercy Is More showed Aug 11 for a Sep 6 locked service" bug.
+- One-time, owner-run Admin-SDK Node script (`functions/src/backfillLastUsed.ts`) that retroactively corrects `lastUsedAt` for the single production org, writing `MAX(locked service date)` only for songs that have at least one locked service and never touching any other song — mirroring `computeLastUsedDate`/`serviceDateToMillis` byte-identical from the 84-01 canonical helper so the live path and the backfill can never disagree.
+- Narrowed RoleGroup to band/tech/other, rewrote the shared evaluateGroupCombo rule (Band<->Tech exclusive, Other combines freely, ≤1 Band instrument with Vocals exempt), and added a read-time-only compat shim for legacy vocals data.
+- Optional `Team.recurrence` field + pure UTC-stable `teamMatchesDate` helper, wired into NewServiceDialog so picking/changing the Service Date pre-checks every team whose configured Nth-Sunday pattern matches — fully overridable, never clobbering manual choices, and never applied to existing services.
+- `TeamRecurrenceSlideOver.vue` — a Teleported right-drawer mirroring `SongSlideOver.vue`'s shell — plus a per-row `>` chevron on the Volunteer → Teams tab, letting a planner multi-select 1st–5th Sunday ordinals (or clear to none) and persist via `teamsStore.updateTeam(id, { recurrence })`, with the saved pattern round-tripping on reopen.
+- Editable song Key bound to the primary/first arrangement, Scripture rotation excluding the sermon passage, and verified-accurate schedulable-roles copy — closing R249, R253, R256.
+- Song Key field in SongSlideOver is now a native `<input list>`+`<datalist>` typeahead over a shared 14-key constant, with free entry still accepted; ArrangementAccordion consumes the same constant instead of an inline literal.
+- Two new standalone slide-over editors — RoleSlideOver and TeamSlideOver — mirror SongSlideOver's drawer shell for create/edit/delete, with TeamSlideOver absorbing the Phase-86 recurrence multi-select into one drawer and preserving both the WR-01 duplicate-name guard and the WR-02 rename soft-warn.
+- Roles and Teams tabs now match the Songs editing pattern — RolesConfigPanel and TeamsConfigPanel are pure read-only row presenters emitting `edit`/`add`, RosterView owns the selection state and mounts Plan-02's RoleSlideOver/TeamSlideOver, and the now-absorbed TeamRecurrenceSlideOver.vue is deleted.
+- Renamed Role.vocal to a general per-role multiRole flag, rewrote evaluateGroupCombo to filter multi-role roles out before applying the Band/Tech/cap rule (making cross-type co-occurrence, e.g. vocalist + sound, now legal), and generalized the RoleSlideOver control to any group with owner helper text — all with a read-time-only legacy compat shim, no data migration.
+- Added a non-recursive `propagateMultiRole` pass to `proposeQuarterSchedule`, mirroring `propagatePairing`, so a person's multi-role assignments (e.g. bass + vocals + lead) co-schedule onto the same date — anchored on their rarest role for free via the existing `withinCadence` even-spread gate, with no rarity sort or scoring change.
+
+---
+
 ## v2.2 Configurability, Hardening & Cleanup (Shipped: 2026-08-25)
 
 **Phases completed:** 5 phases, 13 plans, 35 tasks

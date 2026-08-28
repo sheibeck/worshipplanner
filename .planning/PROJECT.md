@@ -8,35 +8,33 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.3 Scheduling Accuracy & Song/Team Refinements
+## Current State — no active milestone
 
-**Goal:** Fix scheduling-and-rotation correctness and add pattern-based team auto-scheduling — so
-last-used dates are right (and backfilled), song keys are editable, no volunteer is double-booked across
-teams on one date, scripture rotation reflects only the plan (not the sermon), consistent teams schedule
-themselves, and the scheduler's UI copy tells the truth.
+All milestones through **v2.3** have shipped and are archived under `.planning/milestones/`. The next
+milestone is scoped via `/gsd-new-milestone`, which also creates a fresh `.planning/REQUIREMENTS.md`
+(intentionally absent between milestones). Roadmap: `.planning/ROADMAP.md`.
 
-**Target features:**
-- **Last-used date correctness + backfill** — fix the bug where a song's last-scheduled date lags reality
-  (e.g. "His Mercy Is More" showed Aug 11 despite a locked/exported Sep 6 service), then a one-time script
-  to recompute every song's last-used date from all services it was ever added to, retroactive to before
-  the fix.
-- **Editable song Key** — update/edit the Key on each song.
-- **One-team-per-date conflict rule** — a volunteer can't serve on two teams on the same date. Vocals is
-  folded into Band; Vocals becomes the sole role that allows multiple people and can combine with one
-  Band instrument (sing + play at once). This is the only special-case rule.
-- **Scripture rotation excludes sermon scripture** — the Scripture rotation tab lists only scripture items
-  added to the service plan, never the sermon/teaching passage.
-- **Recurring team scheduling (pattern-based)** — schedule a team on a consistent pattern (every Nth week,
-  or the Nth Sunday of the month); a service falling on a matching date auto-selects that team. Configured
-  in Volunteer → Teams via a `>` slideout like the Song table has.
-- **Accurate "soft planning target" copy** — scheduling hard-targets the default count (behavior stays);
-  correct the description so it no longer calls it a "soft planning target."
+<details>
+<summary>Shipped milestone — v2.3 Scheduling Accuracy & Song/Team Refinements (Phases 84–89, shipped & deployed 2026-08-27)</summary>
 
-## Current State — v2.3 milestone active (scoping)
+Fixed scheduling-and-rotation correctness and added the team-scheduling + editing-UX controls churches
+needed. **Delivered:** last-used date now derives from a song's most-recent **LOCKED** service (killing the
+Aug-11-vs-Sep-6 bug) plus a one-time backfill applied to the Berean prod org (R247–R248); **Vocals folded
+into Band** with a Band↔Tech one-team-per-date conflict rule and the vocals sing-and-play exception
+(R250–R252); Nth-Sunday **recurring team auto-scheduling** via a Volunteer→Teams `>` slideout (R254–R255);
+editable song **Key**, sermon-free Scripture rotation, and corrected schedulable-roles copy (R249, R253,
+R256); **Roles/Teams tabs** reworked to read-only rows opening a slideout (mirroring Songs) + a song Key
+type-ahead (R257–R258); and — added mid-milestone from UAT — a generalized per-role **multi-role** flag
+(any group, vocals default-on, cross-type) with same-date scheduler **bundling** anchored on a person's
+rarest role (R259–R260). Deployed to production 2026-08-27 (hosting + all Cloud Functions incl. the Phase-85
+vocals→Band messaging fix); no `firestore`/`storage` rules changes. Owner-approved UAT; audit PASSED 14/14,
+all integration seams WIRED. The code-review gate caught two shipped-bug-preventing defects (Phase-84
+date-clobber, Phase-85 vocalist message drop). Full record:
+[milestones/v2.3-ROADMAP.md](milestones/v2.3-ROADMAP.md) ·
+[milestones/v2.3-REQUIREMENTS.md](milestones/v2.3-REQUIREMENTS.md) ·
+[milestones/v2.3-MILESTONE-AUDIT.md](milestones/v2.3-MILESTONE-AUDIT.md).
 
-All milestones through **v2.2** have shipped and are archived under `.planning/milestones/`. v2.3 is being
-scoped via `/gsd-new-milestone`; requirements land in `.planning/REQUIREMENTS.md` and phases in
-`.planning/ROADMAP.md`.
+</details>
 
 <details>
 <summary>Shipped milestone — v2.2 Configurability, Hardening & Cleanup (Phases 79–83, shipped 2026-08-25)</summary>
@@ -270,6 +268,7 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Validated
 
+- ✓ Scheduling accuracy & song/team refinements + multi-role scheduling — last-used lock-gated derivation + prod backfill (R247–R248), Vocals folded into Band with a Band↔Tech one-team-per-date rule + sing-and-play exception (R250–R252), Nth-Sunday recurring team auto-select via a Volunteer→Teams `>` slideout (R254–R255), editable song Key + sermon-free Scripture rotation + corrected schedulable-roles copy (R249, R253, R256), Roles/Teams read-only-row slideouts + song Key type-ahead (R257–R258), and a generalized per-role multi-role flag + same-date scheduler bundling anchored on a person's rarest role (R259–R260) — **v2.3** (shipped & deployed to production 2026-08-27; hosting + all Cloud Functions incl. the Phase-85 messaging fix; no rules changes; R248 backfill applied to Berean prod; audit PASSED 14/14; owner-approved UAT; archived: `milestones/v2.3-REQUIREMENTS.md`).
 - ✓ Per-org configurable Teams + security/data-integrity hardening + polish/ops + per-org AI enablement (OFF by default) + Roles/Teams tab UX — own team list replacing hard-coded Berean rules & dropped ordinal-Sunday auto-select (R228–R231, R241); inviteLookup gate, createdBy immutability, deleteService share revocation, reprise-safe slide clear, pending-render guard (R232–R236); PC-export coverage, Resend domain runbook, Owner Console a11y, shared SongBrowser (R237–R240); super-admin AI master gate + fail-closed proxy (R242–R243); tab width/Delete button/copy (R244–R246) — **v2.2** (shipped 2026-08-25, hosting live; rules/functions owner-gated; audit PASSED 19/19). **R230 (per-team song-tag AI filter) delivered then removed 2026-08-25 by owner decision.**
 - ✓ Super-admin Owner Console + multi-church onboarding + org lifecycle — super-admin claim gate & claim-merge, Firestore runtime config with dry-run blast-radius preview, tabbed Configuration/Organizations shell, org onboarding (org + settings + seeded template + first admin), multi-org Storage auth-claim widening, deactivate/reactivate, deactivation-gated cascade delete, pending-invite visibility, super-admin enter-any-church — **v1.9–v2.1** (R174–R211; all deployed to production 2026-08-23; v2.1 audit PASSED 16/16; archived).
 - ✓ Fan-out, cron & instance guardrails — gated the unused daily `sendScheduledReminders` cross-org scan OFF by default (`SCHEDULED_MESSAGING_CRON_ENABLED`), Resend send-loop caps (per-message recipient reject + per-org daily quota, fail-open), project-wide `setGlobalOptions({maxInstances})` (api keeps its tighter cap), and Cloud Run render-service `--max-instances=3`/`--concurrency=1` (R170–R173) — v1.8 Phase 67 (code-complete + verified 2026-08-20; **UNDEPLOYED, all bounded/reversible → autonomous deploy**). Note: gating the cron also pauses composer "schedule-for-later" dispatch until the flag is enabled (disclosed, reversible).
@@ -316,8 +315,9 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-**v2.3 Scheduling Accuracy & Song/Team Refinements** is being scoped (see Current Milestone above).
-Requirements are defined fresh in `.planning/REQUIREMENTS.md`. v2.0–v2.2 have all shipped and archived.
+**No active milestone.** v2.3 shipped & deployed to production 2026-08-27 (all 6 phases, R247–R260;
+audit PASSED 14/14; owner-approved). The next milestone's requirements are created fresh via
+`/gsd-new-milestone`.
 
 **Standing owner-run hand-overs (carry until run):**
 
@@ -478,4 +478,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-25 — started milestone v2.3 Scheduling Accuracy & Song/Team Refinements: last-used date correctness + backfill script, editable song Key, one-team-per-date conflict rule (Vocals folded into Band), sermon-free scripture rotation, pattern-based recurring team scheduling (Nth week / Nth Sunday) with a Volunteer→Teams slideout, and corrected "soft planning target" copy. Research skipped (brownfield refinements). Prior: v2.2 completed & archived (Audit PASSED 19/19).*
+*Last updated: 2026-08-27 after v2.3 milestone — completed, deployed to production, & archived v2.3 Scheduling Accuracy & Song/Team Refinements (Phases 84–89, R247–R260): last-used lock-gated fix + prod backfill, Vocals→Band + Band↔Tech conflict rule, Nth-Sunday recurring team auto-scheduling, editable song Key + sermon-free rotation + copy fix, Roles/Teams read-only-row slideouts + Key type-ahead, and a generalized multi-role flag + same-date scheduler bundling (88–89 added mid-milestone from UAT). Deployed 2026-08-27 (hosting + all functions; no rules changes); R248 backfill applied to Berean prod; audit PASSED 14/14; owner-approved UAT. No active milestone — next is scoped via `/gsd-new-milestone`.*
