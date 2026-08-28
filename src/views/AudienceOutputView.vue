@@ -62,62 +62,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
-import type { Service } from '@/types/service'
+import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import type { AssembledSlide } from '@/types/slide'
-import { useAuthStore } from '@/stores/auth'
-import { useServiceStore } from '@/stores/services'
-import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
-import { openRunChannel, type BroadcastChannelFactory, type RunChannelHandle } from '@/utils/runChannel'
-import { SLIDE_FONTS } from '@/config/slideFonts'
-import { cssVarsFor, snapWeight, waitForSlideFont, loadFontCss, FONT_LOAD_TIMEOUT_MS } from '@/utils/slideTypography'
+import { useOutputWindow } from '@/composables/useOutputWindow'
+import type { BroadcastChannelFactory } from '@/utils/runChannel'
 import SlideCanvas from '@/components/slides/SlideCanvas.vue'
 
 /**
  * Testability seam (93-PATTERNS §4): the run-channel factory is injectable so
  * tests can drive `onState` deterministically with an in-memory fake. Production
- * passes nothing and `openRunChannel` uses the native BroadcastChannel.
+ * passes nothing and `openRunChannel` uses the native BroadcastChannel. The prop
+ * is forwarded into useOutputWindow so the composable threads it to openRunChannel.
  */
 const props = defineProps<{
   channelFactory?: BroadcastChannelFactory
 }>()
 
-const route = useRoute()
-const authStore = useAuthStore()
-const serviceStore = useServiceStore()
+// The shared output-window lifecycle-core (R272 reuse-not-fork): ?org=/serviceId
+// scoping, WR-02 subscribe gate, read-only assembly, receive-only run channel,
+// font gate, rootStyle cursor coupling, non-teardown fullscreen recovery, and the
+// Screen Wake Lock — all registered on THIS view's instance via its onMounted/
+// onUnmounted. The per-canvas media plumbing stays view-local below.
+const { assembledSlideshow, index, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
+  useOutputWindow({ channelFactory: props.channelFactory })
 
-// ── Org + service scoping ────────────────────────────────────────────────────
-// serviceId from the route param; org from the ?org= query (the self-scoping
-// convention per 93-CONTEXT), falling back to the auth store's active org.
-const serviceId = computed(() => route.params.serviceId as string)
-const orgIdRef = computed(() => (route.query.org as string | undefined) ?? authStore.orgId ?? null)
-
-// Read-only viewer: the initial-load branch ONLY — no backfillSlotIds, no
-// JSON clone, no dirty tracking, no remote-merge (all editor machinery).
-const localService = ref<Service | null>(null)
-watch(
-  () => serviceStore.services,
-  (services) => {
-    if (localService.value) return // initial-load only
-    const found = services.find((s) => s.id === serviceId.value)
-    if (found) {
-      localService.value = found
-    }
-  },
-  { immediate: true },
-)
-
-// In-window assembly — canWrite OMITTED so it stays its false default: a viewer
-// never attempts a materialize/rebuild write its Firestore rules would deny.
-const { assembledSlideshow } = useSlideshowAssembly(localService, orgIdRef)
-
-// ── Run channel (receive-only) ───────────────────────────────────────────────
-const index = ref<number | null>(null)
-const blackout = ref(false) // read for forward-compat; drives NO UI this milestone
-let handle: RunChannelHandle | null = null
-
-// ── Current slide + media invariant ──────────────────────────────────────────
+// ── Current slide + media invariant (view-local per-canvas plumbing) ──────────
 // A null index (before the first RunState) and an out-of-range index both
 // resolve to null (pure black) — a malformed/out-of-range index can never crash
 // the projector (T-93-01).
@@ -136,146 +105,17 @@ watch(index, async () => {
   slideCanvasRef.value?.play()
 })
 
-// ── Font gate (congregation-safe first paint) ────────────────────────────────
-const DEFAULT_FONT_FAMILY = 'Inter'
-const DEFAULT_FONT_WEIGHT = 400
-const fontReady = ref(false)
-
-/** The root's CSS-var typography wrapper + the fullscreen-only cursor hide. */
-const rootStyle = computed(() => ({
-  ...cssVarsFor(authStore.settings.slideTypography),
-  fontFamily: 'var(--slide-font-family)',
-  cursor: isFullscreen.value ? 'none' : 'auto',
-}))
-
-function resolvedFontChoice(): { family: string; weight: number } {
-  const typography = authStore.settings.slideTypography
-  const family =
-    typography?.fontFamily !== undefined && SLIDE_FONTS[typography.fontFamily]
-      ? typography.fontFamily
-      : DEFAULT_FONT_FAMILY
-  const weight = snapWeight(family, typography?.fontWeight ?? DEFAULT_FONT_WEIGHT)
-  return { family, weight }
-}
-
-// ── Fullscreen loss recovery (learn the idiom, DIVERGE from teardown) ─────────
-// jsdom reports document.fullscreenElement as `undefined`, real browsers as
-// `null` when not fullscreen — `!!` treats both as "not fullscreen".
-const rootRef = ref<HTMLElement | null>(null)
-const isFullscreen = ref<boolean>(!!document.fullscreenElement)
-
-// This listener ONLY updates isFullscreen. It must NEVER call any exit/teardown/
-// close/unmount path — the single most dangerous copy-paste risk from
-// PresentationViewer.handleFullscreenChange (Pitfall 6).
-function handleFullscreenChange() {
-  isFullscreen.value = !!document.fullscreenElement
-}
-
-function handleReenterFullscreen() {
-  // Pitfall 5 — only a synchronous in-window gesture can re-enter; the
-  // requestFullscreen() call MUST be the handler's first statement, no await.
-  rootRef.value?.requestFullscreen().catch(() => {
-    // Rejection is a common, expected outcome (missing gesture, embedding
-    // context) — swallow silently, never surface an error to the congregation.
-  })
-}
-
-// ── Screen Wake Lock (R271; no in-repo analog) ───────────────────────────────
-const wakeLock = ref<WakeLockSentinel | null>(null)
-
-async function acquireWakeLock() {
-  if (!('wakeLock' in navigator)) return // feature-detect; absence is non-fatal
-  try {
-    wakeLock.value = await navigator.wakeLock.request('screen')
-  } catch {
-    // Rejection (no gesture, policy, hidden tab) is non-fatal — never a toast.
-  }
-}
-
-function handleVisibilityChange() {
-  // The lock auto-releases when the tab hides, so re-acquire on return.
-  if (document.visibilityState === 'visible') {
-    void acquireWakeLock()
-  }
-}
-
-// ── Lifecycle ────────────────────────────────────────────────────────────────
-onMounted(async () => {
-  // Service subscription — key the service source off the SAME resolved orgId
-  // useSlideshowAssembly subscribes content to, not off "is the store fresh?".
-  //
-  // WR-02 (93-REVIEW): the old `!serviceStore.orgId` gate assumed a fresh Pinia
-  // singleton (the standalone window.open path). But this is also a directly-
-  // loadable SPA route: on a same-tab navigation where the store is ALREADY
-  // subscribed to org X while this URL's `?org=` is Y, that gate skipped the
-  // re-subscribe, leaving `services` sourced from X while the assembly reads Y —
-  // a silent cross-org desync on the congregation surface (never-found service →
-  // permanent black, or an X service assembled against Y's content maps). Gate on
-  // an org MISMATCH instead: subscribe() is idempotent (it tears down the prior
-  // listener first), so re-subscribing when the requested org differs re-keys the
-  // service source to `orgIdRef` and eliminates the bleed. Skipping when the org
-  // already matches preserves the existing subscription (no redundant re-listen).
-  const orgId = orgIdRef.value
-  if (orgId && serviceStore.orgId !== orgId) {
-    serviceStore.subscribe(orgId)
-  }
-
-  // Receive-only channel: set the index from control's state, announce our
-  // (re)mount so control re-sends current state, and NEVER post state ourselves.
-  handle = openRunChannel(serviceId.value, props.channelFactory)
-  handle.onState((state) => {
-    index.value = state.index
-    blackout.value = state.blackout
-  })
-  handle.postHello()
-
-  document.addEventListener('fullscreenchange', handleFullscreenChange)
-  document.addEventListener('visibilitychange', handleVisibilityChange)
-  void acquireWakeLock()
-
-  // Bounded font-load gate — a rejected import or timeout must never strand the
-  // projector, so try/catch/finally always resolves fontReady (mirrors
-  // PresentationViewer's R094 gate).
-  try {
-    const { family, weight } = resolvedFontChoice()
-    await Promise.race([
-      (async () => {
-        if (family !== DEFAULT_FONT_FAMILY || weight !== DEFAULT_FONT_WEIGHT) {
-          await loadFontCss(family, weight)
-        }
-        await waitForSlideFont(family, weight, FONT_LOAD_TIMEOUT_MS)
-      })(),
-      new Promise((resolve) => setTimeout(resolve, FONT_LOAD_TIMEOUT_MS)),
-    ])
-  } catch {
-    // Degrade to "render anyway" — same as a timeout.
-  } finally {
-    fontReady.value = true
-  }
-
-  // Deferred first play until AFTER the font gate (and its DOM update) so the
-  // canvas — and the media refs it mounts — exist by the time play() is called.
-  await nextTick()
-  slideCanvasRef.value?.play()
+// Deferred first play — re-homed from the old onMounted (audience 256-259) to a
+// view-local watch(fontReady) so the state-arrives-before-the-font-gate race still
+// plays the first slide's media once: when the gate resolves and the canvas
+// mounts, play() is called after the DOM update.
+watch(fontReady, (ready) => {
+  if (!ready) return
+  void nextTick().then(() => slideCanvasRef.value?.play())
 })
 
 // slideCanvasRef is nulled by Vue before onUnmounted runs, so pause() here.
 onBeforeUnmount(() => {
   slideCanvasRef.value?.pause()
-})
-
-onUnmounted(async () => {
-  handle?.close()
-  document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
-  try {
-    await wakeLock.value?.release()
-  } catch {
-    // Releasing an already-released lock can reject — never block teardown on it.
-  }
-  wakeLock.value = null
-  // Safe here: this standalone window is the sole consumer of the store, unlike
-  // ServiceEditorView which deliberately leaves the subscription up for peers.
-  serviceStore.unsubscribeAll()
 })
 </script>
