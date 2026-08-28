@@ -5,15 +5,15 @@ milestone_name: Run the Service (Live Presentation)
 current_phase: 92
 current_phase_name: v2.4
 status: planning
-stopped_at: Completed 95-02-PLAN.md
-last_updated: "2026-08-28T23:28:09.139Z"
+stopped_at: Completed 95-01-PLAN.md
+last_updated: "2026-08-28T23:31:06.758Z"
 last_activity: 2026-08-28
 last_activity_desc: "92-01-PLAN.md executed: `/monitor-setup` route (`requiresAuth` only, no"
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 15
-  completed_plans: 9
+  completed_plans: 10
   percent: 57
 ---
 
@@ -2777,6 +2777,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 94 P02 | 15m | 2 tasks | 2 files |
 | Phase 94 P03 | ~20m | 2 tasks | 2 files |
 | Phase 95 P02 | 10m | 1 tasks | 1 files |
+| Phase 95 P01 | 12min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3224,6 +3225,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Phase 93-01: audience output window is receive-only (canWrite omitted); cursor:none only while fullscreen so re-enter affordance stays clickable
 - [Phase ?]: Extracted useOutputWindow shared lifecycle-core; media watcher stays per-view, channelFactory threaded as composable arg (R272)
 - [Phase ?]: Run button gates on canRunService = isLocked && !!authStore.orgId (NOT isEditor) so viewers can Run a locked service (R275)
+- [Phase ?]: 95-01: useServiceAssembly holds only the shared load slice (serviceId/org, initial-load watch, read-only assembly, WR-02 gate); no onUnmounted/unsubscribeAll so in-app consumers don't tear peers down
+- [Phase ?]: 95-01: shared slice called first in useOutputWindow setup so its subscribe-gate onMounted fires before the channel opens (subscribe-before-channel)
 
 ### Roadmap Evolution
 
@@ -3549,8 +3552,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-28T23:27:56.278Z
-Stopped at: Completed 95-02-PLAN.md
+Last session: 2026-08-28T23:30:52.974Z
+Stopped at: Completed 95-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

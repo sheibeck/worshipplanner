@@ -13,9 +13,9 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 ### Run Entry & Control Screen
 
 - [x] **R261**: A projectionist can start running a **locked** service via a **Run** button that opens a dedicated standalone Run/control screen (not the service editor); the button is absent/disabled on draft services.
-- [ ] **R262**: On the Run/control screen, the projectionist sees the **order of service** as a list with the item containing the current slide clearly highlighted as "you are here."
-- [ ] **R263**: The projectionist can **click an order-of-service item to jump** the live output to that item's first slide.
-- [ ] **R264**: The Run/control screen shows a **large current-slide preview** (what the audience sees) alongside a smaller **next-slide** preview.
+- [x] **R262**: On the Run/control screen, the projectionist sees the **order of service** as a list with the item containing the current slide clearly highlighted as "you are here."
+- [x] **R263**: The projectionist can **click an order-of-service item to jump** the live output to that item's first slide.
+- [x] **R264**: The Run/control screen shows a **large current-slide preview** (what the audience sees) alongside a smaller **next-slide** preview.
 - [ ] **R265**: The projectionist can navigate with **standard keyboard keys**: Right Arrow / Space = next slide, Left Arrow = previous slide, Down / Up Arrow = next / previous order-of-service item, Escape = exit run mode (with a confirmation so a stray Escape cannot tear down a live service).
 - [ ] **R266**: The Run/control screen uses a **single-selection model** — the current/selected slide **is** what is live, with no separate "push to live" step.
 
@@ -73,9 +73,9 @@ Which phase covers which requirement. Populated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R261 | Phase 95 | Complete |
-| R262 | Phase 95 | Pending |
-| R263 | Phase 95 | Pending |
-| R264 | Phase 95 | Pending |
+| R262 | Phase 95 | Complete |
+| R263 | Phase 95 | Complete |
+| R264 | Phase 95 | Complete |
 | R265 | Phase 95 | Pending |
 | R266 | Phase 95 | Pending |
 | R267 | Phase 92 | Complete |
