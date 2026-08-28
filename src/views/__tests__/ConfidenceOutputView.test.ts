@@ -1,0 +1,674 @@
+/**
+ * Phase 94 Plan 03 (R272). Behavioral coverage for ConfidenceOutputView.vue —
+ * the band-facing confidence monitor: a two-pane current/next 70/30 split with
+ * BOTH backgrounds suppressed to plain black, the next pane a STATIC preview
+ * that never autoplays, and last-slide safety with no reflow.
+ *
+ * This suite proves the R272-critical properties against the REAL view:
+ *  - two-pane render (current + next) for a mid-deck index, distinguishable by
+ *    slide id + the "Next" tag on the next pane only;
+ *  - BOTH panes wired suppressBackground=true + interactive=false (stub-level),
+ *    AND — closing the R272 DOM chain end-to-end — the REAL SlideCanvas
+ *    (vi.importActual, unstubbed) emits NEITHER presentation-background NOR
+ *    presentation-background-scrim under suppressBackground=true for a
+ *    background-carrying slide AND a video slide, with a NON-VACUOUS false
+ *    control (suppressBackground=false DOES render presentation-background);
+ *  - last-slide (next==null) renders the next pane empty with the "Next" tag
+ *    HIDDEN, no wrap to slide 0, no crash, and BOTH 70/30 regions still present;
+ *  - the NEXT pane never autoplays — only the current pane's canvas is driven
+ *    (pause before play), the next pane's play spy is never called.
+ *
+ * It also re-proves the Phase 93 lifecycle now that it lives in the shared
+ * useOutputWindow composable: channel-driven index + higher-seq advance +
+ * stale-seq drop, postHello on mount / NEVER postState / close on unmount,
+ * chrome absence + cursor:none while fullscreen, wake-lock present/re-acquire/
+ * absent, fullscreen-loss -> Re-enter affordance WITHOUT teardown, and the
+ * WR-02 org-scoped subscribe gate.
+ *
+ * Harness lineage: AudienceOutputView.test.ts (mirrored verbatim in shape) —
+ * reactive vue-router mock, inert @/firebase, mocked stores + useSlideshowAssembly,
+ * an injectable in-memory run-channel fake, Fullscreen/fonts/visibility stubs, and
+ * enableAutoUnmount so onUnmounted cleanup runs. The SlideCanvas stub is EXTENDED
+ * to record suppressBackground/interactive and expose PER-INSTANCE play/pause
+ * spies into a module-scope registry so both panes' wiring and the next-pane
+ * static invariant are assertable.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
+import { reactive } from 'vue'
+import type { AssembledSlide } from '@/types/slide'
+import type { BroadcastChannelLike, BroadcastChannelFactory } from '@/utils/runChannel'
+import ConfidenceOutputView from '../ConfidenceOutputView.vue'
+
+// onUnmounted must run so the channel-close, wake-lock-release, and
+// unsubscribeAll cleanup this suite asserts actually fire.
+enableAutoUnmount(afterEach)
+
+// ── Mocks ─────────────────────────────────────────────────────────────────────
+
+// Reactive route (mirrors AudienceOutputView.test.ts); seeds params.serviceId +
+// query.org (the ?org= self-scoping convention useOutputWindow reads).
+const mockRoute = reactive({ params: { serviceId: 'service-1' }, query: { org: 'org-1' } })
+vi.mock('vue-router', () => ({
+  useRoute: () => mockRoute,
+  useRouter: () => ({ push: vi.fn() }),
+}))
+
+// Hoisted so the vi.mock factories can reference them. `canvasRegistry` collects a
+// record per mounted SlideCanvas stub instance so the test can assert both panes
+// suppressed and the next pane never played.
+const { serviceStoreMock, fakeSlides, canvasRegistry } = vi.hoisted(() => {
+  function fakeSlide(id: string): unknown {
+    return {
+      slide: {
+        id,
+        position: 0,
+        contentKind: 'lyric',
+        sectionId: 'verse-1',
+        sectionLabel: 'Verse 1',
+        lines: [`line for ${id}`],
+      },
+      slotIndex: 0,
+      slotKind: 'SONG',
+      section: 'worship',
+      sourceId: 'song-1',
+    }
+  }
+  return {
+    serviceStoreMock: {
+      services: [] as unknown[],
+      orgId: null as string | null,
+      subscribe: vi.fn(),
+      unsubscribeAll: vi.fn(),
+    },
+    fakeSlides: [fakeSlide('a'), fakeSlide('b'), fakeSlide('c')],
+    // Per-instance record: { slideId, suppressBackground, interactive, play, pause }.
+    // Cleared in beforeEach.
+    canvasRegistry: [] as Array<{
+      slideId: string | undefined
+      suppressBackground: boolean
+      interactive: boolean
+      play: ReturnType<typeof vi.fn>
+      pause: ReturnType<typeof vi.fn>
+    }>,
+  }
+})
+
+vi.mock('@/firebase', () => ({ auth: {}, db: {}, functions: {} }))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    orgId: 'org-1',
+    settings: {
+      slideTypography: { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' },
+    },
+  }),
+}))
+
+vi.mock('@/stores/services', () => ({
+  useServiceStore: () => serviceStoreMock,
+}))
+
+// Fixed assembled slideshow so the panes are driven purely from the channel index.
+vi.mock('@/composables/useSlideshowAssembly', async () => {
+  const { ref } = await import('vue')
+  return {
+    useSlideshowAssembly: () => ({ assembledSlideshow: ref(fakeSlides as AssembledSlide[]) }),
+  }
+})
+
+// EXTENDED SlideCanvas stub: renders its slide id as text (so panes are
+// identifiable), declares suppressBackground + interactive so both are
+// inspectable, and — per instance — creates play/pause vi.fns, exposes them (so
+// the parent's currentCanvasRef.play()/pause() land on inspectable mocks), and
+// records { slideId, suppressBackground, interactive, play, pause } into the
+// module-scope registry. Instances are REUSED across slide changes (no :key), so
+// the current-region instance and the next-region instance each appear once —
+// the current pane's play spy is driven, the next pane's is never called.
+vi.mock('@/components/slides/SlideCanvas.vue', async () => {
+  const { defineComponent, h } = await import('vue')
+  return {
+    default: defineComponent({
+      name: 'SlideCanvasStub',
+      props: {
+        slide: { type: Object, required: false, default: undefined },
+        suppressBackground: { type: Boolean, default: false },
+        interactive: { type: Boolean, default: false },
+      },
+      setup(props, { expose }) {
+        const play = vi.fn()
+        const pause = vi.fn()
+        expose({ play, pause })
+        canvasRegistry.push({
+          slideId: (props.slide as { slide?: { id?: string } } | undefined)?.slide?.id,
+          suppressBackground: props.suppressBackground,
+          interactive: props.interactive,
+          play,
+          pause,
+        })
+        return () =>
+          h(
+            'div',
+            { 'data-testid': 'slide-canvas' },
+            ((props.slide as { slide?: { id?: string } } | undefined)?.slide?.id) ?? '',
+          )
+      },
+    }),
+  }
+})
+
+// ── Real-SlideCanvas fixtures (for the black-suppression integration test) ──────
+// Typed AssembledSlide builders mirroring SlideCanvas.test.ts so the REAL canvas
+// receives the exact data shape it does in production.
+function lyricSlide(id: string): AssembledSlide {
+  return {
+    slide: {
+      id,
+      position: 1,
+      contentKind: 'lyric',
+      sectionId: 'verse-1',
+      sectionLabel: 'Verse 1',
+      lines: ['Amazing grace, how sweet the sound'],
+    },
+    slotIndex: 0,
+    slotKind: 'SONG',
+    section: 'worship',
+    sourceId: 'song-1',
+  } as AssembledSlide
+}
+
+function videoSlide(id: string, url: string): AssembledSlide {
+  return {
+    slide: {
+      id,
+      position: 5,
+      contentKind: 'video',
+      videoSrc: url,
+    },
+    slotIndex: 4,
+    slotKind: 'IMPORTED',
+    section: 'worship',
+    sourceId: 'video-1',
+  } as AssembledSlide
+}
+
+function withBackground(assembled: AssembledSlide, url: string): AssembledSlide {
+  return {
+    ...assembled,
+    slide: {
+      ...assembled.slide,
+      backgroundImageUrl: url,
+      backgroundSource: 'slide',
+    },
+  } as AssembledSlide
+}
+
+// ── In-memory run-channel fake (identical to AudienceOutputView.test.ts) ────────
+function createFakeChannel() {
+  const posted: Array<{ type?: string }> = []
+  let listener: ((event: { data: unknown }) => void) | undefined
+  const close = vi.fn()
+  const channel: BroadcastChannelLike = {
+    postMessage(message: unknown) {
+      posted.push(message as { type?: string })
+    },
+    addEventListener(_type, callback) {
+      listener = callback
+    },
+    close,
+  }
+  const factory: BroadcastChannelFactory = () => channel
+  return {
+    factory,
+    posted,
+    close,
+    emitState(index: number, seq: number, blackout = false) {
+      listener?.({ data: { type: 'state', index, blackout, seq } })
+    },
+  }
+}
+
+function setFullscreenElement(value: Element | null) {
+  Object.defineProperty(document, 'fullscreenElement', {
+    value,
+    configurable: true,
+    writable: true,
+  })
+}
+
+function mountView(channelFactory: BroadcastChannelFactory) {
+  return mount(ConfidenceOutputView, { props: { channelFactory } })
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  Element.prototype.requestFullscreen = vi.fn().mockResolvedValue(undefined)
+  setFullscreenElement(null)
+  Object.defineProperty(document, 'fonts', {
+    value: { ready: Promise.resolve(), load: vi.fn().mockResolvedValue([]) },
+    configurable: true,
+    writable: true,
+  })
+  Object.defineProperty(document, 'visibilityState', {
+    value: 'visible',
+    configurable: true,
+    writable: true,
+  })
+  serviceStoreMock.subscribe.mockClear()
+  serviceStoreMock.unsubscribeAll.mockClear()
+  serviceStoreMock.orgId = null
+  mockRoute.params.serviceId = 'service-1'
+  mockRoute.query.org = 'org-1'
+  // Fresh per-instance registry each test.
+  canvasRegistry.length = 0
+})
+
+afterEach(() => {
+  delete (navigator as unknown as { wakeLock?: unknown }).wakeLock
+  vi.restoreAllMocks()
+})
+
+// ── R272 confidence-specific behavior ──────────────────────────────────────────
+
+describe('ConfidenceOutputView — two-pane current+next render (R272)', () => {
+  it('renders a current pane (b) and a next pane (c) for a mid-deck index, with the "Next" tag on the next pane only', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(1, 1)
+    await flushPromises()
+
+    const currentRegion = wrapper.get('[data-testid="confidence-current-region"]')
+    const nextRegion = wrapper.get('[data-testid="confidence-next-region"]')
+
+    // Two distinct panes: current shows 'b', next shows 'c'.
+    expect(currentRegion.find('[data-testid="slide-canvas"]').text()).toBe('b')
+    expect(nextRegion.find('[data-testid="slide-canvas"]').text()).toBe('c')
+
+    // The "Next" tag lives on the next pane only.
+    expect(nextRegion.find('[data-testid="confidence-next-label"]').exists()).toBe(true)
+    expect(currentRegion.find('[data-testid="confidence-next-label"]').exists()).toBe(false)
+  })
+
+  it('wires BOTH panes suppressBackground=true and interactive=false (view R272 wiring)', async () => {
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(1, 1)
+    await flushPromises()
+
+    // Both panes mounted; every recorded instance is black-suppressed + inert.
+    expect(canvasRegistry).toHaveLength(2)
+    expect(canvasRegistry.every((c) => c.suppressBackground === true)).toBe(true)
+    expect(canvasRegistry.every((c) => c.interactive === false)).toBe(true)
+  })
+})
+
+describe('ConfidenceOutputView — real-SlideCanvas black suppression (R272 DOM chain)', () => {
+  it('emits NO presentation-background/scrim under suppressBackground=true for a background-carrying slide AND a video slide, with a non-vacuous false control', async () => {
+    // jsdom media stubs so the REAL SlideCanvas's VideoPlayer mounts without throwing.
+    window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+    window.HTMLMediaElement.prototype.pause = vi.fn()
+
+    // The REAL SlideCanvas, bypassing this file's stub.
+    const mod = await vi.importActual<typeof import('@/components/slides/SlideCanvas.vue')>(
+      '@/components/slides/SlideCanvas.vue',
+    )
+    const Real = mod.default
+
+    const bgSlide = withBackground(lyricSlide('bg'), 'https://example.com/bg.jpg')
+    const videoBgSlide = withBackground(videoSlide('v1', 'https://example.com/clip.mp4'), 'https://example.com/bg.jpg')
+
+    // Background-carrying slide, suppressed → NEITHER element renders.
+    const suppressedBg = mount(Real, { props: { slide: bgSlide, suppressBackground: true } })
+    await flushPromises()
+    expect(suppressedBg.find('[data-testid="presentation-background"]').exists()).toBe(false)
+    expect(suppressedBg.find('[data-testid="presentation-background-scrim"]').exists()).toBe(false)
+
+    // Video slide, suppressed → same absence.
+    const suppressedVideo = mount(Real, { props: { slide: videoBgSlide, suppressBackground: true } })
+    await flushPromises()
+    expect(suppressedVideo.find('[data-testid="presentation-background"]').exists()).toBe(false)
+    expect(suppressedVideo.find('[data-testid="presentation-background-scrim"]').exists()).toBe(false)
+
+    // NON-VACUOUS false control: the SAME background-carrying slide with
+    // suppressBackground=false DOES render presentation-background, so the
+    // suppressed assertions above cannot pass trivially.
+    const control = mount(Real, { props: { slide: bgSlide, suppressBackground: false } })
+    await flushPromises()
+    const controlBg = control.find('[data-testid="presentation-background"]')
+    expect(controlBg.exists()).toBe(true)
+    expect(controlBg.attributes('style')).toContain('https://example.com/bg.jpg')
+
+    suppressedBg.unmount()
+    suppressedVideo.unmount()
+    control.unmount()
+  })
+})
+
+describe('ConfidenceOutputView — last-slide safety, no reflow (R272)', () => {
+  it('renders the last slide (c) with the next pane empty, the "Next" tag hidden, no wrap, no throw, and both regions still present', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // index 2 == last slide 'c'; nextSlide resolves to null (no wrap to 'a').
+    fake.emitState(2, 1)
+    await flushPromises()
+
+    const currentRegion = wrapper.get('[data-testid="confidence-current-region"]')
+    const nextRegion = wrapper.get('[data-testid="confidence-next-region"]')
+
+    // Current pane shows the LAST slide — not a wrap-around to 'a'.
+    const currentCanvas = currentRegion.find('[data-testid="slide-canvas"]')
+    expect(currentCanvas.text()).toBe('c')
+
+    // Next pane empty: no SlideCanvas, "Next" tag hidden.
+    expect(nextRegion.find('[data-testid="slide-canvas"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="confidence-next-label"]').exists()).toBe(false)
+
+    // Both 70/30 region wrappers still present — the layout did not collapse.
+    expect(wrapper.find('[data-testid="confidence-current-region"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="confidence-next-region"]').exists()).toBe(true)
+  })
+})
+
+describe('ConfidenceOutputView — next pane never autoplays (R272)', () => {
+  it('drives only the current pane on a slide change (pause before play); the next pane play spy is never called', async () => {
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(0, 1) // current 'a', next 'b'
+    await flushPromises()
+    fake.emitState(1, 2) // current 'b', next 'c' (both region instances reused)
+    await flushPromises()
+
+    // Instances are reused across the advance: exactly one current-region record
+    // and one next-region record. The current pane is the only one ever driven.
+    const played = canvasRegistry.filter((c) => c.play.mock.calls.length > 0)
+    const notPlayed = canvasRegistry.filter((c) => c.play.mock.calls.length === 0)
+    expect(played).toHaveLength(1)
+    expect(notPlayed).toHaveLength(1)
+
+    const currentPane = played[0]!
+    const nextPane = notPlayed[0]!
+
+    // Current pane: pause fires before its (last) play on the slide change.
+    expect(currentPane.pause).toHaveBeenCalled()
+    const pauseOrder = currentPane.pause.mock.invocationCallOrder
+    const playOrder = currentPane.play.mock.invocationCallOrder
+    expect(Math.min(...pauseOrder)).toBeLessThan(Math.max(...playOrder))
+
+    // Next pane: STATIC preview — never played.
+    expect(nextPane.play).not.toHaveBeenCalled()
+  })
+})
+
+// ── Inherited Phase 93 lifecycle (retargeted to confidence testids) ─────────────
+
+describe('ConfidenceOutputView — channel-driven index (R272 via useOutputWindow)', () => {
+  it('renders the slide the channel index selects, and a HIGHER-seq state advances it', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    const current = () =>
+      wrapper.find('[data-testid="confidence-current-region"] [data-testid="slide-canvas"]')
+
+    // Before any state, pure black — no current slide.
+    expect(current().exists()).toBe(false)
+
+    fake.emitState(0, 1)
+    await flushPromises()
+    expect(current().text()).toBe('a')
+
+    fake.emitState(2, 2)
+    await flushPromises()
+    expect(current().text()).toBe('c')
+  })
+
+  it('drops a lower/stale-seq state (runChannel real stale-drop) — the slide does not go backward', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    const current = () =>
+      wrapper.find('[data-testid="confidence-current-region"] [data-testid="slide-canvas"]')
+
+    fake.emitState(2, 5)
+    await flushPromises()
+    expect(current().text()).toBe('c')
+
+    fake.emitState(0, 3) // seq 3 <= 5 → dropped by openRunChannel
+    await flushPromises()
+    expect(current().text()).toBe('c')
+  })
+})
+
+describe('ConfidenceOutputView — receive-only handshake (R272)', () => {
+  it('posts a hello on mount and NEVER posts a state across the whole lifecycle', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    expect(fake.posted.some((m) => m.type === 'hello')).toBe(true)
+
+    fake.emitState(0, 1)
+    await flushPromises()
+    fake.emitState(1, 2)
+    await flushPromises()
+    wrapper.unmount()
+
+    expect(fake.posted.some((m) => m.type === 'state')).toBe(false)
+  })
+
+  it('closes the channel on unmount', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    wrapper.unmount()
+    expect(fake.close).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ConfidenceOutputView — no operator chrome + cursor (R272)', () => {
+  it('renders ZERO operator chrome and no buttons while fullscreen', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(0, 1)
+    await flushPromises()
+    expect(
+      wrapper.find('[data-testid="confidence-current-region"] [data-testid="slide-canvas"]').text(),
+    ).toBe('a')
+
+    expect(wrapper.find('[data-testid="presentation-progress"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-next"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-prev"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-exit"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-chrome"]').exists()).toBe(false)
+    // While fullscreen even the re-enter affordance is hidden → zero buttons.
+    expect(wrapper.findAll('button')).toHaveLength(0)
+  })
+
+  it('applies cursor: none while fullscreen', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    const root = wrapper.get('[data-testid="confidence-output"]')
+    expect((root.element as HTMLElement).style.cursor).toBe('none')
+  })
+})
+
+describe('ConfidenceOutputView — pure-black loading/empty gate (R272)', () => {
+  it('renders no SlideCanvas before any state (index null)', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
+  })
+
+  it('renders pure black for an out-of-range index — no SlideCanvas, no copy', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(99, 1)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
+  })
+})
+
+describe('ConfidenceOutputView — Screen Wake Lock (R272)', () => {
+  it('requests a screen wake lock on mount and re-requests on visibilitychange→visible', async () => {
+    const sentinel = { release: vi.fn().mockResolvedValue(undefined) }
+    const request = vi.fn().mockResolvedValue(sentinel)
+    Object.defineProperty(navigator, 'wakeLock', {
+      value: { request },
+      configurable: true,
+      writable: true,
+    })
+
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(request).toHaveBeenCalledWith('screen')
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(request).toHaveBeenCalledTimes(2)
+  })
+
+  it('releases the acquired wake-lock sentinel on unmount', async () => {
+    const sentinel = { release: vi.fn().mockResolvedValue(undefined) }
+    const request = vi.fn().mockResolvedValue(sentinel)
+    Object.defineProperty(navigator, 'wakeLock', {
+      value: { request },
+      configurable: true,
+      writable: true,
+    })
+
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+    expect(request).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+    await flushPromises()
+    expect(sentinel.release).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not throw on mount when navigator.wakeLock is absent', async () => {
+    expect('wakeLock' in navigator).toBe(false)
+    const fake = createFakeChannel()
+
+    let error: unknown = null
+    try {
+      mountView(fake.factory)
+      await flushPromises()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeNull()
+  })
+})
+
+describe('ConfidenceOutputView — fullscreen-loss recovery (R272; Pitfall 6)', () => {
+  it('does NOT render the re-enter affordance while fullscreen', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="confidence-reenter-fullscreen"]').exists()).toBe(false)
+  })
+
+  it('surfaces the re-enter affordance on fullscreen loss WITHOUT closing the channel or unmounting, and restores the cursor', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Keep a live slide underneath the affordance.
+    fake.emitState(0, 1)
+    await flushPromises()
+
+    setFullscreenElement(null)
+    document.dispatchEvent(new Event('fullscreenchange'))
+    await flushPromises()
+
+    const affordance = wrapper.find('[data-testid="confidence-reenter-fullscreen"]')
+    expect(affordance.exists()).toBe(true)
+    expect(affordance.attributes('aria-label')).toBe('Re-enter fullscreen')
+
+    // No teardown: channel stays open, component stays mounted, live slide stays.
+    expect(fake.close).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="confidence-output"]').exists()).toBe(true)
+    expect(
+      wrapper.find('[data-testid="confidence-current-region"] [data-testid="slide-canvas"]').text(),
+    ).toBe('a')
+
+    const root = wrapper.get('[data-testid="confidence-output"]')
+    expect((root.element as HTMLElement).style.cursor).toBe('auto')
+  })
+
+  it('clicking the re-enter affordance calls requestFullscreen', async () => {
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    const affordance = wrapper.get('[data-testid="confidence-reenter-fullscreen"]')
+    await affordance.trigger('click')
+
+    expect(Element.prototype.requestFullscreen).toHaveBeenCalled()
+  })
+})
+
+describe('ConfidenceOutputView — org-scoped service subscription (WR-02)', () => {
+  it('subscribes the services store to the requested ?org= on a fresh (unsubscribed) store', async () => {
+    serviceStoreMock.orgId = null
+    mockRoute.query.org = 'org-1'
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(serviceStoreMock.subscribe).toHaveBeenCalledWith('org-1')
+  })
+
+  it('re-subscribes to the requested ?org= when the store is already on a DIFFERENT org', async () => {
+    serviceStoreMock.orgId = 'org-other'
+    mockRoute.query.org = 'org-1'
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(serviceStoreMock.subscribe).toHaveBeenCalledWith('org-1')
+  })
+
+  it('does NOT re-subscribe when the store is already on the requested org', async () => {
+    serviceStoreMock.orgId = 'org-1'
+    mockRoute.query.org = 'org-1'
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(serviceStoreMock.subscribe).not.toHaveBeenCalled()
+  })
+})
