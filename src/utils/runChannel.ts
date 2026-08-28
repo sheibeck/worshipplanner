@@ -108,6 +108,12 @@ export function openRunChannel(serviceId: string, factory: BroadcastChannelFacto
   let stateCallback: ((state: RunState) => void) | undefined
   let helloCallback: (() => void) | undefined
 
+  // Tracks whether close() has been called on THIS handle. The real
+  // BroadcastChannel.postMessage() throws InvalidStateError after close() —
+  // postState/postHello guard against that by becoming a safe no-op instead
+  // of letting a stray in-flight post throw uncaught.
+  let closed = false
+
   channel.addEventListener('message', (event) => {
     const data = event.data
     if (!isRunChannelMessage(data)) return
@@ -125,6 +131,7 @@ export function openRunChannel(serviceId: string, factory: BroadcastChannelFacto
 
   return {
     postState(state: RunState) {
+      if (closed) return
       const message: RunStateMessage = { type: 'state', ...state }
       channel.postMessage(message)
     },
@@ -132,6 +139,7 @@ export function openRunChannel(serviceId: string, factory: BroadcastChannelFacto
       stateCallback = callback
     },
     postHello() {
+      if (closed) return
       const message: HelloMessage = { type: 'hello' }
       channel.postMessage(message)
     },
@@ -139,6 +147,7 @@ export function openRunChannel(serviceId: string, factory: BroadcastChannelFacto
       helloCallback = callback
     },
     close() {
+      closed = true
       channel.close()
     },
   }

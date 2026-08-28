@@ -190,6 +190,28 @@ describe('openRunChannel', () => {
     output.close()
   })
 
+  it('postState/postHello on a closed handle do not throw and do not deliver, even against a channel that throws on post-close postMessage (real BroadcastChannel semantics)', () => {
+    // Mirrors the REAL BroadcastChannel: postMessage after close() throws
+    // InvalidStateError, unlike makeFakeChannelFactory's fake which silently
+    // no-ops. This proves the wrapper's own `closed` guard short-circuits
+    // BEFORE reaching postMessage, rather than relying on a generous test double.
+    const postMessage = vi.fn(() => {
+      throw new Error('InvalidStateError: channel is closed')
+    })
+    const factory = vi.fn(() => ({
+      postMessage,
+      addEventListener: vi.fn(),
+      close: vi.fn(),
+    }))
+    const handle = openRunChannel('svc-1', factory)
+
+    handle.close()
+
+    expect(() => handle.postState({ index: 0, blackout: false, seq: 1 })).not.toThrow()
+    expect(() => handle.postHello()).not.toThrow()
+    expect(postMessage).not.toHaveBeenCalled()
+  })
+
   it('ignores a state message with seq: NaN — never delivered, never corrupts the stale-drop high-water mark', () => {
     const factory = makeFakeChannelFactory()
     const control = openRunChannel('svc-1', factory)
