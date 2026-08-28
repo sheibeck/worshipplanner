@@ -27,8 +27,8 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Audience Output
 
-- [ ] **R270**: The audience output opens on the assigned monitor as a **fullscreen slide with its background image and zero operator chrome** (no arrows, slide counts, organizational labels, or visible cursor).
-- [ ] **R271**: The audience display **stays awake for the duration of the service** (Screen Wake Lock) and **recovers gracefully if it loses fullscreen** (offers to re-enter fullscreen; never tears down the running session or the other output).
+- [x] **R270**: The audience output opens on the assigned monitor as a **fullscreen slide with its background image and zero operator chrome** (no arrows, slide counts, organizational labels, or visible cursor).
+- [x] **R271**: The audience display **stays awake for the duration of the service** (Screen Wake Lock) and **recovers gracefully if it loses fullscreen** (offers to re-enter fullscreen; never tears down the running session or the other output).
 
 ### Confidence Monitor Output
 
@@ -81,8 +81,8 @@ Which phase covers which requirement. Populated during roadmap creation.
 | R267 | Phase 92 | Complete |
 | R268 | Phase 92 | Complete |
 | R269 | Phase 92 | Complete |
-| R270 | Phase 93 | Pending |
-| R271 | Phase 93 | Pending |
+| R270 | Phase 93 | Complete |
+| R271 | Phase 93 | Complete |
 | R272 | Phase 94 | Pending |
 | R273 | Phase 96 | Pending |
 | R274 | Phase 96 | Pending |

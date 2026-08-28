@@ -453,9 +453,11 @@ expected; Phase 96 re-confirms this rather than assuming it.
   2. The audience display does not go to sleep for the duration of a realistic service length. (R271)
   3. If the audience output loses fullscreen, it offers a one-click way to re-enter fullscreen without tearing down the running session or the confidence output. (R271)
 
-**Plans**: 2 plans
-- [ ] 93-01-PLAN.md — Register the /present/audience/:serviceId route and build the chromeless, receive-only, self-bootstrapping AudienceOutputView (channel-driven slide, wake lock, no-teardown fullscreen recovery)
+**Plans**: 1/2 plans executed
+
+- [x] 93-01-PLAN.md — Register the /present/audience/:serviceId route and build the chromeless, receive-only, self-bootstrapping AudienceOutputView (channel-driven slide, wake lock, no-teardown fullscreen recovery)
 - [ ] 93-02-PLAN.md — Author AudienceOutputView.test.ts (channel/hello/never-writes-state, chrome-absence + cursor toggle, wake-lock acquire/re-acquire/absence, fullscreen-loss recovery)
+
 **UI hint**: yes
 
 ### Phase 94: Confidence Monitor Output Window
