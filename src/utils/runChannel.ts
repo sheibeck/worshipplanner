@@ -58,7 +58,13 @@ function defaultFactory(name: string): BroadcastChannelLike {
   return new BroadcastChannel(name) as unknown as BroadcastChannelLike
 }
 
-/** Handle returned by `openRunChannel` — the caller's entire surface onto the channel. */
+/**
+ * Handle returned by `openRunChannel` — the caller's entire surface onto the
+ * channel. `onState`/`onHello` each hold AT MOST ONE callback per handle —
+ * calling either a second time silently overwrites (last-registration-wins,
+ * no error). Matches today's one-window-one-handle usage; a future consumer
+ * needing multiple subscribers on the same handle must fan out itself.
+ */
 export interface RunChannelHandle {
   postState(state: RunState): void
   onState(callback: (state: RunState) => void): void
