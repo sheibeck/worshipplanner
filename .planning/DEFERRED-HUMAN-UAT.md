@@ -26,3 +26,12 @@ wake-lock behavior over a service length), NOT a known defect.
    (60–90 min of real elapsed time).
 3. **Fullscreen-loss recovery from the booth** — the single "Re-enter fullscreen" pill is findable, and
    clicking it actually re-enters fullscreen without tearing down the session or the other output.
+
+## Phase 94 — Confidence Monitor Output Window (verified 2026-08-28, pass-with-deferred-human-UAT)
+
+1. **Confidence monitor on a second physical screen** — current + next panes render and are clearly
+   distinguished on real hardware.
+2. **True black-background suppression as the band sees it** — the actual background image is never
+   visible on either pane on a real display.
+3. **Glanceable legibility of the ~30% next pane** from stage distance (if unreadable, tune the split
+   ratio / next-pane font scale — not the current pane's dominance).
