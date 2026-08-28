@@ -392,82 +392,105 @@ expected; Phase 96 re-confirms this rather than assuming it.
 ## Phase Details
 
 ### Phase 90: SlideCanvas Extraction
+
 **Goal**: Extract `PresentationViewer.vue`'s slide-rendering logic into a reusable `SlideCanvas.vue` component with zero behavior change, establishing the single rendering source of truth every downstream Run/Audience/Confidence window will compose instead of forking it.
 **Depends on**: Nothing (first phase of v2.4)
 **Requirements**: (none — enabling refactor; no v2.4 requirement maps here by design, see milestone Basis note)
 **Success Criteria** (what must be TRUE):
+
   1. `SlideCanvas.vue` exists as a standalone component (`slide`/`suppressBackground`/`interactive` props) that renders every slide content type the app supports — lyrics, scripture, image, video, and copyright.
   2. `PresentationViewer.vue` composes `SlideCanvas` internally at its one existing call site with no observable behavior change — its existing test suite and `data-testid` markers pass unmodified.
   3. The app's documented type-check and test-suite baseline is unchanged after the refactor (no new failures introduced).
-**Plans**: 1 plan
-- [ ] 90-01-PLAN.md — Extract SlideCanvas.vue (slide/suppressBackground/interactive) from PresentationViewer; compose it at the one call site with zero behavior change; add focused SlideCanvas tests
+
+**Plans**: 1/1 plans executed
+
+- [x] 90-01-PLAN.md — Extract SlideCanvas.vue (slide/suppressBackground/interactive) from PresentationViewer; compose it at the one call site with zero behavior change; add focused SlideCanvas tests
+
 **UI hint**: yes
 
 ### Phase 91: Config + Channel Utilities
+
 **Goal**: Pure, framework-agnostic utility modules exist for control→output sync, per-device monitor-role persistence, and service-slot↔slide lookup, so the riskiest sync/persistence logic is built and unit-tested before any window depends on it.
 **Depends on**: Nothing (independently buildable; sequenced ahead of Phases 92-96, which consume it)
 **Requirements**: (none — enabling infrastructure; no v2.4 requirement maps here by design, see milestone Basis note)
 **Success Criteria** (what must be TRUE):
+
   1. A typed BroadcastChannel protocol module lets any window send/receive a `{index, blackout, seq}`-shaped state update, covered by unit tests with no Vue/Firebase dependency.
   2. A monitor-config module computes a stable per-screen fingerprint (label + resolution + position) and persists/retrieves an Audience/Confidence role mapping from `localStorage`, keyed per device.
   3. A service-slots module resolves `slotIndex` ↔ first-assembled-slide-index consistently with the existing `slideshowAssembler.ts`, unit-tested in isolation.
+
 **Plans**: TBD
 
 ### Phase 92: Monitor Configuration Screen
+
 **Goal**: A projectionist can open a standalone, persistent monitor-setup screen to detect connected displays and assign Audience/Confidence roles, with a first-class fallback when screen-management permission isn't available.
 **Depends on**: Phase 91
 **Requirements**: R267, R268, R269
 **Success Criteria** (what must be TRUE):
+
   1. A projectionist can navigate to a standalone monitor-setup screen, independent of any specific service, and see the currently connected monitors listed. (R267)
   2. A projectionist can assign Audience and Confidence roles to the detected monitors, and that assignment persists on that device across browser sessions. (R267, R268)
   3. Returning later to Run a service, the saved mapping is reused silently without re-prompting — the app only re-prompts when the physical monitor layout has actually changed. (R268)
   4. When screen-management permission is denied or the API is unavailable, the projectionist is guided through a working manual path (open the output window, drag it to the target monitor, go fullscreen) rather than hitting a dead end. (R269)
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 93: Audience Output Window
+
 **Goal**: The audience sees a fullscreen slide with its background image and zero operator chrome on the monitor assigned as Audience, and the display stays awake and recovers gracefully for the whole service.
 **Depends on**: Phase 90, Phase 91, Phase 92
 **Requirements**: R270, R271
 **Success Criteria** (what must be TRUE):
+
   1. Opening the audience output on the assigned monitor shows the current slide fullscreen with its background image, and no arrows, slide counts, organizational labels, or visible cursor are present. (R270)
   2. The audience display does not go to sleep for the duration of a realistic service length. (R271)
   3. If the audience output loses fullscreen, it offers a one-click way to re-enter fullscreen without tearing down the running session or the confidence output. (R271)
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 94: Confidence Monitor Output Window
+
 **Goal**: The band/team sees the current and next slide on the Confidence monitor with backgrounds always suppressed to black and no operator chrome.
 **Depends on**: Phase 90, Phase 91, Phase 93
 **Requirements**: R272
 **Success Criteria** (what must be TRUE):
+
   1. Opening the confidence output on the assigned monitor shows both the current slide and the next upcoming slide, clearly distinguished from each other. (R272)
   2. Every slide on the confidence output renders against a plain black background — the actual background image is never shown. (R272)
   3. No operator chrome (arrows, slide counts, organizational labels) is visible on the confidence output.
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 95: Run/Control Screen + Run Entry Point
+
 **Goal**: A projectionist can start and drive a locked service's live presentation from one calm control screen that stays in charge of both output windows, with no separate "push to live" step.
 **Depends on**: Phase 92, Phase 93, Phase 94
 **Requirements**: R261, R262, R263, R264, R265, R266, R275
 **Success Criteria** (what must be TRUE):
+
   1. A "Run" button appears on a locked service and opens a dedicated, standalone Run/control screen (not the service editor); the button is absent or disabled on a draft service. (R261)
   2. Any authenticated org member — editor or viewer — can click Run on a locked service, and running never grants any ability to edit the plan. (R275)
   3. The control screen shows the order of service as a list with the item containing the current slide clearly highlighted, alongside a large current-slide preview and a smaller next-slide preview. (R262, R264)
   4. Clicking an order-of-service item jumps the live output to that item's first slide; the projectionist can also navigate with standard keys — Right/Space = next, Left = previous, Down/Up = next/previous item, Escape = exit with a confirmation. (R263, R265)
   5. The current/selected slide on the control screen is always what's live on the outputs — there is no separate "push to live" step. (R266)
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 96: Live-Ops Hardening
+
 **Goal**: The live session survives real-world operating conditions — closed windows, monitor replugs, and a realistic service duration — without losing the projectionist's place or requiring a restart.
 **Depends on**: Phase 95
 **Requirements**: R273, R274
 **Success Criteria** (what must be TRUE):
+
   1. The audience and confidence outputs stay in sync with the operator's navigation on the control screen with no perceptible lag. (R273)
   2. If an output window is closed mid-service, the control screen detects it and offers one-click reopen without losing the current slide position. (R274)
   3. If a monitor is unplugged mid-service, the control screen detects the change and offers one-click reassignment/recovery without losing the current slide position. (R274)
   4. This milestone remains confirmed client-side only — no new Firestore document or `firestore.rules` change was needed to satisfy R273/R274; if one had turned out to be needed, it would carry rules test coverage verified via `npm run test:rules`.
+
 **Plans**: TBD
 **UI hint**: yes

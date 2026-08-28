@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Run the Service (Live Presentation)
 status: planning
-last_updated: "2026-08-28T12:40:40.413Z"
+last_updated: "2026-08-28T13:52:00.000Z"
 last_activity: 2026-08-28
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 1
+  completed_plans: 1
+  percent: 14
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -73,7 +73,8 @@ Firestore schema, zero Cloud Functions, no new npm dependency. No `firestore.rul
 change is anticipated; Phase 96 re-confirms this rather than assuming it (only adds rules coverage if a
 new run-state document turns out to be needed, which research says it is not).
 
-**Next step:** `/gsd-plan-phase 90` (optionally preceded by `/gsd-discuss-phase 90`).
+**Next step:** Phase 90 (SlideCanvas Extraction) is code-complete via plan 90-01 — see
+`.planning/phases/90-slidecanvas-extraction/90-01-SUMMARY.md`. `/gsd-plan-phase 91`.
 
 ---
 
@@ -1003,10 +1004,14 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 90 — SlideCanvas Extraction (v2.4 roadmap created, ready to plan)
-Plan: — (not yet planned)
-Status: Roadmap complete, ready to plan
-Last activity: 2026-08-28 — v2.4 ROADMAP.md created (Phases 90-96), REQUIREMENTS.md traceability filled (15/15 mapped), STATE.md updated
+Phase: 90 — SlideCanvas Extraction (v2.4)
+Plan: 90-01 — SlideCanvas Extraction — COMPLETE
+Status: Phase 90's single plan (90-01) executed and verified; ready to plan Phase 91
+Last activity: 2026-08-28 — 90-01-PLAN.md executed: `src/components/slides/SlideCanvas.vue` extracted from
+`PresentationViewer.vue` with zero observable behavior change (`PresentationViewer.test.ts` byte-unchanged,
+100/100 pass), `SlideCanvas.test.ts` added (13 tests), `npm run type-check` clean, `npx vitest run` shows
+only the documented `storage.rules.test.ts` baseline failure (155/156 suites, 4455/4455 tests pass). See
+`.planning/phases/90-slidecanvas-extraction/90-01-SUMMARY.md`. Next step: `/gsd-plan-phase 91`.
 
 ## ★ v2.4 ROADMAP.md phase breakdown (created 2026-08-28)
 
