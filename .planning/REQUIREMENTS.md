@@ -32,7 +32,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Confidence Monitor Output
 
-- [ ] **R272**: The confidence output opens on the assigned monitor showing the **current slide and the upcoming slide**, with **background images suppressed to a plain black background** and no operator chrome.
+- [x] **R272**: The confidence output opens on the assigned monitor showing the **current slide and the upcoming slide**, with **background images suppressed to a plain black background** and no operator chrome.
 
 ### Live-Operation Robustness
 
@@ -83,7 +83,7 @@ Which phase covers which requirement. Populated during roadmap creation.
 | R269 | Phase 92 | Complete |
 | R270 | Phase 93 | Complete |
 | R271 | Phase 93 | Complete |
-| R272 | Phase 94 | Pending |
+| R272 | Phase 94 | Complete |
 | R273 | Phase 96 | Pending |
 | R274 | Phase 96 | Pending |
 | R275 | Phase 95 | Pending |
