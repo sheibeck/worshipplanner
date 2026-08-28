@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.3
-milestone_name: Scheduling Accuracy & Song/Team Refinements
-status: completed
-stopped_at: Completed 89-02-PLAN.md
-last_updated: "2026-08-28T00:58:21.935Z"
-last_activity: 2026-08-27
-last_activity_desc: Milestone v2.3 completed and archived
+milestone: v2.4
+milestone_name: Run the Service (Live Presentation)
+status: planning
+last_updated: "2026-08-28T12:40:40.413Z"
+last_activity: 2026-08-28
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 11
-  completed_plans: 11
-  percent: 100
-current_phase: 89
-current_phase_name: Multi-Role Scheduling
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -957,10 +953,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v2.3 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-27 — Milestone v2.3 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-28 — Milestone v2.4 started
 
 ## ★ v2.2 ROADMAP.md phase breakdown (created 2026-08-23)
 

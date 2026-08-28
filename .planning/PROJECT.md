@@ -8,11 +8,42 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current State — no active milestone
+## Current Milestone: v2.4 Run the Service (Live Presentation)
 
-All milestones through **v2.3** have shipped and are archived under `.planning/milestones/`. The next
-milestone is scoped via `/gsd-new-milestone`, which also creates a fresh `.planning/REQUIREMENTS.md`
-(intentionally absent between milestones). Roadmap: `.planning/ROADMAP.md`.
+**Goal:** Give a non-technical projectionist a clean, standalone way to *run* a locked service's
+slide deck live during a church service — driving a fullscreen audience projector and a band
+confidence monitor from one Chrome/Edge browser.
+
+**Target features:**
+- **"Run" button on any locked service** → opens a dedicated, standalone Run/control screen (not the
+  cluttered service editor).
+- **Run/control screen** — the order of service down one side with the **current item clearly
+  highlighted** by which slide you're on; **click an item to jump** to its first slide; a large
+  current-slide view; **standard keyboard navigation** (arrows / space / etc.); calm, non-technical UX.
+- **Standalone, persistent monitor configuration** — a dedicated setup screen (separate from the Run
+  flow) that detects connected monitors and assigns **Audience** vs **Confidence** roles; the mapping
+  is **saved and remembered per device** so running a service is essentially one click (re-prompt only
+  if the physical monitor layout changed).
+- **Audience output** — fullscreen slides *with* backgrounds and **zero chrome** (no arrows, slide
+  counts, or organizational labels).
+- **Confidence monitor output** — **current + upcoming** slide with **background images suppressed to
+  black**; no chrome.
+- **Multi-monitor delivery from the browser** — Window Management API on Chrome/Edge for
+  auto-placement, with a **pop-out-window + fullscreen fallback** when screen permission isn't granted.
+- **UI research** on live-presentation conventions (ProPresenter / EasyWorship / Proclaim) so
+  navigation is obvious and keyboard shortcuts are standard.
+
+**Key context / decisions:**
+- New **projectionist** role concept = the person running the service; only **locked** services can be Run.
+- **Chrome/Edge** target confirmed; browser multi-monitor delivery is the central technical unknown for research.
+- **Deferred (out of scope this milestone):** instant blackout / logo-cut button; any non-Chromium
+  monitor auto-detection.
+
+## Current State — active milestone v2.4
+
+All milestones through **v2.3** have shipped and are archived under `.planning/milestones/`. **v2.4 Run
+the Service** is now active — requirements are scoped in a fresh `.planning/REQUIREMENTS.md` and phased
+in `.planning/ROADMAP.md`.
 
 <details>
 <summary>Shipped milestone — v2.3 Scheduling Accuracy & Song/Team Refinements (Phases 84–89, shipped & deployed 2026-08-27)</summary>
@@ -315,9 +346,13 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-**No active milestone.** v2.3 shipped & deployed to production 2026-08-27 (all 6 phases, R247–R260;
-audit PASSED 14/14; owner-approved). The next milestone's requirements are created fresh via
-`/gsd-new-milestone`.
+**v2.4 Run the Service (Live Presentation)** — being scoped now. A non-technical projectionist runs a
+locked service's slides live: a Run button → standalone Run/control screen (order of service with
+current-item highlight, click-to-jump, keyboard nav), a persistent standalone monitor-config screen
+(Audience vs Confidence roles, remembered per device), a fullscreen chrome-free audience output, a
+black-background confidence output showing current + upcoming slide, and browser multi-monitor delivery
+(Window Management API on Chrome/Edge + pop-out fallback). Requirements created fresh in
+`.planning/REQUIREMENTS.md`; deferred: instant blackout/logo-cut button, non-Chromium auto-detection.
 
 **Standing owner-run hand-overs (carry until run):**
 
@@ -478,4 +513,10 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-27 after v2.3 milestone — completed, deployed to production, & archived v2.3 Scheduling Accuracy & Song/Team Refinements (Phases 84–89, R247–R260): last-used lock-gated fix + prod backfill, Vocals→Band + Band↔Tech conflict rule, Nth-Sunday recurring team auto-scheduling, editable song Key + sermon-free rotation + copy fix, Roles/Teams read-only-row slideouts + Key type-ahead, and a generalized multi-role flag + same-date scheduler bundling (88–89 added mid-milestone from UAT). Deployed 2026-08-27 (hosting + all functions; no rules changes); R248 backfill applied to Berean prod; audit PASSED 14/14; owner-approved UAT. No active milestone — next is scoped via `/gsd-new-milestone`.*
+*Last updated: 2026-08-28 — started milestone v2.4 Run the Service (Live Presentation). A non-technical
+projectionist runs a locked service's slides live from Chrome/Edge: Run button → standalone Run/control
+screen (order of service with current-item highlight, click-to-jump, keyboard nav), a persistent
+standalone monitor-config screen (Audience vs Confidence roles, remembered per device), fullscreen
+chrome-free audience output, black-background confidence output (current + upcoming slide), and browser
+multi-monitor delivery via the Window Management API with a pop-out fallback. Deferred: blackout/logo-cut
+button, non-Chromium auto-detection. Requirements scoped next.*
