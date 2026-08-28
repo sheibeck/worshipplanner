@@ -1,0 +1,407 @@
+/**
+ * Phase 93 Plan 02 (R270/R271). Behavioral coverage for AudienceOutputView.vue —
+ * the receive-only, chrome-free congregation-facing output window.
+ *
+ * This suite proves the six must-haves against the REAL view (93-01):
+ *  - the live slide follows the receive-only run channel (real openRunChannel
+ *    stale-drop exercised through an injected in-memory BroadcastChannelLike);
+ *  - postHello() fires on mount and the view NEVER posts a `state` message —
+ *    control is the single writer — and the channel is close()d on unmount;
+ *  - ZERO operator chrome renders and `cursor: none` applies while fullscreen;
+ *  - the loading/empty (index null) and out-of-range states are pure black;
+ *  - Screen Wake Lock is acquired on mount and re-acquired on visibility return,
+ *    and its absence is non-fatal;
+ *  - fullscreen loss surfaces the calm "Re-enter fullscreen" affordance WITHOUT
+ *    closing the channel or unmounting (the OPPOSITE of PresentationViewer).
+ *
+ * Harness lineage: ServiceEditorView.test.ts (reactive vue-router mock + inert
+ * @/firebase + enableAutoUnmount so onUnmounted cleanup runs), MonitorSetupView
+ * .test.ts (per-test install/delete of a navigator.* capability), and
+ * PresentationViewer.test.ts (Fullscreen-API stubbing + dispatched
+ * fullscreenchange). Stores and useSlideshowAssembly are mocked so the test is
+ * about THIS view's behavior, not Firestore.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
+import { reactive } from 'vue'
+import type { AssembledSlide } from '@/types/slide'
+import type { BroadcastChannelLike, BroadcastChannelFactory } from '@/utils/runChannel'
+import AudienceOutputView from '../AudienceOutputView.vue'
+
+// onUnmounted must run so the channel-close, wake-lock-release, and
+// unsubscribeAll cleanup this suite asserts actually fire.
+enableAutoUnmount(afterEach)
+
+// ── Mocks ─────────────────────────────────────────────────────────────────────
+
+// Reactive so a route change could be simulated without a remount (mirrors
+// ServiceEditorView.test.ts's mockRoute); seeds params.serviceId + query.org
+// (the ?org= self-scoping convention the view reads).
+const mockRoute = reactive({ params: { serviceId: 'service-1' }, query: { org: 'org-1' } })
+vi.mock('vue-router', () => ({
+  useRoute: () => mockRoute,
+  useRouter: () => ({ push: vi.fn() }),
+}))
+
+// A stable, Firestore-free services store: the view watches `services` (initial-
+// load only), reads `orgId` to gate subscribe(), and calls unsubscribeAll() on
+// unmount. Hoisted so the vi.mock factory can reference it.
+const { serviceStoreMock, fakeSlides } = vi.hoisted(() => {
+  function fakeSlide(id: string): unknown {
+    return {
+      slide: {
+        id,
+        position: 0,
+        contentKind: 'lyric',
+        sectionId: 'verse-1',
+        sectionLabel: 'Verse 1',
+        lines: [`line for ${id}`],
+      },
+      slotIndex: 0,
+      slotKind: 'SONG',
+      section: 'worship',
+      sourceId: 'song-1',
+    }
+  }
+  return {
+    serviceStoreMock: {
+      services: [] as unknown[],
+      orgId: null as string | null,
+      subscribe: vi.fn(),
+      unsubscribeAll: vi.fn(),
+    },
+    fakeSlides: [fakeSlide('a'), fakeSlide('b'), fakeSlide('c')],
+  }
+})
+
+vi.mock('@/firebase', () => ({ auth: {}, db: {}, functions: {} }))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    orgId: 'org-1',
+    settings: {
+      slideTypography: { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' },
+    },
+  }),
+}))
+
+vi.mock('@/stores/services', () => ({
+  useServiceStore: () => serviceStoreMock,
+}))
+
+// Return a fixed assembled slideshow so the test drives currentSlide purely from
+// the channel index, never from Firestore assembly.
+vi.mock('@/composables/useSlideshowAssembly', async () => {
+  const { ref } = await import('vue')
+  return {
+    useSlideshowAssembly: () => ({ assembledSlideshow: ref(fakeSlides as AssembledSlide[]) }),
+  }
+})
+
+// Replace SlideCanvas with a lightweight stub that renders its slide id (so the
+// test can assert WHICH slide is showing) and exposes the play/pause handles the
+// view drives via its ref.
+vi.mock('@/components/slides/SlideCanvas.vue', async () => {
+  const { defineComponent, h } = await import('vue')
+  return {
+    default: defineComponent({
+      name: 'SlideCanvasStub',
+      props: {
+        slide: { type: Object, required: false, default: undefined },
+        interactive: { type: Boolean, default: false },
+      },
+      setup(props, { expose }) {
+        expose({ play: () => {}, pause: () => {} })
+        return () =>
+          h(
+            'div',
+            { 'data-testid': 'slide-canvas' },
+            ((props.slide as { slide?: { id?: string } } | undefined)?.slide?.id) ?? '',
+          )
+      },
+    }),
+  }
+})
+
+// ── In-memory run-channel fake ─────────────────────────────────────────────────
+// A BroadcastChannelLike whose postMessage records every message and whose
+// addEventListener stores the message listener, so the test can (a) read what the
+// view posted and (b) push `state` messages INTO the view. The view opens the
+// REAL openRunChannel with this fake, so emitState() exercises runChannel's true
+// stale-drop guard rather than bypassing it.
+function createFakeChannel() {
+  const posted: Array<{ type?: string }> = []
+  let listener: ((event: { data: unknown }) => void) | undefined
+  const close = vi.fn()
+  const channel: BroadcastChannelLike = {
+    postMessage(message: unknown) {
+      posted.push(message as { type?: string })
+    },
+    addEventListener(_type, callback) {
+      listener = callback
+    },
+    close,
+  }
+  const factory: BroadcastChannelFactory = () => channel
+  return {
+    factory,
+    posted,
+    close,
+    emitState(index: number, seq: number, blackout = false) {
+      listener?.({ data: { type: 'state', index, blackout, seq } })
+    },
+  }
+}
+
+function setFullscreenElement(value: Element | null) {
+  Object.defineProperty(document, 'fullscreenElement', {
+    value,
+    configurable: true,
+    writable: true,
+  })
+}
+
+function mountView(channelFactory: BroadcastChannelFactory) {
+  return mount(AudienceOutputView, { props: { channelFactory } })
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  // jsdom's Fullscreen API is unimplemented — stub per test (PresentationViewer
+  // idiom). Default: not fullscreen.
+  Element.prototype.requestFullscreen = vi.fn().mockResolvedValue(undefined)
+  setFullscreenElement(null)
+  // The font-load gate reads document.fonts; stub it so waitForSlideFont resolves
+  // deterministically and fontReady flips true (SlideCanvas only renders once
+  // fontReady is true).
+  Object.defineProperty(document, 'fonts', {
+    value: { ready: Promise.resolve(), load: vi.fn().mockResolvedValue([]) },
+    configurable: true,
+    writable: true,
+  })
+  Object.defineProperty(document, 'visibilityState', {
+    value: 'visible',
+    configurable: true,
+    writable: true,
+  })
+  serviceStoreMock.subscribe.mockClear()
+  serviceStoreMock.unsubscribeAll.mockClear()
+})
+
+afterEach(() => {
+  delete (navigator as unknown as { wakeLock?: unknown }).wakeLock
+  vi.restoreAllMocks()
+})
+
+// ── Tests ──────────────────────────────────────────────────────────────────────
+
+describe('AudienceOutputView — channel-driven slide (R270/R271)', () => {
+  it('renders the slide the channel index selects, and a HIGHER-seq state advances it', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Before any state, pure black — no slide.
+    expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(false)
+
+    fake.emitState(0, 1)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('a')
+
+    // Higher seq advances.
+    fake.emitState(2, 2)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('c')
+  })
+
+  it('drops a lower/stale-seq state (runChannel real stale-drop) — the slide does not go backward', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(2, 5)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('c')
+
+    // seq 3 <= highest delivered 5 → dropped by openRunChannel, never delivered.
+    fake.emitState(0, 3)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('c')
+  })
+})
+
+describe('AudienceOutputView — receive-only handshake (R270/R271)', () => {
+  it('posts a hello on mount and NEVER posts a state across the whole lifecycle', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    expect(fake.posted.some((m) => m.type === 'hello')).toBe(true)
+
+    // Drive several inbound states, then tear down.
+    fake.emitState(0, 1)
+    await flushPromises()
+    fake.emitState(1, 2)
+    await flushPromises()
+    wrapper.unmount()
+
+    expect(fake.posted.some((m) => m.type === 'state')).toBe(false)
+  })
+
+  it('closes the channel on unmount', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    wrapper.unmount()
+    expect(fake.close).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('AudienceOutputView — no operator chrome + cursor (R270)', () => {
+  it('renders ZERO operator chrome and no buttons while fullscreen', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(0, 1)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('a')
+
+    // None of PresentationViewer's operator affordances exist here.
+    expect(wrapper.find('[data-testid="presentation-progress"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-next"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-prev"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-exit"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-chrome"]').exists()).toBe(false)
+    // While fullscreen even the re-enter affordance is hidden → zero buttons.
+    expect(wrapper.findAll('button')).toHaveLength(0)
+  })
+
+  it('applies cursor: none while fullscreen', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    const root = wrapper.get('[data-testid="audience-output"]')
+    expect((root.element as HTMLElement).style.cursor).toBe('none')
+  })
+})
+
+describe('AudienceOutputView — pure-black loading/empty gate (R270)', () => {
+  // Mount fullscreen so the (windowed-only) re-enter affordance is hidden,
+  // isolating the "no slide, no spinner, no copy" claim to the pure-black gate.
+  it('renders no SlideCanvas, no spinner, and no copy before any state (index null)', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
+  })
+
+  it('renders pure black for an out-of-range index — no SlideCanvas, no error copy', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(99, 1)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
+  })
+})
+
+describe('AudienceOutputView — Screen Wake Lock (R271)', () => {
+  it('requests a screen wake lock on mount and re-requests on visibilitychange→visible', async () => {
+    const sentinel = { release: vi.fn().mockResolvedValue(undefined) }
+    const request = vi.fn().mockResolvedValue(sentinel)
+    Object.defineProperty(navigator, 'wakeLock', {
+      value: { request },
+      configurable: true,
+      writable: true,
+    })
+
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(request).toHaveBeenCalledWith('screen')
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(request).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not throw on mount when navigator.wakeLock is absent', async () => {
+    expect('wakeLock' in navigator).toBe(false)
+    const fake = createFakeChannel()
+
+    let error: unknown = null
+    try {
+      mountView(fake.factory)
+      await flushPromises()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeNull()
+  })
+})
+
+describe('AudienceOutputView — fullscreen-loss recovery (R271; Pitfall 6)', () => {
+  it('does NOT render the re-enter affordance while fullscreen', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="audience-reenter-fullscreen"]').exists()).toBe(false)
+  })
+
+  it('surfaces the re-enter affordance on fullscreen loss WITHOUT closing the channel or unmounting, and restores the cursor', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Keep a live slide underneath the affordance.
+    fake.emitState(0, 1)
+    await flushPromises()
+
+    // Lose fullscreen.
+    setFullscreenElement(null)
+    document.dispatchEvent(new Event('fullscreenchange'))
+    await flushPromises()
+
+    const affordance = wrapper.find('[data-testid="audience-reenter-fullscreen"]')
+    expect(affordance.exists()).toBe(true)
+    expect(affordance.attributes('aria-label')).toBe('Re-enter fullscreen')
+
+    // No teardown: channel stays open, component stays mounted, live slide stays.
+    expect(fake.close).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="audience-output"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('a')
+
+    // Cursor restored while windowed so the affordance stays clickable.
+    const root = wrapper.get('[data-testid="audience-output"]')
+    expect((root.element as HTMLElement).style.cursor).toBe('auto')
+  })
+
+  it('clicking the re-enter affordance calls requestFullscreen', async () => {
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    const affordance = wrapper.get('[data-testid="audience-reenter-fullscreen"]')
+    await affordance.trigger('click')
+
+    expect(Element.prototype.requestFullscreen).toHaveBeenCalled()
+  })
+})
