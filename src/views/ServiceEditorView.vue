@@ -90,6 +90,27 @@
                 </svg>
                 {{ statusLabel }}
               </span>
+              <!-- R261/R275: Run entry point. A primary CTA sitting next to the
+                   status pill on a LOCKED service, reachable by ANY authenticated
+                   member — editor OR viewer — because running is presentation-only
+                   (v-if gates on canRunService = isLocked && orgId, deliberately
+                   NOT canEditService/isEditor). Absent (not merely disabled) on a
+                   draft and for an org-less user. Placed here in the header flex
+                   row, NOT in the isEditor-gated lock banner below, so viewers are
+                   never locked out of Run (95-UI-SPEC § 7). -->
+              <button
+                v-if="canRunService"
+                type="button"
+                data-testid="run-service-btn"
+                aria-label="Run this service live"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium inline-flex items-center gap-2"
+                @click="onRun"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                  <path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.34-5.89a1.5 1.5 0 000-2.54L6.3 2.84z" />
+                </svg>
+                Run
+              </button>
             </div>
           </div>
 
@@ -2092,6 +2113,26 @@ const selectedPcTeamIds = ref<string[]>([])
 const isLocked = computed(() => localService.value !== null && localService.value.status !== 'draft')
 
 const canEditService = computed(() => authStore.isEditor && !isLocked.value)
+
+// R275: Run is a DELIBERATE divergence from canEditService. Running a service is
+// presentation-only and grants no edit ability, so it is available to ANY
+// authenticated member — editor OR viewer — of the active org, and is
+// intentionally NOT gated on authStore.isEditor. A set authStore.orgId is the
+// operative "authenticated member with an active org" signal (the store only
+// holds an orgId for such a member). This computed does not re-implement auth:
+// the enforced boundary is the /run route's requiresAuth guard (95-03), not this
+// UI gate. isLocked (=== status !== 'draft') keeps Run absent on a draft.
+const canRunService = computed(() => isLocked.value && !!authStore.orgId)
+
+// R261/R275: ordinary SPA navigation only — no state mutation, no store touch.
+// The org travels in ?org= to match the /run and /present routes; it is sourced
+// from authStore.orgId (not user input), and the destination re-scopes via
+// Firestore org-membership rules. localService is always present when
+// canRunService is true (isLocked requires a non-null localService).
+function onRun() {
+  if (!localService.value) return
+  router.push('/run/' + localService.value.id + '?org=' + authStore.orgId)
+}
 
 const statusLabel = computed(() =>
   localService.value?.status === 'exported'
