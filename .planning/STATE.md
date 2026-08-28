@@ -2,15 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Run the Service (Live Presentation)
+current_phase: 91
+current_phase_name: v2.4
 status: planning
-last_updated: "2026-08-28T13:52:00.000Z"
+stopped_at: Completed 91-01-PLAN.md
+last_updated: "2026-08-28T14:27:46.543Z"
 last_activity: 2026-08-28
+last_activity_desc: "91-01-PLAN.md executed: runChannel.ts/monitorConfig.ts/serviceSlots.ts built and unit-tested"
 progress:
   total_phases: 7
-  completed_phases: 0
-  total_plans: 1
-  completed_plans: 1
-  percent: 14
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
+  percent: 29
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -47,20 +51,26 @@ against further compression; see `.planning/ROADMAP.md` § v2.4 for full phase d
 - **Phase 90 — SlideCanvas Extraction (no requirement; enabling refactor):** extract
   `PresentationViewer.vue`'s slide-rendering guts into a reusable `SlideCanvas.vue` with zero behavior
   change, so every downstream window composes one rendering source of truth instead of forking it.
+
 - **Phase 91 — Config + Channel Utilities (no requirement; enabling infrastructure):** pure,
   framework-agnostic modules — a typed BroadcastChannel control→output protocol, a per-device monitor
   fingerprint/localStorage config, and a slotIndex↔slide lookup — built and unit-tested before any
   window depends on them.
+
 - **Phase 92 — Monitor Configuration Screen (R267–R269):** standalone `/monitor-setup` route —
   screen enumeration, Audience/Confidence role assignment, per-device persistence, and the
   pop-out+drag+fullscreen fallback as an equally-supported primary path.
+
 - **Phase 93 — Audience Output Window (R270–R271):** fullscreen, chrome-free slide output with
   background, Screen Wake Lock, and graceful fullscreen-loss recovery.
+
 - **Phase 94 — Confidence Monitor Output Window (R272):** current+next slide output with background
   suppressed to black, no chrome — a rendering-mode fork of Phase 93's pattern.
+
 - **Phase 95 — Run/Control Screen + Run Entry Point (R261–R266, R275):** the Run button on a locked
   service, the order-of-service rail with current-item highlight, click-to-jump, keyboard nav, the
   single-selection model, and any-authenticated-member authorization.
+
 - **Phase 96 — Live-Ops Hardening (R273–R274):** closed-output-window recovery, monitor-replug
   detection, and control↔output sync robustness over a realistic service length.
 
@@ -1004,14 +1014,17 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 90 — SlideCanvas Extraction (v2.4)
-Plan: 90-01 — SlideCanvas Extraction — COMPLETE
-Status: Phase 90's single plan (90-01) executed and verified; ready to plan Phase 91
-Last activity: 2026-08-28 — 90-01-PLAN.md executed: `src/components/slides/SlideCanvas.vue` extracted from
-`PresentationViewer.vue` with zero observable behavior change (`PresentationViewer.test.ts` byte-unchanged,
-100/100 pass), `SlideCanvas.test.ts` added (13 tests), `npm run type-check` clean, `npx vitest run` shows
-only the documented `storage.rules.test.ts` baseline failure (155/156 suites, 4455/4455 tests pass). See
-`.planning/phases/90-slidecanvas-extraction/90-01-SUMMARY.md`. Next step: `/gsd-plan-phase 91`.
+Phase: 91 — Config + Channel Utilities (v2.4)
+Plan: 91-01 — Config + Channel Utilities — COMPLETE
+Status: Phase 91's single plan (91-01) executed and verified; ready to plan Phase 92
+Last activity: 2026-08-28 — 91-01-PLAN.md executed: three pure, framework-free `src/utils/` modules
+built and unit-tested — `runChannel.ts` (typed BroadcastChannel `wp-run-{serviceId}` control→output
+protocol with a strictly-increasing-seq stale-drop guard, 11 tests), `monitorConfig.ts` (device-scoped
+Audience/Confidence monitor persistence keyed on a label+resolution+position+isPrimary fingerprint,
+17 tests), `serviceSlots.ts` (`sortedSlotsWithIndex`/`firstAssembledIndexBySlot`, proven against the
+real `assembleSlideshow` engine, 5 tests). `npm run type-check` clean, `npx vitest run` shows only the
+documented `storage.rules.test.ts` baseline failure (158/159 suites, 4488/4488 non-skipped tests pass).
+See `.planning/phases/91-config-channel-utilities/91-01-SUMMARY.md`. Next step: `/gsd-plan-phase 92`.
 
 ## ★ v2.4 ROADMAP.md phase breakdown (created 2026-08-28)
 
@@ -2737,6 +2750,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 88 P03 | 32min | 3 tasks | 8 files |
 | Phase 89 P01 | 55min | 3 tasks | 15 files |
 | Phase 89 P02 | 20min | 2 tasks | 2 files |
+| Phase 91 P01 | 25min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3176,6 +3190,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R259: multiRole flag (owner's term) replaces vocals-only exemption; evaluateGroupCombo filters multi-role roles out first, then applies Band<->Tech + cap rule to the remainder (vocalist can now also run Tech — deliberate behavior change)
 - [Phase ?]: roster.ts compat shim normalizes multiRole for every role with branch-specific defaulting (vocals-group branch defaults true, others default false), read-time only, no Firestore write migration
 - [Phase ?]: R260: propagateMultiRole is a non-recursive pass parallel to propagatePairing, gating each pulled role independently on its own withinCadence/capacity/group-compat — rarity anchoring, cadence bounds, and determinism all emerge from the existing gate with no rarity sort or scoring change.
+- [Phase ?]: 91-01: monitorConfig storage key is device-scoped (wp:runMonitorConfig:v1), deliberately unscoped by uid/org unlike stores/songs.ts's uid-scoped precedent
+- [Phase ?]: 91-01: runChannel seq is caller-owned; onState enforces a strictly-greater-than delivery guard, no self-echo filtering added
+- [Phase ?]: 91-01: serviceSlots.sortedSlotsWithIndex reproduces slideshowAssembler.ts's map-then-sort byte-for-byte so slotIndex provenance can never drift from the assembler
 
 ### Roadmap Evolution
 
@@ -3501,8 +3518,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-27T12:24:21.625Z
-Stopped at: Completed 89-02-PLAN.md
+Last session: 2026-08-28T14:27:46.487Z
+Stopped at: Completed 91-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
