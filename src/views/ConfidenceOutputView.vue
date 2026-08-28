@@ -49,7 +49,7 @@
         :interactive="false"
       />
       <span
-        v-if="nextSlide"
+        v-if="nextSlide && fontReady"
         data-testid="confidence-next-label"
         class="absolute top-2 left-3 text-sm font-medium uppercase tracking-wide text-gray-500"
       >

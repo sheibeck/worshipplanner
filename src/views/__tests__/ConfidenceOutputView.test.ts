@@ -531,6 +531,55 @@ describe('ConfidenceOutputView — pure-black loading/empty gate (R272)', () => 
     expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(false)
     expect(wrapper.text()).toBe('')
   })
+
+  // WR-01 (94-REVIEW): the RunState-arrives-BEFORE-the-font-gate race. Every other
+  // test lets fontReady resolve before emitting state, so nextSlide is only ever
+  // non-null once the panes can render. Here we hold the font gate open (a pending
+  // document.fonts.ready) and emit a mid-deck state UNDERNEATH it: index is set
+  // (current+next both non-null) while fontReady is still false. The panes are
+  // correctly hidden — and the "Next" label MUST be too, or a stray gray NEXT
+  // renders on the otherwise pure-black loading surface (the label was previously
+  // gated on `nextSlide` only). Resolving the gate then reveals label + panes.
+  it('does NOT render the "Next" label when a state arrives before the font gate resolves, then reveals it once fontReady resolves', async () => {
+    setFullscreenElement(document.createElement('div')) // hide the re-enter affordance → isolate the label
+
+    // Hold the font gate open: a pending document.fonts.ready keeps fontReady false
+    // (the FONT_LOAD_TIMEOUT_MS fallback uses real timers and never fires in-test).
+    let resolveFonts: () => void = () => {}
+    const fontsReady = new Promise<void>((resolve) => {
+      resolveFonts = resolve
+    })
+    Object.defineProperty(document, 'fonts', {
+      value: { ready: fontsReady, load: vi.fn().mockResolvedValue([]) },
+      configurable: true,
+      writable: true,
+    })
+
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises() // onMounted synchronous portion ran; fontReady still false (gate pending)
+
+    // Reproduce the race: emit a mid-deck state (current 'b', next 'c') while the
+    // gate still holds. index is set, currentSlide + nextSlide are both non-null.
+    fake.emitState(1, 1)
+    await flushPromises()
+
+    // Pure-black loading contract: both panes hidden AND the "Next" label absent.
+    expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="confidence-next-label"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
+
+    // Once the font gate resolves, the panes AND the "Next" label appear.
+    resolveFonts()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="confidence-next-label"]').exists()).toBe(true)
+    expect(
+      wrapper.find('[data-testid="confidence-current-region"] [data-testid="slide-canvas"]').text(),
+    ).toBe('b')
+    expect(
+      wrapper.find('[data-testid="confidence-next-region"] [data-testid="slide-canvas"]').text(),
+    ).toBe('c')
+  })
 })
 
 describe('ConfidenceOutputView — Screen Wake Lock (R272)', () => {
