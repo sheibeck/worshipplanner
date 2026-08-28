@@ -85,6 +85,19 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      // R270/R271/R275 — the audience output window. requiresAuth ONLY (any
+      // authenticated org member, editor or viewer; presentation-only, no
+      // editor tier — mirrors /monitor-setup and /services, NOT /settings).
+      // The org travels in the ?org= query so the window self-scopes; it is
+      // opened programmatically by Phase 95's Run/Control flow yet is also
+      // directly loadable. Placed among the static authed routes, before the
+      // trailing public dynamic slug routes, so it is never shadowed.
+      path: '/present/audience/:serviceId',
+      name: 'audience-output',
+      component: () => import('../views/AudienceOutputView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       // R177 — deliberately NOT /admins (owned by TeamView.vue, per-org roles).
       // This is the platform-level, super-admin-only console.
       path: '/owner-console',
