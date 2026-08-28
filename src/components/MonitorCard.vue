@@ -1,8 +1,8 @@
 <template>
   <div class="rounded-lg bg-gray-900 border border-gray-800 p-4">
     <!-- Row 1: label + Primary badge -->
-    <div class="flex items-center gap-2 min-w-0">
-      <h3 class="text-base font-semibold text-gray-100 truncate">{{ screen.label || 'Unlabeled display' }}</h3>
+    <div class="flex items-center gap-2">
+      <h3 class="flex-1 min-w-0 truncate text-base font-semibold text-gray-100">{{ screen.label || 'Unlabeled display' }}</h3>
       <span
         v-if="screen.isPrimary"
         class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700 shrink-0"
