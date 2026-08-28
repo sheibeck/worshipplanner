@@ -21,9 +21,9 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Monitor Configuration (standalone & persistent)
 
-- [ ] **R267**: A projectionist can open a **standalone monitor-setup screen** (its own route, separate from the Run flow) that detects the connected monitors and lets them assign **Audience** and **Confidence** roles.
-- [ ] **R268**: The monitor→role assignment is **saved and remembered per device**, so running a service is effectively one click once configured; on each Run the app re-validates the saved mapping against the live screens and only re-prompts when the physical monitor layout has actually changed.
-- [ ] **R269**: When the browser's screen-management permission is denied or unavailable, the projectionist gets a **first-class fallback** path (open the output window, drag it to the target monitor, go fullscreen) — never a dead end.
+- [x] **R267**: A projectionist can open a **standalone monitor-setup screen** (its own route, separate from the Run flow) that detects the connected monitors and lets them assign **Audience** and **Confidence** roles.
+- [x] **R268**: The monitor→role assignment is **saved and remembered per device**, so running a service is effectively one click once configured; on each Run the app re-validates the saved mapping against the live screens and only re-prompts when the physical monitor layout has actually changed.
+- [x] **R269**: When the browser's screen-management permission is denied or unavailable, the projectionist gets a **first-class fallback** path (open the output window, drag it to the target monitor, go fullscreen) — never a dead end.
 
 ### Audience Output
 
@@ -78,9 +78,9 @@ Which phase covers which requirement. Populated during roadmap creation.
 | R264 | Phase 95 | Pending |
 | R265 | Phase 95 | Pending |
 | R266 | Phase 95 | Pending |
-| R267 | Phase 92 | Pending |
-| R268 | Phase 92 | Pending |
-| R269 | Phase 92 | Pending |
+| R267 | Phase 92 | Complete |
+| R268 | Phase 92 | Complete |
+| R269 | Phase 92 | Complete |
 | R270 | Phase 93 | Pending |
 | R271 | Phase 93 | Pending |
 | R272 | Phase 94 | Pending |
@@ -89,6 +89,7 @@ Which phase covers which requirement. Populated during roadmap creation.
 | R275 | Phase 95 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 15 total (R261–R275)
 - Mapped to phases: 15/15 ✓
 - Unmapped: 0 ✓

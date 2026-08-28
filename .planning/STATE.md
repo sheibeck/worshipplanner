@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Run the Service (Live Presentation)
-current_phase: 91
+current_phase: 92
 current_phase_name: v2.4
 status: planning
-stopped_at: Completed 91-01-PLAN.md
-last_updated: "2026-08-28T14:27:46.543Z"
+stopped_at: Completed 92-01-PLAN.md
+last_updated: "2026-08-28T15:39:56.399Z"
 last_activity: 2026-08-28
-last_activity_desc: "91-01-PLAN.md executed: runChannel.ts/monitorConfig.ts/serviceSlots.ts built and unit-tested"
+last_activity_desc: "92-01-PLAN.md executed: /monitor-setup route + gated nav entry, MonitorCard/MonitorFallbackPanel, and MonitorSetupView's full A/B/B2/B3/C/D state machine with save round-trip check"
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 29
 ---
 
@@ -1014,9 +1014,27 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 91 — Config + Channel Utilities (v2.4)
+Phase: 92 — Monitor Configuration Screen (v2.4)
+Plan: 92-01 — Monitor Configuration Screen (Build) — COMPLETE; 92-02 (behavioral tests) remains
+Status: Phase 92's build plan (92-01) executed and verified; plan 92-02 (wave 2, behavioral tests) not
+yet run
+Last activity: 2026-08-28 — 92-01-PLAN.md executed: `/monitor-setup` route (`requiresAuth` only, no
+`requiresEditor` — R267/R275) + a "Monitor Setup" AppSidebar nav entry gated on `authStore.orgId`;
+`MonitorCard.vue` (label/resolution/Primary badge + accessible Audience/Confidence radiogroup) and
+`MonitorFallbackPanel.vue` (shared denied/unavailable manual-setup panel); `MonitorSetupView.vue`
+implementing the full A/B/B2/B3/C/D state machine — synchronous `getScreenDetails()` Detect handler (no
+`await` before the call, preserving user activation), the fallback panel as a first-class entry point for
+denied/unavailable (never a dead end), cross-card exclusive role assignment, and a `saveMapping()` →
+`loadMapping()` round-trip check gating a truthful green "Saved for this device" vs. a non-blocking amber
+not-persisted warning. `npm run type-check` clean; `npx vitest run` shows only the documented
+`storage.rules.test.ts` baseline failure (154/158 suites, 4090 tests passed, 26 skipped) — no regression.
+See `.planning/phases/92-monitor-configuration-screen/92-01-SUMMARY.md`. Next step: execute
+`92-02-PLAN.md` (behavioral tests for this view).
+
+### Prior: Phase 91 — Config + Channel Utilities (v2.4)
+
 Plan: 91-01 — Config + Channel Utilities — COMPLETE
-Status: Phase 91's single plan (91-01) executed and verified; ready to plan Phase 92
+Status: Phase 91's single plan (91-01) executed and verified.
 Last activity: 2026-08-28 — 91-01-PLAN.md executed: three pure, framework-free `src/utils/` modules
 built and unit-tested — `runChannel.ts` (typed BroadcastChannel `wp-run-{serviceId}` control→output
 protocol with a strictly-increasing-seq stale-drop guard, 11 tests), `monitorConfig.ts` (device-scoped
@@ -1024,7 +1042,7 @@ Audience/Confidence monitor persistence keyed on a label+resolution+position+isP
 17 tests), `serviceSlots.ts` (`sortedSlotsWithIndex`/`firstAssembledIndexBySlot`, proven against the
 real `assembleSlideshow` engine, 5 tests). `npm run type-check` clean, `npx vitest run` shows only the
 documented `storage.rules.test.ts` baseline failure (158/159 suites, 4488/4488 non-skipped tests pass).
-See `.planning/phases/91-config-channel-utilities/91-01-SUMMARY.md`. Next step: `/gsd-plan-phase 92`.
+See `.planning/phases/91-config-channel-utilities/91-01-SUMMARY.md`.
 
 ## ★ v2.4 ROADMAP.md phase breakdown (created 2026-08-28)
 
@@ -2751,6 +2769,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 89 P01 | 55min | 3 tasks | 15 files |
 | Phase 89 P02 | 20min | 2 tasks | 2 files |
 | Phase 91 P01 | 25min | 3 tasks | 6 files |
+| Phase 92 P01 | 35min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -3193,6 +3212,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 91-01: monitorConfig storage key is device-scoped (wp:runMonitorConfig:v1), deliberately unscoped by uid/org unlike stores/songs.ts's uid-scoped precedent
 - [Phase ?]: 91-01: runChannel seq is caller-owned; onState enforces a strictly-greater-than delivery guard, no self-echo filtering added
 - [Phase ?]: 91-01: serviceSlots.sortedSlotsWithIndex reproduces slideshowAssembler.ts's map-then-sort byte-for-byte so slotIndex provenance can never drift from the assembler
+- [Phase ?]: 92-01: Nav entry and route gated on authStore.orgId only (not isEditor), per R275 - any authenticated org member can reach monitor setup
 
 ### Roadmap Evolution
 
@@ -3518,8 +3538,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-28T14:27:46.487Z
-Stopped at: Completed 91-01-PLAN.md
+Last session: 2026-08-28T15:39:55.915Z
+Stopped at: Completed 92-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
