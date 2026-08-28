@@ -160,5 +160,21 @@ None - no external service configuration required. Zero new npm dependencies (al
 - FOUND: 78b63f56, f676000f, 7f1d37f0, 399f3297, 85c2ac06, 8f90b996, 3f075643 (all present in `git log --oneline --all`)
 
 ---
+
+## Post-Completion: Code Review Fix (91-REVIEW.md, 2026-08-28)
+
+`/gsd-code-review --fix` applied all 7 findings from `91-REVIEW.md` (0 critical, 4 warning, 3 info) as 7 atomic commits, keeping all three modules pure (no vue/firebase/pinia/@/stores imports — reverified after fixes).
+
+- **WR-01** (`61ecb00c`): `isRunChannelMessage`'s shape guard now requires `Number.isFinite` on both `seq` and `index`, closing the `NaN`/`Infinity` seq path that could permanently disable or permanently jam the stale-drop guard. +2 tests.
+- **WR-02** (`b8ef6fd4`): `openRunChannel` tracks a `closed` flag; `postState`/`postHello` are safe no-ops after `close()` instead of relying on the test fake's generosity (real `BroadcastChannel.postMessage()` throws `InvalidStateError` post-close). +1 test against a fake that throws on post-close postMessage.
+- **WR-03** (`a2e08848`): `resolveStorage`'s bare `localStorage` global-getter reference moved inside its own try/catch, so a browser where merely accessing the getter throws (old Safari private mode, storage-partitioned contexts) still honors the module's "never throws" guarantee. +1 test stubbing a throwing global getter.
+- **WR-04** (`2bed54c4`): `matchMapping` is now bidirectional set-equality — a live screen not present in the saved mapping (a newly plugged-in monitor) now also forces `needs-reprompt`, not just a saved screen going missing. Module doc-comment updated to state the bidirectional contract. +1 test.
+- **IN-01** (`47b6f14a`): Documented (not redesigned) that `onState`/`onHello` hold at most one callback per handle, last-registration-wins.
+- **IN-02** (`6459584b`): Added an assembler-agreement case with a real zero-slide-producing slot (empty `SONG`, no `songId`) run through the actual `assembleSlideshow`, confirming its original index survives in `sortedSlotsWithIndex` but is absent from `firstAssembledIndexBySlot`.
+- **IN-03** (`0d3502be`): Added empty-input coverage: `sortedSlotsWithIndex(makeService([]))` and `firstAssembledIndexBySlot([])`.
+
+**Verification after fixes:** `npm run type-check` (vue-tsc --build) clean. Bare `npx vitest run`: 158 files passed, 1 failed (`src/storage.rules.test.ts`, the pre-existing baseline failure — unrelated, not chased). 4496 tests passed (up from the phase's original 33 module-scoped tests to 46 across the three modules' test files, plus the rest of the suite unaffected). No new failures introduced. Purity greps re-confirmed clean on all three modules.
+
+---
 *Phase: 91-config-channel-utilities*
 *Completed: 2026-08-28*
