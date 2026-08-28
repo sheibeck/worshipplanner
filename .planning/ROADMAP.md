@@ -399,7 +399,8 @@ expected; Phase 96 re-confirms this rather than assuming it.
   1. `SlideCanvas.vue` exists as a standalone component (`slide`/`suppressBackground`/`interactive` props) that renders every slide content type the app supports — lyrics, scripture, image, video, and copyright.
   2. `PresentationViewer.vue` composes `SlideCanvas` internally at its one existing call site with no observable behavior change — its existing test suite and `data-testid` markers pass unmodified.
   3. The app's documented type-check and test-suite baseline is unchanged after the refactor (no new failures introduced).
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 90-01-PLAN.md — Extract SlideCanvas.vue (slide/suppressBackground/interactive) from PresentationViewer; compose it at the one call site with zero behavior change; add focused SlideCanvas tests
 **UI hint**: yes
 
 ### Phase 91: Config + Channel Utilities
