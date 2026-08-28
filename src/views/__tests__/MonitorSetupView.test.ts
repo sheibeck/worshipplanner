@@ -281,6 +281,52 @@ describe('MonitorSetupView — WR-03: a stale detection resolution must not over
   })
 })
 
+describe('MonitorSetupView — WR-02: a same-layout re-detect must not discard unsaved role edits', () => {
+  it('keeps in-progress "Reassign roles" selections (and shows the kept notice) when Re-detect finds the same screens', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const fpA = computeFingerprint(screens[0]!)
+    const fpB = computeFingerprint(screens[1]!)
+
+    // Seed a saved mapping that MATCHES the live screens, so detection lands
+    // on the "Your displays are set up" B2 summary.
+    saveMapping({
+      assignments: [
+        { fingerprint: fpA, role: 'audience' },
+        { fingerprint: fpB, role: 'confidence' },
+      ],
+      savedAt: Date.now(),
+    })
+
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="detect-button"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Your displays are set up')
+
+    // Expand into the editable grid and make an unsaved change: put Confidence
+    // on the monitor that was saved as Audience.
+    const reassignButton = wrapper.findAll('button').find((b) => b.text() === 'Reassign roles')
+    await reassignButton!.trigger('click')
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-confidence"]`).trigger('click')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-confidence"]`).attributes('aria-checked')).toBe('true')
+
+    // Re-detect finds the SAME physical screens — the unsaved edit must survive.
+    const redetectButton = wrapper.findAll('button').find((b) => b.text() === 'Re-detect')
+    expect(redetectButton).toBeTruthy()
+    await redetectButton!.trigger('click')
+    await flushPromises()
+
+    // The edit is preserved (not reset to the saved Audience-on-fpA mapping),
+    // the view did NOT collapse back to the read-only summary, and the
+    // non-blocking "we kept your choices" notice is shown.
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-confidence"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).attributes('aria-checked')).toBe('false')
+    expect(wrapper.text()).not.toContain('Your displays are set up')
+    expect(wrapper.find('[data-testid="refresh-kept-notice"]').exists()).toBe(true)
+  })
+})
+
 describe('MonitorSetupView — save round-trip "not persisted" warning', () => {
   it('shows the non-blocking amber not-persisted warning (not the green confirmation) when localStorage silently no-ops', async () => {
     const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]

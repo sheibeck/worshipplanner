@@ -64,7 +64,7 @@
           <button
             type="button"
             class="mt-4 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md px-4 py-2 text-sm font-medium transition-colors"
-            @click="editingFromMatched = true"
+            @click="onReassignRoles"
           >
             Reassign roles
           </button>
@@ -92,6 +92,17 @@
               Re-detect
             </button>
           </div>
+
+          <!-- WR-02: a re-detect / OS screenschange whose physical screen set
+               is unchanged must NOT silently discard the operator's unsaved
+               in-progress selections — we keep them and say so, non-blockingly. -->
+          <p
+            v-if="refreshNoticeVisible"
+            data-testid="refresh-kept-notice"
+            class="text-xs text-amber-300 mt-2"
+          >
+            Your displays look the same as before, so we kept your in-progress choices. Save when you're ready.
+          </p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
             <MonitorCard
@@ -181,6 +192,15 @@ const audienceFingerprint = ref<string | null>(null)
 const confidenceFingerprint = ref<string | null>(null)
 const saveOutcome = ref<'idle' | 'saved' | 'not-persisted-warning'>('idle')
 
+// WR-02 state: `dirtyEdits` tracks whether the operator has made unsaved
+// in-progress role selections (a fresh/reprompt selection, or a "Reassign
+// roles" edit from the matched summary). `refreshNoticeVisible` surfaces a
+// non-blocking notice when a mid-session refresh (Re-detect / OS
+// screenschange) was suppressed to protect those edits because the physical
+// screen set had not actually changed.
+const dirtyEdits = ref(false)
+const refreshNoticeVisible = ref(false)
+
 // Not reactive — a raw handle to the live ScreenDetails object for the
 // screenschange listener, removed in onUnmounted.
 let screenDetailsRef: ScreenDetailsLike | null = null
@@ -219,6 +239,19 @@ function onSelectRole(fingerprint: string, role: MonitorRole) {
     if (audienceFingerprint.value === fingerprint) audienceFingerprint.value = null
   }
   saveOutcome.value = 'idle'
+  // The operator has an unsaved edit now — a same-layout refresh must not
+  // clobber it (WR-02). Clear any prior "we kept your choices" notice too.
+  dirtyEdits.value = true
+  refreshNoticeVisible.value = false
+}
+
+// Expanding the matched B2 summary into the editable grid is itself the start
+// of an unsaved edit — mark it dirty so a same-layout Re-detect / screenschange
+// can't collapse it back to the read-only summary (WR-02).
+function onReassignRoles() {
+  editingFromMatched.value = true
+  dirtyEdits.value = true
+  refreshNoticeVisible.value = false
 }
 
 const sameMonitorSelected = computed(
@@ -262,6 +295,9 @@ function onSave() {
   const persisted = readBack !== null && assignmentSetsEqual(readBack.assignments, assignments)
   if (persisted) {
     saveOutcome.value = 'saved'
+    // The edit is now the saved baseline — no longer dirty (WR-02).
+    dirtyEdits.value = false
+    refreshNoticeVisible.value = false
     if (grantedView.value === 'reprompt') {
       grantedView.value = 'fresh'
     }
@@ -271,6 +307,12 @@ function onSave() {
 }
 
 function resolveGrantedBranch() {
+  // A full (re)resolution establishes a clean baseline from persisted state —
+  // any prior in-progress edit is intentionally being replaced here, so clear
+  // the dirty/notice flags (WR-02). Callers that must PROTECT an unsaved edit
+  // (applyDetectedScreens on a same-set refresh) skip calling this entirely.
+  dirtyEdits.value = false
+  refreshNoticeVisible.value = false
   const saved = loadMapping()
   if (!saved) {
     grantedView.value = 'fresh'
@@ -297,21 +339,56 @@ function resolveGrantedBranch() {
   saveOutcome.value = 'idle'
 }
 
-function onScreensChange() {
-  if (!screenDetailsRef) return
-  liveScreens.value = screenDetailsRef.screens
-  resolveGrantedBranch()
+// A stable, order-independent key of the physical screen SET, used to decide
+// whether a mid-session refresh actually changed the monitors (WR-02).
+function screenSetKey(screens: ScreenLike[]): string {
+  return screens.map(computeFingerprint).sort().join('|')
 }
 
-function handleDetectionSuccess(details: ScreenDetailsLike) {
+/**
+ * Applies a detected `ScreenDetails` to the view and (re)attaches the
+ * screenschange listener.
+ *
+ * `isRefresh` distinguishes a mid-session re-detect / OS screenschange (the
+ * operator is already looking at the granted grid, possibly mid-edit) from an
+ * initial detection. On a refresh whose physical screen SET is unchanged, an
+ * unconditional `resolveGrantedBranch()` would silently discard the operator's
+ * unsaved role selections (and collapse a "Reassign roles" edit back to the
+ * read-only summary) — so we keep the in-progress edit and show a non-blocking
+ * notice instead (WR-02). A genuine layout change still re-resolves, since
+ * selections made against screens that are gone are no longer valid.
+ */
+function applyDetectedScreens(details: ScreenDetailsLike, isRefresh: boolean) {
+  const previousKey = screenSetKey(liveScreens.value)
+  const nextKey = screenSetKey(details.screens)
+
   if (screenDetailsRef && screenDetailsRef !== details) {
     screenDetailsRef.removeEventListener('screenschange', onScreensChange)
   }
   screenDetailsRef = details
   details.addEventListener('screenschange', onScreensChange)
-  liveScreens.value = details.screens
   phase.value = 'granted'
+  liveScreens.value = details.screens
+
+  if (isRefresh && nextKey === previousKey && dirtyEdits.value) {
+    // Same monitors, unsaved edit in flight — protect it (WR-02).
+    refreshNoticeVisible.value = true
+    return
+  }
   resolveGrantedBranch()
+}
+
+function onScreensChange() {
+  if (!screenDetailsRef) return
+  applyDetectedScreens(screenDetailsRef, true)
+}
+
+function handleDetectionSuccess(details: ScreenDetailsLike) {
+  applyDetectedScreens(details, false)
+}
+
+function handleRefreshSuccess(details: ScreenDetailsLike) {
+  applyDetectedScreens(details, true)
 }
 
 function handleDetectionFailure() {
@@ -367,7 +444,9 @@ function onRedetect() {
   ;(window as any)
     .getScreenDetails()
     .then((details: ScreenDetailsLike) => {
-      if (requestId === detectRequestId) handleDetectionSuccess(details)
+      // Refresh path — protect any unsaved in-progress edit when the physical
+      // screen set is unchanged (WR-02).
+      if (requestId === detectRequestId) handleRefreshSuccess(details)
     })
     .catch(() => {
       if (requestId === detectRequestId) handleDetectionFailure()
