@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { sortedSlotsWithIndex, firstAssembledIndexBySlot } from '@/utils/serviceSlots'
 import { assembleSlideshow } from '@/utils/slideshowAssembler'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
-import type { Service, ServiceSlot, NonAssignableSlot, ScriptureSlot } from '@/types/service'
+import type { Service, ServiceSlot, NonAssignableSlot, ScriptureSlot, SongSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { Timestamp } from 'firebase/firestore'
 
@@ -29,6 +29,20 @@ function makePrayerSlot(overrides: Partial<NonAssignableSlot> = {}): NonAssignab
     id: overrides.id ?? 'slot-prayer',
     kind: 'PRAYER',
     position: overrides.position ?? 0,
+    ...overrides,
+  }
+}
+
+/** An EMPTY SONG slot (no songId) — guaranteed to emit zero slides through the real assembler. */
+function makeEmptySongSlot(overrides: Partial<SongSlot> = {}): SongSlot {
+  return {
+    id: overrides.id ?? 'slot-song-empty',
+    kind: 'SONG',
+    position: overrides.position ?? 0,
+    requiredVwType: 1,
+    songId: null,
+    songTitle: null,
+    songKey: null,
     ...overrides,
   }
 }
@@ -130,5 +144,26 @@ describe('assembler agreement', () => {
       const earlierMatch = slides.slice(0, firstSlideArrayIndex as number).some((s) => s.slotIndex === originalIndex)
       expect(earlierMatch).toBe(false)
     }
+  })
+
+  it('a slot that emits zero slides through the real assembler (empty SONG, no songId) keeps its original index in sortedSlotsWithIndex but is absent from firstAssembledIndexBySlot', () => {
+    const slotPrayer = makePrayerSlot({ id: 'slot-prayer', position: 10 })
+    const slotEmptySong = makeEmptySongSlot({ id: 'slot-empty-song', position: 20 }) // no songId -> assembleSlideshow emits zero slides for this slot
+    // Array order: prayer(0), emptySong(1).
+    const service = makeService([slotPrayer, slotEmptySong])
+
+    const slides = assembleSlideshow(service, emptyInputs)
+    const firstIndexBySlot = firstAssembledIndexBySlot(slides)
+    const sorted = sortedSlotsWithIndex(service)
+
+    const emptySongEntry = sorted.find((r) => r.slot.id === 'slot-empty-song')
+    expect(emptySongEntry).toBeDefined()
+    const emptySongIndex = emptySongEntry!.index
+
+    // Rendered as non-clickable in the rail: original index survives in sortedSlotsWithIndex...
+    expect(sorted.some((r) => r.index === emptySongIndex)).toBe(true)
+    // ...but is correctly omitted from the slide-jump lookup since it produced no slides.
+    expect(firstIndexBySlot.has(emptySongIndex)).toBe(false)
+    expect(slides.some((s) => s.slotIndex === emptySongIndex)).toBe(false)
   })
 })
