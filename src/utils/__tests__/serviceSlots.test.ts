@@ -65,6 +65,10 @@ describe('sortedSlotsWithIndex', () => {
 
     expect(service.slots.map((s) => s.id)).toEqual(originalOrder)
   })
+
+  it('returns an empty array for a service with no slots', () => {
+    expect(sortedSlotsWithIndex(makeService([]))).toEqual([])
+  })
 })
 
 describe('firstAssembledIndexBySlot', () => {
@@ -89,6 +93,10 @@ describe('firstAssembledIndexBySlot', () => {
     ]
     const result = firstAssembledIndexBySlot(slides)
     expect(result.has(5)).toBe(false)
+  })
+
+  it('returns an empty map for an empty slide array', () => {
+    expect(firstAssembledIndexBySlot([])).toEqual(new Map())
   })
 })
 
