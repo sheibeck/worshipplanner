@@ -17,3 +17,12 @@ wake-lock behavior over a service length), NOT a known defect.
 4. Backstop (visual): a **3+ monitor** setup wraps the card grid at `md:grid-cols-2` without layout
    breakage. (Label truncation itself IS unit-verified via `MonitorCard.test.ts`; only the 3+ grid-wrap
    remains human.)
+
+## Phase 93 — Audience Output Window (verified 2026-08-28, pass-with-deferred-human-UAT)
+
+1. **Second-monitor projection** — real full-bleed, chrome-free, cursor-free audience output *with its
+   background image* on a physical second display (Chrome/Edge).
+2. **Wake-lock endurance** — the audience display never sleeps/dims over a realistic service length
+   (60–90 min of real elapsed time).
+3. **Fullscreen-loss recovery from the booth** — the single "Re-enter fullscreen" pill is findable, and
+   clicking it actually re-enters fullscreen without tearing down the session or the other output.
