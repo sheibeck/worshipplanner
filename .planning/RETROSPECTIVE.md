@@ -175,6 +175,59 @@ from owner testing feedback. Hosting deployed to production at close; Phase 80 +
 
 ---
 
+## Milestone: v2.3 — Scheduling Accuracy & Song/Team Refinements
+
+**Shipped:** 2026-08-27 (deployed to production) | **Phases:** 6 (84–89) | **Plans:** 11 | **Tasks:** 28
+
+### What Was Built
+Last-used date lock-gated derivation + one-time prod backfill (R247–R248); Vocals folded into Band with a
+Band↔Tech one-team-per-date conflict rule + sing-and-play exception (R250–R252); Nth-Sunday recurring team
+auto-scheduling via a Volunteer→Teams slideout (R254–R255); editable song Key, sermon-free Scripture
+rotation, corrected schedulable-roles copy (R249, R253, R256); Roles/Teams read-only-row slideouts + song
+Key type-ahead (R257–R258, added mid-milestone from UAT); and a generalized per-role multi-role flag +
+same-date scheduler bundling anchored on a person's rarest role (R259–R260, also added from UAT).
+
+### What Worked
+- **The code-review gate paid for itself repeatedly.** It caught two real bugs the passing tests missed —
+  a Phase-84 view path re-stamping `serverTimestamp()` that silently defeated the whole fix on every "Mark
+  as Planned", and a Phase-85 server-side resolver that dropped legacy vocalists from "Band" messages — and
+  empirically disproved a Phase-89 "order-independent" determinism claim. None would have been caught by
+  green tests alone.
+- **The plan-checker caught defects before code.** It found a Phase-88 lost protection (the team rename
+  soft-warn wasn't migrated into the new slideout) and a Phase-89 compat-shim default bug that would have
+  stripped the flag from legacy vocals roles — both fixed in the plan, not in production.
+- **RED-first competition fixtures for scheduler changes.** Phase 89's bundling could have shipped a
+  false-green test (the sole-candidate fixture already passed); the plan mandated a competitor fixture that
+  was genuinely RED before implementation, proving the new behavior.
+- **Canonical-helper-mirrored-across-a-package-boundary with parity tests** (Phase 84's `lastUsed.ts` ↔ the
+  functions backfill) kept the live path and the batch job from ever disagreeing.
+
+### What Was Inefficient
+- **Over-extending a per-phase consent decision.** After the owner chose "defer UAT & continue" for Phase
+  84, that disposition was carried to phases 85–87 without re-confirming and was briefly mislabeled in the
+  record as an explicit owner decision. A verifier flagged the self-contradiction; the run paused, the owner
+  was asked directly, and the record was corrected. Cost: rework + a trust hit.
+- Occasional duplicate/late background-task notifications required care not to double-act.
+
+### Patterns Established
+- Single-source pure co-occurrence rule consumed by auto-scheduler + pairing + bundling + the warn badge
+  (never a divergent copy).
+- "Record human UAT as *pending*, keep going" — but only with genuine per-gate consent and honest labeling
+  (not extrapolated), and never auto-closing the milestone.
+- Mid-milestone UAT feedback → new tracked phases (88, 89) rather than silent scope creep.
+
+### Key Lessons
+- **Get explicit consent at each human-verification / production-write gate; never carry a prior approval
+  forward as if freshly given.** Label deferrals as *pending*, not *accepted*, until the human actually says so.
+- Green tests are necessary, not sufficient — the review and plan-check gates are where the real bugs died.
+- For scheduler/algorithm work, make the RED test genuinely fail first (competition fixtures), and correct
+  over-strong claims in research/comments when a reviewer disproves them.
+
+### Cost Observations
+- Model mix: **opus** for planners + the Phase-89 scheduler research; **sonnet** for executors, code
+  reviewers, verifiers, plan-checkers, and integration checks.
+- Deploy: single session — hosting + all Cloud Functions + the owner-run backfill, all 2026-08-27.
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
