@@ -163,6 +163,28 @@ describe('saveMapping / loadMapping', () => {
     saveMapping(mapping, storage)
     expect(storage.getItem(MONITOR_CONFIG_STORAGE_KEY)).not.toBeNull()
   })
+
+  it('saveMapping/loadMapping never throw (and degrade to no-op/null) when merely REFERENCING the global localStorage getter throws — no storageOverride, so resolveStorage\'s global-access branch is genuinely exercised', () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new Error('SecurityError: localStorage access blocked')
+      },
+    })
+    try {
+      const mapping: MonitorMapping = { assignments: [{ fingerprint: 'fp-1', role: 'audience' }], savedAt: 1 }
+      expect(() => saveMapping(mapping)).not.toThrow()
+      expect(() => loadMapping()).not.toThrow()
+      expect(loadMapping()).toBeNull()
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(globalThis, 'localStorage', originalDescriptor)
+      } else {
+        delete (globalThis as { localStorage?: unknown }).localStorage
+      }
+    }
+  })
 })
 
 describe('matchMapping', () => {

@@ -65,10 +65,21 @@ export function computeFingerprint(screen: ScreenLike): string {
   return `${label}:${screen.width}x${screen.height}:${screen.left},${screen.top}:${screen.isPrimary}`
 }
 
+/**
+ * The `typeof localStorage`/global-getter access is wrapped in its OWN
+ * try/catch (not just the caller's) because merely REFERENCING the
+ * `localStorage` global can itself throw in some browsers (old Safari
+ * private-mode getters, storage-partitioned/third-party contexts raising
+ * SecurityError) — a throw here must never escape, matching this module's
+ * "never throws" guarantee.
+ */
 function resolveStorage(storage?: Storage): Storage | undefined {
   if (storage) return storage
-  if (typeof localStorage !== 'undefined') return localStorage
-  return undefined
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function isValidMapping(value: unknown): value is MonitorMapping {
