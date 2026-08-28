@@ -12,7 +12,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Run Entry & Control Screen
 
-- [ ] **R261**: A projectionist can start running a **locked** service via a **Run** button that opens a dedicated standalone Run/control screen (not the service editor); the button is absent/disabled on draft services.
+- [x] **R261**: A projectionist can start running a **locked** service via a **Run** button that opens a dedicated standalone Run/control screen (not the service editor); the button is absent/disabled on draft services.
 - [ ] **R262**: On the Run/control screen, the projectionist sees the **order of service** as a list with the item containing the current slide clearly highlighted as "you are here."
 - [ ] **R263**: The projectionist can **click an order-of-service item to jump** the live output to that item's first slide.
 - [ ] **R264**: The Run/control screen shows a **large current-slide preview** (what the audience sees) alongside a smaller **next-slide** preview.
@@ -41,7 +41,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Authorization
 
-- [ ] **R275**: **Any authenticated member** of the service's organization (editor **or** viewer) can Run a locked service; running is presentation-only and requires no new RBAC role tier and no ability to edit the plan.
+- [x] **R275**: **Any authenticated member** of the service's organization (editor **or** viewer) can Run a locked service; running is presentation-only and requires no new RBAC role tier and no ability to edit the plan.
 
 ## Future Requirements
 
@@ -72,7 +72,7 @@ Which phase covers which requirement. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R261 | Phase 95 | Pending |
+| R261 | Phase 95 | Complete |
 | R262 | Phase 95 | Pending |
 | R263 | Phase 95 | Pending |
 | R264 | Phase 95 | Pending |
@@ -86,7 +86,7 @@ Which phase covers which requirement. Populated during roadmap creation.
 | R272 | Phase 94 | Complete |
 | R273 | Phase 96 | Pending |
 | R274 | Phase 96 | Pending |
-| R275 | Phase 95 | Pending |
+| R275 | Phase 95 | Complete |
 
 **Coverage:**
 
