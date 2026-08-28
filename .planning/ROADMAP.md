@@ -419,7 +419,8 @@ expected; Phase 96 re-confirms this rather than assuming it.
   2. A monitor-config module computes a stable per-screen fingerprint (label + resolution + position) and persists/retrieves an Audience/Confidence role mapping from `localStorage`, keyed per device.
   3. A service-slots module resolves `slotIndex` ↔ first-assembled-slide-index consistently with the existing `slideshowAssembler.ts`, unit-tested in isolation.
 
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 91-01-PLAN.md — runChannel.ts (typed BroadcastChannel protocol) + monitorConfig.ts (device-scoped fingerprint/localStorage mapping) + serviceSlots.ts (slotIndex↔first-slide lookup), each framework-free unit-tested
 
 ### Phase 92: Monitor Configuration Screen
 
