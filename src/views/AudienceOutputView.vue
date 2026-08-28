@@ -201,9 +201,22 @@ function handleVisibilityChange() {
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {
-  // Service subscription — gated on a concrete orgId, idempotent per the store.
+  // Service subscription — key the service source off the SAME resolved orgId
+  // useSlideshowAssembly subscribes content to, not off "is the store fresh?".
+  //
+  // WR-02 (93-REVIEW): the old `!serviceStore.orgId` gate assumed a fresh Pinia
+  // singleton (the standalone window.open path). But this is also a directly-
+  // loadable SPA route: on a same-tab navigation where the store is ALREADY
+  // subscribed to org X while this URL's `?org=` is Y, that gate skipped the
+  // re-subscribe, leaving `services` sourced from X while the assembly reads Y —
+  // a silent cross-org desync on the congregation surface (never-found service →
+  // permanent black, or an X service assembled against Y's content maps). Gate on
+  // an org MISMATCH instead: subscribe() is idempotent (it tears down the prior
+  // listener first), so re-subscribing when the requested org differs re-keys the
+  // service source to `orgIdRef` and eliminates the bleed. Skipping when the org
+  // already matches preserves the existing subscription (no redundant re-listen).
   const orgId = orgIdRef.value
-  if (orgId && !serviceStore.orgId) {
+  if (orgId && serviceStore.orgId !== orgId) {
     serviceStore.subscribe(orgId)
   }
 
