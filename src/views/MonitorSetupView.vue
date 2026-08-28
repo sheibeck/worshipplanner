@@ -153,6 +153,17 @@ import {
 type Phase = 'prompt' | 'detecting' | 'denied' | 'unavailable' | 'granted'
 type GrantedView = 'fresh' | 'matched' | 'reprompt'
 
+/**
+ * Precise structural shape of the live `ScreenDetails` object (REVIEW-FIX
+ * IN-04): replaces the bare `Function` type, which erased call-signature
+ * checking entirely (any callable of any arity would type-check).
+ */
+interface ScreenDetailsLike {
+  screens: ScreenLike[]
+  addEventListener: (type: 'screenschange', listener: () => void) => void
+  removeEventListener: (type: 'screenschange', listener: () => void) => void
+}
+
 const phase = ref<Phase>('prompt')
 const grantedView = ref<GrantedView>('fresh')
 // B2's "already configured" summary expanded in place into the editable grid
@@ -167,7 +178,7 @@ const saveOutcome = ref<'idle' | 'saved' | 'not-persisted-warning'>('idle')
 
 // Not reactive — a raw handle to the live ScreenDetails object for the
 // screenschange listener, removed in onUnmounted.
-let screenDetailsRef: { screens: ScreenLike[]; removeEventListener: Function } | null = null
+let screenDetailsRef: ScreenDetailsLike | null = null
 
 const screensWithFingerprint = computed(() =>
   liveScreens.value.map((screen) => ({ screen, fingerprint: computeFingerprint(screen) })),
@@ -279,7 +290,7 @@ function onScreensChange() {
   resolveGrantedBranch()
 }
 
-function handleDetectionSuccess(details: { screens: ScreenLike[]; addEventListener: Function; removeEventListener: Function }) {
+function handleDetectionSuccess(details: ScreenDetailsLike) {
   if (screenDetailsRef && screenDetailsRef !== details) {
     screenDetailsRef.removeEventListener('screenschange', onScreensChange)
   }
