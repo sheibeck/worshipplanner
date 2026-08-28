@@ -471,11 +471,11 @@ expected; Phase 96 re-confirms this rather than assuming it.
   2. Every slide on the confidence output renders against a plain black background — the actual background image is never shown. (R272)
   3. No operator chrome (arrows, slide counts, organizational labels) is visible on the confidence output.
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 - [x] 94-01-PLAN.md — Extract shared useOutputWindow composable + refactor AudienceOutputView (keep 18 Phase 93 tests green)
 - [x] 94-02-PLAN.md — ConfidenceOutputView (current+next two-pane, both backgrounds suppressed to black) + /present/confidence route
-- [ ] 94-03-PLAN.md — ConfidenceOutputView tests + direct useOutputWindow unit test
+- [x] 94-03-PLAN.md — ConfidenceOutputView tests + direct useOutputWindow unit test
 
 **UI hint**: yes
 
