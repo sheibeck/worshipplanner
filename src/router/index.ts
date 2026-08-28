@@ -98,6 +98,21 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      // R272/R275 — the confidence (stage) output window for the worship band.
+      // Sibling of /present/audience: requiresAuth ONLY (any authenticated org
+      // member, editor or viewer; presentation-only, no editor tier — mirrors
+      // /monitor-setup and /services, NOT /settings). The org travels in the
+      // ?org= query so the window self-bootstraps and self-scopes; it is opened
+      // programmatically by Phase 95's Run/Control flow yet is also directly
+      // loadable. Both output panes suppress their backgrounds to plain black.
+      // Placed among the static authed routes, before the trailing public
+      // dynamic slug routes, so it is never shadowed.
+      path: '/present/confidence/:serviceId',
+      name: 'confidence-output',
+      component: () => import('../views/ConfidenceOutputView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       // R177 — deliberately NOT /admins (owned by TeamView.vue, per-org roles).
       // This is the platform-level, super-admin-only console.
       path: '/owner-console',
