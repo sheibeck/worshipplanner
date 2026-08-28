@@ -210,4 +210,23 @@ describe('matchMapping', () => {
     const result = matchMapping(saved, liveScreens)
     expect(result.status).toBe('needs-reprompt')
   })
+
+  it('returns needs-reprompt when a NEW live screen not present in the saved mapping is plugged in (a genuinely added monitor)', () => {
+    const saved: MonitorMapping = {
+      assignments: [
+        { fingerprint: computeFingerprint(makeScreen({ label: 'A' })), role: 'audience' },
+        { fingerprint: computeFingerprint(makeScreen({ label: 'B', left: 1920 })), role: 'confidence' },
+      ],
+      savedAt: 1,
+    }
+    // Both previously-saved screens are still live (subset check alone would say
+    // "matched"), PLUS a genuinely new third screen the mapping knows nothing about.
+    const liveScreens = [
+      makeScreen({ label: 'A' }),
+      makeScreen({ label: 'B', left: 1920 }),
+      makeScreen({ label: 'C', left: 3840, isPrimary: false }),
+    ]
+    const result = matchMapping(saved, liveScreens)
+    expect(result.status).toBe('needs-reprompt')
+  })
 })

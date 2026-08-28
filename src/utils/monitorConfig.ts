@@ -17,6 +17,12 @@
 // The module never calls the Window Management API itself (no
 // `getScreenDetails()`) — screens are always passed in by the caller, keeping
 // this pure and testable with plain object fixtures.
+//
+// `matchMapping`'s saved-vs-live comparison is BIDIRECTIONAL set-equality
+// (WR-04, 91-REVIEW.md), not a one-way "every saved fingerprint is still
+// live" subset check: a screen removed since the mapping was saved AND a
+// screen newly added since are both genuine layout changes and both force
+// `needs-reprompt` (R268 / PITFALLS Pitfall 2).
 
 /** Minimal structural shape this module needs from a live screen object. */
 export interface ScreenLike {
@@ -131,12 +137,19 @@ export function loadMapping(storageOverride?: Storage): MonitorMapping | null {
 /**
  * Decides whether a saved mapping can be silently reused against the CURRENT
  * live screens, or whether a genuine layout change requires re-prompting
- * (R268). Matched only when EVERY saved fingerprint is found among the live
- * screens' fingerprints. Does not open windows or prompt itself — the caller
- * owns that.
+ * (R268). The contract is BIDIRECTIONAL set-equality between saved and live
+ * fingerprints, not a one-way subset check: matched only when EVERY saved
+ * fingerprint is found among the live screens' fingerprints, AND EVERY live
+ * screen's fingerprint is found among the saved fingerprints. A screen
+ * unplugged since the mapping was saved (saved fingerprint missing from
+ * live) and a screen newly plugged in since (live fingerprint absent from
+ * saved) are both genuine layout changes and both force `needs-reprompt`.
+ * Does not open windows or prompt itself — the caller owns that.
  */
 export function matchMapping(savedMapping: MonitorMapping, liveScreens: ScreenLike[]): MatchResult {
   const liveFingerprints = new Set(liveScreens.map((screen) => computeFingerprint(screen)))
-  const allFound = savedMapping.assignments.every((assignment) => liveFingerprints.has(assignment.fingerprint))
-  return allFound ? { status: 'matched' } : { status: 'needs-reprompt' }
+  const savedFingerprints = new Set(savedMapping.assignments.map((assignment) => assignment.fingerprint))
+  const allSavedFound = savedMapping.assignments.every((assignment) => liveFingerprints.has(assignment.fingerprint))
+  const allLiveKnown = liveScreens.every((screen) => savedFingerprints.has(computeFingerprint(screen)))
+  return allSavedFound && allLiveKnown ? { status: 'matched' } : { status: 'needs-reprompt' }
 }
