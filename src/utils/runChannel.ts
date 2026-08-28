@@ -83,7 +83,13 @@ function isRunChannelMessage(value: unknown): value is RunChannelMessage {
   if (type === 'hello') return true
   if (type === 'state') {
     const v = value as { index?: unknown; blackout?: unknown; seq?: unknown }
-    return typeof v.index === 'number' && typeof v.blackout === 'boolean' && typeof v.seq === 'number'
+    return (
+      typeof v.index === 'number' &&
+      Number.isFinite(v.index) &&
+      typeof v.blackout === 'boolean' &&
+      typeof v.seq === 'number' &&
+      Number.isFinite(v.seq)
+    )
   }
   return false
 }

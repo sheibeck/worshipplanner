@@ -190,6 +190,42 @@ describe('openRunChannel', () => {
     output.close()
   })
 
+  it('ignores a state message with seq: NaN — never delivered, never corrupts the stale-drop high-water mark', () => {
+    const factory = makeFakeChannelFactory()
+    const control = openRunChannel('svc-1', factory)
+    const output = openRunChannel('svc-1', factory)
+
+    const delivered: number[] = []
+    output.onState((state) => delivered.push(state.seq))
+
+    control.postState({ index: 0, blackout: false, seq: 1 })
+    control.postState({ index: 1, blackout: false, seq: NaN }) // malformed — dropped by shape guard
+    control.postState({ index: 2, blackout: false, seq: 2 }) // must still deliver — high-water mark not corrupted
+
+    expect(delivered).toEqual([1, 2])
+
+    control.close()
+    output.close()
+  })
+
+  it('ignores a state message with seq: Infinity — never delivered, never permanently blocks later legitimate messages', () => {
+    const factory = makeFakeChannelFactory()
+    const control = openRunChannel('svc-1', factory)
+    const output = openRunChannel('svc-1', factory)
+
+    const delivered: number[] = []
+    output.onState((state) => delivered.push(state.seq))
+
+    control.postState({ index: 0, blackout: false, seq: 1 })
+    control.postState({ index: 1, blackout: false, seq: Infinity }) // malformed — dropped by shape guard
+    control.postState({ index: 2, blackout: false, seq: 2 }) // must still deliver — high-water mark not corrupted
+
+    expect(delivered).toEqual([1, 2])
+
+    control.close()
+    output.close()
+  })
+
   it('defaults to the global BroadcastChannel constructor when no factory is supplied', () => {
     class StubBroadcastChannel {
       name: string
