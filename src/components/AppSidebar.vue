@@ -122,6 +122,21 @@ const navItems = computed(() => {
     })
   }
 
+  // R267/R275 — deliberately gated on authStore.orgId ONLY, matching the
+  // Services item above, NOT authStore.isEditor like the adjacent Group C
+  // Settings item below. Monitor setup is a device config screen reachable
+  // by any authenticated org member (editor or viewer) — do not tighten this
+  // to isEditor.
+  if (authStore.orgId) {
+    items.push({
+      label: 'Monitor Setup',
+      to: '/monitor-setup',
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-6l1 3h1a1 1 0 010 2H9a1 1 0 010-2h1l1-3H5a2 2 0 01-2-2V5z" />
+      </svg>`,
+    })
+  }
+
   if (authStore.isEditor) {
     items.push({
       label: 'Songs',

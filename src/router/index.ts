@@ -76,6 +76,15 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresEditor: true },
     },
     {
+      // R267/R275 — deliberately requiresAuth ONLY, mirroring /services, NOT
+      // /settings' requiresEditor: true. Any authenticated org member
+      // (editor or viewer) may reach the monitor setup screen.
+      path: '/monitor-setup',
+      name: 'monitor-setup',
+      component: () => import('../views/MonitorSetupView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       // R177 — deliberately NOT /admins (owned by TeamView.vue, per-org roles).
       // This is the platform-level, super-admin-only console.
       path: '/owner-console',
