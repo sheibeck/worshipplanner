@@ -435,10 +435,10 @@ expected; Phase 96 re-confirms this rather than assuming it.
   3. Returning later to Run a service, the saved mapping is reused silently without re-prompting — the app only re-prompts when the physical monitor layout has actually changed. (R268)
   4. When screen-management permission is denied or the API is unavailable, the projectionist is guided through a working manual path (open the output window, drag it to the target monitor, go fullscreen) rather than hitting a dead end. (R269)
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 - [x] 92-01-PLAN.md — Build + wire the Monitor Setup screen (route, gated nav entry, MonitorSetupView + MonitorCard + MonitorFallbackPanel; state machine, synchronous detection, device-scoped persistence with save round-trip check)
-- [ ] 92-02-PLAN.md — Behavioral tests: three permission paths, persistence round-trip / matched reuse / changed-layout reprompt, save-warning, synchronous-call contract, and the orgId-gated nav entry
+- [x] 92-02-PLAN.md — Behavioral tests: three permission paths, persistence round-trip / matched reuse / changed-layout reprompt, save-warning, synchronous-call contract, and the orgId-gated nav entry
 
 **UI hint**: yes
 

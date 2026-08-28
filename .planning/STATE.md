@@ -5,10 +5,10 @@ milestone_name: Run the Service (Live Presentation)
 current_phase: 92
 current_phase_name: v2.4
 status: planning
-stopped_at: Completed 92-01-PLAN.md
-last_updated: "2026-08-28T15:39:56.399Z"
+stopped_at: Completed 92-02-PLAN.md (Phase 92 complete)
+last_updated: "2026-08-28T15:53:53.644Z"
 last_activity: 2026-08-28
-last_activity_desc: "92-01-PLAN.md executed: /monitor-setup route + gated nav entry, MonitorCard/MonitorFallbackPanel, and MonitorSetupView's full A/B/B2/B3/C/D state machine with save round-trip check"
+last_activity_desc: "92-01-PLAN.md executed: `/monitor-setup` route (`requiresAuth` only, no"
 progress:
   total_phases: 7
   completed_phases: 2
@@ -2770,6 +2770,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 89 P02 | 20min | 2 tasks | 2 files |
 | Phase 91 P01 | 25min | 3 tasks | 6 files |
 | Phase 92 P01 | 35min | 3 tasks | 5 files |
+| Phase 92 P02 | ~20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3213,6 +3214,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 91-01: runChannel seq is caller-owned; onState enforces a strictly-greater-than delivery guard, no self-echo filtering added
 - [Phase ?]: 91-01: serviceSlots.sortedSlotsWithIndex reproduces slideshowAssembler.ts's map-then-sort byte-for-byte so slotIndex provenance can never drift from the assembler
 - [Phase ?]: 92-01: Nav entry and route gated on authStore.orgId only (not isEditor), per R275 - any authenticated org member can reach monitor setup
+- [Phase ?]: Phase 92 nav entry gated on authStore.orgId only (not isEditor) per R267/R275 — proven by AppSidebar.test.ts
 
 ### Roadmap Evolution
 
@@ -3538,8 +3540,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-28T15:39:55.915Z
-Stopped at: Completed 92-01-PLAN.md
+Last session: 2026-08-28T15:53:53.590Z
+Stopped at: Completed 92-02-PLAN.md (Phase 92 complete)
 Resume file: None
 
 ## Operator Next Steps
