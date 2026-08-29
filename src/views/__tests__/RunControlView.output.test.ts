@@ -755,7 +755,14 @@ describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-1
     const banner = wrapper.find('[data-testid="run-reassign-banner"]')
     expect(banner.exists()).toBe(true)
     expect(banner.text()).toContain('Your monitor setup changed')
-    expect(banner.find('a[data-to="/monitor-setup"]').exists()).toBe(true)
+    // WR-01: the PRIMARY action is an in-place reopen (place-preserving), and the
+    // monitor-setup affordance opens in a NEW TAB (target=_blank) so the running
+    // control is not torn down — no more same-tab <router-link> navigation.
+    expect(banner.find('[data-testid="run-reassign-reopen"]').exists()).toBe(true)
+    const setupLink = banner.find('[data-testid="run-reassign-setup-link"]')
+    expect(setupLink.exists()).toBe(true)
+    expect(setupLink.attributes('href')).toBe('/monitor-setup')
+    expect(setupLink.attributes('target')).toBe('_blank')
   })
 
   it('a still-matching screenschange (benign refresh) raises NO run-reassign-banner (no false alarm)', async () => {
@@ -770,6 +777,57 @@ describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-1
     await flushPromises()
 
     expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(false)
+  })
+
+  it('the IN-PLACE reassign reopen re-opens the affected role WITHOUT unmounting the control and WITHOUT losing index (WR-01; R274)', async () => {
+    seedMatchingMapping()
+    const { control } = installGetScreenDetails([screenA, screenB])
+    const { wrapper, fake } = mountView()
+
+    await goLive(wrapper)
+
+    // Navigate to a non-zero index (0 → 1 → 2) so a lost session would show.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    await flushPromises()
+    const before = fake.posted.filter((m) => m.type === 'state')
+    const preChangeIndex = before[before.length - 1]!.index
+    expect(preChangeIndex).toBe(2)
+
+    // Unplug the CONFIDENCE monitor (screenB gone) → needs-reprompt → banner up,
+    // with the confidence role named as the one that lost its screen.
+    control.setScreens([screenA])
+    control.fireScreensChange()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(true)
+
+    const callsBefore = openSpy.mock.calls.length
+    // Click the PRIMARY in-place reopen — re-resolves confidence against the
+    // CURRENT screens (gone → un-positioned honest fallback) and reopens it.
+    await wrapper.find('[data-testid="run-reassign-reopen"]').trigger('click')
+    await flushPromises()
+
+    // Exactly one reopen for the affected (confidence) role, un-positioned since
+    // its saved monitor is gone — NOT a control-destroying navigation.
+    expect(openSpy.mock.calls.length).toBe(callsBefore + 1)
+    expect(openSpy).toHaveBeenLastCalledWith(CONFIDENCE_URL, 'wp-confidence', '')
+
+    // The control is STILL mounted (its top-bar heading still renders) and the
+    // channel was NOT closed — the running session survived the recovery.
+    expect(wrapper.find('[data-testid="run-service-name"]').exists()).toBe(true)
+    expect(fake.close).not.toHaveBeenCalled()
+    // Banner dismissed now that the reopen ran.
+    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(false)
+
+    // The reopened output announces itself → onHello(resendCurrent) resends the
+    // CURRENT index; position is restored by the handshake, nothing persisted.
+    fake.deliver({ type: 'hello' })
+    await flushPromises()
+
+    const after = fake.posted.filter((m) => m.type === 'state')
+    const lastState = after[after.length - 1]!
+    expect(lastState.index).toBe(2)
+    expect(lastState.index).toBe(preChangeIndex)
   })
 })
 
@@ -801,6 +859,11 @@ describe('RunControlView output — closed-vs-unplug precedence (R274)', () => {
     // The reopen chip is gated on !monitorChanged → suppressed until reassignment.
     expect(wrapper.find('[data-testid="run-reopen-audience"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(false)
+    // WR-02: under close+unplug precedence the closed audience line must NOT fall
+    // through to the GREEN "ready" label — a closed window is never rendered green.
+    expect(wrapper.find('[data-testid="run-output-ready-audience"]').exists()).toBe(false)
+    // Instead it shows the muted amber "reassign displays" indicator (no chip).
+    expect(wrapper.find('[data-testid="run-output-closed-audience-muted"]').exists()).toBe(true)
   })
 })
 

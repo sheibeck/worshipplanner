@@ -73,8 +73,13 @@
             <span class="h-2 w-2 flex-none rounded-full bg-green-400" aria-hidden="true"></span>
             Displays ready
           </span>
-          <!-- AUDIENCE line: amber closed-recovery row when the window was closed
-               (and no monitor change is pending — precedence), else green label. -->
+          <!-- AUDIENCE line (WR-02 honesty): the GREEN "ready" label is gated on
+               !audienceClosed INDEPENDENT of monitorChanged — a closed window is
+               NEVER rendered green. Three branches:
+                 1. closed & no reassign → amber closed-recovery row + reopen chip
+                 2. closed & reassign up → muted amber "closed" indicator, NO chip
+                    (the reassign banner is the senior action — precedence)
+                 3. open → green ready label. -->
           <div v-if="audienceClosed && !monitorChanged" class="flex flex-col items-end gap-0.5">
             <span
               data-testid="run-output-closed-audience"
@@ -96,8 +101,19 @@
               You won't lose your place — reopening returns to the current slide.
             </span>
           </div>
-          <span v-else class="text-xs text-gray-400">Audience → {{ readyAudienceLabel }}</span>
-          <!-- CONFIDENCE line: mirror of the audience closed-recovery row. -->
+          <span
+            v-else-if="audienceClosed"
+            data-testid="run-output-closed-audience-muted"
+            class="inline-flex items-center gap-2 text-xs text-amber-200/80"
+          >
+            <span class="h-2 w-2 flex-none rounded-full bg-amber-400" aria-hidden="true"></span>
+            Audience → reassign displays to reopen
+          </span>
+          <span v-else data-testid="run-output-ready-audience" class="text-xs text-gray-400">
+            Audience → {{ readyAudienceLabel }}
+          </span>
+          <!-- CONFIDENCE line: mirror of the audience closed-recovery row, with
+               the same WR-02 honesty gating (green ready ONLY when !confidenceClosed). -->
           <div v-if="confidenceClosed && !monitorChanged" class="flex flex-col items-end gap-0.5">
             <span
               data-testid="run-output-closed-confidence"
@@ -119,7 +135,17 @@
               You won't lose your place — reopening returns to the current slide.
             </span>
           </div>
-          <span v-else class="text-xs text-gray-400">Confidence → {{ readyConfidenceLabel }}</span>
+          <span
+            v-else-if="confidenceClosed"
+            data-testid="run-output-closed-confidence-muted"
+            class="inline-flex items-center gap-2 text-xs text-amber-200/80"
+          >
+            <span class="h-2 w-2 flex-none rounded-full bg-amber-400" aria-hidden="true"></span>
+            Confidence → reassign displays to reopen
+          </span>
+          <span v-else data-testid="run-output-ready-confidence" class="text-xs text-gray-400">
+            Confidence → {{ readyConfidenceLabel }}
+          </span>
         </div>
 
         <!-- BLOCKED: compact honest indicator + retry; detail in the banner below. -->
@@ -203,13 +229,43 @@
       </svg>
       <div class="min-w-0 flex-1">
         <p class="font-medium">Your monitor setup changed</p>
+        <!-- WR-01 HONESTY: only the IN-PLACE reopen below preserves your slide.
+             The banner promises place-preservation for THAT action only — it does
+             NOT claim a same-tab monitor-setup round-trip keeps your place (that
+             would unmount the control and desync the still-open outputs). -->
         <p class="mt-1 text-sm">
           A display was unplugged or rearranged, so we can't place the {{ reassignRole }} output on its old
-          screen. Your place in the service is safe — reassign your displays to keep going.
+          screen. Your service is still live — reopen the {{ reassignRole }} display below to keep going
+          without losing your place.
         </p>
-        <router-link to="/monitor-setup" class="mt-2 inline-block text-amber-200 underline">
-          Open monitor setup
-        </router-link>
+        <div class="mt-2 flex flex-wrap items-center gap-3">
+          <!-- PRIMARY (place-preserving): re-resolve the affected role against the
+               CURRENT live screens and reopen it IN PLACE. The control never
+               unmounts; the reopened output re-syncs to the current slide via its
+               hello → resendCurrent handshake. If the monitor is truly gone the
+               output opens un-positioned (honest fallback) — still no lost session. -->
+          <button
+            type="button"
+            data-testid="run-reassign-reopen"
+            :aria-label="`Reopen and replace the ${reassignRole} display on the current screen`"
+            class="min-h-11 rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            @click="reopenReassignedOutputs"
+          >
+            Reopen &amp; replace {{ reassignRole }}
+          </button>
+          <!-- SECONDARY: monitor setup in a NEW TAB (target=_blank) so the running
+               control — its index/seq/channel + the open outputs — stays alive. A
+               same-tab navigation would tear the live session down. -->
+          <a
+            href="/monitor-setup"
+            target="_blank"
+            rel="noopener"
+            data-testid="run-reassign-setup-link"
+            class="text-amber-200 underline"
+          >
+            Open monitor setup in a new tab
+          </a>
+        </div>
       </div>
     </div>
 
@@ -797,6 +853,11 @@ function startClosedPoll() {
  * returns to the exact current slide; index.value is never touched here.
  */
 function reopenOutput(role: MonitorRole) {
+  // IN-03: defense-in-parity with openOutputs' async guard — never open a window
+  // outside a live session. reopenOutput is synchronous and today only reachable
+  // from a button rendered while placed+mounted, so this cannot fire post-exit in
+  // production, but the early-return keeps it honest against a future refactor.
+  if (isUnmounted) return
   const name = role === 'audience' ? 'wp-audience' : 'wp-confidence'
   const url = role === 'audience' ? audienceUrl() : confidenceUrl()
   const saved = loadMapping()
@@ -805,6 +866,32 @@ function reopenOutput(role: MonitorRole) {
   if (!win) return
   if (role === 'audience') audienceClosed.value = false
   else confidenceClosed.value = false
+}
+
+/**
+ * IN-PLACE reassign recovery (R274 / WR-01) — the reassign banner's PRIMARY
+ * action. Reopens the affected output role(s) against the CURRENT (post-change)
+ * live screens WITHOUT unmounting the control, reusing the reopenOutput →
+ * resolveScreen → openWindow path. Position is NOT persisted here: each reopened
+ * output announces itself with a hello → onHello(resendCurrent) resends the
+ * CURRENT index, so it returns to the exact live slide. If a monitor is truly
+ * gone resolveScreen yields null and the output opens un-positioned (honest
+ * fallback) — either way the running session (index/seq/channel + the other open
+ * output) survives, unlike the old same-tab /monitor-setup navigation that tore
+ * it all down. monitorChanged is cleared only AFTER the reopen has run so the
+ * banner dismisses on a real recovery action; if the reopen is refused the ~1s
+ * closed-poll re-surfaces the honest amber closed row.
+ */
+function reopenReassignedOutputs() {
+  if (reassignRole.value === 'audience') {
+    reopenOutput('audience')
+  } else if (reassignRole.value === 'confidence') {
+    reopenOutput('confidence')
+  } else {
+    reopenOutput('audience')
+    reopenOutput('confidence')
+  }
+  monitorChanged.value = false
 }
 
 /**
