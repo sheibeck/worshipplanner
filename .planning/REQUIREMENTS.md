@@ -87,9 +87,9 @@ Which phase covers which requirement. Populated during roadmap creation.
 | R273 | Phase 96 | Complete |
 | R274 | Phase 96 | Complete |
 | R275 | Phase 95 | Complete |
-| R285 | Phase 98 | Planned |
-| R286 | Phase 98 | Planned |
-| R287 | Phase 98 | Planned |
+| R285 | Phase 98 | Complete |
+| R286 | Phase 98 | Complete |
+| R287 | Phase 98 | Complete |
 
 **Coverage:**
 

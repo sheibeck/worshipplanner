@@ -5,16 +5,16 @@ milestone_name: Run the Service (Live Presentation)
 current_phase: 98
 current_phase_name: fullscreen-setup-helper
 status: in-progress
-stopped_at: Completed 98-01-PLAN.md
-last_updated: "2026-08-29T22:00:33.737Z"
+stopped_at: Completed 98-02-PLAN.md
+last_updated: "2026-08-29T22:19:11.364Z"
 last_activity: 2026-08-29
-last_activity_desc: "98-01-PLAN.md executed: pure logic layer for the Automatic Fullscreen setup"
+last_activity_desc: "98-02-PLAN.md executed: `src/components/FullscreenSetupPanel.vue` (the"
 progress:
   total_phases: 9
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 29
-  completed_plans: 27
-  percent: 78
+  completed_plans: 28
+  percent: 89
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -1015,19 +1015,24 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 98 — Fullscreen Setup Helper (v2.4)
-Plan: 98-01 — Fullscreen Setup Helper (Pure Logic Layer) — COMPLETE; 98-02 (UI panel, Wave 2) remains
-Status: Phase 98's pure-logic plan (98-01) executed and verified; plan 98-02 (UI panel consuming this
-layer) not yet planned/run
-Last activity: 2026-08-29 — 98-01-PLAN.md executed: `src/utils/osDetect.ts` (OS/browser detection with
-UA-string fallback), `src/utils/fullscreenPolicyFiles.ts` (origin-baked Windows `.reg` HKCU+HKLM, macOS
-`.mobileconfig`, Linux managed JSON generators + `buildPolicyArtifact` dispatcher), `src/utils/downloadTextFile.ts`
-(Blob + `<a download>` helper), and `src/composables/useFullscreenReadiness.ts` (read-only three-state
-readiness composable reusing `useOutputWindow.ts`'s exact `{name:'fullscreen',allowWithoutGesture:true}`
-descriptor, never calling `requestFullscreen`, self-correcting on window focus). 41 new unit tests green;
-`npm run type-check` clean; `npx vitest run` shows only the documented `src/storage.rules.test.ts` baseline
-failure — no regression. `useOutputWindow.ts`/`useRunControl.ts` untouched (regression guard confirmed via
-`git diff --stat`). See `.planning/phases/98-fullscreen-setup-helper/98-01-SUMMARY.md`. Next step: plan
-`98-02` (the Monitor Setup UI panel consuming this pure logic layer).
+Plan: 98-01 — Fullscreen Setup Helper (Pure Logic Layer) — COMPLETE; 98-02 (UI panel, Wave 2) — COMPLETE
+Status: Both of Phase 98's plans executed and verified. Phase 98 (and this milestone's Phase 90-98 roadmap)
+is feature-complete pending the owner's hardware UAT walkthrough (see 98-02-SUMMARY.md's coverage item D5) —
+milestone stays OPEN, not archived, per the standing "no auto-close without consent" policy.
+Last activity: 2026-08-29 — 98-02-PLAN.md executed: `src/components/FullscreenSetupPanel.vue` (the
+four-state checking/ready/not-ready/unsupported UI over 98-01's readiness composable — per-OS origin-baked
+download with HKCU default + HKLM admin link on Windows, honest per-OS friction copy, a red download-error
+line, and a self-correcting "Confirm fullscreen support" button that flips not-ready to ready on the same
+mounted wrapper with no reload) mounted unconditionally at the bottom of `src/views/MonitorSetupView.vue`,
+outside the existing phase v-if/else chain (present in every phase, since the `fullscreen` permission this
+panel manages is distinct from the `window-management` permission the rest of the screen gates on). 28 new
+component + view tests green; `npm run type-check` clean; bare `npx vitest run` shows only the documented
+`src/storage.rules.test.ts` baseline failure (174/175 files, 4733/4758 tests) — no regression. Regression
+guard (`useOutputWindow.test.ts`, 21 tests) green; `useOutputWindow.ts`/`useRunControl.ts` confirmed
+untouched via `git diff --stat` (no `useRunControl.test.ts` file exists in this repo). See
+`.planning/phases/98-fullscreen-setup-helper/98-02-SUMMARY.md`. Next step: the owner's real-hardware UAT
+walkthrough (download the setup file, run it, fully restart the browser, click Confirm, confirm it flips
+to ready) — not an in-plan gate, tracked as this milestone's one remaining live open item.
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
@@ -2810,6 +2815,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 97 P09 | 12min | 3 tasks | 2 files |
 | Phase 97 P10 | 15m | 2 tasks | 2 files |
 | Phase 98 P01 | 18min | 3 tasks | 8 files |
+| Phase 98 P02 | 22min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3264,6 +3270,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R284: ServiceCard Run button is viewer-inclusive (gated on isLocked && orgId, not isEditor), mirroring ServiceEditorView; v-if absent on drafts/org-less.
 - [Phase ?]: 97-09: RunControlView redesigned into State A (pre-flight) / State B (live) gated by live; output-status cluster + banner band kept inline verbatim so output.test.ts passes unedited
 - [Phase ?]: 98-01: origin flows into policy generators ONLY as a typed param (never window/URL param); useFullscreenReadiness never calls requestFullscreen (read-only).
+- [Phase ?]: Origin is read from window.location.origin only inside triggerDownload() at click time, never hoisted — keeps the no-injection-surface guarantee (T-98-04) literal and testable.
+- [Phase ?]: Component tests for a composable-backed panel must mock the composable to return a real Vue ref (not a plain object) for status — template reactivity only tracks genuine Refs.
 
 ### Roadmap Evolution
 
@@ -3589,8 +3597,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-29T22:00:20.407Z
-Stopped at: Completed 98-01-PLAN.md
+Last session: 2026-08-29T22:19:11.289Z
+Stopped at: Completed 98-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

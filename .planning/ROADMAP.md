@@ -389,7 +389,7 @@ expected; Phase 96 re-confirms this rather than assuming it.
 - [ ] **Phase 95: Run/Control Screen + Run Entry Point** - Run button, order-of-service rail, click-to-jump, keyboard nav, single-selection live model
 - [ ] **Phase 96: Live-Ops Hardening** - Closed-window recovery, monitor-replug detection, and sync robustness over a realistic service
 - [ ] **Phase 97: Run Service Redesign** - Owner UAT-driven redesign: pre-flight + live control layout (design import), confidence left/right, blackout, timers, in-item filmstrip, rehearse, service-list Run, output self-fullscreen
-- [ ] **Phase 98: Fullscreen Setup Helper** - Guided, self-checking in-app enablement of the Chromium Automatic Fullscreen policy from the Monitor Setup screen: readiness detection + origin-aware, per-OS (Windows/macOS/Linux) policy-file download, so a non-technical operator turns on multi-monitor auto-fullscreen once per computer without touching a policy editor
+- [x] **Phase 98: Fullscreen Setup Helper** - Guided, self-checking in-app enablement of the Chromium Automatic Fullscreen policy from the Monitor Setup screen: readiness detection + origin-aware, per-OS (Windows/macOS/Linux) policy-file download, so a non-technical operator turns on multi-monitor auto-fullscreen once per computer without touching a policy editor
 
 ## Phase Details
 
@@ -585,12 +585,12 @@ without anyone editing a registry or policy by hand.
      (capability delegation, "Fullscreen displays", tap-to-fullscreen) remain; client-only, no
      Firestore/rules/functions change.
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 Plans:
 
 - [x] 98-01-PLAN.md — Pure logic: OS/browser detection, origin-baked policy-file generators (Windows .reg HKCU+HKLM, macOS .mobileconfig, Linux JSON), Blob download helper, read-only readiness composable (Wave 1)
-- [ ] 98-02-PLAN.md — FullscreenSetupPanel.vue UI (4 states + per-OS download/steps/troubleshooting) + additive mount in MonitorSetupView.vue (Wave 2)
+- [x] 98-02-PLAN.md — FullscreenSetupPanel.vue UI (4 states + per-OS download/steps/troubleshooting) + additive mount in MonitorSetupView.vue (Wave 2)
 
 **UI hint**: yes
 
