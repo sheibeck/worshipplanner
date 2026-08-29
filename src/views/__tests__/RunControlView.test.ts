@@ -847,11 +847,15 @@ describe('RunControlView — Manage opens monitor-setup without noopener (owner 
   })
 })
 
-// ── Owner fix #6: never leave a live/rehearsing service without an ending confirm ─
-// An in-app route change while live must CANCEL and open the exit-confirm; CONFIRM
-// tears down (channel close) then proceeds to the ORIGINAL destination; CANCEL stays.
-// A tab close/refresh registers a beforeunload listener only while live.
-describe('RunControlView — leave-guard ends the service (owner #6)', () => {
+// ── Owner UAT: the leave-guard is scoped to a TRULY-LIVE service ─────────────────
+// A REHEARSAL puts nothing on the congregation screens, so leaving it is UNGUARDED
+// (End Rehearsal returns to pre-flight instead — covered below). Only a real live
+// service (live && !rehearsing) cancels an in-app leave + arms the beforeunload
+// prompt; the true-live block of that behavior is proven in
+// RunControlView.output.test.ts (which can drive a real go-live). Here we prove the
+// rehearse path is unguarded (this harness stubs window.open→null, so a real
+// go-live can't succeed).
+describe('RunControlView — leave-guard scoped to a truly-live service (owner UAT)', () => {
   it('an in-app leave while NOT live passes straight through (guard returns true, no dialog)', async () => {
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
@@ -867,70 +871,25 @@ describe('RunControlView — leave-guard ends the service (owner #6)', () => {
     expect(wrapper.find('[data-testid="run-service-name"]').exists()).toBe(true)
   })
 
-  it('an in-app leave while LIVE cancels navigation and opens the exit-confirm dialog', async () => {
+  it('an in-app leave while REHEARSING passes straight through unguarded (no confirm, no teardown)', async () => {
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
     await flushPromises()
-    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click') // enter live
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click') // enter rehearse
     await flushPromises()
 
     const result = capturedRouteLeaveGuard!({ fullPath: '/services' })
     await flushPromises()
 
-    // The guard CANCELLED the leave (false) and opened the confirm — no teardown yet.
-    expect(result).toBe(false)
-    expect(document.body.querySelector('[data-testid="run-exit-dialog"]')).not.toBeNull()
-    expect(fake.close).not.toHaveBeenCalled()
-    expect(mockRouterPush).not.toHaveBeenCalled()
-  })
-
-  it('confirming the leave tears the service down and navigates to the ORIGINAL destination', async () => {
-    const fake = createFakeChannel()
-    const wrapper = mountView(fake.factory)
-    await flushPromises()
-    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
-    await flushPromises()
-
-    capturedRouteLeaveGuard!({ fullPath: '/services' })
-    await flushPromises()
-
-    const confirmBtn = document.body.querySelector('[data-testid="run-exit-confirm"]') as HTMLElement | null
-    expect(confirmBtn).not.toBeNull()
-    confirmBtn!.click()
-    await flushPromises()
-
-    // Teardown (channel close) ran, and navigation went to the pending destination —
-    // NOT the service-editor default.
-    expect(fake.close).toHaveBeenCalledTimes(1)
-    expect(mockRouterPush).toHaveBeenCalledTimes(1)
-    expect(mockRouterPush).toHaveBeenCalledWith('/services')
-  })
-
-  it('cancelling the leave keeps the service live (channel open, no navigation)', async () => {
-    const fake = createFakeChannel()
-    const wrapper = mountView(fake.factory)
-    await flushPromises()
-    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
-    await flushPromises()
-
-    capturedRouteLeaveGuard!({ fullPath: '/services' })
-    await flushPromises()
-
-    const cancelBtn = document.body.querySelector('[data-testid="run-exit-cancel"]') as HTMLElement | null
-    expect(cancelBtn).not.toBeNull()
-    cancelBtn!.click()
-    await flushPromises()
-
-    // Stayed: dialog closed, channel still open, no navigation.
+    // Rehearse is low-stakes: the guard ALLOWS the leave (true), opens NO confirm
+    // dialog, and never closes the channel.
+    expect(result).toBe(true)
     expect(document.body.querySelector('[data-testid="run-exit-dialog"]')).toBeNull()
     expect(fake.close).not.toHaveBeenCalled()
-    expect(mockRouterPush).not.toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="run-service-name"]').exists()).toBe(true)
   })
 
-  it('registers a beforeunload listener when it goes live and removes it on exit', async () => {
+  it('rehearse does NOT register a beforeunload listener (the guard is scoped to a truly-live service)', async () => {
     const addSpy = vi.spyOn(window, 'addEventListener')
-    const removeSpy = vi.spyOn(window, 'removeEventListener')
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
     await flushPromises()
@@ -938,16 +897,61 @@ describe('RunControlView — leave-guard ends the service (owner #6)', () => {
     // Pre-live: no beforeunload listener yet.
     expect(addSpy.mock.calls.filter((c) => c[0] === 'beforeunload')).toHaveLength(0)
 
-    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click') // go live
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click') // enter rehearse
     await flushPromises()
-    expect(addSpy.mock.calls.filter((c) => c[0] === 'beforeunload').length).toBeGreaterThanOrEqual(1)
 
-    // Ending the service removes the listener (live → false).
+    // A rehearsal puts nothing on the congregation screens, so the beforeunload
+    // guard is NOT armed (only a truly-live service arms it).
+    expect(addSpy.mock.calls.filter((c) => c[0] === 'beforeunload')).toHaveLength(0)
+  })
+})
+
+// ── Owner UAT: End Rehearsal returns to the pre-flight screen (State A) ──────────
+// Ending a rehearsal must go BACK to "Ready when you are" so the operator can then
+// Go Live — NOT close the console or navigate away, and NOT open/close any window.
+describe('RunControlView — End Rehearsal returns to pre-flight (owner UAT)', () => {
+  it('clicking End Rehearsal returns to State A (run-go-live-btn visible), does NOT navigate, and opens/closes no windows', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    // Now live (State B): the exit button reads "End Rehearsal" and the pre-flight
+    // go-live button is gone.
+    expect(wrapper.find('[data-testid="run-go-live-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-exit-btn"]').text()).toBe('End Rehearsal')
+
+    const openCallsBefore = vi.mocked(window.open).mock.calls.length
+    await wrapper.find('[data-testid="run-exit-btn"]').trigger('click')
+    await flushPromises()
+
+    // Back to pre-flight State A: the go-live button is visible again, the live
+    // previews are gone, and NO confirm dialog was shown.
+    expect(wrapper.find('[data-testid="run-go-live-btn"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-current-preview"]').exists()).toBe(false)
+    expect(document.body.querySelector('[data-testid="run-exit-dialog"]')).toBeNull()
+    // No navigation and no window open/close — End Rehearsal only returns to pre-flight.
+    expect(mockRouterPush).not.toHaveBeenCalled()
+    expect(vi.mocked(window.open).mock.calls.length).toBe(openCallsBefore)
+    expect(fake.close).not.toHaveBeenCalled()
+  })
+
+  it('Escape during a rehearsal also returns to pre-flight without a confirm dialog', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
     keydown('Escape')
     await flushPromises()
-    const confirmBtn = document.body.querySelector('[data-testid="run-exit-confirm"]') as HTMLElement | null
-    confirmBtn!.click()
-    await flushPromises()
-    expect(removeSpy.mock.calls.filter((c) => c[0] === 'beforeunload').length).toBeGreaterThanOrEqual(1)
+
+    // No confirm dialog — Escape during rehearse ends it straight back to State A.
+    expect(document.body.querySelector('[data-testid="run-exit-dialog"]')).toBeNull()
+    expect(wrapper.find('[data-testid="run-go-live-btn"]').exists()).toBe(true)
+    expect(mockRouterPush).not.toHaveBeenCalled()
+    expect(fake.close).not.toHaveBeenCalled()
   })
 })

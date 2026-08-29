@@ -21,7 +21,7 @@
       :elapsed="elapsed"
       :audienceOpen="audienceOpen"
       :confidenceOpen="confidenceOpen"
-      @exit="openExitConfirm"
+      @exit="onExitRequest"
       @reopen="reopenOutput"
       @manage="openManage"
     />
@@ -239,14 +239,25 @@
            -> postBlackout). RunDisplaysPanel now also carries the closed-window
            RECOVERY (R274) the removed top status band used to (owner fix #3). -->
       <section v-else class="flex-1 min-w-0 h-full flex flex-col gap-6 overflow-y-auto p-6 lg:p-8">
-        <!-- PREVIEW then DISPLAYS: previews on top, the Displays panel stacked
-             UNDER them and right-aligned so it sits beneath the Next-up pane
-             (owner request — under Next-up, not beside it). -->
-        <div class="flex flex-col gap-6">
-          <div class="flex-1 min-w-0">
-            <RunPreviewPair :current="current" :next="next" :live="live" />
-          </div>
-          <div class="w-full lg:w-72 lg:self-end">
+        <!-- Owner UAT 2×2 — RunPreviewPair now owns the whole preview grid: the
+             LEFT column is the On-screen preview (top) over the "Slides in this
+             item" filmstrip (bottom, its #under-current slot), and the RIGHT column
+             is the Next-up preview (top) over the Displays panel (bottom, its
+             #under-next slot). RunPreviewPair already lays the two panes out
+             (On-screen lg:col-span-2 left, Next-up lg:col-span-1 right) and exposes
+             a slot under each; the filmstrip keeps its own overflow-x-auto so it
+             stays usable in the narrower left column. `rehearsing` makes the
+             On-screen tag/ring read yellow "Rehearsing" in rehearse mode. -->
+        <RunPreviewPair :current="current" :next="next" :live="live" :rehearsing="rehearsing">
+          <template #under-current>
+            <RunFilmstrip
+              :slides="filmstripSlides"
+              :indices="filmstripIndices"
+              :currentIndex="index"
+              @jump="postIndex"
+            />
+          </template>
+          <template #under-next>
             <RunDisplaysPanel
               :audience="audience"
               :confidence="confidence"
@@ -257,15 +268,8 @@
               @reopen="reopenOutput"
               @manage="openManage"
             />
-          </div>
-        </div>
-
-        <RunFilmstrip
-          :slides="filmstripSlides"
-          :indices="filmstripIndices"
-          :currentIndex="index"
-          @jump="postIndex"
-        />
+          </template>
+        </RunPreviewPair>
 
         <!-- OUTPUT PANEL (R280) — Black blanks the projector, Clear restores it;
              both route to the single-writer postBlackout. The active state is shown
@@ -437,7 +441,7 @@ const {
   // actions
   rehearse,
   openManage,
-  openExitConfirm,
+  onExitRequest,
   // exit confirm
   confirmOpen,
   cancelExit,

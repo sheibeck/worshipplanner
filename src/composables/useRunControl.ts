@@ -292,7 +292,10 @@ export function useRunControl(options: UseRunControlOptions = {}) {
         break
       case 'Escape':
         e.preventDefault()
-        confirmOpen.value = true // OPEN the confirm — never immediate teardown
+        // Owner UAT: branch by mode — a rehearsal ends back to pre-flight (no
+        // confirm), a real live service opens the exit-confirm (never immediate
+        // teardown). onExitRequest is a hoisted function declaration below.
+        onExitRequest()
         break
       case 'b':
       case 'B':
@@ -756,6 +759,42 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     }
   }
 
+  /**
+   * END REHEARSAL (owner UAT) — return to the pre-flight "Ready when you are"
+   * screen (State A) WITHOUT tearing down or navigating away. A rehearsal opened
+   * NO output windows and holds no getScreenDetails (liveScreenDetails===null), so
+   * there is nothing on the congregation screens to close: we simply drop live +
+   * rehearsing (→ State A renders via v-if="!live"), reset the elapsed timer, and
+   * clear blackout so a later Go live starts clean. The run channel handle stays
+   * open (the operator is still in the console); when they click Go live the
+   * existing openOutputs path re-drives everything and the freshly-opened outputs
+   * sync via the hello→resend handshake. Deliberately NEVER window.open,
+   * router.push, or the confirmExit teardown — ending a rehearsal is low-stakes and
+   * needs no confirm.
+   */
+  function endRehearsal() {
+    rehearsing.value = false
+    live.value = false
+    blackout.value = false
+    resetElapsed()
+  }
+
+  /**
+   * EXIT affordance router (owner UAT) — the header @exit branches by mode. During
+   * a REHEARSAL (rehearsing) it ends low-stakes back to pre-flight (endRehearsal:
+   * no confirm, no teardown, no navigation). During a real LIVE service
+   * (live && !rehearsing) it opens the exit-confirm dialog, whose confirm runs the
+   * full teardown + navigation (unchanged). Pre-flight (!live) never reaches this —
+   * the header exit button only renders in the live states.
+   */
+  function onExitRequest() {
+    if (rehearsing.value) {
+      endRehearsal()
+    } else {
+      openExitConfirm()
+    }
+  }
+
   function confirmExit() {
     confirmOpen.value = false
     endServiceTeardown()
@@ -772,31 +811,38 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     }
   }
 
-  // ── Leave guards (owner fix #6) ─────────────────────────────────────────────
-  // IN-APP navigation: while live, CANCEL the leave and open the exit-confirm
+  // ── Leave guards (owner fix #6, scoped to a TRULY-LIVE service — owner UAT) ──
+  // IN-APP navigation: only a REAL live service (live && !rehearsing — outputs are
+  // on the congregation screens) CANCELs the leave and opens the exit-confirm
   // dialog, remembering the destination; CONFIRM tears down then proceeds, CANCEL
-  // stays. Not-live leaves pass straight through.
+  // stays. A REHEARSAL puts nothing on the screens, so leaving it is UNGUARDED
+  // (End Rehearsal returns to pre-flight instead); not-live leaves pass straight
+  // through too.
   onBeforeRouteLeave((to) => {
-    if (!live.value) return true
+    if (!live.value || rehearsing.value) return true
     pendingLeaveTo.value = to
     confirmOpen.value = true
     return false
   })
 
-  // TAB CLOSE / REFRESH: a beforeunload listener (present ONLY while live) triggers
-  // the browser's native "Leave site?" prompt. The browser will NOT run app teardown
-  // on a hard unload — the confirm itself is the requirement.
+  // TAB CLOSE / REFRESH: a beforeunload listener (present ONLY during a truly-live
+  // service, live && !rehearsing) triggers the browser's native "Leave site?"
+  // prompt. The browser will NOT run app teardown on a hard unload — the confirm
+  // itself is the requirement. Rehearse never arms it (nothing is on the screens).
   function handleBeforeUnload(e: BeforeUnloadEvent) {
     e.preventDefault()
     e.returnValue = ''
   }
-  watch(live, (isLive) => {
-    if (isLive) {
-      window.addEventListener('beforeunload', handleBeforeUnload)
-    } else {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  })
+  watch(
+    () => live.value && !rehearsing.value,
+    (guarded) => {
+      if (guarded) {
+        window.addEventListener('beforeunload', handleBeforeUnload)
+      } else {
+        window.removeEventListener('beforeunload', handleBeforeUnload)
+      }
+    },
+  )
   watch(confirmOpen, async (open) => {
     if (!open) return
     await nextTick()
@@ -1000,9 +1046,11 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     reopenOutput,
     reopenReassignedOutputs,
     openOutputs,
-    // exit confirm
+    // exit confirm + mode-branched exit affordance (owner UAT)
     confirmOpen,
     openExitConfirm,
+    onExitRequest,
+    endRehearsal,
     cancelExit,
     confirmExit,
     cancelBtnRef,

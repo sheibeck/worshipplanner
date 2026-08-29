@@ -75,12 +75,17 @@ const { mockService, mockSlides } = vi.hoisted(() => {
 // ── Mocks ───────────────────────────────────────────────────────────────────
 // vue-router: RunControlView calls useRouter() (exit navigation) and renders a
 // <router-link to="/monitor-setup"> in the fallback banner. Stub RouterLink to a
-// plain anchor exposing `to` so the monitor-setup link is assertable.
+// plain anchor exposing `to` so the monitor-setup link is assertable. Owner UAT:
+// CAPTURE the onBeforeRouteLeave guard + a stable router.push spy so the true-live
+// leave-guard behavior (only a real go-live blocks an in-app leave) is assertable
+// against a REAL placed session.
+const mockRouterPush = vi.fn()
+let capturedRouteLeaveGuard: ((to: unknown) => boolean | void) | undefined
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-  // Owner fix #6: the composable registers onBeforeRouteLeave in setup — provide a
-  // no-op so setup does not crash (these output tests don't drive the leave-guard).
-  onBeforeRouteLeave: () => {},
+  useRouter: () => ({ push: mockRouterPush }),
+  onBeforeRouteLeave: (guard: (to: unknown) => boolean | void) => {
+    capturedRouteLeaveGuard = guard
+  },
   RouterLink: {
     props: ['to'],
     template: '<a :data-to="to"><slot /></a>',
@@ -314,6 +319,8 @@ async function goLiveFake(wrapper: ReturnType<typeof mountView>['wrapper']) {
 beforeEach(() => {
   localStorage.clear()
   openedWins = []
+  mockRouterPush.mockClear()
+  capturedRouteLeaveGuard = undefined
   openSpy = vi.spyOn(window, 'open').mockImplementation(() => makeFakeWin())
   // jsdom does not implement Element.prototype.scrollIntoView; the rail's
   // active-row auto-scroll watch calls it after postIndex(0) on mount. Stub it
@@ -1125,5 +1132,63 @@ describe('RunControlView output — control-screen fullscreen on go-live/exit (o
     await flushPromises()
 
     expect(exitSpy).not.toHaveBeenCalled()
+  })
+})
+
+// ── 15. LEAVE-GUARD BLOCKS A TRULY-LIVE SERVICE (owner UAT) ──────────────────────
+//    Only a REAL go-live (outputs on the congregation screens) blocks an in-app
+//    leave + arms the beforeunload prompt; the rehearse path is proven UNGUARDED in
+//    RunControlView.test.ts. This block drives a real placed go-live so the
+//    live && !rehearsing guard is exercised end-to-end.
+describe('RunControlView output — leave-guard blocks a truly-live service (owner UAT)', () => {
+  it('after a real go-live, an in-app leave is CANCELLED + opens the confirm; confirm tears down and navigates to the pending destination', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper, fake } = mountView()
+    await goLive(wrapper)
+    // Genuinely live — both outputs open (rehearsing is false on a real go-live).
+    expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(true)
+
+    // The in-app leave is BLOCKED (guard false) and opens the confirm dialog.
+    const result = capturedRouteLeaveGuard!({ fullPath: '/services' })
+    await flushPromises()
+    expect(result).toBe(false)
+    expect(document.body.querySelector('[data-testid="run-exit-dialog"]')).not.toBeNull()
+    expect(fake.close).not.toHaveBeenCalled()
+    expect(mockRouterPush).not.toHaveBeenCalled()
+
+    // Confirming tears the service down (channel close + windows closed) and
+    // navigates to the ORIGINAL pending destination — not the editor default.
+    const confirmBtn = document.body.querySelector<HTMLElement>('[data-testid="run-exit-confirm"]')
+    expect(confirmBtn).not.toBeNull()
+    confirmBtn!.click()
+    await flushPromises()
+    expect(fake.close).toHaveBeenCalledTimes(1)
+    expect(mockRouterPush).toHaveBeenCalledWith('/services')
+    for (const win of openedWins) {
+      expect(win.close).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('a real go-live registers a beforeunload listener and exit removes it', async () => {
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await goLive(wrapper)
+
+    // A real live service arms the beforeunload "Leave site?" guard.
+    expect(addSpy.mock.calls.filter((c) => c[0] === 'beforeunload').length).toBeGreaterThanOrEqual(1)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    const confirmBtn = document.body.querySelector<HTMLElement>('[data-testid="run-exit-confirm"]')
+    expect(confirmBtn).not.toBeNull()
+    confirmBtn!.click()
+    await flushPromises()
+
+    // Ending the service disarms it (live && !rehearsing → false).
+    expect(removeSpy.mock.calls.filter((c) => c[0] === 'beforeunload').length).toBeGreaterThanOrEqual(1)
   })
 })
