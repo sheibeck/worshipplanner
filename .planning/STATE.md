@@ -5,10 +5,10 @@ milestone_name: Run the Service (Live Presentation)
 current_phase: 92
 current_phase_name: live-ops-hardening
 status: planning
-stopped_at: Completed 97-03-PLAN.md
-last_updated: "2026-08-29T04:52:16.224Z"
-last_activity: 2026-08-29
-last_activity_desc: "97-03-PLAN.md executed: output windows self-fullscreen (R278), confidence left/right + next-scale (R279/R276), blackout overlay (R280)"
+stopped_at: Completed 97-02-PLAN.md
+last_updated: "2026-08-29T05:07:19.802Z"
+last_activity: 2026-08-28
+last_activity_desc: "92-01-PLAN.md executed: `/monitor-setup` route (`requiresAuth` only, no"
 progress:
   total_phases: 8
   completed_phases: 6
@@ -2786,6 +2786,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 96 P02 | 12m | 2 tasks | 1 files |
 | Phase 97 P01 | 20m | 2 tasks | 2 files |
 | Phase 97 P03 | 35m | 3 tasks | 3 files |
+| Phase 97 P02 | 12m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3237,6 +3238,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 95-01: shared slice called first in useOutputWindow setup so its subscribe-gate onMounted fires before the channel opens (subscribe-before-channel)
 - [Phase ?]: 95-05: RunControlView control contract (R262-R266) proven by a 12-test behavioral suite driving the REAL openRunChannel via an injected fake channel — strictly-increasing seq, onHello resend, rail nav, keyboard map, Escape-opens-confirm-not-teardown.
 - [Phase ?]: 96-01: closed detection stays 'placed' (per-line amber, not an OutputStatus value); reopenOutput is synchronous reusing held liveScreenDetails (WR-01 intact); reassign-wins precedence; client-only (no Firestore/rules)
+- [Phase ?]: R284: ServiceCard Run button is viewer-inclusive (gated on isLocked && orgId, not isEditor), mirroring ServiceEditorView; v-if absent on drafts/org-less.
 
 ### Roadmap Evolution
 
@@ -3562,8 +3564,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-29T04:52:16.140Z
-Stopped at: Completed 97-03-PLAN.md
+Last session: 2026-08-29T05:07:19.066Z
+Stopped at: Completed 97-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

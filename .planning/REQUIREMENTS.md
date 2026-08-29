@@ -111,7 +111,7 @@ Owner hardware-UAT feedback (2026-08-28) drove an approved redesign of the live 
 - [ ] **R281**: The control screen shows a **clock and an elapsed-since-go-live timer**.
 - [ ] **R282**: The control screen shows an **in-item slide filmstrip** with click-to-jump within the current item.
 - [ ] **R283**: The operator can **rehearse without screens** — drive the service on the control screen without opening the output windows.
-- [ ] **R284**: A **Run** affordance appears on each locked service row in the **service listing**, beside the existing row actions, for any authenticated member.
+- [x] **R284**: A **Run** affordance appears on each locked service row in the **service listing**, beside the existing row actions, for any authenticated member.
 
 **Traceability (Phase 97):** R276–R284 → Phase 97. The Next-up smaller-font fix and the overall run/stop
 UX refinement are folded into R276. Explicitly omitted (no backing data/system, would be fake UI):
