@@ -103,7 +103,7 @@ requirement by design — both are enabling refactor/infrastructure work every r
 Owner hardware-UAT feedback (2026-08-28) drove an approved redesign of the live Run experience
 (Claude Design `Run Service.dc.html`). These refine/extend R261–R274; all map to Phase 97.
 
-- [ ] **R276**: The Run/control screen matches the approved design — a **pre-flight** state (centered "Ready when you are" with display readiness + a Go-live action, not a corner button) and a **live** state (program/next-up preview split, in-item slide filmstrip, transport bar with keyboard legend + progress).
+- [x] **R276**: The Run/control screen matches the approved design — a **pre-flight** state (centered "Ready when you are" with display readiness + a Go-live action, not a corner button) and a **live** state (program/next-up preview split, in-item slide filmstrip, transport bar with keyboard legend + progress).
 - [ ] **R277**: The live status is **honest** — displays read "not open" (muted/amber) before go-live and turn **green** once actually live; no alarming red live indicator before the operator is live.
 - [ ] **R278**: The audience and confidence output windows **default to fullscreen** on their assigned monitors without the operator clicking a per-window "Re-enter fullscreen" (which remains only as a fallback).
 - [ ] **R279**: The confidence monitor shows the current and next slide **side-by-side (left/right)** instead of top/bottom, backgrounds still suppressed to black.
