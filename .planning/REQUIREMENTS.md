@@ -110,7 +110,7 @@ Owner hardware-UAT feedback (2026-08-28) drove an approved redesign of the live 
 - [x] **R280**: The operator can **blackout / clear** the outputs from the control screen (and the `B` key), driven by the run channel's existing `blackout` field.
 - [x] **R281**: The control screen shows a **clock and an elapsed-since-go-live timer**.
 - [x] **R282**: The control screen shows an **in-item slide filmstrip** with click-to-jump within the current item.
-- [ ] **R283**: The operator can **rehearse without screens** — drive the service on the control screen without opening the output windows.
+- [x] **R283**: The operator can **rehearse without screens** — drive the service on the control screen without opening the output windows.
 - [x] **R284**: A **Run** affordance appears on each locked service row in the **service listing**, beside the existing row actions, for any authenticated member.
 
 **Traceability (Phase 97):** R276–R284 → Phase 97. The Next-up smaller-font fix and the overall run/stop

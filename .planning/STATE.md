@@ -5,10 +5,10 @@ milestone_name: Run the Service (Live Presentation)
 current_phase: 92
 current_phase_name: live-ops-hardening
 status: planning
-stopped_at: Completed 97-08-PLAN.md
-last_updated: "2026-08-29T05:57:24.829Z"
-last_activity: 2026-08-29
-last_activity_desc: "97-08-PLAN.md executed: wired live/blackout/rehearse/timers + readiness/filmstrip/derivations into useRunControl.ts (wave 3); control suites green, baseline storage.rules only"
+stopped_at: Completed 97-09-PLAN.md
+last_updated: "2026-08-29T06:15:49.950Z"
+last_activity: 2026-08-28
+last_activity_desc: "92-01-PLAN.md executed: `/monitor-setup` route (`requiresAuth` only, no"
 progress:
   total_phases: 8
   completed_phases: 6
@@ -2791,6 +2791,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 97 P04 | 1788 | 3 tasks | 4 files |
 | Phase 97 P06 | 20m | 2 tasks | 3 files |
 | Phase 97 P08 | 900 | 2 tasks | 1 files |
+| Phase 97 P09 | 12min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3243,6 +3244,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 95-05: RunControlView control contract (R262-R266) proven by a 12-test behavioral suite driving the REAL openRunChannel via an injected fake channel — strictly-increasing seq, onHello resend, rail nav, keyboard map, Escape-opens-confirm-not-teardown.
 - [Phase ?]: 96-01: closed detection stays 'placed' (per-line amber, not an OutputStatus value); reopenOutput is synchronous reusing held liveScreenDetails (WR-01 intact); reassign-wins precedence; client-only (no Firestore/rules)
 - [Phase ?]: R284: ServiceCard Run button is viewer-inclusive (gated on isLocked && orgId, not isEditor), mirroring ServiceEditorView; v-if absent on drafts/org-less.
+- [Phase ?]: 97-09: RunControlView redesigned into State A (pre-flight) / State B (live) gated by live; output-status cluster + banner band kept inline verbatim so output.test.ts passes unedited
 
 ### Roadmap Evolution
 
@@ -3568,8 +3570,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-29T05:57:24.763Z
-Stopped at: Completed 97-08-PLAN.md
+Last session: 2026-08-29T06:15:38.818Z
+Stopped at: Completed 97-09-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
