@@ -20,11 +20,9 @@ function installPermissions(query: (descriptor: unknown) => Promise<{ state: str
 }
 
 function uninstallPermissions() {
-  Object.defineProperty(navigator, 'permissions', {
-    value: undefined,
-    configurable: true,
-    writable: true,
-  })
+  // Delete (not just set undefined) so `'permissions' in navigator` reports
+  // false again, matching jsdom's real default-absent state.
+  delete (navigator as unknown as { permissions?: unknown }).permissions
 }
 
 const TestHost = defineComponent({
