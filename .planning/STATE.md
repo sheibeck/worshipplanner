@@ -5,16 +5,16 @@ milestone_name: Run the Service (Live Presentation)
 current_phase: 92
 current_phase_name: v2.4
 status: planning
-stopped_at: Completed 95-03-PLAN.md
-last_updated: "2026-08-28T23:43:56.692Z"
+stopped_at: Completed 95-04-PLAN.md
+last_updated: "2026-08-29T00:02:08.911Z"
 last_activity: 2026-08-28
-last_activity_desc: "95-03-PLAN.md executed: RunControlView standalone operator surface + /run/:serviceId route (single-writer channel, rail, dual preview, keyboard, exit-confirm)"
+last_activity_desc: "95-04-PLAN.md executed: Go-live gesture opens+places both output windows from a fresh activation; honest idle/opening/placed/fallback/blocked state gated on real window.open returns; closeOutputs wired first into exit-confirm"
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 15
-  completed_plans: 12
-  percent: 57
+  completed_plans: 13
+  percent: 60
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -2779,6 +2779,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 95 P02 | 10m | 1 tasks | 1 files |
 | Phase 95 P01 | 12min | 2 tasks | 2 files |
 | Phase 95 P03 | 25m | 2 tasks | 2 files |
+| Phase 95 P04 | 25min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -3553,8 +3554,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-28T23:43:56.622Z
-Stopped at: Completed 95-03-PLAN.md
+Last session: 2026-08-29T00:02:08.844Z
+Stopped at: Completed 95-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
