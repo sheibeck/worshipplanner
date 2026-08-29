@@ -35,3 +35,12 @@ wake-lock behavior over a service length), NOT a known defect.
    visible on either pane on a real display.
 3. **Glanceable legibility of the ~30% next pane** from stage distance (if unreadable, tune the split
    ratio / next-pane font scale — not the current pane's dominance).
+
+## Phase 95 — Run/Control Screen + Run Entry Point (verified 2026-08-28, pass-with-deferred-human-UAT)
+
+1. Real **two-monitor open+place+fullscreen from one "Go live" click** on Chrome/Edge — the audience +
+   confidence windows land on their assigned monitors.
+2. **End-to-end keyboard driving** of a live service across both output windows (Right/Space/Left/Up/Down).
+3. The **Escape-confirm feel** + real projector-blanking on confirmed exit.
+4. The **pop-out fallback** drag-to-monitor + per-window fullscreen (when the mapping doesn't match).
+5. The **blocked and partial popup states** on real hardware (popup-blocked / only-one-window-opened).
