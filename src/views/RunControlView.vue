@@ -335,8 +335,20 @@
       </div>
     </div>
 
-    <!-- 2. MAIN REGION — State A (pre-flight) vs State B (live) by `live`. -->
+    <!-- 2. MAIN REGION — the order-of-service rail (both states) + State A
+         (pre-flight) vs State B (live) center column by `live`. -->
     <div class="flex-1 min-h-0 flex">
+      <!-- ORDER-OF-SERVICE RAIL (R262/R263) — present in BOTH states. Owns its own
+           active-row auto-scroll; the active item (activeIndex = a slotIndex)
+           expands to its slides from expandedSlides. Emits intent only. -->
+      <RunRail
+        :rows="railRows"
+        :activeIndex="currentSlotIndex"
+        :expandedSlides="expandedSlides"
+        @jump="jumpToSlot"
+        @jump-slide="postIndex"
+      />
+
       <!-- STATE A (!live): the centered pre-flight column. run-go-live-btn now
            lives inside RunPreflightPanel (relocated from the old idle corner). -->
       <section v-if="!live" class="flex-1 min-w-0 h-full flex flex-col">
@@ -358,12 +370,83 @@
         </p>
       </section>
 
-      <!-- STATE B (live): program/next-up split, filmstrip, output panel, displays,
-           transport — wired in Task 2. -->
-      <section v-else class="flex-1 min-w-0 h-full flex flex-col"></section>
+      <!-- STATE B (live): the program/next-up preview split (RunPreviewPair), the
+           in-item click-to-jump filmstrip (RunFilmstrip -> postIndex), the Output
+           panel (Black/Clear -> postBlackout), and the additive Displays panel. -->
+      <section v-else class="flex-1 min-w-0 h-full flex flex-col gap-6 overflow-y-auto p-6 lg:p-8">
+        <RunPreviewPair :current="current" :next="next" :live="live" />
+
+        <RunFilmstrip
+          :slides="filmstripSlides"
+          :indices="filmstripIndices"
+          :currentIndex="index"
+          @jump="postIndex"
+        />
+
+        <div class="grid gap-6 lg:grid-cols-2 items-start">
+          <!-- OUTPUT PANEL (R280) — Black blanks the projector, Clear restores it;
+               both route to the single-writer postBlackout. The active state is
+               shown so the operator sees whether the screens are black. Logo is
+               omitted (no asset). -->
+          <div
+            data-testid="run-output-panel"
+            class="rounded-lg border border-white/10 bg-[#141624] p-4"
+          >
+            <h3 class="mb-3 text-sm font-semibold text-gray-100">Output</h3>
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                data-testid="run-blackout-btn"
+                :aria-pressed="blackout ? 'true' : 'false'"
+                class="min-h-11 flex-1 rounded-md border px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                :class="
+                  blackout
+                    ? 'border-transparent bg-black text-white ring-2 ring-white/40'
+                    : 'border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
+                "
+                @click="postBlackout(true)"
+              >
+                Black
+              </button>
+              <button
+                type="button"
+                data-testid="run-clear-btn"
+                :aria-pressed="!blackout ? 'true' : 'false'"
+                class="min-h-11 flex-1 rounded-md border px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                :class="
+                  !blackout
+                    ? 'border-transparent bg-[color:var(--run-accent)] text-white'
+                    : 'border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
+                "
+                @click="postBlackout(false)"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <RunDisplaysPanel
+            :audience="audience"
+            :confidence="confidence"
+            :live="live"
+            @reopen="reopenOutput"
+            @manage="openManage"
+          />
+        </div>
+      </section>
     </div>
 
-    <!-- 3. EXIT-CONFIRM DIALOG (R265) — unchanged. -->
+    <!-- 3. TRANSPORT BAR (State B) — Previous / Next route to goBySlide; the bar
+         also carries the keyboard legend + service progress. -->
+    <RunTransportBar
+      v-if="live"
+      :progress="progress"
+      :positionLabel="positionLabel"
+      @prev="goBySlide(-1)"
+      @next="goBySlide(1)"
+    />
+
+    <!-- 4. EXIT-CONFIRM DIALOG (R265) — unchanged. -->
     <Teleport to="body">
       <div
         v-if="confirmOpen"
@@ -408,6 +491,11 @@ import type { BroadcastChannelFactory } from '@/utils/runChannel'
 import { useRunControl } from '@/composables/useRunControl'
 import RunHeader from '@/components/run/RunHeader.vue'
 import RunPreflightPanel from '@/components/run/RunPreflightPanel.vue'
+import RunRail from '@/components/run/RunRail.vue'
+import RunPreviewPair from '@/components/run/RunPreviewPair.vue'
+import RunFilmstrip from '@/components/run/RunFilmstrip.vue'
+import RunTransportBar from '@/components/run/RunTransportBar.vue'
+import RunDisplaysPanel from '@/components/run/RunDisplaysPanel.vue'
 
 /**
  * Testability seam (93/95-PATTERNS): the run-channel factory is injectable so
@@ -434,6 +522,11 @@ const {
   elapsed,
   audienceOpen,
   confidenceOpen,
+  // navigation model + previews (State B)
+  current,
+  next,
+  index,
+  currentSlotIndex,
   // pre-flight readiness (R276)
   slideCount,
   itemCount,
@@ -441,6 +534,22 @@ const {
   allRendered,
   audienceLabel,
   confidenceLabel,
+  // displays panel + blackout (State B)
+  audience,
+  confidence,
+  blackout,
+  postBlackout,
+  // in-item filmstrip + rail expansion (R282)
+  filmstripSlides,
+  filmstripIndices,
+  expandedSlides,
+  // transport derivations
+  progress,
+  // rail + navigation actions
+  railRows,
+  jumpToSlot,
+  goBySlide,
+  postIndex,
   // output state machine + recovery (inline, verbatim)
   outputStatus,
   readyAudienceLabel,
