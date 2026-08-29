@@ -105,9 +105,9 @@ Owner hardware-UAT feedback (2026-08-28) drove an approved redesign of the live 
 
 - [x] **R276**: The Run/control screen matches the approved design — a **pre-flight** state (centered "Ready when you are" with display readiness + a Go-live action, not a corner button) and a **live** state (program/next-up preview split, in-item slide filmstrip, transport bar with keyboard legend + progress).
 - [ ] **R277**: The live status is **honest** — displays read "not open" (muted/amber) before go-live and turn **green** once actually live; no alarming red live indicator before the operator is live.
-- [ ] **R278**: The audience and confidence output windows **default to fullscreen** on their assigned monitors without the operator clicking a per-window "Re-enter fullscreen" (which remains only as a fallback).
-- [ ] **R279**: The confidence monitor shows the current and next slide **side-by-side (left/right)** instead of top/bottom, backgrounds still suppressed to black.
-- [ ] **R280**: The operator can **blackout / clear** the outputs from the control screen (and the `B` key), driven by the run channel's existing `blackout` field.
+- [x] **R278**: The audience and confidence output windows **default to fullscreen** on their assigned monitors without the operator clicking a per-window "Re-enter fullscreen" (which remains only as a fallback).
+- [x] **R279**: The confidence monitor shows the current and next slide **side-by-side (left/right)** instead of top/bottom, backgrounds still suppressed to black.
+- [x] **R280**: The operator can **blackout / clear** the outputs from the control screen (and the `B` key), driven by the run channel's existing `blackout` field.
 - [ ] **R281**: The control screen shows a **clock and an elapsed-since-go-live timer**.
 - [ ] **R282**: The control screen shows an **in-item slide filmstrip** with click-to-jump within the current item.
 - [ ] **R283**: The operator can **rehearse without screens** — drive the service on the control screen without opening the output windows.
