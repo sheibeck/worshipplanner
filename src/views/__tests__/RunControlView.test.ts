@@ -270,7 +270,7 @@ afterEach(() => {
 describe('RunControlView — single-writer channel + monotonic seq (R266)', () => {
   it('posts state slide 0 on mount and a STRICTLY INCREASING seq on every navigation', async () => {
     const fake = createFakeChannel()
-    mountView(fake.factory)
+    const wrapper = mountView(fake.factory)
     await flushPromises()
 
     // Initial go-live: exactly one state for slide 0.
@@ -278,6 +278,13 @@ describe('RunControlView — single-writer channel + monotonic seq (R266)', () =
     expect(initial).toHaveLength(1)
     expect(initial[0]!.index).toBe(0)
     expect(initial[0]!.blackout).toBe(false)
+
+    // Transport keys are inert pre-live (State A); rehearse enters live WITHOUT
+    // opening a window and WITHOUT re-posting slide 0 (index is already 0), so the
+    // initial post count is unchanged before navigation begins.
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+    expect(fake.states()).toHaveLength(1)
 
     // Several navigations, each posts a fresh state.
     keydown('ArrowRight') // -> index 1
@@ -302,7 +309,11 @@ describe('RunControlView — single-writer channel + monotonic seq (R266)', () =
 
   it('resends the CURRENT index with a higher seq on an inbound hello (onHello resync)', async () => {
     const fake = createFakeChannel()
-    mountView(fake.factory)
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Enter live (rehearse) so the transport keys act — inert in pre-flight State A.
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
     await flushPromises()
 
     keydown('ArrowRight') // -> index 1
@@ -362,6 +373,12 @@ describe('RunControlView — order-of-service rail (R262/R263)', () => {
       .find((w) => w.attributes('data-active') === 'true')
     expect(active0?.text()).toContain('Amazing Grace')
 
+    // Enter live (rehearse, no window) so the transport keys are active — they are
+    // inert in pre-flight State A. The rail renders in both states, so the active
+    // row is unchanged by the state flip.
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
     // Navigate to the slide with slotIndex 2 (ArrowDown skips the empty slot 1).
     keydown('ArrowDown')
     await flushPromises()
@@ -414,9 +431,12 @@ describe('RunControlView — order-of-service rail (R262/R263)', () => {
 describe('RunControlView — keyboard navigation (R265)', () => {
   it('ArrowRight and Space each advance +1; ArrowLeft goes -1 (clamped at 0)', async () => {
     const fake = createFakeChannel()
-    mountView(fake.factory)
+    const wrapper = mountView(fake.factory)
     await flushPromises()
-    // mount posted index 0.
+    // mount posted index 0. Enter live (rehearse) so the transport keys act — they
+    // are inert in pre-flight State A.
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
 
     keydown('ArrowRight')
     await flushPromises()
@@ -439,9 +459,12 @@ describe('RunControlView — keyboard navigation (R265)', () => {
 
   it('ArrowDown/ArrowUp move to the next/previous order item, skipping the empty slot', async () => {
     const fake = createFakeChannel()
-    mountView(fake.factory)
+    const wrapper = mountView(fake.factory)
     await flushPromises()
-    // Start on slotIndex 0 (index 0).
+    // Start on slotIndex 0 (index 0). Enter live (rehearse) so the transport keys
+    // act — they are inert in pre-flight State A.
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
 
     // Down: next order item with slides is slot 2 (slot 1 is empty) -> index 2.
     keydown('ArrowDown')
@@ -540,6 +563,10 @@ describe('RunControlView — dual preview + single-selection (R264/R266)', () =>
     // No preview->program staging control exists.
     expect(wrapper.find('[data-testid="run-push-live"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-take"]').exists()).toBe(false)
+
+    // Enter live (rehearse) so the transport keys act — inert in pre-flight State A.
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
 
     // A single navigation immediately posts a new state (no confirm step).
     const before = fake.states().length
@@ -673,5 +700,114 @@ describe('RunControlView — in-item filmstrip jump + scaled next-up (R282/R276)
     const nextPreview = wrapper.find('[data-testid="run-next-preview"]')
     expect(nextPreview.exists()).toBe(true)
     expect(nextPreview.html()).toContain('scale(')
+  })
+})
+
+// ── 97 REVIEW WR-01: pre-live / rehearse display dots open NO window (R283) ──────
+// The header Audience/Confidence dots must NOT be a reopen affordance outside a
+// live session with a held go-live. Pre-flight the dot is a passive (disabled)
+// indicator; during Rehearse (live, but no getScreenDetails was ever resolved) a
+// stray emit is caught by reopenOutput's liveScreenDetails===null guard. Either
+// way NO output window opens outside the go-live gesture (window.open is stubbed
+// to null on mount, so any reopen would register as a call).
+describe('RunControlView — pre-live display dots are passive (WR-01/R283)', () => {
+  it('clicking a pre-flight Audience/Confidence header dot opens NO window and the dot is disabled', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // State A (pre-live): the dots render but are DISABLED passive indicators.
+    const audienceDot = wrapper.find('[data-testid="run-display-dot-audience"]')
+    const confidenceDot = wrapper.find('[data-testid="run-display-dot-confidence"]')
+    expect(audienceDot.exists()).toBe(true)
+    expect(confidenceDot.exists()).toBe(true)
+    expect(audienceDot.attributes('disabled')).toBeDefined()
+    expect(confidenceDot.attributes('disabled')).toBeDefined()
+
+    const openCallsBefore = vi.mocked(window.open).mock.calls.length
+    await audienceDot.trigger('click')
+    await confidenceDot.trigger('click')
+    await flushPromises()
+
+    // No reopen fired: window.open was never called from a pre-live dot click, so
+    // no un-positioned output window was opened outside the go-live gesture.
+    expect(vi.mocked(window.open).mock.calls.length).toBe(openCallsBefore)
+  })
+
+  it('after rehearse (live, NO windows) clicking a header dot still opens NO window (reopenOutput no-ops)', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    // Rehearse never resolved getScreenDetails, so liveScreenDetails is null and the
+    // reopenOutput guard no-ops even though the dot is now actionable (live && !open).
+    const openCallsBefore = vi.mocked(window.open).mock.calls.length
+    await wrapper.find('[data-testid="run-display-dot-audience"]').trigger('click')
+    await wrapper.find('[data-testid="run-display-dot-confidence"]').trigger('click')
+    await flushPromises()
+    expect(vi.mocked(window.open).mock.calls.length).toBe(openCallsBefore)
+  })
+})
+
+// ── 97 REVIEW WR-02: pre-flight Enter triggers go-live; inert once live ─────────
+describe('RunControlView — Enter goes live from pre-flight (WR-02)', () => {
+  it('pressing Enter in State A triggers go-live (openOutputs runs)', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // getScreenDetails is deleted + window.open stubbed to null in beforeEach, so
+    // Enter → openOutputs → openUnplaced attempts both window.open calls (→ blocked).
+    const openCallsBefore = vi.mocked(window.open).mock.calls.length
+    keydown('Enter')
+    await flushPromises()
+
+    // Enter reached the SAME go-live action as run-go-live-btn: window.open was
+    // attempted for the two outputs and the honest blocked banner rendered.
+    expect(vi.mocked(window.open).mock.calls.length).toBeGreaterThan(openCallsBefore)
+    expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(true)
+  })
+
+  it('Enter does nothing once live (no second go-live)', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Enter live via rehearse (opens no window).
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    const openCallsBefore = vi.mocked(window.open).mock.calls.length
+    keydown('Enter')
+    await flushPromises()
+
+    // No go-live path fires while live — window.open is never called by Enter.
+    expect(vi.mocked(window.open).mock.calls.length).toBe(openCallsBefore)
+  })
+})
+
+// ── 97 REVIEW IN-02: transport + blackout keys inert pre-live ────────────────────
+describe('RunControlView — transport/blackout keys inert pre-live (IN-02)', () => {
+  it('ArrowRight/ArrowDown/B do nothing in pre-flight State A (no post, no blackout)', async () => {
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    const before = fake.states().length // slide 0 posted on mount
+    keydown('ArrowRight')
+    keydown('ArrowDown')
+    keydown('b')
+    await flushPromises()
+
+    // No new state posted — the transport and blackout keys are inert before go-live.
+    expect(fake.states().length).toBe(before)
+    // The mount state is still slide 0 with blackout false — B never toggled it, so
+    // go-live can never start the projector black from a stray pre-flight keypress.
+    const last = fake.states()[fake.states().length - 1]!
+    expect(last.index).toBe(0)
+    expect(last.blackout).toBe(false)
   })
 })

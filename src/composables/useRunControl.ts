@@ -24,7 +24,7 @@
  * composable is a pure behaviour seam — ZERO behaviour change from the extraction.
  */
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import type { ComponentPublicInstance, ComputedRef } from 'vue'
+import type { ComputedRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useServiceAssembly } from '@/composables/useServiceAssembly'
 import { useRunTimers } from '@/composables/useRunTimers'
@@ -224,16 +224,13 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     postIndex(t)
   }
 
-  // ── Auto-scroll the active rail row into view ──────────────────────────────
-  const railRef = ref<HTMLElement | null>(null)
-  const activeItemRef = ref<HTMLElement | null>(null)
-  function captureActiveRow(el: Element | ComponentPublicInstance | null, isActive: boolean) {
-    if (isActive) activeItemRef.value = (el as HTMLElement | null) ?? null
-  }
-  watch(index, async () => {
-    await nextTick()
-    activeItemRef.value?.scrollIntoView({ block: 'nearest' })
-  })
+  // Active-row auto-scroll now lives entirely in RunRail.vue (97-06), which owns
+  // its own captureActiveRow + watch(activeIndex) scrollIntoView. The parent-side
+  // copy that used to sit here was a dead extraction leftover (IN-01): the view
+  // never bound the composable's railRef/captureActiveRow to the child, so its
+  // watch(index) → activeItemRef?.scrollIntoView was a permanent optional-chain
+  // no-op. Removed so the composable's contract matches what actually drives
+  // scrolling — the child is the sole owner.
 
   // ── Keyboard (R265) ────────────────────────────────────────────────────────
   const confirmOpen = ref(false)
@@ -243,6 +240,27 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     if (confirmOpen.value) return // nav keys inert while the dialog is open
     const t = document.activeElement
     if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return // inert in text inputs
+    // PRE-LIVE (State A, !live): ONLY Enter (go live) and Escape act. The
+    // transport (arrows/Space) and blackout (B) keys are INERT — there is nothing
+    // on the screens to navigate or black out before go-live, and an inert
+    // pre-live keyboard complements WR-01's no-action-pre-live posture (a stray
+    // keypress can no longer silently change what go-live will show). WR-02: Enter
+    // fires the SAME go-live action as run-go-live-btn, wiring the "Press Enter to
+    // go live" hint the pre-flight panel advertises.
+    if (!live.value) {
+      switch (e.key) {
+        case 'Enter':
+          e.preventDefault()
+          openOutputs()
+          break
+        case 'Escape':
+          e.preventDefault()
+          confirmOpen.value = true // OPEN the confirm — never immediate teardown
+          break
+      }
+      return
+    }
+    // LIVE (State B): full transport + blackout.
     switch (e.key) {
       case 'ArrowRight':
       case ' ':
@@ -372,6 +390,15 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // from a button rendered while placed+mounted, so this cannot fire post-exit in
     // production, but the early-return keeps it honest against a future refactor.
     if (isUnmounted) return
+    // WR-01 (defense-in-depth): NEVER open an output window outside a real live
+    // session that has already gone live. A reopen is only ever legitimate as a
+    // recovery of a genuinely-closed output — which requires (a) live===true and
+    // (b) a HELD go-live ScreenDetails (liveScreenDetails). Pre-flight (live=false)
+    // and Rehearse (live=true but no getScreenDetails was ever resolved, so
+    // liveScreenDetails===null) both NO-OP here, so a stray dot/panel emit can
+    // never open an un-positioned window that bypasses the honest open state
+    // machine (outputStatus would still read idle while a real window was live).
+    if (!live.value || liveScreenDetails === null) return
     const name = role === 'audience' ? 'wp-audience' : 'wp-confidence'
     const url = role === 'audience' ? audienceUrl() : confidenceUrl()
     const saved = loadMapping()
@@ -858,8 +885,6 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     firstIndexBySlot,
     countLabel,
     jumpToSlot,
-    railRef,
-    captureActiveRow,
     // transport (returned for 97-08/97-09 wiring even though the current template
     // drives them via handleKeydown/jumpToSlot internally — harmless + forward-enabling)
     goBySlide,
