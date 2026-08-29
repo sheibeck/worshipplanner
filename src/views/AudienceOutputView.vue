@@ -23,6 +23,19 @@
       :interactive="false"
     />
 
+    <!-- R280 — full-bleed blackout overlay. When the control posts blackout:true
+         the projector shows pure black, painting OVER the live slide (sibling of
+         SlideCanvas, after it in paint order); blackout:false removes it and the
+         slide returns. No partial reveal (T-97-03-03). The reenter overlay stays
+         AFTER this so the re-enter button remains reachable if fullscreen is lost
+         mid-blackout. -->
+    <div
+      v-if="blackout"
+      class="absolute inset-0 bg-black"
+      data-testid="audience-blackout"
+      aria-hidden="true"
+    ></div>
+
     <!-- R271 / Pitfall 6 — the ONE interactive element in this view, shown
          ONLY when fullscreen has been lost. It overlays the live slide (no
          black scrim — slides keep advancing underneath). Its click re-enters
@@ -83,8 +96,8 @@ const props = defineProps<{
 // font gate, rootStyle cursor coupling, non-teardown fullscreen recovery, and the
 // Screen Wake Lock — all registered on THIS view's instance via its onMounted/
 // onUnmounted. The per-canvas media plumbing stays view-local below.
-const { assembledSlideshow, index, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
-  useOutputWindow({ channelFactory: props.channelFactory })
+const { assembledSlideshow, index, blackout, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
+  useOutputWindow({ channelFactory: props.channelFactory, role: 'audience' })
 
 // ── Current slide + media invariant (view-local per-canvas plumbing) ──────────
 // A null index (before the first RunState) and an out-of-range index both
