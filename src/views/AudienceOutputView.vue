@@ -37,21 +37,24 @@
     ></div>
 
     <!-- R271 / Pitfall 6 — the ONE interactive element in this view, shown
-         ONLY when fullscreen has been lost. It overlays the live slide (no
-         black scrim — slides keep advancing underneath). Its click re-enters
-         fullscreen synchronously; losing fullscreen NEVER tears down the
-         session, closes the channel, or unmounts the window. Calm neutral,
-         NOT the app's action accent. -->
-    <div
+         ONLY when fullscreen has been lost. The WHOLE surface is the tap target
+         (inset-0 full-bleed button): one tap ANYWHERE on the display re-enters
+         fullscreen synchronously (the gestured path — permitted without any
+         delegation). It overlays the live slide (transparent, no black scrim —
+         slides keep advancing underneath) and the centered pill is only a visual
+         hint (pointer-events-none so the tap always lands on the button). Losing
+         fullscreen NEVER tears down the session, closes the channel, or unmounts
+         the window. Calm neutral, NOT the app's action accent. -->
+    <button
       v-if="!isFullscreen"
-      class="absolute inset-0 flex items-center justify-center"
+      type="button"
+      data-testid="audience-reenter-fullscreen"
+      aria-label="Re-enter fullscreen"
+      class="absolute inset-0 flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer"
+      @click="handleReenterFullscreen"
     >
-      <button
-        type="button"
-        data-testid="audience-reenter-fullscreen"
-        aria-label="Re-enter fullscreen"
-        class="inline-flex items-center gap-2 rounded-full bg-gray-900/80 backdrop-blur-sm px-4 min-h-11 min-w-11 text-base font-medium text-gray-100"
-        @click="handleReenterFullscreen"
+      <span
+        class="pointer-events-none inline-flex items-center gap-2 rounded-full bg-gray-900/80 backdrop-blur-sm px-4 min-h-11 min-w-11 text-base font-medium text-gray-100"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -69,8 +72,8 @@
           />
         </svg>
         Re-enter fullscreen
-      </button>
-    </div>
+      </span>
+    </button>
   </div>
 </template>
 

@@ -519,13 +519,18 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // Owner UAT — auto-fullscreen the output windows. Chrome's Window Management
     // API supports opening a popup DIRECTLY in fullscreen via the `fullscreen`
     // window feature (with the window-management permission — already granted in
-    // monitor setup — and this Go-live user gesture). That is far more reliable
-    // than requesting fullscreen AFTER the popup loads, which loses the popup's
-    // transient activation to the SPA/auth bootstrap. `left`/`top` pick the
-    // target monitor; `fullscreen` fills it with no chrome. The child's own
-    // requestFullscreen() + the manual "Re-enter fullscreen" affordance remain
-    // as fallbacks for browsers that ignore the `fullscreen` feature.
-    // Refs: developer.chrome.com Window Management API + fullscreen popups.
+    // monitor setup — and this Go-live user gesture). `left`/`top` pick the
+    // target monitor; `fullscreen` fills it with no chrome. These features are
+    // harmless best-effort positioning.
+    //
+    // NOTE: we DELIBERATELY do NOT call win.document.documentElement.request-
+    // Fullscreen() here. That cross-document call targets the child's still-
+    // loading/blank document from the OPENER and never worked. Reliable auto-
+    // fullscreen is now Fullscreen Capability Delegation: the child announces
+    // { type:'wp-output-ready' } and we delegate our fullscreen capability back
+    // to it (see installFullscreenDelegation / handleOutputReady) while this
+    // Go-live click's transient activation is still valid — plus the child's
+    // one-tap-anywhere affordance as the guaranteed fallback.
     const features = screen
       ? `fullscreen,popup,left=${screen.left},top=${screen.top},width=${screen.width},height=${screen.height}`
       : ''
@@ -538,18 +543,54 @@ export function useRunControl(options: UseRunControlOptions = {}) {
       } catch {
         // best-effort placement — never throw
       }
-      try {
-        // The non-standard `screen` fullscreen option is not in the base TS lib;
-        // cast + guard. Real reliable fullscreen is each output window's OWN
-        // affordance, so a rejection here is silent (never tear down).
-        win.document?.documentElement?.requestFullscreen?.({
-          screen,
-        } as unknown as FullscreenOptions)
-      } catch {
-        // activation lost / embedding / unsupported — silent, best-effort
-      }
     }
     return win
+  }
+
+  // ── Fullscreen Capability Delegation (opener side) ──────────────────────────
+  // A popup cannot self-fullscreen (it loses its own activation to its bootstrap),
+  // but WE (the control window) still hold transient activation from the Go-live
+  // click. When an opened output posts { type:'wp-output-ready' } back to us, we
+  // delegate our fullscreen capability to that exact window via postMessage with
+  // the non-standard { delegate:'fullscreen' } option, so the child may then
+  // requestFullscreen() with no gesture of its own. Trust is gated on same-origin
+  // AND event.source being one of OUR opened output handles. Feature-detected by
+  // being ignored: a browser without capability delegation simply drops the option
+  // and the child uses its one-tap-anywhere fallback. Never throws.
+  let fullscreenDelegationInstalled = false
+
+  function handleOutputReady(event: MessageEvent) {
+    if (event.origin !== window.location.origin) return
+    const data = event.data as { type?: string } | null
+    if (!data || data.type !== 'wp-output-ready') return
+    const source = event.source
+    if (!source) return
+    // Only delegate to a window WE opened (one of the stored output handles).
+    const isOurs = Object.keys(outputWindows).some((name) => outputWindows[name] === source)
+    if (!isOurs) return
+    try {
+      ;(source as Window).postMessage(
+        { type: 'wp-fullscreen-delegate' },
+        // The non-standard `delegate` option is not in the base TS lib's
+        // WindowPostMessageOptions — cast it. Ignored by browsers without
+        // Fullscreen Capability Delegation (the child then uses its tap fallback).
+        { targetOrigin: window.location.origin, delegate: 'fullscreen' } as unknown as WindowPostMessageOptions,
+      )
+    } catch {
+      // cross-origin / torn-down source / unsupported — best-effort, never throw
+    }
+  }
+
+  function installFullscreenDelegation() {
+    if (fullscreenDelegationInstalled) return
+    window.addEventListener('message', handleOutputReady)
+    fullscreenDelegationInstalled = true
+  }
+
+  function removeFullscreenDelegation() {
+    if (!fullscreenDelegationInstalled) return
+    window.removeEventListener('message', handleOutputReady)
+    fullscreenDelegationInstalled = false
   }
 
   /** Resolve a role → its saved fingerprint → the live screen with that fingerprint. */
@@ -650,6 +691,10 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // getScreenDetails() resolve becomes stale and is dropped below.
     const requestId = ++goLiveRequestId
     outputStatus.value = 'opening'
+    // Start listening for output-window readiness BEFORE any window.open, so the
+    // Fullscreen Capability Delegation handshake is armed the instant a child
+    // signals ready — while THIS click's transient activation is still valid.
+    installFullscreenDelegation()
     // Control-screen fullscreen on go-live. This runs SYNCHRONOUSLY inside the
     // run-go-live-btn click / Enter handler (nothing is awaited before it), so the
     // click's live transient activation still authorizes it — the operator asked
@@ -749,6 +794,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // reopen chip after teardown (96-01 endurance fix). Null-guarded for the
     // double call with onUnmounted.
     stopRecoveryWatchers()
+    // Stop listening for output-window readiness — the run session is ending, so
+    // no further fullscreen delegation should fire (and the listener must not leak).
+    removeFullscreenDelegation()
     // Leave the live state: drop live + rehearsing + blackout and reset the elapsed
     // timer (R277/R280/R281). Order relative to the window teardown does not matter.
     live.value = false
@@ -1014,6 +1062,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // closeOutputs() never nulls outputWindows, so without this an uncleared poll
     // would run forever after unmount — the load-bearing endurance fix.
     stopRecoveryWatchers()
+    // Never leak the fullscreen-delegation message listener past teardown.
+    removeFullscreenDelegation()
     handle?.close()
     document.removeEventListener('keydown', handleKeydown)
     // Owner fix #6: never leak the live-only beforeunload listener past teardown.

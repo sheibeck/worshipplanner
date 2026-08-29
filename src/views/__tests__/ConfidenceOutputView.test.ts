@@ -842,13 +842,13 @@ describe('ConfidenceOutputView — left/right split layout (R279) + next-scale (
   })
 })
 
-describe('ConfidenceOutputView — plain synchronous self-fullscreen on mount (Pitfall 1 fix)', () => {
-  it('requests fullscreen ONCE with NO { screen } option on mount and does NOT resolve getScreenDetails', async () => {
-    // The mount-time fullscreen is now a PLAIN, no-await requestFullscreen(): the
-    // opener-transferred transient activation must NOT be consumed by an awaited
-    // getScreenDetails() (that intervening await is what rejected the request and
-    // surfaced the "Re-enter fullscreen" button). Install getScreenDetails to prove
-    // the self-fullscreen path no longer touches it.
+describe('ConfidenceOutputView — no un-gestured mount fullscreen + one-tap fallback (delegation model)', () => {
+  it('does NOT self-request fullscreen on mount and does NOT touch getScreenDetails (the console-error fix)', async () => {
+    // The old mount-time requestFullscreen() always rejected with "API can only be
+    // initiated by a user gesture" — a popup loses its own activation to its SPA/
+    // auth bootstrap. That was the console error. Auto-fullscreen is now driven by
+    // Fullscreen Capability Delegation FROM THE OPENER, so mount fires NO
+    // self-request and never resolves the Window Management API.
     const getScreenDetails = installGetScreenDetails([screenA, screenB])
 
     setFullscreenElement(null)
@@ -856,39 +856,31 @@ describe('ConfidenceOutputView — plain synchronous self-fullscreen on mount (P
     mountView(fake.factory)
     await flushPromises()
 
-    const rfs = vi.mocked(Element.prototype.requestFullscreen)
-    expect(rfs).toHaveBeenCalledTimes(1)
-    // No { screen } option — the control positions the window; plain fullscreen
-    // lands on the correct current screen.
-    expect(rfs.mock.calls[0]?.[0]).toBeUndefined()
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
     expect(getScreenDetails).not.toHaveBeenCalled()
   })
 
-  it('does NOT throw and still attempts a single plain requestFullscreen() when the Window Management API is absent', async () => {
-    expect('getScreenDetails' in window).toBe(false)
+  it('renders a FULL-SURFACE one-tap affordance while windowed — a tap ANYWHERE re-enters fullscreen', async () => {
     setFullscreenElement(null)
     const fake = createFakeChannel()
-
-    let error: unknown = null
-    try {
-      mountView(fake.factory)
-      await flushPromises()
-    } catch (e) {
-      error = e
-    }
-    expect(error).toBeNull()
-
-    const rfs = vi.mocked(Element.prototype.requestFullscreen)
-    expect(rfs).toHaveBeenCalledTimes(1)
-    expect(rfs.mock.calls[0]?.[0]).toBeUndefined()
-  })
-
-  it('does NOT auto-request fullscreen when already fullscreen at mount', async () => {
-    setFullscreenElement(document.createElement('div'))
-    const fake = createFakeChannel()
-    mountView(fake.factory)
+    const wrapper = mountView(fake.factory)
     await flushPromises()
 
+    const affordance = wrapper.get('[data-testid="confidence-reenter-fullscreen"]')
+    // Full-bleed: the WHOLE display surface is the tap target (inset-0), not just a
+    // small centered button — one tap anywhere on the display goes fullscreen.
+    expect(affordance.classes()).toContain('inset-0')
+    await affordance.trigger('click')
+    expect(Element.prototype.requestFullscreen).toHaveBeenCalled()
+  })
+
+  it('hides the one-tap affordance once fullscreen (never blocks the live panes)', async () => {
+    setFullscreenElement(document.createElement('div'))
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="confidence-reenter-fullscreen"]').exists()).toBe(false)
     expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
   })
 })

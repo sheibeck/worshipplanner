@@ -165,6 +165,9 @@ type FakeWin = {
   moveTo: ReturnType<typeof vi.fn>
   close: ReturnType<typeof vi.fn>
   closed: boolean
+  // postMessage — the target of the opener's Fullscreen Capability Delegation
+  // ({ type:'wp-fullscreen-delegate' }) once the output posts wp-output-ready.
+  postMessage: ReturnType<typeof vi.fn>
   document: { documentElement: { requestFullscreen: ReturnType<typeof vi.fn> } }
 }
 let openedWins: FakeWin[] = []
@@ -173,6 +176,7 @@ function makeFakeWin(): Window {
     moveTo: vi.fn(),
     close: vi.fn(),
     closed: false,
+    postMessage: vi.fn(),
     document: { documentElement: { requestFullscreen: vi.fn().mockResolvedValue(undefined) } },
   }
   openedWins.push(win)
@@ -353,7 +357,7 @@ describe('RunControlView output — pre-open idle state (R261; T-95-19)', () => 
 
 // ── 1. MATCHED — open + place both windows on their assigned screens ────────────
 describe('RunControlView output — matched placement (R261/R266)', () => {
-  it('opens the audience + confidence windows with stable names, fullscreens each on its screen, and shows both outputs green/ready in the Displays panel', async () => {
+  it('opens the audience + confidence windows with stable names + placement features, and shows both outputs green/ready in the Displays panel', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
@@ -365,12 +369,15 @@ describe('RunControlView output — matched placement (R261/R266)', () => {
     expect(openSpy).toHaveBeenCalledWith(AUDIENCE_URL, 'wp-audience', expect.stringMatching(/width=/))
     expect(openSpy).toHaveBeenCalledWith(CONFIDENCE_URL, 'wp-confidence', expect.stringMatching(/width=/))
 
-    // Each opened window was fullscreened with a { screen } option.
+    // Both handles came back (the placement features position each window).
     expect(openedWins).toHaveLength(2)
+    // NOTE: the opener no longer calls the child document's requestFullscreen
+    // (that cross-document call targeted the child's blank/loading doc and never
+    // worked). Auto-fullscreen is now Fullscreen Capability Delegation — proven in
+    // the dedicated delegation suite below — so no per-window requestFullscreen is
+    // expected here.
     for (const win of openedWins) {
-      expect(win.document.documentElement.requestFullscreen).toHaveBeenCalledWith(
-        expect.objectContaining({ screen: expect.anything() }),
-      )
+      expect(win.document.documentElement.requestFullscreen).not.toHaveBeenCalled()
     }
 
     // The honest success surface renders — both outputs green/ready in the Displays
@@ -1138,6 +1145,88 @@ describe('RunControlView output — control-screen fullscreen on go-live/exit (o
     await flushPromises()
 
     expect(exitSpy).not.toHaveBeenCalled()
+  })
+})
+
+// ── 14b. FULLSCREEN CAPABILITY DELEGATION (opener side) ──────────────────────────
+//    A popup cannot self-fullscreen (it loses its own activation to its bootstrap),
+//    so the control (which HOLDS activation from the Go-live click) delegates its
+//    fullscreen capability to each opened output when that output posts
+//    { type:'wp-output-ready' } back. Trust is gated on same-origin AND the message
+//    source being one of OUR opened window handles; the listener is torn down on
+//    exit so it never leaks.
+describe('RunControlView output — fullscreen capability delegation (opener side)', () => {
+  function fireMessage(data: unknown, origin: string, source: unknown) {
+    // Build a plain Event with the MessageEvent fields our handler reads — avoids
+    // jsdom's MessageEvent `source` type validation (a fake window is not a real
+    // WindowProxy) while still exercising the real window 'message' listener.
+    const evt = new Event('message') as MessageEvent
+    Object.defineProperty(evt, 'data', { value: data })
+    Object.defineProperty(evt, 'origin', { value: origin })
+    Object.defineProperty(evt, 'source', { value: source })
+    window.dispatchEvent(evt)
+  }
+
+  it('delegates fullscreen to an opened output that posts wp-output-ready (same-origin, known source)', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await goLive(wrapper)
+    expect(openedWins).toHaveLength(2)
+
+    // The audience output (openedWins[0]) signals ready → the control delegates
+    // fullscreen back to that exact window with the { delegate:'fullscreen' } option.
+    const audienceWin = openedWins[0]!
+    fireMessage({ type: 'wp-output-ready' }, window.location.origin, audienceWin)
+
+    expect(audienceWin.postMessage).toHaveBeenCalledWith(
+      { type: 'wp-fullscreen-delegate' },
+      expect.objectContaining({ delegate: 'fullscreen', targetOrigin: window.location.origin }),
+    )
+  })
+
+  it('ignores a wp-output-ready from a CROSS-ORIGIN message', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await goLive(wrapper)
+
+    const audienceWin = openedWins[0]!
+    fireMessage({ type: 'wp-output-ready' }, 'https://evil.example', audienceWin)
+    expect(audienceWin.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('ignores a wp-output-ready whose source is NOT one of our opened windows', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await goLive(wrapper)
+
+    const stranger = { postMessage: vi.fn() }
+    fireMessage({ type: 'wp-output-ready' }, window.location.origin, stranger)
+    expect(stranger.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('removes the delegation message listener on exit (no leak)', async () => {
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await goLive(wrapper)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    const confirmBtn = document.body.querySelector<HTMLElement>('[data-testid="run-exit-confirm"]')
+    expect(confirmBtn).not.toBeNull()
+    confirmBtn!.click()
+    await flushPromises()
+
+    // After teardown a wp-output-ready no longer delegates (listener removed).
+    expect(removeSpy.mock.calls.some((c) => c[0] === 'message')).toBe(true)
+    const audienceWin = openedWins[0]!
+    audienceWin.postMessage.mockClear()
+    fireMessage({ type: 'wp-output-ready' }, window.location.origin, audienceWin)
+    expect(audienceWin.postMessage).not.toHaveBeenCalled()
   })
 })
 

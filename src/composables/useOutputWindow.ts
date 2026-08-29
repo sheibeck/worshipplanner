@@ -41,10 +41,10 @@ export interface UseOutputWindowOptions {
   /**
    * Each output view passes its OWN static role ('audience' | 'confidence') — the
    * routes /present/audience|confidence make the role statically known. Retained as
-   * an harmless identity option; the mount-time fullscreen no longer resolves an
-   * assigned screen from it (see the onMounted note below): the control creates and
-   * positions each window on its assigned monitor via window.open features, so a
-   * PLAIN requestFullscreen() lands fullscreen on the correct current screen.
+   * a harmless identity option; fullscreen is no longer resolved from it. The
+   * control creates + positions each window on its assigned monitor via window.open
+   * features, and auto-fullscreen is driven by Fullscreen Capability Delegation from
+   * the opener (see handleDelegationMessage) rather than any self-request here.
    */
   role?: MonitorRole
 }
@@ -113,6 +113,33 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     })
   }
 
+  // ── Fullscreen Capability Delegation (best-effort zero-tap) ─────────────────
+  // A popup opened via window.open loses its OWN transient user-activation the
+  // moment its SPA/auth bootstrap runs, so a mount-time requestFullscreen() here
+  // always rejected ("API can only be initiated by a user gesture") — the console
+  // error the owner saw. The correct mechanism is Fullscreen Capability
+  // Delegation: the OPENER (control window), which still HAS activation from the
+  // Go-live click, delegates its fullscreen capability to us. We (a) announce
+  // readiness so the opener knows to delegate, and (b) on receiving the delegation
+  // message call requestFullscreen() — now permitted WITHOUT our own gesture. A
+  // browser that does not implement capability delegation simply never enables us,
+  // and the one-tap-anywhere affordance (rendered while !isFullscreen) guarantees
+  // a usable result. All best-effort: never throws, never surfaces an error.
+  function handleDelegationMessage(event: MessageEvent) {
+    // Trust ONLY same-origin messages (the opener is our own app on our origin).
+    if (event.origin !== window.location.origin) return
+    const data = event.data as { type?: string } | null
+    if (!data || data.type !== 'wp-fullscreen-delegate') return
+    // Permitted now via the delegated capability — swallow any rejection so a
+    // browser without delegation (or a lost activation) falls back to the tap.
+    try {
+      const result = document.documentElement.requestFullscreen?.()
+      if (result) result.catch(() => {})
+    } catch {
+      // Absent API / disallowed — silent; the one-tap affordance is the fallback.
+    }
+  }
+
   // ── Screen Wake Lock (R271; no in-repo analog) ─────────────────────────────
   const wakeLock = ref<WakeLockSentinel | null>(null)
 
@@ -147,23 +174,18 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     })
     handle.postHello()
 
-    // SYNCHRONOUS mount-time fullscreen (Pitfall 1 fix). This MUST be the first
-    // statement after postHello() with NOTHING awaited before it — the wake-lock
-    // and font-gate awaits are DELIBERATELY sequenced AFTER it. The opener's
-    // window.open transfers a transient user-activation to this child; ANY await
-    // here (the old selfFullscreen()'s getScreenDetails() in particular) consumes
-    // that activation before requestFullscreen runs, so the request rejects and
-    // the manual "Re-enter fullscreen" affordance appears instead of a real
-    // fullscreen start. The control CREATES + positions each output window on its
-    // assigned monitor via window.open features (see RunControl.openWindow), so a
-    // PLAIN requestFullscreen() (no { screen } option) goes fullscreen on the
-    // correct current screen. Feature-detected + .catch-swallowed: an absent API,
-    // a lost activation, or a rejection leaves the manual affordance as the honest
-    // fallback (shown only while !isFullscreen). NEVER throws.
-    if (!isFullscreen.value) {
-      rootRef.value?.requestFullscreen?.().catch(() => {
-        // Activation lost / unsupported — silent; the manual affordance remains.
-      })
+    // Fullscreen Capability Delegation — the ZERO-TAP path (replaces the old
+    // un-gestured mount-time requestFullscreen() that only ever threw the console
+    // error). Listen for the opener's delegation message, then announce readiness
+    // to the opener so it delegates its fullscreen capability back to us while its
+    // Go-live click's transient activation is still valid. Both wrapped so an
+    // absent/cross-origin opener never throws; if delegation never lands, the
+    // one-tap-anywhere affordance (rendered while !isFullscreen) is the fallback.
+    window.addEventListener('message', handleDelegationMessage)
+    try {
+      window.opener?.postMessage({ type: 'wp-output-ready' }, window.location.origin)
+    } catch {
+      // No opener / cross-origin opener — best-effort; the tap fallback remains.
     }
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
@@ -199,6 +221,7 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     handle?.close()
     document.removeEventListener('fullscreenchange', handleFullscreenChange)
     document.removeEventListener('visibilitychange', handleVisibilityChange)
+    window.removeEventListener('message', handleDelegationMessage)
     try {
       await wakeLock.value?.release()
     } catch {

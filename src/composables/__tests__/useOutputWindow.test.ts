@@ -373,3 +373,91 @@ describe('useOutputWindow — unmount cleanup', () => {
     expect(serviceStoreMock.unsubscribeAll).toHaveBeenCalledTimes(1)
   })
 })
+
+// ── Fullscreen Capability Delegation (child side) ───────────────────────────────
+// A popup opened via window.open loses its OWN transient user-activation once its
+// SPA/auth bootstrap runs, so a mount-time requestFullscreen() ALWAYS rejected
+// ("API can only be initiated by a user gesture") — the console error the owner
+// saw, and it never went fullscreen. The composable no longer self-requests on
+// mount. Instead it (a) announces { type:'wp-output-ready' } to window.opener, and
+// (b) on receiving the opener's same-origin { type:'wp-fullscreen-delegate' }
+// message, calls document.documentElement.requestFullscreen() — now permitted via
+// the delegated capability, WITHOUT its own gesture.
+describe('useOutputWindow — Fullscreen Capability Delegation (child side)', () => {
+  function fireMessage(data: unknown, origin: string) {
+    const evt = new Event('message') as MessageEvent
+    Object.defineProperty(evt, 'data', { value: data })
+    Object.defineProperty(evt, 'origin', { value: origin })
+    window.dispatchEvent(evt)
+  }
+
+  it('does NOT self-request fullscreen on mount (the un-gestured call is removed — the console-error fix)', async () => {
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+    mountHost(fake.factory)
+    await flushPromises()
+
+    // No opener present (jsdom default) → no delegation → NO requestFullscreen.
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
+  })
+
+  it('posts { type:"wp-output-ready" } to window.opener on mount', async () => {
+    const openerPost = vi.fn()
+    Object.defineProperty(window, 'opener', {
+      value: { postMessage: openerPost },
+      configurable: true,
+      writable: true,
+    })
+    try {
+      const fake = createFakeChannel()
+      mountHost(fake.factory)
+      await flushPromises()
+      expect(openerPost).toHaveBeenCalledWith({ type: 'wp-output-ready' }, window.location.origin)
+    } finally {
+      Object.defineProperty(window, 'opener', { value: null, configurable: true, writable: true })
+    }
+  })
+
+  it('requests fullscreen on a same-origin { type:"wp-fullscreen-delegate" } message', async () => {
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+    mountHost(fake.factory)
+    await flushPromises()
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
+
+    fireMessage({ type: 'wp-fullscreen-delegate' }, window.location.origin)
+    await flushPromises()
+
+    // document.documentElement inherits the prototype-stubbed requestFullscreen.
+    expect(vi.mocked(Element.prototype.requestFullscreen)).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a CROSS-ORIGIN delegate message', async () => {
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+    mountHost(fake.factory)
+    await flushPromises()
+
+    fireMessage({ type: 'wp-fullscreen-delegate' }, 'https://evil.example')
+    await flushPromises()
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
+  })
+
+  it('removes the message listener on unmount (no leak) — a later delegate does nothing', async () => {
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+    const wrapper = mountHost(fake.factory)
+    await flushPromises()
+
+    wrapper.unmount()
+    await flushPromises()
+    expect(removeSpy.mock.calls.some((c) => c[0] === 'message')).toBe(true)
+
+    // After unmount the delegate is inert.
+    vi.mocked(Element.prototype.requestFullscreen).mockClear()
+    fireMessage({ type: 'wp-fullscreen-delegate' }, window.location.origin)
+    await flushPromises()
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
+  })
+})
