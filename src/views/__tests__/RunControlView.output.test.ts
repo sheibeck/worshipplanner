@@ -1026,3 +1026,86 @@ describe('RunControlView output — blackout during a live session (R280)', () =
     }
   })
 })
+
+// ── 14. CONTROL-SCREEN FULLSCREEN ON GO-LIVE / EXIT (owner UAT) ──────────────────
+//    The operator asked for the CONTROL window to also enter fullscreen when
+//    Running the service (Go-live), and to leave fullscreen on exit. openOutputs
+//    requests fullscreen on the document root SYNCHRONOUSLY in the click path (so
+//    the click activation authorizes it); confirmExit exits it only when the
+//    document is actually fullscreen (a rehearse-only exit never entered it).
+describe('RunControlView output — control-screen fullscreen on go-live/exit (owner UAT)', () => {
+  function setDocFullscreenElement(value: Element | null) {
+    Object.defineProperty(document, 'fullscreenElement', {
+      value,
+      configurable: true,
+      writable: true,
+    })
+  }
+
+  let rfsSpy: ReturnType<typeof vi.fn>
+  let exitSpy: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    rfsSpy = vi.fn().mockResolvedValue(undefined)
+    exitSpy = vi.fn().mockResolvedValue(undefined)
+    ;(document.documentElement as unknown as { requestFullscreen: unknown }).requestFullscreen = rfsSpy
+    ;(document as unknown as { exitFullscreen: unknown }).exitFullscreen = exitSpy
+    setDocFullscreenElement(null)
+  })
+
+  afterEach(() => {
+    delete (document.documentElement as unknown as { requestFullscreen?: unknown }).requestFullscreen
+    delete (document as unknown as { exitFullscreen?: unknown }).exitFullscreen
+    setDocFullscreenElement(null)
+  })
+
+  it('go-live requests PLAIN fullscreen on the control document root (synchronously in the click path)', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+
+    expect(rfsSpy).toHaveBeenCalledTimes(1)
+    // Plain request — the control never passes a { screen } option.
+    expect(rfsSpy.mock.calls[0]?.[0]).toBeUndefined()
+  })
+
+  it('confirmExit exits control fullscreen when the document IS fullscreen', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await goLive(wrapper)
+
+    // Simulate the control window being fullscreen after go-live.
+    setDocFullscreenElement(document.documentElement)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    const confirmBtn = document.body.querySelector<HTMLElement>('[data-testid="run-exit-confirm"]')
+    expect(confirmBtn).not.toBeNull()
+    confirmBtn!.click()
+    await flushPromises()
+
+    expect(exitSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('confirmExit does NOT call exitFullscreen when the document is NOT fullscreen', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await goLive(wrapper)
+
+    // Control never entered fullscreen (e.g. the request was refused).
+    setDocFullscreenElement(null)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    const confirmBtn = document.body.querySelector<HTMLElement>('[data-testid="run-exit-confirm"]')
+    expect(confirmBtn).not.toBeNull()
+    confirmBtn!.click()
+    await flushPromises()
+
+    expect(exitSpy).not.toHaveBeenCalled()
+  })
+})

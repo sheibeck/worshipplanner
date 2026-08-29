@@ -622,6 +622,16 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // getScreenDetails() resolve becomes stale and is dropped below.
     const requestId = ++goLiveRequestId
     outputStatus.value = 'opening'
+    // Control-screen fullscreen on go-live. This runs SYNCHRONOUSLY inside the
+    // run-go-live-btn click / Enter handler (nothing is awaited before it), so the
+    // click's live transient activation still authorizes it — the operator asked
+    // for the CONTROL window to also go fullscreen when running the service. Plain
+    // requestFullscreen() on the document root, feature-detected + .catch-swallowed
+    // (never throws, never tears down); Rehearse does NOT call openOutputs, so it
+    // stays windowed. Exited again in confirmExit.
+    document.documentElement.requestFullscreen?.().catch(() => {
+      // Activation lost / unsupported — silent; running continues windowed.
+    })
     if (!('getScreenDetails' in window)) {
       openUnplaced()
       return
@@ -705,6 +715,14 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // close + router.push, so ending run mode tears down the real displays (R266).
     closeOutputs()
     handle?.close()
+    // Leave the control-screen fullscreen entered on go-live (only when we are
+    // actually fullscreen — a rehearse exit never entered it). Feature-detected +
+    // .catch-swallowed so a reject/absence never blocks teardown or navigation.
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {
+        // Already exited / unsupported — never block the exit path.
+      })
+    }
     router.push({ name: 'service-editor', params: { id: serviceId.value } })
   }
   watch(confirmOpen, async (open) => {

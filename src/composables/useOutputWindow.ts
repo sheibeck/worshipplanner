@@ -26,7 +26,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
 import { useServiceAssembly } from '@/composables/useServiceAssembly'
 import { openRunChannel, type BroadcastChannelFactory, type RunChannelHandle } from '@/utils/runChannel'
-import { loadMapping, computeFingerprint, type MonitorRole, type ScreenLike } from '@/utils/monitorConfig'
+import { type MonitorRole } from '@/utils/monitorConfig'
 import { SLIDE_FONTS } from '@/config/slideFonts'
 import { cssVarsFor, snapWeight, waitForSlideFont, loadFontCss, FONT_LOAD_TIMEOUT_MS } from '@/utils/slideTypography'
 
@@ -39,12 +39,12 @@ export interface UseOutputWindowOptions {
    */
   channelFactory?: BroadcastChannelFactory
   /**
-   * R278 self-fullscreen: each output view passes its OWN static role
-   * ('audience' | 'confidence') — the routes /present/audience|confidence make
-   * the role statically known, so no control-side `&role=` URL param is needed.
-   * When set (and the Window Management API + a saved mapping resolve the role's
-   * assigned screen), the mount-time selfFullscreen() targets that screen. When
-   * absent/unresolvable it degrades to a single plain requestFullscreen().
+   * Each output view passes its OWN static role ('audience' | 'confidence') — the
+   * routes /present/audience|confidence make the role statically known. Retained as
+   * an harmless identity option; the mount-time fullscreen no longer resolves an
+   * assigned screen from it (see the onMounted note below): the control creates and
+   * positions each window on its assigned monitor via window.open features, so a
+   * PLAIN requestFullscreen() lands fullscreen on the correct current screen.
    */
   role?: MonitorRole
 }
@@ -113,55 +113,6 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     })
   }
 
-  // ── Self-fullscreen on load (R278) ─────────────────────────────────────────
-  // Each output resolves ITS OWN assigned screen from the granted Window
-  // Management permission + the saved localStorage mapping, then fullscreens
-  // onto it — replacing reliance on the control's unreliable cross-document
-  // requestFullscreen({ screen }). Every call is feature-detected + try/catch
-  // swallowed: a missing permission, absent API, or unresolvable screen degrades
-  // to a single plain requestFullscreen(), and the manual "Re-enter fullscreen"
-  // affordance remains as the honest final fallback. NEVER throws.
-
-  /** Resolve the role's saved fingerprint → the live screen with that fingerprint (mirrors RunControlView.resolveScreen). Never throws. */
-  async function resolveAssignedScreen(): Promise<ScreenLike | null> {
-    if (!options.role || !('getScreenDetails' in window)) return null
-    try {
-      const details = await (
-        window as unknown as { getScreenDetails: () => Promise<{ screens: ScreenLike[] }> }
-      ).getScreenDetails()
-      const saved = loadMapping()
-      if (!saved) return null
-      const fingerprint = saved.assignments.find((a) => a.role === options.role)?.fingerprint
-      if (!fingerprint) return null
-      return details.screens.find((s) => computeFingerprint(s) === fingerprint) ?? null
-    } catch {
-      // Permission denied / API rejects — degrade to the plain-fullscreen fallback.
-      return null
-    }
-  }
-
-  /** Best-effort mount-time fullscreen onto the assigned screen; plain fullscreen once when unresolvable. Never throws. */
-  async function selfFullscreen() {
-    if (isFullscreen.value) return
-    const screen = await resolveAssignedScreen()
-    try {
-      // Pitfall 5 — the requestFullscreen call is the FIRST statement in each
-      // branch; the non-standard { screen } option is cast+guarded exactly as
-      // RunControlView.openWindow does. requestFullscreen rejects ASYNC (not a
-      // throw), so the returned promise is .catch-swallowed like the manual
-      // affordance; the try/catch guards a synchronous absence of the method.
-      const attempt = screen
-        ? rootRef.value?.requestFullscreen({ screen } as unknown as FullscreenOptions)
-        : rootRef.value?.requestFullscreen()
-      attempt?.catch(() => {
-        // Missing gesture / activation lost / unsupported — silent; the manual
-        // "Re-enter fullscreen" affordance remains as the honest fallback.
-      })
-    } catch {
-      // Synchronous absence/unsupported — silent; the manual affordance remains.
-    }
-  }
-
   // ── Screen Wake Lock (R271; no in-repo analog) ─────────────────────────────
   const wakeLock = ref<WakeLockSentinel | null>(null)
 
@@ -196,9 +147,24 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     })
     handle.postHello()
 
-    // R278 — best-effort self-fullscreen onto this role's assigned monitor,
-    // AFTER postHello() so channel setup is never blocked by a fullscreen await.
-    void selfFullscreen()
+    // SYNCHRONOUS mount-time fullscreen (Pitfall 1 fix). This MUST be the first
+    // statement after postHello() with NOTHING awaited before it — the wake-lock
+    // and font-gate awaits are DELIBERATELY sequenced AFTER it. The opener's
+    // window.open transfers a transient user-activation to this child; ANY await
+    // here (the old selfFullscreen()'s getScreenDetails() in particular) consumes
+    // that activation before requestFullscreen runs, so the request rejects and
+    // the manual "Re-enter fullscreen" affordance appears instead of a real
+    // fullscreen start. The control CREATES + positions each output window on its
+    // assigned monitor via window.open features (see RunControl.openWindow), so a
+    // PLAIN requestFullscreen() (no { screen } option) goes fullscreen on the
+    // correct current screen. Feature-detected + .catch-swallowed: an absent API,
+    // a lost activation, or a rejection leaves the manual affordance as the honest
+    // fallback (shown only while !isFullscreen). NEVER throws.
+    if (!isFullscreen.value) {
+      rootRef.value?.requestFullscreen?.().catch(() => {
+        // Activation lost / unsupported — silent; the manual affordance remains.
+      })
+    }
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     document.addEventListener('visibilitychange', handleVisibilityChange)

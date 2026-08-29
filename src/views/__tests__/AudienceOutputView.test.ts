@@ -26,7 +26,7 @@ import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { reactive } from 'vue'
 import type { AssembledSlide } from '@/types/slide'
 import type { BroadcastChannelLike, BroadcastChannelFactory } from '@/utils/runChannel'
-import { computeFingerprint, saveMapping, type ScreenLike } from '@/utils/monitorConfig'
+import { type ScreenLike } from '@/utils/monitorConfig'
 import AudienceOutputView from '../AudienceOutputView.vue'
 
 // onUnmounted must run so the channel-close, wake-lock-release, and
@@ -583,32 +583,33 @@ describe('AudienceOutputView — blackout overlay obeys the channel field (R280)
   })
 })
 
-describe('AudienceOutputView — self-fullscreen on assigned monitor (R278)', () => {
-  it('resolves the audience screen from the saved mapping + getScreenDetails and requestFullscreen({ screen }) on mount', async () => {
-    // Seed a mapping whose audience fingerprint matches screenA, and install a
-    // fake getScreenDetails resolving [screenA, screenB]. computeFingerprint of
-    // the RESOLVED live screen must match the seeded fingerprint, so the role
-    // resolves to screenA — proving the saved-mapping → live-screen match.
-    saveMapping({ assignments: [{ role: 'audience', fingerprint: computeFingerprint(screenA) }], savedAt: 0 })
+describe('AudienceOutputView — plain synchronous self-fullscreen on mount (Pitfall 1 fix)', () => {
+  it('requests fullscreen ONCE with NO { screen } option on mount and does NOT resolve getScreenDetails', async () => {
+    // The mount-time fullscreen is now a PLAIN, no-await requestFullscreen(): the
+    // opener-transferred transient activation must NOT be consumed by an awaited
+    // getScreenDetails() (that intervening await is what rejected the request and
+    // surfaced the "Re-enter fullscreen" button). Install getScreenDetails to prove
+    // the self-fullscreen path no longer touches it.
     const getScreenDetails = installGetScreenDetails([screenA, screenB])
 
-    // Not fullscreen at mount, so selfFullscreen proceeds.
+    // Not fullscreen at mount, so the auto-request proceeds.
     setFullscreenElement(null)
     const fake = createFakeChannel()
     mountView(fake.factory)
     await flushPromises()
 
-    expect(getScreenDetails).toHaveBeenCalledTimes(1)
     const rfs = vi.mocked(Element.prototype.requestFullscreen)
-    expect(rfs).toHaveBeenCalled()
-    // The FIRST (mount-time) call carries the { screen } option resolved to screenA.
-    const firstArg = rfs.mock.calls[0]?.[0] as { screen?: unknown } | undefined
-    expect(firstArg?.screen).toBe(screenA)
+    expect(rfs).toHaveBeenCalledTimes(1)
+    // No { screen } option — the control positions the window; plain fullscreen
+    // lands on the correct current screen.
+    expect(rfs.mock.calls[0]?.[0]).toBeUndefined()
+    // The self-fullscreen path no longer resolves an assigned screen.
+    expect(getScreenDetails).not.toHaveBeenCalled()
   })
 
-  it('does NOT throw and falls back to a single plain requestFullscreen() when getScreenDetails is absent', async () => {
-    // No Window Management API (jsdom default, afterEach cleaned) and no mapping →
-    // selfFullscreen must degrade to one plain requestFullscreen() and never throw.
+  it('does NOT throw and still attempts a single plain requestFullscreen() when the Window Management API is absent', async () => {
+    // No Window Management API (jsdom default, afterEach cleaned) — the plain
+    // fullscreen still fires exactly once and never throws.
     expect('getScreenDetails' in window).toBe(false)
     setFullscreenElement(null)
     const fake = createFakeChannel()
@@ -623,32 +624,19 @@ describe('AudienceOutputView — self-fullscreen on assigned monitor (R278)', ()
     expect(error).toBeNull()
 
     const rfs = vi.mocked(Element.prototype.requestFullscreen)
-    // Auto-attempted exactly once, PLAIN (no { screen } option).
     expect(rfs).toHaveBeenCalledTimes(1)
     expect(rfs.mock.calls[0]?.[0]).toBeUndefined()
   })
 
-  it('does NOT throw when getScreenDetails resolves but no live screen matches the mapping', async () => {
-    // Mapping points at screenA's fingerprint, but getScreenDetails resolves only
-    // screenB — the role is unresolvable. selfFullscreen must not throw and must
-    // still attempt a single plain requestFullscreen() fallback.
-    saveMapping({ assignments: [{ role: 'audience', fingerprint: computeFingerprint(screenA) }], savedAt: 0 })
-    installGetScreenDetails([screenB])
-    setFullscreenElement(null)
+  it('does NOT auto-request fullscreen when already fullscreen at mount', async () => {
+    // The !isFullscreen guard skips the auto-request when the window mounted
+    // already fullscreen — no redundant request, and the manual affordance stays
+    // hidden.
+    setFullscreenElement(document.createElement('div'))
     const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
 
-    let error: unknown = null
-    try {
-      mountView(fake.factory)
-      await flushPromises()
-    } catch (e) {
-      error = e
-    }
-    expect(error).toBeNull()
-
-    const rfs = vi.mocked(Element.prototype.requestFullscreen)
-    expect(rfs).toHaveBeenCalledTimes(1)
-    // Unresolvable screen → plain fullscreen, never a { screen } arg.
-    expect(rfs.mock.calls[0]?.[0]).toBeUndefined()
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
   })
 })
