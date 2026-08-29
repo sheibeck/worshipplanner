@@ -5,16 +5,16 @@ milestone_name: Run the Service (Live Presentation)
 current_phase: 92
 current_phase_name: v2.4
 status: planning
-stopped_at: Completed 95-04-PLAN.md
-last_updated: "2026-08-29T00:02:08.911Z"
+stopped_at: Completed 95-05-PLAN.md
+last_updated: "2026-08-29T00:17:03.257Z"
 last_activity: 2026-08-28
-last_activity_desc: "95-04-PLAN.md executed: Go-live gesture opens+places both output windows from a fresh activation; honest idle/opening/placed/fallback/blocked state gated on real window.open returns; closeOutputs wired first into exit-confirm"
+last_activity_desc: "92-01-PLAN.md executed: `/monitor-setup` route (`requiresAuth` only, no"
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 15
-  completed_plans: 13
-  percent: 60
+  completed_plans: 14
+  percent: 57
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -2780,6 +2780,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 95 P01 | 12min | 2 tasks | 2 files |
 | Phase 95 P03 | 25m | 2 tasks | 2 files |
 | Phase 95 P04 | 25min | 2 tasks | 1 files |
+| Phase 95 P05 | 18m | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -3229,6 +3230,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Run button gates on canRunService = isLocked && !!authStore.orgId (NOT isEditor) so viewers can Run a locked service (R275)
 - [Phase ?]: 95-01: useServiceAssembly holds only the shared load slice (serviceId/org, initial-load watch, read-only assembly, WR-02 gate); no onUnmounted/unsubscribeAll so in-app consumers don't tear peers down
 - [Phase ?]: 95-01: shared slice called first in useOutputWindow setup so its subscribe-gate onMounted fires before the channel opens (subscribe-before-channel)
+- [Phase ?]: 95-05: RunControlView control contract (R262-R266) proven by a 12-test behavioral suite driving the REAL openRunChannel via an injected fake channel — strictly-increasing seq, onHello resend, rail nav, keyboard map, Escape-opens-confirm-not-teardown.
 
 ### Roadmap Evolution
 
@@ -3554,8 +3556,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-29T00:02:08.844Z
-Stopped at: Completed 95-04-PLAN.md
+Last session: 2026-08-29T00:17:03.194Z
+Stopped at: Completed 95-05-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
