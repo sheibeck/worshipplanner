@@ -130,18 +130,20 @@ enablement a guided, self-checking flow inside the existing Monitor Setup screen
 touches a policy editor. Scope is client-side only (a generated download + a permission-state check); no
 Firestore/rules/functions change.
 
-- [ ] **R285**: The Monitor Setup screen **detects and displays** whether this computer is ready for
+- [x] **R285**: The Monitor Setup screen **detects and displays** whether this computer is ready for
   automatic multi-monitor fullscreen — querying `navigator.permissions.query({name:'fullscreen',
   allowWithoutGesture:true})` — showing a clear **ready ✓ / not-ready** state, with a **"Confirm
   fullscreen support"** action that re-checks on demand and, on Chromium browsers that don't support the
   query or non-Chromium browsers, explains the limitation rather than dead-ending.
-- [ ] **R286**: When not ready, the screen offers a **one-click download of the correct enablement
+
+- [x] **R286**: When not ready, the screen offers a **one-click download of the correct enablement
   artifact for the operator's OS and browser** — Windows `.reg` (per-user **HKCU, no-admin** default with
   an **HKLM admin** fallback), macOS **configuration profile** (`.mobileconfig`)/plist, and Linux
   **managed-policy JSON** — with the app's real **origin derived from `window.location.origin`** baked in,
   plus per-OS step-by-step instructions that set honest expectations (browser "this file may be dangerous"
   prompt on Windows; admin/sudo needed on macOS/Linux).
-- [ ] **R287**: The helper lives **inside the monitor-assignment flow** and is **self-correcting** — once
+
+- [x] **R287**: The helper lives **inside the monitor-assignment flow** and is **self-correcting** — once
   the grant is detected it flips to the confirmed "ready ✓" state without a reload, and it surfaces
   actionable troubleshooting when still not ready (fully restart the browser, try the admin/sudo variant,
   unsupported browser/OS). No auto-fullscreen behavior regresses when the setting is absent (the existing

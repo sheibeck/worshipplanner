@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Run the Service (Live Presentation)
-current_phase: 92
-current_phase_name: live-ops-hardening
-status: planning
-stopped_at: Completed 97-09-PLAN.md
-last_updated: "2026-08-29T06:28:08.473Z"
-last_activity: 2026-08-28
-last_activity_desc: "92-01-PLAN.md executed: `/monitor-setup` route (`requiresAuth` only, no"
+current_phase: 98
+current_phase_name: fullscreen-setup-helper
+status: in-progress
+stopped_at: Completed 98-01-PLAN.md
+last_updated: "2026-08-29T22:00:33.737Z"
+last_activity: 2026-08-29
+last_activity_desc: "98-01-PLAN.md executed: pure logic layer for the Automatic Fullscreen setup"
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 7
-  total_plans: 27
-  completed_plans: 26
-  percent: 88
+  total_plans: 29
+  completed_plans: 27
+  percent: 78
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -1014,7 +1014,23 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 92 — Monitor Configuration Screen (v2.4)
+Phase: 98 — Fullscreen Setup Helper (v2.4)
+Plan: 98-01 — Fullscreen Setup Helper (Pure Logic Layer) — COMPLETE; 98-02 (UI panel, Wave 2) remains
+Status: Phase 98's pure-logic plan (98-01) executed and verified; plan 98-02 (UI panel consuming this
+layer) not yet planned/run
+Last activity: 2026-08-29 — 98-01-PLAN.md executed: `src/utils/osDetect.ts` (OS/browser detection with
+UA-string fallback), `src/utils/fullscreenPolicyFiles.ts` (origin-baked Windows `.reg` HKCU+HKLM, macOS
+`.mobileconfig`, Linux managed JSON generators + `buildPolicyArtifact` dispatcher), `src/utils/downloadTextFile.ts`
+(Blob + `<a download>` helper), and `src/composables/useFullscreenReadiness.ts` (read-only three-state
+readiness composable reusing `useOutputWindow.ts`'s exact `{name:'fullscreen',allowWithoutGesture:true}`
+descriptor, never calling `requestFullscreen`, self-correcting on window focus). 41 new unit tests green;
+`npm run type-check` clean; `npx vitest run` shows only the documented `src/storage.rules.test.ts` baseline
+failure — no regression. `useOutputWindow.ts`/`useRunControl.ts` untouched (regression guard confirmed via
+`git diff --stat`). See `.planning/phases/98-fullscreen-setup-helper/98-01-SUMMARY.md`. Next step: plan
+`98-02` (the Monitor Setup UI panel consuming this pure logic layer).
+
+### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
+
 Plan: 92-01 — Monitor Configuration Screen (Build) — COMPLETE; 92-02 (behavioral tests) remains
 Status: Phase 92's build plan (92-01) executed and verified; plan 92-02 (wave 2, behavioral tests) not
 yet run
@@ -2793,6 +2809,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 97 P08 | 900 | 2 tasks | 1 files |
 | Phase 97 P09 | 12min | 3 tasks | 2 files |
 | Phase 97 P10 | 15m | 2 tasks | 2 files |
+| Phase 98 P01 | 18min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -3246,6 +3263,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 96-01: closed detection stays 'placed' (per-line amber, not an OutputStatus value); reopenOutput is synchronous reusing held liveScreenDetails (WR-01 intact); reassign-wins precedence; client-only (no Firestore/rules)
 - [Phase ?]: R284: ServiceCard Run button is viewer-inclusive (gated on isLocked && orgId, not isEditor), mirroring ServiceEditorView; v-if absent on drafts/org-less.
 - [Phase ?]: 97-09: RunControlView redesigned into State A (pre-flight) / State B (live) gated by live; output-status cluster + banner band kept inline verbatim so output.test.ts passes unedited
+- [Phase ?]: 98-01: origin flows into policy generators ONLY as a typed param (never window/URL param); useFullscreenReadiness never calls requestFullscreen (read-only).
 
 ### Roadmap Evolution
 
@@ -3571,8 +3589,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-29T06:15:38.818Z
-Stopped at: Completed 97-09-PLAN.md
+Last session: 2026-08-29T22:00:20.407Z
+Stopped at: Completed 98-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -571,21 +571,25 @@ without anyone editing a registry or policy by hand.
      current computer, derived from `navigator.permissions.query({name:'fullscreen',
      allowWithoutGesture:true})`, and a **"Confirm fullscreen support"** control re-checks it on demand;
      browsers that can't support it are explained, not dead-ended. (R285)
+
   2. When not ready, the operator can **download the correct enablement file for their OS + browser** —
      Windows `.reg` (HKCU no-admin default + HKLM admin fallback), macOS `.mobileconfig`/plist, Linux
      managed-policy JSON — with the app's **real origin** (`window.location.origin`) baked in and clear
      per-OS steps (including the Windows "dangerous file" prompt and macOS/Linux admin/sudo reality). (R286)
+
   3. The helper is embedded in the **monitor-assignment flow** and **self-corrects** — it flips to
      "ready ✓" once the grant is detected without a reload, and shows actionable troubleshooting (restart
      browser, admin/sudo variant, unsupported browser) while still not ready. (R287)
+
   4. No auto-fullscreen path regresses when the setting is absent — the existing gesture fallbacks
      (capability delegation, "Fullscreen displays", tap-to-fullscreen) remain; client-only, no
      Firestore/rules/functions change.
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
-- [ ] 98-01-PLAN.md — Pure logic: OS/browser detection, origin-baked policy-file generators (Windows .reg HKCU+HKLM, macOS .mobileconfig, Linux JSON), Blob download helper, read-only readiness composable (Wave 1)
+
+- [x] 98-01-PLAN.md — Pure logic: OS/browser detection, origin-baked policy-file generators (Windows .reg HKCU+HKLM, macOS .mobileconfig, Linux JSON), Blob download helper, read-only readiness composable (Wave 1)
 - [ ] 98-02-PLAN.md — FullscreenSetupPanel.vue UI (4 states + per-OS download/steps/troubleshooting) + additive mount in MonitorSetupView.vue (Wave 2)
 
 **UI hint**: yes
