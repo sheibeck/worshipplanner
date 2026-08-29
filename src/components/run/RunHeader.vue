@@ -41,6 +41,8 @@ const emit = defineEmits<{
   // Owner UAT: the blackout toggle asks the parent (single writer) to flip the
   // projector-black state — the parent calls postBlackout(!blackout).
   'toggle-blackout': []
+  // Owner UAT: re-send all open output windows to fullscreen in one action.
+  'fullscreen-displays': []
 }>()
 
 /**
@@ -153,6 +155,22 @@ function onReopen(role: 'audience' | 'confidence') {
          glance that the projector is black. Emits toggle-blackout; the parent (single
          writer) flips it via postBlackout(!blackout). The `B` key toggles the same
          state via useRunControl.handleKeydown. -->
+    <!-- FULLSCREEN DISPLAYS (owner UAT) — ONE control action re-sends EVERY open
+         output window to fullscreen at once (Fullscreen Capability Delegation),
+         so the operator never has to click each monitor. Shown when truly live.
+         Primary fullscreen is automatic on go-live; this covers a display that
+         wasn't ready in time or a re-assert. -->
+    <button
+      v-if="trulyLive"
+      type="button"
+      class="run-blackout"
+      data-testid="run-fullscreen-displays"
+      aria-label="Make all displays fullscreen"
+      @click="$emit('fullscreen-displays')"
+    >
+      Fullscreen displays
+    </button>
+
     <button
       v-if="trulyLive"
       type="button"

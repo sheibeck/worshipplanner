@@ -790,10 +790,12 @@ describe('ConfidenceOutputView — left/right split layout (R279) + next-scale (
     const root = wrapper.get('[data-testid="confidence-output"]')
     expect(root.classes()).toContain('flex-row')
 
-    // The next-region carries the vertical border-l seam between the panes.
+    // The next-region carries the bright, thick vertical seam between the panes
+    // (owner UAT: visible from a distance — a 6px solid white rule).
     const currentRegion = wrapper.get('[data-testid="confidence-current-region"]')
     const nextRegion = wrapper.get('[data-testid="confidence-next-region"]')
-    expect(nextRegion.classes()).toContain('border-l')
+    expect(nextRegion.classes()).toContain('border-l-[6px]')
+    expect(nextRegion.classes()).toContain('border-white')
 
     // Current-region appears BEFORE next-region in DOM order (left → right).
     const children = Array.from(root.element.children)

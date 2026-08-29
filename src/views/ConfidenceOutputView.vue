@@ -44,7 +44,7 @@
          the narrower right column. -->
     <div
       data-testid="confidence-next-region"
-      class="relative flex-[2_1_0%] flex items-center justify-center overflow-hidden border-l border-white/10"
+      class="relative flex-[2_1_0%] flex items-center justify-center overflow-hidden border-l-[6px] border-white"
     >
       <div
         v-if="nextSlide && fontReady"

@@ -559,6 +559,38 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   // and the child uses its one-tap-anywhere fallback. Never throws.
   let fullscreenDelegationInstalled = false
 
+  /**
+   * Delegate THIS window's fullscreen capability to one opened output window
+   * (Fullscreen Capability Delegation). The non-standard `delegate` option is
+   * not in the base TS lib's WindowPostMessageOptions — cast it. Ignored by
+   * browsers without the feature (the child then uses its tap fallback).
+   * Best-effort — never throws.
+   */
+  function delegateFullscreenTo(win: Window) {
+    try {
+      win.postMessage(
+        { type: 'wp-fullscreen-delegate' },
+        { targetOrigin: window.location.origin, delegate: 'fullscreen' } as unknown as WindowPostMessageOptions,
+      )
+    } catch {
+      // cross-origin / torn-down / unsupported — best-effort, never throw
+    }
+  }
+
+  /**
+   * Owner UAT — one control action re-delegates fullscreen to EVERY open output
+   * window at once, so the operator never clicks each monitor individually. Fired
+   * from a control-screen button whose click supplies the transient activation
+   * that capability delegation requires; complements the auto-delegation on
+   * go-live (covers a display that wasn't ready in time, or a re-assert).
+   */
+  function delegateFullscreenToAll() {
+    for (const name of Object.keys(outputWindows)) {
+      const win = outputWindows[name]
+      if (win && !win.closed) delegateFullscreenTo(win)
+    }
+  }
+
   function handleOutputReady(event: MessageEvent) {
     if (event.origin !== window.location.origin) return
     const data = event.data as { type?: string } | null
@@ -568,17 +600,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // Only delegate to a window WE opened (one of the stored output handles).
     const isOurs = Object.keys(outputWindows).some((name) => outputWindows[name] === source)
     if (!isOurs) return
-    try {
-      ;(source as Window).postMessage(
-        { type: 'wp-fullscreen-delegate' },
-        // The non-standard `delegate` option is not in the base TS lib's
-        // WindowPostMessageOptions — cast it. Ignored by browsers without
-        // Fullscreen Capability Delegation (the child then uses its tap fallback).
-        { targetOrigin: window.location.origin, delegate: 'fullscreen' } as unknown as WindowPostMessageOptions,
-      )
-    } catch {
-      // cross-origin / torn-down source / unsupported — best-effort, never throw
-    }
+    delegateFullscreenTo(source as Window)
   }
 
   function installFullscreenDelegation() {
@@ -1083,6 +1105,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     rehearsing,
     blackout,
     postBlackout,
+    delegateFullscreenToAll,
     rehearse,
     clock,
     elapsed,
