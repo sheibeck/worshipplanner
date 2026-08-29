@@ -107,9 +107,16 @@
           :data-repeat="row.isRepeat ? 'true' : 'false'"
           :class="[rowCardClass(row), 'section-row']"
         >
-          <div class="flex items-center gap-2 px-3 py-2.5">
+          <!-- The whole header row toggles expand/collapse (owner UAT — the far-right
+               chevron was too small a target). Interactive children (drag handle,
+               Duplicate/Remove, the chevron button) `.stop` so they don't also
+               toggle; the expanded editor below is a separate block, unaffected. -->
+          <div
+            class="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
+            @click="toggleRow(row.stableKey)"
+          >
             <span data-testid="row-position" class="w-5 shrink-0 text-right text-[11px] text-gray-500">{{ row.position }}</span>
-            <span class="drag-handle shrink-0 cursor-grab text-gray-600 hover:text-gray-400" aria-hidden="true">
+            <span class="drag-handle shrink-0 cursor-grab text-gray-600 hover:text-gray-400" aria-hidden="true" @click.stop>
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
               </svg>
@@ -132,20 +139,20 @@
                   type="button"
                   :data-testid="`row-duplicate-${row.rowKey}`"
                   class="shrink-0 rounded-md border border-gray-700 bg-gray-800 px-2 py-1 text-[11px] font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
-                  @click="onDuplicate(row)"
+                  @click.stop="onDuplicate(row)"
                 >Duplicate</button>
                 <button
                   type="button"
                   :data-testid="`row-remove-${row.rowKey}`"
                   class="shrink-0 rounded-md border border-red-900/60 bg-gray-800 px-2 py-1 text-[11px] font-medium text-red-300 transition-colors hover:border-red-700 hover:bg-red-950/40"
-                  @click="onRemove(row)"
+                  @click.stop="onRemove(row)"
                 >Remove</button>
               </template>
               <button
                 type="button"
                 :data-testid="`row-toggle-${row.rowKey}`"
                 class="shrink-0 text-gray-500 transition-colors hover:text-gray-300"
-                @click="toggleRow(row.stableKey)"
+                @click.stop="toggleRow(row.stableKey)"
               >{{ isExpanded(row) ? '⌃' : '⌄' }}</button>
             </template>
 
@@ -164,20 +171,20 @@
                   type="button"
                   :data-testid="`row-duplicate-${row.rowKey}`"
                   class="shrink-0 rounded-md border border-gray-700 bg-gray-800 px-2 py-1 text-[11px] font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
-                  @click="onDuplicate(row)"
+                  @click.stop="onDuplicate(row)"
                 >Duplicate</button>
                 <button
                   type="button"
                   :data-testid="`row-remove-${row.rowKey}`"
                   class="shrink-0 rounded-md border border-red-900/60 bg-gray-800 px-2 py-1 text-[11px] font-medium text-red-300 transition-colors hover:border-red-700 hover:bg-red-950/40"
-                  @click="onRemove(row)"
+                  @click.stop="onRemove(row)"
                 >Remove</button>
               </template>
               <button
                 type="button"
                 :data-testid="`row-toggle-${row.rowKey}`"
                 class="shrink-0 text-gray-500 transition-colors hover:text-gray-300"
-                @click="toggleRow(row.stableKey)"
+                @click.stop="toggleRow(row.stableKey)"
               >{{ isExpanded(row) ? '⌃' : '⌄' }}</button>
             </template>
           </div>
