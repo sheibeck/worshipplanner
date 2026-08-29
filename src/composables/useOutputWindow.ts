@@ -43,8 +43,11 @@ export interface UseOutputWindowOptions {
    * routes /present/audience|confidence make the role statically known. Retained as
    * a harmless identity option; fullscreen is no longer resolved from it. The
    * control creates + positions each window on its assigned monitor via window.open
-   * features, and auto-fullscreen is driven by Fullscreen Capability Delegation from
-   * the opener (see handleDelegationMessage) rather than any self-request here.
+   * features, so auto-fullscreen has two independent, best-effort paths: (1) the
+   * PRIMARY zero-click path — Chrome's "Automatic Fullscreen" content setting, via
+   * attemptAutoFullscreen() on mount when the origin is granted; and (2) the
+   * fallback — Fullscreen Capability Delegation from the opener (see
+   * handleDelegationMessage) plus the one-tap overlay in each view.
    */
   role?: MonitorRole
 }
@@ -140,6 +143,46 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     }
   }
 
+  // ── Automatic Fullscreen content setting (Chrome 126+ — the ZERO-CLICK primary) ─
+  // Chrome's "Automatic Fullscreen" content setting (a one-time per-computer allow,
+  // or the AutomaticFullscreenAllowedForUrls enterprise policy) lets an allowed
+  // origin call Element.requestFullscreen() WITHOUT a user gesture. This is the
+  // correct fix for the multi-display problem: gesture-based fullscreen (capability
+  // delegation, the control button, a per-window tap) can only fullscreen ONE window
+  // per gesture — the browser consumes the transient activation on the first
+  // requestFullscreen, so the second display never gets it. With the content setting
+  // granted, each output window self-fullscreens on load INDEPENDENTLY (no shared
+  // gesture), so BOTH displays go fullscreen with zero clicks.
+  //
+  // The control already OPENED and POSITIONED each window on its assigned monitor
+  // (window.open left/top/width/height), so a PLAIN requestFullscreen() fullscreens
+  // on the monitor the window is already on = the correct screen. No getScreenDetails()
+  // is needed or wanted here — the window is already placed.
+  //
+  // When the setting is NOT granted (or the permission descriptor is unsupported /
+  // query() throws), this does NOTHING: the existing fallbacks remain — the
+  // wp-fullscreen-delegate capability-delegation listener above, the opener-side
+  // delegation + control "Fullscreen displays" button (useRunControl, untouched),
+  // and the one-tap-anywhere overlay in each output view.
+  async function attemptAutoFullscreen() {
+    try {
+      // The { name:'fullscreen', allowWithoutGesture:true } descriptor is not in the
+      // base TS lib's PermissionDescriptor — cast it. A browser without this
+      // descriptor THROWS a TypeError from query(), caught below as "not granted".
+      const status = await navigator.permissions.query(
+        { name: 'fullscreen', allowWithoutGesture: true } as unknown as PermissionDescriptor,
+      )
+      if (status.state === 'granted') {
+        // PLAIN — no { screen }, no gesture. The window is already on its monitor.
+        document.documentElement.requestFullscreen().catch(() => {})
+      }
+      // state !== 'granted' → do nothing; the delegation/tap fallbacks take over.
+    } catch {
+      // Absent Permissions API / unsupported descriptor / query rejection — silent;
+      // the delegation + one-tap fallbacks remain the path to fullscreen.
+    }
+  }
+
   // ── Screen Wake Lock (R271; no in-repo analog) ─────────────────────────────
   const wakeLock = ref<WakeLockSentinel | null>(null)
 
@@ -173,6 +216,13 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
       blackout.value = state.blackout
     })
     handle.postHello()
+
+    // Automatic Fullscreen content setting (Chrome 126+) — the ZERO-CLICK PRIMARY
+    // path. Fire-and-forget: it is async and must NOT block channel/font setup, and
+    // its outcome is best-effort (it self-requests fullscreen ONLY when the origin
+    // is granted the content setting). `void` so a rejection never surfaces and the
+    // rest of mount continues regardless.
+    void attemptAutoFullscreen()
 
     // Fullscreen Capability Delegation — the ZERO-TAP path (replaces the old
     // un-gestured mount-time requestFullscreen() that only ever threw the console

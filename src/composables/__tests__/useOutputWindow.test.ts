@@ -172,6 +172,11 @@ beforeEach(() => {
 
 afterEach(() => {
   delete (navigator as unknown as { wakeLock?: unknown }).wakeLock
+  // Remove any Permissions API installed by an Automatic-Fullscreen test so every
+  // other suite sees jsdom's default (navigator.permissions absent → the granted
+  // branch never runs and no mount-time requestFullscreen fires).
+  delete (navigator as unknown as { permissions?: unknown }).permissions
+  delete (window as unknown as { getScreenDetails?: unknown }).getScreenDetails
   vi.restoreAllMocks()
 })
 
@@ -458,6 +463,100 @@ describe('useOutputWindow — Fullscreen Capability Delegation (child side)', ()
     vi.mocked(Element.prototype.requestFullscreen).mockClear()
     fireMessage({ type: 'wp-fullscreen-delegate' }, window.location.origin)
     await flushPromises()
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
+  })
+})
+
+// ── Automatic Fullscreen content setting (Chrome 126+, permission-gated mount) ───
+// The PRIMARY zero-click path. When the origin is granted Chrome's "Automatic
+// Fullscreen" content setting, `navigator.permissions.query({ name:'fullscreen',
+// allowWithoutGesture:true })` resolves { state:'granted' } and the composable
+// self-requests fullscreen on mount WITHOUT a gesture — a PLAIN requestFullscreen()
+// (no getScreenDetails), because the control already positioned the window on its
+// monitor. When not granted (or the descriptor is unsupported / query throws), the
+// mount path does NOTHING and the delegation + one-tap fallbacks remain.
+describe('useOutputWindow — Automatic Fullscreen content setting (permission-gated)', () => {
+  function installPermissions(query: (descriptor: unknown) => Promise<{ state: string }>) {
+    Object.defineProperty(navigator, 'permissions', {
+      value: { query: vi.fn(query) },
+      configurable: true,
+      writable: true,
+    })
+    return (navigator as unknown as { permissions: { query: ReturnType<typeof vi.fn> } }).permissions
+      .query
+  }
+
+  function installGetScreenDetails() {
+    const fn = vi.fn(() =>
+      Promise.resolve({ screens: [], addEventListener: vi.fn(), removeEventListener: vi.fn() }),
+    )
+    ;(window as unknown as { getScreenDetails: unknown }).getScreenDetails = fn
+    return fn
+  }
+
+  it('self-requests fullscreen on mount (no gesture, no getScreenDetails) when the setting is granted', async () => {
+    setFullscreenElement(null)
+    const query = installPermissions(() => Promise.resolve({ state: 'granted' }))
+    // Install getScreenDetails to PROVE the granted path stays plain and never
+    // resolves the Window Management API (the prompt's explicit requirement).
+    const getScreenDetails = installGetScreenDetails()
+
+    const fake = createFakeChannel()
+    mountHost(fake.factory)
+    await flushPromises()
+
+    // Queried the Automatic-Fullscreen descriptor…
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(query.mock.calls[0]![0]).toMatchObject({ name: 'fullscreen', allowWithoutGesture: true })
+    // …then plain-requested fullscreen on the document element, WITHOUT any gesture.
+    expect(vi.mocked(Element.prototype.requestFullscreen)).toHaveBeenCalledTimes(1)
+    // Plain path: getScreenDetails is never touched.
+    expect(getScreenDetails).not.toHaveBeenCalled()
+  })
+
+  it('does NOT auto-request fullscreen on mount when the setting is denied', async () => {
+    setFullscreenElement(null)
+    const query = installPermissions(() => Promise.resolve({ state: 'denied' }))
+
+    const fake = createFakeChannel()
+    mountHost(fake.factory)
+    await flushPromises()
+
+    expect(query).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
+  })
+
+  it('does NOT auto-request fullscreen (and does not throw) when query() rejects', async () => {
+    setFullscreenElement(null)
+    installPermissions(() => Promise.reject(new TypeError('unsupported descriptor')))
+
+    const fake = createFakeChannel()
+    let error: unknown = null
+    try {
+      mountHost(fake.factory)
+      await flushPromises()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeNull()
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
+  })
+
+  it('does NOT auto-request fullscreen (and does not throw) when the Permissions API is absent', async () => {
+    setFullscreenElement(null)
+    // jsdom default: navigator.permissions is undefined — accessing .query throws
+    // synchronously and is swallowed. Assert the absent-API path is inert.
+    expect('permissions' in navigator).toBe(false)
+
+    const fake = createFakeChannel()
+    let error: unknown = null
+    try {
+      mountHost(fake.factory)
+      await flushPromises()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeNull()
     expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
   })
 })
