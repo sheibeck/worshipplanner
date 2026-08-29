@@ -207,6 +207,49 @@
       </div>
     </div>
 
+    <!-- PARTIAL (WR-02): EXACTLY ONE output window opened; the other was refused
+         by the browser (some grant only one window per gesture). Amber, honest —
+         names the dark display and offers retry, NEVER a green "displays ready"
+         claim while a monitor is black. Mutually exclusive with fallback/blocked
+         by the single outputStatus ref. -->
+    <div
+      v-if="outputStatus === 'partial'"
+      data-testid="run-partial-banner"
+      class="flex-none m-4 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3 text-amber-200"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        class="mt-0.5 h-5 w-5 flex-none text-amber-400"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <div class="min-w-0 flex-1">
+        <p class="font-medium">Only one display opened</p>
+        <p class="mt-1 text-sm">
+          The
+          <span class="font-semibold">{{ blockedRole }}</span>
+          display was blocked by your browser and is still dark. Allow pop-ups for this site, then
+          click Go live again to open it.
+        </p>
+        <button
+          type="button"
+          data-testid="run-partial-retry"
+          aria-label="Go live — open the audience and confidence displays"
+          class="mt-3 min-h-11 inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          @click="openOutputs"
+        >
+          Go live
+        </button>
+      </div>
+    </div>
+
     <!-- 2. MAIN REGION -->
     <div class="flex-1 min-h-0 flex">
       <!-- ORDER-OF-SERVICE RAIL (R262 / R263) -->
@@ -600,13 +643,25 @@ function handleKeydown(e: KeyboardEvent) {
 // postHellos and the control's onHello (resendCurrent) resends the current
 // index — so the operator may click Go live at ANY time (even after navigating
 // several slides) and the freshly-opened output syncs to the live slide.
-type OutputStatus = 'idle' | 'opening' | 'placed' | 'fallback' | 'blocked'
+type OutputStatus = 'idle' | 'opening' | 'placed' | 'partial' | 'fallback' | 'blocked'
 const outputStatus = ref<OutputStatus>('idle')
 const readyAudienceLabel = ref<string | null>(null)
 const readyConfidenceLabel = ref<string | null>(null)
+// WR-02: which display was refused when EXACTLY ONE of the two window.open
+// calls came back null (the honest 'partial' state names the dark monitor).
+const blockedRole = ref<MonitorRole | null>(null)
 
 // Raw window handles (NOT reactive), keyed by stable window name.
 const outputWindows: Record<string, Window | null> = {}
+
+// WR-01: monotonic Go-live token + unmount flag guarding a LATE
+// getScreenDetails() resolution from re-opening orphaned output windows after
+// the operator has moved on (a fresh Go-live click, a confirmed exit, or an
+// unmount). Mirrors MonitorSetupView's detectRequestId precedent: every new
+// attempt bumps the token, and confirmExit/onUnmounted invalidate any in-flight
+// resolve so its .then/.catch is a no-op — no window is ever opened after exit.
+let goLiveRequestId = 0
+let isUnmounted = false
 
 /**
  * Opens ONE output window and (when a target screen is given) best-effort places
@@ -655,17 +710,38 @@ function screenLabel(screen: ScreenLike | null): string {
   return screen?.label && screen.label.length > 0 ? screen.label : 'display'
 }
 
+/**
+ * WR-02 — honest gate on the TWO output handles before any success claim.
+ * A "placed"/"fallback" claim requires BOTH windows to have real (non-null)
+ * handles, because some browsers grant only ONE window per user activation:
+ *  - both null → 'blocked' (pop-ups refused, nothing opened)
+ *  - one null  → 'partial' (one display is live, the other is dark) — the
+ *                banner names the refused role and offers retry, NEVER green
+ *  - both open → returns true so the caller may make its success claim
+ * Returns true ONLY when both windows opened.
+ */
+function bothOpened(aWin: Window | null, cWin: Window | null): boolean {
+  if (aWin && cWin) return true
+  if (!aWin && !cWin) {
+    outputStatus.value = 'blocked'
+    return false
+  }
+  // Exactly one opened: name the display that was refused (the null handle).
+  blockedRole.value = aWin ? 'confidence' : 'audience'
+  outputStatus.value = 'partial'
+  return false
+}
+
 /** MATCHED path — open + place each output on its assigned monitor. */
 function openPlaced(saved: MonitorMapping, screens: ScreenLike[]) {
   const audienceScreen = resolveScreen(saved, 'audience', screens)
   const confidenceScreen = resolveScreen(saved, 'confidence', screens)
   const aWin = openWindow(audienceUrl(), 'wp-audience', audienceScreen)
   const cWin = openWindow(confidenceUrl(), 'wp-confidence', confidenceScreen)
-  // Gate the success claim on a real window: both null → pop-ups blocked.
-  if (!aWin && !cWin) {
-    outputStatus.value = 'blocked'
-    return
-  }
+  // Gate the success claim on BOTH real windows (WR-02): fewer than two → an
+  // honest blocked/partial state, never a green "Displays ready" over a dark
+  // monitor.
+  if (!bothOpened(aWin, cWin)) return
   readyAudienceLabel.value = screenLabel(audienceScreen)
   readyConfidenceLabel.value = screenLabel(confidenceScreen)
   outputStatus.value = 'placed'
@@ -675,12 +751,9 @@ function openPlaced(saved: MonitorMapping, screens: ScreenLike[]) {
 function openUnplaced() {
   const aWin = openWindow(audienceUrl(), 'wp-audience', null)
   const cWin = openWindow(confidenceUrl(), 'wp-confidence', null)
-  // A pop-up blocker in a gesture is all-or-nothing, so both-null is the
-  // load-bearing blocked case; ≥1 non-null handle means windows opened.
-  if (!aWin && !cWin) {
-    outputStatus.value = 'blocked'
-    return
-  }
+  // WR-02: the amber "two windows opened" fallback claim requires BOTH handles;
+  // both-null is blocked, exactly-one-null is the honest partial state.
+  if (!bothOpened(aWin, cWin)) return
   outputStatus.value = 'fallback'
 }
 
@@ -702,6 +775,10 @@ function confidenceUrl(): string {
  * Mirrors MonitorSetupView.onDetectClick.
  */
 function openOutputs() {
+  // WR-01: claim a fresh token for THIS gesture. A second Go-live click, a
+  // confirmed exit, or an unmount bumps goLiveRequestId, so an earlier in-flight
+  // getScreenDetails() resolve becomes stale and is dropped below.
+  const requestId = ++goLiveRequestId
   outputStatus.value = 'opening'
   if (!('getScreenDetails' in window)) {
     openUnplaced()
@@ -710,6 +787,9 @@ function openOutputs() {
   ;(window as unknown as { getScreenDetails: () => Promise<{ screens: ScreenLike[] }> })
     .getScreenDetails()
     .then((details) => {
+      // Stale (a newer attempt superseded us) or the view has torn down — do
+      // NOT open windows that would be orphaned (Pitfall 6 / WR-01).
+      if (isUnmounted || requestId !== goLiveRequestId) return
       const saved = loadMapping()
       if (!saved) {
         openUnplaced()
@@ -723,6 +803,7 @@ function openOutputs() {
       openPlaced(saved, details.screens)
     })
     .catch(() => {
+      if (isUnmounted || requestId !== goLiveRequestId) return
       openUnplaced()
     })
 }
@@ -746,6 +827,9 @@ function cancelExit() {
   confirmOpen.value = false
 }
 function confirmExit() {
+  // WR-01: invalidate any in-flight Go-live resolve so a late getScreenDetails()
+  // cannot re-open orphaned output windows after the operator has exited.
+  goLiveRequestId += 1
   // Blank the projector FIRST — close the output windows before the channel
   // close + router.push, so ending run mode tears down the real displays (R266).
   closeOutputs()
@@ -779,6 +863,9 @@ watch(assembledSlideshow, (slides) => {
 })
 
 onUnmounted(() => {
+  // WR-01: mark torn down so a late getScreenDetails() resolve short-circuits
+  // instead of opening windows into a dead component.
+  isUnmounted = true
   handle?.close()
   document.removeEventListener('keydown', handleKeydown)
 })

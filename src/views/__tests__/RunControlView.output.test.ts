@@ -165,6 +165,22 @@ function installDeniedGetScreenDetails() {
   return fn
 }
 
+/**
+ * Install a DEFERRED getScreenDetails() whose resolution is controlled by the
+ * caller — the promise stays pending until `resolve()` is invoked. Lets a test
+ * interleave an exit/unmount BETWEEN the Go-live click and the getScreenDetails
+ * resolution to exercise the WR-01 stale-resolution guard.
+ */
+function installDeferredGetScreenDetails(screens: ScreenLike[]) {
+  let release: () => void = () => {}
+  const promise = new Promise<{ screens: ScreenLike[] }>((res) => {
+    release = () => res({ screens })
+  })
+  const fn = vi.fn(() => promise)
+  ;(window as unknown as { getScreenDetails: unknown }).getScreenDetails = fn
+  return { fn, resolve: release }
+}
+
 function seedMatchingMapping() {
   saveMapping({
     assignments: [
@@ -379,6 +395,104 @@ describe('RunControlView output — blocked (pop-up refused) (R261; T-95-16/T-95
     expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
+  })
+})
+
+// ── 5b. PARTIAL — exactly ONE window.open null must NOT claim success (WR-02) ────
+describe('RunControlView output — partial open is not full success (WR-02)', () => {
+  it('matched but the CONFIDENCE window.open returns null: NOT run-status-placed — honest partial banner naming the dark confidence display', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    // First open (audience) succeeds; second (confidence) is refused → null.
+    openSpy
+      .mockImplementationOnce(() => makeFakeWin())
+      .mockImplementationOnce(() => null)
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+
+    // No green "Displays ready" and no both-opened fallback claim.
+    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(false)
+
+    // The honest partial banner renders and names the display that stayed dark.
+    const banner = wrapper.find('[data-testid="run-partial-banner"]')
+    expect(banner.exists()).toBe(true)
+    expect(banner.text().toLowerCase()).toContain('confidence')
+    // Retry affordance is present.
+    expect(wrapper.find('[data-testid="run-partial-retry"]').exists()).toBe(true)
+  })
+
+  it('fallback path with the AUDIENCE window.open null: NOT the both-opened fallback banner — honest partial state naming the audience display', async () => {
+    // No saved mapping → openUnplaced (fallback) path.
+    installGetScreenDetails([screenA, screenB])
+    // First open (audience) refused → null; second (confidence) succeeds.
+    openSpy
+      .mockImplementationOnce(() => null)
+      .mockImplementationOnce(() => makeFakeWin())
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+
+    // The amber fallback banner claims BOTH windows opened — it must NOT show.
+    expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(false)
+
+    const banner = wrapper.find('[data-testid="run-partial-banner"]')
+    expect(banner.exists()).toBe(true)
+    expect(banner.text().toLowerCase()).toContain('audience')
+  })
+})
+
+// ── 5c. STALE RESOLUTION — a late getScreenDetails resolve after exit/unmount ─────
+//        must open NO orphaned output windows (WR-01 / Pitfall 6).
+describe('RunControlView output — stale-resolution guard (WR-01)', () => {
+  it('a confirmed EXIT between Go live and the getScreenDetails resolution opens NO output windows', async () => {
+    seedMatchingMapping()
+    const deferred = installDeferredGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    // Click Go live — getScreenDetails is now IN FLIGHT (still pending).
+    await wrapper.find('[data-testid="run-go-live-btn"]').trigger('click')
+    await flushPromises()
+    expect(openSpy).not.toHaveBeenCalled() // nothing opened yet
+
+    // Operator exits run mode BEFORE the promise resolves.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    const confirmBtn = document.body.querySelector<HTMLElement>('[data-testid="run-exit-confirm"]')
+    expect(confirmBtn).not.toBeNull()
+    confirmBtn!.click()
+    await flushPromises()
+
+    // NOW the late getScreenDetails resolves — the stale guard must no-op it.
+    deferred.resolve()
+    await flushPromises()
+
+    // No windows opened after exit → no orphans.
+    expect(openSpy).not.toHaveBeenCalled()
+    expect(openedWins).toHaveLength(0)
+  })
+
+  it('an UNMOUNT between Go live and the getScreenDetails resolution opens NO output windows', async () => {
+    seedMatchingMapping()
+    const deferred = installDeferredGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="run-go-live-btn"]').trigger('click')
+    await flushPromises()
+    expect(openSpy).not.toHaveBeenCalled()
+
+    // The view tears down while the resolve is still pending.
+    wrapper.unmount()
+    deferred.resolve()
+    await flushPromises()
+
+    expect(openSpy).not.toHaveBeenCalled()
+    expect(openedWins).toHaveLength(0)
   })
 })
 
