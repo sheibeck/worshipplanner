@@ -39,9 +39,14 @@ enableAutoUnmount(afterEach)
 // backstop drives serviceId's own computed off route.params.id, which only
 // stays reactive if the mocked route itself is a Vue reactive object.
 const mockRoute = reactive({ params: { id: 'service-1' } })
+// 95-06 (R261/R275): stabilize useRouter().push into a SINGLE shared spy (hoisted
+// so the vi.mock factory below can reference it) so the Run-button describe block
+// can assert the /run navigation. Additive + low-risk: no pre-existing test in
+// this file reads router.push, and the block resets it in its own beforeEach.
+const { mockRouterPush } = vi.hoisted(() => ({ mockRouterPush: vi.fn() }))
 vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockRouterPush }),
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
@@ -8816,5 +8821,79 @@ describe('ServiceEditorView - tab strip keyboard navigation (WR-01, 81-REVIEW)',
     // Only Service Order + Slides are visible for a non-editor, so
     // ArrowLeft from Service Order wraps straight to Slides.
     expect(wrapper.get('#svc-tab-slides').attributes('aria-selected')).toBe('true')
+  })
+})
+
+// ── 95-06 (R261/R275): the Run entry button ─────────────────────────────────────
+// Proves the presence/absence gating of the header Run CTA and — the load-bearing
+// R275 assertion — that it is NOT editor-gated: a VIEWER of a locked service can
+// still Run. canRunService = isLocked && !!orgId (deliberately NOT isEditor), so
+// the button is absent on a draft and present on a locked service for BOTH an
+// editor and a viewer. Clicking it router.push-es /run/:serviceId?org=.
+describe('Run entry button (R261/R275)', () => {
+  async function mountView(overrides: Partial<Service> = {}) {
+    mockServicesList = [{ ...mockService, ...overrides }]
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    // Self-contained state so this block never perturbs (nor is perturbed by)
+    // siblings: default to an org-set editor and a fresh push spy.
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockRouterPush.mockClear()
+  })
+
+  it('is ABSENT on a draft service (any role)', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-service-btn"]').exists()).toBe(false)
+  })
+
+  it('is PRESENT on a LOCKED service for an EDITOR, with the run aria-label', async () => {
+    mockAuthState.isEditor = true
+    const wrapper = await mountView({ status: 'planned' })
+    await flushPromises()
+    const btn = wrapper.find('[data-testid="run-service-btn"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.attributes('aria-label')).toBe('Run this service live')
+  })
+
+  it('is PRESENT on a LOCKED service for a VIEWER — running is NOT editor-gated (R275)', async () => {
+    // The load-bearing R275 proof: isEditor=false, orgId set → Run still renders.
+    mockAuthState.isEditor = false
+    mockAuthState.orgId = 'org-1'
+    const wrapper = await mountView({ status: 'planned' })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-service-btn"]').exists()).toBe(true)
+  })
+
+  it('is ABSENT on a locked service for an org-less user (no active org)', async () => {
+    // canRunService also requires an active org — an org-less member sees no Run.
+    mockAuthState.isEditor = false
+    mockAuthState.orgId = null
+    const wrapper = await mountView({ status: 'planned' })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-service-btn"]').exists()).toBe(false)
+  })
+
+  it('navigates to /run/:serviceId?org= on click', async () => {
+    const wrapper = await mountView({ status: 'exported' })
+    await flushPromises()
+    await wrapper.get('[data-testid="run-service-btn"]').trigger('click')
+    expect(mockRouterPush).toHaveBeenCalledWith('/run/service-1?org=org-1')
   })
 })
