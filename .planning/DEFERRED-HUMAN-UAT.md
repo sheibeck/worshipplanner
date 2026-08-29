@@ -6,6 +6,15 @@ are collected here and presented to the owner at milestone end. Everything below
 limit of unit testing** (real permission prompts, physical multi-monitor hardware, real fullscreen /
 wake-lock behavior over a service length), NOT a known defect.
 
+## ✅ Owner confirmation — 2026-08-29
+
+The owner ran hardware UAT and **confirmed every item below as working EXCEPT the multi-monitor
+auto-fullscreen item (Phase 97 #1 / R278)**. All phases 92–96 items and Phase 97 items #2–#6 are
+**owner-accepted**. The one remaining open item is auto-fullscreen, tracked separately below and being
+re-approached via the **Presentation API** (see `docs/run-fullscreen-setup.md` and the fullscreen
+decision note). Do not re-litigate the confirmed items; the milestone stays OPEN only on the
+fullscreen item.
+
 ## Phase 92 — Monitor Configuration Screen (verified 2026-08-28, pass-with-deferred-human-UAT)
 
 1. Real Window-Management permission **grant** + multi-monitor detection on Chrome/Edge — the prompt

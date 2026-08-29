@@ -87,6 +87,9 @@ Which phase covers which requirement. Populated during roadmap creation.
 | R273 | Phase 96 | Complete |
 | R274 | Phase 96 | Complete |
 | R275 | Phase 95 | Complete |
+| R285 | Phase 98 | Planned |
+| R286 | Phase 98 | Planned |
+| R287 | Phase 98 | Planned |
 
 **Coverage:**
 
@@ -117,6 +120,37 @@ Owner hardware-UAT feedback (2026-08-28) drove an approved redesign of the live 
 UX refinement are folded into R276. Explicitly omitted (no backing data/system, would be fake UI):
 presence/activity, CCLI preflight, Key/BPM, Logo-cut, Stage 3rd output, "Follow me on confidence".
 
+## v2.4 Addendum — Fullscreen Setup Helper (Phase 98)
+
+Owner UAT (2026-08-29) established that R278 auto-fullscreen depends on the Chromium **Automatic
+Fullscreen** content setting, which the browser will not prompt for — it is enabled per-computer via a
+browser **policy** (`AutomaticFullscreenAllowedForUrls`). Editing a registry/policy by hand is a
+non-starter for the non-technical projectionist this milestone targets. This phase makes that one-time
+enablement a guided, self-checking flow inside the existing Monitor Setup screen, so the operator never
+touches a policy editor. Scope is client-side only (a generated download + a permission-state check); no
+Firestore/rules/functions change.
+
+- [ ] **R285**: The Monitor Setup screen **detects and displays** whether this computer is ready for
+  automatic multi-monitor fullscreen — querying `navigator.permissions.query({name:'fullscreen',
+  allowWithoutGesture:true})` — showing a clear **ready ✓ / not-ready** state, with a **"Confirm
+  fullscreen support"** action that re-checks on demand and, on Chromium browsers that don't support the
+  query or non-Chromium browsers, explains the limitation rather than dead-ending.
+- [ ] **R286**: When not ready, the screen offers a **one-click download of the correct enablement
+  artifact for the operator's OS and browser** — Windows `.reg` (per-user **HKCU, no-admin** default with
+  an **HKLM admin** fallback), macOS **configuration profile** (`.mobileconfig`)/plist, and Linux
+  **managed-policy JSON** — with the app's real **origin derived from `window.location.origin`** baked in,
+  plus per-OS step-by-step instructions that set honest expectations (browser "this file may be dangerous"
+  prompt on Windows; admin/sudo needed on macOS/Linux).
+- [ ] **R287**: The helper lives **inside the monitor-assignment flow** and is **self-correcting** — once
+  the grant is detected it flips to the confirmed "ready ✓" state without a reload, and it surfaces
+  actionable troubleshooting when still not ready (fully restart the browser, try the admin/sudo variant,
+  unsupported browser/OS). No auto-fullscreen behavior regresses when the setting is absent (the existing
+  gesture fallbacks remain).
+
+**Traceability (Phase 98):** R285–R287 → Phase 98. Electron packaging (a zero-privilege desktop wrapper)
+is explicitly **out of scope** here and recorded as the escape-hatch alternative if per-computer setup is
+later judged unacceptable; this phase delivers the browser-policy helper only.
+
 ---
 *Requirements defined: 2026-08-28*
-*Last updated: 2026-08-28 — added v2.4 Phase 97 redesign addendum (R276–R284), owner UAT-driven*
+*Last updated: 2026-08-29 — added v2.4 Phase 98 Fullscreen Setup Helper addendum (R285–R287), owner UAT-driven*

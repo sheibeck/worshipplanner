@@ -389,6 +389,7 @@ expected; Phase 96 re-confirms this rather than assuming it.
 - [ ] **Phase 95: Run/Control Screen + Run Entry Point** - Run button, order-of-service rail, click-to-jump, keyboard nav, single-selection live model
 - [ ] **Phase 96: Live-Ops Hardening** - Closed-window recovery, monitor-replug detection, and sync robustness over a realistic service
 - [ ] **Phase 97: Run Service Redesign** - Owner UAT-driven redesign: pre-flight + live control layout (design import), confidence left/right, blackout, timers, in-item filmstrip, rehearse, service-list Run, output self-fullscreen
+- [ ] **Phase 98: Fullscreen Setup Helper** - Guided, self-checking in-app enablement of the Chromium Automatic Fullscreen policy from the Monitor Setup screen: readiness detection + origin-aware, per-OS (Windows/macOS/Linux) policy-file download, so a non-technical operator turns on multi-monitor auto-fullscreen once per computer without touching a policy editor
 
 ## Phase Details
 
@@ -554,3 +555,40 @@ expected; Phase 96 re-confirms this rather than assuming it.
 > **v2.4 Basis note (2026-08-28):** Phase 97 is a post-UAT redesign added after phases 90–96 were built and
 > verified. The milestone was held open for owner hardware UAT; this phase folds the owner's approved design
 > + six UX fixes back in before close.
+
+### Phase 98: Fullscreen Setup Helper
+
+**Goal**: A non-technical projectionist can turn on true multi-monitor auto-fullscreen for a computer
+**once**, entirely from inside the Monitor Setup screen — the app tells them whether this computer is
+ready, and if not, hands them a single origin-correct, OS-appropriate policy file to download and run,
+then confirms success on its own — so the R278 auto-fullscreen promise is actually reachable in the field
+without anyone editing a registry or policy by hand.
+**Depends on**: Phase 92 (Monitor Setup screen), Phase 97 (R278 output self-fullscreen this enables)
+**Requirements**: R285, R286, R287
+**Success Criteria** (what must be TRUE):
+
+  1. The Monitor Setup screen shows an honest **ready ✓ / not-ready** state for automatic fullscreen on the
+     current computer, derived from `navigator.permissions.query({name:'fullscreen',
+     allowWithoutGesture:true})`, and a **"Confirm fullscreen support"** control re-checks it on demand;
+     browsers that can't support it are explained, not dead-ended. (R285)
+  2. When not ready, the operator can **download the correct enablement file for their OS + browser** —
+     Windows `.reg` (HKCU no-admin default + HKLM admin fallback), macOS `.mobileconfig`/plist, Linux
+     managed-policy JSON — with the app's **real origin** (`window.location.origin`) baked in and clear
+     per-OS steps (including the Windows "dangerous file" prompt and macOS/Linux admin/sudo reality). (R286)
+  3. The helper is embedded in the **monitor-assignment flow** and **self-corrects** — it flips to
+     "ready ✓" once the grant is detected without a reload, and shows actionable troubleshooting (restart
+     browser, admin/sudo variant, unsupported browser) while still not ready. (R287)
+  4. No auto-fullscreen path regresses when the setting is absent — the existing gesture fallbacks
+     (capability delegation, "Fullscreen displays", tap-to-fullscreen) remain; client-only, no
+     Firestore/rules/functions change.
+
+**Plans**: TBD (planning pending)
+
+**UI hint**: yes
+
+> **v2.4 Basis note (2026-08-29):** Phase 98 was added from owner UAT after phases 90–97. It exists because
+> R278's auto-fullscreen depends on the Chromium Automatic Fullscreen content setting, which the browser
+> will not prompt for and which must be enabled per-computer via the `AutomaticFullscreenAllowedForUrls`
+> policy — a step too technical to hand to the non-technical operator this milestone targets. Electron (a
+> zero-privilege desktop wrapper that needs no per-computer policy) is the recorded escape-hatch
+> alternative, explicitly out of scope for this phase.
