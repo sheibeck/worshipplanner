@@ -1848,6 +1848,28 @@ describe('SlideGrid', () => {
       expect(otherWrapper.find('[data-testid="slide-grid-song-readonly-badge"]').exists()).toBe(false)
     })
 
+    // Owner UAT: the read-only badge is a working link to the song's lyrics.
+    it('the read-only badge is a button that emits edit-in-song with the group\'s songId', async () => {
+      const wrapper = mountGrid({ selectedSlot: makeSongSlot() })
+      const badge = wrapper.find('[data-testid="slide-grid-song-readonly-badge"]')
+      expect(badge.element.tagName).toBe('BUTTON')
+      expect(badge.attributes('aria-label')).toBe('Edit lyrics in Song Lyrics')
+      await badge.trigger('click')
+      expect(wrapper.emitted('edit-in-song')).toEqual([['s1']])
+    })
+
+    // A song slot with no song assigned has nothing to link to — the badge
+    // stays an inert span rather than a dead button.
+    it('renders the badge as an inert span (no edit-in-song) when the song slot has no songId', async () => {
+      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: null, songTitle: null, songKey: null, requiredVwType: 1 } as never)
+      const wrapper = mountGrid({ selectedSlot: slot })
+      const badge = wrapper.find('[data-testid="slide-grid-song-readonly-badge"]')
+      expect(badge.exists()).toBe(true)
+      expect(badge.element.tagName).toBe('SPAN')
+      await badge.trigger('click')
+      expect(wrapper.emitted('edit-in-song')).toBeUndefined()
+    })
+
     it('still renders SlideCard for a song group, selectable exactly as before', async () => {
       const assembledSlideshow = [makeAssembled(0, 'c1'), makeAssembled(0, 'c2')]
       const wrapper = mountGrid({ selectedSlot: makeSongSlot(), assembledSlideshow })

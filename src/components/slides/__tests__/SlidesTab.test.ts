@@ -833,6 +833,19 @@ describe('SlidesTab', () => {
       expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'details' } })
     })
 
+    // Owner UAT: the read-only song badge (SlideGrid's `edit-in-song` emit)
+    // reuses the same song-lyrics navigation the menu's edit-in-song performs,
+    // pushing the lyrics tab for the group's own songId.
+    it('badge: SlideGrid\'s edit-in-song emit pushes the lyrics tab for the group\'s songId', async () => {
+      const wrapper = mountWithEntry({ kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('edit-in-song', 'song-42')
+      await wrapper.vm.$nextTick()
+
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-42', tab: 'lyrics' } })
+    })
+
     it('menu: the edit-in-scripture key emits navigate-to-scripture-editor and leaves the drawer closed', async () => {
       const wrapper = mountWithEntry({ kind: 'scripture', scriptureReadingId: 'read-1', innerSlideId: 'inner-1' })
       await wrapper.vm.$nextTick()

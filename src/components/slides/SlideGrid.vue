@@ -31,8 +31,23 @@
              DIFFERENT restriction that applies even to a draft service, while
              the lifecycle lock is already stated once by the sticky page banner.
              A lock chip here would be the second banner D-06 forbids. -->
+        <!-- Owner UAT: the read-only marker is now an ACTIONABLE link to the
+             song's own lyrics editor — clicking it takes the planner to where
+             the slides ARE edited, instead of only telling them slides can't
+             be edited here. Reuses the exact `edit-in-song` navigation the
+             3-dot menu already performs (SlidesTab.vue), via an emit carrying
+             this group's `songId`. Falls back to a plain, inert span when the
+             song slot has no song assigned yet (nothing to link to). -->
+        <button
+          v-if="isSongGroup && songGroupSongId"
+          type="button"
+          class="ml-auto inline-flex items-center gap-1 rounded border border-gray-700 bg-gray-800/50 px-2 py-0.5 text-[11px] text-gray-400 transition-colors hover:border-indigo-600 hover:text-indigo-300"
+          data-testid="slide-grid-song-readonly-badge"
+          aria-label="Edit lyrics in Song Lyrics"
+          @click="emit('edit-in-song', songGroupSongId)"
+        >Read-only — edit in Song Lyrics</button>
         <span
-          v-if="isSongGroup"
+          v-else-if="isSongGroup"
           class="ml-auto inline-flex items-center rounded border border-gray-700 bg-gray-800/50 px-2 py-0.5 text-[11px] text-gray-400"
           data-testid="slide-grid-song-readonly-badge"
         >Read-only — edit in Song Lyrics</span>
@@ -424,6 +439,15 @@ const emit = defineEmits<{
    * `navigate-to-scripture-editor` relay.
    */
   'edit-congregational': []
+  /**
+   * The read-only song badge was clicked (owner UAT): a discoverable route to
+   * the same song-lyrics editor the 3-dot menu's `edit-in-song` key opens.
+   * Carries the SONG group's own `songId` (read from `selectedSlot`, never from
+   * anything on the DOM event) so the tab one level up performs the exact same
+   * `buildSongEditLink` navigation. Emitted only for a SONG group whose slot
+   * actually carries a `songId`.
+   */
+  'edit-in-song': [songId: string]
 }>()
 
 const slideGroupsStore = useSlideGroups()
@@ -474,6 +498,18 @@ const groupTitle = computed(() => {
  * prop; no new prop is threaded (30-03-PLAN.md key_links).
  */
 const isSongGroup = computed(() => props.selectedSlot?.kind === 'SONG')
+
+/**
+ * The SONG group's own song id, read straight off the selected slot (a
+ * `SongSlot` carries `songId: string | null`). `null` for a non-song group or
+ * a song slot with no song assigned yet — the read-only badge stays inert (a
+ * plain span) in that case rather than offering a link to nothing. Sourced
+ * only from `selectedSlot`, never from a DOM event, so the emitted navigation
+ * target can never be redirected (mirrors T-33-24 for the menu's edit-in-song).
+ */
+const songGroupSongId = computed<string | null>(() =>
+  props.selectedSlot?.kind === 'SONG' ? props.selectedSlot.songId : null,
+)
 
 /**
  * ★ R036 — the two composed gates this component uses everywhere. Both fold the

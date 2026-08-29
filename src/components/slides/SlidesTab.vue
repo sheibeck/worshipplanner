@@ -30,6 +30,7 @@
           @select="onSelectSlide"
           @menu-action="onMenuAction"
           @edit-congregational="onEditCongregational"
+          @edit-in-song="onEditInSongBadge"
         />
       </div>
     </div>
@@ -466,6 +467,19 @@ function onEditCongregational(): void {
   if (!confirmLeavingOpenDrawer()) return
   drawerOpen.value = false
   requestEditInScripture()
+}
+
+/**
+ * The read-only song badge (SlideGrid's `edit-in-song` emit, owner UAT) — a
+ * discoverable route to the SAME song-lyrics editor the 3-dot menu's
+ * `edit-in-song` key opens. Takes the exact same path as that menu case: honour
+ * an open drawer's unsaved-edit guard first (WR-04), then `router.push` the
+ * song-edit link on its lyrics tab. The `songId` is the group's own, read off
+ * the selected SONG slot inside SlideGrid — never off the DOM event.
+ */
+function onEditInSongBadge(songId: string): void {
+  if (!confirmLeavingOpenDrawer()) return
+  void router.push(buildSongEditLink(songId, 'lyrics'))
 }
 
 function onMenuAction(slideId: string, key: MenuItemKey): void {
