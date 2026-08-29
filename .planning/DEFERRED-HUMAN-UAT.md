@@ -44,3 +44,12 @@ wake-lock behavior over a service length), NOT a known defect.
 3. The **Escape-confirm feel** + real projector-blanking on confirmed exit.
 4. The **pop-out fallback** drag-to-monitor + per-window fullscreen (when the mapping doesn't match).
 5. The **blocked and partial popup states** on real hardware (popup-blocked / only-one-window-opened).
+
+## Phase 96 — Live-Ops Hardening (verified 2026-08-28, pass-with-deferred-human-UAT)
+
+1. **Closed-window one-click reopen** — actually close an output mid-service and reopen it onto the right
+   physical monitor with the current slide intact.
+2. **Monitor-unplug in-place reassign** — physically unplug a monitor and recover via "Reopen & replace,"
+   keeping the control running and the place intact.
+3. **Full realistic-length service** — no perceptible sync lag between control and outputs, and no
+   teardown/resource accumulation over ~60–90 min.
