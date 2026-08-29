@@ -12,10 +12,103 @@
         {{ serviceHeading }}
       </h1>
 
-      <!-- 95-04 SEAM: the output-status cluster (Displays ready / Opening… /
-           amber fallback) slots here (ml-auto, before the Exit button). Left
-           intentionally empty in this wave — control-screen core only. -->
-      <div class="ml-auto"></div>
+      <!-- OUTPUT-STATUS CLUSTER (95-04) — center-right, before Exit. Renders by
+           outputStatus: idle shows the Go live action, opening the spinner,
+           placed the green "Displays ready" summary, blocked a compact honest
+           indicator + retry. In 'fallback' the cluster is empty — the amber
+           banner below carries it. -->
+      <div class="ml-auto flex items-center gap-4">
+        <!-- IDLE: the primary Go live action (the ONLY caller of openOutputs). -->
+        <div v-if="outputStatus === 'idle'" class="flex flex-col items-end gap-0.5">
+          <button
+            type="button"
+            data-testid="run-go-live-btn"
+            aria-label="Go live — open the audience and confidence displays"
+            class="min-h-11 inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            @click="openOutputs"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" />
+              <rect x="2" y="4" width="20" height="14" rx="2" ry="2" stroke-width="0" fill="none" />
+            </svg>
+            Go live
+          </button>
+          <span class="text-xs text-gray-400">Open the audience &amp; confidence displays</span>
+        </div>
+
+        <!-- OPENING: transient spinner while getScreenDetails/window.open run. -->
+        <div
+          v-else-if="outputStatus === 'opening'"
+          data-testid="run-status-opening"
+          class="flex items-center gap-2 text-xs text-gray-400"
+        >
+          <svg
+            class="h-4 w-4 animate-spin text-indigo-400"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+          Opening displays…
+        </div>
+
+        <!-- PLACED: green dot ALWAYS paired with words (colorblind-safe). -->
+        <div
+          v-else-if="outputStatus === 'placed'"
+          data-testid="run-status-placed"
+          class="flex flex-col items-end gap-0.5"
+        >
+          <span class="inline-flex items-center gap-2 text-sm text-gray-100">
+            <span class="h-2 w-2 flex-none rounded-full bg-green-400" aria-hidden="true"></span>
+            Displays ready
+          </span>
+          <span class="text-xs text-gray-400">Audience → {{ readyAudienceLabel }}</span>
+          <span class="text-xs text-gray-400">Confidence → {{ readyConfidenceLabel }}</span>
+        </div>
+
+        <!-- BLOCKED: compact honest indicator + retry; detail in the banner below. -->
+        <div
+          v-else-if="outputStatus === 'blocked'"
+          class="flex items-center gap-3"
+        >
+          <span class="inline-flex items-center gap-1.5 text-xs text-amber-300">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              class="h-4 w-4 flex-none text-amber-400"
+              aria-hidden="true"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            Displays blocked
+          </span>
+          <button
+            type="button"
+            data-testid="run-go-live-retry"
+            aria-label="Go live — open the audience and confidence displays"
+            class="min-h-11 inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            @click="openOutputs"
+          >
+            Go live
+          </button>
+        </div>
+      </div>
 
       <button
         type="button"
@@ -37,6 +130,82 @@
         </svg>
       </button>
     </header>
+
+    <!-- OUTPUT-STATUS BANNERS (95-04) — a sibling band between the top bar and
+         the main region (pushes it down, never overlays). Fallback and blocked
+         are MUTUALLY EXCLUSIVE by outputStatus. -->
+    <!-- FALLBACK: windows DID open, just un-positioned. Amber, never red. -->
+    <div
+      v-if="outputStatus === 'fallback'"
+      data-testid="run-fallback-banner"
+      class="flex-none m-4 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3 text-amber-200"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        class="mt-0.5 h-5 w-5 flex-none text-amber-400"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <div class="min-w-0 flex-1">
+        <p class="font-medium">Finish setting up your displays</p>
+        <ol class="mt-2 list-decimal list-inside text-sm space-y-1">
+          <li>Two windows opened — one Audience, one Confidence.</li>
+          <li>Drag each window onto the correct screen.</li>
+          <li>Click Enter fullscreen in each window.</li>
+        </ol>
+        <router-link to="/monitor-setup" class="mt-2 inline-block text-amber-200 underline">
+          Open monitor setup
+        </router-link>
+      </div>
+    </div>
+
+    <!-- BLOCKED: ZERO windows open (pop-up blocker). Amber (recoverable), NOT
+         red, and NEVER any "opened / displays ready" claim. -->
+    <div
+      v-if="outputStatus === 'blocked'"
+      data-testid="run-blocked-banner"
+      class="flex-none m-4 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3 text-amber-200"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        class="mt-0.5 h-5 w-5 flex-none text-amber-400"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <div class="min-w-0 flex-1">
+        <p class="font-medium">Your browser blocked the display windows</p>
+        <p class="mt-1 text-sm">
+          The pop-up blocker prevented the audience and confidence windows from opening. Allow
+          pop-ups for this site, then click Go live again.
+        </p>
+        <!-- The cluster already renders run-go-live-retry in the blocked state,
+             so this banner uses its own primary-button testid to avoid a
+             duplicate id (both render simultaneously while blocked). -->
+        <button
+          type="button"
+          data-testid="run-blocked-retry"
+          aria-label="Go live — open the audience and confidence displays"
+          class="mt-3 min-h-11 inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          @click="openOutputs"
+        >
+          Go live
+        </button>
+      </div>
+    </div>
 
     <!-- 2. MAIN REGION -->
     <div class="flex-1 min-h-0 flex">
