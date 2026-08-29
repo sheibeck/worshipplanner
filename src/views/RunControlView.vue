@@ -239,12 +239,14 @@
            -> postBlackout). RunDisplaysPanel now also carries the closed-window
            RECOVERY (R274) the removed top status band used to (owner fix #3). -->
       <section v-else class="flex-1 min-w-0 h-full flex flex-col gap-6 overflow-y-auto p-6 lg:p-8">
-        <!-- PREVIEW + DISPLAYS: previews left, Displays right column (6b placement). -->
-        <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <!-- PREVIEW then DISPLAYS: previews on top, the Displays panel stacked
+             UNDER them and right-aligned so it sits beneath the Next-up pane
+             (owner request — under Next-up, not beside it). -->
+        <div class="flex flex-col gap-6">
           <div class="flex-1 min-w-0">
             <RunPreviewPair :current="current" :next="next" :live="live" />
           </div>
-          <div class="w-full lg:w-72 lg:flex-none">
+          <div class="w-full lg:w-72 lg:self-end">
             <RunDisplaysPanel
               :audience="audience"
               :confidence="confidence"
