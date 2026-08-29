@@ -9,10 +9,11 @@
        parent can map @jump straight to postIndex without an off-by-item error. -->
   <div data-testid="run-filmstrip" class="flex flex-col gap-2">
     <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Slides in this item</span>
-    <div class="flex items-center gap-3 overflow-x-auto pb-1">
+    <div class="filmstrip-scroll flex items-center gap-3 overflow-x-auto scroll-smooth pb-2">
       <button
         v-for="thumb in thumbs"
         :key="thumb.index"
+        :ref="(el) => setActiveThumb(el, thumb.index)"
         type="button"
         data-testid="run-filmstrip-slide"
         :data-index="thumb.index"
@@ -48,7 +49,7 @@
  * as a scaled non-interactive SlideCanvas; the current slide (indices[i] ===
  * currentIndex) gets the green live frame.
  */
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import SlideCanvas from '@/components/slides/SlideCanvas.vue'
 import type { AssembledSlide } from '@/types/slide'
 
@@ -91,4 +92,45 @@ const thumbStageStyle = {
   transform: `scale(${THUMB_WIDTH / REFERENCE_WIDTH})`,
   transformOrigin: 'top left',
 }
+
+/**
+ * Owner UAT: keep the current (highlighted) thumb visible. As the operator
+ * advances, the active thumb would otherwise scroll off the right edge and
+ * they'd have to hand-scroll. We capture the active thumb's element via a
+ * function ref and scroll it into view within the horizontal strip whenever
+ * the current slide changes (and on mount). `block: 'nearest'` avoids nudging
+ * the page vertically; guarded for jsdom (no real scrollIntoView).
+ */
+let activeThumbEl: HTMLElement | null = null
+function setActiveThumb(el: unknown, thumbIndex: number) {
+  if (thumbIndex === props.currentIndex && el instanceof HTMLElement) activeThumbEl = el
+}
+function scrollActiveIntoView() {
+  activeThumbEl?.scrollIntoView?.({ behavior: 'smooth', inline: 'nearest', block: 'nearest' })
+}
+watch(() => props.currentIndex, scrollActiveIntoView, { flush: 'post' })
+onMounted(scrollActiveIntoView)
 </script>
+
+<style scoped>
+/* Owner UAT: a thin, dark, rounded scrollbar instead of the OS default white
+   bar under the thumbnail strip. Firefox uses scrollbar-width/color; WebKit/
+   Blink use the ::-webkit-scrollbar pseudo-elements. */
+.filmstrip-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(75 85 99) transparent; /* gray-600 thumb on a transparent track */
+}
+.filmstrip-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+.filmstrip-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.filmstrip-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(75 85 99); /* gray-600 */
+  border-radius: 9999px;
+}
+.filmstrip-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgb(107 114 128); /* gray-500 on hover */
+}
+</style>
