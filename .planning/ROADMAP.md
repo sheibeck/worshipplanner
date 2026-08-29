@@ -582,7 +582,11 @@ without anyone editing a registry or policy by hand.
      (capability delegation, "Fullscreen displays", tap-to-fullscreen) remain; client-only, no
      Firestore/rules/functions change.
 
-**Plans**: TBD (planning pending)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 98-01-PLAN.md — Pure logic: OS/browser detection, origin-baked policy-file generators (Windows .reg HKCU+HKLM, macOS .mobileconfig, Linux JSON), Blob download helper, read-only readiness composable (Wave 1)
+- [ ] 98-02-PLAN.md — FullscreenSetupPanel.vue UI (4 states + per-OS download/steps/troubleshooting) + additive mount in MonitorSetupView.vue (Wave 2)
 
 **UI hint**: yes
 
