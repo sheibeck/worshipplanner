@@ -1,12 +1,16 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ServiceCard from '../ServiceCard.vue'
 import type { Service } from '@/types/service'
 import type { Timestamp } from 'firebase/firestore'
 
+// Hoisted so the R284 navigation cases can assert against the SAME push spy the
+// component calls (a spy created inside the factory would be unreachable).
+const pushSpy = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({
-    push: vi.fn(() => Promise.resolve()),
+    push: pushSpy,
   }),
 }))
 
@@ -24,10 +28,15 @@ vi.mock('@/stores/songs', () => ({
 }))
 
 // ServiceCard reads bibleVersion to route its scripture reader links to the
-// church's chosen translation (ESV.org vs BibleGateway/NLT).
+// church's chosen translation (ESV.org vs BibleGateway/NLT). It also reads orgId
+// for the R284 Run gate — a mutable hoisted holder lets a case null it.
+const authState = vi.hoisted(() => ({ orgId: 'org-1' as string | null }))
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     settings: { bibleVersion: 'ESV' },
+    get orgId() {
+      return authState.orgId
+    },
   }),
 }))
 
@@ -130,6 +139,12 @@ const mockServiceUnordered: Service = {
   updatedAt: mockTimestamp,
 }
 
+// R284 fixtures: LOCKED services (status !== 'draft') so canRun is true when an
+// orgId is set. One 'planned' and one 'exported' to prove isLocked covers both
+// non-draft statuses.
+const mockServicePlanned: Service = { ...mockService, id: 'svc-planned', status: 'planned' }
+const mockServiceExported: Service = { ...mockService, id: 'svc-exported', status: 'exported' }
+
 const globalStubs = {
   'router-link': {
     template: '<a :href="to"><slot /></a>',
@@ -231,5 +246,64 @@ describe('ServiceCard', () => {
     expect(miscIdx).toBeLessThan(dividerIdx)
     // The sending-section song renders AFTER the message divider.
     expect(doxologyIdx).toBeGreaterThan(dividerIdx)
+  })
+})
+
+// R284 — a viewer-inclusive Run affordance on each LOCKED listing row, gated on
+// isLocked (status !== 'draft') && !!authStore.orgId, navigating to /run/:id?org=
+// with @click.stop so it does not also open the card-body editor link.
+describe('ServiceCard — Run affordance (R284)', () => {
+  const RUN_SEL = '[data-testid="run-service-card-btn"]'
+
+  beforeEach(() => {
+    authState.orgId = 'org-1'
+    pushSpy.mockClear()
+  })
+
+  it('shows Run on a locked (planned) row for an org member', () => {
+    const wrapper = mount(ServiceCard, {
+      props: { service: mockServicePlanned },
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.find(RUN_SEL).exists()).toBe(true)
+  })
+
+  it('shows Run on an exported row too (isLocked covers both non-draft statuses)', () => {
+    const wrapper = mount(ServiceCard, {
+      props: { service: mockServiceExported },
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.find(RUN_SEL).exists()).toBe(true)
+  })
+
+  it('hides Run on a draft row', () => {
+    const wrapper = mount(ServiceCard, {
+      props: { service: mockService },
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.find(RUN_SEL).exists()).toBe(false)
+  })
+
+  it('hides Run when orgId is null (no active org)', () => {
+    authState.orgId = null
+    const wrapper = mount(ServiceCard, {
+      props: { service: mockServicePlanned },
+      global: { stubs: globalStubs },
+    })
+    expect(wrapper.find(RUN_SEL).exists()).toBe(false)
+  })
+
+  it('navigates to /run/:id?org= on click without opening the editor', async () => {
+    const wrapper = mount(ServiceCard, {
+      props: { service: mockServicePlanned },
+      global: { stubs: globalStubs },
+    })
+    await wrapper.find(RUN_SEL).trigger('click')
+    // @click.stop keeps the card-body router-link from also firing — a single
+    // /run push (never a /services push) is sufficient proof.
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+    expect(pushSpy).toHaveBeenCalledWith(
+      '/run/' + encodeURIComponent(mockServicePlanned.id) + '?org=org-1',
+    )
   })
 })
