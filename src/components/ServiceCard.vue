@@ -38,8 +38,17 @@
       </div>
     </router-link>
 
-    <!-- Action footer: Share + Print (outside router-link to avoid navigation) -->
+    <!-- Action footer: Run + Share + Print (outside router-link to avoid navigation) -->
     <div class="shrink-0 flex items-center justify-end gap-1 px-3 py-1.5 border-t border-gray-800/50">
+      <!-- R284: viewer-inclusive Run affordance on LOCKED rows (isLocked && orgId,
+           mirroring ServiceEditorView's run-service-btn). @click.stop keeps a Run
+           click from also firing the card-body router-link to the editor. -->
+      <button v-if="canRun" type="button" data-testid="run-service-card-btn" aria-label="Run this service live" class="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors" @click.stop="onRun">
+        <svg viewBox="0 0 20 20" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+          <path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.34-5.89a1.5 1.5 0 000-2.54L6.3 2.84z" />
+        </svg>
+        Run
+      </button>
       <button type="button" @click="onShare" :disabled="isSharing" class="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors" title="Share">
         <svg v-if="!shareCopied" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -81,6 +90,26 @@ const authStore = useAuthStore()
 
 const isSharing = ref(false)
 const shareCopied = ref(false)
+
+// R284/R275: Run affordance on LOCKED listing rows, mirroring
+// ServiceEditorView's gating verbatim. isLocked === status !== 'draft' keeps Run
+// absent on a draft; canRun is VIEWER-INCLUSIVE — gated on a set authStore.orgId
+// (any authenticated member of the active org), NOT on isEditor, so a viewer can
+// start a live Run without opening the editor first.
+const isLocked = computed(() => props.service.status !== 'draft')
+const canRun = computed(() => isLocked.value && !!authStore.orgId)
+
+// R284: ordinary SPA navigation to the Run screen. The org travels in ?org=
+// sourced from authStore.orgId (not user input); both ids are encoded so a
+// URL-reserved character can never corrupt the /run path or the ?org= query.
+function onRun() {
+  router.push(
+    '/run/' +
+      encodeURIComponent(props.service.id) +
+      '?org=' +
+      encodeURIComponent(authStore.orgId ?? ''),
+  )
+}
 
 const displayTeams = computed(() => {
   return props.service.teams.map(team => {
