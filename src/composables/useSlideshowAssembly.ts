@@ -13,7 +13,7 @@
  * — there is no second order source and no precedence chain.
  */
 import { ref, reactive, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore'
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
 import { useImportedSlides } from '@/stores/importedSlides'
@@ -28,30 +28,56 @@ import type { AssembledSlide, AssembledSection } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { SlideGroup, SlideGroupInput, GroupSlideEntry } from '@/types/slideGroup'
 
-/** Loads the current (newest) lyrics doc for a song. Injectable for tests. */
-export type LyricsLoader = (orgId: string, songId: string) => Promise<SongLyrics | null>
+/** Tears down a lyrics subscription opened by a {@link LyricsSubscriber}. */
+export type LyricsUnsubscribe = () => void
 
 /**
- * Default lyrics loader — a one-shot `getDocs` query (not a live subscription;
- * the composable re-fetches only when a new distinct songId appears) against
- * organizations/{orgId}/songs/{songId}/lyrics ordered createdAt desc, limit 1.
- * Mirrors the field-defaulting behavior of `songLyrics` store's `subscribeLyrics`
- * (missing `performanceOrder` defaults to `[]`).
+ * Opens a LIVE subscription to a song's current (newest) lyrics document.
+ * `onUpdate` fires with the newest doc (or `null` when none exists) on the
+ * initial snapshot AND on every subsequent edit, so a reworded lyric or a
+ * verse added/removed/reordered propagates to the assembled slideshow with no
+ * composable remount — and independently of `canWrite`, so a locked/viewer
+ * session sees content edits live. Injectable for tests. Returns an
+ * unsubscribe the composable calls when the song leaves the service or on
+ * teardown.
  */
-async function defaultLyricsLoader(orgId: string, songId: string): Promise<SongLyrics | null> {
+export type LyricsSubscriber = (
+  orgId: string,
+  songId: string,
+  onUpdate: (lyrics: SongLyrics | null) => void,
+) => LyricsUnsubscribe
+
+/**
+ * Default lyrics subscriber — a LIVE `onSnapshot` listener (replacing the
+ * pre-existing one-shot `getDocs` cache, which only re-fetched when a new
+ * distinct songId appeared and so left content/structure edits stale until a
+ * full remount) against organizations/{orgId}/songs/{songId}/lyrics ordered
+ * createdAt desc, limit 1 — newest-doc-wins, mirroring `songLyrics` store's
+ * `subscribeLyrics`. Missing `performanceOrder` defaults to `[]`, same as the
+ * store and the old loader.
+ */
+function defaultLyricsSubscriber(
+  orgId: string,
+  songId: string,
+  onUpdate: (lyrics: SongLyrics | null) => void,
+): LyricsUnsubscribe {
   const q = query(
     collection(db, 'organizations', orgId, 'songs', songId, 'lyrics'),
     orderBy('createdAt', 'desc'),
     limit(1),
   )
-  const snap = await getDocs(q)
-  if (snap.empty) return null
-  const docSnap = snap.docs[0]!
-  const data = docSnap.data() as Record<string, unknown>
-  if (!Array.isArray(data.performanceOrder)) {
-    data.performanceOrder = []
-  }
-  return { id: docSnap.id, songId, ...data } as SongLyrics
+  return onSnapshot(q, (snap) => {
+    if (snap.empty) {
+      onUpdate(null)
+      return
+    }
+    const docSnap = snap.docs[0]!
+    const data = docSnap.data() as Record<string, unknown>
+    if (!Array.isArray(data.performanceOrder)) {
+      data.performanceOrder = []
+    }
+    onUpdate({ id: docSnap.id, songId, ...data } as SongLyrics)
+  })
 }
 
 // WR-02 (42-REVIEW.md): `pptxRendersStore` is a Pinia singleton, but this composable's
@@ -65,8 +91,8 @@ async function defaultLyricsLoader(orgId: string, songId: string): Promise<SongL
 let activeSlideshowAssemblyInstances = 0
 
 export interface UseSlideshowAssemblyOptions {
-  /** Injectable lyrics loader — defaults to a real Firestore `getDocs` query. */
-  lyricsLoader?: LyricsLoader
+  /** Injectable lyrics subscriber — defaults to a real Firestore `onSnapshot` listener. */
+  lyricsSubscriber?: LyricsSubscriber
   /**
    * Whether this consumer is allowed to write slide groups (materialize/
    * reconcile). Defaults to `false` — the `/services/:id` route has no
@@ -159,7 +185,7 @@ export function useSlideshowAssembly(
   const importedStore = useImportedSlides()
   const slideGroupsStore = useSlideGroups()
   const pptxRendersStore = usePptxRenders()
-  const loadLyrics = options?.lyricsLoader ?? defaultLyricsLoader
+  const subscribeLyrics = options?.lyricsSubscriber ?? defaultLyricsSubscriber
 
   // WR-02: see the module-level counter's doc comment above.
   activeSlideshowAssemblyInstances += 1
@@ -356,9 +382,18 @@ export function useSlideshowAssembly(
     return map
   })
 
-  // --- per-song current lyrics: songLyrics store is single-song, so gather here ---
+  // --- per-song current lyrics: songLyrics store is single-song, so gather
+  // here via a LIVE `onSnapshot` subscription per distinct songId (Part 1).
+  // A lyric edit — reworded text OR a verse added/removed/reordered — pushes
+  // into `songLyricsById` reactively, so the assembler re-renders with no
+  // remount and regardless of `canWrite`. Teardown lives in `cleanup()`.
   const songLyricsById = reactive(new Map<string, SongLyrics>())
   const isLoading = ref(false)
+  // Open lyrics subscriptions keyed by songId, plus the org they were opened
+  // under (an org change tears them all down — they query the old org's
+  // subcollection — and re-opens under the new org).
+  const lyricsSubscriptions = new Map<string, LyricsUnsubscribe>()
+  let lyricsSubscriptionOrgId: string | null = null
 
   const distinctSongIds = computed<string[]>(() => {
     const svc = service.value
@@ -370,32 +405,108 @@ export function useSlideshowAssembly(
     return Array.from(ids)
   })
 
-  async function loadMissingLyrics(ids: string[], org: string | null) {
+  function syncLyricsSubscriptions(ids: string[], org: string | null) {
+    // An org change invalidates every open subscription. Tear them all down
+    // (and drop their cached lyrics) before re-subscribing under the new org.
+    if (org !== lyricsSubscriptionOrgId) {
+      for (const [songId, unsub] of lyricsSubscriptions) {
+        unsub()
+        songLyricsById.delete(songId)
+      }
+      lyricsSubscriptions.clear()
+      lyricsSubscriptionOrgId = org
+    }
     if (!org) return
-    // T-20-03-DoS mitigation: only fetch songIds NOT already in songLyricsById.
-    const missing = ids.filter((id) => !songLyricsById.has(id))
-    if (missing.length === 0) return
 
-    isLoading.value = true
-    try {
-      await Promise.all(
-        missing.map(async (songId) => {
-          const lyrics = await loadLyrics(org, songId)
-          if (lyrics) songLyricsById.set(songId, lyrics)
-        }),
-      )
-    } finally {
-      isLoading.value = false
+    const desired = new Set(ids)
+    // Drop subscriptions (and cached lyrics) for songs no longer referenced by
+    // any slot — the live analogue of the old cache's implicit staleness, but
+    // bounded: at most one listener per distinct song currently in the service.
+    for (const [songId, unsub] of lyricsSubscriptions) {
+      if (desired.has(songId)) continue
+      unsub()
+      lyricsSubscriptions.delete(songId)
+      songLyricsById.delete(songId)
+    }
+    // Open a live subscription for each newly-referenced song. T-20-03-DoS
+    // mitigation preserved: a songId already subscribed is never re-subscribed.
+    for (const songId of desired) {
+      if (lyricsSubscriptions.has(songId)) continue
+      isLoading.value = true
+      const unsub = subscribeLyrics(org, songId, (lyrics) => {
+        if (lyrics) {
+          songLyricsById.set(songId, lyrics)
+        } else {
+          songLyricsById.delete(songId)
+        }
+        isLoading.value = false
+      })
+      lyricsSubscriptions.set(songId, unsub)
     }
   }
 
   const stopLyricsWatch = watch(
     [distinctSongIds, resolvedOrgId],
     ([ids, org]) => {
-      void loadMissingLyrics(ids, org)
+      syncLyricsSubscriptions(ids, org)
     },
     { immediate: true },
   )
+
+  // --- Part 2: live structure for a stale SONG group, in-memory only ---
+  //
+  // True when a SONG slot's PERSISTED slide group no longer matches the verse
+  // structure the song's CURRENT lyrics would produce — a verse added, removed,
+  // or reordered in `performanceOrder` since the group was materialized.
+  // Compares the group's stored lyric-entry section sequence against
+  // `performanceOrder` filtered to sections that still exist — EXACTLY what the
+  // assembler's no-group fallback path derives — so the two never disagree on
+  // ordering (CLAUDE.md: don't create a second ordering that disagrees with the
+  // assembler). Returns false when there is nothing to compare (non-SONG slot,
+  // no songId, or lyrics not loaded yet): never force a live derivation when the
+  // current structure is unknown.
+  function songGroupIsStale(group: SlideGroup, slot: Service['slots'][number]): boolean {
+    if (slot.kind !== 'SONG' || !slot.songId) return false
+    const lyrics = songLyricsById.get(slot.songId)
+    if (!lyrics) return false
+    const freshOrder = lyrics.performanceOrder.filter((sectionId) =>
+      lyrics.sections.some((section) => section.id === sectionId),
+    )
+    const storedOrder = [...group.slides]
+      .sort((a, b) => a.order - b.order)
+      .flatMap((entry) => (entry.sourceRef.kind === 'lyric' ? [entry.sourceRef.sectionId] : []))
+    if (freshOrder.length !== storedOrder.length) return true
+    return freshOrder.some((sectionId, index) => sectionId !== storedOrder[index])
+  }
+
+  // The group map the assembler renders from. For an EDITABLE session
+  // (`canWrite`) this is the store's map UNCHANGED — the rebuild loop persists
+  // any regenerated group, so the stored group is authoritative and behavior is
+  // identical to before. For a LOCKED / viewer session (`!canWrite`), a SONG
+  // group gone stale against its song's current verse structure is OMITTED, so
+  // the assembler falls through to its live no-group derivation path
+  // (`performanceOrder`), reflowing an added / removed / reordered verse IN
+  // MEMORY. Nothing is persisted here: this override only feeds
+  // `assembledSlideshow` (read/render), never the write paths
+  // (`materializationCandidates` / `rebuildOutcomes` / `ensureGroupMaterialized`
+  // all read the store map directly and stay gated on `canWrite`), so a locked
+  // session still writes nothing to `/slideGroups`.
+  const assemblyGroupsBySlotId = computed<Map<string, SlideGroup>>(() => {
+    const stored = slideGroupsStore.groupsBySlotId
+    if (canWrite.value) return stored
+    const svc = service.value
+    if (!svc) return stored
+    let overridden: Map<string, SlideGroup> | null = null
+    for (const slot of svc.slots) {
+      if (slot.kind !== 'SONG') continue
+      const group = stored.get(slot.id)
+      if (!group) continue
+      if (!songGroupIsStale(group, slot)) continue
+      if (!overridden) overridden = new Map(stored)
+      overridden.delete(slot.id)
+    }
+    return overridden ?? stored
+  })
 
   const assembledSlideshow = computed<AssembledSlide[]>(() => {
     const svc = service.value
@@ -404,7 +515,7 @@ export function useSlideshowAssembly(
       songLyricsById,
       scriptureReadingsById: scriptureReadingsById.value,
       importedDecksById: importedDecksById.value,
-      groupsBySlotId: slideGroupsStore.groupsBySlotId,
+      groupsBySlotId: assemblyGroupsBySlotId.value,
       pptxRendersByImportId: pptxRendersStore.rendersByImportId,
       renderedImageUrlsByImportId: renderedImageUrlsByImportId.value,
     })
@@ -738,6 +849,12 @@ export function useSlideshowAssembly(
     stopRebuildWatch()
     stopRenderSubscriptionWatch()
     stopRenderedUrlsWatch()
+
+    // Part 1: tear down every live per-song lyrics `onSnapshot` listener this
+    // instance opened (the watches above no longer fire, but the Firestore
+    // listeners they created are independent and must be closed explicitly).
+    for (const unsub of lyricsSubscriptions.values()) unsub()
+    lyricsSubscriptions.clear()
 
     // WR-02: `activeSlideshowAssemblyInstances` still includes THIS instance at this
     // point (it decrements below), so > 1 here means at least one other instance is

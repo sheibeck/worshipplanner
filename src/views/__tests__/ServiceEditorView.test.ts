@@ -106,14 +106,19 @@ vi.mock('firebase/firestore', () => ({
   getFirestore: vi.fn(),
   collection: vi.fn(),
   doc: vi.fn(() => ({})),
-  onSnapshot: vi.fn(),
+  // useSlideshowAssembly's default lyrics subscriber now opens a LIVE
+  // `onSnapshot` listener per song (replacing the old one-shot `getDocs`
+  // cache), so this MUST return an unsubscribe function — the composable calls
+  // it on teardown/org-change. The snapshot callback is never invoked here, so
+  // no lyrics are delivered, matching the previous "no lyrics doc" behavior.
+  onSnapshot: vi.fn(() => () => {}),
   getDoc: mockGetDoc,
   setDoc: mockSetDoc,
   updateDoc: vi.fn(),
   serverTimestamp: vi.fn(() => ({})),
-  // useSlideshowAssembly's default lyrics loader (20-04) issues a one-shot
-  // getDocs query — stub the whole chain so it resolves to "no lyrics doc"
-  // rather than throwing on undefined firestore query builders.
+  // Query-builder chain stubbed so the composable's lyrics query construction
+  // does not throw on undefined firestore builders. `getDocs` is retained for
+  // any other one-shot reads in the mounted component graph.
   query: vi.fn(),
   orderBy: vi.fn(),
   limit: vi.fn(),

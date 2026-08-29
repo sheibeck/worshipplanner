@@ -264,6 +264,23 @@ function makeLyrics(songId: string): SongLyrics {
   }
 }
 
+/**
+ * Adapts a synchronous lyrics resolver into the subscribe-style seam the
+ * composable now consumes (Part 1 — a LIVE per-song `onSnapshot` replaced the
+ * old one-shot `getDocs` loader). Emits the resolved lyrics ONCE on subscribe,
+ * with a no-op teardown — deterministic, no real Firestore. Tests that need to
+ * push a LATER snapshot update capture `onUpdate` directly instead of using
+ * this helper.
+ */
+function subscribeStub(resolve: (orgId: string, songId: string) => SongLyrics | null) {
+  return vi.fn(
+    (orgId: string, songId: string, onUpdate: (lyrics: SongLyrics | null) => void) => {
+      onUpdate(resolve(orgId, songId))
+      return () => {}
+    },
+  )
+}
+
 describe('useSlideshowAssembly', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -326,13 +343,24 @@ describe('useSlideshowAssembly', () => {
     expect(assembledSlideshow.value[0]!.slide).toMatchObject({ body: 'Hymn Two' })
   })
 
-  it('gathers current lyrics for EVERY distinct song in the service, not just one', async () => {
+  it('opens one LIVE lyrics subscription per distinct song and re-renders a slide when a lyric snapshot UPDATES (live-subscription contract)', async () => {
     songsState.songs = [
       { id: 'song-a' } as Song,
       { id: 'song-b' } as Song,
     ]
 
-    const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+    // A controllable subscribe-style seam: capture each song's `onUpdate`
+    // emitter so the test can push a LATER snapshot update — the contract that
+    // replaced the old one-shot `getDocs` cache, whose "not called again"
+    // assertion this test used to encode.
+    const emitters = new Map<string, (lyrics: SongLyrics | null) => void>()
+    const fakeLyricsSubscriber = vi.fn(
+      (_orgId: string, songId: string, onUpdate: (lyrics: SongLyrics | null) => void) => {
+        emitters.set(songId, onUpdate)
+        onUpdate(makeLyrics(songId))
+        return () => {}
+      },
+    )
 
     const service = ref<Service | null>(
       makeService([
@@ -342,38 +370,48 @@ describe('useSlideshowAssembly', () => {
     )
 
     const { assembledSlideshow, isLoading } = useSlideshowAssembly(service, 'org-1', {
-      lyricsLoader: fakeLyricsLoader,
+      lyricsSubscriber: fakeLyricsSubscriber,
     })
 
-    // Flush the async lyrics-loading watcher.
     await nextTick()
     await nextTick()
     await vi.waitFor(() => expect(isLoading.value).toBe(false))
 
-    expect(fakeLyricsLoader).toHaveBeenCalledWith('org-1', 'song-a')
-    expect(fakeLyricsLoader).toHaveBeenCalledWith('org-1', 'song-b')
-    expect(fakeLyricsLoader).toHaveBeenCalledTimes(2)
+    // One live subscription per distinct song — the `onUpdate` third argument
+    // is what carries later edits back into the assembly.
+    expect(fakeLyricsSubscriber).toHaveBeenCalledWith('org-1', 'song-a', expect.any(Function))
+    expect(fakeLyricsSubscriber).toHaveBeenCalledWith('org-1', 'song-b', expect.any(Function))
+    expect(fakeLyricsSubscriber).toHaveBeenCalledTimes(2)
 
     // Each song contributes leading copyright + 1 lyric slide + trailing copyright = 3 slides.
     expect(assembledSlideshow.value).toHaveLength(6)
-    const songATitles = assembledSlideshow.value
-      .filter((s) => s.sourceId === 'song-a')
-      .map((s) => (s.slide as { title?: string }).title)
-    const songBTitles = assembledSlideshow.value
-      .filter((s) => s.sourceId === 'song-b')
-      .map((s) => (s.slide as { title?: string }).title)
-    expect(songATitles).toContain('song-a Title')
-    expect(songBTitles).toContain('song-b Title')
+    const lyricLinesFor = (songId: string) =>
+      assembledSlideshow.value
+        .filter((s) => s.sourceId === songId && 'lines' in s.slide)
+        .flatMap((s) => (s.slide as { lines: string[] }).lines)
+    expect(lyricLinesFor('song-a')).toContain('song-a line 1')
+    expect(lyricLinesFor('song-b')).toContain('song-b line 1')
 
-    // A song with no lyrics doc is simply absent — does not fetch again for a
-    // songId already present in songLyricsById.
-    fakeLyricsLoader.mockClear()
+    // A lyric CONTENT edit arrives as a snapshot UPDATE on the SAME
+    // subscription — the assembled slide text re-renders with no remount and
+    // WITHOUT any new subscribe call.
+    fakeLyricsSubscriber.mockClear()
+    const reworded = makeLyrics('song-a')
+    reworded.sections = [{ id: 'v1', label: 'Verse 1', lines: ['song-a REWORDED'] }]
+    emitters.get('song-a')!(reworded)
+    await nextTick()
+
+    expect(lyricLinesFor('song-a')).toContain('song-a REWORDED')
+    expect(fakeLyricsSubscriber).not.toHaveBeenCalled()
+
+    // Re-rendering with the same songId set opens no additional subscription
+    // (T-20-03-DoS mitigation preserved by the live path).
     service.value = makeService([
       songSlot({ position: 0, songId: 'song-a' }),
       songSlot({ position: 1, songId: 'song-b' }),
     ])
     await nextTick()
-    expect(fakeLyricsLoader).not.toHaveBeenCalled()
+    expect(fakeLyricsSubscriber).not.toHaveBeenCalled()
   })
 
   it('derives scriptureReadingsById from the scriptureSlides store and subscribes once per org', async () => {
@@ -705,19 +743,19 @@ describe('useSlideshowAssembly', () => {
     })
 
     it('a SONG slot with songId null produces no call; assigning a song later produces exactly one call carrying no bed (D-19: no legacy slot-media migration)', async () => {
-      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+      const fakeLyricsSubscriber = subscribeStub((_orgId, songId) => makeLyrics(songId))
       songsState.songs = [{ id: 'song-a' } as Song]
       const service = ref<Service | null>(
         makeService([songSlot({ position: 0, id: 'slot-song-a', songId: null })]),
       )
-      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsSubscriber: fakeLyricsSubscriber })
       await nextTick()
       await nextTick()
       expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
 
       service.value = makeService([songSlot({ position: 0, id: 'slot-song-a', songId: 'song-a' })])
       await nextTick()
-      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await vi.waitFor(() => expect(fakeLyricsSubscriber).toHaveBeenCalled())
       await nextTick()
       await nextTick()
 
@@ -751,16 +789,16 @@ describe('useSlideshowAssembly', () => {
 
     it('the same song assigned to two different slots produces two calls with two distinct slotId values', async () => {
       songsState.songs = [{ id: 'song-a' } as Song]
-      const fakeLyricsLoader = vi.fn(async () => makeLyrics('song-a'))
+      const fakeLyricsSubscriber = subscribeStub(() => makeLyrics('song-a'))
       const service = ref<Service | null>(
         makeService([
           songSlot({ position: 0, id: 'slot-song-a', songId: 'song-a' }),
           songSlot({ position: 1, id: 'slot-song-b', songId: 'song-a' }),
         ]),
       )
-      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsSubscriber: fakeLyricsSubscriber })
       await nextTick()
-      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await vi.waitFor(() => expect(fakeLyricsSubscriber).toHaveBeenCalled())
       await nextTick()
       await nextTick()
 
@@ -800,7 +838,7 @@ describe('useSlideshowAssembly', () => {
         createdAt: {} as never,
         updatedAt: {} as never,
       }
-      const fakeLyricsLoader = vi.fn(async () => twoSectionLyrics)
+      const fakeLyricsSubscriber = subscribeStub(() => twoSectionLyrics)
 
       slideGroupsState.groups = [
         {
@@ -825,9 +863,9 @@ describe('useSlideshowAssembly', () => {
       const service = ref<Service | null>(
         makeService([songSlot({ position: 0, id: 'slot-song-a', songId: 'song-a' })]),
       )
-      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsSubscriber: fakeLyricsSubscriber })
       await nextTick()
-      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await vi.waitFor(() => expect(fakeLyricsSubscriber).toHaveBeenCalled())
       await nextTick()
       await nextTick()
 
@@ -847,7 +885,7 @@ describe('useSlideshowAssembly', () => {
     // song's copyright/lyric entries with the new song's.
     it('an uncustomized group replaces wholesale when slot.songId changes to a different song, with no stale entries from the old song', async () => {
       songsState.songs = [{ id: 'song-a' } as Song, { id: 'song-b' } as Song]
-      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+      const fakeLyricsSubscriber = subscribeStub((_orgId, songId) => makeLyrics(songId))
 
       slideGroupsState.groups = [
         {
@@ -868,9 +906,9 @@ describe('useSlideshowAssembly', () => {
       const service = ref<Service | null>(
         makeService([songSlot({ position: 0, id: 'slot-song-swap', songId: 'song-b' })]),
       )
-      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsSubscriber: fakeLyricsSubscriber })
       await nextTick()
-      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await vi.waitFor(() => expect(fakeLyricsSubscriber).toHaveBeenCalled())
       await nextTick()
       await nextTick()
 
@@ -887,7 +925,7 @@ describe('useSlideshowAssembly', () => {
 
     it('R046: a group with a labeled lyric entry (source-derived) is STILL replaced wholesale, immediately, with a single write and no confirm state anywhere on the return', async () => {
       songsState.songs = [{ id: 'song-a' } as Song, { id: 'song-b' } as Song]
-      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+      const fakeLyricsSubscriber = subscribeStub((_orgId, songId) => makeLyrics(songId))
 
       slideGroupsState.groups = [
         {
@@ -914,10 +952,10 @@ describe('useSlideshowAssembly', () => {
       )
       const returned = useSlideshowAssembly(service, 'org-1', {
         canWrite: true,
-        lyricsLoader: fakeLyricsLoader,
+        lyricsSubscriber: fakeLyricsSubscriber,
       })
       await nextTick()
-      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await vi.waitFor(() => expect(fakeLyricsSubscriber).toHaveBeenCalled())
       await nextTick()
       await nextTick()
 
@@ -1091,7 +1129,7 @@ describe('useSlideshowAssembly', () => {
         createdAt: {} as never,
         updatedAt: {} as never,
       }
-      const fakeLyricsLoader = vi.fn(async () => twoSectionLyrics)
+      const fakeLyricsSubscriber = subscribeStub(() => twoSectionLyrics)
 
       const preRebuildSlides: GroupSlideEntry[] = [
         { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
@@ -1112,9 +1150,9 @@ describe('useSlideshowAssembly', () => {
       const service = ref<Service | null>(
         makeService([songSlot({ position: 0, id: 'slot-song-base', songId: 'song-a' })]),
       )
-      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsSubscriber: fakeLyricsSubscriber })
       await nextTick()
-      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await vi.waitFor(() => expect(fakeLyricsSubscriber).toHaveBeenCalled())
       await nextTick()
       await nextTick()
 
@@ -1156,7 +1194,7 @@ describe('useSlideshowAssembly', () => {
         createdAt: {} as never,
         updatedAt: {} as never,
       }
-      const fakeLyricsLoader = vi.fn(async () => twoSectionLyrics)
+      const fakeLyricsSubscriber = subscribeStub(() => twoSectionLyrics)
 
       // Stored group is missing 'v2' (the lyric section just added) and
       // carries a video entry a user dropped onto this song group.
@@ -1183,9 +1221,9 @@ describe('useSlideshowAssembly', () => {
       const service = ref<Service | null>(
         makeService([songSlot({ position: 0, id: 'slot-song-video', songId: 'song-a' })]),
       )
-      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsSubscriber: fakeLyricsSubscriber })
       await nextTick()
-      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await vi.waitFor(() => expect(fakeLyricsSubscriber).toHaveBeenCalled())
       await nextTick()
       await nextTick()
 
@@ -1357,7 +1395,7 @@ describe('useSlideshowAssembly', () => {
     it('a rejected rebuild write is logged and releases its applied-guard so a retry is possible', async () => {
       const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       songsState.songs = [{ id: 'song-a' } as Song]
-      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+      const fakeLyricsSubscriber = subscribeStub((_orgId, songId) => makeLyrics(songId))
 
       // A group missing the lyric entry its source now derives ⇒ `rebuildGroup`
       // reports `changed`, so the watcher issues a `replaceGroupSlides`.
@@ -1378,7 +1416,7 @@ describe('useSlideshowAssembly', () => {
       const service = ref<Service | null>(
         makeService([songSlot({ position: 0, id: 'slot-song-a', songId: 'song-a' })]),
       )
-      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsSubscriber: fakeLyricsSubscriber })
       await nextTick()
       await vi.waitFor(() => expect(mockReplaceGroupSlides).toHaveBeenCalled())
       await nextTick()
@@ -1769,6 +1807,138 @@ describe('useSlideshowAssembly', () => {
       await nextTick()
       await nextTick()
       expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // --- FULL propagation to a LOCKED / viewer service (canWrite=false):
+  // BOTH a lyric CONTENT edit AND a STRUCTURAL change (verse added / removed /
+  // reordered) reach the assembled slides live and in-memory, with the write
+  // guards intact — zero materialization/rebuild writes to /slideGroups. ---
+  describe('locked-service live propagation (canWrite=false: content + structure, zero writes)', () => {
+    it('a content edit re-renders slide text and a structural change reflows the slide set, with no materialization or rebuild write', async () => {
+      songsState.songs = [{ id: 'song-a' } as Song]
+
+      // A persisted group whose structure currently MATCHES the song
+      // (copyright, v1, copyright). The locked assembler renders it from the
+      // stored group until the song's verse structure diverges.
+      slideGroupsState.groups = [
+        {
+          id: 'slot-song-locked',
+          slotId: 'slot-song-locked',
+          serviceId: 'service-1',
+          slides: [
+            { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+            { id: 'ly-v1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' } },
+            { id: 'cr-2', order: 2, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      let emit!: (lyrics: SongLyrics | null) => void
+      const fakeLyricsSubscriber = vi.fn(
+        (_orgId: string, _songId: string, onUpdate: (lyrics: SongLyrics | null) => void) => {
+          emit = onUpdate
+          onUpdate(makeLyrics('song-a')) // v1 only — matches the stored group
+          return () => {}
+        },
+      )
+
+      const service = ref<Service | null>(
+        makeService([songSlot({ position: 0, id: 'slot-song-locked', songId: 'song-a' })]),
+      )
+      // canWrite omitted ⇒ locked/viewer session (the read-only useServiceAssembly path).
+      const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1', {
+        lyricsSubscriber: fakeLyricsSubscriber,
+      })
+      await nextTick()
+      await nextTick()
+
+      const lyricLines = () =>
+        assembledSlideshow.value
+          .filter((s) => s.slide.contentKind === 'lyric' && 'lines' in s.slide)
+          .flatMap((s) => (s.slide as { lines: string[] }).lines)
+      const lyricSectionIds = () =>
+        assembledSlideshow.value
+          .filter((s) => s.slide.contentKind === 'lyric' && 'sectionId' in s.slide)
+          .map((s) => (s.slide as { sectionId: string }).sectionId)
+
+      // Baseline: structure matches, one lyric slide (v1), rendered from the group.
+      expect(lyricSectionIds()).toEqual(['v1'])
+      expect(lyricLines()).toContain('song-a line 1')
+
+      // 1) CONTENT edit — reword v1. Same structure ⇒ still rendered via the
+      //    (matching) stored group, but the LIVE lyric text updates (Part 1).
+      const reworded = makeLyrics('song-a')
+      reworded.sections = [{ id: 'v1', label: 'Verse 1', lines: ['LOCKED REWORD'] }]
+      emit(reworded)
+      await nextTick()
+      expect(lyricLines()).toContain('LOCKED REWORD')
+
+      // 2) STRUCTURAL change — add v2 and reorder to [v2, v1]. The persisted
+      //    group (still v1-only) is now STALE, so the locked assembler derives
+      //    the slot's slides LIVE from performanceOrder, in memory (Part 2).
+      const restructured: SongLyrics = {
+        ...makeLyrics('song-a'),
+        sections: [
+          { id: 'v1', label: 'Verse 1', lines: ['song-a line 1'] },
+          { id: 'v2', label: 'Verse 2', lines: ['song-a line 2'] },
+        ],
+        performanceOrder: ['v2', 'v1'],
+      }
+      emit(restructured)
+      await nextTick()
+
+      expect(lyricSectionIds()).toEqual(['v2', 'v1'])
+      expect(lyricLines()).toEqual(['song-a line 2', 'song-a line 1'])
+
+      // The whole point: a locked session persisted NOTHING through any of this
+      // — every write guard stayed shut.
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    })
+
+    it('an EDITABLE session (canWrite=true) still reconciles+persists a stale song group rather than deriving in memory (Part 2 is locked-only)', async () => {
+      songsState.songs = [{ id: 'song-a' } as Song]
+
+      // Stored group has only v1; the current lyrics gained v2 — stale.
+      slideGroupsState.groups = [
+        {
+          id: 'slot-song-editable',
+          slotId: 'slot-song-editable',
+          serviceId: 'service-1',
+          slides: [
+            { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+            { id: 'ly-v1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' } },
+            { id: 'cr-2', order: 2, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      const twoSectionLyrics: SongLyrics = {
+        ...makeLyrics('song-a'),
+        sections: [
+          { id: 'v1', label: 'Verse 1', lines: ['song-a line 1'] },
+          { id: 'v2', label: 'Verse 2', lines: ['song-a line 2'] },
+        ],
+        performanceOrder: ['v1', 'v2'],
+      }
+      const fakeLyricsSubscriber = subscribeStub(() => twoSectionLyrics)
+
+      const service = ref<Service | null>(
+        makeService([songSlot({ position: 0, id: 'slot-song-editable', songId: 'song-a' })]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsSubscriber: fakeLyricsSubscriber })
+      await nextTick()
+      await nextTick()
+      await nextTick()
+
+      // Editable path is unchanged: the rebuild loop persists the regenerated
+      // group (it does NOT silently derive-in-memory like the locked path).
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+      expect(mockReplaceGroupSlides.mock.calls[0]![1]).toBe('slot-song-editable')
     })
   })
 })
