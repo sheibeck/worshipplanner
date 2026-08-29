@@ -145,7 +145,7 @@
                   type="button"
                   :data-testid="`row-remove-${row.rowKey}`"
                   class="shrink-0 rounded-md border border-red-900/60 bg-gray-800 px-2 py-1 text-[11px] font-medium text-red-300 transition-colors hover:border-red-700 hover:bg-red-950/40"
-                  @click.stop="onRemove(row)"
+                  @click.stop="requestRemove(row)"
                 >Remove</button>
               </template>
               <button
@@ -177,7 +177,7 @@
                   type="button"
                   :data-testid="`row-remove-${row.rowKey}`"
                   class="shrink-0 rounded-md border border-red-900/60 bg-gray-800 px-2 py-1 text-[11px] font-medium text-red-300 transition-colors hover:border-red-700 hover:bg-red-950/40"
-                  @click.stop="onRemove(row)"
+                  @click.stop="requestRemove(row)"
                 >Remove</button>
               </template>
               <button
@@ -300,6 +300,42 @@
       @close="pasteMode = false"
       @saved="onPasteSaved"
     />
+
+    <!-- Delete-section confirm (owner UAT) — an accidental click on a row's
+         Remove no longer drops the verse outright; it opens this small confirm
+         first. Mirrors the app's inline Teleport confirm-dialog idiom
+         (RunControlView.vue's exit confirm): Cancel is focused, Delete is the
+         red destructive action, and only Delete runs the existing `onRemove`
+         logic. A single dialog serves every row — `pendingRemove` holds the row
+         awaiting confirmation, so the confirm control's testid tracks that row's
+         key. -->
+    <Teleport to="body">
+      <div
+        v-if="pendingRemove"
+        data-testid="row-remove-dialog"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      >
+        <div class="w-full max-w-sm rounded-xl border border-gray-800 bg-gray-900 p-6 shadow-2xl">
+          <h2 class="mb-2 text-base font-semibold text-gray-100">Delete this section?</h2>
+          <p class="mb-6 text-sm text-gray-400">This can't be undone.</p>
+          <div class="flex justify-end gap-3">
+            <button
+              ref="removeCancelBtnRef"
+              type="button"
+              data-testid="row-remove-cancel"
+              class="rounded-md border border-gray-700 bg-gray-800 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              @click="cancelRemove"
+            >Cancel</button>
+            <button
+              type="button"
+              :data-testid="`row-remove-confirm-${pendingRemove.rowKey}`"
+              class="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+              @click="confirmRemove"
+            >Delete</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -639,6 +675,37 @@ function onDuplicate(row: SectionRow) {
     if (newRow) expandRowKey(newRow.stableKey)
   }
 }
+
+// Owner UAT: Remove no longer deletes on the first click. It opens a confirm
+// dialog holding the row awaiting deletion; only `confirmRemove` runs the
+// actual `onRemove` deletion below, so an accidental click can't drop a verse.
+// A single `pendingRemove` serves every row — the dialog's confirm control is
+// keyed by `pendingRemove.rowKey`.
+const pendingRemove = ref<SectionRow | null>(null)
+const removeCancelBtnRef = ref<HTMLButtonElement | null>(null)
+
+function requestRemove(row: SectionRow) {
+  pendingRemove.value = row
+}
+
+function cancelRemove() {
+  pendingRemove.value = null
+}
+
+function confirmRemove() {
+  const row = pendingRemove.value
+  if (!row) return
+  onRemove(row)
+  pendingRemove.value = null
+}
+
+// Focus Cancel when the confirm opens — the safe default (RunControlView.vue's
+// exit confirm does the same), so a stray Enter cancels rather than deletes.
+watch(pendingRemove, async (row) => {
+  if (!row) return
+  await nextTick()
+  removeCancelBtnRef.value?.focus()
+})
 
 function onRemove(row: SectionRow) {
   const index = orderIndexForRow(row)

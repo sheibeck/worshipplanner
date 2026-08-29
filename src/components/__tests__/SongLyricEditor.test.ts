@@ -929,6 +929,8 @@ describe('SongLyricEditor', () => {
     const repeatRow = rows[2]! // chorus#1
     await repeatRow.find('[data-testid^="row-toggle-"]').trigger('click')
     await repeatRow.find('[data-testid="row-remove-chorus#1"]').trigger('click')
+    // Owner UAT: Remove now opens a confirm first — Delete runs the deletion.
+    await wrapper.find('[data-testid="row-remove-confirm-chorus#1"]').trigger('click')
     await flushPromises()
 
     rows = wrapper.findAll('[data-testid="section-rows"] > div')
@@ -953,6 +955,7 @@ describe('SongLyricEditor', () => {
     const chorusRow = rows[1]!
     await chorusRow.find('[data-testid^="row-toggle-"]').trigger('click')
     await chorusRow.find('[data-testid="row-remove-chorus#0"]').trigger('click')
+    await wrapper.find('[data-testid="row-remove-confirm-chorus#0"]').trigger('click')
     await flushPromises()
 
     rows = wrapper.findAll('[data-testid="section-rows"] > div')
@@ -977,6 +980,7 @@ describe('SongLyricEditor', () => {
     const followedChorusRow = rows[0]! // chorus#0
     await followedChorusRow.find('[data-testid^="row-toggle-"]').trigger('click')
     await followedChorusRow.find('[data-testid="row-remove-chorus#0"]').trigger('click')
+    await wrapper.find('[data-testid="row-remove-confirm-chorus#0"]').trigger('click')
     await flushPromises()
 
     rows = wrapper.findAll('[data-testid="section-rows"] > div')
@@ -984,6 +988,40 @@ describe('SongLyricEditor', () => {
     const survivor = rows.find((r) => r.attributes('data-testid') === 'section-row-chorus#0')
     expect(survivor).toBeDefined()
     expect(survivor!.attributes('data-repeat')).toBe('false')
+  })
+
+  // ── Owner UAT: Remove requires an explicit confirm ────────────────────────
+  it('Remove opens a confirm and does NOT delete until Delete is clicked; Cancel aborts', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    let rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(2)
+    const chorusRow = rows[1]!
+    await chorusRow.find('[data-testid^="row-toggle-"]').trigger('click')
+
+    // First click opens the confirm dialog — the section is still present.
+    await chorusRow.find('[data-testid="row-remove-chorus#0"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="row-remove-dialog"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="section-rows"] > div')).toHaveLength(2)
+    expect(wrapper.text()).toContain('My chains are gone')
+
+    // Cancel aborts: dialog closes, the section survives.
+    await wrapper.find('[data-testid="row-remove-cancel"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="row-remove-dialog"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid="section-rows"] > div')).toHaveLength(2)
+
+    // Reopen and confirm: only now is the section deleted.
+    rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[1]!.find('[data-testid="row-remove-chorus#0"]').trigger('click')
+    await wrapper.find('[data-testid="row-remove-confirm-chorus#0"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="section-rows"] > div')).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('My chains are gone')
   })
 
   it('the add row renders the six quick-add chips in mockup order, incl. Pre-Chorus (R119)', async () => {
@@ -1065,6 +1103,7 @@ describe('SongLyricEditor', () => {
     // its new row), so Duplicate/Remove are already visible here.
     const removeBtn = lastRow.find('button[data-testid^="row-remove-"]')
     await removeBtn.trigger('click')
+    await wrapper.find('button[data-testid^="row-remove-confirm-"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[data-testid="closing-note"]').text()).toContain('3 sections')
   })
@@ -1099,6 +1138,7 @@ describe('SongLyricEditor', () => {
     const rows = wrapper.findAll('[data-testid="section-rows"] > div')
     await rows[1]!.find('[data-testid^="row-toggle-"]').trigger('click')
     await rows[1]!.find('[data-testid="row-remove-chorus#0"]').trigger('click')
+    await wrapper.find('[data-testid="row-remove-confirm-chorus#0"]').trigger('click')
     await flushPromises()
 
     mockUpdateCurrentLyrics.mockClear()
