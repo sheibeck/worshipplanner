@@ -548,3 +548,130 @@ describe('RunControlView — dual preview + single-selection (R264/R266)', () =>
     expect(fake.states().length).toBe(before + 1)
   })
 })
+
+// ── 97-10: rehearse-without-screens + honest green-when-live (R283/R277) ────────
+describe('RunControlView — rehearse without screens + live-green (R283/R277)', () => {
+  it('rehearse enters live WITHOUT opening any window, turns the status green, and drives slide 0', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Pre-flight State A: the live status is NOT green (muted/amber "Not open"),
+    // the pre-flight go-live button is shown, and the live previews are absent.
+    const statusBefore = wrapper.find('[data-testid="run-live-status"]')
+    expect(statusBefore.exists()).toBe(true)
+    expect(statusBefore.classes()).not.toContain('run-status--live')
+    expect(statusBefore.classes()).toContain('run-status--idle')
+    expect(wrapper.find('[data-testid="run-go-live-btn"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-current-preview"]').exists()).toBe(false)
+
+    // Record window.open's call count BEFORE rehearse (stubbed to null on mount).
+    const openCallsBefore = vi.mocked(window.open).mock.calls.length
+
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    // R283: rehearse opened NO window — a regression routing it through openOutputs
+    // (getScreenDetails/window.open) fails here.
+    expect(vi.mocked(window.open).mock.calls.length).toBe(openCallsBefore)
+
+    // Now live (State B): the program preview renders and the pre-flight go-live
+    // button is gone.
+    expect(wrapper.find('[data-testid="run-current-preview"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-go-live-btn"]').exists()).toBe(false)
+
+    // R277: the live status is GREEN only once live.
+    expect(wrapper.find('[data-testid="run-live-status"]').classes()).toContain('run-status--live')
+
+    // Slide 0 is driving the channel (posted on mount, still the current state) —
+    // rehearse drives the control with no output window opened.
+    const states = fake.states()
+    expect(states.some((m) => m.index === 0)).toBe(true)
+    expect(states[states.length - 1]!.index).toBe(0)
+  })
+})
+
+// ── 97-10: blackout via the B key + Black/Clear buttons (R280) ──────────────────
+describe('RunControlView — blackout via B key + Black/Clear (R280)', () => {
+  it('B toggles blackout and Black/Clear post blackout true/false, all with strictly increasing seq', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Enter live via rehearse (no window) so the State-B Output panel renders.
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    const seqBeforeBlackout = fake.states()[fake.states().length - 1]!.seq!
+
+    // 'B' blacks out the projector — the last state posts blackout:true with a
+    // STRICTLY higher seq (a missing seq bump would be swallowed by stale-drop).
+    keydown('b')
+    await flushPromises()
+    let last = fake.states()[fake.states().length - 1]!
+    expect(last.blackout).toBe(true)
+    expect(last.seq!).toBeGreaterThan(seqBeforeBlackout)
+
+    // 'B' again clears it.
+    keydown('b')
+    await flushPromises()
+    last = fake.states()[fake.states().length - 1]!
+    expect(last.blackout).toBe(false)
+
+    // The Black button blacks out; the Clear button restores.
+    await wrapper.find('[data-testid="run-blackout-btn"]').trigger('click')
+    await flushPromises()
+    expect(fake.states()[fake.states().length - 1]!.blackout).toBe(true)
+
+    await wrapper.find('[data-testid="run-clear-btn"]').trigger('click')
+    await flushPromises()
+    expect(fake.states()[fake.states().length - 1]!.blackout).toBe(false)
+
+    // Every posted state kept the seq strictly increasing across the blackout posts.
+    const seqs = fake.states().map((m) => m.seq!)
+    for (let i = 1; i < seqs.length; i++) {
+      expect(seqs[i]!).toBeGreaterThan(seqs[i - 1]!)
+    }
+  })
+})
+
+// ── 97-10: in-item filmstrip click-to-jump + scaled next-up (R282/R276) ─────────
+describe('RunControlView — in-item filmstrip jump + scaled next-up (R282/R276)', () => {
+  it("clicking a filmstrip thumb posts that slide's GLOBAL array index", async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Enter live so the in-item filmstrip renders. The default fixture's active
+    // item (slot 0) has slides at GLOBAL indices 0 and 1.
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    const thumbs = wrapper.findAll('[data-testid="run-filmstrip-slide"]')
+    expect(thumbs.length).toBeGreaterThanOrEqual(2)
+    const thumb1 = thumbs.find((w) => w.attributes('data-index') === '1')
+    expect(thumb1).toBeTruthy()
+
+    await thumb1!.trigger('click')
+    await flushPromises()
+
+    // The posted index is the thumb's GLOBAL array index (1), not the local loop
+    // index — the array-index contract from 97-05 proven at the view level.
+    expect(fake.states()[fake.states().length - 1]!.index).toBe(1)
+  })
+
+  it('renders the next-up preview inside a transform:scale container (smaller next-up)', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    // At index 0 there is a next slide ('b'); its canvas is wrapped in a
+    // transform:scale container so the next-up renders smaller (owner fix #2).
+    const nextPreview = wrapper.find('[data-testid="run-next-preview"]')
+    expect(nextPreview.exists()).toBe(true)
+    expect(nextPreview.html()).toContain('scale(')
+  })
+})
