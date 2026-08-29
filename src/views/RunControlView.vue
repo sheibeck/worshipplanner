@@ -3,7 +3,7 @@
        Nocturne-dark shell (NOT AppShell), Run-scoped palette only. Two visual
        states driven by `live`: State A (pre-flight, !live) centres RunPreflightPanel
        beside the rail; State B (live) shows the program/next-up split, in-item
-       filmstrip, Black/Clear output panel, displays panel and transport bar.
+       filmstrip, displays panel and transport bar (blackout is a header toggle now).
        RunHeader renders in BOTH states. The Phase 92-96 output-status cluster +
        recovery banner band stay INLINE here VERBATIM (same testids, same
        outputStatus/recovery conditions) so RunControlView.output.test.ts passes
@@ -21,9 +21,10 @@
       :elapsed="elapsed"
       :audienceOpen="audienceOpen"
       :confidenceOpen="confidenceOpen"
+      :blackout="blackout"
       @exit="onExitRequest"
       @reopen="reopenOutput"
-      @manage="openManage"
+      @toggle-blackout="postBlackout(!blackout)"
     />
 
     <!-- OUTPUT-STATUS CLUSTER REMOVED (owner fix #3). The redundant top status band
@@ -234,10 +235,11 @@
 
       <!-- STATE B (live): the program/next-up preview split (RunPreviewPair) with
            the Displays panel as a right column beside/under the next-up preview
-           (owner fix #4 — relocated from the bottom), the in-item click-to-jump
-           filmstrip (RunFilmstrip -> postIndex), and the Output panel (Black/Clear
-           -> postBlackout). RunDisplaysPanel now also carries the closed-window
-           RECOVERY (R274) the removed top status band used to (owner fix #3). -->
+           (owner fix #4 — relocated from the bottom) and the in-item click-to-jump
+           filmstrip (RunFilmstrip -> postIndex). Blackout is now a single toggle in
+           the RunHeader (owner UAT — the old Black/Clear output panel was removed).
+           RunDisplaysPanel now also carries the closed-window RECOVERY (R274) the
+           removed top status band used to (owner fix #3). -->
       <section v-else class="flex-1 min-w-0 h-full flex flex-col gap-6 overflow-y-auto p-6 lg:p-8">
         <!-- Owner UAT 2×2 — RunPreviewPair now owns the whole preview grid: the
              LEFT column is the On-screen preview (top) over the "Slides in this
@@ -270,46 +272,6 @@
             />
           </template>
         </RunPreviewPair>
-
-        <!-- OUTPUT PANEL (R280) — Black blanks the projector, Clear restores it;
-             both route to the single-writer postBlackout. The active state is shown
-             so the operator sees whether the screens are black. Logo omitted (no asset). -->
-        <div
-          data-testid="run-output-panel"
-          class="rounded-lg border border-white/10 bg-[#141624] p-4 lg:max-w-md"
-        >
-          <h3 class="mb-3 text-sm font-semibold text-gray-100">Output</h3>
-          <div class="flex items-center gap-3">
-            <button
-              type="button"
-              data-testid="run-blackout-btn"
-              :aria-pressed="blackout ? 'true' : 'false'"
-              class="min-h-11 flex-1 rounded-md border px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              :class="
-                blackout
-                  ? 'border-transparent bg-black text-white ring-2 ring-white/40'
-                  : 'border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
-              "
-              @click="postBlackout(true)"
-            >
-              Black
-            </button>
-            <button
-              type="button"
-              data-testid="run-clear-btn"
-              :aria-pressed="!blackout ? 'true' : 'false'"
-              class="min-h-11 flex-1 rounded-md border px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              :class="
-                !blackout
-                  ? 'border-transparent bg-[color:var(--run-accent)] text-white'
-                  : 'border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
-              "
-              @click="postBlackout(false)"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
       </section>
     </div>
 

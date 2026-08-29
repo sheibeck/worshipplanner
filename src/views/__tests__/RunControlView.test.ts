@@ -631,16 +631,24 @@ describe('RunControlView — rehearse without screens + rehearsing-yellow (R283/
   })
 })
 
-// ── 97-10: blackout via the B key + Black/Clear buttons (R280) ──────────────────
-describe('RunControlView — blackout via B key + Black/Clear (R280)', () => {
-  it('B toggles blackout and Black/Clear post blackout true/false, all with strictly increasing seq', async () => {
+// ── 97-10: blackout via the B key during a rehearsal (R280) ─────────────────────
+// The blackout toggle now lives in the header and renders ONLY when truly live
+// (live && !rehearsing) — a rehearsal opens no output windows, so there is nothing
+// to black out and the toggle is deliberately absent. The `B` key, however, still
+// toggles the blackout state during a rehearsal (handleKeydown runs whenever live).
+// The header-toggle's post-on-click coverage runs on the REAL placed go-live in
+// RunControlView.output.test.ts (which can drive a genuine two-window go-live).
+describe('RunControlView — blackout via B key during rehearse; toggle hidden in rehearse (R280)', () => {
+  it('B toggles blackout true/false with strictly increasing seq, and the header toggle is NOT shown while rehearsing', async () => {
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
     await flushPromises()
 
-    // Enter live via rehearse (no window) so the State-B Output panel renders.
+    // Enter live via rehearse (no window). A rehearsal is NOT truly-live, so the
+    // header blackout toggle must be ABSENT — there are no outputs to black out.
     await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
     await flushPromises()
+    expect(wrapper.find('[data-testid="run-blackout-toggle"]').exists()).toBe(false)
 
     const seqBeforeBlackout = fake.states()[fake.states().length - 1]!.seq!
 
@@ -657,15 +665,6 @@ describe('RunControlView — blackout via B key + Black/Clear (R280)', () => {
     await flushPromises()
     last = fake.states()[fake.states().length - 1]!
     expect(last.blackout).toBe(false)
-
-    // The Black button blacks out; the Clear button restores.
-    await wrapper.find('[data-testid="run-blackout-btn"]').trigger('click')
-    await flushPromises()
-    expect(fake.states()[fake.states().length - 1]!.blackout).toBe(true)
-
-    await wrapper.find('[data-testid="run-clear-btn"]').trigger('click')
-    await flushPromises()
-    expect(fake.states()[fake.states().length - 1]!.blackout).toBe(false)
 
     // Every posted state kept the seq strictly increasing across the blackout posts.
     const seqs = fake.states().map((m) => m.seq!)
@@ -829,13 +828,21 @@ describe('RunControlView — transport/blackout keys inert pre-live (IN-02)', ()
 // noopener severs the opener relationship, so the fresh tab loses the opener's
 // sessionStorage (the picked active org) and the router guard bounces it to
 // /select-church. A plain window.open lets it inherit sessionStorage.
+// Owner UAT: the redundant header "Manage" link was removed; the single Manage
+// surface now lives on RunDisplaysPanel (State B), so this drives that button after
+// entering live via rehearse. Same single-writer openManage handler, same contract.
 describe('RunControlView — Manage opens monitor-setup without noopener (owner #5)', () => {
-  it('clicking the header Manage link calls window.open(/monitor-setup, _blank) with NO third feature arg', async () => {
+  it('clicking the Displays-panel Manage button calls window.open(/monitor-setup, _blank) with NO third feature arg', async () => {
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
     await flushPromises()
 
-    await wrapper.find('[data-testid="run-manage-link"]').trigger('click')
+    // The Displays panel (with its Manage button) only renders in State B — enter
+    // live via rehearse (opens no window in this harness).
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[data-testid="run-displays-manage"]').trigger('click')
 
     // Exactly the plain new-tab open — no 'noopener' (which would drop sessionStorage).
     expect(window.open).toHaveBeenCalledWith('/monitor-setup', '_blank')

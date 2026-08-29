@@ -29,6 +29,7 @@ const props = defineProps<{
   elapsed: string
   audienceOpen: boolean
   confidenceOpen: boolean
+  blackout: boolean
 }>()
 
 // Owner fix #7: green ONLY on a real go-live (live && !rehearsing).
@@ -37,7 +38,9 @@ const trulyLive = computed(() => props.live && !props.rehearsing)
 const emit = defineEmits<{
   exit: []
   reopen: [role: 'audience' | 'confidence']
-  manage: []
+  // Owner UAT: the blackout toggle asks the parent (single writer) to flip the
+  // projector-black state — the parent calls postBlackout(!blackout).
+  'toggle-blackout': []
 }>()
 
 /**
@@ -96,7 +99,7 @@ function onReopen(role: 'audience' | 'confidence') {
     </span>
 
     <!-- Displays cluster: audience + confidence dots (green when open, amber/muted
-         otherwise) that reopen their display on click, plus a Manage link. -->
+         otherwise) that reopen their display on click. -->
     <div class="run-displays">
       <button
         type="button"
@@ -140,15 +143,32 @@ function onReopen(role: 'audience' | 'confidence') {
         <span class="run-display__dot" aria-hidden="true"></span>
         Confidence
       </button>
-      <button
-        type="button"
-        class="run-manage"
-        data-testid="run-manage-link"
-        @click="$emit('manage')"
-      >
-        Manage
-      </button>
     </div>
+
+    <!-- BLACKOUT TOGGLE (owner UAT) — a single live-ops control replacing the old
+         Black/Clear output panel. Shown ONLY when truly live (live && !rehearsing):
+         a rehearsal opens no output windows, so there is nothing to black out. When
+         NOT blacked out it reads "Go to black"; while blacked out it reads "Clear
+         black" and shows an active (filled/ring) state so the operator sees at a
+         glance that the projector is black. Emits toggle-blackout; the parent (single
+         writer) flips it via postBlackout(!blackout). The `B` key toggles the same
+         state via useRunControl.handleKeydown. -->
+    <button
+      v-if="trulyLive"
+      type="button"
+      class="run-blackout"
+      :class="{ 'run-blackout--active': blackout }"
+      data-testid="run-blackout-toggle"
+      :aria-pressed="blackout ? 'true' : 'false'"
+      :aria-label="
+        blackout
+          ? 'Clear black — restore the projector output'
+          : 'Go to black — blank the projector output'
+      "
+      @click="$emit('toggle-blackout')"
+    >
+      {{ blackout ? 'Clear black' : 'Go to black' }}
+    </button>
 
     <!-- End service / End rehearsal — run-exit-btn preserved so the existing exit
          assertions match; owner fix #7 relabels it while rehearsing. -->
@@ -307,19 +327,28 @@ function onReopen(role: 'audience' | 'confidence') {
   cursor: default;
 }
 
-.run-manage {
+/* Blackout toggle — a live-ops control. Neutral when the projector is showing,
+   and a visible FILLED/ring active state while blacked out so the operator can
+   tell at a glance the screens are black. */
+.run-blackout {
   min-height: 44px;
-  padding: 0 10px;
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  color: var(--color-neutral-400);
-  font-size: 12px;
-  text-decoration: underline;
+  padding: 0 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
-.run-manage:hover {
-  color: var(--color-text);
+.run-blackout:hover {
+  border-color: var(--color-neutral-600);
+}
+.run-blackout--active {
+  background: #000;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
 }
 
 .run-exit {

@@ -1035,12 +1035,18 @@ describe('RunControlView output — blackout during a live session (R280)', () =
     await flushPromises()
     expect(states()[states().length - 1]!.blackout).toBe(false)
 
-    // The Black / Clear buttons drive the same single-writer postBlackout.
-    await wrapper.find('[data-testid="run-blackout-btn"]').trigger('click')
+    // The header blackout toggle (owner UAT — replaces the old Black/Clear panel)
+    // renders ONLY in the truly-live state, which a matched go-live satisfies.
+    const toggle = wrapper.find('[data-testid="run-blackout-toggle"]')
+    expect(toggle.exists()).toBe(true)
+
+    // It drives the SAME single-writer postBlackout: first click blacks out, the
+    // second clears — each posting with a strictly higher seq.
+    await toggle.trigger('click')
     await flushPromises()
     expect(states()[states().length - 1]!.blackout).toBe(true)
 
-    await wrapper.find('[data-testid="run-clear-btn"]').trigger('click')
+    await wrapper.find('[data-testid="run-blackout-toggle"]').trigger('click')
     await flushPromises()
     expect(states()[states().length - 1]!.blackout).toBe(false)
 
