@@ -24,20 +24,27 @@
     <div class="lg:col-span-2">
       <div class="mb-2 flex items-center gap-2">
         <span class="text-xs font-semibold text-gray-400">On screen</span>
+        <!-- Owner UAT: in rehearse mode the tag/ring is YELLOW "Rehearsing" (green
+             LIVE is reserved for a real go-live), matching the header status tile. -->
         <span
           v-if="live"
           data-testid="run-current-live-tag"
-          class="inline-flex items-center gap-1.5 rounded-full bg-gray-900/80 px-2.5 py-1 text-xs font-semibold text-gray-100"
+          class="inline-flex items-center gap-1.5 rounded-full bg-gray-900/80 px-2.5 py-1 text-xs font-semibold"
+          :class="rehearsing ? 'text-amber-200' : 'text-gray-100'"
         >
-          <span class="h-2 w-2 rounded-full bg-green-500" aria-hidden="true"></span>
-          LIVE
+          <span
+            class="h-2 w-2 rounded-full"
+            :class="rehearsing ? 'bg-amber-400' : 'bg-green-500'"
+            aria-hidden="true"
+          ></span>
+          {{ rehearsing ? 'Rehearsing' : 'LIVE' }}
         </span>
       </div>
       <div
         ref="currentBox"
         data-testid="run-current-preview"
         class="relative aspect-video overflow-hidden rounded-lg bg-black ring-2"
-        :class="live ? 'ring-green-500' : 'ring-gray-700'"
+        :class="live ? (rehearsing ? 'ring-amber-400' : 'ring-green-500') : 'ring-gray-700'"
       >
         <div
           v-if="current"
@@ -53,6 +60,8 @@
           Loading slideshow…
         </div>
       </div>
+      <!-- Owner UAT 2×2: content stacked UNDER the On-screen pane (the filmstrip). -->
+      <div class="mt-6"><slot name="under-current" /></div>
     </div>
 
     <!-- NEXT (subordinate, RIGHT) — the same scale-to-fit thumbnail as the program
@@ -81,6 +90,8 @@
           End of service
         </div>
       </div>
+      <!-- Owner UAT 2×2: content stacked UNDER the Next-up pane (the Displays panel). -->
+      <div class="mt-6"><slot name="under-next" /></div>
     </div>
   </div>
 </template>
@@ -116,8 +127,12 @@ defineProps<{
   current: AssembledSlide | null
   /** The upcoming slide (subordinate preview). */
   next: AssembledSlide | null
-  /** True once go-live/rehearse has begun — turns the program frame GREEN. */
+  /** True once go-live/rehearse has begun — turns the program frame GREEN (or
+   *  amber when `rehearsing`). */
   live: boolean
+  /** True while rehearsing (no outputs) — the program tag/ring reads amber
+   *  "Rehearsing" instead of green "LIVE" (owner UAT). */
+  rehearsing?: boolean
 }>()
 
 /**
