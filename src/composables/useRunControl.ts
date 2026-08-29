@@ -516,8 +516,18 @@ export function useRunControl(options: UseRunControlOptions = {}) {
    * relationship is preserved.
    */
   function openWindow(url: string, name: string, screen: ScreenLike | null): Window | null {
+    // Owner UAT — auto-fullscreen the output windows. Chrome's Window Management
+    // API supports opening a popup DIRECTLY in fullscreen via the `fullscreen`
+    // window feature (with the window-management permission — already granted in
+    // monitor setup — and this Go-live user gesture). That is far more reliable
+    // than requesting fullscreen AFTER the popup loads, which loses the popup's
+    // transient activation to the SPA/auth bootstrap. `left`/`top` pick the
+    // target monitor; `fullscreen` fills it with no chrome. The child's own
+    // requestFullscreen() + the manual "Re-enter fullscreen" affordance remain
+    // as fallbacks for browsers that ignore the `fullscreen` feature.
+    // Refs: developer.chrome.com Window Management API + fullscreen popups.
     const features = screen
-      ? `left=${screen.left},top=${screen.top},width=${screen.width},height=${screen.height}`
+      ? `fullscreen,popup,left=${screen.left},top=${screen.top},width=${screen.width},height=${screen.height}`
       : ''
     const win = window.open(url, name, screen ? features : '')
     outputWindows[name] = win
@@ -849,10 +859,27 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     cancelBtnRef.value?.focus()
   })
 
+  /**
+   * Owner UAT: the run header should show the SERVICE DATE (services are
+   * identified by date, like the editor's own title), formatted as
+   * "Sunday, MM/DD/YYYY" — not the generic service name. Parses the stored
+   * YYYY-MM-DD as a LOCAL date (avoids the UTC off-by-one a bare `new Date(str)`
+   * would give) and falls back to the raw string / name if unparseable.
+   */
+  function formatServiceDate(dateStr: string): string {
+    const [y, m, d] = dateStr.split('-').map((n) => Number(n))
+    if (!y || !m || !d) return dateStr
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+  }
   const serviceHeading = computed(() => {
     const svc = localService.value
     if (!svc) return ''
-    return svc.date ? `${svc.name} · ${svc.date}` : svc.name
+    return svc.date ? formatServiceDate(svc.date) : svc.name
   })
 
   /** Bare service name (no date) — the RunPreflightPanel `serviceName` prop. */
@@ -919,10 +946,17 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   const expandedSlides = computed(() =>
     filmstrip.value.slides.map((s, i) => {
       const arrayIndex = filmstrip.value.indices[i] ?? -1
-      const sectionLabel = (s.slide as { sectionLabel?: string }).sectionLabel
+      const slide = s.slide
+      const sectionLabel = (slide as { sectionLabel?: string }).sectionLabel
+      // Owner UAT: the copyright slides at a song's start/end (CopyrightSlide —
+      // contentKind 'lyric', no sectionId; carries the title/CCLI/license) have
+      // no section label, so they used to fall back to a bare 'Slide N' that read
+      // like a bug. Label them 'Credits' instead. 'Slide N' stays only as an
+      // ultimate fallback for any other label-less slide.
+      const isCopyright = slide.contentKind === 'lyric' && !('sectionId' in slide)
       return {
         arrayIndex,
-        label: sectionLabel?.trim() || `Slide ${i + 1}`,
+        label: sectionLabel?.trim() || (isCopyright ? 'Credits' : `Slide ${i + 1}`),
         isCurrent: arrayIndex === index.value,
       }
     }),

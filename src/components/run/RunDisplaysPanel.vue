@@ -157,18 +157,6 @@ const rows = computed<Row[]>(() => [
         </button>
       </div>
 
-      <!-- STAGE: disabled 'Off' placeholder only — no 3rd output built. -->
-      <div
-        data-testid="run-display-stage-off"
-        aria-disabled="true"
-        class="flex items-center gap-3 rounded-md bg-white/[0.02] border border-white/5 px-3 py-2.5 opacity-60 cursor-default"
-      >
-        <span class="h-2.5 w-2.5 flex-none rounded-full bg-gray-600" aria-hidden="true"></span>
-        <div class="min-w-0 flex-1">
-          <p class="text-sm font-medium text-gray-400">Stage</p>
-          <p class="text-xs text-gray-500">Off</p>
-        </div>
-      </div>
     </div>
   </section>
 </template>
