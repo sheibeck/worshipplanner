@@ -3,43 +3,37 @@
  * four mutually-exclusive states (checking / ready / not-ready / unsupported), the
  * per-OS origin-baked download, and the self-correcting Confirm re-check.
  *
- * `useFullscreenReadiness` (98-01) is mocked here — a shared reactive `status` ref and
- * a `recheck` spy that tests drive directly — so each state is deterministic without
- * touching `navigator.permissions` (already covered by useFullscreenReadiness.test.ts).
- * `osDetect` is likewise mocked so the OS/browser pairing is deterministic per test;
+ * `useFullscreenReadiness` (98-01) is mocked here via `vi.mocked(...).mockReturnValue`
+ * with a REAL Vue `ref` for `status` — a plain mutable object would not be tracked by
+ * Vue's reactivity system, so state transitions (e.g. Confirm flipping not-ready to
+ * ready) would never re-render the template. `osDetect`'s `detectOS`/`detectBrowser`
+ * are likewise mocked (each test configures the OS/browser pairing BEFORE mounting,
+ * matching the component's compute-once-at-setup usage — a real OS change requires an
+ * actual browser restart, which the panel already models via `recheck()`/'checking').
  * `downloadTextFile` is mocked so we can assert on its call args (and make it throw)
  * without touching the real DOM Blob/anchor machinery (already covered by
  * downloadTextFile.test.ts). `fullscreenPolicyFiles` is left REAL so the generated
- * `contents` genuinely bake in `window.location.origin` (proving R286/T-98-04 end to end
- * from this panel, not just from the util's own unit tests).
+ * `contents` genuinely bake in `window.location.origin` (proving R286/T-98-04 end to
+ * end from this panel, not just from the util's own unit tests).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import FullscreenSetupPanel from '../FullscreenSetupPanel.vue'
+import { useFullscreenReadiness, type FullscreenReadiness } from '@/composables/useFullscreenReadiness'
+import { detectOS, detectBrowser } from '@/utils/osDetect'
 import { downloadTextFile } from '@/utils/downloadTextFile'
-import type { FullscreenReadiness } from '@/composables/useFullscreenReadiness'
-import type { DetectedOS, DetectedBrowser } from '@/utils/osDetect'
-
-const H = vi.hoisted(() => {
-  return {
-    mockStatus: { value: 'checking' as FullscreenReadiness },
-    mockRecheck: vi.fn(async () => {}),
-    mockOs: { value: 'windows' as DetectedOS },
-    mockBrowser: { value: 'chrome' as DetectedBrowser },
-  }
-})
 
 vi.mock('@/composables/useFullscreenReadiness', () => ({
-  useFullscreenReadiness: () => ({ status: H.mockStatus, recheck: H.mockRecheck }),
+  useFullscreenReadiness: vi.fn(),
 }))
 
 vi.mock('@/utils/osDetect', async (importActual) => {
   const actual = await importActual<typeof import('@/utils/osDetect')>()
   return {
     ...actual,
-    detectOS: () => H.mockOs.value,
-    detectBrowser: () => H.mockBrowser.value,
+    detectOS: vi.fn(),
+    detectBrowser: vi.fn(),
   }
 })
 
@@ -47,22 +41,20 @@ vi.mock('@/utils/downloadTextFile', () => ({
   downloadTextFile: vi.fn(),
 }))
 
-// The mocked module above replaces the ref exports with plain mutable objects
-// (`{ value }`) so status can be reassigned across tests the same way a real
-// `ref` would be reassigned via `.value` — Vue's reactivity system tracks the
-// object identity returned by the composable, and since the SAME object is
-// returned on every call, mutating `.value` inside a test re-triggers the
-// component's render, exactly like the real composable's reactive `status`.
+let statusRef: Ref<FullscreenReadiness>
+const mockRecheck = vi.fn(async () => {})
+
 function setStatus(value: FullscreenReadiness) {
-  H.mockStatus.value = value
+  statusRef.value = value
 }
 
 beforeEach(() => {
-  H.mockStatus.value = 'checking'
-  H.mockRecheck.mockReset()
-  H.mockRecheck.mockImplementation(async () => {})
-  H.mockOs.value = 'windows'
-  H.mockBrowser.value = 'chrome'
+  statusRef = ref<FullscreenReadiness>('checking')
+  mockRecheck.mockReset()
+  mockRecheck.mockImplementation(async () => {})
+  vi.mocked(useFullscreenReadiness).mockReturnValue({ status: statusRef, recheck: mockRecheck })
+  vi.mocked(detectOS).mockReturnValue('windows')
+  vi.mocked(detectBrowser).mockReturnValue('chrome')
   vi.mocked(downloadTextFile).mockReset()
 })
 
@@ -115,8 +107,8 @@ describe('FullscreenSetupPanel — not-ready state', () => {
 
   it('interpolates the detected browser and OS into the download button label', () => {
     setStatus('not-ready')
-    H.mockOs.value = 'macos'
-    H.mockBrowser.value = 'chrome'
+    vi.mocked(detectOS).mockReturnValue('macos')
+    vi.mocked(detectBrowser).mockReturnValue('chrome')
     const wrapper = mount(FullscreenSetupPanel)
     expect(wrapper.get('[data-testid="fullscreen-setup-download-button"]').text()).toBe(
       'Download setup file for Chrome on macOS',
@@ -125,18 +117,18 @@ describe('FullscreenSetupPanel — not-ready state', () => {
 
   it('shows the Windows-only admin download link only when the detected OS is windows', () => {
     setStatus('not-ready')
-    H.mockOs.value = 'windows'
+    vi.mocked(detectOS).mockReturnValue('windows')
     const winWrapper = mount(FullscreenSetupPanel)
     expect(winWrapper.find('[data-testid="fullscreen-setup-admin-download-link"]').exists()).toBe(true)
 
-    H.mockOs.value = 'macos'
+    vi.mocked(detectOS).mockReturnValue('macos')
     const macWrapper = mount(FullscreenSetupPanel)
     expect(macWrapper.find('[data-testid="fullscreen-setup-admin-download-link"]').exists()).toBe(false)
   })
 
   it('downloads the origin-baked, OS-correct HKCU artifact when the download button is clicked', async () => {
     setStatus('not-ready')
-    H.mockOs.value = 'windows'
+    vi.mocked(detectOS).mockReturnValue('windows')
     const wrapper = mount(FullscreenSetupPanel)
     await wrapper.get('[data-testid="fullscreen-setup-download-button"]').trigger('click')
 
@@ -150,7 +142,7 @@ describe('FullscreenSetupPanel — not-ready state', () => {
 
   it('downloads the HKLM admin artifact when the admin link is clicked', async () => {
     setStatus('not-ready')
-    H.mockOs.value = 'windows'
+    vi.mocked(detectOS).mockReturnValue('windows')
     const wrapper = mount(FullscreenSetupPanel)
     await wrapper.get('[data-testid="fullscreen-setup-admin-download-link"]').trigger('click')
 
@@ -163,13 +155,13 @@ describe('FullscreenSetupPanel — not-ready state', () => {
 
   it('generates the correct filename extension for macOS and Linux downloads', async () => {
     setStatus('not-ready')
-    H.mockOs.value = 'macos'
+    vi.mocked(detectOS).mockReturnValue('macos')
     const macWrapper = mount(FullscreenSetupPanel)
     await macWrapper.get('[data-testid="fullscreen-setup-download-button"]').trigger('click')
     expect(vi.mocked(downloadTextFile).mock.calls[0]![0]).toBe('worshipplanner-enable-fullscreen.mobileconfig')
 
     vi.mocked(downloadTextFile).mockReset()
-    H.mockOs.value = 'linux'
+    vi.mocked(detectOS).mockReturnValue('linux')
     const linuxWrapper = mount(FullscreenSetupPanel)
     await linuxWrapper.get('[data-testid="fullscreen-setup-download-button"]').trigger('click')
     expect(vi.mocked(downloadTextFile).mock.calls[0]![0]).toBe('worshipplanner-enable-fullscreen.json')
@@ -193,8 +185,8 @@ describe('FullscreenSetupPanel — not-ready state', () => {
 describe('FullscreenSetupPanel — self-correcting confirm (R287)', () => {
   it('re-runs the readiness check and flips not-ready -> ready on the SAME wrapper, with no remount', async () => {
     setStatus('not-ready')
-    H.mockRecheck.mockImplementation(async () => {
-      H.mockStatus.value = 'ready'
+    mockRecheck.mockImplementation(async () => {
+      statusRef.value = 'ready'
     })
     const wrapper = mount(FullscreenSetupPanel)
     const panelElementBefore = wrapper.get('[data-testid="fullscreen-setup-panel"]').element
@@ -202,7 +194,7 @@ describe('FullscreenSetupPanel — self-correcting confirm (R287)', () => {
     await wrapper.get('[data-testid="fullscreen-setup-confirm-button"]').trigger('click')
     await flushPromises()
 
-    expect(H.mockRecheck).toHaveBeenCalledTimes(1)
+    expect(mockRecheck).toHaveBeenCalledTimes(1)
     expect(wrapper.get('[data-testid="fullscreen-setup-panel"]').element).toBe(panelElementBefore)
     expect(wrapper.find('[data-testid="fullscreen-setup-status-ready"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="fullscreen-setup-status-not-ready"]').exists()).toBe(false)
@@ -210,8 +202,8 @@ describe('FullscreenSetupPanel — self-correcting confirm (R287)', () => {
 
   it('does not show troubleshooting on first paint, and shows it only after a still-not-ready confirm', async () => {
     setStatus('not-ready')
-    H.mockRecheck.mockImplementation(async () => {
-      H.mockStatus.value = 'not-ready'
+    mockRecheck.mockImplementation(async () => {
+      statusRef.value = 'not-ready'
     })
     const wrapper = mount(FullscreenSetupPanel)
     expect(wrapper.find('[data-testid="fullscreen-setup-troubleshooting"]').exists()).toBe(false)
@@ -239,7 +231,7 @@ describe('FullscreenSetupPanel — unsupported state', () => {
     setStatus('unsupported')
     const wrapper = mount(FullscreenSetupPanel)
     await wrapper.get('[data-testid="fullscreen-setup-confirm-button"]').trigger('click')
-    expect(H.mockRecheck).toHaveBeenCalledTimes(1)
+    expect(mockRecheck).toHaveBeenCalledTimes(1)
   })
 })
 
