@@ -536,14 +536,14 @@ expected; Phase 96 re-confirms this rather than assuming it.
   4. Blackout/Clear (and the `B` key) black the outputs via the channel `blackout` field and restore them; a clock + elapsed timer show; the in-item filmstrip lists the active item's slides and click jumps; Rehearse enters the live screen without opening outputs; a Run button appears on locked service rows in the listing. (R280–R284)
   5. All phase 92–96 behavioral suites stay green (single-writer seq, onHello resend, exit-confirm, closed-poll/reopen, reassign precedence, no-leak, confidence suppression); client-only (no Firestore/rules change).
 
-**Plans**: 5/10 plans executed
+**Plans**: 7/10 plans executed
 
 - [x] 97-01-PLAN.md — Extract useRunControl composable (behaviour-preserving seam) [W1]
 - [x] 97-02-PLAN.md — ServiceCard Run button on locked rows (R284) [W1]
 - [x] 97-03-PLAN.md — Output windows: self-fullscreen + blackout overlay + confidence left/right (R278/R279/R280) [W1]
-- [ ] 97-04-PLAN.md — useRunTimers + RunHeader + RunTransportBar (R277/R281/R276) [W2]
+- [x] 97-04-PLAN.md — useRunTimers + RunHeader + RunTransportBar (R277/R281/R276) [W2]
 - [x] 97-05-PLAN.md — RunPreflightPanel + RunPreviewPair + RunFilmstrip (R276/R282) [W2]
-- [ ] 97-06-PLAN.md — RunRail + RunDisplaysPanel (R276) [W2]
+- [x] 97-06-PLAN.md — RunRail + RunDisplaysPanel (R276) [W2]
 - [x] 97-07-PLAN.md — Output-window tests: blackout + self-fullscreen + left/right (R278/R279/R280) [W2]
 - [ ] 97-08-PLAN.md — useRunControl features: live/blackout/rehearse/timers/readiness/filmstrip (R276/R277/R280/R281/R282/R283) [W3]
 - [ ] 97-09-PLAN.md — RunControlView template redesign + wire children (State A/B), testids preserved [W4]
