@@ -958,3 +958,71 @@ describe('RunControlView output — rapid navigation stays in sync (R273)', () =
     expect(stateMsgs[stateMsgs.length - 1]!.index).toBe(2)
   })
 })
+
+// ── 12. GO-LIVE FROM THE PRE-FLIGHT PANEL + GREEN LIVE STATUS (R276 owner fix #5 / R277)
+//    run-go-live-btn now lives in State-A's RunPreflightPanel (relocated from the
+//    old idle corner); the same testid drives go-live, only its location changed.
+describe('RunControlView output — go-live from the pre-flight panel (R276/R277)', () => {
+  it('a matched go-live via the pre-flight run-go-live-btn reaches run-status-placed AND turns run-live-status green', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    // Pre-flight State A: the go-live button is in the pre-flight panel and the
+    // live status is NOT yet green (honest — no screens open).
+    expect(wrapper.find('[data-testid="run-preflight"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-go-live-btn"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-live-status"]').classes()).not.toContain('run-status--live')
+
+    await goLive(wrapper)
+
+    // Placed AND genuinely live (green) — owner fix #5 (Go-live relocated) end-to-end.
+    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-live-status"]').classes()).toContain('run-status--live')
+  })
+})
+
+// ── 13. BLACKOUT DURING A REAL PLACED LIVE SESSION (R280) ────────────────────────
+//    Complements the rehearse-path blackout coverage in RunControlView.test.ts by
+//    exercising blackout on the REAL placed path (both output windows faked-open).
+describe('RunControlView output — blackout during a live session (R280)', () => {
+  it('after a matched go-live, B / Black / Clear post blackout true/false with strictly increasing seq', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper, fake } = mountView()
+
+    await goLive(wrapper)
+    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+
+    const states = () => fake.posted.filter((m) => m.type === 'state')
+    const seqBefore = states()[states().length - 1]!.seq!
+
+    // 'B' blacks out the real placed session — blackout:true with a higher seq.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'b' }))
+    await flushPromises()
+    const last = states()[states().length - 1]!
+    expect(last.blackout).toBe(true)
+    expect(last.seq!).toBeGreaterThan(seqBefore)
+
+    // 'B' again clears it.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'b' }))
+    await flushPromises()
+    expect(states()[states().length - 1]!.blackout).toBe(false)
+
+    // The Black / Clear buttons drive the same single-writer postBlackout.
+    await wrapper.find('[data-testid="run-blackout-btn"]').trigger('click')
+    await flushPromises()
+    expect(states()[states().length - 1]!.blackout).toBe(true)
+
+    await wrapper.find('[data-testid="run-clear-btn"]').trigger('click')
+    await flushPromises()
+    expect(states()[states().length - 1]!.blackout).toBe(false)
+
+    // Monotonic seq across the whole live session — no blackout post swallowed.
+    const seqs = states().map((m) => m.seq!)
+    for (let i = 1; i < seqs.length; i++) {
+      expect(seqs[i]!).toBeGreaterThan(seqs[i - 1]!)
+    }
+  })
+})
