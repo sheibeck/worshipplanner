@@ -5,10 +5,15 @@
  * wired in 97-09) owns all state and passes the `live` flag + the clock/elapsed
  * strings from useRunTimers.
  *
- * Owner fix #4: the live status is GREEN only when `live` is true, and a
- * muted/amber "Not open" otherwise — NEVER a pre-live red. The status is driven
- * by the `live` prop the parent sets on go-live/rehearse, NOT derived from any
- * output-status machine here.
+ * Owner fix #4: the live status is GREEN only when truly live, and a muted/amber
+ * "Not open" otherwise — NEVER a pre-live red. Owner fix #7: a REHEARSAL is a
+ * distinct third state — YELLOW "Rehearsing" (never green) with an "End Rehearsal"
+ * exit label — so green unambiguously means the outputs are really live. All three
+ * are driven by the `live`/`rehearsing` props the parent sets, NOT derived from any
+ * output-status machine here:
+ *   - green "Live"       when live && !rehearsing (a real go-live)
+ *   - amber "Rehearsing" when rehearsing
+ *   - muted "Not open"   when not live
  *
  * Nocturne Run-scoped palette (97-UI-SPEC) is applied via local CSS custom
  * properties on the root only — this does NOT retheme the app.
@@ -18,12 +23,16 @@ import { computed } from 'vue'
 const props = defineProps<{
   serviceHeading: string
   live: boolean
+  rehearsing: boolean
   positionLabel: string
   clock: string
   elapsed: string
   audienceOpen: boolean
   confidenceOpen: boolean
 }>()
+
+// Owner fix #7: green ONLY on a real go-live (live && !rehearsing).
+const trulyLive = computed(() => props.live && !props.rehearsing)
 
 const emit = defineEmits<{
   exit: []
@@ -54,15 +63,23 @@ function onReopen(role: 'audience' | 'confidence') {
 
 <template>
   <header class="run-header" data-testid="run-header">
-    <!-- LIVE status — green iff live, muted/amber "Not open" before (owner fix #4). -->
+    <!-- LIVE status — three honest states (owner fix #4 + #7): green "Live" on a
+         real go-live, YELLOW "Rehearsing" during a rehearsal, muted "Not open"
+         before. Green (run-status--live) means the outputs are genuinely live. -->
     <span
       class="run-status"
-      :class="live ? 'run-status--live' : 'run-status--idle'"
+      :class="
+        trulyLive
+          ? 'run-status--live'
+          : rehearsing
+            ? 'run-status--rehearsing'
+            : 'run-status--idle'
+      "
       data-testid="run-live-status"
       role="status"
     >
       <span class="run-status__dot" aria-hidden="true"></span>
-      {{ live ? 'LIVE' : 'Not open' }}
+      {{ trulyLive ? 'Live' : rehearsing ? 'Rehearsing' : 'Not open' }}
     </span>
 
     <!-- Service heading + position — run-service-name preserved for the control suite. -->
@@ -133,15 +150,16 @@ function onReopen(role: 'audience' | 'confidence') {
       </button>
     </div>
 
-    <!-- End service — run-exit-btn preserved so the existing exit assertions match. -->
+    <!-- End service / End rehearsal — run-exit-btn preserved so the existing exit
+         assertions match; owner fix #7 relabels it while rehearsing. -->
     <button
       type="button"
       class="run-exit"
       data-testid="run-exit-btn"
-      aria-label="End service (Esc)"
+      :aria-label="rehearsing ? 'End Rehearsal (Esc)' : 'End Service (Esc)'"
       @click="$emit('exit')"
     >
-      End service
+      {{ rehearsing ? 'End Rehearsal' : 'End Service' }}
     </button>
   </header>
 </template>
@@ -202,6 +220,15 @@ function onReopen(role: 'audience' | 'confidence') {
   border: 1px solid rgba(224, 178, 60, 0.32);
 }
 .run-status--idle .run-status__dot {
+  background: var(--color-amber);
+}
+/* Rehearsing (owner fix #7): YELLOW/amber — visually distinct from green "Live". */
+.run-status--rehearsing {
+  color: var(--color-amber);
+  background: rgba(224, 178, 60, 0.14);
+  border: 1px solid rgba(224, 178, 60, 0.45);
+}
+.run-status--rehearsing .run-status__dot {
   background: var(--color-amber);
 }
 

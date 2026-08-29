@@ -15,6 +15,7 @@
     <RunHeader
       :serviceHeading="serviceHeading"
       :live="live"
+      :rehearsing="rehearsing"
       :positionLabel="positionLabel"
       :clock="clock"
       :elapsed="elapsed"
@@ -25,151 +26,12 @@
       @manage="openManage"
     />
 
-    <!-- OUTPUT-STATUS CLUSTER (95-04) — INLINE + VERBATIM. Renders by outputStatus:
-         opening the spinner, placed the green "Displays ready" summary + the
-         closed/reopen recovery rows, blocked a compact honest indicator + retry.
-         The idle Go-live button has relocated to RunPreflightPanel (State A). In
-         'fallback'/'partial' the cluster is empty — the amber banners carry it. -->
-    <div
-      v-if="outputStatus !== 'idle'"
-      class="flex-none flex items-center justify-end gap-4 border-b border-white/10 bg-black/20 px-6 py-2"
-    >
-      <!-- OPENING: transient spinner while getScreenDetails/window.open run. -->
-      <div
-        v-if="outputStatus === 'opening'"
-        data-testid="run-status-opening"
-        class="flex items-center gap-2 text-xs text-gray-400"
-      >
-        <svg
-          class="h-4 w-4 animate-spin text-indigo-400"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
-        Opening displays…
-      </div>
-
-      <!-- PLACED: green dot ALWAYS paired with words (colorblind-safe). -->
-      <div
-        v-else-if="outputStatus === 'placed'"
-        data-testid="run-status-placed"
-        class="flex flex-col items-end gap-0.5"
-      >
-        <span class="inline-flex items-center gap-2 text-sm text-gray-100">
-          <span class="h-2 w-2 flex-none rounded-full bg-green-400" aria-hidden="true"></span>
-          Displays ready
-        </span>
-        <!-- AUDIENCE line (WR-02 honesty): the GREEN "ready" label is gated on
-             !audienceClosed INDEPENDENT of monitorChanged — a closed window is
-             NEVER rendered green. Three branches:
-               1. closed & no reassign → amber closed-recovery row + reopen chip
-               2. closed & reassign up → muted amber "closed" indicator, NO chip
-                  (the reassign banner is the senior action — precedence)
-               3. open → green ready label. -->
-        <div v-if="audienceClosed && !monitorChanged" class="flex flex-col items-end gap-0.5">
-          <span
-            data-testid="run-output-closed-audience"
-            class="inline-flex items-center gap-2 text-sm text-amber-200"
-          >
-            <span class="h-2 w-2 flex-none rounded-full bg-amber-400" aria-hidden="true"></span>
-            Audience display closed
-            <button
-              type="button"
-              data-testid="run-reopen-audience"
-              aria-label="Reopen the audience display on its screen"
-              class="min-h-11 rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              @click="reopenOutput('audience')"
-            >
-              Reopen Audience
-            </button>
-          </span>
-          <span class="text-xs text-amber-200/80">
-            You won't lose your place — reopening returns to the current slide.
-          </span>
-        </div>
-        <span
-          v-else-if="audienceClosed"
-          data-testid="run-output-closed-audience-muted"
-          class="inline-flex items-center gap-2 text-xs text-amber-200/80"
-        >
-          <span class="h-2 w-2 flex-none rounded-full bg-amber-400" aria-hidden="true"></span>
-          Audience → reassign displays to reopen
-        </span>
-        <span v-else data-testid="run-output-ready-audience" class="text-xs text-gray-400">
-          Audience → {{ readyAudienceLabel }}
-        </span>
-        <!-- CONFIDENCE line: mirror of the audience closed-recovery row, with
-             the same WR-02 honesty gating (green ready ONLY when !confidenceClosed). -->
-        <div v-if="confidenceClosed && !monitorChanged" class="flex flex-col items-end gap-0.5">
-          <span
-            data-testid="run-output-closed-confidence"
-            class="inline-flex items-center gap-2 text-sm text-amber-200"
-          >
-            <span class="h-2 w-2 flex-none rounded-full bg-amber-400" aria-hidden="true"></span>
-            Confidence display closed
-            <button
-              type="button"
-              data-testid="run-reopen-confidence"
-              aria-label="Reopen the confidence display on its screen"
-              class="min-h-11 rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              @click="reopenOutput('confidence')"
-            >
-              Reopen Confidence
-            </button>
-          </span>
-          <span class="text-xs text-amber-200/80">
-            You won't lose your place — reopening returns to the current slide.
-          </span>
-        </div>
-        <span
-          v-else-if="confidenceClosed"
-          data-testid="run-output-closed-confidence-muted"
-          class="inline-flex items-center gap-2 text-xs text-amber-200/80"
-        >
-          <span class="h-2 w-2 flex-none rounded-full bg-amber-400" aria-hidden="true"></span>
-          Confidence → reassign displays to reopen
-        </span>
-        <span v-else data-testid="run-output-ready-confidence" class="text-xs text-gray-400">
-          Confidence → {{ readyConfidenceLabel }}
-        </span>
-      </div>
-
-      <!-- BLOCKED: compact honest indicator + retry; detail in the banner below. -->
-      <div
-        v-else-if="outputStatus === 'blocked'"
-        class="flex items-center gap-3"
-      >
-        <span class="inline-flex items-center gap-1.5 text-xs text-amber-300">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            class="h-4 w-4 flex-none text-amber-400"
-            aria-hidden="true"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
-              clip-rule="evenodd"
-            />
-          </svg>
-          Displays blocked
-        </span>
-        <button
-          type="button"
-          data-testid="run-go-live-retry"
-          aria-label="Go live — open the audience and confidence displays"
-          class="min-h-11 inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          @click="openOutputs"
-        >
-          Go live
-        </button>
-      </div>
-    </div>
+    <!-- OUTPUT-STATUS CLUSTER REMOVED (owner fix #3). The redundant top status band
+         (the spinner / "Displays ready" summary / per-role closed-recovery rows /
+         compact blocked indicator) is gone. Its closed-window RECOVERY affordance
+         (R274) now lives on RunDisplaysPanel in State B (owner fix #4), which carries
+         each output's open / not-open / CLOSED + Reopen surface. The separate
+         reassign / fallback / blocked / partial banners below are UNCHANGED. -->
 
     <!-- OUTPUT-STATUS BANNERS (95-04/96-01) — INLINE + VERBATIM. A sibling band
          between the status cluster and the main region (pushes it down, never
@@ -370,11 +232,31 @@
         </p>
       </section>
 
-      <!-- STATE B (live): the program/next-up preview split (RunPreviewPair), the
-           in-item click-to-jump filmstrip (RunFilmstrip -> postIndex), the Output
-           panel (Black/Clear -> postBlackout), and the additive Displays panel. -->
+      <!-- STATE B (live): the program/next-up preview split (RunPreviewPair) with
+           the Displays panel as a right column beside/under the next-up preview
+           (owner fix #4 — relocated from the bottom), the in-item click-to-jump
+           filmstrip (RunFilmstrip -> postIndex), and the Output panel (Black/Clear
+           -> postBlackout). RunDisplaysPanel now also carries the closed-window
+           RECOVERY (R274) the removed top status band used to (owner fix #3). -->
       <section v-else class="flex-1 min-w-0 h-full flex flex-col gap-6 overflow-y-auto p-6 lg:p-8">
-        <RunPreviewPair :current="current" :next="next" :live="live" />
+        <!-- PREVIEW + DISPLAYS: previews left, Displays right column (6b placement). -->
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div class="flex-1 min-w-0">
+            <RunPreviewPair :current="current" :next="next" :live="live" />
+          </div>
+          <div class="w-full lg:w-72 lg:flex-none">
+            <RunDisplaysPanel
+              :audience="audience"
+              :confidence="confidence"
+              :live="live"
+              :audienceClosed="audienceClosed"
+              :confidenceClosed="confidenceClosed"
+              :reassigning="monitorChanged"
+              @reopen="reopenOutput"
+              @manage="openManage"
+            />
+          </div>
+        </div>
 
         <RunFilmstrip
           :slides="filmstripSlides"
@@ -383,55 +265,44 @@
           @jump="postIndex"
         />
 
-        <div class="grid gap-6 lg:grid-cols-2 items-start">
-          <!-- OUTPUT PANEL (R280) — Black blanks the projector, Clear restores it;
-               both route to the single-writer postBlackout. The active state is
-               shown so the operator sees whether the screens are black. Logo is
-               omitted (no asset). -->
-          <div
-            data-testid="run-output-panel"
-            class="rounded-lg border border-white/10 bg-[#141624] p-4"
-          >
-            <h3 class="mb-3 text-sm font-semibold text-gray-100">Output</h3>
-            <div class="flex items-center gap-3">
-              <button
-                type="button"
-                data-testid="run-blackout-btn"
-                :aria-pressed="blackout ? 'true' : 'false'"
-                class="min-h-11 flex-1 rounded-md border px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                :class="
-                  blackout
-                    ? 'border-transparent bg-black text-white ring-2 ring-white/40'
-                    : 'border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
-                "
-                @click="postBlackout(true)"
-              >
-                Black
-              </button>
-              <button
-                type="button"
-                data-testid="run-clear-btn"
-                :aria-pressed="!blackout ? 'true' : 'false'"
-                class="min-h-11 flex-1 rounded-md border px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                :class="
-                  !blackout
-                    ? 'border-transparent bg-[color:var(--run-accent)] text-white'
-                    : 'border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
-                "
-                @click="postBlackout(false)"
-              >
-                Clear
-              </button>
-            </div>
+        <!-- OUTPUT PANEL (R280) — Black blanks the projector, Clear restores it;
+             both route to the single-writer postBlackout. The active state is shown
+             so the operator sees whether the screens are black. Logo omitted (no asset). -->
+        <div
+          data-testid="run-output-panel"
+          class="rounded-lg border border-white/10 bg-[#141624] p-4 lg:max-w-md"
+        >
+          <h3 class="mb-3 text-sm font-semibold text-gray-100">Output</h3>
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              data-testid="run-blackout-btn"
+              :aria-pressed="blackout ? 'true' : 'false'"
+              class="min-h-11 flex-1 rounded-md border px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              :class="
+                blackout
+                  ? 'border-transparent bg-black text-white ring-2 ring-white/40'
+                  : 'border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
+              "
+              @click="postBlackout(true)"
+            >
+              Black
+            </button>
+            <button
+              type="button"
+              data-testid="run-clear-btn"
+              :aria-pressed="!blackout ? 'true' : 'false'"
+              class="min-h-11 flex-1 rounded-md border px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              :class="
+                !blackout
+                  ? 'border-transparent bg-[color:var(--run-accent)] text-white'
+                  : 'border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
+              "
+              @click="postBlackout(false)"
+            >
+              Clear
+            </button>
           </div>
-
-          <RunDisplaysPanel
-            :audience="audience"
-            :confidence="confidence"
-            :live="live"
-            @reopen="reopenOutput"
-            @manage="openManage"
-          />
         </div>
       </section>
     </div>
@@ -517,6 +388,7 @@ const {
   serviceHeading,
   serviceName,
   live,
+  rehearsing,
   positionLabel,
   clock,
   elapsed,
@@ -550,10 +422,8 @@ const {
   jumpToSlot,
   goBySlide,
   postIndex,
-  // output state machine + recovery (inline, verbatim)
+  // output state machine + recovery (banners inline; closed-recovery on the panel)
   outputStatus,
-  readyAudienceLabel,
-  readyConfidenceLabel,
   blockedRole,
   audienceClosed,
   confidenceClosed,

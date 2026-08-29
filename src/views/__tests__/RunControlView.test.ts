@@ -53,9 +53,16 @@ enableAutoUnmount(afterEach)
 // useServiceAssembly reads).
 const mockRouterPush = vi.fn()
 const mockRoute = reactive({ params: { serviceId: 'service-1' }, query: { org: 'org-1' } })
+// Owner fix #6: the composable registers onBeforeRouteLeave. Capture the guard so a
+// test can drive an in-app leave attempt directly (the guard cancels + opens the
+// confirm while live). A plain module-level holder the mock factory closes over.
+let capturedRouteLeaveGuard: ((to: unknown) => boolean | void) | undefined
 vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
   useRouter: () => ({ push: mockRouterPush }),
+  onBeforeRouteLeave: (guard: (to: unknown) => boolean | void) => {
+    capturedRouteLeaveGuard = guard
+  },
 }))
 
 // Firestore-free stores + a mutable slide fixture. `slides` is what the NEXT
@@ -259,6 +266,7 @@ beforeEach(() => {
   mockRouterPush.mockClear()
   mockRoute.params.serviceId = 'service-1'
   mockRoute.query.org = 'org-1'
+  capturedRouteLeaveGuard = undefined
 })
 
 afterEach(() => {
@@ -576,9 +584,9 @@ describe('RunControlView — dual preview + single-selection (R264/R266)', () =>
   })
 })
 
-// ── 97-10: rehearse-without-screens + honest green-when-live (R283/R277) ────────
-describe('RunControlView — rehearse without screens + live-green (R283/R277)', () => {
-  it('rehearse enters live WITHOUT opening any window, turns the status green, and drives slide 0', async () => {
+// ── 97-10: rehearse-without-screens + YELLOW "Rehearsing" status (R283/R277 + owner #7)
+describe('RunControlView — rehearse without screens + rehearsing-yellow (R283/R277)', () => {
+  it('rehearse enters live WITHOUT opening any window, turns the status YELLOW "Rehearsing" (never green), relabels exit "End Rehearsal", and drives slide 0', async () => {
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
     await flushPromises()
@@ -607,8 +615,13 @@ describe('RunControlView — rehearse without screens + live-green (R283/R277)',
     expect(wrapper.find('[data-testid="run-current-preview"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="run-go-live-btn"]').exists()).toBe(false)
 
-    // R277: the live status is GREEN only once live.
-    expect(wrapper.find('[data-testid="run-live-status"]').classes()).toContain('run-status--live')
+    // Owner fix #7: a rehearsal reads YELLOW "Rehearsing" — never the green "Live"
+    // tile (green is reserved for a real go-live), and the exit says "End Rehearsal".
+    const statusAfter = wrapper.find('[data-testid="run-live-status"]')
+    expect(statusAfter.classes()).toContain('run-status--rehearsing')
+    expect(statusAfter.classes()).not.toContain('run-status--live')
+    expect(statusAfter.text()).toContain('Rehearsing')
+    expect(wrapper.find('[data-testid="run-exit-btn"]').text()).toBe('End Rehearsal')
 
     // Slide 0 is driving the channel (posted on mount, still the current state) —
     // rehearse drives the control with no output window opened.
@@ -809,5 +822,132 @@ describe('RunControlView — transport/blackout keys inert pre-live (IN-02)', ()
     const last = fake.states()[fake.states().length - 1]!
     expect(last.index).toBe(0)
     expect(last.blackout).toBe(false)
+  })
+})
+
+// ── Owner fix #5: Manage opens monitor-setup in a NEW TAB without noopener ────────
+// noopener severs the opener relationship, so the fresh tab loses the opener's
+// sessionStorage (the picked active org) and the router guard bounces it to
+// /select-church. A plain window.open lets it inherit sessionStorage.
+describe('RunControlView — Manage opens monitor-setup without noopener (owner #5)', () => {
+  it('clicking the header Manage link calls window.open(/monitor-setup, _blank) with NO third feature arg', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="run-manage-link"]').trigger('click')
+
+    // Exactly the plain new-tab open — no 'noopener' (which would drop sessionStorage).
+    expect(window.open).toHaveBeenCalledWith('/monitor-setup', '_blank')
+    const manageCall = vi
+      .mocked(window.open)
+      .mock.calls.find((c) => c[0] === '/monitor-setup')
+    expect(manageCall).toBeTruthy()
+    expect(manageCall![2]).toBeUndefined()
+  })
+})
+
+// ── Owner fix #6: never leave a live/rehearsing service without an ending confirm ─
+// An in-app route change while live must CANCEL and open the exit-confirm; CONFIRM
+// tears down (channel close) then proceeds to the ORIGINAL destination; CANCEL stays.
+// A tab close/refresh registers a beforeunload listener only while live.
+describe('RunControlView — leave-guard ends the service (owner #6)', () => {
+  it('an in-app leave while NOT live passes straight through (guard returns true, no dialog)', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    expect(capturedRouteLeaveGuard).toBeTypeOf('function')
+    const result = capturedRouteLeaveGuard!({ fullPath: '/services' })
+    await flushPromises()
+
+    expect(result).toBe(true) // allowed
+    expect(document.body.querySelector('[data-testid="run-exit-dialog"]')).toBeNull()
+    expect(fake.close).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="run-service-name"]').exists()).toBe(true)
+  })
+
+  it('an in-app leave while LIVE cancels navigation and opens the exit-confirm dialog', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click') // enter live
+    await flushPromises()
+
+    const result = capturedRouteLeaveGuard!({ fullPath: '/services' })
+    await flushPromises()
+
+    // The guard CANCELLED the leave (false) and opened the confirm — no teardown yet.
+    expect(result).toBe(false)
+    expect(document.body.querySelector('[data-testid="run-exit-dialog"]')).not.toBeNull()
+    expect(fake.close).not.toHaveBeenCalled()
+    expect(mockRouterPush).not.toHaveBeenCalled()
+  })
+
+  it('confirming the leave tears the service down and navigates to the ORIGINAL destination', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    capturedRouteLeaveGuard!({ fullPath: '/services' })
+    await flushPromises()
+
+    const confirmBtn = document.body.querySelector('[data-testid="run-exit-confirm"]') as HTMLElement | null
+    expect(confirmBtn).not.toBeNull()
+    confirmBtn!.click()
+    await flushPromises()
+
+    // Teardown (channel close) ran, and navigation went to the pending destination —
+    // NOT the service-editor default.
+    expect(fake.close).toHaveBeenCalledTimes(1)
+    expect(mockRouterPush).toHaveBeenCalledTimes(1)
+    expect(mockRouterPush).toHaveBeenCalledWith('/services')
+  })
+
+  it('cancelling the leave keeps the service live (channel open, no navigation)', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    capturedRouteLeaveGuard!({ fullPath: '/services' })
+    await flushPromises()
+
+    const cancelBtn = document.body.querySelector('[data-testid="run-exit-cancel"]') as HTMLElement | null
+    expect(cancelBtn).not.toBeNull()
+    cancelBtn!.click()
+    await flushPromises()
+
+    // Stayed: dialog closed, channel still open, no navigation.
+    expect(document.body.querySelector('[data-testid="run-exit-dialog"]')).toBeNull()
+    expect(fake.close).not.toHaveBeenCalled()
+    expect(mockRouterPush).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="run-service-name"]').exists()).toBe(true)
+  })
+
+  it('registers a beforeunload listener when it goes live and removes it on exit', async () => {
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Pre-live: no beforeunload listener yet.
+    expect(addSpy.mock.calls.filter((c) => c[0] === 'beforeunload')).toHaveLength(0)
+
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click') // go live
+    await flushPromises()
+    expect(addSpy.mock.calls.filter((c) => c[0] === 'beforeunload').length).toBeGreaterThanOrEqual(1)
+
+    // Ending the service removes the listener (live → false).
+    keydown('Escape')
+    await flushPromises()
+    const confirmBtn = document.body.querySelector('[data-testid="run-exit-confirm"]') as HTMLElement | null
+    confirmBtn!.click()
+    await flushPromises()
+    expect(removeSpy.mock.calls.filter((c) => c[0] === 'beforeunload').length).toBeGreaterThanOrEqual(1)
   })
 })

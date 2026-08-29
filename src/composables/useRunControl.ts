@@ -25,7 +25,8 @@
  */
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { ComputedRef } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, onBeforeRouteLeave } from 'vue-router'
+import type { RouteLocationNormalized } from 'vue-router'
 import { useServiceAssembly } from '@/composables/useServiceAssembly'
 import { useRunTimers } from '@/composables/useRunTimers'
 import {
@@ -93,6 +94,13 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   // blackout.value (defaulting false so pre-97 { blackout:false } assertions hold).
   const live = ref(false)
   const blackout = ref(false)
+  // ── Rehearse flag (owner fix #7) ───────────────────────────────────────────
+  // `rehearsing` distinguishes a REHEARSAL (live UI, NO output windows) from a
+  // real go-live. `live` stays true in BOTH so State B renders and the leave-guard
+  // applies, but the header must read a YELLOW "Rehearsing" tile (not green "Live")
+  // and its exit button "End Rehearsal". A real go-live (openPlaced/openUnplaced)
+  // sets it false; rehearse() sets it true; confirmExit resets it.
+  const rehearsing = ref(false)
 
   // ── Single-writer channel + navigation model (R266) ────────────────────────
   const index = ref<number | null>(null)
@@ -136,6 +144,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
    */
   function rehearse() {
     live.value = true
+    // Owner fix #7: a rehearsal is NOT a real go-live — flag it so the header tile
+    // reads YELLOW "Rehearsing" (not green "Live") and its exit says "End Rehearsal".
+    rehearsing.value = true
     startElapsed()
     if (index.value == null && assembledSlideshow.value.length > 0) postIndex(0)
   }
@@ -576,6 +587,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     outputStatus.value = 'placed'
     // Honest live flag (R277): both outputs opened — this is a genuine go-live.
     live.value = true
+    // Owner fix #7: a real go-live is NOT a rehearsal — turn the yellow tile green.
+    rehearsing.value = false
     startElapsed()
     // Start the closed-output poll once the outputs have actually opened
     // (idempotent via the pollId != null guard).
@@ -593,6 +606,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // Honest live flag (R277): both outputs opened (un-positioned) — a genuine
     // go-live, so enter the live state and start the elapsed timer.
     live.value = true
+    // Owner fix #7: a real go-live is NOT a rehearsal — turn the yellow tile green.
+    rehearsing.value = false
     startElapsed()
     // Start the closed-output poll once the outputs have actually opened
     // (idempotent via the pollId != null guard).
@@ -689,13 +704,29 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   }
 
   // ── Exit confirm ───────────────────────────────────────────────────────────
+  // Owner fix #6: while live (which INCLUDES rehearsing) any attempt to leave the
+  // control screen — an in-app route change, browser Back, or a tab close/refresh —
+  // must prompt to confirm ENDING the service and actually end it before leaving.
+  // A cancelled in-app leave is remembered here so CONFIRM proceeds to the ORIGINAL
+  // destination (not the service-editor default) after teardown.
+  const pendingLeaveTo = ref<RouteLocationNormalized | null>(null)
+
   function openExitConfirm() {
     confirmOpen.value = true
   }
   function cancelExit() {
     confirmOpen.value = false
+    // A cancelled route-leave must not "stick" — clear it so a later deliberate
+    // End Service goes to the service-editor default rather than the stale target.
+    pendingLeaveTo.value = null
   }
-  function confirmExit() {
+
+  /**
+   * The shared end-service teardown (R266/R277/R280/R281) — everything confirmExit
+   * does EXCEPT the final navigation. Extracted so both the End Service button and
+   * the confirmed in-app route-leave (owner fix #6) run the identical teardown.
+   */
+  function endServiceTeardown() {
     // WR-01: invalidate any in-flight Go-live resolve so a late getScreenDetails()
     // cannot re-open orphaned output windows after the operator has exited.
     goLiveRequestId += 1
@@ -705,14 +736,14 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // reopen chip after teardown (96-01 endurance fix). Null-guarded for the
     // double call with onUnmounted.
     stopRecoveryWatchers()
-    // Leave the live state: drop live + blackout and reset the elapsed timer
-    // (R277/R280/R281). Order relative to the window teardown does not matter for
-    // these three refs.
+    // Leave the live state: drop live + rehearsing + blackout and reset the elapsed
+    // timer (R277/R280/R281). Order relative to the window teardown does not matter.
     live.value = false
+    rehearsing.value = false
     blackout.value = false
     resetElapsed()
     // Blank the projector FIRST — close the output windows before the channel
-    // close + router.push, so ending run mode tears down the real displays (R266).
+    // close + navigation, so ending run mode tears down the real displays (R266).
     closeOutputs()
     handle?.close()
     // Leave the control-screen fullscreen entered on go-live (only when we are
@@ -723,8 +754,49 @@ export function useRunControl(options: UseRunControlOptions = {}) {
         // Already exited / unsupported — never block the exit path.
       })
     }
-    router.push({ name: 'service-editor', params: { id: serviceId.value } })
   }
+
+  function confirmExit() {
+    confirmOpen.value = false
+    endServiceTeardown()
+    // Owner fix #6: if this confirm resolves a cancelled in-app route-leave, proceed
+    // to the ORIGINAL destination — teardown already set live=false, so the re-fired
+    // leave-guard allows it (no double-prompt, no double-navigate). Otherwise the
+    // deliberate End Service returns to the service editor.
+    const dest = pendingLeaveTo.value
+    pendingLeaveTo.value = null
+    if (dest) {
+      router.push(dest.fullPath)
+    } else {
+      router.push({ name: 'service-editor', params: { id: serviceId.value } })
+    }
+  }
+
+  // ── Leave guards (owner fix #6) ─────────────────────────────────────────────
+  // IN-APP navigation: while live, CANCEL the leave and open the exit-confirm
+  // dialog, remembering the destination; CONFIRM tears down then proceeds, CANCEL
+  // stays. Not-live leaves pass straight through.
+  onBeforeRouteLeave((to) => {
+    if (!live.value) return true
+    pendingLeaveTo.value = to
+    confirmOpen.value = true
+    return false
+  })
+
+  // TAB CLOSE / REFRESH: a beforeunload listener (present ONLY while live) triggers
+  // the browser's native "Leave site?" prompt. The browser will NOT run app teardown
+  // on a hard unload — the confirm itself is the requirement.
+  function handleBeforeUnload(e: BeforeUnloadEvent) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+  watch(live, (isLive) => {
+    if (isLive) {
+      window.addEventListener('beforeunload', handleBeforeUnload)
+    } else {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  })
   watch(confirmOpen, async (open) => {
     if (!open) return
     await nextTick()
@@ -828,10 +900,15 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   /**
    * Open the monitor-setup screen in a NEW TAB so the running control (index/seq/
    * channel + any open outputs) survives — mirrors the reassign banner's new-tab
-   * rule. noopener keeps the new tab from reaching back into this window.
+   * rule. Owner fix #5: NO 'noopener'. noopener severs the opener relationship, and
+   * the HTML spec only copies the opener's sessionStorage — which carries a
+   * multi-church user's picked active org — to the child when that relationship is
+   * preserved. With noopener the fresh tab had no active-org, so the router guard
+   * bounced it to /select-church. A plain window.open (like the run/output windows
+   * already use) lets the new tab inherit sessionStorage and load monitor-setup.
    */
   function openManage() {
-    window.open('/monitor-setup', '_blank', 'noopener')
+    window.open('/monitor-setup', '_blank')
   }
 
   // ── Channel lifecycle + initial go-live ────────────────────────────────────
@@ -859,6 +936,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     stopRecoveryWatchers()
     handle?.close()
     document.removeEventListener('keydown', handleKeydown)
+    // Owner fix #6: never leak the live-only beforeunload listener past teardown.
+    window.removeEventListener('beforeunload', handleBeforeUnload)
   })
 
   return {
@@ -871,6 +950,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     currentSlotIndex,
     // live session + blackout + timers (R277/R280/R281)
     live,
+    rehearsing,
     blackout,
     postBlackout,
     rehearse,

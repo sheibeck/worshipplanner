@@ -78,6 +78,9 @@ const { mockService, mockSlides } = vi.hoisted(() => {
 // plain anchor exposing `to` so the monitor-setup link is assertable.
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
+  // Owner fix #6: the composable registers onBeforeRouteLeave in setup — provide a
+  // no-op so setup does not crash (these output tests don't drive the leave-guard).
+  onBeforeRouteLeave: () => {},
   RouterLink: {
     props: ['to'],
     template: '<a :data-to="to"><slot /></a>',
@@ -334,8 +337,8 @@ describe('RunControlView output — pre-open idle state (R261; T-95-19)', () => 
     // The open is driven by the click, NOT by mounting.
     expect(openSpy).not.toHaveBeenCalled()
     expect(wrapper.find('[data-testid="run-go-live-btn"]').exists()).toBe(true)
-    // Idle never claims a display opened.
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(false)
+    // Idle never claims a display opened — pre-live State A renders no Displays panel.
+    expect(wrapper.find('[data-testid="run-displays-panel"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(false)
   })
@@ -343,7 +346,7 @@ describe('RunControlView output — pre-open idle state (R261; T-95-19)', () => 
 
 // ── 1. MATCHED — open + place both windows on their assigned screens ────────────
 describe('RunControlView output — matched placement (R261/R266)', () => {
-  it('opens the audience + confidence windows with stable names, fullscreens each on its screen, and shows run-status-placed', async () => {
+  it('opens the audience + confidence windows with stable names, fullscreens each on its screen, and shows both outputs green/ready in the Displays panel', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
@@ -363,8 +366,11 @@ describe('RunControlView output — matched placement (R261/R266)', () => {
       )
     }
 
-    // The honest success status renders; no fallback/blocked banner.
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+    // The honest success surface renders — both outputs green/ready in the Displays
+    // panel (owner fix #4, replacing the removed "Displays ready" status band); no
+    // fallback/blocked banner.
+    expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-ready-confidence"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(false)
   })
@@ -389,7 +395,7 @@ describe('RunControlView output — fallback pop-outs (R261)', () => {
     const banner = wrapper.find('[data-testid="run-fallback-banner"]')
     expect(banner.exists()).toBe(true)
     expect(banner.find('a[data-to="/monitor-setup"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(false)
+    // The amber fallback banner (not a green "Displays ready") is the honest signal.
   })
 
   it('no saved mapping at all: still opens both un-positioned + fallback banner', async () => {
@@ -465,15 +471,16 @@ describe('RunControlView output — blocked (pop-up refused) (R261; T-95-16/T-95
     expect(openedWins).toHaveLength(0)
 
     // The HONEST blocked state — never a success/opened claim while zero opened.
+    // live stayed false, so State B (and its Displays panel) never rendered.
     expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-displays-panel"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
   })
 })
 
 // ── 5b. PARTIAL — exactly ONE window.open null must NOT claim success (WR-02) ────
 describe('RunControlView output — partial open is not full success (WR-02)', () => {
-  it('matched but the CONFIDENCE window.open returns null: NOT run-status-placed — honest partial banner naming the dark confidence display', async () => {
+  it('matched but the CONFIDENCE window.open returns null: NOT a live success — honest partial banner naming the dark confidence display', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])
     // First open (audience) succeeds; second (confidence) is refused → null.
@@ -484,8 +491,9 @@ describe('RunControlView output — partial open is not full success (WR-02)', (
 
     await goLive(wrapper)
 
-    // No green "Displays ready" and no both-opened fallback claim.
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(false)
+    // No green "Displays ready" (live stayed false → no Displays panel) and no
+    // both-opened fallback claim.
+    expect(wrapper.find('[data-testid="run-displays-panel"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(false)
 
@@ -508,9 +516,10 @@ describe('RunControlView output — partial open is not full success (WR-02)', (
 
     await goLive(wrapper)
 
-    // The amber fallback banner claims BOTH windows opened — it must NOT show.
+    // The amber fallback banner claims BOTH windows opened — it must NOT show, and
+    // live stayed false so no Displays panel rendered.
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-displays-panel"]').exists()).toBe(false)
 
     const banner = wrapper.find('[data-testid="run-partial-banner"]')
     expect(banner.exists()).toBe(true)
@@ -619,29 +628,32 @@ describe('RunControlView output — closed detection, per-role reopen, position 
     vi.useRealTimers()
   })
 
-  it('a closed AUDIENCE handle surfaces run-output-closed-audience + run-reopen-audience for that role ONLY, cluster stays placed', async () => {
+  it('a closed AUDIENCE handle surfaces run-display-closed-audience + run-display-reopen-audience for that role ONLY, session stays live', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
 
     await goLiveFake(wrapper)
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+    // Go-live succeeded — the Displays panel shows both outputs green/ready.
+    expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-ready-confidence"]').exists()).toBe(true)
     expect(openedWins).toHaveLength(2)
 
     // Audience opens first in openPlaced, so openedWins[0] is the audience handle.
     openedWins[0]!.closed = true
     await vi.advanceTimersByTimeAsync(1000)
 
-    // Only the audience line turns amber; confidence stays green; the cluster
-    // remains 'placed' (the closed flags do NOT change outputStatus).
-    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="run-reopen-audience"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="run-output-closed-confidence"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="run-reopen-confidence"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+    // Only the audience line turns amber; confidence stays green; the session
+    // stays live (the closed flags do NOT change outputStatus).
+    expect(wrapper.find('[data-testid="run-display-closed-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-reopen-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-closed-confidence"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-display-reopen-confidence"]').exists()).toBe(false)
+    // The cluster stays live — confidence is still green/ready in the Displays panel.
+    expect(wrapper.find('[data-testid="run-display-ready-confidence"]').exists()).toBe(true)
   })
 
-  it('a closed CONFIDENCE handle surfaces run-output-closed-confidence + run-reopen-confidence for that role ONLY', async () => {
+  it('a closed CONFIDENCE handle surfaces run-display-closed-confidence + run-display-reopen-confidence for that role ONLY', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
@@ -652,13 +664,13 @@ describe('RunControlView output — closed detection, per-role reopen, position 
     openedWins[1]!.closed = true
     await vi.advanceTimersByTimeAsync(1000)
 
-    expect(wrapper.find('[data-testid="run-output-closed-confidence"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="run-reopen-confidence"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="run-reopen-audience"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-display-closed-confidence"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-reopen-confidence"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-closed-audience"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-display-reopen-audience"]').exists()).toBe(false)
   })
 
-  it('clicking run-reopen-audience re-opens the AUDIENCE window only (not confidence) and clears the amber row on a non-null handle', async () => {
+  it('clicking run-display-reopen-audience re-opens the AUDIENCE window only (not confidence) and clears the amber row on a non-null handle', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
@@ -666,10 +678,10 @@ describe('RunControlView output — closed detection, per-role reopen, position 
     await goLiveFake(wrapper)
     openedWins[0]!.closed = true
     await vi.advanceTimersByTimeAsync(1000)
-    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-closed-audience"]').exists()).toBe(true)
 
     const callsBefore = openSpy.mock.calls.length
-    await wrapper.find('[data-testid="run-reopen-audience"]').trigger('click')
+    await wrapper.find('[data-testid="run-display-reopen-audience"]').trigger('click')
     await vi.advanceTimersByTimeAsync(0)
 
     // Exactly ONE more window.open — the audience name, placed (matched → features).
@@ -679,7 +691,7 @@ describe('RunControlView output — closed detection, per-role reopen, position 
     const reopenCall = openSpy.mock.calls[openSpy.mock.calls.length - 1]!
     expect(reopenCall[0]).not.toBe(CONFIDENCE_URL)
     // A non-null handle cleared the amber row back to green.
-    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-display-closed-audience"]').exists()).toBe(false)
   })
 
   it('a REFUSED reopen (window.open returns null) keeps the amber closed row — never a false "recovered" claim (T-96-12)', async () => {
@@ -690,14 +702,14 @@ describe('RunControlView output — closed detection, per-role reopen, position 
     await goLiveFake(wrapper)
     openedWins[0]!.closed = true
     await vi.advanceTimersByTimeAsync(1000)
-    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-closed-audience"]').exists()).toBe(true)
 
     // The pop-up blocker refuses the reopen → null handle → the row must remain.
     openSpy.mockReturnValueOnce(null as unknown as Window)
-    await wrapper.find('[data-testid="run-reopen-audience"]').trigger('click')
+    await wrapper.find('[data-testid="run-display-reopen-audience"]').trigger('click')
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-closed-audience"]').exists()).toBe(true)
   })
 
   it('POSITION PRESERVED: after ArrowRight→index 2, close→reopen→deliver({type:"hello"}), the last posted state.index === the pre-close index (T-96-13)', async () => {
@@ -718,7 +730,7 @@ describe('RunControlView output — closed detection, per-role reopen, position 
     // Close the audience output, latch it via the poll, then reopen.
     openedWins[0]!.closed = true
     await vi.advanceTimersByTimeAsync(1000)
-    await wrapper.find('[data-testid="run-reopen-audience"]').trigger('click')
+    await wrapper.find('[data-testid="run-display-reopen-audience"]').trigger('click')
     await vi.advanceTimersByTimeAsync(0)
 
     // The reopened output announces itself with a hello → onHello(resendCurrent)
@@ -743,7 +755,8 @@ describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-1
     const { wrapper } = mountView()
 
     await goLive(wrapper)
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+    // Go-live succeeded (audience green/ready in the Displays panel); no reassign yet.
+    expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(false)
 
     // The confidence monitor (screenB) is unplugged → the live set drops it →
@@ -840,7 +853,7 @@ describe('RunControlView output — closed-vs-unplug precedence (R274)', () => {
     vi.useRealTimers()
   })
 
-  it('with BOTH a closed audience window AND a monitor change, run-reassign-banner shows and run-reopen-audience is SUPPRESSED', async () => {
+  it('with BOTH a closed audience window AND a monitor change, run-reassign-banner shows and run-display-reopen-audience is SUPPRESSED', async () => {
     seedMatchingMapping()
     const { control } = installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
@@ -857,13 +870,13 @@ describe('RunControlView output — closed-vs-unplug precedence (R274)', () => {
 
     expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(true)
     // The reopen chip is gated on !monitorChanged → suppressed until reassignment.
-    expect(wrapper.find('[data-testid="run-reopen-audience"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-display-reopen-audience"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-display-closed-audience"]').exists()).toBe(false)
     // WR-02: under close+unplug precedence the closed audience line must NOT fall
     // through to the GREEN "ready" label — a closed window is never rendered green.
-    expect(wrapper.find('[data-testid="run-output-ready-audience"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(false)
     // Instead it shows the muted amber "reassign displays" indicator (no chip).
-    expect(wrapper.find('[data-testid="run-output-closed-audience-muted"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-closed-audience-muted"]').exists()).toBe(true)
   })
 })
 
@@ -909,7 +922,7 @@ describe('RunControlView output — no-leak / single teardown (R274)', () => {
       const { wrapper } = mountView()
 
       await goLiveFake(wrapper)
-      expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(true)
 
       // Deliberate exit: Escape → confirm. confirmExit runs stopRecoveryWatchers,
       // clearing the poll BEFORE closeOutputs (which never nulls the handles).
@@ -925,8 +938,8 @@ describe('RunControlView output — no-leak / single teardown (R274)', () => {
       openedWins[0]!.closed = true
       await vi.advanceTimersByTimeAsync(2000)
 
-      expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="run-reopen-audience"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="run-display-closed-audience"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="run-display-reopen-audience"]').exists()).toBe(false)
     } finally {
       vi.useRealTimers()
     }
@@ -963,7 +976,7 @@ describe('RunControlView output — rapid navigation stays in sync (R273)', () =
 //    run-go-live-btn now lives in State-A's RunPreflightPanel (relocated from the
 //    old idle corner); the same testid drives go-live, only its location changed.
 describe('RunControlView output — go-live from the pre-flight panel (R276/R277)', () => {
-  it('a matched go-live via the pre-flight run-go-live-btn reaches run-status-placed AND turns run-live-status green', async () => {
+  it('a matched go-live via the pre-flight run-go-live-btn shows both outputs green/ready AND turns run-live-status green', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
@@ -978,8 +991,13 @@ describe('RunControlView output — go-live from the pre-flight panel (R276/R277
     await goLive(wrapper)
 
     // Placed AND genuinely live (green) — owner fix #5 (Go-live relocated) end-to-end.
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+    // A REAL go-live shows both outputs green/ready in the Displays panel and turns
+    // the header status green (never the yellow "Rehearsing" tile), with "End Service".
+    expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-ready-confidence"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="run-live-status"]').classes()).toContain('run-status--live')
+    expect(wrapper.find('[data-testid="run-live-status"]').classes()).not.toContain('run-status--rehearsing')
+    expect(wrapper.find('[data-testid="run-exit-btn"]').text()).toBe('End Service')
   })
 })
 
@@ -993,7 +1011,7 @@ describe('RunControlView output — blackout during a live session (R280)', () =
     const { wrapper, fake } = mountView()
 
     await goLive(wrapper)
-    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(true)
 
     const states = () => fake.posted.filter((m) => m.type === 'state')
     const seqBefore = states()[states().length - 1]!.seq!
