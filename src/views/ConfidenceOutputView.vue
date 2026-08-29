@@ -1,8 +1,9 @@
 <template>
   <!-- R272 — full-bleed band-facing confidence surface. Sibling of
        AudienceOutputView: it inherits the entire lifecycle + chrome contract via
-       useOutputWindow (94-01) and diverges ONLY here — a current + next vertical
-       70/30 split with BOTH backgrounds suppressed to plain black. The root
+       useOutputWindow (94-01) and diverges ONLY here — a current + next
+       side-by-side left/right split (current dominant LEFT, next preview RIGHT
+       scaled down) with BOTH backgrounds suppressed to plain black. The root
        carries the same `--slide-font-*` CSS-var wrapper so SlideCanvas's scoped
        per-element font rules inherit; cursor is hidden ONLY while fullscreen
        (restored windowed so the re-enter affordance stays clickable). No
@@ -10,17 +11,17 @@
   <div
     ref="rootRef"
     data-testid="confidence-output"
-    class="fixed inset-0 bg-black flex flex-col"
+    class="fixed inset-0 bg-black flex flex-row"
     :style="rootStyle"
   >
-    <!-- CURRENT region (dominant, top ~70%). Drives media via currentCanvasRef.
+    <!-- CURRENT region (dominant, LEFT ~60%). Drives media via currentCanvasRef.
          suppressBackground=true forces SlideCanvas's currentBackgroundUrl null
          FIRST so the actual background image is NEVER shown to the band. Rendered
          ONLY once a valid current slide exists AND the font gate has resolved;
          otherwise pure black with zero elements. No label on this pane. -->
     <div
       data-testid="confidence-current-region"
-      class="relative flex-[7_1_0%] flex items-center justify-center overflow-hidden"
+      class="relative flex-[3_1_0%] flex items-center justify-center overflow-hidden"
     >
       <SlideCanvas
         v-if="currentSlide && fontReady"
@@ -31,23 +32,31 @@
       />
     </div>
 
-    <!-- NEXT region (subordinate, bottom ~30%). STATIC preview — NO ref, never
+    <!-- NEXT region (subordinate, RIGHT ~40%). STATIC preview — NO ref, never
          driven by play(): the band never hears the upcoming slide's audio nor
          sees its video motion. suppressBackground=true here too. On the last
-         slide nextSlide is null: the region STAYS present (flex-[3_1_0%] fixed,
+         slide nextSlide is null: the region STAYS present (flex-[2_1_0%] fixed,
          pure black, "Next" tag hidden) — collapsing it would jump-resize the
          current pane in front of the band on the final advance. The
-         border-t border-white/10 hairline is the seam between panes. -->
+         border-l border-white/10 hairline is the seam between the left/right
+         panes. R276 — the preview is scaled DOWN (SlideCanvas has no font-size
+         prop) so the upcoming slide reads smaller than the current pane and fits
+         the narrower right column. -->
     <div
       data-testid="confidence-next-region"
-      class="relative flex-[3_1_0%] flex items-center justify-center overflow-hidden border-t border-white/10"
+      class="relative flex-[2_1_0%] flex items-center justify-center overflow-hidden border-l border-white/10"
     >
-      <SlideCanvas
+      <div
         v-if="nextSlide && fontReady"
-        :slide="nextSlide"
-        :suppressBackground="true"
-        :interactive="false"
-      />
+        class="flex items-center justify-center"
+        style="transform: scale(0.8); transform-origin: center"
+      >
+        <SlideCanvas
+          :slide="nextSlide"
+          :suppressBackground="true"
+          :interactive="false"
+        />
+      </div>
       <span
         v-if="nextSlide && fontReady"
         data-testid="confidence-next-label"
@@ -56,6 +65,18 @@
         Next
       </span>
     </div>
+
+    <!-- R280 — full-bleed blackout overlay over BOTH panes. When the control
+         posts blackout:true the band monitor shows pure black (sibling of the
+         region divs, after them in paint order); blackout:false removes it and
+         both panes return. The reenter overlay stays AFTER this so the re-enter
+         button remains reachable if fullscreen is lost mid-blackout. -->
+    <div
+      v-if="blackout"
+      class="absolute inset-0 bg-black"
+      data-testid="confidence-blackout"
+      aria-hidden="true"
+    ></div>
 
     <!-- R271 / Pitfall 6 — the ONE interactive element, shown ONLY when
          fullscreen has been lost. Absolutely positioned so it overlays both live
@@ -117,8 +138,8 @@ const props = defineProps<{
 // font gate, rootStyle cursor coupling, non-teardown fullscreen recovery, and the
 // Screen Wake Lock — all inherited identically from the audience window. The
 // per-canvas media plumbing stays view-local below (current pane only).
-const { assembledSlideshow, index, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
-  useOutputWindow({ channelFactory: props.channelFactory })
+const { assembledSlideshow, index, blackout, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
+  useOutputWindow({ channelFactory: props.channelFactory, role: 'confidence' })
 
 // ── Current + next slides (view-local, from index + assembledSlideshow) ───────
 // A null index (before the first RunState) and an out-of-range index both resolve
