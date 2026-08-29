@@ -654,6 +654,128 @@ const blockedRole = ref<MonitorRole | null>(null)
 // Raw window handles (NOT reactive), keyed by stable window name.
 const outputWindows: Record<string, Window | null> = {}
 
+// ── Live-Ops recovery (96-01) ────────────────────────────────────────────────
+// The precise ScreenDetails shape we depend on (mirrors MonitorSetupView's
+// ScreenDetailsLike): it carries the live .screens AND the add/removeEventListener
+// pair for 'screenschange'. A bare Function would defeat arity/type checking.
+interface ScreenDetailsLike {
+  screens: ScreenLike[]
+  addEventListener: (type: 'screenschange', listener: () => void) => void
+  removeEventListener: (type: 'screenschange', listener: () => void) => void
+}
+
+// Per-output CLOSED flags. These do NOT extend OutputStatus (96-UI-SPEC §A): the
+// cluster stays 'placed'; only the affected subordinate line turns amber. LATCH-
+// ONLY — the poll sets them true and NEVER false, so only a successful reopen
+// clears them (a refused reopen can never silently clear the amber row).
+const audienceClosed = ref(false)
+const confidenceClosed = ref(false)
+// A mid-service monitor change (unplug/rearrange) → the reassign banner.
+const monitorChanged = ref(false)
+// The body names the specific missing role when resolvable, else this default.
+const reassignRole = ref('audience or confidence')
+
+// The SINGLE shared closed-poll interval id (null when not running).
+let pollId: ReturnType<typeof setInterval> | null = null
+// The HELD Go-live ScreenDetails (non-reactive) — reused by reopenOutput for a
+// synchronous same-position reopen, and the target of the screenschange listener.
+let liveScreenDetails: ScreenDetailsLike | null = null
+
+/** A cross-origin/torn-down handle .closed read can throw — guard it (never-throw). */
+function readClosed(name: string): boolean {
+  try {
+    return outputWindows[name]?.closed === true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The SINGLE shared ~1s closed-output poll (one interval, not one-per-window).
+ * LATCH-ONLY: it only ever sets a closed ref true, never false, so a null handle
+ * after a refused reopen cannot silently clear the amber row — only a successful
+ * reopen does. The pollId != null guard makes a second Go-live / reopen idempotent.
+ */
+function startClosedPoll() {
+  if (pollId != null) return
+  pollId = setInterval(() => {
+    if (readClosed('wp-audience')) audienceClosed.value = true
+    if (readClosed('wp-confidence')) confidenceClosed.value = true
+  }, 1000)
+}
+
+/**
+ * PER-ROLE REOPEN (R274) — re-runs the open+place for THAT role ONLY. It is
+ * SYNCHRONOUS: it resolves the role's screen from the already-HELD
+ * liveScreenDetails.screens via the existing resolveScreen (NO fresh
+ * getScreenDetails), so it opens no stale-resolution window and needs no new
+ * token — the original openOutputs().then WR-01 guard (:792/:806) stays intact.
+ * openWindow re-stores outputWindows[name] and best-effort moveTo +
+ * requestFullscreen({ screen }). The closed ref is cleared ONLY on a non-null
+ * handle: a pop-up-blocker-refused reopen keeps the amber row and never flips the
+ * line back to green (honesty rule). Position is NOT persisted — the reopened
+ * output's hello → onHello(resendCurrent) resends the CURRENT index, so it
+ * returns to the exact current slide; index.value is never touched here.
+ */
+function reopenOutput(role: MonitorRole) {
+  const name = role === 'audience' ? 'wp-audience' : 'wp-confidence'
+  const url = role === 'audience' ? audienceUrl() : confidenceUrl()
+  const saved = loadMapping()
+  const screen = saved && liveScreenDetails ? resolveScreen(saved, role, liveScreenDetails.screens) : null
+  const win = openWindow(url, name, screen)
+  if (!win) return
+  if (role === 'audience') audienceClosed.value = false
+  else confidenceClosed.value = false
+}
+
+/**
+ * MONITOR-UNPLUG handler (R274) — re-runs matchMapping against the held live
+ * screens. needs-reprompt (or any non-matched) → monitorChanged=true + name the
+ * missing role; a still-matching change (benign refresh) → monitorChanged=false,
+ * raising NO false alarm. Never guesses a new mapping from the stale one.
+ */
+function onScreensChange() {
+  if (!liveScreenDetails) return
+  const saved = loadMapping()
+  if (!saved) {
+    monitorChanged.value = false
+    return
+  }
+  const result = matchMapping(saved, liveScreenDetails.screens)
+  if (result.status !== 'matched') {
+    monitorChanged.value = true
+    const audMissing = resolveScreen(saved, 'audience', liveScreenDetails.screens) == null
+    const confMissing = resolveScreen(saved, 'confidence', liveScreenDetails.screens) == null
+    reassignRole.value =
+      audMissing && !confMissing ? 'audience' : confMissing && !audMissing ? 'confidence' : 'audience or confidence'
+  } else {
+    monitorChanged.value = false
+  }
+}
+
+/**
+ * SINGLE-TEARDOWN of both recovery watchers — clears the poll (clearInterval +
+ * null the id) AND removes the screenschange listener (null the held ref),
+ * null-guarded so the double call (confirmExit then onUnmounted) is safe.
+ * Load-bearing: closeOutputs() does NOT null outputWindows entries, so an
+ * uncleared poll would keep reading .closed===true forever and re-surface a
+ * reopen chip / leak after exit.
+ */
+function stopRecoveryWatchers() {
+  if (pollId != null) {
+    clearInterval(pollId)
+    pollId = null
+  }
+  if (liveScreenDetails) {
+    try {
+      liveScreenDetails.removeEventListener?.('screenschange', onScreensChange)
+    } catch {
+      // a listener-less / torn-down handle removeEventListener can throw — never propagate
+    }
+    liveScreenDetails = null
+  }
+}
+
 // WR-01: monotonic Go-live token + unmount flag guarding a LATE
 // getScreenDetails() resolution from re-opening orphaned output windows after
 // the operator has moved on (a fresh Go-live click, a confirmed exit, or an
@@ -745,6 +867,9 @@ function openPlaced(saved: MonitorMapping, screens: ScreenLike[]) {
   readyAudienceLabel.value = screenLabel(audienceScreen)
   readyConfidenceLabel.value = screenLabel(confidenceScreen)
   outputStatus.value = 'placed'
+  // Start the closed-output poll once the outputs have actually opened
+  // (idempotent via the pollId != null guard).
+  startClosedPoll()
 }
 
 /** FALLBACK path — open both outputs un-positioned (operator drags + fullscreens). */
@@ -755,6 +880,9 @@ function openUnplaced() {
   // both-null is blocked, exactly-one-null is the honest partial state.
   if (!bothOpened(aWin, cWin)) return
   outputStatus.value = 'fallback'
+  // Start the closed-output poll once the outputs have actually opened
+  // (idempotent via the pollId != null guard).
+  startClosedPoll()
 }
 
 // URLs computed at open time so they read the CURRENT serviceId/org.
@@ -784,12 +912,29 @@ function openOutputs() {
     openUnplaced()
     return
   }
-  ;(window as unknown as { getScreenDetails: () => Promise<{ screens: ScreenLike[] }> })
+  ;(window as unknown as { getScreenDetails: () => Promise<ScreenDetailsLike> })
     .getScreenDetails()
     .then((details) => {
       // Stale (a newer attempt superseded us) or the view has torn down — do
       // NOT open windows that would be orphaned (Pitfall 6 / WR-01).
       if (isUnmounted || requestId !== goLiveRequestId) return
+      // MONITOR-UNPLUG (R274): HOLD this Go-live ScreenDetails and attach the
+      // screenschange listener — AFTER the WR-01 stale guard so a late resolve
+      // after exit attaches nothing. Swap off any prior handle first (mirrors
+      // MonitorSetupView). The typeof guard is load-bearing: a ScreenDetails
+      // without listener support (older engines / a partial test fake) is
+      // skipped rather than throwing into the .catch.
+      if (liveScreenDetails && liveScreenDetails !== details) {
+        try {
+          liveScreenDetails.removeEventListener?.('screenschange', onScreensChange)
+        } catch {
+          // listener-less / torn-down prior handle — never propagate
+        }
+      }
+      liveScreenDetails = details
+      if (typeof details.addEventListener === 'function') {
+        details.addEventListener('screenschange', onScreensChange)
+      }
       const saved = loadMapping()
       if (!saved) {
         openUnplaced()
@@ -830,6 +975,12 @@ function confirmExit() {
   // WR-01: invalidate any in-flight Go-live resolve so a late getScreenDetails()
   // cannot re-open orphaned output windows after the operator has exited.
   goLiveRequestId += 1
+  // Stop the recovery watchers BEFORE closeOutputs() — closeOutputs() does NOT
+  // null outputWindows entries, so an uncleared poll would latch a closed ref
+  // for a window the operator deliberately closed on exit and re-surface a
+  // reopen chip after teardown (96-01 endurance fix). Null-guarded for the
+  // double call with onUnmounted.
+  stopRecoveryWatchers()
   // Blank the projector FIRST — close the output windows before the channel
   // close + router.push, so ending run mode tears down the real displays (R266).
   closeOutputs()
@@ -866,6 +1017,11 @@ onUnmounted(() => {
   // WR-01: mark torn down so a late getScreenDetails() resolve short-circuits
   // instead of opening windows into a dead component.
   isUnmounted = true
+  // Clear the closed-poll interval + remove the screenschange listener exactly
+  // once here too (null-guarded, safe after a confirmExit that already ran it).
+  // closeOutputs() never nulls outputWindows, so without this an uncleared poll
+  // would run forever after unmount — the load-bearing endurance fix.
+  stopRecoveryWatchers()
   handle?.close()
   document.removeEventListener('keydown', handleKeydown)
 })
