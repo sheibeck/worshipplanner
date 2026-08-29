@@ -38,6 +38,7 @@ import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { reactive } from 'vue'
 import type { AssembledSlide } from '@/types/slide'
 import type { BroadcastChannelLike, BroadcastChannelFactory } from '@/utils/runChannel'
+import { computeFingerprint, saveMapping, type ScreenLike } from '@/utils/monitorConfig'
 import ConfidenceOutputView from '../ConfidenceOutputView.vue'
 
 // onUnmounted must run so the channel-close, wake-lock-release, and
@@ -240,6 +241,21 @@ function mountView(channelFactory: BroadcastChannelFactory) {
   return mount(ConfidenceOutputView, { props: { channelFactory } })
 }
 
+// ── Self-fullscreen fixtures (R278) ─────────────────────────────────────────────
+// Two screens with DISTINCT fingerprints; the confidence role is seeded to
+// screenB (the AUDIENCE window claims screenA in its own suite). installGet-
+// ScreenDetails mirrors the MonitorSetupView.test.ts idiom; deleted in afterEach.
+const screenA: ScreenLike = { label: 'Front Wall', width: 1920, height: 1080, left: 0, top: 0, isPrimary: true }
+const screenB: ScreenLike = { label: 'Stage Monitor', width: 1280, height: 720, left: 1920, top: 0, isPrimary: false }
+
+function installGetScreenDetails(screens: ScreenLike[]) {
+  const addEventListener = vi.fn()
+  const removeEventListener = vi.fn()
+  const fn = vi.fn(() => Promise.resolve({ screens, addEventListener, removeEventListener }))
+  ;(window as unknown as { getScreenDetails: unknown }).getScreenDetails = fn
+  return fn
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -262,10 +278,16 @@ beforeEach(() => {
   mockRoute.query.org = 'org-1'
   // Fresh per-instance registry each test.
   canvasRegistry.length = 0
+  // R278 self-fullscreen tests seed a localStorage monitor mapping; clear so each
+  // test starts from a known-empty mapping (no cross-test bleed).
+  localStorage.clear()
 })
 
 afterEach(() => {
   delete (navigator as unknown as { wakeLock?: unknown }).wakeLock
+  // Remove any getScreenDetails installed by an R278 test so the rest of the suite
+  // sees jsdom's default: no Window Management API.
+  delete (window as unknown as { getScreenDetails?: unknown }).getScreenDetails
   vi.restoreAllMocks()
 })
 
@@ -719,5 +741,143 @@ describe('ConfidenceOutputView — org-scoped service subscription (WR-02)', () 
     await flushPromises()
 
     expect(serviceStoreMock.subscribe).not.toHaveBeenCalled()
+  })
+})
+
+describe('ConfidenceOutputView — blackout overlay obeys the channel field (R280)', () => {
+  it('renders the confidence-blackout overlay OVER both panes on blackout:true and clears it on blackout:false', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // Live current + next panes underneath, no blackout yet.
+    fake.emitState(0, 1, false)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="confidence-blackout"]').exists()).toBe(false)
+
+    // blackout:true → the overlay renders over both region panes (which stay mounted).
+    fake.emitState(0, 2, true)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="confidence-blackout"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="confidence-current-region"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="confidence-next-region"]').exists()).toBe(true)
+
+    // The overlay is a LATER sibling of both region wrappers → it paints ABOVE
+    // them (non-vacuous DOM-order proof over the next-region seam).
+    const children = Array.from(wrapper.get('[data-testid="confidence-output"]').element.children)
+    const nextRegionPos = children.findIndex((el) => el.getAttribute('data-testid') === 'confidence-next-region')
+    const blackoutPos = children.findIndex((el) => el.getAttribute('data-testid') === 'confidence-blackout')
+    expect(nextRegionPos).toBeGreaterThanOrEqual(0)
+    expect(blackoutPos).toBeGreaterThan(nextRegionPos)
+
+    // blackout:false → overlay removed.
+    fake.emitState(0, 3, false)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="confidence-blackout"]').exists()).toBe(false)
+  })
+})
+
+describe('ConfidenceOutputView — left/right split layout (R279) + next-scale (R276)', () => {
+  it('is a horizontal flex-row split with current-region LEFT before next-region RIGHT (border-l seam), both panes suppressed, next pane scaled smaller', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(0, 1) // current 'a', next 'b'
+    await flushPromises()
+
+    // Horizontal split (flex-row), NOT the pre-97 vertical flex-col.
+    const root = wrapper.get('[data-testid="confidence-output"]')
+    expect(root.classes()).toContain('flex-row')
+
+    // The next-region carries the vertical border-l seam between the panes.
+    const currentRegion = wrapper.get('[data-testid="confidence-current-region"]')
+    const nextRegion = wrapper.get('[data-testid="confidence-next-region"]')
+    expect(nextRegion.classes()).toContain('border-l')
+
+    // Current-region appears BEFORE next-region in DOM order (left → right).
+    const children = Array.from(root.element.children)
+    const currentPos = children.findIndex((el) => el.getAttribute('data-testid') === 'confidence-current-region')
+    const nextPos = children.findIndex((el) => el.getAttribute('data-testid') === 'confidence-next-region')
+    expect(currentPos).toBeGreaterThanOrEqual(0)
+    expect(nextPos).toBeGreaterThan(currentPos)
+
+    // BOTH panes keep suppressBackground (Phase 94 invariant) — non-vacuous: two
+    // recorded canvas instances, every one suppressed, none carrying the
+    // presentation-background the un-suppressed control WOULD render.
+    expect(canvasRegistry).toHaveLength(2)
+    expect(canvasRegistry.every((c) => c.suppressBackground === true)).toBe(true)
+
+    // R276 — the next pane is scaled SMALLER than the current: the scale(0.8)
+    // wrapper lives in the next-region only; the current pane has none.
+    const nextScale = nextRegion.find('[style*="scale"]')
+    expect(nextScale.exists()).toBe(true)
+    expect(nextScale.attributes('style')).toContain('scale(0.8)')
+    expect(currentRegion.find('[style*="scale"]').exists()).toBe(false)
+  })
+
+  it('keeps both region wrappers present with only the inner canvas + "Next" label toggling on the last slide (no reflow)', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // index 2 == last slide 'c'; nextSlide resolves null (no wrap to 'a').
+    fake.emitState(2, 1)
+    await flushPromises()
+
+    // Both region wrappers stay present — the layout must NOT collapse the next
+    // pane (that would jump-resize the current pane in front of the band).
+    expect(wrapper.find('[data-testid="confidence-current-region"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="confidence-next-region"]').exists()).toBe(true)
+
+    // Only the inner next canvas + "Next" label toggle off.
+    const nextRegion = wrapper.get('[data-testid="confidence-next-region"]')
+    expect(nextRegion.find('[data-testid="slide-canvas"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="confidence-next-label"]').exists()).toBe(false)
+
+    // The current pane still shows the last slide (no wrap-around).
+    expect(
+      wrapper.find('[data-testid="confidence-current-region"] [data-testid="slide-canvas"]').text(),
+    ).toBe('c')
+  })
+})
+
+describe('ConfidenceOutputView — self-fullscreen on assigned monitor (R278)', () => {
+  it('resolves the confidence screen from the saved mapping + getScreenDetails and requestFullscreen({ screen }) on mount', async () => {
+    // Confidence is seeded to screenB; getScreenDetails resolves [screenA, screenB].
+    // The role must resolve to screenB via computeFingerprint match — proving the
+    // per-role saved-mapping → live-screen resolution (not audience's screenA).
+    saveMapping({ assignments: [{ role: 'confidence', fingerprint: computeFingerprint(screenB) }], savedAt: 0 })
+    const getScreenDetails = installGetScreenDetails([screenA, screenB])
+
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(getScreenDetails).toHaveBeenCalledTimes(1)
+    const rfs = vi.mocked(Element.prototype.requestFullscreen)
+    expect(rfs).toHaveBeenCalled()
+    const firstArg = rfs.mock.calls[0]?.[0] as { screen?: unknown } | undefined
+    expect(firstArg?.screen).toBe(screenB)
+  })
+
+  it('does NOT throw and falls back to a single plain requestFullscreen() when getScreenDetails is absent', async () => {
+    expect('getScreenDetails' in window).toBe(false)
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+
+    let error: unknown = null
+    try {
+      mountView(fake.factory)
+      await flushPromises()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeNull()
+
+    const rfs = vi.mocked(Element.prototype.requestFullscreen)
+    expect(rfs).toHaveBeenCalledTimes(1)
+    expect(rfs.mock.calls[0]?.[0]).toBeUndefined()
   })
 })
