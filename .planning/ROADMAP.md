@@ -515,5 +515,9 @@ expected; Phase 96 re-confirms this rather than assuming it.
   3. If a monitor is unplugged mid-service, the control screen detects the change and offers one-click reassignment/recovery without losing the current slide position. (R274)
   4. This milestone remains confirmed client-side only — no new Firestore document or `firestore.rules` change was needed to satisfy R273/R274; if one had turned out to be needed, it would carry rules test coverage verified via `npm run test:rules`.
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+- [ ] 96-01-PLAN.md — Harden RunControlView: closed-window poll + per-role reopen + monitor-unplug screenschange listener + reassign banner + single-teardown cleanup [wave 1]
+- [ ] 96-02-PLAN.md — Live-ops hardening tests: closed detection + reopen + position preserved + monitor-unplug/precedence + no-leak teardown + rapid-nav sync [wave 2]
+
 **UI hint**: yes
