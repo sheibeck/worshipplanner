@@ -53,3 +53,16 @@ wake-lock behavior over a service length), NOT a known defect.
    keeping the control running and the place intact.
 3. **Full realistic-length service** — no perceptible sync lag between control and outputs, and no
    teardown/resource accumulation over ~60–90 min.
+
+## Phase 97 — Run Service Redesign (verified 2026-08-29, pass-with-deferred-human-UAT)
+
+The owner-requested redesign (Claude Design import) + the 6 UAT fixes + blackout/timers/filmstrip/rehearse.
+All R276–R284 code-verified; these need real hardware:
+
+1. **Auto-fullscreen (R278)** — Go live → both output windows land fullscreen on their assigned monitors
+   with NO manual "Re-enter fullscreen" click (the key fix; only the output-side self-fullscreen is new).
+2. **Confidence left/right legibility (R279)** — current + next side-by-side readable from the stage.
+3. **Blackout on the real projector (R280)** — `B` / Black / Clear actually black + restore the outputs.
+4. **Timers + filmstrip end-to-end (R281/R282)** — clock/elapsed run; in-item filmstrip click-to-jump.
+5. **Closed/unplug recovery on hardware** — reopen + in-place reassign keep the place (retest post-redesign).
+6. **Overall run/stop feel** — pre-flight → Go live → drive → blackout → End service across a full cycle.
