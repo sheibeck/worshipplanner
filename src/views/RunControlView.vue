@@ -73,8 +73,53 @@
             <span class="h-2 w-2 flex-none rounded-full bg-green-400" aria-hidden="true"></span>
             Displays ready
           </span>
-          <span class="text-xs text-gray-400">Audience → {{ readyAudienceLabel }}</span>
-          <span class="text-xs text-gray-400">Confidence → {{ readyConfidenceLabel }}</span>
+          <!-- AUDIENCE line: amber closed-recovery row when the window was closed
+               (and no monitor change is pending — precedence), else green label. -->
+          <div v-if="audienceClosed && !monitorChanged" class="flex flex-col items-end gap-0.5">
+            <span
+              data-testid="run-output-closed-audience"
+              class="inline-flex items-center gap-2 text-sm text-amber-200"
+            >
+              <span class="h-2 w-2 flex-none rounded-full bg-amber-400" aria-hidden="true"></span>
+              Audience display closed
+              <button
+                type="button"
+                data-testid="run-reopen-audience"
+                aria-label="Reopen the audience display on its screen"
+                class="min-h-11 rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                @click="reopenOutput('audience')"
+              >
+                Reopen Audience
+              </button>
+            </span>
+            <span class="text-xs text-amber-200/80">
+              You won't lose your place — reopening returns to the current slide.
+            </span>
+          </div>
+          <span v-else class="text-xs text-gray-400">Audience → {{ readyAudienceLabel }}</span>
+          <!-- CONFIDENCE line: mirror of the audience closed-recovery row. -->
+          <div v-if="confidenceClosed && !monitorChanged" class="flex flex-col items-end gap-0.5">
+            <span
+              data-testid="run-output-closed-confidence"
+              class="inline-flex items-center gap-2 text-sm text-amber-200"
+            >
+              <span class="h-2 w-2 flex-none rounded-full bg-amber-400" aria-hidden="true"></span>
+              Confidence display closed
+              <button
+                type="button"
+                data-testid="run-reopen-confidence"
+                aria-label="Reopen the confidence display on its screen"
+                class="min-h-11 rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                @click="reopenOutput('confidence')"
+              >
+                Reopen Confidence
+              </button>
+            </span>
+            <span class="text-xs text-amber-200/80">
+              You won't lose your place — reopening returns to the current slide.
+            </span>
+          </div>
+          <span v-else class="text-xs text-gray-400">Confidence → {{ readyConfidenceLabel }}</span>
         </div>
 
         <!-- BLOCKED: compact honest indicator + retry; detail in the banner below. -->
@@ -134,6 +179,40 @@
     <!-- OUTPUT-STATUS BANNERS (95-04) — a sibling band between the top bar and
          the main region (pushes it down, never overlays). Fallback and blocked
          are MUTUALLY EXCLUSIVE by outputStatus. -->
+    <!-- REASSIGN (96-01): a monitor was unplugged/rearranged mid-service. First
+         in the band (visually senior), independent of outputStatus, and while it
+         shows the per-role reopen chip is suppressed (precedence). Amber, never
+         red — distinguishable from the closed-window row by heading + verb. -->
+    <div
+      v-if="monitorChanged"
+      data-testid="run-reassign-banner"
+      class="flex-none m-4 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3 text-amber-200"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        class="mt-0.5 h-5 w-5 flex-none text-amber-400"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <div class="min-w-0 flex-1">
+        <p class="font-medium">Your monitor setup changed</p>
+        <p class="mt-1 text-sm">
+          A display was unplugged or rearranged, so we can't place the {{ reassignRole }} output on its old
+          screen. Your place in the service is safe — reassign your displays to keep going.
+        </p>
+        <router-link to="/monitor-setup" class="mt-2 inline-block text-amber-200 underline">
+          Open monitor setup
+        </router-link>
+      </div>
+    </div>
+
     <!-- FALLBACK: windows DID open, just un-positioned. Amber, never red. -->
     <div
       v-if="outputStatus === 'fallback'"
