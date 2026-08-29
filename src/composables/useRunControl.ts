@@ -27,6 +27,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { ComponentPublicInstance, ComputedRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useServiceAssembly } from '@/composables/useServiceAssembly'
+import { useRunTimers } from '@/composables/useRunTimers'
 import {
   openRunChannel,
   type BroadcastChannelFactory,
@@ -78,6 +79,21 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   const { serviceId, orgIdRef, localService, assembledSlideshow } = useServiceAssembly()
   const router = useRouter()
 
+  // ── Wall clock + elapsed-since-go-live timers (R281) ───────────────────────
+  // startElapsed() is idempotent (first go-live OR first rehearse records the
+  // origin); resetElapsed() is called on exit. clock/elapsed are re-exposed for
+  // the redesigned header (97-09).
+  const { clock, elapsed, startElapsed, resetElapsed } = useRunTimers()
+
+  // ── Live flag (R277) + blackout (R280) ─────────────────────────────────────
+  // `live` is the HONEST session flag: set true ONLY by a successful go-live
+  // (openPlaced/openUnplaced, past the bothOpened gate) AND by rehearse() — never
+  // derived from outputStatus, so partial/blocked never read as live. Reset in
+  // confirmExit. `blackout` is the projector-black toggle; every poster now sends
+  // blackout.value (defaulting false so pre-97 { blackout:false } assertions hold).
+  const live = ref(false)
+  const blackout = ref(false)
+
   // ── Single-writer channel + navigation model (R266) ────────────────────────
   const index = ref<number | null>(null)
   let seq = 0
@@ -87,14 +103,41 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   function postIndex(target: number) {
     index.value = target
     seq += 1
-    handle?.postState({ index: target, blackout: false, seq })
+    handle?.postState({ index: target, blackout: blackout.value, seq })
   }
 
   /** onHello resend — MUST advance seq so runChannel's stale-drop accepts it. */
   function resendCurrent() {
     if (index.value == null) return
     seq += 1
-    handle?.postState({ index: index.value, blackout: false, seq })
+    handle?.postState({ index: index.value, blackout: blackout.value, seq })
+  }
+
+  /**
+   * Blackout toggle (R280) — set blackout.value then re-post the CURRENT index
+   * with the new blackout. MUST advance seq BEFORE posting (mirrors
+   * resendCurrent) so runChannel's monotonic stale-drop accepts it; a post
+   * without a seq bump would be silently swallowed and the projector would never
+   * black out. No-op (only the ref update) when nothing is live yet (index null).
+   */
+  function postBlackout(v: boolean) {
+    blackout.value = v
+    if (index.value == null) return
+    seq += 1
+    handle?.postState({ index: index.value, blackout: blackout.value, seq })
+  }
+
+  /**
+   * Rehearse (R283) — enter the live UI WITHOUT opening any output window. Sets
+   * live + starts the elapsed timer and, if nothing is showing yet, posts slide 0
+   * to drive the channel (a later-opened output syncs via postHello→onHello). It
+   * NEVER calls openPlaced/openUnplaced/openWindow/getScreenDetails, so NO
+   * window.open fires and outputStatus stays 'idle' (honest: no screens open).
+   */
+  function rehearse() {
+    live.value = true
+    startElapsed()
+    if (index.value == null && assembledSlideshow.value.length > 0) postIndex(0)
   }
 
   const current = computed<AssembledSlide | null>(() =>
@@ -222,7 +265,13 @@ export function useRunControl(options: UseRunControlOptions = {}) {
         e.preventDefault()
         confirmOpen.value = true // OPEN the confirm — never immediate teardown
         break
-      // 'B' is intentionally bound to nothing (reserved for a future blackout).
+      case 'b':
+      case 'B':
+        // Toggle projector blackout (R280). The early returns above already make
+        // this inert while the exit dialog is open and inside text inputs.
+        e.preventDefault()
+        postBlackout(!blackout.value)
+        break
     }
   }
 
@@ -498,6 +547,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     readyAudienceLabel.value = screenLabel(audienceScreen)
     readyConfidenceLabel.value = screenLabel(confidenceScreen)
     outputStatus.value = 'placed'
+    // Honest live flag (R277): both outputs opened — this is a genuine go-live.
+    live.value = true
+    startElapsed()
     // Start the closed-output poll once the outputs have actually opened
     // (idempotent via the pollId != null guard).
     startClosedPoll()
@@ -511,6 +563,10 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // both-null is blocked, exactly-one-null is the honest partial state.
     if (!bothOpened(aWin, cWin)) return
     outputStatus.value = 'fallback'
+    // Honest live flag (R277): both outputs opened (un-positioned) — a genuine
+    // go-live, so enter the live state and start the elapsed timer.
+    live.value = true
+    startElapsed()
     // Start the closed-output poll once the outputs have actually opened
     // (idempotent via the pollId != null guard).
     startClosedPoll()
@@ -612,6 +668,12 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // reopen chip after teardown (96-01 endurance fix). Null-guarded for the
     // double call with onUnmounted.
     stopRecoveryWatchers()
+    // Leave the live state: drop live + blackout and reset the elapsed timer
+    // (R277/R280/R281). Order relative to the window teardown does not matter for
+    // these three refs.
+    live.value = false
+    blackout.value = false
+    resetElapsed()
     // Blank the projector FIRST — close the output windows before the channel
     // close + router.push, so ending run mode tears down the real displays (R266).
     closeOutputs()
@@ -629,6 +691,103 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     if (!svc) return ''
     return svc.date ? `${svc.name} · ${svc.date}` : svc.name
   })
+
+  /** Bare service name (no date) — the RunPreflightPanel `serviceName` prop. */
+  const serviceName = computed(() => localService.value?.name ?? '')
+
+  // ── Pre-flight readiness (R276) — HONEST, from renderState (NOT CCLI) ───────
+  const slideCount = computed(() => assembledSlideshow.value.length)
+  /** Number of rail items (the RunPreflightPanel `itemCount` prop). */
+  const itemCount = computed(() => railRows.value.length)
+  /**
+   * Count of assembled slides that are drawable now: renderState is undefined
+   * (a 'pending'/'failed' PPTX render is NOT ready). See slide.ts (:50-62).
+   */
+  const renderedCount = computed(
+    () => assembledSlideshow.value.filter((s) => s.slide.renderState === undefined).length,
+  )
+  /** Honest 'all N slides rendered' — every slide drawable, and at least one exists. */
+  const allRendered = computed(() => slideCount.value > 0 && renderedCount.value === slideCount.value)
+
+  // ── Monitor labels (from the saved mapping fingerprints) + open flags ───────
+  /** The saved-mapping display label for a role, or an honest 'no monitor' note. */
+  function mappingLabel(role: MonitorRole): string {
+    const saved = loadMapping()
+    const fp = saved?.assignments.find((a) => a.role === role)?.fingerprint
+    if (!fp) return 'No monitor assigned'
+    // The fingerprint's first colon-segment is the display label (monitorConfig :69-72).
+    return fp.split(':')[0] || 'Assigned display'
+  }
+  const audienceLabel = computed(() => mappingLabel('audience'))
+  const confidenceLabel = computed(() => mappingLabel('confidence'))
+  /** open = the output is live/placed (placed|fallback) AND not closed. */
+  const audienceOpen = computed(
+    () => (outputStatus.value === 'placed' || outputStatus.value === 'fallback') && !audienceClosed.value,
+  )
+  const confidenceOpen = computed(
+    () => (outputStatus.value === 'placed' || outputStatus.value === 'fallback') && !confidenceClosed.value,
+  )
+  /** Objects for RunDisplaysPanel's `{ open, label }` per-output prop contract. */
+  const audience = computed(() => ({ open: audienceOpen.value, label: audienceLabel.value }))
+  const confidence = computed(() => ({ open: confidenceOpen.value, label: confidenceLabel.value }))
+
+  // ── In-item filmstrip (R282) — the active item's slides + GLOBAL indices ────
+  const filmstrip = computed(() => {
+    const slides: AssembledSlide[] = []
+    const indices: number[] = []
+    assembledSlideshow.value.forEach((s, i) => {
+      if (s.slotIndex === currentSlotIndex.value) {
+        slides.push(s)
+        indices.push(i)
+      }
+    })
+    return { slides, indices }
+  })
+  const filmstripSlides = computed(() => filmstrip.value.slides)
+  const filmstripIndices = computed(() => filmstrip.value.indices)
+  /** The current slide's position WITHIN the active item (RunFilmstrip currentIndex). */
+  const filmstripCurrentIndex = computed(() => index.value)
+
+  /**
+   * The active rail item's slides as { arrayIndex, label, isCurrent } — RunRail's
+   * `expandedSlides` prop. Label is the lyric section label when present, else a
+   * positional 'Slide N' within the item.
+   */
+  const expandedSlides = computed(() =>
+    filmstrip.value.slides.map((s, i) => {
+      const arrayIndex = filmstrip.value.indices[i] ?? -1
+      const sectionLabel = (s.slide as { sectionLabel?: string }).sectionLabel
+      return {
+        arrayIndex,
+        label: sectionLabel?.trim() || `Slide ${i + 1}`,
+        isCurrent: arrayIndex === index.value,
+      }
+    }),
+  )
+
+  // ── Header / transport position + progress ─────────────────────────────────
+  /** 'Item X of N · slide Y of M' — item position + slide-within-item, honest. */
+  const positionLabel = computed(() => {
+    if (index.value == null || slideCount.value === 0) return ''
+    const itemPos = railRows.value.findIndex((r) => r.index === currentSlotIndex.value)
+    const within = filmstrip.value.indices.indexOf(index.value)
+    const itemPart = itemPos >= 0 ? `Item ${itemPos + 1} of ${itemCount.value}` : ''
+    const slidePart = within >= 0 ? `slide ${within + 1} of ${filmstrip.value.slides.length}` : ''
+    return [itemPart, slidePart].filter((p) => p.length > 0).join(' · ')
+  })
+  /** Progress across the whole slideshow as a 0–100 percentage (RunTransportBar). */
+  const progress = computed(() =>
+    slideCount.value === 0 ? 0 : (((index.value ?? 0) + 1) / slideCount.value) * 100,
+  )
+
+  /**
+   * Open the monitor-setup screen in a NEW TAB so the running control (index/seq/
+   * channel + any open outputs) survives — mirrors the reassign banner's new-tab
+   * rule. noopener keeps the new tab from reaching back into this window.
+   */
+  function openManage() {
+    window.open('/monitor-setup', '_blank', 'noopener')
+  }
 
   // ── Channel lifecycle + initial go-live ────────────────────────────────────
   onMounted(() => {
@@ -660,10 +819,40 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   return {
     // service/nav model
     serviceHeading,
+    serviceName,
     index,
     current,
     next,
     currentSlotIndex,
+    // live session + blackout + timers (R277/R280/R281)
+    live,
+    blackout,
+    postBlackout,
+    rehearse,
+    clock,
+    elapsed,
+    // pre-flight readiness (R276) — honest, from renderState
+    slideCount,
+    itemCount,
+    renderedCount,
+    allRendered,
+    // monitor labels + open flags
+    audienceLabel,
+    confidenceLabel,
+    audienceOpen,
+    confidenceOpen,
+    audience,
+    confidence,
+    // in-item filmstrip (R282) + rail expansion
+    filmstrip,
+    filmstripSlides,
+    filmstripIndices,
+    filmstripCurrentIndex,
+    expandedSlides,
+    // header / transport derivations
+    positionLabel,
+    progress,
+    openManage,
     // rail
     railRows,
     firstIndexBySlot,
