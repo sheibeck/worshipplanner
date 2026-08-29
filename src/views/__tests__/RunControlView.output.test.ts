@@ -59,14 +59,15 @@ const { mockService, mockSlides } = vi.hoisted(() => {
     createdAt: ts,
     updatedAt: ts,
   }
+  // 96-02: at least 3 assembled slides (here 4) so ArrowRight navigation advances
+  // the index past 0 — the position-preserved (→index 2) and rapid-nav (3 fwd, 1
+  // back → index 2) blocks need a runway. slotIndex 0 for all is fine (only length
+  // matters for goBySlide's clamp); the pre-96 blocks never assert slide count.
   const slides = [
-    {
-      slide: { id: 'a', position: 0, contentKind: 'lyric', sectionId: 'verse-1', sectionLabel: 'Verse 1', lines: ['line a'] },
-      slotIndex: 0,
-      slotKind: 'SONG',
-      section: 'worship',
-      sourceId: 'song-1',
-    },
+    { slide: { id: 'a', position: 0, contentKind: 'lyric', sectionId: 'verse-1', sectionLabel: 'Verse 1', lines: ['line a'] }, slotIndex: 0, slotKind: 'SONG', section: 'worship', sourceId: 'song-1' },
+    { slide: { id: 'b', position: 1, contentKind: 'lyric', sectionId: 'verse-1', sectionLabel: 'Verse 1', lines: ['line b'] }, slotIndex: 0, slotKind: 'SONG', section: 'worship', sourceId: 'song-1' },
+    { slide: { id: 'c', position: 2, contentKind: 'lyric', sectionId: 'chorus', sectionLabel: 'Chorus', lines: ['line c'] }, slotIndex: 0, slotKind: 'SONG', section: 'worship', sourceId: 'song-1' },
+    { slide: { id: 'd', position: 3, contentKind: 'lyric', sectionId: 'chorus', sectionLabel: 'Chorus', lines: ['line d'] }, slotIndex: 0, slotKind: 'SONG', section: 'worship', sourceId: 'song-1' },
   ]
   return { mockService: service, mockSlides: slides }
 })
@@ -111,18 +112,32 @@ vi.mock('@/components/slides/SlideCanvas.vue', async () => {
 })
 
 // ── In-memory run-channel fake (AudienceOutputView.test.ts lineage) ────────────
+// 96-02 upgrade: the fake now CAPTURES the 'message' listener the handle registers
+// and exposes deliver(data) to fire an inbound message as { data } — so a test can
+// simulate a reopened output's { type:'hello' } and drive the control's
+// onHello(resendCurrent) handshake. posted carries the full state shape (index/seq)
+// so the position-preserved + rapid-nav tests can inspect the resent index.
+type PostedMessage = { type?: string; index?: number; blackout?: boolean; seq?: number }
 function createFakeChannel() {
-  const posted: Array<{ type?: string }> = []
+  const posted: PostedMessage[] = []
   const close = vi.fn()
+  let messageCb: ((event: { data: unknown }) => void) | undefined
   const channel: BroadcastChannelLike = {
     postMessage(message: unknown) {
-      posted.push(message as { type?: string })
+      posted.push(message as PostedMessage)
     },
-    addEventListener() {},
+    addEventListener(type: 'message', callback: (event: { data: unknown }) => void) {
+      if (type === 'message') messageCb = callback
+    },
     close,
   }
   const factory: BroadcastChannelFactory = () => channel
-  return { factory, posted, close }
+  // Fire an inbound message through the captured listener (e.g. a reopened
+  // output's { type:'hello' }). No-op if nothing has subscribed yet.
+  const deliver = (data: unknown) => {
+    messageCb?.({ data })
+  }
+  return { factory, posted, close, deliver }
 }
 
 // ── Fake screens + window plumbing ─────────────────────────────────────────────
@@ -135,9 +150,13 @@ const screenB = makeScreen({ label: 'Stage Monitor', left: 1920, top: 0, isPrima
 
 // Every fake window openWindow() returns is captured here so per-window
 // moveTo/requestFullscreen/close spies are inspectable after the gesture.
+// 96-02: `closed` is MUTABLE (default false) — the impl's ~1s poll reads
+// outputWindows[name]?.closed, so a test flips openedWins[i].closed = true to
+// simulate a closed output. Pre-96 tests never set it, so their poll never latches.
 type FakeWin = {
   moveTo: ReturnType<typeof vi.fn>
   close: ReturnType<typeof vi.fn>
+  closed: boolean
   document: { documentElement: { requestFullscreen: ReturnType<typeof vi.fn> } }
 }
 let openedWins: FakeWin[] = []
@@ -145,17 +164,58 @@ function makeFakeWin(): Window {
   const win: FakeWin = {
     moveTo: vi.fn(),
     close: vi.fn(),
+    closed: false,
     document: { documentElement: { requestFullscreen: vi.fn().mockResolvedValue(undefined) } },
   }
   openedWins.push(win)
   return win as unknown as Window
 }
 
-/** Install a resolving getScreenDetails() returning the two fake screens. */
-function installGetScreenDetails(screens: ScreenLike[]) {
-  const fn = vi.fn(() => Promise.resolve({ screens }))
+// 96-02: the ScreenDetails-like fake the upgraded install returns — a MUTABLE
+// screens set (read live via the getter each time the impl re-reads .screens) plus
+// a CAPTURING addEventListener and a removeEventListener spy. control lets a test
+// mutate the live set and fire the captured screenschange listener directly.
+type FakeScreenDetails = {
+  readonly screens: ScreenLike[]
+  addEventListener: ReturnType<typeof vi.fn>
+  removeEventListener: ReturnType<typeof vi.fn>
+}
+type ScreenDetailsControl = {
+  setScreens: (next: ScreenLike[]) => void
+  fireScreensChange: () => void
+}
+
+/**
+ * Install a resolving getScreenDetails() returning a ScreenDetails-like object.
+ * 96-02 upgrade: it resolves { screens (mutable via control.setScreens),
+ * addEventListener (captures the 'screenschange' listener), removeEventListener
+ * (a spy) } rather than a bare { screens }. The matched/fallback pre-96 blocks
+ * only read .screens so they stay green; Task 2 uses the captured listener + the
+ * mutable set to exercise the REAL onScreensChange/matchMapping.
+ */
+function installGetScreenDetails(initialScreens: ScreenLike[]) {
+  let live = [...initialScreens]
+  let listener: () => void = () => {}
+  const details: FakeScreenDetails = {
+    get screens() {
+      return live
+    },
+    addEventListener: vi.fn((type: string, l: () => void) => {
+      if (type === 'screenschange') listener = l
+    }),
+    removeEventListener: vi.fn(),
+  }
+  const control: ScreenDetailsControl = {
+    setScreens(next: ScreenLike[]) {
+      live = next
+    },
+    fireScreensChange() {
+      listener()
+    },
+  }
+  const fn = vi.fn(() => Promise.resolve(details))
   ;(window as unknown as { getScreenDetails: unknown }).getScreenDetails = fn
-  return fn
+  return { fn, details, control }
 }
 
 /** Install a REJECTING getScreenDetails() (the denied path). */
@@ -233,6 +293,19 @@ async function goLive(wrapper: ReturnType<typeof mountView>['wrapper']) {
   await flushPromises()
   await wrapper.find('[data-testid="run-go-live-btn"]').trigger('click')
   await flushPromises()
+}
+
+/**
+ * 96-02 — the Go-live gesture under FAKE timers. flushPromises leans on real
+ * timers, so with vi.useFakeTimers() active we settle the mount + flush the
+ * getScreenDetails().then microtasks via vi.advanceTimersByTimeAsync(0) instead
+ * (it drains the microtask queue between ticks). After this the outputs are open
+ * and the impl's ~1s startClosedPoll interval is live under fake timers.
+ */
+async function goLiveFake(wrapper: ReturnType<typeof mountView>['wrapper']) {
+  await vi.advanceTimersByTimeAsync(0)
+  await wrapper.find('[data-testid="run-go-live-btn"]').trigger('click')
+  await vi.advanceTimersByTimeAsync(0)
 }
 
 beforeEach(() => {
@@ -519,5 +592,143 @@ describe('RunControlView output — close on exit (R266)', () => {
     for (const win of openedWins) {
       expect(win.close).toHaveBeenCalledTimes(1)
     }
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase 96 Plan 02 (R273/R274) — LIVE-OPS HARDENING behavioral coverage.
+//
+// Everything below stays CLIENT-ONLY: no firebase/firestore/emulator module is
+// imported anywhere in this file, and no assertion touches a server path. R273
+// (single source of truth; a reopened output re-syncs to the exact current index
+// via the existing hello→resend handshake) and R274 (one-click reopen/reassign
+// without losing the slide) are pure client + BroadcastChannel + localStorage, so
+// `npm run test:rules` is NOT a gate for this phase. Every window/screen/timer/
+// channel message is faked — no real window opens, no real getScreenDetails runs.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── 7. CLOSED DETECTION + PER-ROLE REOPEN + POSITION PRESERVED (R273/R274) ──────
+//    Fake timers are SCOPED to this block so the impl's ~1s closed-poll can be
+//    driven with vi.advanceTimersByTimeAsync (which flushes microtasks between
+//    ticks, so the getScreenDetails().then settles too).
+describe('RunControlView output — closed detection, per-role reopen, position preserved (R273/R274)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('a closed AUDIENCE handle surfaces run-output-closed-audience + run-reopen-audience for that role ONLY, cluster stays placed', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLiveFake(wrapper)
+    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+    expect(openedWins).toHaveLength(2)
+
+    // Audience opens first in openPlaced, so openedWins[0] is the audience handle.
+    openedWins[0]!.closed = true
+    await vi.advanceTimersByTimeAsync(1000)
+
+    // Only the audience line turns amber; confidence stays green; the cluster
+    // remains 'placed' (the closed flags do NOT change outputStatus).
+    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-reopen-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-output-closed-confidence"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-reopen-confidence"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+  })
+
+  it('a closed CONFIDENCE handle surfaces run-output-closed-confidence + run-reopen-confidence for that role ONLY', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLiveFake(wrapper)
+
+    // openedWins[1] is the confidence handle (opened second in openPlaced).
+    openedWins[1]!.closed = true
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(wrapper.find('[data-testid="run-output-closed-confidence"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-reopen-confidence"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-reopen-audience"]').exists()).toBe(false)
+  })
+
+  it('clicking run-reopen-audience re-opens the AUDIENCE window only (not confidence) and clears the amber row on a non-null handle', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLiveFake(wrapper)
+    openedWins[0]!.closed = true
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(true)
+
+    const callsBefore = openSpy.mock.calls.length
+    await wrapper.find('[data-testid="run-reopen-audience"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(0)
+
+    // Exactly ONE more window.open — the audience name, placed (matched → features).
+    expect(openSpy.mock.calls.length).toBe(callsBefore + 1)
+    expect(openSpy).toHaveBeenLastCalledWith(AUDIENCE_URL, 'wp-audience', expect.stringMatching(/width=/))
+    // The reopen never touched the confidence window in this click.
+    const reopenCall = openSpy.mock.calls[openSpy.mock.calls.length - 1]!
+    expect(reopenCall[0]).not.toBe(CONFIDENCE_URL)
+    // A non-null handle cleared the amber row back to green.
+    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(false)
+  })
+
+  it('a REFUSED reopen (window.open returns null) keeps the amber closed row — never a false "recovered" claim (T-96-12)', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLiveFake(wrapper)
+    openedWins[0]!.closed = true
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(true)
+
+    // The pop-up blocker refuses the reopen → null handle → the row must remain.
+    openSpy.mockReturnValueOnce(null as unknown as Window)
+    await wrapper.find('[data-testid="run-reopen-audience"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(true)
+  })
+
+  it('POSITION PRESERVED: after ArrowRight→index 2, close→reopen→deliver({type:"hello"}), the last posted state.index === the pre-close index (T-96-13)', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper, fake } = mountView()
+
+    await goLiveFake(wrapper)
+
+    // Navigate to a non-zero index (0 → 1 → 2) so the pre-close slide is not slide 0.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    await vi.advanceTimersByTimeAsync(0)
+    const stateBefore = fake.posted.filter((m) => m.type === 'state')
+    const preCloseIndex = stateBefore[stateBefore.length - 1]!.index
+    expect(preCloseIndex).toBe(2)
+
+    // Close the audience output, latch it via the poll, then reopen.
+    openedWins[0]!.closed = true
+    await vi.advanceTimersByTimeAsync(1000)
+    await wrapper.find('[data-testid="run-reopen-audience"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(0)
+
+    // The reopened output announces itself with a hello → onHello(resendCurrent)
+    // resends the CURRENT index. Nothing is persisted; the channel restores place.
+    fake.deliver({ type: 'hello' })
+    await vi.advanceTimersByTimeAsync(0)
+
+    const stateAfter = fake.posted.filter((m) => m.type === 'state')
+    const lastState = stateAfter[stateAfter.length - 1]!
+    expect(lastState.index).toBe(2)
+    expect(lastState.index).toBe(preCloseIndex)
   })
 })
