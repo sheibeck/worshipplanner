@@ -75,3 +75,23 @@ All R276–R284 code-verified; these need real hardware:
 4. **Timers + filmstrip end-to-end (R281/R282)** — clock/elapsed run; in-item filmstrip click-to-jump.
 5. **Closed/unplug recovery on hardware** — reopen + in-place reassign keep the place (retest post-redesign).
 6. **Overall run/stop feel** — pre-flight → Go live → drive → blackout → End service across a full cycle.
+
+## Phase 98 — Fullscreen Setup Helper (verified 2026-08-29, pass-with-deferred-human-UAT)
+
+The in-app helper that turns on the Chromium Automatic Fullscreen policy. R285–R287 code-verified (4/4
+must-haves in source, gates clean, no regression). These need real hardware / real OS policy writes that
+jsdom cannot simulate:
+
+1. **Windows HKCU (no-admin) end-to-end** — double-clicking the generated per-user `.reg` on a real,
+   non-domain-joined Windows PC actually registers the policy (`chrome://policy`) WITHOUT admin, and the
+   readiness panel flips to "ready ✓". (This is the crux "can we avoid admin?" question — research left it
+   split; only hardware settles it. Localhost proof files are in `docs/fullscreen-setup/`.)
+2. **Full R278 promise on real multi-monitor hardware** — once the policy is granted, Go live puts BOTH
+   output windows fullscreen on their assigned monitors with zero per-window clicks.
+3. **Windows HKLM admin fallback** — when HKCU doesn't register, the "admin version" link's `.reg` works
+   with one UAC approval.
+4. **macOS `.mobileconfig` install** — the generated profile installs and grants the setting. NOTE: the
+   code itself flags this format as RESEARCH Assumption A1 (LOW confidence, not first-party-confirmed);
+   the UI copy is deliberately hedged. Verify the exact profile shape on a real Mac.
+5. **Linux managed-policy JSON install** — the generated JSON at `/etc/opt/chrome/policies/managed/`
+   (Chrome) grants the setting; confirm the real path for the operator's distro/Edge/Chromium.
