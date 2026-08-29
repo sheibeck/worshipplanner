@@ -31,9 +31,15 @@
       >
         <!-- Header -->
         <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-800 shrink-0">
-          <h2 class="text-base font-semibold text-gray-100">
-            {{ isCreateMode ? 'New Song' : 'Edit Song' }}
-          </h2>
+          <!-- Owner UAT: show the song title in the header so it's visible on every
+               tab (the title input only lives on the Details tab). Live from
+               form.title, truncated so a long title can't push the actions off. -->
+          <div class="min-w-0">
+            <p v-if="!isCreateMode" class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Edit Song</p>
+            <h2 class="truncate text-base font-semibold text-gray-100">
+              {{ isCreateMode ? 'New Song' : (form.title.trim() || 'Untitled song') }}
+            </h2>
+          </div>
           <div class="flex items-center gap-2">
             <button
               type="button"
