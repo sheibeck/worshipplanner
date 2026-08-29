@@ -109,7 +109,7 @@ Owner hardware-UAT feedback (2026-08-28) drove an approved redesign of the live 
 - [x] **R279**: The confidence monitor shows the current and next slide **side-by-side (left/right)** instead of top/bottom, backgrounds still suppressed to black.
 - [x] **R280**: The operator can **blackout / clear** the outputs from the control screen (and the `B` key), driven by the run channel's existing `blackout` field.
 - [ ] **R281**: The control screen shows a **clock and an elapsed-since-go-live timer**.
-- [ ] **R282**: The control screen shows an **in-item slide filmstrip** with click-to-jump within the current item.
+- [x] **R282**: The control screen shows an **in-item slide filmstrip** with click-to-jump within the current item.
 - [ ] **R283**: The operator can **rehearse without screens** — drive the service on the control screen without opening the output windows.
 - [x] **R284**: A **Run** affordance appears on each locked service row in the **service listing**, beside the existing row actions, for any authenticated member.
 
