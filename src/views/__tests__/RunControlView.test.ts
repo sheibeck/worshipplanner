@@ -508,6 +508,13 @@ describe('RunControlView — dual preview + single-selection (R264/R266)', () =>
     const wrapper = mountView(fake.factory)
     await flushPromises()
 
+    // 97-09 redesign: the program/next-up previews live in State B (live), so the
+    // control opens in the pre-flight State A first. Rehearse enters live WITHOUT
+    // opening any output window (no window.open), rendering the preview split; the
+    // channel/nav stay active from mount, so the assertions below are unchanged.
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
     // index 0: current 'a', next 'b'.
     expect(wrapper.find('[data-testid="run-current-preview"]').text()).toBe('a')
     expect(wrapper.find('[data-testid="run-next-preview"]').text()).toBe('b')
