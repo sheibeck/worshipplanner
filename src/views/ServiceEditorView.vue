@@ -2131,7 +2131,16 @@ const canRunService = computed(() => isLocked.value && !!authStore.orgId)
 // canRunService is true (isLocked requires a non-null localService).
 function onRun() {
   if (!localService.value) return
-  router.push('/run/' + localService.value.id + '?org=' + authStore.orgId)
+  // IN-03: encode the interpolated ids so an id carrying a URL-reserved
+  // character can never corrupt the /run path or the ?org= query. Both are
+  // Firestore-generated (URL-safe) today, so the emitted URL is unchanged for
+  // real ids — this is defence against a future id shape, not a behaviour change.
+  router.push(
+    '/run/' +
+      encodeURIComponent(localService.value.id) +
+      '?org=' +
+      encodeURIComponent(authStore.orgId ?? ''),
+  )
 }
 
 const statusLabel = computed(() =>
