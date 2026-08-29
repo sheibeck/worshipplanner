@@ -26,6 +26,7 @@ import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { reactive } from 'vue'
 import type { AssembledSlide } from '@/types/slide'
 import type { BroadcastChannelLike, BroadcastChannelFactory } from '@/utils/runChannel'
+import { computeFingerprint, saveMapping, type ScreenLike } from '@/utils/monitorConfig'
 import AudienceOutputView from '../AudienceOutputView.vue'
 
 // onUnmounted must run so the channel-close, wake-lock-release, and
@@ -171,6 +172,24 @@ function mountView(channelFactory: BroadcastChannelFactory) {
   return mount(AudienceOutputView, { props: { channelFactory } })
 }
 
+// ── Self-fullscreen fixtures (R278) ─────────────────────────────────────────────
+// Two screens with DISTINCT fingerprints so a seeded role→fingerprint mapping
+// resolves to exactly one of them. `installGetScreenDetails` mirrors the
+// MonitorSetupView.test.ts idiom: a resolved { screens, addEventListener,
+// removeEventListener } object on window.getScreenDetails (jsdom lacks the Window
+// Management API by default). Deleted in afterEach so the "absent API" fallback
+// path stays clean.
+const screenA: ScreenLike = { label: 'Front Wall', width: 1920, height: 1080, left: 0, top: 0, isPrimary: true }
+const screenB: ScreenLike = { label: 'Stage Monitor', width: 1280, height: 720, left: 1920, top: 0, isPrimary: false }
+
+function installGetScreenDetails(screens: ScreenLike[]) {
+  const addEventListener = vi.fn()
+  const removeEventListener = vi.fn()
+  const fn = vi.fn(() => Promise.resolve({ screens, addEventListener, removeEventListener }))
+  ;(window as unknown as { getScreenDetails: unknown }).getScreenDetails = fn
+  return fn
+}
+
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -201,10 +220,17 @@ beforeEach(() => {
   // WR-01: fresh invocationCallOrder per test for the pause→play ordering check.
   slideCanvasSpies.play.mockClear()
   slideCanvasSpies.pause.mockClear()
+  // R278 self-fullscreen tests seed a localStorage monitor mapping; clear so each
+  // test starts from a known-empty mapping (no cross-test bleed).
+  localStorage.clear()
 })
 
 afterEach(() => {
   delete (navigator as unknown as { wakeLock?: unknown }).wakeLock
+  // Remove any getScreenDetails installed by an R278 test so the "absent API"
+  // fallback path (and every other suite) sees jsdom's default: no Window
+  // Management API.
+  delete (window as unknown as { getScreenDetails?: unknown }).getScreenDetails
   vi.restoreAllMocks()
 })
 
@@ -505,5 +531,124 @@ describe('AudienceOutputView — org-scoped service subscription (WR-02)', () =>
     await flushPromises()
 
     expect(serviceStoreMock.subscribe).not.toHaveBeenCalled()
+  })
+})
+
+describe('AudienceOutputView — blackout overlay obeys the channel field (R280)', () => {
+  it('renders the audience-blackout overlay OVER the live slide on blackout:true and clears it on blackout:false', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // A live slide underneath, no blackout yet.
+    fake.emitState(0, 1, false)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('a')
+    expect(wrapper.find('[data-testid="audience-blackout"]').exists()).toBe(false)
+
+    // blackout:true → the full-bleed overlay renders; the SlideCanvas is NOT torn
+    // down underneath (the overlay is additive, painting on top).
+    fake.emitState(0, 2, true)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="audience-blackout"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(true)
+
+    // The overlay is a LATER sibling of the SlideCanvas → it paints ABOVE it
+    // (non-vacuous DOM-order proof, not merely "both exist").
+    const children = Array.from(wrapper.get('[data-testid="audience-output"]').element.children)
+    const canvasPos = children.findIndex((el) => el.getAttribute('data-testid') === 'slide-canvas')
+    const blackoutPos = children.findIndex((el) => el.getAttribute('data-testid') === 'audience-blackout')
+    expect(canvasPos).toBeGreaterThanOrEqual(0)
+    expect(blackoutPos).toBeGreaterThan(canvasPos)
+
+    // blackout:false → overlay removed, the slide is visible again.
+    fake.emitState(0, 3, false)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="audience-blackout"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('a')
+  })
+
+  it('does not tear down the re-enter affordance while blacked out (windowed)', async () => {
+    // Windowed (isFullscreen false) so the re-enter affordance renders; a blackout
+    // overlay must not remove the re-enter path — it sits AFTER the overlay.
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(0, 1, true)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="audience-blackout"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="audience-reenter-fullscreen"]').exists()).toBe(true)
+  })
+})
+
+describe('AudienceOutputView — self-fullscreen on assigned monitor (R278)', () => {
+  it('resolves the audience screen from the saved mapping + getScreenDetails and requestFullscreen({ screen }) on mount', async () => {
+    // Seed a mapping whose audience fingerprint matches screenA, and install a
+    // fake getScreenDetails resolving [screenA, screenB]. computeFingerprint of
+    // the RESOLVED live screen must match the seeded fingerprint, so the role
+    // resolves to screenA — proving the saved-mapping → live-screen match.
+    saveMapping({ assignments: [{ role: 'audience', fingerprint: computeFingerprint(screenA) }], savedAt: 0 })
+    const getScreenDetails = installGetScreenDetails([screenA, screenB])
+
+    // Not fullscreen at mount, so selfFullscreen proceeds.
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    expect(getScreenDetails).toHaveBeenCalledTimes(1)
+    const rfs = vi.mocked(Element.prototype.requestFullscreen)
+    expect(rfs).toHaveBeenCalled()
+    // The FIRST (mount-time) call carries the { screen } option resolved to screenA.
+    const firstArg = rfs.mock.calls[0]?.[0] as { screen?: unknown } | undefined
+    expect(firstArg?.screen).toBe(screenA)
+  })
+
+  it('does NOT throw and falls back to a single plain requestFullscreen() when getScreenDetails is absent', async () => {
+    // No Window Management API (jsdom default, afterEach cleaned) and no mapping →
+    // selfFullscreen must degrade to one plain requestFullscreen() and never throw.
+    expect('getScreenDetails' in window).toBe(false)
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+
+    let error: unknown = null
+    try {
+      mountView(fake.factory)
+      await flushPromises()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeNull()
+
+    const rfs = vi.mocked(Element.prototype.requestFullscreen)
+    // Auto-attempted exactly once, PLAIN (no { screen } option).
+    expect(rfs).toHaveBeenCalledTimes(1)
+    expect(rfs.mock.calls[0]?.[0]).toBeUndefined()
+  })
+
+  it('does NOT throw when getScreenDetails resolves but no live screen matches the mapping', async () => {
+    // Mapping points at screenA's fingerprint, but getScreenDetails resolves only
+    // screenB — the role is unresolvable. selfFullscreen must not throw and must
+    // still attempt a single plain requestFullscreen() fallback.
+    saveMapping({ assignments: [{ role: 'audience', fingerprint: computeFingerprint(screenA) }], savedAt: 0 })
+    installGetScreenDetails([screenB])
+    setFullscreenElement(null)
+    const fake = createFakeChannel()
+
+    let error: unknown = null
+    try {
+      mountView(fake.factory)
+      await flushPromises()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeNull()
+
+    const rfs = vi.mocked(Element.prototype.requestFullscreen)
+    expect(rfs).toHaveBeenCalledTimes(1)
+    // Unresolvable screen → plain fullscreen, never a { screen } arg.
+    expect(rfs.mock.calls[0]?.[0]).toBeUndefined()
   })
 })
