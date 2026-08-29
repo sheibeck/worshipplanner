@@ -66,10 +66,14 @@ describe('downloadTextFile', () => {
     const clickSpy = vi.fn()
     const anchor = { href: '', download: '', click: clickSpy } as unknown as HTMLAnchorElement
     vi.spyOn(document, 'createElement').mockReturnValue(anchor)
+    const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockReturnValue(anchor)
+    const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockReturnValue(anchor)
 
     downloadTextFile('f.json', '{}', 'application/json')
 
+    expect(appendChildSpy).toHaveBeenCalledWith(anchor)
     expect(clickSpy).toHaveBeenCalledTimes(1)
+    expect(removeChildSpy).toHaveBeenCalledWith(anchor)
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
   })
 })
