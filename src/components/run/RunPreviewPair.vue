@@ -67,9 +67,8 @@
     <!-- NEXT (subordinate, RIGHT) — the same scale-to-fit thumbnail as the program
          pane, sized to its own (smaller) box. "End of service" when next is null. -->
     <div class="lg:col-span-1">
-      <div class="mb-2 flex items-center justify-between">
+      <div class="mb-2 flex items-center">
         <span class="text-xs font-semibold text-gray-400">Next up</span>
-        <span v-if="next" class="text-xs text-gray-500">Take →</span>
       </div>
       <div
         ref="nextBox"
