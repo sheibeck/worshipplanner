@@ -388,6 +388,7 @@ expected; Phase 96 re-confirms this rather than assuming it.
 - [ ] **Phase 94: Confidence Monitor Output Window** - Current+next slide output with background suppressed to black, no chrome
 - [ ] **Phase 95: Run/Control Screen + Run Entry Point** - Run button, order-of-service rail, click-to-jump, keyboard nav, single-selection live model
 - [ ] **Phase 96: Live-Ops Hardening** - Closed-window recovery, monitor-replug detection, and sync robustness over a realistic service
+- [ ] **Phase 97: Run Service Redesign** - Owner UAT-driven redesign: pre-flight + live control layout (design import), confidence left/right, blackout, timers, in-item filmstrip, rehearse, service-list Run, output self-fullscreen
 
 ## Phase Details
 
@@ -521,3 +522,23 @@ expected; Phase 96 re-confirms this rather than assuming it.
 - [x] 96-02-PLAN.md — Live-ops hardening tests: closed detection + reopen + position preserved + monitor-unplug/precedence + no-leak teardown + rapid-nav sync [wave 2]
 
 **UI hint**: yes
+
+### Phase 97: Run Service Redesign
+
+**Goal**: The live Run experience matches the owner's approved design and resolves the hardware-UAT UX issues — a calm pre-flight → live control screen, side-by-side confidence, auto-fullscreen outputs, blackout, timers, an in-item filmstrip, rehearse mode, and a service-list Run button — without regressing any phase 92–96 correctness machinery.
+**Depends on**: Phase 96 (redesigns 94/95, hardens 96 recovery)
+**Requirements**: R276, R277, R278, R279, R280, R281, R282, R283, R284
+**Success Criteria** (what must be TRUE):
+
+  1. The control screen presents the design's pre-flight ("Ready when you are", Go-live centered) and live (program/next-up split, in-item filmstrip, transport bar) states; the live status reads not-open before go-live and turns green once live. (R276, R277)
+  2. On Go live, both output windows open AND default to fullscreen on their assigned monitors with no per-window manual re-enter (fallback affordance remains). (R278)
+  3. The confidence monitor shows current + next side-by-side (left/right), backgrounds suppressed to black, last-slide no-reflow preserved. (R279)
+  4. Blackout/Clear (and the `B` key) black the outputs via the channel `blackout` field and restore them; a clock + elapsed timer show; the in-item filmstrip lists the active item's slides and click jumps; Rehearse enters the live screen without opening outputs; a Run button appears on locked service rows in the listing. (R280–R284)
+  5. All phase 92–96 behavioral suites stay green (single-writer seq, onHello resend, exit-confirm, closed-poll/reopen, reassign precedence, no-leak, confidence suppression); client-only (no Firestore/rules change).
+
+**Plans**: TBD
+**UI hint**: yes (design contract already imported → `97-UI-SPEC.md`)
+
+> **v2.4 Basis note (2026-08-28):** Phase 97 is a post-UAT redesign added after phases 90–96 were built and
+> verified. The milestone was held open for owner hardware UAT; this phase folds the owner's approved design
+> + six UX fixes back in before close.
