@@ -492,14 +492,14 @@ expected; Phase 96 re-confirms this rather than assuming it.
   4. Clicking an order-of-service item jumps the live output to that item's first slide; the projectionist can also navigate with standard keys — Right/Space = next, Left = previous, Down/Up = next/previous item, Escape = exit with a confirmation. (R263, R265)
   5. The current/selected slide on the control screen is always what's live on the outputs — there is no separate "push to live" step. (R266)
 
-**Plans**: 5/6 plans executed
+**Plans**: 6/6 plans executed
 
 - [x] 95-01-PLAN.md — Extract useServiceAssembly + refactor useOutputWindow (shared service-load slice) [wave 1]
 - [x] 95-02-PLAN.md — Run entry button on a locked service (any member, editor or viewer) [wave 1]
 - [x] 95-03-PLAN.md — RunControlView core: shell + single-writer channel + rail + dual preview + keyboard + exit-confirm + route [wave 2]
 - [x] 95-04-PLAN.md — RunControlView output orchestration: open/place output windows + amber fallback + status cluster [wave 3]
 - [x] 95-05-PLAN.md — RunControlView core behavioral tests (channel/seq, rail, keyboard, escape-confirm) [wave 4]
-- [ ] 95-06-PLAN.md — Output-orchestration tests + Run-button (R275 viewer) tests [wave 4]
+- [x] 95-06-PLAN.md — Output-orchestration tests + Run-button (R275 viewer) tests [wave 4]
 
 **UI hint**: yes
 
