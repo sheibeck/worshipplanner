@@ -36,8 +36,8 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Live-Operation Robustness
 
-- [ ] **R273**: The Run/control screen is the **single source of truth**; the audience and confidence outputs stay **in sync** with the operator's navigation with no perceptible lag.
-- [ ] **R274**: If an output window is **closed** or a monitor is **unplugged mid-service**, the control screen detects it and offers **one-click recovery** (reopen/reassign) without losing the current slide position.
+- [x] **R273**: The Run/control screen is the **single source of truth**; the audience and confidence outputs stay **in sync** with the operator's navigation with no perceptible lag.
+- [x] **R274**: If an output window is **closed** or a monitor is **unplugged mid-service**, the control screen detects it and offers **one-click recovery** (reopen/reassign) without losing the current slide position.
 
 ### Authorization
 
@@ -84,8 +84,8 @@ Which phase covers which requirement. Populated during roadmap creation.
 | R270 | Phase 93 | Complete |
 | R271 | Phase 93 | Complete |
 | R272 | Phase 94 | Complete |
-| R273 | Phase 96 | Pending |
-| R274 | Phase 96 | Pending |
+| R273 | Phase 96 | Complete |
+| R274 | Phase 96 | Complete |
 | R275 | Phase 95 | Complete |
 
 **Coverage:**
