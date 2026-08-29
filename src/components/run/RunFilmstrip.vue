@@ -21,10 +21,13 @@
         :class="thumb.index === currentIndex ? 'ring-green-500' : 'ring-gray-700 hover:ring-indigo-500'"
         @click="emit('jump', thumb.index)"
       >
-        <div
-          class="absolute inset-0"
-          :style="{ transform: `scale(${thumbScale})`, transformOrigin: 'top center' }"
-        >
+        <!-- Owner UAT: render each thumb as a true mini-slide. SlideCanvas uses
+             projector-sized fonts; laying it out at the tiny thumb width wrapped
+             every word into a stacked mess. Instead render at the 1280×720
+             reference stage (where the fonts are proportionally correct) and
+             scale the WHOLE stage down to the thumb, so text + layout shrink
+             together (same technique as RunPreviewPair). -->
+        <div class="absolute left-0 top-0" :style="thumbStageStyle">
           <SlideCanvas :slide="thumb.slide" :interactive="false" />
         </div>
       </button>
@@ -72,6 +75,20 @@ const thumbs = computed(() =>
   props.slides.map((slide, i) => ({ slide, index: props.indices[i] ?? -1 })),
 )
 
-/** Shrinks the full-size SlideCanvas into the thumbnail (no font-size prop). */
-const thumbScale = 0.25
+/**
+ * Scale-to-fit each thumb: render SlideCanvas at a fixed 1280×720 reference
+ * stage (where its projector-sized fonts are proportionally correct), then
+ * scale the whole stage down to the thumb box (a fixed `w-32` = 128px, aspect
+ * 16:9), so font AND layout shrink together into a faithful mini-slide. Static
+ * factor because the thumb width is fixed; mirrors RunPreviewPair's approach.
+ */
+const REFERENCE_WIDTH = 1280
+const REFERENCE_HEIGHT = 720
+const THUMB_WIDTH = 128
+const thumbStageStyle = {
+  width: `${REFERENCE_WIDTH}px`,
+  height: `${REFERENCE_HEIGHT}px`,
+  transform: `scale(${THUMB_WIDTH / REFERENCE_WIDTH})`,
+  transformOrigin: 'top left',
+}
 </script>
