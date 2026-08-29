@@ -732,3 +732,166 @@ describe('RunControlView output — closed detection, per-role reopen, position 
     expect(lastState.index).toBe(preCloseIndex)
   })
 })
+
+// ── 8. MONITOR-UNPLUG → REASSIGN (R274) ─────────────────────────────────────────
+//    The screenschange tests invoke the CAPTURED listener directly (no timers),
+//    avoiding the flushPromises/fake-timer interaction entirely.
+describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-14)', () => {
+  it('a screenschange that drops an assigned monitor (needs-reprompt) surfaces run-reassign-banner with the monitor-setup link', async () => {
+    seedMatchingMapping()
+    const { control } = installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+    expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(false)
+
+    // The confidence monitor (screenB) is unplugged → the live set drops it →
+    // matchMapping returns needs-reprompt.
+    control.setScreens([screenA])
+    control.fireScreensChange()
+    await flushPromises()
+
+    const banner = wrapper.find('[data-testid="run-reassign-banner"]')
+    expect(banner.exists()).toBe(true)
+    expect(banner.text()).toContain('Your monitor setup changed')
+    expect(banner.find('a[data-to="/monitor-setup"]').exists()).toBe(true)
+  })
+
+  it('a still-matching screenschange (benign refresh) raises NO run-reassign-banner (no false alarm)', async () => {
+    seedMatchingMapping()
+    const { control } = installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+
+    // The live set is unchanged (both monitors still present) → matched → silent.
+    control.fireScreensChange()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(false)
+  })
+})
+
+// ── 9. PRECEDENCE — reassign banner suppresses the reopen chip (R274; 96-UI-SPEC §B)
+describe('RunControlView output — closed-vs-unplug precedence (R274)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('with BOTH a closed audience window AND a monitor change, run-reassign-banner shows and run-reopen-audience is SUPPRESSED', async () => {
+    seedMatchingMapping()
+    const { control } = installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLiveFake(wrapper)
+
+    // Close the audience output AND latch it via the poll (chip would show alone).
+    openedWins[0]!.closed = true
+    await vi.advanceTimersByTimeAsync(1000)
+    // Then a monitor unplug (needs-reprompt) → monitorChanged wins precedence.
+    control.setScreens([screenA])
+    control.fireScreensChange()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(true)
+    // The reopen chip is gated on !monitorChanged → suppressed until reassignment.
+    expect(wrapper.find('[data-testid="run-reopen-audience"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(false)
+  })
+})
+
+// ── 10. NO-LEAK / SINGLE-TEARDOWN (R274 endurance; T-96-11) ──────────────────────
+describe('RunControlView output — no-leak / single teardown (R274)', () => {
+  it('removeEventListener("screenschange", …) fires on the run-exit-confirm EXIT', async () => {
+    seedMatchingMapping()
+    const { details } = installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+    expect(details.addEventListener).toHaveBeenCalledWith('screenschange', expect.any(Function))
+    expect(details.removeEventListener).not.toHaveBeenCalled()
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    const confirmBtn = document.body.querySelector<HTMLElement>('[data-testid="run-exit-confirm"]')
+    expect(confirmBtn).not.toBeNull()
+    confirmBtn!.click()
+    await flushPromises()
+
+    expect(details.removeEventListener).toHaveBeenCalledWith('screenschange', expect.any(Function))
+  })
+
+  it('removeEventListener("screenschange", …) fires on wrapper.unmount()', async () => {
+    seedMatchingMapping()
+    const { details } = installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+    expect(details.removeEventListener).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+
+    expect(details.removeEventListener).toHaveBeenCalledWith('screenschange', expect.any(Function))
+  })
+
+  it('after a deliberate EXIT, advancing timers surfaces NO reopen chip — the poll was cleared (the load-bearing gotcha)', async () => {
+    vi.useFakeTimers()
+    try {
+      seedMatchingMapping()
+      installGetScreenDetails([screenA, screenB])
+      const { wrapper } = mountView()
+
+      await goLiveFake(wrapper)
+      expect(wrapper.find('[data-testid="run-status-placed"]').exists()).toBe(true)
+
+      // Deliberate exit: Escape → confirm. confirmExit runs stopRecoveryWatchers,
+      // clearing the poll BEFORE closeOutputs (which never nulls the handles).
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await vi.advanceTimersByTimeAsync(0)
+      const confirmBtn = document.body.querySelector<HTMLElement>('[data-testid="run-exit-confirm"]')
+      expect(confirmBtn).not.toBeNull()
+      confirmBtn!.click()
+      await vi.advanceTimersByTimeAsync(0)
+
+      // A window the operator closed on exit stays non-nulled in outputWindows; if
+      // the poll had leaked it would latch audienceClosed and re-surface a chip.
+      openedWins[0]!.closed = true
+      await vi.advanceTimersByTimeAsync(2000)
+
+      expect(wrapper.find('[data-testid="run-output-closed-audience"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="run-reopen-audience"]').exists()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// ── 11. RAPID NAV SYNC (R273) ────────────────────────────────────────────────────
+describe('RunControlView output — rapid navigation stays in sync (R273)', () => {
+  it('a burst of ArrowRight×3 / ArrowLeft×1 posts state messages with strictly increasing seq and the correct final index', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper, fake } = mountView()
+
+    await goLive(wrapper)
+
+    // Rapid navigation: 0 → 1 → 2 → 3 (clamped runway of 4 slides) then 3 → 2.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }))
+    await flushPromises()
+
+    const stateMsgs = fake.posted.filter((m) => m.type === 'state')
+    // Strictly increasing seq — no drop/reorder from the single-writer channel.
+    for (let i = 1; i < stateMsgs.length; i++) {
+      expect(stateMsgs[i]!.seq!).toBeGreaterThan(stateMsgs[i - 1]!.seq!)
+    }
+    // The final broadcast lands on the expected slide (3 forward, 1 back → 2).
+    expect(stateMsgs[stateMsgs.length - 1]!.index).toBe(2)
+  })
+})
