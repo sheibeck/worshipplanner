@@ -169,6 +169,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
+import { ignorePermissionDenied } from '@/utils/firestoreListener'
 import AppShell from '@/components/AppShell.vue'
 
 interface Member {
@@ -375,19 +376,27 @@ onMounted(() => {
   const orgId = authStore.orgId
   if (!orgId) return
 
-  membersUnsub = onSnapshot(collection(db, 'organizations', orgId, 'members'), (snap) => {
-    members.value = snap.docs.map((d) => ({
-      uid: d.id,
-      ...(d.data() as Omit<Member, 'uid'>),
-    }))
-  })
+  membersUnsub = onSnapshot(
+    collection(db, 'organizations', orgId, 'members'),
+    (snap) => {
+      members.value = snap.docs.map((d) => ({
+        uid: d.id,
+        ...(d.data() as Omit<Member, 'uid'>),
+      }))
+    },
+    ignorePermissionDenied('TeamView members'),
+  )
 
-  invitesUnsub = onSnapshot(collection(db, 'organizations', orgId, 'invites'), (snap) => {
-    pendingInvites.value = snap.docs.map((d) => ({
-      email: d.id,
-      ...(d.data() as Omit<PendingInvite, 'email'>),
-    }))
-  })
+  invitesUnsub = onSnapshot(
+    collection(db, 'organizations', orgId, 'invites'),
+    (snap) => {
+      pendingInvites.value = snap.docs.map((d) => ({
+        email: d.id,
+        ...(d.data() as Omit<PendingInvite, 'email'>),
+      }))
+    },
+    ignorePermissionDenied('TeamView invites'),
+  )
 })
 
 onUnmounted(() => {

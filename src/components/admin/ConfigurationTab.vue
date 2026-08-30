@@ -137,6 +137,7 @@ import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppConfigStore } from '@/stores/appConfig'
+import { isPermissionDenied } from '@/utils/firestoreListener'
 import CleanupConfigCard from '@/components/admin/CleanupConfigCard.vue'
 import AiProxyConfigCard from '@/components/admin/AiProxyConfigCard.vue'
 import MessagingConfigCard from '@/components/admin/MessagingConfigCard.vue'
@@ -299,7 +300,13 @@ onMounted(() => {
       loaded.value = true
     },
     (err) => {
-      console.error('[ConfigurationTab] roster subscription error:', err)
+      // Bug 2b (quick 260830-l9c) — a super-admin's own logout can hit this
+      // handler with a benign permission-denied once the token is revoked;
+      // suppress ONLY the console.error for that code, state-setting below
+      // stays unchanged for a genuine error.
+      if (!isPermissionDenied(err)) {
+        console.error('[ConfigurationTab] roster subscription error:', err)
+      }
       loaded.value = true
     },
   )

@@ -79,6 +79,7 @@ import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
 import { useServiceStore } from '@/stores/services'
+import { ignorePermissionDenied } from '@/utils/firestoreListener'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
@@ -119,9 +120,13 @@ function onDismiss() {
 onMounted(() => {
   const orgId = authStore.orgId
   if (!orgId) return
-  unsub = onSnapshot(collection(db, 'organizations', orgId, 'members'), (snap) => {
-    memberCount.value = snap.size
-  })
+  unsub = onSnapshot(
+    collection(db, 'organizations', orgId, 'members'),
+    (snap) => {
+      memberCount.value = snap.size
+    },
+    ignorePermissionDenied('GettingStarted memberCount'),
+  )
 })
 
 onUnmounted(() => {

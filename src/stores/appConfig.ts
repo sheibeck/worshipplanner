@@ -10,6 +10,7 @@ import { doc, onSnapshot, setDoc, serverTimestamp, type Unsubscribe } from 'fire
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { mergeAppConfig, type AppConfig, type AppConfigInput } from '@/config/appConfigDefaults'
+import { isPermissionDenied } from '@/utils/firestoreListener'
 
 export const useAppConfigStore = defineStore('appConfig', () => {
   // Pre-merge raw doc — drives the presence-based (default) badge (R186).
@@ -30,7 +31,13 @@ export const useAppConfigStore = defineStore('appConfig', () => {
         loaded.value = true
       },
       (err) => {
-        console.error('[appConfig store] subscription error:', err)
+        // Bug 2b (quick 260830-l9c) — a super-admin's own logout can hit this
+        // handler with a benign permission-denied once the token is revoked;
+        // suppress ONLY the console.error for that code, state-setting below
+        // stays unchanged for a genuine error.
+        if (!isPermissionDenied(err)) {
+          console.error('[appConfig store] subscription error:', err)
+        }
         loadError.value = 'Load error'
         loaded.value = true
       },
