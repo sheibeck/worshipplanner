@@ -376,3 +376,24 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 
 > Deployed to production (hosting) 2026-08-30 (`worship-planner-bc515.web.app`); client-side only — no Firestore/Storage rules or Cloud Functions changed. Closed on owner acceptance/approval (no formal `/gsd-audit-milestone` run, per the v1.4/v1.5 precedent). R261–R284 delivered; **R278 auto-fullscreen met via per-display "Go fullscreen" buttons** — browser zero-click multi-monitor fullscreen proved unachievable (Chrome 151 + Edge rejected `requestFullscreen` `not granted` despite a `chrome://policy`-OK machine-wide policy; the permission query false-positives). **Phase 98 / R285–R287 built then withdrawn.** Owner hardware-UAT items (phases 92–97) accepted 2026-08-29.
 </details>
+
+## Backlog
+
+### Phase 999.2: Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG)
+
+**Goal:** [Captured for future planning] Rename the app from "Worship Planner" (name taken) to **WorshipBuilder**, and cut hosting over to a single deploy on `worshipbuilder.web.app`, then point other/custom domains at it.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Context (already done, 2026-08-30): the Firebase Hosting site `worshipbuilder` is **already created** in the existing project `worship-planner-bc515` — `https://worshipbuilder.web.app` is secured (second site, same project → same Firestore/Auth/Functions/data, no migration). It serves nothing yet. No time pressure; the name is locked.
+
+Owner's stated plan: a **single** deploy to `worshipbuilder.web.app` (make it the one hosting target — NOT dual-site), then point other/custom domains to it.
+
+Work this will cover when promoted:
+- [ ] `firebase.json`: set the hosting block's target to the `worshipbuilder` site (`"site": "worshipbuilder"`) as the single deploy target (currently one unnamed block → default site).
+- [ ] ⚠ PREREQUISITE: add `worshipbuilder.web.app` **and** `worshipbuilder.firebaseapp.com` to Firebase Auth → Settings → Authorized domains BEFORE cutover, or `signInWithPopup` (Google/email sign-in) silently fails on the new domain. Manual console step — no CLI command.
+- [ ] Grep for any hardcoded base URL (e.g. `worship-planner-bc515.web.app`) in share-link generation etc. before cutover; relative / `window.location.origin` links carry over automatically, hardcoded ones do not.
+- [ ] Rename user-facing app title strings "Worship Planner" → "WorshipBuilder".
+- [ ] Production deploy to `worshipbuilder.web.app` (per-deploy owner confirmation per deploy policy).
+- [ ] Later: point other/custom domains to the new site.
+- [ ] TBD (promote with /gsd-review-backlog when ready)
