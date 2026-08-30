@@ -478,7 +478,36 @@ export const useAuthStore = defineStore('auth', () => {
     const userRef = doc(db, 'users', uid)
     const userSnap = await getDoc(userRef)
     const userData = userSnap.exists() ? userSnap.data() : null
-    const ids: string[] = userData?.orgIds ?? []
+    const orgIds: string[] = userData?.orgIds ?? []
+
+    // Bug 1b (quick 260830-l9c) — self-heal a clobbered orgIds array from the
+    // authoritative `orgs` custom claim. functions/src/orgMembershipClaims.ts
+    // computes the FULL multi-org set server-side
+    // (collectionGroup('members') scan) on every membership write, so an
+    // account whose client-side orgIds was already clobbered down to a
+    // single element (the pre-1a REPLACE bug) still has every org listed in
+    // its claim — unioning it in here means the picker self-heals with no
+    // manual Firestore repair. Read WITHOUT forcing a network refresh (the
+    // separate forced refreshOrgClaim(activeId, ...) below still runs once
+    // activeId is known) so this stays cheap on the ordinary
+    // already-a-member path. Never throws: a failed claim read must still
+    // let an orgIds-only login proceed.
+    let claimOrgs: Record<string, unknown> = {}
+    const currentUser = user.value
+    if (currentUser) {
+      try {
+        const tokenResult = await getIdTokenResult(currentUser, false)
+        claimOrgs = (tokenResult.claims.orgs ?? {}) as Record<string, unknown>
+      } catch (err) {
+        console.error('[auth] loadOrgContext claim read:', err)
+      }
+    }
+    // orgIds first — keeps the primary/index-0 org leading the picker — then
+    // any claim-only orgs orgIds hasn't caught up to yet, deduped.
+    const ids: string[] = [
+      ...orgIds,
+      ...Object.keys(claimOrgs).filter((id) => !orgIds.includes(id)),
+    ]
 
     // Build the membership list ({id, name, active}) the church picker
     // renders. Each org doc is read individually and guarded: an org the user

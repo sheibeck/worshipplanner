@@ -541,6 +541,52 @@ describe('useAuthStore', () => {
       ])
       expect(store.needsOrgSelection).toBe(true)
     })
+
+    // Bug 1b (quick 260830-l9c) — self-heal: a clobbered orgIds (down to one
+    // element by the pre-1a REPLACE bug) still self-heals from the
+    // authoritative `orgs` custom claim, which the server computes from a
+    // full collectionGroup('members') scan and so never loses an org. The
+    // union must drive BOTH memberships AND activeId — activeId stays null
+    // here (union length 2) so the picker shows, rather than auto-entering
+    // the single clobbered orgIds entry.
+    it('self-heals the picker from claims.orgs when orgIds was clobbered to one element', async () => {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: ['org-2'] }),
+          }) as never
+        }
+        if (path === 'organizations/org-1') {
+          return Promise.resolve({ exists: () => true, data: () => ({ name: 'Org One' }) }) as never
+        }
+        if (path === 'organizations/org-2') {
+          return Promise.resolve({ exists: () => true, data: () => ({ name: 'Org Two' }) }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
+        claims: { orgs: { 'org-1': 'editor', 'org-2': 'editor' } },
+      } as never)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.memberships).toEqual([
+        { id: 'org-2', name: 'Org Two', active: true },
+        { id: 'org-1', name: 'Org One', active: true },
+      ])
+      expect(store.orgId).toBeNull()
+      expect(store.needsOrgSelection).toBe(true)
+      expect(store.requiresOrgSelection).toBe(true)
+      // Union has length 2, so refreshOrgClaim never runs — the only call is
+      // the top unforced read.
+      expect(getIdTokenResult).toHaveBeenCalledTimes(1)
+      expect(getIdTokenResult).toHaveBeenCalledWith(mockUser, false)
+    })
   })
 
   // ── 76-02 (R213) ─────────────────────────────────────────────────────────
@@ -665,9 +711,15 @@ describe('useAuthStore', () => {
 
     it('a super-admin whose own read of a deactivated org succeeds is NOT blocked', async () => {
       mockOrgDocPath({ name: 'Test Org', active: false })
-      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
-        claims: { orgId: 'org-1', superAdmin: true },
-      } as never)
+      // Bug 1b (quick 260830-l9c) added a leading unforced getIdTokenResult
+      // read (loadOrgContext's self-heal union) — the leading value below is
+      // consumed by that read, so the superAdmin claim still lands on the
+      // FORCED refreshOrgClaim call this test actually exercises.
+      vi.mocked(getIdTokenResult)
+        .mockResolvedValueOnce({ claims: {} } as never)
+        .mockResolvedValueOnce({
+          claims: { orgId: 'org-1', superAdmin: true },
+        } as never)
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
@@ -1100,12 +1152,14 @@ describe('useAuthStore', () => {
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
-      expect(getIdTokenResult).toHaveBeenCalledTimes(1)
+      // 1 unforced (loadOrgContext's top self-heal claim read) + 1 forced
+      // (refreshOrgClaim) — Bug 1b (quick 260830-l9c) adds the leading read.
+      expect(getIdTokenResult).toHaveBeenCalledTimes(2)
       expect(getIdTokenResult).toHaveBeenCalledWith(mockUser, true)
       expect(store.orgId).toBe('org-1')
     })
 
-    it('performs no forced refresh when the user belongs to no organization', async () => {
+    it('performs no FORCED refresh when the user belongs to no organization', async () => {
       vi.mocked(doc).mockImplementation(
         (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
       )
@@ -1122,17 +1176,22 @@ describe('useAuthStore', () => {
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
-      expect(getIdTokenResult).not.toHaveBeenCalled()
+      // The top unforced self-heal read still runs even for empty orgIds —
+      // only the FORCED refresh (activeId known) is skipped.
+      expect(getIdTokenResult).toHaveBeenCalledWith(mockUser, false)
+      expect(getIdTokenResult).not.toHaveBeenCalledWith(mockUser, true)
       expect(store.orgId).toBeNull()
     })
 
     it('just-joined, claim present on the first refresh: exactly one refresh, no delay', async () => {
       mockOrgDocPathWithInvite({ name: 'Test Org' })
-      vi.mocked(getIdTokenResult).mockResolvedValueOnce({ claims: { orgId: 'org-1' } } as never)
+      vi.mocked(getIdTokenResult)
+        .mockResolvedValueOnce({ claims: {} } as never)
+        .mockResolvedValueOnce({ claims: { orgId: 'org-1' } } as never)
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
-      expect(getIdTokenResult).toHaveBeenCalledTimes(1)
+      expect(getIdTokenResult).toHaveBeenCalledTimes(2)
       expect(store.orgId).toBe('org-1')
       expect(store.orgName).toBe('Test Org')
     })
@@ -1140,6 +1199,7 @@ describe('useAuthStore', () => {
     it('just-joined, claim absent then present on the third attempt: three refreshes, two delays, then stops', async () => {
       mockOrgDocPathWithInvite({ name: 'Test Org' })
       vi.mocked(getIdTokenResult)
+        .mockResolvedValueOnce({ claims: {} } as never)
         .mockResolvedValueOnce({ claims: {} } as never)
         .mockResolvedValueOnce({ claims: {} } as never)
         .mockResolvedValueOnce({ claims: { orgId: 'org-1' } } as never)
@@ -1150,7 +1210,7 @@ describe('useAuthStore', () => {
       await vi.advanceTimersByTimeAsync(CLAIM_REFRESH_DELAY_MS * 2)
       await authChangePromise
 
-      expect(getIdTokenResult).toHaveBeenCalledTimes(3)
+      expect(getIdTokenResult).toHaveBeenCalledTimes(4)
       expect(store.orgId).toBe('org-1')
     })
 
@@ -1165,7 +1225,7 @@ describe('useAuthStore', () => {
       await vi.advanceTimersByTimeAsync(CLAIM_REFRESH_DELAY_MS * (CLAIM_REFRESH_MAX_ATTEMPTS - 1))
       await authChangePromise
 
-      expect(getIdTokenResult).toHaveBeenCalledTimes(CLAIM_REFRESH_MAX_ATTEMPTS)
+      expect(getIdTokenResult).toHaveBeenCalledTimes(CLAIM_REFRESH_MAX_ATTEMPTS + 1)
       expect(store.orgId).toBe('org-1')
       expect(store.orgName).toBe('Test Org')
     })
@@ -1181,7 +1241,7 @@ describe('useAuthStore', () => {
       await vi.advanceTimersByTimeAsync(CLAIM_REFRESH_DELAY_MS * (CLAIM_REFRESH_MAX_ATTEMPTS - 1))
       await authChangePromise
 
-      expect(getIdTokenResult).toHaveBeenCalledTimes(CLAIM_REFRESH_MAX_ATTEMPTS)
+      expect(getIdTokenResult).toHaveBeenCalledTimes(CLAIM_REFRESH_MAX_ATTEMPTS + 1)
       expect(store.orgId).toBe('org-1')
     })
 
@@ -1192,7 +1252,10 @@ describe('useAuthStore', () => {
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[auth] refreshOrgClaim:', expect.any(Error))
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[auth] loadOrgContext claim read:',
+        expect.any(Error),
+      )
       expect(store.orgId).toBe('org-1')
       expect(store.orgName).toBe('Test Org')
       consoleErrorSpy.mockRestore()
@@ -1212,9 +1275,14 @@ describe('useAuthStore', () => {
 
     it('becomes true when the refreshed token carries claims.superAdmin === true', async () => {
       mockOrgDocPath({ name: 'Test Org' })
-      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
-        claims: { orgId: 'org-1', superAdmin: true },
-      } as never)
+      // Bug 1b (quick 260830-l9c) added a leading unforced getIdTokenResult
+      // read; the leading value is consumed by that read so the superAdmin
+      // claim lands on the FORCED refreshOrgClaim call this test exercises.
+      vi.mocked(getIdTokenResult)
+        .mockResolvedValueOnce({ claims: {} } as never)
+        .mockResolvedValueOnce({
+          claims: { orgId: 'org-1', superAdmin: true },
+        } as never)
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
@@ -1234,9 +1302,13 @@ describe('useAuthStore', () => {
 
     it('resets to false on logout', async () => {
       mockOrgDocPath({ name: 'Test Org' })
-      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
-        claims: { orgId: 'org-1', superAdmin: true },
-      } as never)
+      // Bug 1b (quick 260830-l9c) — leading value consumed by the top
+      // unforced self-heal read; the real value lands on the forced call.
+      vi.mocked(getIdTokenResult)
+        .mockResolvedValueOnce({ claims: {} } as never)
+        .mockResolvedValueOnce({
+          claims: { orgId: 'org-1', superAdmin: true },
+        } as never)
       vi.mocked(signOut).mockResolvedValueOnce(undefined)
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
@@ -1249,9 +1321,13 @@ describe('useAuthStore', () => {
 
     it('resets to false when onAuthStateChanged fires with no user (sign-out event)', async () => {
       mockOrgDocPath({ name: 'Test Org' })
-      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
-        claims: { orgId: 'org-1', superAdmin: true },
-      } as never)
+      // Bug 1b (quick 260830-l9c) — leading value consumed by the top
+      // unforced self-heal read; the real value lands on the forced call.
+      vi.mocked(getIdTokenResult)
+        .mockResolvedValueOnce({ claims: {} } as never)
+        .mockResolvedValueOnce({
+          claims: { orgId: 'org-1', superAdmin: true },
+        } as never)
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
