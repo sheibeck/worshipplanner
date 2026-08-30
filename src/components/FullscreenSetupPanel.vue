@@ -118,9 +118,8 @@
           </li>
           <li>
             Using Firefox, Safari, or another non-Chromium browser? Automatic fullscreen setup isn't available
-            there &mdash; switch to Chrome or Edge, or keep using the
-            <strong class="text-gray-300">"Fullscreen displays"</strong> button / tap-to-fullscreen when you Run
-            a service (works today either way).
+            there &mdash; switch to Chrome or Edge, or just tap each display to make it fullscreen when you Run
+            a service.
           </li>
         </ul>
       </div>
@@ -140,8 +139,7 @@
       </div>
       <p class="text-sm text-gray-400 mt-1">
         Automatic multi-monitor fullscreen needs Chrome or Edge on this computer. You can still run services
-        here &mdash; each display just needs one tap to go fullscreen, or use the
-        <strong class="text-gray-300">"Fullscreen displays"</strong> button on the Run screen.
+        here &mdash; each display just needs one tap to go fullscreen.
       </p>
       <button
         type="button"

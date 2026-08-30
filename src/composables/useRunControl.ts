@@ -578,17 +578,20 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   }
 
   /**
-   * Owner UAT — one control action re-delegates fullscreen to EVERY open output
-   * window at once, so the operator never clicks each monitor individually. Fired
-   * from a control-screen button whose click supplies the transient activation
-   * that capability delegation requires; complements the auto-delegation on
-   * go-live (covers a display that wasn't ready in time, or a re-assert).
+   * Owner UAT — per-display fullscreen. Bound to a "Go fullscreen" button on each card
+   * in the control's Displays panel. The automatic no-gesture path is unreliable across
+   * browsers (proven on Chrome 151 + Edge with a correct machine-wide policy), so
+   * fullscreen is driven by an explicit operator click — ONE per display, all in one
+   * place at the booth, so nobody chases the mouse across monitors that may not even be
+   * visible. Runs synchronously in the button's click handler, so the click's transient
+   * activation is delegated to the already-open, already-loaded output window, which
+   * then requestFullscreen()s reliably (no load-race to eat the gesture). No-op if the
+   * window is closed. Generalizes to any future output role (e.g. Live Stream).
    */
-  function delegateFullscreenToAll() {
-    for (const name of Object.keys(outputWindows)) {
-      const win = outputWindows[name]
-      if (win && !win.closed) delegateFullscreenTo(win)
-    }
+  function fullscreenDisplay(role: MonitorRole) {
+    const name = role === 'audience' ? 'wp-audience' : 'wp-confidence'
+    const win = outputWindows[name]
+    if (win && !win.closed) delegateFullscreenTo(win)
   }
 
   function handleOutputReady(event: MessageEvent) {
@@ -1133,7 +1136,6 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     rehearsing,
     blackout,
     postBlackout,
-    delegateFullscreenToAll,
     rehearse,
     clock,
     elapsed,
@@ -1180,6 +1182,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     reassignRole,
     reopenOutput,
     reopenReassignedOutputs,
+    fullscreenDisplay,
     openOutputs,
     // exit confirm + mode-branched exit affordance (owner UAT)
     confirmOpen,

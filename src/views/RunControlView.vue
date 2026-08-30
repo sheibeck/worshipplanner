@@ -25,7 +25,6 @@
       @exit="onExitRequest"
       @reopen="reopenOutput"
       @toggle-blackout="postBlackout(!blackout)"
-      @fullscreen-displays="delegateFullscreenToAll"
     />
 
     <!-- OUTPUT-STATUS CLUSTER REMOVED (owner fix #3). The redundant top status band
@@ -269,6 +268,7 @@
               :confidenceClosed="confidenceClosed"
               :reassigning="monitorChanged"
               @reopen="reopenOutput"
+              @fullscreen="fullscreenDisplay"
               @manage="openManage"
             />
           </template>
@@ -380,7 +380,6 @@ const {
   confidence,
   blackout,
   postBlackout,
-  delegateFullscreenToAll,
   // in-item filmstrip + rail expansion (R282)
   filmstripSlides,
   filmstripIndices,
@@ -401,6 +400,7 @@ const {
   reassignRole,
   reopenOutput,
   reopenReassignedOutputs,
+  fullscreenDisplay,
   openOutputs,
   // actions
   rehearse,

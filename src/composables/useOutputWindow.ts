@@ -164,31 +164,26 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
   // wp-fullscreen-delegate capability-delegation listener above, the opener-side
   // delegation + control "Fullscreen displays" button (useRunControl, untouched),
   // and the one-tap-anywhere overlay in each output view.
-  // Returns true when the zero-click policy path is available (granted) and a
-  // requestFullscreen() was issued — the caller then does NOT arm the gesture
-  // delegation fallback, because running BOTH races two requestFullscreen() calls
-  // on the same element, which on real multi-monitor hardware produced the
-  // intermittent "never on go-live, every-other-open on reopen" fullscreen the
-  // owner reported. When granted, the policy path is the SOLE, deterministic path.
-  async function attemptAutoFullscreen(): Promise<boolean> {
+  // Best-effort: where the browser honors the setting, each output self-fullscreens
+  // on mount with no gesture. Where it does NOT — proven on the owner's Chrome 151
+  // AND Edge even with a correct machine-wide policy (chrome://policy showed OK): the
+  // permission query reports 'granted' but requestFullscreen still rejects
+  // "not granted" — this is a silent no-op, and the per-display "Go fullscreen"
+  // buttons on the control's Displays panel (gesture-delegated, one click per display,
+  // all in one place at the booth) are the reliable path. Never throws.
+  async function attemptAutoFullscreen() {
     try {
       // The { name:'fullscreen', allowWithoutGesture:true } descriptor is not in the
-      // base TS lib's PermissionDescriptor — cast it. A browser without this
-      // descriptor THROWS a TypeError from query(), caught below as "not granted".
+      // base TS lib's PermissionDescriptor — cast it. A browser without it THROWS.
       const status = await navigator.permissions.query(
         { name: 'fullscreen', allowWithoutGesture: true } as unknown as PermissionDescriptor,
       )
       if (status.state === 'granted') {
-        // PLAIN — no { screen }, no gesture. The window is already on its monitor.
+        // PLAIN — no { screen }. The window is already positioned on its monitor.
         document.documentElement.requestFullscreen().catch(() => {})
-        return true
       }
-      // state !== 'granted' → do nothing here; the delegation/tap fallbacks take over.
-      return false
     } catch {
-      // Absent Permissions API / unsupported descriptor / query rejection — silent;
-      // the delegation + one-tap fallbacks remain the path to fullscreen.
-      return false
+      // Absent Permissions API / unsupported descriptor / query rejection — silent.
     }
   }
 
@@ -226,28 +221,20 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     })
     handle.postHello()
 
-    // Automatic Fullscreen content setting (Chrome 126+) — the ZERO-CLICK PRIMARY
-    // path. Await it so we can decide whether the delegation fallback is even needed:
-    // when the policy is granted this self-fullscreens deterministically and we must
-    // NOT also arm delegation (two requestFullscreen() on one element race). The
-    // await is a fast permission query and runs AFTER channel/hello setup above.
-    const autoFullscreenGranted = await attemptAutoFullscreen()
+    // Best-effort automatic fullscreen where the browser honors the content setting
+    // (fire-and-forget; a silent no-op where it does not — see attemptAutoFullscreen).
+    void attemptAutoFullscreen()
 
-    // Fullscreen Capability Delegation — the ZERO-TAP FALLBACK, armed ONLY when the
-    // policy path is unavailable. Listen for the opener's delegation message, then
-    // announce readiness so the opener delegates its fullscreen capability back to us
-    // while its Go-live/Reopen click's transient activation is still valid. Both
-    // wrapped so an absent/cross-origin opener never throws; if delegation never
-    // lands, the one-tap-anywhere affordance (rendered while !isFullscreen) is the
-    // final fallback. Skipped entirely when the policy already granted zero-click FS.
-    if (!autoFullscreenGranted) {
-      window.addEventListener('message', handleDelegationMessage)
-      try {
-        window.opener?.postMessage({ type: 'wp-output-ready' }, window.location.origin)
-      } catch {
-        // No opener / cross-origin opener — best-effort; the tap fallback remains.
-      }
-    }
+    // Fullscreen Capability Delegation — ALWAYS listen, so each per-display
+    // "Go fullscreen" button on the control's Displays panel works: that button click
+    // delegates ITS gesture to THIS window, which then requestFullscreen()s reliably
+    // (the window is already open + loaded, so the gesture is not eaten by a load
+    // race). We deliberately do NOT auto-announce readiness on mount anymore —
+    // auto-delegating on open raced the automatic path and produced the "every other
+    // open" flakiness. Fullscreen is now explicit and deterministic: one delegated
+    // button click per display, all in one place at the booth. The one-tap-anywhere
+    // overlay (rendered while !isFullscreen) remains as a last resort.
+    window.addEventListener('message', handleDelegationMessage)
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     document.addEventListener('visibilitychange', handleVisibilityChange)

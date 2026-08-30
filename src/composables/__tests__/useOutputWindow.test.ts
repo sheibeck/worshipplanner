@@ -381,13 +381,15 @@ describe('useOutputWindow — unmount cleanup', () => {
 
 // ── Fullscreen Capability Delegation (child side) ───────────────────────────────
 // A popup opened via window.open loses its OWN transient user-activation once its
-// SPA/auth bootstrap runs, so a mount-time requestFullscreen() ALWAYS rejected
-// ("API can only be initiated by a user gesture") — the console error the owner
-// saw, and it never went fullscreen. The composable no longer self-requests on
-// mount. Instead it (a) announces { type:'wp-output-ready' } to window.opener, and
-// (b) on receiving the opener's same-origin { type:'wp-fullscreen-delegate' }
-// message, calls document.documentElement.requestFullscreen() — now permitted via
-// the delegated capability, WITHOUT its own gesture.
+// SPA/auth bootstrap runs, so a mount-time requestFullscreen() (without the browser's
+// Automatic Fullscreen content setting, which proved unreliable across Chrome + Edge)
+// rejects. Fullscreen is therefore driven by Capability Delegation: on receiving the
+// opener's same-origin { type:'wp-fullscreen-delegate' } message — sent when the
+// operator clicks a per-display "Go fullscreen" button on the control's Displays
+// panel — the child calls requestFullscreen() with the delegated gesture, WITHOUT its
+// own. The child does NOT auto-announce readiness on mount anymore (that auto-delegation
+// raced the automatic path and caused the intermittent "every other open" fullscreen);
+// the buttons are the explicit, reliable trigger.
 describe('useOutputWindow — Fullscreen Capability Delegation (child side)', () => {
   function fireMessage(data: unknown, origin: string) {
     const evt = new Event('message') as MessageEvent
@@ -406,7 +408,7 @@ describe('useOutputWindow — Fullscreen Capability Delegation (child side)', ()
     expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
   })
 
-  it('posts { type:"wp-output-ready" } to window.opener on mount', async () => {
+  it('does NOT auto-announce wp-output-ready on mount (fullscreen is button-driven, not auto-delegated)', async () => {
     const openerPost = vi.fn()
     Object.defineProperty(window, 'opener', {
       value: { postMessage: openerPost },
@@ -417,7 +419,11 @@ describe('useOutputWindow — Fullscreen Capability Delegation (child side)', ()
       const fake = createFakeChannel()
       mountHost(fake.factory)
       await flushPromises()
-      expect(openerPost).toHaveBeenCalledWith({ type: 'wp-output-ready' }, window.location.origin)
+      // Auto-announcing readiness made the opener auto-delegate on mount, which raced
+      // the automatic path and caused the intermittent fullscreen. The output stays
+      // silent on mount now; the per-display "Go fullscreen" buttons drive fullscreen
+      // explicitly via a wp-fullscreen-delegate message (see the delegation test below).
+      expect(openerPost).not.toHaveBeenCalledWith({ type: 'wp-output-ready' }, window.location.origin)
     } finally {
       Object.defineProperty(window, 'opener', { value: null, configurable: true, writable: true })
     }

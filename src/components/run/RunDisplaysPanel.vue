@@ -47,6 +47,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   reopen: [role: Role]
+  fullscreen: [role: Role]
   manage: []
 }>()
 
@@ -154,6 +155,23 @@ const rows = computed<Row[]>(() => [
           @click="emit('reopen', row.role)"
         >
           Reopen
+        </button>
+
+        <!-- Per-display fullscreen (owner UAT): one click here sends THIS display
+             fullscreen. Every display's button lives in this panel, so the operator
+             never chases the mouse across monitors that may not even be visible.
+             Shown only while the output is open (you can't fullscreen a closed
+             window). Reliable: the click's gesture is delegated to the already-open
+             window. Scales to any number of outputs (e.g. a future Live Stream). -->
+        <button
+          v-if="row.state === 'open'"
+          type="button"
+          :data-testid="`run-display-fullscreen-${row.role}`"
+          :aria-label="`Make the ${row.role} display fullscreen`"
+          class="min-h-9 flex-none rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          @click="emit('fullscreen', row.role)"
+        >
+          Go fullscreen
         </button>
       </div>
 

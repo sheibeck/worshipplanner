@@ -1185,6 +1185,27 @@ describe('RunControlView output — fullscreen capability delegation (opener sid
     )
   })
 
+  it('per-display "Go fullscreen" button delegates fullscreen to THAT display (owner UAT)', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await goLive(wrapper)
+    expect(openedWins).toHaveLength(2)
+
+    // openedWins[0] is the audience window (opened first in openPlaced). Its per-display
+    // "Go fullscreen" button (rendered once the display is open) delegates THIS click's
+    // gesture to THAT window — the reliable, explicit path (no automatic race).
+    const audienceWin = openedWins[0]!
+    const btn = wrapper.find('[data-testid="run-display-fullscreen-audience"]')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+
+    expect(audienceWin.postMessage).toHaveBeenCalledWith(
+      { type: 'wp-fullscreen-delegate' },
+      expect.objectContaining({ delegate: 'fullscreen', targetOrigin: window.location.origin }),
+    )
+  })
+
   it('ignores a wp-output-ready from a CROSS-ORIGIN message', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])
