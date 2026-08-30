@@ -410,5 +410,6 @@ Design notes captured from owner:
 - Owner Console: per-org toggle to enable/disable Bible API access (gate the existing API-backed features on it).
 - When API is OFF: no automatic congregational readings for that org. Substitute a **manual** flow — e.g. a deep-link/driver out to BibleGateway for the chosen version, and/or a manual "paste the passage in" affordance instead of auto-fetching via the API.
 - Upside of the manual/paste path: works with **any** Bible version, instead of us having to support each version through a specific API.
+- Org **Settings** must **hide the Bible Translations** selector when the API is turned off at the org level (nothing for the org to configure there when there's no API-backed version list to choose from).
 - Open questions for planning: how the toggle interacts with existing scripture-slide / congregational-reading features; where version selection lives per org; whether paste-in becomes the universal path even when APIs are on.
 - [ ] TBD (promote with /gsd-review-backlog when ready)
