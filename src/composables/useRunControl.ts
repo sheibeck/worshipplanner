@@ -669,6 +669,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // Start the closed-output poll once the outputs have actually opened
     // (idempotent via the pollId != null guard).
     startClosedPoll()
+    // Re-enter control-screen fullscreen now that both popups are open (they made
+    // Chrome drop the opener's fullscreen entered synchronously at go-live).
+    reassertControlFullscreen()
   }
 
   /** FALLBACK path — open both outputs un-positioned (operator drags + fullscreens). */
@@ -688,6 +691,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // Start the closed-output poll once the outputs have actually opened
     // (idempotent via the pollId != null guard).
     startClosedPoll()
+    // Re-enter control-screen fullscreen now that both popups are open (they made
+    // Chrome drop the opener's fullscreen entered synchronously at go-live).
+    reassertControlFullscreen()
   }
 
   // URLs computed at open time so they read the CURRENT serviceId/org.
@@ -770,6 +776,28 @@ export function useRunControl(options: UseRunControlOptions = {}) {
         if (isUnmounted || requestId !== goLiveRequestId) return
         openUnplaced()
       })
+  }
+
+  /**
+   * Owner UAT — keep the CONTROL screen fullscreen while running. openOutputs
+   * requests control fullscreen SYNCHRONOUSLY in the click path (so a non-policy
+   * machine still gets its one gesture-authorized attempt), but opening the two
+   * output popups immediately after makes Chrome DROP the opener's fullscreen — so
+   * the control flashed to fullscreen and fell back out. Re-assert AFTER both
+   * outputs are open, deferred a tick so the popup-driven fullscreen-exit has
+   * settled. With the Automatic Fullscreen policy granted (the multi-monitor target)
+   * this re-entry needs NO gesture; without it it is a silently-rejected no-op.
+   * Idempotent (skips when already fullscreen) and guarded against a fast exit.
+   * Exited again in endServiceTeardown.
+   */
+  function reassertControlFullscreen() {
+    window.setTimeout(() => {
+      if (isUnmounted || !live.value) return
+      if (document.fullscreenElement) return // already fullscreen — nothing to do
+      document.documentElement.requestFullscreen?.().catch(() => {
+        // No policy grant / no activation — silent; running continues windowed.
+      })
+    }, 200)
   }
 
   /** Guarded teardown of every opened output window — called first on exit. */
