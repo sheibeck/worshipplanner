@@ -19,6 +19,7 @@ import {
   serverTimestamp,
   onSnapshot,
   updateDoc,
+  arrayUnion,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { auth, db } from '@/firebase'
@@ -745,8 +746,13 @@ export const useAuthStore = defineStore('auth', () => {
           email: firebaseUser.email ?? '',
         })
 
-        // Switch user to the invited org
-        batch.update(userRef, { orgIds: [inviteOrgId] })
+        // Bug 1a (quick 260830-l9c) — APPEND, don't replace: a prior invite
+        // acceptance may have already put a different org at orgIds[0] (the
+        // primary org functions/src/orgMembershipClaims.ts's decideMembershipClaim
+        // reads via orgIds[0]). arrayUnion appends to the end and never
+        // reorders existing elements, so the original primary survives a
+        // second church's invite instead of being clobbered down to one entry.
+        batch.update(userRef, { orgIds: arrayUnion(inviteOrgId) })
 
         await batch.commit()
         return { membershipCreated: true }

@@ -33,6 +33,12 @@ vi.mock('firebase/auth', () => {
 })
 
 // Mock firebase/firestore module
+//
+// mockBatchUpdate (Task 1, quick 260830-l9c) — a STABLE, persistent spy
+// shared across every writeBatch() call, so a test can assert what args
+// batch.update() was called with. Previously writeBatch() returned a FRESH
+// object with a fresh vi.fn() per call, so nothing was assertable.
+const mockBatchUpdate = vi.fn()
 vi.mock('firebase/firestore', () => ({
   getFirestore: vi.fn(() => ({})),
   doc: vi.fn(() => ({ id: 'mock-doc' })),
@@ -49,11 +55,12 @@ vi.mock('firebase/firestore', () => ({
   addDoc: vi.fn(() => Promise.resolve({ id: 'new-org-id' })),
   writeBatch: vi.fn(() => ({
     set: vi.fn(),
-    update: vi.fn(),
+    update: mockBatchUpdate,
     delete: vi.fn(),
     commit: vi.fn(() => Promise.resolve()),
   })),
   serverTimestamp: vi.fn(() => new Date()),
+  arrayUnion: vi.fn((v: unknown) => ({ __arrayUnion: v })),
 }))
 
 // Mock @/firebase module
@@ -424,6 +431,23 @@ describe('useAuthStore', () => {
       const result = await store.ensureUserDocument(mockUser as never)
       expect(result).toEqual({ membershipCreated: true })
       expect(writeBatch).toHaveBeenCalled()
+    })
+
+    // Bug 1a (quick 260830-l9c) — accepting a second church's invite must
+    // APPEND to orgIds via arrayUnion, never REPLACE it (which clobbered the
+    // original primary org down to a single element).
+    it('appends orgIds via arrayUnion on invite accept — does not replace the array', async () => {
+      const { doc: docFn } = await import('firebase/firestore')
+      mockOrgDocPathWithInvite({ name: 'Org One' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await store.ensureUserDocument(mockUser as never)
+      const userRef = vi.mocked(docFn).mock.results.find(
+        (r) => (r.value as { path?: string }).path === 'users/test-uid',
+      )?.value
+      expect(mockBatchUpdate).toHaveBeenCalledWith(userRef, {
+        orgIds: { __arrayUnion: 'org-1' },
+      })
     })
   })
 
