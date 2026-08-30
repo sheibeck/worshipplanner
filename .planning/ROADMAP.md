@@ -397,3 +397,18 @@ Work this will cover when promoted:
 - [ ] Production deploy to `worshipbuilder.web.app` (per-deploy owner confirmation per deploy policy).
 - [ ] Later: point other/custom domains to the new site.
 - [ ] TBD (promote with /gsd-review-backlog when ready)
+
+### Phase 999.3: Per-org Bible API toggle with BibleGateway manual fallback (BACKLOG)
+
+**Goal:** [Captured for future planning] Put the Bible API options behind a **per-organization** on/off configuration, controllable from the Owner Console. When the API is OFF for an org, substitute a **manual driver out to BibleGateway** in the version they want, so we always have a path forward without passing pay-only API costs to users.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Why: the Bible APIs are **pay-only and licensed for non-commercial use** — we must not pass those costs to users, so every org needs a zero-cost fallback path.
+
+Design notes captured from owner:
+- Owner Console: per-org toggle to enable/disable Bible API access (gate the existing API-backed features on it).
+- When API is OFF: no automatic congregational readings for that org. Substitute a **manual** flow — e.g. a deep-link/driver out to BibleGateway for the chosen version, and/or a manual "paste the passage in" affordance instead of auto-fetching via the API.
+- Upside of the manual/paste path: works with **any** Bible version, instead of us having to support each version through a specific API.
+- Open questions for planning: how the toggle interacts with existing scripture-slide / congregational-reading features; where version selection lives per org; whether paste-in becomes the universal path even when APIs are on.
+- [ ] TBD (promote with /gsd-review-backlog when ready)
