@@ -146,13 +146,6 @@
           </p>
         </div>
       </div>
-
-      <!-- Phase 98 (R285/R286/R287): additive, unconditional across every phase
-           above — automatic-fullscreen readiness is gated by the `fullscreen`
-           permission, a different permission than `window-management`, so it
-           is relevant even on the manual/denied/unavailable paths. Never one
-           of the mutually-exclusive phase branches. -->
-      <FullscreenSetupPanel class="mt-8" />
     </div>
   </AppShell>
 </template>
@@ -162,7 +155,6 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppShell from '@/components/AppShell.vue'
 import MonitorCard from '@/components/MonitorCard.vue'
 import MonitorFallbackPanel from '@/components/MonitorFallbackPanel.vue'
-import FullscreenSetupPanel from '@/components/FullscreenSetupPanel.vue'
 import {
   computeFingerprint,
   saveMapping,

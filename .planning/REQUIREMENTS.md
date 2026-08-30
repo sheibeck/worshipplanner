@@ -87,9 +87,9 @@ Which phase covers which requirement. Populated during roadmap creation.
 | R273 | Phase 96 | Complete |
 | R274 | Phase 96 | Complete |
 | R275 | Phase 95 | Complete |
-| R285 | Phase 98 | Complete |
-| R286 | Phase 98 | Complete |
-| R287 | Phase 98 | Complete |
+| R285 | Phase 98 | Removed — superseded 2026-08-30 |
+| R286 | Phase 98 | Removed — superseded 2026-08-30 |
+| R287 | Phase 98 | Removed — superseded 2026-08-30 |
 
 **Coverage:**
 
@@ -120,7 +120,19 @@ Owner hardware-UAT feedback (2026-08-28) drove an approved redesign of the live 
 UX refinement are folded into R276. Explicitly omitted (no backing data/system, would be fake UI):
 presence/activity, CCLI preflight, Key/BPM, Logo-cut, Stage 3rd output, "Follow me on confidence".
 
-## v2.4 Addendum — Fullscreen Setup Helper (Phase 98)
+## v2.4 Addendum — Fullscreen Setup Helper (Phase 98) — ⚠ REMOVED / SUPERSEDED 2026-08-30
+
+> **This whole phase was built, then REMOVED on 2026-08-30.** Owner hardware UAT proved its premise false:
+> the Chromium Automatic Fullscreen policy does NOT actually permit no-gesture multi-monitor fullscreen —
+> with a provably-correct machine-wide policy (`chrome://policy` OK), `requestFullscreen()` still rejected
+> `not granted` on BOTH Chrome 151 and Edge, and the `fullscreen`/`allowWithoutGesture` permission query
+> returned a **false-positive** `granted`. So R285's readiness check would have lied and R286's download
+> would have "fixed" nothing. The real solution shipped instead: **per-display "Go fullscreen" buttons on
+> the Run control's Displays panel** (gesture-delegated, one click per display, no registry, no per-computer
+> setup, and confirmed working with the policy fully removed). All Phase 98 code (`FullscreenSetupPanel.vue`,
+> `useFullscreenReadiness`, `osDetect`, `fullscreenPolicyFiles`, `downloadTextFile`, the `docs/fullscreen-setup/*.reg`
+> and `docs/run-fullscreen-setup.md`) was deleted; the planning artifacts are kept as a historical record.
+> R285–R287 are **withdrawn**, not delivered.
 
 Owner UAT (2026-08-29) established that R278 auto-fullscreen depends on the Chromium **Automatic
 Fullscreen** content setting, which the browser will not prompt for — it is enabled per-computer via a

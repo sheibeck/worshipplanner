@@ -76,7 +76,15 @@ All R276–R284 code-verified; these need real hardware:
 5. **Closed/unplug recovery on hardware** — reopen + in-place reassign keep the place (retest post-redesign).
 6. **Overall run/stop feel** — pre-flight → Go live → drive → blackout → End service across a full cycle.
 
-## Phase 98 — Fullscreen Setup Helper (verified 2026-08-29, pass-with-deferred-human-UAT)
+## Phase 98 — Fullscreen Setup Helper — ⚠ REMOVED 2026-08-30 (do NOT run these UAT items)
+
+> The Fullscreen Setup Helper was removed 2026-08-30: hardware UAT disproved its premise (the Automatic
+> Fullscreen policy does not enable no-gesture multi-monitor fullscreen on Chrome 151/Edge even when
+> `chrome://policy` shows OK; the permission query false-positives). Superseded by per-display
+> "Go fullscreen" buttons (gesture-delegated) on the Run control's Displays panel. The items below are
+> **void** — the feature and its `.reg` files no longer exist.
+
+### (void) original deferred items
 
 The in-app helper that turns on the Chromium Automatic Fullscreen policy. R285–R287 code-verified (4/4
 must-haves in source, gates clean, no regression). These need real hardware / real OS policy writes that

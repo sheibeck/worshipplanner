@@ -389,7 +389,7 @@ expected; Phase 96 re-confirms this rather than assuming it.
 - [ ] **Phase 95: Run/Control Screen + Run Entry Point** - Run button, order-of-service rail, click-to-jump, keyboard nav, single-selection live model
 - [ ] **Phase 96: Live-Ops Hardening** - Closed-window recovery, monitor-replug detection, and sync robustness over a realistic service
 - [ ] **Phase 97: Run Service Redesign** - Owner UAT-driven redesign: pre-flight + live control layout (design import), confidence left/right, blackout, timers, in-item filmstrip, rehearse, service-list Run, output self-fullscreen
-- [x] **Phase 98: Fullscreen Setup Helper** - Guided, self-checking in-app enablement of the Chromium Automatic Fullscreen policy from the Monitor Setup screen: readiness detection + origin-aware, per-OS (Windows/macOS/Linux) policy-file download, so a non-technical operator turns on multi-monitor auto-fullscreen once per computer without touching a policy editor
+- [~] **Phase 98: Fullscreen Setup Helper** — ⚠ **BUILT THEN REMOVED 2026-08-30** (premise disproven on hardware; superseded by per-display "Go fullscreen" buttons on the Run control's Displays panel — gesture-delegated, no registry). See the Phase 98 detail note and REQUIREMENTS Phase 98 addendum.
 
 ## Phase Details
 
@@ -556,7 +556,16 @@ expected; Phase 96 re-confirms this rather than assuming it.
 > verified. The milestone was held open for owner hardware UAT; this phase folds the owner's approved design
 > + six UX fixes back in before close.
 
-### Phase 98: Fullscreen Setup Helper
+### Phase 98: Fullscreen Setup Helper — ⚠ BUILT THEN REMOVED 2026-08-30
+
+> **SUPERSEDED / REMOVED.** Owner hardware UAT disproved the premise: the Chromium Automatic Fullscreen
+> policy does not actually permit no-gesture multi-monitor fullscreen (Chrome 151 + Edge both rejected
+> `requestFullscreen()` with `not granted` despite a `chrome://policy`-OK machine-wide policy), and the
+> permission query the helper relied on returns a false-positive `granted`. The real fix shipped instead —
+> **per-display "Go fullscreen" buttons** on the Run control's Displays panel (gesture-delegated; no
+> registry, no per-computer setup; confirmed working with the policy fully uninstalled). All Phase 98 code
+> and the `docs/fullscreen-setup/` reg files were deleted; these planning artifacts are retained as history.
+> R285–R287 are withdrawn. The goal/criteria below are the ORIGINAL (now-void) plan.
 
 **Goal**: A non-technical projectionist can turn on true multi-monitor auto-fullscreen for a computer
 **once**, entirely from inside the Monitor Setup screen — the app tells them whether this computer is

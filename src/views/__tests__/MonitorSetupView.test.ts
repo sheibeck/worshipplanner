@@ -59,12 +59,6 @@ function mountView() {
     global: {
       stubs: {
         AppShell: { template: '<div><slot /></div>' },
-        // Phase 98: FullscreenSetupPanel owns its own readiness composable
-        // (navigator.permissions.query) — stubbed here so these view tests
-        // stay decoupled from that composable and assert only on presence/
-        // placement, matching FullscreenSetupPanel.test.ts's own coverage of
-        // its internal states.
-        FullscreenSetupPanel: { template: '<div data-testid="fullscreen-setup-panel" />' },
       },
     },
   })
@@ -359,36 +353,5 @@ describe('MonitorSetupView — save round-trip "not persisted" warning', () => {
     expect(wrapper.text()).not.toContain('Saved for this device')
 
     setItemSpy.mockRestore()
-  })
-})
-
-describe('MonitorSetupView — FullscreenSetupPanel is mounted additively, outside the phase chain (Phase 98)', () => {
-  it('renders the panel in the default/prompt phase, before any detection has run', async () => {
-    // getScreenDetails present but not yet clicked, and jsdom has no
-    // navigator.permissions by default, so the view settles in 'prompt'
-    // (the same setup the "synchronous permission-call contract" test above
-    // relies on) rather than auto-advancing to 'unavailable' or 'granted'.
-    installGetScreenDetails([makeScreen({ label: 'Front Wall' })])
-    const wrapper = mountView()
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Set up your displays')
-    expect(wrapper.find('[data-testid="fullscreen-setup-panel"]').exists()).toBe(true)
-  })
-
-  it('renders the panel in the unavailable phase too, proving it sits outside the mutually-exclusive phase v-if/else chain', async () => {
-    expect('getScreenDetails' in window).toBe(false)
-    const wrapper = mountView()
-    await flushPromises()
-
-    expect(wrapper.text()).toContain("Your browser can't auto-detect monitors")
-    expect(wrapper.find('[data-testid="fullscreen-setup-panel"]').exists()).toBe(true)
-  })
-
-  it('renders exactly one FullscreenSetupPanel', async () => {
-    const wrapper = mountView()
-    await flushPromises()
-
-    expect(wrapper.findAll('[data-testid="fullscreen-setup-panel"]')).toHaveLength(1)
   })
 })
