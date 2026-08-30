@@ -16,11 +16,6 @@
       <!-- State C: permission denied -->
       <MonitorFallbackPanel v-else-if="phase === 'denied'" reason="denied" @retry="onDetectClick" />
 
-      <!-- State C (voluntary): operator chose "Set up manually instead" — same
-           fallback UI as a real denial, but with honest, non-blocking copy
-           (REVIEW-FIX IN-manual-copy). -->
-      <MonitorFallbackPanel v-else-if="phase === 'manual'" reason="manual" @retry="onDetectClick" />
-
       <!-- State A: before detection -->
       <div v-else-if="phase === 'prompt' || phase === 'detecting'" class="bg-gray-900 border border-gray-800 rounded-lg p-6 text-center max-w-md mx-auto">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-gray-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -36,13 +31,6 @@
           @click="onDetectClick"
         >
           {{ phase === 'detecting' ? 'Detecting...' : 'Detect My Monitors' }}
-        </button>
-        <button
-          type="button"
-          class="block mx-auto text-xs text-gray-500 hover:text-gray-300 underline underline-offset-2 mt-3"
-          @click="onSetupManually"
-        >
-          Set up manually instead
         </button>
       </div>
 
@@ -166,7 +154,7 @@ import {
   type ScreenLike,
 } from '@/utils/monitorConfig'
 
-type Phase = 'prompt' | 'detecting' | 'denied' | 'manual' | 'unavailable' | 'granted'
+type Phase = 'prompt' | 'detecting' | 'denied' | 'unavailable' | 'granted'
 type GrantedView = 'fresh' | 'matched' | 'reprompt'
 
 /**
@@ -206,11 +194,9 @@ const refreshNoticeVisible = ref(false)
 let screenDetailsRef: ScreenDetailsLike | null = null
 
 // Monotonic token guarding against a stale getScreenDetails() resolution
-// overriding a choice the operator has since made — e.g. clicking "Set up
-// manually instead" while an earlier detection is still in flight
-// (REVIEW-FIX WR-03). Bumped by every new detection attempt AND by the
-// manual-fallback escape hatch, so a resolution/rejection that arrives after
-// a newer attempt (or after the operator moved on) is a no-op.
+// overriding a newer detection attempt (REVIEW-FIX WR-03). Bumped by every
+// new detection attempt, so a resolution/rejection that arrives after a newer
+// attempt started is a no-op.
 let detectRequestId = 0
 
 const screensWithFingerprint = computed(() =>
@@ -395,17 +381,6 @@ function handleDetectionFailure() {
   phase.value = 'denied'
 }
 
-// Voluntary escape hatch (State A) — NOT a real permission denial, so it
-// gets its own 'manual' phase with honest copy (REVIEW-FIX IN-manual-copy).
-// Also bumps the detection request token so a still-in-flight
-// getScreenDetails() from an earlier Detect click cannot resolve afterward
-// and silently yank the operator back into the granted grid (REVIEW-FIX
-// WR-03).
-function onSetupManually() {
-  detectRequestId++
-  phase.value = 'manual'
-}
-
 // The single most gesture-sensitive line in this phase: getScreenDetails()
 // MUST be the first statement here (after the plain feature-detect guard,
 // which consumes no event-loop turn) with NO await/store dispatch/router
@@ -424,8 +399,7 @@ function onDetectClick() {
     .getScreenDetails()
     .then((details: ScreenDetailsLike) => {
       // Stale-resolution guard (REVIEW-FIX WR-03): ignore if a newer
-      // detection attempt started, or the operator moved on (e.g. clicked
-      // "Set up manually instead" while this was still pending).
+      // detection attempt started while this was still pending.
       if (requestId === detectRequestId) handleDetectionSuccess(details)
     })
     .catch(() => {

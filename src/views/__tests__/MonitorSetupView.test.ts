@@ -245,42 +245,6 @@ describe('MonitorSetupView — same-monitor validation blocks Save', () => {
   })
 })
 
-describe('MonitorSetupView — WR-03: a stale detection resolution must not override the manual fallback choice', () => {
-  it('ignores a getScreenDetails() resolution that arrives after "Set up manually instead" was clicked', async () => {
-    let resolveDetails!: (value: { screens: ScreenLike[]; addEventListener: () => void; removeEventListener: () => void }) => void
-    const pending = new Promise<{ screens: ScreenLike[]; addEventListener: () => void; removeEventListener: () => void }>((resolve) => {
-      resolveDetails = resolve
-    })
-    ;(window as unknown as { getScreenDetails: unknown }).getScreenDetails = vi.fn(() => pending)
-
-    const wrapper = mountView()
-    await flushPromises()
-
-    await wrapper.get('[data-testid="detect-button"]').trigger('click')
-    await flushPromises()
-    expect(wrapper.text()).toContain('Detecting...')
-
-    // Operator gives up waiting on the still-pending prompt and chooses the
-    // manual fallback instead.
-    const manualButton = wrapper.findAll('button').find((b) => b.text() === 'Set up manually instead')
-    expect(manualButton).toBeTruthy()
-    await manualButton!.trigger('click')
-    expect(wrapper.text()).toContain("No problem — let's set this up by hand")
-    // IN-manual-copy: honest copy for a voluntary opt-out, not denial copy.
-    expect(wrapper.text()).toContain('You chose to set up your displays manually')
-    expect(wrapper.text()).not.toContain('blocked automatic detection')
-
-    // The stale detection now resolves.
-    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
-    resolveDetails({ screens, addEventListener: vi.fn(), removeEventListener: vi.fn() })
-    await flushPromises()
-
-    // The operator's explicit manual choice must survive the late resolution.
-    expect(wrapper.text()).toContain("No problem — let's set this up by hand")
-    expect(wrapper.text()).not.toContain('Your displays are set up')
-  })
-})
-
 describe('MonitorSetupView — WR-02: a same-layout re-detect must not discard unsaved role edits', () => {
   it('keeps in-progress "Reassign roles" selections (and shows the kept notice) when Re-detect finds the same screens', async () => {
     const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]

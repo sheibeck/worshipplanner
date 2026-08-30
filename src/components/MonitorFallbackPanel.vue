@@ -25,7 +25,7 @@
 import { computed } from 'vue'
 
 const props = defineProps<{
-  reason: 'denied' | 'unavailable' | 'manual'
+  reason: 'denied' | 'unavailable'
 }>()
 
 defineEmits<{
@@ -41,13 +41,6 @@ const heading = computed(() =>
 const body = computed(() => {
   if (props.reason === 'unavailable') {
     return "Chrome or Edge can do this automatically — your browser doesn't support it. No problem, you can still set up both displays by hand:"
-  }
-  if (props.reason === 'manual') {
-    // Distinct from 'denied' copy on purpose (REVIEW-FIX IN-manual-copy):
-    // this path is reached only when the operator VOLUNTARILY clicked "Set
-    // up manually instead" — nothing was blocked, so the copy must not imply
-    // a permission denial that never happened.
-    return "You chose to set up your displays manually. You can still get both displays working with a few clicks:"
   }
   return 'Your browser blocked automatic detection. You can still get both displays working with a few clicks:'
 })
