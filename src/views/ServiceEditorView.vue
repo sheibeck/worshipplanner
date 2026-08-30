@@ -892,14 +892,14 @@
                      line above depends on and leave a locked editor with nothing. -->
                 <p v-else-if="authStore.isEditor && isLocked" class="text-sm text-gray-200">
                   {{ localService.sermonPassage
-                    ? `${localService.sermonPassage.book} ${localService.sermonPassage.chapter}:${localService.sermonPassage.verseStart}${localService.sermonPassage.verseEnd ? '-' + localService.sermonPassage.verseEnd : ''}`
+                    ? formatScriptureReference(localService.sermonPassage)
                     : '—'
                   }}
                 </p>
                 <!-- Viewer: read-only text -->
                 <p v-else class="text-sm text-gray-200">
                   {{ localService.sermonPassage
-                    ? `${localService.sermonPassage.book} ${localService.sermonPassage.chapter}:${localService.sermonPassage.verseStart}${localService.sermonPassage.verseEnd ? '-' + localService.sermonPassage.verseEnd : ''}`
+                    ? formatScriptureReference(localService.sermonPassage)
                     : '—'
                   }}
                 </p>
