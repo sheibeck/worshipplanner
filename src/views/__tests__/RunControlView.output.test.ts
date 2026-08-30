@@ -1206,6 +1206,29 @@ describe('RunControlView output — fullscreen capability delegation (opener sid
     )
   })
 
+  it('per-display button reflects REAL fullscreen state — done ✓ when fullscreen, flips back on Escape (owner UAT)', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await goLive(wrapper)
+
+    // Initially not fullscreen → the action button shows, no done badge.
+    expect(wrapper.find('[data-testid="run-display-fullscreen-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-fullscreen-done-audience"]').exists()).toBe(false)
+
+    // The audience output reports it IS fullscreen → button becomes the done ✓ badge.
+    fireMessage({ type: 'wp-fullscreen-state', role: 'audience', fullscreen: true }, window.location.origin, openedWins[0])
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-display-fullscreen-done-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-fullscreen-audience"]').exists()).toBe(false)
+
+    // Projectionist presses Escape on that display → reports false → flips back to the action.
+    fireMessage({ type: 'wp-fullscreen-state', role: 'audience', fullscreen: false }, window.location.origin, openedWins[0])
+    await flushPromises()
+    expect(wrapper.find('[data-testid="run-display-fullscreen-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-display-fullscreen-done-audience"]').exists()).toBe(false)
+  })
+
   it('ignores a wp-output-ready from a CROSS-ORIGIN message', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])

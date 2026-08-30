@@ -328,6 +328,12 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   const outputStatus = ref<OutputStatus>('idle')
   const readyAudienceLabel = ref<string | null>(null)
   const readyConfidenceLabel = ref<string | null>(null)
+  // Owner UAT: REAL fullscreen state per output, reported by each output window on
+  // fullscreenchange (see useOutputWindow.reportFullscreenState). Drives the
+  // Displays-panel per-display button: done ✓ vs "Go fullscreen", and flips back the
+  // instant the projectionist presses Escape out of fullscreen on that display.
+  const audienceFullscreen = ref(false)
+  const confidenceFullscreen = ref(false)
   // WR-02: which display was refused when EXACTLY ONE of the two window.open
   // calls came back null (the honest 'partial' state names the dark monitor).
   const blockedRole = ref<MonitorRole | null>(null)
@@ -596,7 +602,15 @@ export function useRunControl(options: UseRunControlOptions = {}) {
 
   function handleOutputReady(event: MessageEvent) {
     if (event.origin !== window.location.origin) return
-    const data = event.data as { type?: string } | null
+    const data = event.data as { type?: string; role?: string; fullscreen?: boolean } | null
+    // Owner UAT: an output window reporting its REAL fullscreen state → update the
+    // per-display button. Origin-gated (same-origin only); it is UI state, not a
+    // capability grant, so no source-window check is needed.
+    if (data && data.type === 'wp-fullscreen-state') {
+      if (data.role === 'audience') audienceFullscreen.value = !!data.fullscreen
+      else if (data.role === 'confidence') confidenceFullscreen.value = !!data.fullscreen
+      return
+    }
     if (!data || data.type !== 'wp-output-ready') return
     const source = event.source
     if (!source) return
@@ -855,6 +869,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     live.value = false
     rehearsing.value = false
     blackout.value = false
+    audienceFullscreen.value = false
+    confidenceFullscreen.value = false
     resetElapsed()
     // Blank the projector FIRST — close the output windows before the channel
     // close + navigation, so ending run mode tears down the real displays (R266).
@@ -1183,6 +1199,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     reopenOutput,
     reopenReassignedOutputs,
     fullscreenDisplay,
+    audienceFullscreen,
+    confidenceFullscreen,
     openOutputs,
     // exit confirm + mode-branched exit affordance (owner UAT)
     confirmOpen,

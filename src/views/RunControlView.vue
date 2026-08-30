@@ -267,6 +267,8 @@
               :audienceClosed="audienceClosed"
               :confidenceClosed="confidenceClosed"
               :reassigning="monitorChanged"
+              :audienceFullscreen="audienceFullscreen"
+              :confidenceFullscreen="confidenceFullscreen"
               @reopen="reopenOutput"
               @fullscreen="fullscreenDisplay"
               @manage="openManage"
@@ -401,6 +403,8 @@ const {
   reopenOutput,
   reopenReassignedOutputs,
   fullscreenDisplay,
+  audienceFullscreen,
+  confidenceFullscreen,
   openOutputs,
   // actions
   rehearse,

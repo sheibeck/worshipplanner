@@ -429,6 +429,43 @@ describe('useOutputWindow — Fullscreen Capability Delegation (child side)', ()
     }
   })
 
+  it('reports REAL fullscreen state to window.opener on fullscreenchange (enter and Escape)', async () => {
+    const openerPost = vi.fn()
+    Object.defineProperty(window, 'opener', {
+      value: { postMessage: openerPost },
+      configurable: true,
+      writable: true,
+    })
+    try {
+      setFullscreenElement(null)
+      const fake = createFakeChannel()
+      mountHost(fake.factory)
+      await flushPromises()
+      openerPost.mockClear() // ignore the initial on-mount report
+
+      // Enter fullscreen → a fullscreenchange with document.fullscreenElement set.
+      setFullscreenElement(document.documentElement)
+      document.dispatchEvent(new Event('fullscreenchange'))
+      await flushPromises()
+      expect(openerPost).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'wp-fullscreen-state', fullscreen: true }),
+        window.location.origin,
+      )
+
+      // Escape out → reports false, so the control's per-display button flips back.
+      openerPost.mockClear()
+      setFullscreenElement(null)
+      document.dispatchEvent(new Event('fullscreenchange'))
+      await flushPromises()
+      expect(openerPost).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'wp-fullscreen-state', fullscreen: false }),
+        window.location.origin,
+      )
+    } finally {
+      Object.defineProperty(window, 'opener', { value: null, configurable: true, writable: true })
+    }
+  })
+
   it('requests fullscreen on a same-origin { type:"wp-fullscreen-delegate" } message', async () => {
     setFullscreenElement(null)
     const fake = createFakeChannel()

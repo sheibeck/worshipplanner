@@ -105,6 +105,24 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
   // PresentationViewer.handleFullscreenChange (Pitfall 6).
   function handleFullscreenChange() {
     isFullscreen.value = !!document.fullscreenElement
+    reportFullscreenState()
+  }
+
+  // Report REAL fullscreen state to the opener (control) so each per-display
+  // "Go fullscreen" button reflects ground truth: it shows a done ✓ when the display
+  // is ACTUALLY fullscreen, and flips back to "Go fullscreen" the instant someone
+  // presses Escape (a real fullscreenchange) — not merely whether the button was
+  // clicked. Lets the projectionist see, at the booth, which displays still need a
+  // click. Best-effort; no/cross-origin opener → silent.
+  function reportFullscreenState() {
+    try {
+      window.opener?.postMessage(
+        { type: 'wp-fullscreen-state', role: options.role ?? null, fullscreen: isFullscreen.value },
+        window.location.origin,
+      )
+    } catch {
+      /* no / cross-origin opener */
+    }
   }
 
   function handleReenterFullscreen() {
@@ -238,6 +256,9 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    // Announce initial fullscreen state (normally false) so the control's per-display
+    // button starts in the correct "Go fullscreen" state without waiting for a change.
+    reportFullscreenState()
     void acquireWakeLock()
 
     // Bounded font-load gate — a rejected import or timeout must never strand the

@@ -43,6 +43,10 @@ const props = defineProps<{
   audienceClosed: boolean
   confidenceClosed: boolean
   reassigning: boolean
+  // REAL fullscreen state per output (reported by each output window). Drives the
+  // per-display button: "Go fullscreen" vs a done ✓, flipping back on an Escape.
+  audienceFullscreen: boolean
+  confidenceFullscreen: boolean
 }>()
 
 const emit = defineEmits<{
@@ -66,15 +70,23 @@ interface Row {
   title: string
   card: OutputCard
   state: CardState
+  fullscreen: boolean
 }
 
 const rows = computed<Row[]>(() => [
-  { role: 'audience', title: 'Audience', card: props.audience, state: cardState(props.audience, props.audienceClosed) },
+  {
+    role: 'audience',
+    title: 'Audience',
+    card: props.audience,
+    state: cardState(props.audience, props.audienceClosed),
+    fullscreen: props.audienceFullscreen,
+  },
   {
     role: 'confidence',
     title: 'Confidence',
     card: props.confidence,
     state: cardState(props.confidence, props.confidenceClosed),
+    fullscreen: props.confidenceFullscreen,
   },
 ])
 </script>
@@ -162,9 +174,12 @@ const rows = computed<Row[]>(() => [
              never chases the mouse across monitors that may not even be visible.
              Shown only while the output is open (you can't fullscreen a closed
              window). Reliable: the click's gesture is delegated to the already-open
-             window. Scales to any number of outputs (e.g. a future Live Stream). -->
+             window. Scales to any number of outputs (e.g. a future Live Stream).
+             The button reflects REAL fullscreen state (reported by the output): once
+             the display is fullscreen it shows a done ✓, and it flips BACK to the
+             action the instant someone presses Escape out of fullscreen. -->
         <button
-          v-if="row.state === 'open'"
+          v-if="row.state === 'open' && !row.fullscreen"
           type="button"
           :data-testid="`run-display-fullscreen-${row.role}`"
           :aria-label="`Make the ${row.role} display fullscreen`"
@@ -173,6 +188,14 @@ const rows = computed<Row[]>(() => [
         >
           Go fullscreen
         </button>
+        <span
+          v-else-if="row.state === 'open' && row.fullscreen"
+          :data-testid="`run-display-fullscreen-done-${row.role}`"
+          class="inline-flex items-center gap-1 min-h-9 flex-none rounded-md bg-green-500/15 px-3 py-1.5 text-xs font-medium text-green-300"
+        >
+          <span class="h-1.5 w-1.5 rounded-full bg-green-400" aria-hidden="true"></span>
+          Fullscreen
+        </span>
       </div>
 
     </div>
