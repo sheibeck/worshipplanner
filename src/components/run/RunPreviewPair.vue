@@ -59,6 +59,21 @@
         >
           Loading slideshow…
         </div>
+        <!-- Owner UAT: when the operator has "gone to black", mirror it here so the
+             On-screen preview OBVIOUSLY shows BLACK (not a broken/empty preview) — the
+             projectionist can see at a glance that the audience is blacked out. Sits
+             OVER the slide preview; cleared when blackout is off. -->
+        <div
+          v-if="blackout"
+          data-testid="run-current-blackout"
+          class="absolute inset-0 flex items-center justify-center bg-black"
+        >
+          <span
+            class="rounded border border-white/25 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white/70"
+          >
+            Black
+          </span>
+        </div>
       </div>
       <!-- Owner UAT 2×2: content stacked UNDER the On-screen pane (the filmstrip). -->
       <div class="mt-6"><slot name="under-current" /></div>
@@ -132,6 +147,9 @@ defineProps<{
   /** True while rehearsing (no outputs) — the program tag/ring reads amber
    *  "Rehearsing" instead of green "LIVE" (owner UAT). */
   rehearsing?: boolean
+  /** True when the operator has blacked out the outputs — the On-screen (program)
+   *  preview shows a BLACK overlay so the projectionist sees the audience is black. */
+  blackout?: boolean
 }>()
 
 /**

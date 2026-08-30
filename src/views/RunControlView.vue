@@ -250,7 +250,7 @@
              a slot under each; the filmstrip keeps its own overflow-x-auto so it
              stays usable in the narrower left column. `rehearsing` makes the
              On-screen tag/ring read yellow "Rehearsing" in rehearse mode. -->
-        <RunPreviewPair :current="current" :next="next" :live="live" :rehearsing="rehearsing">
+        <RunPreviewPair :current="current" :next="next" :live="live" :rehearsing="rehearsing" :blackout="blackout">
           <template #under-current>
             <RunFilmstrip
               :slides="filmstripSlides"
