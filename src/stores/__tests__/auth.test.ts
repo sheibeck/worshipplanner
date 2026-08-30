@@ -69,6 +69,15 @@ vi.mock('@/firebase', () => ({
   db: {},
 }))
 
+// Bug 2a (quick 260830-l9c) — logout() dynamically imports orgScopedStores
+// (same pattern selectOrg/enterOrgAsSuperAdmin/exitSuperAdminView already
+// use); a no-op spy here is harmless for THOSE tests (they assert org
+// state, not teardown) and lets the new logout ordering test below assert
+// resetOrgScopedStores actually ran, and ran before signOut.
+vi.mock('../orgScopedStores', () => ({
+  resetOrgScopedStores: vi.fn(),
+}))
+
 // CR-01 (46-REVIEW.md) — loadOrgContext eager-loads the org's chosen slide
 // font. Only `loadFontCss` is mocked/asserted on directly; `snapWeight`/
 // `SLIDE_FONTS` stay real so the family/weight resolution under test is the
@@ -394,6 +403,23 @@ describe('useAuthStore', () => {
       await store.logout()
       triggerAuthStateChange(null)
       expect(store.user).toBeNull()
+    })
+
+    // Bug 2a (quick 260830-l9c) — all 11 org-scoped store listeners MUST be
+    // torn down before the token is revoked, or they fail their Firestore
+    // rules mid-signOut ("Uncaught Error in snapshot listener").
+    it('resets org-scoped stores before signOut', async () => {
+      const { resetOrgScopedStores } = await import('../orgScopedStores')
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+
+      await store.logout()
+
+      expect(resetOrgScopedStores).toHaveBeenCalled()
+      expect(vi.mocked(resetOrgScopedStores).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(signOut).mock.invocationCallOrder[0]!,
+      )
     })
   })
 

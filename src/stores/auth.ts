@@ -857,6 +857,12 @@ export const useAuthStore = defineStore('auth', () => {
     viewingAsSuperAdmin.value = null
     memberUnsub?.()
     memberUnsub = null
+    // Bug 2a (quick 260830-l9c) — tear down all org-scoped store listeners
+    // BEFORE the token is revoked, so none of them fail a Firestore rule
+    // mid-signOut. Same dynamic-import pattern selectOrg/enterOrgAsSuperAdmin/
+    // exitSuperAdminView already use (avoids an auth<->store import cycle).
+    const { resetOrgScopedStores } = await import('./orgScopedStores')
+    resetOrgScopedStores()
     await signOut(auth)
   }
 
