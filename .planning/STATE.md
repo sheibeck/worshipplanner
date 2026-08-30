@@ -4,11 +4,11 @@ milestone: v2.4
 milestone_name: Run the Service (Live Presentation)
 current_phase: 98
 current_phase_name: fullscreen-setup-helper
-status: in-progress
-stopped_at: Completed 98-02-PLAN.md
-last_updated: "2026-08-29T22:19:11.364Z"
-last_activity: 2026-08-29
-last_activity_desc: "98-02-PLAN.md executed: `src/components/FullscreenSetupPanel.vue` (the"
+status: complete
+stopped_at: "v2.4 SHIPPED + deployed to production (hosting) 2026-08-30; milestone archived and closed on owner approval. Phase 98 (Fullscreen Setup Helper) was BUILT THEN REMOVED — premise disproven; superseded by per-display Go-fullscreen buttons."
+last_updated: "2026-08-30T00:00:00.000Z"
+last_activity: 2026-08-30
+last_activity_desc: "v2.4 shipped, deployed to production, and archived; milestone closed on owner approval"
 progress:
   total_phases: 9
   completed_phases: 8

@@ -8,7 +8,15 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.4 Run the Service (Live Presentation)
+## Current State: v2.4 Run the Service — ✅ SHIPPED & deployed to production 2026-08-30
+
+The live "Run the Service" milestone shipped and is live at `worship-planner-bc515.web.app` (client-only;
+closed on owner approval). Browser zero-click multi-monitor fullscreen proved unachievable on real
+hardware, so the outputs go fullscreen via reliable per-display "Go fullscreen" buttons and Phase 98's
+registry-policy helper was removed. **No next milestone is defined yet — run `/gsd-new-milestone` to start
+one.**
+
+### Delivered milestone goal + features
 
 **Goal:** Give a non-technical projectionist a clean, standalone way to *run* a locked service's
 slide deck live during a church service — driving a fullscreen audience projector and a band
