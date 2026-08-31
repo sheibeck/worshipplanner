@@ -29,8 +29,17 @@ vi.mock("firebase-admin/firestore", () => ({
   getFirestore: vi.fn(),
 }));
 
+// Return type mirrors the Resend SDK's { data, error } shape so tests can
+// resolve with an API error (data:null, error:{...}) — the SDK does NOT throw
+// on API-level rejections.
+type ResendSendResult = {
+  data: { id: string } | null;
+  error?: { statusCode?: number; name?: string; message?: string } | null;
+};
 const { mockSend } = vi.hoisted(() => ({
-  mockSend: vi.fn(async (_payload: unknown) => ({ data: { id: "m1" } })),
+  mockSend: vi.fn<(_payload: unknown) => Promise<ResendSendResult>>(async () => ({
+    data: { id: "m1" },
+  })),
 }));
 let fakeShareBaseUrl = "https://app.example.com";
 
