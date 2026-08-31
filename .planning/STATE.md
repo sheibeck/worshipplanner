@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Invite Email & Non-Google Onboarding
 status: completed
-stopped_at: Completed 100-01-PLAN.md
-last_updated: "2026-08-31T16:20:01.574Z"
+stopped_at: "v2.5 SHIPPED, closed & archived (tag v2.5 + master PUSHED to GitHub). functions:sendInviteOnboardingEmail AND hosting both DEPLOYED to prod 2026-08-31 (live at worship-planner-bc515.web.app). ONLY remaining follow-up: Resend DNS domain verification (functions/DEPLOY-EMAIL-DOMAIN.md) — until done the onboarding@resend.dev test sender only delivers to the owner's own inbox. No active milestone — /gsd-new-milestone for the next."
+last_updated: "2026-08-31T16:35:00.000Z"
 last_activity: 2026-08-31
-last_activity_desc: Milestone v2.5 completed and archived
+last_activity_desc: "v2.5 completed + archived + tag/master pushed; function + hosting deployed to prod; Resend DNS verification is the sole remaining follow-up"
 progress:
   total_phases: 2
   completed_phases: 2
