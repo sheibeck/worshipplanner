@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Per-Org Bible API Toggle & Manual Fallback (Phases 101-103, in progress)
-current_phase: 102
-current_phase_name: Gated Scripture Fetch Dispatcher
+current_phase: 103
+current_phase_name: Manual Fallback When Bible API Is Off
 status: executing
-stopped_at: Completed 102-02-PLAN.md
-last_updated: "2026-08-31T19:11:23.524Z"
+stopped_at: Completed 103-01-PLAN.md
+last_updated: "2026-08-31T20:59:16.801Z"
 last_activity: 2026-08-31
-last_activity_desc: "102-02-PLAN.md executed: added `checkOrgBibleEnablement(db, orgId)` mirroring"
+last_activity_desc: "103-01-PLAN.md executed: added `bibleGatewayLink(ref, version?)` to `src/utils/scripture.ts`"
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 67
 ---
 
@@ -1125,18 +1125,16 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 102 — Gated Scripture Fetch Dispatcher
-Plan: 102-02 — Server defense-in-depth (`checkOrgBibleEnablement`) — COMPLETE (2 of 2 plans in Phase 102)
-Status: Phase 102 fully executed and verified; ready to plan Phase 103 (Manual Fallback When Bible API Is Off)
-Last activity: 2026-08-31 — 102-02-PLAN.md executed: added `checkOrgBibleEnablement(db, orgId)` mirroring
-`checkOrgAiEnablement` (live `organizations/{orgId}.bibleApiEnabled` read, default-OFF deny 403,
-fail-closed 503 on read error) and wired it into the `api` proxy's esv/nlt branches, rejecting a
-disabled/org-less caller before the upstream fetch — independent of the Plan 102-01 client dispatcher
-(R297 defense-in-depth). `cd functions && npm test` 633/633 passing; `npm run type-check` clean; root
-`npx vitest run` shows only the documented 2-file baseline (`storage.rules.test.ts`,
-`stores/appConfig.test.ts`) — no regression. Deploy remains DEFERRED to the owner-gated milestone-end
-batch (`firebase deploy --only functions:api`) since default-OFF would deny esv/nlt for every
-not-yet-enabled org. See `.planning/phases/102-gated-scripture-fetch-dispatcher/102-02-SUMMARY.md`.
+Phase: 103 — Manual Fallback When Bible API Is Off
+Plan: 103-01 — bibleGatewayLink deep-link builder (R298) + Settings card gate (R300) — COMPLETE (1 of 2 plans in Phase 103)
+Status: Wave 1 (103-01) executed and verified; Plan 103-02 (fallback UI in ScriptureInput.vue/CongregationalEditor.vue) remains
+Last activity: 2026-08-31 — 103-01-PLAN.md executed: added `bibleGatewayLink(ref, version?)` to `src/utils/scripture.ts`
+(delegates to `formatScriptureReference`, encodes reference + optional version, omits `&version=` when
+absent/empty) and gated the Settings "Bible Translation" card behind `authStore.isBibleApiEnabled`,
+mirroring the AI Features card's `aiMasterEnabled` gate exactly — no change to `bibleVersionInput`, the
+radios, `onChangeBibleVersion`, or the save path. `npm run type-check` clean; `npx vitest run` shows only
+the documented 2-file baseline (`storage.rules.test.ts`, `stores/appConfig.test.ts`) — no regression. See
+`.planning/phases/103-manual-fallback-when-bible-api-is-off/103-01-SUMMARY.md`.
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
@@ -2927,6 +2925,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 101 P02 | 20min | 3 tasks | 6 files |
 | Phase 102 P01 | 45min | 3 tasks | 6 files |
 | Phase 102 P02 | 25min | 2 tasks | 2 files |
+| Phase 103 P01 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3392,6 +3391,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: isBibleApiEnabled is single-leg (no settings.* AND-leg) since no church-editable Bible API setting exists this milestone
 - [Phase ?]: 102-01: scriptureApi.ts dispatcher returns a discriminated { status: 'ok'|'disabled'|'error' } result rather than throwing for the disabled case — mirrors claudeApi.ts::isAiEnabled()'s graceful-off pattern; version RESOLUTION stays in each component, only version DISPATCH + the enablement gate moved into the dispatcher
 - [Phase ?]: Phase 102 Plan 02: added checkOrgBibleEnablement server-side gate mirroring checkOrgAiEnablement, wired into esv/nlt proxy branches (R297 defense-in-depth); deploy deferred to owner-gated milestone-end batch
+- [Phase ?]: 103-01: bibleGatewayLink(ref, version?) delegates its search string to the existing formatScriptureReference formatter rather than re-deriving book/chapter/verse formatting a second time; omits &version= for an absent or empty-string version so BibleGateway falls back to its own default
+- [Phase ?]: 103-01: Settings "Bible Translation" card gated by v-if="authStore.isBibleApiEnabled" mirroring the AI Features card's aiMasterEnabled gate exactly — hides the card, never deletes the stored bibleVersion field or its save logic
 
 ### Roadmap Evolution
 
@@ -3718,8 +3719,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-31T19:11:11.763Z
-Stopped at: Completed 102-02-PLAN.md
+Last session: 2026-08-31T20:59:16.685Z
+Stopped at: Completed 103-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

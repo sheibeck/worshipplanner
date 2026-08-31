@@ -488,9 +488,11 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
   3. The LLM congregational split continues to operate on manually pasted text when Bible API is off, still subject to the independent AI gate (R299).
   4. When disabled for an org, the "Bible Translation" selector is hidden in that org's Settings (`SettingsView.vue`), mirroring how the "AI Features" card hides when the AI master gate is off (R300).
 
-**Plans**: 2 plans
-- [ ] 103-01-PLAN.md — bibleGatewayLink deep-link builder (R298) + hide the Settings "Bible Translation" card when off (R300)
+**Plans**: 1/2 plans executed
+
+- [x] 103-01-PLAN.md — bibleGatewayLink deep-link builder (R298) + hide the Settings "Bible Translation" card when off (R300)
 - [ ] 103-02-PLAN.md — Bible-API-off fallback UI in both editors: deep-link + paste-in, congregational split on pasted text under the independent AI gate (R298, R299)
+
 **UI hint**: yes
 
 ## Backlog
