@@ -8,10 +8,12 @@ import {
   listOrganizationsHandler,
   setOrgActiveHandler,
   setOrgAiEnabledHandler,
+  setOrgBibleEnabledHandler,
   type OnboardOrganizationRequest,
   type AssignOrgAdminRequest,
   type SetOrgActiveRequest,
   type SetOrgAiEnabledRequest,
+  type SetOrgBibleEnabledRequest,
 } from "./orgProvisioning";
 
 // Mirrors functions/src/superAdminClaims.test.ts's established mocking seams,
@@ -213,6 +215,7 @@ const ONBOARD_DEFAULTS: OnboardOrganizationRequest = { name: "Grace Church", adm
 const ASSIGN_DEFAULTS: AssignOrgAdminRequest = { orgId: ORG_ID, email: TARGET_EMAIL };
 const SET_ACTIVE_DEFAULTS: SetOrgActiveRequest = { orgId: ORG_ID, active: false };
 const SET_AI_ENABLED_DEFAULTS: SetOrgAiEnabledRequest = { orgId: ORG_ID, aiEnabled: true };
+const SET_BIBLE_ENABLED_DEFAULTS: SetOrgBibleEnabledRequest = { orgId: ORG_ID, enabled: true };
 
 /**
  * Phase 76: a distinct getAuth() mock seam for setOrgActiveHandler's claim
@@ -266,6 +269,13 @@ function setAiEnabledRequest(overrides: {
   data?: Partial<SetOrgAiEnabledRequest>;
 } = {}) {
   return fakeRequest<SetOrgAiEnabledRequest>(overrides, SET_AI_ENABLED_DEFAULTS);
+}
+
+function setBibleEnabledRequest(overrides: {
+  auth?: { uid: string; token?: Record<string, unknown> } | null;
+  data?: Partial<SetOrgBibleEnabledRequest>;
+} = {}) {
+  return fakeRequest<SetOrgBibleEnabledRequest>(overrides, SET_BIBLE_ENABLED_DEFAULTS);
 }
 
 // --- CALLER GATE (R200/R204, T-74-01/T-74-02) -------------------------------
@@ -852,8 +862,8 @@ describe("listOrganizationsHandler", () => {
 
     expect(result).toEqual({
       organizations: [
-        { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 0, active: true, aiMasterEnabled: false },
-        { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 0, active: true, aiMasterEnabled: false },
+        { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 0, active: true, aiMasterEnabled: false, bibleApiEnabled: false },
+        { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 0, active: true, aiMasterEnabled: false, bibleApiEnabled: false },
       ],
     });
   });
@@ -880,8 +890,8 @@ describe("listOrganizationsHandler", () => {
     const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
 
     expect(result.organizations).toEqual([
-      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 2, active: true, aiMasterEnabled: false },
-      { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 1, active: true, aiMasterEnabled: false },
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 3, pendingCount: 2, active: true, aiMasterEnabled: false, bibleApiEnabled: false },
+      { orgId: "org2", name: "Hope Chapel", createdAt: "ts2", memberCount: 0, pendingCount: 1, active: true, aiMasterEnabled: false, bibleApiEnabled: false },
     ]);
   });
 
@@ -896,7 +906,7 @@ describe("listOrganizationsHandler", () => {
     const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
 
     expect(result.organizations).toEqual([
-      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 5, pendingCount: 0, active: true, aiMasterEnabled: false },
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 5, pendingCount: 0, active: true, aiMasterEnabled: false, bibleApiEnabled: false },
     ]);
   });
 
@@ -911,7 +921,7 @@ describe("listOrganizationsHandler", () => {
     const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
 
     expect(result.organizations).toEqual([
-      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 2, pendingCount: 0, active: false, aiMasterEnabled: false },
+      { orgId: "org1", name: "Grace Church", createdAt: "ts1", memberCount: 2, pendingCount: 0, active: false, aiMasterEnabled: false, bibleApiEnabled: false },
     ]);
   });
 
@@ -938,6 +948,7 @@ describe("listOrganizationsHandler", () => {
         pendingCount: 0,
         active: true,
         aiMasterEnabled: true,
+        bibleApiEnabled: false,
       },
     ]);
   });
@@ -961,6 +972,60 @@ describe("listOrganizationsHandler", () => {
         pendingCount: 0,
         active: true,
         aiMasterEnabled: false,
+        bibleApiEnabled: false,
+      },
+    ]);
+  });
+
+  // Phase 101 (R295/R301): bibleApiEnabled surfaces per org so the Owner
+  // Console table can render current state -- an org with the field
+  // explicitly true reads true, and an org with the field ABSENT (every
+  // pre-Phase-101 org, including a fresh onboard) reads false (OFF by
+  // default, no migration).
+  it("Phase 101 (R295): bibleApiEnabled reads true when the org doc carries it explicitly", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.orgsListDocs = [
+      { id: "org1", data: { name: "Grace Church", createdAt: "ts1", bibleApiEnabled: true }, memberCount: 2 },
+    ];
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
+
+    expect(result.organizations).toEqual([
+      {
+        orgId: "org1",
+        name: "Grace Church",
+        createdAt: "ts1",
+        memberCount: 2,
+        pendingCount: 0,
+        active: true,
+        aiMasterEnabled: false,
+        bibleApiEnabled: true,
+      },
+    ]);
+  });
+
+  it("Phase 101 (R295/R301): a fresh org with no bibleApiEnabled field reads false (Bible API OFF by default)", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.orgsListDocs = [
+      { id: "org1", data: { name: "Grace Church", createdAt: "ts1" }, memberCount: 0 },
+    ];
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await listOrganizationsHandler(fakeRequest<void>({}, undefined as unknown as void));
+
+    expect(result.organizations).toEqual([
+      {
+        orgId: "org1",
+        name: "Grace Church",
+        createdAt: "ts1",
+        memberCount: 0,
+        pendingCount: 0,
+        active: true,
+        aiMasterEnabled: false,
+        bibleApiEnabled: false,
       },
     ]);
   });
@@ -1295,5 +1360,138 @@ describe("setOrgAiEnabledHandler", () => {
       },
       { merge: true },
     );
+  });
+});
+
+// --- setOrgBibleEnabled (R295: per-org master Bible-API gate) ---------------
+//
+// Mirrors setOrgAiEnabledHandler's describe block above, minus the R243
+// forced-off dual-write: there is no church-editable settings.* leaf for the
+// Bible API this milestone, so DISABLE writes ONLY the master field + its
+// audit siblings -- never a settings.* key.
+
+describe("setOrgBibleEnabledHandler", () => {
+  it("rejects an unauthenticated caller before any Firestore read", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(
+      setOrgBibleEnabledHandler(setBibleEnabledRequest({ auth: null })),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
+  });
+
+  it("rejects a token without superAdmin (permission-denied), never reads Firestore", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    const dbSpy = vi.fn(() => fake.db().collection("superAdmins"));
+    vi.mocked(getFirestore).mockReturnValue({ collection: dbSpy } as never);
+
+    await expect(
+      setOrgBibleEnabledHandler(setBibleEnabledRequest({ auth: { uid: CALLER_UID, token: {} } })),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("rejects invalid-argument for a blank/non-string orgId", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(
+      setOrgBibleEnabledHandler(setBibleEnabledRequest({ data: { orgId: "" } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("rejects invalid-argument for a non-boolean enabled", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(
+      setOrgBibleEnabledHandler(setBibleEnabledRequest({ data: { enabled: "true" as unknown as boolean } })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+  });
+
+  it("rejects not-found for an orgId with no matching organizations/{orgId} doc", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: false });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    await expect(setOrgBibleEnabledHandler(setBibleEnabledRequest())).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("ENABLE: an org whose master gate was off gets bibleApiEnabled:true + audit fields via the Admin SDK", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: {} }); // no bibleApiEnabled -- absent/OFF
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await setOrgBibleEnabledHandler(setBibleEnabledRequest({ data: { orgId: ORG_ID, enabled: true } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, enabled: true });
+    expect(fake.docSetSpy).toHaveBeenCalledWith(
+      `organizations/${ORG_ID}`,
+      {
+        bibleApiEnabled: true,
+        bibleApiEnabledAt: "SERVER_TIMESTAMP_SENTINEL",
+        bibleApiEnabledBy: CALLER_UID,
+        bibleApiDisabledAt: "DELETE_SENTINEL",
+        bibleApiDisabledBy: "DELETE_SENTINEL",
+      },
+      { merge: true },
+    );
+  });
+
+  it("DISABLE: writes bibleApiEnabled:false + audit fields, and writes NO settings.* key (no church leaf this milestone)", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, {
+      exists: true,
+      data: { bibleApiEnabled: true, settings: { bibleVersion: "NLT" } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await setOrgBibleEnabledHandler(setBibleEnabledRequest({ data: { orgId: ORG_ID, enabled: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, enabled: false });
+    expect(fake.docSetSpy).toHaveBeenCalledWith(
+      `organizations/${ORG_ID}`,
+      {
+        bibleApiEnabled: false,
+        bibleApiDisabledAt: "SERVER_TIMESTAMP_SENTINEL",
+        bibleApiDisabledBy: CALLER_UID,
+        bibleApiEnabledAt: "DELETE_SENTINEL",
+        bibleApiEnabledBy: "DELETE_SENTINEL",
+      },
+      { merge: true },
+    );
+    const [, writtenData] = fake.docSetSpy.mock.calls[0] as [string, Record<string, unknown>];
+    expect(writtenData).not.toHaveProperty("settings");
+    expect(writtenData).not.toHaveProperty("settings.bibleApiEnabled");
+  });
+
+  it("SHORT-CIRCUIT (ENABLE): calling with enabled:true on an org already enabled performs no write", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: { bibleApiEnabled: true } });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await setOrgBibleEnabledHandler(setBibleEnabledRequest({ data: { orgId: ORG_ID, enabled: true } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, enabled: true });
+    expect(fake.docSetSpy).not.toHaveBeenCalled();
+  });
+
+  it("SHORT-CIRCUIT (DISABLE): calling with enabled:false on an org already off (field absent) performs no write", async () => {
+    mockAuth();
+    const fake = withCallerGate(new FakeFirestore());
+    fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: {} });
+    vi.mocked(getFirestore).mockReturnValue(fake.db() as never);
+
+    const result = await setOrgBibleEnabledHandler(setBibleEnabledRequest({ data: { orgId: ORG_ID, enabled: false } }));
+
+    expect(result).toEqual({ orgId: ORG_ID, enabled: false });
+    expect(fake.docSetSpy).not.toHaveBeenCalled();
   });
 });

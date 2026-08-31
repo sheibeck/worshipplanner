@@ -194,6 +194,20 @@ export interface Organization {
    * 82-RESEARCH.md).
    */
   aiMasterEnabled?: boolean
+  /**
+   * Phase 101 (R295) — the super-admin MASTER gate for the Bible **API**
+   * (paid ESV/NLT proxy), NOT scripture features in general — an OFF org
+   * still does scripture manually (Phases 102/103). Absent or `false` =>
+   * OFF (default), mirroring `aiMasterEnabled`'s inverted-default posture: a
+   * fresh/legacy org has the Bible API off until a super-admin explicitly
+   * enables it. Written ONLY by the `setOrgBibleEnabled` Cloud Function
+   * (Admin SDK, `functions/src/orgProvisioning.ts`, Plan 01);
+   * `firestore.rules`'s `lifecycleFields()` guard denies every client write
+   * path, including a super-admin's own client SDK. Deliberately a distinct
+   * top-level name (never a bare settings leaf) — there is no
+   * church-editable Bible-API leaf this milestone.
+   */
+  bibleApiEnabled?: boolean
 }
 
 /**

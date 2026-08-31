@@ -437,6 +437,11 @@ export interface OrgSummary {
    * is OFF by default for every organization (including newly-onboarded
    * ones)" -- only an EXPLICIT `aiMasterEnabled: true` reads as enabled. */
   aiMasterEnabled: boolean;
+  /** Phase 101 (R295): the super-admin-only master Bible-API gate. `false`
+   * when absent -- same INVERSE-default posture as `aiMasterEnabled`: a
+   * fresh/legacy org has the Bible API off until a super-admin explicitly
+   * enables it, no migration of existing orgs. */
+  bibleApiEnabled: boolean;
 }
 
 export interface ListOrganizationsResponse {
@@ -470,6 +475,7 @@ export async function listOrganizationsHandler(
         createdAt?: unknown;
         active?: boolean;
         aiMasterEnabled?: boolean;
+        bibleApiEnabled?: boolean;
       };
       return {
         orgId: orgDoc.id,
@@ -479,6 +485,7 @@ export async function listOrganizationsHandler(
         pendingCount: invitesCountSnap.data().count,
         active: data.active ?? true,
         aiMasterEnabled: data.aiMasterEnabled ?? false,
+        bibleApiEnabled: data.bibleApiEnabled ?? false,
       };
     }),
   );
@@ -734,3 +741,80 @@ export async function setOrgAiEnabledHandler(
 }
 
 export const setOrgAiEnabled = onCall(setOrgAiEnabledHandler);
+
+// --- setOrgBibleEnabled (R295: per-org master Bible-API gate) --------------
+
+export interface SetOrgBibleEnabledRequest {
+  orgId: string;
+  enabled: boolean;
+}
+
+export interface SetOrgBibleEnabledResponse {
+  orgId: string;
+  enabled: boolean;
+}
+
+/**
+ * The testable handler body, exported separately from the onCall wrapper
+ * below -- modeled on setOrgActiveHandler's SIMPLER shape (caller gate,
+ * input validation, org-existence check, same-state-aware merge write), NOT
+ * setOrgAiEnabledHandler's dual-write shape: there is no church-editable
+ * `settings.*` leaf for the Bible API this milestone (R295 decision -- that
+ * leaf is deferred), so the DISABLE branch writes ONLY the master field plus
+ * its audit siblings, never a forced-off `settings.*` dot-path key.
+ *
+ * Governs the Bible **API** (paid ESV/NLT proxy) only, not scripture
+ * features in general -- an OFF org still does scripture manually (Phases
+ * 102/103).
+ */
+export async function setOrgBibleEnabledHandler(
+  request: CallableRequest<SetOrgBibleEnabledRequest>,
+): Promise<SetOrgBibleEnabledResponse> {
+  const callerUid = await assertSuperAdminCaller(request);
+
+  const { orgId, enabled } = request.data ?? ({} as SetOrgBibleEnabledRequest);
+  if (typeof orgId !== "string" || orgId.trim() === "") {
+    throw new HttpsError("invalid-argument", "orgId is required.");
+  }
+  if (typeof enabled !== "boolean") {
+    throw new HttpsError("invalid-argument", "enabled (boolean) is required.");
+  }
+
+  const db = getFirestore();
+  const orgRef = db.collection("organizations").doc(orgId);
+  const orgSnap = await orgRef.get();
+  if (!orgSnap.exists) {
+    throw new HttpsError("not-found", `No organization found for id "${orgId}".`);
+  }
+
+  const orgData = orgSnap.data() as { bibleApiEnabled?: boolean } | undefined;
+  const currentBibleApiEnabled = orgData?.bibleApiEnabled ?? false;
+
+  if (currentBibleApiEnabled !== enabled) {
+    await orgRef.set(
+      enabled
+        ? {
+            bibleApiEnabled: true,
+            bibleApiEnabledAt: FieldValue.serverTimestamp(),
+            bibleApiEnabledBy: callerUid,
+            // Mirrors setOrgAiEnabled's IN-01 fix: clear the opposite
+            // transition's audit fields so a stale bibleApiDisabledBy/At
+            // from an earlier disable can't be misread as still current.
+            bibleApiDisabledAt: FieldValue.delete(),
+            bibleApiDisabledBy: FieldValue.delete(),
+          }
+        : {
+            bibleApiEnabled: false,
+            bibleApiDisabledAt: FieldValue.serverTimestamp(),
+            bibleApiDisabledBy: callerUid,
+            bibleApiEnabledAt: FieldValue.delete(),
+            bibleApiEnabledBy: FieldValue.delete(),
+          },
+      { merge: true },
+    );
+  }
+
+  return { orgId, enabled };
+}
+
+export const setOrgBibleEnabled = onCall(setOrgBibleEnabledHandler);
