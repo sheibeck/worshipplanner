@@ -256,6 +256,14 @@ async function autoFetch(): Promise<void> {
     // fetchError shown; the textarea/rawPassage stay untouched and the
     // component remains functional for manual entry. Phase 103 attaches the
     // BibleGateway/paste UI here.
+  } catch {
+    // WR-02 (102-REVIEW): the refactor to status-branching dropped the
+    // generic catch, leaving `stripVerseMarkers(result.text)` and the
+    // subsequent state writes with no safety net — an exception there
+    // previously set fetchError; it would otherwise now become an unhandled
+    // rejection. The dispatcher itself never throws, but this restores the
+    // documented "anything in here degrades gracefully" contract.
+    fetchError.value = true
   } finally {
     isFetching.value = false
   }

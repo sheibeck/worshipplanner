@@ -406,6 +406,14 @@ async function fetchPreview() {
     }
     // 'disabled' (Phase 102, R297): silent no-op — no fetch was attempted, no
     // error is shown. Phase 103 attaches the manual-fallback UI here.
+  } catch {
+    // WR-02 (102-REVIEW): defensive safety net restored. The dispatcher
+    // itself never throws (its own errors map to `{status:'error'}` above),
+    // but this still protects against an exception anywhere else in the try
+    // block (e.g. `useAuthStore()` inside the dispatcher, or future
+    // post-fetch processing) degrading gracefully instead of becoming an
+    // unhandled rejection.
+    previewError.value = 'Could not load passage. Check your connection and try again.'
   } finally {
     previewLoading.value = false
   }
@@ -495,6 +503,10 @@ async function togglePreview(index: number) {
       aiPreviewError.value = true
     }
     // 'disabled' (Phase 102, R297): silent no-op — see fetchPreview above.
+  } catch {
+    // WR-02 (102-REVIEW): defensive safety net restored — see fetchPreview
+    // above for the full rationale.
+    aiPreviewError.value = true
   } finally {
     aiPreviewLoading.value = false
   }
