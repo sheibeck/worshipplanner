@@ -391,7 +391,7 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 
 **Owner-run external prerequisites** (not phases, not code): confirm the Firebase Auth Email/Password provider is enabled for `worship-planner-bc515`; complete `functions/DEPLOY-EMAIL-DOMAIN.md`'s Resend DNS domain verification, or invite emails to non-owner addresses will silently not deliver (default `onboarding@resend.dev` only reaches the Resend account owner's inbox).
 
-- [ ] **Phase 99: Invite Email Function & Owner Toggle** - A Cloud Function sends the right onboarding email per invitee type (non-Google set-password link, Google/Gmail sign-in notice), gated by an Owner Console on/off switch
+- [x] **Phase 99: Invite Email Function & Owner Toggle** - A Cloud Function sends the right onboarding email per invitee type (non-Google set-password link, Google/Gmail sign-in notice), gated by an Owner Console on/off switch (completed 2026-08-31)
 - [ ] **Phase 100: Invite & Login Onboarding Wiring** - TeamView's invite UI actually calls the function with corrected copy, LoginView gains a discoverable password path + operation-not-allowed handling, and existing sign-in/invite-acceptance keep working
 
 ### Phase 99: Invite Email Function & Owner Toggle
@@ -422,7 +422,10 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
   3. Existing Google sign-in and the invite-acceptance flow (`ensureUserDocument` granting membership on first authenticated sign-in) continue to work unchanged (R294).
   4. If the invite email fails to send, the invite/membership Firestore record is still written — email delivery is best-effort and never blocks or reverts the invite (R294).
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+- [ ] 100-01-PLAN.md — TeamView invite→`sendInviteOnboardingEmail` wiring (best-effort, honest copy), LoginView `auth/operation-not-allowed` error + discoverability hint, and view tests (Wave 1) [R288, R292, R294]
+
 **UI hint**: yes
 
 ## Backlog
