@@ -4,17 +4,17 @@ milestone: v2.6
 milestone_name: Per-Org Bible API Toggle & Manual Fallback (Phases 101-103, in progress)
 current_phase: 103
 current_phase_name: Manual Fallback When Bible API Is Off
-status: executing
-stopped_at: Completed 103-01-PLAN.md
-last_updated: "2026-08-31T20:59:16.801Z"
+status: verifying
+stopped_at: Completed 103-02-PLAN.md
+last_updated: "2026-08-31T21:15:19.450Z"
 last_activity: 2026-08-31
 last_activity_desc: "103-01-PLAN.md executed: added `bibleGatewayLink(ref, version?)` to `src/utils/scripture.ts`"
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 67
+  completed_plans: 6
+  percent: 100
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.6 Per-Org Bible API Toggle & Manual Fallback (roadmap created 2026-08-31)
 
-**Status:** Ready to plan
+**Status:** Phase complete — ready for verification
 
 **Goal:** Put Bible API access behind a per-organization on/off switch controlled from the Owner Console,
 and when it is off give that org a zero-cost manual path (BibleGateway deep-link + paste-the-passage-in)
@@ -2926,6 +2926,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 102 P01 | 45min | 3 tasks | 6 files |
 | Phase 102 P02 | 25min | 2 tasks | 2 files |
 | Phase 103 P01 | 25min | 2 tasks | 4 files |
+| Phase 103 P02 | 40min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3393,6 +3394,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Phase 102 Plan 02: added checkOrgBibleEnablement server-side gate mirroring checkOrgAiEnablement, wired into esv/nlt proxy branches (R297 defense-in-depth); deploy deferred to owner-gated milestone-end batch
 - [Phase ?]: 103-01: bibleGatewayLink(ref, version?) delegates its search string to the existing formatScriptureReference formatter rather than re-deriving book/chapter/verse formatting a second time; omits &version= for an absent or empty-string version so BibleGateway falls back to its own default
 - [Phase ?]: 103-01: Settings "Bible Translation" card gated by v-if="authStore.isBibleApiEnabled" mirroring the AI Features card's aiMasterEnabled gate exactly — hides the card, never deletes the stored bibleVersion field or its save logic
+- [Phase ?]: ScriptureInput's paste textarea binds directly to previewText; CongregationalEditor's paste textarea transforms via stripVerseMarkers into rawPassage/text, mirroring autoFetch exactly; AI split gate kept strictly independent of the Bible gate (verified by opposing tests)
 
 ### Roadmap Evolution
 
@@ -3719,8 +3721,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-31T20:59:16.685Z
-Stopped at: Completed 103-01-PLAN.md
+Last session: 2026-08-31T21:15:19.388Z
+Stopped at: Completed 103-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -27,7 +27,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 ### Manual Fallback (Bible API OFF)
 
 - [x] **R298**: **When disabled**, scripture selection and congregational-reading UI offer an **"Open in BibleGateway" deep-link** for the entered reference in the desired version (works with **any** version, not just ESV/NLT), reusing the existing BibleGateway link builder in `src/utils/scripture.ts`.
-- [ ] **R299**: **When disabled**, the user can **manually paste the passage text** into a scripture slide / congregational reading and that pasted text becomes the slide/reading content (works with **any** version); the LLM congregational split continues to operate on the pasted text (still subject to the independent AI gate).
+- [x] **R299**: **When disabled**, the user can **manually paste the passage text** into a scripture slide / congregational reading and that pasted text becomes the slide/reading content (works with **any** version); the LLM congregational split continues to operate on the pasted text (still subject to the independent AI gate).
 - [x] **R300**: **When disabled for an org**, the **"Bible Translation" selector is hidden** in that org's Settings (`SettingsView.vue`), mirroring how the "AI Features" card hides when the AI master gate is off — there is no API-backed version list to configure when the API is off.
 
 ## Future Requirements (deferred)
