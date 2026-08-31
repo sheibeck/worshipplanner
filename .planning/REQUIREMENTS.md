@@ -49,10 +49,10 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 | Requirement | Phase |
 |-------------|-------|
-| R295 | TBD |
-| R296 | TBD |
-| R297 | TBD |
-| R298 | TBD |
-| R299 | TBD |
-| R300 | TBD |
-| R301 | TBD |
+| R295 | Phase 101 |
+| R296 | Phase 102 |
+| R297 | Phase 102 |
+| R298 | Phase 103 |
+| R299 | Phase 103 |
+| R300 | Phase 103 |
+| R301 | Phase 101 |

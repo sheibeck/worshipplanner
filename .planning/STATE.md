@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-08-31T16:53:50.289Z"
 last_activity: 2026-08-31
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -27,9 +27,69 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.5 Invite Email & Non-Google Onboarding (roadmap created 2026-08-30)
+# ▶ ACTIVE MILESTONE — v2.6 Per-Org Bible API Toggle & Manual Fallback (roadmap created 2026-08-31)
 
-**Status:** v2.5 milestone complete
+**Status:** Roadmap created; ready for phase discussion/planning.
+
+**Goal:** Put Bible API access behind a per-organization on/off switch controlled from the Owner Console,
+and when it is off give that org a zero-cost manual path (BibleGateway deep-link + paste-the-passage-in)
+so scripture and congregational-reading features always work without passing pay-only, non-commercial API
+costs to users. Requirements R295–R301 in REQUIREMENTS.md.
+
+(v2.5 ended at Phase 100); this milestone is **Phases 101–103**.
+
+**Roadmap (3 phases, `coarse` granularity — see `.planning/ROADMAP.md` § v2.6 for full phase detail):**
+
+- **Phase 101 — Per-Org Bible API Toggle: Owner Console Infrastructure (R295, R301):** a super-admin
+  master field on `Organization`, written only by a new super-admin-gated Cloud Function
+  (`setOrgBibleEnabled`, mirroring `setOrgAiEnabled`), surfaced/flipped from the Owner Console
+  Organizations tab (`OrgConfigDrawer`), client-write-denied in `firestore.rules`, default OFF for every
+  org (no migration). Sequenced first — nothing downstream has a gate to check without it.
+
+- **Phase 102 — Gated Scripture Fetch Dispatcher (R296, R297):** a new single choke point
+  (`src/utils/scriptureApi.ts`, the `isAiEnabled()` analog) that `ScriptureInput.vue` and
+  `CongregationalEditor.vue` both call instead of hitting `esvApi.ts`/`nltApi.ts` directly, enforcing the
+  per-org gate client-side, plus the server `api` proxy's `esv`/`nlt` branches enforcing the same gate
+  independently (defense-in-depth). No regression when enabled. Depends on Phase 101 (needs the org
+  master field + `authStore` mirror to gate against).
+
+- **Phase 103 — Manual Fallback When Bible API Is Off (R298, R299, R300):** an "Open in BibleGateway"
+  deep-link (any version, reusing the existing `src/utils/scripture.ts` link builder) plus a
+  paste-the-passage-in box that becomes the slide/reading content (LLM congregational split still runs on
+  pasted text), and the "Bible Translation" selector hidden in Settings when off — mirroring how the AI
+  Features card hides when the AI master gate is off. Depends on Phase 102 (fallback UI is conditioned on
+  the gate reporting OFF).
+
+**Coverage:** 7/7 v2.6 requirements mapped, each to exactly one phase; no orphans, no duplicates.
+
+**Key context / decisions:** Promoted from backlog 999.3. ESV/NLT APIs are pay-only + non-commercial
+licensed, so the owner must be able to disable them per church while every org keeps a working scripture
+path. Default OFF, no migration — the manual fallback makes an OFF org fully functional, not broken. A
+single super-admin master gate (no church-editable leaf) is sufficient for the cost-control goal now.
+There is no existing single Bible-fetch choke point today (fetching is split across `src/utils/esvApi.ts`
+and `src/utils/nltApi.ts`, with ESV/NLT version dispatch duplicated inline in the two caller components) —
+Phase 102 introduces one. Research was skipped (known architecture, mirrors the v2.2 AI-enablement
+pattern).
+
+**Deploy expectation:** this milestone adds a new Cloud Function (`setOrgBibleEnabled`), a
+`firestore.rules` change (deny client writes to the new master field), and a server `api` proxy change
+(the `esv`/`nlt` branches) — a Functions + rules deploy is expected alongside the client changes. Per the
+standing 2026-08-25 policy, any deploy is confirm-then-deploy, not autonomous-silent.
+
+**Next step:** `/gsd-plan-phase 101` (optionally preceded by `/gsd-discuss-phase 101`).
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.5 Invite Email & Non-Google Onboarding (shipped 2026-08-31)
+
+**Status:** v2.5 milestone complete.
+
+> ✅ **Deployed 2026-08-31** (owner-approved close). `functions:sendInviteOnboardingEmail` deployed to
+> production; audit PASSED (7/7 requirements, 4/4 integration seams WIRED); code review caught and fixed
+> an editor-can-email-arbitrary-addresses hole (invite-existence gate) before ship. Closed on owner
+> acceptance with local + own-inbox UAT confirmed. **Standing owner follow-ups:** deploy hosting (the
+> client invite-UI/toggle/LoginView changes are live only in local dev) and complete Resend DNS domain
+> verification so invite emails reach addresses other than the owner's own inbox.
 
 **Goal:** Every invited user gets an invite email, non-Google users can set a password and sign in, and
 an owner can switch onboarding emails on/off. Requirements R288–R294 in REQUIREMENTS.md.

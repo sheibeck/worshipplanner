@@ -428,6 +428,59 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 
 **UI hint**: yes
 
+### 🚧 v2.6 Per-Org Bible API Toggle & Manual Fallback (Phases 101-103, in progress)
+
+**Milestone Goal:** Put Bible API access behind a per-organization on/off switch controlled from the Owner Console, and when it is off give that org a zero-cost manual path (BibleGateway deep-link + paste-the-passage-in) so scripture and congregational-reading features always work without passing pay-only, non-commercial API costs to users.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R295–R301 (7 mapped, 100% coverage)
+
+**Key context:** Promoted from backlog 999.3. Mirrors the v2.2 per-org AI enablement pattern (`aiMasterEnabled`/`setOrgAiEnabled`) — a super-admin master field on `Organization`, written only by a super-admin-gated Cloud Function, mirrored into `authStore`, and gated in `firestore.rules`. Default OFF, no data migration — the manual fallback makes an OFF org fully functional, not broken. There is no existing single Bible-fetch choke point today (fetching is split across `src/utils/esvApi.ts` and `src/utils/nltApi.ts`, with ESV/NLT version dispatch duplicated inline in `src/components/ScriptureInput.vue` and `src/components/CongregationalEditor.vue`) — this milestone introduces one (`src/utils/scriptureApi.ts`). The BibleGateway link builder already exists in `src/utils/scripture.ts` (`scriptureWebLink`/`nltLink`).
+
+- [ ] **Phase 101: Per-Org Bible API Toggle — Owner Console Infrastructure** - A super-admin controls Bible API access per organization from the Owner Console, with every org defaulting to OFF
+- [ ] **Phase 102: Gated Scripture Fetch Dispatcher** - A single client/server choke point enforces the per-org gate, with zero regression when the API is enabled
+- [ ] **Phase 103: Manual Fallback When Bible API Is Off** - An OFF org gets a working BibleGateway deep-link + paste-in path, and Settings hides the Bible Translation selector
+
+### Phase 101: Per-Org Bible API Toggle — Owner Console Infrastructure
+**Goal**: A super-admin can enable or disable Bible API access per organization from the Owner Console, mirroring the proven per-org AI enablement pattern, with every org defaulting to OFF and no client able to flip the field directly.
+**Depends on**: Nothing (first phase of v2.6)
+**Requirements**: R295, R301
+**Success Criteria** (what must be TRUE):
+
+  1. A super-admin can enable/disable Bible API access for a specific organization from the Owner Console's Organizations tab (`OrgConfigDrawer`), persisted via a new super-admin-gated Cloud Function (`setOrgBibleEnabled`) that writes a master field on the `Organization` document (R295).
+  2. `firestore.rules` denies any direct client write to that master field — only the Cloud Function can set it (R295).
+  3. A newly onboarded org and every existing org (including Berean) start with Bible API disabled, with no data migration performed (R295).
+  4. The Owner Console's Organizations list shows each org's current Bible API on/off state at a glance, mirroring the existing AI-enablement row/drawer treatment (R301).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 102: Gated Scripture Fetch Dispatcher
+**Goal**: Every ESV/NLT scripture fetch — client and server — passes through one per-org gate, so a disabled org makes zero proxy requests while an enabled org's experience is unchanged.
+**Depends on**: Phase 101 (needs the org master field + `authStore` mirror to gate against)
+**Requirements**: R296, R297
+**Success Criteria** (what must be TRUE):
+
+  1. When Bible API is enabled for an org, ESV/NLT passage preview and the LLM-assisted congregational-reading auto-fetch continue to work exactly as they do today, with no observable regression (R296).
+  2. A new single dispatcher (`src/utils/scriptureApi.ts`, the `isAiEnabled()` analog) is the only path `ScriptureInput.vue` and `CongregationalEditor.vue` use to fetch passage text — neither calls `esvApi.ts`/`nltApi.ts` directly anymore (R297).
+  3. When Bible API is disabled for an org, the app makes no ESV/NLT proxy request for that org, and scripture-text-dependent UI degrades gracefully rather than erroring (R297).
+  4. The server `api` proxy's `esv` and `nlt` branches independently enforce the same per-org gate (defense-in-depth), rejecting a fetch for a disabled org even if a client bypassed the dispatcher (R297).
+
+**Plans**: TBD
+
+### Phase 103: Manual Fallback When Bible API Is Off
+**Goal**: An organization with Bible API disabled has a fully functional, zero-cost path for scripture selection and congregational readings — a BibleGateway deep-link plus manual paste-in — so being OFF never breaks the workflow.
+**Depends on**: Phase 102 (the fallback UI is conditioned on the gate reporting OFF)
+**Requirements**: R298, R299, R300
+**Success Criteria** (what must be TRUE):
+
+  1. When disabled, scripture selection and congregational-reading UI offer an "Open in BibleGateway" deep-link for the entered reference in the desired version — any version, not just ESV/NLT — reusing the existing link builder in `src/utils/scripture.ts` (R298).
+  2. When disabled, a user can manually paste passage text into a scripture slide or congregational reading, and that pasted text becomes the slide/reading content, for any version (R299).
+  3. The LLM congregational split continues to operate on manually pasted text when Bible API is off, still subject to the independent AI gate (R299).
+  4. When disabled for an org, the "Bible Translation" selector is hidden in that org's Settings (`SettingsView.vue`), mirroring how the "AI Features" card hides when the AI master gate is off (R300).
+
+**Plans**: TBD
+**UI hint**: yes
+
 ## Backlog
 
 ### Phase 999.2: Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG)
@@ -450,19 +503,5 @@ Work this will cover when promoted:
 - [ ] Later: point other/custom domains to the new site.
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
-### Phase 999.3: Per-org Bible API toggle with BibleGateway manual fallback (BACKLOG)
-
-**Goal:** [Captured for future planning] Put the Bible API options behind a **per-organization** on/off configuration, controllable from the Owner Console. When the API is OFF for an org, substitute a **manual driver out to BibleGateway** in the version they want, so we always have a path forward without passing pay-only API costs to users.
-**Requirements:** TBD
-**Plans:** 0 plans
-
-Why: the Bible APIs are **pay-only and licensed for non-commercial use** — we must not pass those costs to users, so every org needs a zero-cost fallback path.
-
-Design notes captured from owner:
-
-- Owner Console: per-org toggle to enable/disable Bible API access (gate the existing API-backed features on it).
-- When API is OFF: no automatic congregational readings for that org. Substitute a **manual** flow — e.g. a deep-link/driver out to BibleGateway for the chosen version, and/or a manual "paste the passage in" affordance instead of auto-fetching via the API.
-- Upside of the manual/paste path: works with **any** Bible version, instead of us having to support each version through a specific API.
-- Org **Settings** must **hide the Bible Translations** selector when the API is turned off at the org level (nothing for the org to configure there when there's no API-backed version list to choose from).
-- Open questions for planning: how the toggle interacts with existing scripture-slide / congregational-reading features; where version selection lives per org; whether paste-in becomes the universal path even when APIs are on.
-- [ ] TBD (promote with /gsd-review-backlog when ready)
+> **Promoted 2026-08-31:** Phase 999.3 (Per-org Bible API toggle with BibleGateway manual fallback) was
+> promoted into the active milestone **v2.6** (requirements R295–R301). See the v2.6 phases below.
