@@ -221,6 +221,9 @@ const inviteRole = ref<'editor' | 'viewer'>('viewer')
 const inviteError = ref<string | null>(null)
 const isInviting = ref(false)
 const invitedFeedback = ref<string | null>(null)
+// WR-01 (100-REVIEW): id of the pending invitedFeedback auto-clear timer, so a
+// rapid second invite clears the prior timer before starting a new one.
+let invitedFeedbackTimer: ReturnType<typeof setTimeout> | null = null
 
 // ── Action state ───────────────────────────────────────────────────────────────
 
@@ -321,6 +324,10 @@ async function onInvite() {
       invitedFeedback.value = `Invite email sent to ${normalized}.`
     } else if (emailResult?.kind === 'skipped-disabled') {
       invitedFeedback.value = `${normalized} added — onboarding emails are turned off, so let them know to sign in with this address.`
+    } else if (emailResult?.kind === 'skipped-existing') {
+      // WR-02 (100-REVIEW): the invitee already has an account — no email is
+      // needed, so don't claim a send failed. Honest "already set up" copy.
+      invitedFeedback.value = `${normalized} added — they already have an account, so they can sign in with this address.`
     } else {
       invitedFeedback.value = `${normalized} added — we couldn't send the invite email, so let them know to sign in with this address.`
     }
@@ -328,9 +335,13 @@ async function onInvite() {
     inviteEmail.value = ''
     inviteRole.value = 'viewer'
 
-    // Clear success feedback after 2 seconds
-    setTimeout(() => {
+    // Clear success feedback after 2 seconds. WR-01 (100-REVIEW): track the
+    // timer id and clear any prior pending one first, so a rapid second invite
+    // cannot have the first invite's stale timer wipe the newer message.
+    if (invitedFeedbackTimer !== null) clearTimeout(invitedFeedbackTimer)
+    invitedFeedbackTimer = setTimeout(() => {
       invitedFeedback.value = null
+      invitedFeedbackTimer = null
     }, 2000)
   } catch (err) {
     console.error('[TeamView] invite error:', err)

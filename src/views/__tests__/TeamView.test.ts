@@ -237,6 +237,16 @@ describe('TeamView', () => {
       )
     })
 
+    it('shows the already-has-account copy when the callable resolves kind: skipped-existing (WR-02)', async () => {
+      mockSendInviteOnboardingEmail.mockResolvedValueOnce({
+        data: { emailSent: false, kind: 'skipped-existing' },
+      })
+      const wrapper = await invite('existing@example.com')
+      expect(wrapper.find('.text-green-400').text()).toBe(
+        "existing@example.com added — they already have an account, so they can sign in with this address.",
+      )
+    })
+
     it('shows the send-failed copy and does NOT surface inviteError when the callable rejects (R294)', async () => {
       mockSendInviteOnboardingEmail.mockRejectedValueOnce(new Error('unreachable'))
       const wrapper = await invite('unreachable@example.com')
