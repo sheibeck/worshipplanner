@@ -181,20 +181,32 @@ const isLoading = ref(false)
 const loadingMethod = ref<'google' | 'email' | 'reset' | null>(null)
 const showForgotPassword = ref(false)
 
-function mapFirebaseError(code: string): string {
+function mapFirebaseError(code: string, context: 'signin' | 'reset' = 'signin'): string {
   switch (code) {
     case 'auth/wrong-password':
       return 'Incorrect password. Try again or reset your password.'
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please try again later.'
+      return context === 'reset'
+        ? 'Too many reset attempts. Please try again later.'
+        : 'Too many attempts. Please try again later.'
     case 'auth/popup-closed-by-user':
       return ''
     case 'auth/invalid-email':
       return 'Please enter a valid email address.'
+    case 'auth/missing-email':
+      return 'Please enter your email address.'
+    case 'auth/user-not-found':
+      return context === 'reset'
+        ? "We couldn't find an account for that email address."
+        : 'Incorrect email or password.'
     case 'auth/operation-not-allowed':
-      return "Email/password sign-in isn't enabled for this app yet — ask your administrator to enable it."
+      return context === 'reset'
+        ? "Password reset isn't available yet — ask your administrator to enable email sign-in for this app."
+        : "Email/password sign-in isn't enabled for this app yet — ask your administrator to enable it."
     default:
-      return `Sign-in failed. Please try again.`
+      return context === 'reset'
+        ? "Couldn't send the reset email. Please try again."
+        : 'Sign-in failed. Please try again.'
   }
 }
 
@@ -242,7 +254,7 @@ async function handleForgotPassword() {
     resetMessage.value = `Reset link sent to ${resetEmail.value}. Check your inbox.`
   } catch (err: unknown) {
     const firebaseErr = err as { code?: string; message?: string }
-    errorMessage.value = mapFirebaseError(firebaseErr?.code ?? '') || firebaseErr?.message || 'Failed to send reset email.'
+    errorMessage.value = mapFirebaseError(firebaseErr?.code ?? '', 'reset') || firebaseErr?.message || 'Failed to send reset email.'
   } finally {
     isLoading.value = false
     loadingMethod.value = null

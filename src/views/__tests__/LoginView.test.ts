@@ -69,4 +69,30 @@ describe('LoginView', () => {
     await wrapper.find('button[type="button"]').trigger('click')
     expect(wrapper.text()).not.toContain('Open the link we sent')
   })
+
+  it('reset-password errors use reset-context copy, not the sign-in default', async () => {
+    // A generic/unmapped error on the reset screen must NOT read "Sign-in failed".
+    mockResetPassword.mockRejectedValueOnce({ code: 'auth/internal-error' })
+    const wrapper = mount(LoginView)
+    await wrapper.find('button[type="button"]').trigger('click') // open "Reset your password"
+    await wrapper.find('input[type="email"]').setValue('someone@example.com')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Couldn't send the reset email. Please try again.")
+    expect(wrapper.text()).not.toContain('Sign-in failed')
+  })
+
+  it('reset-password operation-not-allowed maps to a reset-context admin-enable message', async () => {
+    mockResetPassword.mockRejectedValueOnce({ code: 'auth/operation-not-allowed' })
+    const wrapper = mount(LoginView)
+    await wrapper.find('button[type="button"]').trigger('click')
+    await wrapper.find('input[type="email"]').setValue('someone@example.com')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(
+      "Password reset isn't available yet — ask your administrator to enable email sign-in for this app.",
+    )
+  })
 })
