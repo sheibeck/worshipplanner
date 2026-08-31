@@ -471,9 +471,9 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
   3. When Bible API is disabled for an org, the app makes no ESV/NLT proxy request for that org, and scripture-text-dependent UI degrades gracefully rather than erroring (R297).
   4. The server `api` proxy's `esv` and `nlt` branches independently enforce the same per-org gate (defense-in-depth), rejecting a fetch for a disabled org even if a client bypassed the dispatcher (R297).
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
-- [ ] 102-01-PLAN.md — Client `scriptureApi.ts` dispatcher (single gated choke point) + route ScriptureInput.vue/CongregationalEditor.vue through it; enabled=passthrough (R296), disabled=graceful no-op (R297)
+- [x] 102-01-PLAN.md — Client `scriptureApi.ts` dispatcher (single gated choke point) + route ScriptureInput.vue/CongregationalEditor.vue through it; enabled=passthrough (R296), disabled=graceful no-op (R297)
 - [ ] 102-02-PLAN.md — Server defense-in-depth: `checkOrgBibleEnablement` mirroring `checkOrgAiEnablement`, applied to the esv/nlt proxy branches (R297)
 
 ### Phase 103: Manual Fallback When Bible API Is Off

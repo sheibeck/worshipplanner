@@ -4,16 +4,16 @@ milestone: v2.6
 milestone_name: Per-Org Bible API Toggle & Manual Fallback (Phases 101-103, in progress)
 current_phase: 102
 current_phase_name: Gated Scripture Fetch Dispatcher
-status: planning
-stopped_at: Completed 101-02-PLAN.md
-last_updated: "2026-08-31T18:12:26.272Z"
+status: executing
+stopped_at: Completed 102-01-PLAN.md
+last_updated: "2026-08-31T18:38:22.000Z"
 last_activity: 2026-08-31
-last_activity_desc: Phase 101 complete, transitioned to Phase 102
+last_activity_desc: Phase 102 Plan 01 (client dispatcher + component refactor) complete
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 33
 ---
 
@@ -2917,6 +2917,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 100 P01 | 15min | 3 tasks | 4 files |
 | Phase 101 P01 | 17min | 2 tasks | 6 files |
 | Phase 101 P02 | 20min | 3 tasks | 6 files |
+| Phase 102 P01 | 45min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3380,6 +3381,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Callable invocation placed strictly after batch.commit() succeeds in its own nested try/catch (never rethrows) so email send failure can never revert or block the authoritative invite (R294).
 - [Phase ?]: 101-01: setOrgBibleEnabled mirrors setOrgActive's simpler shape (no settings.* dual-write), single master gate, input field named 'enabled'
 - [Phase ?]: isBibleApiEnabled is single-leg (no settings.* AND-leg) since no church-editable Bible API setting exists this milestone
+- [Phase ?]: 102-01: scriptureApi.ts dispatcher returns a discriminated { status: 'ok'|'disabled'|'error' } result rather than throwing for the disabled case — mirrors claudeApi.ts::isAiEnabled()'s graceful-off pattern; version RESOLUTION stays in each component, only version DISPATCH + the enablement gate moved into the dispatcher
 
 ### Roadmap Evolution
 
@@ -3706,8 +3708,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-31T17:53:47.498Z
-Stopped at: Completed 101-02-PLAN.md
+Last session: 2026-08-31T18:38:22.000Z
+Stopped at: Completed 102-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

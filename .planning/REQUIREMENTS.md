@@ -21,8 +21,8 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Gated Bible API Behavior
 
-- [ ] **R296**: **When Bible API is ENABLED for an org**, scripture text fetching works exactly as today — ESV/NLT passage preview in scripture slides and the auto (LLM-assisted) congregational readings — with **no regression** to the current experience.
-- [ ] **R297**: **When Bible API is DISABLED for an org**, the app makes **no ESV/NLT proxy request** for that org and scripture-text-dependent features **degrade gracefully** rather than erroring — enforced at a new client dispatcher (`scriptureApi.ts`, the `isAiEnabled()` analog) and independently at the server `esv`/`nlt` proxy branches as defense-in-depth.
+- [x] **R296**: **When Bible API is ENABLED for an org**, scripture text fetching works exactly as today — ESV/NLT passage preview in scripture slides and the auto (LLM-assisted) congregational readings — with **no regression** to the current experience.
+- [x] **R297**: **When Bible API is DISABLED for an org**, the app makes **no ESV/NLT proxy request** for that org and scripture-text-dependent features **degrade gracefully** rather than erroring — enforced at a new client dispatcher (`scriptureApi.ts`, the `isAiEnabled()` analog) and independently at the server `esv`/`nlt` proxy branches as defense-in-depth.
 
 ### Manual Fallback (Bible API OFF)
 
