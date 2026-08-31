@@ -132,9 +132,13 @@
     <p v-if="parseError" class="text-xs text-red-400 mt-1">{{ parseError }}</p>
 
     <!-- Reader link (shown when book and chapter are filled) — routes to the
-         church's chosen translation, not always ESV. -->
+         church's chosen translation, not always ESV. Gated on
+         authStore.isBibleApiEnabled (WR-01, 103-REVIEW) so it doesn't render
+         alongside the fallback block's own "Open in BibleGateway" link below
+         when the Bible API is off -- only one "open externally" affordance
+         should ever be visible at a time. -->
     <a
-      v-if="canPreview"
+      v-if="canPreview && authStore.isBibleApiEnabled"
       :href="readerUrl"
       target="_blank"
       rel="noopener"
@@ -166,8 +170,9 @@
         Open in BibleGateway
       </a>
       <div>
-        <label class="block text-xs font-medium text-gray-300 mb-1">Paste the passage text</label>
+        <label for="scripture-paste-textarea" class="block text-xs font-medium text-gray-300 mb-1">Paste the passage text</label>
         <textarea
+          id="scripture-paste-textarea"
           v-model="previewText"
           placeholder="Paste the verses here (any version)"
           rows="4"
@@ -399,13 +404,27 @@ const passageQuery = computed(() => {
   return base
 })
 
-const showPreviewButton = computed(() => canPreview.value && passageQuery.value !== previewRef.value)
+// CR-01 (103-REVIEW): gated on authStore.isBibleApiEnabled. When the API is
+// off, this button does nothing (fetchPreview's dispatcher call resolves to
+// {status:'disabled'}, a silent no-op) -- worse, clicking it used to wipe
+// previewText, which in the disabled branch is the user's PASTED content, not
+// fetch-cache. Hiding the button when off both removes the dead affordance
+// and closes that data-loss path.
+const showPreviewButton = computed(
+  () => authStore.isBibleApiEnabled && canPreview.value && passageQuery.value !== previewRef.value,
+)
 
 // When the effective Bible version changes (e.g. the per-item override is
 // switched ESV↔NLT), drop any shown preview so it can't display stale text in
 // the old version. The reader link/label already recompute live via
 // effectiveVersion; re-previewing then fetches the new version.
+// CR-01 (103-REVIEW): guarded on isBibleApiEnabled -- when the API is off,
+// previewText holds the user's pasted content (via v-model in the fallback
+// block), not a fetch cache, and effectiveVersion can still change (the
+// per-item bibleVersion prop is independent of the Bible-API gate) without
+// that pasted text having gone stale.
 watch(effectiveVersion, () => {
+  if (!authStore.isBibleApiEnabled) return
   previewText.value = ''
   previewRef.value = ''
   previewError.value = ''
@@ -470,10 +489,16 @@ function onTextInput() {
     skipNextWatchSync = true
     parseError.value = ''
     emit('update:modelValue', null)
-    // Clear preview state when input is cleared
-    previewText.value = ''
-    previewRef.value = ''
-    previewError.value = ''
+    // Clear preview state when input is cleared. CR-01 (103-REVIEW): guarded
+    // the same way as the clearing block below -- when the API is off the
+    // paste textarea (and its content in previewText) stays visible and
+    // usable regardless of whether a reference is entered, so clearing the
+    // reference field must not wipe it.
+    if (authStore.isBibleApiEnabled) {
+      previewText.value = ''
+      previewRef.value = ''
+      previewError.value = ''
+    }
     return
   }
   const parsed = parseScriptureInput(text)
@@ -485,8 +510,15 @@ function onTextInput() {
     parseError.value = 'Unrecognized reference — try "Book Chapter:Verse-Verse"'
     emit('update:modelValue', null)
   }
-  // Clear cached preview when text changes
-  if (passageQuery.value !== previewRef.value) {
+  // Clear cached preview when text changes. CR-01 (103-REVIEW): only the
+  // enabled (fetch-backed) path treats a reference change as invalidating
+  // previewText -- in the disabled/paste path, previewText is user-authored
+  // content (bound via v-model in the fallback block) that a reference edit
+  // must not silently destroy. previewRef never gets set while the API is
+  // off (it's only assigned in fetchPreview's 'ok' branch), so without this
+  // guard passageQuery !== previewRef would be true on nearly every
+  // keystroke, wiping the user's paste.
+  if (authStore.isBibleApiEnabled && passageQuery.value !== previewRef.value) {
     previewText.value = ''
     previewRef.value = ''
     previewError.value = ''
