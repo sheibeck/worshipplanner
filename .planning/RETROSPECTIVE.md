@@ -228,6 +228,59 @@ same-date scheduler bundling anchored on a person's rarest role (R259–R260, al
   reviewers, verifiers, plan-checkers, and integration checks.
 - Deploy: single session — hosting + all Cloud Functions + the owner-run backfill, all 2026-08-27.
 
+## Milestone: v2.5 — Invite Email & Non-Google Onboarding
+
+**Shipped:** 2026-08-31
+**Phases:** 2 (99–100) | **Plans:** 3
+
+### What Was Built
+Fixed the original bug (non-Gmail invitees got nothing and couldn't set a password): a new
+editor-only, invite-existence-gated `sendInviteOnboardingEmail` Cloud Function that emails a
+`generatePasswordResetLink()` set-password link to non-Google invitees (provisioning their Auth account)
+and a "sign in with Google" notice to Gmail invitees; TeamView wiring with honest, persistent,
+color-coded feedback + a Resend action; LoginView `auth/operation-not-allowed` + set/reset discoverability;
+and an `appConfig`-backed Owner Console on/off toggle.
+
+### What Worked
+- **`/gsd-autonomous` end-to-end** drove both phases (discuss→plan→execute→verify→review) with the
+  orchestrator running inline so subagents could nest. The gates earned their keep: the **verifier**
+  caught a legacy-`admin`-role lockout, and **code review** caught a real security hole (an editor could
+  email arbitrary third parties with genuine reset links from the app's domain) — fixed with an
+  invite-existence gate before any provisioning/send.
+- Reusing the existing Resend/`adminEmail`/`appConfig` patterns kept the build to "compose from proven
+  parts," and the pattern-mapper flagged the real traps up front (circular import via `index.ts`,
+  module-private builders).
+
+### What Was Inefficient
+- **Two bugs only surfaced in owner UAT that stronger tests would have caught pre-ship:** (1) the
+  `appConfig` store wrote a *literal* dotted key via `setDoc(...,{merge:true})` so **every** Owner Console
+  toggle silently failed to persist — there was no appConfig store test at all; (2) the function reported
+  a false `emailSent:true` because the Resend SDK **returns** `{error}` rather than throwing, and neither
+  the code nor its tests checked it (the live `sendQueuedMessage` had the same latent gap).
+- Micro-copy/UX polish (persistent messages, red-on-failure, Resend link, context-aware reset errors)
+  all came as post-ship UAT feedback rather than being specified in the UI-SPEC.
+
+### Patterns Established
+- **Direct toggle vs guarded "Enable"**: reversible settings get a plain immediate-save checkbox;
+  destructive ones (cleanup) keep the preview-then-confirm gate.
+- **Best-effort side-effect after an authoritative write** (invite doc committed, then the email call in
+  its own try/catch) — the shape R294 needed.
+
+### Key Lessons
+- **`setDoc(...,{merge:true})` treats dotted keys as literal field names** — only `updateDoc` nests. Expand
+  dot-paths into nested objects (and *test the persisted shape*, not just that a mock was called).
+- **The Resend SDK resolves with `{data, error}`; it does not throw on API rejections.** Always check
+  `error` — a green "sent" that never delivered is worse than an honest failure.
+- A config surface with **no round-trip test** is an untested assertion — the toggle "worked" in every
+  unit test (which mocked `saveField`) yet never persisted in reality.
+
+### Cost Observations
+- Model mix: **opus** for the two planners; **sonnet** for researcher, pattern-mapper, executors,
+  verifiers, plan-checkers, reviewers, and the integration checker.
+- Deploys: `functions:sendInviteOnboardingEmail` deployed + redeployed to prod (owner-approved, per-deploy
+  confirm); hosting deliberately not deployed (client changes still local-only) and Resend DNS verification
+  deferred — both standing owner follow-ups.
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
