@@ -39,8 +39,9 @@
         Open in BibleGateway
       </a>
       <div>
-        <label class="block text-xs font-medium text-gray-300 mb-1">Paste the passage text</label>
+        <label for="congregational-paste-textarea" class="block text-xs font-medium text-gray-300 mb-1">Paste the passage text</label>
         <textarea
+          id="congregational-paste-textarea"
           :value="pastedText"
           @input="onPasteInput"
           data-testid="congregational-paste-textarea"
@@ -240,6 +241,12 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null)
 // R298/R299 (103-02): manual-fallback state, only rendered/used when the
 // org's Bible API is off (see template above).
 const pastedText = ref('')
+// CR-02 (103-REVIEW): the last "Leader\n<stripped>" string onPasteInput itself
+// wrote into `text`. Used to detect whether `text` still holds exactly what
+// paste last seeded — i.e. the user hasn't since diverged from it via a
+// manual edit or an AI split — so a further paste-box keystroke only
+// re-seeds `text` when it's safe to do so, never clobbering a split/edit.
+const lastPasteSeed = ref('')
 
 const AI_SPLIT_FAILURE_TEXT =
   "Couldn't split this passage — your reading is unchanged. Build it by hand or try again."
@@ -276,12 +283,26 @@ const fallbackBibleGatewayLink = computed(() => {
 // authStore.isAiEnabled or the AI split gate -- the two gates stay
 // independent (Bible-off + AI-on still splits; Bible-off + AI-off still
 // allows paste with manual sectioning, no auto-split).
+//
+// CR-02 (103-REVIEW): fires on EVERY keystroke of the (permanently visible)
+// paste textarea, for the component's whole lifetime -- unlike autoFetch's
+// genuine one-shot seed. Unconditionally overwriting `text` here used to mean
+// paste -> Split with AI -> go fix a typo in the paste box -> the very next
+// keystroke reverted `text` back to the raw unsplit seed, silently discarding
+// the split (and any manual sectioning). The guard below only re-seeds `text`
+// when it still holds exactly what paste itself last seeded -- i.e. the user
+// hasn't since diverged from it via a split or a manual edit -- so seeding
+// stays a "seed, don't clobber" operation instead of a per-keystroke clobber.
 function onPasteInput(event: Event): void {
   const value = (event.target as HTMLTextAreaElement).value
   pastedText.value = value
   const stripped = stripVerseMarkers(value)
   rawPassage.value = stripped
-  text.value = `Leader\n${stripped}`
+  const seeded = `Leader\n${stripped}`
+  if (text.value === lastPasteSeed.value) {
+    text.value = seeded
+  }
+  lastPasteSeed.value = seeded
 }
 
 function formatQuery(scriptureRef: ScriptureRef): string {
@@ -376,7 +397,15 @@ async function onAiSplit(): Promise<void> {
       toasts.push(AI_SPLIT_FAILURE_TEXT)
       return
     }
-    const stampVersion = capturedVersion.value ?? authStore.settings.bibleVersion
+    // WR-02 (103-REVIEW): the org's stored bibleVersion has no relationship to
+    // pasted "any version" text -- capturedVersion is only ever set inside
+    // autoFetch's 'ok' branch, which never runs while the API is off, so it
+    // always falls through to here on the paste path. Falling back to the
+    // org default there would falsely stamp e.g. ESV on pasted NIV text.
+    // Guarded so the org-default fallback is only used on the fetch-backed
+    // (enabled) path; the paste path leaves translationSource unset.
+    const stampVersion =
+      capturedVersion.value ?? (authStore.isBibleApiEnabled ? authStore.settings.bibleVersion : null)
     const stamped: CongregationalSection[] = result.map((section) => ({
       speaker: section.speaker,
       text: section.text,
@@ -391,7 +420,15 @@ async function onAiSplit(): Promise<void> {
 }
 
 function onSave(): void {
-  const version = capturedVersion.value ?? props.bibleVersion ?? authStore.settings.bibleVersion
+  // WR-02 (103-REVIEW): same guard as onAiSplit's stampVersion -- the
+  // per-item override (props.bibleVersion) is a deliberate, explicit choice
+  // and still applies; only the final catch-all org-default fallback is
+  // nulled out when the Bible API is off, since that setting has no
+  // relationship to whatever the user actually pasted.
+  const version =
+    capturedVersion.value ??
+    props.bibleVersion ??
+    (authStore.isBibleApiEnabled ? authStore.settings.bibleVersion : null)
   emit('update:sections', parseCongregationalText(text.value, version ?? undefined))
   emit('close')
 }

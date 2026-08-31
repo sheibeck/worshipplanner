@@ -453,4 +453,98 @@ describe('CongregationalEditor', () => {
     expect(wrapper.text()).not.toContain('Bible API is off for your church')
     expect(pasteTextarea(wrapper).exists()).toBe(false)
   })
+
+  // CR-02 (103-REVIEW) regression: onPasteInput used to unconditionally
+  // rewrite `text` on every keystroke of the paste textarea, so paste ->
+  // Split with AI -> edit the paste box again silently discarded the split.
+  it('CR-02: editing the paste box after an AI split does NOT discard the split', async () => {
+    useAuthStore().bibleApiEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
+
+    mockSplitCongregationalReading.mockResolvedValueOnce([
+      { speaker: 'LEADER', text: 'Give thanks to the Lord.' },
+      { speaker: 'CONGREGATION', text: 'For his love endures.' },
+    ])
+    await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+    await flushPromises()
+
+    const afterSplit = textareaEl(wrapper).value
+    expect(afterSplit).toBe('Leader\nGive thanks to the Lord.\n---\nCongregation\nFor his love endures.')
+
+    // Go fix a typo in the original paste -- an ordinary follow-up edit that
+    // must not revert the main textarea back to the raw unsplit seed.
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT + ' Amen.')
+
+    expect(textareaEl(wrapper).value).toBe(afterSplit)
+  })
+
+  // CR-02 regression: the same protection applies to a manual hand-edit of
+  // the main textarea, not just an AI split.
+  it('CR-02: editing the paste box after a manual edit to the main textarea does NOT discard the manual edit', async () => {
+    useAuthStore().bibleApiEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
+
+    // Manual hand-edit/sectioning of the main reading textarea.
+    await wrapper
+      .find('[data-testid="congregational-textarea"]')
+      .setValue('Leader\nGive thanks to the Lord.\n---\nCongregation\nFor his love endures.\n---\nAll\nAmen.')
+
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT + ' More text.')
+
+    expect(textareaEl(wrapper).value).toBe(
+      'Leader\nGive thanks to the Lord.\n---\nCongregation\nFor his love endures.\n---\nAll\nAmen.',
+    )
+  })
+
+  // CR-02: the seed-only-when-unchanged guard must still let ordinary
+  // successive paste keystrokes re-seed the textarea (the common case).
+  it('CR-02: successive paste-box keystrokes keep re-seeding the textarea when nothing else has diverged', async () => {
+    useAuthStore().bibleApiEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
+
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT + ' Extra verse text.')
+    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT} Extra verse text.`)
+  })
+
+  // WR-02 (103-REVIEW): pasted "any version" text must not be stamped with
+  // the org's stored bibleVersion -- that setting has no relationship to
+  // whatever the user actually pasted.
+  it('WR-02: Save on a purely-pasted reading does not stamp the org-default translationSource', async () => {
+    useAuthStore().bibleApiEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+    await wrapper.find('[data-testid="congregational-save"]').trigger('click')
+
+    const sections = lastEmittedSections(wrapper)
+    expect(sections).toHaveLength(1)
+    expect(sections[0]!.translationSource).toBeUndefined()
+  })
+
+  // IN-01 (103-REVIEW): the paste textarea's label is associated via
+  // for/id so a screen reader announces it on focus.
+  it('IN-01: associates the paste textarea with its label via for/id', async () => {
+    useAuthStore().bibleApiEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    const textarea = pasteTextarea(wrapper)
+    const label = wrapper.findAll('label').find((l) => l.text().includes('Paste the passage text'))
+    expect(label).toBeTruthy()
+    expect(textarea.attributes('id')).toBeTruthy()
+    expect(label!.attributes('for')).toBe(textarea.attributes('id'))
+  })
 })
