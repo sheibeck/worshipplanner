@@ -4,6 +4,7 @@ import {
   esvLink,
   nltLink,
   scriptureWebLink,
+  bibleGatewayLink,
   scripturesOverlap,
   parseScriptureInput,
   formatScriptureReference,
@@ -158,6 +159,38 @@ describe('scriptureWebLink', () => {
     expect(scriptureWebLink('John', 3, 'NLT')).toBe(
       'https://www.biblegateway.com/passage/?search=John%203&version=NLT',
     )
+  })
+})
+
+// R298: the manual fallback deep-link, usable with ANY version — not tied
+// to the ESV/NLT scriptureWebLink pair above.
+describe('bibleGatewayLink', () => {
+  it('builds a verse-range search with the version param', () => {
+    expect(bibleGatewayLink({ book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 }, 'NLT')).toBe(
+      'https://www.biblegateway.com/passage/?search=Romans%208%3A1-11&version=NLT',
+    )
+  })
+
+  it('omits &version= when no version is supplied', () => {
+    const url = bibleGatewayLink({ book: 'Romans', chapter: 8, verseStart: 28 })
+    expect(url).toBe('https://www.biblegateway.com/passage/?search=Romans%208%3A28')
+    expect(url).not.toContain('&version=')
+  })
+
+  it('builds a chapter-only search with the version param', () => {
+    expect(bibleGatewayLink({ book: 'Romans', chapter: 8 }, 'ESV')).toBe(
+      'https://www.biblegateway.com/passage/?search=Romans%208&version=ESV',
+    )
+  })
+
+  it('URL-encodes a multi-word book name', () => {
+    const url = bibleGatewayLink({ book: '1 Corinthians', chapter: 13, verseStart: 4, verseEnd: 7 })
+    expect(url).toBe('https://www.biblegateway.com/passage/?search=1%20Corinthians%2013%3A4-7')
+  })
+
+  it('treats an empty-string version as absent', () => {
+    const url = bibleGatewayLink({ book: 'Romans', chapter: 8, verseStart: 28 }, '')
+    expect(url).not.toContain('&version=')
   })
 })
 

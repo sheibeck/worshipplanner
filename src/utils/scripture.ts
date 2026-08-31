@@ -103,6 +103,26 @@ export function scriptureWebLink(
   return version === 'NLT' ? nltLink(book, chapter) : esvLink(book, chapter)
 }
 
+/**
+ * R298: BibleGateway deep-link for a reference, usable with ANY version —
+ * the manual fallback when an org's Bible API is off. Delegates the search
+ * string to `formatScriptureReference` (the one canonical "Book
+ * Chapter:Start-End" formatter, ~line 190) rather than re-deriving it, so
+ * this link and every other rendering of the reference can never disagree.
+ *
+ * `version` is appended as `&version=<version>` ONLY when it is a non-empty
+ * string; an org with no stored `bibleVersion` (or an org that never had one
+ * because the translation selector is hidden per R300) omits the param and
+ * BibleGateway falls back to its own default. Both the reference and the
+ * version are `encodeURIComponent`-ed before interpolation (T-103-01) so a
+ * crafted reference cannot inject extra query params.
+ */
+export function bibleGatewayLink(ref: ScriptureRef, version?: string): string {
+  const search = encodeURIComponent(formatScriptureReference(ref))
+  const base = `https://www.biblegateway.com/passage/?search=${search}`
+  return version ? `${base}&version=${encodeURIComponent(version)}` : base
+}
+
 export function parseScriptureInput(text: string): ScriptureRef | null {
   const trimmed = text.trim()
   if (!trimmed) return null
