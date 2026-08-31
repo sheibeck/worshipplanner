@@ -385,6 +385,7 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 **Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R288–R294 (7 mapped, 100% coverage)
 
 **Flagged for phase discussion** (leaning defaults below; confirm in `/gsd-discuss-phase 99`):
+
 - Google-vs-non-Google detection heuristic — leaning: `gmail.com`/`googlemail.com` → notify-only "sign in with Google"; everything else → set-password link (which also offers Google sign-in as a fallback so no invitee is stranded).
 - Onboarding-email toggle scope — leaning: global (`appConfig`), not per-org.
 
@@ -399,11 +400,14 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 **Depends on**: Nothing (first phase of v2.5)
 **Requirements**: R289, R290, R291, R293
 **Success Criteria** (what must be TRUE):
+
   1. Inviting a non-Google email address through the function creates a Firebase Auth account for that address (if none exists) and sends an email containing a valid `generatePasswordResetLink()` "set your password" link, which also offers Google sign-in as a fallback (R290, R291).
   2. Inviting a Google/Gmail address (`gmail.com`/`googlemail.com`) through the function sends a "you've been invited — sign in with Google" notification email, with no Auth account pre-created and no password step (R289).
   3. An owner can switch onboarding/invite emails on or off from the Owner Console's Configuration tab (backed by `appConfig`), and when off, the function sends no email for either invitee type (R293).
-**Plans**: 2 plans
-- [ ] 99-01-PLAN.md — Owner toggle: `appConfig.onboarding.emailsEnabled` (server + client mirror) + Owner Console Configuration card (Wave 1) [R293]
+
+**Plans**: 1/2 plans executed
+
+- [x] 99-01-PLAN.md — Owner toggle: `appConfig.onboarding.emailsEnabled` (server + client mirror) + Owner Console Configuration card (Wave 1) [R293]
 - [ ] 99-02-PLAN.md — `sendInviteOnboardingEmail` Cloud Function: gmail-notify vs non-Google set-password provisioning, org-editor gate, toggle honored, re-exported from index.ts (Wave 2, depends on 99-01) [R289, R290, R291, R293]
 
 ### Phase 100: Invite & Login Onboarding Wiring
@@ -412,10 +416,12 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 **Depends on**: Phase 99 (consumes its invite-email Cloud Function)
 **Requirements**: R288, R292, R294
 **Success Criteria** (what must be TRUE):
+
   1. Inviting a team member from TeamView's "Invite a team member" UI triggers Phase 99's Cloud Function, the invitee receives a real email matching their type, and the post-invite success copy accurately reflects that an email was sent (R288).
   2. On the login screen, a user has a clearly discoverable path to set or reset their password (not buried inside "Forgot password?" alone), and attempting email/password sign-in when the provider is disabled (`auth/operation-not-allowed`) shows a specific, actionable message instead of the generic "Sign-in failed." (R292).
   3. Existing Google sign-in and the invite-acceptance flow (`ensureUserDocument` granting membership on first authenticated sign-in) continue to work unchanged (R294).
   4. If the invite email fails to send, the invite/membership Firestore record is still written — email delivery is best-effort and never blocks or reverts the invite (R294).
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -432,6 +438,7 @@ Context (already done, 2026-08-30): the Firebase Hosting site `worshipbuilder` i
 Owner's stated plan: a **single** deploy to `worshipbuilder.web.app` (make it the one hosting target — NOT dual-site), then point other/custom domains to it.
 
 Work this will cover when promoted:
+
 - [ ] `firebase.json`: set the hosting block's target to the `worshipbuilder` site (`"site": "worshipbuilder"`) as the single deploy target (currently one unnamed block → default site).
 - [ ] ⚠ PREREQUISITE: add `worshipbuilder.web.app` **and** `worshipbuilder.firebaseapp.com` to Firebase Auth → Settings → Authorized domains BEFORE cutover, or `signInWithPopup` (Google/email sign-in) silently fails on the new domain. Manual console step — no CLI command.
 - [ ] Grep for any hardcoded base URL (e.g. `worship-planner-bc515.web.app`) in share-link generation etc. before cutover; relative / `window.location.origin` links carry over automatically, hardcoded ones do not.
@@ -449,6 +456,7 @@ Work this will cover when promoted:
 Why: the Bible APIs are **pay-only and licensed for non-commercial use** — we must not pass those costs to users, so every org needs a zero-cost fallback path.
 
 Design notes captured from owner:
+
 - Owner Console: per-org toggle to enable/disable Bible API access (gate the existing API-backed features on it).
 - When API is OFF: no automatic congregational readings for that org. Substitute a **manual** flow — e.g. a deep-link/driver out to BibleGateway for the chosen version, and/or a manual "paste the passage in" affordance instead of auto-fetching via the API.
 - Upside of the manual/paste path: works with **any** Bible version, instead of us having to support each version through a specific API.

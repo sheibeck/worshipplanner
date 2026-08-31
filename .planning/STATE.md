@@ -2,14 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Invite Email & Non-Google Onboarding
-status: planning
-last_updated: "2026-08-31T02:19:05.611Z"
+current_phase: 99
+current_phase_name: invite-email-function-owner-toggle
+status: executing
+stopped_at: Completed 99-01-PLAN.md
+last_updated: "2026-08-31T03:18:59.360Z"
 last_activity: 2026-08-30
+last_activity_desc: Phase 99 execution started
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -29,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.5 Invite Email & Non-Google Onboarding (roadmap created 2026-08-30)
 
-**Status:** Roadmap created; no phases started.
+**Status:** Ready to execute
 
 **Goal:** Every invited user gets an invite email, non-Google users can set a password and sign in, and
 an owner can switch onboarding emails on/off. Requirements R288–R294 in REQUIREMENTS.md.
@@ -1051,7 +1055,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 90 — SlideCanvas Extraction (v2.4 Run the Service)
+**Current focus:** Phase 99 — invite-email-function-owner-toggle
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1061,10 +1065,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-30 — Milestone v2.5 started
+Phase: 99 (invite-email-function-owner-toggle) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-08-30 — Phase 99 execution started
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
@@ -2848,6 +2852,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 97 P10 | 15m | 2 tasks | 2 files |
 | Phase 98 P01 | 18min | 3 tasks | 8 files |
 | Phase 98 P02 | 22min | 2 tasks | 4 files |
+| Phase 99 P01 | 25m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -3304,6 +3309,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 98-01: origin flows into policy generators ONLY as a typed param (never window/URL param); useFullscreenReadiness never calls requestFullscreen (read-only).
 - [Phase ?]: Origin is read from window.location.origin only inside triggerDownload() at click time, never hoisted — keeps the no-injection-surface guarantee (T-98-04) literal and testable.
 - [Phase ?]: Component tests for a composable-backed panel must mock the composable to return a real Vue ref (not a plain object) for status — template reactivity only tracks genuine Refs.
+- [Phase ?]: onboarding.emailsEnabled defaults to false (fail-safe until Resend domain verified); no (default) badge on the checkbox, mirroring MessagingConfigCard's own cron-toggle precedent
 
 ### Roadmap Evolution
 
@@ -3630,8 +3636,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-29T22:19:11.289Z
-Stopped at: Completed 98-02-PLAN.md
+Last session: 2026-08-31T03:18:59.291Z
+Stopped at: Completed 99-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

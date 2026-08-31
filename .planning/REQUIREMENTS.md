@@ -25,7 +25,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Owner Console Control
 
-- [ ] **R293**: An owner can **turn onboarding / invite emails on or off** from the Owner Console (`ConfigurationTab`, backed by `appConfig`); when off, invites still record membership but send **no email**, and the invite function honors the setting.
+- [x] **R293**: An owner can **turn onboarding / invite emails on or off** from the Owner Console (`ConfigurationTab`, backed by `appConfig`); when off, invites still record membership but send **no email**, and the invite function honors the setting.
 
 ### Non-Regression & Delivery Safety
 
