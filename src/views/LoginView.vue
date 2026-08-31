@@ -96,6 +96,10 @@
               </button>
             </div>
           </form>
+
+          <p class="text-xs text-gray-500 text-center mt-4">
+            Invited by email? Open the link we sent to set your password — or reset it below.
+          </p>
         </div>
 
         <!-- Forgot Password Form -->
@@ -187,6 +191,8 @@ function mapFirebaseError(code: string): string {
       return ''
     case 'auth/invalid-email':
       return 'Please enter a valid email address.'
+    case 'auth/operation-not-allowed':
+      return "Email/password sign-in isn't enabled for this app yet — ask your administrator to enable it."
     default:
       return `Sign-in failed. Please try again.`
   }
