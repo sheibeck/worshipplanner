@@ -36,8 +36,7 @@
         </div>
         <p v-if="inviteError" class="text-red-400 text-sm mt-2">{{ inviteError }}</p>
         <p v-if="invitedFeedback" class="text-green-400 text-sm mt-2">
-          {{ invitedFeedback }} added to the pending list — no email is sent, so let them know
-          directly to sign in with this address to join.
+          {{ invitedFeedback }}
         </p>
       </div>
 
@@ -170,10 +169,27 @@ import {
   serverTimestamp,
   type Unsubscribe,
 } from 'firebase/firestore'
-import { db } from '@/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { ignorePermissionDenied } from '@/utils/firestoreListener'
 import AppShell from '@/components/AppShell.vue'
+
+// Phase 100 (R288) — mirrors functions/src/inviteOnboarding.ts's
+// sendInviteOnboardingEmail request/response contract exactly. Declared
+// LOCALLY (not imported from `functions/`, a separate build target) — same
+// convention as OrganizationsTab.vue's callable types. The callable is a
+// best-effort side-effect (see onInvite below); tests mock httpsCallable, so
+// an undeployed/unreachable target never blocks the invite (R294).
+interface SendInviteOnboardingEmailRequest {
+  orgId: string
+  email: string
+}
+
+interface SendInviteOnboardingEmailResponse {
+  emailSent: boolean
+  kind: 'google-notify' | 'set-password' | 'skipped-disabled' | 'skipped-existing'
+}
 
 interface Member {
   uid: string
@@ -284,7 +300,31 @@ async function onInvite() {
 
     await batch.commit()
 
-    invitedFeedback.value = normalized
+    // Invite docs are authoritative and already committed above. The
+    // onboarding email is best-effort (R294) — its own nested try/catch so a
+    // rejected/undeployed/unreachable callable never reverts or fails the
+    // invite. The catch only logs; it must never rethrow or set inviteError.
+    let emailResult: SendInviteOnboardingEmailResponse | null = null
+    try {
+      const sendInviteOnboardingEmail = httpsCallable<
+        SendInviteOnboardingEmailRequest,
+        SendInviteOnboardingEmailResponse
+      >(functions, 'sendInviteOnboardingEmail')
+      const result = await sendInviteOnboardingEmail({ orgId, email: normalized })
+      emailResult = result.data
+    } catch (err) {
+      console.error('[TeamView] sendInviteOnboardingEmail error (non-fatal):', err)
+    }
+
+    // Honest, result-driven success copy (R288/UI-SPEC state table).
+    if (emailResult?.emailSent) {
+      invitedFeedback.value = `Invite email sent to ${normalized}.`
+    } else if (emailResult?.kind === 'skipped-disabled') {
+      invitedFeedback.value = `${normalized} added — onboarding emails are turned off, so let them know to sign in with this address.`
+    } else {
+      invitedFeedback.value = `${normalized} added — we couldn't send the invite email, so let them know to sign in with this address.`
+    }
+
     inviteEmail.value = ''
     inviteRole.value = 'viewer'
 
