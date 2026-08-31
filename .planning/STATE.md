@@ -4,17 +4,17 @@ milestone: v2.5
 milestone_name: Invite Email & Non-Google Onboarding
 current_phase: 99
 current_phase_name: invite-email-function-owner-toggle
-status: executing
-stopped_at: Completed 99-01-PLAN.md
-last_updated: "2026-08-31T03:18:59.360Z"
+status: verifying
+stopped_at: Completed 99-02-PLAN.md
+last_updated: "2026-08-31T03:34:18.475Z"
 last_activity: 2026-08-30
 last_activity_desc: Phase 99 execution started
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.5 Invite Email & Non-Google Onboarding (roadmap created 2026-08-30)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Every invited user gets an invite email, non-Google users can set a password and sign in, and
 an owner can switch onboarding emails on/off. Requirements R288–R294 in REQUIREMENTS.md.
@@ -1067,7 +1067,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 99 (invite-email-function-owner-toggle) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-30 — Phase 99 execution started
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
@@ -2853,6 +2853,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 98 P01 | 18min | 3 tasks | 8 files |
 | Phase 98 P02 | 22min | 2 tasks | 4 files |
 | Phase 99 P01 | 25m | 2 tasks | 7 files |
+| Phase 99 P02 | 35m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -3310,6 +3311,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Origin is read from window.location.origin only inside triggerDownload() at click time, never hoisted — keeps the no-injection-surface guarantee (T-98-04) literal and testable.
 - [Phase ?]: Component tests for a composable-backed panel must mock the composable to return a real Vue ref (not a plain object) for status — template reactivity only tracks genuine Refs.
 - [Phase ?]: onboarding.emailsEnabled defaults to false (fail-safe until Resend domain verified); no (default) badge on the checkbox, mirroring MessagingConfigCard's own cron-toggle precedent
+- [Phase ?]: inviteOnboarding.ts: getUserByEmail non-not-found errors rethrow as-is (mirrors resolveAdminTarget); createUser/generatePasswordResetLink failures throw HttpsError('internal') since the invitee would otherwise have no usable path; only the Resend send is best-effort
+- [Phase ?]: checkAndConsumeOrgEmailQuota deferred this phase to avoid a circular import with index.ts, per CONTEXT.md's explicit allowance
 
 ### Roadmap Evolution
 
@@ -3636,8 +3639,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-31T03:18:59.291Z
-Stopped at: Completed 99-01-PLAN.md
+Last session: 2026-08-31T03:34:18.373Z
+Stopped at: Completed 99-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
