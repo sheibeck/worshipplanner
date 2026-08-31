@@ -1,15 +1,18 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.6
-milestone_name: Per-Org Bible API Toggle & Manual Fallback
+milestone_name: Per-Org Bible API Toggle & Manual Fallback (Phases 101-103, in progress)
+current_phase_name: defining requirements
 status: planning
-last_updated: "2026-08-31T16:53:50.289Z"
+stopped_at: Completed 101-01-PLAN.md
+last_updated: "2026-08-31T17:37:33.550Z"
 last_activity: 2026-08-31
+last_activity_desc: Milestone v2.6 started
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -2911,6 +2914,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 99 P01 | 25m | 2 tasks | 7 files |
 | Phase 99 P02 | 35m | 2 tasks | 3 files |
 | Phase 100 P01 | 15min | 3 tasks | 4 files |
+| Phase 101 P01 | 17min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3372,6 +3376,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: checkAndConsumeOrgEmailQuota deferred this phase to avoid a circular import with index.ts, per CONTEXT.md's explicit allowance
 - [Phase ?]: Confirmed SendInviteOnboardingEmailResponse.kind is the real 4-member union (incl. skipped-existing) by reading functions/src/inviteOnboarding.ts directly rather than trusting the 3-member PATTERNS.md draft.
 - [Phase ?]: Callable invocation placed strictly after batch.commit() succeeds in its own nested try/catch (never rethrows) so email send failure can never revert or block the authoritative invite (R294).
+- [Phase ?]: 101-01: setOrgBibleEnabled mirrors setOrgActive's simpler shape (no settings.* dual-write), single master gate, input field named 'enabled'
 
 ### Roadmap Evolution
 
@@ -3698,8 +3703,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-31T04:31:08.354Z
-Stopped at: Completed 100-01-PLAN.md
+Last session: 2026-08-31T17:37:32.948Z
+Stopped at: Completed 101-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

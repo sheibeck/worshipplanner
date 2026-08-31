@@ -441,6 +441,7 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 - [ ] **Phase 103: Manual Fallback When Bible API Is Off** - An OFF org gets a working BibleGateway deep-link + paste-in path, and Settings hides the Bible Translation selector
 
 ### Phase 101: Per-Org Bible API Toggle — Owner Console Infrastructure
+
 **Goal**: A super-admin can enable or disable Bible API access per organization from the Owner Console, mirroring the proven per-org AI enablement pattern, with every org defaulting to OFF and no client able to flip the field directly.
 **Depends on**: Nothing (first phase of v2.6)
 **Requirements**: R295, R301
@@ -451,12 +452,15 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
   3. A newly onboarded org and every existing org (including Berean) start with Bible API disabled, with no data migration performed (R295).
   4. The Owner Console's Organizations list shows each org's current Bible API on/off state at a glance, mirroring the existing AI-enablement row/drawer treatment (R301).
 
-**Plans**: 2 plans
-- [ ] 101-01-PLAN.md — Backend: Organization.bibleApiEnabled field + super-admin-gated setOrgBibleEnabled Cloud Function + listOrganizations echo + firestore.rules deny (R295, R301)
+**Plans**: 1/2 plans executed
+
+- [x] 101-01-PLAN.md — Backend: Organization.bibleApiEnabled field + super-admin-gated setOrgBibleEnabled Cloud Function + listOrganizations echo + firestore.rules deny (R295, R301)
 - [ ] 101-02-PLAN.md — Frontend: authStore bibleApiEnabled/isBibleApiEnabled mirror + OrgConfigDrawer checkbox + OrganizationsTab onToggleBible + per-row at-a-glance state (R295, R301)
+
 **UI hint**: yes
 
 ### Phase 102: Gated Scripture Fetch Dispatcher
+
 **Goal**: Every ESV/NLT scripture fetch — client and server — passes through one per-org gate, so a disabled org makes zero proxy requests while an enabled org's experience is unchanged.
 **Depends on**: Phase 101 (needs the org master field + `authStore` mirror to gate against)
 **Requirements**: R296, R297
@@ -470,6 +474,7 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 **Plans**: TBD
 
 ### Phase 103: Manual Fallback When Bible API Is Off
+
 **Goal**: An organization with Bible API disabled has a fully functional, zero-cost path for scripture selection and congregational readings — a BibleGateway deep-link plus manual paste-in — so being OFF never breaks the workflow.
 **Depends on**: Phase 102 (the fallback UI is conditioned on the gate reporting OFF)
 **Requirements**: R298, R299, R300

@@ -16,8 +16,8 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Owner Console Control
 
-- [ ] **R295**: A super-admin can **enable or disable Bible API access per organization** from the Owner Console (Organizations tab → `OrgConfigDrawer`), backed by a super-admin-gated Cloud Function that writes a master field on the `Organization` document (mirroring `setOrgAiEnabled` / `aiMasterEnabled`); the field is client-write-denied in `firestore.rules`. **Default: OFF** — a newly onboarded org and every existing org start with the Bible API disabled until the super-admin turns it on. (No data migration: the manual fallback below means an OFF org is fully functional, not broken.)
-- [ ] **R301**: The Owner Console **Organizations list surfaces each org's current Bible API on/off state** (mirroring the AI toggle row/drawer), so the super-admin can see at a glance which churches have it enabled.
+- [x] **R295**: A super-admin can **enable or disable Bible API access per organization** from the Owner Console (Organizations tab → `OrgConfigDrawer`), backed by a super-admin-gated Cloud Function that writes a master field on the `Organization` document (mirroring `setOrgAiEnabled` / `aiMasterEnabled`); the field is client-write-denied in `firestore.rules`. **Default: OFF** — a newly onboarded org and every existing org start with the Bible API disabled until the super-admin turns it on. (No data migration: the manual fallback below means an OFF org is fully functional, not broken.)
+- [x] **R301**: The Owner Console **Organizations list surfaces each org's current Bible API on/off state** (mirroring the AI toggle row/drawer), so the super-admin can see at a glance which churches have it enabled.
 
 ### Gated Bible API Behavior
 
