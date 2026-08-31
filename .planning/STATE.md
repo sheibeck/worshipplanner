@@ -5,16 +5,16 @@ milestone_name: Per-Org Bible API Toggle & Manual Fallback (Phases 101-103, in p
 current_phase: 102
 current_phase_name: Gated Scripture Fetch Dispatcher
 status: executing
-stopped_at: Completed 102-01-PLAN.md
-last_updated: "2026-08-31T18:38:22.000Z"
+stopped_at: Completed 102-02-PLAN.md
+last_updated: "2026-08-31T19:11:23.524Z"
 last_activity: 2026-08-31
-last_activity_desc: Phase 102 Plan 01 (client dispatcher + component refactor) complete
+last_activity_desc: "102-02-PLAN.md executed: added `checkOrgBibleEnablement(db, orgId)` mirroring"
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 33
+  completed_plans: 4
+  percent: 67
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -1126,9 +1126,17 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 102 — Gated Scripture Fetch Dispatcher
-Plan: Not started
-Status: Defining requirements
-Last activity: 2026-08-31 — Phase 101 complete, transitioned to Phase 102
+Plan: 102-02 — Server defense-in-depth (`checkOrgBibleEnablement`) — COMPLETE (2 of 2 plans in Phase 102)
+Status: Phase 102 fully executed and verified; ready to plan Phase 103 (Manual Fallback When Bible API Is Off)
+Last activity: 2026-08-31 — 102-02-PLAN.md executed: added `checkOrgBibleEnablement(db, orgId)` mirroring
+`checkOrgAiEnablement` (live `organizations/{orgId}.bibleApiEnabled` read, default-OFF deny 403,
+fail-closed 503 on read error) and wired it into the `api` proxy's esv/nlt branches, rejecting a
+disabled/org-less caller before the upstream fetch — independent of the Plan 102-01 client dispatcher
+(R297 defense-in-depth). `cd functions && npm test` 633/633 passing; `npm run type-check` clean; root
+`npx vitest run` shows only the documented 2-file baseline (`storage.rules.test.ts`,
+`stores/appConfig.test.ts`) — no regression. Deploy remains DEFERRED to the owner-gated milestone-end
+batch (`firebase deploy --only functions:api`) since default-OFF would deny esv/nlt for every
+not-yet-enabled org. See `.planning/phases/102-gated-scripture-fetch-dispatcher/102-02-SUMMARY.md`.
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
@@ -2918,6 +2926,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 101 P01 | 17min | 2 tasks | 6 files |
 | Phase 101 P02 | 20min | 3 tasks | 6 files |
 | Phase 102 P01 | 45min | 3 tasks | 6 files |
+| Phase 102 P02 | 25min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3382,6 +3391,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 101-01: setOrgBibleEnabled mirrors setOrgActive's simpler shape (no settings.* dual-write), single master gate, input field named 'enabled'
 - [Phase ?]: isBibleApiEnabled is single-leg (no settings.* AND-leg) since no church-editable Bible API setting exists this milestone
 - [Phase ?]: 102-01: scriptureApi.ts dispatcher returns a discriminated { status: 'ok'|'disabled'|'error' } result rather than throwing for the disabled case — mirrors claudeApi.ts::isAiEnabled()'s graceful-off pattern; version RESOLUTION stays in each component, only version DISPATCH + the enablement gate moved into the dispatcher
+- [Phase ?]: Phase 102 Plan 02: added checkOrgBibleEnablement server-side gate mirroring checkOrgAiEnablement, wired into esv/nlt proxy branches (R297 defense-in-depth); deploy deferred to owner-gated milestone-end batch
 
 ### Roadmap Evolution
 
@@ -3708,8 +3718,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-31T18:38:22.000Z
-Stopped at: Completed 102-01-PLAN.md
+Last session: 2026-08-31T19:11:11.763Z
+Stopped at: Completed 102-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
