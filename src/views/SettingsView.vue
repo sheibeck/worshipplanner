@@ -308,8 +308,17 @@
       </div>
 
       <!-- Bible Translation section (R090) — explains before offering the choice,
-           mirrors the AI Features card exactly (45-UI-SPEC.md). -->
-      <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
+           mirrors the AI Features card exactly (45-UI-SPEC.md).
+           Phase 103 (R300): the entire card is v-if-gated on
+           authStore.isBibleApiEnabled — when an org's Bible API is off there
+           is no API-backed version list to configure, so the card is hidden
+           entirely (never deletes the stored bibleVersion field or its save
+           logic; an org later re-enabled shows the selector again with its
+           prior value). -->
+      <div
+        v-if="authStore.isBibleApiEnabled"
+        class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6"
+      >
         <h2 class="text-sm font-semibold text-gray-300 mb-3">Bible Translation</h2>
 
         <p class="text-xs text-gray-400 mb-3">
