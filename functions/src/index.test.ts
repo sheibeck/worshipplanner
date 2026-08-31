@@ -4502,6 +4502,76 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
+  // WR-03 (102-REVIEW): end-to-end proof that the `api` handler itself wires
+  // checkOrgBibleEnablement into the esv/nlt branches -- mirrors the
+  // R242/R243/CR-01 anthropic handler tests above 1:1. checkOrgBibleEnablement
+  // is already thoroughly unit-tested in isolation (see its own describe
+  // block), and the WR-01 test just above proves the *enabled* esv path
+  // end-to-end; these three close the gap the plan's own truths list called
+  // out -- a disabled org / org-less caller / Firestore read error on the
+  // esv branch must all be denied by the actual handler BEFORE `fetch` is
+  // ever called, independent of the client dispatcher.
+  function fakeEsvReq() {
+    return {
+      path: "/api/esv/v1/passage/text/",
+      originalUrl: "/api/esv/v1/passage/text/?q=John+1",
+      method: "GET",
+      headers: { "x-app-auth": "valid-token" },
+      body: undefined,
+    };
+  }
+
+  it("WR-03 (102-REVIEW): a disabled org (bibleApiEnabled:false) is denied 403 on esv before fetch", async () => {
+    const { db } = mockCombinedDb({ bibleApiEnabled: false });
+    vi.mocked(getFirestore).mockReturnValue(db);
+    const req = fakeEsvReq();
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ error: "Bible API features are disabled for your organization." });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("WR-03 (102-REVIEW): a caller whose token has NO orgId claim is denied 403 on esv before the enablement check, before fetch", async () => {
+    vi.mocked(getAuth).mockReturnValue({
+      verifyIdToken: vi.fn(async () => ({ uid: "uid1" })), // no orgId claim
+      getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+    } as never);
+    const req = fakeEsvReq();
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getFirestore).not.toHaveBeenCalled();
+  });
+
+  it("WR-03 (102-REVIEW): an org-doc read error fails CLOSED with 503 on esv before fetch, unlike the rate limiter's fail-open posture", async () => {
+    const throwingCollection = (name: string) => {
+      if (name === "organizations") {
+        return {
+          doc: () => ({
+            get: vi.fn(async () => {
+              throw new Error("Firestore unavailable");
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected collection "${name}"`);
+    };
+    vi.mocked(getFirestore).mockReturnValue({ collection: throwingCollection } as never);
+    const req = fakeEsvReq();
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("WR-01 (69-REVIEW.md): the anthropic branch fails OPEN to DEFAULT_APP_CONFIG when getAppConfig rejects, instead of the request failing", async () => {
     const { db } = mockCombinedDb();
     vi.mocked(getFirestore).mockReturnValue(db);
