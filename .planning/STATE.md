@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Invite Email & Non-Google Onboarding
-current_phase: 99
-current_phase_name: invite-email-function-owner-toggle
+current_phase: 100
+current_phase_name: invite-login-onboarding-wiring
 status: verifying
-stopped_at: Completed 99-02-PLAN.md
-last_updated: "2026-08-31T03:34:18.475Z"
-last_activity: 2026-08-30
-last_activity_desc: Phase 99 execution started
+stopped_at: Completed 100-01-PLAN.md
+last_updated: "2026-08-31T04:31:08.459Z"
+last_activity: 2026-08-31
+last_activity_desc: Phase 100 execution started
 progress:
   total_phases: 2
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
+  percent: 100
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -1055,7 +1055,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 99 — invite-email-function-owner-toggle
+**Current focus:** Phase 100 — invite-login-onboarding-wiring
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1065,10 +1065,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 99 (invite-email-function-owner-toggle) — EXECUTING
-Plan: 2 of 2
+Phase: 100 (invite-login-onboarding-wiring) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
-Last activity: 2026-08-30 — Phase 99 execution started
+Last activity: 2026-08-31 — Phase 100 execution started
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
@@ -2854,6 +2854,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 98 P02 | 22min | 2 tasks | 4 files |
 | Phase 99 P01 | 25m | 2 tasks | 7 files |
 | Phase 99 P02 | 35m | 2 tasks | 3 files |
+| Phase 100 P01 | 15min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3313,6 +3314,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: onboarding.emailsEnabled defaults to false (fail-safe until Resend domain verified); no (default) badge on the checkbox, mirroring MessagingConfigCard's own cron-toggle precedent
 - [Phase ?]: inviteOnboarding.ts: getUserByEmail non-not-found errors rethrow as-is (mirrors resolveAdminTarget); createUser/generatePasswordResetLink failures throw HttpsError('internal') since the invitee would otherwise have no usable path; only the Resend send is best-effort
 - [Phase ?]: checkAndConsumeOrgEmailQuota deferred this phase to avoid a circular import with index.ts, per CONTEXT.md's explicit allowance
+- [Phase ?]: Confirmed SendInviteOnboardingEmailResponse.kind is the real 4-member union (incl. skipped-existing) by reading functions/src/inviteOnboarding.ts directly rather than trusting the 3-member PATTERNS.md draft.
+- [Phase ?]: Callable invocation placed strictly after batch.commit() succeeds in its own nested try/catch (never rethrows) so email send failure can never revert or block the authoritative invite (R294).
 
 ### Roadmap Evolution
 
@@ -3639,8 +3642,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-31T03:34:18.373Z
-Stopped at: Completed 99-02-PLAN.md
+Last session: 2026-08-31T04:31:08.354Z
+Stopped at: Completed 100-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

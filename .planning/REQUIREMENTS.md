@@ -14,14 +14,14 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Invite Email Delivery
 
-- [ ] **R288**: When a team member is invited through the in-app invite UI (TeamView), the system sends that person a **real invite email** — no invitee is left with no notification. (Subject to the owner toggle, R293.)
+- [x] **R288**: When a team member is invited through the in-app invite UI (TeamView), the system sends that person a **real invite email** — no invitee is left with no notification. (Subject to the owner toggle, R293.)
 - [x] **R289**: A **Google / Gmail** invitee receives a **"you've been invited — sign in with Google using this address"** notification email (no password step and no pre-created email/password account, avoiding Google↔password account-linking conflicts).
 - [x] **R290**: A **non-Google** invitee receives an email containing a secure **"set your password" link** that lets them establish a password and then sign in with email/password.
 
 ### Non-Google Account Onboarding
 
 - [x] **R291**: Inviting a non-Google user **provisions their sign-in account server-side** (Cloud Function creating the Firebase Auth account + a `generatePasswordResetLink()` set-password link), so a brand-new invitee (e.g. `bob@someemail.com`) can set a password and sign in **without being told an undocumented "type a password into Sign in" trick**.
-- [ ] **R292**: On the login screen, an invited user has a **discoverable path to set / reset their password** (not buried), and email/password sign-in surfaces a **clear, actionable message** when the provider is unavailable (`auth/operation-not-allowed`) instead of the generic "Sign-in failed."
+- [x] **R292**: On the login screen, an invited user has a **discoverable path to set / reset their password** (not buried), and email/password sign-in surfaces a **clear, actionable message** when the provider is unavailable (`auth/operation-not-allowed`) instead of the generic "Sign-in failed."
 
 ### Owner Console Control
 
@@ -29,7 +29,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Non-Regression & Delivery Safety
 
-- [ ] **R294**: Existing **Google sign-in** and the existing **invite-acceptance flow** (`ensureUserDocument` granting membership on first authenticated sign-in) continue to work unchanged, and a failure to send the invite email **never prevents the invite/membership record from being written** (email is best-effort, membership is authoritative).
+- [x] **R294**: Existing **Google sign-in** and the existing **invite-acceptance flow** (`ensureUserDocument` granting membership on first authenticated sign-in) continue to work unchanged, and a failure to send the invite email **never prevents the invite/membership record from being written** (email is best-effort, membership is authoritative).
 
 ## Future Requirements (deferred)
 

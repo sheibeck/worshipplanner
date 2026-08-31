@@ -422,9 +422,9 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
   3. Existing Google sign-in and the invite-acceptance flow (`ensureUserDocument` granting membership on first authenticated sign-in) continue to work unchanged (R294).
   4. If the invite email fails to send, the invite/membership Firestore record is still written — email delivery is best-effort and never blocks or reverts the invite (R294).
 
-**Plans**: 1 plan
+**Plans**: 1/1 plans executed
 
-- [ ] 100-01-PLAN.md — TeamView invite→`sendInviteOnboardingEmail` wiring (best-effort, honest copy), LoginView `auth/operation-not-allowed` error + discoverability hint, and view tests (Wave 1) [R288, R292, R294]
+- [x] 100-01-PLAN.md — TeamView invite→`sendInviteOnboardingEmail` wiring (best-effort, honest copy), LoginView `auth/operation-not-allowed` error + discoverability hint, and view tests (Wave 1) [R288, R292, R294]
 
 **UI hint**: yes
 
