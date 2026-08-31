@@ -5,10 +5,10 @@ milestone_name: Invite Email & Non-Google Onboarding
 current_phase: 100
 current_phase_name: invite-login-onboarding-wiring
 status: awaiting-owner-close
-stopped_at: "v2.5 CODE-COMPLETE (phases 99+100, 2/2) — audit PASSED 7/7 reqs, 4/4 integration seams. NOT deployed, NOT closed. Awaiting owner validation + owner-run prereqs (Firebase Email/Password provider, Resend DNS verification, flip onboarding-emails toggle ON) + confirm-then-deploy (functions:sendInviteOnboardingEmail + hosting). Then /gsd-complete-milestone v2.5. The transition pointer briefly advanced to 999.2 (backlog, out of scope) — corrected here."
-last_updated: "2026-08-31T04:46:14.661Z"
+stopped_at: "v2.5 CODE-COMPLETE (phases 99+100) + audit PASSED. functions:sendInviteOnboardingEmail DEPLOYED to prod 2026-08-31 (owner-approved) for local UAT. STILL PENDING before real delivery/close: hosting NOT deployed (client invite-UI + toggle card live only in local dev), owner-run prereqs (Firebase Email/Password provider, Resend DNS verification), and flipping the onboarding-emails toggle ON (default OFF). Owner doing local UAT against the deployed function. Then hosting deploy + /gsd-complete-milestone v2.5. UAT script: .planning/v2.5-UAT.md."
+last_updated: "2026-08-31T09:30:00.000Z"
 last_activity: 2026-08-31
-last_activity_desc: "v2.5 phases 99+100 built, verified, code-reviewed, and milestone-audited (PASSED); paused before deploy/close for owner"
+last_activity_desc: "Deployed functions:sendInviteOnboardingEmail to prod (owner-approved) so owner can UAT the invite flow from local dev; hosting still undeployed, milestone still open"
 progress:
   total_phases: 2
   completed_phases: 2
