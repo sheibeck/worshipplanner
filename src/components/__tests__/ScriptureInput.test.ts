@@ -707,6 +707,51 @@ describe('ESV/NLT preview routing (45-04, R090)', () => {
     expect(wrapper.text()).not.toContain('Mocked passage text')
   })
 
+  // IN-01 (102-REVIEW): the fetchPreview disabled-branch test above only
+  // exercises the reference-preview button; togglePreview (the AI-suggestion
+  // expanded preview) shares the same fetchPassageByOrgSetting call and
+  // three-way status branch but had no dedicated disabled-case assertion.
+  // Mirrors the fetchPreview disabled test above almost verbatim.
+  it('bibleApiEnabled=false: expanding an AI-suggestion preview (togglePreview) calls neither client and shows no aiPreviewError', async () => {
+    mockBibleApiEnabled = false
+    const { getScriptureSuggestions } = await import('@/utils/claudeApi')
+    vi.mocked(getScriptureSuggestions).mockResolvedValueOnce([
+      {
+        book: 'John',
+        chapter: 3,
+        verseStart: 16,
+        verseEnd: 17,
+        reason: 'test reason',
+        recentlyUsed: false,
+        weeksAgoUsed: null,
+      },
+    ])
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        modelValue: null,
+        sermonPassage: null,
+        showOverlapWarning: true,
+        showAiSuggest: true,
+        label: 'Scripture Reading',
+      },
+    })
+    await wrapper.find('input[placeholder^="Search passages"]').setValue('comfort')
+    await wrapper.find('input[placeholder^="Search passages"]').trigger('keydown.enter')
+    await flushPromises()
+
+    const resultButton = wrapper.findAll('button').find((b) => b.text().includes('John'))
+    await resultButton!.trigger('click')
+    await flushPromises()
+
+    expect(fetchPassageText).not.toHaveBeenCalled()
+    expect(fetchNltPassageText).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Could not load preview')
+    expect(wrapper.text()).not.toContain('Mocked passage text')
+  })
+
   it('the AI-suggestion expanded preview also routes by the church setting (NLT)', async () => {
     mockBibleVersion = 'NLT'
     const { getScriptureSuggestions } = await import('@/utils/claudeApi')
