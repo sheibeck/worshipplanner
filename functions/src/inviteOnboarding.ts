@@ -77,6 +77,17 @@ function resolveAppBaseUrl(): string {
 }
 
 /**
+ * WR-01 (99-REVIEW): collapse any CR/LF out of a header-bound value (the email
+ * subject) before it reaches the Resend send. `orgName` is org-doc-sourced
+ * (super-admin controlled) so the risk is low, but this applies the SAME
+ * header-injection defense the codebase already documents for the From display
+ * name (params.ts's fromDisplayName) consistently to the subject line.
+ */
+function sanitizeHeader(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").trim();
+}
+
+/**
  * Domain-suffix classifier for the invitee-type branch (99-CONTEXT.md's
  * leaning default). Normalize FIRST (.trim().toLowerCase()) before calling --
  * mirrors resolveAdminTarget's normalizedEmail discipline. googlemail.com is
@@ -188,6 +199,24 @@ export async function sendInviteOnboardingEmailHandler(
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+
+  // CR-01 (99-REVIEW): bind every provisioning + send to a REAL pending invite
+  // record. This callable creates Firebase Auth accounts and emails
+  // caller-supplied addresses; without this gate an org editor could invoke it
+  // directly with attacker-chosen emails to send convincing "invited to {org}"
+  // messages -- carrying genuine password-reset links -- to arbitrary third
+  // parties from our own Resend sending domain. TeamView.onInvite writes the
+  // authoritative invite doc (same trim().toLowerCase() normalization) BEFORE
+  // calling this function, so the doc's absence means this is not a legitimate
+  // invite send. Ties the blast radius to invites the org actually created.
+  const inviteSnap = await orgRef.collection("invites").doc(normalizedEmail).get();
+  if (!inviteSnap.exists) {
+    throw new HttpsError(
+      "failed-precondition",
+      "No pending invite exists for this address in this organization.",
+    );
+  }
+
   const baseUrl = resolveAppBaseUrl();
   const fromEmail = bareEmailAddress(config.sender.fromAddress);
   const displayName = fromDisplayName(orgName);
@@ -197,7 +226,7 @@ export async function sendInviteOnboardingEmailHandler(
   if (isGoogleEmail(normalizedEmail)) {
     const { subject, text } = buildGoogleNotifyContent(orgName, normalizedEmail, baseUrl);
     try {
-      await resend.emails.send({ from, to: normalizedEmail, subject, text });
+      await resend.emails.send({ from, to: normalizedEmail, subject: sanitizeHeader(subject), text });
       return { emailSent: true, kind: "google-notify" };
     } catch (err) {
       console.error(
@@ -235,7 +264,11 @@ export async function sendInviteOnboardingEmailHandler(
         `[inviteOnboarding] getUserByEmail failed for orgId=${orgId}, to=${normalizedEmail}:`,
         err,
       );
-      throw err;
+      // WR-02 (99-REVIEW): surface a friendly HttpsError instead of the raw
+      // Firebase error object (which would reach the client as an opaque
+      // 'internal' with leaked provider detail) for any non-user-not-found
+      // lookup failure.
+      throw new HttpsError("internal", "Could not look up the invited user's account.");
     }
   }
 
@@ -253,7 +286,7 @@ export async function sendInviteOnboardingEmailHandler(
 
   const { subject, text } = buildSetPasswordContent(orgName, normalizedEmail, baseUrl, resetLink);
   try {
-    await resend.emails.send({ from, to: normalizedEmail, subject, text });
+    await resend.emails.send({ from, to: normalizedEmail, subject: sanitizeHeader(subject), text });
     return { emailSent: true, kind: "set-password" };
   } catch (err) {
     console.error(

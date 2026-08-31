@@ -88,9 +88,15 @@ class FakeFirestore {
 
 function seedOrg(
   fake: FakeFirestore,
-  opts: { memberExists?: boolean; memberRole?: string; emailsEnabled?: boolean } = {},
+  opts: {
+    memberExists?: boolean;
+    memberRole?: string;
+    emailsEnabled?: boolean;
+    inviteExists?: boolean;
+  } = {},
 ): FakeFirestore {
-  const { memberExists = true, memberRole = "editor", emailsEnabled = true } = opts;
+  const { memberExists = true, memberRole = "editor", emailsEnabled = true, inviteExists = true } =
+    opts;
   if (memberExists) {
     fake.setDocState(`organizations/${ORG_ID}/members/${CALLER_UID}`, {
       exists: true,
@@ -99,6 +105,18 @@ function seedOrg(
   }
   fake.setDocState(`organizations/${ORG_ID}`, { exists: true, data: { name: ORG_NAME } });
   fake.setDocState("appConfig/global", { exists: true, data: { onboarding: { emailsEnabled } } });
+  // CR-01: the handler requires a real pending invite doc (written by
+  // TeamView.onInvite, same trim().toLowerCase() normalization) before it will
+  // provision/email. Seed it for every address the tests exercise; toggle off
+  // via inviteExists:false to cover the "no invite" rejection.
+  if (inviteExists) {
+    for (const em of [INVITEE_EMAIL, "bob@gmail.com", "x@googlemail.com"]) {
+      fake.setDocState(`organizations/${ORG_ID}/invites/${em}`, {
+        exists: true,
+        data: { role: "viewer" },
+      });
+    }
+  }
   return fake;
 }
 
@@ -199,6 +217,22 @@ describe("caller gate", () => {
       emailSent: true,
     });
     expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects with failed-precondition when no pending invite record exists (CR-01)", async () => {
+    // An org editor cannot use this callable to email an arbitrary address that
+    // was never actually invited: without a real invite doc, no Auth account is
+    // created and no email is sent.
+    const { getUserByEmail, createUser } = mockAuth();
+    const fake = seedOrg(new FakeFirestore(), { inviteExists: false });
+    vi.mocked(getFirestore).mockReturnValue(fake.db());
+
+    await expect(sendInviteOnboardingEmailHandler(fakeRequest())).rejects.toMatchObject({
+      code: "failed-precondition",
+    });
+    expect(getUserByEmail).not.toHaveBeenCalled();
+    expect(createUser).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });
 
@@ -319,7 +353,7 @@ describe("set-password / createUser", () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it("getUserByEmail rejects a non-'auth/user-not-found' code: handler rejects", async () => {
+  it("getUserByEmail rejects a non-'auth/user-not-found' code: handler throws HttpsError('internal', ...) (WR-02)", async () => {
     mockAuth({
       getUserByEmailImpl: async () => {
         throw { code: "auth/internal-error" };
@@ -328,8 +362,10 @@ describe("set-password / createUser", () => {
     const fake = seedOrg(new FakeFirestore());
     vi.mocked(getFirestore).mockReturnValue(fake.db());
 
+    // WR-02: the raw Firebase error is wrapped in a friendly HttpsError rather
+    // than re-thrown verbatim, so the client never sees leaked provider detail.
     await expect(sendInviteOnboardingEmailHandler(fakeRequest())).rejects.toMatchObject({
-      code: "auth/internal-error",
+      code: "internal",
     });
     expect(mockSend).not.toHaveBeenCalled();
   });
