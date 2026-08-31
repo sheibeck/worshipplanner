@@ -4,8 +4,7 @@ import type { UpsertPersonInput } from '@/types/roster'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 import { miscLabel } from '@/utils/slotTypes'
-import { fetchPassageText } from '@/utils/esvApi'
-import { fetchNltPassageText } from '@/utils/nltApi'
+import { fetchScriptureText } from '@/utils/scriptureApi'
 
 /**
  * Base URL for Planning Center API calls.
@@ -991,13 +990,36 @@ export async function addSlotAsItem(
       // reaches the new optional field. Any value other than exactly 'NLT'
       // (including a corrupt or absent one) safely routes to the ESV fetch.
       const effectiveVersion = (slot as ScriptureSlot).bibleVersion ?? bibleVersion
+      // CR-01 (102-REVIEW): routed through the scriptureApi.ts dispatcher —
+      // the phase's single choke point — rather than calling
+      // fetchPassageText/fetchNltPassageText directly. That kept this "push
+      // to Planning Center" flow ungated even after the server-side R297 gate
+      // deployed, silently 403ing on every SCRIPTURE slot for a disabled org.
+      // Kept wrapped in try/catch (the pre-existing shape) as a defensive
+      // safety net: the dispatcher's gate check runs BEFORE its own internal
+      // try/catch, so a throw from useAuthStore() there would otherwise
+      // propagate here uncaught (same edge case WR-02, 102-REVIEW, restored
+      // a catch for in the two Vue components).
       try {
-        description =
-          effectiveVersion === 'NLT'
-            ? await fetchNltPassageText(refText)
-            : await fetchPassageText(refText)
+        const result = await fetchScriptureText(refText, effectiveVersion)
+        if (result.status === 'ok') {
+          description = result.text
+        } else if (result.status === 'disabled') {
+          // R297: a disabled org's dispatcher makes ZERO proxy calls — no
+          // fetch was attempted. Fall back to any scripture text already
+          // stored on the slot (Phase 103's manual-paste UX populates this
+          // for a disabled org's congregational readings); if none is
+          // available, degrade gracefully with no description rather than
+          // throw or error.
+          const sections = (slot as ScriptureSlot).congregationalSections
+          if (sections && sections.length > 0) {
+            description = sections.map((s) => s.text).join('\n\n')
+          }
+        }
+        // 'error': fall through with description left undefined.
       } catch {
-        // silently ignore scripture fetch errors (ESV or NLT)
+        // silently ignore scripture fetch errors (ESV or NLT) — preserves
+        // the pre-existing behavior for any unexpected exception.
       }
     }
 

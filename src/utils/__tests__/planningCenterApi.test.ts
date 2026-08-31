@@ -14,6 +14,25 @@ vi.mock('@/utils/nltApi', () => ({
   fetchNltPassageText: vi.fn(),
 }))
 
+// CR-01 (102-REVIEW): addSlotAsItem's SCRIPTURE branch now routes through the
+// scriptureApi.ts dispatcher (rather than calling fetchPassageText/
+// fetchNltPassageText directly), which reads `authStore.isBibleApiEnabled`
+// via `useAuthStore()` before every fetch. Mocked here (not via a real Pinia
+// instance — this is a pure-util test file, no setActivePinia) so the
+// dispatcher's gate runs against a controllable, flippable value instead of
+// throwing "no active Pinia". Defaults to true so every pre-existing
+// SCRIPTURE test in this file (written before Phase 102) keeps asserting
+// against the enabled/passthrough path unchanged; the dedicated disabled-gate
+// tests below flip it false.
+let mockBibleApiEnabled = true
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    get isBibleApiEnabled() {
+      return mockBibleApiEnabled
+    },
+  }),
+}))
+
 import { fetchPassageText } from '@/utils/esvApi'
 import { fetchNltPassageText } from '@/utils/nltApi'
 
@@ -533,6 +552,7 @@ describe('addSlotAsItem', () => {
     vi.mocked(fetchNltPassageText).mockReset()
     vi.mocked(fetchPassageText).mockResolvedValue('In the beginning God created the heavens...')
     vi.mocked(fetchNltPassageText).mockResolvedValue('In the beginning God created the heavens... (NLT)')
+    mockBibleApiEnabled = true
   })
 
   const defaultFetchResponse = () =>
@@ -944,6 +964,62 @@ describe('addSlotAsItem', () => {
     await expect(
       addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV'),
     ).resolves.not.toThrow()
+  })
+
+  // CR-01 (102-REVIEW): the SCRIPTURE branch now routes through the
+  // scriptureApi.ts dispatcher instead of calling fetchPassageText/
+  // fetchNltPassageText directly, so a disabled org's "push to Planning
+  // Center" flow makes ZERO proxy calls for a SCRIPTURE slot (R297) rather
+  // than the pre-fix ungated bypass.
+  describe('R297: disabled org (bibleApiEnabled=false)', () => {
+    it('makes no ESV/NLT proxy call and creates the item with no description when the slot has no stored text', async () => {
+      mockBibleApiEnabled = false
+      defaultFetchResponse()
+      const slot: ScriptureSlot = {
+        kind: 'SCRIPTURE',
+        id: 'slot-scripture-disabled',
+        position: 2,
+        book: 'Psalms',
+        chapter: 23,
+        verseStart: 1,
+        verseEnd: 6,
+      }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV')
+
+      expect(vi.mocked(fetchPassageText)).not.toHaveBeenCalled()
+      expect(vi.mocked(fetchNltPassageText)).not.toHaveBeenCalled()
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBeUndefined()
+    })
+
+    it('falls back to the slot\'s own congregationalSections text when present, still with no proxy call', async () => {
+      mockBibleApiEnabled = false
+      defaultFetchResponse()
+      const slot: ScriptureSlot = {
+        kind: 'SCRIPTURE',
+        id: 'slot-scripture-disabled-congregational',
+        position: 2,
+        book: 'Psalms',
+        chapter: 23,
+        verseStart: 1,
+        verseEnd: 6,
+        readingMode: 'congregational',
+        congregationalSections: [
+          { speaker: 'LEADER', text: 'The LORD is my shepherd;' },
+          { speaker: 'CONGREGATION', text: 'I shall not want.' },
+        ],
+      }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV')
+
+      expect(vi.mocked(fetchPassageText)).not.toHaveBeenCalled()
+      expect(vi.mocked(fetchNltPassageText)).not.toHaveBeenCalled()
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('The LORD is my shepherd;\n\nI shall not want.')
+    })
   })
 
   // A (bug fix): the SCRIPTURE branch used to call fetchPassageText (ESV)
