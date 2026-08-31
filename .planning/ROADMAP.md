@@ -392,7 +392,7 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 **Owner-run external prerequisites** (not phases, not code): confirm the Firebase Auth Email/Password provider is enabled for `worship-planner-bc515`; complete `functions/DEPLOY-EMAIL-DOMAIN.md`'s Resend DNS domain verification, or invite emails to non-owner addresses will silently not deliver (default `onboarding@resend.dev` only reaches the Resend account owner's inbox).
 
 - [x] **Phase 99: Invite Email Function & Owner Toggle** - A Cloud Function sends the right onboarding email per invitee type (non-Google set-password link, Google/Gmail sign-in notice), gated by an Owner Console on/off switch (completed 2026-08-31)
-- [ ] **Phase 100: Invite & Login Onboarding Wiring** - TeamView's invite UI actually calls the function with corrected copy, LoginView gains a discoverable password path + operation-not-allowed handling, and existing sign-in/invite-acceptance keep working
+- [x] **Phase 100: Invite & Login Onboarding Wiring** - TeamView's invite UI actually calls the function with corrected copy, LoginView gains a discoverable password path + operation-not-allowed handling, and existing sign-in/invite-acceptance keep working (completed 2026-08-31)
 
 ### Phase 99: Invite Email Function & Owner Toggle
 

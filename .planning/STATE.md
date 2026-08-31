@@ -4,11 +4,11 @@ milestone: v2.5
 milestone_name: Invite Email & Non-Google Onboarding
 current_phase: 100
 current_phase_name: invite-login-onboarding-wiring
-status: verifying
-stopped_at: Completed 100-01-PLAN.md
-last_updated: "2026-08-31T04:31:08.459Z"
+status: awaiting-owner-close
+stopped_at: "v2.5 CODE-COMPLETE (phases 99+100, 2/2) — audit PASSED 7/7 reqs, 4/4 integration seams. NOT deployed, NOT closed. Awaiting owner validation + owner-run prereqs (Firebase Email/Password provider, Resend DNS verification, flip onboarding-emails toggle ON) + confirm-then-deploy (functions:sendInviteOnboardingEmail + hosting). Then /gsd-complete-milestone v2.5. The transition pointer briefly advanced to 999.2 (backlog, out of scope) — corrected here."
+last_updated: "2026-08-31T04:46:14.661Z"
 last_activity: 2026-08-31
-last_activity_desc: Phase 100 execution started
+last_activity_desc: "v2.5 phases 99+100 built, verified, code-reviewed, and milestone-audited (PASSED); paused before deploy/close for owner"
 progress:
   total_phases: 2
   completed_phases: 2
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.5 Invite Email & Non-Google Onboarding (roadmap created 2026-08-30)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to plan
 
 **Goal:** Every invited user gets an invite email, non-Google users can set a password and sign in, and
 an owner can switch onboarding emails on/off. Requirements R288–R294 in REQUIREMENTS.md.
@@ -1065,10 +1065,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 100 (invite-login-onboarding-wiring) — EXECUTING
-Plan: 1 of 1
+Phase: 999.2 — Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG)
+Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-08-31 — Phase 100 execution started
+Last activity: 2026-08-31 — Phase 100 complete, transitioned to Phase 999.2
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
