@@ -51,6 +51,7 @@ import {
   checkAndConsumeRateLimit,
   checkAndConsumeOrgEmailQuota,
   checkOrgAiEnablement,
+  checkOrgBibleEnablement,
   buildUsageEntry,
   writeUsageLedger,
   api,
@@ -4108,6 +4109,78 @@ describe("checkOrgAiEnablement (org AI enablement gate, R242/R243)", () => {
   it("reads exactly organizations/{orgId} -- the exact orgId argument, no other collection", async () => {
     const { db, doc } = mockOrgDb({ aiMasterEnabled: true });
     await checkOrgAiEnablement(db, "org42");
+    expect(doc).toHaveBeenCalledWith("org42");
+  });
+});
+
+// R297: the org Bible-API-enablement gate -- the server-side defense-in-depth
+// half of the ESV/NLT per-org gate (Plan 102-02). Mirrors
+// checkOrgAiEnablement's describe block above 1:1 (same mocked-Firestore
+// harness, no live emulator), reading `bibleApiEnabled` instead of
+// `aiMasterEnabled`.
+describe("checkOrgBibleEnablement (org Bible-API enablement gate, R297)", () => {
+  function mockOrgDb(orgData: Record<string, unknown> | undefined, opts: { throwOnGet?: boolean } = {}) {
+    const getSpy = vi.fn(async () => {
+      if (opts.throwOnGet) throw new Error("Firestore unavailable");
+      return { exists: orgData !== undefined, data: () => orgData };
+    });
+    const doc = vi.fn((id: string) => ({ id, get: getSpy }));
+    const collection = vi.fn((name: string) => {
+      if (name !== "organizations") throw new Error(`unexpected collection "${name}"`);
+      return { doc };
+    });
+    return { db: { collection } as never, getSpy, doc };
+  }
+
+  it("ALLOW: an org with bibleApiEnabled:true returns an ok verdict", async () => {
+    const { db } = mockOrgDb({ bibleApiEnabled: true });
+    const result = await checkOrgBibleEnablement(db, "org1");
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("DENY (403): an org with bibleApiEnabled:false returns a not-ok verdict with a user-facing message", async () => {
+    const { db } = mockOrgDb({ bibleApiEnabled: false });
+    const result = await checkOrgBibleEnablement(db, "org1");
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      error: { error: "Bible API features are disabled for your organization." },
+    });
+  });
+
+  it("DENY (403): an org doc with the field entirely ABSENT (every pre-Phase-101 org) also denies -- OFF by default", async () => {
+    const { db } = mockOrgDb({ name: "Grace Church" });
+    const result = await checkOrgBibleEnablement(db, "org1");
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      error: { error: "Bible API features are disabled for your organization." },
+    });
+  });
+
+  it("DENY (403): a nonexistent org doc also denies, never throws", async () => {
+    const { db } = mockOrgDb(undefined);
+    const result = await checkOrgBibleEnablement(db, "org1");
+    expect(result).toEqual({
+      ok: false,
+      status: 403,
+      error: { error: "Bible API features are disabled for your organization." },
+    });
+  });
+
+  it("FAIL-CLOSED (503): a Firestore read error denies with a distinct status/message, the deliberate departure from the rate limiter's fail-open posture", async () => {
+    const { db } = mockOrgDb(undefined, { throwOnGet: true });
+    const result = await checkOrgBibleEnablement(db, "org1");
+    expect(result).toEqual({
+      ok: false,
+      status: 503,
+      error: { error: "Could not verify Bible availability. Try again shortly." },
+    });
+  });
+
+  it("reads exactly organizations/{orgId} -- the exact orgId argument, no other collection", async () => {
+    const { db, doc } = mockOrgDb({ bibleApiEnabled: true });
+    await checkOrgBibleEnablement(db, "org42");
     expect(doc).toHaveBeenCalledWith("org42");
   });
 });

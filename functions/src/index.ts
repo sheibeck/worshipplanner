@@ -388,6 +388,45 @@ export async function checkOrgAiEnablement(
   }
 }
 
+/**
+ * R297: the server-side half of the per-org Bible-API (ESV/NLT) gate --
+ * defense-in-depth behind the client dispatcher (Plan 102-01). Mirrors
+ * checkOrgAiEnablement 1:1 (same live `organizations/{orgId}` read, same
+ * fail-closed posture, same "claim is only a pointer, never the enforcement
+ * value" rationale -- see that function's doc comment above for the full
+ * reasoning, which applies unchanged here). Reuses the existing
+ * OrgAiEnablementResult union rather than declaring a redundant type, since
+ * the shape ({ ok: true } | { ok: false, status, error }) is identical.
+ */
+export type OrgBibleEnablementResult = OrgAiEnablementResult;
+
+export async function checkOrgBibleEnablement(
+  db: Firestore,
+  orgId: string,
+): Promise<OrgBibleEnablementResult> {
+  try {
+    const orgSnap = await db.collection("organizations").doc(orgId).get();
+    const bibleApiEnabled = (orgSnap.data() as { bibleApiEnabled?: boolean } | undefined)?.bibleApiEnabled ?? false;
+    if (bibleApiEnabled !== true) {
+      return {
+        ok: false,
+        status: 403,
+        error: { error: "Bible API features are disabled for your organization." },
+      };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.warn("[api] org Bible-enablement read failed; failing closed:", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return {
+      ok: false,
+      status: 503,
+      error: { error: "Could not verify Bible availability. Try again shortly." },
+    };
+  }
+}
+
 export interface RateLimitResult {
   allowed: boolean;
   scope?: "minute" | "day";
