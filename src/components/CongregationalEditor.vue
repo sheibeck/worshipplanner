@@ -155,8 +155,7 @@
 // until Save. A failed split leaves the textarea untouched and surfaces a
 // toast.
 import { ref, computed, onMounted } from 'vue'
-import { fetchPassageText } from '@/utils/esvApi'
-import { fetchNltPassageText } from '@/utils/nltApi'
+import { fetchScriptureText } from '@/utils/scriptureApi'
 import { stripVerseMarkers } from '@/utils/scriptureBoundaries'
 import { splitCongregationalReading } from '@/utils/claudeApi'
 import {
@@ -244,13 +243,19 @@ async function autoFetch(): Promise<void> {
   const version = props.bibleVersion ?? authStore.settings.bibleVersion
   const query = formatQuery(scriptureRef)
   try {
-    const raw = version === 'NLT' ? await fetchNltPassageText(query) : await fetchPassageText(query)
-    const stripped = stripVerseMarkers(raw)
-    rawPassage.value = stripped
-    capturedVersion.value = version ?? null
-    text.value = `Leader\n${stripped}`
-  } catch {
-    fetchError.value = true
+    const result = await fetchScriptureText(query, version)
+    if (result.status === 'ok') {
+      const stripped = stripVerseMarkers(result.text)
+      rawPassage.value = stripped
+      capturedVersion.value = version ?? null
+      text.value = `Leader\n${stripped}`
+    } else if (result.status === 'error') {
+      fetchError.value = true
+    }
+    // 'disabled' (Phase 102, R297): silent no-op — no fetch was attempted, no
+    // fetchError shown; the textarea/rawPassage stay untouched and the
+    // component remains functional for manual entry. Phase 103 attaches the
+    // BibleGateway/paste UI here.
   } finally {
     isFetching.value = false
   }

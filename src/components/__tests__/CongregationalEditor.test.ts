@@ -92,6 +92,13 @@ describe('CongregationalEditor', () => {
     const store = useAuthStore()
     await flushPromises()
     store.aiMasterEnabled = true
+    // Phase 102 (R296/R297): the real store's bibleApiEnabled ref defaults to
+    // false (default OFF, Phase 101), so the dispatcher would return
+    // 'disabled' and every existing auto-fetch test below would break unless
+    // set true here — mirrors the aiMasterEnabled line above exactly (same
+    // flushPromises-then-set ordering, since onAuthStateChanged resets it on
+    // the null user). The dedicated disabled-gate test below sets it false.
+    store.bibleApiEnabled = true
   })
 
   // ── Auto-fetch on open (no sections) ────────────────────────────────────
@@ -343,5 +350,18 @@ describe('CongregationalEditor', () => {
 
     expect(wrapper.find('[data-testid="fetch-error"]').exists()).toBe(true)
     expect(mockFetchNltPassageText).not.toHaveBeenCalled()
+  })
+
+  // ── Gated scripture fetch dispatcher (Phase 102, R296/R297) ─────────────
+
+  it('bibleApiEnabled=false: auto-fetch on open (with a valid reference) calls neither client, sets no fetchError, leaves the textarea empty', async () => {
+    useAuthStore().bibleApiEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    expect(mockFetchPassageText).not.toHaveBeenCalled()
+    expect(mockFetchNltPassageText).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="fetch-error"]').exists()).toBe(false)
+    expect(textareaEl(wrapper).value).toBe('')
   })
 })
