@@ -127,6 +127,11 @@ let mockBibleVersion: 'ESV' | 'NLT' = 'ESV'
 // pre-existing (pre-82) test in this file keeps its current behavior;
 // the dedicated master-gate-off test below flips it false.
 let mockAiMasterEnabled = true
+// Phase 102 (R296/R297): scriptureApi.ts's dispatcher reads this off the auth
+// store — defaults to true so every pre-existing preview-fetch test (which
+// asserts fetchPassageText/fetchNltPassageText were called) keeps passing;
+// the dedicated disabled-gate test below flips it false.
+let mockBibleApiEnabled = true
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     settings: {
@@ -146,6 +151,9 @@ vi.mock('@/stores/auth', () => ({
     get isAiEnabled() {
       return mockAiMasterEnabled && mockAiEnabled
     },
+    get isBibleApiEnabled() {
+      return mockBibleApiEnabled
+    },
   }),
 }))
 
@@ -159,6 +167,7 @@ afterEach(() => {
   mockAiEnabled = true
   mockAiMasterEnabled = true
   mockBibleVersion = 'ESV'
+  mockBibleApiEnabled = true
 })
 
 describe('ScriptureInput', () => {
@@ -676,6 +685,26 @@ describe('ESV/NLT preview routing (45-04, R090)', () => {
 
     expect(fetchNltPassageText).toHaveBeenCalledWith('John 3:16-17')
     expect(fetchPassageText).not.toHaveBeenCalled()
+  })
+
+  // Phase 102 (R297): a disabled org's dispatcher gate must produce ZERO
+  // proxy calls and no error UI — a graceful no-op, not a thrown error.
+  it('bibleApiEnabled=false: triggering a preview calls neither client and shows no previewError', async () => {
+    mockBibleApiEnabled = false
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: { ...defaultProps, modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 } },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetchPassageText).not.toHaveBeenCalled()
+    expect(fetchNltPassageText).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Could not load passage')
+    expect(wrapper.text()).not.toContain('Mocked passage text')
   })
 
   it('the AI-suggestion expanded preview also routes by the church setting (NLT)', async () => {

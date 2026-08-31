@@ -205,8 +205,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { scriptureWebLink, scripturesOverlap, parseScriptureInput, formatScriptureReference } from '@/utils/scripture'
-import { fetchPassageText } from '@/utils/esvApi'
-import { fetchNltPassageText } from '@/utils/nltApi'
+import { fetchScriptureText } from '@/utils/scriptureApi'
 import { getScriptureSuggestions, type AiScriptureSuggestion } from '@/utils/claudeApi'
 import { useAuthStore } from '@/stores/auth'
 import type { ScriptureRef } from '@/types/service'
@@ -375,21 +374,20 @@ function dismissPreview() {
   previewError.value = ''
 }
 
-// 45-04 (R090): routes a passage fetch to the church's chosen source. This
-// component is preview-only — nothing it fetches is ever persisted (unlike
-// CongregationalEditor.vue's onFetchPassage, which additionally stamps
-// translationSource at fetch time) — so there is no provenance to capture
-// here, only the routing choice itself. Shared by both fetch call sites
-// below (the reference preview panel AND the AI-suggestion expanded
-// preview) so neither silently stays ESV-only when the church has chosen
-// NLT.
-function fetchPassageByOrgSetting(query: string): Promise<string> {
+// 45-04 (R090): routes a passage fetch to the church's chosen source, via the
+// scriptureApi dispatcher (Phase 102) which owns both the ESV/NLT version
+// dispatch and the per-org Bible-API gate. This component is preview-only —
+// nothing it fetches is ever persisted (unlike CongregationalEditor.vue's
+// autoFetch, which additionally stamps translationSource at fetch time) — so
+// there is no provenance to capture here, only the routing choice itself.
+// Shared by both fetch call sites below (the reference preview panel AND the
+// AI-suggestion expanded preview) so neither silently stays ESV-only when the
+// church has chosen NLT.
+function fetchPassageByOrgSetting(query: string) {
   // R128 (Phase 56): the per-item override wins over the org default; absent
   // prop reproduces today's org-default routing. `effectiveVersion` is the
   // shared computed used by the reader link + label too.
-  return effectiveVersion.value === 'NLT'
-    ? fetchNltPassageText(query)
-    : fetchPassageText(query)
+  return fetchScriptureText(query, effectiveVersion.value)
 }
 
 async function fetchPreview() {
@@ -399,11 +397,15 @@ async function fetchPreview() {
   previewError.value = ''
   previewText.value = ''
   try {
-    const text = await fetchPassageByOrgSetting(query)
-    previewText.value = text || 'No passage text found for this reference.'
-    previewRef.value = query
-  } catch {
-    previewError.value = 'Could not load passage. Check your connection and try again.'
+    const result = await fetchPassageByOrgSetting(query)
+    if (result.status === 'ok') {
+      previewText.value = result.text || 'No passage text found for this reference.'
+      previewRef.value = query
+    } else if (result.status === 'error') {
+      previewError.value = 'Could not load passage. Check your connection and try again.'
+    }
+    // 'disabled' (Phase 102, R297): silent no-op — no fetch was attempted, no
+    // error is shown. Phase 103 attaches the manual-fallback UI here.
   } finally {
     previewLoading.value = false
   }
@@ -486,10 +488,13 @@ async function togglePreview(index: number) {
     const r = aiResults.value[index]
     if (!r) return
     const query = `${r.book} ${r.chapter}:${r.verseStart}-${r.verseEnd}`
-    const text = await fetchPassageByOrgSetting(query)
-    aiPreviewText.value = text || 'No passage text found.'
-  } catch {
-    aiPreviewError.value = true
+    const result = await fetchPassageByOrgSetting(query)
+    if (result.status === 'ok') {
+      aiPreviewText.value = result.text || 'No passage text found.'
+    } else if (result.status === 'error') {
+      aiPreviewError.value = true
+    }
+    // 'disabled' (Phase 102, R297): silent no-op — see fetchPreview above.
   } finally {
     aiPreviewLoading.value = false
   }
