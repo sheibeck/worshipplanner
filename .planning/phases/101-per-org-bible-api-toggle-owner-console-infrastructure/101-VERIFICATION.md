@@ -18,7 +18,7 @@ human_verification:
 
 **Phase Goal:** A super-admin can enable or disable Bible API access per organization from the Owner Console, mirroring the proven per-org AI enablement pattern, with every org defaulting to OFF and no client able to flip the field directly.
 **Verified:** 2026-08-31T18:15:00Z
-**Status:** human_needed
+**Status:** passed (automated 4/4; one visual browser check deferred to the batched end-of-milestone UAT round — see `v2.6-DEFERRED-UAT.md`, per this autonomous run's policy)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement

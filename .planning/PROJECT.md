@@ -392,12 +392,18 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-**v2.6 Per-Org Bible API Toggle & Manual Fallback** — being scoped now. A super-admin enables/disables the
-Bible API per church from the Owner Console (default OFF); a new `scriptureApi.ts` dispatcher carries the
-per-org gate (client + server esv/nlt branches). When OFF, scripture/congregational-reading UI offers an
-"Open in BibleGateway" deep-link plus a manual paste-the-passage-in box (any version), the LLM split runs
-on pasted text, and Settings hides the Bible Translation selector. Mirrors the v2.2 per-org AI pattern.
-Requirements R295–R301 in `.planning/REQUIREMENTS.md`.
+**v2.6 Per-Org Bible API Toggle & Manual Fallback** — ✅ BUILT & audited (Phases 101–103, R295–R301);
+awaiting the owner's batched visual UAT (`.planning/v2.6-DEFERRED-UAT.md`) and the owner-gated deploy, then
+`/gsd-complete-milestone`. A super-admin enables/disables the Bible API per church from the Owner Console
+(default OFF); a new `scriptureApi.ts` dispatcher carries the per-org gate (client + server esv/nlt
+branches). When OFF, scripture/congregational-reading UI offers an "Open in BibleGateway" deep-link plus a
+manual paste-the-passage-in box (any version), the LLM split runs on pasted text (gated independently on
+AI), and Settings hides the Bible Translation selector. Mirrors the v2.2 per-org AI pattern. Milestone
+audit PASSED 7/7 reqs + 5/5 integration seams; two code-review rounds caught & fixed real defects (a
+Planning-Center-export gate bypass; two fallback data-loss bugs). Built autonomously via `/gsd-autonomous`.
+**UNDEPLOYED** — deploy is hosting + `functions:api` (server esv/nlt gate), owner-gated, and must be
+sequenced with enabling the Bible API for the production org (Berean) so its scripture auto-fetch keeps
+working. Requirements R295–R301 in `.planning/REQUIREMENTS.md`.
 
 **v2.5 Invite Email & Non-Google Onboarding** — ✅ shipped 2026-08-31. Every invited user receives an invite
 email (reusing the Resend pattern); non-Google invitees get a Cloud-Function-provisioned Auth account + a
