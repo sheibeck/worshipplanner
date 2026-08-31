@@ -82,7 +82,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { parseScriptureInput } from '@/utils/scripture'
-import { fetchPassageText } from '@/utils/esvApi'
+import { fetchScriptureText } from '@/utils/scriptureApi'
 import { splitPassage } from '@/utils/scriptureSplitter'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
@@ -134,7 +134,25 @@ async function onFetchPassage() {
   const query = formatQuery(scriptureRef)
 
   try {
-    const text = await fetchPassageText(query)
+    // WR-01 (102-REVIEW): routed through the scriptureApi.ts dispatcher — the
+    // single client-side choke point (R297) — instead of calling
+    // fetchPassageText directly. This component is currently unmounted
+    // anywhere in the app, but leaving a direct esvApi call here would
+    // silently reintroduce an ungated ESV proxy call the moment it's wired
+    // into a view. Still ESV-only (pre-existing gap, out of this phase's
+    // scope — no NLT dispatch existed here before either).
+    const result = await fetchScriptureText(query, 'ESV')
+    if (result.status === 'error') {
+      fetchError.value = true
+      return
+    }
+    if (result.status === 'disabled') {
+      // R297: a disabled org's dispatcher makes ZERO proxy calls. Graceful
+      // no-op, matching ScriptureInput.vue/CongregationalEditor.vue — no
+      // error surfaced, existing slides/manual entry stay usable.
+      return
+    }
+    const text = result.text
     rawText.value = text
     const slides = splitPassage(text, scriptureRef)
     localSlides.value = slides

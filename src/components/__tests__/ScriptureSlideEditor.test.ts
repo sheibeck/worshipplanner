@@ -60,9 +60,16 @@ vi.mock('@/composables/useAutoSave', () => ({
   }),
 }))
 
-const mockFetchPassageText = vi.fn()
-vi.mock('@/utils/esvApi', () => ({
-  fetchPassageText: (...args: unknown[]) => mockFetchPassageText(...args),
+// WR-01 (102-REVIEW): the component now routes through the scriptureApi.ts
+// dispatcher (the phase's single choke point) instead of calling
+// fetchPassageText directly, so this test mocks the dispatcher itself rather
+// than esvApi. The dispatcher's own gate/dispatch behavior is covered by
+// scriptureApi.test.ts; this file only proves the component uses it
+// correctly (enabled → 'ok'/'error' branching; the 'disabled' branch is
+// exercised by its own dedicated test below).
+const mockFetchScriptureText = vi.fn()
+vi.mock('@/utils/scriptureApi', () => ({
+  fetchScriptureText: (...args: unknown[]) => mockFetchScriptureText(...args),
 }))
 
 const mockSplitPassage = vi.fn()
@@ -106,7 +113,7 @@ describe('ScriptureSlideEditor', () => {
     vi.clearAllMocks()
     autoSaveStatusRef.value = 'idle'
     capturedSaveFn = null
-    mockFetchPassageText.mockResolvedValue('[28] And we know that...')
+    mockFetchScriptureText.mockResolvedValue({ status: 'ok', text: '[28] And we know that...' })
     mockSplitPassage.mockReturnValue(makeSampleSlides())
   })
 
@@ -129,13 +136,28 @@ describe('ScriptureSlideEditor', () => {
     expect(wrapper.find('[data-testid="fetch-btn"]').attributes('disabled')).toBeUndefined()
   })
 
-  it('clicking fetch calls fetchPassageText with correct query', async () => {
+  it('clicking fetch calls the scriptureApi dispatcher with correct query and ESV version', async () => {
     const wrapper = mountEditor()
     await wrapper.find('[data-testid="reference-input"]').setValue('Romans 8:28-30')
     await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
     await flushPromises()
 
-    expect(mockFetchPassageText).toHaveBeenCalledWith('Romans 8:28-30')
+    expect(mockFetchScriptureText).toHaveBeenCalledWith('Romans 8:28-30', 'ESV')
+  })
+
+  // Phase 102 (R297): a disabled org's dispatcher gate must produce ZERO
+  // proxy calls (already true — this is the mock boundary) and no error UI
+  // -- a graceful no-op, not a thrown error.
+  it('dispatcher returns disabled: no slides/reading are created and no fetch-error is shown', async () => {
+    mockFetchScriptureText.mockResolvedValueOnce({ status: 'disabled' })
+    const wrapper = mountEditor()
+    await wrapper.find('[data-testid="reference-input"]').setValue('Romans 8:28-30')
+    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="fetch-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slides-container"]').exists()).toBe(false)
+    expect(mockCreateReading).not.toHaveBeenCalled()
   })
 
   it('after fetch, displays split slides with verse range labels', async () => {
@@ -226,7 +248,7 @@ describe('ScriptureSlideEditor', () => {
   })
 
   it('shows error message when ESV fetch fails', async () => {
-    mockFetchPassageText.mockRejectedValueOnce(new Error('Network error'))
+    mockFetchScriptureText.mockResolvedValueOnce({ status: 'error' })
     const wrapper = mountEditor()
     await wrapper.find('[data-testid="reference-input"]').setValue('Romans 8:28-30')
     await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
