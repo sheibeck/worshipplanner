@@ -146,6 +146,39 @@
       {{ readerLabel }}
     </a>
 
+    <!-- Bible API off: manual fallback (R298 deep-link, R299 paste-into-preview).
+         Rendered ONLY when the org's Bible API is disabled — the enabled
+         auto-fetch/preview path above is otherwise unchanged. -->
+    <div v-if="!authStore.isBibleApiEnabled" class="space-y-2">
+      <p class="text-xs text-gray-400">
+        Bible API is off for your church. Open the passage in BibleGateway, then paste the text below.
+      </p>
+      <a
+        v-if="currentRef"
+        :href="fallbackBibleGatewayLink"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+        Open in BibleGateway
+      </a>
+      <div>
+        <label class="block text-xs font-medium text-gray-300 mb-1">Paste the passage text</label>
+        <textarea
+          v-model="previewText"
+          placeholder="Paste the verses here (any version)"
+          rows="4"
+          class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        ></textarea>
+        <p v-if="!previewText" class="text-xs text-gray-500 mt-1">
+          No passage text yet — open BibleGateway above and paste it here.
+        </p>
+      </div>
+    </div>
+
     <!-- Preview passage button -->
     <button
       v-if="showPreviewButton || previewLoading"
@@ -204,7 +237,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { scriptureWebLink, scripturesOverlap, parseScriptureInput, formatScriptureReference } from '@/utils/scripture'
+import { scriptureWebLink, scripturesOverlap, parseScriptureInput, formatScriptureReference, bibleGatewayLink } from '@/utils/scripture'
 import { fetchScriptureText } from '@/utils/scriptureApi'
 import { getScriptureSuggestions, type AiScriptureSuggestion } from '@/utils/claudeApi'
 import { useAuthStore } from '@/stores/auth'
@@ -317,6 +350,16 @@ const readerUrl = computed(() => {
 const readerLabel = computed(() =>
   effectiveVersion.value === 'NLT' ? 'View on BibleGateway' : 'View on ESV.org',
 )
+
+// R298: manual-fallback deep-link, shown only when the org's Bible API is off
+// (see the template block above). Uses the same effectiveVersion the reader
+// link/preview fetch already resolve — the per-item override when set, else
+// the org's stored bibleVersion — so the link never disagrees with the rest
+// of this component about which translation is "the" version.
+const fallbackBibleGatewayLink = computed(() => {
+  if (!currentRef.value) return ''
+  return bibleGatewayLink(currentRef.value, effectiveVersion.value)
+})
 
 const isComplete = computed(() => {
   const r = currentRef.value

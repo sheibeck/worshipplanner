@@ -100,6 +100,26 @@ vi.mock('@/utils/scripture', () => ({
       return `${ref.book} ${ref.chapter}`
     },
   ),
+  // 103-02 (R298): the manual-fallback deep-link builder. Mirrors the real
+  // implementation's shape (delegates to the reference formatter above,
+  // appends &version= only when a non-empty version is given) closely enough
+  // to assert against in tests.
+  bibleGatewayLink: vi.fn(
+    (
+      ref: { book: string; chapter: number; verseStart?: number; verseEnd?: number },
+      version?: string,
+    ) => {
+      const formatted =
+        ref.verseStart && ref.verseEnd && ref.verseEnd !== ref.verseStart
+          ? `${ref.book} ${ref.chapter}:${ref.verseStart}-${ref.verseEnd}`
+          : ref.verseStart
+            ? `${ref.book} ${ref.chapter}:${ref.verseStart}`
+            : `${ref.book} ${ref.chapter}`
+      const search = encodeURIComponent(formatted)
+      const base = `https://www.biblegateway.com/passage/?search=${search}`
+      return version ? `${base}&version=${encodeURIComponent(version)}` : base
+    },
+  ),
 }))
 
 vi.mock('@/utils/esvApi', () => ({
@@ -788,5 +808,66 @@ describe('ESV/NLT preview routing (45-04, R090)', () => {
 
     expect(fetchNltPassageText).toHaveBeenCalledWith('John 3:16-17')
     expect(fetchPassageText).not.toHaveBeenCalled()
+  })
+})
+
+// 103-02 (R298/R299): the manual fallback shown when an org's Bible API is
+// off — a BibleGateway deep-link for the entered reference and a paste
+// textarea that feeds the SAME previewText the fetched preview used.
+describe('Manual fallback when Bible API is off (103-02, R298/R299)', () => {
+  const withRefProps = {
+    modelValue: { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 },
+    sermonPassage: null,
+    showOverlapWarning: true,
+    label: 'Scripture Reading',
+  }
+
+  it('renders the intro copy, a correct BibleGateway deep-link, and the paste textarea for a valid reference', () => {
+    mockBibleApiEnabled = false
+    const wrapper = mount(ScriptureInput, { props: withRefProps })
+
+    expect(wrapper.text()).toContain('Bible API is off for your church')
+    expect(wrapper.text()).toContain('Open the passage in BibleGateway')
+
+    const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
+    expect(link).toBeTruthy()
+    expect(link!.attributes('target')).toBe('_blank')
+    expect(link!.attributes('rel')).toBe('noopener')
+    expect(link!.attributes('href')).toContain('biblegateway.com/passage')
+    expect(link!.attributes('href')).toContain(encodeURIComponent('Romans 8:1-11'))
+    expect(link!.attributes('href')).toContain('version=')
+
+    expect(wrapper.text()).toContain('Paste the passage text')
+    expect(wrapper.find('textarea').attributes('placeholder')).toBe('Paste the verses here (any version)')
+  })
+
+  it('pasting text into the paste textarea populates the same preview panel the fetched text used', async () => {
+    mockBibleApiEnabled = false
+    const wrapper = mount(ScriptureInput, { props: withRefProps })
+
+    const textarea = wrapper.find('textarea')
+    await textarea.setValue('For I am not ashamed of the gospel, because it is the power of God.')
+
+    expect(wrapper.text()).toContain('For I am not ashamed of the gospel, because it is the power of God.')
+  })
+
+  it('hides the deep-link and shows the empty-state helper when no reference is typed yet', () => {
+    mockBibleApiEnabled = false
+    const wrapper = mount(ScriptureInput, {
+      props: { modelValue: null, sermonPassage: null, showOverlapWarning: true, label: 'Scripture Reading' },
+    })
+
+    const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
+    expect(link).toBeFalsy()
+    expect(wrapper.text()).toContain('No passage text yet')
+  })
+
+  it('renders none of the fallback UI when the Bible API is enabled', () => {
+    mockBibleApiEnabled = true
+    const wrapper = mount(ScriptureInput, { props: withRefProps })
+
+    expect(wrapper.text()).not.toContain('Bible API is off for your church')
+    expect(wrapper.text()).not.toContain('Paste the passage text')
+    expect(wrapper.find('textarea').exists()).toBe(false)
   })
 })
