@@ -43,6 +43,10 @@ describe('appConfigDefaults', () => {
       expect(mergeAppConfig({}).deleteCapPerRun).toBe(500)
       expect(mergeAppConfig({ deleteCapPerRun: 100 }).deleteCapPerRun).toBe(100)
     })
+
+    it('DEFAULT_APP_CONFIG.onboarding is the fail-closed { emailsEnabled: false } shape (R293)', () => {
+      expect(DEFAULT_APP_CONFIG.onboarding).toEqual({ emailsEnabled: false })
+    })
   })
 
   describe('isExplicitlySet', () => {

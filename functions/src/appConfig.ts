@@ -46,6 +46,9 @@ export interface AppConfig {
     maxRecipients: number;
     orgDailyEmailQuota: number;
   };
+  onboarding: {
+    emailsEnabled: boolean;
+  };
   sender: {
     fromName: string;
     fromAddress: string;
@@ -92,6 +95,9 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     scheduledCronEnabled: false, // SCHEDULED_MESSAGING_CRON_ENABLED unset today == off (index.ts:1986)
     maxRecipients: 200, // MESSAGE_MAX_RECIPIENTS fallback (index.ts:2744)
     orgDailyEmailQuota: 1000, // ORG_MAX_EMAILS_PER_DAY fallback (index.ts:2745)
+  },
+  onboarding: {
+    emailsEnabled: false, // fail-safe default until Resend domain verified + owner confirms (Phase 99, R293)
   },
   sender: {
     // NEW field -- defined for Phase 70 forward-compatibility but DORMANT
@@ -242,6 +248,13 @@ function coerceMessaging(raw: unknown): AppConfig["messaging"] {
   };
 }
 
+function coerceOnboarding(raw: unknown): AppConfig["onboarding"] {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    emailsEnabled: coerceEnableFlag(r.emailsEnabled),
+  };
+}
+
 /**
  * Deep-merges a partial/missing Firestore doc onto DEFAULT_APP_CONFIG, one
  * nested group at a time, so a doc that sets only e.g. cleanup.mediaEnabled
@@ -256,6 +269,7 @@ export function mergeAppConfig(partial: Partial<AppConfig> | undefined): AppConf
     deleteCapPerRun: coercePositiveInt(p.deleteCapPerRun, DEFAULT_APP_CONFIG.deleteCapPerRun),
     aiProxy: coerceAiProxy(p.aiProxy),
     messaging: coerceMessaging(p.messaging),
+    onboarding: coerceOnboarding(p.onboarding),
     sender: coerceSender(p.sender),
     ...(typeof p.updatedBy === "string" ? { updatedBy: p.updatedBy } : {}),
     ...(p.updatedAt !== undefined ? { updatedAt: p.updatedAt } : {}),

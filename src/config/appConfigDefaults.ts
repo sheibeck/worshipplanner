@@ -38,6 +38,9 @@ export interface AppConfig {
     maxRecipients: number
     orgDailyEmailQuota: number
   }
+  onboarding: {
+    emailsEnabled: boolean
+  }
   sender: {
     fromName: string
     fromAddress: string
@@ -93,6 +96,9 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     maxRecipients: 200,
     orgDailyEmailQuota: 1000,
   },
+  onboarding: {
+    emailsEnabled: false,
+  },
   sender: {
     fromName: '',
     fromAddress: 'onboarding@resend.dev',
@@ -119,6 +125,7 @@ export function mergeAppConfig(raw: AppConfigInput | undefined): AppConfig {
     deleteCapPerRun: p.deleteCapPerRun ?? DEFAULT_APP_CONFIG.deleteCapPerRun,
     aiProxy: { ...DEFAULT_APP_CONFIG.aiProxy, ...p.aiProxy },
     messaging: { ...DEFAULT_APP_CONFIG.messaging, ...p.messaging },
+    onboarding: { ...DEFAULT_APP_CONFIG.onboarding, ...p.onboarding },
     sender: { ...DEFAULT_APP_CONFIG.sender, ...p.sender },
     ...(typeof p.updatedBy === 'string' ? { updatedBy: p.updatedBy } : {}),
     ...(p.updatedAt !== undefined ? { updatedAt: p.updatedAt } : {}),

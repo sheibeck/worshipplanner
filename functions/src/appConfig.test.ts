@@ -70,6 +70,9 @@ describe("DEFAULT_APP_CONFIG shape", () => {
         maxRecipients: 200,
         orgDailyEmailQuota: 1000,
       },
+      onboarding: {
+        emailsEnabled: false,
+      },
       sender: {
         fromName: "",
         fromAddress: "onboarding@resend.dev",
@@ -104,6 +107,7 @@ describe("getAppConfig: R182 partial doc deep-merge", () => {
     expect(result.deleteCapPerRun).toBe(DEFAULT_APP_CONFIG.deleteCapPerRun);
     expect(result.aiProxy).toEqual(DEFAULT_APP_CONFIG.aiProxy);
     expect(result.messaging).toEqual(DEFAULT_APP_CONFIG.messaging);
+    expect(result.onboarding).toEqual(DEFAULT_APP_CONFIG.onboarding);
     expect(result.sender).toEqual(DEFAULT_APP_CONFIG.sender);
   });
 });
@@ -164,6 +168,30 @@ describe("R184 fail-closed: cleanup + cron flags", () => {
     const { db } = makeFakeDb(docSnap({ cleanup: { mediaEnabled: true } }));
     const result = await getAppConfig(db);
     expect(result.cleanup.mediaEnabled).toBe(true);
+  });
+
+  it("onboarding.emailsEnabled resolves false for malformed input (R293)", async () => {
+    for (const bad of ["true", 1, null, {}]) {
+      resetAppConfigCacheForTest();
+      const { db } = makeFakeDb(docSnap({ onboarding: { emailsEnabled: bad } }));
+      const result = await getAppConfig(db);
+      expect(result.onboarding.emailsEnabled).toBe(false);
+    }
+  });
+
+  it("an absent/empty onboarding group resolves emailsEnabled false (R293 fail-closed)", async () => {
+    for (const bad of [undefined, {}]) {
+      resetAppConfigCacheForTest();
+      const { db } = makeFakeDb(docSnap({ onboarding: bad }));
+      const result = await getAppConfig(db);
+      expect(result.onboarding.emailsEnabled).toBe(false);
+    }
+  });
+
+  it("onboarding.emailsEnabled honors a literal true", async () => {
+    const { db } = makeFakeDb(docSnap({ onboarding: { emailsEnabled: true } }));
+    const result = await getAppConfig(db);
+    expect(result.onboarding.emailsEnabled).toBe(true);
   });
 });
 
