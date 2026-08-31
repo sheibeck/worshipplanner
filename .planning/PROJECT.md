@@ -8,7 +8,9 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.5 Invite Email & Non-Google Onboarding
+## Shipped Milestone: v2.5 Invite Email & Non-Google Onboarding — ✅ SHIPPED 2026-08-31
+
+**Status:** Code-complete, audited PASSED (7/7 reqs, 4/4 integration seams), function deployed to production, and locally UAT'd (owner confirmed). No active milestone follows — run `/gsd-new-milestone` to start one. **Standing owner follow-ups:** deploy hosting (the client invite-UI/toggle/LoginView changes are live only in local dev), and complete Resend DNS domain verification so invite emails reach addresses other than the owner's own inbox.
 
 **Goal:** Every invited user gets an invite email, non-Google users can set a password and sign in, and an owner can switch onboarding emails on/off.
 
@@ -64,11 +66,12 @@ confidence monitor from one Chrome/Edge browser.
 - **Deferred (out of scope this milestone):** instant blackout / logo-cut button; any non-Chromium
   monitor auto-detection.
 
-## Current State — active milestone v2.5
+## Current State — between milestones (v2.5 shipped)
 
-All milestones through **v2.4** have shipped and are archived under `.planning/milestones/`. **v2.5 Invite
-Email & Non-Google Onboarding** is now active — requirements are scoped in a fresh
-`.planning/REQUIREMENTS.md` and phased in `.planning/ROADMAP.md`.
+All milestones through **v2.5** have shipped and are archived under `.planning/milestones/`. **No active
+milestone** — the next one is scoped via `/gsd-new-milestone`. v2.5's `functions:sendInviteOnboardingEmail`
+is deployed to production; its hosting deploy and Resend DNS domain verification remain standing owner
+follow-ups (below).
 
 <details>
 <summary>Shipped milestone — v2.3 Scheduling Accuracy & Song/Team Refinements (Phases 84–89, shipped & deployed 2026-08-27)</summary>
@@ -324,6 +327,7 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Validated
 
+- ✓ Invite email & non-Google onboarding — every TeamView invite now sends a real email: Gmail/Google invitees get a "sign in with Google" notice, non-Google invitees get a Cloud-Function-provisioned Auth account + `generatePasswordResetLink()` set-password link (an editor-only, invite-existence-gated `sendInviteOnboardingEmail` callable, reusing the Resend pattern); LoginView gains a discoverable set/reset-password path + a real `auth/operation-not-allowed` message; the Owner Console gets an `appConfig`-backed onboarding-email on/off toggle (R288–R294) — **v2.5** (shipped 2026-08-31; built autonomously via `/gsd-autonomous` + a local-UAT fix round; audit PASSED 7/7 reqs + 4/4 integration seams; code review caught & fixed an editor-can-email-arbitrary-addresses hole; `functions:sendInviteOnboardingEmail` deployed to prod; **hosting deploy + Resend DNS domain verification are standing owner follow-ups** — until the domain is verified the test sender only reaches the owner's own inbox; archived: `milestones/v2.5-REQUIREMENTS.md`).
 - ✓ Scheduling accuracy & song/team refinements + multi-role scheduling — last-used lock-gated derivation + prod backfill (R247–R248), Vocals folded into Band with a Band↔Tech one-team-per-date rule + sing-and-play exception (R250–R252), Nth-Sunday recurring team auto-select via a Volunteer→Teams `>` slideout (R254–R255), editable song Key + sermon-free Scripture rotation + corrected schedulable-roles copy (R249, R253, R256), Roles/Teams read-only-row slideouts + song Key type-ahead (R257–R258), and a generalized per-role multi-role flag + same-date scheduler bundling anchored on a person's rarest role (R259–R260) — **v2.3** (shipped & deployed to production 2026-08-27; hosting + all Cloud Functions incl. the Phase-85 messaging fix; no rules changes; R248 backfill applied to Berean prod; audit PASSED 14/14; owner-approved UAT; archived: `milestones/v2.3-REQUIREMENTS.md`).
 - ✓ Per-org configurable Teams + security/data-integrity hardening + polish/ops + per-org AI enablement (OFF by default) + Roles/Teams tab UX — own team list replacing hard-coded Berean rules & dropped ordinal-Sunday auto-select (R228–R231, R241); inviteLookup gate, createdBy immutability, deleteService share revocation, reprise-safe slide clear, pending-render guard (R232–R236); PC-export coverage, Resend domain runbook, Owner Console a11y, shared SongBrowser (R237–R240); super-admin AI master gate + fail-closed proxy (R242–R243); tab width/Delete button/copy (R244–R246) — **v2.2** (shipped 2026-08-25, hosting live; rules/functions owner-gated; audit PASSED 19/19). **R230 (per-team song-tag AI filter) delivered then removed 2026-08-25 by owner decision.**
 - ✓ Super-admin Owner Console + multi-church onboarding + org lifecycle — super-admin claim gate & claim-merge, Firestore runtime config with dry-run blast-radius preview, tabbed Configuration/Organizations shell, org onboarding (org + settings + seeded template + first admin), multi-org Storage auth-claim widening, deactivate/reactivate, deactivation-gated cascade delete, pending-invite visibility, super-admin enter-any-church — **v1.9–v2.1** (R174–R211; all deployed to production 2026-08-23; v2.1 audit PASSED 16/16; archived).
@@ -545,11 +549,15 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-30 — started milestone v2.5 Invite Email & Non-Google Onboarding. Every invited
-user gets a real invite email (reusing the Resend pattern); non-Google invitees are provisioned an Auth
-account + a "set your password" link so they can sign in, while Google/Gmail invitees get a "sign in with
-Google" notification; the real flow is wired into TeamView `onInvite`, LoginView gains a discoverable
-password path + `auth/operation-not-allowed` handling, and the Owner Console gets a toggle to switch
-onboarding emails on/off. Flagged for phase discussion: Google-vs-non-Google detection heuristic; global
-vs per-org toggle. Owner prereqs: Email/Password provider enabled + Resend DNS domain verification. Root
-cause & decisions in `.planning/debug/resolved/non-gmail-password-setup.md`. Requirements scoped next.*
+*Last updated: 2026-08-31 after v2.5 milestone — SHIPPED Invite Email & Non-Google Onboarding (Phases
+99–100, R288–R294). Every TeamView invite sends a real email: Gmail/Google invitees get a "sign in with
+Google" notice; non-Google invitees get a Cloud-Function-provisioned Auth account + a
+`generatePasswordResetLink()` set-password link (editor-only, invite-existence-gated `sendInviteOnboardingEmail`,
+reusing Resend). LoginView gained a discoverable set/reset-password path + a real `auth/operation-not-allowed`
+message; the Owner Console gained an `appConfig`-backed onboarding-email on/off toggle. Built autonomously
+via `/gsd-autonomous`, then a local-UAT fix round (appConfig dotted-key persistence bug, context-aware
+reset errors, Resend returned-error check, persistent/red invite feedback + a Resend action). Audit PASSED
+7/7 + 4/4 integration seams; code review caught & fixed an editor-can-email-arbitrary-addresses hole.
+`functions:sendInviteOnboardingEmail` deployed to prod; **standing owner follow-ups: hosting deploy +
+Resend DNS domain verification** (until verified, the test sender only reaches the owner's own inbox).
+Archived: `milestones/v2.5-ROADMAP.md` · `milestones/v2.5-REQUIREMENTS.md` · `milestones/v2.5-MILESTONE-AUDIT.md`.*

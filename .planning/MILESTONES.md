@@ -1,5 +1,15 @@
 # Milestones
 
+## v2.5 Invite Email & Non-Google Onboarding (Shipped: 2026-08-31)
+
+**Phases completed:** 2 phases, 3 plans, 3 tasks
+
+**Key accomplishments:**
+
+- TeamView.onInvite now calls Phase 99's sendInviteOnboardingEmail callable (best-effort, after the authoritative Firestore batch commit) with honest three-state copy, and LoginView gains an actionable auth/operation-not-allowed message plus an invitee discoverability hint.
+
+---
+
 ## v2.3 Scheduling Accuracy & Song/Team Refinements (Shipped: 2026-08-27)
 
 **Phases completed:** 6 phases, 11 plans, 28 tasks

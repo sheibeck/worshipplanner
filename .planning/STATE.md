@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Invite Email & Non-Google Onboarding
-current_phase: 100
-current_phase_name: invite-login-onboarding-wiring
-status: awaiting-owner-close
-stopped_at: "v2.5 CODE-COMPLETE + audit PASSED + a local-UAT fix round (2026-08-31). functions:sendInviteOnboardingEmail DEPLOYED+REDEPLOYED to prod (owner-approved). UAT confirmed the flow end-to-end (Resend 403 test-mode log proves auth→gate→branch→send). UAT fixes shipped: (1) appConfig saveField wrote a literal dotted key → every Owner Console toggle silently failed to persist (fixed store-wide); (2) LoginView context-aware reset-password errors; (3) inviteOnboarding now checks the Resend SDK's RETURNED {error} (was a false emailSent:true on a 403); (4) TeamView persistent + red-on-failure invite feedback + a Resend action on pending invites. STILL PENDING before real delivery/close: hosting NOT deployed (client changes live only in local dev), Firebase Email/Password provider (owner ENABLED it during UAT — verify), Resend DNS domain verification (owner DEFERRED — until then onboarding@resend.dev only delivers to sheibeck@gmail.com), and the onboarding-emails toggle must stay ON. Then hosting deploy + /gsd-complete-milestone v2.5. UAT script: .planning/v2.5-UAT.md."
-last_updated: "2026-08-31T10:05:00.000Z"
+status: completed
+stopped_at: Completed 100-01-PLAN.md
+last_updated: "2026-08-31T16:20:01.574Z"
 last_activity: 2026-08-31
-last_activity_desc: "Local UAT of v2.5: verified the invite flow, fixed 4 issues (appConfig toggle persistence, reset-password errors, Resend returned-error check, persistent/red feedback + Resend action), redeployed the function; Resend domain verification deferred by owner; milestone still open"
+last_activity_desc: Milestone v2.5 completed and archived
 progress:
   total_phases: 2
   completed_phases: 2
   total_plans: 3
   completed_plans: 3
   percent: 100
+current_phase: 100
+current_phase_name: invite-login-onboarding-wiring
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.5 Invite Email & Non-Google Onboarding (roadmap created 2026-08-30)
 
-**Status:** Ready to plan
+**Status:** v2.5 milestone complete
 
 **Goal:** Every invited user gets an invite email, non-Google users can set a password and sign in, and
 an owner can switch onboarding emails on/off. Requirements R288–R294 in REQUIREMENTS.md.
@@ -1065,10 +1065,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 999.2 — Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG)
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-08-31 — Phase 100 complete, transitioned to Phase 999.2
+Phase: Milestone v2.5 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-31 — Milestone v2.5 completed and archived
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
