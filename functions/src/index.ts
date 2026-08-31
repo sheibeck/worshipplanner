@@ -18,6 +18,7 @@ import { syncOrgMembershipClaim } from "./orgMembershipClaims";
 import { syncSuperAdminClaim, setSuperAdminClaim } from "./superAdminClaims";
 import { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive, setOrgAiEnabled } from "./orgProvisioning";
 import { deleteOrganization } from "./orgDeletion";
+import { sendInviteOnboardingEmail } from "./inviteOnboarding";
 import { Resend } from "resend";
 import { renderMessageTokens } from "./messageTokens";
 import { verifySvixSignature } from "./webhookSignature";
@@ -3402,6 +3403,16 @@ export { syncSuperAdminClaim, setSuperAdminClaim };
 // UNDEPLOYED per 74-01-PLAN.md's/76-01-PLAN.md's hand-over deploy notes
 // (setOrgAiEnabled added Phase 82, R242-R243).
 export { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive, setOrgAiEnabled };
+
+// --- inviteOnboarding (Phase 99: sendInviteOnboardingEmail, R289-R291/R293 --
+// the invite-onboarding provisioning + email callable). Implementation lives
+// in ./inviteOnboarding so its testable handler
+// (sendInviteOnboardingEmailHandler) can be imported directly by tests
+// without going through the deployed wrapper. Re-exported here so Firebase
+// discovers it from the entry point -- mirrors the orgProvisioning block
+// above (a function not re-exported here fails `firebase deploy` with "No
+// function matches the filter").
+export { sendInviteOnboardingEmail };
 
 // --- orgDeletion (Phase 77: deleteOrganization, R215-R219, R221 -- the
 // super-admin-gated permanent church deletion cascade). Implementation lives
