@@ -364,4 +364,93 @@ describe('CongregationalEditor', () => {
     expect(wrapper.find('[data-testid="fetch-error"]').exists()).toBe(false)
     expect(textareaEl(wrapper).value).toBe('')
   })
+
+  // ── Manual fallback when Bible API is off (103-02, R298/R299) ──────────
+
+  function pasteTextarea(wrapper: ReturnType<typeof mountEditor>) {
+    return wrapper.find('[data-testid="congregational-paste-textarea"]')
+  }
+
+  it('renders the intro copy, a correct BibleGateway deep-link, and the paste textarea for a valid reference', async () => {
+    useAuthStore().bibleApiEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Bible API is off for your church')
+    expect(wrapper.text()).toContain('Open the passage in BibleGateway')
+
+    const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
+    expect(link).toBeTruthy()
+    expect(link!.attributes('target')).toBe('_blank')
+    expect(link!.attributes('rel')).toBe('noopener')
+    expect(link!.attributes('href')).toContain('biblegateway.com/passage')
+    expect(link!.attributes('href')).toContain(encodeURIComponent('Psalms 136:1-3'))
+
+    // The existing `---`-delimited textarea remains present and functional.
+    expect(wrapper.find('[data-testid="congregational-textarea"]').exists()).toBe(true)
+    expect(pasteTextarea(wrapper).exists()).toBe(true)
+  })
+
+  it('pasting passage text populates rawPassage + the textarea, and a subsequent Save emits sections parsed from it', async () => {
+    useAuthStore().bibleApiEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
+
+    await wrapper.find('[data-testid="congregational-save"]').trigger('click')
+    const sections = lastEmittedSections(wrapper)
+    expect(sections).toHaveLength(1)
+    expect(sections[0]!.speaker).toBe('LEADER')
+    expect(sections[0]!.text).toBe(STRIPPED_PASSAGE_TEXT)
+  })
+
+  // INDEPENDENCE (R299): Bible-off + AI-on -- the split still runs on the
+  // pasted text. The AI split gate must never be coupled to isBibleApiEnabled.
+  it('INDEPENDENCE: Bible off + AI on -- "Split with AI" is visible after paste and splits the pasted text', async () => {
+    useAuthStore().bibleApiEnabled = false
+    // aiMasterEnabled/settings.aiEnabled already true from the outer beforeEach.
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+    expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(true)
+
+    mockSplitCongregationalReading.mockResolvedValueOnce([
+      { speaker: 'LEADER', text: 'Give thanks to the Lord.' },
+      { speaker: 'CONGREGATION', text: 'For his love endures.' },
+    ])
+    await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(mockSplitCongregationalReading).toHaveBeenCalledWith(STRIPPED_PASSAGE_TEXT)
+    expect(textareaEl(wrapper).value).toBe(
+      'Leader\nGive thanks to the Lord.\n---\nCongregation\nFor his love endures.',
+    )
+  })
+
+  // INDEPENDENCE (R299): Bible-off + AI-off -- no split button, but the paste
+  // path (and manual sectioning) still works unchanged.
+  it('INDEPENDENCE: Bible off + AI off -- no split button is rendered, but paste still populates the reading', async () => {
+    useAuthStore().bibleApiEnabled = false
+    useAuthStore().aiMasterEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
+
+    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
+    expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
+  })
+
+  it('renders none of the fallback UI when the Bible API is enabled', async () => {
+    // bibleApiEnabled=true from the outer beforeEach.
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Bible API is off for your church')
+    expect(pasteTextarea(wrapper).exists()).toBe(false)
+  })
 })

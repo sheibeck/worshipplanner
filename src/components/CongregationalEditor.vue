@@ -17,6 +17,43 @@
       </button>
     </div>
 
+    <!-- Bible API off: manual fallback (R298 deep-link, R299 paste -> rawPassage/text).
+         Rendered ONLY when the org's Bible API is disabled. The "Split with
+         AI" button below stays gated ONLY on authStore.isAiEnabled -- NEVER
+         on this gate -- so Bible-off + AI-on still splits the pasted text,
+         and Bible-off + AI-off still allows paste with manual sectioning. -->
+    <div v-if="!authStore.isBibleApiEnabled" class="space-y-2">
+      <p class="text-xs text-gray-400">
+        Bible API is off for your church. Open the passage in BibleGateway, then paste the text below.
+      </p>
+      <a
+        v-if="props.reference"
+        :href="fallbackBibleGatewayLink"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+        Open in BibleGateway
+      </a>
+      <div>
+        <label class="block text-xs font-medium text-gray-300 mb-1">Paste the passage text</label>
+        <textarea
+          :value="pastedText"
+          @input="onPasteInput"
+          data-testid="congregational-paste-textarea"
+          placeholder="Paste the verses here (any version)"
+          rows="4"
+          class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        ></textarea>
+        <p v-if="!pastedText" class="text-xs text-gray-500 mt-1">
+          No passage text yet — open BibleGateway above and paste it here.
+        </p>
+      </div>
+    </div>
+
     <!-- Helper line -->
     <p class="text-xs text-gray-400 leading-relaxed">
       Separate slides with a line containing only <code class="text-gray-200">---</code>. Put the
@@ -156,6 +193,7 @@
 // toast.
 import { ref, computed, onMounted } from 'vue'
 import { fetchScriptureText } from '@/utils/scriptureApi'
+import { bibleGatewayLink } from '@/utils/scripture'
 import { stripVerseMarkers } from '@/utils/scriptureBoundaries'
 import { splitCongregationalReading } from '@/utils/claudeApi'
 import {
@@ -199,6 +237,9 @@ const rawPassage = ref('')
 const isSplitting = ref(false)
 const showDeleteConfirm = ref(false)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+// R298/R299 (103-02): manual-fallback state, only rendered/used when the
+// org's Bible API is off (see template above).
+const pastedText = ref('')
 
 const AI_SPLIT_FAILURE_TEXT =
   "Couldn't split this passage — your reading is unchanged. Build it by hand or try again."
@@ -217,6 +258,31 @@ onMounted(() => {
   }
   void autoFetch()
 })
+
+// R298: manual-fallback deep-link, shown only when the org's Bible API is
+// off. Version resolution matches autoFetch's exactly (per-item override
+// wins over the org default) so the link and the fetch it stands in for
+// never disagree about which translation is "the" version.
+const fallbackBibleGatewayLink = computed(() => {
+  if (!props.reference) return ''
+  const version = props.bibleVersion ?? authStore.settings.bibleVersion
+  return bibleGatewayLink(props.reference, version ?? undefined)
+})
+
+// R299: routes pasted text into the SAME state autoFetch's ok-branch fills
+// (rawPassage + text, both stripVerseMarkers-applied / "Leader\n"-seeded) so
+// the existing hasPassageToSplit/onAiSplit/onSave paths operate on pasted
+// text exactly as they do on fetched text. Deliberately does NOT touch
+// authStore.isAiEnabled or the AI split gate -- the two gates stay
+// independent (Bible-off + AI-on still splits; Bible-off + AI-off still
+// allows paste with manual sectioning, no auto-split).
+function onPasteInput(event: Event): void {
+  const value = (event.target as HTMLTextAreaElement).value
+  pastedText.value = value
+  const stripped = stripVerseMarkers(value)
+  rawPassage.value = stripped
+  text.value = `Leader\n${stripped}`
+}
 
 function formatQuery(scriptureRef: ScriptureRef): string {
   const base = `${scriptureRef.book} ${scriptureRef.chapter}`
