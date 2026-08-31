@@ -187,6 +187,19 @@ describe("caller gate", () => {
     });
     expect(mockSend).not.toHaveBeenCalled();
   });
+
+  it("accepts a caller whose role is the legacy 'admin' value (editor-equivalent)", async () => {
+    // 'admin' is a still-supported legacy member-role treated as editor-equivalent
+    // elsewhere; the gate must not reject it (mirrors queueServiceMessageHandler).
+    mockAuth();
+    const fake = seedOrg(new FakeFirestore(), { memberRole: "admin" });
+    vi.mocked(getFirestore).mockReturnValue(fake.db());
+
+    await expect(sendInviteOnboardingEmailHandler(fakeRequest())).resolves.toMatchObject({
+      emailSent: true,
+    });
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  });
 });
 
 // --- DISABLED (R293) ---------------------------------------------------------

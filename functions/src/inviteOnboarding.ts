@@ -166,7 +166,13 @@ export async function sendInviteOnboardingEmailHandler(
     throw new HttpsError("permission-denied", "You are not a member of this organization.");
   }
   const role = (memberDoc.data() as { role?: string } | undefined)?.role;
-  if (role !== "editor") {
+  // Accept both 'editor' and the legacy 'admin' member-role value -- mirrors
+  // queueServiceMessageHandler (index.ts) exactly. 'admin' is a still-supported
+  // legacy role on older member docs (new orgs are provisioned with 'editor'),
+  // treated as editor-equivalent everywhere else (orgMembershipClaims.ts,
+  // src/stores/auth.ts); rejecting it would silently lock a legacy-admin owner
+  // out of inviting once TeamView wires this in (Phase 100).
+  if (role !== "editor" && role !== "admin") {
     throw new HttpsError("permission-denied", "You must be an editor to invite members.");
   }
 
