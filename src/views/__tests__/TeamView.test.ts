@@ -243,20 +243,31 @@ describe('TeamView', () => {
       })
       const wrapper = await invite('existing@example.com')
       expect(wrapper.find('.text-green-400').text()).toBe(
-        "existing@example.com added — they already have an account, so they can sign in with this address.",
+        'existing@example.com already has an account, so they can sign in with this address.',
       )
     })
 
-    it('shows the send-failed copy and does NOT surface inviteError when the callable rejects (R294)', async () => {
-      mockSendInviteOnboardingEmail.mockRejectedValueOnce(new Error('unreachable'))
+    it('shows the send-failed copy in RED and does NOT surface inviteError when the email fails (R294)', async () => {
+      // A returned failure (emailSent:false, no skipped-* kind) is a genuine
+      // send failure — the invite still succeeded, but the message is red.
+      mockSendInviteOnboardingEmail.mockResolvedValueOnce({
+        data: { emailSent: false, kind: 'set-password' },
+      })
       const wrapper = await invite('unreachable@example.com')
-      expect(wrapper.find('.text-green-400').text()).toBe(
-        "unreachable@example.com added — we couldn't send the invite email, so let them know to sign in with this address.",
+      // Failure copy renders in red, not green.
+      expect(wrapper.find('.text-green-400').exists()).toBe(false)
+      expect(wrapper.find('.text-red-400').text()).toBe(
+        "unreachable@example.com added, but the invite email couldn't be sent — use Resend, or tell them to sign in with this address.",
       )
-      // Best-effort resilience: the invite still succeeded (batch committed,
-      // no red inviteError line rendered).
+      // Best-effort resilience: the invite still committed.
       expect(mockBatchCommit).toHaveBeenCalledTimes(1)
-      expect(wrapper.find('.text-red-400').exists()).toBe(false)
+    })
+
+    it('a thrown/unreachable callable also shows the red send-failed copy (R294)', async () => {
+      mockSendInviteOnboardingEmail.mockRejectedValueOnce(new Error('unreachable'))
+      const wrapper = await invite('down@example.com')
+      expect(wrapper.find('.text-red-400').text()).toContain("the invite email couldn't be sent")
+      expect(mockBatchCommit).toHaveBeenCalledTimes(1)
     })
   })
 })

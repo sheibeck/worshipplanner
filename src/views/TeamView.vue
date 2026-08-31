@@ -35,7 +35,11 @@
           </button>
         </div>
         <p v-if="inviteError" class="text-red-400 text-sm mt-2">{{ inviteError }}</p>
-        <p v-if="invitedFeedback" class="text-green-400 text-sm mt-2">
+        <p
+          v-if="invitedFeedback"
+          class="text-sm mt-2"
+          :class="invitedFeedbackError ? 'text-red-400' : 'text-green-400'"
+        >
           {{ invitedFeedback }}
         </p>
       </div>
@@ -132,11 +136,19 @@
               </td>
               <td class="px-4 py-3 text-gray-400 text-sm">Invited</td>
               <td class="px-4 py-3">
-                <button
-                  type="button"
-                  @click="onCancelInvite(invite.email)"
-                  class="text-sm text-gray-400 hover:text-gray-200 transition-colors"
-                >Cancel</button>
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    :disabled="resendingEmail !== null"
+                    @click="onResendInvite(invite.email)"
+                    class="text-sm text-indigo-400 hover:text-indigo-300 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  >{{ resendingEmail === invite.email ? 'Resending…' : 'Resend' }}</button>
+                  <button
+                    type="button"
+                    @click="onCancelInvite(invite.email)"
+                    class="text-sm text-gray-400 hover:text-gray-200 transition-colors"
+                  >Cancel</button>
+                </div>
               </td>
             </tr>
 
@@ -221,14 +233,18 @@ const inviteRole = ref<'editor' | 'viewer'>('viewer')
 const inviteError = ref<string | null>(null)
 const isInviting = ref(false)
 const invitedFeedback = ref<string | null>(null)
-// WR-01 (100-REVIEW): id of the pending invitedFeedback auto-clear timer, so a
-// rapid second invite clears the prior timer before starting a new one.
-let invitedFeedbackTimer: ReturnType<typeof setTimeout> | null = null
+// Whether invitedFeedback is a failure (red) vs a success/info (green). The
+// message persists until the next invite/resend action or a page refresh — no
+// auto-clear timer — so it can always be read.
+const invitedFeedbackError = ref(false)
 
 // ── Action state ───────────────────────────────────────────────────────────────
 
 const confirmingRemoveUid = ref<string | null>(null)
 const actionError = ref<string | null>(null)
+// Email of the pending invite whose onboarding email is currently being resent
+// (only one at a time), so its Resend button can show progress / disable.
+const resendingEmail = ref<string | null>(null)
 
 // ── Subscriptions ──────────────────────────────────────────────────────────────
 
@@ -252,10 +268,66 @@ function formatDate(ts: { toDate?: () => Date } | null): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+// ── Onboarding email (shared by invite + resend) ────────────────────────────────
+
+// Best-effort call to the sendInviteOnboardingEmail Cloud Function. Returns the
+// function's { emailSent, kind } result, or null if the callable itself
+// threw/was unreachable — the caller must treat null/failure as "email didn't
+// send" without ever failing the invite (R294).
+async function sendOnboardingEmail(
+  orgId: string,
+  email: string,
+): Promise<SendInviteOnboardingEmailResponse | null> {
+  try {
+    const fn = httpsCallable<SendInviteOnboardingEmailRequest, SendInviteOnboardingEmailResponse>(
+      functions,
+      'sendInviteOnboardingEmail',
+    )
+    const result = await fn({ orgId, email })
+    return result.data
+  } catch (err) {
+    console.error('[TeamView] sendInviteOnboardingEmail error (non-fatal):', err)
+    return null
+  }
+}
+
+// Map an email result to persistent, honest feedback copy + severity (red on a
+// genuine send failure, green/info otherwise). `verb` tailors the wording for
+// the first invite vs a later resend.
+function applyEmailFeedback(
+  email: string,
+  result: SendInviteOnboardingEmailResponse | null,
+  verb: 'added' | 'resent',
+): void {
+  if (result?.emailSent) {
+    invitedFeedback.value =
+      verb === 'resent' ? `Invite email resent to ${email}.` : `Invite email sent to ${email}.`
+    invitedFeedbackError.value = false
+  } else if (result?.kind === 'skipped-disabled') {
+    invitedFeedback.value =
+      verb === 'resent'
+        ? `Onboarding emails are turned off — turn them on in the Owner Console to send.`
+        : `${email} added — onboarding emails are turned off, so let them know to sign in with this address.`
+    invitedFeedbackError.value = false
+  } else if (result?.kind === 'skipped-existing') {
+    invitedFeedback.value = `${email} already has an account, so they can sign in with this address.`
+    invitedFeedbackError.value = false
+  } else {
+    // Genuine send failure (callable threw, or Resend rejected the send).
+    invitedFeedback.value =
+      verb === 'resent'
+        ? `Couldn't send the invite email to ${email}. Please try again.`
+        : `${email} added, but the invite email couldn't be sent — use Resend, or tell them to sign in with this address.`
+    invitedFeedbackError.value = true
+  }
+}
+
 // ── Invite action ──────────────────────────────────────────────────────────────
 
 async function onInvite() {
   inviteError.value = null
+  invitedFeedback.value = null
+  invitedFeedbackError.value = false
   const email = inviteEmail.value.trim()
 
   if (!email || !isValidEmailFormat(email)) {
@@ -303,51 +375,40 @@ async function onInvite() {
 
     await batch.commit()
 
-    // Invite docs are authoritative and already committed above. The
-    // onboarding email is best-effort (R294) — its own nested try/catch so a
-    // rejected/undeployed/unreachable callable never reverts or fails the
-    // invite. The catch only logs; it must never rethrow or set inviteError.
-    let emailResult: SendInviteOnboardingEmailResponse | null = null
-    try {
-      const sendInviteOnboardingEmail = httpsCallable<
-        SendInviteOnboardingEmailRequest,
-        SendInviteOnboardingEmailResponse
-      >(functions, 'sendInviteOnboardingEmail')
-      const result = await sendInviteOnboardingEmail({ orgId, email: normalized })
-      emailResult = result.data
-    } catch (err) {
-      console.error('[TeamView] sendInviteOnboardingEmail error (non-fatal):', err)
-    }
-
-    // Honest, result-driven success copy (R288/UI-SPEC state table).
-    if (emailResult?.emailSent) {
-      invitedFeedback.value = `Invite email sent to ${normalized}.`
-    } else if (emailResult?.kind === 'skipped-disabled') {
-      invitedFeedback.value = `${normalized} added — onboarding emails are turned off, so let them know to sign in with this address.`
-    } else if (emailResult?.kind === 'skipped-existing') {
-      // WR-02 (100-REVIEW): the invitee already has an account — no email is
-      // needed, so don't claim a send failed. Honest "already set up" copy.
-      invitedFeedback.value = `${normalized} added — they already have an account, so they can sign in with this address.`
-    } else {
-      invitedFeedback.value = `${normalized} added — we couldn't send the invite email, so let them know to sign in with this address.`
-    }
+    // Invite docs are authoritative and already committed above. The onboarding
+    // email is best-effort (R294) — sendOnboardingEmail swallows any callable
+    // failure so it can never revert or fail the invite. The feedback message
+    // persists (no auto-clear) until the next action or a refresh, and turns red
+    // only on a genuine send failure.
+    const emailResult = await sendOnboardingEmail(orgId, normalized)
+    applyEmailFeedback(normalized, emailResult, 'added')
 
     inviteEmail.value = ''
     inviteRole.value = 'viewer'
-
-    // Clear success feedback after 2 seconds. WR-01 (100-REVIEW): track the
-    // timer id and clear any prior pending one first, so a rapid second invite
-    // cannot have the first invite's stale timer wipe the newer message.
-    if (invitedFeedbackTimer !== null) clearTimeout(invitedFeedbackTimer)
-    invitedFeedbackTimer = setTimeout(() => {
-      invitedFeedback.value = null
-      invitedFeedbackTimer = null
-    }, 2000)
   } catch (err) {
     console.error('[TeamView] invite error:', err)
     inviteError.value = 'Failed to create invite. Please try again.'
   } finally {
     isInviting.value = false
+  }
+}
+
+// ── Resend onboarding email for a pending invite ────────────────────────────────
+
+async function onResendInvite(email: string) {
+  const orgId = authStore.orgId
+  if (!orgId || resendingEmail.value) return
+  inviteError.value = null
+  invitedFeedback.value = null
+  invitedFeedbackError.value = false
+  resendingEmail.value = email
+  try {
+    // The invite doc already exists (this is a pending invite), so the
+    // function's invite-existence gate is satisfied — a plain resend.
+    const result = await sendOnboardingEmail(orgId, email)
+    applyEmailFeedback(email, result, 'resent')
+  } finally {
+    resendingEmail.value = null
   }
 }
 
