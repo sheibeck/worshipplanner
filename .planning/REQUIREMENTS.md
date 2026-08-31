@@ -49,10 +49,10 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 | Requirement | Phase |
 |-------------|-------|
-| R288 | — |
-| R289 | — |
-| R290 | — |
-| R291 | — |
-| R292 | — |
-| R293 | — |
-| R294 | — |
+| R288 | Phase 100 |
+| R289 | Phase 99 |
+| R290 | Phase 99 |
+| R291 | Phase 99 |
+| R292 | Phase 100 |
+| R293 | Phase 99 |
+| R294 | Phase 100 |

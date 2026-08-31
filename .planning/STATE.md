@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-08-31T02:19:05.611Z"
 last_activity: 2026-08-30
 progress:
-  total_phases: 0
+  total_phases: 2
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -27,9 +27,60 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.4 Run the Service (Live Presentation) (roadmap created 2026-08-28)
+# ▶ ACTIVE MILESTONE — v2.5 Invite Email & Non-Google Onboarding (roadmap created 2026-08-30)
 
 **Status:** Roadmap created; no phases started.
+
+**Goal:** Every invited user gets an invite email, non-Google users can set a password and sign in, and
+an owner can switch onboarding emails on/off. Requirements R288–R294 in REQUIREMENTS.md.
+
+(v2.4 ended at Phase 98); this milestone is **Phases 99–100**.
+
+**Roadmap (2 phases, `coarse` granularity — see `.planning/ROADMAP.md` § v2.5 for full phase detail):**
+
+- **Phase 99 — Invite Email Function & Owner Toggle (R289, R290, R291, R293):** a Cloud Function that
+  sends the correct onboarding email per invitee type — non-Google invitees get an
+  `admin.auth().createUser()`-provisioned account plus a `generatePasswordResetLink()` "set your password"
+  link (with Google sign-in offered as a fallback), Google/Gmail invitees get a plain "sign in with
+  Google" notice — reusing the existing Resend send pattern (`functions/src/adminEmail.ts`), all gated by
+  a new Owner Console (`ConfigurationTab`/`appConfig`) onboarding-emails on/off toggle. Sequenced first —
+  nothing downstream can send a real email until this exists.
+
+- **Phase 100 — Invite & Login Onboarding Wiring (R288, R292, R294):** wires the real flow into
+  `TeamView.vue`'s `onInvite` (replacing the Firestore-only write + misleading copy) so inviting someone
+  actually calls Phase 99's function; adds a discoverable set/reset-password path plus
+  `auth/operation-not-allowed` handling to `LoginView.vue`; and proves existing Google sign-in +
+  invite-acceptance (`ensureUserDocument`) still work, with email send failure never blocking the
+  membership write. Depends on Phase 99 (consumes its function).
+
+**Coverage:** 7/7 v2.5 requirements mapped, each to exactly one phase; no orphans, no duplicates.
+
+**Flagged for phase discussion** (leaning defaults; confirm in `/gsd-discuss-phase 99`): Google-vs-non-Google
+detection heuristic (leaning: `gmail.com`/`googlemail.com` → notify-only, else → set-password link); whether
+the onboarding-email toggle is global (`appConfig`, leaning) or per-org.
+
+**Owner-run external prerequisites (not phases, not code):** confirm Firebase Auth Email/Password provider
+is enabled for `worship-planner-bc515`; complete `functions/DEPLOY-EMAIL-DOMAIN.md` Resend DNS domain
+verification so invite emails reach non-owner addresses.
+
+**Deploy expectation:** Phase 99 adds a new Cloud Function + touches `appConfig` — a Functions deploy (and
+possibly a `firestore.rules`/`ConfigurationTab` client change) is expected; per the standing 2026-08-25
+policy, any deploy is confirm-then-deploy, not autonomous-silent.
+
+**Next step:** `/gsd-plan-phase 99` (optionally preceded by `/gsd-discuss-phase 99`).
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.4 Run the Service (Live Presentation) (shipped & deployed to production 2026-08-30)
+
+**Status:** v2.4 milestone complete.
+
+> ✅ **Deployed 2026-08-30** (owner-approved). Hosting (client) deployed to `worship-planner-bc515.web.app`;
+> client-side only — no Firestore/Storage rules or Cloud Functions changed. Closed on owner
+> acceptance/approval (no formal `/gsd-audit-milestone` run, per the v1.4/v1.5 precedent). R261–R284
+> delivered; R278 auto-fullscreen met via per-display "Go fullscreen" buttons after browser zero-click
+> multi-monitor fullscreen proved unachievable on real hardware. Phase 98/R285–R287 built then withdrawn
+> 2026-08-30 (premise disproven). Owner hardware-UAT items (phases 92–97) accepted 2026-08-29.
 
 **Goal:** Give a non-technical projectionist a clean, standalone way to run a locked service's slide
 deck live during a church service — driving a fullscreen audience projector and a band confidence

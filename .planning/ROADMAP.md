@@ -17,6 +17,7 @@
 - ✅ **v2.2 — Configurability, Hardening & Cleanup** — Phases 79-83 (shipped 2026-08-25; per-org configurable teams replacing hard-coded Berean rules + dropped ordinal-Sunday auto-select (R228-R231, R241), security & data-integrity hardening — inviteLookup create gate, createdBy immutability, deleteService share revocation, song-clear slide cleanup, pending-render edit guard (R232-R236), polish/ops close-out — PC export coverage, Resend verified-domain runbook, Owner Console a11y, shared song-browse component (R237-R240), per-org AI enablement OFF-by-default (R242-R243), and Roles/Teams tab UX/copy (R244-R246); hosting deployed 2026-08-25, backend rules/functions owner-gated; audit PASSED 19/19. **The per-team song-tag filter (R230) was delivered then removed 2026-08-25 by owner decision.**)
 - ✅ **v2.3 — Scheduling Accuracy & Song/Team Refinements** — Phases 84-89 (shipped & deployed to production 2026-08-27; last-used date correctness + backfill (R247-R248), team conflict rules — Vocals folds into Band, one-team-per-date with the sing-and-play exception (R250-R252), pattern-based recurring team scheduling (R254-R255), song & rotation refinements — editable Key, sermon-free rotation, corrected copy (R249, R253, R256), Roles/Teams read-only-row slideouts + song Key type-ahead (R257-R258), and multi-role scheduling — generalized combinable flag + same-date bundling (R259-R260); audit PASSED 14/14, owner-approved UAT)
 - ✅ **v2.4 — Run the Service (Live Presentation)** — Phases 90-98 (shipped & deployed to production 2026-08-30; a non-technical projectionist runs a locked service's slides live from Chrome/Edge — Run button → standalone Run/control screen, persistent monitor-setup, fullscreen chrome-free audience output, black-background confidence output, Window Management multi-monitor delivery with a pop-out fallback, live-ops hardening, the Phase 97 owner redesign (blackout/timers/filmstrip/rehearse/confidence-left-right), and a hardware-UAT round landing reliable per-display "Go fullscreen" buttons after browser zero-click fullscreen proved a dead end — R261-R284; Phase 98/R285-R287 built then withdrawn; client-only, owner-approved)
+- 🚧 **v2.5 — Invite Email & Non-Google Onboarding** — Phases 99-100 (in progress; every TeamView invite sends a real email — Google/Gmail invitees get a "sign in with Google" notice, non-Google invitees get a Cloud-Function-provisioned Auth account + `generatePasswordResetLink()` set-password link — LoginView gains a discoverable password path + `auth/operation-not-allowed` handling, and the Owner Console gets an `appConfig`-backed onboarding-email on/off toggle — R288-R294)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -376,6 +377,45 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 
 > Deployed to production (hosting) 2026-08-30 (`worship-planner-bc515.web.app`); client-side only — no Firestore/Storage rules or Cloud Functions changed. Closed on owner acceptance/approval (no formal `/gsd-audit-milestone` run, per the v1.4/v1.5 precedent). R261–R284 delivered; **R278 auto-fullscreen met via per-display "Go fullscreen" buttons** — browser zero-click multi-monitor fullscreen proved unachievable (Chrome 151 + Edge rejected `requestFullscreen` `not granted` despite a `chrome://policy`-OK machine-wide policy; the permission query false-positives). **Phase 98 / R285–R287 built then withdrawn.** Owner hardware-UAT items (phases 92–97) accepted 2026-08-29.
 </details>
+
+### 🚧 v2.5 Invite Email & Non-Google Onboarding (Phases 99-100, in progress)
+
+**Milestone Goal:** Every invited user gets an invite email, non-Google users can set a password and sign in, and an owner can switch onboarding emails on/off.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R288–R294 (7 mapped, 100% coverage)
+
+**Flagged for phase discussion** (leaning defaults below; confirm in `/gsd-discuss-phase 99`):
+- Google-vs-non-Google detection heuristic — leaning: `gmail.com`/`googlemail.com` → notify-only "sign in with Google"; everything else → set-password link (which also offers Google sign-in as a fallback so no invitee is stranded).
+- Onboarding-email toggle scope — leaning: global (`appConfig`), not per-org.
+
+**Owner-run external prerequisites** (not phases, not code): confirm the Firebase Auth Email/Password provider is enabled for `worship-planner-bc515`; complete `functions/DEPLOY-EMAIL-DOMAIN.md`'s Resend DNS domain verification, or invite emails to non-owner addresses will silently not deliver (default `onboarding@resend.dev` only reaches the Resend account owner's inbox).
+
+- [ ] **Phase 99: Invite Email Function & Owner Toggle** - A Cloud Function sends the right onboarding email per invitee type (non-Google set-password link, Google/Gmail sign-in notice), gated by an Owner Console on/off switch
+- [ ] **Phase 100: Invite & Login Onboarding Wiring** - TeamView's invite UI actually calls the function with corrected copy, LoginView gains a discoverable password path + operation-not-allowed handling, and existing sign-in/invite-acceptance keep working
+
+### Phase 99: Invite Email Function & Owner Toggle
+
+**Goal**: A Cloud Function reliably sends the correct onboarding email for any invited address — provisioning a Firebase Auth account and a secure set-password link for non-Google invitees, and a sign-in-with-Google notice for Google/Gmail invitees — governed by an owner-controlled on/off switch in the Owner Console, and reusing the existing Resend send pattern (`functions/src/adminEmail.ts`).
+**Depends on**: Nothing (first phase of v2.5)
+**Requirements**: R289, R290, R291, R293
+**Success Criteria** (what must be TRUE):
+  1. Inviting a non-Google email address through the function creates a Firebase Auth account for that address (if none exists) and sends an email containing a valid `generatePasswordResetLink()` "set your password" link, which also offers Google sign-in as a fallback (R290, R291).
+  2. Inviting a Google/Gmail address (`gmail.com`/`googlemail.com`) through the function sends a "you've been invited — sign in with Google" notification email, with no Auth account pre-created and no password step (R289).
+  3. An owner can switch onboarding/invite emails on or off from the Owner Console's Configuration tab (backed by `appConfig`), and when off, the function sends no email for either invitee type (R293).
+**Plans**: TBD
+
+### Phase 100: Invite & Login Onboarding Wiring
+
+**Goal**: The real invite-email flow is reachable end-to-end through the app — TeamView's invite UI actually sends invites through Phase 99's function with corrected success copy, the login screen gives any user a discoverable way to set/reset their password with a clear error when email/password sign-in is unavailable, and existing Google sign-in plus invite-acceptance keep working unchanged.
+**Depends on**: Phase 99 (consumes its invite-email Cloud Function)
+**Requirements**: R288, R292, R294
+**Success Criteria** (what must be TRUE):
+  1. Inviting a team member from TeamView's "Invite a team member" UI triggers Phase 99's Cloud Function, the invitee receives a real email matching their type, and the post-invite success copy accurately reflects that an email was sent (R288).
+  2. On the login screen, a user has a clearly discoverable path to set or reset their password (not buried inside "Forgot password?" alone), and attempting email/password sign-in when the provider is disabled (`auth/operation-not-allowed`) shows a specific, actionable message instead of the generic "Sign-in failed." (R292).
+  3. Existing Google sign-in and the invite-acceptance flow (`ensureUserDocument` granting membership on first authenticated sign-in) continue to work unchanged (R294).
+  4. If the invite email fails to send, the invite/membership Firestore record is still written — email delivery is best-effort and never blocks or reverts the invite (R294).
+**Plans**: TBD
+**UI hint**: yes
 
 ## Backlog
 
