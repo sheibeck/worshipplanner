@@ -8,7 +8,24 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current State: v2.4 Run the Service — ✅ SHIPPED & deployed to production 2026-08-30
+## Current Milestone: v2.5 Invite Email & Non-Google Onboarding
+
+**Goal:** Every invited user gets an invite email, non-Google users can set a password and sign in, and an owner can switch onboarding emails on/off.
+
+**Target features:**
+- **Server-side invite email for all invitees** — inviting anyone through the app's TeamView invite UI sends a real email (reusing the existing Resend send pattern in `functions/src/adminEmail.ts` + secrets). Today no one receives anything.
+- **Set-password onboarding for non-Google users** — a Cloud Function creates the Firebase Auth account (`admin.auth().createUser`) for the invited email and emails a `generatePasswordResetLink()` "set your password" link, so a brand-new non-Google user (e.g. `bob@someemail.com`) can actually get in. Google/Gmail invitees instead get a simple "you've been invited — sign in with Google" notification (no account pre-created, no password).
+- **Wire the real flow into TeamView `onInvite`** and correct the invite UI copy.
+- **Discoverable password path in LoginView** plus a real `auth/operation-not-allowed` error message (instead of the generic "Sign-in failed").
+- **Owner Console onboarding-email toggle** — a checkbox in `ConfigurationTab` (backed by `appConfig`) to enable/disable sending onboarding/invite emails; the invite function respects it.
+
+**Key context / decisions:**
+- Root cause of the original bug and the chosen mechanism are recorded in `.planning/debug/resolved/non-gmail-password-setup.md`: the old TeamView invite only wrote Firestore docs — it never sent an email or provisioned an Auth account, so non-Google invitees had no discoverable way to get a password.
+- **Flagged for phase discussion:** how the system decides Google-vs-non-Google per invitee (leaning: `gmail.com`/`googlemail.com` → notify-only, else → set-password link, with the set-password email also offering Google sign-in as a fallback so no one is stranded); and whether the onboarding-email toggle is global (`appConfig`, leaning) or per-org.
+- **Owner-run external prerequisites** (not code, tracked): confirm Firebase Auth **Email/Password provider is enabled** for `worship-planner-bc515`; complete `functions/DEPLOY-EMAIL-DOMAIN.md` **Resend DNS domain verification** so invite emails reach non-owner addresses (default `onboarding@resend.dev` only delivers to the Resend account owner's inbox).
+- Must not break existing Google sign-in or the invite-acceptance path (`ensureUserDocument`) / Firestore rules.
+
+## Previous Milestone: v2.4 Run the Service — ✅ SHIPPED & deployed to production 2026-08-30
 
 The live "Run the Service" milestone shipped and is live at `worship-planner-bc515.web.app` (client-only;
 closed on owner approval). Browser zero-click multi-monitor fullscreen proved unachievable on real
@@ -47,11 +64,11 @@ confidence monitor from one Chrome/Edge browser.
 - **Deferred (out of scope this milestone):** instant blackout / logo-cut button; any non-Chromium
   monitor auto-detection.
 
-## Current State — active milestone v2.4
+## Current State — active milestone v2.5
 
-All milestones through **v2.3** have shipped and are archived under `.planning/milestones/`. **v2.4 Run
-the Service** is now active — requirements are scoped in a fresh `.planning/REQUIREMENTS.md` and phased
-in `.planning/ROADMAP.md`.
+All milestones through **v2.4** have shipped and are archived under `.planning/milestones/`. **v2.5 Invite
+Email & Non-Google Onboarding** is now active — requirements are scoped in a fresh
+`.planning/REQUIREMENTS.md` and phased in `.planning/ROADMAP.md`.
 
 <details>
 <summary>Shipped milestone — v2.3 Scheduling Accuracy & Song/Team Refinements (Phases 84–89, shipped & deployed 2026-08-27)</summary>
@@ -354,13 +371,20 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-**v2.4 Run the Service (Live Presentation)** — being scoped now. A non-technical projectionist runs a
-locked service's slides live: a Run button → standalone Run/control screen (order of service with
-current-item highlight, click-to-jump, keyboard nav), a persistent standalone monitor-config screen
-(Audience vs Confidence roles, remembered per device), a fullscreen chrome-free audience output, a
-black-background confidence output showing current + upcoming slide, and browser multi-monitor delivery
-(Window Management API on Chrome/Edge + pop-out fallback). Requirements created fresh in
-`.planning/REQUIREMENTS.md`; deferred: instant blackout/logo-cut button, non-Chromium auto-detection.
+**v2.5 Invite Email & Non-Google Onboarding** — being scoped now. Every invited user receives an invite
+email (reusing the Resend pattern); non-Google invitees get a Cloud-Function-provisioned Auth account + a
+"set your password" link so they can actually sign in, while Google/Gmail invitees get a "sign in with
+Google" notification. Wires the real flow into TeamView `onInvite`, adds a discoverable password path +
+`auth/operation-not-allowed` handling in LoginView, and an Owner Console (`ConfigurationTab`/`appConfig`)
+toggle to switch onboarding emails on/off. Requirements created fresh in `.planning/REQUIREMENTS.md`.
+Flagged for phase discussion: Google-vs-non-Google detection heuristic; global vs per-org toggle. Owner
+prereqs: Email/Password provider enabled + Resend DNS domain verification. Root cause & decisions:
+`.planning/debug/resolved/non-gmail-password-setup.md`.
+
+**v2.4 Run the Service (Live Presentation)** — ✅ shipped & deployed to production 2026-08-30; closed on
+owner approval. A non-technical projectionist runs a locked service's slides live from Chrome/Edge with
+per-display "Go fullscreen" outputs (Phase 98's zero-click registry helper was built then removed as
+unachievable on real hardware).
 
 **Standing owner-run hand-overs (carry until run):**
 
@@ -521,10 +545,11 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-28 — started milestone v2.4 Run the Service (Live Presentation). A non-technical
-projectionist runs a locked service's slides live from Chrome/Edge: Run button → standalone Run/control
-screen (order of service with current-item highlight, click-to-jump, keyboard nav), a persistent
-standalone monitor-config screen (Audience vs Confidence roles, remembered per device), fullscreen
-chrome-free audience output, black-background confidence output (current + upcoming slide), and browser
-multi-monitor delivery via the Window Management API with a pop-out fallback. Deferred: blackout/logo-cut
-button, non-Chromium auto-detection. Requirements scoped next.*
+*Last updated: 2026-08-30 — started milestone v2.5 Invite Email & Non-Google Onboarding. Every invited
+user gets a real invite email (reusing the Resend pattern); non-Google invitees are provisioned an Auth
+account + a "set your password" link so they can sign in, while Google/Gmail invitees get a "sign in with
+Google" notification; the real flow is wired into TeamView `onInvite`, LoginView gains a discoverable
+password path + `auth/operation-not-allowed` handling, and the Owner Console gets a toggle to switch
+onboarding emails on/off. Flagged for phase discussion: Google-vs-non-Google detection heuristic; global
+vs per-org toggle. Owner prereqs: Email/Password provider enabled + Resend DNS domain verification. Root
+cause & decisions in `.planning/debug/resolved/non-gmail-password-setup.md`. Requirements scoped next.*

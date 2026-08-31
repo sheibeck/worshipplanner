@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.4
-milestone_name: Run the Service (Live Presentation)
-current_phase: 98
-current_phase_name: fullscreen-setup-helper
-status: complete
-stopped_at: "v2.4 SHIPPED + deployed to production (hosting) 2026-08-30; milestone archived and closed on owner approval. Phase 98 (Fullscreen Setup Helper) was BUILT THEN REMOVED — premise disproven; superseded by per-display Go-fullscreen buttons."
-last_updated: "2026-08-30T00:00:00.000Z"
+milestone: v2.5
+milestone_name: Invite Email & Non-Google Onboarding
+status: planning
+last_updated: "2026-08-31T02:19:05.611Z"
 last_activity: 2026-08-30
-last_activity_desc: "v2.4 shipped, deployed to production, and archived; milestone closed on owner approval"
 progress:
-  total_phases: 9
-  completed_phases: 8
-  total_plans: 29
-  completed_plans: 28
-  percent: 89
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -1014,25 +1010,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 98 — Fullscreen Setup Helper (v2.4)
-Plan: 98-01 — Fullscreen Setup Helper (Pure Logic Layer) — COMPLETE; 98-02 (UI panel, Wave 2) — COMPLETE
-Status: Both of Phase 98's plans executed and verified. Phase 98 (and this milestone's Phase 90-98 roadmap)
-is feature-complete pending the owner's hardware UAT walkthrough (see 98-02-SUMMARY.md's coverage item D5) —
-milestone stays OPEN, not archived, per the standing "no auto-close without consent" policy.
-Last activity: 2026-08-29 — 98-02-PLAN.md executed: `src/components/FullscreenSetupPanel.vue` (the
-four-state checking/ready/not-ready/unsupported UI over 98-01's readiness composable — per-OS origin-baked
-download with HKCU default + HKLM admin link on Windows, honest per-OS friction copy, a red download-error
-line, and a self-correcting "Confirm fullscreen support" button that flips not-ready to ready on the same
-mounted wrapper with no reload) mounted unconditionally at the bottom of `src/views/MonitorSetupView.vue`,
-outside the existing phase v-if/else chain (present in every phase, since the `fullscreen` permission this
-panel manages is distinct from the `window-management` permission the rest of the screen gates on). 28 new
-component + view tests green; `npm run type-check` clean; bare `npx vitest run` shows only the documented
-`src/storage.rules.test.ts` baseline failure (174/175 files, 4733/4758 tests) — no regression. Regression
-guard (`useOutputWindow.test.ts`, 21 tests) green; `useOutputWindow.ts`/`useRunControl.ts` confirmed
-untouched via `git diff --stat` (no `useRunControl.test.ts` file exists in this repo). See
-`.planning/phases/98-fullscreen-setup-helper/98-02-SUMMARY.md`. Next step: the owner's real-hardware UAT
-walkthrough (download the setup file, run it, fully restart the browser, click Confirm, confirm it flips
-to ready) — not an in-plan gate, tracked as this milestone's one remaining live open item.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-30 — Milestone v2.5 started
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
