@@ -226,7 +226,25 @@ export async function sendInviteOnboardingEmailHandler(
   if (isGoogleEmail(normalizedEmail)) {
     const { subject, text } = buildGoogleNotifyContent(orgName, normalizedEmail, baseUrl);
     try {
-      await resend.emails.send({ from, to: normalizedEmail, subject: sanitizeHeader(subject), text });
+      // The Resend SDK does NOT throw on an API-level rejection (e.g. test-mode
+      // "you can only send to your own address", invalid recipient, quota) --
+      // it RESOLVES with { data, error }. Only a network/transport failure
+      // throws. So a truthy `error` means the send did not happen; reporting
+      // emailSent:true without checking it produced a false "sent" (green copy,
+      // nothing in Resend).
+      const { error } = await resend.emails.send({
+        from,
+        to: normalizedEmail,
+        subject: sanitizeHeader(subject),
+        text,
+      });
+      if (error) {
+        console.error(
+          `[inviteOnboarding] google-notify send rejected for orgId=${orgId}, to=${normalizedEmail}:`,
+          error,
+        );
+        return { emailSent: false, kind: "google-notify" };
+      }
       return { emailSent: true, kind: "google-notify" };
     } catch (err) {
       console.error(
@@ -286,7 +304,22 @@ export async function sendInviteOnboardingEmailHandler(
 
   const { subject, text } = buildSetPasswordContent(orgName, normalizedEmail, baseUrl, resetLink);
   try {
-    await resend.emails.send({ from, to: normalizedEmail, subject: sanitizeHeader(subject), text });
+    // See the google-notify branch: the Resend SDK RESOLVES with { data, error }
+    // on an API-level rejection rather than throwing, so a truthy `error` must
+    // be treated as a failed send (not a false emailSent:true).
+    const { error } = await resend.emails.send({
+      from,
+      to: normalizedEmail,
+      subject: sanitizeHeader(subject),
+      text,
+    });
+    if (error) {
+      console.error(
+        `[inviteOnboarding] set-password send rejected for orgId=${orgId}, to=${normalizedEmail}:`,
+        error,
+      );
+      return { emailSent: false, kind: "set-password" };
+    }
     return { emailSent: true, kind: "set-password" };
   } catch (err) {
     console.error(

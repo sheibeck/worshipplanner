@@ -273,6 +273,25 @@ describe("google", () => {
     expect(arg.text.toLowerCase()).toContain("google");
   });
 
+  it("a Resend API error (returned, not thrown) resolves emailSent:false, not a false 'sent'", async () => {
+    // The Resend SDK resolves with { data, error } on an API-level rejection
+    // (e.g. test-mode "can only send to your own address"); it does NOT throw.
+    // The handler must treat a truthy error as a failed send.
+    mockAuth();
+    const fake = seedOrg(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db());
+    mockSend.mockResolvedValueOnce({
+      data: null,
+      error: { statusCode: 403, message: "You can only send testing emails to your own address." },
+    });
+
+    const result = await sendInviteOnboardingEmailHandler(
+      fakeRequest({ data: { email: "bob@gmail.com" } }),
+    );
+
+    expect(result).toEqual({ emailSent: false, kind: "google-notify" });
+  });
+
   it("x@googlemail.com: same notify-only path, no createUser", async () => {
     const { createUser } = mockAuth();
     const fake = seedOrg(new FakeFirestore());
@@ -388,6 +407,20 @@ describe("set-password / createUser", () => {
   it("Resend send fails after Auth succeeded: best-effort, resolves emailSent:false (no throw)", async () => {
     mockAuth();
     mockSend.mockRejectedValueOnce(new Error("resend 500"));
+    const fake = seedOrg(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db());
+
+    const result = await sendInviteOnboardingEmailHandler(fakeRequest());
+
+    expect(result).toEqual({ emailSent: false, kind: "set-password" });
+  });
+
+  it("Resend returns an API error (not thrown) after Auth succeeded: resolves emailSent:false", async () => {
+    mockAuth();
+    mockSend.mockResolvedValueOnce({
+      data: null,
+      error: { statusCode: 422, message: "Invalid recipient" },
+    });
     const fake = seedOrg(new FakeFirestore());
     vi.mocked(getFirestore).mockReturnValue(fake.db());
 
