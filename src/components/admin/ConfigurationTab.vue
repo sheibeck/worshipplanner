@@ -116,6 +116,7 @@
       <CleanupConfigCard />
       <AiProxyConfigCard />
       <MessagingConfigCard />
+      <OnboardingConfigCard />
       <SenderConfigCard />
     </template>
 
@@ -141,6 +142,7 @@ import { isPermissionDenied } from '@/utils/firestoreListener'
 import CleanupConfigCard from '@/components/admin/CleanupConfigCard.vue'
 import AiProxyConfigCard from '@/components/admin/AiProxyConfigCard.vue'
 import MessagingConfigCard from '@/components/admin/MessagingConfigCard.vue'
+import OnboardingConfigCard from '@/components/admin/OnboardingConfigCard.vue'
 import SenderConfigCard from '@/components/admin/SenderConfigCard.vue'
 
 interface SuperAdminEntry {
