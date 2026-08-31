@@ -451,7 +451,9 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
   3. A newly onboarded org and every existing org (including Berean) start with Bible API disabled, with no data migration performed (R295).
   4. The Owner Console's Organizations list shows each org's current Bible API on/off state at a glance, mirroring the existing AI-enablement row/drawer treatment (R301).
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 101-01-PLAN.md — Backend: Organization.bibleApiEnabled field + super-admin-gated setOrgBibleEnabled Cloud Function + listOrganizations echo + firestore.rules deny (R295, R301)
+- [ ] 101-02-PLAN.md — Frontend: authStore bibleApiEnabled/isBibleApiEnabled mirror + OrgConfigDrawer checkbox + OrganizationsTab onToggleBible + per-row at-a-glance state (R295, R301)
 **UI hint**: yes
 
 ### Phase 102: Gated Scripture Fetch Dispatcher
