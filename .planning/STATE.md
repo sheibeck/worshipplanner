@@ -5,10 +5,10 @@ milestone_name: Invite Email & Non-Google Onboarding
 current_phase: 100
 current_phase_name: invite-login-onboarding-wiring
 status: awaiting-owner-close
-stopped_at: "v2.5 CODE-COMPLETE (phases 99+100) + audit PASSED. functions:sendInviteOnboardingEmail DEPLOYED to prod 2026-08-31 (owner-approved) for local UAT. STILL PENDING before real delivery/close: hosting NOT deployed (client invite-UI + toggle card live only in local dev), owner-run prereqs (Firebase Email/Password provider, Resend DNS verification), and flipping the onboarding-emails toggle ON (default OFF). Owner doing local UAT against the deployed function. Then hosting deploy + /gsd-complete-milestone v2.5. UAT script: .planning/v2.5-UAT.md."
-last_updated: "2026-08-31T09:30:00.000Z"
+stopped_at: "v2.5 CODE-COMPLETE + audit PASSED + a local-UAT fix round (2026-08-31). functions:sendInviteOnboardingEmail DEPLOYED+REDEPLOYED to prod (owner-approved). UAT confirmed the flow end-to-end (Resend 403 test-mode log proves auth→gate→branch→send). UAT fixes shipped: (1) appConfig saveField wrote a literal dotted key → every Owner Console toggle silently failed to persist (fixed store-wide); (2) LoginView context-aware reset-password errors; (3) inviteOnboarding now checks the Resend SDK's RETURNED {error} (was a false emailSent:true on a 403); (4) TeamView persistent + red-on-failure invite feedback + a Resend action on pending invites. STILL PENDING before real delivery/close: hosting NOT deployed (client changes live only in local dev), Firebase Email/Password provider (owner ENABLED it during UAT — verify), Resend DNS domain verification (owner DEFERRED — until then onboarding@resend.dev only delivers to sheibeck@gmail.com), and the onboarding-emails toggle must stay ON. Then hosting deploy + /gsd-complete-milestone v2.5. UAT script: .planning/v2.5-UAT.md."
+last_updated: "2026-08-31T10:05:00.000Z"
 last_activity: 2026-08-31
-last_activity_desc: "Deployed functions:sendInviteOnboardingEmail to prod (owner-approved) so owner can UAT the invite flow from local dev; hosting still undeployed, milestone still open"
+last_activity_desc: "Local UAT of v2.5: verified the invite flow, fixed 4 issues (appConfig toggle persistence, reset-password errors, Resend returned-error check, persistent/red feedback + Resend action), redeployed the function; Resend domain verification deferred by owner; milestone still open"
 progress:
   total_phases: 2
   completed_phases: 2
