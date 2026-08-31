@@ -937,6 +937,76 @@ describe('useAuthStore', () => {
     })
   })
 
+  describe('bibleApiEnabled / isBibleApiEnabled (Phase 101, R295)', () => {
+    it('defaults to false after loadOrgContext when the org doc has no bibleApiEnabled field', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.bibleApiEnabled).toBe(false)
+      expect(store.isBibleApiEnabled).toBe(false)
+    })
+
+    it('reflects an explicit true bibleApiEnabled field on the org doc', async () => {
+      mockOrgDocPath({ name: 'Test Org', bibleApiEnabled: true })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.bibleApiEnabled).toBe(true)
+      expect(store.isBibleApiEnabled).toBe(true)
+    })
+
+    it('reflects an explicit false bibleApiEnabled field on the org doc', async () => {
+      mockOrgDocPath({ name: 'Test Org', bibleApiEnabled: false })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.bibleApiEnabled).toBe(false)
+      expect(store.isBibleApiEnabled).toBe(false)
+    })
+
+    it('resets to false on logout (no stale leak across org switches)', async () => {
+      mockOrgDocPath({ name: 'Test Org', bibleApiEnabled: true })
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.bibleApiEnabled).toBe(true)
+
+      await store.logout()
+      expect(store.bibleApiEnabled).toBe(false)
+    })
+
+    it('resets to false when the user belongs to no organization', async () => {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: [] }),
+          }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.bibleApiEnabled).toBe(false)
+    })
+
+    it('isBibleApiEnabled is single-leg: tracks bibleApiEnabled alone, independent of settings', async () => {
+      mockOrgDocPath({ name: 'Test Org', bibleApiEnabled: true, settings: { aiEnabled: false } })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.bibleApiEnabled).toBe(true)
+      expect(store.isBibleApiEnabled).toBe(true)
+    })
+  })
+
   describe('OrgSettings (R073)', () => {
     it('resolves full OrgSettings from defaults when the org document has no settings key', async () => {
       mockOrgDocPath({ name: 'Test Org' })

@@ -129,6 +129,16 @@ export const useAuthStore = defineStore('auth', () => {
   // Features card v-if.
   const aiMasterEnabled = ref(false)
 
+  // Phase 101 (R295) — the super-admin MASTER Bible API gate, read from the
+  // org doc's top-level `bibleApiEnabled` field. Absent/false => OFF
+  // (default) — every org starts OFF until a super-admin enables it via
+  // setOrgBibleEnabled (Plan 01). Mirror-written from applyOrgSnapshot, NOT
+  // live-synced via onSnapshot — same latency posture as aiMasterEnabled
+  // above. SINGLE-LEG: unlike aiMasterEnabled, there is no church-editable
+  // `settings.bibleApiEnabled` leaf this milestone (deferred) — this is the
+  // ONLY gate. Consumed by Phases 102/103's scripture-fetch gate.
+  const bibleApiEnabled = ref(false)
+
   // The organizations the signed-in user belongs to ({id, name, active}) — the
   // source the login church-picker renders when a user belongs to more than
   // one. Populated by loadOrgContext. `active` defaults to `true` for a
@@ -165,6 +175,11 @@ export const useAuthStore = defineStore('auth', () => {
   // so a super-admin disabling AI for an org hides those affordances
   // consistently, not just the Settings card.
   const isAiEnabled = computed(() => aiMasterEnabled.value && settings.value.aiEnabled)
+
+  // Phase 101 (R295) — SINGLE-LEG gate: unlike isAiEnabled above, there is no
+  // church-editable settings.bibleApiEnabled leaf this milestone, so this
+  // does NOT AND against settings — it simply mirrors the master field.
+  const isBibleApiEnabled = computed(() => bibleApiEnabled.value)
 
   // Org-selection gates consumed by the router. A signed-in user with more than
   // one church and no active choice must pick one; a signed-in user with zero
@@ -368,6 +383,7 @@ export const useAuthStore = defineStore('auth', () => {
     vwModeEnabled.value = true
     settings.value = { ...DEFAULT_ORG_SETTINGS }
     aiMasterEnabled.value = false
+    bibleApiEnabled.value = false
     viewingAsSuperAdmin.value = null
     deactivatedOrgMessage.value = null
   }
@@ -440,6 +456,9 @@ export const useAuthStore = defineStore('auth', () => {
     // for every org. No dual-read/legacy-field precedent exists for this
     // field (brand new this phase), so a plain `?? false` is sufficient.
     aiMasterEnabled.value = (orgData.aiMasterEnabled as boolean | undefined) ?? false
+
+    // Phase 101 (R295) — DEFAULT OFF, same posture as aiMasterEnabled above.
+    bibleApiEnabled.value = (orgData.bibleApiEnabled as boolean | undefined) ?? false
 
     // CR-01 (46-REVIEW.md) — eager-load the org's actual chosen slide
     // face here, the ONE point every render site's settings flow
@@ -639,6 +658,7 @@ export const useAuthStore = defineStore('auth', () => {
       vwModeEnabled.value = true
       settings.value = { ...DEFAULT_ORG_SETTINGS }
       aiMasterEnabled.value = false
+      bibleApiEnabled.value = false
       memberships.value = []
       deactivatedOrgMessage.value = null
       viewingAsSuperAdmin.value = null
@@ -853,6 +873,7 @@ export const useAuthStore = defineStore('auth', () => {
     vwModeEnabled.value = true
     settings.value = { ...DEFAULT_ORG_SETTINGS }
     aiMasterEnabled.value = false
+    bibleApiEnabled.value = false
     deactivatedOrgMessage.value = null
     viewingAsSuperAdmin.value = null
     memberUnsub?.()
@@ -914,5 +935,7 @@ export const useAuthStore = defineStore('auth', () => {
     settings,
     aiMasterEnabled,
     isAiEnabled,
+    bibleApiEnabled,
+    isBibleApiEnabled,
   }
 })
