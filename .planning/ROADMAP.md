@@ -436,7 +436,7 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 
 **Key context:** Promoted from backlog 999.3. Mirrors the v2.2 per-org AI enablement pattern (`aiMasterEnabled`/`setOrgAiEnabled`) — a super-admin master field on `Organization`, written only by a super-admin-gated Cloud Function, mirrored into `authStore`, and gated in `firestore.rules`. Default OFF, no data migration — the manual fallback makes an OFF org fully functional, not broken. There is no existing single Bible-fetch choke point today (fetching is split across `src/utils/esvApi.ts` and `src/utils/nltApi.ts`, with ESV/NLT version dispatch duplicated inline in `src/components/ScriptureInput.vue` and `src/components/CongregationalEditor.vue`) — this milestone introduces one (`src/utils/scriptureApi.ts`). The BibleGateway link builder already exists in `src/utils/scripture.ts` (`scriptureWebLink`/`nltLink`).
 
-- [ ] **Phase 101: Per-Org Bible API Toggle — Owner Console Infrastructure** - A super-admin controls Bible API access per organization from the Owner Console, with every org defaulting to OFF
+- [x] **Phase 101: Per-Org Bible API Toggle — Owner Console Infrastructure** - A super-admin controls Bible API access per organization from the Owner Console, with every org defaulting to OFF (completed 2026-08-31)
 - [ ] **Phase 102: Gated Scripture Fetch Dispatcher** - A single client/server choke point enforces the per-org gate, with zero regression when the API is enabled
 - [ ] **Phase 103: Manual Fallback When Bible API Is Off** - An OFF org gets a working BibleGateway deep-link + paste-in path, and Settings hides the Bible Translation selector
 
