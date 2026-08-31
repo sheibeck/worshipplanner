@@ -31,11 +31,14 @@
             :disabled="isInviting"
             class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
           >
-            {{ isInviting ? 'Inviting...' : invitedFeedback ? 'Invited!' : 'Invite' }}
+            {{ isInviting ? 'Inviting...' : invitedFeedback ? 'Added!' : 'Invite' }}
           </button>
         </div>
         <p v-if="inviteError" class="text-red-400 text-sm mt-2">{{ inviteError }}</p>
-        <p v-if="invitedFeedback" class="text-green-400 text-sm mt-2">Invite sent to {{ invitedFeedback }}!</p>
+        <p v-if="invitedFeedback" class="text-green-400 text-sm mt-2">
+          {{ invitedFeedback }} added to the pending list — no email is sent, so let them know
+          directly to sign in with this address to join.
+        </p>
       </div>
 
       <!-- Loading state -->
@@ -291,7 +294,7 @@ async function onInvite() {
     }, 2000)
   } catch (err) {
     console.error('[TeamView] invite error:', err)
-    inviteError.value = 'Failed to send invite. Please try again.'
+    inviteError.value = 'Failed to create invite. Please try again.'
   } finally {
     isInviting.value = false
   }
