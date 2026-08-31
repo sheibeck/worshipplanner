@@ -603,6 +603,19 @@ describe('Org lifecycle field guard (T-76-10/T-76-06)', () => {
     )
   })
 
+  // Phase 101 (R295): `bibleApiEnabled` -- the second super-admin-only master
+  // gate -- rides the SAME lifecycleFields() allow-list. This is the
+  // bibleApiEnabled twin of the aiMasterEnabled DENY immediately above.
+  it('DENIES an ordinary editor from setting bibleApiEnabled:true directly on their own org', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA', { name: "UserA's Church" })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { bibleApiEnabled: true }),
+    )
+  })
+
   // WR-01 (82-REVIEW): aiMasterEnabled's own audit-trail siblings
   // (aiEnabledAt/aiEnabledBy/aiDisabledAt/aiDisabledBy, written by
   // setOrgAiEnabledHandler) must ride along in lifecycleFields() too --
@@ -766,6 +779,20 @@ describe('Super-admin content access without a membership doc (R225, Phase 78)',
     const db = context.firestore()
     await assertFails(
       updateDoc(doc(db, 'organizations', 'orgA'), { aiMasterEnabled: true }),
+    )
+  })
+
+  // Phase 101 (R295/T-101-02) -- the bibleApiEnabled twin of the CRITICAL
+  // test immediately above. A super-admin's OWN client SDK must be denied
+  // writing the new master Bible-API gate directly too: `lifecycleFields()`
+  // is shared, not duplicated, so this is the SAME guard -- worth its own
+  // explicit proof, mirroring the aiMasterEnabled CRITICAL test verbatim.
+  it('CRITICAL -- DENIES a super-admin client SDK from writing bibleApiEnabled directly (must use setOrgBibleEnabled)', async () => {
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church" })
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA'), { bibleApiEnabled: true }),
     )
   })
 

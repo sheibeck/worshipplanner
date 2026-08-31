@@ -124,14 +124,23 @@ service cloud.firestore {
       // a super-admin client write here would skip setOrgAiEnabled's R243
       // forced-off side effect on `settings.aiEnabled`, reopening the same
       // partial-state hole Phase 78 closed for `active`.
+      // Phase 101 (R295): `bibleApiEnabled` -- the second super-admin-only
+      // master gate (this one for the Bible API, ESV/NLT paid proxy) -- rides
+      // the SAME allow-list too, for the same reason: written ONLY by the
+      // setOrgBibleEnabled Cloud Function via the Admin SDK, no exemption for
+      // a super-admin's own client SDK.
       function lifecycleFields() {
         // WR-01 (82-REVIEW): aiMasterEnabled's own audit-trail siblings
         // (aiEnabledAt/aiEnabledBy/aiDisabledAt/aiDisabledBy, written by
         // setOrgAiEnabledHandler) must ride along in this same allow-list --
         // otherwise an ordinary editor can forge them directly, the exact
         // T-76-06 audit-forgery class already closed for `active`'s siblings.
+        // bibleApiEnabled's own audit siblings (bibleApiEnabledAt/By,
+        // bibleApiDisabledAt/By, written by setOrgBibleEnabledHandler) ride
+        // along here too, for the same reason (Phase 101, R295).
         return ['active', 'deactivatedAt', 'deactivatedBy', 'reactivatedAt', 'reactivatedBy',
-                'aiMasterEnabled', 'aiEnabledAt', 'aiEnabledBy', 'aiDisabledAt', 'aiDisabledBy'];
+                'aiMasterEnabled', 'aiEnabledAt', 'aiEnabledBy', 'aiDisabledAt', 'aiDisabledBy',
+                'bibleApiEnabled', 'bibleApiEnabledAt', 'bibleApiEnabledBy', 'bibleApiDisabledAt', 'bibleApiDisabledBy'];
       }
       function preservesLifecycleFields() {
         return request.resource == null
