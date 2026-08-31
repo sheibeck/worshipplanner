@@ -71,6 +71,30 @@
             <p v-if="aiError" class="text-red-400 text-xs mt-1.5">{{ aiError }}</p>
           </section>
 
+          <!-- Bible API enablement (Phase 101, R295) — mirrors the AI
+               enablement section above verbatim: same markup/classes, same
+               checkbox/disabled/error shape. Single-leg master gate (no
+               settings.* leaf this milestone), per 101-UI-SPEC.md. -->
+          <section class="border-t border-gray-800 pt-5">
+            <label class="inline-flex items-center gap-2 text-sm text-gray-200">
+              <input
+                type="checkbox"
+                data-testid="org-config-bible-checkbox"
+                :checked="org.bibleApiEnabled"
+                :disabled="bibleToggling"
+                class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                @change="emit('toggle-bible')"
+              />
+              Enable Bible API
+            </label>
+            <p class="text-xs text-gray-400 mt-1.5">
+              {{ bibleToggling
+                ? (org.bibleApiEnabled ? 'Disabling Bible API...' : 'Enabling Bible API...')
+                : "Allow this church to auto-fetch ESV/NLT scripture text. When off, they use the manual BibleGateway / paste path (no API cost)." }}
+            </p>
+            <p v-if="bibleError" class="text-red-400 text-xs mt-1.5">{{ bibleError }}</p>
+          </section>
+
           <!-- Active -->
           <section class="border-t border-gray-800 pt-5">
             <div class="flex items-center justify-between gap-3">
@@ -234,12 +258,16 @@ interface OrgSummary {
   pendingCount: number
   active: boolean
   aiMasterEnabled?: boolean
+  bibleApiEnabled?: boolean
 }
 
 const props = defineProps<{
   org: OrgSummary | null
   aiToggling: boolean
   aiError: string | null
+  // Bible API enablement (Phase 101, R295) — mirrors aiToggling/aiError.
+  bibleToggling: boolean
+  bibleError: string | null
   activeToggling: boolean
   activeError: string | null
   activeFeedback: string | null
@@ -265,6 +293,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   'toggle-ai': []
+  'toggle-bible': []
   'request-deactivate': []
   reactivate: []
   'request-delete': []

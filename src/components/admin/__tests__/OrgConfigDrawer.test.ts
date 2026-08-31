@@ -25,6 +25,7 @@ function makeOrg(overrides: Partial<{
   pendingCount: number
   active: boolean
   aiMasterEnabled: boolean
+  bibleApiEnabled: boolean
 }> = {}) {
   return {
     orgId: 'org-1',
@@ -34,6 +35,7 @@ function makeOrg(overrides: Partial<{
     pendingCount: 0,
     active: true,
     aiMasterEnabled: false,
+    bibleApiEnabled: false,
     ...overrides,
   }
 }
@@ -45,6 +47,8 @@ function mountDrawer(props: Partial<InstanceType<typeof OrgConfigDrawer>['$props
       org: makeOrg(),
       aiToggling: false,
       aiError: null,
+      bibleToggling: false,
+      bibleError: null,
       activeToggling: false,
       activeError: null,
       activeFeedback: null,
@@ -135,6 +139,28 @@ describe('OrgConfigDrawer -- AI enablement checkbox', () => {
   it('disables the checkbox while aiToggling and renders aiError', () => {
     const wrapper = mountDrawer({ aiToggling: true, aiError: 'server exploded' })
     expect(wrapper.find('[data-testid="org-config-ai-checkbox"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('server exploded')
+  })
+})
+
+describe('OrgConfigDrawer -- Bible API enablement checkbox (Phase 101, R295)', () => {
+  it('reflects bibleApiEnabled true as checked, false as unchecked', () => {
+    let wrapper = mountDrawer({ org: makeOrg({ bibleApiEnabled: true }) })
+    expect((wrapper.find('[data-testid="org-config-bible-checkbox"]').element as HTMLInputElement).checked).toBe(true)
+
+    wrapper = mountDrawer({ org: makeOrg({ bibleApiEnabled: false }) })
+    expect((wrapper.find('[data-testid="org-config-bible-checkbox"]').element as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('emits toggle-bible (no payload) on change', async () => {
+    const wrapper = mountDrawer()
+    await wrapper.find('[data-testid="org-config-bible-checkbox"]').trigger('change')
+    expect(wrapper.emitted('toggle-bible')).toEqual([[]])
+  })
+
+  it('disables the checkbox while bibleToggling and renders bibleError', () => {
+    const wrapper = mountDrawer({ bibleToggling: true, bibleError: 'server exploded' })
+    expect(wrapper.find('[data-testid="org-config-bible-checkbox"]').attributes('disabled')).toBeDefined()
     expect(wrapper.text()).toContain('server exploded')
   })
 })
