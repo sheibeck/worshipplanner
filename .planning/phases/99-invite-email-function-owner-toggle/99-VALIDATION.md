@@ -42,7 +42,10 @@ created: 2026-08-30
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | — | — | R289/R290/R291/R293 | — | — | unit | `npx vitest run functions/src` | ❌ W0 | ⬜ pending |
+| 99-01-T1 | 99-01 | 1 | R293 | T-99-08 | `onboarding.emailsEnabled` coerces fail-closed (only literal `true` enables); both mirrors value-identical | unit | `cd functions && npx vitest run src/appConfig.test.ts` + `npx vitest run src/config/__tests__/appConfigDefaults.test.ts` | ❌ extend existing | ⬜ pending |
+| 99-01-T2 | 99-01 | 1 | R293 | T-99-07 | Owner Console checkbox saves `onboarding.emailsEnabled` via `saveField`; reverts on failure | component | `npx vitest run src/components/admin/__tests__/OnboardingConfigCard.test.ts src/components/admin/__tests__/ConfigurationTab.test.ts` | ❌ W0 (new) | ⬜ pending |
+| 99-02-T1 | 99-02 | 2 | R289/R290/R291/R293 | T-99-01, T-99-03, T-99-06 | Org-editor gate + gmail/non-Google branch + toggle short-circuit; compiles (no circular import / unexported import) | build | `cd functions && npm run build` | n/a (tsc) | ⬜ pending |
+| 99-02-T2 | 99-02 | 2 | R289/R290/R291/R293 | T-99-01, T-99-02, T-99-06 | Handler: caller gate, disabled short-circuit, gmail notify (no createUser), non-Google createUser+resetLink, email-already-exists race | unit | `npx vitest run functions/src/inviteOnboarding.test.ts` | ❌ W0 (new) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

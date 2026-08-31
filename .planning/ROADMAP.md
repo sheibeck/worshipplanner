@@ -402,7 +402,9 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
   1. Inviting a non-Google email address through the function creates a Firebase Auth account for that address (if none exists) and sends an email containing a valid `generatePasswordResetLink()` "set your password" link, which also offers Google sign-in as a fallback (R290, R291).
   2. Inviting a Google/Gmail address (`gmail.com`/`googlemail.com`) through the function sends a "you've been invited — sign in with Google" notification email, with no Auth account pre-created and no password step (R289).
   3. An owner can switch onboarding/invite emails on or off from the Owner Console's Configuration tab (backed by `appConfig`), and when off, the function sends no email for either invitee type (R293).
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 99-01-PLAN.md — Owner toggle: `appConfig.onboarding.emailsEnabled` (server + client mirror) + Owner Console Configuration card (Wave 1) [R293]
+- [ ] 99-02-PLAN.md — `sendInviteOnboardingEmail` Cloud Function: gmail-notify vs non-Google set-password provisioning, org-editor gate, toggle honored, re-exported from index.ts (Wave 2, depends on 99-01) [R289, R290, R291, R293]
 
 ### Phase 100: Invite & Login Onboarding Wiring
 
