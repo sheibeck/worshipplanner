@@ -729,6 +729,27 @@ export const api = onRequest(
       }
     }
 
+    // R297: defense-in-depth server-side half of the per-org Bible-API gate
+    // (Plan 102-01 built the client dispatcher; this is the real security
+    // control, enforced independently of any client bypass). Mirrors the
+    // anthropic branch's org-resolution + enablement reject immediately
+    // above -- decodedCaller is always non-null here (esv and nlt are both
+    // in SECRET_INJECTED, so the auth gate above already returned 401 for a
+    // null caller). planningcenter is not a Bible service and is untouched
+    // by this condition, falling through exactly as before.
+    if (service === "esv" || service === "nlt") {
+      const callerOrgId = resolveOrgId(decodedCaller!);
+      if (!callerOrgId) {
+        res.status(403).json({ error: "Bible API features require an organization." });
+        return;
+      }
+      const bibleVerdict = await checkOrgBibleEnablement(getFirestore(), callerOrgId);
+      if (!bibleVerdict.ok) {
+        res.status(bibleVerdict.status).json(bibleVerdict.error);
+        return;
+      }
+    }
+
     try {
       const upstream = await fetch(upstreamUrl, {
         method: req.method,

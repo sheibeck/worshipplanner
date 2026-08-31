@@ -4466,11 +4466,20 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
 
   it("WR-01 (69-REVIEW.md): a non-anthropic service (esv) never calls getAppConfig, and succeeds even if getAppConfig would reject", async () => {
     // Proves the fix: getAppConfig() is now scoped inside the `service ===
-    // "anthropic"` branch, so esv/nlt/planningcenter stay Firestore-
-    // independent exactly as they were before this phase. Rejecting the
-    // mock (rather than merely asserting "not called") would surface a
-    // regression even if some other code path started awaiting it.
+    // "anthropic"` branch, so esv/nlt/planningcenter stay independent of the
+    // AI appConfig/rate-limit/ledger controls exactly as they were before
+    // this phase. Rejecting the mock (rather than merely asserting "not
+    // called") would surface a regression even if some other code path
+    // started awaiting it.
+    //
+    // getFirestore IS now called for esv/nlt (R297, Plan 102-02's
+    // checkOrgBibleEnablement defense-in-depth gate) -- that assertion was
+    // updated when this test's era of "esv is fully Firestore-independent"
+    // ended; the org doc below is set up as enabled so the request still
+    // succeeds end to end.
     vi.mocked(getAppConfig).mockRejectedValue(new Error("appConfig Firestore read boom"));
+    const { db } = mockCombinedDb({ bibleApiEnabled: true });
+    vi.mocked(getFirestore).mockReturnValue(db);
     fetchMock.mockResolvedValue({
       status: 200,
       headers: { get: () => "application/json" },
@@ -4488,7 +4497,7 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
     await api(req as never, res as never);
 
     expect(getAppConfig).not.toHaveBeenCalled();
-    expect(getFirestore).not.toHaveBeenCalled();
+    expect(getFirestore).toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(200);
   });
