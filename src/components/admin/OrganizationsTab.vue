@@ -83,6 +83,17 @@
                 >
                   Deactivated
                 </span>
+                <!-- Phase 101 (R301) — per-row at-a-glance Bible API state.
+                     Reuses the established "on" badge palette (indigo, same
+                     shape as the Deactivated/pending badges above); default-
+                     OFF orgs render no badge, matching how absent
+                     aiMasterEnabled shows nothing. -->
+                <span
+                  v-if="org.bibleApiEnabled"
+                  class="ml-1 inline-flex items-center rounded-full bg-indigo-900/40 text-indigo-300 border border-indigo-800/50 px-1.5 py-0.5 text-xs font-medium"
+                >
+                  Bible API
+                </span>
               </td>
               <td class="px-4 py-3 text-gray-500 text-xs font-mono">{{ org.orgId }}</td>
               <td class="px-4 py-3 text-gray-400 text-sm">{{ formatDate(org.createdAt) }}</td>
@@ -138,6 +149,8 @@
       :org="configOrg"
       :ai-toggling="togglingAiOrgId === configOrg?.orgId"
       :ai-error="configOrg ? (aiToggleError[configOrg.orgId] ?? null) : null"
+      :bible-toggling="togglingBibleOrgId === configOrg?.orgId"
+      :bible-error="configOrg ? (bibleToggleError[configOrg.orgId] ?? null) : null"
       :active-toggling="togglingOrgId === configOrg?.orgId"
       :active-error="configOrg ? (toggleError[configOrg.orgId] ?? null) : null"
       :active-feedback="configOrg ? (toggleFeedback[configOrg.orgId] ?? null) : null"
@@ -152,6 +165,7 @@
       :enter-error="configOrg ? (enterError[configOrg.orgId] ?? null) : null"
       @close="onCloseDrawer"
       @toggle-ai="() => configOrg && onToggleAi(configOrg)"
+      @toggle-bible="() => configOrg && onToggleBible(configOrg)"
       @reactivate="() => configOrg && onToggleActive(configOrg)"
       @request-deactivate="deactivateDialogOrg = configOrg"
       @request-delete="() => configOrg && openDeleteDialog(configOrg)"
@@ -226,6 +240,11 @@ interface OrgSummary {
   // Optional/absent reads as OFF, matching the org doc's own
   // aiMasterEnabled?: boolean default (src/types/organization.ts).
   aiMasterEnabled?: boolean
+  // Phase 101 (R295) — mirrors the server OrgSummary's new field
+  // (functions/src/orgProvisioning.ts's listOrganizationsHandler, Plan 01).
+  // Optional/absent reads as OFF, matching the org doc's own
+  // bibleApiEnabled?: boolean default (src/types/organization.ts).
+  bibleApiEnabled?: boolean
 }
 
 // R212/R214 (Phase 76) — mirrors functions/src/orgProvisioning.ts's
@@ -259,6 +278,20 @@ interface SetOrgAiEnabledRequest {
 interface SetOrgAiEnabledResponse {
   orgId: string
   aiEnabled: boolean
+}
+
+// Phase 101 (R295) — mirrors functions/src/orgProvisioning.ts's
+// setOrgBibleEnabledHandler request/response contract exactly (Plan 01).
+// The callable field is `enabled` (not `bibleEnabled`), the agreed
+// cross-plan contract.
+interface SetOrgBibleEnabledRequest {
+  orgId: string
+  enabled: boolean
+}
+
+interface SetOrgBibleEnabledResponse {
+  orgId: string
+  enabled: boolean
 }
 
 interface OnboardOrganizationRequest {
@@ -335,6 +368,11 @@ const toggleFeedbackIsWarning = ref<Record<string, boolean>>({})
 // Deactivate/Reactivate state block above exactly. ──
 const togglingAiOrgId = ref<string | null>(null)
 const aiToggleError = ref<Record<string, string>>({})
+
+// ── Bible API on/off toggle state (Phase 101, R295), keyed per orgId —
+// mirrors the AI on/off toggle state block immediately above. ──
+const togglingBibleOrgId = ref<string | null>(null)
+const bibleToggleError = ref<Record<string, string>>({})
 
 // ── Delete state (R220/R221) ──────────────────────────────────────────────
 // deleteDialogOrg doubles as the dialog's `open` flag via
@@ -659,6 +697,34 @@ async function onToggleAi(org: OrgSummary) {
     aiToggleError.value = { ...aiToggleError.value, [orgId]: friendlyCallableError(err) }
   } finally {
     togglingAiOrgId.value = null
+  }
+}
+
+// ── Bible API on/off toggle action (Phase 101, R295) ──────────────────────
+// Pure httpsCallable consumer — this component writes NO organizations
+// document directly (mirrors onToggleAi above); setOrgBibleEnabled is the
+// only channel.
+
+async function onToggleBible(org: OrgSummary) {
+  // Same double-submit guard shape as togglingAiOrgId above.
+  if (togglingBibleOrgId.value) return
+
+  const orgId = org.orgId
+  const nextEnabled = !org.bibleApiEnabled
+  togglingBibleOrgId.value = orgId
+  delete bibleToggleError.value[orgId]
+  try {
+    const setOrgBibleEnabled = httpsCallable<SetOrgBibleEnabledRequest, SetOrgBibleEnabledResponse>(
+      functions,
+      'setOrgBibleEnabled',
+    )
+    await setOrgBibleEnabled({ orgId, enabled: nextEnabled })
+    await refreshOrgs()
+  } catch (err) {
+    console.error('[OrganizationsTab] setOrgBibleEnabled error:', err)
+    bibleToggleError.value = { ...bibleToggleError.value, [orgId]: friendlyCallableError(err) }
+  } finally {
+    togglingBibleOrgId.value = null
   }
 }
 

@@ -32,6 +32,8 @@ interface OrgSummaryFixture {
   active: boolean
   // Phase 82 (R242) — mirrors the server OrgSummary's new field.
   aiMasterEnabled?: boolean
+  // Phase 101 (R295) — mirrors the server OrgSummary's new field.
+  bibleApiEnabled?: boolean
 }
 
 const {
@@ -42,6 +44,7 @@ const {
   mockDeleteOrganization,
   mockEnterOrgAsSuperAdmin,
   mockSetOrgAiEnabled,
+  mockSetOrgBibleEnabled,
 } = vi.hoisted(() => ({
     mockListOrganizations: vi.fn<() => Promise<{ data: { organizations: OrgSummaryFixture[] } }>>(
       () => Promise.resolve({ data: { organizations: [] } }),
@@ -97,6 +100,12 @@ const {
     mockSetOrgAiEnabled: vi.fn<() => Promise<{ data: { orgId: string; aiEnabled: boolean } }>>(
       () => Promise.resolve({ data: { orgId: 'org-1', aiEnabled: true } }),
     ),
+    // Phase 101 (R295) — mirrors setOrgBibleEnabledHandler's response shape
+    // (Plan 01). The callable field is `enabled`, matching the cross-plan
+    // contract.
+    mockSetOrgBibleEnabled: vi.fn<() => Promise<{ data: { orgId: string; enabled: boolean } }>>(
+      () => Promise.resolve({ data: { orgId: 'org-1', enabled: true } }),
+    ),
   }))
 
 vi.mock('firebase/functions', () => ({
@@ -107,6 +116,7 @@ vi.mock('firebase/functions', () => ({
     if (name === 'setOrgActive') return mockSetOrgActive
     if (name === 'deleteOrganization') return mockDeleteOrganization
     if (name === 'setOrgAiEnabled') return mockSetOrgAiEnabled
+    if (name === 'setOrgBibleEnabled') return mockSetOrgBibleEnabled
     throw new Error(`Unexpected callable name: ${name}`)
   }),
 }))
@@ -132,6 +142,7 @@ beforeEach(() => {
   mockDeleteOrganization.mockClear()
   mockEnterOrgAsSuperAdmin.mockClear()
   mockSetOrgAiEnabled.mockClear()
+  mockSetOrgBibleEnabled.mockClear()
   mockListOrganizations.mockImplementation(() => Promise.resolve({ data: { organizations: [] } }))
   mockOnboardOrganization.mockImplementation(() =>
     Promise.resolve({ data: { status: 'added', orgId: 'org-1', name: 'Test Church' } }),
@@ -211,6 +222,7 @@ function makeOrg(
     pendingCount: number
     active: boolean
     aiMasterEnabled: boolean
+    bibleApiEnabled: boolean
   }> = {},
 ) {
   return {
@@ -223,6 +235,9 @@ function makeOrg(
     // Phase 82 (R242) — DEFAULT OFF, matching aiMasterEnabled's absent=false
     // org-doc default (src/types/organization.ts).
     aiMasterEnabled: false,
+    // Phase 101 (R295) — DEFAULT OFF, matching bibleApiEnabled's absent=false
+    // org-doc default (src/types/organization.ts).
+    bibleApiEnabled: false,
     ...overrides,
   }
 }
@@ -1001,6 +1016,148 @@ describe('OrganizationsTab -- AI on/off toggle via drawer (R242, Phase 82, quick
     await flushPromises()
 
     expect(wrapper.text()).toContain('You do not have permission to perform this action.')
+  })
+})
+
+describe('OrganizationsTab -- Bible API on/off toggle via drawer (Phase 101, R295)', () => {
+  async function mountWithOneOrg(overrides: Partial<{ bibleApiEnabled: boolean }> = {}) {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: { organizations: [makeOrg({ orgId: 'org-1', name: 'Grace Church', ...overrides })] },
+      }),
+    )
+    return mountTab()
+  }
+
+  it('Bible: the drawer checkbox is unchecked for an org with the master gate off, and checked for one with it on', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [
+            makeOrg({ orgId: 'org-1', name: 'Grace Church', bibleApiEnabled: false }),
+            makeOrg({ orgId: 'org-2', name: 'Hope Church', bibleApiEnabled: true }),
+          ],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+
+    await openConfigDrawer(wrapper, 0)
+    expect((wrapper.find('[data-testid="org-config-bible-checkbox"]').element as HTMLInputElement).checked).toBe(false)
+    await wrapper.find('button[aria-label="Close"]').trigger('click')
+
+    await openConfigDrawer(wrapper, 1)
+    expect((wrapper.find('[data-testid="org-config-bible-checkbox"]').element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('Bible: changing the checkbox on an org with the gate off calls setOrgBibleEnabled with {orgId, enabled:true}', async () => {
+    const wrapper = await mountWithOneOrg({ bibleApiEnabled: false })
+    await openConfigDrawer(wrapper)
+
+    const bibleCheckbox = wrapper.find('[data-testid="org-config-bible-checkbox"]')
+    await bibleCheckbox.trigger('change')
+    await flushPromises()
+
+    expect(mockSetOrgBibleEnabled).toHaveBeenCalledWith({ orgId: 'org-1', enabled: true })
+  })
+
+  it('Bible: changing the checkbox on an org with the gate on calls setOrgBibleEnabled with {orgId, enabled:false}', async () => {
+    mockSetOrgBibleEnabled.mockImplementation(() =>
+      Promise.resolve({ data: { orgId: 'org-1', enabled: false } }),
+    )
+    const wrapper = await mountWithOneOrg({ bibleApiEnabled: true })
+    await openConfigDrawer(wrapper)
+
+    const bibleCheckbox = wrapper.find('[data-testid="org-config-bible-checkbox"]')
+    await bibleCheckbox.trigger('change')
+    await flushPromises()
+
+    expect(mockSetOrgBibleEnabled).toHaveBeenCalledWith({ orgId: 'org-1', enabled: false })
+  })
+
+  it('Bible: a successful toggle refreshes the org list so the drawer checkbox reflects the new state', async () => {
+    const wrapper = await mountWithOneOrg({ bibleApiEnabled: false })
+    mockListOrganizations.mockClear()
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: { organizations: [makeOrg({ orgId: 'org-1', name: 'Grace Church', bibleApiEnabled: true })] },
+      }),
+    )
+    await openConfigDrawer(wrapper)
+
+    await wrapper.find('[data-testid="org-config-bible-checkbox"]').trigger('change')
+    await flushPromises()
+
+    expect(mockListOrganizations).toHaveBeenCalledTimes(1)
+    expect((wrapper.find('[data-testid="org-config-bible-checkbox"]').element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('Bible: a second change while a toggle is in flight fires the callable exactly once', async () => {
+    let resolveFn: (v: { data: { orgId: string; enabled: boolean } }) => void = () => {}
+    mockSetOrgBibleEnabled.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFn = resolve
+        }),
+    )
+    const wrapper = await mountWithOneOrg({ bibleApiEnabled: false })
+    await openConfigDrawer(wrapper)
+
+    const bibleCheckbox = wrapper.find('[data-testid="org-config-bible-checkbox"]')
+    await bibleCheckbox.trigger('change')
+    expect(mockSetOrgBibleEnabled).toHaveBeenCalledTimes(1)
+
+    await bibleCheckbox.trigger('change')
+    expect(mockSetOrgBibleEnabled).toHaveBeenCalledTimes(1)
+
+    resolveFn({ data: { orgId: 'org-1', enabled: true } })
+    await flushPromises()
+  })
+
+  it('Bible: a rejected callable surfaces the friendly error inside the drawer without crashing, and does NOT call refreshOrgs()', async () => {
+    const wrapper = await mountWithOneOrg({ bibleApiEnabled: false })
+    mockListOrganizations.mockClear()
+    mockSetOrgBibleEnabled.mockImplementation(() => Promise.reject(new Error('server exploded')))
+    await openConfigDrawer(wrapper)
+
+    await wrapper.find('[data-testid="org-config-bible-checkbox"]').trigger('change')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('server exploded')
+    expect(mockListOrganizations).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="org-config-bible-checkbox"]').exists()).toBe(true)
+    expect(configDrawerOf(wrapper).props('bibleError')).toBe('server exploded')
+  })
+
+  it('Bible: a permission-denied rejection maps to the shared friendly-error string', async () => {
+    const wrapper = await mountWithOneOrg({ bibleApiEnabled: false })
+    mockSetOrgBibleEnabled.mockImplementation(() =>
+      Promise.reject(Object.assign(new Error('denied'), { code: 'functions/permission-denied' })),
+    )
+    await openConfigDrawer(wrapper)
+
+    await wrapper.find('[data-testid="org-config-bible-checkbox"]').trigger('change')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('You do not have permission to perform this action.')
+  })
+
+  it('Bible (R301): an enabled org renders the row "Bible API" badge; a default-OFF org renders none', async () => {
+    mockListOrganizations.mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          organizations: [
+            makeOrg({ orgId: 'org-1', name: 'Grace Church', bibleApiEnabled: true }),
+            makeOrg({ orgId: 'org-2', name: 'Hope Church', bibleApiEnabled: false }),
+          ],
+        },
+      }),
+    )
+    const wrapper = await mountTab()
+    const rows = wrapper.findAll('tbody tr')
+
+    expect(rows[0]!.text()).toContain('Bible API')
+    expect(rows[1]!.text()).not.toContain('Bible API')
   })
 })
 
