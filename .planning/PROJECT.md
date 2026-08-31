@@ -8,6 +8,23 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
+## Current Milestone: v2.6 Per-Org Bible API Toggle & Manual Fallback
+
+**Goal:** Put Bible API access behind a per-organization on/off switch controlled from the Owner Console, and when it is off give that org a zero-cost manual path (BibleGateway deep-link + paste-the-passage-in) so scripture and congregational-reading features always work without passing pay-only, non-commercial API costs to users.
+
+**Target features:**
+- **Per-org Bible API toggle in the Owner Console** — a super-admin enables/disables Bible API access per church (Organizations tab → `OrgConfigDrawer`), backed by a super-admin-gated Cloud Function writing a master `Organization` field. Mirrors the v2.2 per-org AI enablement pattern. **Default OFF.**
+- **Single Bible-fetch choke point** — a new `scriptureApi.ts` dispatcher (the `isAiEnabled()` analog) unifies today's split ESV/NLT fetching and carries the per-org gate; server `esv`/`nlt` proxy branches enforce it too.
+- **Manual fallback when OFF** — "Open in BibleGateway" deep-link (any version) plus a paste-the-passage-in box whose text becomes the slide/reading content; LLM congregational split still runs on pasted text.
+- **Settings hides the Bible Translation selector** when the API is off for the org.
+
+**Key context / decisions:**
+- Promoted from backlog 999.3. ESV/NLT APIs are pay-only + non-commercial-licensed → the owner must be able to disable per church while every org keeps a working scripture path.
+- **Default OFF, no migration:** existing orgs (Berean) start disabled on rollout and use the BibleGateway/paste fallback until the owner enables them per-org — the intended cost-control posture. The manual path guarantees an OFF org is functional, not broken.
+- **Fallback = deep-link + paste (both).** Manual paste is offered **only when the API is OFF**; the auto-fetch experience is unchanged when ON.
+- Single super-admin master gate (no church-editable leaf) is sufficient for the cost-control goal.
+- Requirements R295–R301 in `.planning/REQUIREMENTS.md`. Architecture map: no existing single Bible-fetch choke point; toggle mirrors `setOrgAiEnabled`/`aiMasterEnabled`; BibleGateway link builder already in `src/utils/scripture.ts`.
+
 ## Shipped Milestone: v2.5 Invite Email & Non-Google Onboarding — ✅ SHIPPED 2026-08-31
 
 **Status:** Code-complete, audited PASSED (7/7 reqs, 4/4 integration seams), function deployed to production, and locally UAT'd (owner confirmed). No active milestone follows — run `/gsd-new-milestone` to start one. **Standing owner follow-ups:** deploy hosting (the client invite-UI/toggle/LoginView changes are live only in local dev), and complete Resend DNS domain verification so invite emails reach addresses other than the owner's own inbox.
@@ -375,7 +392,14 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-**v2.5 Invite Email & Non-Google Onboarding** — being scoped now. Every invited user receives an invite
+**v2.6 Per-Org Bible API Toggle & Manual Fallback** — being scoped now. A super-admin enables/disables the
+Bible API per church from the Owner Console (default OFF); a new `scriptureApi.ts` dispatcher carries the
+per-org gate (client + server esv/nlt branches). When OFF, scripture/congregational-reading UI offers an
+"Open in BibleGateway" deep-link plus a manual paste-the-passage-in box (any version), the LLM split runs
+on pasted text, and Settings hides the Bible Translation selector. Mirrors the v2.2 per-org AI pattern.
+Requirements R295–R301 in `.planning/REQUIREMENTS.md`.
+
+**v2.5 Invite Email & Non-Google Onboarding** — ✅ shipped 2026-08-31. Every invited user receives an invite
 email (reusing the Resend pattern); non-Google invitees get a Cloud-Function-provisioned Auth account + a
 "set your password" link so they can actually sign in, while Google/Gmail invitees get a "sign in with
 Google" notification. Wires the real flow into TeamView `onInvite`, adds a discoverable password path +
@@ -549,6 +573,13 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
+*Last updated: 2026-08-31 — started milestone v2.6 Per-Org Bible API Toggle & Manual Fallback (promoted
+from backlog 999.3; requirements R295–R301). A super-admin per-org Bible-API toggle in the Owner Console
+(default OFF, mirroring the v2.2 per-org AI pattern), a new `scriptureApi.ts` choke point carrying the gate
+(client + server esv/nlt branches), and a manual BibleGateway deep-link + paste-in fallback when OFF (any
+version, LLM split still runs on pasted text, Settings hides the Bible Translation selector). Skipped
+research (known architecture). Previous footer below.*
+
 *Last updated: 2026-08-31 after v2.5 milestone — SHIPPED Invite Email & Non-Google Onboarding (Phases
 99–100, R288–R294). Every TeamView invite sends a real email: Gmail/Google invitees get a "sign in with
 Google" notice; non-Google invitees get a Cloud-Function-provisioned Auth account + a

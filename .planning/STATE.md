@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.5
-milestone_name: Invite Email & Non-Google Onboarding
-status: completed
-stopped_at: "v2.5 SHIPPED, closed & archived (tag v2.5 + master PUSHED to GitHub). functions:sendInviteOnboardingEmail AND hosting both DEPLOYED to prod 2026-08-31 (live at worship-planner-bc515.web.app). ONLY remaining follow-up: Resend DNS domain verification (functions/DEPLOY-EMAIL-DOMAIN.md) — until done the onboarding@resend.dev test sender only delivers to the owner's own inbox. No active milestone — /gsd-new-milestone for the next."
-last_updated: "2026-08-31T16:35:00.000Z"
+milestone: v2.6
+milestone_name: Per-Org Bible API Toggle & Manual Fallback
+status: planning
+last_updated: "2026-08-31T16:53:50.289Z"
 last_activity: 2026-08-31
-last_activity_desc: "v2.5 completed + archived + tag/master pushed; function + hosting deployed to prod; Resend DNS verification is the sole remaining follow-up"
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
-  percent: 100
-current_phase: 100
-current_phase_name: invite-login-onboarding-wiring
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -1065,10 +1061,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v2.5 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-31 — Milestone v2.5 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-31 — Milestone v2.6 started
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
