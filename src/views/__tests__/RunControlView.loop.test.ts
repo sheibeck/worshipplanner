@@ -15,10 +15,17 @@
  * slotIndex 0 (loop.enabled, intervalSeconds:10) plus a non-looping SONG at
  * slotIndex 1 (for the item-change case), and a separate 1-slide looping
  * fixture for the single-slide no-op case.
+ *
+ * 106-REVIEW WR-01 addition: the useServiceAssembly mock now stashes the LIVE
+ * assembledSlideshow ref on H (H.assembledSlideshowRef) so a test can mutate
+ * it AFTER mount — this powers the WR-01 case (a looping item's slide count
+ * growing past 1 via a mid-run async render, with no navigation, must still
+ * arm the timer).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import type { Ref } from 'vue'
 import type { Service } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { BroadcastChannelLike, BroadcastChannelFactory } from '@/utils/runChannel'
@@ -112,10 +119,18 @@ const H = vi.hoisted(() => {
     threeSlideLoopingSlides,
     singleSlideLoopingService,
     singleSlideLoopingSlides,
+    // 106-REVIEW WR-01: exposed so a test can append a slide for the SAME
+    // slotIndex after mount, simulating a late-resolving async render.
+    fakeSlide,
     state: {
       service: threeSlideLoopingService(),
       slides: threeSlideLoopingSlides(),
     },
+    // 106-REVIEW WR-01: set by the useServiceAssembly mock factory below (at
+    // actual mount time) so a test can mutate .value AFTER mount to simulate
+    // an async render (e.g. PPTX deck) growing the CURRENT item's assembled
+    // slide count with no accompanying navigation.
+    assembledSlideshowRef: null as Ref<AssembledSlide[]> | null,
   }
 })
 
@@ -144,12 +159,20 @@ vi.mock('vue-router', () => ({
 vi.mock('@/composables/useServiceAssembly', async () => {
   const { ref } = await import('vue')
   return {
-    useServiceAssembly: () => ({
-      serviceId: ref('service-1'),
-      orgIdRef: ref('org-1'),
-      localService: ref(H.state.service as unknown as Service),
-      assembledSlideshow: ref(H.state.slides as unknown as AssembledSlide[]),
-    }),
+    useServiceAssembly: () => {
+      // 106-REVIEW WR-01: stash the LIVE ref on H so a test can mutate
+      // .value after mount (simulating a late-resolving async render) without
+      // needing a fresh mount — mirrors how the real assembledSlideshow
+      // computed changes underneath an already-mounted Run screen.
+      const assembledSlideshow = ref(H.state.slides as unknown as AssembledSlide[])
+      H.assembledSlideshowRef = assembledSlideshow
+      return {
+        serviceId: ref('service-1'),
+        orgIdRef: ref('org-1'),
+        localService: ref(H.state.service as unknown as Service),
+        assembledSlideshow,
+      }
+    },
   }
 })
 
@@ -414,5 +437,35 @@ describe('RunControlView — per-item loop (R306/R308)', () => {
     const afterResume = states(fake)
     expect(afterResume[afterResume.length - 1]!.index).toBe((indexAtBlack as number) + 1)
     expect(afterResume[afterResume.length - 1]!.blackout).toBe(false)
+  })
+
+  it('a looping item that starts at <=1 slide arms once its slide count grows past 1 with NO navigation — a mid-run async render (e.g. a PPTX deck) resolving late (106-REVIEW WR-01)', async () => {
+    useSingleSlideFixture()
+    const { wrapper, fake } = mountView()
+    await rehearseFake(wrapper)
+
+    expect(states(fake).map((m) => m.index)).toEqual([0])
+
+    // No navigation, no slide-count change yet: still correctly a no-op
+    // (matches the existing single-slide-no-op coverage).
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(states(fake).map((m) => m.index)).toEqual([0])
+
+    // Simulate the item's async render finishing mid-Run: two more slides
+    // resolve for the SAME item (slotIndex 0), growing it from 1 slide to 3
+    // with NO accompanying navigation — reconcileLoop must re-evaluate off
+    // the slide-count watch alone.
+    const grown = [
+      ...H.assembledSlideshowRef!.value,
+      H.fakeSlide('b', 0, 'Verse 2'),
+      H.fakeSlide('c', 0, 'Chorus'),
+    ]
+    H.assembledSlideshowRef!.value = grown as unknown as AssembledSlide[]
+    await vi.advanceTimersByTimeAsync(0)
+
+    // The timer is now armed with no navigation in between — a full interval
+    // later it auto-advances.
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(states(fake).map((m) => m.index)).toEqual([0, 1])
   })
 })

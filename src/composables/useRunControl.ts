@@ -1187,6 +1187,19 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   // Go-live/rehearse arms (live flips true with index already resolved);
   // End Service/End Rehearsal (live flips false) disarms.
   watch(live, reconcileLoop)
+  // 106-REVIEW WR-01: reconcileLoop() reads filmstrip.value.slides.length as a
+  // PLAIN function call from the triggers above — none of which fire when the
+  // CURRENT item's assembled slide count changes for a reason other than
+  // navigation (e.g. a PPTX/IMPORTED item's deck finishing its async render
+  // mid-Run, growing a looping item from <=1 slide, which correctly did not
+  // arm, past 1). Without this watch a looping item that starts short stays
+  // silently disarmed until the operator happens to navigate. Watching the
+  // slide count directly (not just currentSlotIndex/live) closes that gap in
+  // both directions — arms as soon as a looping item becomes multi-slide, and
+  // disarms if it later shrinks back to <=1 (advanceLoop's own guard already
+  // makes that direction a harmless no-op, but reconciling promptly is still
+  // correct).
+  watch(() => filmstrip.value.slides.length, reconcileLoop)
 
   /**
    * The active rail item's slides as { arrayIndex, label, isCurrent } — RunRail's
