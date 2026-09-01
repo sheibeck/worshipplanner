@@ -172,6 +172,26 @@ export interface ScriptureRef {
   verseEnd?: number
 }
 
+/**
+ * A single stage-plot marker (R313/R314/R315, Phase 107). `label` is free
+ * text and the source of truth (an owner may label a marker for a one-off
+ * speaker's mic); `kind` is an OPTIONAL light visual accent only — never a
+ * required constrained picker (107-CONTEXT.md). `zone` places the marker in
+ * exactly one of the two stage regions. `xPct`/`yPct` are percentages
+ * (0-100) of that zone's box, NOT pixels — this is what makes a saved
+ * position resize-stable and reload-exact (R314): a viewport resize simply
+ * recomputes pixel placement from the same stored percentage, with no
+ * refetch or recalculation step.
+ */
+export interface StageMarker {
+  id: string
+  label: string
+  kind?: 'instrument' | 'mic' | 'monitor' | 'other'
+  zone: 'onstage' | 'offstage'
+  xPct: number
+  yPct: number
+}
+
 export interface Service {
   id: string
   date: string
@@ -204,6 +224,28 @@ export interface Service {
     reminderEnabled: boolean | null
     reminderDaysBefore: number | null
     reminderSentAt: Timestamp | null
+  }
+  /**
+   * Visual stage plot for tech/sound (R313/R314/R315, Phase 107). Additive,
+   * optional, no-migration — mirrors `messaging`/`notes`/`loop`'s lifecycle
+   * exactly: absent on every service written before this field existed (old
+   * behavior, no backfill needed), and an emptied layout is set back to
+   * `undefined` and dropped by the existing `stripUndefined` save path before
+   * the Firestore write, so a raw `undefined` never reaches the document.
+   *
+   * Deliberately NOT a new top-level collection or subcollection (an earlier
+   * milestone ARCHITECTURE.md draft proposed a `stageLayouts/{serviceId}`
+   * collection + store — 107-CONTEXT.md supersedes that draft). Storing it
+   * here means the layout rides the service doc's existing read/write
+   * `firestore.rules`, its existing `onSnapshot`, and the existing autosave
+   * path — no new rules surface, no new Pinia store. This is also what
+   * RESOLVES the Phase-104 `STAGELAYOUTS-RESET-OBLIGATION` marker in
+   * `src/stores/orgScopedStores.ts`: because the layout lives on the service
+   * doc (owned by the already-reset services store), a church switch cannot
+   * leak a prior org's layout — there is no separate store to register.
+   */
+  stageLayout?: {
+    elements: StageMarker[]
   }
 }
 

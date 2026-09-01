@@ -27,16 +27,23 @@ import { useSongLyricsStore } from './songLyrics'
  *
  * Imported dynamically from auth.ts to avoid the auth <-> store import cycle.
  *
- * STAGELAYOUTS-RESET-OBLIGATION (Phase 104, R312 forward obligation for
- * Phase 107): Phase 107 adds a `stageLayouts` org-scoped store. When it
- * lands, its `unsubscribe...()` (or equivalent teardown) call MUST be added
- * to this function. Skipping this registration means a church switch (via
- * `selectOrg()`, `enterOrgAsSuperAdmin()`, or `exitSuperAdminView()`, all of
- * which call this function) will leak the PRIOR church's stage layout into
- * the newly-selected church's UI — the exact class of stale-data bug this
- * function exists to prevent for every other store below. Search this
- * codebase for the token `STAGELAYOUTS-RESET-OBLIGATION` to find this note
- * from Phase 107 planning/verification.
+ * STAGELAYOUTS-RESET-OBLIGATION — RESOLVED (Phase 107): the forward
+ * obligation Phase 104 left here (R312) assumed Phase 107 would add a
+ * `stageLayouts` org-scoped store needing its own teardown call in this
+ * function. It did not. Phase 107 stores the stage layout as an additive,
+ * optional field (`Service.stageLayout`) on the SERVICE document itself
+ * (107-CONTEXT.md, superseding an earlier ARCHITECTURE.md draft that
+ * proposed a separate `stageLayouts/{serviceId}` collection + store), owned
+ * end-to-end by `useServiceStore()`, whose `unsubscribeAll()` is already
+ * called above. There is NO separate org-scoped stage-layout store to
+ * register here, so a church switch (via `selectOrg()`,
+ * `enterOrgAsSuperAdmin()`, or `exitSuperAdminView()`, all of which call
+ * this function) cannot leak a prior church's stage layout — R312 is
+ * satisfied with NO code change to this function. The literal token
+ * `STAGELAYOUTS-RESET-OBLIGATION` is kept here (Phase 104 verification greps
+ * for it) purely as a resolved historical marker; do not add a new
+ * `useStageLayout*()` teardown call — confirming none was needed is the
+ * point of this resolution.
  */
 export function resetOrgScopedStores(): void {
   useServiceStore().unsubscribeAll()
