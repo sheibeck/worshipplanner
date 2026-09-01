@@ -1730,7 +1730,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore, ServiceLockedError, buildServiceSnapshot, type ServiceSnapshot } from '@/stores/services'
@@ -2341,9 +2341,28 @@ function onSectionChange(index: number, value: string) {
 // field is draft-locked by the existing services/{docId} storedStatus gate.
 const LOOP_INTERVAL_PRESETS = [5, 10, 15, 20, 30, 60] as const
 
+/** Deviation (Rule 2 — missing critical functionality, not in the original plan
+ *  action text): `loopPresetFor` is a PURE function of `slot.loop.intervalSeconds`
+ *  — the correct, spec'd behavior for the RELOAD/round-trip case (a persisted 45s
+ *  custom value must re-derive to "Custom…" with no extra state). But because it's
+ *  pure, explicitly picking "Custom…" from the dropdown while the CURRENT value
+ *  already equals one of the six presets — which is true immediately after
+ *  checking Loop (defaults to 10s) or after picking any preset — has ZERO visible
+ *  effect: the very next render re-derives back to the matching preset and the
+ *  custom input never reveals itself, silently breaking "selecting Custom reveals
+ *  the number input" for the single most common case. This Set tracks slots where
+ *  the operator has explicitly chosen Custom so the UI can honor that choice even
+ *  when intervalSeconds still matches a preset; it is UI-only, reset per-mount, and
+ *  never persisted, so it has no effect on the reload/round-trip contract — a fresh
+ *  mount still derives purely from `loopPresetFor`'s intervalSeconds mapping. Keyed
+ *  on the stable slot.id, mirroring `openRowMenuId`'s precedent. */
+const explicitCustomLoopSlotIds = reactive(new Set<string>())
+
 /** Checking initializes slot.loop = { enabled: true, intervalSeconds: 10 } when
  *  absent (R307 default 10s); unchecking sets enabled = false while RETAINING
- *  intervalSeconds so re-checking restores the last interval. */
+ *  intervalSeconds so re-checking restores the last interval. Clears any pending
+ *  "explicit Custom" choice on uncheck so a stale override can't outlive the row
+ *  being turned off and back on. */
 function onToggleLoop(index: number, checked: boolean) {
   if (!canEditService.value) return
   if (!localService.value) return
@@ -2357,14 +2376,18 @@ function onToggleLoop(index: number, checked: boolean) {
     }
   } else if (slot.loop) {
     slot.loop.enabled = false
+    explicitCustomLoopSlotIds.delete(slot.id)
   }
 }
 
 /** Maps a saved intervalSeconds back to its matching preset string, or 'custom' when
  *  it doesn't match one of the six presets — so a service saved with e.g. 45s (custom)
  *  correctly re-selects "Custom…" and pre-fills the number field with 45 on reload,
- *  never silently snapping to a nearest preset. */
+ *  never silently snapping to a nearest preset. Also honors an in-session explicit
+ *  Custom… selection (see explicitCustomLoopSlotIds above) even when intervalSeconds
+ *  still equals a preset. */
 function loopPresetFor(slot: ServiceSlot): string {
+  if (explicitCustomLoopSlotIds.has(slot.id)) return 'custom'
   const seconds = slot.loop?.intervalSeconds
   if (seconds != null && (LOOP_INTERVAL_PRESETS as readonly number[]).includes(seconds)) {
     return String(seconds)
@@ -2372,21 +2395,30 @@ function loopPresetFor(slot: ServiceSlot): string {
   return 'custom'
 }
 
-/** A numeric preset sets intervalSeconds to that number; selecting Custom leaves the
- *  current intervalSeconds untouched (so the number field pre-fills with it) and
- *  keeps enabled = true. */
+/** A numeric preset sets intervalSeconds to that number and clears any pending
+ *  explicit-Custom override; selecting Custom leaves the current intervalSeconds
+ *  untouched (so the number field pre-fills with it), keeps enabled = true, and
+ *  records the explicit-Custom override so the input reveals even when the current
+ *  value still matches a preset. Always reassigns a NEW `loop` object rather than
+ *  mutating a field in place: when the incoming numeric value already matches the
+ *  current intervalSeconds, an in-place field write is a no-op under Vue's
+ *  fine-grained reactivity and the `loopPresetFor`-driven select binding never
+ *  re-evaluates — a fresh object reference guarantees dependent template
+ *  expressions re-run every time. */
 function onLoopPresetChange(index: number, value: string) {
   if (!canEditService.value) return
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot?.loop) return
   if (value === 'custom') {
-    slot.loop.enabled = true
+    explicitCustomLoopSlotIds.add(slot.id)
+    slot.loop = { enabled: true, intervalSeconds: slot.loop.intervalSeconds }
     return
   }
+  explicitCustomLoopSlotIds.delete(slot.id)
   const parsed = Number(value)
   if (!Number.isNaN(parsed)) {
-    slot.loop.intervalSeconds = parsed
+    slot.loop = { enabled: true, intervalSeconds: parsed }
   }
 }
 
