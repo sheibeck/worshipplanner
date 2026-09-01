@@ -31,6 +31,7 @@
           @menu-action="onMenuAction"
           @edit-congregational="onEditCongregational"
           @edit-in-song="onEditInSongBadge"
+          @loop-change="(index, loop) => emit('loop-change', index, loop)"
         />
       </div>
     </div>
@@ -162,6 +163,9 @@ const emit = defineEmits<{
    *  R061: the payload is the flat index into `assembledSlideshow` that
    *  `PresentationViewer` should open on. */
   (e: 'present', startIndex: number): void
+  /** Per-item LOOP change (MISC/ANNOUNCEMENTS only) relayed up from SlideGrid;
+   *  ServiceEditorView persists it onto `slot.loop`. */
+  (e: 'loop-change', index: number, loop: NonNullable<ServiceSlot['loop']>): void
 }>()
 
 const router = useRouter()

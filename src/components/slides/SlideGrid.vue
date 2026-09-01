@@ -134,10 +134,20 @@
            (or, for background, on the minimal testid wrapper below) rather
            than on a padded child div — there is no padded child div left. -->
       <div
-        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl || showRemoveImportedControl"
+        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl || showRemoveImportedControl || canLoopSlot"
         class="mx-6 mt-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
         data-testid="slide-grid-group-media-panel"
       >
+        <!-- Per-item Loop (MISC/ANNOUNCEMENTS only) — relocated here from the
+             Service Order tab (owner 2026-09-01), sitting with the group's
+             "+ Add music" / "+ Add background" item controls. Never for Song. -->
+        <SlotLoopControl
+          v-if="canLoopSlot"
+          :slot="selectedSlot!"
+          :editable="true"
+          @change="(loop) => emit('loop-change', slotArrayIndex, loop)"
+        />
+
         <!-- Group music bar (25-06, R032). Emit-only control; this component
              intercepts both events and writes the selected group's bed via
              the slideGroups store's scoped write (the sole surviving
@@ -380,6 +390,7 @@ import SlideCard from './SlideCard.vue'
 import SlideGroupMusicControl from './SlideGroupMusicControl.vue'
 import BackgroundControl from './BackgroundControl.vue'
 import SlideDropTarget from './SlideDropTarget.vue'
+import SlotLoopControl from './SlotLoopControl.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import { resolveDrop, UNSUPPORTED_FILE_MESSAGE } from './dropRouting'
 import {
@@ -448,6 +459,14 @@ const emit = defineEmits<{
    * actually carries a `songId`.
    */
   'edit-in-song': [songId: string]
+  /**
+   * The per-item LOOP control changed (owner 2026-09-01: loop authoring moved
+   * here from the Service Order tab, and only for MISC/ANNOUNCEMENTS items —
+   * never Song). Carries the selected slot's raw array index + the new loop
+   * object; SlidesTab relays it to ServiceEditorView, which persists it onto
+   * `slot.loop` through the existing autosave path.
+   */
+  'loop-change': [index: number, loop: NonNullable<ServiceSlot['loop']>]
 }>()
 
 const slideGroupsStore = useSlideGroups()
@@ -498,6 +517,10 @@ const groupTitle = computed(() => {
  * prop; no new prop is threaded (30-03-PLAN.md key_links).
  */
 const isSongGroup = computed(() => props.selectedSlot?.kind === 'SONG')
+// Loop is only ever offered for MISC and ANNOUNCEMENTS items — never Song
+// (owner 2026-09-01). Editor-only + draft-locked like every other write here.
+const isLoopableSlot = computed(() => props.selectedSlot?.kind === 'MISC' || props.selectedSlot?.kind === 'ANNOUNCEMENTS')
+const canLoopSlot = computed(() => isLoopableSlot.value && props.isEditor && !props.serviceLocked)
 
 /**
  * The SONG group's own song id, read straight off the selected slot (a

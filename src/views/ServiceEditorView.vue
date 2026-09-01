@@ -90,27 +90,37 @@
                 </svg>
                 {{ statusLabel }}
               </span>
-              <!-- R261/R275: Run entry point. A primary CTA sitting next to the
-                   status pill on a LOCKED service, reachable by ANY authenticated
-                   member — editor OR viewer — because running is presentation-only
-                   (v-if gates on canRunService = isLocked && orgId, deliberately
-                   NOT canEditService/isEditor). Absent (not merely disabled) on a
-                   draft and for an org-less user. Placed here in the header flex
-                   row, NOT in the isEditor-gated lock banner below, so viewers are
-                   never locked out of Run (95-UI-SPEC § 7). -->
-              <button
-                v-if="canRunService"
-                type="button"
-                data-testid="run-service-btn"
-                aria-label="Run this service live"
-                class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md px-4 py-2 text-sm font-medium inline-flex items-center gap-2"
-                @click="onRun"
+
+              <!-- Save-status ("Saving…/Saved HH:MM" + Undo) RELOCATED here beside
+                   the status pill (owner 2026-09-01): it used to sit in its own
+                   `sticky top-0` bar above the tab content, where toggling its
+                   chrome on each save reflowed the whole screen. In this header
+                   row — whose height is already set by the pill/Run button — its
+                   appearance no longer moves the body. All the invariants the old
+                   spot carried are preserved verbatim: the SAME testid + host, the
+                   SAME `canEditService && congregationalSlotIndex === null` gate
+                   (keeps the aria-live region MOUNTED at idle for R041/34-10, and
+                   avoids the congregational-modal double-region collision, 34-07),
+                   the SAME idle class list (`flex items-center gap-2`, no chrome),
+                   and the Undo link still nested inside the bar. Only the active
+                   chrome drops `sticky/z/mb` — it's inline now, not a top bar. -->
+              <div
+                v-if="canEditService && congregationalSlotIndex === null"
+                :class="['flex items-center gap-2', serviceSaveStatusVisible
+                  ? 'rounded-md border border-gray-800 bg-gray-900 px-3 py-1'
+                  : '']"
+                data-testid="service-save-status-bar"
               >
-                <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
-                  <path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.34-5.89a1.5 1.5 0 000-2.54L6.3 2.84z" />
-                </svg>
-                Run
-              </button>
+                <SaveStatusIndicator :surface-id="`service:${serviceId}`" />
+                <button
+                  v-if="previousService"
+                  type="button"
+                  data-testid="undo-link"
+                  title="Undo last save (Ctrl+Z)"
+                  class="text-xs text-indigo-400 hover:text-indigo-300 underline transition-colors"
+                  @click="onUndo"
+                >Undo</button>
+              </div>
             </div>
           </div>
 
@@ -142,6 +152,42 @@
               Mark as Planned
             </button>
 
+            <!-- Print for tech (landscape B&W stage plot), only on the Stage
+                 Layout tab. NOT gated on canEditService — printing is read-only,
+                 so it works on a locked/planned service too. Sits AFTER Mark as
+                 Planned so the lifecycle button leads, consistent with the other
+                 tabs (owner 2026-09-01). -->
+            <button
+              v-if="activeTab === 'stage'"
+              type="button"
+              data-testid="stage-print-btn"
+              class="print:hidden inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+              @click="printStageLayout"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a1 1 0 001-1v-4a1 1 0 00-1-1H9a1 1 0 00-1 1v4a1 1 0 001 1zm8-12V5a2 2 0 00-2-2H7a2 2 0 00-2 2v4h14z" />
+              </svg>
+              Print for tech
+            </button>
+
+            <!-- Share stage layout (landscape stage-only public link), only on
+                 the Stage Layout tab. Editor-gated like the Service Order Share
+                 (a share denormalizes editor-only snapshot data). Distinct from
+                 the action-bar Share, which shares the whole service PLAN. -->
+            <button
+              v-if="activeTab === 'stage' && authStore.isEditor"
+              type="button"
+              data-testid="stage-share-btn"
+              :disabled="isSharing"
+              class="print:hidden inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50"
+              @click="onShareStage"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              {{ stageShareLabel }}
+            </button>
+
             <!-- 36-03 (R068): the one shared, declarative action bar
                  (ContextualActionBar.vue / buildActionBarItems, 36-02)
                  replaces the four unconditional buttons this comment block
@@ -152,6 +198,28 @@
                  the Slides tab is active, immediately left of Save, driven
                  by `slidesTabRef`. -->
             <ContextualActionBar :items="activeActionItems" />
+
+            <!-- R261/R275: Run entry point — relocated (owner 2026-09-01) from
+                 beside the status pill into this right-hand button cluster with
+                 the other context-sensitive actions, kept as the one filled-
+                 indigo PRIMARY so it stands out (Review Slides is secondary).
+                 Reachable by ANY authenticated member — editor OR viewer —
+                 because running is presentation-only: gated on canRunService
+                 (isLocked && orgId), deliberately NOT canEditService/isEditor.
+                 Absent (not disabled) on a draft / for an org-less user. -->
+            <button
+              v-if="canRunService"
+              type="button"
+              data-testid="run-service-btn"
+              aria-label="Run this service live"
+              class="print:hidden inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+              @click="onRun"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                <path d="M6.3 2.84A1.5 1.5 0 004 4.11v11.78a1.5 1.5 0 002.3 1.27l9.34-5.89a1.5 1.5 0 000-2.54L6.3 2.84z" />
+              </svg>
+              Run
+            </button>
           </div>
         </div>
 
@@ -219,82 +287,16 @@
           </span>
         </div>
 
-        <!-- 32-05/32-UI-SPEC § 3: sticky save-status bar, mutually exclusive
-             with the lock banner below (canEditService vs isLocked).
-
-             34-10 (UAT F4) — repro: mark the service Planned, reopen it for
-             editing, land on this element rendered with a full border/
-             background/padding and nothing inside it (SaveStatusIndicator's
-             idle branch renders nothing) — an empty bordered box pinned to
-             the top of the scrollport.
-
-             Rule being honored: 31-UI-SPEC E5, "don't render an empty box",
-             already applied here by SlideGrid.vue:68-73 and :84-90 via
-             `v-if` on the wrapper.
-
-             Why THIS wrapper diverges from that mechanism: it contains the
-             aria-live region below. Assistive technology announces
-             MUTATIONS to a region it is already monitoring, not content a
-             region was created already holding — unmounting this wrapper at
-             idle (the v-if approach) would cost the first status
-             announcement of every session, a real R041 regression traded
-             for a cosmetic fix. So `v-if="canEditService"` stays (a viewer
-             or a locked service still renders nothing here — a permission
-             concern, not a status one), and instead only the CHROME is
-             conditional on `serviceSaveStatusVisible`: at idle the element
-             carries no classes at all — no border, no background, no
-             padding, no margin, no sticky positioning — an empty block
-             element around an empty block element, contributing zero
-             height. The box is the chrome; removing the chrome removes the
-             box and keeps the region mounted.
-
-             34-07 (T-34-07-06) — ADDITIONALLY requires
-             `congregationalSlotIndex === null`. A Teleported modal leaves
-             this page mounted underneath it, and the clause above already
-             keeps this region mounted at idle (34-10), so without this
-             extra condition the congregational-editor modal's own
-             SaveStatusIndicator (same `service:{serviceId}` surface id)
-             would coexist with this one — two polite live regions carrying
-             identical text, which double-announce and make a
-             `[data-testid="save-status"]` selector ambiguous about which
-             node it matched. Do NOT "simplify" this back to a permission-only
-             gate, and do NOT fix the collision by giving the modal a
-             different surface id — that would create two DISAGREEING
-             statuses instead, which is worse.
-
-             R102 (48-03): the wrapper's `flex items-center gap-2` is now
-             UNCONDITIONAL (previously part of the serviceSaveStatusVisible
-             ternary) so the relocated Undo link lays out correctly beside
-             SaveStatusIndicator even at idle — only border/background/
-             padding/sticky/mb-3 stay conditional on there being a status to
-             report. This does not reintroduce the 31-UI-SPEC E5 empty-box
-             regression: SaveStatusIndicator renders nothing visible at idle
-             and the Undo link is `v-if="previousService"`-gated, so an idle
-             service with no undo-able snapshot still renders a
-             zero-visible-chrome `<div>`. -->
-        <div
-          v-if="canEditService && congregationalSlotIndex === null"
-          :class="['flex items-center gap-2', serviceSaveStatusVisible
-            ? 'sticky top-0 z-10 mb-3 rounded-md border border-gray-800 bg-gray-900 px-4 py-2'
-            : '']"
-          data-testid="service-save-status-bar"
-        >
-          <SaveStatusIndicator :surface-id="`service:${serviceId}`" />
-          <!-- R102 (48-03): Undo relocated here from the header Save area —
-               same gate (previousService; the wrapper already carries
-               canEditService, so the redundant `canEditService &&` prefix is
-               dropped), same onUndo handler, same Ctrl+Z keybinding, now
-               rendered as a link beside the save-status text instead of a
-               bordered button among the primary actions. -->
-          <button
-            v-if="previousService"
-            type="button"
-            data-testid="undo-link"
-            title="Undo last save (Ctrl+Z)"
-            class="text-xs text-indigo-400 hover:text-indigo-300 underline transition-colors"
-            @click="onUndo"
-          >Undo</button>
-        </div>
+        <!-- Save-status bar RELOCATED (owner 2026-09-01) up into the header
+             row beside the status pill — see the block after the status pill
+             above. It used to live HERE as a `sticky top-0` bar whose chrome
+             toggled on every save and reflowed the tab content; moving it into
+             the fixed-height header removes that reflow. All of its invariants
+             (same testid/host, the canEditService && congregationalSlotIndex ===
+             null gate that keeps the aria-live region mounted at idle for
+             R041/34-10 and dodges the congregational-modal double-region
+             collision of 34-07, the idle `flex items-center gap-2` class list,
+             and the nested Undo link) moved WITH it. -->
 
         <!-- D-05/D-06: THE lock banner. One element, rendered once, and its
              "once" is guaranteed structurally — it sits here, outside all three
@@ -1297,63 +1299,10 @@
                 <p v-if="!(slot as ImportedSlot).importId" class="text-sm text-gray-400 italic">Imported Slides — Empty</p>
               </template>
 
-              <!-- Loop checkbox row (R306/R307, Phase 106): editor-only, draft-locked
-                   like every other slot field — a field on the existing `slots` array,
-                   no new save path or rules surface. Markup lifted verbatim from
-                   106-UI-SPEC.md "Component Inventory § 1. Loop checkbox row": checkbox
-                   class is byte-for-byte the PC-Teams checkbox class, the <select> class
-                   is byte-for-byte the Bible-version selector class, and the custom-
-                   seconds <input> mirrors the HYMN text-input token narrowed to w-20.
-                   Mutations route through localService.value.slots[index] exactly like
-                   onSectionChange — the existing single useAutoSave(localService, ...)
-                   deep-watch is the only persistence path; no new save call is added. -->
-              <div v-if="canEditService" class="flex items-center gap-2" data-testid="slot-loop-row">
-                <label class="flex items-center gap-2 text-sm text-gray-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    :checked="slot.loop?.enabled ?? false"
-                    class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
-                    data-testid="slot-loop-checkbox"
-                    @change="onToggleLoop(index, ($event.target as HTMLInputElement).checked)"
-                  />
-                  Loop
-                </label>
-
-                <!-- interval control: only rendered when loop.enabled -->
-                <template v-if="slot.loop?.enabled">
-                  <span class="text-xs text-gray-400">Every</span>
-                  <select
-                    :value="loopPresetFor(slot)"
-                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    data-testid="slot-loop-preset"
-                    aria-label="Loop interval"
-                    @change="onLoopPresetChange(index, ($event.target as HTMLSelectElement).value)"
-                  >
-                    <option value="5">5s</option>
-                    <option value="10">10s (default)</option>
-                    <option value="15">15s</option>
-                    <option value="20">20s</option>
-                    <option value="30">30s</option>
-                    <option value="60">60s</option>
-                    <option value="custom">Custom…</option>
-                  </select>
-
-                  <input
-                    v-if="loopPresetFor(slot) === 'custom'"
-                    type="number"
-                    min="1"
-                    max="3600"
-                    step="1"
-                    :value="slot.loop?.intervalSeconds"
-                    placeholder="Seconds"
-                    class="w-20 rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-                    data-testid="slot-loop-custom-seconds"
-                    aria-label="Custom loop interval in seconds"
-                    title="Enter 1–3600 seconds"
-                    @blur="onLoopCustomBlur(index, ($event.target as HTMLInputElement).value)"
-                  />
-                </template>
-              </div>
+              <!-- Loop authoring RELOCATED (owner 2026-09-01) out of the Service
+                   Order plan into the Slide editor (SlideGrid header), and ONLY
+                   for MISC/ANNOUNCEMENTS items — never Song. See onSlotLoopChange
+                   + SlotLoopControl.vue. -->
 
                 <!-- Consolidated notes-canonical field (260811-vsr): written ONCE for
                      every kind, now FULL-WIDTH and stacked in the field column (walks
@@ -1577,6 +1526,7 @@
             :ensure-group-materialized="ensureGroupMaterialized"
             @navigate-to-scripture-editor="handleNavigateToScriptureEditor"
             @present="onPresent"
+            @loop-change="onSlotLoopChange"
           />
           <PresentationViewer
             v-if="presenting"
@@ -1604,6 +1554,8 @@
             v-if="localService"
             :elements="localService.stageLayout?.elements ?? []"
             :editable="canEditService"
+            :band-roles="stageBandRoles"
+            :assignable-people="stageServingAssignments"
             @add="onStageMarkerAdd"
             @update="onStageMarkerUpdate"
             @remove="onStageMarkerRemove"
@@ -1733,9 +1685,16 @@
   </AppShell>
   </div>
 
-  <!-- Print layout: hidden on screen, visible when printing -->
+  <!-- Print layout: hidden on screen, visible when printing. Swapped out while
+       printing the stage-only landscape sheet so the two don't both print. -->
   <ServicePrintLayout
-    v-if="localService"
+    v-if="localService && !stagePrintMode"
+    :service="localService"
+  />
+
+  <!-- Stage-only landscape B&W print sheet for the tech team (stagePrintMode). -->
+  <StageLayoutPrintDocument
+    v-if="localService && stagePrintMode"
     :service="localService"
   />
 
@@ -1774,7 +1733,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore, ServiceLockedError, buildServiceSnapshot, type ServiceSnapshot } from '@/stores/services'
@@ -1801,6 +1760,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import MiscLabelBadge from '@/components/MiscLabelBadge.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
+import StageLayoutPrintDocument from '@/components/stage/StageLayoutPrintDocument.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
 import StageLayoutEditor from '@/components/stage/StageLayoutEditor.vue'
@@ -2388,105 +2348,18 @@ function onSectionChange(index: number, value: string) {
 }
 
 // ── Per-item loop authoring (R306/R307, Phase 106) ──────────────────────────────
-// Each handler mutates `localService.value.slots[index]` directly (mirrors
-// onSectionChange above) so persistence rides the EXISTING single
-// useAutoSave(localService, ...) deep-watch — no new save call is added, and the
-// field is draft-locked by the existing services/{docId} storedStatus gate.
-const LOOP_INTERVAL_PRESETS = [5, 10, 15, 20, 30, 60] as const
-
-/** Deviation (Rule 2 — missing critical functionality, not in the original plan
- *  action text): `loopPresetFor` is a PURE function of `slot.loop.intervalSeconds`
- *  — the correct, spec'd behavior for the RELOAD/round-trip case (a persisted 45s
- *  custom value must re-derive to "Custom…" with no extra state). But because it's
- *  pure, explicitly picking "Custom…" from the dropdown while the CURRENT value
- *  already equals one of the six presets — which is true immediately after
- *  checking Loop (defaults to 10s) or after picking any preset — has ZERO visible
- *  effect: the very next render re-derives back to the matching preset and the
- *  custom input never reveals itself, silently breaking "selecting Custom reveals
- *  the number input" for the single most common case. This Set tracks slots where
- *  the operator has explicitly chosen Custom so the UI can honor that choice even
- *  when intervalSeconds still matches a preset; it is UI-only, reset per-mount, and
- *  never persisted, so it has no effect on the reload/round-trip contract — a fresh
- *  mount still derives purely from `loopPresetFor`'s intervalSeconds mapping. Keyed
- *  on the stable slot.id, mirroring `openRowMenuId`'s precedent. */
-const explicitCustomLoopSlotIds = reactive(new Set<string>())
-
-/** Checking initializes slot.loop = { enabled: true, intervalSeconds: 10 } when
- *  absent (R307 default 10s); unchecking sets enabled = false while RETAINING
- *  intervalSeconds so re-checking restores the last interval. Clears any pending
- *  "explicit Custom" choice on uncheck so a stale override can't outlive the row
- *  being turned off and back on. */
-function onToggleLoop(index: number, checked: boolean) {
+// The loop UI + its logic now live in SlotLoopControl.vue, rendered in the Slide
+// editor (SlideGrid header) for MISC/ANNOUNCEMENTS items only (owner 2026-09-01;
+// never on the Service Order plan, never for Song). SlidesTab relays the
+// control's `change` up here as `loop-change(index, loop)`. This handler just
+// persists it onto `slot.loop`, riding the EXISTING single useAutoSave deep-watch
+// — no new save call, and draft-locked by the existing storedStatus gate.
+function onSlotLoopChange(index: number, loop: NonNullable<ServiceSlot['loop']>) {
   if (!canEditService.value) return
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot) return
-  if (checked) {
-    if (!slot.loop) {
-      slot.loop = { enabled: true, intervalSeconds: 10 }
-    } else {
-      slot.loop.enabled = true
-    }
-  } else if (slot.loop) {
-    slot.loop.enabled = false
-    explicitCustomLoopSlotIds.delete(slot.id)
-  }
-}
-
-/** Maps a saved intervalSeconds back to its matching preset string, or 'custom' when
- *  it doesn't match one of the six presets — so a service saved with e.g. 45s (custom)
- *  correctly re-selects "Custom…" and pre-fills the number field with 45 on reload,
- *  never silently snapping to a nearest preset. Also honors an in-session explicit
- *  Custom… selection (see explicitCustomLoopSlotIds above) even when intervalSeconds
- *  still equals a preset. */
-function loopPresetFor(slot: ServiceSlot): string {
-  if (explicitCustomLoopSlotIds.has(slot.id)) return 'custom'
-  const seconds = slot.loop?.intervalSeconds
-  if (seconds != null && (LOOP_INTERVAL_PRESETS as readonly number[]).includes(seconds)) {
-    return String(seconds)
-  }
-  return 'custom'
-}
-
-/** A numeric preset sets intervalSeconds to that number and clears any pending
- *  explicit-Custom override; selecting Custom leaves the current intervalSeconds
- *  untouched (so the number field pre-fills with it), keeps enabled = true, and
- *  records the explicit-Custom override so the input reveals even when the current
- *  value still matches a preset. Always reassigns a NEW `loop` object rather than
- *  mutating a field in place: when the incoming numeric value already matches the
- *  current intervalSeconds, an in-place field write is a no-op under Vue's
- *  fine-grained reactivity and the `loopPresetFor`-driven select binding never
- *  re-evaluates — a fresh object reference guarantees dependent template
- *  expressions re-run every time. */
-function onLoopPresetChange(index: number, value: string) {
-  if (!canEditService.value) return
-  if (!localService.value) return
-  const slot = localService.value.slots[index]
-  if (!slot?.loop) return
-  if (value === 'custom') {
-    explicitCustomLoopSlotIds.add(slot.id)
-    slot.loop = { enabled: true, intervalSeconds: slot.loop.intervalSeconds }
-    return
-  }
-  explicitCustomLoopSlotIds.delete(slot.id)
-  const parsed = Number(value)
-  if (!Number.isNaN(parsed)) {
-    slot.loop = { enabled: true, intervalSeconds: parsed }
-  }
-}
-
-/** Silent-normalize idiom (106-UI-SPEC.md's error row): non-numeric/empty/out-of-range
- *  clamps to the nearest valid 1–3600 value on blur — no toast, no banner, and no
- *  invalid intervalSeconds is ever persisted. */
-function onLoopCustomBlur(index: number, rawValue: string) {
-  if (!canEditService.value) return
-  if (!localService.value) return
-  const slot = localService.value.slots[index]
-  if (!slot?.loop) return
-  const parsed = Number(rawValue)
-  const fallback = slot.loop.intervalSeconds ?? 10
-  const base = rawValue.trim() !== '' && Number.isFinite(parsed) ? parsed : fallback
-  slot.loop.intervalSeconds = Math.min(3600, Math.max(1, Math.round(base)))
+  slot.loop = loop
 }
 
 // ── Stage Layout authoring (R313/R314, Phase 107) ───────────────────────────
@@ -4059,6 +3932,34 @@ function onPrint() {
   window.print()
 }
 
+// ── Stage Layout print (quick task 2026-09-01) ──────────────────────────────
+// A dedicated LANDSCAPE, black-and-white print of just the stage plot for the
+// tech team, distinct from the whole-service ServicePrintLayout (portrait).
+// While active, `stagePrintMode` swaps ServicePrintLayout out for the
+// StageLayoutPrintDocument and a temporary `@page { size: landscape }` rule is
+// injected (removed on afterprint) so it doesn't disturb the normal portrait
+// service print. Works whether the service is a draft or locked/planned —
+// printing is read-only, so this is NOT gated on canEditService.
+const stagePrintMode = ref(false)
+async function printStageLayout() {
+  stagePrintMode.value = true
+  const style = document.createElement('style')
+  style.id = 'stage-print-landscape'
+  style.textContent = '@page { size: landscape; margin: 0.4in; }'
+  document.head.appendChild(style)
+  const cleanup = () => {
+    stagePrintMode.value = false
+    document.getElementById('stage-print-landscape')?.remove()
+    window.removeEventListener('afterprint', cleanup)
+  }
+  window.addEventListener('afterprint', cleanup)
+  await nextTick()
+  window.print()
+  // Fallback in case afterprint never fires (keeps the app from being stuck in
+  // stage-print mode); harmless if cleanup already ran.
+  setTimeout(cleanup, 2000)
+}
+
 async function checkForExistingPlan() {
   if (!authStore.pcCredentials || !exportSelectedServiceTypeId.value || !localService.value?.date) {
     existingPlan.value = null
@@ -4568,6 +4469,39 @@ async function onShare() {
   }
 }
 
+// ── Share stage layout (quick task 2026-09-01) ──────────────────────────────
+// Same token + share doc as the plan share (createShareToken), but the copied
+// link carries `?view=stage`, which ShareView renders as a landscape,
+// stage-only public page. Shares the `isSharing` re-entrancy guard with onShare
+// (only one share write in flight at a time); its own `stageShareCopied` drives
+// the button label independently of the action-bar Share.
+const stageShareCopied = ref(false)
+const stageShareLabel = computed(() =>
+  isSharing.value ? 'Sharing...' : stageShareCopied.value ? 'Link copied!' : shareError.value ? shareError.value : 'Share stage layout',
+)
+async function onShareStage() {
+  if (!localService.value || !serviceStore.orgId) return
+  if (isSharing.value) return
+  isSharing.value = true
+  try {
+    const token = await serviceStore.createShareToken(localService.value, serviceStore.orgId)
+    const url = `${window.location.origin}/share/${token}?view=stage`
+    await navigator.clipboard.writeText(url)
+    stageShareCopied.value = true
+    setTimeout(() => {
+      stageShareCopied.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('Stage share failed:', err)
+    shareError.value = 'Failed to create share link'
+    setTimeout(() => {
+      shareError.value = null
+    }, 3000)
+  } finally {
+    isSharing.value = false
+  }
+}
+
 // ── Roles tab (Task 2) ──────────────────────────────────────────────────────────
 // Editor-only: resolvedRoleAssignments/hasQuarterForServiceDate return empty/false
 // for non-editors since rosterStore/quartersStore were never subscribed (Task 1).
@@ -4580,6 +4514,26 @@ const resolvedRoleAssignments = computed<ResolvedRoleAssignment[]>(() => {
 const hasQuarterForServiceDate = computed(() => {
   if (!authStore.isEditor || !localService.value) return false
   return findQuarterForDate(quartersStore.quarters, localService.value.date) !== undefined
+})
+
+// The org's Band roles — the Stage Layout tab's Instruments palette mirrors
+// these so a marker's instrument lines up with the role a person plays.
+const stageBandRoles = computed<{ id: string; name: string }[]>(() =>
+  rosterStore.roles.filter((r) => r.group === 'band').map((r) => ({ id: r.id, name: r.name })),
+)
+
+// One entry per person-in-a-role serving this service — the Stage Layout tab's
+// pick-a-person source, shown as "Name - Role" so a person can be lined up with
+// the instrument (role) they play instead of hand-typing a label.
+const stageServingAssignments = computed<{ id: string; name: string; roleId: string; roleName: string }[]>(() => {
+  const out: { id: string; name: string; roleId: string; roleName: string }[] = []
+  for (const assignment of resolvedRoleAssignments.value) {
+    const roleName = rosterStore.roles.find((r) => r.id === assignment.roleId)?.name ?? assignment.roleId
+    for (const id of assignment.effectivePersonIds) {
+      out.push({ id, name: rosterStore.people.find((p) => p.id === id)?.name ?? id, roleId: assignment.roleId, roleName })
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name) || a.roleName.localeCompare(b.roleName))
 })
 
 function effectiveNames(assignment: ResolvedRoleAssignment): string[] {

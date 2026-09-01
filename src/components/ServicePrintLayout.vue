@@ -101,13 +101,11 @@
       <p class="whitespace-pre-wrap">{{ props.service.notes }}</p>
     </div>
 
-    <!-- Stage Layout section (R315): live, authenticated-editor read from
-         props.service — no snapshot needed here and no new access. Omitted
-         entirely when there are no markers. -->
-    <div v-if="props.service.stageLayout?.elements?.length" class="mt-4 break-inside-avoid">
-      <p class="text-sm font-semibold text-gray-700 mb-1">Stage Layout</p>
-      <StageLayoutView :elements="props.service.stageLayout.elements" theme="light" />
-    </div>
+    <!-- The stage layout is intentionally NOT part of the service-plan print
+         (owner 2026-09-01). It has its own dedicated "Print for tech" button on
+         the Stage Layout tab, which prints a landscape B&W plot; duplicating it
+         on the portrait service plan just wastes a page for the roster/order
+         audience this sheet is for. -->
 
     <!-- Footer -->
     <p class="text-xs text-gray-400 mt-6 pt-2 border-t border-gray-200">
@@ -121,7 +119,6 @@ import { computed } from 'vue'
 import type { Service, HymnSlot, ScriptureRef, ServiceSlot, NonAssignableSlot } from '@/types/service'
 import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
-import StageLayoutView from '@/components/stage/StageLayoutView.vue'
 
 const props = defineProps<{
   service: Service

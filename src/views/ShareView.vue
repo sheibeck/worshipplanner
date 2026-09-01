@@ -13,7 +13,25 @@
       </div>
     </div>
 
-    <!-- Service content -->
+    <!-- Stage-only LANDSCAPE view (?view=stage): deliberately wide (not the
+         plan's narrow max-w-2xl column) so the 16:10 room isn't squished into a
+         cramped width — modest margins, capped so it's not absurd on ultrawide. -->
+    <div v-else-if="serviceSnapshot && isStageView" class="mx-auto max-w-[1600px] px-6 py-8 sm:px-10">
+      <div class="mb-6">
+        <h1 class="text-xl font-bold text-gray-900">
+          Stage Layout <span class="font-normal text-gray-600">— {{ formattedDate }}</span>
+        </h1>
+      </div>
+      <div v-if="stageElements.length">
+        <StageLayoutView :elements="stageElements" theme="light" :print="true" />
+      </div>
+      <p v-else class="text-gray-500 text-sm">No stage layout has been set up for this service.</p>
+      <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
+        Shared from WorshipPlanner
+      </div>
+    </div>
+
+    <!-- Service plan content (portrait; stage layout is its own landscape share) -->
     <div v-else-if="serviceSnapshot" class="max-w-2xl mx-auto px-4 py-8 sm:px-6">
       <!-- Header -->
       <div class="mb-6">
@@ -110,14 +128,9 @@
         </div>
       </div>
 
-      <!-- Stage Layout section (R315): read-only from the frozen snapshot ONLY
-           — no new getDoc, no org-scoped read. Omitted entirely when the
-           snapshot has no layout or zero markers, mirroring the Who's
-           Serving section's roleAssignments?.length guard above. -->
-      <div v-if="serviceSnapshot.stageLayout?.elements?.length" class="mt-6 rounded-lg bg-gray-50 p-4">
-        <h2 class="text-sm font-semibold text-gray-700 mb-2">Stage Layout</h2>
-        <StageLayoutView :elements="serviceSnapshot.stageLayout.elements" theme="light" />
-      </div>
+      <!-- The stage layout is NOT on the portrait service-plan share (owner
+           2026-09-01) — it has its own landscape "Share stage layout" link
+           (?view=stage), rendered by the block above. -->
 
       <!-- Footer -->
       <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
@@ -148,9 +161,18 @@ void vwTypeLabels
 
 // ── State ───────────────────────────────────────────────────────────────────
 
+const route = useRoute()
 const isLoading = ref(true)
 const notFound = ref(false)
 const serviceSnapshot = ref<any>(null)
+
+// `?view=stage` renders a LANDSCAPE, stage-only public page (the "Share stage
+// layout" link) instead of the portrait service plan — the two are separated,
+// mirroring their separate print outputs.
+// Optional-chained: a real route always has a `query` object, but some test
+// route mocks omit it — never crash the whole share page over a missing query.
+const isStageView = computed(() => route.query?.view === 'stage')
+const stageElements = computed<any[]>(() => serviceSnapshot.value?.stageLayout?.elements ?? [])
 
 // ── Computed ────────────────────────────────────────────────────────────────
 
@@ -173,7 +195,13 @@ const teamsDisplay = computed(() => {
 // ── Mount ───────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
-  const route = useRoute()
+  // A stage-only share should print landscape too; inject the rule for this
+  // page only (this component instance renders either the plan OR the stage).
+  if (isStageView.value) {
+    const style = document.createElement('style')
+    style.textContent = '@page { size: landscape; margin: 0.4in; }'
+    document.head.appendChild(style)
+  }
   const token = route.params.token as string | undefined
   try {
     const snap = token

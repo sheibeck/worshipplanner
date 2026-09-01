@@ -2520,3 +2520,39 @@ describe('SlideGrid — remove imported slides action (group-level button, R106)
     expect(wrapper.find(REMOVE_SEL).exists()).toBe(false)
   })
 })
+
+describe('SlideGrid — per-item loop (MISC/ANNOUNCEMENTS only, owner 2026-09-01)', () => {
+  it('shows the loop control for a MISC item and an ANNOUNCEMENTS item', () => {
+    for (const kind of ['MISC', 'ANNOUNCEMENTS'] as const) {
+      const wrapper = mountGrid({ selectedSlot: makeSlot({ kind, id: 'x', position: 0 }) })
+      expect(wrapper.find('[data-testid="slot-loop-row"]').exists()).toBe(true)
+    }
+  })
+
+  it('NEVER shows the loop control for a Song item', () => {
+    const wrapper = mountGrid({
+      selectedSlot: makeSlot({ kind: 'SONG', id: 's', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never),
+    })
+    expect(wrapper.find('[data-testid="slot-loop-row"]').exists()).toBe(false)
+  })
+
+  it('does not show the loop control for other non-loopable kinds (PRAYER/MESSAGE)', () => {
+    for (const kind of ['PRAYER', 'MESSAGE'] as const) {
+      const wrapper = mountGrid({ selectedSlot: makeSlot({ kind, id: 'x', position: 0 }) })
+      expect(wrapper.find('[data-testid="slot-loop-row"]').exists()).toBe(false)
+    }
+  })
+
+  it('hides the loop control for a viewer and for a locked service', () => {
+    const misc = makeSlot({ kind: 'MISC', id: 'm', position: 0 })
+    expect(mountGrid({ selectedSlot: misc, isEditor: false }).find('[data-testid="slot-loop-row"]').exists()).toBe(false)
+    expect(mountGrid({ selectedSlot: misc, serviceLocked: true }).find('[data-testid="slot-loop-row"]').exists()).toBe(false)
+  })
+
+  it('emits loop-change with the slot array index and the new loop when toggled on', async () => {
+    const wrapper = mountGrid({ selectedSlot: makeSlot({ kind: 'MISC', id: 'm', position: 0 }), slotArrayIndex: 2 })
+    await wrapper.get('[data-testid="slot-loop-checkbox"]').setValue(true)
+    const emitted = wrapper.emitted('loop-change')!
+    expect(emitted[0]).toEqual([2, { enabled: true, intervalSeconds: 10 }])
+  })
+})

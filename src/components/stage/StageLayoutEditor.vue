@@ -1,51 +1,73 @@
 <script setup lang="ts">
 /**
- * Freeform drag canvas — the AUTHORING half of the visual stage layout
- * (R313/R314, Phase 107). The app's FIRST freeform-drag surface, built
- * deliberately on native Pointer Events (pointerdown/pointermove/pointerup +
- * setPointerCapture) — never Konva/interactjs/SortableJS/HTML5 DnD (STACK /
- * PITFALLS Pitfall 3: HTML5 DnD is mouse-only by spec and silently does not
- * fire on touch, which is exactly the device tech/sound volunteers use).
+ * The AUTHORING half of the visual stage layout (R313/R314, Phase 107),
+ * redesigned to the single-room "Nocturne" diagram: a left PALETTE of typed
+ * chips, one continuous room CANVAS (StageRoom), and — for editing a marker —
+ * the app's existing right-hand slide-over pattern (matching RoleSlideOver /
+ * TeamSlideOver: a Teleport modal with a backdrop and a buffered Save/Cancel
+ * form). Click a chip to drop a marker, drag it where it stands, click it to
+ * edit its label / assigned person / type / note.
  *
- * The parent owns `elements` — this component NEVER mutates the prop array
- * in place; every change round-trips through an emit (add/update/remove/move)
- * so the parent's existing single autosave path stays the one source of
- * truth (ServiceEditorView mutates `localService.value.stageLayout` on these
- * events, mirroring `onToggleLoop`/`onSectionChange`).
+ * Placement is FREE (never snapped to a grid): pointerup resolves the exact
+ * clamped `xPct/yPct` within the single room rect and derives the stored
+ * `zone` from that position. Still native Pointer Events (never
+ * Konva/interactjs/HTML5-DnD, which is mouse-only and dead on touch).
  *
- * Drag persists on POINTERUP ONLY: pointermove updates a transient pixel
- * delta (`dragState`) for the VISUAL position, never emits, never touches
- * the prop. pointerup resolves the containing zone via bounding-rect
- * containment (`zoneFromPoint`, falling back to the marker's current zone
- * when dropped outside both) and clamped `xPct/yPct` (`pctWithinRect` +
- * defensive `clampPct`), then emits exactly ONE `move` — no per-move write
- * storm (T-107-04). Each zone's `getBoundingClientRect()` is fetched fresh
- * at drag-START (pointerdown), never cached across mount or across a prior
- * drag interaction, so a resize/reflow between drags can never desync the
- * drop math (PITFALLS Pitfall 3).
+ * The parent owns `elements`; this component NEVER mutates the prop array —
+ * every change round-trips through an emit (add/update/remove/move) so the
+ * parent's single autosave path stays the one source of truth.
  *
- * A pointerdown->pointerup with no meaningful movement is a CLICK, not a
- * drag — it opens the edit popover instead of emitting `move`. The editable
- * zone containers deliberately do NOT set `overflow-hidden` (unlike the
- * read-only `StageLayoutView`, which does, for clean print/share framing) —
- * a dragged chip must be able to visually cross from one zone box into the
- * other while the pointer is down, and clipping it at the zone boundary
- * would defeat the entire "drag between zones" interaction.
+ * A marker can be named by picking a PERSON already serving this service (via
+ * `assignablePeople`, resolved from the service's role assignments) OR by a
+ * free-text LABEL — the label stays editable for a spot with no matching
+ * assigned person (a guest, a spare, gear). The kind's TYPE is always shown
+ * on the tile alongside the label, so a tile reads as both a name and a type.
  *
- * When `editable` is false (locked service), this component renders the
- * SAME shared read-only `StageLayoutView` used by share/print — no third
- * rendering path, no drag handles, no add/edit/delete controls.
+ * When `editable` is false (locked service) this renders the SAME shared
+ * read-only `StageLayoutView` used by share/print — no third rendering path.
  */
-import { ref, computed, nextTick, onUnmounted } from 'vue'
-import type { StageMarker } from '@/types/service'
-import { clampPct, pctWithinRect, zoneFromPoint, createMarker, markerKindAccentClass, MARKER_KINDS } from '@/utils/stageLayout'
-import StageLayoutView from '@/components/stage/StageLayoutView.vue'
-import StageMarkerChip from '@/components/stage/StageMarkerChip.vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import type { StageMarker, StageMarkerKind } from '@/types/service'
+import {
+  clampPct,
+  zoneFromPosition,
+  placementLabel,
+  createMarker,
+  buildStagePalette,
+  stagePaletteSkinClass,
+  stageMarkerIcon,
+  stageMarkerSkinClass,
+  stageTypeLabel,
+  isInstrumentKind,
+  type StagePaletteItem,
+} from '@/utils/stageLayout'
 
-const props = defineProps<{
-  elements: StageMarker[]
-  editable: boolean
-}>()
+interface ServingAssignment {
+  id: string
+  name: string
+  roleId: string
+  roleName: string
+}
+import StageRoom from '@/components/stage/StageRoom.vue'
+import StageMarkerChip from '@/components/stage/StageMarkerChip.vue'
+import StageKindIcon from '@/components/stage/StageKindIcon.vue'
+import StageLayoutView from '@/components/stage/StageLayoutView.vue'
+
+const props = withDefaults(
+  defineProps<{
+    elements: StageMarker[]
+    editable: boolean
+    /** The org's Band roles — the Instruments palette mirrors these so a
+     *  marker's instrument lines up with the role a person plays. */
+    bandRoles?: { id: string; name: string }[]
+    /** One entry per person-in-a-role serving this service (its resolved role
+     *  assignments) — the pick-a-person source, shown as "Name - Role". A
+     *  person in two roles appears twice. Empty when no one is assigned yet;
+     *  the free-text label is always available regardless. */
+    assignablePeople?: ServingAssignment[]
+  }>(),
+  { bandRoles: () => [], assignablePeople: () => [] },
+)
 
 const emit = defineEmits<{
   add: [marker: StageMarker]
@@ -54,137 +76,170 @@ const emit = defineEmits<{
   move: [payload: { id: string; zone: StageMarker['zone']; xPct: number; yPct: number }]
 }>()
 
-const KIND_LABELS: Record<(typeof MARKER_KINDS)[number], string> = {
-  instrument: 'Instrument',
-  mic: 'Mic',
-  monitor: 'Monitor',
-  other: 'Other',
-}
+const palette = computed(() => buildStagePalette(props.bandRoles))
+const roomComp = ref<InstanceType<typeof StageRoom> | null>(null)
 
-const onstageMarkers = computed(() => props.elements.filter((m) => m.zone === 'onstage'))
-const offstageMarkers = computed(() => props.elements.filter((m) => m.zone === 'offstage'))
-
-function accentClass(marker: StageMarker): string {
-  return markerKindAccentClass(marker.kind, 'dark')
-}
-
-// ── Add-marker flow ──────────────────────────────────────────────────────────
-const showAddForm = ref(false)
-const addForm = ref<{ label: string; kind: StageMarker['kind'] | ''; zone: StageMarker['zone'] }>({
-  label: '',
-  kind: '',
-  zone: 'onstage',
-})
-const addLabelInputEl = ref<HTMLInputElement | null>(null)
-// Defaults the NEXT add-marker form's zone toggle to whichever zone the user
-// last interacted with (an add, or a drag/move-zone), falling back to On
-// Stage on first open — 107-UI-SPEC's copywriting contract.
-const lastInteractedZone = ref<StageMarker['zone']>('onstage')
-
-async function openAddForm() {
-  addForm.value = { label: '', kind: '', zone: lastInteractedZone.value }
-  showAddForm.value = true
-  await nextTick()
-  addLabelInputEl.value?.focus()
-}
-
-function cancelAddForm() {
-  showAddForm.value = false
-}
-
-function submitAdd() {
-  const label = addForm.value.label.trim()
-  if (!label) return
-  const zone = addForm.value.zone
-  // IN-01: without an offset, adding two or three markers back-to-back (no
-  // drag between adds) stacks them exactly on top of each other at 50/50,
-  // which can look like the click did nothing. A small deterministic
-  // per-existing-marker offset (cycling every 5th marker so it never drifts
-  // off a sane center range) keeps sequential adds visually distinguishable
-  // before the user drags them apart, while a brand-new zone (0 markers)
-  // still lands at the exact 50/50 center this component's own tests pin.
-  const countInZone = props.elements.filter((m) => m.zone === zone).length
-  const offset = (countInZone % 5) * 4
+// ── Add from palette ────────────────────────────────────────────────────────
+// A dropped marker starts with NO free-text label (its type shows on the tile);
+// the planner names it or picks a person afterwards. A small deterministic
+// cascade off centre keeps back-to-back adds from stacking. The item carries
+// either a fixed `kind` or a band `roleId`/`roleName`.
+function onAddItem(item: StagePaletteItem) {
+  if (!props.editable) return
+  const n = props.elements.length
   const marker = createMarker({
-    label,
-    zone,
-    xPct: 50 + offset,
-    yPct: 50 + offset,
-    ...(addForm.value.kind ? { kind: addForm.value.kind } : {}),
+    label: '',
+    xPct: 47.5 + (n % 4) * 2.5,
+    yPct: 30 + (n % 4) * 2.5,
+    ...(item.kind ? { kind: item.kind } : {}),
+    ...(item.roleId && item.roleName ? { roleId: item.roleId, roleName: item.roleName } : {}),
   })
   emit('add', marker)
-  lastInteractedZone.value = zone
-  showAddForm.value = false
 }
 
-// ── Edit popover (label/kind/move-zone/remove-confirm) ─────────────────────
-const editingMarkerId = ref<string | null>(null)
-const editForm = ref<{ label: string; kind: StageMarker['kind'] | '' }>({ label: '', kind: '' })
-const showRemoveConfirm = ref(false)
-
-const editingMarker = computed(() => props.elements.find((m) => m.id === editingMarkerId.value) ?? null)
-
-function openEditPopover(marker: StageMarker) {
-  editingMarkerId.value = marker.id
-  editForm.value = { label: marker.label, kind: marker.kind ?? '' }
-  showRemoveConfirm.value = false
+// ── Edit slide-over (buffered form, matching RoleSlideOver) ──────────────────
+interface EditForm {
+  label: string
+  kind: StageMarkerKind | ''
+  roleId: string
+  roleName: string
+  note: string
+  personId: string
+  personName: string
+  withVocal: boolean
 }
 
-/** The chip's own delete icon jumps straight to the confirm row inside the
- *  same popover — a shortcut into the same single remove flow the popover's
- *  own trigger uses, not a second implementation. */
-function openRemoveConfirmDirect(marker: StageMarker) {
-  openEditPopover(marker)
-  showRemoveConfirm.value = true
-}
+const editingId = ref<string | null>(null)
+const editForm = ref<EditForm>({ label: '', kind: '', roleId: '', roleName: '', note: '', personId: '', personName: '', withVocal: false })
+const showDeleteConfirm = ref(false)
+const editingMarker = computed(() => props.elements.find((m) => m.id === editingId.value) ?? null)
+const drawerOpen = computed(() => editingMarker.value !== null)
+const placement = computed(() =>
+  editingMarker.value ? placementLabel(editingMarker.value.xPct, editingMarker.value.yPct) : '',
+)
 
-function closeEditPopover() {
-  editingMarkerId.value = null
-  showRemoveConfirm.value = false
-}
+// Whether the current type is an instrument (band role OR an Instruments-group
+// kind) — gates the "player also sings" checkbox and the "+ Vocal" label.
+const editIsInstrument = computed(() => !!editForm.value.roleId || isInstrumentKind(editForm.value.kind || undefined))
 
-function saveEdit() {
-  const current = editingMarker.value
-  if (!current) return
-  const label = editForm.value.label.trim()
-  if (!label) return
-  const updated: StageMarker = {
-    id: current.id,
-    label,
-    zone: current.zone,
-    xPct: current.xPct,
-    yPct: current.yPct,
-    ...(editForm.value.kind ? { kind: editForm.value.kind } : {}),
+// The Type <select> encodes a fixed kind as its key and a band role as
+// `role:<roleId>`, so one control offers both.
+const editTypeValue = computed<string>({
+  get: () => (editForm.value.roleId ? `role:${editForm.value.roleId}` : editForm.value.kind),
+  set: (value: string) => {
+    if (value.startsWith('role:')) {
+      const roleId = value.slice(5)
+      const role = props.bandRoles.find((r) => r.id === roleId)
+      editForm.value.roleId = roleId
+      editForm.value.roleName = role?.name ?? ''
+      editForm.value.kind = ''
+    } else {
+      editForm.value.kind = value as StageMarkerKind | ''
+      editForm.value.roleId = ''
+      editForm.value.roleName = ''
+    }
+  },
+})
+
+// Header preview marker (icon + skin) reflecting the buffered form.
+const headerMarker = computed(() => ({ kind: editForm.value.kind || undefined, roleName: editForm.value.roleName || undefined }))
+
+// Person picker: people serving this service, shown "Name - Role", with those
+// assigned to THIS marker's band role floated to the front (lining people up
+// with the instrument they play).
+const orderedPeople = computed<ServingAssignment[]>(() => {
+  const roleId = editForm.value.roleId
+  if (!roleId) return props.assignablePeople
+  const match = props.assignablePeople.filter((p) => p.roleId === roleId)
+  const rest = props.assignablePeople.filter((p) => p.roleId !== roleId)
+  return [...match, ...rest]
+})
+
+function openEdit(marker: StageMarker) {
+  editingId.value = marker.id
+  editForm.value = {
+    label: marker.label,
+    kind: marker.kind ?? '',
+    roleId: marker.roleId ?? '',
+    roleName: marker.roleName ?? '',
+    note: marker.note ?? '',
+    personId: marker.personId ?? '',
+    personName: marker.personName ?? '',
+    withVocal: marker.withVocal ?? false,
   }
-  emit('update', updated)
-  closeEditPopover()
+  showDeleteConfirm.value = false
 }
 
-function otherZone(marker: StageMarker): StageMarker['zone'] {
-  return marker.zone === 'onstage' ? 'offstage' : 'onstage'
+function closeDrawer() {
+  editingId.value = null
+  showDeleteConfirm.value = false
 }
 
-function otherZoneLabel(marker: StageMarker): string {
-  return otherZone(marker) === 'onstage' ? 'On Stage' : 'Off Stage (Side)'
+function selectPerson(person: ServingAssignment) {
+  editForm.value.personId = person.id
+  editForm.value.personName = person.name
+  // The person's name is the marker's name now — clear the free-text label so
+  // it isn't shown redundantly alongside them.
+  editForm.value.label = ''
+}
+function clearPerson() {
+  editForm.value.personId = ''
+  editForm.value.personName = ''
+  // Back to unassigned: fall the label back to the type (the band role name, or
+  // the fixed kind's label) so the marker still reads as something.
+  editForm.value.label = editForm.value.roleName || stageTypeLabel(editForm.value.kind || undefined)
 }
 
-function onMoveZone() {
-  const current = editingMarker.value
-  if (!current) return
-  const zone = otherZone(current)
-  emit('move', { id: current.id, zone, xPct: clampPct(current.xPct), yPct: clampPct(current.yPct) })
-  lastInteractedZone.value = zone
-  closeEditPopover()
+/** Builds the persisted marker from the buffered form, keeping optional keys
+ *  ABSENT (never `undefined`/`''`) when empty — the codebase's absent-not-
+ *  undefined convention and what the stripUndefined save path expects. */
+function buildFrom(marker: StageMarker, offsetX = 0): StageMarker {
+  const note = editForm.value.note.trim()
+  return {
+    id: marker.id,
+    label: editForm.value.label.trim(),
+    zone: marker.zone,
+    xPct: clampPct(marker.xPct + offsetX),
+    yPct: marker.yPct,
+    ...(editForm.value.roleId && editForm.value.roleName
+      ? { roleId: editForm.value.roleId, roleName: editForm.value.roleName }
+      : editForm.value.kind
+        ? { kind: editForm.value.kind }
+        : {}),
+    ...(note ? { note } : {}),
+    ...(editForm.value.personId ? { personId: editForm.value.personId, personName: editForm.value.personName } : {}),
+    // Only persist the vocal flag when it's on AND the type is an instrument —
+    // so switching away from an instrument can't strand a stale "+ Vocal".
+    ...(editForm.value.withVocal && editIsInstrument.value ? { withVocal: true } : {}),
+  }
 }
 
-function confirmRemove() {
-  const current = editingMarker.value
-  if (!current) return
-  emit('remove', current.id)
-  closeEditPopover()
+function onSave() {
+  const marker = editingMarker.value
+  if (!marker || !props.editable) return
+  emit('update', buildFrom(marker))
+  closeDrawer()
 }
 
-// ── Drag (native Pointer Events, drop-only persist) ─────────────────────────
+function onDuplicate() {
+  const marker = editingMarker.value
+  if (!marker || !props.editable) return
+  // Duplicate carries the (possibly edited) buffered form, offset to the side
+  // with a fresh id.
+  const base = buildFrom(marker, 6)
+  const copy: StageMarker = { ...base, id: createMarker({ label: '', xPct: 0, yPct: 0 }).id }
+  emit('add', copy)
+  closeDrawer()
+}
+
+function onDelete() {
+  const marker = editingMarker.value
+  if (!marker || !props.editable) return
+  emit('remove', marker.id)
+  closeDrawer()
+}
+
+// ── Drag (native Pointer Events, drop-only persist, free placement) ─────────
 interface DragState {
   markerId: string
   pointerId: number
@@ -193,63 +248,37 @@ interface DragState {
   currentClientX: number
   currentClientY: number
   movedEnough: boolean
-  onstageRect: DOMRect
-  offstageRect: DOMRect
+  roomRect: DOMRect
 }
 
 const DRAG_THRESHOLD_PX = 4
-
 const dragState = ref<DragState | null>(null)
-const onstageZoneEl = ref<HTMLElement | null>(null)
-const offstageZoneEl = ref<HTMLElement | null>(null)
 
-/** A resize/orientation-change or a scroll happening strictly BETWEEN
- *  pointerdown and pointerup (mid-drag) would leave `dragState`'s
- *  pointerdown-time `onstageRect`/`offstageRect` stale against the DOM's
- *  actual on-screen geometry, producing a wrong-zone or off-by-N% drop.
- *  Rather than re-measuring on every pointermove (expensive, and drop
- *  math only ever runs at pointerup), treat a reflow mid-drag exactly like
- *  `pointercancel` — the platform changed the ground out from under the
- *  gesture, so abort with no emit. Listeners are only ever live WHILE a
- *  drag is in flight (registered in `onChipPointerDown`, torn down as soon
- *  as the drag ends by any path), so this never manipulates the actual
- *  editor position and stays cheap to poll indefinitely. `scroll` is
- *  registered in the capture phase because a scroll on an ancestor
- *  container (not just `window`) does not bubble by default. */
+/** A resize/scroll mid-drag would stale the pointerdown-time room rect; treat
+ *  it like pointercancel (abort, no emit). Listeners live only while dragging.
+ *  `scroll` is captured because an ancestor scroll doesn't bubble to window. */
 function onWindowReflow() {
   if (!dragState.value) return
   dragState.value = null
   stopReflowGuard()
 }
-
 function startReflowGuard() {
   window.addEventListener('resize', onWindowReflow)
   window.addEventListener('scroll', onWindowReflow, true)
 }
-
 function stopReflowGuard() {
   window.removeEventListener('resize', onWindowReflow)
   window.removeEventListener('scroll', onWindowReflow, true)
 }
 
-onUnmounted(stopReflowGuard)
-
-/** Guards against a SECOND pointer starting a drag while one is already in
- *  flight — without this, a second finger landing on another chip (or the
- *  same chip) reassigns `dragState` mid-drag, which orphans the first
- *  chip's `setPointerCapture` (its own pointerup/pointercancel then no
- *  longer match `ds.markerId` and bail before releasing capture) and
- *  silently abandons the first drag. Ignoring the second pointerdown
- *  entirely — never calling `setPointerCapture` for it — means the first
- *  drag runs to completion untouched and the second pointer's own
- *  move/up/cancel events simply no-op below (`ds.markerId !== marker.id`). */
 function onChipPointerDown(event: PointerEvent, marker: StageMarker) {
   if (!props.editable) return
-  if (dragState.value) return // a drag is already in progress — ignore additional pointers
+  if (drawerOpen.value) return // editing modal is up (backdrop covers the canvas)
+  if (dragState.value) return // a drag is already in progress — ignore extra pointers
+  const rect = roomComp.value?.getRoomRect()
+  if (!rect) return
   const target = event.currentTarget as HTMLElement
   target.setPointerCapture?.(event.pointerId)
-  // Recomputed fresh at the START of every drag — never cached across mount
-  // or across a prior interaction (PITFALLS Pitfall 3).
   dragState.value = {
     markerId: marker.id,
     pointerId: event.pointerId,
@@ -258,8 +287,7 @@ function onChipPointerDown(event: PointerEvent, marker: StageMarker) {
     currentClientX: event.clientX,
     currentClientY: event.clientY,
     movedEnough: false,
-    onstageRect: onstageZoneEl.value!.getBoundingClientRect(),
-    offstageRect: offstageZoneEl.value!.getBoundingClientRect(),
+    roomRect: rect,
   }
   startReflowGuard()
 }
@@ -280,9 +308,6 @@ function onChipPointerMove(event: PointerEvent, marker: StageMarker) {
 function onChipPointerUp(event: PointerEvent, marker: StageMarker) {
   const ds = dragState.value
   if (!ds || ds.markerId !== marker.id) return
-  // Sync from the pointerup event itself (not just the last pointermove) so
-  // a click/drag with no interposed pointermove is still classified
-  // correctly, and the drop math always reflects the FINAL pointer position.
   ds.currentClientX = event.clientX
   ds.currentClientY = event.clientY
   if (
@@ -291,32 +316,31 @@ function onChipPointerUp(event: PointerEvent, marker: StageMarker) {
   ) {
     ds.movedEnough = true
   }
+  const moved = ds.movedEnough
+  const rect = ds.roomRect
   dragState.value = null
   stopReflowGuard()
   const target = event.currentTarget as HTMLElement
   if (target.hasPointerCapture?.(event.pointerId)) target.releasePointerCapture(event.pointerId)
 
-  if (!ds.movedEnough) {
-    openEditPopover(marker)
+  if (!moved) {
+    openEdit(marker) // a click opens the editor slide-over
     return
   }
 
-  const zone = zoneFromPoint(
-    ds.currentClientX,
-    ds.currentClientY,
-    { onstage: ds.onstageRect, offstage: ds.offstageRect },
-    marker.zone,
-  )
-  const targetRect = zone === 'onstage' ? ds.onstageRect : ds.offstageRect
-  const { xPct, yPct } = pctWithinRect(ds.currentClientX, ds.currentClientY, targetRect)
-  emit('move', { id: marker.id, zone, xPct: clampPct(xPct), yPct: clampPct(yPct) })
-  lastInteractedZone.value = zone
+  // Drop EXACTLY where the chip is shown — no jump. The visual follow is the
+  // marker's stored position plus the raw pointer delta (see chipStyle), so the
+  // persisted position must be that same delta applied to the stored position,
+  // NOT the pointer's own coordinate (which would re-centre the chip under the
+  // cursor and make it hop by however far from centre you grabbed it). Free
+  // placement, no grid, no snap.
+  const dxPct = rect.width === 0 ? 0 : ((ds.currentClientX - ds.startClientX) / rect.width) * 100
+  const dyPct = rect.height === 0 ? 0 : ((ds.currentClientY - ds.startClientY) / rect.height) * 100
+  const cx = clampPct(marker.xPct + dxPct)
+  const cy = clampPct(marker.yPct + dyPct)
+  emit('move', { id: marker.id, zone: zoneFromPosition(cx, cy), xPct: cx, yPct: cy })
 }
 
-/** pointercancel means the platform took the gesture away (e.g. the browser
- *  recognized a scroll) — abort the drag entirely: no move emit, no edit
- *  popover, just drop the transient visual state so the chip snaps back to
- *  its last PERSISTED (prop) position. */
 function onChipPointerCancel(event: PointerEvent, marker: StageMarker) {
   const ds = dragState.value
   if (!ds || ds.markerId !== marker.id) return
@@ -326,12 +350,9 @@ function onChipPointerCancel(event: PointerEvent, marker: StageMarker) {
   if (target.hasPointerCapture?.(event.pointerId)) target.releasePointerCapture(event.pointerId)
 }
 
-/** Base position is ALWAYS the stored percentage (never a measured pixel) —
- *  this is what keeps a saved marker resize-stable and reload-exact (R314)
- *  by construction, exactly like StageLayoutView's own markerStyle. While
- *  actively dragging past the click threshold, a raw pointer-delta pixel
- *  offset is layered on top purely for the visual follow — it is never
- *  persisted; only the pointerup-resolved zone + percentage is emitted. */
+/** Base position is ALWAYS the stored percentage (resize-stable, reload-exact).
+ *  While dragging past threshold, a raw pointer-delta pixel offset is layered
+ *  on for the visual follow only — never persisted. */
 function chipStyle(marker: StageMarker): Record<string, string> {
   const style: Record<string, string> = { left: `${marker.xPct}%`, top: `${marker.yPct}%` }
   const ds = dragState.value
@@ -339,254 +360,300 @@ function chipStyle(marker: StageMarker): Record<string, string> {
     const dx = ds.currentClientX - ds.startClientX
     const dy = ds.currentClientY - ds.startClientY
     style.transform = `translate(-50%, -50%) translate(${dx}px, ${dy}px)`
-    style.zIndex = '20'
+    style.zIndex = '30'
   } else {
     style.transform = 'translate(-50%, -50%)'
   }
   return style
 }
+
+// Escape closes the editor slide-over (modal convention).
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && drawerOpen.value) closeDrawer()
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+  stopReflowGuard()
+})
 </script>
 
 <template>
   <div data-testid="stage-layout-editor">
     <template v-if="editable">
-      <div v-if="elements.length === 0" class="mb-4">
-        <h3 class="text-sm font-semibold text-gray-200">No stage layout yet</h3>
-        <p class="mt-1 text-sm text-gray-400">
-          Add a marker to show your tech team where each instrument, mic, or monitor goes — on stage
-          or off to the side.
-        </p>
+      <!-- Palette on the LEFT, canvas on the right. The room has a HARD-CODED
+           width (see StageRoom), so the palette's presence never changes the
+           room's size — what you place while editing is exactly what shows when
+           the service is locked, on the share link, and in print (WYSIWYG). The
+           canvas scrolls horizontally on a narrow viewport rather than squeezing
+           the fixed-width room. -->
+      <div class="flex flex-col gap-4 lg:flex-row">
+        <!-- Palette -->
+        <div class="flex-none lg:w-56">
+          <div class="mb-2">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Place on the diagram</p>
+            <p class="mt-0.5 text-xs text-gray-500">Click a chip to drop it, then drag it into position.</p>
+          </div>
+          <div class="flex flex-col gap-3">
+            <div v-for="group in palette" :key="group.name">
+              <p class="mb-1 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-600">
+                {{ group.name }}
+              </p>
+              <p
+                v-if="group.name === 'Instruments' && !group.items.some((i) => i.roleId)"
+                class="pl-0.5 text-[11px] italic text-gray-600"
+              >
+                No band roles yet — add them in the Roles tab.
+              </p>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="item in group.items"
+                  :key="item.id"
+                  type="button"
+                  :data-testid="`palette-chip-${item.id}`"
+                  class="inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-[11.5px] transition-colors hover:brightness-125"
+                  :class="stagePaletteSkinClass(item.gear, 'dark')"
+                  @click="onAddItem(item)"
+                >
+                  <StageKindIcon :name="item.icon" class="h-3.5 w-3.5" />
+                  {{ item.label }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canvas — the room is a fixed width (StageRoom); scroll if the
+             viewport is too narrow rather than shrink the room. -->
+        <div class="min-w-0 flex-1 overflow-x-auto">
+          <StageRoom ref="roomComp" theme="dark">
+            <StageMarkerChip
+              v-for="marker in props.elements"
+              :key="marker.id"
+              :marker="marker"
+              theme="dark"
+              interactive
+              :selected="marker.id === editingId"
+              :style="chipStyle(marker)"
+              @pointerdown="onChipPointerDown($event, marker)"
+              @pointermove="onChipPointerMove($event, marker)"
+              @pointerup="onChipPointerUp($event, marker)"
+              @pointercancel="onChipPointerCancel($event, marker)"
+            />
+            <div
+              v-if="props.elements.length === 0"
+              class="pointer-events-none absolute left-1/2 top-[34%] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1.5 text-center"
+            >
+              <span class="text-sm text-gray-500">Nothing placed yet</span>
+              <span class="text-xs text-gray-600">Pick a chip on the left — vocals, instruments, mics, monitors.</span>
+            </div>
+          </StageRoom>
+        </div>
       </div>
 
-      <div class="mb-6 flex items-center justify-between">
-        <button
-          type="button"
-          data-testid="add-marker-button"
-          class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-500"
-          @click="openAddForm"
+      <!-- Edit slide-over (existing app pattern: Teleport modal + backdrop) -->
+      <Teleport to="body">
+        <Transition
+          enter-active-class="transition-opacity duration-200 ease-out"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="transition-opacity duration-150 ease-in"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
         >
-          Add marker
-        </button>
-      </div>
+          <div v-if="drawerOpen" class="fixed inset-0 z-40 bg-black/30" @click="closeDrawer" />
+        </Transition>
 
-      <div
-        v-if="showAddForm"
-        data-testid="add-marker-form"
-        class="mb-4 space-y-3 rounded-lg border border-gray-700 bg-gray-900 p-4"
-      >
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-400">Label</label>
-          <input
-            ref="addLabelInputEl"
-            v-model="addForm.label"
-            type="text"
-            data-testid="add-marker-label-input"
-            placeholder="e.g. Lead Vocal, Drums, Guest speaker mic"
-            class="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            @keyup.enter="submitAdd"
-          />
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-400">Kind (optional)</label>
-          <select
-            v-model="addForm.kind"
-            data-testid="add-marker-kind-select"
-            class="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          >
-            <option value="">No kind</option>
-            <option v-for="k in MARKER_KINDS" :key="k" :value="k">{{ KIND_LABELS[k] }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-400">Zone</label>
-          <div class="flex gap-2">
-            <button
-              type="button"
-              data-testid="add-marker-zone-onstage"
-              class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
-              :class="addForm.zone === 'onstage' ? 'bg-indigo-600 text-white' : 'border border-gray-700 bg-gray-800 text-gray-300'"
-              @click="addForm.zone = 'onstage'"
-            >
-              On Stage
-            </button>
-            <button
-              type="button"
-              data-testid="add-marker-zone-offstage"
-              class="rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
-              :class="addForm.zone === 'offstage' ? 'bg-indigo-600 text-white' : 'border border-gray-700 bg-gray-800 text-gray-300'"
-              @click="addForm.zone = 'offstage'"
-            >
-              Off Stage (Side)
-            </button>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 pt-1">
-          <button
-            type="button"
-            data-testid="add-marker-submit"
-            class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
-            :disabled="!addForm.label.trim()"
-            @click="submitAdd"
-          >
-            Add
-          </button>
-          <button
-            type="button"
-            data-testid="add-marker-cancel"
-            class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700"
-            @click="cancelAddForm"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
-        <div>
-          <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">ON STAGE</h3>
+        <Transition
+          enter-active-class="transition-transform duration-250 ease-out"
+          enter-from-class="translate-x-full"
+          enter-to-class="translate-x-0"
+          leave-active-class="transition-transform duration-200 ease-in"
+          leave-from-class="translate-x-0"
+          leave-to-class="translate-x-full"
+        >
           <div
-            ref="onstageZoneEl"
-            data-testid="stage-zone-onstage"
-            class="relative aspect-video w-full touch-none rounded-lg border border-gray-800 bg-gray-900"
+            v-if="drawerOpen && editingMarker"
+            data-testid="marker-inspector"
+            class="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col border-l border-gray-800 bg-gray-900 shadow-2xl"
           >
-            <p
-              v-if="onstageMarkers.length === 0"
-              class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm italic text-gray-500"
-            >
-              Drop markers here
-            </p>
-            <StageMarkerChip
-              v-for="marker in onstageMarkers"
-              :key="marker.id"
-              :marker="marker"
-              :accent-class="accentClass(marker)"
-              :chip-style="chipStyle(marker)"
-              @pointerdown="onChipPointerDown($event, marker)"
-              @pointermove="onChipPointerMove($event, marker)"
-              @pointerup="onChipPointerUp($event, marker)"
-              @pointercancel="onChipPointerCancel($event, marker)"
-              @edit="openEditPopover(marker)"
-              @remove="openRemoveConfirmDirect(marker)"
-            />
-          </div>
-        </div>
+            <!-- Header -->
+            <div class="flex shrink-0 items-center gap-3 border-b border-gray-800 px-5 py-4">
+              <div
+                class="flex h-9 w-9 flex-none items-center justify-center rounded-lg border"
+                :class="stageMarkerSkinClass(headerMarker, 'dark', false)"
+              >
+                <StageKindIcon :name="stageMarkerIcon(headerMarker)" class="h-4 w-4" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <h2 class="truncate text-base font-semibold text-gray-100">Edit marker</h2>
+                <p class="text-[11px] text-gray-500">{{ placement }}</p>
+              </div>
+              <button
+                type="button"
+                class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700"
+                @click="closeDrawer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-testid="marker-save"
+                class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+                @click="onSave"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                data-testid="marker-drawer-close"
+                aria-label="Close"
+                class="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-300"
+                @click="closeDrawer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-        <div>
-          <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">OFF STAGE (SIDE)</h3>
-          <div
-            ref="offstageZoneEl"
-            data-testid="stage-zone-offstage"
-            class="relative aspect-video w-full touch-none rounded-lg border border-dashed border-gray-700 bg-gray-950"
-          >
-            <p
-              v-if="offstageMarkers.length === 0"
-              class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm italic text-gray-500"
-            >
-              Drop markers here
-            </p>
-            <StageMarkerChip
-              v-for="marker in offstageMarkers"
-              :key="marker.id"
-              :marker="marker"
-              :accent-class="accentClass(marker)"
-              :chip-style="chipStyle(marker)"
-              @pointerdown="onChipPointerDown($event, marker)"
-              @pointermove="onChipPointerMove($event, marker)"
-              @pointerup="onChipPointerUp($event, marker)"
-              @pointercancel="onChipPointerCancel($event, marker)"
-              @edit="openEditPopover(marker)"
-              @remove="openRemoveConfirmDirect(marker)"
-            />
-          </div>
-        </div>
-      </div>
+            <!-- Body -->
+            <div class="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+              <div>
+                <label class="mb-1 block text-xs font-medium text-gray-400">Type</label>
+                <select
+                  v-model="editTypeValue"
+                  data-testid="marker-kind-select"
+                  class="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="">Unspecified</option>
+                  <optgroup v-for="group in palette" :key="group.name" :label="group.name">
+                    <option v-for="item in group.items" :key="item.id" :value="item.kind ? item.kind : `role:${item.roleId}`">
+                      {{ item.label }}
+                    </option>
+                  </optgroup>
+                </select>
+                <label
+                  v-if="editIsInstrument"
+                  class="mt-2 flex items-center gap-2 text-sm text-gray-300"
+                >
+                  <input
+                    v-model="editForm.withVocal"
+                    type="checkbox"
+                    data-testid="marker-vocal-checkbox"
+                    class="rounded border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Player also sings (add vocal)
+                </label>
+              </div>
 
-      <div
-        v-if="editingMarker"
-        data-testid="marker-edit-popover"
-        class="mt-4 max-w-sm space-y-3 rounded-lg border border-gray-700 bg-gray-900 p-4"
-      >
-        <template v-if="!showRemoveConfirm">
-          <div>
-            <label class="mb-1 block text-xs font-medium text-gray-400">Label</label>
-            <input
-              v-model="editForm.label"
-              type="text"
-              data-testid="edit-marker-label-input"
-              class="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
+              <div>
+                <div class="mb-1 flex items-baseline justify-between">
+                  <label class="block text-xs font-medium text-gray-400">Assigned person</label>
+                  <span class="text-[11px] text-gray-600">optional</span>
+                </div>
+                <div v-if="orderedPeople.length" class="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    data-testid="person-pill-unassigned"
+                    class="h-7 rounded-full border px-3 text-[11.5px] transition-colors"
+                    :class="editForm.personId === '' ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-gray-700 bg-gray-800 text-gray-400 hover:bg-gray-700'"
+                    @click="clearPerson"
+                  >
+                    Unassigned
+                  </button>
+                  <button
+                    v-for="person in orderedPeople"
+                    :key="`${person.id}-${person.roleId}`"
+                    type="button"
+                    :data-testid="`person-pill-${person.id}-${person.roleId}`"
+                    class="h-7 rounded-full border px-3 text-[11.5px] transition-colors"
+                    :class="editForm.personId === person.id ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-gray-700 bg-gray-800 text-gray-400 hover:bg-gray-700'"
+                    @click="selectPerson(person)"
+                  >
+                    {{ person.name }} - {{ person.roleName }}
+                  </button>
+                </div>
+                <p v-else class="text-[11px] leading-relaxed text-gray-600">
+                  No one is serving this service yet. Assign people in the Roles tab to pick them here, or just type a
+                  label below.
+                </p>
+              </div>
+
+              <div>
+                <label class="mb-1 block text-xs font-medium text-gray-400">
+                  Label
+                  <span class="font-normal text-gray-600">(a name, or a note when no one is assigned)</span>
+                </label>
+                <input
+                  v-model="editForm.label"
+                  type="text"
+                  data-testid="marker-label-input"
+                  placeholder="e.g. Front left, Guest speaker"
+                  class="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label class="mb-1 block text-xs font-medium text-gray-400">Note for the tech team</label>
+                <textarea
+                  v-model="editForm.note"
+                  data-testid="marker-note-input"
+                  rows="3"
+                  placeholder="e.g. XLR run from stage left, needs a boom"
+                  class="w-full resize-y rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <button
+                type="button"
+                data-testid="marker-duplicate"
+                class="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-gray-700 text-sm text-gray-300 transition-colors hover:bg-gray-800"
+                @click="onDuplicate"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h6a2 2 0 002-2v-2" />
+                </svg>
+                Duplicate marker
+              </button>
+
+              <!-- Delete (confirm row, mirroring RoleSlideOver) -->
+              <div class="border-t border-gray-800 pt-3">
+                <button
+                  v-if="!showDeleteConfirm"
+                  type="button"
+                  data-testid="marker-delete-trigger"
+                  class="text-sm text-red-400 transition-colors hover:text-red-300"
+                  @click="showDeleteConfirm = true"
+                >
+                  Remove marker
+                </button>
+                <div v-else data-testid="marker-delete-confirm" class="rounded-md border border-red-800 bg-red-900/20 p-3">
+                  <p class="text-sm text-red-300">Remove this marker? This can't be undone.</p>
+                  <div class="mt-2 flex items-center gap-3">
+                    <button
+                      type="button"
+                      data-testid="marker-delete"
+                      class="rounded-md bg-red-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-600"
+                      @click="onDelete"
+                    >
+                      Remove
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="marker-delete-cancel"
+                      class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
+                      @click="showDeleteConfirm = false"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <label class="mb-1 block text-xs font-medium text-gray-400">Kind (optional)</label>
-            <select
-              v-model="editForm.kind"
-              data-testid="edit-marker-kind-select"
-              class="w-full rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">No kind</option>
-              <option v-for="k in MARKER_KINDS" :key="k" :value="k">{{ KIND_LABELS[k] }}</option>
-            </select>
-          </div>
-          <button
-            type="button"
-            data-testid="move-zone-button"
-            class="text-sm text-indigo-400 transition-colors hover:text-indigo-300"
-            @click="onMoveZone"
-          >
-            Move to {{ otherZoneLabel(editingMarker) }}
-          </button>
-          <div class="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              data-testid="marker-edit-save"
-              class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
-              :disabled="!editForm.label.trim()"
-              @click="saveEdit"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              data-testid="marker-edit-cancel"
-              class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700"
-              @click="closeEditPopover"
-            >
-              Cancel
-            </button>
-          </div>
-          <div class="border-t border-gray-800 pt-2">
-            <button
-              type="button"
-              data-testid="marker-edit-remove-trigger"
-              class="text-sm text-red-400 transition-colors hover:text-red-300"
-              @click="showRemoveConfirm = true"
-            >
-              Remove marker
-            </button>
-          </div>
-        </template>
-        <template v-else>
-          <p class="text-sm text-red-300">Remove this marker? This can't be undone.</p>
-          <div data-testid="marker-remove-confirm" class="flex items-center gap-2">
-            <button
-              type="button"
-              data-testid="marker-remove-confirm-button"
-              class="rounded-md bg-red-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-600"
-              @click="confirmRemove"
-            >
-              Remove
-            </button>
-            <button
-              type="button"
-              data-testid="marker-remove-cancel-button"
-              class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
-              @click="showRemoveConfirm = false"
-            >
-              Cancel
-            </button>
-          </div>
-        </template>
-      </div>
+        </Transition>
+      </Teleport>
     </template>
 
     <StageLayoutView v-else :elements="elements" theme="dark" />

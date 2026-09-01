@@ -38,6 +38,10 @@ export type ActionBarIcon =
   | 'upload'
   | 'check'
   | 'present'
+  // 'review' — the eye glyph for the renamed "Review Slides" action (owner
+  // 2026-09-01), swapped in for the old ▶ 'present' play glyph so reviewing
+  // slides is not confused with running a live service (Run).
+  | 'review'
   | 'spinner'
   | 'print'
   | 'share'

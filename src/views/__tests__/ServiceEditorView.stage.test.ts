@@ -400,7 +400,7 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
     const editor = wrapper.findComponent(StageLayoutEditor)
     expect(editor.props('elements')).toEqual([marker])
 
-    const updated: StageMarker = { ...marker, label: 'Lead Vocalist', kind: 'other' }
+    const updated: StageMarker = { ...marker, label: 'Lead Vocalist', kind: 'vocal' }
     await editor.vm.$emit('update', updated)
     await wrapper.vm.$nextTick()
     expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toEqual([updated])
@@ -463,6 +463,31 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
     await editor.vm.$emit('remove', 'm1')
     await wrapper.vm.$nextTick()
     expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toEqual([marker])
+  })
+
+  it('the Stage Layout tab has a "Print for tech" button that calls window.print()', async () => {
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
+    const wrapper = await mountView({ stageLayout: { elements: [{ id: 'm1', label: 'Drums', kind: 'instrument', zone: 'onstage', xPct: 30, yPct: 40 }] } })
+    await goToStageTab(wrapper)
+
+    const btn = wrapper.get('[data-testid="stage-print-btn"]')
+    await btn.trigger('click')
+    await flushPromises()
+    expect(printSpy).toHaveBeenCalledTimes(1)
+    printSpy.mockRestore()
+  })
+
+  it('the "Print for tech" button is available on a LOCKED (planned) service too — printing is read-only', async () => {
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
+    const wrapper = await mountView({ status: 'planned', stageLayout: { elements: [{ id: 'm1', label: 'Drums', kind: 'instrument', zone: 'onstage', xPct: 30, yPct: 40 }] } })
+    await goToStageTab(wrapper)
+
+    const btn = wrapper.find('[data-testid="stage-print-btn"]')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    await flushPromises()
+    expect(printSpy).toHaveBeenCalledTimes(1)
+    printSpy.mockRestore()
   })
 
   it('Arrow/Home/End roving-tabindex navigation includes the Stage Layout tab for an editor', async () => {

@@ -1305,7 +1305,7 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     expect(wrapper.find('[data-testid="undo-link"]').exists()).toBe(true)
   })
 
-  it('design 1a: Present renders in the page header on the Slides tab, immediately before Save, and NOT inside the slides tab panel', async () => {
+  it('Review Slides (Present) renders in the page header on the Slides tab — the ONLY action-bar item, no Save (owner 2026-09-01) — and NOT inside the slides tab panel', async () => {
     const wrapper = await mountView({ status: 'draft' })
     await wrapper.vm.$nextTick()
     await clickTab(wrapper, 'Slides')
@@ -1316,8 +1316,9 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     // Not inside the (stubbed) tab panel — it lives in the page header only.
     expect(wrapper.find('[data-testid="slides-tab-stub"]').find('[data-testid="action-bar-item-present"]').exists()).toBe(false)
 
+    // Slides tab: Review Slides only — Save is gone (slide edits never dirty localService).
     const testIds = barButtons(wrapper).map((b) => b.attributes('data-testid'))
-    expect(testIds).toEqual(['action-bar-item-present', 'action-bar-item-save'])
+    expect(testIds).toEqual(['action-bar-item-present'])
   })
 
   it('clicking the relocated Present button opens PresentationViewer at the start index SlidesTab.onPresentClick() computed', async () => {
@@ -3220,12 +3221,11 @@ describe('ServiceEditorView - R122 slot-level notes field (54-02)', () => {
 // cases exercise the authoring UI only (106-01); the Run-time timer that consumes
 // slot.loop is Plan 02's scope.
 
-describe('Service Order — per-item loop authoring (R306/R307)', () => {
-  interface SlotsVm {
-    localService: { slots: Array<Record<string, unknown>> }
-  }
-  type LoopSlot = { loop?: { enabled: boolean; intervalSeconds: number } }
-
+describe('Service Order — loop authoring RELOCATED to the Slide editor (owner 2026-09-01)', () => {
+  // Loop moved out of the Service Order plan into the Slide editor (SlideGrid)
+  // for MISC/ANNOUNCEMENTS items only — never Song. Behavioural coverage now
+  // lives in SlotLoopControl.test.ts + SlideGrid.test.ts. Here we only assert
+  // the plan no longer carries any loop control.
   async function mountView() {
     const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
     return shallowMount(ServiceEditorView, {
@@ -3245,124 +3245,25 @@ describe('Service Order — per-item loop authoring (R306/R307)', () => {
     })
   }
 
-  function loopFixture(loop?: { enabled: boolean; intervalSeconds: number }): Service {
-    return {
-      ...buildSectionedService(),
-      slots: [
-        { kind: 'SONG', id: 'loop-song', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'worship', ...(loop ? { loop } : {}) },
-        { kind: 'HYMN', id: 'loop-hymn', position: 1, hymnName: 'It Is Well', hymnNumber: '', verses: '', section: 'sending' },
-      ],
-    }
-  }
-
   beforeEach(() => {
     mockAuthState.isEditor = true
     mockAuthState.orgId = 'org-1'
   })
 
-  it('renders the loop row and checkbox for a slot, with the interval control hidden until Loop is checked', async () => {
-    mockServicesList = [loopFixture()]
+  it('renders NO loop control on the Service Order tab (even for a MISC item, which is loopable in the Slide editor)', async () => {
+    mockServicesList = [
+      {
+        ...buildSectionedService(),
+        slots: [
+          { kind: 'MISC', id: 'misc-1', position: 0, section: 'worship', label: 'Pre-service loop' },
+          { kind: 'SONG', id: 'song-1', position: 1, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'worship' },
+        ] as Service['slots'],
+      },
+    ]
     const wrapper = await mountView()
 
-    const row = wrapper.find('[data-testid="slot-loop-row"]')
-    expect(row.exists()).toBe(true)
-    const checkbox = row.find('[data-testid="slot-loop-checkbox"]')
-    expect(checkbox.exists()).toBe(true)
-    expect((checkbox.element as HTMLInputElement).checked).toBe(false)
-    expect(row.find('[data-testid="slot-loop-preset"]').exists()).toBe(false)
-    expect(row.find('[data-testid="slot-loop-custom-seconds"]').exists()).toBe(false)
-  })
-
-  it('checking the checkbox sets slot.loop = { enabled: true, intervalSeconds: 10 } and reveals the preset dropdown (R307 default 10s)', async () => {
-    mockServicesList = [loopFixture()]
-    const wrapper = await mountView()
-
-    const checkbox = wrapper.find('[data-testid="slot-loop-checkbox"]')
-    await checkbox.setValue(true)
-    await wrapper.vm.$nextTick()
-
-    const slots = (wrapper.vm as unknown as SlotsVm).localService.slots
-    expect((slots[0] as LoopSlot).loop).toEqual({ enabled: true, intervalSeconds: 10 })
-
-    const preset = wrapper.find('[data-testid="slot-loop-preset"]')
-    expect(preset.exists()).toBe(true)
-    expect((preset.element as HTMLSelectElement).value).toBe('10')
-  })
-
-  it('selecting a preset sets intervalSeconds to that value; selecting Custom reveals the seconds input pre-filled with the current value', async () => {
-    mockServicesList = [loopFixture({ enabled: true, intervalSeconds: 10 })]
-    const wrapper = await mountView()
-
-    const preset = wrapper.find('[data-testid="slot-loop-preset"]')
-    await preset.setValue('30')
-    await wrapper.vm.$nextTick()
-
-    let slots = (wrapper.vm as unknown as SlotsVm).localService.slots
-    expect((slots[0] as LoopSlot).loop?.intervalSeconds).toBe(30)
-
-    await wrapper.find('[data-testid="slot-loop-preset"]').setValue('custom')
-    await wrapper.vm.$nextTick()
-
-    // Selecting Custom leaves intervalSeconds untouched — the number field pre-fills with it.
-    slots = (wrapper.vm as unknown as SlotsVm).localService.slots
-    expect((slots[0] as LoopSlot).loop?.intervalSeconds).toBe(30)
-    const customInput = wrapper.find('[data-testid="slot-loop-custom-seconds"]')
-    expect(customInput.exists()).toBe(true)
-    expect((customInput.element as HTMLInputElement).value).toBe('30')
-  })
-
-  it('loopPresetFor round-trips: a slot seeded with intervalSeconds 45 renders the preset as Custom with the number field showing 45 (never snaps to 30 or 60)', async () => {
-    mockServicesList = [loopFixture({ enabled: true, intervalSeconds: 45 })]
-    const wrapper = await mountView()
-
-    const preset = wrapper.find('[data-testid="slot-loop-preset"]')
-    expect((preset.element as HTMLSelectElement).value).toBe('custom')
-    const customInput = wrapper.find('[data-testid="slot-loop-custom-seconds"]')
-    expect(customInput.exists()).toBe(true)
-    expect((customInput.element as HTMLInputElement).value).toBe('45')
-  })
-
-  it.each([
-    ['0', 1],
-    ['-5', 1],
-    ['', 10],
-    ['not-a-number', 10],
-    ['9999', 3600],
-  ])('entering %s into the custom seconds field and blurring clamps to %i (R307 persistence)', async (rawValue, expected) => {
-    mockServicesList = [loopFixture({ enabled: true, intervalSeconds: 10 })]
-    const wrapper = await mountView()
-
-    // Force Custom so the number field is present, seeded at the fixture's 10.
-    await wrapper.find('[data-testid="slot-loop-preset"]').setValue('custom')
-    await wrapper.vm.$nextTick()
-
-    const customInput = wrapper.find('[data-testid="slot-loop-custom-seconds"]')
-    await customInput.setValue(rawValue)
-    await customInput.trigger('blur')
-    await wrapper.vm.$nextTick()
-
-    const slots = (wrapper.vm as unknown as SlotsVm).localService.slots
-    expect((slots[0] as LoopSlot).loop?.intervalSeconds).toBe(expected)
-  })
-
-  it('unchecking Loop sets enabled false but retains intervalSeconds so re-checking restores it', async () => {
-    mockServicesList = [loopFixture({ enabled: true, intervalSeconds: 30 })]
-    const wrapper = await mountView()
-
-    const checkbox = wrapper.find('[data-testid="slot-loop-checkbox"]')
-    await checkbox.setValue(false)
-    await wrapper.vm.$nextTick()
-
-    let slots = (wrapper.vm as unknown as SlotsVm).localService.slots
-    expect((slots[0] as LoopSlot).loop).toEqual({ enabled: false, intervalSeconds: 30 })
-    // Interval control hides immediately when disabled.
-    expect(wrapper.find('[data-testid="slot-loop-preset"]').exists()).toBe(false)
-
-    await checkbox.setValue(true)
-    await wrapper.vm.$nextTick()
-
-    slots = (wrapper.vm as unknown as SlotsVm).localService.slots
-    expect((slots[0] as LoopSlot).loop).toEqual({ enabled: true, intervalSeconds: 30 })
+    expect(wrapper.find('[data-testid="slot-loop-row"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slot-loop-checkbox"]').exists()).toBe(false)
   })
 })
 
@@ -7913,7 +7814,7 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
   })
 
   for (const status of ['pending', 'saving', 'saved', 'error'] as const) {
-    it(`status "${status}": the bar carries its full chrome class list`, async () => {
+    it(`status "${status}": the bar carries its inline chrome class list`, async () => {
       const wrapper = await mountView()
       await wrapper.vm.$nextTick()
 
@@ -7921,9 +7822,13 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
       await wrapper.vm.$nextTick()
 
       const bar = wrapper.find('[data-testid="service-save-status-bar"]')
+      // The bar RELOCATED into the header row beside the status pill (owner
+      // 2026-09-01) so it no longer reflows the tab content — it is no longer a
+      // `sticky top-0` bar. Active chrome is now the inline pill treatment.
       expect(bar.classes()).toEqual(
-        expect.arrayContaining(['sticky', 'top-0', 'z-10', 'rounded-md', 'border', 'border-gray-800', 'bg-gray-900']),
+        expect.arrayContaining(['rounded-md', 'border', 'border-gray-800', 'bg-gray-900', 'px-3', 'py-1']),
       )
+      expect(bar.classes()).not.toContain('sticky')
     })
   }
 

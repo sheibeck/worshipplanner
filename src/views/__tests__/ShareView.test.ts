@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 
-// Mock vue-router — params are mutable per-test via mockRouteParams
+// Mock vue-router — params + query are mutable per-test.
 const mockRouteParams: Record<string, string | undefined> = { token: 'test-token-123' }
+const mockRouteQuery: Record<string, string | undefined> = {}
 vi.mock('vue-router', () => ({
   useRoute: vi.fn(() => ({
     params: mockRouteParams,
+    query: mockRouteQuery,
   })),
 }))
 
@@ -108,6 +110,7 @@ describe('ShareView', () => {
     delete mockRouteParams.slug
     delete mockRouteParams.date
     mockRouteParams.token = 'test-token-123'
+    delete mockRouteQuery.view
   })
 
   it('shows loading state initially', async () => {
@@ -357,79 +360,72 @@ describe('ShareView', () => {
     expect(wrapper.text()).toContain('Guest speaker this week')
   })
 
-  // ── 107-03 — read-only Stage Layout section (R315) ─────────────────────────
-  // ShareView consumes ONLY the already-fetched serviceSnapshot — no new
-  // getDoc, no org-scoped read. These tests assert render-from-snapshot,
-  // omit-when-empty, and the XSS-safe literal-text label render.
+  // ── Stage layout: portrait PLAN share excludes it; ?view=stage shows it ─────
+  // The stage layout is separated onto its own landscape "Share stage layout"
+  // link (?view=stage); the portrait service-plan share no longer renders it.
+  // ShareView still consumes ONLY the already-fetched serviceSnapshot.
 
-  it('renders the Stage Layout section from the snapshot when stageLayout has markers, with no extra Firebase read', async () => {
-    mockGetDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({
-        serviceSnapshot: {
-          ...mockSnapshot,
-          stageLayout: {
-            elements: [
-              { id: 'm1', label: 'Acoustic Guitar', kind: 'instrument', zone: 'onstage', xPct: 25, yPct: 60 },
-              { id: 'm2', label: 'Drums', zone: 'offstage', xPct: 50, yPct: 50 },
-            ],
-          },
-        },
-      }),
-    })
+  const stageSnapshot = {
+    ...mockSnapshot,
+    stageLayout: {
+      elements: [
+        { id: 'm1', label: 'Acoustic Guitar', kind: 'instrument', zone: 'onstage', xPct: 25, yPct: 60 },
+        { id: 'm2', label: 'Drums', zone: 'offstage', xPct: 50, yPct: 50 },
+      ],
+    },
+  }
+
+  it('the service-PLAN share (no ?view=stage) does NOT render the stage layout, even with markers', async () => {
+    mockGetDoc.mockResolvedValue({ exists: () => true, data: () => ({ serviceSnapshot: stageSnapshot }) })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    // Plan content still renders...
+    expect(wrapper.text()).toContain('Amazing Grace')
+    // ...but the stage plot does not.
+    expect(wrapper.text()).not.toContain('Acoustic Guitar')
+    expect(wrapper.find('[data-testid="stage-layout-view"]').exists()).toBe(false)
+  })
+
+  it('?view=stage renders the landscape stage layout from the snapshot, with no extra Firebase read', async () => {
+    mockRouteQuery.view = 'stage'
+    mockGetDoc.mockResolvedValue({ exists: () => true, data: () => ({ serviceSnapshot: stageSnapshot }) })
     const wrapper = await mountShareView()
     await flushPromises()
 
     expect(wrapper.text()).toContain('Stage Layout')
     expect(wrapper.text()).toContain('Acoustic Guitar')
     expect(wrapper.text()).toContain('Drums')
-    // Exactly one getDoc call — the token/share-doc fetch. No second Firebase
-    // read is triggered by rendering the stage layout section.
+    expect(wrapper.find('[data-testid="stage-layout-view"]').exists()).toBe(true)
+    // The plan slot list is NOT shown in the stage-only view.
+    expect(wrapper.text()).not.toContain('Amazing Grace')
+    // Still exactly one getDoc — no second read for the stage view.
     expect(mockGetDoc).toHaveBeenCalledTimes(1)
   })
 
-  it('omits the Stage Layout section when stageLayout is absent from the snapshot', async () => {
-    mockGetDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({ serviceSnapshot: mockSnapshot }),
-    })
+  it('?view=stage shows an empty message when the snapshot has no stage layout', async () => {
+    mockRouteQuery.view = 'stage'
+    mockGetDoc.mockResolvedValue({ exists: () => true, data: () => ({ serviceSnapshot: mockSnapshot }) })
     const wrapper = await mountShareView()
     await flushPromises()
 
-    expect(wrapper.text()).not.toContain('Stage Layout')
+    expect(wrapper.text()).toContain('No stage layout')
   })
 
-  it('omits the Stage Layout section when stageLayout has zero markers', async () => {
-    mockGetDoc.mockResolvedValue({
-      exists: () => true,
-      data: () => ({
-        serviceSnapshot: { ...mockSnapshot, stageLayout: { elements: [] } },
-      }),
-    })
-    const wrapper = await mountShareView()
-    await flushPromises()
-
-    expect(wrapper.text()).not.toContain('Stage Layout')
-  })
-
-  it('renders a marker label containing markup as literal text, never parsed as DOM (T-107-03)', async () => {
+  it('?view=stage renders a marker label containing markup as literal text, never parsed as DOM', async () => {
+    mockRouteQuery.view = 'stage'
     mockGetDoc.mockResolvedValue({
       exists: () => true,
       data: () => ({
         serviceSnapshot: {
           ...mockSnapshot,
-          stageLayout: {
-            elements: [
-              { id: 'm1', label: '<img src=x onerror=alert(1)>', zone: 'onstage', xPct: 10, yPct: 10 },
-            ],
-          },
+          stageLayout: { elements: [{ id: 'm1', label: '<img src=x onerror=alert(1)>', zone: 'onstage', xPct: 10, yPct: 10 }] },
         },
       }),
     })
     const wrapper = await mountShareView()
     await flushPromises()
 
-    // The markup renders as literal text content, not a parsed <img> element.
     expect(wrapper.find('img').exists()).toBe(false)
     expect(wrapper.text()).toContain('<img src=x onerror=alert(1)>')
   })

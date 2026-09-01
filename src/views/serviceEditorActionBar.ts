@@ -169,24 +169,17 @@ function buildSaveItem(ctx: ActionBarContext): ActionBarItem {
 function buildPresentItem(ctx: ActionBarContext): ActionBarItem {
   return {
     key: 'present',
-    label: 'Present',
-    icon: 'present',
-    // Owner follow-up: "Update the Present Button so that it matches the
-    // other buttons, right now it stands out because it's so visually
-    // different." Deliberately omits `tone` (falls back to `default`,
-    // ContextualActionBar.vue's own fallback) rather than the outlined-
-    // indigo `present` tone 36-UI-SPEC.md §2 originally called for.
-    //
-    // ★ DIVERGES FROM 36-UI-SPEC.md §2, which explicitly asked for a fourth
-    // `present` tone so Present and Save would never collapse into one
-    // visual treatment. The owner has now asked for the opposite — do not
-    // "restore" the spec's outlined-indigo present tone. Present and Save
-    // remain visually distinguishable anyway: Save keeps `tone: 'primary'`
-    // (filled indigo), Present is now `default` (gray) — two different
-    // treatments, just not the spec's original pairing. The `▶` icon is
-    // untouched; the owner objected to the button's styling, not its glyph.
+    // Owner 2026-09-01: renamed "Present" → "Review Slides" so it is not
+    // confused with Run (running a live service). Kept SECONDARY (default
+    // gray, no `tone`) on the owner's explicit direction — "Review button
+    // should be secondary; that makes Run as primary stand out more" — so Run
+    // is the one filled-indigo standout in the button area. The old ▶ play
+    // glyph (which read as "run/play") is swapped for an eye to reinforce that
+    // this is a REVIEW, not a live run.
+    label: 'Review Slides',
+    icon: 'review',
     disabled: !ctx.canPresent,
-    title: !ctx.canPresent ? 'Add songs or scripture to build a slideshow to present.' : undefined,
+    title: !ctx.canPresent ? 'Add songs or scripture to build a slideshow to review.' : undefined,
     testId: 'action-bar-item-present',
     onClick: ctx.handlers.onPresent,
   }
@@ -274,13 +267,6 @@ function buildServiceOrderItems(ctx: ActionBarContext): ActionBarItem[] {
   if (exportItem) {
     items.push(exportItem)
   }
-  if (ctx.canEditService) {
-    items.push(buildSaveItem(ctx))
-  }
-  // R101 (48-03): Print/Share relocated here from the page bottom, appended
-  // AFTER Save — Save stays the row's one `tone: 'primary'` item; Print and
-  // Share both use the bar's `default` gray tone (same as Present), reading
-  // as an appendix to the primary actions rather than a competitor to Save.
   items.push(buildPrintItem(ctx))
   // R136 (59-04): ✉ Messages sits LEFT OF Share (UI-SPEC #0) — pushed before
   // the share item so the row reads [..., print, messages, share].
@@ -292,17 +278,23 @@ function buildServiceOrderItems(ctx: ActionBarContext): ActionBarItem[] {
   if (shareItem) {
     items.push(shareItem)
   }
-  return items
-}
-
-function buildSlidesItems(ctx: ActionBarContext): ActionBarItem[] {
-  // Present has no editor gate today (SlidesTab.vue:12-23) and is pushed
-  // BEFORE Save so the row reads Present then Save, matching design 1a.
-  const items: ActionBarItem[] = [buildPresentItem(ctx)]
+  // Save is the LAST (rightmost) action-bar item on every tab (owner
+  // 2026-09-01), matching the Slides tab where Save also sits last — so the
+  // primary Save control is in the same position regardless of tab. (It used
+  // to sit mid-row, right after Export.)
   if (ctx.canEditService) {
     items.push(buildSaveItem(ctx))
   }
   return items
+}
+
+function buildSlidesItems(ctx: ActionBarContext): ActionBarItem[] {
+  // No Save on the Slides tab (owner 2026-09-01): slide edits ride the
+  // slideGroups store, NOT `localService`, so `isDirty` never trips here and a
+  // Save button would sit permanently disabled. Autosave still persists slide
+  // changes. "Review Slides" (Present) is the only action; it has no editor
+  // gate (presentation-only), so a viewer sees it too.
+  return [buildPresentItem(ctx)]
 }
 
 /**

@@ -184,6 +184,52 @@ describe('buildServiceSnapshot stageLayout projection (T-107-01)', () => {
     expect(marker?.yPct).toBe(0)
   })
 
+  it('projects a marker note (non-PII tech text) through to the snapshot, and omits it when absent', async () => {
+    const { buildServiceSnapshot } = await import('../services')
+    const service = makeService({
+      stageLayout: {
+        elements: [
+          { id: 'm1', label: 'Guest', kind: 'mic', zone: 'onstage', xPct: 40, yPct: 40, note: 'XLR from stage left' },
+          { id: 'm2', label: '', kind: 'instrument', zone: 'offstage', xPct: 10, yPct: 20 },
+        ],
+      },
+    })
+
+    const snapshot = buildServiceSnapshot(service)
+    expect(snapshot.stageLayout?.elements[0]?.note).toBe('XLR from stage left')
+    expect('note' in (snapshot.stageLayout!.elements[1] as object)).toBe(false)
+  })
+
+  it('projects a band-role instrument display fields (roleName, personName, withVocal) but never the internal ids', async () => {
+    const { buildServiceSnapshot } = await import('../services')
+    const service = makeService({
+      stageLayout: {
+        elements: [
+          {
+            id: 'm1',
+            label: '',
+            roleId: 'role-abc',
+            roleName: 'Electric Guitar',
+            personId: 'person-xyz',
+            personName: 'Dana R.',
+            withVocal: true,
+            zone: 'onstage',
+            xPct: 40,
+            yPct: 40,
+          },
+        ],
+      },
+    })
+
+    const marker = buildServiceSnapshot(service).stageLayout?.elements[0] as unknown as Record<string, unknown>
+    expect(marker.roleName).toBe('Electric Guitar')
+    expect(marker.personName).toBe('Dana R.')
+    expect(marker.withVocal).toBe(true)
+    // Internal ids never reach the public snapshot.
+    expect('roleId' in marker).toBe(false)
+    expect('personId' in marker).toBe(false)
+  })
+
   it('preserves xPct/yPct verbatim through the projection', async () => {
     const { buildServiceSnapshot } = await import('../services')
     const service = makeService({

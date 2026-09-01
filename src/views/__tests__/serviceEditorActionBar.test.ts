@@ -148,13 +148,14 @@ describe('buildActionBarItems', () => {
       { name: 'roles, editor', tab: 'roles', overrides: { canEditService: true }, expected: [] },
       { name: 'roles, viewer', tab: 'roles', overrides: { canEditService: false }, expected: [] },
       { name: 'slides, canEditService false', tab: 'slides', overrides: { canEditService: false }, expected: ['present'] },
-      { name: 'slides, canEditService true', tab: 'slides', overrides: { canEditService: true }, expected: ['present', 'save'] },
+      // No Save on Slides (owner 2026-09-01) — slide edits don't dirty localService.
+      { name: 'slides, canEditService true', tab: 'slides', overrides: { canEditService: true }, expected: ['present'] },
       {
         name: 'service-order, canEditService true, hasPcCredentials true',
         tab: 'service-order',
         overrides: { canEditService: true, hasPcCredentials: true },
         // R101 (48-03): Print/Share now trail Save (isEditor defaults true).
-        expected: ['suggest-all-songs', 'export-pc', 'save', 'print', 'messages', 'share'],
+        expected: ['suggest-all-songs', 'export-pc', 'print', 'messages', 'share', 'save'],
       },
       {
         // Owner follow-up: Copy for PC deleted entirely — no export/copy item
@@ -163,7 +164,7 @@ describe('buildActionBarItems', () => {
         name: 'service-order, canEditService true, hasPcCredentials false — no export/copy item at all',
         tab: 'service-order',
         overrides: { canEditService: true, hasPcCredentials: false },
-        expected: ['suggest-all-songs', 'save', 'print', 'messages', 'share'],
+        expected: ['suggest-all-songs', 'print', 'messages', 'share', 'save'],
       },
       {
         // R101 (48-03): Print/Share are NOT gated on canEditService (same as
@@ -201,17 +202,17 @@ describe('buildActionBarItems', () => {
   describe('pcEnabled (39-05, R089)', () => {
     it('pcEnabled false, hasPcCredentials true: export-pc is absent from service-order', () => {
       const ctx = makeContext({ canEditService: true, hasPcCredentials: true, pcEnabled: false })
-      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'save', 'print', 'messages', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'print', 'messages', 'share', 'save'])
     })
 
     it('pcEnabled true, hasPcCredentials true: export-pc is present in service-order', () => {
       const ctx = makeContext({ canEditService: true, hasPcCredentials: true, pcEnabled: true })
-      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'save', 'print', 'messages', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'print', 'messages', 'share', 'save'])
     })
 
     it('pcEnabled false, hasPcCredentials false: export-pc is still absent (both gates agree)', () => {
       const ctx = makeContext({ canEditService: true, hasPcCredentials: false, pcEnabled: false })
-      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'save', 'print', 'messages', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'print', 'messages', 'share', 'save'])
     })
   })
 
@@ -223,12 +224,12 @@ describe('buildActionBarItems', () => {
   describe('aiEnabled (WR-01)', () => {
     it('aiEnabled false: suggest-all-songs is absent from service-order', () => {
       const ctx = makeContext({ canEditService: true, aiEnabled: false })
-      expect(keysOf('service-order', ctx)).toEqual(['export-pc', 'save', 'print', 'messages', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['export-pc', 'print', 'messages', 'share', 'save'])
     })
 
     it('aiEnabled true: suggest-all-songs is present in service-order', () => {
       const ctx = makeContext({ canEditService: true, aiEnabled: true })
-      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'save', 'print', 'messages', 'share'])
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'print', 'messages', 'share', 'save'])
     })
 
     it('aiEnabled false composes with canEditService: suggest-all-songs never appears regardless of edit permission', () => {
@@ -244,20 +245,19 @@ describe('buildActionBarItems', () => {
     })
   })
 
-  it('ADJACENCY: on slides with canEditService true, present sits immediately before save', () => {
+  it('slides exposes only Review Slides (Present) — no Save (owner 2026-09-01)', () => {
     const ctx = makeContext({ canEditService: true })
-    const keys = keysOf('slides', ctx)
-    expect(keys.indexOf('present')).toBe(keys.indexOf('save') - 1)
+    expect(keysOf('slides', ctx)).toEqual(['present'])
   })
 
-  it('ORDERING: service-order with canEditService true is suggest, then export (when credentialed), then save, then print, then share', () => {
+  it('ORDERING: service-order is suggest, export (when credentialed), print, messages, share, then Save LAST (owner 2026-09-01)', () => {
     const credentialed = keysOf('service-order', makeContext({ canEditService: true, hasPcCredentials: true }))
-    expect(credentialed).toEqual(['suggest-all-songs', 'export-pc', 'save', 'print', 'messages', 'share'])
+    expect(credentialed).toEqual(['suggest-all-songs', 'export-pc', 'print', 'messages', 'share', 'save'])
 
     // Owner follow-up: uncredentialed no longer inserts a copy-pc item — the
-    // export slot is simply absent, so suggest sits directly before save.
+    // export slot is simply absent. Save is the rightmost item in every case.
     const uncredentialed = keysOf('service-order', makeContext({ canEditService: true, hasPcCredentials: false }))
-    expect(uncredentialed).toEqual(['suggest-all-songs', 'save', 'print', 'messages', 'share'])
+    expect(uncredentialed).toEqual(['suggest-all-songs', 'print', 'messages', 'share', 'save'])
   })
 
   it('IDEMPOTENCY: two successive calls with the same context return equal key arrays', () => {
@@ -398,8 +398,11 @@ describe('buildActionBarItems', () => {
 
     it('present carries the disabled title and testid exactly', () => {
       const disabled = buildActionBarItems('slides', makeContext({ canPresent: false })).find((i) => i.key === 'present')
-      expect(disabled?.title).toBe('Add songs or scripture to build a slideshow to present.')
+      expect(disabled?.title).toBe('Add songs or scripture to build a slideshow to review.')
       expect(disabled?.testId).toBe('action-bar-item-present')
+      // Renamed "Present" → "Review Slides" (owner 2026-09-01), kept secondary.
+      expect(disabled?.label).toBe('Review Slides')
+      expect(disabled?.icon).toBe('review')
 
       const enabled = buildActionBarItems('slides', makeContext({ canPresent: true })).find((i) => i.key === 'present')
       expect(enabled?.title).toBeUndefined()
@@ -412,11 +415,12 @@ describe('buildActionBarItems', () => {
   // button used (T-48-03-01); buildPrintItem is unconditional, matching the
   // bottom-row Print button it replaces.
   describe('Print/Share (R101, 48-03)', () => {
-    it('service-order ends in [..., save, print, messages, share] when isEditor and canEditService', () => {
+    it('service-order ends in [..., print, messages, share, save] when isEditor and canEditService', () => {
       const ctx = makeContext({ canEditService: true, isEditor: true })
       const keys = keysOf('service-order', ctx)
-      // R136 (59-04): ✉ Messages sits between Print and Share (left of Share).
-      expect(keys.slice(-4)).toEqual(['save', 'print', 'messages', 'share'])
+      // R136 (59-04): ✉ Messages sits between Print and Share (left of Share);
+      // Save is now the rightmost item (owner 2026-09-01).
+      expect(keys.slice(-4)).toEqual(['print', 'messages', 'share', 'save'])
     })
 
     it('share is absent (no "share" key) when isEditor is false', () => {

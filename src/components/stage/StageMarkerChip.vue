@@ -1,74 +1,88 @@
 <script setup lang="ts">
 /**
- * Shared draggable marker-chip row for `StageLayoutEditor.vue` (Phase 107,
- * WR-03 dedup). This block used to be copy-pasted verbatim between the
- * on-stage and off-stage zone containers — a ~40-line block (chip div,
- * accent dot, label span, edit/remove buttons with identical SVGs and
- * handlers) that could silently drift between zones on any future markup
- * change. Extracted into a single component both zones now render from a
- * `v-for`, so there is exactly ONE place to change the chip markup.
+ * A single stage-marker tile (Phase 107 redesign): a rounded icon tile with
+ * the kind glyph, the label beneath it, plus the type, an assigned person, and
+ * a tech note. Purely PRESENTATIONAL and single-root, so both callers drive it
+ * by fallthrough:
+ *   • StageLayoutEditor positions it (`:style`), marks it interactive, and
+ *     attaches the native pointer handlers for drag + the click-to-select.
+ *   • StageLayoutView (read-only: locked editor / share / print) just
+ *     positions it — no handlers, not interactive.
+ * No store/Firebase import — safe on the public ShareView.
  *
- * All drag/edit/remove behavior stays owned by the parent — this component
- * only re-emits the raw pointer events plus `edit`/`remove` intents, never
- * touches `dragState` itself, so `StageLayoutEditor.vue`'s single source of
- * pointer-lifecycle truth (WR-01/WR-02 guards) is untouched by this split.
+ * `print` mode renders a larger, high-contrast BLACK-AND-WHITE tile for the
+ * tech team's printed sheet (bigger legible type, black text, a white tile with
+ * a black outline). The label is bound via Vue text interpolation ONLY, so a
+ * label containing markup renders as literal text (XSS-safe, R315).
  */
+import { computed } from 'vue'
 import type { StageMarker } from '@/types/service'
+import { stageMarkerIcon, stageMarkerSkinClass, stageMarkerTypeLabel } from '@/utils/stageLayout'
+import StageKindIcon from '@/components/stage/StageKindIcon.vue'
 
-defineProps<{
-  marker: StageMarker
-  accentClass: string
-  chipStyle: Record<string, string>
-}>()
+const props = withDefaults(
+  defineProps<{
+    marker: StageMarker
+    theme?: 'dark' | 'light'
+    selected?: boolean
+    interactive?: boolean
+    print?: boolean
+  }>(),
+  { theme: 'dark', selected: false, interactive: false, print: false },
+)
 
-const emit = defineEmits<{
-  pointerdown: [event: PointerEvent]
-  pointermove: [event: PointerEvent]
-  pointerup: [event: PointerEvent]
-  pointercancel: [event: PointerEvent]
-  edit: []
-  remove: []
-}>()
+function tileClass(): string {
+  if (props.print) return 'border-2 border-black bg-white text-black'
+  return stageMarkerSkinClass(props.marker, props.theme, props.selected)
+}
+
+const iconName = computed(() => stageMarkerIcon(props.marker))
+// The TYPE label (band role name, or fixed kind, "+ Vocal" when the player
+// also sings) shown alongside the free-text label so a tile reads as both a
+// name and a type.
+const typeLabel = computed(() => stageMarkerTypeLabel(props.marker))
+
+// Print uses larger, black text for legibility; on screen a slightly larger
+// baseline than before for readability (a11y).
+const labelClass = computed(() => (props.print ? 'text-[13px] font-semibold text-black' : props.theme === 'dark' ? 'text-[11px] font-medium text-gray-100' : 'text-[11px] font-medium text-gray-800'))
+const personClass = computed(() => (props.print ? 'text-[12px] font-medium text-black' : props.theme === 'dark' ? 'text-[11px] text-indigo-300' : 'text-[11px] text-indigo-600'))
+const typeClass = computed(() => (props.print ? 'text-[11px] font-semibold text-black' : props.theme === 'dark' ? 'text-[10.5px] text-gray-400' : 'text-[10.5px] text-gray-500'))
+const noteClass = computed(() => (props.print ? 'text-[11px] text-black' : props.theme === 'dark' ? 'text-[10.5px] text-gray-400' : 'text-[10.5px] text-gray-500'))
 </script>
 
 <template>
+  <!-- Centering is done by the caller's inline `transform: translate(-50%,-50%)`
+       (StageLayoutView.markerStyle / StageLayoutEditor.chipStyle), NOT a
+       Tailwind `-translate-x/y-1/2` class here. In Tailwind v4 that class emits
+       the CSS `translate` property, which STACKS with the editor's inline
+       `transform` translate and double-shifts the tile by half its width — so a
+       marker looked ~50px further left while editing than once locked. One
+       inline transform on both surfaces keeps them pixel-identical. -->
   <div
     data-testid="stage-marker"
     :data-marker-id="marker.id"
-    class="group absolute flex cursor-grab touch-none select-none items-center gap-1.5 whitespace-nowrap rounded-md border border-gray-700 bg-gray-800 px-2 py-1 text-sm text-gray-200 active:cursor-grabbing"
-    :style="chipStyle"
-    @pointerdown="emit('pointerdown', $event)"
-    @pointermove="emit('pointermove', $event)"
-    @pointerup="emit('pointerup', $event)"
-    @pointercancel="emit('pointercancel', $event)"
+    class="absolute flex flex-col items-center gap-1"
+    :class="[print ? 'w-[120px]' : 'w-[100px]', interactive ? 'cursor-grab touch-none active:cursor-grabbing' : '', selected ? 'z-30' : 'z-10']"
   >
-    <span class="inline-block h-2 w-2 shrink-0 rounded-full border" :class="accentClass" />
-    <span class="max-w-[10rem] truncate">{{ marker.label }}</span>
-    <span class="ml-1 hidden items-center gap-1 group-hover:flex group-focus-within:flex">
-      <button
-        type="button"
-        data-testid="marker-edit-button"
-        aria-label="Edit marker"
-        class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-gray-400 hover:text-gray-200"
-        @pointerdown.stop
-        @click.stop="emit('edit')"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        data-testid="marker-remove-button"
-        aria-label="Remove marker"
-        class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-red-400 hover:text-red-300"
-        @pointerdown.stop
-        @click.stop="emit('remove')"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
-    </span>
+    <div
+      class="flex items-center justify-center rounded-xl border"
+      :class="[print ? 'h-12 w-12' : 'h-11 w-11', tileClass(), selected ? 'ring-2 ring-indigo-400/40' : '']"
+    >
+      <StageKindIcon :name="iconName" :class="print ? 'h-6 w-6' : 'h-5 w-5'" />
+    </div>
+    <!-- Free-text label (the name), when set. -->
+    <div v-if="marker.label" class="max-w-[120px] text-center leading-tight" :class="labelClass">{{ marker.label }}</div>
+    <!-- Assigned person, when chosen from the service's roster. -->
+    <div v-if="marker.personName" class="max-w-[120px] text-center leading-tight" :class="personClass">{{ marker.personName }}</div>
+    <!-- Type (kind) — shown so a tile reads as both name and type, but hidden
+         when it would just duplicate the label. -->
+    <div
+      v-if="typeLabel && typeLabel !== marker.label"
+      class="max-w-[120px] text-center uppercase leading-tight tracking-wide"
+      :class="typeClass"
+    >
+      {{ typeLabel }}
+    </div>
+    <div v-if="marker.note" class="line-clamp-2 max-w-[120px] text-center italic leading-tight" :class="noteClass">{{ marker.note }}</div>
   </div>
 </template>

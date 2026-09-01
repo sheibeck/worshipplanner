@@ -1,21 +1,22 @@
-import type { StageMarker } from '@/types/service'
+import type { StageMarker, StageMarkerKind } from '@/types/service'
 
 /**
- * Pure geometry + factory helpers for the visual stage layout (R313/R314,
- * Phase 107). Deliberately dependency-free — no Vue, no Pinia, no Firebase
- * imports — so this module is safe to call from BOTH the editor's live
- * drag canvas (Plan 02) and the read-only renderer (this plan / Plan 03),
- * which in turn is what keeps StageLayoutView.vue import-free enough to
- * mount on the public, unauthenticated ShareView.
+ * Pure geometry + kind-registry helpers for the visual stage layout (R313/R314,
+ * Phase 107; redesigned to the single-room "Nocturne" diagram). Dependency-free
+ * (no Vue/Pinia/Firebase) so it is safe from BOTH the editor's drag canvas and
+ * the read-only renderer (`StageLayoutView`), which keeps that view import-free
+ * enough for the public, unauthenticated ShareView.
  *
- * Every position in this module is a PERCENTAGE in [0,100] of its zone's
- * bounding box, never a raw pixel — that is what makes a saved marker
- * position resize-stable and reload-exact (R314): a viewport resize just
- * recomputes pixel placement from the same stored percentage on render,
- * with no refetch or recalculation step.
+ * The diagram is ONE continuous room; positions are a single percentage space
+ * ([0,100] of the room rect) — never snapped, always resize-stable (R314). A
+ * marker's stored `zone` is derived from where it lands (`zoneFromPosition`).
+ *
+ * A marker's TYPE is either a fixed `kind` (Vocals / Mics & DI / Gear, plus the
+ * Orchestra & Instrument extras) OR a band ROLE (`roleId`/`roleName`): the
+ * Instruments palette mirrors the org's Band roles so a marker's instrument
+ * lines up with the role a person is assigned to. The read-only surfaces need
+ * only the denormalized `roleName` to render (icon/label/skin), never the id.
  */
-
-export const MARKER_KINDS = ['instrument', 'mic', 'monitor', 'other'] as const
 
 interface Rect {
   left: number
@@ -31,11 +32,9 @@ export function clampPct(value: number): number {
 
 /**
  * Converts a pointer/client point into its percentage offset within `rect`,
- * each axis clamped to [0,100] independently — a point outside the rect
- * clamps to the nearest edge rather than exceeding the range. Round-trips
- * exactly (within floating tolerance) with the inverse pct->pixel mapping
- * `rect.left + (xPct / 100) * rect.width`, which is the property that keeps
- * reload and resize stable (R314).
+ * each axis clamped to [0,100] independently. Round-trips exactly (within
+ * floating tolerance) with the inverse pct->pixel mapping, the property that
+ * keeps reload and resize stable (R314).
  */
 export function pctWithinRect(clientX: number, clientY: number, rect: Rect): { xPct: number; yPct: number } {
   const xPct = rect.width === 0 ? 0 : ((clientX - rect.left) / rect.width) * 100
@@ -43,81 +42,210 @@ export function pctWithinRect(clientX: number, clientY: number, rect: Rect): { x
   return { xPct: clampPct(xPct), yPct: clampPct(yPct) }
 }
 
-function isPointInRect(x: number, y: number, rect: Rect): boolean {
-  return x >= rect.left && x <= rect.left + rect.width && y >= rect.top && y <= rect.top + rect.height
+// The stage platform occupies the inset top band of the room (matches the
+// trapezoid drawn in StageRoom: left 10%–right 90%, top 5%–edge 65%).
+export const STAGE_BAND = { minX: 11, maxX: 89, maxY: 64 } as const
+
+/** Derives a marker's stored zone from its single-space position. */
+export function zoneFromPosition(xPct: number, yPct: number): StageMarker['zone'] {
+  const onStage = xPct > STAGE_BAND.minX && xPct < STAGE_BAND.maxX && yPct < STAGE_BAND.maxY
+  return onStage ? 'onstage' : 'offstage'
+}
+
+/** Human-readable placement label for the inspector drawer. */
+export function placementLabel(xPct: number, yPct: number): string {
+  if (zoneFromPosition(xPct, yPct) === 'onstage') return 'On stage'
+  if (yPct >= STAGE_BAND.maxY) return 'In front of the stage'
+  return 'Off stage · in the wing'
+}
+
+// ── Kind registry (fixed kinds only) ─────────────────────────────────────────
+// Instruments here are the two EXTRAS (Orchestra, Instrument) that don't follow
+// a Band role — the per-org band-role instrument chips are built dynamically in
+// `buildStagePalette`. `gear` splits neutral gear tiles from accent performer
+// tiles; `icon` names a glyph in StageKindIcon.vue.
+
+export interface StageKindMeta {
+  label: string
+  group: 'Vocals' | 'Instruments' | 'Mics & DI' | 'Gear'
+  icon: string
+  gear: boolean
+}
+
+export const STAGE_KIND_META: Record<StageMarkerKind, StageKindMeta> = {
+  lead: { label: 'Lead vocal', group: 'Vocals', icon: 'mic-stage', gear: false },
+  vocal: { label: 'Vocal', group: 'Vocals', icon: 'mic', gear: false },
+  choir: { label: 'Choir', group: 'Vocals', icon: 'users', gear: false },
+  orchestra: { label: 'Orchestra', group: 'Instruments', icon: 'strings', gear: false },
+  instrument: { label: 'Instrument', group: 'Instruments', icon: 'music', gear: false },
+  mic: { label: 'Microphone', group: 'Mics & DI', icon: 'mic', gear: true },
+  di: { label: 'DI box', group: 'Mics & DI', icon: 'plug', gear: true },
+  monitor: { label: 'Monitor', group: 'Gear', icon: 'speaker', gear: true },
+  amp: { label: 'Amp', group: 'Gear', icon: 'speaker', gear: true },
+  stand: { label: 'Music stand', group: 'Gear', icon: 'music', gear: true },
+  power: { label: 'Power drop', group: 'Gear', icon: 'bolt', gear: true },
+  tv: { label: 'TV', group: 'Gear', icon: 'tv', gear: true },
+  misc: { label: 'Miscellaneous', group: 'Gear', icon: 'box', gear: true },
+  communion: { label: 'Communion', group: 'Gear', icon: 'cup', gear: true },
+}
+
+export const STAGE_KINDS = Object.keys(STAGE_KIND_META) as StageMarkerKind[]
+export const STAGE_KIND_GROUPS = ['Vocals', 'Instruments', 'Mics & DI', 'Gear'] as const
+
+/** True when the fixed kind is neutral "gear". Unknown/absent → gear-neutral. */
+export function isGearKind(kind: StageMarker['kind']): boolean {
+  return kind ? STAGE_KIND_META[kind]?.gear !== false : true
+}
+
+/** True when the fixed kind is in the Instruments group. */
+export function isInstrumentKind(kind: StageMarker['kind']): boolean {
+  return kind ? STAGE_KIND_META[kind]?.group === 'Instruments' : false
+}
+
+/** A best-effort glyph for a band-role instrument, keyed off the role name. */
+export function roleInstrumentIcon(roleName: string): string {
+  const n = roleName.toLowerCase()
+  if (/bass|guitar|gtr|uke/.test(n)) return 'guitar'
+  if (/key|piano|synth|organ|rhodes/.test(n)) return 'piano'
+  if (/drum|perc|cajon|kit/.test(n)) return 'drum'
+  if (/violin|viola|cello|string|orchestra|fiddle/.test(n)) return 'strings'
+  if (/vocal|sing|vox|lead|choir/.test(n)) return 'mic-stage'
+  return 'music'
+}
+
+// ── Marker-level display helpers (kind OR band role) ─────────────────────────
+
+/** A band-role instrument OR an Instruments-group kind — the markers that can
+ *  carry the "player also sings" flag and take the accent (performer) tile. */
+export function markerIsInstrument(marker: Pick<StageMarker, 'kind' | 'roleName'>): boolean {
+  return marker.roleName ? true : isInstrumentKind(marker.kind)
+}
+
+/** Gear (neutral tile) vs performer (accent tile). A role-instrument marker is
+ *  always a performer; otherwise it follows the fixed kind's gear flag. */
+export function isGearMarker(marker: Pick<StageMarker, 'kind' | 'roleName'>): boolean {
+  return marker.roleName ? false : isGearKind(marker.kind)
+}
+
+/** The glyph for a marker: role-based when it carries a band role, else its
+ *  fixed kind's glyph, else a neutral dot. */
+export function stageMarkerIcon(marker: Pick<StageMarker, 'kind' | 'roleName'>): string {
+  if (marker.roleName) return roleInstrumentIcon(marker.roleName)
+  return (marker.kind && STAGE_KIND_META[marker.kind]?.icon) || 'dot'
+}
+
+/** The TYPE label for a marker tile: the band role name, or the fixed kind's
+ *  label, plus "+ Vocal" for an instrument whose player also sings. */
+export function stageMarkerTypeLabel(marker: Pick<StageMarker, 'kind' | 'roleName' | 'withVocal'>): string {
+  const base = marker.roleName ? marker.roleName : marker.kind ? STAGE_KIND_META[marker.kind]?.label ?? '' : ''
+  if (!base) return ''
+  return marker.withVocal && markerIsInstrument(marker) ? `${base} + Vocal` : base
+}
+
+/** The fixed-kind TYPE label (+ "+ Vocal" for instrument kinds). Used for the
+ *  label fallback when a person is unassigned on a fixed-kind marker. */
+export function stageTypeLabel(kind: StageMarker['kind'], withVocal = false): string {
+  if (!kind) return ''
+  const base = STAGE_KIND_META[kind]?.label ?? ''
+  return withVocal && isInstrumentKind(kind) ? `${base} + Vocal` : base
+}
+
+// ── Tile skin (full literal Tailwind classes, purge-safe) ────────────────────
+function skinClass(gear: boolean, theme: 'dark' | 'light', selected: boolean): string {
+  if (theme === 'light') {
+    if (selected) return gear ? 'bg-gray-100 border-indigo-500 text-gray-700' : 'bg-indigo-50 border-indigo-500 text-indigo-700'
+    return gear ? 'bg-gray-100 border-gray-300 text-gray-600' : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+  }
+  if (selected) return gear ? 'bg-gray-800 border-indigo-400 text-gray-200' : 'bg-indigo-950 border-indigo-400 text-indigo-200'
+  return gear ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-indigo-950 border-indigo-800 text-indigo-200'
+}
+
+/** Skin for a palette chip (fixed kind or role — role chips are performers). */
+export function stagePaletteSkinClass(gear: boolean, theme: 'dark' | 'light' = 'dark'): string {
+  return skinClass(gear, theme, false)
+}
+/** Back-compat: skin from a fixed kind. */
+export function stageTileSkinClass(kind: StageMarker['kind'], theme: 'dark' | 'light' = 'dark', selected = false): string {
+  return skinClass(isGearKind(kind), theme, selected)
+}
+/** Skin from a whole marker (accounts for band-role instruments). */
+export function stageMarkerSkinClass(marker: Pick<StageMarker, 'kind' | 'roleName'>, theme: 'dark' | 'light' = 'dark', selected = false): string {
+  return skinClass(isGearMarker(marker), theme, selected)
+}
+
+// ── Palette (Instruments mirror the org's Band roles) ────────────────────────
+export interface StagePaletteItem {
+  /** stable key / testid suffix */
+  id: string
+  label: string
+  icon: string
+  gear: boolean
+  kind?: StageMarkerKind
+  roleId?: string
+  roleName?: string
+}
+export interface StagePaletteGroup {
+  name: string
+  items: StagePaletteItem[]
+}
+
+function kindItems(group: StageKindMeta['group']): StagePaletteItem[] {
+  return STAGE_KINDS.filter((k) => STAGE_KIND_META[k].group === group).map((kind) => ({
+    id: kind,
+    label: STAGE_KIND_META[kind].label,
+    icon: STAGE_KIND_META[kind].icon,
+    gear: STAGE_KIND_META[kind].gear,
+    kind,
+  }))
 }
 
 /**
- * Resolves which zone a point falls inside by bounding-rect containment.
- * A point inside neither zone rect returns `fallbackZone` — this is what
- * lets a drag dropped outside any zone keep the marker's CURRENT zone
- * instead of silently reassigning it.
+ * Builds the palette. The Instruments group is the org's Band roles (each a
+ * role chip that lines a marker's instrument up with the role a person plays),
+ * followed by the fixed Orchestra & Instrument extras that don't follow a Band
+ * role. Vocals / Mics & DI / Gear are the fixed kinds.
  */
-export function zoneFromPoint(
-  clientX: number,
-  clientY: number,
-  zones: { onstage: Rect; offstage: Rect },
-  fallbackZone: StageMarker['zone'],
-): StageMarker['zone'] {
-  if (isPointInRect(clientX, clientY, zones.onstage)) return 'onstage'
-  if (isPointInRect(clientX, clientY, zones.offstage)) return 'offstage'
-  return fallbackZone
+export function buildStagePalette(bandRoles: { id: string; name: string }[] = []): StagePaletteGroup[] {
+  const roleItems: StagePaletteItem[] = bandRoles.map((r) => ({
+    id: `role-${r.id}`,
+    label: r.name,
+    icon: roleInstrumentIcon(r.name),
+    gear: false,
+    roleId: r.id,
+    roleName: r.name,
+  }))
+  return [
+    { name: 'Vocals', items: kindItems('Vocals') },
+    { name: 'Instruments', items: [...roleItems, ...kindItems('Instruments')] },
+    { name: 'Mics & DI', items: kindItems('Mics & DI') },
+    { name: 'Gear', items: kindItems('Gear') },
+  ]
 }
 
 /**
- * Builds a brand-new StageMarker with a fresh id. Omits the `kind` key
- * entirely when not supplied — NEVER `kind: undefined` — matching this
- * codebase's established "absent key, not undefined value" convention for
- * optional fields (see `createSlot` in src/utils/slotTypes.ts).
+ * Builds a brand-new StageMarker with a fresh id, deriving `zone` from the drop
+ * position. Carries a fixed `kind` OR a band `roleId`/`roleName`. Omits every
+ * optional key it wasn't given (absent, never `undefined`).
  */
 export function createMarker(input: {
   label: string
-  zone: StageMarker['zone']
   xPct: number
   yPct: number
   kind?: StageMarker['kind']
+  roleId?: string
+  roleName?: string
+  zone?: StageMarker['zone']
 }): StageMarker {
-  const { label, zone, xPct, yPct, kind } = input
+  const { label, xPct, yPct, kind, roleId, roleName } = input
+  const x = clampPct(xPct)
+  const y = clampPct(yPct)
   return {
     id: crypto.randomUUID(),
     label,
-    zone,
-    xPct: clampPct(xPct),
-    yPct: clampPct(yPct),
+    zone: input.zone ?? zoneFromPosition(x, y),
+    xPct: x,
+    yPct: y,
     ...(kind ? { kind } : {}),
-  }
-}
-
-/**
- * Returns a STATIC, complete literal Tailwind class string for a marker's
- * optional `kind` accent, per theme. Every branch is written as a full
- * literal (never built by string concatenation/interpolation) so Tailwind
- * v4's content-scan purge can find every class at build time — the same
- * discipline `kindBadgeClass()` in src/utils/slotTypes.ts already follows.
- * `kind` absent/'other' and any theme both fall back to the neutral gray
- * family, matching 107-UI-SPEC's kind table.
- */
-export function markerKindAccentClass(kind: StageMarker['kind'], theme: 'dark' | 'light' = 'dark'): string {
-  if (theme === 'light') {
-    switch (kind) {
-      case 'instrument':
-        return 'bg-sky-100 border-sky-300 text-sky-700'
-      case 'mic':
-        return 'bg-emerald-100 border-emerald-300 text-emerald-700'
-      case 'monitor':
-        return 'bg-amber-100 border-amber-300 text-amber-700'
-      default:
-        return 'bg-gray-100 border-gray-300 text-gray-700'
-    }
-  }
-  switch (kind) {
-    case 'instrument':
-      return 'bg-sky-950 border-sky-800 text-sky-300'
-    case 'mic':
-      return 'bg-emerald-950 border-emerald-800 text-emerald-300'
-    case 'monitor':
-      return 'bg-amber-950 border-amber-800 text-amber-300'
-    default:
-      return 'bg-gray-800 border-gray-600 text-gray-300'
+    ...(roleId && roleName ? { roleId, roleName } : {}),
   }
 }

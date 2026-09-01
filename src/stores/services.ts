@@ -185,6 +185,22 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     zone: marker.zone,
     xPct: clampPct(marker.xPct),
     yPct: clampPct(marker.yPct),
+    // `note` is planner-authored tech instruction (non-PII free text, e.g.
+    // "XLR run from stage left") and belongs on the printed/shared plot the
+    // tech team reads. Conditional spread keeps the key ABSENT (never
+    // `note: undefined`) on a marker that never set one, same discipline as
+    // `kind` above and the whole projection's absent-not-undefined contract.
+    ...(marker.note ? { note: marker.note } : {}),
+    // Band-role instrument: project the display role NAME (needed for the tile's
+    // type/icon/skin on the read-only page), never the internal roleId.
+    ...(marker.roleName ? { roleName: marker.roleName } : {}),
+    // Assigned person: project only the display NAME (same trust level as the
+    // "Who's Serving" roleAssignments the share page already shows), never the
+    // internal personId. The tile renders `personName` directly.
+    ...(marker.personName ? { personName: marker.personName } : {}),
+    // The "player also sings" flag is a boolean display cue (no PII); carry it
+    // so the shared/printed tile reads "Electric + Vocal" too.
+    ...(marker.withVocal ? { withVocal: true } : {}),
   }))
 
   return {

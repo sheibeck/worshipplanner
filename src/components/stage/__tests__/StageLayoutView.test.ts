@@ -5,27 +5,27 @@ import type { StageMarker } from '@/types/service'
 
 const markers: StageMarker[] = [
   { id: 'm1', label: 'Lead Vocal', kind: 'mic', zone: 'onstage', xPct: 25, yPct: 60 },
-  { id: 'm2', label: 'Drums', kind: 'instrument', zone: 'offstage', xPct: 80, yPct: 40 },
+  // A band-role instrument (Instruments palette mirrors band roles): the type
+  // label comes from the denormalized roleName.
+  { id: 'm2', label: '', roleId: 'r1', roleName: 'Drums', zone: 'offstage', xPct: 80, yPct: 40 },
 ]
 
 describe('StageLayoutView', () => {
-  it('renders exactly two zone containers with the expected headings', () => {
+  it('renders a single continuous room diagram (not two zone boxes)', () => {
     const wrapper = mount(StageLayoutView, { props: { elements: markers } })
-    expect(wrapper.find('[data-testid="stage-zone-onstage"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="stage-zone-offstage"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('ON STAGE')
-    expect(wrapper.text()).toContain('OFF STAGE (SIDE)')
+    expect(wrapper.find('[data-testid="stage-room"]').exists()).toBe(true)
+    // The old two-box layout is gone.
+    expect(wrapper.find('[data-testid="stage-zone-onstage"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="stage-zone-offstage"]').exists()).toBe(false)
+    // Room chrome labels read the way the room does.
+    expect(wrapper.text()).toContain('Back of stage')
+    expect(wrapper.text()).toContain('Audience')
   })
 
-  it('renders one marker chip per element, placed inside its zone', () => {
+  it('renders one marker tile per element inside the room', () => {
     const wrapper = mount(StageLayoutView, { props: { elements: markers } })
-    const chips = wrapper.findAll('[data-testid="stage-marker"]')
-    expect(chips).toHaveLength(2)
-
-    const onstageZone = wrapper.find('[data-testid="stage-zone-onstage"]')
-    const offstageZone = wrapper.find('[data-testid="stage-zone-offstage"]')
-    expect(onstageZone.findAll('[data-testid="stage-marker"]')).toHaveLength(1)
-    expect(offstageZone.findAll('[data-testid="stage-marker"]')).toHaveLength(1)
+    const room = wrapper.find('[data-testid="stage-room"]')
+    expect(room.findAll('[data-testid="stage-marker"]')).toHaveLength(2)
   })
 
   it('renders each marker at the exact xPct/yPct given via inline style (R314 reload fidelity)', () => {
@@ -41,10 +41,6 @@ describe('StageLayoutView', () => {
   })
 
   it('placement style is percentage-only, never a pixel/measured value (resize-stable by construction)', () => {
-    // The component must derive left/top purely from the given xPct/yPct
-    // props — never from a measured container rect — so a viewport resize
-    // recomputes pixel placement via CSS alone, with no JS recalculation
-    // step and no possibility of drift (R314).
     const wrapper = mount(StageLayoutView, { props: { elements: markers } })
     const style = wrapper.find('[data-testid="stage-marker"]').attributes('style') ?? ''
     expect(style).toMatch(/left:\s*\d+(\.\d+)?%/)
@@ -52,11 +48,14 @@ describe('StageLayoutView', () => {
     expect(style).not.toMatch(/px/)
   })
 
-  it('renders no drag-grab, edit, delete, or add-marker affordances (read-only)', () => {
+  it('renders no drag, edit, delete, palette, or drawer affordances (read-only)', () => {
     const wrapper = mount(StageLayoutView, { props: { elements: markers } })
-    expect(wrapper.find('[data-testid="marker-edit-button"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="marker-remove-button"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="add-marker-button"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="marker-delete"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="marker-inspector"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid^="palette-chip-"]').exists()).toBe(false)
+    // Tiles are not marked interactive (no grab cursor / touch-none).
+    const tile = wrapper.find('[data-testid="stage-marker"]')
+    expect(tile.classes()).not.toContain('cursor-grab')
   })
 
   it('renders a label containing markup as literal text, never parsed as DOM (XSS-safe)', () => {
@@ -68,22 +67,39 @@ describe('StageLayoutView', () => {
     expect(wrapper.find('img').exists()).toBe(false)
   })
 
-  it('applies dark-mode classes by default', () => {
-    const wrapper = mount(StageLayoutView, { props: { elements: markers } })
-    const root = wrapper.find('[data-testid="stage-layout-view"]')
-    expect(root.classes().some((c) => c.includes('gray-9') || c.includes('gray-95'))).toBe(true)
+  it('renders a marker note as literal read-only text when present', () => {
+    const withNote: StageMarker[] = [
+      { id: 'm5', label: 'Guest', kind: 'mic', zone: 'onstage', xPct: 40, yPct: 40, note: 'Handheld on standby' },
+    ]
+    const wrapper = mount(StageLayoutView, { props: { elements: withNote } })
+    expect(wrapper.text()).toContain('Handheld on standby')
   })
 
-  it('applies light-mode classes when theme="light"', () => {
-    const wrapper = mount(StageLayoutView, { props: { elements: markers, theme: 'light' } })
-    const onstageZone = wrapper.find('[data-testid="stage-zone-onstage"]')
-    expect(onstageZone.classes().some((c) => c.includes('gray-50') || c.includes('white'))).toBe(true)
+  it('renders a band-role instrument type, an assigned person name, and "+ Vocal"', () => {
+    const rich: StageMarker[] = [
+      { id: 'm6', label: '', roleId: 'r1', roleName: 'Electric Guitar', personName: 'Dana R.', withVocal: true, zone: 'onstage', xPct: 40, yPct: 40 },
+    ]
+    const wrapper = mount(StageLayoutView, { props: { elements: rich } })
+    expect(wrapper.text()).toContain('Dana R.')
+    expect(wrapper.text()).toContain('Electric Guitar + Vocal')
   })
 
-  it('renders an accent for a marker with a kind and does not error for a marker with no kind', () => {
-    const noKindMarkers: StageMarker[] = [{ id: 'm4', label: 'Extra Speaker Mic', zone: 'onstage', xPct: 50, yPct: 50 }]
-    expect(() => mount(StageLayoutView, { props: { elements: noKindMarkers } })).not.toThrow()
-    const wrapper = mount(StageLayoutView, { props: { elements: markers } })
-    expect(wrapper.html()).toContain('sky')
+  it('applies a dark room by default and a light room when theme="light"', () => {
+    const dark = mount(StageLayoutView, { props: { elements: markers } })
+    expect(dark.find('[data-testid="stage-room"]').classes().some((c) => c.includes('#0d0f1a') || c.includes('bg-['))).toBe(true)
+
+    const light = mount(StageLayoutView, { props: { elements: markers, theme: 'light' } })
+    expect(light.find('[data-testid="stage-room"]').classes()).toContain('bg-white')
+  })
+
+  it('shows an empty-state hint and does not error with no markers', () => {
+    const wrapper = mount(StageLayoutView, { props: { elements: [] } })
+    expect(wrapper.findAll('[data-testid="stage-marker"]')).toHaveLength(0)
+    expect(wrapper.text()).toContain('No stage layout')
+  })
+
+  it('does not throw for a marker with no kind', () => {
+    const noKind: StageMarker[] = [{ id: 'm4', label: 'Extra Speaker Mic', zone: 'onstage', xPct: 50, yPct: 50 }]
+    expect(() => mount(StageLayoutView, { props: { elements: noKind } })).not.toThrow()
   })
 })

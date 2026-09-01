@@ -183,13 +183,65 @@ export interface ScriptureRef {
  * recomputes pixel placement from the same stored percentage, with no
  * refetch or recalculation step.
  */
+/**
+ * A marker's optional kind. Drives the palette grouping, the tile icon, and
+ * the accent/neutral skin (see STAGE_KIND_META in src/utils/stageLayout.ts).
+ * Additive: absent on markers that never set one (older/neutral markers still
+ * typecheck and render with a neutral dot glyph).
+ */
+export type StageMarkerKind =
+  | 'lead'
+  | 'vocal'
+  | 'choir'
+  | 'orchestra'
+  | 'instrument'
+  | 'mic'
+  | 'di'
+  | 'monitor'
+  | 'amp'
+  | 'stand'
+  | 'power'
+  | 'tv'
+  | 'misc'
+  | 'communion'
+
 export interface StageMarker {
   id: string
   label: string
-  kind?: 'instrument' | 'mic' | 'monitor' | 'other'
+  kind?: StageMarkerKind
+  /**
+   * A band-role instrument: the marker's TYPE is one of the org's Band roles
+   * (the Instruments palette mirrors those), so the instrument lines up with
+   * the role a person is assigned to. `roleName` is denormalized alongside
+   * `roleId` so the read-only renderer (share/print, no store) shows the type
+   * without a lookup. Mutually exclusive with `kind` in practice; absent for
+   * the fixed Vocals/Mics/Gear/Orchestra/Instrument kinds. */
+  roleId?: string
+  roleName?: string
+  /** Derived from position (`zoneFromPosition`) and stored so the data stays
+   *  self-describing; 'onstage' = on the platform band, 'offstage' = a side
+   *  wing or the audience apron. */
   zone: 'onstage' | 'offstage'
   xPct: number
   yPct: number
+  /** Optional free-text note for the tech team (e.g. "XLR run from stage
+   *  left"). Absent key when empty. Shown read-only on print/share. */
+  note?: string
+  /**
+   * Optional person assigned to this spot, chosen from the people already
+   * serving this service (its resolved role assignments) — so a planner
+   * selects a name instead of hand-typing a label. `personName` is
+   * denormalized alongside `personId` so the read-only renderer (share/print,
+   * which imports no store) can show the name directly; `personId` keeps the
+   * picker's selected state stable across identical names. Both absent when
+   * the spot is unassigned (gear, spares, or an unfilled position).
+   */
+  personId?: string
+  personName?: string
+  /** For an instrument marker whose player also sings — the tile then reads
+   *  e.g. "Electric + Vocal". Only meaningful for Instruments-group kinds;
+   *  absent otherwise. */
+  withVocal?: boolean
 }
 
 export interface Service {
