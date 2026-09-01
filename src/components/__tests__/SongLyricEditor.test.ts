@@ -1024,7 +1024,7 @@ describe('SongLyricEditor', () => {
     expect(wrapper.text()).not.toContain('My chains are gone')
   })
 
-  it('the add row renders the six quick-add chips in mockup order, incl. Pre-Chorus (R119)', async () => {
+  it('the add row renders the six quick-add chips in mockup order, incl. Pre-Chorus (R119), plus the Black Slide chip (R302)', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     const wrapper = await mountEditor()
@@ -1040,6 +1040,7 @@ describe('SongLyricEditor', () => {
       'Bridge',
       'Tag',
       'Ending',
+      'Black Slide',
     ])
   })
 
@@ -1706,6 +1707,151 @@ describe('SongLyricEditor', () => {
 
       expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="lyrics-header"]').exists()).toBe(true)
+    })
+  })
+
+  // ── 105-02 (R302/R303/R304): "Insert black slide" + blackout row chrome ──
+
+  describe('blackout (Black Slide) row', () => {
+    it('the add row shows a 7th "Black Slide" chip after the six quick-add chips', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      const addRow = wrapper.find('[data-testid="add-section-row"]')
+      const chips = addRow.findAll('button')
+      expect(chips.map((c) => c.text())).toEqual([
+        'Verse', 'Chorus', 'Pre-Chorus', 'Bridge', 'Tag', 'Ending', 'Black Slide',
+      ])
+      const blackoutChip = wrapper.find('[data-testid="add-section-chip-blackout"]')
+      expect(blackoutChip.exists()).toBe(true)
+      expect(blackoutChip.text()).toBe('Black Slide')
+    })
+
+    it('clicking the Black Slide chip inserts a blackout row (kind blackout, lines []), auto-expanded, with NO new service section', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="add-section-chip-blackout"]').trigger('click')
+      await flushPromises()
+
+      const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+      expect(rows).toHaveLength(3)
+      const newRow = rows[2]!
+      expect(newRow.text()).toContain('BLACK SLIDE')
+
+      // Auto-expanded: the calm placeholder panel is visible, no textarea.
+      expect(newRow.find('textarea').exists()).toBe(false)
+      expect(newRow.find('[data-testid^="row-blackout-placeholder-"]').exists()).toBe(true)
+      expect(newRow.text()).toContain('This slide renders solid black')
+
+      const saveFn = await saveFnFor(wrapper)
+      mockUpdateCurrentLyrics.mockClear()
+      await saveFn()
+      const call = mockUpdateCurrentLyrics.mock.calls[0] as unknown as [string, string, string, { sections: LyricSection[]; performanceOrder: string[] }]
+      const newSection = call[3].sections.find((s) => s.label === 'Black Slide')
+      expect(newSection?.kind).toBe('blackout')
+      expect(newSection?.lines).toEqual([])
+      // No new service section: this is purely a LyricSection row in the
+      // existing performanceOrder — the persisted shape carries only
+      // sections/performanceOrder, never anything section-of-service-like.
+      expect(Object.keys(call[3])).toEqual(['sections', 'performanceOrder'])
+    })
+
+    it('a collapsed blackout row shows the black swatch + caption and "no text", no lyric preview', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics({
+        sections: [...SAMPLE_SECTIONS, { id: 'black-slide', label: 'Black Slide', lines: [], kind: 'blackout' }],
+        performanceOrder: ['verse-1', 'chorus', 'black-slide'],
+      })
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+      const blackoutRow = rows[2]!
+      expect(blackoutRow.text()).toContain('BLACK SLIDE')
+      expect(blackoutRow.find('[data-testid="row-preview"]').text()).toContain('Solid black')
+      expect(blackoutRow.find('[data-testid="row-preview"]').text()).toContain('no text or image')
+      expect(blackoutRow.find('[data-testid="row-line-count"]').text()).toBe('no text')
+      expect(blackoutRow.find('textarea').exists()).toBe(false)
+    })
+
+    it('an expanded blackout row shows the calm placeholder panel, no textarea, no split UI', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics({
+        sections: [...SAMPLE_SECTIONS, { id: 'black-slide', label: 'Black Slide', lines: [], kind: 'blackout' }],
+        performanceOrder: ['verse-1', 'chorus', 'black-slide'],
+      })
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+      const blackoutRow = rows[2]!
+      await blackoutRow.find('[data-testid^="row-toggle-"]').trigger('click')
+
+      expect(blackoutRow.find('textarea').exists()).toBe(false)
+      expect(blackoutRow.find('[data-testid^="row-split-"]').exists()).toBe(false)
+      const placeholder = blackoutRow.find('[data-testid="row-blackout-placeholder-black-slide"]')
+      expect(placeholder.exists()).toBe(true)
+      expect(placeholder.text()).toBe('This slide renders solid black — no text, background, or label.')
+    })
+
+    it('Duplicate and Remove work on a blackout row via the existing controls', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics({
+        sections: [...SAMPLE_SECTIONS, { id: 'black-slide', label: 'Black Slide', lines: [], kind: 'blackout' }],
+        performanceOrder: ['verse-1', 'chorus', 'black-slide'],
+      })
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      let rows = wrapper.findAll('[data-testid="section-rows"] > div')
+      const blackoutRow = rows[2]!
+      await blackoutRow.find('[data-testid^="row-toggle-"]').trigger('click')
+      await blackoutRow.find('[data-testid="row-duplicate-black-slide#0"]').trigger('click')
+      await flushPromises()
+
+      rows = wrapper.findAll('[data-testid="section-rows"] > div')
+      expect(rows).toHaveLength(4)
+      expect(rows[3]!.attributes('data-repeat')).toBe('true')
+      expect(rows[3]!.text()).toContain('BLACK SLIDE')
+
+      // The duplicate auto-expanded (source row was expanded) — a repeated
+      // blackout row renders the same calm placeholder, not the empty
+      // row-shared-text box.
+      expect(rows[3]!.find('[data-testid="row-blackout-placeholder-black-slide"]').exists()).toBe(true)
+      expect(rows[3]!.find('[data-testid^="row-shared-text-"]').exists()).toBe(false)
+
+      await rows[3]!.find('[data-testid="row-remove-black-slide#1"]').trigger('click')
+      await wrapper.find('[data-testid="row-remove-confirm-black-slide#1"]').trigger('click')
+      await flushPromises()
+
+      rows = wrapper.findAll('[data-testid="section-rows"] > div')
+      expect(rows).toHaveLength(3)
+    })
+
+    it('inserting a blackout between two lyric rows does not renumber them (R304)', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="add-section-chip-blackout"]').trigger('click')
+      await flushPromises()
+
+      // Drag the new blackout row (index 2) between Verse 1 and Chorus.
+      await simulateDragEnd(2, 1, 3)
+      await flushPromises()
+
+      const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+      expect(rows).toHaveLength(3)
+      expect(rows[0]!.text()).toContain('VERSE 1')
+      expect(rows[1]!.text()).toContain('BLACK SLIDE')
+      expect(rows[2]!.text()).toContain('CHORUS')
+      expect(rows[2]!.text()).not.toContain('CHORUS 2')
     })
   })
 })

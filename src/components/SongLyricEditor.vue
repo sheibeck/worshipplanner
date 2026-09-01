@@ -127,13 +127,30 @@
                 {{ row.displayLabel.toUpperCase() }}
                 <span aria-hidden="true">{{ isExpanded(row) ? '⌃' : '⌄' }}</span>
               </span>
+              <!-- R302/blackout (105-UI-SPEC.md Visual Contract): a blackout
+                   row swaps the lyric-preview span for a small solid-black
+                   swatch + muted caption, and the line-count span for
+                   'no text' — same slot, same classes, so a blackout row
+                   never reads as broken/empty (PITFALLS). -->
+              <template v-if="!isExpanded(row) && isBlackout(row)">
+                <span
+                  data-testid="row-preview"
+                  class="min-w-0 flex-1 flex items-center gap-1.5 truncate text-[11.5px] text-gray-400"
+                >
+                  <span class="inline-block h-3 w-3 shrink-0 rounded-sm bg-black border border-gray-700" aria-hidden="true"></span>
+                  Solid black &mdash; no text or image
+                </span>
+              </template>
               <span
-                v-if="!isExpanded(row)"
+                v-else-if="!isExpanded(row)"
                 data-testid="row-preview"
                 class="min-w-0 flex-1 truncate text-[11.5px] text-gray-400"
               >{{ previewText(row.section) }}</span>
               <span v-else class="min-w-0 flex-1"></span>
-              <span data-testid="row-line-count" class="shrink-0 text-[10.5px] text-gray-500">{{ lineCountLabel(row.section) }}</span>
+              <span
+                data-testid="row-line-count"
+                class="shrink-0 text-[10.5px] text-gray-500"
+              >{{ isBlackout(row) ? 'no text' : lineCountLabel(row.section) }}</span>
               <template v-if="isExpanded(row)">
                 <button
                   type="button"
@@ -189,7 +206,21 @@
             </template>
           </div>
 
-          <div v-if="isExpanded(row) && !row.isRepeat" class="px-3 pb-3">
+          <!-- R302/blackout: a black slide has no lines to split, so the
+               expanded body is a single calm placeholder panel instead of
+               the textarea+split block — no textarea, no slide-split UI. -->
+          <div
+            v-if="isExpanded(row) && !row.isRepeat && isBlackout(row)"
+            class="px-3 pb-3"
+          >
+            <div
+              :data-testid="`row-blackout-placeholder-${row.sectionId}`"
+              class="rounded-md border border-gray-800 bg-black px-3 py-6 flex items-center justify-center"
+            >
+              <p class="text-[12px] text-gray-500">This slide renders solid black &mdash; no text, background, or label.</p>
+            </div>
+          </div>
+          <div v-else-if="isExpanded(row) && !row.isRepeat" class="px-3 pb-3">
             <textarea
               :data-testid="`row-textarea-${row.sectionId}`"
               :value="row.section.lines.join('\n')"
@@ -229,6 +260,17 @@
               </template>
             </div>
           </div>
+          <div
+            v-else-if="isExpanded(row) && row.isRepeat && isBlackout(row)"
+            class="px-3 pb-3"
+          >
+            <div
+              :data-testid="`row-blackout-placeholder-${row.sectionId}`"
+              class="rounded-md border border-gray-800 bg-black px-3 py-6 flex items-center justify-center"
+            >
+              <p class="text-[12px] text-gray-500">This slide renders solid black &mdash; no text, background, or label.</p>
+            </div>
+          </div>
           <div v-else-if="isExpanded(row) && row.isRepeat" class="space-y-1.5 px-3 pb-3">
             <div
               :data-testid="`row-shared-text-${row.rowKey}`"
@@ -258,6 +300,18 @@
           class="rounded-full border border-gray-700 bg-gray-800 px-2.5 py-1 text-[11px] font-medium text-gray-300 transition-colors hover:border-indigo-600 hover:text-indigo-300"
           @click="onAddSection(kind)"
         >{{ kind }}</button>
+        <!-- R302: a 7th chip, styled identically to the six ADD_SECTION_KINDS
+             chips above (no accent color) — inserts a first-class blackout
+             row via the SAME onAddSection path, minting kind:'blackout'
+             (songSectionOrder.ts::addSection('BLACKOUT')). Creates NO new
+             service section — it is a LyricSection row in the single-list
+             order like any other kind. -->
+        <button
+          type="button"
+          data-testid="add-section-chip-blackout"
+          class="rounded-full border border-gray-700 bg-gray-800 px-2.5 py-1 text-[11px] font-medium text-gray-300 transition-colors hover:border-indigo-600 hover:text-indigo-300"
+          @click="onAddSection('BLACKOUT')"
+        >Black Slide</button>
       </div>
 
       <p data-testid="closing-note" class="text-[11px] leading-relaxed text-gray-500">
@@ -796,6 +850,13 @@ function toggleRow(stableKey: string) {
     next.add(stableKey)
   }
   expandedRowKeys.value = next
+}
+
+// R302 (105-UI-SPEC.md): the ONE predicate every blackout-row template
+// branch above reads — a row is a blackout row iff its resolved section
+// carries kind:'blackout' (minted by addSection('BLACKOUT')).
+function isBlackout(row: SectionRow): boolean {
+  return row.section.kind === 'blackout'
 }
 
 function previewText(section: LyricSection): string {
