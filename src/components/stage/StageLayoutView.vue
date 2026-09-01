@@ -35,6 +35,25 @@ const props = withDefaults(
 const onstageMarkers = computed(() => props.elements.filter((marker) => marker.zone === 'onstage'))
 const offstageMarkers = computed(() => props.elements.filter((marker) => marker.zone === 'offstage'))
 
+// WR-03 dedup: the on-stage and off-stage zone blocks used to be two
+// verbatim-duplicated `<div>` trees below (same structure, only the
+// heading text/testid/dashed-border class/marker list differed) — a
+// future markup change had to be applied twice or the zones would drift.
+// A single `v-for` over this descriptor array now renders both from one
+// template block.
+const zones = computed(() => [
+  { key: 'onstage' as const, label: 'ON STAGE', dashed: false, markers: onstageMarkers.value },
+  { key: 'offstage' as const, label: 'OFF STAGE (SIDE)', dashed: true, markers: offstageMarkers.value },
+])
+
+function zoneContainerClass(dashed: boolean): string {
+  const base = 'relative aspect-video w-full overflow-hidden rounded-lg'
+  if (props.theme === 'light') {
+    return dashed ? `${base} border border-dashed border-gray-300 bg-gray-50` : `${base} border border-gray-200 bg-gray-50`
+  }
+  return dashed ? `${base} border border-dashed border-gray-700 bg-gray-950` : `${base} border border-gray-800 bg-gray-900`
+}
+
 function markerStyle(marker: StageMarker): Record<string, string> {
   return { left: `${marker.xPct}%`, top: `${marker.yPct}%` }
 }
@@ -49,54 +68,18 @@ function accentClass(marker: StageMarker): string {
     data-testid="stage-layout-view"
     :class="['grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]', theme === 'dark' ? 'bg-gray-950' : 'bg-white']"
   >
-    <div>
+    <div v-for="zone in zones" :key="zone.key">
       <h3
         :class="[
           'mb-2 text-xs font-semibold uppercase tracking-wide',
           theme === 'dark' ? 'text-gray-400' : 'text-gray-500',
         ]"
       >
-        ON STAGE
+        {{ zone.label }}
       </h3>
-      <div
-        data-testid="stage-zone-onstage"
-        :class="[
-          'relative aspect-video w-full overflow-hidden rounded-lg',
-          theme === 'dark' ? 'border border-gray-800 bg-gray-900' : 'border border-gray-200 bg-gray-50',
-        ]"
-      >
+      <div :data-testid="`stage-zone-${zone.key}`" :class="zoneContainerClass(zone.dashed)">
         <div
-          v-for="marker in onstageMarkers"
-          :key="marker.id"
-          data-testid="stage-marker"
-          class="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-sm"
-          :class="theme === 'dark' ? 'border border-gray-700 bg-gray-800 text-gray-200' : 'border border-gray-300 bg-white text-gray-800'"
-          :style="markerStyle(marker)"
-        >
-          <span class="inline-block h-2 w-2 shrink-0 rounded-full border" :class="accentClass(marker)" />
-          <span class="truncate">{{ marker.label }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div>
-      <h3
-        :class="[
-          'mb-2 text-xs font-semibold uppercase tracking-wide',
-          theme === 'dark' ? 'text-gray-400' : 'text-gray-500',
-        ]"
-      >
-        OFF STAGE (SIDE)
-      </h3>
-      <div
-        data-testid="stage-zone-offstage"
-        :class="[
-          'relative aspect-video w-full overflow-hidden rounded-lg',
-          theme === 'dark' ? 'border border-dashed border-gray-700 bg-gray-950' : 'border border-dashed border-gray-300 bg-gray-50',
-        ]"
-      >
-        <div
-          v-for="marker in offstageMarkers"
+          v-for="marker in zone.markers"
           :key="marker.id"
           data-testid="stage-marker"
           class="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-sm"
