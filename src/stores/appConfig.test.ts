@@ -111,14 +111,17 @@ describe('useAppConfigStore', () => {
   })
 
   describe('saveField', () => {
-    it('calls setDoc exactly once with the dot-path payload, email, serverTimestamp, and merge:true', async () => {
+    it('calls setDoc exactly once with the nested-object payload, email, serverTimestamp, and merge:true', async () => {
       const store = useAppConfigStore()
       await store.saveField('retention.mediaDays', 45)
 
       expect(mockSetDoc).toHaveBeenCalledTimes(1)
       const [, payload, opts] = mockSetDoc.mock.calls[0] as [unknown, Record<string, unknown>, unknown]
+      // saveField expands the dot-path into a NESTED object (buildNestedField) because
+      // setDoc(...,{merge:true}) treats a dotted key as a literal field name, not a path
+      // (only updateDoc interprets dots). See appConfig.ts saveField (bug fix 2026-08-31).
       expect(payload).toEqual({
-        'retention.mediaDays': 45,
+        retention: { mediaDays: 45 },
         updatedBy: 'owner@example.com',
         updatedAt: 'SERVER_TIMESTAMP_SENTINEL',
       })
