@@ -66,17 +66,15 @@
       </span>
     </div>
 
-    <!-- R280 — full-bleed blackout overlay over BOTH panes. When the control
-         posts blackout:true the band monitor shows pure black (sibling of the
-         region divs, after them in paint order); blackout:false removes it and
-         both panes return. The reenter overlay stays AFTER this so the re-enter
-         button remains reachable if fullscreen is lost mid-blackout. -->
-    <div
-      v-if="blackout"
-      class="absolute inset-0 bg-black"
-      data-testid="confidence-blackout"
-      aria-hidden="true"
-    ></div>
+    <!-- R305 — the runtime "Go to black" control is now Audience-only: the
+         confidence-blackout overlay that used to live here (R280) has been
+         REMOVED so the band monitor keeps showing current/next through a
+         runtime blackout. Do NOT re-add a `v-if="blackout"` overlay here — that
+         would re-break R305. This is distinct from an AUTHORED blackout SLIDE
+         (contentKind:'blackout'), which is real slide content and still renders
+         black on this monitor via SlideCanvas/currentSlide above; only the
+         live "Go to black" operator control is suppressed on this surface.
+         AudienceOutputView keeps its own blackout overlay untouched. -->
 
     <!-- R271 / Pitfall 6 — the ONE interactive element, shown ONLY when
          fullscreen has been lost. The WHOLE surface is the tap target (inset-0
@@ -141,7 +139,10 @@ const props = defineProps<{
 // font gate, rootStyle cursor coupling, non-teardown fullscreen recovery, and the
 // Screen Wake Lock — all inherited identically from the audience window. The
 // per-canvas media plumbing stays view-local below (current pane only).
-const { assembledSlideshow, index, blackout, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
+// `blackout` is intentionally NOT destructured here (R305): the confidence
+// monitor no longer consumes it. useOutputWindow keeps returning it unchanged
+// for AudienceOutputView.
+const { assembledSlideshow, index, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
   useOutputWindow({ channelFactory: props.channelFactory, role: 'confidence' })
 
 // ── Current + next slides (view-local, from index + assembledSlideshow) ───────

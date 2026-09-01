@@ -204,6 +204,24 @@ function withBackground(assembled: AssembledSlide, url: string): AssembledSlide 
   } as AssembledSlide
 }
 
+// An AUTHORED blackout SLIDE (contentKind:'blackout', Phase 105) — content,
+// distinct from the runtime "Go to black" control this file's R305 suite
+// proves is gone from the confidence surface. Used only by the real-SlideCanvas
+// content-path test below.
+function blackoutSlide(id: string): AssembledSlide {
+  return {
+    slide: {
+      id,
+      position: 3,
+      contentKind: 'blackout',
+    },
+    slotIndex: 2,
+    slotKind: 'SONG',
+    section: 'worship',
+    sourceId: 'song-1',
+  } as AssembledSlide
+}
+
 // ── In-memory run-channel fake (identical to AudienceOutputView.test.ts) ────────
 function createFakeChannel() {
   const posted: Array<{ type?: string }> = []
@@ -744,36 +762,65 @@ describe('ConfidenceOutputView — org-scoped service subscription (WR-02)', () 
   })
 })
 
-describe('ConfidenceOutputView — blackout overlay obeys the channel field (R280)', () => {
-  it('renders the confidence-blackout overlay OVER both panes on blackout:true and clears it on blackout:false', async () => {
+describe('ConfidenceOutputView — runtime "Go to black" is Audience-only, no overlay (R305)', () => {
+  it('never renders a confidence-blackout overlay on blackout:true; current + next panes keep showing the real slides throughout', async () => {
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
     await flushPromises()
 
-    // Live current + next panes underneath, no blackout yet.
+    // Live current + next panes underneath, no runtime blackout yet.
     fake.emitState(0, 1, false)
     await flushPromises()
     expect(wrapper.find('[data-testid="confidence-blackout"]').exists()).toBe(false)
+    expect(
+      wrapper.find('[data-testid="confidence-current-region"] [data-testid="slide-canvas"]').text(),
+    ).toBe('a')
+    expect(
+      wrapper.find('[data-testid="confidence-next-region"] [data-testid="slide-canvas"]').text(),
+    ).toBe('b')
 
-    // blackout:true → the overlay renders over both region panes (which stay mounted).
+    // blackout:true — the control's "Go to black" — is now Audience-only
+    // (R305): the confidence monitor renders NO overlay at all, and both
+    // region panes keep rendering the actual current/next slides, unchanged.
     fake.emitState(0, 2, true)
     await flushPromises()
-    expect(wrapper.find('[data-testid="confidence-blackout"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="confidence-blackout"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="confidence-current-region"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="confidence-next-region"]').exists()).toBe(true)
+    expect(
+      wrapper.find('[data-testid="confidence-current-region"] [data-testid="slide-canvas"]').text(),
+    ).toBe('a')
+    expect(
+      wrapper.find('[data-testid="confidence-next-region"] [data-testid="slide-canvas"]').text(),
+    ).toBe('b')
 
-    // The overlay is a LATER sibling of both region wrappers → it paints ABOVE
-    // them (non-vacuous DOM-order proof over the next-region seam).
-    const children = Array.from(wrapper.get('[data-testid="confidence-output"]').element.children)
-    const nextRegionPos = children.findIndex((el) => el.getAttribute('data-testid') === 'confidence-next-region')
-    const blackoutPos = children.findIndex((el) => el.getAttribute('data-testid') === 'confidence-blackout')
-    expect(nextRegionPos).toBeGreaterThanOrEqual(0)
-    expect(blackoutPos).toBeGreaterThan(nextRegionPos)
-
-    // blackout:false → overlay removed.
+    // blackout:false — still no overlay, nothing changes on this surface.
     fake.emitState(0, 3, false)
     await flushPromises()
     expect(wrapper.find('[data-testid="confidence-blackout"]').exists()).toBe(false)
+  })
+})
+
+describe('ConfidenceOutputView — authored blackout SLIDE still renders black content (distinct from the removed R305 runtime overlay)', () => {
+  it('a contentKind:"blackout" current slide renders through the REAL SlideCanvas (as used on the confidence current pane) with no lyric body and no background', async () => {
+    // The REAL SlideCanvas, bypassing this file's stub — proves the confidence
+    // CURRENT pane still goes solid black for an AUTHORED blackout slide (real
+    // slide content), independent of the runtime "Go to black" control that
+    // R305 above proves no longer reaches this surface. suppressBackground=true
+    // mirrors ConfidenceOutputView's own current-pane wiring.
+    const mod = await vi.importActual<typeof import('@/components/slides/SlideCanvas.vue')>(
+      '@/components/slides/SlideCanvas.vue',
+    )
+    const Real = mod.default
+
+    const wrapper = mount(Real, { props: { slide: blackoutSlide('bk'), suppressBackground: true } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="presentation-body"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-background"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="presentation-background-scrim"]').exists()).toBe(false)
+
+    wrapper.unmount()
   })
 })
 
