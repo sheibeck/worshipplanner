@@ -29,6 +29,7 @@ import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import type { RouteLocationNormalized } from 'vue-router'
 import { useServiceAssembly } from '@/composables/useServiceAssembly'
 import { useRunTimers } from '@/composables/useRunTimers'
+import { useLoopTimer } from '@/composables/useLoopTimer'
 import { useToasts } from '@/stores/toasts'
 import {
   openRunChannel,
@@ -119,6 +120,12 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     index.value = target
     seq += 1
     handle?.postState({ index: target, blackout: blackout.value, seq })
+    // Phase 106 (R306/R308): re-evaluate the loop timer against the NEW current
+    // item after every navigation — manual (arrow/space/click) AND every loop
+    // tick itself. This single wiring point covers "manual nav restarts the
+    // interval on the looping item" and "navigating to a non-looping item
+    // disarms" (reconcileLoop is defined further down, reading `current`/`rail`).
+    reconcileLoop()
   }
 
   /** onHello resend — MUST advance seq so runChannel's stale-drop accepts it. */
@@ -140,6 +147,10 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     if (index.value == null) return
     seq += 1
     handle?.postState({ index: index.value, blackout: blackout.value, seq })
+    // Phase 106 (R308 #4, 106-CONTEXT.md decision): "Go to black" PAUSES the
+    // loop; restoring from black RESUMES it. reconcileLoop reads the fresh
+    // blackout.value set above.
+    reconcileLoop()
   }
 
   /**
@@ -882,6 +893,10 @@ export function useRunControl(options: UseRunControlOptions = {}) {
    * the confirmed in-app route-leave (owner fix #6) run the identical teardown.
    */
   function endServiceTeardown() {
+    // Phase 106 (T-106-03): defense-in-depth alongside useLoopTimer's own
+    // onUnmounted disarm and the watch(live) reconcile below — disarm the loop
+    // timer explicitly on every deliberate end-service exit too.
+    loopTimer.disarm()
     // WR-01: invalidate any in-flight Go-live resolve so a late getScreenDetails()
     // cannot re-open orphaned output windows after the operator has exited.
     goLiveRequestId += 1
@@ -1096,6 +1111,74 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   const filmstripIndices = computed(() => filmstrip.value.indices)
   /** The current slide's position WITHIN the active item (RunFilmstrip currentIndex). */
   const filmstripCurrentIndex = computed(() => index.value)
+
+  // ── Per-item loop timer (R306/R308, Phase 106) ──────────────────────────────
+  // The SINGLE loop timer lives HERE — never in an output window
+  // (AudienceOutputView/ConfidenceOutputView stay receive-only, ARCHITECTURE
+  // anti-patterns). Every advance routes through postIndex() above (the single
+  // writer), so the loop and manual nav can never fight or double-drive the
+  // output windows (T-106-04). reconcileLoop() is the ONE place that decides
+  // arm vs. disarm, called from postIndex (after posting — manual nav AND
+  // every loop tick itself), postBlackout ("Go to black" pauses/resumes the
+  // loop per 106-CONTEXT.md), and — below — watch(currentSlotIndex) (item
+  // change) and watch(live) (go-live/rehearse arms, End Service/End Rehearsal
+  // disarms).
+  const loopTimer = useLoopTimer()
+
+  /** Clamp a (possibly hand-edited/persisted) interval to 1–3600s (T-106-05). */
+  function clampInterval(n: number): number {
+    if (!Number.isFinite(n)) return 10
+    return Math.min(Math.max(Math.round(n), 1), 3600)
+  }
+
+  /** The current item's ServiceSlot (for reading .loop), or null pre-live/empty. */
+  function currentLoopSlot(): ServiceSlot | null {
+    return rail.value.find((r) => r.index === currentSlotIndex.value)?.slot ?? null
+  }
+
+  /**
+   * Advance WITHIN the current item's filmstrip ONLY — never into another
+   * item. From the last slide it wraps to the item's FIRST global index
+   * (R306); a ≤1-slide item is a no-op (reconcileLoop should never arm for
+   * one, but this stays defensive). Always routes through postIndex, the
+   * single writer.
+   */
+  function advanceLoop() {
+    const indices = filmstrip.value.indices
+    if (indices.length <= 1) return
+    const pos = indices.indexOf(index.value ?? -1)
+    if (pos === -1) return
+    const nextTarget = pos === indices.length - 1 ? indices[0]! : indices[pos + 1]!
+    postIndex(nextTarget)
+  }
+
+  /**
+   * The ONE place that decides whether the loop timer should be running.
+   * Arms iff live && !blackout && the CURRENT item's loop.enabled && it has
+   * more than one slide; otherwise disarms. Arming always resets the clock
+   * (useLoopTimer.arm disarms first) — this is what makes a manual nav within
+   * the looping item restart the interval instead of fighting a stale tick.
+   */
+  function reconcileLoop() {
+    const slot = currentLoopSlot()
+    const shouldArm =
+      live.value && !blackout.value && slot?.loop?.enabled === true && filmstrip.value.slides.length > 1
+    if (shouldArm) {
+      loopTimer.arm(clampInterval(slot!.loop!.intervalSeconds) * 1000, advanceLoop)
+    } else {
+      loopTimer.disarm()
+    }
+  }
+
+  // Item change (R308): re-evaluate whenever the CURRENT ITEM changes (not
+  // every slide index — looping is scoped to "this item's slides", matching
+  // the filmstrip computed's own item-scoping). Covers "leaving a looping item
+  // disarms" and "returning to it re-arms" for both manual nav (already
+  // covered by postIndex) and any future index mutation that bypasses it.
+  watch(currentSlotIndex, reconcileLoop)
+  // Go-live/rehearse arms (live flips true with index already resolved);
+  // End Service/End Rehearsal (live flips false) disarms.
+  watch(live, reconcileLoop)
 
   /**
    * The active rail item's slides as { arrayIndex, label, isCurrent } — RunRail's
