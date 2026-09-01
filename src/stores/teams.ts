@@ -49,10 +49,7 @@ export const useTeamsStore = defineStore('teams', () => {
     teams.value = []
   }
 
-  // Seeds the default team list (Choir/Orchestra/Communion/Special) only when
-  // the org has no teams yet. Calling this again once teams exist writes
-  // nothing — first-writer-wins, never clobbers an org that already edited
-  // its list (RESEARCH Pitfall 4).
+  // See ADR-0171 (docs/adr/0171-seeds-the-default-team-list-choir-orchestra-communion-specia.md)
   async function seedDefaultTeamsIfEmpty(): Promise<void> {
     if (!orgId.value) return
     if (teams.value.length !== 0) return

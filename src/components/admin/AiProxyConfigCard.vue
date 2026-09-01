@@ -68,10 +68,7 @@
 </template>
 
 <script setup lang="ts">
-// Phase 70-02 (R186/R187) — AI Proxy card: three ConfigNumberField number
-// knobs (incl. the rateLimitPerDay >= rateLimitPerMin cross-field rule, RESEARCH
-// Pitfall 4) plus allowedModels as ONE comma-separated ConfigTextField (RESEARCH
-// Pitfall 3 — split/trim/filter/require-non-empty before saving a string[]).
+// See ADR-0088 (docs/adr/0088-cross-field-rule-ratelimitperday-ratelimitpermin-research.md)
 import { ref, reactive, computed, watch } from 'vue'
 import ConfigNumberField from './ConfigNumberField.vue'
 import ConfigTextField from './ConfigTextField.vue'
@@ -119,11 +116,7 @@ async function onSaveNumber(path: string, value: number): Promise<void> {
   }
 }
 
-// ── Cross-field rule: rateLimitPerDay >= rateLimitPerMin (RESEARCH Pitfall 4) ──
-// ConfigNumberField's `update:modelValue` (70-02 addition) exposes the LIVE
-// edited value so this reacts to what the owner is currently typing, not just
-// the last-saved effective value — a naive "compare only saved values" check
-// would let a genuinely invalid save through.
+// See ADR-0088 (docs/adr/0088-cross-field-rule-ratelimitperday-ratelimitpermin-research.md)
 const rateLimitPerDayLive = ref(store.resolvedConfig.aiProxy.rateLimitPerDay)
 watch(
   () => store.resolvedConfig.aiProxy.rateLimitPerDay,
@@ -139,13 +132,7 @@ const rateLimitPerDayCrossFieldError = computed<string | null>(() => {
   return null
 })
 
-// Mirror of the above (review WR-01): the original cross-field rule was only
-// wired onto the rateLimitPerDay field, so an owner could raise
-// rateLimitPerMin above the (unchanged) rateLimitPerDay with no warning and
-// Save would succeed. Bidirectional by construction — both computeds react
-// to the OTHER field's live edited value the same way, so raising either
-// field past the other's current effective value blocks Save on the field
-// being edited.
+// See ADR-0089 (docs/adr/0089-mirror-of-the-above-review-wr-01-the-original-cross-field-ru.md)
 const rateLimitPerMinLive = ref(store.resolvedConfig.aiProxy.rateLimitPerMin)
 watch(
   () => store.resolvedConfig.aiProxy.rateLimitPerMin,

@@ -72,16 +72,7 @@
     />
   </div>
 
-  <!-- Consumer-owned row/list markup — receives the shared tag-filtered pool.
-       WR-03 (81-REVIEW): neither current production consumer destructures
-       this slot prop today — SongsView.vue also layers VW-type/key filters
-       this shell doesn't own, so it must keep its own store-driven
-       filteredSongs; SongSlotPicker.vue needs synchronous script access
-       (outside the slot/render context) for its IntersectionObserver
-       load-more machinery. Both delegate to the same filterSongsByTags()
-       this computed calls, so all three invocations stay provably
-       equivalent — this prop remains for callers that CAN consume it
-       directly, and as what SongBrowser.test.ts mounts against. -->
+  <!-- See ADR-0078 (docs/adr/0078-consumer-owned-row-list-markup-receives-the-shared-tag-filte.md) -->
   <slot :filteredSongs="filteredSongs" :searchQuery="searchQuery" />
 </template>
 

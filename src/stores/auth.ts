@@ -89,7 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const orgId = ref<string | null>(null)
   const orgName = ref<string | null>(null)
-  // Memorable share-URL slug (R-02/D-18) — used to build /{slug}/quarterN-YYYY links.
+  // See ADR-0145 (docs/adr/0145-memorable-share-url-slug-r-02-d-18-used-to-build.md)
   const orgSlug = ref<string | null>(null)
   const userRole = ref<'editor' | 'viewer' | null>(null)
 
@@ -104,10 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
   const pcAppId = ref<string | null>(null)
   const pcSecret = ref<string | null>(null)
 
-  // Church-level Vertical Worship 1-2-3 methodology toggle (D-15). Default ON —
-  // missing field on legacy org docs means VW mode is enabled. Single source of
-  // truth every VW surface gates on (D-16). Mirror-written from Settings; NOT
-  // live-synced via onSnapshot (Pitfall 2).
+  // See ADR-0146 (docs/adr/0146-church-level-vertical-worship-1-2-3-methodology-toggle-d-15.md)
   const vwModeEnabled = ref(true)
 
   // The one typed org-settings object every consumer reads (R073). Merged with
@@ -118,15 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
   // nothing can mutate the default object.
   const settings = ref<OrgSettings>({ ...DEFAULT_ORG_SETTINGS })
 
-  // Phase 82 (R242/R243) — the super-admin MASTER AI gate, read from the org
-  // doc's top-level `aiMasterEnabled` field (distinct from
-  // `settings.aiEnabled` above). Absent/false => OFF (default) — DELIBERATELY
-  // the inverse of vwModeEnabled's `?? true` default, since AI must be off by
-  // default for every org (R242). Mirror-written from applyOrgSnapshot, NOT
-  // live-synced via onSnapshot — same latency posture as vwModeEnabled/
-  // settings (Pitfall 2, 82-RESEARCH.md). Consumed as the first AND-gate leg
-  // in `src/utils/claudeApi.ts`'s isAiEnabled() and as SettingsView.vue's AI
-  // Features card v-if.
+  // See ADR-0147 (docs/adr/0147-phase-82-r242-r243-the-super-admin-master-ai-gate-read-from.md)
   const aiMasterEnabled = ref(false)
 
   // Phase 101 (R295) — the super-admin MASTER Bible API gate, read from the
@@ -161,25 +150,13 @@ export const useAuthStore = defineStore('auth', () => {
   const hasDeactivatedOrg = computed(() => deactivatedOrgMessage.value !== null)
 
   // R224/R226 (Phase 78) — the org id a super-admin is temporarily VIEWING
-  // via enterOrgAsSuperAdmin, with NO membership document of their own.
-  // Null means no such visit is in effect. Purely client/UI-gating state —
-  // never the security boundary; every Firestore/Storage op made while set
-  // is independently re-checked by firestore.rules/storage.rules' own
-  // super-admin arm (78-01-PLAN.md). Must be cleared alongside orgId/etc. in
-  // ALL THREE places that reset org context inline: resetOrgContext, logout,
-  // and the onAuthStateChanged null-user branch (Pitfall 4).
+  // See ADR-0148 (docs/adr/0148-via-enterorgassuperadmin-with-no-membership-document-of-thei.md)
   const viewingAsSuperAdmin = ref<string | null>(null)
 
   const isAuthenticated = computed(() => user.value !== null)
   const isEditor = computed(() => userRole.value === 'editor')
 
-  // WR-02 (82-REVIEW): the single shared two-gate AI-affordance check --
-  // mirrors src/utils/claudeApi.ts's isAiEnabled() exactly (master gate AND
-  // church setting). Every UI site that decides whether to SHOW an AI
-  // affordance (not just claudeApi.ts's functions that actually CALL the
-  // proxy) must read this computed instead of the bare `settings.aiEnabled`,
-  // so a super-admin disabling AI for an org hides those affordances
-  // consistently, not just the Settings card.
+  // See ADR-0074 (docs/adr/0074-the-single-shared-two-gate-ai-affordance-check-mirrors.md)
   const isAiEnabled = computed(() => aiMasterEnabled.value && settings.value.aiEnabled)
 
   // Phase 101 (R295) — SINGLE-LEG gate: unlike isAiEnabled above, there is no
@@ -266,15 +243,7 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
-  // WR-03 (68-REVIEW.md) — the requiresSuperAdmin router guard read
-  // authStore.user without waiting for the store's own onAuthStateChanged
-  // listener to have populated it, unlike requiresEditor's waitForRole()
-  // above. That listener is only registered on the FIRST useAuthStore() call
-  // anywhere in the app (Pinia stores are lazy), so a fresh page-load/reload
-  // directly on a super-admin-only route had an implicit, untested ordering
-  // dependency on when that first call happened to occur. waitForReady()
-  // gives requiresSuperAdmin the same explicit wait shape as waitForRole():
-  // it resolves immediately once isReady is already true, otherwise it waits
+  // See ADR-0149 (docs/adr/0149-68-review-md-the-requiressuperadmin-router-guard-read.md)
   // for the onAuthStateChanged listener below to flip isReady true (whether
   // the resolved user is present or null) before the guard proceeds to call
   // refreshSuperAdminClaim().
@@ -338,12 +307,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // R177 (Pitfall 4) — forces a single getIdTokenResult(user, true) read and
-  // updates isSuperAdmin from it. Used by the requiresSuperAdmin route guard
-  // so a just-granted super-admin's next navigation picks up the fresh claim
-  // instead of relying on the token's normal hourly refresh cadence. Never
-  // throws: a failed refresh just leaves isSuperAdmin at its last known
-  // value, and the guard's redirect-on-false still applies safely.
+  // See ADR-0148 (docs/adr/0148-via-enterorgassuperadmin-with-no-membership-document-of-thei.md)
   async function refreshSuperAdminClaim(): Promise<void> {
     const currentUser = user.value
     if (!currentUser) {
@@ -358,20 +322,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // R213 (Phase 76) — the SAME full org-context reset the pre-existing
-  // `activeId === null` branch performs, factored out so the two new
-  // deactivation-detection branches below share it exactly rather than
-  // drifting from that branch's field list over time.
-  //
-  // WR-01 (78-REVIEW.md): `deactivatedOrgMessage` is cleared HERE, not just
-  // by loadOrgContext's own unconditional clear at its top. Before this,
-  // `enterOrgAsSuperAdmin`/`exitSuperAdminView` were the first callers of
-  // resetOrgContext() that bypass loadOrgContext entirely, so a stale
-  // non-null deactivatedOrgMessage from an earlier deactivated-org bounce
-  // survived a super-admin's enter/exit and kept `hasDeactivatedOrg` (and
-  // therefore `requiresOrgSelection`) true — stranding them at
-  // /select-church on the very next navigation, the same router-strand
-  // class `hasNoOrg`'s viewingAsSuperAdmin guard was written to close.
+  // See ADR-0150 (docs/adr/0150-r213-phase-76-the-same-full-org-context-reset-the-pre-existi.md)
   // Clearing it in this single shared reset point means every caller
   // (loadOrgContext's own branches included) stays in sync automatically;
   // loadOrgContext's genuine-deactivation branches set it back to non-null
@@ -424,15 +375,7 @@ export const useAuthStore = defineStore('auth', () => {
     const resolvedVwModeEnabled =
       orgSettings.vwModeEnabled ?? (orgData.vwModeEnabled as boolean | undefined) ?? true
 
-    // WR-01 (46-REVIEW.md): `slideTypography` is deep-merged specifically
-    // — the plain `...orgSettings` spread above is shallow, so a
-    // partial/legacy stored value (e.g. a hand-edited Firestore document,
-    // or any future write path that persists fewer than all three leaf
-    // keys) would otherwise replace the whole nested object wholesale,
-    // leaving `fontWeight`/`fontScale` `undefined` rather than falling
-    // back to the per-field defaults. `cssVarsFor` already tolerates this
-    // at render time, but `SettingsView.vue`'s local refs are initialized
-    // directly from this object with no equivalent guard.
+    // See ADR-0151 (docs/adr/0151-slidetypography-is-deep-merged-specifically-the-plain.md)
     // messaging (R130/R132/R133, Phase 58) is deep-merged for the same
     // reason as slideTypography above: the outer `...orgSettings` spread
     // is shallow, so a partial stored `messaging` object (e.g. only
@@ -466,19 +409,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Phase 101 (R295) — DEFAULT OFF, same posture as aiMasterEnabled above.
     bibleApiEnabled.value = (orgData.bibleApiEnabled as boolean | undefined) ?? false
 
-    // CR-01 (46-REVIEW.md) — eager-load the org's actual chosen slide
-    // face here, the ONE point every render site's settings flow
-    // through. Without this, SlideGrid.vue and EditSlideDrawer.vue (the
-    // grid and the Edit Slide drawer preview — soft-gate surfaces per
-    // 46-UI-SPEC.md, font-display: swap) bind `--slide-font-family` to a
-    // family whose @font-face rule was never registered, so the browser
-    // silently falls through to its generic fallback instead of the
-    // chosen font for any org whose choice differs from main.ts's eager
-    // Inter default — until something ELSE (Settings, or the Presenter)
-    // happens to load it first in that session. Fire-and-forget: a
-    // rejected dynamic import degrades to the CSS stack's native
-    // fallback, never a user-visible error (same posture as WR-03's
-    // SettingsView.vue fix).
+    // See ADR-0152 (docs/adr/0152-46-review-md-eager-load-the-org-s-actual-chosen-slide-face-h.md)
     const resolvedTypographyFamily = SLIDE_FONTS[settings.value.slideTypography.fontFamily]
       ? settings.value.slideTypography.fontFamily
       : DEFAULT_ORG_SETTINGS.slideTypography.fontFamily
@@ -707,17 +638,7 @@ export const useAuthStore = defineStore('auth', () => {
   // — the real boundary is firestore.rules'/storage.rules' super-admin arm
   // (78-01-PLAN.md). Writes NOTHING to Firestore (R226): no setDoc/writeBatch,
   // no members/{uid} onSnapshot subscription (there is no member doc for it
-  // to find — if started, its first callback would immediately null userRole
-  // back out). Deliberately performs NO isOrgActive/deactivation check,
-  // unlike loadOrgContext — the rules layer already grants a super-admin
-  // unconditional access to a deactivated org's doc, and entering one for
-  // support is intended, not a bug to guard against.
-  //
-  // WR-03 (78-REVIEW.md): returns a boolean so the caller (OrganizationsTab's
-  // onEnterChurch) can tell a genuine entry apart from a silent no-op (not a
-  // super-admin / no user, a denied or errored read, or a missing/stale org
-  // doc) instead of navigating unconditionally and stranding the super-admin
-  // at the router's org-selection gate with zero explanation.
+  // See ADR-0098 (docs/adr/0098-enterorgassuperadmin-now-signals-success-failure-instead-of.md)
   async function enterOrgAsSuperAdmin(targetOrgId: string): Promise<boolean> {
     if (!user.value || !isSuperAdmin.value) return false
     resetOrgContext()

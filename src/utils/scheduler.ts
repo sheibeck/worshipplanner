@@ -53,12 +53,7 @@ export function evaluateGroupCombo(
   return { ok: true }
 }
 
-/**
- * Whether adding `candidateRoleId` to a person's already-assigned roleIds for a given date
- * (`assignedRoleIdsThisDate`) keeps the resulting combo legal (D-10/D-12). Pure/deterministic —
- * used by BOTH the main `eligible()` filter and `propagatePairing`'s role selection so paired
- * partners can never be pulled into an illegal combo (RESEARCH Pitfall 2).
- */
+/** See ADR-0187 (docs/adr/0187-whether-adding-candidateroleid-to-a-person-s-already-assigne.md) */
 export function isGroupCompatible(
   assignedRoleIdsThisDate: string[],
   candidateRoleId: string,
@@ -69,33 +64,14 @@ export function isGroupCompatible(
     .ok
 }
 
-/**
- * Deterministic, pure, greedy weighted-fair-share quarterly scheduler (D-06 through D-12).
- *
- * Processes service dates chronologically; for each date, fills each role's slots (in the
- * order returned by resolveRolesForDate) by picking the eligible/available candidate furthest
- * below their 1-in-N frequency target for THAT role (D-05 — cadence and tier are scored per
- * (person, role), not blended across a person's roles). Blackout dates (D-07) and pairings
- * (D-09) are hard constraints — never violated. Unfillable slots are reported in `unfilled`
- * rather than fabricating an assignment (D-10); pairings that can't be honored (partner
- * blacked out, out-tier for every eligible role, or no group-compatible role available) are
- * reported in `pairingConflicts` rather than silently dropped or forced. Group co-occurrence
- * rules (D-10) are enforced identically in both the main assignment loop and the pairing
- * propagation path via the shared `isGroupCompatible` helper (RESEARCH Pitfall 2).
- *
- * Pure function: no database reads/writes, no framework imports, no wall-clock reads, no
- * non-deterministic randomness — fully deterministic and unit-testable, mirroring the
- * pattern established by src/utils/suggestions.ts.
- */
+/** See ADR-0187 (docs/adr/0187-whether-adding-candidateroleid-to-a-person-s-already-assigne.md) */
 export function proposeQuarterSchedule(
   people: Person[],
   serviceDates: string[],
   resolveRolesForDate: (date: string) => RoleSlotConfig[],
   personQuarterData: PersonQuarterData[],
   existingCalendar?: QuarterCalendar,
-  // Caller (quarters.ts) builds this from rosterStore.roles. Unknown roleIds default to 'other'
-  // (safe default) so existing call-sites that omit this param keep compiling and behave as
-  // "everything combines" (RESEARCH Pitfall 1).
+  // See ADR-0188 (docs/adr/0188-caller-quarters-ts-builds-this-from-rosterstore-roles-unknow.md)
   roleGroupOf: (roleId: string) => RoleGroup = () => 'other',
   // Caller (quarters.ts) builds this from rosterStore.roles alongside roleGroupOf
   // (buildIsMultiRole). Unknown roleIds default to false (safe/non-exempt default) so existing
@@ -114,17 +90,7 @@ export function proposeQuarterSchedule(
   const tierOf = (personId: string, roleId: string): FrequencyTier =>
     roleFrequencyOf(personId, roleId).tier
   // D-01/D-02 — even-spread cadence gate. "1-in-N" means "serve at most once every N dates", so
-  // a person stays eligible for a role on the date at `dateIndex` ONLY while their per-role served
-  // count is still below the running even-spread target (dateIndex+1)/n — i.e. while they are
-  // behind their ideal pace. This is what spreads a monthly (n=4) person evenly across the WHOLE
-  // quarter (weeks 1, 5, 9, 13…) instead of greedily booking them every week until a flat
-  // whole-quarter budget runs out and then leaving the rest blank (the front-loading bug: the
-  // sole guitarist getting every Sunday in June, then nothing). A simple count ceiling can't do
-  // this — the target has to advance with the calendar. WR-02: n<=0 (the drawer's "As-needed
-  // (fill-in)" preset writes n:0, and malformed/legacy entries could too) has no valid cadence,
-  // so the person is NEVER proactively scheduled — no divide-by-zero into Infinity. Used by BOTH
-  // the main assignment loop and propagatePairing so direct picks and pull-ins are spaced
-  // identically (no front-loading on either path).
+  // See ADR-0189 (docs/adr/0189-a-person-stays-eligible-for-a-role-on-the-date-at-dateindex.md)
   const withinCadence = (personId: string, roleId: string, dateIndex: number): boolean => {
     const n = roleFrequencyOf(personId, roleId).n
     if (n <= 0) return false
@@ -209,9 +175,7 @@ export function proposeQuarterSchedule(
         // fill-ins by hand.
         const regularRoles = notOutTier.filter((r) => tierOf(partnerId, r.roleId) === 'regular')
         if (regularRoles.length === 0) continue
-        // D-12/Pitfall 2 — the CONFIRMED landmine: propagatePairing is a second, independent
-        // role-selection path. It MUST apply the exact same shared group-compatibility check as
-        // the main loop below, or a paired partner can silently be pulled into an illegal combo.
+        // See ADR-0187 (docs/adr/0187-whether-adding-candidateroleid-to-a-person-s-already-assigne.md)
         const eligibleRoles = regularRoles.filter((r) =>
           isGroupCompatible(rolesHeldThisDate(partnerId), r.roleId, roleGroupOf, isMultiRole),
         )
@@ -233,33 +197,19 @@ export function proposeQuarterSchedule(
           // not a genuine problem like blackout/no-role/group-violation above.
           continue
         }
-        // Residual scope boundary (RESEARCH Pitfall 4 / Open Question 1, consciously accepted):
-        // this gate only constrains pull-ins via propagation. If the partner independently holds
-        // a role the anchor does not, the main loop's spacing pass could in principle still pick
-        // the partner directly on a date the anchor isn't serving at all, which a maximally strict
-        // reading of containment would forbid. The canonical pairing shape (co-vocalists /
-        // parent-child sharing the same role) does not hit this edge case, so it's shipped as-is.
+        // See ADR-0190 (docs/adr/0190-r260-a-pulled-in-paired-partner-who-is-themselves-a-multi-ro.md)
         const withCapacity = spaced.find(
           (r) => (calendar[date]![r.roleId]?.length ?? 0) < r.count,
         )
         const target = withCapacity ?? spaced[0]!
         assignToRole(target.roleId, partnerId)
-        // R260 — a pulled-in paired partner who is themselves a multi-role holder also bundles
-        // their own other multi-roles onto this date (RESEARCH Open Question 1: implement the
-        // consistent version). Composes cleanly since propagateMultiRole is independent per
-        // person (RESEARCH Pitfall 4).
+        // See ADR-0190 (docs/adr/0190-r260-a-pulled-in-paired-partner-who-is-themselves-a-multi-ro.md)
         if (isMultiRole(target.roleId)) propagateMultiRole(partnerId)
         propagatePairing(partnerId, visited) // handle chained pairings (e.g. two kids, one parent)
       }
     }
 
-    // R260 — same-date bundling of a person's OTHER multi-role assignments (RESEARCH B.2). A
-    // NON-recursive single sweep (Pitfall 2: no infinite propagation) over the person's whole
-    // role set for this date, triggered after every multi-role assignment (both here and inside
-    // propagatePairing above). Each pulled role is gated by its OWN withinCadence + slot
-    // capacity + isGroupCompatible via the shared assignToRole (never a parallel writer —
-    // Pitfall 1, dedupes and increments servedByRole exactly once). No rarity sort, no deficit
-    // scoring change — rarity-anchoring is emergent from withinCadence's even-spread gate (B.3).
+    // See ADR-0187 (docs/adr/0187-whether-adding-candidateroleid-to-a-person-s-already-assigne.md)
     const propagateMultiRole = (personId: string) => {
       const person = people.find((p) => p.id === personId)
       if (!person) return

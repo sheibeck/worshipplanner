@@ -241,12 +241,7 @@ export interface AssembledSlide {
    * Absent on the no-group fallback derivation path.
    */
   groupId?: string
-  /**
-   * Equals the stored `GroupSlideEntry.id` this slide was resolved from.
-   * Never recomputed from slot index or emission order — Phase 23's WR-02
-   * keys `PresentationViewer`'s media children on this id. Absent on the
-   * fallback path.
-   */
+  /** See ADR-0173 (docs/adr/0173-equals-the-stored-groupslideentry-id-this-slide-was-resolved.md) */
   groupSlideId?: string
   /**
    * True when `slide.audioUrl` was resolved from the group's `bedAudioUrl`

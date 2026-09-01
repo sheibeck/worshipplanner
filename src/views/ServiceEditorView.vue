@@ -579,17 +579,7 @@
           </div>
         </Teleport>
 
-        <!-- 34-07 (owner UAT F1) — the congregational-reading editor modal.
-             Teleported to body, same scrim/panel shape as the export dialog
-             above (an established pattern in this file, not a new one).
-             `ServiceEditorView` is the only place that can host it: it owns
-             `localService`, `canEditService` and the one `useAutoSave` over
-             `localService`. Keyed on `congregationalSlot.id` (WR-04,
-             34-PATTERNS.md) — `CongregationalEditor` seeds its editable
-             state ONCE at mount and is not reactive to a later prop change,
-             so swapping which slot is being edited MUST force a fresh
-             instance or a save would silently misattribute to the first
-             slot the instance ever saw. -->
+        <!-- See ADR-0223 (docs/adr/0223-localservice-keyed-on-congregationalslot-id-wr-04.md) -->
         <Teleport to="body">
           <div
             v-if="congregationalSlot !== null"
@@ -716,9 +706,7 @@
              Service Order and Roles — a reposition of the existing three
              buttons, not a restyle; each button keeps its own class strings,
              `:class` expression and `@click` assignment unchanged. -->
-        <!-- WR-01 (81-REVIEW): roving tabindex requires the companion
-             arrow-key handler per the WAI-ARIA APG Tabs pattern, so
-             @keydown moves focus + activates the adjacent VISIBLE tab. -->
+        <!-- See ADR-0217 (docs/adr/0217-roving-tabindex-on-the-tab-bar-above-removes-inactive-tabs-f.md) -->
         <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
           <button
             id="svc-tab-service-order"
@@ -1412,14 +1400,14 @@
 
         </div>
 
-        <!-- Roles tab: seeded from the quarterly schedule for this service's date, editor-only data (CR-01/02/03/05) -->
+        <!-- See ADR-0224 (docs/adr/0224-fix-do-not-restore-a-closure-captured-pre-drag-snapshot-here.md) -->
         <div
           v-show="activeTab === 'roles'"
           id="svc-panel-roles"
           role="tabpanel"
           aria-labelledby="svc-tab-roles"
         >
-          <!-- Non-editor: no roster/quarters data was ever subscribed to (Pitfall 4) — read-only note only -->
+          <!-- See ADR-0225 (docs/adr/0225-non-editor-no-roster-quarters-data-was-ever-subscribed-to-pi.md) -->
           <div v-if="!authStore.isEditor" class="rounded-lg bg-gray-900 border border-gray-800 p-6 text-center">
             <p class="text-sm text-gray-400">Who's serving is visible via the shared service link.</p>
           </div>
@@ -1659,13 +1647,7 @@
         />
         </div>
 
-        <!-- Bottom actions: Delete only. Print and Share moved into the top
-             ContextualActionBar (R101, 48-03) — see serviceEditorActionBar.ts's
-             buildPrintItem/buildShareItem. Delete stays here deliberately,
-             below the fold, away from the primary actions a destructive
-             control must never sit beside. The `flex-1` spacer that used to
-             push Delete past Print/Share is removed; `justify-end` on this
-             row now does that job directly (Anti-Patterns / Pitfall 4). -->
+        <!-- See ADR-0225 (docs/adr/0225-non-editor-no-roster-quarters-data-was-ever-subscribed-to-pi.md) -->
         <div class="mt-6 pt-4 border-t border-gray-800 flex flex-wrap items-center justify-end gap-2 print:hidden">
           <!-- Delete button: editor only -->
           <button
@@ -1810,15 +1792,7 @@ const saveStatus = useSaveStatus()
 // once the Slides tab itself is opened, not about which tab opens first.
 const activeTab = ref<'service-order' | 'roles' | 'slides' | 'messages' | 'stage'>('service-order')
 
-// WR-01 (81-REVIEW): roving tabindex on the tab bar (above) removes inactive
-// tabs from the Tab key order per the WAI-ARIA APG Tabs pattern, which
-// requires arrow-key navigation to compensate. Roles/Messages are
-// conditionally rendered (authStore.isEditor / isMessagingEnabled()), so the
-// order used for Arrow/Home/End navigation is recomputed from what is
-// actually visible rather than a static list.
-// Stage Layout (Phase 107, R313/R314): inserted right after Roles in both the
-// rendered tab strip AND this navigation order — gated on the SAME
-// `authStore.isEditor` check as Roles (tech/sound planning is an editor
+// See ADR-0217 (docs/adr/0217-roving-tabindex-on-the-tab-bar-above-removes-inactive-tabs-f.md)
 // concern, matching Roles' own gate), independent of the messaging kill-switch.
 type ServiceEditorTabId = 'service-order' | 'roles' | 'slides' | 'messages' | 'stage'
 const visibleTabOrder = computed<ServiceEditorTabId[]>(() => {
@@ -1935,11 +1909,7 @@ const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 const isDeleting = ref(false)
-// WR-01 (80-REVIEW): deleteService's revocation steps are now best-effort,
-// but the service-doc delete itself (the last step) is unguarded and can
-// still throw. Before this, onDelete had no catch — a failure closed the
-// confirm dialog silently, looking like success while the service was NOT
-// actually deleted.
+// See ADR-0162 (docs/adr/0162-mirrors-teamview-vue-s-oncancelinvite-pattern-surface-the-fa.md)
 const deleteError = ref<string | null>(null)
 // R136 (59-04): the ✉ Messages composer's open state, toggled by the
 // action-bar item's onMessages handler.
@@ -2599,25 +2569,11 @@ async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
     originalService.value = JSON.parse(JSON.stringify(localService.value))
     saveStatus.set(surfaceId.value, { status: 'saved', savedAt: new Date() })
   } catch (err) {
-    // CR-01 fix: do NOT restore a closure-captured pre-drag snapshot here.
-    // SortableJS calls `onEnd` fire-and-forget (never awaited), so a second,
-    // faster drag can start — and its write can succeed and persist — before
-    // THIS drag's write settles. A stale pre-drag snapshot would then discard
-    // that already-persisted second edit from local state, and because the
-    // revert makes `localService` differ from `originalService` again, the
-    // general 800ms debounce watcher would treat it as a new unsaved change
-    // and silently re-write the stale array back over the successful edit.
-    //
+    // See ADR-0224 (docs/adr/0224-fix-do-not-restore-a-closure-captured-pre-drag-snapshot-here.md)
     // Instead, restore `originalService.value.slots` — the last known-good
     // PERSISTED state at the moment this catch runs. If nothing else wrote
     // in the meantime, that's identical to this drag's own pre-drag state
-    // (today's simple case, unchanged). If a later drag/save already
-    // succeeded, `originalService` already reflects it (every successful
-    // write sets `originalService.value = clone(localService.value)`), so
-    // this revert becomes a no-op against that newer state instead of
-    // clobbering it — and because local now matches original exactly, the
-    // debounce watcher's `isDirty` check is false, so it never re-arms and
-    // never re-persists the reverted array (T-29-09 / CR-01).
+    // See ADR-0224 (docs/adr/0224-fix-do-not-restore-a-closure-captured-pre-drag-snapshot-here.md)
     if (localService.value && originalService.value) {
       localService.value.slots = JSON.parse(JSON.stringify(originalService.value.slots))
     }
@@ -2726,9 +2682,7 @@ const activeActionItems = computed(() =>
     canEditService: canEditService.value,
     hasSermonContext: hasSermonContext.value,
     aiSuggestingAll: aiSuggestingAll.value,
-    // WR-02 (82-REVIEW): two-gate authStore.isAiEnabled, not the bare
-    // church setting alone -- so a super-admin-disabled org hides the
-    // action-bar AI item too.
+    // See ADR-0074 (docs/adr/0074-the-single-shared-two-gate-ai-affordance-check-mirrors.md)
     aiEnabled: authStore.isAiEnabled,
     hasPcCredentials: authStore.hasPcCredentials,
     pcEnabled: authStore.settings.pcEnabled,
@@ -2832,11 +2786,7 @@ const autoSave = useAutoSave(
   computed(() => isDirty.value && canEditService.value), // folds the lock in
 )
 
-// Declared before the watcher below (rather than down with the rest of the
-// R037 transition state) because CR-03's `!editable` branch reads it —
-// hoisting keeps that read after its own declaration rather than relying on
-// the (currently true, but fragile) fact that `status` can't be 'error' on
-// the watcher's own `{ immediate: true }` first run.
+// See ADR-0226 (docs/adr/0226-declared-before-the-watcher-below-rather-than-down-with-the.md)
 const lifecycleError = ref<string | null>(null)
 
 // Reports status into the shared store; belt-and-braces (31-RESEARCH),
@@ -2848,15 +2798,7 @@ watch(
   ([editable, status]) => {
     if (!editable) {
       autoSave.cleanup()
-      // CR-03: an outstanding 'error' means a real, unsaved edit is still
-      // sitting in localService — handleAutosaveFailure's "kept dirty"
-      // branch deliberately never reverts it, precisely so it can be
-      // retried. Silently reporting 'idle' here would make that edit vanish
-      // with zero on-screen trace the instant the service locks: the status
-      // bar disappears along with `canEditService` regardless of what this
-      // writes, so route the failure into `lifecycleError` instead — it is
-      // NOT gated behind `canEditService` in the locked banner path
-      // (31-UI-SPEC § 1) — rather than reporting a falsely-clean 'idle'.
+      // See ADR-0227 (docs/adr/0227-an-outstanding-error-means-a-real-unsaved-edit-is-still-sitt.md)
       // Leave the saveStatus entry itself untouched: it already holds the
       // definitive 'error' entry handleAutosaveFailure wrote, and
       // overwriting it to 'idle' would be exactly the "quieter indicator"
@@ -2885,12 +2827,7 @@ watch(serviceId, (newId, oldId) => {
   if (oldId && oldId !== newId) saveStatus.clear(`service:${oldId}`)
 })
 
-// ── Delivery-history subscription (60-03) ────────────────────────────────────
-// Subscribe to this service's messages (newest-first) when the panel is
-// eligible — editor + messaging on. Re-subscribes on serviceId change or once
-// isEditor resolves (WR-01-style late role flip). The store's single-listener
-// guard makes repeat calls idempotent. Editor-only + nested-path reads run
-// under the Phase 58 isOrgMember rules (no new client rule).
+// See ADR-0228 (docs/adr/0228-authstore-iseditor-resolves-asynchronously-loadorgcontext-ru.md)
 watch(
   [serviceId, () => authStore.isEditor],
   () => {
@@ -3028,10 +2965,7 @@ function initStores() {
   if (!songStore.orgId) {
     songStore.subscribe(orgId)
   }
-  // Roles tab data (Pitfall 4 / T-17-04-01 / CR-05): /services/:id has no
-  // requiresEditor route guard, so a non-editor viewer can land here — the
-  // editor-only roles/quarters/people collections must never be subscribed to
-  // for a viewer (Phase 16.2 removal decision: no expanded viewer read access).
+  // See ADR-0229 (docs/adr/0229-roles-tab-data-pitfall-4-t-17-04-01-cr-05-services-id-has-no.md)
   if (authStore.isEditor) {
     if (!rosterStore.orgId) {
       rosterStore.subscribe(orgId)
@@ -3061,15 +2995,7 @@ function initStores() {
   }
 }
 
-// WR-01: authStore.isEditor resolves asynchronously (loadOrgContext runs off
-// the auth-state-changed flow, not synchronously at mount), and /services/:id
-// has no requiresEditor guard forcing waitForRole() first. If a real editor
-// lands directly on this route before isEditor flips true, initStores() ran
-// its one-time check with isEditor still false and never subscribed
-// roster/quarters. Re-run initStores() when isEditor becomes true so the
-// subscription retries once the role resolves; initStores()'s own
-// `if (!rosterStore.orgId)` / `if (!quartersStore.orgId)` guards make this
-// idempotent (no double-subscribe on repeated calls).
+// See ADR-0228 (docs/adr/0228-authstore-iseditor-resolves-asynchronously-loadorgcontext-ru.md)
 watch(
   () => authStore.isEditor,
   (isEditor) => {
@@ -3079,19 +3005,7 @@ watch(
   },
 )
 
-// 260901-lua: /services/:id is keyed to a serviceId that belongs to the
-// CURRENT (old) church. On the sidebar's in-place Switch Church, that same
-// serviceId cannot exist in the newly-selected church, so staying would
-// attempt a cross-org read/write. Fail safe by navigating away to /services
-// on a genuine org CHANGE only. Deliberately no `{ immediate: true }`, so this
-// never fires on first mount; the `if (oldOrgId)` guard also skips the
-// initial null -> value org resolution (WR-01 late auth, when a user lands
-// directly on this route before authStore.orgId resolves) — oldOrgId is
-// null/undefined on that first callback. It fires ONLY when an
-// already-established church changes to another value (or to null), i.e. a
-// genuine switch away. Because we navigate away, this view unmounts and
-// ServicesView's own orgId watcher subscribes the new church — no store
-// re-point needed here.
+// See ADR-0228 (docs/adr/0228-authstore-iseditor-resolves-asynchronously-loadorgcontext-ru.md)
 watch(
   () => authStore.orgId,
   (orgId, oldOrgId) => {
@@ -3143,14 +3057,7 @@ function getCcliNumber(songId: string): string | null {
 // Center export (D-03).
 
 const isTransitioning = ref(false)
-// lifecycleError is declared earlier (with the autosave watcher block) —
-// see CR-03's comment there for why.
-
-// ── R144 (61-04): first-lock auto-notification state ────────────────────────────
-//
-// The subordinate confirmation line inside the lock banner reads this. `null`
-// renders nothing (messaging off, default off, or a re-lock — the SC2 neutral
-// no-op). Discriminated by `kind` (61-UI-SPEC § Component #0).
+// See ADR-0230 (docs/adr/0230-lifecycleerror-is-declared-earlier-with-the-autosave-watcher.md)
 const lockNotify = ref<
   | null
   | { kind: 'sent'; count: number }
@@ -3279,9 +3186,7 @@ async function onMarkAsPlanned(): Promise<void> {
       const svc = localService.value
       const orgId = authStore.orgId
       if (svc && orgId) {
-        // READ BEFORE WRITE: the snapshot's prior existence is the first-lock
-        // signal. Reading AFTER the setDoc would make every lock look like a
-        // re-lock (61-RESEARCH Pitfall 4).
+        // See ADR-0231 (docs/adr/0231-read-before-write-the-snapshot-s-prior-existence-is-the-firs.md)
         const snapRef = doc(db, 'organizations', orgId, 'services', svc.id, 'lockSnapshots', 'current')
         const prior = await getDoc(snapRef)
 
@@ -4118,12 +4023,7 @@ async function onConfirmExport() {
     const failures: string[] = []
     let planId: string
 
-    // Collect our songs (SONG + HYMN) and scriptures from service slots.
-    // IMPORTED slots (Phase 21) have no analogous PC item type and are
-    // intentionally excluded from both buckets below — the 'existing plan'
-    // branch below only ever touches songSlots/scriptureSlots (same as
-    // PRAYER/MESSAGE), so IMPORTED is already skipped there without further
-    // (slot as any) narrowing (RESEARCH Pitfall 2).
+    // See ADR-0232 (docs/adr/0232-imported-slots-reference-pptx-image-decks-with-no-analogous.md)
     const songSlots = localService.value.slots.filter(s => s.kind === 'SONG' || s.kind === 'HYMN')
     const scriptureSlots = localService.value.slots.filter(s => s.kind === 'SCRIPTURE')
     // The four remaining exportable kinds (IMPORTED stays excluded; SONG/HYMN/
@@ -4367,11 +4267,7 @@ async function onConfirmExport() {
         }
       } else {
         for (const slot of localService.value.slots) {
-          // IMPORTED slots reference PPTX/image decks with no analogous PC item
-          // type; skip export entirely rather than falling through
-          // addSlotAsItem's default MESSAGE-item branch and mislabeling it
-          // (RESEARCH Pitfall 2) — no (slot as any) narrowing needed here since
-          // we skip before ever reaching the label-building catch block below.
+          // See ADR-0232 (docs/adr/0232-imported-slots-reference-pptx-image-decks-with-no-analogous.md)
           if (slot.kind === 'IMPORTED') continue
           try {
             await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage)
@@ -4463,11 +4359,7 @@ async function onConfirmExport() {
 
 async function onShare() {
   if (!localService.value || !serviceStore.orgId) return
-  // WR-01 (48-REVIEW): re-entrancy guard — the action-bar button's own
-  // `disabled: ctx.isSharing` is the primary defense, but this backstop
-  // ensures a second concurrent invocation (e.g. a rapid double-click before
-  // the disabled state re-renders) can never fire a second createShareToken
-  // write while one is already in flight.
+  // See ADR-0233 (docs/adr/0233-the-pre-migration-bottom-row-button-was-disabled-localservic.md)
   if (isSharing.value) return
   isSharing.value = true
   try {
@@ -4583,14 +4475,7 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
   }
   const nextPersonIds = Array.from(current)
 
-  // WR-02: optimistic local update. `assignment.effectivePersonIds` is derived
-  // (via resolvedRoleAssignments) from localService.value, but without this it
-  // only reflects a write once it round-trips through serviceStore.services.
-  // Two rapid clicks on the same role's checkbox group (e.g. selecting two
-  // different people) would otherwise both read the same stale
-  // effectivePersonIds baseline, and the second write would silently clobber
-  // the first. Mutating localService.value synchronously here means a
-  // same-tick second click reads the just-applied state instead.
+  // See ADR-0234 (docs/adr/0234-optimistic-local-update-assignment-effectivepersonids-is-der.md)
   if (!localService.value.roleAssignmentOverrides) {
     localService.value.roleAssignmentOverrides = {}
   }
@@ -4684,15 +4569,7 @@ const messagingReminderText = computed(() => {
   return `On, ${days} days before ${suffix}`
 })
 
-/**
- * WR-02-style optimistic update, mirroring onToggleOverridePerson: mutate
- * localService.value.messaging synchronously (so a same-tick second change
- * reads the just-applied state), fire the scoped store write, and roll back
- * on failure. `onSave`'s payload is a fixed field allowlist that does not
- * include `messaging` (same as `roleAssignmentOverrides`), so this optimistic
- * mutation cannot leak into a generic autosave write — only
- * setServiceMessagingDefaults' own scoped updateDoc ever persists it.
- */
+/** See ADR-0234 (docs/adr/0234-optimistic-local-update-assignment-effectivepersonids-is-der.md) */
 async function setMessagingOverride(
   patch: Partial<{
     lockNotifyEnabled: boolean | null
@@ -4745,10 +4622,7 @@ async function onDelete() {
     showDeleteConfirm.value = false
     router.push('/services')
   } catch (err) {
-    // WR-01 (80-REVIEW): mirrors TeamView.vue's onCancelInvite pattern —
-    // surface the failure and keep the confirm dialog open (do NOT close it
-    // here) so the user can see the error and retry, instead of the dialog
-    // silently closing while the service was never actually deleted.
+    // See ADR-0162 (docs/adr/0162-mirrors-teamview-vue-s-oncancelinvite-pattern-surface-the-fa.md)
     console.error('[ServiceEditorView] delete service error:', err)
     deleteError.value = 'Failed to delete service. Please try again.'
   } finally {
@@ -4803,45 +4677,16 @@ async function onSave() {
       // payload) correctly overwrites the remote field every time.
       stageLayout: data.stageLayout ?? null,
     }
-    // CR-01: snapshot exactly what is about to be sent, so the "mark clean"
-    // step below (after the WR-01 slots sync-back, which is also compared
-    // against `normalizedSlots`, not the pre-normalization value) can tell a
-    // genuinely-concurrent edit — made to localService while this write is
-    // in flight — from that intentional sync-back.
+    // See ADR-0235 (docs/adr/0235-snapshot-exactly-what-is-about-to-be-sent-so-the-mark-clean.md)
     const sentSnapshot = JSON.stringify(payload)
     await serviceStore.updateService(id, payload)
 
-    // WR-01: sync the just-persisted, normalized slot order back into
-    // localService so display and persisted state agree in ORDER, not only
-    // content — otherwise a legacy/corrupted document's first non-reorder
-    // save silently reorders what's persisted without updating what's
-    // displayed (self-heals on the next remote snapshot, but is a real,
-    // avoidable mismatch until then).
-    //
-    // Guarded by reference equality against `data.slots` (captured before
-    // any `await` above, including the scheduledSongIds loop and the write
-    // itself): if something else reassigned `localService.value.slots` to a
-    // NEW array during those awaits — most plausibly a reorder drag racing
-    // this save, the same failure class CR-01 closed — the reference no
-    // longer matches, and we must NOT clobber that newer, more current
-    // array with this stale, pre-await snapshot. Skip the sync-back in that
-    // case; the existing remote-merge watcher already reconciles any
-    // resulting order mismatch on the next Firestore snapshot.
+    // See ADR-0235 (docs/adr/0235-snapshot-exactly-what-is-about-to-be-sent-so-the-mark-clean.md)
     if (localService.value && localService.value.slots === data.slots) {
       localService.value.slots = normalizedSlots
     }
 
-    // Mark current local state as clean (don't overwrite localService — user
-    // may still be typing) — but ONLY if it still matches exactly what was
-    // just persisted above. CR-01: a distinct mutation made to localService
-    // while the write was in flight (e.g. a different field edited between
-    // the snapshot above and this line resolving) must NOT be marked clean
-    // against a payload that never included it — doing so silently and
-    // permanently drops that edit, because the next debounce timer's own
-    // `isDirty` re-check would then see nothing to save. Leaving
-    // originalService untouched in that case keeps isDirty accurately true,
-    // so the still-armed follow-up timer performs a real save carrying the
-    // concurrent edit instead of a false-positive no-op.
+    // See ADR-0224 (docs/adr/0224-fix-do-not-restore-a-closure-captured-pre-drag-snapshot-here.md)
     if (
       localService.value &&
       JSON.stringify({

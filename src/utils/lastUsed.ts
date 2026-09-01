@@ -55,24 +55,7 @@ export function computeLastUsedDate(songId: string, services: LastUsedServiceInp
   return max
 }
 
-/**
- * The single shared calendar-date parse convention for a `Service.date`
- * `"YYYY-MM-DD"` string. BOTH the live store adapter (`services.ts`) and the
- * 84-02 backfill must use this exact expression so the `Timestamp` each
- * environment writes is identical.
- *
- * WR-03 (84-REVIEW): parses as UTC midnight (`Date.UTC`) rather than the
- * previous `new Date(\`${date}T00:00:00\`)`, which resolved "local midnight"
- * against whichever timezone the running process defaulted to — the end
- * user's browser on the client, but the HOST MACHINE's ambient `TZ` for the
- * Admin-SDK backfill script (a CI runner, cloud shell, or Docker container
- * commonly defaults to UTC). Two environments computing a different midnight
- * for the identical `"YYYY-MM-DD"` string would make `Timestamp.isEqual`
- * never converge — the backfill's idempotency check would "correct" an
- * already-correct song's `lastUsedAt` forever, off by a fixed offset, with
- * no error raised. `Date.UTC` is timezone-explicit and process-independent,
- * so both environments now compute byte-identical millis for the same date.
- */
+/** See ADR-0009 (docs/adr/0009-the-single-shared-calendar-date-parse-convention-for-a-servi.md) */
 export function serviceDateToMillis(date: string): number {
   const parts = date.split('-')
   const year = Number(parts[0])

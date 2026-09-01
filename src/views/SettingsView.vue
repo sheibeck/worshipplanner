@@ -35,7 +35,7 @@
 
         <p v-if="saveError" class="text-red-400 text-sm mt-2">{{ saveError }}</p>
 
-        <!-- Share URL slug field (R-02, D-18) -->
+        <!-- See ADR-0236 (docs/adr/0236-save-action-share-url-slug-r-02-d-18.md) -->
         <div class="mt-6 pt-6 border-t border-gray-800">
           <label class="block text-xs text-gray-400 mb-1">Share URL slug</label>
           <input
@@ -619,7 +619,7 @@ const isSaving = ref(false)
 const savedFeedback = ref(false)
 const saveError = ref<string | null>(null)
 
-// ── Share URL slug state (R-02, D-18) ──────────────────────────────────────────
+// See ADR-0236 (docs/adr/0236-save-action-share-url-slug-r-02-d-18.md)
 
 const editSlug = ref('')
 const persistedSlug = ref<string | null>(null)
@@ -804,9 +804,7 @@ watch(
   { immediate: true },
 )
 
-// Keep the local checkbox in sync if the store's org context finishes loading
-// after this component mounts (org doc is not live-synced — Pitfall 2 — so this
-// only reflects our own mirror-writes and the initial async loadOrgContext read).
+// See ADR-0237 (docs/adr/0237-keep-the-local-checkbox-in-sync-if-the-store-s-org-context-f.md)
 watch(
   () => authStore.vwModeEnabled,
   (val) => {
@@ -898,9 +896,7 @@ async function onSave() {
   }
 }
 
-// ── Save action (Share URL slug, R-02/D-18) ────────────────────────────────────
-// Uniqueness always goes through claimSlug's create-only orgSlugs claim — never a raw
-// updateDoc of organizations/{orgId}.slug alone.
+// See ADR-0236 (docs/adr/0236-save-action-share-url-slug-r-02-d-18.md)
 
 async function onSaveSlug() {
   if (isSlugSaveDisabled.value) return
@@ -1018,9 +1014,7 @@ async function onClearPcCredentials() {
   }
 }
 
-// ── Vertical Worship toggle action (D-15/D-16) ─────────────────────────────────
-// Mirror-write template follows onSaveSlug: updateDoc the org doc, then
-// immediately reassign the store ref (org doc is not live-synced — Pitfall 2).
+// See ADR-0237 (docs/adr/0237-keep-the-local-checkbox-in-sync-if-the-store-s-org-context-f.md)
 
 async function onToggleVwMode() {
   if (!authStore.orgId || !authStore.isEditor) return
@@ -1180,12 +1174,7 @@ async function saveSlideTypography() {
 async function onChangeSlideFontFamily() {
   const snapped = snapWeight(slideFontFamilyInput.value, slideFontWeightInput.value)
   slideFontWeightInput.value = snapped
-  // WR-03 (46-REVIEW.md): a genuinely failed dynamic import here would
-  // otherwise surface as an unhandled promise rejection on every affected
-  // family switch. Not user-visible either way — the preview box's native
-  // CSS-stack fallback already covers a failed/missing asset — but every
-  // other async handler in this file is careful to swallow non-fatal
-  // failures rather than leave one loose.
+  // See ADR-0238 (docs/adr/0238-a-genuinely-failed-dynamic-import-here-would-otherwise-surfa.md)
   loadFontCss(slideFontFamilyInput.value, snapped).catch(() => {})
   await saveSlideTypography()
 }
@@ -1264,10 +1253,7 @@ async function onToggleReminderEnabled() {
   }
 }
 
-// reminderDaysBefore MUST persist as a number — `v-model.number` already coerces
-// the local ref, but the write itself re-wraps in Number(...) so a revert-on-error
-// restores a real numeric prior value, never a stringified one (58-RESEARCH.md
-// Pitfall 5).
+// See ADR-0239 (docs/adr/0239-reminderdaysbefore-must-persist-as-a-number-v-model-number-a.md)
 async function onChangeReminderDaysBefore() {
   if (!authStore.orgId || !authStore.isEditor) return
 

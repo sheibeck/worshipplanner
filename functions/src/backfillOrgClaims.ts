@@ -209,14 +209,7 @@ export async function backfillOrgMembershipClaims(
         continue;
       }
 
-      // decision.action is "skip" (reason "not-primary-org" or "already-current")
-      // or "clear" (not reachable from this call site: decideMembershipClaim only
-      // ever returns 'clear' when documentExists is false (WR-01), and
-      // decidePrimaryClaim always passes documentExists: true). Either way the
-      // primary keys are unaffected, but `orgs` still needs its own
-      // skip-if-matching check -- this is what lets a non-primary-org membership
-      // (or a primary membership whose claim is already current) still pick up a
-      // changed orgs map.
+      // See ADR-0011 (docs/adr/0011-decision-action-is-skip-reason-not-primary-org-or.md)
       const existingUser = await getAuth().getUser(uid);
       const existingClaims = existingUser.customClaims as
         | (Partial<OrgMembershipClaim> & { orgs?: Record<string, OrgMembershipRole> })
@@ -234,10 +227,7 @@ export async function backfillOrgMembershipClaims(
         console.log(`[backfillOrgClaims] ${uid} (${orgId}): set (orgs-only)`, { orgs: desiredOrgs });
       }
     } catch (err) {
-      // WR-02 (73-REVIEW.md): give the ~1000-byte custom-claims cap's
-      // auth/claims-too-large error a distinguishable, greppable log line --
-      // mirrors syncOrgMembershipClaimHandler's identical carve-out. Still
-      // recorded in `failed` exactly as before; only the logging changes.
+      // See ADR-0012 (docs/adr/0012-the-1000-byte-custom-claims-cap-throws-auth-claims-too-large.md)
       if (isClaimsTooLargeError(err)) {
         console.error(
           `[backfillOrgClaims] CLAIM SIZE LIMIT EXCEEDED for uid=${uid} (${orgId}): custom claims exceeded the ~1000-byte cap and were not written`,
@@ -261,21 +251,7 @@ export async function backfillOrgMembershipClaims(
 // initializeApp() or touches a live project -- only running it directly does.
 //
 // Usage (after `npm run build` from functions/, per functions/DEPLOY-ORG-CLAIMS.md):
-//   node lib/backfillOrgClaims.js            # dry run (default)
-//   node lib/backfillOrgClaims.js --apply    # writes claims for real
-//
-// Credentials resolve from GOOGLE_APPLICATION_CREDENTIALS or
-// `gcloud auth application-default login`, exactly like any other Admin SDK script.
-//
-// WR-02: the whole body is wrapped in try/catch. The initial
-// `getFirestore().collectionGroup('members').get()` inside backfillOrgMembershipClaims
-// is NOT covered by that function's own per-uid try/catch (only the loop body is) --
-// a rejection there (bad/expired credentials, wrong project, network failure) previously
-// propagated out of this IIFE as a raw unhandled rejection instead of the script's own
-// diagnostic output, with no process.exitCode set. The owner runs this by hand against
-// production credentials, so a readable "aborted before processing any account" message
-// plus a non-zero exit code mirrors the per-account failure reporting already present.
-//
+// See ADR-0013 (docs/adr/0013-node-lib-backfillorgclaims-js-dry-run-default-node.md)
 // Extracted into a named, exported function (mirrors syncOrgMembershipClaimHandler's
 // separation from the onDocumentWritten wrapper) so this top-level error path itself is
 // unit-testable without requiring `require.main === module`.

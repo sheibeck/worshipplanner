@@ -19,7 +19,7 @@ export interface Person {
   id: string
   name: string
   email: string // from PC import, CSV, or manual entry
-  /** APP-ONLY / manual — NOT fetchable from Planning Center Services v2 (D-14, RESEARCH Pitfall 5) */
+  /** See ADR-0172 (docs/adr/0172-app-only-manual-not-fetchable-from-planning-center-services.md) */
   phone: string
   active: boolean // soft-delete inverse (D-20); inactive people drop out of proposals + pickers
   /** STANDING data (D-18) — Role.id[] this person can fill */

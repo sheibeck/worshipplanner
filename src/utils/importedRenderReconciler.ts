@@ -11,31 +11,7 @@
  * `slideshowAssembler.ts`'s own stated contracts): no Firestore reads, no
  * Storage calls, no Vue reactivity, no imports from any store or composable.
  * It takes `(deck, render, resolvedUrls)` as plain, pre-resolved data — the
- * async `getDownloadURL()` work happens upstream in the composable layer
- * (`useSlideshowAssembly.ts`), never here.
- *
- * Three load-bearing facts a future editor must not lose:
- *
- * 1. **No positional pairing exists between `deck.slides[i]` and rendered
- *    page `i+1`** (42-RESEARCH.md Pitfall 1). `functions/src/index.ts`'s own
- *    "★ Trap 1" comment (lines ~294-303) is unambiguous: `mapAstToSlides`
- *    (pptxParser.ts) SKIPS slides with neither substantial text nor images,
- *    and emits ONE ENTRY PER IMAGE on a multi-image slide — the parsed
- *    array's length is structurally decoupled from the deck's real page
- *    count in BOTH directions. `deck.slides` is a COUNT source for the
- *    non-ready modes (parsed/pending/failed) and a CONTENT source only in
- *    `parsed` mode. Anything that indexes `deck.slides` by a rendered page
- *    number is a defect.
- * 2. **Gate on `render.status`, never on `render.renderedCount` truthiness**
- *    (42-RESEARCH.md Pitfall 3). `functions/src/index.ts:396-415`'s own
- *    three-conjunct ready gate (`actualCount > 0 && actualCount ===
- *    reportedCount && contiguous`) means `status` already encodes every
- *    failure mode. A `failed` document CAN carry a non-zero `renderedCount`
- *    (the `incomplete-render` outcome still writes the partial `actualCount`,
- *    `functions/src/index.ts:411-415`); a `pending` document legitimately
- *    carries none.
- * 3. **`renderedCount` wins in every ready case** (D-05), with ONE named
- *    carve-out: `status: 'ready'` with `renderedCount` absent or `< 1` is
+  * See ADR-0178 (docs/adr/0178-in-the-ready-state-an-identity-is-the-reconciler-s-synthetic.md)
  *    self-contradictory — the server's own ready gate REQUIRES `actualCount
  *    > 0` before it ever writes `status: 'ready'` — so this state is
  *    unproducible by the real pipeline. A client that emitted zero entries
@@ -47,8 +23,7 @@ import type { ImportedDeck } from '@/types/importedDeck'
 import type { PptxRenderDoc } from '@/types/pptxRender'
 import type { ImageSlide, TextSlide } from '@/types/slide'
 
-/** Prefix for the synthetic ready-state entry identity this module mints —
- * `rendered-page-N`, never `deck.slides[N-1].id` (Pitfall 1). */
+/** See ADR-0179 (docs/adr/0179-prefix-for-the-synthetic-ready-state-entry-identity-this-mod.md) */
 export const RENDERED_PAGE_IDENTITY_PREFIX = 'rendered-page-'
 
 /** The four states a deck's IMPORTED content can resolve to. `parsed` is the
@@ -112,15 +87,7 @@ export function resolveImportedRender(
     }
   }
 
-  // WR-04 (42-REVIEW.md): an EXPLICIT `render.status === 'ready'` check, not
-  // an implicit fall-through by elimination. `PptxRenderDoc` is cast from
-  // `snap.data()` with no runtime validation (`pptxRenders.ts`), so a future
-  // status value the client hasn't deployed for yet (`functions/src/index.ts`
-  // can add one without a client deploy — the sibling `failureReason` slug
-  // space already works this way) or a malformed document must degrade
-  // safely to `failed`, never be silently treated as `ready` merely because
-  // it fell through the `pending`/`failed` checks above and happened to
-  // carry a truthy `renderedCount`.
+  // See ADR-0180 (docs/adr/0180-an-explicit-render-status-ready-check-not-an-implicit.md)
   if (render.status === 'ready') {
     if (render.renderedCount !== undefined && render.renderedCount >= 1) {
       // Fact 3: renderedCount wins outright — no comparison against
@@ -143,36 +110,13 @@ export function resolveImportedRender(
 }
 
 /**
- * Mints the stable per-entry identity `derivedIdentityKey`/
- * `carryStoredDerivedEntries` key on across a rebuild. `ready` mode mints
- * synthetic `rendered-page-N` identities (Fact 1 — no `deck.slides[i].id`
- * pairing); every other mode (`parsed`/`pending`/`failed`) reuses
- * `deck.slides[i].id`.
- *
- * CR-01 (42-REVIEW.md) — corrected 2026-08-07: a `pending`/`failed` ->
- * `ready` transition does NOT carry forward per-entry customization. A
- * previous version of this comment claimed it could — that was false.
- * `pending`/`failed` identities key on `deck.slides[i].id` (a parsed-slide
- * UUID); `ready` identities key on the synthetic `rendered-page-N` string
- * minted above. The two key spaces never overlap, so
- * `carryStoredDerivedEntries` cannot match a stored pending/failed entry to
- * its post-render counterpart: any label, per-slide `audioUrl`/`audioLoop`,
- * or `notes` a user attached via "Edit details" while the render was still
+  * See ADR-0181 (docs/adr/0181-mints-the-stable-per-entry-identity-derivedidentitykey.md)
  * pending/failed is silently dropped — and the entry's `id` itself churns —
  * the instant the render completes.
  *
  * This is an accepted trade-off, not an oversight left unfixed: Fact 1 (this
  * module's header comment) rules out the one alternative that would restore
- * the promise — a positional `deck.slides[i]` <-> rendered-page-`i+1` pairing
- * — because `mapAstToSlides` (pptxParser.ts) skips slides and emits one entry
- * per image on a multi-image slide, so an index-based carry-forward would
- * attach a user's note to the WRONG slide, which is worse than dropping it.
- * Neither `slideActionMenuItems` nor `EditSlideDrawer.vue` currently warns a
- * user that edits made while a deck's render is pending/failed will not
- * survive the transition to `ready` — see CR-01 for the follow-up options
- * (a render-stable identity scheme, or a UI warning) if this trade-off ever
- * needs revisiting. The returned array's length always equals
- * `resolution.entryCount`.
+ * See ADR-0182 (docs/adr/0182-the-promise-a-positional-deck-slides-i-rendered-page-i-1.md)
  */
 export function importedEntryIdentities(
   deck: Pick<ImportedDeck, 'slides'>,

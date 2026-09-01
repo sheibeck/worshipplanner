@@ -284,10 +284,7 @@ export const useServiceStore = defineStore('services', () => {
     isLoading.value = true
     ownWriteEchoIds.value = []
     pendingWriteIds = []
-    // WR-03 (41-REVIEW): shareLinkCache is subscription-scoped state exactly
-    // like everything else reset above, but was missed — clear it on org
-    // switch too, so a cached token/false from the previous org's services
-    // can never leak into the newly-subscribed org's resolution.
+    // See ADR-0159 (docs/adr/0159-sharelinkcache-is-subscription-scoped-state-exactly-like-eve.md)
     shareLinkCache.clear()
   }
 
@@ -417,12 +414,7 @@ export const useServiceStore = defineStore('services', () => {
     }
   }
 
-  /**
-   * SONG-slot songIds present in a service, deduped source for both
-   * lock/unlock hooks. WR-01 (84-REVIEW): a song repeated across multiple
-   * SONG slots (e.g. a repeated chorus) must trigger exactly ONE recompute
-   * per `markAsPlanned`/`reopenService` call, not one per occurrence.
-   */
+  /** See ADR-0160 (docs/adr/0160-song-slot-songids-present-in-a-service-deduped-source-for-bo.md) */
   function songIdsInService(service: Service): string[] {
     const ids = service.slots
       .filter((slot): slot is SongSlot => slot.kind === 'SONG' && !!slot.songId)
@@ -499,17 +491,7 @@ export const useServiceStore = defineStore('services', () => {
       updatedAt: serverTimestamp(),
     })
 
-    // R247 — this service is now locked; recompute lastUsedAt for its songs
-    // so they pick up this service's date (advancing to MAX over every
-    // locked service that contains them). See buildLastUsedSnapshot's doc
-    // comment for why the snapshot below overrides THIS service's status
-    // rather than relying on services.value, which still shows 'draft' here.
-    //
-    // CR-02 (84-REVIEW): soft-fail, mirroring maybeRefreshShareLink's pattern
-    // in this same file. The status write above already landed — a transient
-    // recompute failure (permission edge case, network blip, quota) must not
-    // reject the whole transition and make the caller report "it didn't
-    // save" for a service that is now genuinely planned.
+    // See ADR-0161 (docs/adr/0161-those-songs-fall-back-to-their-remaining-locked-max-or-null.md)
     const service = services.value.find((s) => s.id === id)
     if (service) {
       const songIds = songIdsInService(service)
@@ -552,14 +534,7 @@ export const useServiceStore = defineStore('services', () => {
       updatedAt: serverTimestamp(),
     })
 
-    // Those songs fall back to their remaining locked MAX (or null if this
-    // was their only locked service) — see buildLastUsedSnapshot's doc
-    // comment for the status-override rationale.
-    //
-    // CR-02 (84-REVIEW): soft-fail, mirroring markAsPlanned's identical guard
-    // above and maybeRefreshShareLink's pattern in this same file — the
-    // status write already landed, so a transient recompute failure must not
-    // reject the reopen itself.
+    // See ADR-0161 (docs/adr/0161-those-songs-fall-back-to-their-remaining-locked-max-or-null.md)
     if (songIds.length > 0) {
       try {
         await recomputeLastUsedFor(songIds, buildLastUsedSnapshot(id, 'draft'))
@@ -600,15 +575,7 @@ export const useServiceStore = defineStore('services', () => {
     // service.date, which is unrecoverable once the service doc is gone.
     const service = services.value.find((s) => s.id === id)
 
-    // WR-01 (80-REVIEW): each revocation step below is independently
-    // try/caught. Before this, a single mid-sequence failure (permission-
-    // denied on a stale/cross-org doc, a transient network error) would
-    // throw out of deleteService entirely, skipping BOTH the remaining
-    // revocation steps AND the actual service-doc delete — leaving the
-    // service partially-revoked yet still fully present, while the caller
-    // (ServiceEditorView.vue's onDelete) silently closed the confirm dialog
-    // with no error surfaced. Revocation is now best-effort: a failure here
-    // is logged and does not block the other artifacts' revocation or the
+    // See ADR-0162 (docs/adr/0162-mirrors-teamview-vue-s-oncancelinvite-pattern-surface-the-fa.md)
     // service-doc delete below, which is what the user actually asked for
     // and is left UNGUARDED so a genuine failure to delete the service
     // itself still throws and reaches the caller.
@@ -647,13 +614,7 @@ export const useServiceStore = defineStore('services', () => {
         if (slug) {
           const shareRef = doc(db, 'serviceShares', `${slug}__service-${service.date}`)
           const shareSnap = await getDoc(shareRef)
-          // CR-01 (80-REVIEW): this doc is keyed by slug+date, NOT serviceId —
-          // two services on the same date share one serviceShares doc. Only
-          // delete it if it still records THIS service as owner; otherwise a
-          // same-date sibling service's live public share page would be
-          // silently destroyed. A doc written before this guard existed (no
-          // serviceId field) is treated as "not mine" and left alone rather
-          // than deleted on an undefined === id false match.
+          // See ADR-0163 (docs/adr/0163-this-doc-is-keyed-purely-by-slug-date-and-the-app-enforces-n.md)
           if (shareSnap.exists() && shareSnap.data().serviceId === id) {
             await deleteDoc(shareRef)
           }
@@ -667,11 +628,7 @@ export const useServiceStore = defineStore('services', () => {
     // the actual delete the user asked for, so a failure here must throw
     // and reach the caller rather than being swallowed like steps 1-3 above.
     await deleteDoc(doc(db, 'organizations', orgId.value, 'services', id))
-    // WR-03 (41-REVIEW): drop the deleted service's shareLinkCache entry so
-    // it cannot accumulate as a dead entry, and so a same-session, same-org
-    // serviceId reuse (however unlikely with Firestore's random doc ids)
-    // never resolves against a stale cached token/false for a service that
-    // no longer exists.
+    // See ADR-0159 (docs/adr/0159-sharelinkcache-is-subscription-scoped-state-exactly-like-eve.md)
     shareLinkCache.delete(id)
   }
 
@@ -876,12 +833,7 @@ export const useServiceStore = defineStore('services', () => {
       updatedAt: serverTimestamp(),
     })
 
-    // R-02/D-18: memorable-URL secondary write, mirroring
-    // quarters.ts::finalizeAndShare exactly — resolve (or claim, on first share)
-    // the org's slug, then overwrite serviceShares/{slug}__service-{date} in
-    // place. WR-06: the opaque shareTokens doc above has already succeeded, so
-    // this whole step is soft-fail — any error here is logged and swallowed, the
-    // token is still returned (T-17-03-03).
+    // See ADR-0164 (docs/adr/0164-r-02-d-18-memorable-url-secondary-write-mirroring.md)
     try {
       const orgRef = doc(db, 'organizations', orgIdValue)
       const orgSnap = await getDoc(orgRef)
@@ -895,12 +847,7 @@ export const useServiceStore = defineStore('services', () => {
       }
 
       await setDoc(doc(db, 'serviceShares', `${slug}__service-${service.date}`), {
-        // CR-01 (80-REVIEW): this doc is keyed purely by slug+date, and the
-        // app enforces no per-org date uniqueness, so two services can share
-        // one serviceShares doc. serviceId lets deleteService tell "this doc
-        // is mine" from "this doc belongs to a same-date sibling service"
-        // before deleting it — without this field the doc has no way to
-        // disambiguate ownership.
+        // See ADR-0163 (docs/adr/0163-this-doc-is-keyed-purely-by-slug-date-and-the-app-enforces-n.md)
         serviceId: service.id,
         orgId: orgIdValue,
         orgSlug: slug,
@@ -1002,34 +949,7 @@ export const useServiceStore = defineStore('services', () => {
     return ensureShareLink(service, orgIdValue)
   }
 
-  /**
-   * R077 (41-04) — keeps a previously-shared service's public payload
-   * current after ANY of the three write paths below, without a second
-   * Share press. Hooked into exactly three write paths and no others:
-   *
-   *   - `updateService` (also covers `assignSongToSlot`, `clearSongFromSlot`,
-   *     the editor's autosave and slot reorder — all route through it)
-   *   - `setRoleOverride`
-   *   - `clearRoleOverride`
-   *
-   * Deliberately NOT hooked: `markAsPlanned` and `reopenService` are
-   * status-only writes and `ShareView.vue` never renders `status`;
-   * `deleteService` uses `deleteDoc` and is not a refresh trigger.
-   * `createService` now generates the link at creation via `ensureShareLink`
-   * (so every service always has one); subsequent edits refresh through here.
-   *
-   * Loop safety (T-41-02): the store's only `onSnapshot` subscribes to
-   * `organizations/{orgId}/services` (see `subscribe()` above). Nothing
-   * subscribes to `shareTokens` or `serviceShareLinks`, so a write to either
-   * has no path back into the editor's remote-merge watcher or autosave —
-   * PROVIDED this function itself never writes to `services/{docId}`, which
-   * it does not: it calls `writeSharePayload` only, never `updateDoc`/`setDoc`
-   * against a services path.
-   *
-   * Never rejects — the whole body is one try/catch (WR-06 soft-fail,
-   * mirroring `writeSharePayload`'s memorable-URL catch above). A share
-   * problem must never fail the user's save.
-   */
+  /** See ADR-0165 (docs/adr/0165-subscribes-to-sharetokens-or-servicesharelinks-so-a-write-to.md) */
   async function maybeRefreshShareLink(id: string, overrides: Partial<Service> = {}): Promise<void> {
     try {
       if (!orgId.value) return
@@ -1066,15 +986,7 @@ export const useServiceStore = defineStore('services', () => {
       // or an ordinary edit to a never-shared service would publish it.
       await writeSharePayload(effectiveService, orgId.value, token)
     } catch (err) {
-      // WR-02 (41-REVIEW): only a genuine `permission-denied` is treated as
-      // permanent-for-session. Before this distinction, ANY error — including
-      // a transient network blip or a brief rules-propagation delay —
-      // permanently disabled refresh for the service for the rest of the
-      // Pinia instance's lifetime, silently drifting an already-public
-      // service out of sync with no way to recover short of a page reload.
-      // Caching `false` on permission-denied specifically is still
-      // deliberate: before the owner deploys Plan 01's rules, every attempt
-      // is denied, and retrying on every keystroke would flood the console
+      // See ADR-0166 (docs/adr/0166-only-a-genuine-permission-denied-is-treated-as-permanent-for.md)
       // for no benefit. Any other error code (or no code at all — e.g. a
       // plain network Error) leaves the cache untouched, so the very next
       // edit gets a fresh attempt instead of being silently skipped forever.

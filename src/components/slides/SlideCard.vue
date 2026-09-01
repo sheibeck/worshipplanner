@@ -101,31 +101,7 @@
         :class="kindBadgeClass"
         data-testid="slide-card-kind-badge"
       >{{ assembledSlide.slotKind }}</span>
-      <!--
-        WR-03 (48-REVIEW): the invisible hit-area padding is asymmetric, not
-        the uniform `p-3.5 -m-3.5` (44px on every side) 48-UI-SPEC.md's
-        Spacing Scale exception describes. A uniform 14px expansion in every
-        direction overlaps the kind-badge span to the left and the footer
-        label span to the right (only `gap-1.5`/6px away) AND the preview
-        `div` above (only `mt-2`/8px away) — because this handle carries
-        `@click.stop` and paints on top within any overlap, those slivers
-        would silently swallow clicks meant for card selection rather than
-        letting them reach the card's own `@click` handler. Left/right are
-        capped at 6px (exactly the `gap-1.5` to each neighbor) and top is
-        capped at 8px (exactly the `mt-2` to the preview) so the enlarged hit
-        area never crosses into a neighboring hit-testable box. Bottom keeps
-        the full 14px — nothing sits directly below the footer row within
-        this card, and `SlideGrid.vue`'s `gap-4` (16px) between grid cells
-        comfortably absorbs the 2px this extends past the card's own
-        `p-3` (12px) bottom padding.
-        This means the handle's actual footprint (28x38px) is smaller than
-        the 44x44px floor in the directions capped above — an unavoidable
-        consequence of a touch target this close to other content in a
-        44px-tall row. Real-thumb reachability at this reduced size remains
-        the 🧪 physical-device backstop 48-UI-SPEC.md's own UI Considerations
-        table already calls out for this exact affordance; it is not,
-        and cannot be, proven from source/unit tests alone.
-      -->
+      <!-- See ADR-0113 (docs/adr/0113-the-invisible-hit-area-padding-is-asymmetric-not.md) -->
       <span
         v-if="reorderable"
         class="drag-handle flex-shrink-0 cursor-grab pl-1.5 -ml-1.5 pr-1.5 -mr-1.5 pt-2 -mt-2 pb-3.5 -mb-3.5 text-gray-600 hover:text-gray-400 active:cursor-grabbing"

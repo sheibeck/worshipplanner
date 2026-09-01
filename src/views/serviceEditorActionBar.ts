@@ -69,13 +69,7 @@ export interface ActionBarContext {
   canEditService: boolean
   hasSermonContext: boolean
   aiSuggestingAll: boolean
-  /**
-   * Org-level AI features toggle (WR-01, 39-REVIEW). Required (not
-   * optional) so the compiler forces every call site to supply it — an
-   * `undefined` here would silently show "Suggest All Songs" with AI off,
-   * the one AI entry point that was missed by 39-05's hide-don't-disable
-   * pass. Follows the same threading pattern as `pcEnabled` below.
-   */
+  /** See ADR-0241 (docs/adr/0241-org-level-ai-features-toggle-wr-01-39-review-required-not.md) */
   aiEnabled: boolean
   hasPcCredentials: boolean
   /**
@@ -185,13 +179,7 @@ function buildPresentItem(ctx: ActionBarContext): ActionBarItem {
   }
 }
 
-/**
- * R101 (48-03): Print, relocated verbatim from the page-bottom button
- * (ServiceEditorView.vue:1303-1314) — unconditional, same as the button it
- * replaces (no editor gate on Print today). testId is preserved so the
- * `print-btn` selector keeps working once the bottom button is deleted
- * (Pitfall 3 / Anti-Patterns: exactly one print-btn must exist).
- */
+/** See ADR-0242 (docs/adr/0242-r101-48-03-print-relocated-verbatim-from-the-page-bottom-but.md) */
 function buildPrintItem(ctx: ActionBarContext): ActionBarItem {
   return {
     key: 'print',
@@ -216,31 +204,13 @@ function buildShareItem(ctx: ActionBarContext): ActionBarItem | undefined {
     key: 'share',
     label: ctx.isSharing ? 'Sharing...' : ctx.shareCopied ? 'Link Copied!' : ctx.shareError ? ctx.shareError : 'Share',
     icon: 'share',
-    // WR-01 (48-REVIEW): the pre-migration bottom-row button was
-    // `:disabled="!localService || isSharing"` — the `!localService` half is
-    // moot here (the whole action bar only mounts once localService is
-    // truthy), but `isSharing` must be preserved so a double-click can't fire
-    // concurrent createShareToken writes while a share is in flight.
+    // See ADR-0233 (docs/adr/0233-the-pre-migration-bottom-row-button-was-disabled-localservic.md)
     disabled: ctx.isSharing,
     onClick: ctx.handlers.onShare,
   }
 }
 
-/**
- * R136 (59-04): the ✉ Messages entry point that opens `MessageComposer.vue`.
- * Editor-gated like every mutating action (returns `undefined` for a viewer —
- * a share/send denormalizes editor-only recipient data).
- *
- * HIDE-ON-FAIL when messaging is off (owner UAT, 2026-08-17): "The messages
- * button ... shows up even if Messaging setting is turned off. It should be
- * hidden if message setting is turned off." This REVERSES 59-04's deliberate
- * disabled+tooltip-for-discoverability choice (59-UI-SPEC.md #0). The item now
- * returns `undefined` when `!ctx.messagingEnabled`, matching `buildShareItem`
- * and the WR-01 AI "hide-don't-disable" rule. The server kill-switch re-check
- * in `queueServiceMessage` (59-02) remains the real boundary; this UI gate is
- * convenience. Do NOT "restore" the disabled+tooltip form — the owner asked
- * for the opposite.
- */
+/** See ADR-0243 (docs/adr/0243-hide-on-fail-when-messaging-is-off-owner-uat-2026-08-17-the.md) */
 function buildMessagesItem(ctx: ActionBarContext): ActionBarItem | undefined {
   if (!ctx.isEditor || !ctx.messagingEnabled) return undefined
   return {
@@ -253,10 +223,7 @@ function buildMessagesItem(ctx: ActionBarContext): ActionBarItem | undefined {
 
 function buildServiceOrderItems(ctx: ActionBarContext): ActionBarItem[] {
   const items: ActionBarItem[] = []
-  // WR-01: "Suggest All Songs" is a live AI entry point (calls
-  // getSongSuggestions for every SONG slot) and must be hidden — not
-  // disabled — when the org has turned AI off, per the UI-SPEC's
-  // Hide-Don't-Disable Contract.
+  // See ADR-0244 (docs/adr/0244-suggest-all-songs-is-a-live-ai-entry-point-calls.md)
   if (ctx.canEditService && ctx.aiEnabled) {
     items.push(buildSuggestItem(ctx))
   }

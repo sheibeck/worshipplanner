@@ -7,12 +7,7 @@
         <p class="text-sm text-gray-400 mt-1">Platform-level super-admin access and configuration</p>
       </div>
 
-      <!-- Tab bar: Configuration / Organizations (Phase 72). WAI-ARIA APG
-           Tabs semantics (R239) — role/aria-* are additive attributes bound
-           to the existing activeTab/setTab state; the v-show mount strategy
-           below is unchanged. WR-01 (81-REVIEW): roving tabindex requires the
-           companion arrow-key handler per the APG Tabs pattern, so
-           @keydown moves focus + activates the adjacent tab. -->
+      <!-- See ADR-0217 (docs/adr/0217-roving-tabindex-on-the-tab-bar-above-removes-inactive-tabs-f.md) -->
       <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
         <button
           id="owner-tab-configuration"
@@ -88,9 +83,7 @@ function normalizeTab(raw: unknown): OwnerConsoleTab {
   return raw === 'organizations' ? 'organizations' : 'configuration'
 }
 
-// `useRoute()`/`useRouter()` return undefined when this view is mounted
-// without a router (existing OwnerConsoleView.test.ts harness) — every read
-// below is optional-chained (RosterView.vue precedent, RESEARCH Pitfall 2).
+// See ADR-0218 (docs/adr/0218-useroute-userouter-return-undefined-when-this-view-is-mounte.md)
 const route = useRoute()
 const router = useRouter()
 
@@ -111,10 +104,7 @@ function setTab(tab: OwnerConsoleTab) {
   router?.replace({ query: { ...route?.query, tab } })
 }
 
-// WR-01 (81-REVIEW): roving tabindex (above) removes inactive tabs from the
-// Tab key order per the WAI-ARIA APG Tabs pattern, which requires arrow-key
-// navigation to compensate. ArrowLeft/ArrowRight move + activate the
-// adjacent tab (wrapping); Home/End jump to the first/last tab.
+// See ADR-0217 (docs/adr/0217-roving-tabindex-on-the-tab-bar-above-removes-inactive-tabs-f.md)
 const TAB_ORDER: OwnerConsoleTab[] = ['configuration', 'organizations']
 const configurationTabButtonRef = ref<HTMLButtonElement | null>(null)
 const organizationsTabButtonRef = ref<HTMLButtonElement | null>(null)

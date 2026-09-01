@@ -9,11 +9,7 @@ export interface SaveStatusEntry {
   errorText?: string
 }
 
-// WR-01 (32-REVIEW): module-level (not store-internal) so both the toast
-// fallback below AND SaveStatusIndicator.vue's inline-error fallback share
-// the identical string — 32-UI-SPEC § 4's "toast body always mirrors the
-// inline text, word for word" contract would otherwise depend on two
-// separately-maintained copies never drifting apart.
+// See ADR-0157 (docs/adr/0157-module-level-not-store-internal-so-both-the-toast-fallback-b.md)
 export const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
 
 // 34-10 (UAT F4): module-level, same reasoning as GENERIC_ERROR_TEXT above —
@@ -25,26 +21,7 @@ export function hasVisibleSaveStatus(entry: SaveStatusEntry): boolean {
   return entry.status !== 'idle'
 }
 
-/**
- * Per-surface save-status aggregator (R040). Sits strictly ABOVE
- * useAutoSave — it does not re-implement any of useAutoSave's own timing,
- * inflight guard, flush() or cleanup() machinery; it only records what each
- * surface reports.
- *
- * Keyed by surfaceId so several autosaving surfaces can be mounted
- * simultaneously without one surface's 'saved' erasing another's 'saving'.
- * This store holds no Firestore state at all — no orgId, no subscribe, no
- * unsubscribeAll.
- *
- * WR-03 (32-REVIEW): a `mostUrgent` cross-surface rollup (deterministic
- * urgency ranking + tie-break) used to live here, fully built and tested,
- * with no production consumer anywhere in `src/` — dead code as shipped.
- * Removed rather than kept "for later," per this codebase's own "don't
- * build more than is needed" convention (32-UI-SPEC § 4's toast-stacking
- * note makes the same call). Re-add it if/when a real cross-surface
- * indicator is planned — the deleted logic is in this phase's own review
- * fix commit for reference.
- */
+/** See ADR-0158 (docs/adr/0158-keyed-by-surfaceid-so-several-autosaving-surfaces-can-be-mou.md) */
 export const useSaveStatus = defineStore('saveStatus', () => {
   const entries = ref<Record<string, SaveStatusEntry>>({})
 

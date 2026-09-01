@@ -116,7 +116,7 @@
       </div>
     </div>
 
-    <!-- PARTIAL (WR-02): EXACTLY ONE output window opened; the other was refused. -->
+    <!-- See ADR-0221 (docs/adr/0221-partial-wr-02-exactly-one-output-window-opened-the-other-was.md) -->
     <div
       v-if="outputStatus === 'partial'"
       data-testid="run-partial-banner"
@@ -305,12 +305,7 @@ const props = defineProps<{
   channelFactory?: BroadcastChannelFactory
 }>()
 
-// R276 (97-08/09): the ENTIRE Phase 92-96 control-core — the single-writer
-// channel, navigation model, rail derivations, honest open state machine, WR-01
-// stale guard, 96-01 recovery, exit/teardown ordering, the timers, blackout,
-// rehearse, pre-flight readiness, filmstrip/rail expansion, and the document
-// keyboard handler — lives in useRunControl. This view is template + this
-// destructure; the composable registers its own onMounted/onUnmounted lifecycle.
+// See ADR-0222 (docs/adr/0222-r276-97-08-09-the-entire-phase-92-96-control-core-the.md)
 const {
   // header / service
   serviceHeading,

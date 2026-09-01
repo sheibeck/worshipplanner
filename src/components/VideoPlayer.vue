@@ -74,13 +74,7 @@ function onError(event: Event): void {
   emit('error', event)
 }
 
-/**
- * `NotAllowedError` (autoplay policy) and `AbortError` (the play() request
- * was interrupted by a same-element `pause()` call, per the HTML media spec
- * — see WR-01) are both expected, silent outcomes here: the presentation
- * driver calls `pauseCurrentMedia()` at the start of every navigation, which
- * can legitimately race a still-pending `play()` on this exact element.
- */
+/** See ADR-0087 (docs/adr/0087-notallowederror-autoplay-policy-and-aborterror-the-play-requ.md) */
 function isExpectedPlaybackRejection(err: unknown): boolean {
   return err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')
 }

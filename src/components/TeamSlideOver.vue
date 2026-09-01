@@ -76,7 +76,7 @@
             />
           </div>
 
-          <!-- Rename soft-warn (WR-02) -->
+          <!-- See ADR-0083 (docs/adr/0083-renaming-orphans-the-name-keyed-reference-on-every-service-t.md) -->
           <div v-if="pendingRenameConfirm" class="rounded-md bg-amber-900/20 border border-amber-800 p-3">
             <p class="text-sm text-amber-300">
               Rename the '{{ props.team!.name }}' team to '{{ form.name.trim() }}'? Any service that already
@@ -235,9 +235,7 @@ watch(
   (isOpen) => {
     if (isOpen) {
       form.value = props.team ? teamToForm(props.team) : emptyForm()
-      // WR-2: dedupe on read (see TeamRecurrenceSlideOver.vue) — a duplicate
-      // entering via a direct console edit/migration/future writer would
-      // otherwise leave toggleOrdinal splicing only one copy per click.
+      // See ADR-0084 (docs/adr/0084-dedupe-on-read-see-teamrecurrenceslideover-vue-a-duplicate.md)
       localOrdinals.value = Array.from(new Set(props.team?.recurrence?.ordinals ?? [])).sort((a, b) => a - b)
       showDeleteConfirm.value = false
       pendingRenameConfirm.value = false
@@ -273,10 +271,7 @@ function onClear() {
   localOrdinals.value = []
 }
 
-// WR-01: teams are consumed by NAME everywhere a service selects them (the
-// service checkboxes), so two teams sharing a name break checkbox
-// independence. Compare trimmed + case-insensitive, excluding the row being
-// edited (so saving a team without changing its name never collides with itself).
+// See ADR-0085 (docs/adr/0085-teams-are-consumed-by-name-everywhere-a-service-selects-them.md)
 function isDuplicateName(name: string, excludeId?: string): boolean {
   const normalized = name.trim().toLowerCase()
   return teamsStore.teams.some((t) => t.id !== excludeId && t.name.trim().toLowerCase() === normalized)
@@ -287,16 +282,13 @@ async function onSave() {
   const name = form.value.name.trim()
   if (!name) return
 
-  // WR-01: reject a save whose name collides with another existing team.
+  // See ADR-0085 (docs/adr/0085-teams-are-consumed-by-name-everywhere-a-service-selects-them.md)
   if (isDuplicateName(name, props.team?.id)) {
     toasts.push(`A team named "${name}" already exists. Choose a different name.`)
     return
   }
 
-  // WR-02: renaming orphans the name-keyed reference on every service that
-  // already selected the old name (same practical consequence as delete) —
-  // require a soft-warn confirm step before committing the rename. Not
-  // triggered on create, on an unchanged name, or on a recurrence-only edit.
+  // See ADR-0083 (docs/adr/0083-renaming-orphans-the-name-keyed-reference-on-every-service-t.md)
   if (!isCreateMode.value) {
     const isRename = name !== props.team!.name
     if (isRename && !pendingRenameConfirm.value) {
@@ -306,9 +298,7 @@ async function onSave() {
   }
   pendingRenameConfirm.value = false
 
-  // WR-2: dedupe on write too, in case a duplicate slipped past the read-side
-  // seed (e.g. this component instance stayed open across a direct Firestore
-  // edit landing mid-session).
+  // See ADR-0084 (docs/adr/0084-dedupe-on-read-see-teamrecurrenceslideover-vue-a-duplicate.md)
   const ordinals = Array.from(new Set(localOrdinals.value)).sort((a, b) => a - b)
 
   isSaving.value = true

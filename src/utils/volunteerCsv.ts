@@ -50,9 +50,7 @@ export function frequencyLabelToN(label: string): number {
     return bareInt
   }
 
-  // WR-03: mirror the bareInt branch's `> 0` guard — "1-in-0" (and any other non-positive N)
-  // must fall through to the same default-4 path as an invalid bare integer, never accepted
-  // as a literal 0 (which would produce an Infinity deficit score in scheduler.ts).
+  // See ADR-0207 (docs/adr/0207-mirror-the-bareint-branch-s-0-guard-1-in-0-and-any-other.md)
   const oneInNMatch = normalized.match(/^1-in-(\d+)$/)
   if (oneInNMatch) {
     const n = Number(oneInNMatch[1])
@@ -108,9 +106,7 @@ export function parseVolunteerCsvRow(row: Record<string, string>): ParsedVolunte
 
   const frequencyRaw = row['Frequency']?.trim() ?? ''
   const frequencyN = frequencyLabelToN(frequencyRaw)
-  // WR-03: a "1-in-N" cell only counts as a known/recognized label when N is actually a
-  // positive integer — "1-in-0" must surface the same unrecognized/defaulted warning as an
-  // invalid bare integer, not be silently accepted as N=0.
+  // See ADR-0207 (docs/adr/0207-mirror-the-bareint-branch-s-0-guard-1-in-0-and-any-other.md)
   const oneInNMatch = frequencyRaw.trim().match(/^1-in-(\d+)$/i)
   const oneInNIsValid = oneInNMatch !== null && Number(oneInNMatch[1]) > 0
   const isKnownLabel =
@@ -137,10 +133,7 @@ export function parseVolunteerCsvRow(row: Record<string, string>): ParsedVolunte
   }
 }
 
-/**
- * Normalize a name for comparison: trim, collapse internal whitespace,
- * lowercase. Used to match CSV names against roster people (D-16, Pitfall 4).
- */
+/** See ADR-0208 (docs/adr/0208-normalize-a-name-for-comparison-trim-collapse-internal-white.md) */
 function normalizeName(s: string): string {
   return s.trim().replace(/\s+/g, ' ').toLowerCase()
 }

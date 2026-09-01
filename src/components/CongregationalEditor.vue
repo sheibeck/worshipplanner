@@ -159,21 +159,7 @@
 
 <script setup lang="ts">
 // Textarea-based congregational-reading editor (supersedes Phase 47's
-// click-between-verses divider UX per direct owner feedback: the divider UX
-// was unintuitive). The user edits a plain `---`-delimited textarea, exactly
-// like the song-lyrics paste flow; `src/utils/congregationalText.ts` is the
-// single source of truth for the text<->sections grammar.
-//
-// Controlled component (R064): it persists NOTHING itself. It seeds its
-// editable `text` ONCE at mount (WR-04 — keyed on slot id by the parent, not
-// reactive to later prop changes) and reports upward only on Save via
-// `update:sections`, on Delete via `delete`, and closes via `close`.
-//
-// R092 (translationSource): `capturedVersion` is captured ONCE — from the
-// existing sections at mount, or from the church's bibleVersion setting at the
-// moment of the auto-fetch — and every Save stamps from that captured value,
-// never a fresh read of the org's current setting.
-//
+// See ADR-0063 (docs/adr/0063-click-between-verses-divider-ux-per-direct-owner-feedback-th.md)
 // R096 (AI split): the AI split is now a textarea-fill button (aiEnabled-
 // gated). It fills the textarea with the split reading; nothing is committed
 // until Save. A failed split leaves the textarea untouched and surfaces a
@@ -292,12 +278,7 @@ async function autoFetch(): Promise<void> {
     // component remains functional for manual entry via the main textarea.
     // The BibleGateway deep-link fallback UI (R298) is attached above.
   } catch {
-    // WR-02 (102-REVIEW): the refactor to status-branching dropped the
-    // generic catch, leaving `stripVerseMarkers(result.text)` and the
-    // subsequent state writes with no safety net — an exception there
-    // previously set fetchError; it would otherwise now become an unhandled
-    // rejection. The dispatcher itself never throws, but this restores the
-    // documented "anything in here degrades gracefully" contract.
+    // See ADR-0064 (docs/adr/0064-the-refactor-to-status-branching-dropped-the-generic-catch-l.md)
     fetchError.value = true
   } finally {
     isFetching.value = false
@@ -345,15 +326,7 @@ async function onAiSplit(): Promise<void> {
       toasts.push(AI_SPLIT_FAILURE_TEXT)
       return
     }
-    // WR-02 (103-REVIEW): the org's stored bibleVersion has no relationship to
-    // "any version" text typed directly into the textarea while the Bible API
-    // is off -- capturedVersion is only ever set inside autoFetch's 'ok'
-    // branch, which never runs while the API is off, so it always falls
-    // through to here on the manual-entry path. Falling back to the org
-    // default there would falsely stamp e.g. ESV on manually-entered NIV
-    // text. Guarded so the org-default fallback is only used on the
-    // fetch-backed (enabled) path; the manual-entry path leaves
-    // translationSource unset.
+    // See ADR-0065 (docs/adr/0065-same-guard-as-onaisplit-s-stampversion-the-per-item-override.md)
     const stampVersion =
       capturedVersion.value ?? (authStore.isBibleApiEnabled ? authStore.settings.bibleVersion : null)
     const stamped: CongregationalSection[] = result.map((section) => ({
@@ -370,11 +343,7 @@ async function onAiSplit(): Promise<void> {
 }
 
 function onSave(): void {
-  // WR-02 (103-REVIEW): same guard as onAiSplit's stampVersion -- the
-  // per-item override (props.bibleVersion) is a deliberate, explicit choice
-  // and still applies; only the final catch-all org-default fallback is
-  // nulled out when the Bible API is off, since that setting has no
-  // relationship to whatever the user actually typed into the textarea.
+  // See ADR-0065 (docs/adr/0065-same-guard-as-onaisplit-s-stampversion-the-per-item-override.md)
   const version =
     capturedVersion.value ??
     props.bibleVersion ??

@@ -4,25 +4,7 @@
 // dependency-free style so the module stays trivially unit-testable.
 //
 // Persisted to `localStorage`, NOT Firestore (ARCHITECTURE.md Anti-Pattern 3):
-// this describes the physical cable plugged into THIS device, not an org/user
-// preference, so the storage key is a SINGLE FIXED constant deliberately
-// UNSCOPED by uid/org — a divergence from `stores/songs.ts`'s uid-scoped
-// `wp:tagFilter:v2:${org}:${uid}` precedent, made on purpose (91-CONTEXT.md).
-//
-// A screen's `label`/id is not a stable hardware key across replug or a
-// browser data-clear (PITFALLS Pitfall 2), so the persisted identity is a
-// SYNTHESIZED fingerprint composed from label + resolution + position +
-// isPrimary, never a raw screen id or array index.
-//
-// The module never calls the Window Management API itself (no
-// `getScreenDetails()`) — screens are always passed in by the caller, keeping
-// this pure and testable with plain object fixtures.
-//
-// `matchMapping`'s saved-vs-live comparison is BIDIRECTIONAL set-equality
-// (WR-04, 91-REVIEW.md), not a one-way "every saved fingerprint is still
-// live" subset check: a screen removed since the mapping was saved AND a
-// screen newly added since are both genuine layout changes and both force
-// `needs-reprompt` (R268 / PITFALLS Pitfall 2).
+// See ADR-0183 (docs/adr/0183-this-describes-the-physical-cable-plugged-into-this-device-n.md)
 
 /** Minimal structural shape this module needs from a live screen object. */
 export interface ScreenLike {

@@ -168,10 +168,7 @@ export const useQuartersStore = defineStore('quarters', () => {
     await updateQuarter(quarterId, { roleOverridesByDate })
   }
 
-  // D-19: replace ONLY the CSV-present people's quarter-scoped entries wholesale; standing
-  // fields are upserted through the roster store (Pitfall 3). People absent from `rows` keep
-  // their existing personQuarterData entry untouched — except for a bidirectional pairing
-  // merge below, which only ever adds a partner id to an existing (or fresh) entry.
+  // See ADR-0153 (docs/adr/0153-d-19-replace-only-the-csv-present-people-s-quarter-scoped-en.md)
   async function applyCsvToQuarter(quarterId: string, rows: ResolvedCsvPerson[]): Promise<void> {
     const quarter = getQuarter(quarterId)
     const rosterStore = useRosterStore()
@@ -404,17 +401,7 @@ export const useQuartersStore = defineStore('quarters', () => {
 
     await updateQuarter(quarterId, { status: 'finalized', shareToken: token })
 
-    // R-02/D-18: resolve (or claim, on first share) the org's memorable-URL slug, then
-    // write the quarterShares/{slug}__q{N}-{year} doc — a stable doc ID so every finalize
-    // OVERWRITES in place (Pitfall 2), never accumulates like shareTokens above. Reuses the
-    // exact calendarWithNames/roles/label/serviceDates snapshot already built — names only,
-    // no email/phone (D-24).
-    //
-    // WR-06: by this point the opaque shareTokens doc AND the quarter's finalized status
-    // have already been committed above — a failure in this memorable-URL step must NOT
-    // surface as a hard "Failed to finalize and share" to the caller, since the finalize
-    // itself already succeeded. This whole step is therefore soft-fail: any error here is
-    // logged and swallowed, and the opaque token is still returned.
+    // See ADR-0154 (docs/adr/0154-r-02-d-18-resolve-or-claim-on-first-share-the-org-s-memorabl.md)
     try {
       const orgRef = doc(db, 'organizations', orgId.value)
       const orgSnap = await getDoc(orgRef)
@@ -434,10 +421,7 @@ export const useQuartersStore = defineStore('quarters', () => {
       }
 
       await setDoc(doc(db, 'quarterShares', `${slug}__q${quarter.quarter}-${quarter.year}`), {
-        // CR-01: the owning orgId is stored on the doc so firestore.rules can scope
-        // create/update to editors of the org that actually owns this share (the shareId
-        // itself is a guessable, deterministic string, so this field is what closes the
-        // cross-tenant write gap).
+        // See ADR-0155 (docs/adr/0155-the-owning-orgid-is-stored-on-the-doc-so-firestore-rules-can.md)
         orgId: orgId.value,
         orgSlug: slug,
         quarterSnapshot: {

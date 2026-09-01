@@ -164,10 +164,7 @@ const bodyText = computed(() => {
   return 'Nothing would be deleted right now. Enabling arms the next scheduled run — newly orphaned data will be deleted automatically once it becomes eligible.'
 })
 
-// The element that had focus immediately before the dialog opened (almost
-// always the row's Enable button that triggered it) -- captured on open,
-// restored on close per 71-UI-SPEC.md Accessibility: "on close, focus
-// returns to the row's Enable button that opened the dialog" (review WR-01).
+// See ADR-0090 (docs/adr/0090-the-element-that-had-focus-immediately-before-the-dialog-ope.md)
 const previouslyFocusedElement = ref<HTMLElement | null>(null)
 
 // Focus-on-open: land on Cancel, never Confirm — a deliberate safe default
@@ -188,12 +185,7 @@ watch(
   },
 )
 
-// Gated on `confirming` so EVERY dismissal path (backdrop click, panel
-// @click.self, Escape, and the Cancel button itself) is a genuine no-op
-// while the enable write is in flight -- matches 71-UI-SPEC.md's "Cancel
-// also disabled during the enabling state (prevents closing mid-write)"
-// requirement, which previously only the Cancel <button>'s :disabled
-// attribute honored (review CR-01).
+// See ADR-0091 (docs/adr/0091-gated-on-confirming-so-every-dismissal-path-backdrop-click-p.md)
 function onCancel(): void {
   if (props.confirming) return
   emit('cancel')

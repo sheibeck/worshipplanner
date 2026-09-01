@@ -107,18 +107,14 @@ export async function renderPptxToImages(req: RenderRequest): Promise<RenderResu
 
   const bucket = storage.bucket(requiredBucketName());
   const workDir = await mkdtemp(path.join(os.tmpdir(), "pptx-"));
-  // Per-request-unique profile directory INSIDE the request's own working directory.
-  // LibreOffice's own lock file makes a shared/reused UserInstallation profile unreliable
-  // under concurrency (37-RESEARCH.md Pitfall 3) -- a fresh mkdtemp per request sidesteps
-  // that class of failure entirely, independent of Cloud Run's own --concurrency setting.
+  // See ADR-0057 (docs/adr/0057-per-request-unique-profile-directory-inside-the-request-s-ow.md)
   const profileDir = path.join(workDir, "lo-profile");
   const pptxPath = path.join(workDir, "source.pptx");
 
   try {
     await bucket.file(storagePath).download({ destination: pptxPath });
 
-    // Step 1: PPTX -> PDF. Explicit timeout bounds the DoS blast radius of an adversarial
-    // or pathological .pptx (zip bomb, deeply nested embeds -- 37-RESEARCH.md Pitfall 5).
+    // See ADR-0058 (docs/adr/0058-step-1-pptx-pdf-explicit-timeout-bounds-the-dos-blast-radius.md)
     await run(
       "soffice",
       [

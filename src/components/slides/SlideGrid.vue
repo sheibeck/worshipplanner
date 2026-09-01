@@ -354,21 +354,7 @@
  * still calls no `useSlideshowAssembly` composable directly — but per 25-05 it
  * DOES import the `slideGroups` Pinia store directly to issue the two writes
  * this plan adds (append-a-slide, drag-reorder), exactly as every other
- * slide-group mutation in the codebase does (never the `localService`
- * deep-watch autosave).
- *
- * Filters `assembledSlideshow` by the selected plan item's ARRAY index
- * (`slotArrayIndex`), never by `groupId` — `groupId` is only set on the
- * group-resolved emission path and is absent for the entire window before a
- * group's Firestore snapshot lands (25-RESEARCH.md Pitfall 2), even though
- * the fallback-path slides being shown are already real and correct.
- *
- * Ships no Grid/List toggle (D-09). The reconciliation confirm/review surface
- * (26-06) was removed entirely in Phase 30 (R048) — every group write is now
- * unconditional; only `replaceGroupSlides` (the concurrent-write transaction
- * merge) remains.
- *
- * 25-07 adds the drop tile (always the grid's last item, D-13), a whole-grid
+  * See ADR-0114 (docs/adr/0114-slide-group-mutation-in-the-codebase-does-never-the-localser.md)
  * dragover highlight, and the four accepted-kind persistence paths (PPTX and
  * image import append via the reused `PptxImportModal.vue`, video appends its
  * own slide, audio sets the group's bed) — see `dropRouting.ts` for the pure
@@ -633,14 +619,7 @@ const cards = computed<CardEntry[]>(() => {
  */
 const openMenuEntryId = ref<string | null>(null)
 
-// WR-02: reset whenever the selected plan item changes. `openMenuEntryId` is
-// local, persistent state on this instance — it is NOT remounted when
-// `SlidesTab.vue`'s rail selection changes plan item, only `selectedSlot`/
-// `group` props change and `cards` recomputes to a different filtered list.
-// Without this, returning to a previously-selected plan item whose group
-// still contains a `GroupSlideEntry.id` matching the stale `openMenuEntryId`
-// (stable ids, so this reliably recurs) makes that card's menu reopen with
-// no click, tap, or keypress from the user.
+// See ADR-0115 (docs/adr/0115-reset-whenever-the-selected-plan-item-changes-openmenuentryi.md)
 watch(
   () => props.selectedSlot?.id,
   () => {
@@ -658,14 +637,7 @@ function onCardMenuSelect(slideId: string, key: MenuItemKey): void {
 }
 
 // --- 25-06 Task 2: group music bar attach/remove — the bed write path ---
-//
-// No on-demand materialization step is needed here, unlike every
-// slide-appending path above: `setGroupBedMedia` already creates a skeleton
-// group document when none exists, and it does so with a merging write
-// (`{ merge: true }`) specifically so a concurrently-landing
-// `ensureGroupMaterialized`/`materializeGroupIfMissing` call cannot be
-// clobbered (WR-01). Adding a redundant materialization call here would only
-// reintroduce that race, not prevent it.
+// See ADR-0116 (docs/adr/0116-no-on-demand-materialization-step-is-needed-here-unlike-ever.md)
 async function onAttachGroupMusic(url: string): Promise<void> {
   if (!canWriteGroupMedia.value) return
   if (!props.selectedSlot) return
@@ -696,13 +668,7 @@ async function onRemoveGroupMusic(): Promise<void> {
   }
 }
 
-// --- Task 2: group background control — the caller-does-the-write idiom,
-// mirroring `onAttachGroupMusic`/`onRemoveGroupMusic` exactly. Background is
-// group MEDIA, so writes go through `canWriteGroupMedia`, never
-// `canMutateGroup` (same reasoning as the music control above). No
-// on-demand materialization step is needed for the same reason the music
-// handlers need none — `setGroupBackground`'s own merging skeleton-create
-// already covers a plan item with no group document yet (WR-01). ---
+// See ADR-0116 (docs/adr/0116-no-on-demand-materialization-step-is-needed-here-unlike-ever.md)
 
 /**
  * `applies to all {N} slides in this group, unless a slide sets its own` —
@@ -764,14 +730,7 @@ async function onRemoveGroupBackground(): Promise<void> {
 //
 // The handler re-checks `canMutateGroup.value` itself rather than relying on
 // the template `v-if` alone (30-VERIFICATION I-01) — every other mutation
-// handler in this file does the same. Entries are sorted by their existing
-// `order` before filtering, mirroring the drag-reorder handler's own
-// defensive sort, so the survivors' relative PLAY order (not raw array
-// insertion order) is what gets renumbered. Does NOT touch
-// `group.sourceSignature` — a removal changes no source (R107 territory is
-// untouched here) — and passes `group.slides` as `baseSlides` so the write
-// routes through the CR-02 concurrent-write transaction merge, exactly like
-// every other group-slides write in this file.
+// See ADR-0117 (docs/adr/0117-entries-unsorted-as-returned-is-the-snapshot-this-append-was.md)
 async function onRemoveImportedSlides(): Promise<void> {
   if (!canMutateGroup.value) return
   if (!props.selectedSlot || !props.group) return
@@ -838,13 +797,7 @@ async function onAddSlide(): Promise<void> {
       // new card from looking blank in the grid.
       sourceRef: { kind: 'text', title: 'New slide', body: '' },
     }
-    // CR-02: `entries` (unsorted, as returned) is the snapshot this append
-    // was computed FROM — passed through as `baseSlides` so a concurrent
-    // write (a double-click's other call, or a drag-reorder landing first)
-    // is detected and merged rather than silently overwritten. See
-    // `replaceGroupSlides`'s doc comment. Re-sorting THIS argument would
-    // defeat the merge — only the payload passed as `slides` goes through
-    // `appendToGroup`.
+    // See ADR-0117 (docs/adr/0117-entries-unsorted-as-returned-is-the-snapshot-this-append-was.md)
     const nextSlides = appendToGroup(entries, [newEntry])
     await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, nextSlides, sourceSignature, entries)
   } catch (err) {
@@ -917,7 +870,7 @@ async function onImportConfirmed(payload: { importId: string; section: ServiceSe
         ...(innerSlide.sourcePage !== undefined ? { renderedPage: innerSlide.sourcePage } : {}),
       },
     }))
-    // CR-02: see `onAddSlide` — `entries` (unsorted) is this append's base snapshot.
+    // See ADR-0117 (docs/adr/0117-entries-unsorted-as-returned-is-the-snapshot-this-append-was.md)
     const nextSlides = appendToGroup(entries, newEntries)
     await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, nextSlides, sourceSignature, entries)
   } catch (err) {
@@ -938,11 +891,7 @@ async function appendVideoEntries(files: File[]): Promise<void> {
   try {
     const resolved = await props.ensureGroupMaterialized(slotId)
     if (!resolved) return
-    // CR-02: `baseEntries` is the snapshot this whole drop's appends were
-    // computed FROM (captured once, before the loop below builds up its own
-    // list of new entries) — passed through to `replaceGroupSlides` as
-    // `baseSlides` so a concurrent write is detected and merged rather than
-    // silently overwritten.
+    // See ADR-0117 (docs/adr/0117-entries-unsorted-as-returned-is-the-snapshot-this-append-was.md)
     const baseEntries = resolved.entries
     const sourceSignature = resolved.sourceSignature
     resetMediaUpload()
@@ -1176,11 +1125,7 @@ watch(
           const reordered = sorted.map((entry, i) => ({ ...entry, order: i }))
 
           try {
-            // CR-02: `currentGroup.slides` (read from props above, same as
-            // `sorted`/`reordered` were derived from) is this write's base
-            // snapshot — passed through so a concurrent append that lands
-            // between this read and this write is detected and merged rather
-            // than silently overwritten by the reorder's full-array replace.
+            // See ADR-0117 (docs/adr/0117-entries-unsorted-as-returned-is-the-snapshot-this-append-was.md)
             await slideGroupsStore.replaceGroupSlides(
               props.orgId,
               currentSlot.id,

@@ -1,26 +1,4 @@
-/**
- * Shared output-window lifecycle-core (Phase 94, R272 reuse-not-fork).
- *
- * Extracted verbatim-in-behavior from AudienceOutputView.vue so the audience
- * window and the Phase 94 confidence window share ONE lifecycle-core instead of
- * copy-pasting it. This composable owns: the `?org=`/`:serviceId` scoping, the
- * WR-02 org-mismatch subscribe gate, the read-only `useSlideshowAssembly`
- * (canWrite omitted), the receive-only run channel (onState/postHello/close —
- * NEVER postState), the bounded font gate, `rootStyle` (CSS-var wrapper +
- * cursor:none-while-fullscreen), non-teardown fullscreen-loss recovery, and the
- * Screen Wake Lock.
- *
- * It MUST be called from inside a component `setup()` — it registers
- * `onMounted`/`onUnmounted` on the calling instance so cleanup (channel close,
- * listener removal, wake-lock release, unsubscribeAll) runs on that view's
- * unmount exactly as the un-extracted view did.
- *
- * The per-canvas media play/pause plumbing (slideCanvasRef + watch(index) +
- * deferred first-play + pre-unmount pause) deliberately STAYS IN EACH VIEW: the
- * audience window has one live canvas; the confidence window has one live canvas
- * plus one inert preview. Each view builds `currentSlide` (and confidence's
- * `nextSlide`) locally from the returned `index` + `assembledSlideshow`.
- */
+/** See ADR-0123 (docs/adr/0123-lifecycle.md) */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
@@ -56,15 +34,7 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
   const authStore = useAuthStore()
   const serviceStore = useServiceStore()
 
-  // ── Shared service-load + read-only assembly slice (Phase 95) ───────────────
-  // useServiceAssembly owns the serviceId/org scoping, the localService
-  // initial-load watch, the read-only useSlideshowAssembly (canWrite omitted),
-  // and the WR-02 org-mismatch subscribe gate (in ITS onMounted). It is called
-  // FIRST here so that onMounted registers BEFORE this composable's onMounted —
-  // preserving the subscribe-before-channel ordering (the subscribe fires before
-  // the run channel opens). This composable keeps the output-only lifecycle
-  // (channel, font gate, cursor, fullscreen recovery, wake lock, and the
-  // onUnmounted serviceStore.unsubscribeAll()).
+  // See ADR-0123 (docs/adr/0123-lifecycle.md)
   const { serviceId, assembledSlideshow } = useServiceAssembly()
 
   // ── Run channel (receive-only) ─────────────────────────────────────────────
@@ -100,9 +70,7 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
   const rootRef = ref<HTMLElement | null>(null)
   const isFullscreen = ref<boolean>(!!document.fullscreenElement)
 
-  // This listener ONLY updates isFullscreen. It must NEVER call any exit/teardown/
-  // close/unmount path — the single most dangerous copy-paste risk from
-  // PresentationViewer.handleFullscreenChange (Pitfall 6).
+  // See ADR-0124 (docs/adr/0124-this-listener-only-updates-isfullscreen-it-must-never-call-a.md)
   function handleFullscreenChange() {
     isFullscreen.value = !!document.fullscreenElement
     reportFullscreenState()
@@ -126,8 +94,7 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
   }
 
   function handleReenterFullscreen() {
-    // Pitfall 5 — only a synchronous in-window gesture can re-enter; the
-    // requestFullscreen() call MUST be the handler's first statement, no await.
+    // See ADR-0125 (docs/adr/0125-5-only-a-synchronous-in-window-gesture-can-re-enter-the.md)
     rootRef.value?.requestFullscreen().catch(() => {
       // Rejection is a common, expected outcome (missing gesture, embedding
       // context) — swallow silently, never surface an error to the congregation.
@@ -224,11 +191,7 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     }
   }
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
-  // NOTE: the WR-02 org-mismatch subscribe gate now lives in useServiceAssembly's
-  // onMounted, which — because useServiceAssembly() is called first in this
-  // setup — registers and fires BEFORE this onMounted. So the service source is
-  // (re)keyed to the resolved org before this handler opens the run channel.
+  // See ADR-0123 (docs/adr/0123-lifecycle.md)
   onMounted(async () => {
     // Receive-only channel: set the index from control's state, announce our
     // (re)mount so control re-sends current state, and NEVER post state ourselves.

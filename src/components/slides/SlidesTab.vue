@@ -76,42 +76,7 @@
  *  - `selectedSlotId` — the plan item (`ServiceSlot.id`) whose group 25-04's
  *    grid renders. Auto-selected to the first item in plan order whenever
  *    this tab is active and the current selection is unset or no longer
- *    present (D-05).
- *  - `selectedSlideId` — the individual slide (an assembled slide's own id,
- *    which equals the stored `GroupSlideEntry.id` once the group has
- *    materialized) the future drawer opens against. Always cleared when the
- *    selected slot changes (a slide selection belongs to its own group), and
- *    cleared again if it stops resolving against the selected slot's own
- *    assembled slides — 25-RESEARCH.md Pitfall 4 documents that a slide's id
- *    changes shape the moment its group materializes (a slot-derived
- *    fallback id gives way to the stored entry id). Fixing the id-minting
- *    scheme itself is Phase 23's WR-02 contract, not this component's job.
- *
- * "Edit in scripture" relay (Phase 26-03, D-15): `ServiceEditorView`'s tab
- * state and its per-plan-item scripture-editor expansion set are local state
- * it alone owns — nothing under this component may reach them directly
- * (26-RESEARCH.md Pitfall 5). `requestEditInScripture` emits
- * `navigate-to-scripture-editor` carrying the selected plan item's raw array
- * index, the one upward channel a page-level action can travel through.
- * Phase 33-09 (R051/R052): the trigger moved from an in-drawer link to the
- * 3-dot menu's `edit-in-scripture` key — `onMenuAction` calls this exact
- * function directly, so the drawer never reaches page state and this
- * component's own relay plumbing is unchanged.
- *
- * Edit Slide drawer seam (Phase 26-05, R033): `selectedEntry` resolves
- * `selectedSlideId` against the selected group's stored slides by a DIRECT id
- * lookup — for a materialized group, `AssembledSlide.slide.id` equals
- * `GroupSlideEntry.id` verbatim (26-RESEARCH.md Pattern 1), so no mapping
- * layer exists or is needed. A selection with no matching entry (the
- * pre-materialization fallback-id window, Pitfall 1) resolves to `null` and
- * the drawer renders nothing — not a loading state.
- *
- * Phase 33-09 (R051): selecting a card no longer opens the drawer — that
- * coupling is exactly what R051 exists to break, so a slide can be dragged
- * without triggering edit. `drawerOpen` is now set true only by
- * `onMenuAction`'s edit key and by the post-duplicate follow-selection
- * handler (`selectSlideById`), and false only by the drawer's own `close`
- * emit or by the selection itself disappearing (below). It is still NEVER
+  * See ADR-0118 (docs/adr/0118-present-d-05-selectedslideid-the-individual-slide-an.md)
  * cleared by a selection CHANGE to a still-valid slide, so once open the
  * drawer keeps following the selection instead of closing and reopening
  * (D-03) — this part of the original design is unchanged.
@@ -173,12 +138,7 @@ const router = useRouter()
 const selectedSlotId = ref<string | null>(null)
 const selectedSlideId = ref<string | null>(null)
 
-/**
- * WR-04: a ref to the mounted drawer so `onMenuAction`'s navigation keys
- * ("edit-in-song"/"edit-in-scripture") can gate on the drawer's OWN unsaved
- * edit guard before routing away — the one path this component owns that the
- * drawer itself cannot self-guard, since 33-09 relocated the navigation here.
- */
+/** See ADR-0119 (docs/adr/0119-the-drawer-has-one-body-so-there-is-no-mode-to-set-duplicate.md) */
 const editSlideDrawerRef = ref<InstanceType<typeof EditSlideDrawer> | null>(null)
 
 /**
@@ -248,8 +208,7 @@ const selectedGroupSlideIds = computed(() => {
   return ids
 })
 
-// Clear a dangling slide selection rather than chasing the id-minting
-// scheme itself (Pitfall 4).
+// See ADR-0120 (docs/adr/0120-clear-a-dangling-slide-selection-rather-than-chasing-the-id.md)
 watch(selectedGroupSlideIds, (ids) => {
   if (selectedSlideId.value !== null && !ids.has(selectedSlideId.value)) {
     selectedSlideId.value = null
@@ -301,16 +260,7 @@ function onDrawerClose(): void {
   drawerOpen.value = false
 }
 
-/**
- * 34-07 (owner UAT F1) — the drawer's Slide Text scripture-route control.
- * Runs the SAME unsaved-drawer guard the menu path runs (WR-04), then closes
- * the drawer and calls the SAME `requestEditInScripture` relay the menu's
- * `edit-in-scripture` key calls, so both routes converge on one relay and
- * therefore one mounted editor. The drawer is closed because the editor now
- * opens as a modal over this tab rather than by navigating away — leaving
- * the drawer open behind it would leave two editing surfaces stacked on the
- * same entry.
- */
+/** See ADR-0119 (docs/adr/0119-the-drawer-has-one-body-so-there-is-no-mode-to-set-duplicate.md) */
 function onDrawerEditScriptureText(): void {
   if (!confirmLeavingOpenDrawer()) return
   drawerOpen.value = false
@@ -346,17 +296,7 @@ const selectedGroup = computed<SlideGroup | null>(() => {
   return props.groupsBySlotId.get(selectedSlotId.value) ?? null
 })
 
-/**
- * The selected slide resolved to its stored entry (Phase 26-05 seam) — a
- * DIRECT id lookup against `selectedGroup.slides`, with no mapping step. For
- * a materialized group `AssembledSlide.slide.id` equals `GroupSlideEntry.id`
- * verbatim (26-RESEARCH.md Pattern 1, verified against
- * `slideshowAssembler.ts`'s `emitFromGroup`). Resolves to `null` — treated by
- * the drawer as "nothing selected," never a loading state — for the
- * pre-materialization fallback-id window where a selected slide's synthetic
- * id has no `GroupSlideEntry` counterpart yet (Pitfall 1); do not "fix" that
- * window with a spinner.
- */
+/** See ADR-0105 (docs/adr/0105-open-it-follows-the-selection-it-never-closes-itself-on-a.md) */
 const selectedEntry = computed<GroupSlideEntry | null>(() => {
   if (!selectedGroup.value || selectedSlideId.value === null) return null
   return selectedGroup.value.slides.find((e) => e.id === selectedSlideId.value) ?? null
@@ -427,32 +367,7 @@ function requestEditInScripture(): void {
   emit('navigate-to-scripture-editor', selectedSlotArrayIndex.value)
 }
 
-/**
- * Phase 33-09 (R051/R052) — the single dispatcher for every one of the five
- * 3-dot menu keys (`SlideGrid`'s `menu-action` emit, 33-08; D2 260805-bvo
- * dropped the sixth, `edit-lyrics`, from `MenuItemKey` entirely). A menu
- * action always implies its own card is the one being acted on, so this
- * selects the entry FIRST — mirroring `onSelectSlide`'s own selection line —
- * before dispatching on the key, since both the drawer's entry resolution
- * and the song-navigation lookup below depend on the selection already
- * being current (even when the acted-on card was not already selected).
- *
- * Only edit-details and Duplicate/Delete ever touch `drawerOpen` — the two
- * navigation keys are pure routes/relays and never open it. D2 (260805-bvo):
- * the drawer has one body, so there is no mode to set — Duplicate and Delete
- * simply open it, because that is where their EXISTING write paths live (the
- * duplicate write, the inline delete confirm) — this dispatcher itself never
- * calls a delete or duplicate store action; it only ever sets a pending
- * request for the drawer to act on (P-01).
- *
- * WR-04: "edit-in-song"/"edit-in-scripture" are checked against the OPEN
- * drawer's own unsaved-edit guard BEFORE `selectedSlideId` is reassigned
- * below — the drawer's own `watch(() => props.entry)` starts flushing/
- * resetting for the new entry the moment the selection changes, so asking
- * afterward would already be asking about the wrong entry. A cancelled
- * confirm leaves the selection and drawer state untouched, so an in-flight
- * edit on the entry being left is never silently abandoned.
- */
+/** See ADR-0119 (docs/adr/0119-the-drawer-has-one-body-so-there-is-no-mode-to-set-duplicate.md) */
 function confirmLeavingOpenDrawer(): boolean {
   if (!drawerOpen.value) return true
   return editSlideDrawerRef.value?.confirmDiscard() ?? true
@@ -473,14 +388,7 @@ function onEditCongregational(): void {
   requestEditInScripture()
 }
 
-/**
- * The read-only song badge (SlideGrid's `edit-in-song` emit, owner UAT) — a
- * discoverable route to the SAME song-lyrics editor the 3-dot menu's
- * `edit-in-song` key opens. Takes the exact same path as that menu case: honour
- * an open drawer's unsaved-edit guard first (WR-04), then `router.push` the
- * song-edit link on its lyrics tab. The `songId` is the group's own, read off
- * the selected SONG slot inside SlideGrid — never off the DOM event.
- */
+/** See ADR-0119 (docs/adr/0119-the-drawer-has-one-body-so-there-is-no-mode-to-set-duplicate.md) */
 function onEditInSongBadge(songId: string): void {
   if (!confirmLeavingOpenDrawer()) return
   void router.push(buildSongEditLink(songId, 'lyrics'))

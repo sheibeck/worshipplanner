@@ -148,32 +148,7 @@ export async function computeOrgsClaimForUid(uid: string): Promise<Record<string
   return buildOrgsMapClaim(memberships);
 }
 
-/**
- * CR-01 fix (76-REVIEW.md): recomputes the FULL `deactivatedOrgs` claim map
- * for a set of surviving org memberships, reading each org's live `active`
- * field. This is the self-heal that closes the gap `setOrgActive`'s one-time
- * member fan-out (orgProvisioning.ts) cannot: a member who joins an
- * ALREADY-deactivated org AFTER that fan-out ran (via pending-invite
- * acceptance or assignOrgAdminHandler) never had `deactivatedOrgs[orgId]`
- * set for them. Calling this on EVERY `syncOrgMembershipClaim` write (any
- * members/{uid} create/update/delete) means the very write that adds the new
- * member also computes their deactivatedOrgs entry from the org's CURRENT
- * active state -- no dependency on `setOrgActive` having run again.
- *
- * `orgIds` should be exactly the keys of the freshly-computed `orgs` map
- * (computeOrgsClaimForUid's result) -- i.e. every org this uid currently has
- * a resolved role in. Reads run concurrently via Promise.all, one
- * `organizations/{orgId}` get per org (the same read shape firestore.rules'
- * isOrgActive() and orgProvisioning.ts's setOrgActiveHandler/
- * listOrganizationsHandler already use).
- *
- * A missing org doc, or a present doc with no `active` field, resolves to
- * ACTIVE (default-true, backward-compatible -- mirrors isOrgActive() and
- * setOrgActiveHandler's own `?? true`) -- such an org contributes NO entry to
- * the returned map, exactly like `buildOrgsMapClaim` never fabricates a key
- * that shouldn't be there. Only an org doc that explicitly reads
- * `active === false` gets a `{ [orgId]: true }` entry.
- */
+/** See ADR-0044 (docs/adr/0044-belt-and-suspenders-76-review-md-refuse-to-grow-membership-o.md) */
 export async function computeDeactivatedOrgsClaimForUid(
   orgIds: string[],
 ): Promise<DeactivatedOrgsClaim> {
@@ -197,13 +172,7 @@ export async function computeDeactivatedOrgsClaimForUid(
 export interface DecideMembershipClaimParams {
   uid: string;
   orgId: string;
-  /**
-   * Whether the member document exists AFTER this write. false only for a
-   * genuine delete -- this is the real create/update/delete signal, threaded
-   * explicitly rather than inferred from `role` (WR-01: `role === undefined`
-   * alone is ambiguous between "document deleted" and "document exists but
-   * has no role field").
-   */
+  /** See ADR-0045 (docs/adr/0045-whether-the-member-document-exists-after-this-write-false-on.md) */
   documentExists: boolean;
   /**
    * The document's `role` field. Only meaningful when `documentExists` is
@@ -274,13 +243,7 @@ export async function decideMembershipClaim(
     return { action: "clear" };
   }
 
-  // Step 3b (WR-01): the document exists but has no `role` field -- e.g. a
-  // manual Firestore Console edit, or a future write path that creates a
-  // members/{uid} doc without setting role. This is NOT a delete, so it must
-  // never take the clear branch above: clearing here would silently revoke a
-  // still-valid membership's claim on ambiguous input. Skip defensively
-  // instead -- a stale claim is the lesser harm; the delete path above
-  // already handles genuine revocation explicitly.
+  // See ADR-0045 (docs/adr/0045-whether-the-member-document-exists-after-this-write-false-on.md)
   if (role === undefined) {
     return { action: "skip", reason: "missing-role" };
   }
@@ -340,12 +303,7 @@ export function orgsMapsEqual(
   return currentKeys.every((key) => currentMap[key] === next[key]);
 }
 
-/**
- * The `deactivatedOrgs`-map counterpart to orgsMapsEqual, same undefined-as-{}
- * treatment (CR-01, 76-REVIEW.md): a legacy token with no `deactivatedOrgs`
- * key at all compares equal to a freshly-computed empty map, so a member of
- * zero deactivated orgs never triggers a spurious claim write.
- */
+/** See ADR-0044 (docs/adr/0044-belt-and-suspenders-76-review-md-refuse-to-grow-membership-o.md) */
 export function deactivatedOrgsMapsEqual(
   current: DeactivatedOrgsClaim | undefined,
   next: DeactivatedOrgsClaim,
@@ -357,43 +315,7 @@ export function deactivatedOrgsMapsEqual(
   return currentKeys.every((key) => currentMap[key] === next[key]);
 }
 
-/**
- * The testable handler body, exported separately from the onDocumentWritten
- * wrapper below -- mirrors requestPptxRenderHandler/requestPptxRender
- * (index.ts). Applies decideMembershipClaim's PRIMARY decision AND a
- * separately-recomputed multi-org `orgs` decision (R207/R208), merging both
- * into as few Admin SDK writes as the case allows.
- *
- * decideMembershipClaim only ever fires for the user's PRIMARY org (its
- * scope is unchanged, see its docblock above) -- but `orgs` must be
- * recomputed on EVERY write, primary or not, since a non-primary-org
- * join/leave never touches the primary claim yet must still update `orgs`
- * (73-RESEARCH.md System Architecture Diagram step 2). computeOrgsClaimForUid
- * is therefore called unconditionally except for the two fully-conservative
- * skip reasons ("no-user-doc", "missing-role") where the write is too
- * ambiguous to act on at all -- exactly the pre-widening behaviour for those
- * two cases, extended unchanged.
- *
- * The whole body is wrapped in try/catch and resolves with a failure
- * outcome rather than rethrowing -- a throw out of a Firestore trigger
- * causes Cloud Functions retries that would hammer the Auth API (T-40-08).
- *
- * CR-01 fix (76-REVIEW.md): ALSO recomputes the `deactivatedOrgs` claim on
- * every write that reaches computeOrgsClaimForUid (i.e. every write except
- * the two fully-conservative skips below), from the SAME surviving-orgs list
- * `orgs` is built from. This is the self-heal that closes the gap in
- * `setOrgActive`'s one-time member fan-out (orgProvisioning.ts): a member who
- * joins an ALREADY-deactivated org (pending-invite acceptance, or
- * assignOrgAdminHandler) fires THIS trigger, which now independently reads
- * that org's live `active` field and sets `deactivatedOrgs[orgId]`
- * accordingly -- no dependency on `setOrgActive` running again after they
- * join. It is also the WR-03 fix: a member removed then re-added mid-
- * deactivation recomputes fresh on rejoin rather than keeping a stale
- * fan-out-time value. `computeDeactivatedOrgsClaimForUid` reads ONLY the
- * orgs the recomputed `orgs` map actually lists (never a stale prior claim),
- * so a genuinely-active org always yields NO entry -- deactivatedOrgs never
- * grows a phantom key for a normal/reactivated membership.
- */
+/** See ADR-0046 (docs/adr/0046-two-cases-extended-unchanged-the-whole-body-is-wrapped-in-tr.md) */
 export async function syncOrgMembershipClaimHandler(
   params: SyncOrgMembershipClaimParams,
 ): Promise<SyncOrgMembershipClaimOutcome> {
@@ -407,29 +329,18 @@ export async function syncOrgMembershipClaimHandler(
       role: after?.role,
     });
 
-    // Fully-conservative skips: the write is too ambiguous to act on at
-    // all (no user doc, or a create/update with no role field -- WR-01).
-    // Never touch orgs/deactivatedOrgs here either -- identical to
-    // pre-widening behaviour.
+    // See ADR-0045 (docs/adr/0045-whether-the-member-document-exists-after-this-write-false-on.md)
     if (decision.action === "skip" && (decision.reason === "no-user-doc" || decision.reason === "missing-role")) {
       return { action: "skip", reason: decision.reason };
     }
 
     const desiredOrgs = await computeOrgsClaimForUid(uid);
-    // CR-01: recomputed from the SAME surviving-org list `orgs` was just
-    // built from -- every org this uid currently has a resolved role in.
+    // See ADR-0047 (docs/adr/0047-recomputed-from-the-same-surviving-org-list-orgs-was-just-bu.md)
     const desiredDeactivatedOrgs = await computeDeactivatedOrgsClaimForUid(Object.keys(desiredOrgs));
 
     switch (decision.action) {
       case "set":
-        // R175: ONE merge call carries the primary keys AND the recomputed
-        // orgs map, preserving superAdmin (or any other unrelated claim).
-        // Spread decision.claims into a fresh object literal: OrgMembershipClaim
-        // has no index signature, so passing it directly fails TS2345
-        // against Record<string, unknown>. CR-01: deactivatedOrgs rides along
-        // in this SAME write -- the write that creates/updates this member's
-        // primary claim is exactly the moment their deactivated-org status
-        // (if any) must also be established.
+        // See ADR-0047 (docs/adr/0047-recomputed-from-the-same-surviving-org-list-orgs-was-just-bu.md)
         await mergeAndSetCustomClaims(uid, {
           ...decision.claims,
           orgs: desiredOrgs,
@@ -437,23 +348,7 @@ export async function syncOrgMembershipClaimHandler(
         });
         return { action: "set" };
       case "clear": {
-        // A genuine primary-membership delete. Clearing the primary keys and
-        // recomputing `orgs` are INDEPENDENT effects (73-RESEARCH.md Pitfall
-        // 2) -- NEVER blanket-clear orgs here; a still-valid second-org
-        // membership must survive. WR-01 (73-REVIEW.md): this used to be TWO
-        // sequential Admin SDK writes (clearClaimKeys then
-        // mergeAndSetCustomClaims), which opened a brief TOCTOU window --
-        // a token minted between the two writes could carry no orgId/role
-        // but a STALE orgs map still listing the org just removed, retaining
-        // Storage access via storage.rules' orgs[orgId] arm. Collapsed into
-        // ONE atomic setCustomUserClaims call via mergeSetAndClearCustomClaims
-        // (claimsHelpers.ts), which reads current claims once and applies the
-        // clear+set in memory before the single write -- preserving
-        // everything it doesn't explicitly touch (e.g. superAdmin).
-        // CR-01: deactivatedOrgs is recomputed from the survivors here too,
-        // so a primary-org delete that leaves the user still a member of a
-        // deactivated second org keeps that entry, and drops the deleted
-        // org's entry (if any) since it's no longer in desiredOrgs' keys.
+        // See ADR-0048 (docs/adr/0048-a-genuine-primary-membership-delete-clearing-the-primary-key.md)
         await mergeSetAndClearCustomClaims(uid, {
           set: { orgs: desiredOrgs, deactivatedOrgs: desiredDeactivatedOrgs },
           clear: ORG_CLAIM_KEYS,
@@ -484,11 +379,7 @@ export async function syncOrgMembershipClaimHandler(
       }
     }
   } catch (err) {
-    // WR-02 (73-REVIEW.md): the ~1000-byte custom-claims cap throws
-    // auth/claims-too-large -- give it a distinguishable, greppable log line
-    // rather than letting it blend into the generic failure path below.
-    // Still fail-closed (return { action: "failed" }) -- this only changes
-    // logging, never success behavior.
+    // See ADR-0012 (docs/adr/0012-the-1000-byte-custom-claims-cap-throws-auth-claims-too-large.md)
     if (isClaimsTooLargeError(err)) {
       console.error(
         `[orgMembershipClaims] CLAIM SIZE LIMIT EXCEEDED for uid=${uid}: custom claims exceeded the ~1000-byte cap and were not written`,

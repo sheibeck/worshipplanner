@@ -272,17 +272,7 @@ const songTiles = computed(() => [
   { label: 'Stale (6+ mo)', value: staleCount.value, to: '/songs', warn: true },
 ])
 
-// 260901-lua: the sidebar's in-place church switcher (AppSidebar.vue ->
-// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
-// remount, so an onMounted-only subscribe (guarded by `if (!store.orgId)`,
-// which would also defeat re-subscription since resetOrgScopedStores() nulls
-// orgId before this fires) never re-points the shared stores on switch.
-// Watching with `immediate: true` replaces the onMounted-only subscribe
-// (mirrors TeamView.vue 104-REVIEW CR-01). Always pass the LIVE new orgId the
-// watcher hands in — never a mount-time captured value — so no write can land
-// on the wrong church. Dashboard shares these stores with other views and has
-// no onUnmounted of its own; the unsubscribe-then-resubscribe here is
-// idempotent and null-guarded.
+// See ADR-0066 (docs/adr/0066-260901-lua-the-sidebar-s-in-place-church-switcher-appsidebar.md)
 watch(
   () => authStore.orgId,
   (orgId) => {

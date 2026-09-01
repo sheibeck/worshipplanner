@@ -131,15 +131,7 @@ export async function setSuperAdminClaimHandler(
   if (typeof targetEmail !== "string" || targetEmail.trim() === "") {
     throw new HttpsError("invalid-argument", "targetEmail is required.");
   }
-  // WR-01 (68-REVIEW.md): `grant` must be validated as an actual boolean, not
-  // branched on with bare truthiness. `CallableRequest<SetSuperAdminClaimRequest>`
-  // is a compile-time-only guarantee -- a raw httpsCallable invocation, a
-  // curl/Postman call, or a future client bug can send `grant` missing/
-  // undefined/null/0/"". Falling through to `if (grant)` would silently take
-  // the REVOKE branch (deleting the target's superAdmins/{targetUid} doc and
-  // revoking their refresh tokens) on any malformed call, even when intent was
-  // to grant -- the more dangerous of the two failure directions. Reject
-  // outright instead of guessing.
+  // See ADR-0056 (docs/adr/0056-grant-must-be-validated-as-an-actual-boolean-not-branched-on.md)
   if (typeof grant !== "boolean") {
     throw new HttpsError("invalid-argument", "grant (boolean) is required.");
   }

@@ -359,9 +359,7 @@ const assignFeedback = ref<Record<string, string>>({})
 const togglingOrgId = ref<string | null>(null)
 const toggleError = ref<Record<string, string>>({})
 const toggleFeedback = ref<Record<string, string>>({})
-// WR-01 (76-REVIEW.md): tracks whether a given org's current toggleFeedback
-// message is a partial-failure warning (claimFailures > 0) rather than a
-// clean success, so the template can style it distinctly (amber, not green).
+// See ADR-0094 (docs/adr/0094-tracks-whether-a-given-org-s-current-togglefeedback-message.md)
 const toggleFeedbackIsWarning = ref<Record<string, boolean>>({})
 
 // ── AI on/off toggle state (R242), keyed per orgId — mirrors the
@@ -486,11 +484,7 @@ async function refreshOrgs() {
 // ── Onboard action (R197/R201/R202) ───────────────────────────────────────
 
 async function onOnboard() {
-  // WR-03: the Enter-key handler on the admin-email input isn't gated by
-  // :disabled the way the submit button is, so a fast double-Enter could
-  // double-submit while a prior onboard call is still in flight. Guard here
-  // (shared by both the click and keydown.enter triggers) to match the
-  // button's :disabled="isOnboarding".
+  // See ADR-0095 (docs/adr/0095-the-enter-key-handler-on-the-admin-email-input-isn-t-gated-b.md)
   if (isOnboarding.value) return
 
   onboardError.value = null
@@ -542,8 +536,7 @@ function cancelAssign() {
 }
 
 async function onConfirmAssign(org: OrgSummary) {
-  // WR-03: same double-Enter guard as onOnboard -- the row's Enter-key
-  // handler isn't gated by :disabled the way the Assign button is.
+  // See ADR-0095 (docs/adr/0095-the-enter-key-handler-on-the-admin-email-input-isn-t-gated-b.md)
   if (isAssigning.value) return
 
   const orgId = org.orgId
@@ -590,7 +583,7 @@ async function onConfirmAssign(org: OrgSummary) {
 // document directly (T-74-07); setOrgActive is the only channel.
 
 async function onToggleActive(org: OrgSummary) {
-  // WR-03: same double-submit guard shape as isOnboarding/isAssigning above.
+  // See ADR-0095 (docs/adr/0095-the-enter-key-handler-on-the-admin-email-input-isn-t-gated-b.md)
   if (togglingOrgId.value) return
 
   const orgId = org.orgId
@@ -603,11 +596,7 @@ async function onToggleActive(org: OrgSummary) {
       'setOrgActive',
     )
     const result = await setOrgActive({ orgId, active: nextActive })
-    // WR-01 (76-REVIEW.md): claimFailures is the resilience signal
-    // 76-RESEARCH.md's Pitfall 4 designs around ("calling setOrgActive again
-    // is a safe, idempotent retry") -- previously dropped on the floor, so an
-    // operator had no way to know Storage enforcement never reached anyone.
-    // Surface it as a non-blocking warning instead of an unqualified success.
+    // See ADR-0096 (docs/adr/0096-claimfailures-is-the-resilience-signal-76-research-md-s-pitf.md)
     const claimFailures = result.data.claimFailures
     const verb = nextActive ? 'Reactivated' : 'Deactivated'
     const hasFailures = claimFailures > 0
@@ -776,20 +765,9 @@ async function onConfirmDelete(typedName: string) {
   }
 }
 
-// ── Enter-church action (R224) ────────────────────────────────────────────
-// Pure authStore consumer -- no direct Firestore reads/writes here; all
-// authorization lives in enterOrgAsSuperAdmin (auth.ts) + firestore.rules'
-// super-admin arm (78-01-PLAN.md). Not gated on org.active -- entering a
-// deactivated org is an explicit, intended support scenario.
-
-// WR-02 (78-REVIEW.md): mirrors this file's other row-action in-flight
-// guards (isOnboarding/isAssigning/togglingOrgId/isDeleting) -- previously
-// this button had no double-submit guard at all, so a rapid double-click
-// (or two different rows in quick succession) could fire two overlapping
-// enterOrgAsSuperAdmin calls that interleave.
+// See ADR-0097 (docs/adr/0097-enter-church-action-r224.md)
 const enteringOrgId = ref<string | null>(null)
-// WR-03 (78-REVIEW.md), keyed per orgId to match this file's other
-// per-row error state (assignError/toggleError).
+// See ADR-0098 (docs/adr/0098-enterorgassuperadmin-now-signals-success-failure-instead-of.md)
 const enterError = ref<Record<string, string>>({})
 
 async function onEnterChurch(org: OrgSummary): Promise<void> {
@@ -799,11 +777,7 @@ async function onEnterChurch(org: OrgSummary): Promise<void> {
   enteringOrgId.value = orgId
   delete enterError.value[orgId]
   try {
-    // WR-03 (78-REVIEW.md): enterOrgAsSuperAdmin now signals success/failure
-    // instead of silently no-oping (not a super-admin, denied/errored read,
-    // or a stale/missing org doc). Only navigate on a genuine entry --
-    // otherwise the super-admin was previously bounced to /select-church by
-    // the router's org-selection gate with zero explanation.
+    // See ADR-0098 (docs/adr/0098-enterorgassuperadmin-now-signals-success-failure-instead-of.md)
     const entered = await authStore.enterOrgAsSuperAdmin(orgId)
     if (!entered) {
       enterError.value = {

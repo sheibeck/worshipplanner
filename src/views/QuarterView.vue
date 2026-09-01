@@ -311,7 +311,7 @@
       @close="openPersonId = null"
     />
 
-    <!-- Add-quarter modal (R-10/D-13) — secondary, separate from the quarter switcher -->
+    <!-- See ADR-0219 (docs/adr/0219-new-quarter-creation-add-quarter-modal-r-10-d-13.md) -->
     <Teleport to="body">
       <Transition
         enter-active-class="transition-opacity duration-200 ease-out"
@@ -608,8 +608,7 @@ async function onDeleteQuarter() {
   }
 }
 
-// ── New quarter creation (Add-quarter modal, R-10/D-13) ─────────────────────
-// The quarter chronologically after (year, quarter). Q4 rolls over to Q1 next year.
+// See ADR-0219 (docs/adr/0219-new-quarter-creation-add-quarter-modal-r-10-d-13.md)
 function quarterAfter(year: number, quarter: 1 | 2 | 3 | 4): { year: number; quarter: 1 | 2 | 3 | 4 } {
   if (quarter === 4) return { year: year + 1, quarter: 1 }
   return { year, quarter: (quarter + 1) as 1 | 2 | 3 | 4 }
@@ -782,9 +781,7 @@ const shareUrl = ref<string | null>(null)
 const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
 
-// Prefer the memorable, slug-based public URL (/{slug}/quarterN-YYYY) that
-// finalizeAndShare also writes (R-02/D-18). Fall back to the opaque token URL
-// only when the org has no configured slug yet.
+// See ADR-0220 (docs/adr/0220-prefer-the-memorable-slug-based-public-url-slug-quartern-yyy.md)
 function buildShareUrl(
   quarter: { quarter: number; year: number },
   token: string | null,
@@ -842,13 +839,7 @@ function initStores(orgId: string) {
   rosterStore.subscribe(orgId)
 }
 
-// 260901-lua: the sidebar's in-place church switcher (AppSidebar.vue ->
-// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
-// remount, so an onMounted-only subscribe never re-fires on switch. Watching
-// with `immediate: true` replaces the old onMounted-only subscribe (mirrors
-// TeamView.vue 104-REVIEW CR-01). Always pass the LIVE new orgId the watcher
-// hands in — never a mount-time captured value — so no write can land on the
-// wrong church.
+// See ADR-0066 (docs/adr/0066-260901-lua-the-sidebar-s-in-place-church-switcher-appsidebar.md)
 watch(
   () => authStore.orgId,
   (orgId) => {

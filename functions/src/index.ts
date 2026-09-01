@@ -88,28 +88,7 @@ export const PROXY_TARGETS: Record<string, string> = {
 // a signed-in app user (verified Firebase ID token in X-App-Auth).
 export const SECRET_INJECTED = new Set(["anthropic", "esv", "nlt"]);
 
-/**
- * NLT auth travels as a `key` QUERY PARAMETER, not a header — unlike the esv/
- * anthropic branches, which only ever rewrite `headers`. `upstreamUrl` is built
- * once as a `const` before any service-specific branching runs (see below), so
- * this is a small pure helper rather than an inline mutation, both to avoid
- * restructuring that `const` into a `let` inline in the handler body and to be
- * unit-testable in isolation (Pitfall 6 / Assumption A2 — the `api` onRequest
- * handler otherwise has zero existing test precedent).
- *
- * For `esv`/`anthropic` (and any other service), the URL is returned
- * byte-unchanged — their secrets are injected into `headers` elsewhere, never
- * into the URL.
- *
- * For `nlt`, the `key` search param is always SET (overwritten, never merged)
- * to the server-held secret — a client-supplied `key=attacker` on the inbound
- * request must never survive onto the outbound URL (T-45-11, spoofing/quota
- * theft). This holds even though NLT's own upstream does not actually enforce
- * the key (verified live, 45-RESEARCH.md Pitfall 4: a missing or garbage key
- * still returns HTTP 200 with correct content) — the point of injecting here
- * is keeping NLT_API_KEY out of the client bundle, independent of whether the
- * upstream enforces it. Do NOT "fix" this by removing the injection.
- */
+/** See ADR-0019 (docs/adr/0019-nlt-auth-travels-as-a-key-query-parameter-not-a-header-unlik.md) */
 export function buildUpstreamUrl(
   service: string,
   upstreamUrl: string,
@@ -199,14 +178,7 @@ export interface AiProxyLimits {
   maxTokensCeiling: number;
 }
 
-/**
- * WR-01 fix: parses an env-var numeric knob so an operator's explicit `0`
- * (e.g. an emergency full-stop on `AI_RATELIMIT_MAX_PER_MIN=0`) is honored
- * rather than discarded. `Number(x) || fallback` treats a genuinely-parsed
- * `0` as falsy and silently replaces it with the default -- the opposite of
- * the caller's intent. Only an unset, blank/whitespace-only, or non-numeric
- * value falls back to `fallback`.
- */
+/** See ADR-0020 (docs/adr/0020-cached-form-no-fresh-true-the-api-handler-is-a-hot-request.md) */
 export function readNumericKnob(raw: string | undefined, fallback: number): number {
   if (raw === undefined) return fallback;
   const trimmed = raw.trim();
@@ -230,15 +202,7 @@ export function readAiProxyLimits(config: AppConfig): AiProxyLimits {
   };
 }
 
-// R164: an explicit maxInstances ceiling motivated by the highest-cost route
-// (the anthropic branch of `api` spends real money per call). NOTE (WR-02,
-// accepted as won't-fix): `maxInstances` is a Cloud Functions v2 /
-// Cloud Run FUNCTION-level setting on the single shared `onRequest` below --
-// it caps the whole `api` function (esv/nlt/planningcenter traffic included),
-// not just the anthropic upstream. That's intentional: esv/nlt/planningcenter
-// also cost money to run, and there is no way to scope maxInstances to one
-// upstream within a single function. Env-overridable so the owner can tune
-// fan-out without a logic redeploy.
+// See ADR-0021 (docs/adr/0021-r164-an-explicit-maxinstances-ceiling-motivated-by-the-highe.md)
 const AI_PROXY_MAX_INSTANCES = readNumericKnob(process.env.AI_PROXY_MAX_INSTANCES, 10);
 
 // R172: a project-wide maxInstances ceiling so EVERY function inherits a
@@ -296,15 +260,7 @@ export function enforceModelAndTokens(
       },
     };
   }
-  // WR-03: reject a streamed request outright rather than forward it. The
-  // aiUsage ledger write below parses the upstream response body as a single
-  // JSON object (`JSON.parse(body) as { usage?: AnthropicUsage }`) -- an SSE
-  // stream's raw text is not valid JSON, so a `stream: true` request would
-  // still be billed/rate-limited but silently never recorded in the ledger
-  // (the `catch (ledgerErr)` swallows the JSON.parse throw). The server
-  // dictates non-streaming so every proxied request records a usage entry
-  // (R163), matching the "reject, don't silently trust" posture already used
-  // for `model` above.
+  // See ADR-0022 (docs/adr/0022-reject-a-streamed-request-outright-rather-than-forward-it.md)
   if (record.stream === true) {
     return {
       ok: false,
@@ -480,21 +436,7 @@ export async function checkAndConsumeRateLimit(
 /**
  * R171: per-org daily Resend email quota -- a fixed-window Admin-SDK counter
  * that mirrors checkAndConsumeRateLimit's shape (single-doc transaction,
- * check-then-increment, no double-count on a rejected send) but on ONE
- * top-level `orgEmailCounters` doc keyed `${orgId}__day__${dayWindow}`, and
- * increments by an arbitrary `count` -- the number of emails THIS send is
- * about to attempt -- rather than always by 1 (a single 50-recipient send
- * costs 50 against the quota, not 1). Rejects when the PROJECTED total
- * (`dayCount + count`) would EXCEED the limit, not merely when `dayCount`
- * already meets it (WR-01, 67-REVIEW.md) -- because `count` can be well
- * above 1, a check against only the pre-send count could let one accepted
- * send push the day's total past `limit` by up to `count - 1`. On rejection,
- * returns not-allowed WITHOUT incrementing -- the org's quota is not
- * consumed by a send that never happens. Kept TOP-LEVEL (not nested under
- * organizations/{orgId}) for the same T-37-15 reason as aiRateLimits/aiUsage: the firestore.rules
- * catch-all deny already blocks client reads, so no rules change is needed.
- *
- * Deliberately does NOT catch its own Firestore errors -- the caller
+  * See ADR-0023 (docs/adr/0023-projected-check-not-a-check-against-the-pre-send-count.md)
  * (sendQueuedMessageHandler) decides the fail policy, same as
  * checkAndConsumeRateLimit above.
  */
@@ -512,15 +454,7 @@ export async function checkAndConsumeOrgEmailQuota(
     const daySnap = await tx.get(dayRef);
     const dayCount = daySnap.exists ? ((daySnap.data()?.count as number | undefined) ?? 0) : 0;
 
-    // WR-01 (67-REVIEW.md): PROJECTED check, not a check against the
-    // pre-send count. `count` (this send's recipient count, up to
-    // MESSAGE_MAX_RECIPIENTS) can be far more than 1, so comparing only
-    // `dayCount` to `limit` (the checkAndConsumeRateLimit shape, correct
-    // there because it always increments by exactly 1) let an accepted send
-    // push the day total past `limit` by up to `count - 1`. Rejecting when
-    // the PROJECTED total would exceed the limit keeps the daily total from
-    // ever exceeding `limit`, at the cost of possibly rejecting a send that
-    // would fit under a smaller one -- the correct tradeoff for a hard cap.
+    // See ADR-0023 (docs/adr/0023-projected-check-not-a-check-against-the-pre-send-count.md)
     if (dayCount + count > limit) {
       return { allowed: false, scope: "day" as const };
     }
@@ -653,18 +587,7 @@ export const api = onRequest(
     if (service === "anthropic") {
       // R242/R243: the org-AI-enablement gate runs FIRST, before any other
       // anthropic control (appConfig read, rate limit, enforceModelAndTokens)
-      // -- a disabled org must never reach even the cheapest of those checks.
-      // decodedCaller is always non-null here (anthropic is in
-      // SECRET_INJECTED, so the auth gate above already returned 401 for a
-      // null caller). resolveOrgId is used ONLY as a pointer to which org --
-      // see checkOrgAiEnablement's own doc comment for why the live get()
-      // inside it, not the claim payload, is the enforcement source.
-      // CR-01 (82-REVIEW): an unresolvable org context must be a DENIAL, not
-      // a skip. This proxy is a paid, per-org-gated resource -- a caller
-      // whose token carries no `orgId` claim (an org-less authenticated
-      // user, or a super-admin who entered an org with no synced membership
-      // doc, R226) must never fall through to the Anthropic fetch below
-      // un-gated.
+      // See ADR-0024 (docs/adr/0024-a-disabled-org-must-never-reach-even-the-cheapest-of-those-c.md)
       const callerOrgId = resolveOrgId(decodedCaller!);
       if (!callerOrgId) {
         res.status(403).json({ error: "AI features require an organization." });
@@ -676,17 +599,7 @@ export const api = onRequest(
         return;
       }
 
-      // Cached form (no {fresh:true}) -- the api handler is a hot request
-      // path (R183); getFirestore() is already called later in this same
-      // handler (checkAndConsumeRateLimit/writeUsageLedger), so this is no
-      // new Firestore dependency class, only an additional cached read.
-      // Scoped to the anthropic branch only (review WR-01): esv/nlt/
-      // planningcenter have no relationship to AI cost controls and must
-      // stay Firestore-independent, exactly as before this phase. The read
-      // itself is fail-open (same guardrail-not-security-control rationale
-      // as the rate limiter below): a Firestore hiccup degrades the
-      // anthropic route to DEFAULT_APP_CONFIG's limits rather than failing
-      // the request outright.
+      // See ADR-0020 (docs/adr/0020-cached-form-no-fresh-true-the-api-handler-is-a-hot-request.md)
       let config: AppConfig = DEFAULT_APP_CONFIG;
       try {
         config = await getAppConfig(getFirestore());
@@ -847,21 +760,7 @@ export function pptxRenderDocRef(orgId: string, importId: string) {
  * - Requires Firebase Auth (request.auth).
  * - storagePath must be prefixed with the caller-claimed orgs/{orgId}/pptx-imports/.
  * - request.auth.uid's org membership is independently re-verified via a
- *   Firestore read (organizations/{orgId}/members/{uid}) -- the client-declared
- *   orgId is never trusted alone, matching firestore.rules' isOrgMember pattern.
- * - Returns Storage PATHS for extracted images (never signed URLs); the client
- *   resolves getDownloadURL() under storage.rules' org gate.
- * - On any parse failure, throws a friendly HttpsError and never deletes the
- *   source object at storagePath -- this function never issues a delete call
- *   at all, on any path (CONTEXT D004 / 21-RESEARCH.md Pitfall 5).
- * - ★ R062 additive write: on a successful parse, also queues a render by
- *   writing organizations/{orgId}/pptxRenders/{importId} (status "pending").
- *   This write is wrapped in its own nested try/catch and can NEVER fail this
- *   call -- a queue-write failure is swallowed and logged, not surfaced to
- *   the caller, because the parsed text layer above is already a complete,
- *   successful result and a render is only an enhancement over it. This
- *   handler never awaits or imports invokeRenderService; rendering happens
- *   asynchronously via a separate trigger (37-04), never on this onCall path.
+  * See ADR-0025 (docs/adr/0025-custom-metadata-not-the-gcs-reserved-top-level-fields-phase.md)
  */
 export async function parsePptxHandler(
   request: CallableRequest<ParsePptxRequestData>,
@@ -2064,9 +1963,7 @@ export async function previewCleanupDryRunHandler(
           "previewCleanupDryRun: backgrounds preview did not return dryRun:true",
         );
       }
-      // NOTE: orphanCount, NOT deletedObjectCount -- deletedObjectCount only
-      // increments on the live-delete branch and is always 0 in forced-dry-run
-      // mode for this handler (71-PATTERNS.md Pitfall 1).
+      // See ADR-0026 (docs/adr/0026-note-orphancount-not-deletedobjectcount-deletedobjectcount-o.md)
       return {
         wouldDeleteCount: s.orphanCount,
         wouldDeleteBytes: s.deletedBytes,
@@ -2190,8 +2087,7 @@ export async function sendScheduledRemindersHandler(
         continue;
       }
 
-      // Load the org settings for THIS org (cached). Read settings.messaging.*
-      // and settings.timezone -- NOT messaging.* (research Pitfall 2).
+      // See ADR-0027 (docs/adr/0027-load-the-org-settings-for-this-org-cached-read-settings-mess.md)
       let org = orgCache.get(orgId);
       if (org === undefined) {
         const orgSnap = await db.collection("organizations").doc(orgId).get();
@@ -2774,21 +2670,7 @@ export const queueServiceMessage = onCall(queueServiceMessageHandler);
 
 // --- sendQueuedMessage send trigger (59-03: R131/R138/R139) --------------
 //
-// The send half of the queue-then-trigger path: an onDocumentCreated trigger
-// on .../messages/{messageId}, the ONLY Function bound to RESEND_API_KEY. Its
-// handler body (sendQueuedMessageHandler) is exported separately from the
-// wrapper (requestPptxRenderHandler precedent) so the idempotency + send logic
-// is directly unit-tested with Resend mocked. It runs a transactional
-// queued->sending claim (GENUINELY NEW code — the PPTX precedent has NO status
-// claim, 59-RESEARCH.md Pitfall 1), re-resolves recipients server-side (never
-// the client's stored list — Anti-Pattern 1), renders per-recipient tokens
-// (R139), sends once per recipient (per-recipient try/catch so one bad address
-// is a failed recipient, not an aborted batch), writes one recipients/{id} doc
-// per recipient, rolls up deliveryCounts, and flips the message status.
-
-// SERVICE_SHARE_BASE_URL (the app's public share-link base origin) now lives in
-// ./params -- imported and re-exported at the top of this file (moved so
-// adminEmail.ts can reuse it without a circular import).
+// See ADR-0028 (docs/adr/0028-the-send-half-of-the-queue-then-trigger-path-an-ondocumentcr.md)
 
 // R181: the bare From *address* Resend sends as used to live here as a
 // deploy-time defineString param -- REMOVED outright (not layered as a
@@ -2807,11 +2689,7 @@ export const queueServiceMessage = onCall(queueServiceMessageHandler);
 // directly in appConfig/global) to a verified `no-reply@<your domain>` is how
 // real volunteers receive mail -- no redeploy required, unlike the old
 // deploy-time param. A `*.web.app` address can never be verified
-// (Google-managed, no DNS access).
-
-// fromDisplayName + bareEmailAddress (the pure From-header helpers) now live in
-// ./params -- imported and re-exported at the top of this file (moved so
-// adminEmail.ts can reuse them without a circular import).
+// See ADR-0029 (docs/adr/0029-google-managed-no-dns-access-fromdisplayname-bareemailaddres.md)
 
 /** Resend tag names AND values allow only these chars (59-RESEARCH.md Pitfall 3). */
 const RESEND_TAG_SAFE = /^[A-Za-z0-9_-]+$/;
@@ -2973,8 +2851,7 @@ export async function sendQueuedMessageHandler(params: {
   }
   const message = claim.data;
 
-  // The three message-level ids become Resend tags (Pitfall 3). If any is not
-  // tag-safe the send is unsafe for the whole message — fail closed.
+  // See ADR-0030 (docs/adr/0030-the-three-message-level-ids-become-resend-tags-pitfall-3-if.md)
   if (![orgId, serviceId, messageId].every((id) => RESEND_TAG_SAFE.test(id))) {
     await messageRef.set(
       { status: "failed", sentAt: FieldValue.serverTimestamp(), deliveryCounts: { sent: 0, failed: 0 } },
@@ -3009,11 +2886,7 @@ export async function sendQueuedMessageHandler(params: {
   ]);
   const orgName = fromDisplayName((orgSnap.data() as { name?: string | null } | undefined)?.name);
   const quarters = quartersSnap.docs.map((d) => d.data() as PortedQuarter);
-  // Read-time compat shim (R250, mirrors src/stores/roster.ts's onSnapshot shim): the
-  // narrowed RoleGroup drops 'vocals' as a team identity, but existing per-org roles may
-  // still be stored with group 'vocals' from before Phase 85. Coerce those to
-  // { group: 'band', vocal: true } on read ONLY — no Firestore write migration — so the
-  // server send list agrees with the client's "Reaches N" estimate (CR-01, 85-REVIEW.md).
+  // See ADR-0031 (docs/adr/0031-read-time-compat-shim-r250-mirrors-src-stores-roster-ts-s.md)
   const roles = rolesSnap.docs.map((d) => {
     const data = d.data() as { group?: string; vocal?: boolean; [k: string]: unknown };
     return { id: d.id, ...data, ...coerceLegacyRoleGroup(data) } as PortedRole;
@@ -3090,20 +2963,7 @@ export async function sendQueuedMessageHandler(params: {
     return { status: "failed", sentCount: 0, failedCount: 0, skippedReason: "over-recipient-cap" };
   }
 
-  // R171: per-org daily Resend send quota -- a fixed-window Admin-SDK
-  // counter backstopping a loop/cron fan-out. Also checked BEFORE `new
-  // Resend(...)` / the send loop, so an over-quota message sends zero
-  // emails. Skipped entirely for a zero-recipient send -- nothing to
-  // consume, and an org already at quota should not block an empty send.
-  //
-  // WR-02 (67-REVIEW.md): wrapped in try/catch and failed OPEN on a thrown
-  // Firestore error, matching this file's own documented cost-guardrail
-  // fail-open precedent for checkAndConsumeRateLimit (`// Fail OPEN: the
-  // limiter is a cost guardrail, not a security control`, locked decision,
-  // 65-CONTEXT.md). By this point the message doc has already been claimed
-  // `queued` -> `sending`, so a fail-CLOSED error here would leave the
-  // message stuck with no terminal status and no retry -- worse than
-  // letting one send through uncounted against the quota.
+  // See ADR-0032 (docs/adr/0032-r171-per-org-daily-resend-send-quota-a-fixed-window-admin-sd.md)
   if (sendList.length > 0) {
     try {
       const quota = await checkAndConsumeOrgEmailQuota(db, orgId, sendList.length, ORG_MAX_EMAILS_PER_DAY);

@@ -109,17 +109,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   },
 };
 
-/**
- * Mirrors readNumericKnob's zero-vs-falsy discipline (index.ts's documented
- * WR-01 fix: `Number(x) || fallback` silently discards a genuine `0`),
- * adapted for a Firestore field typed `unknown` instead of always-a-string
- * env var. A real, in-range value -- including 0 -- is honored; only an
- * absent/blank/non-numeric/wrong-type/negative value falls back. Every knob
- * this guards (rate limits, retention windows, caps) is fail-OPEN-but-CAPPED
- * (R184): a negative number is nonsensical for all of them (no such thing as
- * -1 requests/min or -1 days of retention), so it is treated as malformed
- * input rather than honored, the same as NaN/Infinity.
- */
+/** See ADR-0008 (docs/adr/0008-mirrors-readnumericknob-s-zero-vs-falsy-discipline-index-ts.md) */
 export function coerceConfigNumber(raw: unknown, fallback: number): number {
   if (typeof raw === "number") {
     return Number.isFinite(raw) && raw >= 0 ? raw : fallback;

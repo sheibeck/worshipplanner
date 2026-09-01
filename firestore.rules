@@ -109,35 +109,14 @@ service cloud.firestore {
       // by isOrgActive/isOrgMember/isOrgEditor above) -- a super-admin already
       // sits above this boundary elsewhere in this file (appConfig, superAdmins),
       // so this is not a new escalation surface; T-76-10's exploit is
-      // specifically an ORDINARY editor forging these fields.
-      // Phase 82 (R242/R243): `aiMasterEnabled` -- the super-admin-only master
-      // AI gate -- is appended to this SAME allow-list, not given its own
-      // guard function. It is a DISTINCT top-level field from the pre-existing
-      // `settings.aiEnabled` (the church's own AI preference, editor-writable
-      // via the settings map) -- never a bare `aiEnabled` at this depth, to
-      // avoid the exact name collision 82-RESEARCH.md's Pitfall 1 warns
-      // against. Written ONLY by the setOrgAiEnabled Cloud Function via the
-      // Admin SDK (functions/src/orgProvisioning.ts), which bypasses these
-      // rules entirely -- mirrors `active`'s posture verbatim, INCLUDING the
-      // "no exemption for a super-admin's own client SDK" posture (see the
-      // CRITICAL test at src/rules.test.ts:682 and its aiMasterEnabled twin):
-      // a super-admin client write here would skip setOrgAiEnabled's R243
-      // forced-off side effect on `settings.aiEnabled`, reopening the same
-      // partial-state hole Phase 78 closed for `active`.
+      // See ADR-0001 (docs/adr/0001-super-admin-explicitly-enables-it-written-only-by-the.md)
       // Phase 101 (R295): `bibleApiEnabled` -- the second super-admin-only
       // master gate (this one for the Bible API, ESV/NLT paid proxy) -- rides
       // the SAME allow-list too, for the same reason: written ONLY by the
       // setOrgBibleEnabled Cloud Function via the Admin SDK, no exemption for
       // a super-admin's own client SDK.
       function lifecycleFields() {
-        // WR-01 (82-REVIEW): aiMasterEnabled's own audit-trail siblings
-        // (aiEnabledAt/aiEnabledBy/aiDisabledAt/aiDisabledBy, written by
-        // setOrgAiEnabledHandler) must ride along in this same allow-list --
-        // otherwise an ordinary editor can forge them directly, the exact
-        // T-76-06 audit-forgery class already closed for `active`'s siblings.
-        // bibleApiEnabled's own audit siblings (bibleApiEnabledAt/By,
-        // bibleApiDisabledAt/By, written by setOrgBibleEnabledHandler) ride
-        // along here too, for the same reason (Phase 101, R295).
+        // See ADR-0002 (docs/adr/0002-aimasterenabled-s-own-audit-trail-siblings.md)
         return ['active', 'deactivatedAt', 'deactivatedBy', 'reactivatedAt', 'reactivatedBy',
                 'aiMasterEnabled', 'aiEnabledAt', 'aiEnabledBy', 'aiDisabledAt', 'aiDisabledBy',
                 'bibleApiEnabled', 'bibleApiEnabledAt', 'bibleApiEnabledBy', 'bibleApiDisabledAt', 'bibleApiDisabledBy'];
@@ -154,20 +133,7 @@ service cloud.firestore {
               : !request.resource.data.diff(resource.data).affectedKeys().hasAny(lifecycleFields()));
       }
 
-      // R233/T-80-02/T-80-03: `createdBy` is a provenance/audit field that must
-      // be settable exactly once (at create) and frozen forever after -- an
-      // editor rewriting it is authorship tampering (Tampering) and destroys
-      // the audit trail of who actually provisioned the org (Repudiation).
-      // Deliberately a SIBLING helper, not folded into lifecycleFields()'s
-      // array (80-RESEARCH.md Pitfall 2): that array is also consulted on
-      // CREATE to assert those keys are ABSENT from the incoming doc, but
-      // createdBy is REQUIRED on create (see the `allow create` clause below,
-      // `request.resource.data.createdBy == request.auth.uid`) -- widening the
-      // shared list would deny every legitimate org-create. This helper is
-      // scoped to update only: the only call site below is `allow update`,
-      // which is reached only when `resource` (the stored doc) already exists,
-      // so no `resource == null` branch is needed here (unlike
-      // preservesLifecycleFields(), which is also reachable from create).
+      // See ADR-0003 (docs/adr/0003-r233-t-80-02-t-80-03-createdby-is-a-provenance-audit-field-t.md)
       function preservesCreatedBy() {
         return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdBy']);
       }
@@ -192,19 +158,7 @@ service cloud.firestore {
       // Phase 78 (R225 composition fix): the `|| isSuperAdmin()` disjunct
       // that used to live here is DELETED, not preserved. Before Phase 78,
       // isOrgEditor(orgId) required a genuine membership doc, so a
-      // super-admin without one could never reach this line -- the
-      // exemption was safe. Phase 78's super-admin arm (see isOrgEditor
-      // above) makes isOrgEditor(orgId) true for EVERY super-admin on EVERY
-      // org, so keeping `|| isSuperAdmin()` here would let ANY super-admin
-      // client-write active/deactivatedAt/deactivatedBy/reactivatedAt/
-      // reactivatedBy directly, skipping setOrgActive's deactivatedOrgs
-      // claim fan-out and revokeRefreshTokens -- the CR-01/T-76-10 class of
-      // bug, reopened by composition. Lifecycle fields are now
-      // Admin-SDK-only for LITERALLY EVERYONE, super-admins included;
-      // setOrgActive/deleteOrganization (both Admin SDK, bypassing rules
-      // entirely) remain the only path. Proven by src/rules.test.ts: a
-      // super-admin client updateDoc({active:false}) is DENIED and must use
-      // the setOrgActive callable.
+      // See ADR-0004 (docs/adr/0004-flow-1-org-creation-cr-01-getafter-alone-only-proves-created.md)
       allow update: if isOrgEditor(orgId) && preservesLifecycleFields() && preservesCreatedBy();
       // Allow authenticated users to create a new org if they are the creator.
       // Same lifecycle-field guard applies (defense-in-depth) -- no legitimate
@@ -216,18 +170,7 @@ service cloud.firestore {
       // Phase 77 (R216/T-77-04): deletion is Admin-SDK-only. The
       // deleteOrganization callable (orgDeletion.ts) uses the Admin SDK,
       // which bypasses rules entirely -- this DENY has zero effect on that
-      // legitimate deletion path. It exists solely to close the client-side
-      // gap the `write`->`update` narrowing above just opened up: before
-      // that narrowing, `preservesLifecycleFields()`'s `request.resource ==
-      // null -> true` branch meant the old `allow write` rule granted an
-      // ordinary editor unconditional delete access to the org doc.
-      // Deliberately UNCONDITIONAL -- NO `isSuperAdmin()` exemption
-      // (77-RESEARCH.md Pitfall 5): writing this as `allow delete: if
-      // isSuperAdmin()` would re-open a client-side deletion path for any
-      // super-admin using the client SDK directly, which conflicts with the
-      // design intent that deletion is Admin-SDK-only. Proven by an emulator
-      // DENY for both an ordinary editor and a super-admin client context
-      // (src/rules.test.ts).
+      // See ADR-0005 (docs/adr/0005-legitimate-deletion-path-it-exists-solely-to-close-the-clien.md)
       allow delete: if false;
 
       // Members subcollection
@@ -256,15 +199,7 @@ service cloud.firestore {
         // src/stores/auth.ts:264-350) are handled explicitly; nothing else authorizes
         // a create.
         allow create: if isSignedIn() && request.auth.uid == uid && (
-          // Flow 1: org creation. CR-01: getAfter() alone only proves "createdBy
-          // CURRENTLY equals my uid" -- createdBy is set once and never cleared, so
-          // without the !exists() guard below, ANY past founder (even one explicitly
-          // removed via TeamView's "Remove member") could re-grant themselves
-          // role: 'editor' at any later time with a bare setDoc, no batch required.
-          // !exists() reflects state as of the START of this operation -- unlike
-          // getAfter(), it CANNOT see this batch's own sibling org-create write, so
-          // it is only true when the org genuinely did not exist before this batch
-          // began. Combined with getAfter()'s post-batch createdBy check, the two
+          // See ADR-0004 (docs/adr/0004-flow-1-org-creation-cr-01-getafter-alone-only-proves-created.md)
           // together prove genuine same-batch creation ("this org is being created
           // right now, by me"), not merely a createdBy field match. Role is forced
           // to 'editor', matching the hardcoded value the client already sends on
@@ -532,24 +467,11 @@ service cloud.firestore {
     // editor-scoped update, editor-scoped delete.
     match /shareTokens/{token} {
       allow read: if true;
-      // 41-REVIEW CR-01: was `isSignedIn()` with no org check. Phase 41's
-      // adoption logic (`pickAdoptableToken`/`ensureShareLink` in
-      // src/stores/services.ts) reads and TRUSTS the `orgId`/`createdAt` of
-      // arbitrary pre-existing shareTokens docs to decide a service's
-      // permanent public link, so a signed-in non-editor (or non-member,
-      // given a known serviceId) could plant a document that gets adopted as
-      // the official token. Every legitimate create (writeSharePayload,
-      // reached only via ensureShareLink/maybeRefreshShareLink from
-      // editor-gated UI actions) always writes the real orgId, so this is not
+      // See ADR-0006 (docs/adr/0006-was-issignedin-with-no-org-check-phase-41-s-adoption-logic.md)
       // a behavior change for any sanctioned path — mirrors
       // serviceShareLinks/quarterShares/serviceShares' isOrgEditor idiom.
       allow create: if isOrgEditor(request.resource.data.orgId);
-      // R077/CR-01: refreshed in place by an editor of the owning org so the
-      // frozen snapshot never goes stale — mirrors quarterShares/serviceShares'
-      // org-scoped idiom verbatim. The equality guard makes orgId immutable, so
-      // a share can never be reassigned to another org. isSignedIn() alone is
-      // deliberately rejected: it would reintroduce the exact cross-org-overwrite
-      // bug (T-41-04) already fixed for quarterShares/serviceShares (CR-01).
+      // See ADR-0004 (docs/adr/0004-flow-1-org-creation-cr-01-getafter-alone-only-proves-created.md)
       allow update: if isOrgEditor(resource.data.orgId)
                        && request.resource.data.orgId == resource.data.orgId;
       // Delete allowed so an org editor can revoke a share when its quarter is deleted
@@ -558,11 +480,7 @@ service cloud.firestore {
       allow delete: if isOrgEditor(resource.data.orgId);
     }
 
-    // Persistent share-link index (R076): token + provenance only, keyed by
-    // serviceId. Org-editor-scoped CRUD, NEVER publicly readable — this is an
-    // internal index, not a link ever handed to anyone (unlike shareTokens /
-    // serviceShares above it, which ARE the public payload). orgId is immutable
-    // on update, mirroring the CR-01 idiom.
+    // See ADR-0004 (docs/adr/0004-flow-1-org-creation-cr-01-getafter-alone-only-proves-created.md)
     match /serviceShareLinks/{serviceId} {
       // T-41-09: the `resource == null` branch is load-bearing, not decorative.
       // On a `get`/`getDoc` against a document that does not yet exist,
@@ -585,11 +503,7 @@ service cloud.firestore {
       allow delete: if isOrgEditor(resource.data.orgId);
     }
 
-    // Org slug claims: public read, org-editor-scoped create-only (first-writer-wins).
-    // Reassignment abandons a slug, never reclaims it — no update/delete allowed. WR-01:
-    // isSignedIn() alone let any authenticated user claim a slug for an arbitrary orgId
-    // (slug-squatting), so create requires the caller to be an editor of the orgId in the
-    // payload.
+    // See ADR-0007 (docs/adr/0007-org-slug-claims-public-read-org-editor-scoped-create-only.md)
     match /orgSlugs/{slug} {
       allow read: if true;
       allow create: if isOrgEditor(request.resource.data.orgId);
@@ -608,12 +522,7 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Memorable-URL quarter shares: public read, org-editor-scoped create/update
-    // (overwritten in place on every finalize, unlike frozen shareTokens). CR-01: shareId is
-    // a guessable, deterministic string (`${slug}__q${N}-${year}`), so isSignedIn() alone let
-    // any authenticated user of ANY org overwrite another org's public share doc. Both create
-    // and update require the caller to be an editor of the orgId embedded in the doc, and
-    // update additionally forbids changing orgId (no reassigning a share to a different org).
+    // See ADR-0004 (docs/adr/0004-flow-1-org-creation-cr-01-getafter-alone-only-proves-created.md)
     match /quarterShares/{shareId} {
       allow read: if true;
       allow create: if isOrgEditor(request.resource.data.orgId);

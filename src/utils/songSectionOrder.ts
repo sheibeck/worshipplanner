@@ -27,15 +27,7 @@ const ROW_KEY_SEPARATOR = '#'
 
 /** One row of option 2a's numbered, always-draggable section list. */
 export interface SectionRow {
-  /**
-   * Unique within a single `buildSectionRows` result. Positionally derived
-   * (`${sectionId}#${occurrenceIndex}`) — used for display/testid purposes
-   * only. NOT stable across a mutation that changes which occurrence of a
-   * repeated section comes first (drag reorder, duplicate/remove of an
-   * earlier occurrence). Callers that need to track UI state (e.g.
-   * expand/collapse) per physical row across such mutations must use
-   * `stableKey` instead (WR-01).
-   */
+  /** See ADR-0205 (docs/adr/0205-derives-the-numbered-row-list-option-2a-draws-from-a-section.md) */
   rowKey: string
   /**
    * Stable across a mutation of the order — set from the caller-supplied
@@ -78,19 +70,7 @@ export function deriveSectionKind(label: string): string {
   return label.replace(/\s+\d+$/, '').trim()
 }
 
-/**
- * Derives the numbered row list option 2a draws from a (sections, order)
- * pair. Skips an order id that resolves to no pooled section rather than
- * emitting a row with an undefined section. Never mutates its arguments.
- *
- * `slotIds`, when supplied, must be the same length as `order` — element
- * `i` is a stable identity for the order slot at `order[i]`, independent of
- * section id or position, exposed as `SectionRow.stableKey` (WR-01: lets a
- * caller track UI state, e.g. expand/collapse, per physical row across a
- * reorder/duplicate/remove instead of by the positionally-derived
- * `rowKey`). Omitted or mismatched-length `slotIds` falls back to `rowKey`
- * for `stableKey`, preserving prior behavior for callers that don't pass it.
- */
+/** See ADR-0205 (docs/adr/0205-derives-the-numbered-row-list-option-2a-draws-from-a-section.md) */
 export function buildSectionRows(
   sections: LyricSection[],
   order: string[],
@@ -118,15 +98,7 @@ export function buildSectionRows(
     const position = rows.length + 1
     const isRepeat = occurrenceIndex > 0
 
-    // R304 / PITFALLS Pitfall 5: a blackout section is excluded from
-    // per-kind lyric numbering ENTIRELY — it never consumes a kindOrdinals
-    // slot or a numberBySectionId entry, so inserting/duplicating/removing a
-    // blackout can never renumber a Verse/Chorus row. Its displayLabel is
-    // its own stored label (already unique — minted via addSection's
-    // uniqueSectionLabel collision guard), not a derived "Kind N" number.
-    // Everything else below (position, occurrenceIndex, isRepeat,
-    // repeatOfPosition, rowKey/stableKey) is computed identically to a
-    // lyric row — a blackout is a first-class row in the order.
+    // See ADR-0206 (docs/adr/0206-r304-pitfalls-pitfall-5-a-blackout-section-is-excluded-from.md)
     let displayLabel: string
     if (section.kind === 'blackout') {
       displayLabel = section.label

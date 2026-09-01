@@ -45,18 +45,7 @@ export interface PortedRole {
   order: number;
 }
 
-/**
- * Read-time compat shim (R250, mirrors src/stores/roster.ts's onSnapshot shim):
- * coerces a legacy role doc stored with `group: 'vocals'` to `{ group: 'band',
- * vocal: true }`. Read-time ONLY — no Firestore write migration is performed (same
- * "no data migration" decision as the client). Exported (rather than inlined at the
- * call site) so the server's one role-load boundary
- * (functions/src/index.ts, sendQueuedMessageHandler) and this file's own tests share
- * exactly one coercion implementation — the drift this function exists to close was
- * that a raw, un-shimmed Admin SDK read let a legacy vocalist silently drop out of a
- * "Band" team send while the client's "Reaches N" estimate still counted them
- * (CR-01, 85-REVIEW.md).
- */
+/** See ADR-0031 (docs/adr/0031-read-time-compat-shim-r250-mirrors-src-stores-roster-ts-s.md) */
 export function coerceLegacyRoleGroup(data: {
   group?: string;
   vocal?: boolean;

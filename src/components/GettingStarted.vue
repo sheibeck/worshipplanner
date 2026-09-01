@@ -117,12 +117,7 @@ function onDismiss() {
   dismissed.value = true
 }
 
-// 104-REVIEW CR-01: the sidebar's in-place church switcher changes
-// authStore.orgId without a route change/remount (this panel stays mounted
-// across a switch on the Dashboard), so the member-count listener must react
-// to the org id itself rather than only reading it once in onMounted —
-// otherwise it keeps counting the previous church's members after a switch.
-// `immediate: true` replaces the old onMounted-only subscribe.
+// See ADR-0066 (docs/adr/0066-260901-lua-the-sidebar-s-in-place-church-switcher-appsidebar.md)
 watch(
   () => authStore.orgId,
   (orgId) => {

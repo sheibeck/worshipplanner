@@ -11,22 +11,7 @@ import { assertSuperAdminCaller, normalizeOrgName } from "./orgProvisioning";
 // functions/src/index.ts already does that for the deployed runtime.
 //
 // deleteOrganizationHandler is the single most destructive, irreversible
-// operation in this codebase. It is gated by the SAME assertSuperAdminCaller
-// dual re-verification every other owner-console callable uses (T-77-01),
-// plus two independent server-side re-checks the client cannot bypass:
-//   - the org must already be deactivated (active === false) -- T-77-06
-//   - confirmName must match the org's SERVER-STORED name, exactly -- T-77-02
-//
-// Cascade order (77-RESEARCH.md Cascade Order / Pattern 2 / Pitfall 1):
-// every cross-reference this handler needs (member uids, inviteLookup docs,
-// the orgNames guard read, and the 5 extra orgId-keyed collections) is READ
-// and held in memory BEFORE any delete fires -- recursiveDelete/deleteFiles
-// remove the very data those reads depend on, so reversing this order would
-// silently orphan every affected user's `orgIds` claim (T-77-03/T-77-08).
-//
-// Deliberately OUT OF SCOPE (documented, not an oversight): `aiUsage` and
-// `aiRateLimits` are a platform cost-observability ledger, not tenant
-// content -- 77-RESEARCH.md Open Question 2 recommends leaving them alone.
+// See ADR-0039 (docs/adr/0039-operation-in-this-codebase-it-is-gated-by-the-same.md)
 
 /**
  * The 5 top-level collections that store `orgId` as a plain document field
@@ -119,13 +104,7 @@ export async function deleteOrganizationHandler(
     throw new HttpsError("failed-precondition", "Deactivate the church before deleting it.");
   }
 
-  // T-77-02: the client's echoed confirmName proves nothing on its own --
-  // compare against the SERVER's own stored name, case-sensitive (77-RESEARCH.md
-  // Assumption A1). WR-02 (77-REVIEW.md): trim BOTH sides -- onboardOrganizationHandler
-  // stores `name` verbatim, untrimmed, so a stray leading/trailing space on a
-  // legacy/foreign-written org must not permanently strand it: the dialog's
-  // own `.trim()` on typed input makes it structurally impossible to type a
-  // trailing/leading space back in.
+  // See ADR-0040 (docs/adr/0040-t-77-02-the-client-s-echoed-confirmname-proves-nothing-on-it.md)
   const orgName = orgData?.name ?? "";
   if (confirmName.trim() !== orgName.trim()) {
     throw new HttpsError("invalid-argument", "Typed name does not match the church name.");
@@ -136,8 +115,7 @@ export async function deleteOrganizationHandler(
   // deleted this church."
   console.warn(`[orgDeletion] deleteOrganization: orgId=${orgId}, name=${orgName}, callerUid=${callerUid}`);
 
-  // --- READ phase (Pattern 2 / Pitfall 1): everything below MUST complete
-  // before any delete/recursiveDelete/deleteFiles fires. -----------------
+  // See ADR-0041 (docs/adr/0041-read-phase-pattern-2-pitfall-1-everything-below-must.md)
 
   const membersSnap = await orgRef.collection("members").get();
   const memberUids = membersSnap.docs.map((d) => d.id);
@@ -185,10 +163,7 @@ export async function deleteOrganizationHandler(
     await batch.commit();
   }
 
-  // --- Storage: every object under orgs/{orgId}/ (media, backgrounds,
-  // pptx-imports, rendered, ...) -- a single prefix covers all of them
-  // (77-RESEARCH.md Standard Stack). force:true so a transient per-object
-  // failure never aborts the whole sweep (Pitfall 4). ---------------------
+  // See ADR-0042 (docs/adr/0042-storage-every-object-under-orgs-orgid-media-backgrounds.md)
 
   const bucket = getStorage().bucket();
   const prefix = `orgs/${orgId}/`;
@@ -212,19 +187,5 @@ export async function deleteOrganizationHandler(
   };
 }
 
-// WR-01 (77-REVIEW.md): this cascade is comparably or more expensive than
-// parsePptx (functions/src/index.ts's { memory: "1GiB", timeoutSeconds: 120 })
-// -- 5 concurrent READ queries, N sequential batch commits, a full Storage
-// prefix sweep, and a recursiveDelete over every subcollection at every
-// depth. timeoutSeconds: 540 is the v2 callable maximum, giving the sweep
-// generous headroom to complete well within budget for a single church.
-//
-// Resumability boundary (documented, not solved here -- WR-01 scope):
-// the cross-ref batch deletes + Storage sweep are each idempotent, so a
-// retry against that same state re-runs cleanly WHILE the org doc still
-// exists (see "idempotent retry" in orgDeletion.test.ts). A timeout that
-// fires mid-recursiveDelete, AFTER the org doc itself is gone, is NOT
-// resumable -- there is no code path to resume a cascade once the parent
-// doc no longer exists. A generous timeout is the mitigation; building a
-// not-found-parent resume path is out of scope for this phase.
+// See ADR-0043 (docs/adr/0043-this-cascade-is-comparably-or-more-expensive-than-parsepptx.md)
 export const deleteOrganization = onCall({ timeoutSeconds: 540, memory: "512MiB" }, deleteOrganizationHandler);

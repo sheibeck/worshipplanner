@@ -91,15 +91,7 @@ watch(inputValue, (v) => {
 // WHY Save is disabled, not just that it is (UI-SPEC States & Interactions).
 const ownError = computed<string | null>(() => {
   const n = inputValue.value
-  // WR-02: `v-model.number` on a native `type="number"` input leaves
-  // `inputValue` as the raw string `''` (not `NaN`) when the user backspaces
-  // the field to empty — Vue's `looseToNumber` only converts on a
-  // successful `parseFloat`; on failure it returns the original string
-  // unchanged. Detect that empty-string case explicitly, independent of
-  // `min`, so a required field correctly reports "This field is required."
-  // instead of silently passing the required guard and falling through to a
-  // misleading min/integer message (or, if `min` were absent/<=0, saving an
-  // empty string where Firestore/the functions coerce* layer expect a
+  // See ADR-0092 (docs/adr/0092-v-model-number-on-a-native-type-number-input-leaves-inputval.md)
   // number).
   if (n === null || n === undefined || (n as unknown) === '' || Number.isNaN(n)) {
     return props.required ? 'This field is required.' : null

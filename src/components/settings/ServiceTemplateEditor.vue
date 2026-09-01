@@ -1,8 +1,6 @@
 <template>
   <Teleport to="body">
-    <!-- Deliberately NO scrim, structurally ported from EditSlideDrawer.vue
-         (26-RESEARCH.md Pitfall 7 / R033-era decision) — the settings page
-         underneath stays fully clickable while this panel is open. -->
+    <!-- See ADR-0100 (docs/adr/0100-deliberately-no-scrim-structurally-ported-from-editslidedraw.md) -->
     <Transition
       enter-active-class="transition-transform duration-250 ease-out"
       enter-from-class="translate-x-full"
@@ -320,12 +318,7 @@ function kindLabel(kind: SlotKind): string {
   return slotLabel(createSlot(kind))
 }
 
-// ── Draft state (Pitfall #3 — critical) ─────────────────────────────────────
-// Cloned fresh from the store every time the drawer opens. Every mutation below
-// (add/remove/reorder/section-change/reset) touches ONLY this local array —
-// nothing reaches Firestore or the store until Save Template is clicked. This
-// is what keeps a draft edit from mutating DEFAULT_ORG_SETTINGS's shared array
-// instance in place for every org that has never configured a template.
+// See ADR-0101 (docs/adr/0101-draft-state-pitfall-3-critical.md)
 const draft = ref<ServiceTemplateEntry[]>([])
 
 /** Reset/save UI state — declared here (ahead of the `immediate` open-watcher

@@ -42,16 +42,7 @@ export interface MappedImageSlide {
 
 export type MappedSlide = MappedTextSlide | MappedImageSlide;
 
-/**
- * Mixed-content heuristic threshold (21-RESEARCH.md Pitfall 4 / Open Question 1):
- * a slide's flattened non-image text must exceed this many characters to be
- * treated as "text-dominant" and win over any images on the same slide. Chosen
- * against the real mixed.pptx fixture deck (21-03): short image captions/alt
- * text and single-line titles observed there run well under 40 characters,
- * while genuine body/bullet content reliably exceeds it. Below this threshold,
- * a slide with image children maps to image slide(s) instead; the import
- * preview (21-05) is the user's manual escape hatch for any mis-mapped slide.
- */
+/** See ADR-0054 (docs/adr/0054-mixed-content-heuristic-threshold-21-research-md-pitfall-4-o.md) */
 export const TEXT_DOMINANT_THRESHOLD = 40;
 
 /**
@@ -213,9 +204,7 @@ export async function parsePptxBuffer(
 
   let ast;
   try {
-    // OCR is never enabled -- this phase only needs text/image extraction, and
-    // officeparser's OCR path pulls in a heavy tesseract.js dependency for a
-    // capability this phase does not use (21-RESEARCH.md Pitfall 3).
+    // See ADR-0055 (docs/adr/0055-ocr-is-never-enabled-this-phase-only-needs-text-image-extrac.md)
     ast = await parseOffice(buffer, {
       extractAttachments: true,
       fileType: "pptx",
@@ -248,9 +237,7 @@ export async function parsePptxBuffer(
       await bucket.file(path).save(imageBuffer, {
         contentType: attachment.mimeType,
         metadata: {
-          // Custom metadata (not the GCS-reserved top-level fields) -- Phase
-          // 22's retention sweep reads this to age out old imports without a
-          // follow-up migration (21-RESEARCH.md Pitfall 5).
+          // See ADR-0025 (docs/adr/0025-custom-metadata-not-the-gcs-reserved-top-level-fields-phase.md)
           metadata: {
             createdAt: new Date().toISOString(),
           },

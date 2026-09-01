@@ -370,16 +370,7 @@ export function buildSlots(progression: Progression): ServiceSlot[] {
   ]
 }
 
-/**
- * Reads `PROGRESSION_SLOT_TYPES[progression]` as an ORDERED SEQUENCE of VW
- * types, not a position lookup (Pitfall #2, 44-RESEARCH.md). The map's keys
- * are absolute array indices that only mean anything against `buildSlots()`'s
- * fixed 9-slot layout — sorting those keys ascending and mapping to their
- * values yields the sequence a custom (arbitrary-shape) template must walk
- * by SONG ordinal instead.
- *
- * '1-2-2-3' → [1, 2, 2, 3, 3]   '1-2-3-3' → [1, 2, 3, 3, 3]
- */
+/** See ADR-0203 (docs/adr/0203-reads-progressionslottypes-progression-as-an-ordered-sequenc.md) */
 export function progressionVwTypeSequence(progression: Progression): VWType[] {
   const map = PROGRESSION_SLOT_TYPES[progression]
   return Object.keys(map)

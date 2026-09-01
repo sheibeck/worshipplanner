@@ -29,17 +29,7 @@ import {
 //  - every other domain -> resolve-or-create the Auth account, then send a
 //    generatePasswordResetLink set-password email that ALSO offers Google
 //    sign-in as a fallback, so a Google Workspace user on a custom domain is
-//    never stranded (R290, R291).
-//
-// The onboarding.emailsEnabled owner toggle (Plan 99-01) is read via the
-// existing TTL-cached getAppConfig(db) and gates BOTH branches before any
-// Auth or Resend call (R293).
-//
-// DEFERRED (RESEARCH Pitfall 1): the per-org email quota
-// (checkAndConsumeOrgEmailQuota) is NOT folded in here -- it lives in
-// index.ts, which already imports this module for its re-export, so
-// importing it back would be a circular import. Left as a documented future
-// lever (see the threat register's T-99-05, disposition "accept").
+// See ADR-0033 (docs/adr/0033-never-stranded-r290-r291-the-onboarding-emailsenabled-owner.md)
 
 export interface SendInviteOnboardingEmailRequest {
   orgId: string;
@@ -64,25 +54,14 @@ function assertValidEmailFormat(email: string): void {
   }
 }
 
-/**
- * Resolve the app's usable share/sign-in base URL, or '' when unconfigured.
- * Fresh module-private copy, verbatim shape ported from
- * functions/src/adminEmail.ts:50-54 -- resolveAppBaseUrl is module-private
- * there too (99-RESEARCH.md Pitfall 5), so it cannot be imported.
- */
+/** See ADR-0034 (docs/adr/0034-resolve-the-app-s-usable-share-sign-in-base-url-or-when.md) */
 function resolveAppBaseUrl(): string {
   const base = SERVICE_SHARE_BASE_URL.value().trim();
   if (base === "") return "";
   return base.replace(/\/+$/, "");
 }
 
-/**
- * WR-01 (99-REVIEW): collapse any CR/LF out of a header-bound value (the email
- * subject) before it reaches the Resend send. `orgName` is org-doc-sourced
- * (super-admin controlled) so the risk is low, but this applies the SAME
- * header-injection defense the codebase already documents for the From display
- * name (params.ts's fromDisplayName) consistently to the subject line.
- */
+/** See ADR-0035 (docs/adr/0035-collapse-any-cr-lf-out-of-a-header-bound-value-the-email-sub.md) */
 function sanitizeHeader(value: string): string {
   return value.replace(/[\r\n]+/g, " ").trim();
 }
@@ -200,15 +179,7 @@ export async function sendInviteOnboardingEmailHandler(
 
   const normalizedEmail = email.trim().toLowerCase();
 
-  // CR-01 (99-REVIEW): bind every provisioning + send to a REAL pending invite
-  // record. This callable creates Firebase Auth accounts and emails
-  // caller-supplied addresses; without this gate an org editor could invoke it
-  // directly with attacker-chosen emails to send convincing "invited to {org}"
-  // messages -- carrying genuine password-reset links -- to arbitrary third
-  // parties from our own Resend sending domain. TeamView.onInvite writes the
-  // authoritative invite doc (same trim().toLowerCase() normalization) BEFORE
-  // calling this function, so the doc's absence means this is not a legitimate
-  // invite send. Ties the blast radius to invites the org actually created.
+  // See ADR-0036 (docs/adr/0036-bind-every-provisioning-send-to-a-real-pending-invite-record.md)
   const inviteSnap = await orgRef.collection("invites").doc(normalizedEmail).get();
   if (!inviteSnap.exists) {
     throw new HttpsError(
@@ -255,8 +226,7 @@ export async function sendInviteOnboardingEmailHandler(
     }
   }
 
-  // Non-Google branch: resolve-or-create the Auth user FIRST (Pitfall 2 --
-  // generatePasswordResetLink requires the user to already exist).
+  // See ADR-0037 (docs/adr/0037-non-google-branch-resolve-or-create-the-auth-user-first-pitf.md)
   try {
     await getAuth().getUserByEmail(normalizedEmail);
     // existing user -- do NOT re-create.
@@ -282,10 +252,7 @@ export async function sendInviteOnboardingEmailHandler(
         `[inviteOnboarding] getUserByEmail failed for orgId=${orgId}, to=${normalizedEmail}:`,
         err,
       );
-      // WR-02 (99-REVIEW): surface a friendly HttpsError instead of the raw
-      // Firebase error object (which would reach the client as an opaque
-      // 'internal' with leaked provider detail) for any non-user-not-found
-      // lookup failure.
+      // See ADR-0038 (docs/adr/0038-surface-a-friendly-httpserror-instead-of-the-raw-firebase-er.md)
       throw new HttpsError("internal", "Could not look up the invited user's account.");
     }
   }

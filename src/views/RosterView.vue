@@ -757,14 +757,7 @@ onMounted(() => {
   applyEditQuery()
 })
 
-// 260901-lua: the sidebar's in-place church switcher (AppSidebar.vue ->
-// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
-// remount, so an onMounted-only subscribe never re-fires on switch. Watching
-// with `immediate: true` replaces the old onMounted-only subscribe (mirrors
-// TeamView.vue 104-REVIEW CR-01). Always pass the LIVE new orgId the watcher
-// hands in — never a mount-time captured value — so no write can land on the
-// wrong church. Stop any prior seed watches first so a switch never leaks the
-// old church's seed watchers.
+// See ADR-0066 (docs/adr/0066-260901-lua-the-sidebar-s-in-place-church-switcher-appsidebar.md)
 watch(
   () => authStore.orgId,
   (orgId) => {

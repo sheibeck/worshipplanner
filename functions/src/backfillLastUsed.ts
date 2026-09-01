@@ -76,26 +76,7 @@ export function computeLastUsedDate(songId: string, services: LastUsedServiceInp
   return max
 }
 
-/**
- * The single shared calendar-date parse convention for a `Service.date`
- * `"YYYY-MM-DD"` string. BOTH the live store adapter (`services.ts`) and the
- * 84-02 backfill must use this exact expression so the `Timestamp` each
- * environment writes is identical.
- *
- * WR-03 (84-REVIEW): parses as UTC midnight (`Date.UTC`) rather than the
- * previous `new Date(\`${date}T00:00:00\`)`, which resolved "local midnight"
- * against whichever timezone the running process defaulted to -- the end
- * user's browser on the client, but the HOST MACHINE's ambient `TZ` for this
- * Admin-SDK script (a CI runner, cloud shell, or Docker container commonly
- * defaults to UTC). Two environments computing a different midnight for the
- * identical `"YYYY-MM-DD"` string would make `Timestamp.isEqual` never
- * converge -- the idempotency check would "correct" an already-correct
- * song's `lastUsedAt` forever, off by a fixed offset, with no error raised.
- * `Date.UTC` is timezone-explicit and process-independent, so both
- * environments now compute byte-identical millis for the same date. Keep
- * BYTE-IDENTICAL with src/utils/lastUsed.ts's copy -- the parity tests
- * enforce this.
- */
+/** See ADR-0009 (docs/adr/0009-the-single-shared-calendar-date-parse-convention-for-a-servi.md) */
 export function serviceDateToMillis(date: string): number {
   const parts = date.split("-");
   const year = Number(parts[0]);
@@ -142,14 +123,7 @@ export interface BackfillSummary {
   processed: number;
   skipped: number;
   failed: BackfillFailure[];
-  /**
-   * WR-02 (84-REVIEW): service doc ids excluded from the MAX computation
-   * because `date` was missing or not a `YYYY-MM-DD` string -- distinct from
-   * `failed` (which is per-SONG). A non-empty list here is a materially
-   * different, worth-investigating condition ("this org has a service with
-   * no/bad date") that a human should see before `--apply`, not something
-   * that should silently fall through to a per-song NaN Timestamp failure.
-   */
+  /** See ADR-0010 (docs/adr/0010-a-missing-malformed-date-used-to-fall-through-as-data-date.md) */
   malformedServices: string[];
 }
 
@@ -174,13 +148,7 @@ export async function backfillLastUsedForOrg(options: BackfillOptions): Promise<
     orgRef.collection("songs").get(),
   ]);
 
-  // WR-02 (84-REVIEW): a missing/malformed `date` used to fall through as
-  // `data.date ?? ""`, letting a bogus service silently feed
-  // `serviceDateToMillis("")` -> NaN -> a `Timestamp.fromMillis(NaN)`
-  // attempt, "safely" caught only incidentally by the per-song try/catch
-  // below and indistinguishable from an unrelated song-doc read failure.
-  // Explicitly excluded and reported here instead, BEFORE any song is
-  // classified against it.
+  // See ADR-0010 (docs/adr/0010-a-missing-malformed-date-used-to-fall-through-as-data-date.md)
   const malformedServices: string[] = [];
   const serviceInputs: LastUsedServiceInput[] = [];
   for (const doc of servicesSnap.docs) {

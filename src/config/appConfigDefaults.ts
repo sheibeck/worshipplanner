@@ -1,17 +1,5 @@
 // Phase 70 (R186/R187) — client-side mirror of functions/src/appConfig.ts's
-// `AppConfig` interface + `DEFAULT_APP_CONFIG` (lines 24-97 as of Phase 69).
-//
-// This file is a DELIBERATE DUPLICATE, not an import. `src/` (Vite build) and
-// `functions/` (Cloud Functions build) are separate build targets in this
-// repo — a relative import across that boundary would either fail to resolve
-// at build time or silently bundle server-only code into the client. See
-// 70-RESEARCH.md Pitfall 2 / Anti-Patterns for the full rationale.
-//
-// If functions/src/appConfig.ts's DEFAULT_APP_CONFIG values ever change, this
-// file MUST be updated by hand to match — that file carries a matching
-// forward-pointing comment. `appConfigDefaults.test.ts`'s drift-guard/
-// snapshot test hard-codes the values below so an unmirrored change fails
-// loudly at test time, not just via a stale docs comment.
+// See ADR-0142 (docs/adr/0142-appconfig-interface-defaultappconfig-lines-24-97-as-of-phase.md)
 
 export interface AppConfig {
   cleanup: {

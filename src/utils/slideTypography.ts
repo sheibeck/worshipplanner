@@ -120,11 +120,7 @@ export function waitForSlideFont(
     document.fonts.load(`${weight} 1em "${family}"`),
   ]).then(
     () => true,
-    // WR-02 (46-REVIEW.md): a rejected document.fonts.load() is a FAILED
-    // load, not a stalled one — resolve `false` (same as a timeout)
-    // instead of letting the rejection propagate through Promise.race
-    // below, which would break this function's documented "never hangs
-    // the caller" contract for the reject case.
+    // See ADR-0197 (docs/adr/0197-a-rejected-document-fonts-load-is-a-failed-load-not-a-stalle.md)
     () => false,
   )
 

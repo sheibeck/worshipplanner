@@ -1,8 +1,7 @@
 <template>
   <div class="space-y-2">
     <!-- AI Scripture Search (only for reading slots) -->
-    <!-- WR-02 (82-REVIEW): two-gate authStore.isAiEnabled, not the bare
-         church setting alone. -->
+    <!-- See ADR-0074 (docs/adr/0074-the-single-shared-two-gate-ai-affordance-check-mirrors.md) -->
     <div v-if="showAiSuggest && authStore.isAiEnabled" class="space-y-2">
       <div class="flex gap-2">
         <input
@@ -131,12 +130,7 @@
     </div>
     <p v-if="parseError" class="text-xs text-red-400 mt-1">{{ parseError }}</p>
 
-    <!-- Reader link (shown when book and chapter are filled) — routes to the
-         church's chosen translation, not always ESV. Gated on
-         authStore.isBibleApiEnabled (WR-01, 103-REVIEW) so it doesn't render
-         alongside the fallback block's own "Open in BibleGateway" link below
-         when the Bible API is off -- only one "open externally" affordance
-         should ever be visible at a time. -->
+    <!-- See ADR-0075 (docs/adr/0075-authstore-isbibleapienabled-wr-01-103-review-so-it-doesn-t-r.md) -->
     <a
       v-if="canPreview && authStore.isBibleApiEnabled"
       :href="readerUrl"
@@ -449,12 +443,7 @@ async function fetchPreview() {
     // error is shown. The BibleGateway deep-link fallback UI (R298) is
     // attached above, gated on the same authStore.isBibleApiEnabled check.
   } catch {
-    // WR-02 (102-REVIEW): defensive safety net restored. The dispatcher
-    // itself never throws (its own errors map to `{status:'error'}` above),
-    // but this still protects against an exception anywhere else in the try
-    // block (e.g. `useAuthStore()` inside the dispatcher, or future
-    // post-fetch processing) degrading gracefully instead of becoming an
-    // unhandled rejection.
+    // See ADR-0064 (docs/adr/0064-the-refactor-to-status-branching-dropped-the-generic-catch-l.md)
     previewError.value = 'Could not load passage. Check your connection and try again.'
   } finally {
     previewLoading.value = false
@@ -546,8 +535,7 @@ async function togglePreview(index: number) {
     }
     // 'disabled' (Phase 102, R297): silent no-op — see fetchPreview above.
   } catch {
-    // WR-02 (102-REVIEW): defensive safety net restored — see fetchPreview
-    // above for the full rationale.
+    // See ADR-0064 (docs/adr/0064-the-refactor-to-status-branching-dropped-the-generic-catch-l.md)
     aiPreviewError.value = true
   } finally {
     aiPreviewLoading.value = false

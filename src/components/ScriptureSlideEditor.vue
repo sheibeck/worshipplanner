@@ -134,13 +134,7 @@ async function onFetchPassage() {
   const query = formatQuery(scriptureRef)
 
   try {
-    // WR-01 (102-REVIEW): routed through the scriptureApi.ts dispatcher — the
-    // single client-side choke point (R297) — instead of calling
-    // fetchPassageText directly. This component is currently unmounted
-    // anywhere in the app, but leaving a direct esvApi call here would
-    // silently reintroduce an ungated ESV proxy call the moment it's wired
-    // into a view. Still ESV-only (pre-existing gap, out of this phase's
-    // scope — no NLT dispatch existed here before either).
+    // See ADR-0076 (docs/adr/0076-routed-through-the-scriptureapi-ts-dispatcher-the-single.md)
     const result = await fetchScriptureText(query, 'ESV')
     if (result.status === 'error') {
       fetchError.value = true
@@ -254,17 +248,6 @@ onUnmounted(() => {
   }
 })
 
-// Test-only seam (matches PptxImportModal.vue's existing defineExpose
-// precedent and CongregationalEditor.vue's identical comment) — needed for
-// the E4 `partial` backstop test.
-//
-// ★ WR-04 (32-REVIEW), CALL-SITE CONTRACT — same as CongregationalEditor.vue:
-// `currentReadingId`/`surfaceId`/`referenceText`/`rawText`/`localSlides` are
-// all captured/seeded ONCE at mount and are NOT reactive to `props.readingId`
-// changing afterward. The caller MUST always mount this component with a
-// `:key` tied to `readingId` — swapping the prop in place on a persistent
-// instance is not supported and would silently misattribute saves to the
-// wrong reading. See CongregationalEditor.vue's identical comment for why a
-// partial (surfaceId-only) prop-watcher was considered and rejected.
+// See ADR-0077 (docs/adr/0077-test-only-seam-matches-pptximportmodal-vue-s-existing-define.md)
 defineExpose({ currentReadingId })
 </script>

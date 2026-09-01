@@ -350,13 +350,7 @@ function initStore(orgId: string) {
   songStore.subscribe(orgId)
 }
 
-// 260901-lua: the sidebar's in-place church switcher (AppSidebar.vue ->
-// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
-// remount, so an onMounted-only subscribe never re-fires on switch. Watching
-// with `immediate: true` replaces the old onMounted-only subscribe (mirrors
-// TeamView.vue 104-REVIEW CR-01). Always pass the LIVE new orgId the watcher
-// hands in — never a mount-time captured value — so no write can land on the
-// wrong church.
+// See ADR-0066 (docs/adr/0066-260901-lua-the-sidebar-s-in-place-church-switcher-appsidebar.md)
 watch(
   () => authStore.orgId,
   (orgId) => {
@@ -410,13 +404,7 @@ onMounted(async () => {
   // Check for ?import=true query param — auto-open import modal
   if (route.query.import === 'true') {
     importModalOpen.value = true
-    // Clear query param without navigation. WR-01: AWAITED — `route.query`
-    // does not update until this navigation resolves, so if a song-edit
-    // request is ALSO present in the query, resolveSongEditRequest()'s own
-    // synchronous clearSongEditQueryParam() call below must not read a
-    // pre-clear route.query snapshot and race this replace (whichever one's
-    // navigation resolved last would otherwise win, silently dropping the
-    // other's clear).
+    // See ADR-0240 (docs/adr/0240-clear-query-param-without-navigation-wr-01-awaited-route-que.md)
     await router.replace({ query: { ...route.query, import: undefined } })
   }
 

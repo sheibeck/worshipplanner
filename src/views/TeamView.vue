@@ -518,14 +518,7 @@ function subscribeTeamListeners(orgId: string) {
   )
 }
 
-// 104-REVIEW CR-01: the sidebar's in-place church switcher (AppSidebar.vue ->
-// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
-// remount, so this view's own onSnapshot listeners — not covered by
-// resetOrgScopedStores(), which only knows about the Pinia store layer — must
-// react to the org id themselves instead of reading it once. Watching with
-// `immediate: true` replaces the old onMounted-only subscribe and guarantees a
-// switch tears down the previous church's listeners before pointing new ones
-// at the newly-selected church.
+// See ADR-0066 (docs/adr/0066-260901-lua-the-sidebar-s-in-place-church-switcher-appsidebar.md)
 watch(
   () => authStore.orgId,
   (orgId) => {

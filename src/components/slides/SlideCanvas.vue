@@ -297,13 +297,7 @@ import { renderFailureSentence } from './slideDisplay'
 import AudioPlayer from '../AudioPlayer.vue'
 import VideoPlayer from '../VideoPlayer.vue'
 
-/**
- * Phase 90 — extracted from PresentationViewer.vue. SlideCanvas owns ONLY
- * per-slide rendering + media (video/audio) playback lifecycle + the
- * background layer. It does NOT own exit chrome, nav chrome, keyboard,
- * fullscreen, Escape teardown, or the font-load gate — those stay in
- * PresentationViewer.vue (PITFALLS Pitfall 6/19 — a deliberate NON-copy).
- */
+/** See ADR-0111 (docs/adr/0111-phase-90-extracted-from-presentationviewer-vue-slidecanvas-o.md) */
 const props = defineProps<{
   slide: AssembledSlide | null
   /** Phase 90/94 — when true, ignore the slide's own resolved background
@@ -377,22 +371,10 @@ const currentBackgroundUrl = computed<string | null>(() => {
   return props.slide?.slide.backgroundImageUrl ?? null
 })
 
-/**
- * Keys the VideoPlayer instance on the SLIDE (WR-02) so switching between two
- * video slides always remounts the player — even two adjacent video slides
- * sharing an identical `videoSrc` must not reuse the child instance, or a
- * slide that went through the muted-retry path would silently stay muted on
- * the next one with zero on-screen indication.
- */
+/** See ADR-0112 (docs/adr/0112-keys-the-videoplayer-instance-on-the-slide-wr-02-so-switchin.md) */
 const currentVideoKey = computed(() => `${props.slide?.slide.id ?? ''}:${currentVideoUrl.value ?? ''}`)
 
-/**
- * Keys the AudioPlayer instance on the SLIDE, not just the media URL (WR-02).
- * Phase 24 (R030/D-04): a GROUP BED (`audioFromBed` true, with a `groupId`)
- * is deliberately kept as ONE continuous instance across every slide of that
- * group (R030 bed continuity). A slide with no `groupId` always falls
- * through to the per-slide key.
- */
+/** See ADR-0112 (docs/adr/0112-keys-the-videoplayer-instance-on-the-slide-wr-02-so-switchin.md) */
 const currentAudioKey = computed(() => {
   const current = props.slide
   if (current?.audioFromBed && current.groupId) {

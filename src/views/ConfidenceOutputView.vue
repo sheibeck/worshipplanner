@@ -76,15 +76,7 @@
          live "Go to black" operator control is suppressed on this surface.
          AudienceOutputView keeps its own blackout overlay untouched. -->
 
-    <!-- R271 / Pitfall 6 — the ONE interactive element, shown ONLY when
-         fullscreen has been lost. The WHOLE surface is the tap target (inset-0
-         full-bleed button, absolutely positioned so it overlays both live panes —
-         the fixed-positioned root is its containing block): one tap ANYWHERE on
-         the display re-enters fullscreen synchronously (the gestured path). The
-         centered pill is only a visual hint (pointer-events-none so the tap always
-         lands on the button); slides keep advancing underneath. Losing fullscreen
-         NEVER tears down the session, closes the channel, or unmounts the window.
-         Calm neutral, NOT the app's action accent. -->
+    <!-- See ADR-0211 (docs/adr/0211-r271-pitfall-6-the-one-interactive-element-shown-only-when.md) -->
     <button
       v-if="!isFullscreen"
       type="button"
@@ -134,14 +126,7 @@ const props = defineProps<{
   channelFactory?: BroadcastChannelFactory
 }>()
 
-// The shared output-window lifecycle-core (R272 reuse-not-fork): ?org=/serviceId
-// scoping, WR-02 subscribe gate, read-only assembly, receive-only run channel,
-// font gate, rootStyle cursor coupling, non-teardown fullscreen recovery, and the
-// Screen Wake Lock — all inherited identically from the audience window. The
-// per-canvas media plumbing stays view-local below (current pane only).
-// `blackout` is intentionally NOT destructured here (R305): the confidence
-// monitor no longer consumes it. useOutputWindow keeps returning it unchanged
-// for AudienceOutputView.
+// See ADR-0212 (docs/adr/0212-the-shared-output-window-lifecycle-core-r272-reuse-not-fork-2.md)
 const { assembledSlideshow, index, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
   useOutputWindow({ channelFactory: props.channelFactory, role: 'confidence' })
 

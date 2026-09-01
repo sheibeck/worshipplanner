@@ -80,14 +80,7 @@ function defaultLyricsSubscriber(
   })
 }
 
-// WR-02 (42-REVIEW.md): `pptxRendersStore` is a Pinia singleton, but this composable's
-// `cleanup()` calls its `unsubscribeAll()`, which tears down EVERY outstanding listener
-// in the store, not just the ones this particular instance opened. That is safe only
-// under the "single call site" assumption documented on `pptxRenders.ts` and below — an
-// assumption nothing in the store enforces. This module-level counter is a dev-mode
-// tripwire for exactly that assumption: it does not change teardown behavior (still a
-// full `unsubscribeAll()`, since scoping it per-instance is a real design change no plan
-// here authorizes), it only makes a violation loud instead of silent.
+// See ADR-0136 (docs/adr/0136-pptxrendersstore-is-a-pinia-singleton-but-this-composable-s.md)
 let activeSlideshowAssemblyInstances = 0
 
 export interface UseSlideshowAssemblyOptions {
@@ -187,7 +180,7 @@ export function useSlideshowAssembly(
   const pptxRendersStore = usePptxRenders()
   const subscribeLyrics = options?.lyricsSubscriber ?? defaultLyricsSubscriber
 
-  // WR-02: see the module-level counter's doc comment above.
+  // See ADR-0137 (docs/adr/0137-activeslideshowassemblyinstances-still-includes-this-instanc.md)
   activeSlideshowAssemblyInstances += 1
 
   const canWrite = computed<boolean>(() => {
@@ -287,13 +280,7 @@ export function useSlideshowAssembly(
     { immediate: true },
   )
 
-  // --- Phase 42 (R079/R080): resolve and cache rendered-page download URLs ---
-  //
-  // Keyed `${renderImportId}:${renderedCount}` — the count is load-bearing TWICE
-  // (42-RESEARCH.md Pitfall 4 / T-42-07): it invalidates the cache the instant a
-  // re-render changes the page count, AND it makes serving a previous render's
-  // URL array structurally impossible, since a differently-counted re-render can
-  // never collide with the old key.
+  // See ADR-0138 (docs/adr/0138-phase-42-r079-r080-resolve-and-cache-rendered-page-download.md)
   const renderedUrlCache = reactive(new Map<string, string[]>())
 
   function renderedUrlCacheKey(renderImportId: string, renderedCount: number): string {
@@ -336,11 +323,7 @@ export function useSlideshowAssembly(
             Array.from({ length: count }, (_, i) => resolveImageUrl(renderedPagePath(org, id, i + 1))),
           )
           const freshKey = renderedUrlCacheKey(id, count)
-          // WR-01 (42-REVIEW.md): only the CURRENT count's entry is ever read again
-          // (`renderedImageUrlsByImportId` above looks up exactly one key per id), so
-          // every other `(id, count)` pair for this SAME id is now unreachable — evict
-          // it rather than let it stay resident forever across re-renders/retries
-          // within one composable instance's lifetime.
+          // See ADR-0139 (docs/adr/0139-only-the-current-count-s-entry-is-ever-read-again.md)
           for (const key of renderedUrlCache.keys()) {
             if (key !== freshKey && key.startsWith(`${id}:`)) renderedUrlCache.delete(key)
           }
@@ -722,19 +705,7 @@ export function useSlideshowAssembly(
     orgId: string
     group: SlideGroup
     result: RebuildResult
-    /**
-     * Precomputed here (synchronously, inside the tracked computed) rather
-     * than re-derived in the async apply step.
-     *
-     * 38-REVIEW CR-01: `undefined` means "no opinion, leave the stored
-     * signature alone"; `null` means "explicitly clear it." `result.sourceSignature`
-     * (set only by `rebuildScriptureGroup`'s CLEARED REFERENCE branch) takes
-     * precedence over the ordinary recomputed `sourceSignature(slot, inputs)`
-     * when present, because that branch's freshly-computed signature is
-     * `undefined` for the wrong reason (no reference to sign, not "no
-     * opinion") and would otherwise leave a stale value stored via
-     * `stripUndefined`.
-     */
+    /** See ADR-0140 (docs/adr/0140-this-is-the-one-branch-that-empties-a-congregational-group-s.md) */
     freshSignature?: string | null
   }
 
@@ -782,14 +753,7 @@ export function useSlideshowAssembly(
       if (appliedGroupRefForSlot.get(outcome.slotId) === outcome.group) continue
       appliedGroupRefForSlot.set(outcome.slotId, outcome.group)
 
-      // CR-02: `outcome.group.slides` is the snapshot this rebuild was
-      // computed FROM — passed through as `baseSlides` so a concurrent
-      // SlideGrid.vue write (add-slide/import/video-append/reorder) that
-      // lands between this computation and this write is detected and merged
-      // rather than silently overwritten. See `replaceGroupSlides`'s doc
-      // comment in `src/stores/slideGroups.ts`. This matters MORE now than
-      // pre-Phase-30, since every rebuild outcome writes unconditionally —
-      // there is no confirm step left to catch a lost concurrent edit.
+      // See ADR-0141 (docs/adr/0141-outcome-group-slides-is-the-snapshot-this-rebuild-was-comput.md)
       try {
         await trackGroupWrite(
           slideGroupsStore.replaceGroupSlides(
@@ -856,11 +820,7 @@ export function useSlideshowAssembly(
     for (const unsub of lyricsSubscriptions.values()) unsub()
     lyricsSubscriptions.clear()
 
-    // WR-02: `activeSlideshowAssemblyInstances` still includes THIS instance at this
-    // point (it decrements below), so > 1 here means at least one other instance is
-    // still live — the single-call-site assumption `unsubscribeAll()`'s teardown-of-
-    // EVERY-listener behavior relies on is violated. Warn loudly rather than let this
-    // instance's unmount silently kill another instance's still-open render listeners.
+    // See ADR-0137 (docs/adr/0137-activeslideshowassemblyinstances-still-includes-this-instanc.md)
     if (import.meta.env.DEV && activeSlideshowAssemblyInstances > 1) {
       console.warn(
         '[useSlideshowAssembly] cleanup() is tearing down ALL pptxRenders listeners ' +

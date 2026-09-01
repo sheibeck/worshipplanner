@@ -2,21 +2,7 @@
  * Run-control core composable (Phase 97, R276 foundation).
  *
  * Extracted verbatim-in-behaviour from RunControlView.vue's <script setup> so the
- * entire Phase 92-96 control machinery lives in one seam — mirroring how
- * useOutputWindow.ts owns the output-window lifecycle. This composable owns: the
- * single-writer wp-run-{serviceId} channel (index/seq/handle + postIndex +
- * resendCurrent + the onHello resend + the on-mount slide-0 post + the
- * late-arriving-assembly post), the navigation model, the rail derivations, the
- * honest open state machine (OutputStatus + openOutputs/openPlaced/openUnplaced +
- * bothOpened), the WR-01 stale guard (goLiveRequestId/isUnmounted), the Phase
- * 96-01 live-ops recovery (closed-poll + screenschange reassign + per-role
- * reopen), the exit/teardown ordering (stopRecoveryWatchers before closeOutputs),
- * and the document keyboard handler.
- *
- * It MUST be called from inside a component setup() — it registers
- * onMounted/onUnmounted on the calling instance so the channel open + keyboard
- * listener and their teardown run on that view's lifecycle exactly as the
- * un-extracted view did. useServiceAssembly() is called FIRST so its onMounted
+  * See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
  * subscribe registers BEFORE this composable's channel-opening onMounted
  * (subscribe-before-channel ordering preserved, mirroring useOutputWindow).
  *
@@ -80,12 +66,7 @@ export interface UseRunControlOptions {
 }
 
 export function useRunControl(options: UseRunControlOptions = {}) {
-  // Shared service-load + read-only assembly core (95-01). Owns ?org=/:serviceId
-  // scoping, the localService initial-load watch, the read-only assembly, and the
-  // WR-02 subscribe gate — do NOT re-do any of it here, and (deliberately) it
-  // registers NO unsubscribeAll, so this in-app route never tears down peers.
-  // Called FIRST so its onMounted subscribe registers before this composable's
-  // channel-opening onMounted (subscribe-before-channel ordering preserved).
+  // See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md)
   const { serviceId, orgIdRef, localService, assembledSlideshow } = useServiceAssembly()
   const router = useRouter()
 
@@ -277,13 +258,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     if (confirmOpen.value) return // nav keys inert while the dialog is open
     const t = document.activeElement
     if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return // inert in text inputs
-    // PRE-LIVE (State A, !live): ONLY Enter (go live) and Escape act. The
-    // transport (arrows/Space) and blackout (B) keys are INERT — there is nothing
-    // on the screens to navigate or black out before go-live, and an inert
-    // pre-live keyboard complements WR-01's no-action-pre-live posture (a stray
-    // keypress can no longer silently change what go-live will show). WR-02: Enter
-    // fires the SAME go-live action as run-go-live-btn, wiring the "Press Enter to
-    // go live" hint the pre-flight panel advertises.
+    // See ADR-0128 (docs/adr/0128-pre-live-state-a-live-only-enter-go-live-and-escape-act.md)
     if (!live.value) {
       switch (e.key) {
         case 'Enter':
@@ -360,8 +335,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   // instant the projectionist presses Escape out of fullscreen on that display.
   const audienceFullscreen = ref(false)
   const confidenceFullscreen = ref(false)
-  // WR-02: which display was refused when EXACTLY ONE of the two window.open
-  // calls came back null (the honest 'partial' state names the dark monitor).
+  // See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md)
   const blockedRole = ref<MonitorRole | null>(null)
 
   // Raw window handles (NOT reactive), keyed by stable window name.
@@ -417,33 +391,14 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     }, 1000)
   }
 
-  /**
-   * PER-ROLE REOPEN (R274) — re-runs the open+place for THAT role ONLY. It is
-   * SYNCHRONOUS: it resolves the role's screen from the already-HELD
-   * liveScreenDetails.screens via the existing resolveScreen (NO fresh
-   * getScreenDetails), so it opens no stale-resolution window and needs no new
-   * token — the original openOutputs().then WR-01 guard stays intact.
-   * openWindow re-stores outputWindows[name] and best-effort moveTo +
-   * requestFullscreen({ screen }). The closed ref is cleared ONLY on a non-null
-   * handle: a pop-up-blocker-refused reopen keeps the amber row and never flips the
-   * line back to green (honesty rule). Position is NOT persisted — the reopened
-   * output's hello → onHello(resendCurrent) resends the CURRENT index, so it
-   * returns to the exact current slide; index.value is never touched here.
-   */
+  /** See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md) */
   function reopenOutput(role: MonitorRole) {
     // IN-03: defense-in-parity with openOutputs' async guard — never open a window
     // outside a live session. reopenOutput is synchronous and today only reachable
     // from a button rendered while placed+mounted, so this cannot fire post-exit in
     // production, but the early-return keeps it honest against a future refactor.
     if (isUnmounted) return
-    // WR-01 (defense-in-depth): NEVER open an output window outside a real live
-    // session that has already gone live. A reopen is only ever legitimate as a
-    // recovery of a genuinely-closed output — which requires (a) live===true and
-    // (b) a HELD go-live ScreenDetails (liveScreenDetails). Pre-flight (live=false)
-    // and Rehearse (live=true but no getScreenDetails was ever resolved, so
-    // liveScreenDetails===null) both NO-OP here, so a stray dot/panel emit can
-    // never open an un-positioned window that bypasses the honest open state
-    // machine (outputStatus would still read idle while a real window was live).
+    // See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
     if (!live.value || liveScreenDetails === null) return
     const name = role === 'audience' ? 'wp-audience' : 'wp-confidence'
     const url = role === 'audience' ? audienceUrl() : confidenceUrl()
@@ -455,20 +410,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     else confidenceClosed.value = false
   }
 
-  /**
-   * IN-PLACE reassign recovery (R274 / WR-01) — the reassign banner's PRIMARY
-   * action. Reopens the affected output role(s) against the CURRENT (post-change)
-   * live screens WITHOUT unmounting the control, reusing the reopenOutput →
-   * resolveScreen → openWindow path. Position is NOT persisted here: each reopened
-   * output announces itself with a hello → onHello(resendCurrent) resends the
-   * CURRENT index, so it returns to the exact live slide. If a monitor is truly
-   * gone resolveScreen yields null and the output opens un-positioned (honest
-   * fallback) — either way the running session (index/seq/channel + the other open
-   * output) survives, unlike the old same-tab /monitor-setup navigation that tore
-   * it all down. monitorChanged is cleared only AFTER the reopen has run so the
-   * banner dismisses on a real recovery action; if the reopen is refused the ~1s
-   * closed-poll re-surfaces the honest amber closed row.
-   */
+  /** See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md) */
   function reopenReassignedOutputs() {
     if (reassignRole.value === 'audience') {
       reopenOutput('audience')
@@ -552,12 +494,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     }
   }
 
-  // WR-01: monotonic Go-live token + unmount flag guarding a LATE
-  // getScreenDetails() resolution from re-opening orphaned output windows after
-  // the operator has moved on (a fresh Go-live click, a confirmed exit, or an
-  // unmount). Mirrors MonitorSetupView's detectRequestId precedent: every new
-  // attempt bumps the token, and confirmExit/onUnmounted invalidate any in-flight
-  // resolve so its .then/.catch is a no-op — no window is ever opened after exit.
+  // See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
   let goLiveRequestId = 0
   let isUnmounted = false
 
@@ -692,16 +629,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     return screen?.label && screen.label.length > 0 ? screen.label : 'display'
   }
 
-  /**
-   * WR-02 — honest gate on the TWO output handles before any success claim.
-   * A "placed"/"fallback" claim requires BOTH windows to have real (non-null)
-   * handles, because some browsers grant only ONE window per user activation:
-   *  - both null → 'blocked' (pop-ups refused, nothing opened)
-   *  - one null  → 'partial' (one display is live, the other is dark) — the
-   *                banner names the refused role and offers retry, NEVER green
-   *  - both open → returns true so the caller may make its success claim
-   * Returns true ONLY when both windows opened.
-   */
+  /** See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md) */
   function bothOpened(aWin: Window | null, cWin: Window | null): boolean {
     if (aWin && cWin) return true
     if (!aWin && !cWin) {
@@ -720,9 +648,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     const confidenceScreen = resolveScreen(saved, 'confidence', screens)
     const aWin = openWindow(audienceUrl(), 'wp-audience', audienceScreen)
     const cWin = openWindow(confidenceUrl(), 'wp-confidence', confidenceScreen)
-    // Gate the success claim on BOTH real windows (WR-02): fewer than two → an
-    // honest blocked/partial state, never a green "Displays ready" over a dark
-    // monitor.
+    // See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md)
     if (!bothOpened(aWin, cWin)) return
     readyAudienceLabel.value = screenLabel(audienceScreen)
     readyConfidenceLabel.value = screenLabel(confidenceScreen)
@@ -744,8 +670,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   function openUnplaced() {
     const aWin = openWindow(audienceUrl(), 'wp-audience', null)
     const cWin = openWindow(confidenceUrl(), 'wp-confidence', null)
-    // WR-02: the amber "two windows opened" fallback claim requires BOTH handles;
-    // both-null is blocked, exactly-one-null is the honest partial state.
+    // See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md)
     if (!bothOpened(aWin, cWin)) return
     outputStatus.value = 'fallback'
     // Honest live flag (R277): both outputs opened (un-positioned) — a genuine
@@ -770,19 +695,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     return `/present/confidence/${serviceId.value}?org=${orgIdRef.value ?? ''}`
   }
 
-  /**
-   * The Go-live gesture entry — bound to the run-go-live-btn click, run
-   * SYNCHRONOUSLY. getScreenDetails() is the FIRST statement after the plain
-   * feature-detect (the only line before it is a synchronous ref set), with NO
-   * await/store/router before it, so its .then runs while the click's transient
-   * activation is still live and window.open + requestFullscreen({ screen })
-   * inside openPlaced act within the sanctioned one-gesture window (Pitfall 1/5).
-   * Mirrors MonitorSetupView.onDetectClick.
-   */
+  /** See ADR-0129 (docs/adr/0129-the-go-live-gesture-entry-bound-to-the-run-go-live-btn-click.md) */
   function openOutputs() {
-    // WR-01: claim a fresh token for THIS gesture. A second Go-live click, a
-    // confirmed exit, or an unmount bumps goLiveRequestId, so an earlier in-flight
-    // getScreenDetails() resolve becomes stale and is dropped below.
+    // See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
     const requestId = ++goLiveRequestId
     outputStatus.value = 'opening'
     // Start listening for output-window readiness BEFORE any window.open, so the
@@ -806,15 +721,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     ;(window as unknown as { getScreenDetails: () => Promise<ScreenDetailsLike> })
       .getScreenDetails()
       .then((details) => {
-        // Stale (a newer attempt superseded us) or the view has torn down — do
-        // NOT open windows that would be orphaned (Pitfall 6 / WR-01).
+        // See ADR-0130 (docs/adr/0130-stale-a-newer-attempt-superseded-us-or-the-view-has-torn-dow.md)
         if (isUnmounted || requestId !== goLiveRequestId) return
-        // MONITOR-UNPLUG (R274): HOLD this Go-live ScreenDetails and attach the
-        // screenschange listener — AFTER the WR-01 stale guard so a late resolve
-        // after exit attaches nothing. Swap off any prior handle first (mirrors
-        // MonitorSetupView). The typeof guard is load-bearing: a ScreenDetails
-        // without listener support (older engines / a partial test fake) is
-        // skipped rather than throwing into the .catch.
+        // See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
         if (liveScreenDetails && liveScreenDetails !== details) {
           try {
             liveScreenDetails.removeEventListener?.('screenschange', onScreensChange)
@@ -905,8 +814,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // onUnmounted disarm and the watch(live) reconcile below — disarm the loop
     // timer explicitly on every deliberate end-service exit too.
     loopTimer.disarm()
-    // WR-01: invalidate any in-flight Go-live resolve so a late getScreenDetails()
-    // cannot re-open orphaned output windows after the operator has exited.
+    // See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
     goLiveRequestId += 1
     // Stop the recovery watchers BEFORE closeOutputs() — closeOutputs() does NOT
     // null outputWindows entries, so an uncleared poll would latch a closed ref
@@ -934,12 +842,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // during THIS session must not survive into whatever screen the operator
     // navigates to next. Idempotent no-op if it was already cleared/dismissed.
     notifications.clearSticky('monitor-reassign')
-    // 104-REVIEW WR-04: monitorChanged is RunDisplaysPanel's own source of
-    // truth for the per-output "reassigning" chip (:reassigning="monitorChanged"
-    // in RunControlView.vue) and must be reset in lockstep with the sticky
-    // above, or a later go-live in the SAME mounted instance (no unmount, so
-    // onMounted never re-initializes it) renders a stale "reassigning" chip
-    // before anything has actually changed in the new session.
+    // See ADR-0131 (docs/adr/0131-monitorchanged-is-rundisplayspanel-s-own-source-of-truth-for.md)
     monitorChanged.value = false
     // Leave the control-screen fullscreen entered on go-live (only when we are
     // actually fullscreen — a rehearse exit never entered it). Feature-detected +
@@ -965,11 +868,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
    * needs no confirm.
    */
   function endRehearsal() {
-    // 106-REVIEW WR-02: explicit, mirrors endServiceTeardown's defense-in-depth
-    // (useRunControl.ts:903-907). This exit path does NOT unmount the component
-    // (State A re-renders in place), so useLoopTimer's own onUnmounted(disarm)
-    // safety net does not apply here — without this call, disarming depends
-    // solely on the async watch(live, reconcileLoop) below.
+    // See ADR-0132 (docs/adr/0132-explicit-mirrors-endserviceteardown-s-defense-in-depth.md)
     loopTimer.disarm()
     rehearsing.value = false
     live.value = false
@@ -1193,15 +1092,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   // Go-live/rehearse arms (live flips true with index already resolved);
   // End Service/End Rehearsal (live flips false) disarms.
   watch(live, reconcileLoop)
-  // 106-REVIEW WR-01: reconcileLoop() reads filmstrip.value.slides.length as a
-  // PLAIN function call from the triggers above — none of which fire when the
-  // CURRENT item's assembled slide count changes for a reason other than
-  // navigation (e.g. a PPTX/IMPORTED item's deck finishing its async render
-  // mid-Run, growing a looping item from <=1 slide, which correctly did not
-  // arm, past 1). Without this watch a looping item that starts short stays
-  // silently disarmed until the operator happens to navigate. Watching the
-  // slide count directly (not just currentSlotIndex/live) closes that gap in
-  // both directions — arms as soon as a looping item becomes multi-slide, and
+  // See ADR-0133 (docs/adr/0133-reconcileloop-reads-filmstrip-value-slides-length-as-a-plain.md)
   // disarms if it later shrinks back to <=1 (advanceLoop's own guard already
   // makes that direction a harmless no-op, but reconciling promptly is still
   // correct).
@@ -1275,8 +1166,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   })
 
   onUnmounted(() => {
-    // WR-01: mark torn down so a late getScreenDetails() resolve short-circuits
-    // instead of opening windows into a dead component.
+    // See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
     isUnmounted = true
     // Clear the closed-poll interval + remove the screenschange listener exactly
     // once here too (null-guarded, safe after a confirmExit that already ran it).
@@ -1293,8 +1183,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // unmount path that does not run through confirmExit (e.g. leaving the
     // route while not truly live). Idempotent no-op if already cleared.
     notifications.clearSticky('monitor-reassign')
-    // 104-REVIEW WR-04: keep monitorChanged in lockstep with the sticky clear
-    // above — see the matching comment in endServiceTeardown().
+    // See ADR-0131 (docs/adr/0131-monitorchanged-is-rundisplayspanel-s-own-source-of-truth-for.md)
     monitorChanged.value = false
   })
 

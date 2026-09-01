@@ -67,19 +67,7 @@ export const useRosterStore = defineStore('roster', () => {
       // `multiRole` flag on EVERY role, with NO Firestore write migration (per CONTEXT: avoid
       // a one-time data migration; this is the single read boundary, so every downstream
       // consumer of rosterStore.roles always sees the normalized flag):
-      //   1. Legacy group 'vocals' (R250, pre-Phase-85 docs) — the narrowed RoleGroup dropped
-      //      'vocals' as a team identity; existing docs may still carry it and are coerced to
-      //      group 'band' here.
-      //   2. Legacy field name `vocal` (Phase-85/88 docs persisted before the R259 rename) —
-      //      docs on disk still carry `vocal`, not `multiRole`, since there is no data
-      //      migration; every role (not just the vocals-group branch) must map it or a live
-      //      pre-Phase-89 role would silently lose its flag (RESEARCH Pitfall R1).
-      // Branch-specific defaulting (R259 — the plan-checker BLOCKER fix):
-      //   - vocals-group branch: (data.multiRole ?? data.vocal ?? true) === true — the `?? true`
-      //     preserves the pre-existing `vocal: data.vocal ?? true` default so a pre-Phase-85
-      //     legacy vocals doc with NEITHER field still surfaces as multiRole:true.
-      //   - default branch: (data.multiRole ?? data.vocal) === true — NO `?? true`; a
-      //     non-vocals role with neither field is multiRole:false.
+      // See ADR-0156 (docs/adr/0156-1-legacy-group-vocals-r250-pre-phase-85-docs-the-narrowed.md)
       roles.value = snap.docs.map((d) => {
         const data = d.data() as Role & { vocal?: boolean }
         if ((data.group as string) === 'vocals') {

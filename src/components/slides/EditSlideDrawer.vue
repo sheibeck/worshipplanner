@@ -1,12 +1,6 @@
 <template>
   <Teleport to="body">
-    <!-- Panel only — deliberately NO backdrop/scrim `<Transition>` block.
-         SongSlideOver.vue (the pattern D-01 reuses) ships one; this drawer
-         must actively DROP it (26-RESEARCH.md Pitfall 7, 26-UI-SPEC.md Mockup
-         Correction 7) so the grid underneath stays fully clickable — clicking
-         a different slide card must swap this panel's contents in place
-         (D-03), which a backdrop's close-on-click would silently break. Do
-         not "restore" it for consistency with that analog. -->
+    <!-- See ADR-0102 (docs/adr/0102-must-actively-drop-it-26-research-md-pitfall-7-26-ui-spec-md.md) -->
     <Transition
       enter-active-class="transition-transform duration-250 ease-out"
       enter-from-class="translate-x-full"
@@ -275,12 +269,7 @@
             </template>
           </div>
 
-          <!-- Phase 26-08: Slide Audio — omitted entirely for a video slide
-               (D-12, a hard v-if, never a disabled-looking block): the video
-               carries its own audio and already suppresses the group's bed
-               for its own duration (25-REVIEW-FIX WR-01), so offering a
-               second audio attachment here would recreate the exact
-               conflict the model was built to prevent. -->
+          <!-- See ADR-0103 (docs/adr/0103-for-its-own-duration-25-review-fix-wr-01-so-offering-a.md) -->
           <div v-if="!isVideo" data-testid="drawer-audio-section">
             <label class="block text-xs font-medium text-gray-400 mb-1">Slide Audio</label>
 
@@ -306,12 +295,7 @@
                 >Remove</button>
               </div>
               <p v-if="audioState === 'group'" class="mt-1 text-[11px] text-gray-500" data-testid="audio-shared-caption">Shared with every other slide in this group</p>
-              <!-- This drawer's OWN failure ref/handler (26-RESEARCH.md
-                   Pitfall 6) — AudioPlayer itself renders no degraded-state
-                   text of its own, it only emits `error`; the "Unavailable"
-                   badge above is this panel's responsibility, mirroring
-                   PresentationViewer.vue's mediaFailed pattern, not a prop on
-                   the shared player. -->
+              <!-- See ADR-0104 (docs/adr/0104-this-drawer-s-own-failure-state-26-research-md-pitfall-6.md) -->
               <AudioPlayer chromeless :src="attachedAudioUrl" :loop="loopChecked" @error="onAudioError" />
             </div>
 
@@ -494,22 +478,7 @@
 </template>
 
 <script setup lang="ts">
-/**
- * R033's spine (Phase 26 Plan 05) — the Edit Slide drawer's shell, its
- * connection to Phase 25's `selectedSlideId` seam (resolved one layer up in
- * `SlidesTab.vue`, Task 2), and its two simplest live-apply fields (Task 3).
- * Nothing underneath this panel reflows (R033/D-01): it is a fixed-position
- * overlay with no scrim (D-03), so the grid stays fully clickable while it is
- * open. It follows the selection — it never closes itself on a selection
- * change, only on its own close control or Escape.
- *
- * Renders nothing when closed, and nothing when `entry` is null — the latter
- * covers both "nothing selected" and the pre-materialization window where a
- * selected slide's synthetic fallback id has no stored entry behind it yet
- * (26-RESEARCH.md Pitfall 1). This is a plain `v-if` guard, not a loading
- * state — the window is sub-second in practice and the caller (`SlidesTab.vue`)
- * already handles clearing a dangling selection.
- */
+/** See ADR-0105 (docs/adr/0105-open-it-follows-the-selection-it-never-closes-itself-on-a.md) */
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide, CongregationalSection } from '@/types/slide'
@@ -636,15 +605,7 @@ const canMutate = computed(
   () => props.isEditor && !props.serviceLocked && !isSongGroup.value && !isPendingRender.value,
 )
 
-// WR-04: `confirmDiscard()` is instantiated below (`unsavedGuard`, Task 3),
-// but this is the point where its ONLY still-real usage site is missing —
-// every other consumer (AvailabilityDrawer.vue, RosterView.vue,
-// SongSlideOver.vue) gates its own close handler on it. 33-09 deleted this
-// drawer's in-body "Edit in song"/"Edit in scripture" links (and the guard
-// check that used to gate them) without re-wiring the guard anywhere else,
-// leaving `capture()` calls that fed a check nothing read. Restoring it here
-// closes the gap for the × button and Escape; the menu-dispatched
-// navigation path (`SlidesTab.vue`'s `onMenuAction`) is closed separately via
+// See ADR-0106 (docs/adr/0106-confirmdiscard-is-instantiated-below-unsavedguard-task-3-but.md)
 // the exposed `confirmDiscard` below.
 function onClose(): void {
   if (!unsavedGuard.confirmDiscard()) return
@@ -776,21 +737,7 @@ const NEXT_SPEAKER: Record<CongregationalSection['speaker'], CongregationalSecti
   ALL: 'LEADER',
 }
 
-/**
- * Flips the selected section entry's speaker to the next one in the 3-way
- * cycle (RESEARCH Pitfall 5 — the old binary ternary silently mapped ANY
- * non-LEADER value, including ALL, straight to LEADER, corrupting an ALL
- * slide on a single click). Modeled on `onLoopToggle`'s immediate-write
- * shape (this plan's key_links): re-checks `canMutate` inside the handler
- * (not just the template `v-if`), reads the group's CURRENT slides as the
- * base, maps only the selected entry, and awaits the store call so a
- * rejected write reaches Vue's handler like every other write here.
- * Deliberately NOT debounced — a discrete choice, not a stream of
- * keystrokes, so routing it through the debounced `body` machinery could
- * lose a flip to a pending flush for a different field. Passes the group's
- * stored `sourceSignature` through unchanged, for the same reason
- * `writeField` does.
- */
+/** See ADR-0107 (docs/adr/0107-flips-the-selected-section-entry-s-speaker-to-the-next-one-i.md) */
 async function onSpeakerToggle(): Promise<void> {
   if (!canMutate.value) return
   if (!props.group || !props.entry) return
@@ -926,7 +873,7 @@ async function onLoopToggle(event: Event): Promise<void> {
   await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
 }
 
-/** This drawer's OWN failure state (26-RESEARCH.md Pitfall 6) — `AudioPlayer` is a deliberately dumb primitive that only emits `error`, it renders no degraded-state text of its own. Reset whenever the attached file or the edited slide changes, so a stale failure never sticks to a different file (see the two watchers below). */
+/** See ADR-0104 (docs/adr/0104-this-drawer-s-own-failure-state-26-research-md-pitfall-6.md) */
 const audioFailed = ref(false)
 
 function onAudioError(): void {
@@ -1187,18 +1134,7 @@ function scheduleSavedFade(): void {
   }, SAVED_FLASH_MS)
 }
 
-/**
- * The fresh-base write (T-26-05-01, 26-RESEARCH.md Pattern 2/Pitfall 2). Reads
- * `props.group.slides` FRESH at the moment this function actually runs — never
- * a copy captured when the drawer opened or when the debounce timer was
- * scheduled. A stale base would silently discard any change that landed
- * elsewhere during a long-open session; this is the exact data-loss class
- * 25-REVIEW CR-02 already had to fix once, and every later write this drawer
- * adds must route through this same helper for that reason. `entryId` is
- * captured separately, at schedule time — it names WHICH entry to update even
- * if the drawer's selection has since moved on to a different slide (see
- * `flushField`, called when the edited entry changes).
- */
+/** See ADR-0108 (docs/adr/0108-the-fresh-base-write-t-26-05-01-26-research-md-pattern-2-pit.md) */
 async function writeField(field: FieldName, entryId: string, value: string): Promise<void> {
   // R036: the single persistence point for label/notes/body. Guarding here (not
   // only `scheduleWrite`) also covers `flushField`/`flushAll`, so an edit typed
@@ -1266,14 +1202,7 @@ async function flushField(field: FieldName): Promise<void> {
 }
 
 async function flushAll(): Promise<void> {
-  // CR-01: sequential, NOT Promise.all. Each `writeField` call reads
-  // `props.group.slides` fresh at the moment it runs — if two fields'
-  // debounces both fired concurrently, both would read the exact same
-  // stale base and each write's `next` would silently clobber the other's
-  // field with the stale value. Awaiting each flush in turn means the
-  // second flush's `writeField` reads the post-commit base the first
-  // flush just wrote (props.group updates from the store's own snapshot
-  // round-trip before the next await resumes), so both edits survive.
+  // See ADR-0109 (docs/adr/0109-sequential-not-promise-all-each-writefield-call-reads.md)
   await flushField('notes')
   await flushField('body')
 }
@@ -1516,12 +1445,7 @@ watch(
   },
 )
 
-// WR-04: exposes the unsaved-edit guard so `SlidesTab.vue`'s `onMenuAction`
-// can gate the menu-dispatched "Edit in song"/"Edit in scripture"
-// navigations on THIS drawer's own dirty state before routing away from it —
-// the one navigation path this component itself no longer owns (33-09
-// relocated it), so it cannot gate it internally the way `onClose`/
-// `onKeydown` above do.
+// See ADR-0106 (docs/adr/0106-confirmdiscard-is-instantiated-below-unsavedguard-task-3-but.md)
 defineExpose({ confirmDiscard: unsavedGuard.confirmDiscard })
 </script>
 

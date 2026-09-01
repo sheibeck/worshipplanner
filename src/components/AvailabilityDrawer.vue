@@ -397,16 +397,7 @@ function onToggleRole(roleId: string) {
   }
 }
 
-// ── Serve frequency (per-role quarter tier + cadence, D-05/D-06) ───────────
-// draft.roleFrequency[roleId] carries both the tier AND the cadence n in one
-// write (D-05) — no separate standing frequency field remains. The 'regular'
-// tier's active preset is derived from n (weekly n=1, biweek n=2, monthly n=4).
-// WR-04: a non-preset n (e.g. "3" or "1-in-6" imported via CSV — both valid,
-// supported frequencyLabelToN inputs) must NOT be shown as an active preset —
-// 'monthly' previously matched by fallback, misrepresenting the real cadence
-// and turning a click on "Monthly" into a silent, no-op-looking overwrite.
-// 'custom' is a display-only state: it never matches any rendered preset's
-// key, so no preset button is ever wrongly highlighted as active for it.
+// See ADR-0062 (docs/adr/0062-no-preset-button-is-shown-active-for-a-non-canonical-n-so-ma.md)
 function activeRoleTierPresetKey(roleId: string): FreqPresetKey | 'custom' {
   const entry = draft.roleFrequency[roleId] ?? { tier: 'regular' as FrequencyTier, n: 4 }
   if (entry.tier === 'fillin') return 'fillin'
@@ -434,9 +425,7 @@ function roleFreqReadout(roleId: string): string {
     return `Only scheduled to fill gaps · available on ${servable} of ${serviceDates.value.length} Sundays`
   }
   const approx = Math.min(servable, Math.ceil(serviceDates.value.length / entry.n))
-  // WR-04: no preset button is shown active for a non-canonical n, so make the custom
-  // cadence explicit in the readout text too, rather than relying on the reader to notice
-  // the number doesn't match any highlighted preset.
+  // See ADR-0062 (docs/adr/0062-no-preset-button-is-shown-active-for-a-non-canonical-n-so-ma.md)
   const customPrefix = activeRoleTierPresetKey(roleId) === 'custom' ? `Custom (1-in-${entry.n}) · ` : ''
   return `${customPrefix}≈ ${approx} of ${serviceDates.value.length} Sundays`
 }

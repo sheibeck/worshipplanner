@@ -86,21 +86,7 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * `runTransaction`, mutex, or check-then-create retry loop is used here —
    * RESEARCH.md's "Don't Hand-Roll" section rules those out as unnecessary
    * complexity for a race whose worst case is an overwrite.
-   *
-   * `input` carries no bed by default (D-19 — the slot-media migration is
-   * gone; a freshly materialized group always starts with no bed) and lands
-   * in this SAME `setDoc` as the slides. The bed is audio-only (D-18) —
-   * there is no video bed field.
-   *
-   * CR-01 (asymmetric WR-01 fix): this create is now ALSO `{ merge: true }`.
-   * `setGroupBedMedia`'s skeleton-create was made a merge write specifically
-   * because it races this function — both independently `getDoc` the same
-   * not-yet-existing doc and, on absence, `setDoc`. Only guarding
-   * `setGroupBedMedia`'s half left this function's plain, non-merge `setDoc`
-   * able to win the race and silently erase a `bedAudioUrl` a user had JUST
-   * attached (a concurrently-landing bed-media skeleton write's `bedAudioUrl`
-   * key, which is absent from `input`, would otherwise be wiped by a full
-   * replace). Since this branch only ever runs when `getDoc` found NO
+    * See ADR-0167 (docs/adr/0167-input-carries-no-bed-by-default-d-19-the-slot-media-migratio.md)
    * existing document, `merge: true` is a no-op in the ordinary
    * (non-racing) case — it changes behavior ONLY inside the race window.
    * `slides` (and every other key `input` carries) IS present in this
@@ -152,21 +138,7 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * bed video path exists. An explicit `clearAudio` flag is used (rather than
    * "an undefined url means clear") because `stripUndefined()` would
    * otherwise erase that intent before it reached Firestore —
-   * `deleteField()` is the only way to actually remove a field.
-   *
-   * If the group has not materialized yet, creates a skeleton document
-   * (`slotId`, `serviceId`, `slides: []`, the supplied bed field, both server
-   * timestamps) so attaching media to a slot with no group yet cannot throw.
-   *
-   * WR-01: this skeleton create races `materializeGroupIfMissing` — both
-   * functions independently `getDoc` the same not-yet-existing doc and, on
-   * absence, `setDoc`. If a user attaches bed media in the same round-trip
-   * window as first materialization, whichever write lands last would win
-   * outright under a plain (non-merge) `setDoc`, and since this skeleton's
-   * payload always carries `slides: []`, landing after materialization's
-   * fully-populated write would silently reset the group's real derived
-   * `slides` back to empty. `{ merge: true }` makes this create idempotent
-   * against that race: a concurrently-landing `materializeGroupIfMissing`
+    * See ADR-0168 (docs/adr/0168-deletefield-is-the-only-way-to-actually-remove-a-field-if-th.md)
    * write's `slides` field is preserved rather than clobbered by this
    * skeleton's empty array.
    */
@@ -209,22 +181,7 @@ export const useSlideGroups = defineStore('slideGroups', () => {
     clearBackground?: boolean
   }
 
-  /**
-   * Scoped group-background write (R055) — structurally mirrors
-   * `setGroupBedMedia` above exactly rather than extending its patch type: the
-   * same existence check, the same single-field `updateDoc` on the existing
-   * branch, the same explicit `clearBackground` flag (an undefined url would
-   * be stripped by `stripUndefined()` before the intent reached Firestore —
-   * `deleteField()` is the only way to actually remove the field), and the
-   * same merging skeleton `setDoc` on the missing branch for the identical
-   * WR-01 race reason documented on `setGroupBedMedia`.
-   *
-   * Touches only `backgroundImageUrl` and `updatedAt` on the existing-doc
-   * branch — never `slides`, never `bedAudioUrl`. Setting a group's
-   * background must never overwrite or clear any slide's own background (the
-   * R055 adjacency truth) — this function reads and writes nothing about
-   * `slides` at all.
-   */
+  /** See ADR-0168 (docs/adr/0168-deletefield-is-the-only-way-to-actually-remove-a-field-if-th.md) */
   async function setGroupBackground(
     orgId: string,
     slotId: string,
@@ -259,19 +216,7 @@ export const useSlideGroups = defineStore('slideGroups', () => {
   }
 
   /**
-   * The apply half of reconciliation — writes only `slides`/`sourceSignature`/
-   * `updatedAt`, never a bed field. The decision of WHETHER to apply a
-   * reconciled slide list lives in 24-03's pure functions and 24-05's
-   * composable, never here.
-   *
-   * CR-02: every call site (add-slide, import, video-append, drag-reorder in
-   * `SlideGrid.vue`, and the reconciliation watcher in
-   * `useSlideshowAssembly.ts`) reads a LOCAL snapshot of the group's current
-   * `entries`/`slides` BEFORE computing its own next `slides` array, with no
-   * shared in-process lock across those independent call sites. A plain
-   * `updateDoc` here is therefore a last-write-wins race — a fast
-   * double-click on "+ Add slide", or an append racing a drag-reorder, would
-   * silently discard whichever write lands first.
+   * See ADR-0169 (docs/adr/0169-helper-entries-present-on-the-live-document-but-absent-from.md)
    *
    * `baseSlides` — the snapshot the CALLER actually started from before
    * computing `slides` — turns this into a `runTransaction` compare-and-swap:
@@ -281,35 +226,7 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * added by a different, concurrent write that landed after this caller
    * read `baseSlides` — it is re-appended onto the caller's payload instead
    * of being silently overwritten. This closes both the append-vs-append race
-   * (two callers computing the same "append one entry" delta from the same
-   * stale base) and the append-vs-reorder race (a reorder's full-array
-   * overwrite landing after a concurrent append), because whichever write
-   * loses the commit race re-derives against the OTHER write's already-landed
-   * result rather than blindly replacing it.
-   *
-   * 26-REVIEW CR-02: this also reconciles a concurrent DELETION (Phase 26
-   * ships the first delete-a-slide path, `EditSlideDrawer.vue`'s Delete Slide
-   * action). `mergeConcurrentlyAddedEntries` strips any entry that this
-   * caller's stale `next` still carries (derived from `base`, which had not
-   * yet observed the deletion) but that is absent from the live document —
-   * without this, a slower stale-base write (e.g. a debounced label/notes
-   * edit scheduled before the delete, committing after it) would silently
-   * resurrect the slide the user explicitly deleted. This does not re-derive
-   * a drag-reorder's index math against a changed live array — reordering
-   * still only recovers/strips entries by id, never recomputes positions
-   * against a live array it never saw. `baseSlides` is optional: omitting it
-   * keeps the previous plain-overwrite behavior for any caller that has not
-   * been updated to track a base snapshot.
-   *
-   * 38-REVIEW CR-01: `sourceSignature` is a tri-state, mirroring
-   * `setGroupBedMedia`'s `clearAudio` precedent (documented above) — an
-   * `undefined` value means "no opinion, leave the stored field alone" and is
-   * simply omitted from the write (via `stripUndefined`, as before); an
-   * explicit `null` means "clear this field" and is written as a real
-   * `deleteField()` sentinel, because `stripUndefined` cannot distinguish
-   * "no opinion" from "clear" for a plain `undefined`. Only
-   * `rebuildScriptureGroup`'s CLEARED REFERENCE branch (via
-   * `useSlideshowAssembly.ts`'s `freshSignature`) passes `null` today — the
+    * See ADR-0170 (docs/adr/0170-two-callers-computing-the-same-append-one-entry-delta-from-t.md)
    * one rebuild path that empties a Congregational group's derived slides
    * without any reference left to sign, where leaving the OLD signature
    * stored would let a later identical re-entry hit the DETACHED
@@ -353,29 +270,7 @@ export const useSlideGroups = defineStore('slideGroups', () => {
     })
   }
 
-  /**
-   * CR-02 helper: entries present on the LIVE document but absent from both
-   * the caller's own snapshot (`base`) and its computed payload (`next`) were
-   * added by a concurrent write that landed after `base` was read — append
-   * them rather than let `next`'s write silently erase them. Reassigns
-   * `order` to trail whatever `next` already contains so the recovered
-   * entries sort after it; ids are never regenerated (invariant 2,
-   * `slideGroup.ts`).
-   *
-   * CR-02 fix: this function must ALSO recognize a concurrent *deletion*, not
-   * just a concurrent addition. `next` is always derived from `base`
-   * (`base.map(...)` / `base.filter(...)`), so a caller whose own write has
-   * nothing to do with a given entry still carries that entry in `next`
-   * (present in both `base` and `next`) even after a different writer has
-   * since deleted it (absent from `live`). Left unchecked, this caller's
-   * commit would resurrect the deleted entry. An entry present in `base` AND
-   * still present in `next` (this caller did not itself intend to remove it)
-   * but MISSING from `live` (a concurrent writer's delete already landed) is
-   * therefore stripped before the concurrently-added entries are appended. An
-   * entry this caller itself intentionally removed (present in `base`,
-   * absent from `next`) is untouched by this filter either way — it was
-   * never a candidate for resurrection in the first place.
-   */
+  /** See ADR-0169 (docs/adr/0169-helper-entries-present-on-the-live-document-but-absent-from.md) */
   function mergeConcurrentlyAddedEntries(
     base: GroupSlideEntry[],
     live: GroupSlideEntry[],

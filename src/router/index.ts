@@ -226,18 +226,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresSuperAdmin) {
-    // WR-03 (68-REVIEW.md) — wait for the store's own onAuthStateChanged
-    // listener to have populated authStore.user, mirroring requiresEditor's
-    // waitForRole() wait above, BEFORE calling refreshSuperAdminClaim(). Without
-    // this, a fresh page-load/reload directly on /owner-console could read
-    // authStore.user before it was populated, causing refreshSuperAdminClaim to
-    // bail with isSuperAdmin = false and wrongly redirect a real super-admin.
-    //
-    // R177 (Pitfall 4) — then force a fresh claim read BEFORE deciding to
-    // redirect, so a just-granted super-admin's very next navigation sees it
-    // rather than waiting out the token's normal refresh cadence. Convenience
-    // gate only — the real enforcement is firestore.rules' isSuperAdmin() +
-    // the setSuperAdminClaim onCall's server-side caller re-check.
+    // See ADR-0144 (docs/adr/0144-68-review-md-wait-for-the-store-s-own-onauthstatechanged-lis.md)
     const { useAuthStore } = await import('../stores/auth')
     const authStore = useAuthStore()
     await authStore.waitForReady()

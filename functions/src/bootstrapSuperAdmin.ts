@@ -13,21 +13,7 @@ import { mergeAndSetCustomClaims } from "./claimsHelpers";
 // CHICKEN-AND-EGG: setSuperAdminClaim (./superAdminClaims.ts) requires the
 // CALLER to already be a super-admin -- so there is no client-reachable way to
 // grant the very first one. This script is that first grant's only path, and
-// requires no pre-existing super-admin.
-//
-// RESOLVES BY EMAIL: exactly like backfillOrgClaims.ts and setSuperAdminClaimHandler,
-// the target is resolved email -> uid via getAuth().getUserByEmail(), never a
-// hand-typed uid.
-//
-// WRITES BOTH THE DOC AND THE CLAIM DIRECTLY (T-68-06, Pitfall 6): unlike the
-// in-console grant path (which only ever writes the superAdmins/{uid} document
-// and relies on the syncSuperAdminClaim trigger to react), this script calls
-// mergeAndSetCustomClaims directly in addition to writing the document. The
-// very first grant must not depend on the trigger being deployed yet -- if the
-// owner runs this bootstrap before `firebase deploy --only functions` has ever
-// shipped syncSuperAdminClaim, the doc-only path would leave the claim unset
-// forever (no trigger exists yet to react to the write). Writing both here
-// means the claim lands regardless of deploy ordering; if the trigger IS
+// See ADR-0014 (docs/adr/0014-requires-no-pre-existing-super-admin-resolves-by-email-exact.md)
 // already deployed, its own write is simply a redundant no-op (the claim
 // already matches).
 //
@@ -100,20 +86,7 @@ export async function bootstrapSuperAdmin(options: BootstrapOptions): Promise<Bo
 // does.
 //
 // Usage (after `npm run build` from functions/):
-//   node lib/bootstrapSuperAdmin.js --email owner@example.com             # dry run (default)
-//   node lib/bootstrapSuperAdmin.js --email owner@example.com --apply     # writes for real
-//
-// Credentials resolve from GOOGLE_APPLICATION_CREDENTIALS or
-// `gcloud auth application-default login`, exactly like backfillOrgClaims.ts.
-//
-// The whole body is wrapped in try/catch, mirroring runBackfillCli's WR-02 --
-// a rejection (bad/expired credentials, wrong project, unknown email, network
-// failure) prints a readable diagnostic and sets a non-zero exit code instead
-// of propagating as a raw unhandled rejection.
-//
-// Extracted into a named, exported function (mirrors runBackfillCli's own
-// separation from its require.main guard) so this top-level error path is
-// itself unit-testable without requiring require.main === module.
+// See ADR-0015 (docs/adr/0015-node-lib-bootstrapsuperadmin-js-email-owner-example-com-dry.md)
 export async function runBootstrapCli(): Promise<void> {
   try {
     initializeApp();

@@ -218,16 +218,7 @@ const fontGateActive = computed(() => !fontReady.value && hasSlides.value)
 /** The union the template's "Loading slideshow…" branch renders for. */
 const showLoadingState = computed(() => isLoadingState.value || fontGateActive.value)
 
-/**
- * WR-04: the exit button must stay reachable even if the idle-hide timer has
- * already fired while there is still nothing else on screen to interact
- * with (assembly taking >3s, or the rare empty/race state) — on a
- * touch-only device there would otherwise be no way to trigger Escape.
- * `chromeVisible`'s own value (and its 3s timer) are untouched; this only
- * overrides what's DISPLAYED while loading/empty. Widened (46-04) to also
- * cover the R094 font-load gate — the exit affordance must stay reachable
- * for however long that gate holds too.
- */
+/** See ADR-0068 (docs/adr/0068-the-exit-button-must-stay-reachable-even-if-the-idle-hide-ti.md) */
 const exitVisible = computed(() => chromeVisible.value || showLoadingState.value || isEmptyState.value)
 
 const currentSlide = computed<AssembledSlide | null>(() => props.slides[currentIndex.value] ?? null)
@@ -247,16 +238,7 @@ const progressLabel = computed(() => {
 // R124 (Phase 55): the render-time `scriptureAttributionSuffix` helper that
 // used to append `(ESV)`/`(NLT)` to both scripture render sites was removed —
 // the owner wants clean scripture when presenting. This is a render-only
-// change: the provenance helpers in `@/utils/scripture` and the per-slide
-// `translationSource` field are untouched (R092 preserved), and the version
-// can still be typed into a slide's own editable text.
-
-// A live edit that shortens the show cannot leave currentIndex out of range.
-// Clamping must route through the same pause/play lifecycle as goToIndex()
-// (WR-03) — otherwise nothing ever calls .play() on whatever media element
-// SlideCanvas mounts for the new slide. SlideCanvas's own internal watcher
-// (Phase 90) resets the OLD slide's degraded-state flags on this same
-// slide-identity change, so they never leak onto the clamped-to slide.
+// See ADR-0069 (docs/adr/0069-change-the-provenance-helpers-in-utils-scripture-and-the-per.md)
 watch(
   () => props.slides.length,
   async (len) => {
@@ -308,17 +290,7 @@ function registerActivity() {
   }, 3000)
 }
 
-// ── Keyboard — bound on the viewer root only, never window/document ──────────
-
-/**
- * WR-06: the viewer is teleported to `document.body` and covers the
- * viewport visually, but the rest of the app remains in the DOM behind it
- * (hidden only visually, not removed) — without a focus trap, Tab could walk
- * keyboard focus straight past the viewer's own buttons into that
- * still-present app content. Queries only the viewer's own currently-enabled
- * focusable elements (prev/next are excluded via `:not([disabled])` when at
- * either end of the show).
- */
+// See ADR-0070 (docs/adr/0070-keyboard-bound-on-the-viewer-root-only-never-window-document.md)
 function getFocusableElements(): HTMLElement[] {
   const root = viewerRoot.value
   if (!root) return []
@@ -412,17 +384,7 @@ onMounted(async () => {
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   enterPresentation()
 
-  // R094 — the font-load gate. Runs regardless of whether there are slides
-  // yet (`fontReady` only ever gates rendering when `hasSlides` is true, see
-  // `fontGateActive` above), so it never races the assembly-in-flight state.
-  //
-  // CR-02 (46-REVIEW.md): the whole sequence — including loadFontCss's
-  // unbounded network fetch, NOT just waitForSlideFont's own internal
-  // timeout — is raced against ONE shared FONT_LOAD_TIMEOUT_MS timeout and
-  // wrapped in try/catch/finally, so a rejected dynamic import (stale-chunk
-  // deploy, flaky venue Wi-Fi) or a rejected document.fonts.load() can
-  // never permanently strand fontReady at false and hang "Loading
-  // slideshow…" for the rest of the service.
+  // See ADR-0071 (docs/adr/0071-r094-the-font-load-gate-runs-regardless-of-whether-there-are.md)
   try {
     const { family, weight } = resolvedFontChoice()
     await Promise.race([

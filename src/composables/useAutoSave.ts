@@ -83,15 +83,7 @@ export function useAutoSave(
       status.value = 'saving'
       try {
         await saveFn()
-        // CR-01: a newer mutation may have already run its own watcher while
-        // this save was in flight, advancing status to 'pending' and arming
-        // its own follow-up timer. Don't stomp that back to 'saved' — doing
-        // so lies about an edit that hasn't actually been persisted, and
-        // (worse, for callers whose "is there anything left to save" check
-        // is keyed off something other than this status) can make the
-        // follow-up timer believe there's nothing left to do.
-        //
-        // The `as AutoSaveStatus` widen is required, not decorative: TS's
+        // See ADR-0121 (docs/adr/0121-a-newer-mutation-may-have-already-run-its-own-watcher-while.md)
         // control-flow narrowing sees `status.value = 'saving'` a few lines
         // up and (wrongly, for a Vue ref that's shared, mutable state) keeps
         // treating `status.value` as the literal `'saving'` across the
@@ -130,15 +122,7 @@ export function useAutoSave(
    * Only saves if there is a pending change (status is 'pending').
    */
   async function flush(): Promise<void> {
-    // CR-02: check for an inflight save BEFORE clearing the debounce timer,
-    // not after. A newer mutation can have set status back to 'pending' and
-    // armed its own follow-up timer while a PREVIOUS save is still in
-    // flight; clearing the timer unconditionally here — as this used to —
-    // destroys that follow-up timer, and then the `if (saving) return`
-    // below no-ops without ever performing a save. The edit becomes
-    // unreachable: no timer is armed, and this call already returned. By
-    // returning here first, the already-armed timer survives to retry the
-    // edit on its own schedule once the inflight save clears `saving`.
+    // See ADR-0122 (docs/adr/0122-check-for-an-inflight-save-before-clearing-the-debounce-time.md)
     if (saving) return
 
     clearDebounceTimer()
@@ -156,9 +140,7 @@ export function useAutoSave(
     status.value = 'saving'
     try {
       await saveFn()
-      // CR-01, mirrored from scheduleSave's success handler above (including
-      // the `as AutoSaveStatus` widen — see that comment for why it's
-      // required).
+      // See ADR-0121 (docs/adr/0121-a-newer-mutation-may-have-already-run-its-own-watcher-while.md)
       if ((status.value as AutoSaveStatus) !== 'pending') status.value = 'saved'
     } catch {
       if ((status.value as AutoSaveStatus) !== 'pending') status.value = 'error'

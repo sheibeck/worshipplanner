@@ -18,11 +18,7 @@ export interface Team {
   recurrence?: { ordinals: number[] }
 }
 
-// D-79 default team list — byte-identical to the pre-Phase-79 hard-coded
-// `['Choir', 'Orchestra', 'Communion', 'Special']` so existing orgs (Berean)
-// see the same team names in the checkboxes on first load post-deploy
-// (RESEARCH Pitfall 4). DEFAULT_TEAMS omits `id` (assigned by Firestore on
-// seed).
+// See ADR-0175 (docs/adr/0175-d-79-default-team-list-byte-identical-to-the-pre-phase-79.md)
 export const DEFAULT_TEAMS: Array<Omit<Team, 'id'>> = [
   { name: 'Choir', order: 0 },
   { name: 'Orchestra', order: 1 },

@@ -57,44 +57,7 @@
 </template>
 
 <script setup lang="ts">
-/**
- * SlideActionMenu.vue — the codebase's first real ARIA menu (33-UI-SPEC.md
- * § Phase-Specific Component Contracts §2, markup reproduced verbatim from
- * that authoritative source). Presentational and parent-controlled: `open`
- * is owned by the caller (`SlideGrid.vue` tracks a single `openMenuEntryId`),
- * which is what makes "exactly one menu open at a time" enforceable one
- * level up rather than by cross-card coordination. This component renders
- * the list it is given (`items`, produced by `slideActionMenuItems` in
- * `./slideDisplay`) — it never decides what is in it.
- *
- * ARIA contract — no in-repo precedent existed before this component. A
- * whole-repo grep for `role="menu"` / `aria-haspopup` / `role="listbox"`
- * returned zero matches prior to this file. The trigger is a real `<button>`
- * with `aria-haspopup="menu"` and `aria-expanded`; the panel is `role="menu"`
- * with `role="menuitem"` buttons. Escape closes and returns focus to the
- * trigger via the panel's own `@keydown` handler (not a global listener), so
- * it only fires while focus is actually inside the panel.
- *
- * Deliberate, stated gap: no arrow-key roving-tabindex navigation. This
- * matches the codebase's one other dropdown (`ServiceEditorView.vue`'s Add
- * Element menu, which has no ARIA semantics at all) and the already-
- * documented absence of keyboard slide reordering (SortableJS provides
- * none). Tab order falls through native DOM/button order — sufficient, not
- * optimal, and recorded as a decision rather than an oversight.
- *
- * `@click.stop` on the trigger is the exact idiom `SlideCard.vue`'s drag
- * grip already established: the click must never bubble to the card's own
- * select handler, so opening the menu never re-fires selection.
- *
- * WR-03: opening the panel moves focus onto its first `menuitem`. The
- * trigger `<button>` and the `role="menu"` panel `<div>` are DOM siblings,
- * not ancestor/descendant, and nothing previously moved focus into the
- * panel when `open` became `true` — so `onPanelKeydown`'s `Escape` handler
- * (bound to the panel's own `@keydown`) never received the event until the
- * user had separately tabbed focus into the panel. Focusing the first item
- * on open both fixes Escape and matches the WAI-ARIA menu-button pattern's
- * expectation that opening a menu moves focus onto it.
- */
+/** See ADR-0110 (docs/adr/0110-optimal-and-recorded-as-a-decision-rather-than-an-oversight.md) */
 import { ref, nextTick, watch } from 'vue'
 import type { MenuItem, MenuItemKey } from './slideDisplay'
 

@@ -1,19 +1,4 @@
-/**
- * songEditLink.ts
- *
- * WHY a query convention instead of a per-song route:
- * This application has no per-song address today — `/songs` is a flat list route
- * with no id segment, and the song editor (`SongSlideOver.vue`) is opened purely
- * from local click state inside `SongsView.vue`. Adding a real per-song route
- * would be a larger change than this phase's scope allows. This module instead
- * extends the query-param convention `SongsView.vue` already uses for its
- * existing `?import=true` auto-open-import parameter (read on mount, act, then
- * clear via a non-navigating `router.replace`) — see 26-RESEARCH.md Pitfall 4.
- *
- * This module is pure: it imports nothing from Vue, the router, or any store, so
- * the sender (a future drawer) and the receiver (`SongsView.vue`) can never drift
- * apart on the shape of the link they share.
- */
+/** See ADR-0204 (docs/adr/0204-this-application-has-no-per-song-address-today-songs-is-a-fl.md) */
 
 /** The only tabs `SongSlideOver.vue` actually has. */
 export type SongEditTab = 'details' | 'lyrics'

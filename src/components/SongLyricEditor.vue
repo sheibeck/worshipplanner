@@ -478,15 +478,7 @@ interface EditableLyricsState {
 
 const editableState = reactive<EditableLyricsState>({ sections: [], performanceOrder: [] })
 
-// WR-01: a stable identity per `performanceOrder` SLOT (not per section id,
-// not per position) — kept in lockstep with `editableState.performanceOrder`
-// by every mutation below (drag reorder, duplicate, remove, add-section).
-// `buildSectionRows` exposes it as `SectionRow.stableKey`, which
-// `expandedRowKeys` is keyed by instead of the positionally-derived
-// `rowKey`, so a reorder can never silently reattach expand/collapse state
-// to a different physical row. Component-local only — never persisted, so a
-// document reload naturally starts expand state fresh (see the
-// `currentLyrics` watcher below for the one case that must NOT reseed: our
+// See ADR-0079 (docs/adr/0079-a-stable-identity-per-performanceorder-slot-not-per-section.md)
 // own autosave round-tripping back through the Firestore subscription).
 const orderSlotIds = ref<string[]>([])
 let slotIdCounter = 0
@@ -520,13 +512,7 @@ const isDirty = computed(() => {
   for (let i = 0; i < cur.sections.length; i++) {
     const a = cur.sections[i]!
     const b = editableState.sections[i]!
-    // WR-02 (105 code review): compare `kind` too — today the only way a
-    // section's `kind` is set is at mint time in `addSection('BLACKOUT')`,
-    // which always mints a fresh id, so an id/label match currently implies
-    // a `kind` match as well. But this is a field-by-field equality check
-    // (it already goes out of its way to catch slideBreaks-only changes
-    // above), so a future in-place `kind` mutation (e.g. a "convert to
-    // black slide" affordance) must not be silently missed by autosave.
+    // See ADR-0080 (docs/adr/0080-compare-kind-too-today-the-only-way-a-section-s-kind-is-set.md)
     if (a.id !== b.id || a.label !== b.label || (a.kind ?? 'lyric') !== (b.kind ?? 'lyric')) return true
     if (a.lines.length !== b.lines.length) return true
     for (let j = 0; j < a.lines.length; j++) {
@@ -597,13 +583,7 @@ watch(
 
     const normalized = normalizeLyricOrder(val.sections, val.performanceOrder)
 
-    // WR-01: only reseed slot ids when the order actually changed from what
-    // is already held. This watcher re-fires after our OWN autosave writes
-    // round-trip back through the Firestore subscription with an unchanged
-    // order — reseeding unconditionally would silently collapse every
-    // expanded row on every save. A genuinely different order (first load,
-    // a different document, or a load-time repair) still reseeds, which is
-    // correct: those rows are not the ones the user had open.
+    // See ADR-0079 (docs/adr/0079-a-stable-identity-per-performanceorder-slot-not-per-section.md)
     const orderChanged = !arraysEqual(normalized.performanceOrder, editableState.performanceOrder)
 
     editableState.sections = normalized.sections.map((s) => ({ ...s, lines: [...s.lines] }))
@@ -626,12 +606,7 @@ watch(
   { immediate: true },
 )
 
-// WR-02: a textarea value ending in a newline (Enter after the last line, or
-// a paste with a trailing newline) produces a trailing empty-string element
-// from `split('\n')`. That empty line is not cosmetic here — it renders as a
-// blank line on the projected slide. Strip exactly one trailing empty
-// element (the artifact of how textareas serialize), not all trailing
-// blanks — a user may legitimately want internal blank-line spacing.
+// See ADR-0080 (docs/adr/0080-compare-kind-too-today-the-only-way-a-section-s-kind-is-set.md)
 function onSectionInput(sectionId: string, value: string) {
   const section = editableState.sections.find((s) => s.id === sectionId)
   if (!section) return
@@ -641,11 +616,7 @@ function onSectionInput(sectionId: string, value: string) {
   pruneSlideBreaks(section)
 }
 
-// R117: the write-source complement to `sliceSectionIntoSlides`'s read-time
-// clamp (Pitfall 5). After the line list shrinks, a break index that now falls
-// out of `[1, lines.length)` can never point past the text or slice into
-// emptiness — drop it here so it is never persisted. An empty result removes
-// the field entirely, keeping an unsplit section byte-identical to today (BWC).
+// See ADR-0081 (docs/adr/0081-r117-the-write-source-complement-to-slicesectionintoslides-s.md)
 function pruneSlideBreaks(section: LyricSection) {
   if (!section.slideBreaks) return
   const n = section.lines.length
@@ -704,11 +675,7 @@ function expandRowKey(stableKey: string) {
   expandedRowKeys.value = next
 }
 
-// Duplicate/Remove/Add-section all mutate through 28-01's pure helpers —
-// no ordering or pool logic is re-implemented here. Each mirrors its
-// performanceOrder splice onto `orderSlotIds` at the same index, so
-// `SectionRow.stableKey` (and therefore expand/collapse state) tracks the
-// physical row rather than its position (WR-01).
+// See ADR-0079 (docs/adr/0079-a-stable-identity-per-performanceorder-slot-not-per-section.md)
 
 function onDuplicate(row: SectionRow) {
   const index = orderIndexForRow(row)
@@ -826,9 +793,7 @@ watch(
             parent.insertBefore(evt.item, evt.oldIndex < evt.newIndex ? (ref?.nextSibling ?? null) : (ref ?? null))
           }
           editableState.performanceOrder = moveRow(editableState.performanceOrder, evt.oldIndex, evt.newIndex)
-          // Mirror the same move on the stable-id array (WR-01) — `moveRow`
-          // is a generic index-based splice, agnostic to what the array
-          // holds, so it applies unchanged here.
+          // See ADR-0079 (docs/adr/0079-a-stable-identity-per-performanceorder-slot-not-per-section.md)
           orderSlotIds.value = moveRow(orderSlotIds.value, evt.oldIndex, evt.newIndex)
         },
       })
@@ -843,9 +808,7 @@ function destroySortable() {
 }
 
 function isExpanded(row: SectionRow): boolean {
-  // WR-01: keyed by the row's stable, order-slot-derived identity, not the
-  // positionally-derived `rowKey`, so a reorder/duplicate/remove can never
-  // silently reattach expand state to a different physical row.
+  // See ADR-0079 (docs/adr/0079-a-stable-identity-per-performanceorder-slot-not-per-section.md)
   return expandedRowKeys.value.has(row.stableKey)
 }
 

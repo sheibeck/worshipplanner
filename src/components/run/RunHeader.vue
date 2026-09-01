@@ -43,17 +43,7 @@ const emit = defineEmits<{
   'toggle-blackout': []
 }>()
 
-/**
- * WR-01 (R283): a display dot is a REOPEN affordance ONLY when it represents a
- * genuinely CLOSED output within a live session — i.e. `live && !open`. Pre-live
- * (State A) the dot is a PASSIVE status indicator: it must NOT emit `reopen`,
- * because pre-live there is no held go-live session and reaching `reopenOutput`
- * would open an un-positioned output window OUTSIDE the go-live gesture (bypassing
- * the honest open state machine and violating "rehearse opens no windows"). An
- * already-open display needs no reopen either, so the affordance is live-and-closed
- * only. The parent's `reopenOutput` also no-ops defensively, but gating the button
- * here keeps the affordance honest (disabled = not actionable).
- */
+/** See ADR-0099 (docs/adr/0099-a-display-dot-is-a-reopen-affordance-only-when-it-represents.md) */
 const audienceReopenable = computed(() => props.live && !props.audienceOpen)
 const confidenceReopenable = computed(() => props.live && !props.confidenceOpen)
 

@@ -36,15 +36,7 @@
       aria-hidden="true"
     ></div>
 
-    <!-- R271 / Pitfall 6 — the ONE interactive element in this view, shown
-         ONLY when fullscreen has been lost. The WHOLE surface is the tap target
-         (inset-0 full-bleed button): one tap ANYWHERE on the display re-enters
-         fullscreen synchronously (the gestured path — permitted without any
-         delegation). It overlays the live slide (transparent, no black scrim —
-         slides keep advancing underneath) and the centered pill is only a visual
-         hint (pointer-events-none so the tap always lands on the button). Losing
-         fullscreen NEVER tears down the session, closes the channel, or unmounts
-         the window. Calm neutral, NOT the app's action accent. -->
+    <!-- See ADR-0209 (docs/adr/0209-r271-pitfall-6-the-one-interactive-element-in-this-view-show.md) -->
     <button
       v-if="!isFullscreen"
       type="button"
@@ -94,11 +86,7 @@ const props = defineProps<{
   channelFactory?: BroadcastChannelFactory
 }>()
 
-// The shared output-window lifecycle-core (R272 reuse-not-fork): ?org=/serviceId
-// scoping, WR-02 subscribe gate, read-only assembly, receive-only run channel,
-// font gate, rootStyle cursor coupling, non-teardown fullscreen recovery, and the
-// Screen Wake Lock — all registered on THIS view's instance via its onMounted/
-// onUnmounted. The per-canvas media plumbing stays view-local below.
+// See ADR-0210 (docs/adr/0210-the-shared-output-window-lifecycle-core-r272-reuse-not-fork.md)
 const { assembledSlideshow, index, blackout, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
   useOutputWindow({ channelFactory: props.channelFactory, role: 'audience' })
 

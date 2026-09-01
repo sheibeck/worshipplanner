@@ -14,21 +14,7 @@ import { getAuth } from "firebase-admin/auth";
 // object, and setCustomUserClaims(uid, null) WIPES it entirely -- either
 // would silently strip an unrelated claim (e.g. superAdmin) the next time
 // any other claim writer runs. See orgMembershipClaims.ts:186-199 for the
-// two call sites this module was extracted to fix.
-//
-// No try/catch here -- these helpers throw through. Callers (the trigger
-// handlers) wrap the call and convert a failure into a { action: "failed" }
-// outcome rather than rethrowing out of a Firestore trigger.
-//
-// KNOWN LIMITATION -- residual concurrent-write race (WR-02, 68-REVIEW.md):
-// both helpers are read-then-write (getUser -> setCustomUserClaims) with no
-// compare-and-swap or transaction. This phase's fix closes the *sequential*
-// replace-clobbers-unrelated-key hazard described above, but it does NOT
-// close a *concurrent* race: if syncOrgMembershipClaim and syncSuperAdminClaim
-// both fire for the SAME uid within the same short window (e.g. an owner
-// grants super-admin to a user at nearly the same moment that user's org role
-// changes), both handlers read claims independently and whichever
-// setCustomUserClaims call lands second overwrites the first with a claims
+// See ADR-0016 (docs/adr/0016-two-call-sites-this-module-was-extracted-to-fix-no-try-catch.md)
 // object computed from a now-stale read, silently dropping the first
 // writer's change.
 //
@@ -72,20 +58,7 @@ export async function clearClaimKeys(uid: string, keys: readonly string[]): Prom
   await getAuth().setCustomUserClaims(uid, hasRemaining ? current : null);
 }
 
-/**
- * The atomic counterpart to calling clearClaimKeys then mergeAndSetCustomClaims
- * as two SEPARATE writes (73-REVIEW.md WR-01). Reads current claims ONCE,
- * removes `opts.clear` keys and applies `opts.set` on top -- all in memory --
- * then issues a SINGLE setCustomUserClaims call. This closes the TOCTOU window
- * a two-write clear+set sequence opens: a token minted between the two writes
- * could carry a claim state that was never a deliberate end-state (e.g.
- * cleared primary `orgId`/`role` keys but a still-stale `orgs` map that lists
- * the org whose membership was just removed).
- *
- * Same null-vs-{} handling as clearClaimKeys: the Admin SDK requires `null`
- * (not `{}`) to fully clear a user's custom claims, so `null` is only passed
- * when nothing remains after clear+set.
- */
+/** See ADR-0017 (docs/adr/0017-the-atomic-counterpart-to-calling-clearclaimkeys-then.md) */
 export async function mergeSetAndClearCustomClaims(
   uid: string,
   opts: { set?: Record<string, unknown>; clear?: readonly string[] },
@@ -98,24 +71,7 @@ export async function mergeSetAndClearCustomClaims(
   await getAuth().setCustomUserClaims(uid, hasRemaining ? current : null);
 }
 
-/**
- * Patches (or deletes) ONE key inside a NESTED map claim (e.g.
- * `deactivatedOrgs[orgId]`), preserving every other top-level claim key AND
- * every other key already inside that same nested map -- mirrors
- * `mergeSetAndClearCustomClaims`'s TOCTOU-safe shape (76-RESEARCH.md Pitfall
- * 3): a SINGLE `getUser` read, an in-memory patch of the ONE nested key, then
- * a SINGLE `setCustomUserClaims` write. Never a bare replace of the nested
- * map -- `mergeAndSetCustomClaims(uid, { deactivatedOrgs: {...} })` would
- * REPLACE the whole nested object, silently wiping a sibling org's
- * deactivated-flag for a user who belongs to more than one deactivated org.
- *
- * `value === true` sets `nested[nestedKey] = true`. `value === undefined`
- * deletes `nested[nestedKey]` -- deleting the LAST remaining nested key
- * leaves an empty object (`{}`), which is a valid, harmless claim value; this
- * helper never collapses an empty nested map to `null` (that full-wipe
- * special-case belongs to `clearClaimKeys`'s TOP-LEVEL-key contract only, not
- * to a nested map inside an otherwise-populated claims object).
- */
+/** See ADR-0018 (docs/adr/0018-patches-or-deletes-one-key-inside-a-nested-map-claim-e-g.md) */
 export async function patchNestedClaimKey(
   uid: string,
   topLevelKey: string,
@@ -134,13 +90,7 @@ export async function patchNestedClaimKey(
   await getAuth().setCustomUserClaims(uid, current);
 }
 
-/**
- * Detects the Firebase Admin SDK's `auth/claims-too-large` error -- thrown by
- * `setCustomUserClaims` when the serialized custom-claims object exceeds the
- * ~1000-byte cap (73-REVIEW.md WR-02). Shared by every claim-write call site
- * so a claims-too-large failure logs a distinguishable, greppable line rather
- * than being indistinguishable from any other transient Auth API failure.
- */
+/** See ADR-0012 (docs/adr/0012-the-1000-byte-custom-claims-cap-throws-auth-claims-too-large.md) */
 export function isClaimsTooLargeError(err: unknown): boolean {
   return (
     typeof err === "object" &&

@@ -55,9 +55,7 @@
         <div v-if="!searchQuery">
 
           <!-- AI Picks section -->
-          <!-- WR-02 (82-REVIEW): gate on the two-gate authStore.isAiEnabled
-               (master gate AND church setting), not the bare church setting
-               alone, so a super-admin-disabled org hides this affordance too. -->
+          <!-- See ADR-0074 (docs/adr/0074-the-single-shared-two-gate-ai-affordance-check-mirrors.md) -->
           <div v-if="authStore.isAiEnabled && hasSermonContext !== false">
             <!-- Loading shimmer -->
             <div v-if="aiLoading" class="px-3 py-2">
@@ -300,8 +298,7 @@ const resolvedAiSuggestions = computed<{ song: Song; reason: string }[]>(() => {
   if (!props.aiSuggestions) return []
   return props.aiSuggestions
     .map((ai) => {
-      // Resolve against visibleSongs so a cached suggestion for a since-hidden song
-      // never surfaces in the picker (WR-01).
+      // See ADR-0082 (docs/adr/0082-resolve-against-visiblesongs-so-a-cached-suggestion-for-a.md)
       const song = visibleSongs.value.find((s) => s.id === ai.songId)
       return song ? { song, reason: ai.reason } : null
     })

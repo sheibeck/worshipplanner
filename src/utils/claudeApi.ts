@@ -48,21 +48,7 @@ export interface AiScriptureSuggestion {
  * `validateScriptureSuggestions` or `validateSplitResult` — those four make no
  * network call and gating them would be a functional regression: existing
  * AI-generated content (e.g. an already-split congregational reading) must
- * remain parseable and editable even with AI off.
- *
- * The auth store is read inside this function body, never at module
- * evaluation time — Pinia requires an active app instance that does not exist
- * when this module is first imported.
- *
- * WR-03 (39-REVIEW): the guard is called INSIDE each export's `try` block,
- * not before it. `useAuthStore()` throws if invoked with no active Pinia
- * instance — placing the guard ahead of the `try` would let that throw
- * escape as a rejected promise, contradicting this module's documented
- * never-throw contract ("returns null on any error... never throw from
- * service/utility functions; let callers handle null"). Inside the `try`,
- * that same throw is caught and mapped to the same `null` every other
- * failure mode already returns.
- *
+  * See ADR-0176 (docs/adr/0176-guard-lives-inside-the-try-so-a-throw-from-useauthstore-e-g.md)
  * This is also the choke point named in 39-CONTEXT.md as the natural future
  * home for gating AI behind a paywall, should that ever become necessary.
  */
@@ -241,9 +227,7 @@ export async function getSongSuggestions(
   params: GetSongSuggestionsParams,
 ): Promise<AiSongSuggestion[] | null> {
   try {
-    // WR-03 (39-REVIEW): guard lives INSIDE the try so a throw from
-    // useAuthStore() (e.g. no active Pinia) resolves to null, matching this
-    // module's documented never-throw contract, instead of rejecting.
+    // See ADR-0176 (docs/adr/0176-guard-lives-inside-the-try-so-a-throw-from-useauthstore-e-g.md)
     if (!isAiEnabled()) return null
     const {
       sermonTopic,
@@ -365,9 +349,7 @@ export async function getScriptureSuggestions(
   params: GetScriptureSuggestionsParams,
 ): Promise<AiScriptureSuggestion[] | null> {
   try {
-    // WR-03 (39-REVIEW): guard lives INSIDE the try so a throw from
-    // useAuthStore() (e.g. no active Pinia) resolves to null, matching this
-    // module's documented never-throw contract, instead of rejecting.
+    // See ADR-0176 (docs/adr/0176-guard-lives-inside-the-try-so-a-throw-from-useauthstore-e-g.md)
     if (!isAiEnabled()) return null
     const { sermonTopic, sermonPassage, query, recentScriptures } = params
 
@@ -481,18 +463,7 @@ export const SPLIT_SCHEMA = {
   additionalProperties: false,
 } as const
 
-/**
- * The sole gate between untrusted model output and scripture a congregation
- * will read aloud. Every check below exists in code, not in `SPLIT_SCHEMA`,
- * because the structured-outputs JSON Schema subset supports no numerical
- * constraint and no cross-field relationship: shape conformance says nothing
- * about range, ordering, adjacency, or coverage.
- *
- * A single violation discards the ENTIRE result — never a partial array,
- * never a repair, never a re-sort. `boundaries` MUST be the exact same array
- * used to build the prompt (scriptureBoundaries.ts's Pitfall 5 discipline —
- * never recompute it here).
- */
+/** See ADR-0177 (docs/adr/0177-because-the-structured-outputs-json-schema-subset-supports-n.md) */
 export function validateSplitResult(
   parsed: unknown,
   boundaries: number[],
@@ -577,21 +548,7 @@ Rules:
  * model's response never contributes a single character to the returned
  * sections' `text` — every character comes from `sliceAtBoundaries` against
  * the untouched `rawText` passed in.
- *
- * Two invariants a future editor is most likely to break:
- * 1. `boundaries` is computed exactly once here and threaded unchanged
- *    through prompt-building, validation, and slicing. Recomputing it
- *    anywhere in this function (even by calling `computeBoundaries` again on
- *    the same `rawText`) risks desyncing the indices the model saw from the
- *    indices used to validate/slice its answer (RESEARCH Pitfall 5). This is
- *    not an optional discipline — do not "simplify" it away.
- * 2. A `validateSplitResult` failure discards the ENTIRE result. There is no
- *    partial-application path here, and none should ever be added — a
- *    result that fails validation must never leak a single section to the
- *    caller.
- *
- * Returns `null` on any failure — no internal boundary to split on, a source
- * already containing a marker delimiter, a network/API error, an unparseable
+  * See ADR-0177 (docs/adr/0177-because-the-structured-outputs-json-schema-subset-supports-n.md)
  * reply, or a reply that fails validation. A caller can never be handed a
  * rejected promise or a partial split.
  */
@@ -599,9 +556,7 @@ export async function splitCongregationalReading(
   rawText: string,
 ): Promise<CongregationalSection[] | null> {
   try {
-    // WR-03 (39-REVIEW): guard lives INSIDE the try so a throw from
-    // useAuthStore() (e.g. no active Pinia) resolves to null, matching this
-    // module's documented never-throw contract, instead of rejecting.
+    // See ADR-0176 (docs/adr/0176-guard-lives-inside-the-try-so-a-throw-from-useauthstore-e-g.md)
     if (!isAiEnabled()) return null
     const boundaries = computeBoundaries(rawText)
     if (!hasSplittableBoundaries(boundaries)) return null

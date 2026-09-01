@@ -8,21 +8,7 @@ import type { Timestamp } from 'firebase/firestore'
  * by the SAME id as the slot it anchors to.
  *
  * Load-bearing invariants:
- * 1. `SlideGroup.id === SlideGroup.slotId === the anchoring ServiceSlot.id`.
- *    This is the deterministic Firestore doc id every later plan in this
- *    phase relies on — groups anchor to `slot.id`, never to array index or
- *    `position`, so a drag-reorder on the Service Order tab can never
- *    re-point a group at the wrong plan item (D-01).
- * 2. `GroupSlideEntry.id` is minted ONCE (`crypto.randomUUID()`) at
- *    materialization and is NEVER regenerated afterward. Phase 23's WR-02
- *    contract keys `PresentationViewer`'s per-slide `AudioPlayer`/
- *    `VideoPlayer` child component instances on this id specifically so a
- *    reorder or reconciliation never leaks stale muted/blocked media state
- *    from one slide onto another.
- * 3. Slide TEXT is never stored on this document — it resolves LIVE from
- *    the canonical song / scripture / imported-deck record via `sourceRef`
- *    (D-02). Editing a song's lyrics updates every service referencing it;
- *    there is no per-service text override and no "Generate missing slides"
+  * See ADR-0174 (docs/adr/0174-1-slidegroup-id-slidegroup-slotid-the-anchoring.md)
  *    step, because groups are always populated from the live source.
  *
  *    EXCEPTION (Phase 38, D1/D2): a scripture group's CONGREGATIONAL-state

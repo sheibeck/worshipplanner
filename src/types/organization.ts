@@ -179,20 +179,7 @@ export interface Organization {
    * reading it here.
    */
   vwModeEnabled?: boolean
-  /**
-   * Phase 82 (R242/R243) — the super-admin MASTER gate for AI functionality,
-   * distinct from the church-editable `settings.aiEnabled` leaf below.
-   * Absent or `false` => AI is OFF (default), INVERTED from `vwModeEnabled`'s
-   * absent=true precedent — a fresh/legacy org has AI off until a
-   * super-admin explicitly enables it. Written ONLY by the `setOrgAiEnabled`
-   * Cloud Function (Admin SDK, `functions/src/orgProvisioning.ts`, Plan 01);
-   * `firestore.rules`'s `lifecycleFields()` guard denies every client write
-   * path, including a super-admin's own client SDK — mirrors `active`'s
-   * write-authority shape exactly. Deliberately a distinct top-level name
-   * (never a bare `aiEnabled`) so it can never be confused with or
-   * accidentally overwritten via `settings.aiEnabled` (Pitfall 1,
-   * 82-RESEARCH.md).
-   */
+  /** See ADR-0001 (docs/adr/0001-super-admin-explicitly-enables-it-written-only-by-the.md) */
   aiMasterEnabled?: boolean
   /**
    * Phase 101 (R295) — the super-admin MASTER gate for the Bible **API**

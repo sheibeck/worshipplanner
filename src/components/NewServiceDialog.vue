@@ -208,15 +208,7 @@ function onDateChange() {
   applyRecurrenceAutoSelect(form.value.date)
 }
 
-// WR-1: `teamsStore.subscribe()`'s `onSnapshot` is async, so if the dialog
-// mounts/opens before the first snapshot lands, the calls above compute zero
-// matches against an empty `teamsStore.teams`. `onSnapshot` always REASSIGNS
-// `teams.value` to a brand-new array on every emission (see teams.ts), so a
-// plain (non-deep) watch on the array reference fires once the real snapshot
-// arrives, recomputing auto-select for the CURRENT form date. Guarded to
-// `props.open` so it can't fight a manual toggle before the dialog is even
-// shown; `applyRecurrenceAutoSelect` itself already skips
-// `manuallyTouchedTeams`, so a team the planner has already unchecked stays
+// See ADR-0067 (docs/adr/0067-teamsstore-subscribe-s-onsnapshot-is-async-so-if-the-dialog.md)
 // unchecked when this fires.
 watch(
   () => teamsStore.teams,

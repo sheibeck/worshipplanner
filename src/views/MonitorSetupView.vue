@@ -81,9 +81,7 @@
             </button>
           </div>
 
-          <!-- WR-02: a re-detect / OS screenschange whose physical screen set
-               is unchanged must NOT silently discard the operator's unsaved
-               in-progress selections — we keep them and say so, non-blockingly. -->
+          <!-- See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md) -->
           <p
             v-if="refreshNoticeVisible"
             data-testid="refresh-kept-notice"
@@ -184,12 +182,7 @@ const audienceFingerprint = ref<string | null>(null)
 const confidenceFingerprint = ref<string | null>(null)
 const saveOutcome = ref<'idle' | 'saved' | 'not-persisted-warning'>('idle')
 
-// WR-02 state: `dirtyEdits` tracks whether the operator has made unsaved
-// in-progress role selections (a fresh/reprompt selection, or a "Reassign
-// roles" edit from the matched summary). `refreshNoticeVisible` surfaces a
-// non-blocking notice when a mid-session refresh (Re-detect / OS
-// screenschange) was suppressed to protect those edits because the physical
-// screen set had not actually changed.
+// See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
 const dirtyEdits = ref(false)
 const refreshNoticeVisible = ref(false)
 
@@ -197,10 +190,7 @@ const refreshNoticeVisible = ref(false)
 // screenschange listener, removed in onUnmounted.
 let screenDetailsRef: ScreenDetailsLike | null = null
 
-// Monotonic token guarding against a stale getScreenDetails() resolution
-// overriding a newer detection attempt (REVIEW-FIX WR-03). Bumped by every
-// new detection attempt, so a resolution/rejection that arrives after a newer
-// attempt started is a no-op.
+// See ADR-0214 (docs/adr/0214-monotonic-token-guarding-against-a-stale-getscreendetails.md)
 let detectRequestId = 0
 
 const screensWithFingerprint = computed(() =>
@@ -229,15 +219,12 @@ function onSelectRole(fingerprint: string, role: MonitorRole) {
     if (audienceFingerprint.value === fingerprint) audienceFingerprint.value = null
   }
   saveOutcome.value = 'idle'
-  // The operator has an unsaved edit now — a same-layout refresh must not
-  // clobber it (WR-02). Clear any prior "we kept your choices" notice too.
+  // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
   dirtyEdits.value = true
   refreshNoticeVisible.value = false
 }
 
-// Expanding the matched B2 summary into the editable grid is itself the start
-// of an unsaved edit — mark it dirty so a same-layout Re-detect / screenschange
-// can't collapse it back to the read-only summary (WR-02).
+// See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
 function onReassignRoles() {
   editingFromMatched.value = true
   dirtyEdits.value = true
@@ -285,7 +272,7 @@ function onSave() {
   const persisted = readBack !== null && assignmentSetsEqual(readBack.assignments, assignments)
   if (persisted) {
     saveOutcome.value = 'saved'
-    // The edit is now the saved baseline — no longer dirty (WR-02).
+    // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
     dirtyEdits.value = false
     refreshNoticeVisible.value = false
     if (grantedView.value === 'reprompt') {
@@ -315,10 +302,7 @@ watch(saveOutcome, (value) => {
 })
 
 function resolveGrantedBranch() {
-  // A full (re)resolution establishes a clean baseline from persisted state —
-  // any prior in-progress edit is intentionally being replaced here, so clear
-  // the dirty/notice flags (WR-02). Callers that must PROTECT an unsaved edit
-  // (applyDetectedScreens on a same-set refresh) skip calling this entirely.
+  // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
   dirtyEdits.value = false
   refreshNoticeVisible.value = false
   const saved = loadMapping()
@@ -338,8 +322,7 @@ function resolveGrantedBranch() {
     audienceFingerprint.value = audience ? audience.fingerprint : null
     confidenceFingerprint.value = confidence ? confidence.fingerprint : null
   } else {
-    // Layout changed since the mapping was saved — never guess the new
-    // mapping from the stale one (PITFALLS Pitfall 2).
+    // See ADR-0215 (docs/adr/0215-layout-changed-since-the-mapping-was-saved-never-guess-the-n.md)
     grantedView.value = 'reprompt'
     audienceFingerprint.value = null
     confidenceFingerprint.value = null
@@ -347,25 +330,12 @@ function resolveGrantedBranch() {
   saveOutcome.value = 'idle'
 }
 
-// A stable, order-independent key of the physical screen SET, used to decide
-// whether a mid-session refresh actually changed the monitors (WR-02).
+// See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
 function screenSetKey(screens: ScreenLike[]): string {
   return screens.map(computeFingerprint).sort().join('|')
 }
 
-/**
- * Applies a detected `ScreenDetails` to the view and (re)attaches the
- * screenschange listener.
- *
- * `isRefresh` distinguishes a mid-session re-detect / OS screenschange (the
- * operator is already looking at the granted grid, possibly mid-edit) from an
- * initial detection. On a refresh whose physical screen SET is unchanged, an
- * unconditional `resolveGrantedBranch()` would silently discard the operator's
- * unsaved role selections (and collapse a "Reassign roles" edit back to the
- * read-only summary) — so we keep the in-progress edit and show a non-blocking
- * notice instead (WR-02). A genuine layout change still re-resolves, since
- * selections made against screens that are gone are no longer valid.
- */
+/** See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md) */
 function applyDetectedScreens(details: ScreenDetailsLike, isRefresh: boolean) {
   const previousKey = screenSetKey(liveScreens.value)
   const nextKey = screenSetKey(details.screens)
@@ -379,7 +349,7 @@ function applyDetectedScreens(details: ScreenDetailsLike, isRefresh: boolean) {
   liveScreens.value = details.screens
 
   if (isRefresh && nextKey === previousKey && dirtyEdits.value) {
-    // Same monitors, unsaved edit in flight — protect it (WR-02).
+    // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
     refreshNoticeVisible.value = true
     return
   }
@@ -409,25 +379,19 @@ function handleDetectionFailure() {
   saveOutcome.value = 'idle'
 }
 
-// The single most gesture-sensitive line in this phase: getScreenDetails()
-// MUST be the first statement here (after the plain feature-detect guard,
-// which consumes no event-loop turn) with NO await/store dispatch/router
-// call before it — an intervening await loses user activation and the
-// permission prompt silently fails to appear (PITFALLS Pitfall 1/9).
+// See ADR-0216 (docs/adr/0216-the-single-most-gesture-sensitive-line-in-this-phase.md)
 function onDetectClick() {
   if (!('getScreenDetails' in window)) {
     phase.value = 'unavailable'
     return
   }
   phase.value = 'detecting'
-  // Synchronous ref bump, NOT an await — preserves user activation for the
-  // getScreenDetails() call immediately below (PITFALLS Pitfall 1/9).
+  // See ADR-0216 (docs/adr/0216-the-single-most-gesture-sensitive-line-in-this-phase.md)
   const requestId = ++detectRequestId
   ;(window as any)
     .getScreenDetails()
     .then((details: ScreenDetailsLike) => {
-      // Stale-resolution guard (REVIEW-FIX WR-03): ignore if a newer
-      // detection attempt started while this was still pending.
+      // See ADR-0214 (docs/adr/0214-monotonic-token-guarding-against-a-stale-getscreendetails.md)
       if (requestId === detectRequestId) handleDetectionSuccess(details)
     })
     .catch(() => {
@@ -446,8 +410,7 @@ function onRedetect() {
   ;(window as any)
     .getScreenDetails()
     .then((details: ScreenDetailsLike) => {
-      // Refresh path — protect any unsaved in-progress edit when the physical
-      // screen set is unchanged (WR-02).
+      // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
       if (requestId === detectRequestId) handleRefreshSuccess(details)
     })
     .catch(() => {
@@ -463,7 +426,7 @@ onMounted(async () => {
   phase.value = 'prompt'
   try {
     if ('permissions' in navigator) {
-      // Pre-read for UI state only — never the actual gate (PITFALLS Pitfall 1).
+      // See ADR-0216 (docs/adr/0216-the-single-most-gesture-sensitive-line-in-this-phase.md)
       const status = await (navigator as any).permissions.query({ name: 'window-management' })
       if (status && status.state === 'granted') {
         // Already granted for this origin — no fresh user gesture is required

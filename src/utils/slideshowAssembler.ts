@@ -9,21 +9,7 @@
  * output order is derived solely from `service.slots` sorted by `position`
  * (and, within a slot, `GroupSlideEntry.order`), reordering the input slots
  * deterministically reorders the output (the R006 contract).
- *
- * Two resolution paths, per slot:
- * 1. A slot with a materialized `SlideGroup` (`inputs.groupsBySlotId`) joins
- *    that group's stored structure against LIVE canonical content resolved
- *    through each entry's `sourceRef` (D-02) — editing a song's lyrics
- *    changes the assembled text with no group write. Slide ids equal the
- *    stored `GroupSlideEntry.id`, never recomputed (Phase 23 WR-02). Audio
- *    resolves via D-04's two-level precedence (`resolveEntryMedia`); video
- *    has no bed layer (D-18) and resolves only from a video slide's own
- *    `sourceRef` in `resolveEntryContent`.
- * 2. A slot with NO materialized group yet falls back to deriving the
- *    slideshow directly from the slot's own source (today's pre-Phase-24
- *    behaviour), so the app stays coherent before 24-05/24-06 wire up
- *    reactive group subscription and lazy materialization. Fallback slide
- *    ids are derived from the slot's stable `id` (not slot array index), so
+  * See ADR-0198 (docs/adr/0198-two-resolution-paths-per-slot-1-a-slot-with-a-materialized.md)
  *    a pre-materialization render cannot churn Vue keys across recomputes.
  */
 import type { Service, ServiceSlot, ScriptureRef } from '@/types/service'
@@ -181,13 +167,7 @@ function resolveEntryContent(
       if (!lyrics) return undefined
       const section = lyrics.sections.find((s) => s.id === ref.sectionId)
       if (!section) return undefined
-      // WR-01 (105 code review): no blackout arm here — this whole `case
-      // 'lyric':` branch is unreachable via `assembleSlideshow` (every
-      // `'lyric'`-kind entry is fully handled and `continue`s in the entry
-      // loop before this function is ever called for it; see the R117
-      // comment at this file's `assembleSlideshow` entry loop). Blackout
-      // resolution lives in the loop itself, not here — adding a blackout
-      // arm to this dead branch would just be more dead code.
+      // See ADR-0199 (docs/adr/0199-no-blackout-arm-here-this-whole-case-lyric-branch-is-unreach.md)
       const content: Omit<LyricSlide, 'id' | 'position'> = {
         contentKind: 'lyric',
         sectionId: section.id,
@@ -312,33 +292,13 @@ interface ResolvedGroupMedia {
   backgroundSource?: 'slide' | 'group' | 'song'
 }
 
-/**
- * WR-01 behavioral decision (confirm at human-verify): a `video`-kind entry
- * NEVER resolves the group's bed audio, even when it has no `entry.audioUrl`
- * of its own and the group DOES have a `bedAudioUrl`. This extends D-04's
- * "slide beats group" precedence to video — a dropped video slide carries its
- * own soundtrack inside `videoSrc` (rendered by `PresentationViewer`'s own
- * `VideoPlayer`, unmuted by default), so layering the group's `AudioPlayer`
- * underneath it would play two unrelated audio sources at once with no
- * on-screen indication. The bed is not paused/stopped globally — it simply
- * resolves normally on whatever slide follows, since this function runs
- * independently per entry with no cross-entry state, matching D-18's framing
- * of a video slide as a self-contained unit.
- */
+/** See ADR-0199 (docs/adr/0199-no-blackout-arm-here-this-whole-case-lyric-branch-is-unreach.md) */
 function resolveEntryMedia(
   group: SlideGroup,
   entry: GroupSlideEntry,
   song: SongLyrics | undefined,
 ): ResolvedGroupMedia {
-  // R055/R056/R057: slide → group → song, most specific wins. Computed
-  // BEFORE the video early return below (★ Pitfall 1, 33-RESEARCH.md) — a
-  // video slide's own audio bed is deliberately suppressed (two audio
-  // sources would collide audibly), but a video slide's background is NOT
-  // suppressed the same way: a video's own picture already covers the
-  // background, and there is no collision to avoid. See 33-UI-SPEC.md §9.
-  // ★ Pitfall 3: `song` is legitimately `undefined` for non-SONG groups
-  // (PRAYER/SCRIPTURE/MESSAGE/HYMN/IMPORTED) — optional-chain the song tier
-  // so resolving a group with no owning song never throws.
+  // See ADR-0200 (docs/adr/0200-r055-r056-r057-slide-group-song-most-specific-wins-computed.md)
   const backgroundImageUrl = entry.backgroundImageUrl ?? group.backgroundImageUrl ?? song?.backgroundImageUrl
   const backgroundSource: 'slide' | 'group' | 'song' | undefined = entry.backgroundImageUrl
     ? 'slide'
@@ -418,24 +378,10 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     group: SlideGroup,
     entry: GroupSlideEntry,
     content: SlideContent,
-    // R117 (Phase 53): a manually-split lyric section resolves LIVE to N
-    // slides that all share ONE stored entry; each needs a distinct, stable
-    // slide id. The caller passes `${entry.id}:${i}` for a split's i-th slice.
-    // When absent (every non-lyric entry AND every unsplit lyric section) the
-    // slide keeps `entry.id` verbatim — byte-identical to today, preserving the
-    // Phase 23 WR-02 media-keying invariant (id === groupSlideId === entry.id).
+    // See ADR-0198 (docs/adr/0198-two-resolution-paths-per-slot-1-a-slot-with-a-materialized.md)
     idOverride?: string,
   ): void => {
-    // WR-01: song lookup keyed on the GROUP's owning song (via the slot),
-    // not the individual entry's own `sourceRef.kind`. A SONG group's
-    // `slides` array can legitimately contain `text`/`video` entries
-    // (slideGroupMaterializer.ts's reconciler carries them through by value,
-    // preserved from before R054's Phase-30 lockdown) — keying on
-    // `entry.sourceRef.kind` alone left those entries unable to resolve the
-    // song background tier even though every sibling lyric/copyright slide
-    // in the SAME group correctly fell through to it. Every other slot kind
-    // (PRAYER/SCRIPTURE/MESSAGE/HYMN/IMPORTED) has no owning song document,
-    // so `song` stays `undefined` for them (★ Pitfall 3).
+    // See ADR-0201 (docs/adr/0201-song-lookup-keyed-on-the-group-s-owning-song-via-the-slot-no.md)
     const song =
       slot.kind === 'SONG' && slot.songId
         ? inputs.songLyricsById.get(slot.songId)
@@ -443,9 +389,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
           ? inputs.songLyricsById.get(entry.sourceRef.songId)
           : undefined
     const media = resolveEntryMedia(group, entry, song)
-    // Never recompute the base id — the stored GroupSlideEntry.id IS the slide
-    // id (Phase 23 WR-02 keys media children on it). A split's positional
-    // `${entry.id}:${i}` override is likewise stable across recomputes.
+    // See ADR-0198 (docs/adr/0198-two-resolution-paths-per-slot-1-a-slot-with-a-materialized.md)
     const slideId = idOverride ?? entry.id
     const slide = {
       ...content,
@@ -453,11 +397,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       position: globalPosition,
       ...(media.audioUrl ? { audioUrl: media.audioUrl } : {}),
       ...(media.audioLoop ? { audioLoop: true } : {}),
-      // CR-01 (105 code review): a blackout slide never carries a background,
-      // matching src/types/slide.ts's BlackoutSlide doc comment and 105-UI-SPEC.md's
-      // R303 content contract. `resolveEntryMedia` only special-cases 'video' for
-      // suppression — it has no view of `content.contentKind` — so blackout must be
-      // suppressed here, the one place both are in scope.
+      // See ADR-0202 (docs/adr/0202-a-blackout-slide-never-carries-a-background-matching.md)
       ...(content.contentKind !== 'blackout' && media.backgroundImageUrl
         ? { backgroundImageUrl: media.backgroundImageUrl }
         : {}),
@@ -478,20 +418,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     globalPosition += 1
   }
 
-  /**
-   * R105 (Phase 49, approach B): the dedicated leading reference slide of a
-   * congregational reading on the STORED-GROUP path. It is NOT a stored
-   * `GroupSlideEntry` (see 49-CONTEXT.md) — it is synthesised here, so it must
-   * resolve group media the way an entry-less section slide would: background
-   * from the GROUP tier (`backgroundSource: 'group'`), bed audio from
-   * `group.bedAudioUrl` with `audioFromBed: true` and `groupId: group.id` set,
-   * so the presenter's `AudioPlayer` key `group:{groupId}:{url}` stays
-   * continuous across the reference->section transition (AC7). NO
-   * `groupSlideId` is set — there is no entry, and media never keys on a
-   * fabricated entry id (background reads `slide.backgroundImageUrl`, audio
-   * keys on `groupId`); omitting it is what preserves the Phase 23 WR-02
-   * invariant rather than inventing an id to violate it.
-   */
+  /** See ADR-0198 (docs/adr/0198-two-resolution-paths-per-slot-1-a-slot-with-a-materialized.md) */
   const emitSyntheticReferenceFromGroup = (
     slot: ServiceSlot,
     slotIndex: number,
@@ -516,7 +443,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       // A slot-derived reference has no canonical record behind it (R047).
       sourceId: null,
       groupId: group.id,
-      // No groupSlideId — there is no entry (WR-02 boundary, see above).
+      // See ADR-0198 (docs/adr/0198-two-resolution-paths-per-slot-1-a-slot-with-a-materialized.md)
       audioFromBed: !!audioUrl,
     })
     globalPosition += 1

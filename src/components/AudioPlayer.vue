@@ -93,12 +93,7 @@ async function play(): Promise<void> {
       showPlayAffordance.value = true
       return
     }
-    // A pause()-interrupted play() rejects with AbortError, not
-    // NotAllowedError (HTML media spec) — this is an expected, silent
-    // outcome (see WR-01): the presentation driver calls pauseCurrentMedia()
-    // at the start of every navigation, which can legitimately race a
-    // still-pending play() on this exact element. Never surface it as an
-    // unhandled rejection.
+    // See ADR-0061 (docs/adr/0061-a-pause-interrupted-play-rejects-with-aborterror-not.md)
     if (err instanceof DOMException && err.name === 'AbortError') {
       return
     }

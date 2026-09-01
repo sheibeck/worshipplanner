@@ -4,21 +4,7 @@
  * was replaced with one unconditional, idempotent rebuild per slot kind).
  *
  * This module is PURE: it performs no Firestore reads and touches no Pinia
- * store or Vue reactivity — callers (the composable) load data, decide, and
- * write. Mirrors `slideshowAssembler.ts`'s stated purity contract.
- *
- * The load-bearing id invariant is that an entry id is minted ONCE and never
- * REgenerated for an existing entry — `PresentationViewer.vue` keys its
- * per-slide `AudioPlayer`/`VideoPlayer` child components on this id (Phase 23's
- * WR-02 contract), so regenerating one leaks stale muted/blocked media state
- * from one slide onto another. Every carry/merge path below therefore spreads
- * the stored entry (`{ ...stored }`) rather than rebuilding it, and the
- * assembler (24-04) never mints at all.
- *
- * This is NOT the same as "only `deriveGroupEntries` mints", which this comment
- * used to claim and which has been false for several phases (LO-04):
- * `rebuildSongGroup` mints for a newly-resolved section and for absent
- * leading/trailing copyright entries, and `SlideGrid.vue` and
+  * See ADR-0194 (docs/adr/0194-store-or-vue-reactivity-callers-the-composable-load-data-dec.md)
  * `EditSlideDrawer.vue` each mint for a user-added or duplicated slide. Minting
  * for a NEW entry is fine; only regenerating an EXISTING entry's id is not.
  */
@@ -140,13 +126,7 @@ export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): G
       const resolution = resolveImportedRender(deck, render)
       const identities = importedEntryIdentities(deck, resolution)
 
-      // In the ready state an identity is the reconciler's synthetic
-      // `rendered-page-N` string, page-scoped rather than a parsed inner
-      // slide id — never `deck.slides[i].id` (no positional pairing exists,
-      // 42-RESEARCH.md Pitfall 1). In every other mode it IS a parsed inner
-      // slide id, unchanged from before this phase. A deck with no
-      // `renderImportId` resolves to `parsed` mode here, which is
-      // byte-identical to the pre-Phase-42 behaviour (D-16).
+      // See ADR-0178 (docs/adr/0178-in-the-ready-state-an-identity-is-the-reconciler-s-synthetic.md)
       return identities.map((innerSlideId, index) => ({
         id: crypto.randomUUID(),
         order: index,
@@ -575,31 +555,7 @@ function isCopyrightEntry(
   return entry.sourceRef.kind === 'copyright'
 }
 
-/**
- * Additive-only song rebuild (D-02, RESEARCH.md Pattern 3 strategy 1 /
- * Pitfall 4): diffs the fresh resolved section order against the stored
- * entries by `sourceRef.sectionId` — the ONE content-stable key available for
- * songs, since `ccliParser.ts` mints ids by slugifying labels. A section
- * newly present in the source is INSERTED; a stored entry whose section
- * still resolves is KEPT BY VALUE (never rebuilt — only `order` may be
- * renumbered); a stored entry whose section no longer resolves is RETAINED,
- * never deleted. The leading/trailing `copyright` entries are matched by
- * kind and position, never by `sectionId`, and are never duplicated.
- *
- * A full song-IDENTITY swap (CR-01) is detected FIRST, before any of the
- * above additive logic runs: if the group's stored lyric/copyright entries
- * reference a `songId` different from the slot's CURRENT `songId`, the slot
- * was reassigned to a different song entirely — a source-identity change,
- * not a section-level edit within the same song. The additive by-sectionId
- * merge is only valid for edits WITHIN the same song; running it across a
- * song swap would blend the old song's copyright/lyric entries with the new
- * song's (every old entry's `sectionId` looks "unresolvable" against the new
- * song and gets retained forever). Phase 30 makes this branch UNCONDITIONAL —
- * there is no confirm gate left — but the group's surviving non-derivable
- * entries (a dropped video, a hand-authored slide) still splice in ahead of
- * the trailing copyright, the exact position the additive merge below
- * already uses for them (T-30-02-01).
- */
+/** See ADR-0195 (docs/adr/0195-additive-only-song-rebuild-d-02-research-md-pattern-3-strate.md) */
 export function rebuildSongGroup(group: SlideGroup, slot: SongSlot, inputs: AssemblyInputs): RebuildResult {
   const songId = slot.songId
   if (!songId) {
@@ -733,8 +689,7 @@ export function rebuildSongGroup(group: SlideGroup, slot: SongSlot, inputs: Asse
     }
   }
 
-  // Retained-but-unresolvable entries — kept relative to each other, appended
-  // after the resolvable run and before the trailing copyright (Pitfall 4).
+  // See ADR-0196 (docs/adr/0196-retained-but-unresolvable-entries-kept-relative-to-each-othe.md)
   for (const entry of storedLyricEntries) {
     if (!freshSectionIds.has(entry.sourceRef.sectionId)) {
       merged.push({ ...entry, order: order++ })
@@ -767,26 +722,7 @@ export function rebuildSongGroup(group: SlideGroup, slot: SongSlot, inputs: Asse
   return changed ? { changed: true, slides: merged } : { changed: false, slides: group.slides }
 }
 
-/**
- * Two-field result shape shared by every `rebuild*Group` function, dispatched via {@link rebuildGroup}. Phase 30 deleted the old six-field confirm-shaped result along with the confirm gate itself — every rebuild now decides and writes unconditionally.
- *
- * 38-REVIEW CR-01: `sourceSignature` is an OPTIONAL third field, read only by
- * the composable's write step (`useSlideshowAssembly.ts`) when present.
- * `undefined` (the field simply absent, the default for every branch except
- * the one below) means "no opinion — the composable's own freshly-recomputed
- * signature governs, exactly as before this field existed." An explicit
- * `null` means "clear the stored signature," which the composable and
- * `replaceGroupSlides` must turn into a real Firestore `deleteField()`, not
- * an omitted key — `stripUndefined` treats an omitted key and `undefined` as
- * "no change," which cannot express "remove this," the same distinction
- * `setGroupBedMedia`'s `clearAudio` flag exists to make. Only
- * `rebuildScriptureGroup`'s CLEARED REFERENCE branch sets this today: it is
- * the one branch that empties a group's derived slides via a path where the
- * freshly-computed signature is `undefined` for a reason OTHER than "no
- * opinion" (there is no reference left to sign at all), so the ordinary
- * fall-through would leave a stale congregational signature on the group
- * forever.
- */
+/** See ADR-0140 (docs/adr/0140-this-is-the-one-branch-that-empties-a-congregational-group-s.md) */
 export interface RebuildResult {
   changed: boolean
   slides: GroupSlideEntry[]
@@ -909,15 +845,7 @@ export function rebuildScriptureGroup(group: SlideGroup, slot: ScriptureSlot, in
     )
     if (hasSectionEntries) {
       const slides = renumbered(survivingEntries(group, slot))
-      // 38-REVIEW CR-01: this is the one branch that empties a Congregational
-      // group's section entries via a reference clear, where the freshly
-      // computed `sourceSignature(slot, inputs)` is `undefined` because there
-      // is no reference left to sign — NOT because there is "no opinion."
-      // Without an explicit `sourceSignature: null` here, the write path's
-      // `stripUndefined` would leave the group's stale congregational
-      // signature stored, and a later re-entry of the identical reading would
-      // hit the DETACHED short-circuit above against a permanently-empty
-      // `slides` array. See `RebuildResult`'s doc comment.
+      // See ADR-0140 (docs/adr/0140-this-is-the-one-branch-that-empties-a-congregational-group-s.md)
       return { changed: !slidesEqual(slides, group.slides), slides, sourceSignature: null }
     }
   }
