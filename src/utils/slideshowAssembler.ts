@@ -181,12 +181,13 @@ function resolveEntryContent(
       if (!lyrics) return undefined
       const section = lyrics.sections.find((s) => s.id === ref.sectionId)
       if (!section) return undefined
-      // 105-CONTEXT.md: the one-line blackout branch — a blackout section
-      // resolves to a contentless blackout slide, never lyric content.
-      if (section.kind === 'blackout') {
-        const blackoutContent: Omit<BlackoutSlide, 'id' | 'position'> = { contentKind: 'blackout' }
-        return blackoutContent
-      }
+      // WR-01 (105 code review): no blackout arm here — this whole `case
+      // 'lyric':` branch is unreachable via `assembleSlideshow` (every
+      // `'lyric'`-kind entry is fully handled and `continue`s in the entry
+      // loop before this function is ever called for it; see the R117
+      // comment at this file's `assembleSlideshow` entry loop). Blackout
+      // resolution lives in the loop itself, not here — adding a blackout
+      // arm to this dead branch would just be more dead code.
       const content: Omit<LyricSlide, 'id' | 'position'> = {
         contentKind: 'lyric',
         sectionId: section.id,

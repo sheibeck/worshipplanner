@@ -13,7 +13,7 @@ provides:
   - "BlackoutSlide type + widened SlideContentKind/Slide union in src/types/slide.ts"
   - "addSection(sections, order, 'BLACKOUT') minting rule in songSectionOrder.ts"
   - "buildSectionRows numbering-exclusion for blackout rows (R304)"
-  - "assembleSlideshow blackout branch at all 3 lyric-resolution sites (stored-group, no-group fallback, resolveEntryContent)"
+  - "assembleSlideshow blackout branch at the 2 reachable lyric-resolution sites (stored-group entry loop, no-group fallback loop) — CORRECTED post-review (WR-01, 105-REVIEW.md): `resolveEntryContent`'s lyric case is unreachable from `assembleSlideshow` and its blackout arm was removed, not added, as dead code"
   - "slideContentLabel/slideBodyText/slideFooterLabel blackout copy (BLACKOUT / Solid black / Black Slide)"
 affects: [105-02-editor-ui, 105-03-render-and-runcontrol]
 
@@ -22,7 +22,7 @@ tech-stack:
   added: []
   patterns:
     - "Additive content-kind discriminator on a pooled domain type (LyricSection.kind), mirroring the existing SlideContentKind discriminated-union pattern rather than widening SourceRef"
-    - "One-line blackout branch inserted at each of the 3 lyric-resolution call sites, short-circuiting sliceSectionIntoSlides rather than teaching it about empty content"
+    - "One-line blackout branch inserted at each of the 2 reachable lyric-resolution call sites (stored-group entry loop, no-group fallback loop), short-circuiting sliceSectionIntoSlides rather than teaching it about empty content — a third site, `resolveEntryContent`'s lyric case, was originally (mis)counted here but is unreachable dead code; see WR-01 correction below"
 
 key-files:
   created: []
@@ -42,7 +42,7 @@ key-decisions:
   - "The assembler's blackout branch short-circuits sliceSectionIntoSlides (continue after emitting exactly one slide) rather than relying on the slicer to naturally produce one empty group from lines:[], since that behavior isn't guaranteed by sliceSectionIntoSlides's contract."
 
 patterns-established:
-  - "A pooled section's 'kind' field is read at the START of each resolution branch (resolveEntryContent's lyric case, the stored-group entry loop, the no-group fallback loop) before any per-kind processing — future content kinds on LyricSection should follow the same early-branch shape."
+  - "A pooled section's 'kind' field is read at the START of each REACHABLE resolution branch (the stored-group entry loop, the no-group fallback loop) before any per-kind processing — future content kinds on LyricSection should follow the same early-branch shape. `resolveEntryContent`'s lyric case is NOT one of these; it is dead code, unreachable from `assembleSlideshow` (WR-01 correction, 105-REVIEW.md)."
 
 requirements-completed: [R302, R303, R304]
 
@@ -101,7 +101,7 @@ status: complete
 - `LyricSection.kind?: 'lyric'|'blackout'` (additive, no migration) and a `BlackoutSlide` variant widening `SlideContentKind`/`Slide` in `src/types/slide.ts` — no `SourceRef` change, matching 105-CONTEXT.md's data-model decision.
 - `addSection(sections, order, 'BLACKOUT')` mints a fixed `'Black Slide'`/`'Black Slide 2'` section (reusing `uniqueSectionLabel`'s existing collision guard) with `kind: 'blackout'` and `lines: []`; every other kind's `addSection` call stays byte-identical.
 - `buildSectionRows` excludes a blackout row from per-kind lyric numbering entirely (never touches `kindOrdinals`/`numberBySectionId`) while still computing `position`/`occurrenceIndex`/`isRepeat`/`repeatOfPosition` normally — proven with an explicit `[Verse, blackout, Chorus]` numbering-integrity test (R304).
-- `slideshowAssembler.ts` resolves a blackout section to exactly one `contentKind:'blackout'` `AssembledSlide` at all three lyric-resolution sites: `resolveEntryContent`'s lyric case, the stored-group per-entry lyric loop, and the no-group fallback SONG loop — each short-circuits `sliceSectionIntoSlides` rather than slicing an empty-lines section, and both entry/bed audio precedence and group/entry provenance carry through unchanged.
+- `slideshowAssembler.ts` resolves a blackout section to exactly one `contentKind:'blackout'` `AssembledSlide` at the 2 reachable lyric-resolution sites: the stored-group per-entry lyric loop and the no-group fallback SONG loop — each short-circuits `sliceSectionIntoSlides` rather than slicing an empty-lines section, and both entry/bed audio precedence and group/entry provenance carry through unchanged. (**CORRECTED post-review, WR-01 in 105-REVIEW.md:** a third "site," `resolveEntryContent`'s lyric case, was originally counted here as well, but `resolveEntryContent` is never called for a `'lyric'`-kind entry — the entry loop fully handles and `continue`s every one before reaching that call site — so its blackout arm was dead code and has since been removed.)
 - `slideContentLabel`/`slideBodyText`/`slideFooterLabel` in `slideDisplay.ts` gained a `case 'blackout'` arm each (`'BLACKOUT'` / `'Solid black'` / `'Black Slide'`, per 105-UI-SPEC.md's Copywriting Contract), keeping all three switches exhaustive.
 
 ## Task Commits
@@ -119,7 +119,7 @@ _No separate RED/GREEN/REFACTOR commits — `tdd="true"` behavior/implementation
 - `src/types/songLyrics.ts` - Added optional `LyricSection.kind?: 'lyric'|'blackout'`
 - `src/utils/songSectionOrder.ts` - `addSection`'s `'BLACKOUT'` special case; `buildSectionRows`'s numbering-exclusion branch
 - `src/utils/__tests__/songSectionOrder.test.ts` - `addSection("BLACKOUT") (R302)` and `buildSectionRows — blackout sections (R304)` describe blocks
-- `src/utils/slideshowAssembler.ts` - Blackout branch at `resolveEntryContent`'s lyric case, the stored-group lyric loop, and the no-group fallback SONG loop
+- `src/utils/slideshowAssembler.ts` - Blackout branch at the stored-group lyric loop and the no-group fallback SONG loop (a since-removed blackout arm was also added to `resolveEntryContent`'s dead-code lyric case; see WR-01 correction below)
 - `src/utils/__tests__/slideshowAssembler.test.ts` - `assembleSlideshow — blackout slides (R302/R303, Plan 105-01)` describe block (stored-group, fallback, dual-path lockstep, audio precedence)
 - `src/components/slides/slideDisplay.ts` - `case 'blackout'` arm on all three display-label helpers
 - `src/components/slides/__tests__/slideDisplay.test.ts` - Blackout fixture assertions for all three helpers
@@ -127,7 +127,7 @@ _No separate RED/GREEN/REFACTOR commits — `tdd="true"` behavior/implementation
 ## Decisions Made
 - Blackout is a distinct `LyricSection.kind`/`SlideContentKind`, never an empty `LyricSection` or a `SourceRef` change — the plan's `must_haves` and 105-CONTEXT.md both lock this in, and PITFALLS Pitfall 5 explicitly warns an empty section would corrupt numbering/pooling/export.
 - `buildSectionRows` reads `section.kind` at the very top of its per-row branch (before any `deriveSectionKind`/`kindOrdinals` work), so the exclusion is structurally impossible to bypass for a blackout row, rather than being an after-the-fact filter.
-- The assembler's three branches all follow the identical shape: resolve `section`, check `section.kind === 'blackout'` immediately after, emit one blackout slide, `continue`/`return` — matching the plan's literal call-site guidance and keeping `emitFromGroup`/`emitFallback` themselves untouched (background/media suppression stays a 105-02 render-side concern).
+- The assembler's 2 reachable branches (stored-group entry loop, no-group fallback loop) both follow the identical shape: resolve `section`, check `section.kind === 'blackout'` immediately after, emit one blackout slide, `continue` — matching the plan's literal call-site guidance and keeping `emitFromGroup`/`emitFallback` themselves untouched at the time. **Correction (WR-01, 105-REVIEW.md, applied post-review):** a third "site" originally claimed here, `resolveEntryContent`'s lyric case, was unreachable dead code — the entry loop never calls it for a `'lyric'`-kind entry — and its blackout arm has been removed rather than kept as a third live branch. Background/media suppression for blackout was NOT deferred to 105-02 as this line implied; **CR-01** (105-REVIEW.md) found `emitFromGroup` was still spreading `backgroundImageUrl`/`backgroundSource` onto blackout slides on the stored-group path, and that gap has since been fixed directly in `emitFromGroup`.
 
 ## Deviations from Plan
 

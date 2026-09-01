@@ -1603,7 +1603,15 @@ describe('assembleSlideshow — blackout slides (R302/R303, Plan 105-01)', () =>
     })
   }
 
-  describe('resolveEntryContent (lyric case)', () => {
+  // WR-01 (105 code review): this block used to be named
+  // `describe('resolveEntryContent (lyric case)', ...)`, implying it exercised
+  // `resolveEntryContent`'s lyric branch. It never did — `resolveEntryContent`'s
+  // `case 'lyric':` is unreachable from `assembleSlideshow` (the entry loop fully
+  // handles every 'lyric'-kind entry and `continue`s before `resolveEntryContent`
+  // is ever called for one). This end-to-end assertion actually exercises the
+  // stored-group entry loop's own inline blackout handling, same as the
+  // `describe('stored-group path', ...)` block below.
+  describe('blackout via the stored-group entry loop (not resolveEntryContent)', () => {
     it('returns { contentKind: "blackout" } for a blackout section, via the stored-group path', () => {
       const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
       const service = makeService([slot])
