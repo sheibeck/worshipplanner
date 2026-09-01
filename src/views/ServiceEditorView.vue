@@ -1277,6 +1277,64 @@
                 <p v-if="!(slot as ImportedSlot).importId" class="text-sm text-gray-400 italic">Imported Slides — Empty</p>
               </template>
 
+              <!-- Loop checkbox row (R306/R307, Phase 106): editor-only, draft-locked
+                   like every other slot field — a field on the existing `slots` array,
+                   no new save path or rules surface. Markup lifted verbatim from
+                   106-UI-SPEC.md "Component Inventory § 1. Loop checkbox row": checkbox
+                   class is byte-for-byte the PC-Teams checkbox class, the <select> class
+                   is byte-for-byte the Bible-version selector class, and the custom-
+                   seconds <input> mirrors the HYMN text-input token narrowed to w-20.
+                   Mutations route through localService.value.slots[index] exactly like
+                   onSectionChange — the existing single useAutoSave(localService, ...)
+                   deep-watch is the only persistence path; no new save call is added. -->
+              <div v-if="canEditService" class="flex items-center gap-2" data-testid="slot-loop-row">
+                <label class="flex items-center gap-2 text-sm text-gray-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :checked="slot.loop?.enabled ?? false"
+                    class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                    data-testid="slot-loop-checkbox"
+                    @change="onToggleLoop(index, ($event.target as HTMLInputElement).checked)"
+                  />
+                  Loop
+                </label>
+
+                <!-- interval control: only rendered when loop.enabled -->
+                <template v-if="slot.loop?.enabled">
+                  <span class="text-xs text-gray-400">Every</span>
+                  <select
+                    :value="loopPresetFor(slot)"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    data-testid="slot-loop-preset"
+                    aria-label="Loop interval"
+                    @change="onLoopPresetChange(index, ($event.target as HTMLSelectElement).value)"
+                  >
+                    <option value="5">5s</option>
+                    <option value="10">10s (default)</option>
+                    <option value="15">15s</option>
+                    <option value="20">20s</option>
+                    <option value="30">30s</option>
+                    <option value="60">60s</option>
+                    <option value="custom">Custom…</option>
+                  </select>
+
+                  <input
+                    v-if="loopPresetFor(slot) === 'custom'"
+                    type="number"
+                    min="1"
+                    max="3600"
+                    step="1"
+                    :value="slot.loop?.intervalSeconds"
+                    placeholder="Seconds"
+                    class="w-20 rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                    data-testid="slot-loop-custom-seconds"
+                    aria-label="Custom loop interval in seconds"
+                    title="Enter 1–3600 seconds"
+                    @blur="onLoopCustomBlur(index, ($event.target as HTMLInputElement).value)"
+                  />
+                </template>
+              </div>
+
                 <!-- Consolidated notes-canonical field (260811-vsr): written ONCE for
                      every kind, now FULL-WIDTH and stacked in the field column (walks
                      back Phase 54's sm:w-64 side column). slot.notes takes NO cast —
@@ -2274,6 +2332,76 @@ function onSectionChange(index: number, value: string) {
   if (!slot) return
   slot.section = value === '' ? undefined : (value as ServiceSection)
   localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
+}
+
+// ── Per-item loop authoring (R306/R307, Phase 106) ──────────────────────────────
+// Each handler mutates `localService.value.slots[index]` directly (mirrors
+// onSectionChange above) so persistence rides the EXISTING single
+// useAutoSave(localService, ...) deep-watch — no new save call is added, and the
+// field is draft-locked by the existing services/{docId} storedStatus gate.
+const LOOP_INTERVAL_PRESETS = [5, 10, 15, 20, 30, 60] as const
+
+/** Checking initializes slot.loop = { enabled: true, intervalSeconds: 10 } when
+ *  absent (R307 default 10s); unchecking sets enabled = false while RETAINING
+ *  intervalSeconds so re-checking restores the last interval. */
+function onToggleLoop(index: number, checked: boolean) {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  if (checked) {
+    if (!slot.loop) {
+      slot.loop = { enabled: true, intervalSeconds: 10 }
+    } else {
+      slot.loop.enabled = true
+    }
+  } else if (slot.loop) {
+    slot.loop.enabled = false
+  }
+}
+
+/** Maps a saved intervalSeconds back to its matching preset string, or 'custom' when
+ *  it doesn't match one of the six presets — so a service saved with e.g. 45s (custom)
+ *  correctly re-selects "Custom…" and pre-fills the number field with 45 on reload,
+ *  never silently snapping to a nearest preset. */
+function loopPresetFor(slot: ServiceSlot): string {
+  const seconds = slot.loop?.intervalSeconds
+  if (seconds != null && (LOOP_INTERVAL_PRESETS as readonly number[]).includes(seconds)) {
+    return String(seconds)
+  }
+  return 'custom'
+}
+
+/** A numeric preset sets intervalSeconds to that number; selecting Custom leaves the
+ *  current intervalSeconds untouched (so the number field pre-fills with it) and
+ *  keeps enabled = true. */
+function onLoopPresetChange(index: number, value: string) {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot?.loop) return
+  if (value === 'custom') {
+    slot.loop.enabled = true
+    return
+  }
+  const parsed = Number(value)
+  if (!Number.isNaN(parsed)) {
+    slot.loop.intervalSeconds = parsed
+  }
+}
+
+/** Silent-normalize idiom (106-UI-SPEC.md's error row): non-numeric/empty/out-of-range
+ *  clamps to the nearest valid 1–3600 value on blur — no toast, no banner, and no
+ *  invalid intervalSeconds is ever persisted. */
+function onLoopCustomBlur(index: number, rawValue: string) {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot?.loop) return
+  const parsed = Number(rawValue)
+  const fallback = slot.loop.intervalSeconds ?? 10
+  const base = rawValue.trim() !== '' && Number.isFinite(parsed) ? parsed : fallback
+  slot.loop.intervalSeconds = Math.min(3600, Math.max(1, Math.round(base)))
 }
 
 /** 260811-vsr: which row's ⋯ menu is open (keyed on the stable slot.id, so exactly
