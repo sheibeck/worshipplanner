@@ -1,5 +1,46 @@
 # Milestones
 
+## v2.7 Rehearsal, Stage Plans & Presentation Polish (Shipped: 2026-09-01)
+
+**Phases completed:** 4 phases (104–107), 10 plans
+
+**Audit:** [v2.7-MILESTONE-AUDIT.md](v2.7-MILESTONE-AUDIT.md) — PASSED (14/14 reqs, 6/6 integration seams
+WIRED).
+
+**Deployed to production 2026-09-01** (hosting only — client-side changes, no rules/functions; predeploy
+rebuilt `dist/`; tag `v2.7`). Closed on owner acceptance. Built via `/gsd-autonomous` with per-phase
+verification deferred to a batched end pass, then extensively refined interactively before ship. The
+batched human/visual UAT (`.planning/v2.7-DEFERRED-VERIFICATION.md`) was performed manually by the owner
+on 2026-09-01 and all three phases PASSED — a verified closeout.
+
+**Key accomplishments:**
+
+- **Phase 104 — Notification & Multi-Church Foundations (R309–R312):** a system-wide dismissible
+  notification store (`toasts.ts`/`ToastHost` at `App.vue`) replacing stuck banners, the "monitors not
+  configured" warning made state-driven, and a user-menu church switcher (`selectOrg` +
+  `resetOrgScopedStores`, distinct from super-admin enter-any-church). Code review caught a Critical R312
+  org-scoped listener leak in `TeamView`/`GettingStarted` — fixed with reactive re-subscription.
+- **Phase 105 — Blackout & Inline Black Slide (R302–R305):** an additive `LyricSection.kind` blackout
+  slide (excluded from numbering), solid-black render on every surface, and "Go to black" scoped to the
+  Audience output only.
+- **Phase 106 — Per-Item Loop (R306–R308):** `slot.loop {enabled,intervalSeconds}` (default 10s,
+  preset+custom) driven from `useRunControl.postIndex`'s single writer; go-to-black pauses the loop.
+- **Phase 107 — Visual Stage Layout (R313–R315):** an additive `Service.stageLayout` field (no new
+  collection/rules/store) with a native-Pointer-Events drag canvas + draft-locked Stage Layout tab, and a
+  read-only render on the public share snapshot + print.
+- **Post-audit interactive polish (same milestone/tag):** the Stage Layout was redesigned to the owner's
+  imported "Nocturne" design (single-room diagram, palette, icon-tile markers, inspector slide-over);
+  Instruments mirror the org's Band roles with person "Name - Role" assignment + notes + "+ Vocal";
+  stage share/print split out (landscape `?view=stage` + landscape B&W "Print for tech"); loop authoring
+  relocated to the Slide editor (MISC/Announcement-only); and button-area consistency (Run primary in the
+  cluster, Present→"Review Slides", Save rightmost + dropped from Slides, save-status into the header).
+- **A WYSIWYG stage bug was diagnosed in the running app** (via browser inspection): Tailwind v4's
+  `-translate-x/y-1/2` emits the CSS `translate` property, which stacked with the editor's inline
+  `transform` translate and drew markers half a tile too far left only while editing — fixed with a single
+  inline-transform centering + a hard-coded room size so editing/locked/share/print render identically.
+- Full suite = only the two documented baselines fail (`storage.rules.test.ts`, stale `appConfig.test.ts`);
+  type-check clean.
+
 ## v2.6 Per-Org Bible API Toggle & Manual Fallback (Shipped: 2026-08-31)
 
 **Phases completed:** 3 phases (101–103), 6 plans

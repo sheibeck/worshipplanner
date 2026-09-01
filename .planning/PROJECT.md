@@ -8,9 +8,24 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.7 Rehearsal, Stage Plans & Presentation Polish
+## Shipped Milestone: v2.7 Rehearsal, Stage Plans & Presentation Polish — ✅ SHIPPED & DEPLOYED 2026-09-01
 
-**Goal:** Give teams richer rehearsal and live-presentation tooling — song rehearsal attachments with a shared rehearse view, a visual per-service stage layout — plus targeted Run-the-Service and multi-church usability fixes.
+**Status:** Deployed to production (tag `v2.7`; hosting only — client-side changes, no rules/functions).
+Audit PASSED (14/14 requirements, 6/6 integration seams). Human/visual UAT owner-verified PASSED
+2026-09-01 (STATE.md Human UAT · `.planning/v2.7-DEFERRED-VERIFICATION.md`). Full record:
+[milestones/v2.7-ROADMAP.md](milestones/v2.7-ROADMAP.md) ·
+[milestones/v2.7-REQUIREMENTS.md](milestones/v2.7-REQUIREMENTS.md) ·
+[v2.7-MILESTONE-AUDIT.md](v2.7-MILESTONE-AUDIT.md).
+
+**Goal (as shipped):** Richer live-presentation tooling and multi-church usability — inline black slide +
+audience-only "Go to black", a system-wide dismissible-notification store, a per-item loop, a user-menu
+church switcher, and a freeform visual per-service **stage layout** (redesigned to the owner's imported
+design, with band-role instruments, person "Name - Role" assignment, notes, a "+ Vocal" flag, a
+landscape stage-only share + a landscape B&W "Print for tech"). The rehearsal/file-storage cluster
+(song attachments + public Rehearse mode) was deferred to backlog 999.13 (SEED-003).
+
+<details>
+<summary>Original v2.7 target-feature framing (pre-ship) — retained for reference</summary>
 
 **Target features:**
 - **Inline black slide in the lyric editor** — insert a black "interlude" slide within a song's slides (long instrumental/interlude sections) without creating a new blank section.
@@ -30,7 +45,9 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 - Stage layout is a **freeform visual canvas** with on-stage / off-stage (side) zones; positions saved to Firestore (no file storage).
 - Research requested → domain research runs before requirements.
 
-## Shipped Milestone: v2.6 Per-Org Bible API Toggle & Manual Fallback — ✅ SHIPPED & DEPLOYED 2026-08-31
+</details>
+
+## Previous Milestone: v2.6 Per-Org Bible API Toggle & Manual Fallback — ✅ SHIPPED & DEPLOYED 2026-08-31
 
 **Status:** Deployed to production (tag `v2.6`; rules + `functions:api`/`setOrgBibleEnabled`/
 `listOrganizations` + hosting). Audit PASSED (7/7 requirements, 5/5 integration seams). Closed on owner

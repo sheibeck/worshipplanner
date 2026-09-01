@@ -4,11 +4,12 @@ milestone: v2.7
 milestone_name: Rehearsal, Stage Plans & Presentation Polish
 current_phase: 107
 current_phase_name: Visual Stage Layout
-status: verifying
-stopped_at: Completed 107-03-PLAN.md
-last_updated: "2026-09-01T09:38:13.491Z"
+status: shipped
+closeout_type: verified_closeout
+stopped_at: Milestone v2.7 shipped, deployed to production, and archived
+last_updated: "2026-09-01T19:40:00.000Z"
 last_activity: 2026-09-01
-last_activity_desc: Phase 107 execution started
+last_activity_desc: v2.7 committed, tagged v2.7, pushed, deployed to production (hosting), owner-verified UAT, milestone closed
 progress:
   total_phases: 4
   completed_phases: 4
@@ -16,6 +17,18 @@ progress:
   completed_plans: 10
   percent: 100
 ---
+
+## Human UAT — completed & PASSED
+
+The batched human/visual/hardware UAT from the autonomous run (`.planning/v2.7-DEFERRED-VERIFICATION.md`)
+was performed manually by the owner on 2026-09-01 and **all three phases PASSED** — so this is a
+`verified_closeout`, not an override.
+
+| Category | Item | Status |
+|----------|------|--------|
+| verification | Phase 105 — 105-VERIFICATION.md (real-monitor black, blackout render, Audience-only go-to-black) | passed (owner-verified 2026-09-01) |
+| verification | Phase 106 — 106-VERIFICATION.md (loop wrap + go-to-black pause on a real 2nd display) | passed (owner-verified 2026-09-01) |
+| verification | Phase 107 — 107-VERIFICATION.md (real touch-drag, live share/print of the plot) | passed (owner-verified 2026-09-01) |
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
 
