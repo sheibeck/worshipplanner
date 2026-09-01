@@ -1,175 +1,310 @@
 # Project Research Summary
 
-**Project:** WorshipPlanner — v2.4 "Run the Service (Live Presentation)"
-**Domain:** Browser-based live worship-service presentation/projection — multi-monitor delivery from a single Chrome/Edge tab, integrated into an existing Vue 3 + Firebase app
-**Researched:** 2026-08-28
-**Confidence:** MEDIUM-HIGH
+**Project:** WorshipPlanner — v2.7 (Presentation Polish & Multi-Org Usability)
+**Domain:** Feature-integration research for a mature Vue 3 + Firebase worship-service planning app
+**Researched:** 2026-08-31
+**Confidence:** HIGH
+
+## Scope Note (owner narrowed scope after research was commissioned)
+
+Research was originally commissioned for eight feature areas. The owner has since **deferred two
+of them to a future milestone**: (a) song rehearsal attachments (PDF/MP3/YouTube) and (b) Rehearse
+mode on the public shared link. This SUMMARY, and the roadmap it feeds, cover **only the six
+in-scope v2.7 features** below. The deferred cluster is summarized separately at the end so its
+findings — especially the security/cost risk — aren't lost before the future milestone picks it up.
 
 ## Executive Summary
 
-This milestone is pure integration work on top of an already-correct slide engine, not a new product. `slideshowAssembler.ts` (the pure `service → AssembledSlide[]` builder) is untouched, and `PresentationViewer.vue` already contains every piece of rendering logic the new run/control, audience, and confidence-monitor windows need — it just needs its slide-canvas guts extracted into a reusable `SlideCanvas.vue` so three thin per-role windows can compose it instead of forking it. The recommended stack is zero new npm dependencies: the Window Management API + `requestFullscreen({screen})` for multi-monitor placement (Chromium 100+, matching the project's confirmed Chrome/Edge-only target), `BroadcastChannel` for low-latency same-machine control→output sync (not Firestore — a server round-trip is the wrong tool for sub-100ms slide-advance), `localStorage` for the per-device monitor→role mapping (never Firestore — this describes a physical cable, not an org/user preference), and the Screen Wake Lock API to keep the projector and confidence monitor from sleeping during a 60-90 minute service.
+v2.7 is a **pure integration milestone** against a mature codebase — every in-scope feature reuses
+an existing mechanism rather than introducing new architecture, and the stack research concluded
+**zero new npm dependencies are required**. The six features are: an inline black slide in the
+lyric editor, scoping "Go to black" to the Audience output only, a system-wide dismissible
+message/banner store, a per-item loop timer in Run mode, a user-menu church switcher for
+multi-org members, and a freeform visual stage-layout canvas per service. All six trace directly
+to existing, already-proven patterns in this codebase: the pooled-section slide model, the
+single-writer runChannel/useRunControl broadcast discipline, the existing (if too-narrow)
+toasts.ts Pinia store, the already-hardened selectOrg()/resetOrgScopedStores() multi-org
+reset path, and Pointer Events for freeform drag (a genuinely new interaction pattern for this
+app, but a native-API one, not a new library).
 
-The feature shape converges strongly across every reference tool researched (ProPresenter, EasyWorship, Proclaim, OpenLP, FreeShow): an order-of-service list with a current-item highlight, a large current-slide preview, click-to-jump, standard keyboard nav (Right/Space=next, Left=prev, Up/Down=next/prev item, Escape=exit — carefully re-scoped for a multi-window world), a chrome-free fullscreen audience output, and a black-background current+next confidence monitor. WorshipPlanner should deliberately follow Proclaim's simpler single-selection model (no Preview/Live pane split) rather than ProPresenter's more powerful-but-heavier pattern, matching the explicit "non-technical projectionist" target user. All of this is a client-side derivation over data the app already has — `AssembledSlide.slotIndex` is the pre-existing service-item↔slide join, so no new Firestore schema is needed for the core Run experience.
+The recommended approach is dependency-honoring, not feature-parallel: build the **cross-cutting
+UI primitives first** (the dismissible-message store, the church switcher) since they are fully
+decoupled from everything else and de-risk the rest of the milestone quickly, then the **isolated
+Run-flow fixes** (audience-only blackout, black slide, loop), and **stage layout last**, since it
+is architecturally independent but the single largest, riskiest, most novel build (a new freeform
+canvas interaction pattern with its own data model and Firestore rules block).
 
-The two biggest risks are both about the permission/gesture model, not the UI: (1) the `window-management` permission grant AND denial are both primary, must-be-built paths — a volunteer clicking "block" by reflex must land on a fully-supported pop-out+drag+F11 fallback, not a dead end — and (2) every `window.open()`/`getScreenDetails()`/`requestFullscreen()` call must fire synchronously inside the original click handler with zero `await` in between, or the popup blocker silently kills the flow. Beyond that, live-operation robustness (monitor replug, output-window crash/close recovery, fullscreen-loss not cascading into a full session teardown, wake-lock re-acquisition, preloading images to avoid flash) needs a dedicated hardening pass, and requirements must resolve one open design question the architecture researcher flagged: who is authorized to Run a service (existing editor role, vs. a new "projectionist" role tier hinted at in PROJECT.md).
+The dominant risk pattern across all four research files is **this app's own repeated history of
+drag-and-drop corrupting state** (v1.4 phantom duplicates, v1.6 drag-into-section bugs) — the
+stage-layout canvas is new freeform x/y drag code with no existing precedent to reuse, so it needs
+its own careful design (Pointer Events, percentage coordinates, debounced persistence, real
+touch-device testing) rather than treating it as "just another drag feature." The secondary risk
+is a **notification-system collision**: toasts.ts is deliberately narrow (failure-only, 6s
+auto-dismiss) and must be generalized or replaced — not left running in parallel with a new store
+— or the milestone risks producing two incompatible notification mechanisms.
 
 ## Key Findings
 
 ### Recommended Stack
 
-Every recommended technology is a native browser API already available in Chrome/Edge 100+; the project's explicit Chrome/Edge-only constraint removes the usual "not Baseline" objection to the Window Management API, since there is no cross-browser fallback to build beyond the pop-out/manual path that's needed anyway. No fullscreen-shim, no BroadcastChannel wrapper package, no Presentation API (that's wireless casting, a different problem).
+No new dependencies. The dismissible-message store is a small in-house Pinia extension of the
+existing toasts.ts/ToastHost.vue pattern. The loop timer is a plain setInterval/composable
+routed through the existing runChannel/postIndex choke point. The church switcher is pure
+reuse of already-shipped auth.ts primitives (selectOrg, resetOrgScopedStores). The stage
+layout canvas uses **native Pointer Events + percentage-based {zone, xPct, yPct} coordinates**,
+explicitly rejecting vue-konva/interactjs/vuedraggable as overkill for placing a bounded set
+of free-text-labeled markers into two zones — none of the app's existing SortableJS-based drag
+code fits this (that's list-reorder, not freeform placement).
 
-**Core technologies:**
-- **Window Management API** (`window.getScreenDetails()`, `ScreenDetailed`) — enumerate connected monitors for the monitor-config screen — the only web API that exposes multi-screen topology at all
-- **Fullscreen API with `{screen}` option** (`element.requestFullscreen({screen})`) — places a window fullscreen on a specific monitor in one call, avoiding the flicker of moveTo-then-fullscreen
-- **`window.open()`** — bootstraps the two output windows (both the primary placement path and the universal fallback)
-- **BroadcastChannel** — control→output state sync (`{type:'state', index, blackout, seq}`); in-process, same-tick, zero network cost, zero Firestore write volume per keypress
-- **Screen Wake Lock API** (`navigator.wakeLock.request('screen')`) — keeps audience/confidence displays awake through a 60-90 min service; must be requested independently per output window and re-acquired on `visibilitychange`
-- **`localStorage`** — per-device monitor→role mapping, keyed by a synthesized screen fingerprint, not Firestore
+**Core technologies (all pre-existing):**
+- Pinia — dismissible-message store, mirrors every other cross-cutting store in the app
+- Native Pointer Events API — unifies mouse/touch/pen for the stage-layout drag surface, no polyfill needed for this app's supported-browser bar
+- Native setInterval in a composable — per-item loop timer
+- Existing runChannel.ts/useRunControl.ts single-writer broadcast — the loop and blackout-scoping changes are pure app-state changes over the existing wire protocol, no new transport
 
 ### Expected Features
 
-**Must have (table stakes) — v2.4 launch:**
-- Order-of-service list (grouped by `slotIndex`) with current-item highlight
-- Large current-slide preview on the run/control screen (reuses `PresentationViewer.vue`'s rendering)
-- Click an order-of-service item to jump to its first slide (reuses the existing `initialIndex`/R061 mechanic)
-- Standard keyboard nav: Right/Space=next, Left=prev, Escape=exit (already implemented, extend don't replace), NEW Down/Up=next/prev order-of-service item
-- Audience output: fullscreen slide + background, zero operator chrome, routed to a real second display
-- Confidence monitor: current + next slide, background suppressed to black, no chrome
-- Locked-service gate on the Run entry point (existing app invariant, just wire behind it)
-- Standalone, persistent per-device monitor-role assignment (Audience vs Confidence) — the concrete translation of the "one-click start" usability finding
+**Must have (table stakes for v2.7 — all P1 per FEATURES.md):**
+- Inline black slide insertable in a song's slide sequence, as a new authored slide kind (not a live control)
+- "Go to black" scoped to the Audience output only — confidence monitor stays visible (bug fix, restores the independent-output-toggle model every reference tool — e.g. ProPresenter — already uses)
+- Per-item loop checkbox with a default 10s interval + dropdown/custom value, looping that item's own slides
+- System-wide dismissible messages: state-driven banners that auto-clear when their trigger condition resolves, plus always-available manual dismiss
+- Church switcher in the user menu for multi-org members, showing each org + the user's role, full state reset on switch
+- Freeform stage-layout canvas per service with on-stage/off-stage zones and free-text-labeled draggable markers (including one-off markers, e.g. a guest-speaker mic)
 
-**Should have (differentiators):**
-- Single-selection model (no Preview/Live split) — a deliberate simplicity choice, not a feature to build
-- Calm, minimal operator chrome tuned for a first-time volunteer
-- Section/label (e.g. "Verse 2") on the confidence monitor — trivial reuse of existing `section` metadata
-- Countdown/elapsed timer on the confidence monitor — no slide-model dependency, purely additive
+**Should have / defer within v2.7 scope (P2, add after validation):**
+- Auto-generated stage-plot input list derived from placed markers
+- Seed a new service's stage layout from the org's last-used layout (copy-on-create)
+- Fine-grained per-slide custom loop timing (vs. one interval per item)
 
-**Defer (v2.4.x / v3+):**
-- Instant blackout/logo-cut button — explicitly deferred by PROJECT.md; reserve a UI slot and key (e.g. `B`) now
-- Non-Chromium monitor auto-detection — explicitly deferred
-- Slide transitions/fades — conflicts with the existing `goToIndex` instant-swap media-lifecycle invariant (T-23-08); not requested by any reference tool as baseline
-- Full Preview/Live two-pane operator model — explicit anti-feature, adds complexity for the non-technical target user
-- Remote/mobile companion control app — materially larger scope than this milestone's single-browser-window model
+**Anti-features (explicitly do not build):**
+- A constrained instrument/equipment icon library for the stage plot — fights the free-text, one-off-marker requirement directly; use free-text labels instead
+- A global notification history/log of dismissed messages — no demonstrated need beyond the narrow "don't get stuck" fix
+- A dedicated live instant-blackout/logo-cut master control — still deferred (carried over from v2.4 research); v2.7 only fixes output-scoping of the existing "Go to black"
 
 ### Architecture Approach
 
-Everything new is a thin per-role wrapper around the existing slide engine, plus two small client-only utility modules (a BroadcastChannel protocol, a localStorage device-config store) — no new Firebase surface, no new Firestore collection, no Cloud Function. `SlideCanvas.vue` is extracted from `PresentationViewer.vue` to hold pure per-slide rendering (lyric/scripture/copyright/image/video + media playback), while `PresentationViewer.vue` keeps its chrome (exit button, nav, fullscreen, keyboard, font gate) and now composes `SlideCanvas` internally with zero behavior change at its one existing call site. Three new thin windows — `RunControlView.vue`, `AudienceOutputView.vue`, `ConfidenceOutputView.vue` — each independently instantiate `useSlideshowAssembly(service, orgId, {canWrite:false})` and therefore independently compute the identical `AssembledSlide[]` from the same Firestore documents; only a cheap integer index (plus a blackout flag) crosses via BroadcastChannel — never slide content. `AssembledSlide.slotIndex` (already stamped by `assembleSlideshow`) is the load-bearing join between the order-of-service rail and the flat slide array; a new `serviceSlots.ts` utility centralizes the sort/lookup so the rail's display order never drifts from the assembler's own. A standalone, service-independent `/monitor-setup` route persists the monitor→role mapping to `localStorage`, keyed by a synthesized fingerprint (`label:widthxheight:isPrimary`), never Firestore.
+This is integration research, not greenfield design — every feature slots into an existing code
+path. The dismissible-message store generalizes toasts.ts in place (widen push/dismiss,
+add a keyed setSticky/clearSticky API for condition-driven banners) rather than building a
+parallel system. The church switcher exposes the already-shipped selectOrg() +
+resetOrgScopedStores() machinery from the user menu (AppSidebar.vue) instead of reimplementing
+org-switch logic. The audience-only blackout fix is the smallest possible diff: stop
+ConfidenceOutputView.vue from consuming the shared blackout flag, rather than widening the
+RunState wire protocol. The black slide is a new LyricSection.kind/Slide.contentKind variant
+resolved at slideshowAssembler.ts's three existing content-resolution sites — it reuses 100% of
+the pool/order/drag machinery already in SongLyricEditor.vue, with zero changes needed in
+Run/Audience/Confidence composables (they already iterate assembledSlideshow generically). The
+loop timer lives entirely inside useRunControl.ts (the documented single writer), arming on
+watch(currentSlotIndex) and resetting via the existing postIndex() choke point so manual
+navigation never fights it. The stage layout is a new top-level org-scoped Firestore collection
+(stageLayouts/{serviceId}, mirroring serviceShareLinks), a new rules block modeled on the
+existing slideGroups draft-locked pattern, and a genuinely new StageLayoutEditor.vue freeform
+canvas — the one component in this milestone with no direct code-reuse precedent.
 
 **Major components:**
-1. `SlideCanvas.vue` (new, in `components/slides/`) — pure per-slide render + media playback, consumed by both `PresentationViewer.vue` and the three new Run windows
-2. `RunControlView.vue` + `RunOrderRail.vue` (new) — owns `currentIndex`/`blackout`, opens/positions the two output windows, broadcasts state, renders the order-of-service rail
-3. `AudienceOutputView.vue` / `ConfidenceOutputView.vue` (new, thin) — chromeless listeners; confidence forces `suppressBackground` and renders current+next
-4. `MonitorSetupView.vue` (new, standalone route `/monitor-setup`) — screen enumeration, role assignment, localStorage persistence
-5. `runChannel.ts` / `monitorConfig.ts` / `serviceSlots.ts` (new utils) — BroadcastChannel protocol, device-config fingerprinting, slot↔slide lookup — all pure, framework-agnostic, unit-testable in isolation
+1. src/stores/notifications.ts (generalized toasts.ts) + NotificationHost.vue — cross-cutting, ships first
+2. AppSidebar.vue church-switcher menu entry — reuses auth.ts's selectOrg/resetOrgScopedStores
+3. ConfidenceOutputView.vue blackout-consumption removal — smallest diff, isolated
+4. SongLyricEditor.vue + slideshowAssembler.ts + slideDisplay.ts/SlideCanvas.vue — new blackout slide kind
+5. useRunControl.ts loop composable — timer armed/disarmed through the existing postIndex choke point
+6. StageLayoutEditor.vue + src/stores/stageLayouts.ts + new stageLayouts/{serviceId} Firestore collection/rules — the one net-new subsystem
 
-### Critical Pitfalls
+### Critical Pitfalls (in-scope features only)
 
-1. **Permission-grant and permission-denied are both primary paths, not happy-path-vs-error-state** — `getScreenDetails()` must be called synchronously inside the click handler with no prior `await`; denial must route to a fully-built pop-out+drag+F11 fallback shipped in the SAME phase as auto-detect, not deferred as "polish."
-2. **Synchronous dual `window.open()`** — both output windows must open in direct response to the same click, before any async work; an `await` in between silently trips the popup blocker, and a non-technical operator gets no visible error.
-3. **Monitor→role mapping instability on replug** — persist a composite fingerprint (label + width/height + position), never array index or label alone; re-validate against the live screen list on every Run launch and force re-prompt only on a genuine mismatch, exactly as PROJECT.md specifies.
-4. **Fullscreen-loss cascading into a full session teardown** — the existing `PresentationViewer.vue` pattern (`fullscreenchange` → `exitPresentation()`) is explicitly wrong to copy per-window; each output window must offer a local "click to re-enter fullscreen" affordance on loss, never tear down the session or the other windows.
-5. **Auth/org context in popped-out windows** — a `window.open()` child is a separate JS realm with no automatic Pinia/store sharing; Firebase Auth persistence covers session survival for free, but org selection (sessionStorage-scoped by design) must also be passed explicitly via `?org=` query param, not relied on implicitly.
-6. **Un-preloaded images causing a flash** — background images and PPTX-rendered PNGs must be preloaded 2-3 slides ahead, independently in each output window, or a live click-jump into a large deck shows a visible pop-in/flash-to-black, undermining the "calm" UX goal.
+1. **Stage-layout canvas repeats this app's own drag-and-drop corruption history** (v1.4 phantom duplicates, v1.6 drag-into-section bugs) — avoid by using Pointer Events (not native HTML5 DnD, which is mouse-only by spec), storing position as percentage/normalized coordinates (never raw pixels), debouncing persistence to drag-end, and testing on a real touch device before calling the phase done.
+2. **Loop timer leaks or fights manual navigation / desyncs output windows** — avoid by routing every loop-triggered advance through the exact same runChannel broadcast path (never local-only state), scoping the timer's lifetime to the service-item via watch(currentSlotIndex), and explicitly deciding/testing whether "Go to black" pauses the loop.
+3. **Black slide corrupts the pooled-section slide model or positional numbering** — avoid by giving it its own contentKind (not 'lyric' with empty content), explicitly excluding it from deriveSectionKind/positional numbering, and never letting it be pool-referenced/shared across occurrences. Get this data-model decision settled before any editor UI is built — retrofitting later means migrating already-saved black slides.
+4. **A generic dismissible-message system is retrofitted onto the deliberately narrow toasts.ts, or built as a second, parallel system** — avoid by explicitly generalizing/replacing toasts.ts in this phase and migrating the known stuck-banner cases (RunControlView's monitor-reassign banner, MonitorSetupView's save-outcome warning) onto it as the proof case, not just building the mechanism in isolation.
+5. **Church switcher bypasses the already-hardened multi-org reset path** — avoid by calling the existing selectOrg() (never a new parallel implementation), and registering the stage-layout store (the one new org-scoped store this milestone adds) in resetOrgScopedStores()'s call list as part of that feature's own phase — this is the single item most likely to be silently forgotten.
+
+## Deferred (Future Milestone): Rehearsal Attachments & Public Rehearse Mode
+
+Out of scope for v2.7, but the highest-risk area researched — carry this warning forward:
+
+- **Public Storage exposure risk (Critical Pitfall #1 in PITFALLS.md):** naively widening
+  storage.rules to let an anonymous Rehearse visitor read a song attachment risks making the
+  **entire org's Storage bucket world-readable** if the fix is a blanket allow read: if true
+  on an existing broad match. Requires a dedicated, narrowly-scoped Storage path
+  (e.g. orgs/{orgId}/rehearsalAttachments/...) with its own rule, never a widened existing match.
+- **The firestore.exists() cross-service blind spot repeats:** this codebase already shipped a
+  deny-everyone Storage rule once because firestore.exists() is inert in the Storage emulator
+  (documented incident, CLAUDE.md 2026-08-06). The "is this attachment actually shared" check for
+  an anonymous visitor must not repeat that pattern — denormalize onto Storage custom metadata, or
+  route through a server-side Cloud Function/signed URL, never a storage.rules-side Firestore read.
+- **Egress/cost blast radius:** v1.8 was an entire milestone dedicated to capping Blaze-plan costs;
+  public, unauthenticated, per-play Storage egress on MP3s/PDFs is a structurally new and larger
+  cost surface than anything capped so far, with no existing retention sweep covering it.
+- Recommended future-milestone approach (from STACK/ARCHITECTURE research, not re-litigated here):
+  Storage download-token URL as a bearer capability denormalized into the frozen public share
+  snapshot (same pattern roleAssignments/bpm already use), a dedicated size-capped Storage path,
+  and steering users toward YouTube links (zero Storage cost) over uploaded audio/PDF wherever
+  possible.
 
 ## Implications for Roadmap
 
-### Phase 1: SlideCanvas Extraction (foundation)
-**Rationale:** Every downstream phase (control preview, audience output, confidence output) depends on a working, tested `SlideCanvas.vue`; doing this first isolates the one refactor risk to the existing, well-tested `PresentationViewer.vue` call site before any new surface is built on top of it.
-**Delivers:** `SlideCanvas.vue` extracted with `slide`/`suppressBackground`/`interactive` props; `PresentationViewer.vue` refactored to compose it with zero behavior change (verified against its existing test file's `data-testid` markers).
-**Avoids:** Anti-Pattern 1 (forking `PresentationViewer.vue` three times) — establishes the single-source-of-truth rendering discipline the rest of the milestone depends on.
+Dependency-honoring build order for the **six in-scope v2.7 features**, per ARCHITECTURE.md's
+"Suggested Build Order" (renumbered here to match in-scope numbering) and cross-checked against
+FEATURES.md's dependency graph and PITFALLS.md's phase mapping:
 
-### Phase 2: Config + Channel Utilities
-**Rationale:** `runChannel.ts`, `monitorConfig.ts`, and `serviceSlots.ts` are pure, framework-agnostic, independently unit-testable modules with no UI dependency — building and testing the sync/persistence primitives before any window consumes them catches the highest-consequence pitfalls (fingerprint instability, feedback loops, single-writer discipline) in isolation.
-**Delivers:** A typed BroadcastChannel protocol (`state`/`hello` messages), the screen-fingerprint diff/match algorithm, and the `slotIndex`↔first-assembled-slide-index lookup.
-**Uses:** BroadcastChannel, localStorage fingerprinting per STACK.md; `AssembledSlide.slotIndex` per ARCHITECTURE.md Pattern 3.
-**Avoids:** Pitfall 2 (stale monitor mapping), Pitfall 12 (feedback loop on shared channel) — get the single-writer/fingerprint-diff design right before any window depends on it.
+### Phase 1: Dismissible message store (foundation)
+**Rationale:** Fully decoupled from every other v2.7 feature — no data-model or rules dependency.
+Fixes a real, currently-annoying bug (the stuck "monitors not configured" banner) fast, and later
+Run-flow phases (blackout relabel, any Run-side follow-up) should land against the new/generalized
+store, not the old ad-hoc ref-gated banner.
+**Delivers:** Generalized notifications.ts (extends toasts.ts) with a keyed setSticky/clearSticky
+API for condition-driven banners, plus a dismiss() manual-dismiss path on every message. Migrates
+RunControlView.vue's monitor-reassign banner and MonitorSetupView.vue's save-outcome warning
+onto it as proof cases.
+**Addresses:** System-wide dismissible messages (table stakes, P1)
+**Avoids:** Notification system collision (two parallel mechanisms coexisting)
 
-### Phase 3: Monitor Configuration Screen
-**Rationale:** This is the single riskiest user-gesture flow in the whole milestone (permission prompt UX) and must be built and manually tested — both granted and denied paths — before the Run flow that depends on it exists.
-**Delivers:** Standalone `/monitor-setup` route: screen enumeration via `getScreenDetails()`, Audience/Confidence role assignment UI, persistence to `localStorage`, and the pop-out+drag+F11 fallback as an equally-supported primary path (not an error state).
-**Addresses:** "Standalone, persistent monitor configuration" (table stakes, FEATURES.md).
-**Avoids:** Pitfall 1 (permission requested at the wrong moment), Pitfall 3 (no fallback when API absent/unsupported), Pitfall 7 (fullscreen on wrong screen).
+### Phase 2: User-menu church switcher
+**Rationale:** Fully independent of everything else in this milestone; zero data-model or rules
+dependency; safe to parallelize with Phase 1 if capacity allows, but sequenced second here since
+it shares no risk surface with Phase 1 and both are good "quick win" candidates early in the
+milestone.
+**Delivers:** ChurchSwitcherMenu.vue (or AppSidebar.vue addition) reusing authStore.selectOrg()
+for regular multi-org members, distinct from the existing super-admin enterOrgAsSuperAdmin path;
+shows each org + the user's role; full state reset via resetOrgScopedStores().
+**Addresses:** Church switcher (table stakes, P1)
+**Avoids:** Bypassing the already-hardened multi-org reset path (must call selectOrg(), not reimplement)
 
-### Phase 4: Audience Output Window
-**Rationale:** Builds directly on Phases 1-3; the simpler of the two output windows (single `SlideCanvas`, background on) — validates the window-open/position/fullscreen/BroadcastChannel-listener pipeline before adding the confidence monitor's extra current+next complexity.
-**Delivers:** `AudienceOutputView.vue` — fullscreen, chrome-free, listens-only, own `useSlideshowAssembly` instance, own Wake Lock, own preload-ahead logic, own font-load gate reuse (`slideTypography.ts`).
-**Addresses:** "Audience output: fullscreen + background, zero chrome" (table stakes).
-**Avoids:** Pitfall 5 (fullscreen gesture-origin failure), Pitfall 6 (fullscreen-loss cascade), Pitfall 16 (un-preloaded images), Pitfall 17 (font gate not shared), Pitfall 19 (operator chrome/cursor leaking).
+### Phase 3: "Go to black" scoped to Audience output only
+**Rationale:** Small, isolated, no dependency on anything else in the milestone. A quick, low-risk
+win to bank while the team is already inside RunControlView.vue/useRunControl.ts from Phase 1's
+monitor-banner migration — good sequencing locality, not a hard dependency.
+**Delivers:** ConfidenceOutputView.vue stops consuming the shared blackout flag for its overlay
+(the minimal-diff fix, no RunState wire-protocol change); RunHeader.vue's blackout control
+relabeled ("Blackout audience") for operator clarity.
+**Addresses:** "Go to black" scoped to Audience only (table stakes / bug fix, P1)
+**Avoids:** N/A directly, but sets correct precedent for output-scoping before Phase 5 (loop) touches the same Run-flow code
 
-### Phase 5: Confidence Monitor Output Window
-**Rationale:** A rendering-mode fork of the same audience-window pattern (Pattern 2: suppress-background is one prop, not a second render path) — sequenced after Audience so the shared window-lifecycle/Wake Lock/preload patterns are already proven once.
-**Delivers:** `ConfidenceOutputView.vue` — current+next `SlideCanvas` pair, `suppressBackground` forced true, chrome-free.
-**Addresses:** "Confidence monitor: current+next, black background, no chrome" (table stakes).
-**Avoids:** Same pitfall set as Phase 4, plus confirms the black-background transform stays a prop, not a duplicated content path.
+### Phase 4: Inline black slide in the lyric editor
+**Rationale:** Self-contained within the song-lyrics/slideshow-assembler subsystem; no dependency
+on attachments or stage layout (both deferred anyway). Sequenced before the loop phase so looping
+can be validated against a slideshow that can already contain a black interlude slide — the two
+features are the most likely to interact during a rehearsal-length item.
+**Delivers:** New LyricSection.kind: 'blackout' / Slide.contentKind: 'blackout' variant,
+resolved at all three slideshowAssembler.ts content-resolution sites; editor UI chip in
+SongLyricEditor.vue's ADD_SECTION_KINDS; a new render branch in SlideCanvas.vue; explicit
+exclusion from positional numbering and pool-referencing.
+**Addresses:** Inline black slide (table stakes, P1)
+**Avoids:** Black slide corrupting the pooled-section model or positional numbering; get this settled as a data-model decision before UI, not after
 
-### Phase 6: Run/Control Screen + Run Entry Point
-**Rationale:** The most complex phase — owns the sync architecture decision (BroadcastChannel primary, resolved in Phase 2), the order-of-service rail, the "one click" Run bootstrap that opens both output windows synchronously, and the locked-service gate. Sequenced last among the "core delivery" phases because it depends on all four prior phases (SlideCanvas, utilities, monitor config, both output windows) being in place to open/position/sync against.
-**Delivers:** `RunControlView.vue` + `RunOrderRail.vue`; new "Run" button on locked services (`ServiceCard.vue`/`ServiceEditorView.vue`); keyboard nav (Right/Space/Left existing, NEW Up/Down for item-jump); click-to-jump; window-open orchestration with the matched/unmatched monitor-config branches.
-**Addresses:** "Run button on locked service," "order-of-service list with current-item highlight," "click to jump," "standard keyboard nav" (all table stakes).
-**Avoids:** Pitfall 9 (popup blocker), Pitfall 10 (race condition on window open), Pitfall 18 (operator can't tell windows apart in fallback), Pitfall 20 ("you are here" indicator), Pitfall 21 (accidental exit).
-**Owns the requirements-level decision:** who may click Run — resolve the editor-only vs. new "projectionist" role tier question here (see Gaps below) before this phase is planned in detail.
+### Phase 5: Per-item loop timer
+**Rationale:** Builds inside useRunControl.ts, benefits from Phase 1 already being in place for
+any loop-state messaging, and from Phase 4 existing so looping a song with an inline black
+interlude is exercised as part of verification.
+**Delivers:** ServiceSlot.loop?: { enabled, intervalSeconds } field; timer armed via
+watch(currentSlotIndex), routed through the existing postIndex() choke point so manual nav
+resets rather than fights it; explicit decision on whether "Go to black" pauses the loop.
+**Addresses:** Per-item loop checkbox with interval control (table stakes, P1)
+**Avoids:** Loop timer leaking, racing manual nav, or desyncing output windows; verification must explicitly test manual-nav-during-loop, item-change-during-loop, black-during-loop, and route-away-during-loop, checked in an OUTPUT window, not just control
 
-### Phase 7: Live-Ops Hardening
-**Rationale:** Sequenced last — these are cross-cutting robustness concerns (monitor replug mid-service, closed-window recovery, wake-lock re-acquisition over a realistic 60-90 min session, Firestore-rules coverage for any new state) that only matter once the core three-window flow already works end-to-end, and several require real-length manual testing that's wasteful to run before the core flow stabilizes.
-**Delivers:** `screenschange`/`resize` listener + control-window banner for mid-service monitor changes; `window.closed` polling + one-click reopen for a closed output window; Wake Lock re-acquisition on `visibilitychange`; `firestore.rules` coverage (if any new run-state document is introduced) verified via `npm run test:rules`.
-**Avoids:** Pitfall 4 (monitor unplug mid-service), Pitfall 13 (closed output window, no recovery), Pitfall 14 (machine sleep/screensaver).
+### Phase 6: Visual stage layout per service
+**Rationale:** Architecturally independent of every other v2.7 feature (its only dependency is
+deciding the per-service marker data shape, which is new modeling regardless of sequencing).
+Sequenced **last** deliberately: it is the single largest, most novel build in the milestone (new
+Firestore collection + rules block + a genuinely new freeform-canvas interaction pattern with no
+existing drag precedent to reuse), and this app has a documented history of drag-and-drop
+corrupting state — give it the most implementation runway and the most mature notification/state
+patterns (Phases 1-5) already proven before tackling it.
+**Delivers:** New stageLayouts/{serviceId} top-level Firestore collection (mirrors
+serviceShareLinks), rules block modeled on slideGroups' draft-locked pattern,
+StageLayoutEditor.vue (Pointer Events, percentage {zone, xPct, yPct} coordinates, debounced
+persistence), src/stores/stageLayouts.ts registered in resetOrgScopedStores(), free-text-labeled
+markers supporting one-off additions (e.g. guest-speaker mic).
+**Addresses:** Freeform stage-layout canvas with on/off-stage zones + free-text markers, including one-off markers (table stakes, P1)
+**Avoids:** Repeating this app's own drag-and-drop corruption history; reinforces the checklist item to register the new store in resetOrgScopedStores()
 
 ### Phase Ordering Rationale
 
-- Foundation-first sequencing (SlideCanvas → utilities → monitor config) isolates the highest-blast-radius refactor and the riskiest permission/fingerprint logic before any new UI depends on them, matching both the architecture researcher's "reuse not fork" framing and the pitfalls researcher's "test the riskiest gesture call first, isolated" recommendation.
-- Output windows before the control screen lets the simpler, independently-testable consumer of `SlideCanvas` + BroadcastChannel-listening validate the pattern before the control screen's more complex orchestration (window-open sequencing, rail, keyboard nav) is layered on top.
-- Live-Ops Hardening is deliberately last and separable — FEATURES.md's dependency graph confirms multi-monitor delivery is orthogonal to slide-rendering work, and PITFALLS.md explicitly scopes several of these (replug, closed-window recovery, long-run wake-lock) to a dedicated hardening phase distinct from the initial builds.
-- This order avoids Anti-Pattern 2 (routing state through Firestore) and Anti-Pattern 3 (storing monitor config in Firestore) by settling the sync/persistence architecture (Phase 2) before any window that would be tempted to reach for the app's familiar Firestore-realtime default instead.
+- **Cross-cutting infrastructure first (Phases 1-2):** the dismissible-message store and church
+  switcher have zero dependency on any other v2.7 feature and de-risk the milestone early with
+  fast, low-risk wins.
+- **Isolated Run-flow fixes next (Phases 3-5):** audience-only blackout, black slide, and loop all
+  touch the same RunControlView.vue/useRunControl.ts/slideshow-assembler subsystem — grouping
+  them together (blackout scoping then black slide then loop, since loop benefits from a testable
+  black-slide interlude existing first) means fewer context-switches and lets the loop phase's
+  verification exercise the black-slide phase's output.
+- **Stage layout last (Phase 6):** the only genuinely novel subsystem in this milestone (new
+  collection, new rules block, new drag interaction pattern) — sequencing it last means it inherits
+  the most mature, already-proven-in-this-milestone patterns (notification store, org-store-reset
+  discipline) rather than being built in isolation early, and gives it the most implementation
+  runway given this app's drag-and-drop track record.
+- **No feature in this six-item scope has a hard blocking dependency on another** — every phase
+  above could technically be reordered or parallelized by workstream capacity except that Phase 4
+  (black slide) should precede Phase 5 (loop) for verification-quality reasons, not a hard
+  technical dependency.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 3 (Monitor Configuration Screen):** the permission-prompt UX and pop-out fallback need real-device testing (mixed-DPI monitors, actual permission-denial flow) that this research pass could not fully simulate — flag for `--research-phase` if the plan needs concrete UI copy/flow validation beyond what STACK.md/PITFALLS.md already specify.
-- **Phase 6 (Run/Control Screen):** the projectionist-role decision (below) is a requirements gap, not just an implementation detail — plan-phase should not proceed until requirements resolves it, since it affects the Run entry point's auth/RBAC gating.
+- **Phase 6 (stage layout):** the freeform canvas drag interaction is the one sub-feature flagged
+  by ARCHITECTURE.md as "likely to need its own phase-level design pass (drag math, palette of
+  element kinds, zone boundaries) rather than a straight port of an existing pattern" — this app
+  has no existing freeform-drag precedent to reuse, unlike every other phase.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 1 (SlideCanvas Extraction):** a well-documented, low-risk Vue component-extraction pattern; ARCHITECTURE.md already provides the exact prop shape and migration approach.
-- **Phase 2 (Config + Channel Utilities):** BroadcastChannel and fingerprint-diff patterns are fully spec'd in STACK.md/ARCHITECTURE.md/PITFALLS.md with code-shape examples already provided.
-- **Phases 4-5 (Output Windows):** the rendering-fork pattern (Pattern 2) and font/preload reuse are already concretely specified against this exact codebase.
-- **Phase 7 (Live-Ops Hardening):** each item has a documented MDN/Chrome-for-Developers pattern (visibilitychange re-acquire, screenschange listener, window.closed polling) — implementation is standard, though verification needs real-length manual testing.
+- **Phase 1 (notification store):** direct extension of an existing, already-understood Pinia store.
+- **Phase 2 (church switcher):** pure UI exposure of already-shipped, already-tested auth.ts primitives.
+- **Phase 3 (audience-only blackout):** minimal template-level diff, no new architecture.
+- **Phase 4 (black slide):** reuses 100% of the existing pool/order/drag machinery in SongLyricEditor.vue; the only design work is the contentKind decision, already resolved by ARCHITECTURE.md.
+- **Phase 5 (loop timer):** a documented, well-understood composable pattern (useRunControl.ts's existing choke-point discipline) with a clear implementation sketch already in ARCHITECTURE.md.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM-HIGH | All core APIs verified against MDN/Chrome-for-Developers/W3C spec repo; two facts (long-run `id` persistence across browser restarts, exact Edge version parity) could not be pinned to a single authoritative source |
-| Features | MEDIUM | Cross-checked across ≥2 independent sources per claim (vendor docs + trade press), but no Context7/Ref-authoritative doc provider was available; exact keystrokes are a strong convention to imitate, verify via UAT once built |
-| Architecture | HIGH | All claims verified against live source in this repo; the two external-API claims (Firebase Auth default persistence, Window Management API shape) are well-established, stable platform behavior |
-| Pitfalls | MEDIUM-HIGH | Window Management/Fullscreen/Wake Lock/BroadcastChannel mechanics are HIGH confidence (official docs); live-operation and non-technical-UX pitfalls are MEDIUM — synthesized from platform behavior + this project's own existing code, not a published post-mortem of church presentation software specifically |
+| Stack | HIGH | Every recommendation grounded in direct reads of package.json and existing composables; zero new dependencies needed, so version-drift risk is minimal |
+| Features | MEDIUM | Cross-checked against 2+ independent sources per claim (Planning Center, ProPresenter, WorshipTools, stage-plot trade press, SaaS-UX pattern sources), but no authoritative code-doc provider was available this pass — treat exact UI conventions as strong precedent, verify against real UAT once built |
+| Architecture | HIGH | Every integration point cited against real files read in this pass (runChannel.ts, useRunControl.ts, ShareView.vue, storage.rules, firestore.rules, songLyrics.ts, songSectionOrder.ts, auth.ts, orgScopedStores.ts, toasts.ts, etc.) — pure internal-integration analysis, not inference |
+| Pitfalls | HIGH for codebase-grounded findings (stage-layout drag history, notification collision, church-switcher reset path, black-slide model corruption, loop desync — all read directly from source and this project's own documented incident history); LOW for a handful of general web-search-sourced supporting claims (native HTML5 DnD touch behavior, aria-live conventions) used only as secondary context |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **WHO may run a service** (flagged explicitly by the architecture researcher): PROJECT.md introduces a "new projectionist role concept" but does not specify whether this is (a) the existing editor role simply gaining a new "Run" affordance, or (b) a genuinely new, narrower RBAC tier distinct from editor/viewer. This directly determines the auth-gating logic on the Run entry point (Phase 6) and possibly `firestore.rules` scope — **requirements must resolve this before Phase 6 is planned in detail.**
-- **Exact keyboard shortcut map:** the researched convention (Right/Space=next, Left=prev, Up/Down=item-jump, Escape=exit-with-confirmation) is a synthesis across tools, not a single documented spec for this app — validate the final binding set with the milestone's own planned UI-research/UAT pass before treating it as final.
-- **Edge browser version parity:** Window Management API support in Edge is corroborated via policy-documentation cross-referencing (Edge 123 `DefaultWindowManagementSetting`) rather than a single authoritative "ships since Edge X" statement — low risk given the project already targets modern evergreen Edge, but worth a quick manual smoke-test on the actual church's Edge version if known.
-- **Screen `id` stability across a cookie/data clear:** documented as an edge case (Pitfall/Stack), mitigated by the fingerprint-based re-validation design — but has not been exercised against this specific app; include an explicit "clear site data, confirm re-prompt" test in Phase 3's or Phase 7's verification.
+- **Stage-layout freeform-drag interaction design** is the one area where no existing in-app
+  pattern can be ported wholesale — flag for --research-phase or a dedicated design pass during
+  Phase 6 planning (drag math, marker palette, zone-boundary UX), not a gap in the research itself
+  so much as a genuinely new build.
+- **Whether "Go to black" should pause the per-item loop** (Phase 5/3 interaction) is explicitly
+  named in PITFALLS.md as a decision that must be made deliberately and tested, not left as an
+  accident of implementation order — resolve during Phase 5 planning.
+- **FEATURES.md's confidence is MEDIUM** (no premium search API was available for that research
+  pass) — the comparable-product conventions (Planning Center, ProPresenter, WorshipTools) are
+  useful directional confirmation for the in-scope features (blackout output-scoping, per-item
+  loop defaults, dismissible-notification conventions) but should be treated as strong precedent to
+  imitate, not a verbatim spec.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- MDN — Window Management API, ScreenDetailed, Fullscreen API, Screen Wake Lock API, BroadcastChannel (official docs)
-- Chrome for Developers — "Manage several displays with the Window Management API," "Stay awake with the Screen Wake Lock API"
-- W3C `window-management` spec repo — HOWTO.md, EXPLAINER.md
-- Direct source inspection of this repo: `src/components/PresentationViewer.vue`, `src/utils/slideshowAssembler.ts`, `src/composables/useSlideshowAssembly.ts`, `src/types/slide.ts`, `src/stores/auth.ts`, `src/firebase/index.ts`, `src/router/index.ts`
-- `.planning/PROJECT.md` — v2.4 milestone scope and owner decisions
+- Direct codebase reads: .planning/PROJECT.md, CLAUDE.md, src/utils/runChannel.ts,
+  src/composables/useRunControl.ts, src/composables/useOutputWindow.ts,
+  src/views/RunControlView.vue, src/views/AudienceOutputView.vue,
+  src/views/ConfidenceOutputView.vue, storage.rules, firestore.rules, src/types/song.ts,
+  src/types/service.ts, src/types/slide.ts, src/types/songLyrics.ts,
+  src/utils/songSectionOrder.ts, src/utils/slideshowAssembler.ts,
+  src/components/slides/slideDisplay.ts, src/views/ShareView.vue, src/stores/services.ts,
+  src/stores/toasts.ts, src/stores/auth.ts, src/stores/orgScopedStores.ts,
+  src/components/SongLyricEditor.vue, src/composables/useMediaUpload.ts,
+  src/router/index.ts, src/components/AppSidebar.vue, package.json
 
 ### Secondary (MEDIUM confidence)
-- Renewed Vision (ProPresenter official support docs), EasyWorship official help, Faithlife Proclaim official features/support, OpenLP official manual, FreeShow official docs, Church Presenter blog, Church Production Magazine, Igniter Media, MediaShout/The Lead Pastor — cross-checked feature/keyboard/confidence-monitor convention claims
-- caniuse.com (`mdn-api_window_getscreendetails`) — live browser-support source of truth
-- Scott Logic (multi-window browser apps), community cross-window-communication write-ups — BroadcastChannel/noopener behavior corroboration
+- Planning Center Services / ProPresenter (Renewed Vision) official docs and support articles —
+  loop/auto-advance, output-toggle, and chord-chart conventions
+- WorshipTools, Stageplot Pro, ProSoundWeb, Sonicbids, Church AVL — stage-plot minimum-viable-feature convergence
+- LogRocket, SaaSUI, Carbon Design System — toast/banner UX convention
+- Slack/Notion-referenced SaaS multi-tenant/workspace-switcher pattern sources
 
 ### Tertiary (LOW confidence)
-- W3C `window-management` GitHub Issue #80 (`ScreenDetailed` object-identity stability) — used as corroboration only, not sole source
-- Edge Chromium-parity via policy documentation cross-reference — treat exact version boundary as approximate
+- Single-source web findings on Firebase Storage download-token permanence, native HTML5 DnD
+  touch-event behavior, and aria-live toast conventions — used only as supporting context, not
+  load-bearing for any in-scope v2.7 decision
 
 ---
-*Research completed: 2026-08-28*
+*Research completed: 2026-08-31*
 *Ready for roadmap: yes*

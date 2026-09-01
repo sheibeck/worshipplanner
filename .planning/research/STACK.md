@@ -1,137 +1,253 @@
-# Stack Research
+# Stack Research: v2.7 Rehearsal, Stage Plans & Presentation Polish
 
-**Domain:** Browser-based live worship-service presentation/projection ("Run the Service") — multi-monitor delivery from a single Chrome/Edge tab
-**Researched:** 2026-08-28
-**Confidence:** MEDIUM-HIGH (all core APIs verified against MDN, Chrome for Developers, and the W3C `window-management` spec repo; two facts — long-run `id` persistence across browser *restarts*, and exact Edge version parity — could not be pinned to a single authoritative sentence and are flagged below)
+**Domain:** Stack additions for 5 new-feature areas in a mature Vue 3 + Firebase worship-planning app
+**Researched:** 2026-08-31
+**Confidence:** HIGH
+
+## Bottom Line
+
+**Zero new npm dependencies are required for v2.7.** Every one of the five feature areas is
+covered by a native browser API or by extending an existing dependency/pattern already in
+`package.json` and `src/`. This is a deliberate, opinionated recommendation, not a default —
+each feature below was evaluated against real library alternatives (with current versions) and
+rejected in favor of the lower-complexity native/existing option. Where a library genuinely earns
+its place, it's called out explicitly; none did.
 
 ## Recommended Stack
 
-### Core Technologies — all native browser APIs, zero new npm dependencies
+### Core Technologies (unchanged — no new core deps)
 
-| Technology | Version / Support | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| **Window Management API** (`window.getScreenDetails()`, `ScreenDetails`, `ScreenDetailed`, `screen.isExtended`) | Chromium 100+ (Chrome & Edge; Edge policy docs confirm control as of Edge 123, API itself ships wherever Chromium 100+ ships since Edge tracks Chromium releases). **Not Baseline** — Chromium-only, no Firefox/Safari support. `caniuse.com/mdn-api_window_getscreendetails` is the live source of truth. | Enumerate every connected monitor (position, size, `isPrimary`, `label`, `id`) so the monitor-config screen can list real displays and place output windows on the correct one | This is the *only* web API that exposes multi-screen topology at all. The project's constraint (Chrome/Edge only, per PROJECT.md) removes the "not Baseline" objection — it's a hard requirement here, not a nice-to-have polyfilled elsewhere |
-| **`window-management` permission** | Same Chromium 100+ gate | Gates `getScreenDetails()`; user sees a one-time OS-level "Know when windows are open on other displays / manage windows" prompt | Required — `getScreenDetails()` throws `NotAllowedError` if not granted. Chrome **persists the grant per-origin across sessions** (visible/revocable in the site's lock-icon → Site settings → "Additional permissions"), so the "remembered per device" requirement (R: persistent monitor config) is satisfied by the browser itself, not just app storage |
-| **Fullscreen API with `screen` option** (`element.requestFullscreen({ screen })`) | Chromium 100+ alongside Window Management (Fullscreen API core is Baseline widely-available since ~2018; the `screen` option is the new, Chromium-only part, spec'd together with Window Management) | Puts the audience/confidence `<div>` into true chrome-free fullscreen **on a specific monitor**, in one call, without first moving/resizing a windowed popup | Avoids the flicker/race of "open window → moveTo → resize → requestFullscreen" — `requestFullscreen({screen: targetScreen})` is spec'd to open directly full-screen on that screen. This is the single biggest quality win over the old drag-then-F11 pattern |
-| **`window.open()` with `left/top/width/height`** | Universal (all browsers, all versions) | Fallback/bootstrap: opens the two output windows as ordinary popups, positioned onto a target screen's coordinates (from `ScreenDetailed.left/top/availWidth/availHeight`) before fullscreening them | Needed regardless of Window Management support — it's how you get *any* second window open at all (Window Management only tells you *where* screens are; it doesn't open windows). Also the entire fallback path when permission is denied: user manually drags the popup to the second monitor, then presses F11 |
-| **BroadcastChannel** | Baseline **widely available** since March 2022 (all evergreen browsers) | Cross-window state sync: control window → audience window + confidence window, "go to slide N / blank / next" | See "Cross-window sync" analysis below — this is the correct primitive for this job, not Firestore and not a shared Pinia store |
-| **Screen Wake Lock API** (`navigator.wakeLock.request('screen')`) | Baseline **2025** (shipped across evergreen browsers as of March 2025; secure-context/HTTPS required) | Keep the audience and confidence displays from sleeping/dimming during a 60–90 min service | Native, zero-dependency, exactly matches the need. Must be re-acquired per output window on `visibilitychange` (see gotchas) |
+| Technology | Version (existing) | Purpose | Why nothing changes |
+|------------|---------------------|---------|----------------------|
+| `firebase` (Storage SDK, modular) | `^12.0.0` (already installed) | PDF/MP3 attachment upload for rehearsal media | `uploadBytesResumable` + `getDownloadURL` — the exact API `useMediaUpload.ts`/`useBackgroundUpload.ts` already use. Feature 3 is a straight extension of this pattern, not a new integration. |
+| Native `<audio>` element | HTML5, all target browsers | MP3 rehearsal playback on the public share page | Built-in transport controls, buffering, and mobile support (incl. iOS Safari, which requires a user gesture to start — satisfied by a Play tap) with zero JS. |
+| Native `<iframe>` (YouTube embed) | HTML5 | YouTube video playback on the public share page | `youtube.com/embed/{videoId}` is the documented, stable embed surface; no SDK needed for simple playback (no need for the heavier `youtube-iframe-api` JS API unless you later want programmatic play/pause sync, which is out of scope). |
+| Native `<iframe>` / `target="_blank"` link (browser PDF viewer) | N/A | PDF chord-chart viewing on the public share page | See "PDF viewing" below — every target browser (desktop Chrome/Edge/Firefox/Safari, and modern mobile Chrome/Safari) has a built-in PDF renderer. |
+| Pinia | `^3.0.4` (already installed) | System-wide toast/dismissible-message store | Matches every other piece of cross-cutting UI state in this app (auth, org, run-channel state). A toast store is ~40 lines on top of an already-adopted pattern. |
+| Native `setInterval`/`clearInterval` (in a composable) | N/A | Loop-a-service-item auto-advance timer | A single-purpose interval with a configurable delay and cleanup on unmount — textbook `setInterval` use case, not a scheduling problem. |
+| Native Pointer Events API (`pointerdown`/`pointermove`/`pointerup`, `setPointerCapture`) | Baseline browser API (Chrome/Edge/Firefox/Safari all current) | Freeform drag-and-drop stage-layout canvas | Unifies mouse + touch + pen input in one event model — the touch support the feature explicitly needs comes for free, without a gesture library. |
 
-### Supporting Libraries — none required
+### Supporting Libraries — evaluated, none added
 
-| Library | Verdict |
-|---------|---------|
-| screenfull.js / any fullscreen-shim | **Do not add.** Its entire purpose is normalizing vendor-prefixed Fullscreen API calls across Safari/Firefox/old-Chrome. This project is Chromium-only by explicit constraint (PROJECT.md: "Chrome/Edge target confirmed"), and the native unprefixed API has covered Chromium fully since Chrome 71+ — a shim adds a dependency to solve a problem that doesn't exist for this target |
-| Any "multi-window state management" package (e.g. broadcast-channel npm wrapper, workbox-broadcast-update) | **Do not add.** The native `BroadcastChannel` constructor is ~10 lines to wrap in a composable; a wrapper library buys nothing extra here (no IE11 need, no cross-tab-without-BroadcastChannel fallback need since target is evergreen Chromium) |
-| A "presentation remote control" framework (e.g. reveal.js's multiplex plugin) | **Do not add.** Those solve *networked* remote-control (phone controls a projector over the internet); this milestone is same-machine, same-origin, same-browser-profile — BroadcastChannel already solves it for free |
+| Library | Current version | Purpose it would serve | Verdict |
+|---------|------------------|-------------------------|---------|
+| `vue-konva` / `konva` | `vue-konva` 3.4.0 (npm, Vue 3-only; requires `konva` peer) | Canvas-based freeform stage layout with drag/resize/snap | **Not warranted.** Konva is a full 2D canvas scene-graph library (shapes, layers, hit-testing, transforms) built for rich graphics editors. Placing a fixed set of instrument/mic icons at arbitrary x/y inside two rectangular zones needs none of that — it's DOM positioning, not scene-graph rendering. Konva also renders to `<canvas>`, which means re-implementing accessibility/hover/click affordances that free HTML elements get natively, and it pulls in a canvas render loop for what is a mostly-static authoring surface. |
+| `interactjs` | 1.10.27 (last published ~2 yrs ago per npm/GitHub) | Drag, resize, multi-touch gesture library | **Not warranted**, and mildly stale (last release ~2 years old, though still functional). It's a general gesture engine (inertia, snapping, resizable/rotatable elements) — this feature only needs "pick up an icon, drop it inside a zone," which the native Pointer Events API does directly with less code and no library update-cadence risk. |
+| `vue-draggable-plus` / `vuedraggable` (SortableJS Vue wrapper) | N/A (not currently used — app calls `sortablejs` directly, `^1.15.7`) | Drag-and-drop | **Wrong tool for this feature.** SortableJS-family libraries are built for *reordering lists* (the exact job they already do in this app for song lyric slides, roster rows, etc. — see `src/components/SongLyricEditor.vue`, `src/components/slides/SlideGrid.vue`). Stage-layout placement is *free x/y positioning inside a zone*, not a sortable list — there is no natural "index" to reorder. Do not reach for the existing SortableJS pattern here; it doesn't fit the interaction. |
+| `vue-toastification` | v2.x line (Vue 3-compatible; ~2.4k GitHub stars) | Toast/notification system | **Not warranted.** Full-featured (positions, transitions, pause-on-hover, icons) but that featureset is aimed at ephemeral auto-dismissing toasts — the opposite of what R-level v2.7 asks for ("no warning/error that gets stuck on screen… every message is manually dismissible"). This app's own Key Decisions log already recorded moving *away* from toast-style notifications toward persistent, explicitly-dismissed inline status (`Autosave` decision, v1.4) — a purpose-built store keeps that precedent instead of reintroducing toast semantics wholesale. Also ships its own CSS that would need auditing against the Tailwind v4 dark-mode canonical theme. |
+| `vue3-toastify` | 0.2.9 (last published ~6 months ago) | Toast/notification system | Same verdict as `vue-toastification` — lighter-weight but still an auto-dismiss-first toast library fighting the "manually dismissible, no auto-clear-until-condition-met" requirement (the "monitors not configured" warning must clear on a *state change*, not a timer — that's app logic no toast library provides anyway). |
+| `pdfjs-dist` (Mozilla PDF.js) | 6.3.289 (actively maintained, canvas-based renderer) | In-app PDF rendering with custom UI | **Not warranted for this use case.** PDF.js earns its place when a product needs annotations, custom toolbars, or PDF manipulation as a core UX (dashboards, markup tools). Viewing a static chord-chart PDF is exactly the case where "use the browser's native renderer" is the documented right call — every target browser has one, it needs zero bundle weight, and it works identically whether the PDF opens in an `<iframe>` or a new tab. |
+| `youtube-iframe-api` (YouTube's official JS Player API) | N/A | Programmatic control of the embedded YouTube player | Not needed for "play a rehearsal video" — a plain `<iframe src="…/embed/{id}">` is sufficient. Only reach for the JS Player API if a later milestone needs cross-window playback sync (e.g., pausing video when advancing Run slides), which is out of scope here. |
+
+## Feature-by-Feature Detail
+
+### 1. Public shared-link rehearsal media playback (MP3 / YouTube / PDF)
+
+**No new dependency.**
+
+- **MP3:** `<audio controls :src="downloadUrl" preload="metadata">`. Works unauthenticated because
+  the file is fetched by URL, not through the Firestore/Storage SDK read path — the only
+  requirement is that the Storage **download URL is publicly fetchable** (see Integration Points
+  below; this is a `storage.rules` concern, not a stack concern).
+- **YouTube:** store just the video ID (parsed once at attach-time from any pasted YouTube URL
+  format — `youtu.be/…`, `youtube.com/watch?v=…`, `youtube.com/shorts/…`) and render
+  `<iframe :src="\`https://www.youtube-nocookie.com/embed/${id}\`" allowfullscreen>`. Prefer the
+  `-nocookie` embed domain for a public, unauthenticated page — it doesn't set tracking cookies
+  until the visitor interacts with the player, which is the appropriate default for a page with no
+  login and no consent flow.
+- **PDF:** two-tier approach, no library:
+  1. Primary: a plain link (`<a :href="downloadUrl" target="_blank" rel="noopener">Open chord chart</a>`)
+     — guaranteed to work on every device because it hands off to whatever the OS/browser's native
+     PDF handler is (desktop browsers open their built-in viewer tab; mobile browsers either render
+     inline or offer a share/save sheet). This is the one to lead with for reliability across the
+     unpredictable mix of mobile browsers/webviews volunteers will use.
+  2. Enhancement: an inline `<iframe :src="downloadUrl" class="w-full h-[70vh]">` for desktop/larger
+     viewports, since Chrome/Edge/Firefox/Safari desktop all render PDFs inline in an iframe with no
+     extra code. Don't invest more than that — this is a "view it" feature, not a PDF-editing one.
+
+### 2. Freeform stage-layout canvas
+
+**No new dependency.** Recommended approach: **plain absolute-positioned DOM + native Pointer
+Events**, not SVG and not a canvas library.
+
+- Container: two `position: relative` zones (on-stage, off-stage/side) with Tailwind utility
+  classes for the zone boundaries; each instrument/mic is an absolutely-positioned `<div>` (or a
+  small icon component) inside whichever zone it belongs to, positioned with `left`/`top` stored as
+  **percentages of the zone's bounding box** (not raw pixels) so the layout stays coherent across
+  different screen sizes/orientations without a resize-recalculation step.
+- Drag interaction: `pointerdown` on an icon → `el.setPointerCapture(e.pointerId)` → track
+  `pointermove` deltas → on `pointerup`, compute which zone the icon's center falls in (a simple
+  bounding-rect containment check) and persist `{ zone, xPct, yPct }` to Firestore on the service
+  document (debounced, mirroring the existing autosave pattern already used elsewhere in the
+  editor).
+- Why not SVG: SVG buys you scalable vector icons and easy transforms, but this app already renders
+  icons as regular images/inline SVG *elements* inside HTML elsewhere; there's no need to move the
+  whole canvas into an SVG coordinate system just to place a fixed icon set — plain DOM keeps
+  Tailwind classes, existing icon components, and Vue's reactivity/event model working exactly as
+  they do everywhere else in the app.
+- Why not Konva/interactjs: see the Supporting Libraries table above. Both are justified when you
+  need arbitrary shape drawing, resize handles, rotation, snapping, or hundreds of interactive
+  nodes — none of which this feature asks for (a bounded palette of instrument/mic icons dropped
+  into two zones, once per service, mostly authored by one planner at a time).
+- Touch support: Pointer Events cover touch natively (a `pointerdown` from a touchscreen fires the
+  same handler as from a mouse) — this is precisely why Pointer Events (not the older separate
+  `mousedown`/`touchstart` handler pairs) is the right primitive to reach for; it eliminates an
+  entire class of "works on desktop, broken on tablet" bugs without a library.
+
+### 3. Rehearsal-attachment upload (PDF + MP3) to Firebase Storage
+
+**No new dependency.** Extend the existing upload composable pattern
+(`src/composables/useMediaUpload.ts`, `src/composables/useBackgroundUpload.ts`) rather than
+building a new mechanism:
+
+- New composable (e.g. `useAttachmentUpload.ts`) mirroring the same `uploadBytesResumable` +
+  `getDownloadURL` + `customMetadata.createdAt` shape, diverging only on:
+  - **MIME allow-list:** `application/pdf` and `audio/mpeg` (+ `audio/mp3` sent by some browsers/OS
+    file pickers for the same format) instead of `audio/*`/`video/*` or `image/*`.
+  - **Size cap:** pick a cap appropriate to chord-chart PDFs and rehearsal MP3s (a few MB for a
+    scanned PDF, tens of MB for an MP3) — same client-pre-validate-then-server-enforces pattern as
+    `MEDIA_MAX_BYTES`/`BACKGROUND_MAX_BYTES`; needs a matching `storage.rules` cap for whatever new
+    path prefix these attachments live under (this is a rules decision for the phase, not a library
+    choice).
+  - **Storage path:** attachments live on the **Song** (per PROJECT.md decision), reusable across
+    services — so the natural path is org- and song-scoped, e.g.
+    `orgs/{orgId}/songs/{songId}/attachments/{attachmentId}/{sanitizedFileName}`, distinct from the
+    existing `media/` (14-day cleanup sweep target) and `backgrounds/` prefixes so the existing
+    `cleanupExpiredMedia` function's `MEDIA_PATH_GUARD` regex does **not** accidentally sweep
+    rehearsal attachments that are meant to be durable, reusable song assets, not ephemeral service
+    media.
+- YouTube "attachments" aren't uploads at all — just a URL string field on the song record, parsed
+  to a video ID at save time (see Feature 1). No Storage interaction, no library.
+
+### 4. System-wide dismissible toast/notification mechanism
+
+**No new dependency — build a tiny in-house Pinia store**, sized roughly:
+
+```ts
+// src/stores/notifications.ts (illustrative shape, not final API)
+interface AppNotification {
+  id: string
+  level: 'info' | 'warning' | 'error'
+  message: string
+  // optional: a stable `key` so a producer (e.g. "monitors not configured")
+  // can push once and later call clear(key) itself when the condition
+  // resolves, rather than relying on a timer
+  key?: string
+}
+```
+
+- One `<NotificationHost>` component mounted once in `App.vue` (or the top-level layout), reading
+  the store and rendering a small stack of dismissible banners/cards with Tailwind classes matching
+  the app's existing gray-950/900 dark-mode palette — no separate CSS bundle to reconcile with
+  Tailwind v4, unlike every toast library evaluated.
+- This directly satisfies both stated v2.7 requirements that toast libraries don't: (a) a message
+  can be **cleared by the producing code** when its condition resolves (the "monitors not
+  configured" warning auto-clearing once monitors are set up — no toast library's timer-based
+  auto-dismiss models "clear when X becomes true"), and (b) **every** message is manually
+  dismissible, with no forced-must-read-fast auto-expiry.
+- Store the "monitors not configured" case as a keyed notification (`key: 'monitors-not-configured'`)
+  so the Run-flow code can `dismiss('monitors-not-configured')` the moment monitor config is
+  detected, independent of whether the user manually dismissed it too.
+
+### 5. Loop-a-service-item auto-advance timer
+
+**No new dependency.** A small composable, e.g.:
+
+```ts
+// src/composables/useLoopTimer.ts (illustrative)
+function useLoopTimer(advance: () => void, intervalMs: Ref<number>) {
+  let handle: ReturnType<typeof setInterval> | null = null
+  function start() {
+    stop()
+    handle = setInterval(advance, intervalMs.value)
+  }
+  function stop() {
+    if (handle) clearInterval(handle)
+    handle = null
+  }
+  watch(intervalMs, () => { if (handle) start() }) // restart on interval change
+  onUnmounted(stop)
+  return { start, stop }
+}
+```
+
+- Default 10s per PROJECT.md, with an interval dropdown + custom value — just changes the argument
+  passed to `setInterval`, no scheduling library needed.
+- Looping back to the item's start on reaching its last slide is app logic (index math against the
+  existing slide-array model already used by Run), not a timer concern.
+- No interaction with `runChannel.ts`/`BroadcastChannel` is implied by the timer itself — the loop
+  only needs to call whatever the existing "advance slide" action already is in the Run store, so
+  it broadcasts exactly like a manual arrow-key advance does today.
 
 ## Installation
 
 ```bash
-# No installation required — every recommended technology is a native
-# browser API already available in the project's target browsers
-# (Chrome/Edge, Chromium 100+). Zero new npm dependencies for this milestone.
+# No installation needed — v2.7 adds zero new npm dependencies.
 ```
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|--------------------------|
-| Window Management API + fullscreen `screen` option | Manual drag + F11 only (no Window Management API at all) | If the app ever needs to support Firefox/Safari — those browsers have **no** multi-screen enumeration API at all as of 2026. Since PROJECT.md fixes the target to Chrome/Edge, this alternative is only the *fallback path within* Chrome/Edge (permission denied), not a parallel primary path |
-| BroadcastChannel for control→output sync | Firestore `onSnapshot` (already used elsewhere in the app for real-time cross-device sync) | Firestore is the right tool when sync must cross **devices/networks** (e.g., a phone remote from another room). It is the *wrong* tool here: same-machine same-origin windows going through a server round-trip adds 100–300ms+ of network latency and a Firestore write-quota cost *per slide change*, for zero benefit — BroadcastChannel delivers synchronously in the same process with no network hop. Firestore may still be worth it later only for a genuinely remote control device, out of scope this milestone |
-| BroadcastChannel | `window.postMessage()` with retained window references | Only if the control window needs guaranteed delivery to windows it does NOT still hold a reference to (e.g. a reopened window after the original reference was lost), or needs per-recipient targeting/handshake. Here the control window opens and owns both output windows, but BroadcastChannel is still simpler: no `targetOrigin` bookkeeping, and if an output window is closed and reopened it just resubscribes to the same channel name with no re-wiring needed on the sender side |
-| BroadcastChannel | A shared Pinia store | Pinia state does **not** cross `window.open()` boundaries — each popup window loads its own JS bundle and gets its own isolated Pinia instance (separate JS realm). A shared store only works within one window/tab; it cannot be the sync primitive across 3 physical windows. (Pinia is still fine, even ideal, as the *local* state container inside each window, fed by BroadcastChannel messages) |
-| Native `requestFullscreen({screen})` | Moving a fullscreen window with `moveTo` + refullscreen | The moved-then-fullscreened pattern is the *only* option in browsers without the `screen` fullscreen option (i.e., permission denied / API unsupported) — that's exactly the fallback path, not a general alternative |
+| Plain absolute-positioned DOM + Pointer Events for the stage canvas | `vue-konva`/`konva` (3.4.0) | If a later milestone needs freehand drawing, resize/rotate handles, shape layering, or dozens of simultaneously-interactive elements with hit-testing — i.e. the canvas becomes a real diagramming tool rather than icon placement. |
+| Plain absolute-positioned DOM + Pointer Events | `interactjs` (1.10.27) | If you need inertia/snapping/multi-finger gesture behavior beyond simple pick-up-and-drop, or resizable/rotatable elements — none of which this feature asks for. |
+| In-house Pinia notification store | `vue-toastification` (v2.x) or `vue3-toastify` (0.2.9) | If a future feature genuinely wants classic auto-expiring toast UX (e.g. transient "saved!" confirmations with animation/position options) rather than the "stays until resolved or dismissed" model this milestone specifically asks for. |
+| Native `<iframe>`/link PDF viewing | `pdfjs-dist` (6.3.289) | If chord-chart viewing grows into annotation, page thumbnails, search-within-PDF, or any UI beyond "look at the chart" — that's the point PDF.js's extra weight starts paying for itself. |
+| Native `<iframe>` YouTube embed | YouTube IFrame Player API | If Run-flow or Rehearse-mode later needs programmatic playback control (auto-pause on tab switch, sync with slide advance, etc.) rather than a self-contained embedded player. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|--------------|
-| **Presentation API** (`navigator.presentation`, `PresentationRequest`) | This is a *wireless casting* API (Chromecast/DIAL/Miracast-style "second screen" presentation to a separate device), not a local multi-monitor windowing API. It solves a different problem (no browser window exists on the receiving display at all) and doesn't apply when both outputs are ordinary monitors cabled/HDMI'd into the same machine running the browser | Window Management API + `requestFullscreen({screen})` |
-| **Relying on `ScreenDetailed.id` as a long-term stable device fingerprint across browser reinstalls/profile resets** | The W3C spec text (confirmed via MDN/spec documentation) describes `id` as a **per-origin, session-scoped identifier that resets when the user clears cookies/site data** — it is *not* a hardware serial number. It IS stable across ordinary reloads and browser restarts within the same profile (that's the common case for a church's dedicated projection laptop), but a cache-clear or new browser profile invalidates it silently | Persist the mapping keyed by `id`, but always **re-validate against `label` + `left/top/width/height` on load**, and gracefully fall back to "re-detect and ask" (see Pitfalls flag below) rather than assuming a saved `id` will always resolve |
-| **`window.open()` calls made asynchronously (after an `await`, inside a `setTimeout`, or inside a Firestore `.then()`)** | Chromium's popup blocker requires the call to be synchronous within the original user-gesture call stack (a trusted `click` event). An `await` before the second `window.open()` call breaks that chain and the second popup is silently blocked | Resolve all data needed (screen list, service data) **before** the button click if possible, or open both popups synchronously in direct response to the click and only *then* do async work (fetch/position) inside each already-open window |
-| **A generic fullscreen-shim / cross-browser polyfill library** | Solves Safari/Firefox vendor prefixing, which this Chromium-only target does not need | Native unprefixed `element.requestFullscreen()` |
-| **IndexedDB for the monitor→role mapping** | Massive overkill for a single small per-device key/value record (which screen `id`/label plays Audience vs Confidence) | `localStorage` — see Persistence section below |
+| `vuedraggable`/`vue-draggable-plus` (SortableJS Vue wrapper) for the stage canvas | It's built for reordering lists (index-based), not free x/y placement — forcing it into this feature means fighting its model, not using it as designed. | Native Pointer Events with percentage-based `{zone, xPct, yPct}` coordinates. |
+| Any toast library with default auto-dismiss timers as the *only* dismiss mechanism | Directly conflicts with this milestone's explicit requirement ("no warning/error that gets stuck on screen" is about *stuck* messages, but the flip side — "every message is manually dismissible" — means a message must never vanish involuntarily either, and a stateful "clear when the underlying condition resolves" isn't a toast-library primitive). | A keyed, store-driven notification with an explicit `dismiss()`/`clear(key)` API. |
+| `pdfjs-dist` for a simple view-only chord chart | Canvas-rendering PDF.js is meaningfully heavier (parsing + render-loop + no built-in toolbar) than what "view a PDF" needs, and every target browser already renders PDFs natively. | `<iframe>`/direct link to the Storage download URL. |
+| Reusing the `media/` Storage path prefix for song attachments | The deployed `cleanupExpiredMedia` Cloud Function's `MEDIA_PATH_GUARD` regex (`^orgs/[^/]+/media/`) sweeps that prefix after 14 days — rehearsal attachments are durable, reusable song assets, not ephemeral service media, and would silently vanish. | A distinct prefix, e.g. `orgs/{orgId}/songs/{songId}/attachments/...`, exempt from that sweep (mirrors why `useBackgroundUpload.ts` deliberately uses `backgrounds/`, not `media/`). |
 
-## Cross-Window State Sync — the decision in detail
+## Integration Points (flagged for requirements/roadmap, not a stack decision)
 
-The control window needs to push, with minimum latency and zero flicker: **go to slide N, blank/black, next/prev**, to two dependent windows it opened and (normally) still holds live references to.
-
-**Recommended: `BroadcastChannel`, same-origin, one named channel (e.g. `"worship-run-service"`), JSON messages `{ type: 'goto', slideIndex } | { type: 'blank' } | { type: 'sync-state', ... }`.**
-
-Rationale:
-- **Latency:** in-process, same-origin, no network — effectively synchronous (microtask-scheduled), the lowest latency available to web content. Firestore `onSnapshot` round-trips through the network even on localhost-adjacent setups and is not designed for sub-100ms UI-critical fan-out.
-- **No flicker:** because it doesn't depend on a server ack, the output window can apply the new slide index the instant the message arrives — no loading/pending state needed for the common case (all slide images are already resident, per the app's existing `slideshowAssembler`/render-pending model).
-- **No new infrastructure:** doesn't touch Firestore reads/writes or quota (the run window shouldn't burn a Firestore write on every keypress a projectionist makes — a nervous operator hitting Next/Prev/Next/Prev rapidly during a live service should not be metered against the app's Firestore/Functions cost controls, which v1.8's cost-hardening milestone specifically built to prevent runaway spend).
-- **Resilience to a reopened output window:** if the confidence monitor's window is accidentally closed and reopened (e.g. crashed or the projectionist fat-fingered it), it just needs to subscribe to the same channel name again — no handshake or reference re-wiring on the control window's side. (It will, however, miss whatever slide is "current" until the next change event — mitigate by having the control window periodically rebroadcast full state, or by having a newly-opened output window request a "hello, what's current" message and having the control window answer it once on `message` receipt — a tiny request/response layered on top of the same channel.)
-- **Direct `window.open()`-returned references + `postMessage`** remains a reasonable secondary/defense-in-depth channel (e.g., to push an initial full-state payload immediately after `open()` returns, before the new window's own `BroadcastChannel` listener has necessarily attached) but should not replace BroadcastChannel as the primary channel, since it requires the sender to track live references and re-wire if a window is closed/reopened.
-- **Firestore `onSnapshot`** remains the right tool if this milestone later needs a genuinely remote control surface (e.g. a phone on the church Wi-Fi acting as a clicker from across the room) — explicitly out of scope for this milestone's three-window-same-machine model, but worth flagging as the natural extension point if "remote clicker" becomes a future requirement.
-
-## Screen Wake Lock — integration detail
-
-- Request `navigator.wakeLock.request('screen')` **separately in each output window** (audience and confidence), not just the control window — a wake lock only keeps *that document's* screen awake; it does not prevent a different browsing context's display from sleeping.
-- Chromium releases the lock automatically when a document becomes hidden/inactive (`document.visibilityState !== 'visible'`) — for an unattended fullscreen output window this is rarely triggered by the user, but can happen from OS-level display-sleep policy interactions; re-acquire on the `visibilitychange` listener as MDN's documented pattern shows.
-- Secure context (HTTPS) required — already satisfied (Firebase Hosting serves HTTPS).
-- Cheap to add defensively; no reason to omit it given the milestone's explicit goal is an unattended multi-hour live service.
-
-## Persistence of the Monitor → Role Mapping (per-device "remembered" config)
-
-- **Use `localStorage`**, keyed to the app's origin (already per-device/per-browser-profile, which is exactly the desired scope — "remembered per device" per PROJECT.md, not per-user-account/synced). A single small JSON blob is sufficient: `{ screens: [{ id, label, left, top, width, height, role: 'audience'|'confidence' }], savedAt }`.
-- **Do not rely on `id` alone to resolve the saved mapping on next launch.** Per the "What NOT to Use" row above, `id` is stable across page reloads/restarts within the same browser profile — the expected common case for a fixed projection laptop — but is not guaranteed permanently stable (cookie/site-data clear resets it). The robust re-detect algorithm on the monitor-config screen's load:
-  1. Call `getScreenDetails()` (or fall back to the permission-denied flow) and get the current live screen list.
-  2. Try to match each saved entry by `id` first; if no match, fall back to matching by `(left, top, width, height)` (a monitor plugged into the same port at the same resolution reports identical bounds even after an `id` reset).
-  3. If neither matches (monitor count/arrangement genuinely changed — a cable was moved, a new display attached), **surface the "physical layout changed, please reassign" prompt** the milestone description already anticipates ("re-prompt only if the physical monitor layout changed") rather than silently guessing.
-- No IndexedDB needed — this is not blob/file storage and there is no query requirement beyond a lookup by device.
-
-## Stack Patterns by Variant
-
-**If `window-management` permission is granted (the primary path):**
-- On the monitor-config screen: call `getScreenDetails()`, render each `ScreenDetailed` (label/position/size) as a clickable card, let the user assign Audience/Confidence, persist to `localStorage`.
-- On Run: open two `window.open()` popups (audience, confidence) positioned via each target screen's `left/top/availWidth/availHeight`, immediately synchronously (same click handler, no `await` between the two calls), then in each popup call `element.requestFullscreen({ screen: targetScreenDetailed })`.
-- Because `ScreenDetailed` objects are only valid within the `ScreenDetails` instance/session they came from, **pass screen identity (not the live object) across the `window.open()` boundary** — e.g. via a query string or `localStorage` read on the new window's own load, then re-resolve to a live `ScreenDetailed` by calling `getScreenDetails()` again inside that new window and matching by `id`/bounds, since a raw JS object reference cannot cross to the new window's separate realm anyway.
-
-**If permission is denied, the API is unavailable, or `screen.isExtended === false` (single-display machine, e.g. testing/dev):**
-- Fall back to plain `window.open()` positioned with `left`/`top` offset (best-effort, using `screen.availWidth` heuristics since no second-screen bounds are knowable) and instruct the operator to drag the popup to the correct physical monitor, then press F11 (native browser fullscreen) or trigger `requestFullscreen()` without the `screen` option (fullscreens whichever screen the window is currently on — validated, non-Chromium-only baseline behavior).
-- Detect this path via the standard feature-detect: `if (!('getScreenDetails' in window)) { /* single-screen/manual fallback */ }` combined with a `try/catch` around the `getScreenDetails()` call itself for the denied-permission case (`NotAllowedError`).
+- **Public read access for rehearsal attachments.** `ShareView.vue`'s existing pattern serves a
+  pre-computed Firestore **snapshot** to unauthenticated visitors — it never needs Storage reads
+  directly, so there's no existing precedent in this codebase for *unauthenticated* Storage file
+  access. `storage.rules` currently gates Storage reads on org membership, and per this project's
+  own documented `firestore.exists()`-in-rules limitation, that check cannot be verified against the
+  Storage emulator. Song-attachment objects will need either (a) a `storage.rules` allowance scoped
+  to a public-readable path (e.g. `allow read: if true` under `orgs/{orgId}/songs/{songId}/attachments/**`,
+  accepting that a leaked download URL is world-readable — consistent with how a Firestore share
+  snapshot is already effectively public once the link is out), or (b) a Cloud Function proxy that
+  streams the file. **Recommend (a)** — it's the direct extension of "the link is the auth" that
+  `ShareView.vue` already relies on for the whole shared-plan page, and it needs zero new
+  infrastructure. This is a `storage.rules` design decision for the implementation phase, not a
+  library choice — flagged here so it isn't missed.
+- **`runChannel.ts`/BroadcastChannel** is untouched by any v2.7 stack pick — the loop timer and
+  "Go to black" (Audience-only) changes are app-state changes broadcast through the existing
+  channel, not new transport.
+- **Multi-org custom claim (`orgs:{orgId:role}`)** — the user-menu church switcher (feature not
+  covered by this STACK research, since it's pure application logic against already-issued claims)
+  needs no new stack pieces either; noted here only to confirm no library gap exists there.
 
 ## Version Compatibility
 
-| Package/API | Compatible With | Notes |
-|---|---|---|
-| Window Management API | Chrome/Edge 100+ | Project already targets modern evergreen Chrome/Edge; no lower bound concern given the constraint is "Chrome/Edge" generally, not a pinned old version |
-| `requestFullscreen({screen})` | Same Chromium 100+ gate as Window Management (shipped together as part of the same spec effort) | Do not call with the `screen` option unless `getScreenDetails()` already succeeded — passing a `ScreenDetailed` from a stale/mismatched session is undefined; always fetch fresh before use |
-| BroadcastChannel | All evergreen browsers since ~2022, far below this project's Chrome/Edge 100+ floor | No compatibility risk |
-| Screen Wake Lock | Baseline 2025, HTTPS required | Firebase Hosting already serves HTTPS in this project — no gap |
-| Vue 3 + Pinia (existing stack) | Each `window.open()`'d popup is a separate JS realm/bundle load — Pinia store instances do NOT share state across windows automatically | Feed each window's local Pinia store via BroadcastChannel message handlers, not by assuming shared reactivity |
-
-## Integration Points With Existing Code
-
-- **`src/components/PresentationViewer.vue`** — the existing single-window in-app preview (`Teleport to="body"`, `fixed inset-0 z-50 bg-black`, background layer + scrim, keyboard nav, loading/render-pending states) is the template for the **audience output window's** slide-rendering logic. The new audience output route/component should reuse this rendering core (background image + scrim + slide canvas) but strip all chrome (no exit button, no counters) since "zero chrome" is an explicit requirement. Likely refactor path: extract the pure slide-canvas rendering (background + content, no controls) into a shared composable/sub-component consumed by both the existing in-app preview and the new fullscreen-output windows, rather than duplicating the background/scrim/typography logic.
-- **`src/utils/slideshowAssembler.ts`** (`assembleSlideshow(service, inputs): AssembledSlide[]`) — this is the existing single source of truth for the ordered slide array (including PPTX-rendered images, backgrounds resolved at slide/group/song level, scripture congregational splits). The Run/control window should call this exactly as `PresentationViewer` does today to build the slide list once, then broadcast **only the current index** (and derived current/next slide data) to the output windows over `BroadcastChannel` — not the whole assembled array repeatedly. The confidence monitor's "current + upcoming" requirement is a pure derivation (`slides[index]`, `slides[index+1]`) from data the control window already holds.
-- **Background suppression on the confidence monitor** — reuse the same background-resolution output from `slideshowAssembler`/`PresentationViewer`'s existing per-slide background logic, but the confidence-monitor renderer simply never applies the `backgroundImage` style (render text-only on black) — no new background-resolution logic needed, only a rendering-mode flag.
-
-## Biggest Feasibility Risk — flag for roadmap
-
-**Permission UX + the synchronous-popup constraint are the two risks a phase should explicitly own:**
-
-1. **Permission prompt UX**: `getScreenDetails()` triggers a real, one-time-per-origin OS-style permission prompt that a non-technical projectionist must accept. If they dismiss/deny it (common for unfamiliar prompts), the app must gracefully degrade to the drag+F11 fallback described above — this fallback path is not optional polish, it is a required primary flow for any church volunteer who clicks "block" by reflex. Budget explicit UAT time for both the granted and denied paths on the monitor-config screen.
-2. **Two windows, one click, zero `await` in between**: opening both the audience and confidence windows must happen synchronously within the same click handler (see "What NOT to Use" — async `window.open()` gets silently blocked). Any pre-flight async work (permission checks, screen resolution, Firestore reads for the service data) must complete **before** the "Run" button's click handler fires the two `window.open()` calls, or be restructured so both calls happen first and data loads inside the already-open windows afterward.
-3. **Screen `id` instability across data/cookie clears** (see "What NOT to Use") is a secondary, lower-probability risk — mitigated by the bounds-matching fallback described in Persistence above, but should still be explicitly tested by clearing site data and confirming the re-prompt flow behaves per the milestone's stated "re-prompt only if physical layout changed" intent.
+| Package | Compatible With | Notes |
+|---------|------------------|-------|
+| `firebase@^12.0.0` (Storage SDK) | Vite `^7.3.1`, Vue `^3.5.29` | Already proven in this codebase (`useMediaUpload.ts`, `useBackgroundUpload.ts`, `pptxUpload.ts`) — no version change needed for the new attachment composable. |
+| Pointer Events API | All target browsers (Chrome/Edge/Firefox/Safari, current + mobile) | No polyfill needed for this app's supported-browser bar (already Chrome/Edge-first per the v2.4 Run-the-Service milestone). |
+| `<iframe>` PDF rendering | Desktop Chrome/Edge/Firefox/Safari: yes, inline. Mobile: inconsistent inline rendering across browsers/webviews. | This is exactly why the recommended approach leads with a plain link (native OS/browser handoff) and treats the inline `<iframe>` as a desktop enhancement, not the only path. |
+| `youtube-nocookie.com/embed` | No SDK/version dependency — plain URL contract | Stable, documented embed surface; unaffected by this app's dependency versions. |
 
 ## Sources
 
-- MDN — [Window Management API](https://developer.mozilla.org/en-US/docs/Web/API/Window_Management_API) — HIGH confidence (official docs; verified overview, interfaces, permission name, experimental/non-Baseline status)
-- MDN — [ScreenDetailed](https://developer.mozilla.org/en-US/docs/Web/API/ScreenDetailed) — HIGH confidence (property definitions: label, left, top, isPrimary, isInternal, devicePixelRatio)
-- MDN — [Fullscreen API](https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API) — HIGH confidence (core `requestFullscreen()`/`exitFullscreen()`/events, Baseline status)
-- MDN — [Screen Wake Lock API](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API) — HIGH confidence (request/release lifecycle, visibilitychange re-acquire pattern, Baseline 2025, HTTPS requirement)
-- MDN — [BroadcastChannel](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel) — HIGH confidence (same-origin cross-context messaging, Baseline widely available since March 2022, sender-excluded-from-own-message behavior)
-- Chrome for Developers — [Manage several displays with the Window Management API](https://developer.chrome.com/docs/capabilities/web-apis/window-management) — HIGH confidence (Chrome 100+ ship version, permission-prompt-on-first-use behavior, feature-detect shim example)
-- W3C `window-management` spec repo — [HOWTO.md](https://github.com/w3c/window-management/blob/main/HOWTO.md) and [EXPLAINER.md](https://github.com/w3c/window-management/blob/main/EXPLAINER.md) — HIGH confidence (canonical code patterns for `getScreenDetails()`, window placement onto a specific screen, `requestFullscreen({screen})`, feature-detection with `try/catch` fallback)
-- W3C `window-management` GitHub Issue #80 ("Does getScreenDetails() always resolve with the same object?") — MEDIUM confidence (confirms `id`/object-identity stability was an open spec-clarity question during standardization; used as corroboration, not as the sole source, for the `id`-instability caution)
-- caniuse.com — [`mdn-api_window_getscreendetails`](https://caniuse.com/mdn-api_window_getscreendetails) — cited as the live/current source of truth for exact per-browser support percentages; treat as authoritative over any single snapshot captured during this research pass
-- Cross-checked web search (MEDIUM confidence, multiple corroborating results per claim): Edge Chromium-parity/policy documentation (Edge 123 `DefaultWindowManagementSetting` policy existing confirms the underlying API ships in that Edge generation, consistent with Chrome 100+ parity); synchronous-vs-asynchronous `window.open()` popup-blocker behavior within a single click handler; `window-management` permission grant persistence across sessions via Chrome's per-site "Additional permissions"
-- Existing codebase, read directly (HIGH confidence — primary source): `src/components/PresentationViewer.vue` (single-window slide-canvas rendering pattern: Teleport-to-body, background layer + scrim, keyboard nav, loading/render-pending states) and `src/utils/slideshowAssembler.ts` (`assembleSlideshow(service, inputs): AssembledSlide[]` — existing ordered-slide data source to reuse, not rebuild)
+- npm registry pages for `vue3-toastify`, `vue-toastification`, `interactjs`, `vue-konva`,
+  `pdfjs-dist` (version numbers as surfaced via web search, 2026-08-31) — MEDIUM confidence (web
+  search summaries of npm listings, not directly fetched npm API responses; version numbers are
+  point-in-time and should be re-checked at implementation time via `npm view <pkg> version`).
+- Direct codebase read: `package.json`, `src/composables/useMediaUpload.ts`,
+  `src/composables/useBackgroundUpload.ts`, `src/views/ShareView.vue` — HIGH confidence (primary
+  source, current repo state).
+- `.planning/PROJECT.md` — HIGH confidence (primary source; v2.7 feature scope, prior Key Decisions
+  including the toast-vs-persistent-status precedent, and the `storage.rules`
+  `firestore.exists()`-in-emulator limitation).
 
 ---
-*Stack research for: browser-based live worship-service presentation/projection mode (v2.4 "Run the Service")*
-*Researched: 2026-08-28*
+*Stack research for: v2.7 Rehearsal, Stage Plans & Presentation Polish*
+*Researched: 2026-08-31*
