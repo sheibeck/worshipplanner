@@ -1730,6 +1730,38 @@ describe('assembleSlideshow — blackout slides (R302/R303, Plan 105-01)', () =>
       expect(result[0]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
       expect(result[0]!.audioFromBed).toBe(true)
     })
+
+    // CR-01 (105 code review): a blackout slide must never carry a resolved
+    // background, even when the owning group AND song both have one configured
+    // — src/types/slide.ts's BlackoutSlide doc comment and 105-UI-SPEC.md's R303
+    // content contract both claim this never happens; this proves it at every tier.
+    it('never carries backgroundImageUrl/backgroundSource even when the group AND song both have one configured', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = blackoutSongLyrics({ backgroundImageUrl: 'https://example.com/song-bg.png' })
+      const entry = makeGroupSlideEntry({
+        id: 'entry-black',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'black-slide' },
+      })
+      const group = makeSlideGroup({
+        id: 'slot-song-0',
+        slotId: 'slot-song-0',
+        slides: [entry],
+        backgroundImageUrl: 'https://example.com/group-bg.png',
+      })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(1)
+      expect(result[0]!.slide.contentKind).toBe('blackout')
+      expect('backgroundImageUrl' in result[0]!.slide).toBe(false)
+      expect('backgroundSource' in result[0]!.slide).toBe(false)
+    })
   })
 
   describe('no-group fallback path', () => {

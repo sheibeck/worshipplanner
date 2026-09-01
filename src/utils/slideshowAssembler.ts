@@ -453,8 +453,17 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       position: globalPosition,
       ...(media.audioUrl ? { audioUrl: media.audioUrl } : {}),
       ...(media.audioLoop ? { audioLoop: true } : {}),
-      ...(media.backgroundImageUrl ? { backgroundImageUrl: media.backgroundImageUrl } : {}),
-      ...(media.backgroundSource ? { backgroundSource: media.backgroundSource } : {}),
+      // CR-01 (105 code review): a blackout slide never carries a background,
+      // matching src/types/slide.ts's BlackoutSlide doc comment and 105-UI-SPEC.md's
+      // R303 content contract. `resolveEntryMedia` only special-cases 'video' for
+      // suppression — it has no view of `content.contentKind` — so blackout must be
+      // suppressed here, the one place both are in scope.
+      ...(content.contentKind !== 'blackout' && media.backgroundImageUrl
+        ? { backgroundImageUrl: media.backgroundImageUrl }
+        : {}),
+      ...(content.contentKind !== 'blackout' && media.backgroundSource
+        ? { backgroundSource: media.backgroundSource }
+        : {}),
     } as Slide
     assembled.push({
       slide,
