@@ -56,8 +56,6 @@
       <main class="flex-1 overflow-y-auto">
         <slot />
       </main>
-
-      <ToastHost />
     </div>
   </div>
 </template>
@@ -66,7 +64,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
-import ToastHost from '@/components/ToastHost.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const sidebarOpen = ref(false)

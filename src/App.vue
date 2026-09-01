@@ -14,11 +14,18 @@
 
     <!-- App content once auth is ready -->
     <RouterView v-else />
+
+    <!-- Phase 104 (R309/R310) — the app-wide dismissible-message host, mounted
+         once here (not inside AppShell.vue) so it renders on EVERY route,
+         including RunControlView.vue which is a full-viewport shell that does
+         NOT use AppShell. -->
+    <ToastHost />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
+import ToastHost from '@/components/ToastHost.vue'
 
 const authStore = useAuthStore()
 </script>
