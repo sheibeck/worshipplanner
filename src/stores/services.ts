@@ -35,7 +35,7 @@ import {
   serviceToLastUsedInput,
   type LastUsedServiceInput,
 } from '@/utils/lastUsed'
-import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot } from '@/types/service'
+import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot, StageMarker } from '@/types/service'
 import type { SongSlot } from '@/types/service'
 import type { RoleGroup } from '@/types/roster'
 
@@ -99,6 +99,21 @@ export interface ServiceSnapshot {
     group: RoleGroup
     personNames: string[]
   }[]
+  /**
+   * Read-only public projection of `Service.stageLayout` (R315, Phase 107).
+   * Mirrors `roleAssignments`'s PII-safe-projection precedent: an explicit
+   * per-field map, never a raw spread, so a future non-display `StageMarker`
+   * field cannot silently leak to the public page. There is no PII here (a
+   * marker is only planner free text), but the explicit shape still guards
+   * against scope creep on this field. OPTIONAL and only ever present when
+   * the service has at least one marker — see `buildServiceSnapshot`'s
+   * conditional spread below. Absent (never `undefined`), matching the
+   * `roleAssignments?.length` omit convention `ShareView.vue` already relies
+   * on for its own optional sections.
+   */
+  stageLayout?: {
+    elements: StageMarker[]
+  }
 }
 
 /**
@@ -147,6 +162,22 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     personNames: r.effectivePersonIds.map((id) => nameById.get(id) ?? id),
   }))
 
+  // Stage layout projection (T-107-01): map to EXACTLY the 6 display fields
+  // — id, label, kind, zone, xPct, yPct — never a raw spread of the source
+  // marker, so a future non-display StageMarker field cannot silently reach
+  // the public page. `kind` is optional on StageMarker itself; the
+  // conditional spread here keeps it absent (not `undefined`) on a marker
+  // that never set one, matching this whole projection's absent-not-
+  // undefined contract one level down.
+  const stageLayoutElements: StageMarker[] = (service.stageLayout?.elements ?? []).map((marker) => ({
+    id: marker.id,
+    label: marker.label,
+    ...(marker.kind ? { kind: marker.kind } : {}),
+    zone: marker.zone,
+    xPct: marker.xPct,
+    yPct: marker.yPct,
+  }))
+
   return {
     date: service.date,
     name: service.name,
@@ -157,6 +188,13 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     notes: service.notes,
     status: service.status,
     roleAssignments,
+    // Conditional spread keyed on marker count — the key is ABSENT (never
+    // `undefined`) when the service has no stageLayout or zero markers,
+    // which is what makes this snapshot safe to write to Firestore
+    // (`setDoc` rejects a raw `undefined` at any depth) and mirrors
+    // `roleAssignments?.length` — the existing omit pattern ShareView.vue
+    // already reads for its own optional sections.
+    ...(stageLayoutElements.length > 0 ? { stageLayout: { elements: stageLayoutElements } } : {}),
   }
 }
 
