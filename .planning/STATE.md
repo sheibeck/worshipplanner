@@ -4,17 +4,17 @@ milestone: v2.7
 milestone_name: Rehearsal, Stage Plans & Presentation Polish
 current_phase: 105
 current_phase_name: Presentation Blackout & Inline Black Slide
-status: executing
-stopped_at: Completed 105-03-PLAN.md
-last_updated: "2026-09-01T06:29:59.480Z"
+status: verifying
+stopped_at: Completed 105-02-PLAN.md
+last_updated: "2026-09-01T06:49:06.236Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 105 execution started
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
-  percent: 25
+  completed_plans: 5
+  percent: 50
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.7 Rehearsal, Stage Plans & Presentation Polish (roadmap created 2026-09-01)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 mapped with no orphans. Ready for `/gsd-plan-phase 104`.
 
 **Goal:** Give teams richer rehearsal and live-presentation tooling plus targeted Run-the-Service and
@@ -1141,7 +1141,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 105 (Presentation Blackout & Inline Black Slide) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-01 — Phase 105 execution started
 
 ## ★ v2.7 ROADMAP.md phase breakdown (created 2026-09-01)
@@ -2978,6 +2978,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 104 P02 | 55min | 2 tasks | 6 files |
 | Phase 105 P01 | 25min | 3 tasks | 8 files |
 | Phase 105 P03 | 15min | 1 tasks | 2 files |
+| Phase 105 P02 | 35min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3451,6 +3452,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Church switcher role defaults to 'viewer' unless the claim explicitly says 'editor'; STAGELAYOUTS-RESET-OBLIGATION marker added to orgScopedStores.ts for Phase 107 durability.
 - [Phase ?]: Blackout is a distinct LyricSection.kind/SlideContentKind, not an empty LyricSection or SourceRef change (105-CONTEXT.md decision, PITFALLS Pitfall 5)
 - [Phase ?]: R305: consumer-side blackout suppression in ConfidenceOutputView only, no wire-protocol change (useOutputWindow/AudienceOutputView/useRunControl/runChannel untouched)
+- [Phase ?]: SlideCanvas checks contentKind==='blackout' first in currentBackgroundUrl (ahead of suppressBackground/video) so a blackout slide never paints a background regardless of a stale backgroundImageUrl (T-105-03).
 
 ### Roadmap Evolution
 
@@ -3777,8 +3779,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-09-01T06:29:59.426Z
-Stopped at: Completed 105-03-PLAN.md
+Last session: 2026-09-01T06:49:06.180Z
+Stopped at: Completed 105-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
