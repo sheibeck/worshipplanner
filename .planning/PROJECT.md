@@ -474,6 +474,18 @@ unachievable on real hardware).
       `seeds/SEED-002-church-specific-rules-configurability.md` (status: harvested)
 - [ ] SEED-001: owner-only admin UI for the v1.8 cost/cleanup env knobs, so guardrails are adjustable
       without a redeploy (status: deferred) — `seeds/SEED-001-admin-settings-interface.md`
+- [ ] **999.13 — Song rehearsal attachments + Rehearse mode** (deferred from v2.7, 2026-08-31). Attach
+      PDF chord charts/sheet music, MP3 practice tracks, and YouTube links to a Song (reusable across
+      services); a Rehearse view to play/open them per song. Full architecture + cost research in
+      `seeds/SEED-003-rehearsal-attachments-and-storage-costs.md`. **Cost verdict: absorb in the base
+      $25–30 subscription** — all-in ≈ $0.50–$2.50/church/mo at 100 churches × 100 songs (storage is
+      pennies; egress is the variable; Auth is free ≤ 50k MAU; Firestore reads ~$0.10–0.50/church/mo).
+      **Guardrails required:** per-org storage quota (~10 GB), per-file size caps (PDF ≤10 MB, MP3 ≤20 MB),
+      egress alerting. **Reconsider "public link only" → require volunteer login** (nearly free, kills the
+      scraping/hotlinking egress risk, and enables volunteer self-service "find my service"). Highest-risk
+      area: unauthenticated Storage reads + the `firestore.exists()`-in-Storage-emulator blind spot — use
+      download-token URLs denormalized into the share snapshot or a signed-URL Cloud Function, never a
+      cross-service `storage.rules` check. Add-on tier only for storage/bandwidth outliers, never seat count.
 
 > **Closed in v2.2 (2026-08-25):** 999.1 shared song-browse (R240), 999.2 song-clear slides (R235), 999.4
 > PC-export slot coverage (R237), 999.7 Owner Console a11y (R239), 999.8 configurable teams (R228–R231),
