@@ -485,8 +485,8 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
       expect(store.memberships).toEqual([
-        { id: 'org-1', name: 'Org One', active: true },
-        { id: 'org-2', name: 'Org Two', active: true },
+        { id: 'org-1', name: 'Org One', active: true, role: 'viewer' },
+        { id: 'org-2', name: 'Org Two', active: true, role: 'viewer' },
       ])
       expect(store.orgId).toBeNull()
       expect(store.needsOrgSelection).toBe(true)
@@ -562,8 +562,8 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
       expect(store.memberships).toEqual([
-        { id: 'org-1', name: 'Org One', active: true },
-        { id: 'org-2', name: 'org-2', active: false },
+        { id: 'org-1', name: 'Org One', active: true, role: 'viewer' },
+        { id: 'org-2', name: 'org-2', active: false, role: 'viewer' },
       ])
       expect(store.needsOrgSelection).toBe(true)
     })
@@ -602,8 +602,8 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
       expect(store.memberships).toEqual([
-        { id: 'org-2', name: 'Org Two', active: true },
-        { id: 'org-1', name: 'Org One', active: true },
+        { id: 'org-2', name: 'Org Two', active: true, role: 'editor' },
+        { id: 'org-1', name: 'Org One', active: true, role: 'editor' },
       ])
       expect(store.orgId).toBeNull()
       expect(store.needsOrgSelection).toBe(true)
@@ -612,6 +612,60 @@ describe('useAuthStore', () => {
       // the top unforced read.
       expect(getIdTokenResult).toHaveBeenCalledTimes(1)
       expect(getIdTokenResult).toHaveBeenCalledWith(mockUser, false)
+    })
+  })
+
+  // Phase 104 (R311/R312) — per-org role threaded onto each memberships
+  // entry from the `orgs` custom claim, so the sidebar church switcher's
+  // role badge has data to render. Covers: an explicit editor-claim org, a
+  // viewer-claim org, and an org present in orgIds but absent from the claim
+  // entirely (claim not yet caught up) — the last case must still yield an
+  // entry (role 'viewer'), never crash or drop it.
+  describe('memberships[].role (Phase 104, R311)', () => {
+    it('resolves role editor for an org the claim marks editor, and viewer for one it marks viewer', async () => {
+      mockMultiOrg()
+      // Multi-org with no remembered/single-org active choice never reaches
+      // the FORCED refreshOrgClaim call (activeId stays null) — only the one
+      // unforced claim read at the top of loadOrgContext fires, so
+      // mockResolvedValueOnce is sufficient and avoids leaking this
+      // implementation into later tests (clearAllMocks in beforeEach does
+      // not reset a non-Once mockResolvedValue).
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
+        claims: { orgs: { 'org-1': 'editor', 'org-2': 'viewer' } },
+      } as never)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.memberships).toEqual([
+        { id: 'org-1', name: 'Org One', active: true, role: 'editor' },
+        { id: 'org-2', name: 'Org Two', active: true, role: 'viewer' },
+      ])
+    })
+
+    it('defaults role to viewer for an org present in orgIds but absent from the claim (claim not yet caught up)', async () => {
+      mockMultiOrg()
+      // Claim only knows about org-1 — org-2 is a just-joined membership the
+      // claim hasn't caught up to yet. Must still yield a viewer entry for
+      // org-2, not crash or drop it from the list. mockResolvedValueOnce for
+      // the same reason as the test above.
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({
+        claims: { orgs: { 'org-1': 'editor' } },
+      } as never)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.memberships).toEqual([
+        { id: 'org-1', name: 'Org One', active: true, role: 'editor' },
+        { id: 'org-2', name: 'Org Two', active: true, role: 'viewer' },
+      ])
+    })
+
+    it('defaults role to viewer when the claim has no orgs entry at all', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.memberships).toEqual([{ id: 'org-1', name: 'Test Org', active: true, role: 'viewer' }])
     })
   })
 
@@ -713,8 +767,8 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
       expect(store.memberships).toEqual([
-        { id: 'org-1', name: 'org-1', active: false },
-        { id: 'org-2', name: 'Org Two', active: true },
+        { id: 'org-1', name: 'org-1', active: false, role: 'viewer' },
+        { id: 'org-2', name: 'Org Two', active: true, role: 'viewer' },
       ])
     })
 

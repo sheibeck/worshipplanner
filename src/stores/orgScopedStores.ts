@@ -26,6 +26,17 @@ import { useSongLyricsStore } from './songLyrics'
  * same teardown again) is harmless.
  *
  * Imported dynamically from auth.ts to avoid the auth <-> store import cycle.
+ *
+ * STAGELAYOUTS-RESET-OBLIGATION (Phase 104, R312 forward obligation for
+ * Phase 107): Phase 107 adds a `stageLayouts` org-scoped store. When it
+ * lands, its `unsubscribe...()` (or equivalent teardown) call MUST be added
+ * to this function. Skipping this registration means a church switch (via
+ * `selectOrg()`, `enterOrgAsSuperAdmin()`, or `exitSuperAdminView()`, all of
+ * which call this function) will leak the PRIOR church's stage layout into
+ * the newly-selected church's UI — the exact class of stale-data bug this
+ * function exists to prevent for every other store below. Search this
+ * codebase for the token `STAGELAYOUTS-RESET-OBLIGATION` to find this note
+ * from Phase 107 planning/verification.
  */
 export function resetOrgScopedStores(): void {
   useServiceStore().unsubscribeAll()

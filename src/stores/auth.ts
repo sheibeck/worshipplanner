@@ -139,13 +139,19 @@ export const useAuthStore = defineStore('auth', () => {
   // ONLY gate. Consumed by Phases 102/103's scripture-fetch gate.
   const bibleApiEnabled = ref(false)
 
-  // The organizations the signed-in user belongs to ({id, name, active}) — the
-  // source the login church-picker renders when a user belongs to more than
-  // one. Populated by loadOrgContext. `active` defaults to `true` for a
-  // readable org doc with no `active` field (legacy orgs); a caught read
-  // failure (deactivation OR a stale/orphaned membership) conservatively
-  // defaults to `false` (R213/T-76-08).
-  const memberships = ref<{ id: string; name: string; active: boolean }[]>([])
+  // The organizations the signed-in user belongs to ({id, name, active, role})
+  // — the source the login church-picker AND (Phase 104, R311/R312) the
+  // sidebar church switcher render when a user belongs to more than one.
+  // Populated by loadOrgContext. `active` defaults to `true` for a readable
+  // org doc with no `active` field (legacy orgs); a caught read failure
+  // (deactivation OR a stale/orphaned membership) conservatively defaults to
+  // `false` (R213/T-76-08). `role` (Phase 104, R311) is resolved per-entry
+  // from the `orgs` custom claim (`claimOrgs[id]`, read just above in
+  // loadOrgContext) — 'editor' only when the claim explicitly says so,
+  // 'viewer' otherwise, INCLUDING an org present in orgIds but not yet caught
+  // up in the claim (never crashes or drops the entry — same
+  // never-blank-the-list posture as name/active above).
+  const memberships = ref<{ id: string; name: string; active: boolean; role: 'editor' | 'viewer' }[]>([])
 
   // R213 (Phase 76) — set by loadOrgContext when the active/selected org's
   // doc read is denied (post-76-01 rules shape) or explicitly `active:
@@ -535,17 +541,26 @@ export const useAuthStore = defineStore('auth', () => {
     // being denied) falls back to its id and `active: false` instead of
     // rejecting the whole list, so one bad membership never blanks or breaks
     // the picker (R213/T-76-08).
+    // Phase 104 (R311) — per-org role, threaded from claimOrgs onto every
+    // membership entry so the sidebar church switcher's role badge has data
+    // to render. 'editor' only on an explicit 'editor' claim value; every
+    // other case (viewer claim, no role string, or the id absent from the
+    // claim entirely because it hasn't caught up yet) resolves to 'viewer' —
+    // never throws, never drops the entry.
+    const roleFor = (id: string): 'editor' | 'viewer' =>
+      claimOrgs[id] === 'editor' ? 'editor' : 'viewer'
+
     memberships.value = await Promise.all(
       ids.map(async (id) => {
         try {
           const snap = await getDoc(doc(db, 'organizations', id))
-          if (!snap.exists()) return { id, name: id, active: true }
+          if (!snap.exists()) return { id, name: id, active: true, role: roleFor(id) }
           const data = snap.data()
           const name = (data.name as string) || id
           const active = (data.active as boolean | undefined) ?? true
-          return { id, name, active }
+          return { id, name, active, role: roleFor(id) }
         } catch {
-          return { id, name: id, active: false }
+          return { id, name: id, active: false, role: roleFor(id) }
         }
       }),
     )
