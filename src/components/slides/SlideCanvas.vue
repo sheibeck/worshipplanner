@@ -184,6 +184,17 @@
       />
     </template>
 
+    <!-- blackout (R303, Phase 105) — renders NOTHING: no text, no label, no
+         background image. The parent root's own bg-black (Audience/
+         Confidence/PresentationViewer all already paint one) is the entire
+         visible result; this marker exists only so a test/DOM inspector can
+         confirm the branch was taken, not to draw anything itself. -->
+    <div
+      v-else-if="slideKind === 'blackout'"
+      data-testid="presentation-blackout"
+      aria-hidden="true"
+    ></div>
+
     <!-- Video slide's own source (D-17/D-18) — chromeless, imperatively
          driven, reusing the same videoRef/play/pause/error/autoplay-blocked
          wiring the pre-D-18 bed video used. A video slide has no separate
@@ -351,12 +362,16 @@ const currentVideoUrl = computed<string | null>(() => {
  * resolved upstream, once, by the assembler; this reads only the single
  * winning value already sitting on the current slide. It takes no map of
  * groups by slot id, performs no song-document lookup, and never branches on
- * which tier supplied the value. Phase 90/94: `suppressBackground` forces
- * this null regardless of the slide's own resolved value — checked FIRST,
- * ahead of the R070 video-suppresses-background rule, since a confidence
- * monitor wants black-only no matter what the slide carries.
+ * which tier supplied the value. Phase 105 (R303): a blackout slide is
+ * checked FIRST of all — it never paints a background image or scrim no
+ * matter what (stale/crafted) `backgroundImageUrl` it happens to carry
+ * (T-105-03). Phase 90/94: `suppressBackground` forces this null regardless
+ * of the slide's own resolved value — checked next, ahead of the R070
+ * video-suppresses-background rule, since a confidence monitor wants
+ * black-only no matter what the slide carries.
  */
 const currentBackgroundUrl = computed<string | null>(() => {
+  if (props.slide?.slide.contentKind === 'blackout') return null
   if (props.suppressBackground) return null
   if (currentVideoUrl.value) return null
   return props.slide?.slide.backgroundImageUrl ?? null
@@ -391,7 +406,7 @@ const currentAudioKey = computed(() => {
  * LyricSlide and CopyrightSlide both carry `contentKind: 'lyric'` and are
  * distinguished by shape (`sectionId` only present on LyricSlide).
  */
-type CardKind = 'lyric' | 'copyright' | 'scripture' | 'text' | 'image' | 'video'
+type CardKind = 'lyric' | 'copyright' | 'scripture' | 'text' | 'image' | 'video' | 'blackout'
 
 function cardKind(slide: Slide): CardKind {
   if (slide.contentKind === 'lyric') {

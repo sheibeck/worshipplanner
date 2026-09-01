@@ -153,6 +153,21 @@ function audioSlide(id: string, url: string): AssembledSlide {
   }
 }
 
+function blackoutSlide(id: string, extra?: { audioUrl?: string }): AssembledSlide {
+  return {
+    slide: {
+      id,
+      position: 7,
+      contentKind: 'blackout',
+      ...extra,
+    },
+    slotIndex: 6,
+    slotKind: 'SONG',
+    section: 'worship',
+    sourceId: 'song-1',
+  }
+}
+
 function withBackground(assembled: AssembledSlide, url: string): AssembledSlide {
   return {
     ...assembled,
@@ -248,6 +263,29 @@ describe('SlideCanvas', () => {
       const video = wrapperEl.find('video')
       expect(video.attributes('src')).toBe('https://example.com/clip.mp4')
       expect(video.attributes('controls')).toBeUndefined()
+    })
+
+    // ── blackout (R303, Phase 105) ─────────────────────────────────────────
+    it('blackout: renders presentation-blackout with NO body/background/scrim', async () => {
+      const slide = withBackground(blackoutSlide('a'), 'https://example.com/bg.jpg')
+      const wrapper = mount(SlideCanvas, { props: { slide } })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="presentation-blackout"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="presentation-body"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="presentation-background"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="presentation-background-scrim"]').exists()).toBe(false)
+      expect(wrapper.text().trim()).toBe('')
+    })
+
+    it('blackout: still mounts presentation-audio when audioUrl is present', async () => {
+      window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+      window.HTMLMediaElement.prototype.pause = vi.fn()
+      const slide = blackoutSlide('a', { audioUrl: 'https://example.com/bed.mp3' })
+      const wrapper = mount(SlideCanvas, { props: { slide } })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="presentation-audio"]').exists()).toBe(true)
     })
   })
 
