@@ -101,6 +101,14 @@
       <p class="whitespace-pre-wrap">{{ props.service.notes }}</p>
     </div>
 
+    <!-- Stage Layout section (R315): live, authenticated-editor read from
+         props.service — no snapshot needed here and no new access. Omitted
+         entirely when there are no markers. -->
+    <div v-if="props.service.stageLayout?.elements?.length" class="mt-4 break-inside-avoid">
+      <p class="text-sm font-semibold text-gray-700 mb-1">Stage Layout</p>
+      <StageLayoutView :elements="props.service.stageLayout.elements" theme="light" />
+    </div>
+
     <!-- Footer -->
     <p class="text-xs text-gray-400 mt-6 pt-2 border-t border-gray-200">
       Generated from WorshipPlanner
@@ -113,6 +121,7 @@ import { computed } from 'vue'
 import type { Service, HymnSlot, ScriptureRef, ServiceSlot, NonAssignableSlot } from '@/types/service'
 import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
+import StageLayoutView from '@/components/stage/StageLayoutView.vue'
 
 const props = defineProps<{
   service: Service

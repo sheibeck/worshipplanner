@@ -110,6 +110,15 @@
         </div>
       </div>
 
+      <!-- Stage Layout section (R315): read-only from the frozen snapshot ONLY
+           — no new getDoc, no org-scoped read. Omitted entirely when the
+           snapshot has no layout or zero markers, mirroring the Who's
+           Serving section's roleAssignments?.length guard above. -->
+      <div v-if="serviceSnapshot.stageLayout?.elements?.length" class="mt-6 rounded-lg bg-gray-50 p-4">
+        <h2 class="text-sm font-semibold text-gray-700 mb-2">Stage Layout</h2>
+        <StageLayoutView :elements="serviceSnapshot.stageLayout.elements" theme="light" />
+      </div>
+
       <!-- Footer -->
       <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
         Shared from WorshipPlanner
@@ -125,6 +134,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
+import StageLayoutView from '@/components/stage/StageLayoutView.vue'
 import type { ScriptureRef } from '@/types/service'
 
 // Static VW type label lookup (Tailwind v4 purge safety)

@@ -240,4 +240,38 @@ describe('ServicePrintLayout', () => {
     const wrapper = mount(ServicePrintLayout, { props: { service } })
     expect(wrapper.text()).toContain('Sarah leads')
   })
+
+  // ── 107-03 — read-only "Stage Layout" print section (R315) ─────────────────
+
+  it('renders the "Stage Layout" section after Notes, with markers, when props.service has a stageLayout', () => {
+    const service: Service = {
+      ...mockService,
+      stageLayout: {
+        elements: [
+          { id: 'm1', label: 'Acoustic Guitar', kind: 'instrument', zone: 'onstage', xPct: 25, yPct: 60 },
+          { id: 'm2', label: 'Drums', zone: 'offstage', xPct: 50, yPct: 50 },
+        ],
+      },
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
+
+    expect(wrapper.text()).toContain('Stage Layout')
+    expect(wrapper.text()).toContain('Acoustic Guitar')
+    expect(wrapper.text()).toContain('Drums')
+
+    // "Stage Layout" heading appears after the "Notes" heading in DOM order.
+    const html = wrapper.html()
+    expect(html.indexOf('Notes')).toBeLessThan(html.indexOf('Stage Layout'))
+  })
+
+  it('omits the "Stage Layout" section when props.service has no stageLayout', () => {
+    const wrapper = mount(ServicePrintLayout, { props: { service: mockService } })
+    expect(wrapper.text()).not.toContain('Stage Layout')
+  })
+
+  it('omits the "Stage Layout" section when props.service.stageLayout has zero markers', () => {
+    const service: Service = { ...mockService, stageLayout: { elements: [] } }
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
+    expect(wrapper.text()).not.toContain('Stage Layout')
+  })
 })

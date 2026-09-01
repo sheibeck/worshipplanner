@@ -356,4 +356,81 @@ describe('ShareView', () => {
 
     expect(wrapper.text()).toContain('Guest speaker this week')
   })
+
+  // ── 107-03 — read-only Stage Layout section (R315) ─────────────────────────
+  // ShareView consumes ONLY the already-fetched serviceSnapshot — no new
+  // getDoc, no org-scoped read. These tests assert render-from-snapshot,
+  // omit-when-empty, and the XSS-safe literal-text label render.
+
+  it('renders the Stage Layout section from the snapshot when stageLayout has markers, with no extra Firebase read', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          stageLayout: {
+            elements: [
+              { id: 'm1', label: 'Acoustic Guitar', kind: 'instrument', zone: 'onstage', xPct: 25, yPct: 60 },
+              { id: 'm2', label: 'Drums', zone: 'offstage', xPct: 50, yPct: 50 },
+            ],
+          },
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Stage Layout')
+    expect(wrapper.text()).toContain('Acoustic Guitar')
+    expect(wrapper.text()).toContain('Drums')
+    // Exactly one getDoc call — the token/share-doc fetch. No second Firebase
+    // read is triggered by rendering the stage layout section.
+    expect(mockGetDoc).toHaveBeenCalledTimes(1)
+  })
+
+  it('omits the Stage Layout section when stageLayout is absent from the snapshot', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ serviceSnapshot: mockSnapshot }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Stage Layout')
+  })
+
+  it('omits the Stage Layout section when stageLayout has zero markers', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: { ...mockSnapshot, stageLayout: { elements: [] } },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Stage Layout')
+  })
+
+  it('renders a marker label containing markup as literal text, never parsed as DOM (T-107-03)', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          stageLayout: {
+            elements: [
+              { id: 'm1', label: '<img src=x onerror=alert(1)>', zone: 'onstage', xPct: 10, yPct: 10 },
+            ],
+          },
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    // The markup renders as literal text content, not a parsed <img> element.
+    expect(wrapper.find('img').exists()).toBe(false)
+    expect(wrapper.text()).toContain('<img src=x onerror=alert(1)>')
+  })
 })
