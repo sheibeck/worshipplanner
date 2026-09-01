@@ -600,7 +600,12 @@ reduced to a short pointer.
   4. `npm run type-check` and the full test suite pass unchanged after the comment-only edits — no behavior change results from relocating comments (R317).
 
 **Plans**: 2 plans
+**Wave 1**
+
 - [ ] 108-01-PLAN.md — Comment audit & triage inventory: grep-first enumeration + three-bucket classification of every load-bearing comment across src/**, functions/src/**, render-service/src/**, and the rules files, with a Phase 109 handoff section (R316)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 108-02-PLAN.md — Decision-rationale ADR extraction: author MADR-lite ADRs under docs/adr/ (grouped by decision), shrink source comments to pointers, and prove type-check + full test suite unchanged (R317)
 
 ### Phase 109: Behavioral/Architectural Extraction & Comment Convention
