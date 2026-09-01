@@ -520,7 +520,14 @@ const isDirty = computed(() => {
   for (let i = 0; i < cur.sections.length; i++) {
     const a = cur.sections[i]!
     const b = editableState.sections[i]!
-    if (a.id !== b.id || a.label !== b.label) return true
+    // WR-02 (105 code review): compare `kind` too — today the only way a
+    // section's `kind` is set is at mint time in `addSection('BLACKOUT')`,
+    // which always mints a fresh id, so an id/label match currently implies
+    // a `kind` match as well. But this is a field-by-field equality check
+    // (it already goes out of its way to catch slideBreaks-only changes
+    // above), so a future in-place `kind` mutation (e.g. a "convert to
+    // black slide" affordance) must not be silently missed by autosave.
+    if (a.id !== b.id || a.label !== b.label || (a.kind ?? 'lyric') !== (b.kind ?? 'lyric')) return true
     if (a.lines.length !== b.lines.length) return true
     for (let j = 0; j < a.lines.length; j++) {
       if (a.lines[j] !== b.lines[j]) return true
