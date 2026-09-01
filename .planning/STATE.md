@@ -5,16 +5,16 @@ milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Securit
 current_phase: 108
 current_phase_name: in progress
 status: planning
-stopped_at: Completed 108-01-PLAN.md
-last_updated: "2026-09-01T21:19:09.870Z"
+stopped_at: Completed 108-02-PLAN.md (Decision-Rationale ADR Extraction)
+last_updated: "2026-09-01T22:20:37.517Z"
 last_activity: 2026-09-01
 last_activity_desc: plan 108-01 executed (108-COMMENT-INVENTORY.md)
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 17
 ---
 
 ## Human UAT — completed & PASSED
@@ -3059,6 +3059,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 107-visual-stage-layout P02 | 30min | 2 tasks | 6 files |
 | Phase 107-visual-stage-layout P03 | 35min | 2 tasks | 6 files |
 | Phase 108 P01 | 13min | 3 tasks | 1 files |
+| Phase 108 P02 | 150min | 3 tasks | 339 files |
 
 ## Accumulated Context
 
@@ -3543,6 +3544,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 107-03: stageLayout snapshot projection uses an explicit per-marker field map (never a raw spread), with a test proving a smuggled non-display field cannot leak to the public share page.
 - [Phase ?]: 107-03: ShareView and ServicePrintLayout both reuse StageLayoutView.vue directly for the read-only stage plot render — no third rendering path was created.
 - [Phase ?]: 108-01: comment audit tag ids (WR-01/CR-01/etc.) are per-file/per-review scoped, not globally unique — plan 108-02 must group ADR candidates by (tag + qualifying doc), never by bare tag id alone
+- [Phase ?]: Phase 108-02: Grouped 382 Bucket A decision-rationale comments into 244 MADR-lite ADRs under docs/adr/, keyed by (tag+qualifier) or (file+tag), with the generic Pitfall tag additionally keyed by its extracted sub-number to avoid merging unrelated decisions; shrank 381 source comments across 93 files to ADR pointers with zero behavior change (type-check clean, app/render-service/rules suites unchanged).
+- [Phase ?]: Phase 108-02: Discovered a pre-existing, unrelated test-baseline failure (src/stores/appConfig.test.ts) not caused by this phase; documented in deferred-items.md rather than fixed (out of scope).
 
 ### Roadmap Evolution
 
@@ -3870,8 +3873,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-01T21:19:09.805Z
-Stopped at: Completed 108-01-PLAN.md
+Last session: 2026-09-01T22:20:37.448Z
+Stopped at: Completed 108-02-PLAN.md (Decision-Rationale ADR Extraction)
 Resume file: None
 
 ## Operator Next Steps

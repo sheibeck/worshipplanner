@@ -23,7 +23,7 @@ remediating the Critical/High findings.
 - [x] **R316**: The codebase is audited for load-bearing comments, each classified as decision-rationale,
   behavioral/architectural, or genuinely-local — producing a triage inventory that drives R317/R318.
 
-- [ ] **R317**: Decision-rationale comments (the `R-`/`WR-`/`CR-`/`Pitfall`-tagged "why we did it this
+- [x] **R317**: Decision-rationale comments (the `R-`/`WR-`/`CR-`/`Pitfall`-tagged "why we did it this
   way" notes) are relocated into ADRs under `docs/adr/`, and each affected code comment is reduced to a
   short pointer (e.g. the ADR id) rather than carrying the rationale itself.
 
@@ -75,7 +75,7 @@ remediating the Critical/High findings.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R316 | Phase 108 | Complete |
-| R317 | Phase 108 | Pending |
+| R317 | Phase 108 | Complete |
 | R318 | Phase 109 | Pending |
 | R319 | Phase 109 | Pending |
 | R320 | Phase 110 | Pending |
