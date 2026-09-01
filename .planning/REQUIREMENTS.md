@@ -26,7 +26,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 
 ### Live Presentation — blackout scoping & looping
 
-- [ ] **R305**: Pressing **"Go to black"** blacks out **only the Audience output**; the Confidence
+- [x] **R305**: Pressing **"Go to black"** blacks out **only the Audience output**; the Confidence
   monitor keeps showing the current/upcoming slide.
 
 - [ ] **R306**: A user can mark a service item as **looping** (a per-item checkbox in the editor) so
@@ -108,7 +108,7 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | R302 | Phase 105 | Complete |
 | R303 | Phase 105 | Complete |
 | R304 | Phase 105 | Complete |
-| R305 | Phase 105 | Pending |
+| R305 | Phase 105 | Complete |
 | R306 | Phase 106 | Pending |
 | R307 | Phase 106 | Pending |
 | R308 | Phase 106 | Pending |

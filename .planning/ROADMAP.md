@@ -496,13 +496,13 @@ Plans:
   3. Adding, moving, duplicating, or deleting a black slide leaves song section numbering, the split-section-as-one-unit behavior, and the slide↔service-order mirroring intact (R304).
   4. Pressing "Go to black" during Run blacks out only the Audience output; the Confidence monitor keeps showing the current/upcoming slide the entire time (R305).
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 Plans:
 
 - [x] 105-01-PLAN.md — Blackout data model (LyricSection.kind + BlackoutSlide) + assembler resolution + section-numbering integrity (R302, R303, R304) [wave 1]
 - [ ] 105-02-PLAN.md — SlideCanvas solid-black render + lyric-editor "Insert black slide" affordance + Slides-tab card preview (R302, R303, R304) [wave 2]
-- [ ] 105-03-PLAN.md — "Go to black" scoped to the Audience output only (Confidence suppression, no wire-protocol change) (R305) [wave 1]
+- [x] 105-03-PLAN.md — "Go to black" scoped to the Audience output only (Confidence suppression, no wire-protocol change) (R305) [wave 1]
 
 **UI hint**: yes
 

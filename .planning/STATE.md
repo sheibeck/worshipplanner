@@ -5,15 +5,15 @@ milestone_name: Rehearsal, Stage Plans & Presentation Polish
 current_phase: 105
 current_phase_name: Presentation Blackout & Inline Black Slide
 status: executing
-stopped_at: Completed 105-01-PLAN.md
-last_updated: "2026-09-01T06:24:35.885Z"
+stopped_at: Completed 105-03-PLAN.md
+last_updated: "2026-09-01T06:29:59.480Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 105 execution started
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 25
 ---
 
@@ -1140,7 +1140,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 105 (Presentation Blackout & Inline Black Slide) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-01 — Phase 105 execution started
 
@@ -2977,6 +2977,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 104 P01 | 12min | 3 tasks | 11 files |
 | Phase 104 P02 | 55min | 2 tasks | 6 files |
 | Phase 105 P01 | 25min | 3 tasks | 8 files |
+| Phase 105 P03 | 15min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3449,6 +3450,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Relocated the notification host mount from AppShell.vue to App.vue root so it renders on RunControlView.vue (which bypasses AppShell) — required for R310's proof case.
 - [Phase ?]: Church switcher role defaults to 'viewer' unless the claim explicitly says 'editor'; STAGELAYOUTS-RESET-OBLIGATION marker added to orgScopedStores.ts for Phase 107 durability.
 - [Phase ?]: Blackout is a distinct LyricSection.kind/SlideContentKind, not an empty LyricSection or SourceRef change (105-CONTEXT.md decision, PITFALLS Pitfall 5)
+- [Phase ?]: R305: consumer-side blackout suppression in ConfidenceOutputView only, no wire-protocol change (useOutputWindow/AudienceOutputView/useRunControl/runChannel untouched)
 
 ### Roadmap Evolution
 
@@ -3775,8 +3777,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-09-01T06:24:35.830Z
-Stopped at: Completed 105-01-PLAN.md
+Last session: 2026-09-01T06:29:59.426Z
+Stopped at: Completed 105-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
