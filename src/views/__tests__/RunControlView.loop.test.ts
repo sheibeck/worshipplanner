@@ -16,11 +16,12 @@
  * slotIndex 1 (for the item-change case), and a separate 1-slide looping
  * fixture for the single-slide no-op case.
  *
- * 106-REVIEW WR-01 addition: the useServiceAssembly mock now stashes the LIVE
+ * 106-REVIEW additions: the useServiceAssembly mock now stashes the LIVE
  * assembledSlideshow ref on H (H.assembledSlideshowRef) so a test can mutate
  * it AFTER mount — this powers the WR-01 case (a looping item's slide count
  * growing past 1 via a mid-run async render, with no navigation, must still
- * arm the timer).
+ * arm the timer). Also covers WR-02 (ending a rehearsal while looping clears
+ * the timer via the header exit affordance, not just unmount/item-change).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
@@ -467,5 +468,22 @@ describe('RunControlView — per-item loop (R306/R308)', () => {
     // later it auto-advances.
     await vi.advanceTimersByTimeAsync(10000)
     expect(states(fake).map((m) => m.index)).toEqual([0, 1])
+  })
+
+  it('ending a rehearsal while looping clears the timer — advancing 30s afterward posts no further auto-advance (106-REVIEW WR-02)', async () => {
+    const { wrapper, fake } = mountView()
+    await rehearseFake(wrapper)
+
+    expect(states(fake).map((m) => m.index)).toEqual([0])
+    const postedBefore = states(fake).length
+
+    // The header exit affordance routes to endRehearsal() while rehearsing
+    // (onExitRequest) — no confirm dialog, no navigation.
+    await wrapper.find('[data-testid="run-exit-btn"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(0)
+
+    await vi.advanceTimersByTimeAsync(30000)
+
+    expect(states(fake).length).toBe(postedBefore)
   })
 })

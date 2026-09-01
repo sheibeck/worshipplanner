@@ -965,6 +965,12 @@ export function useRunControl(options: UseRunControlOptions = {}) {
    * needs no confirm.
    */
   function endRehearsal() {
+    // 106-REVIEW WR-02: explicit, mirrors endServiceTeardown's defense-in-depth
+    // (useRunControl.ts:903-907). This exit path does NOT unmount the component
+    // (State A re-renders in place), so useLoopTimer's own onUnmounted(disarm)
+    // safety net does not apply here — without this call, disarming depends
+    // solely on the async watch(live, reconcileLoop) below.
+    loopTimer.disarm()
     rehearsing.value = false
     live.value = false
     blackout.value = false
