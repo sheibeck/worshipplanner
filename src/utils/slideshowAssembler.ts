@@ -27,7 +27,7 @@
  *    a pre-materialization render cannot churn Vue keys across recomputes.
  */
 import type { Service, ServiceSlot, ScriptureRef } from '@/types/service'
-import type { AssembledSlide, Slide, LyricSlide, CopyrightSlide, ScriptureSlide, TextSlide, VideoSlide } from '@/types/slide'
+import type { AssembledSlide, Slide, LyricSlide, CopyrightSlide, ScriptureSlide, TextSlide, VideoSlide, BlackoutSlide } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
@@ -181,6 +181,12 @@ function resolveEntryContent(
       if (!lyrics) return undefined
       const section = lyrics.sections.find((s) => s.id === ref.sectionId)
       if (!section) return undefined
+      // 105-CONTEXT.md: the one-line blackout branch — a blackout section
+      // resolves to a contentless blackout slide, never lyric content.
+      if (section.kind === 'blackout') {
+        const blackoutContent: Omit<BlackoutSlide, 'id' | 'position'> = { contentKind: 'blackout' }
+        return blackoutContent
+      }
       const content: Omit<LyricSlide, 'id' | 'position'> = {
         contentKind: 'lyric',
         sectionId: section.id,
@@ -534,6 +540,14 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
           if (!lyrics) continue // Song no longer resolves — omit, as today.
           const section = lyrics.sections.find((s) => s.id === ref.sectionId)
           if (!section) continue // Section no longer resolves — omit, as today.
+          // 105-CONTEXT.md: the one-line blackout branch (stored-group
+          // path) — emit exactly one blackout AssembledSlide, skipping the
+          // slice loop entirely since a blackout section carries no lines.
+          if (section.kind === 'blackout') {
+            const blackoutContent: Omit<BlackoutSlide, 'id' | 'position'> = { contentKind: 'blackout' }
+            emitFromGroup(slot, index, group, entry, blackoutContent)
+            continue
+          }
           const groups = sliceSectionIntoSlides(section)
           groups.forEach((lines, i) => {
             const content: Omit<LyricSlide, 'id' | 'position'> = {
@@ -574,6 +588,14 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         for (const sectionId of order) {
           const section = lyrics.sections.find((s) => s.id === sectionId)
           if (!section) continue
+          // 105-CONTEXT.md: the one-line blackout branch (no-group fallback
+          // path) — emit exactly one blackout AssembledSlide, skipping the
+          // slice loop entirely, same as the stored-group branch above.
+          if (section.kind === 'blackout') {
+            const blackoutContent: Omit<BlackoutSlide, 'id' | 'position'> = { contentKind: 'blackout' }
+            emitFallback(slot, index, blackoutContent, slot.songId, localSeq++)
+            continue
+          }
           // R117 (Phase 53): slice through the SAME `sliceSectionIntoSlides`
           // the stored-group loop uses, so the two paths agree slide-for-slide
           // (the D1 lockstep discipline). An unsplit section yields exactly one

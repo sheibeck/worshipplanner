@@ -13,7 +13,7 @@ import type {
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
-import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide, VideoSlide, CongregationalSection } from '@/types/slide'
+import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide, VideoSlide, BlackoutSlide, CongregationalSection } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import type { PptxRenderDoc } from '@/types/pptxRender'
 import type { Timestamp } from 'firebase/firestore'
@@ -1582,6 +1582,234 @@ describe('assembleSlideshow — lyric split (R117/R118, Plan 53-02)', () => {
         ['L0', 'L1', 'L2', 'L3'],
         ['L4', 'L5', 'L6', 'L7'],
       ])
+    })
+  })
+})
+
+// Phase 105 Plan 01 (R302/R303/R304): a blackout LyricSection resolves to a
+// single contentKind:'blackout' AssembledSlide on both the stored-group and
+// no-group fallback paths, in correct order position, carrying no lyric
+// fields — 105-CONTEXT.md's "one-line blackout branch" at the three lyric
+// resolution sites.
+describe('assembleSlideshow — blackout slides (R302/R303, Plan 105-01)', () => {
+  function blackoutSongLyrics(overrides: Partial<SongLyrics> = {}): SongLyrics {
+    return makeSongLyrics({
+      sections: [
+        { id: 'verse-1', label: 'Verse 1', lines: ['Line A', 'Line B'] },
+        { id: 'black-slide', label: 'Black Slide', lines: [], kind: 'blackout' },
+        { id: 'chorus', label: 'Chorus', lines: ['Line C'] },
+      ],
+      ...overrides,
+    })
+  }
+
+  describe('resolveEntryContent (lyric case)', () => {
+    it('returns { contentKind: "blackout" } for a blackout section, via the stored-group path', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = blackoutSongLyrics()
+      const entry = makeGroupSlideEntry({
+        id: 'entry-black',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'black-slide' },
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(1)
+      expect(result[0]!.slide.contentKind).toBe('blackout')
+    })
+  })
+
+  describe('stored-group path', () => {
+    it('emits exactly ONE blackout AssembledSlide for a blackout entry, never sliced into empty lyric slides', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = blackoutSongLyrics()
+      const verseEntry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const blackoutEntry = makeGroupSlideEntry({
+        id: 'entry-black',
+        order: 1,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'black-slide' },
+      })
+      const chorusEntry = makeGroupSlideEntry({
+        id: 'entry-chorus',
+        order: 2,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' },
+      })
+      const group = makeSlideGroup({
+        id: 'slot-song-0',
+        slotId: 'slot-song-0',
+        slides: [verseEntry, blackoutEntry, chorusEntry],
+      })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      // Exactly 3 slides — the blackout section never expands into multiple
+      // (empty-line) lyric slides.
+      expect(result).toHaveLength(3)
+      expect(result.map((r) => r.slide.contentKind)).toEqual(['lyric', 'blackout', 'lyric'])
+      // Correct order position between its neighbors (R303 navigation).
+      expect(result.map((r) => r.slide.id)).toEqual(['entry-verse', 'entry-black', 'entry-chorus'])
+      // Keeps group/entry provenance like any other stored-group slide.
+      expect(result[1]!.groupId).toBe('slot-song-0')
+      expect(result[1]!.groupSlideId).toBe('entry-black')
+      // Never carries lyric fields.
+      const blackoutSlide = result[1]!.slide as BlackoutSlide
+      expect('lines' in blackoutSlide).toBe(false)
+      expect('sectionLabel' in blackoutSlide).toBe(false)
+    })
+
+    it("honors the entry's own audio like any other slide", () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = blackoutSongLyrics()
+      const entry = makeGroupSlideEntry({
+        id: 'entry-black',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'black-slide' },
+        audioUrl: 'https://example.com/own.mp3',
+        audioLoop: true,
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result[0]!.slide.audioUrl).toBe('https://example.com/own.mp3')
+      expect(result[0]!.slide.audioLoop).toBe(true)
+      expect(result[0]!.audioFromBed).toBe(false)
+    })
+
+    it("honors the group's bed audio when the entry has none of its own", () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = blackoutSongLyrics()
+      const entry = makeGroupSlideEntry({
+        id: 'entry-black',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'black-slide' },
+      })
+      const group = makeSlideGroup({
+        id: 'slot-song-0',
+        slotId: 'slot-song-0',
+        slides: [entry],
+        bedAudioUrl: 'https://example.com/bed.mp3',
+      })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result[0]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
+      expect(result[0]!.audioFromBed).toBe(true)
+    })
+  })
+
+  describe('no-group fallback path', () => {
+    it('emits exactly ONE fallback blackout AssembledSlide, advancing localSeq so ids stay distinct/stable', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = blackoutSongLyrics({ performanceOrder: ['verse-1', 'black-slide', 'chorus'] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = assembleSlideshow(service, inputs)
+
+      // copyright, verse, blackout, chorus, copyright
+      expect(result).toHaveLength(5)
+      expect(result.map((r) => r.slide.contentKind)).toEqual(['lyric', 'lyric', 'blackout', 'lyric', 'lyric'])
+      expect(result.map((r) => r.slide.id)).toEqual([
+        'slot-song-0:0',
+        'slot-song-0:1',
+        'slot-song-0:2',
+        'slot-song-0:3',
+        'slot-song-0:4',
+      ])
+      expect(new Set(result.map((r) => r.slide.id)).size).toBe(5)
+      const blackoutSlide = result[2]!.slide as BlackoutSlide
+      expect(blackoutSlide.contentKind).toBe('blackout')
+      expect('lines' in blackoutSlide).toBe(false)
+    })
+
+    it('ids stay stable across two successive calls', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = blackoutSongLyrics({ performanceOrder: ['verse-1', 'black-slide', 'chorus'] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result1 = assembleSlideshow(service, inputs)
+      const result2 = assembleSlideshow(service, inputs)
+
+      expect(result1.map((r) => r.slide.id)).toEqual(result2.map((r) => r.slide.id))
+    })
+  })
+
+  describe('dual-path lockstep', () => {
+    it('the stored-group and fallback paths agree: exactly one blackout slide in the same relative order position', () => {
+      const lyrics = blackoutSongLyrics({ performanceOrder: ['verse-1', 'black-slide', 'chorus'] })
+
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const fallbackResult = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) }),
+      )
+
+      const verseEntry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const blackoutEntry = makeGroupSlideEntry({
+        id: 'entry-black',
+        order: 1,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'black-slide' },
+      })
+      const chorusEntry = makeGroupSlideEntry({
+        id: 'entry-chorus',
+        order: 2,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' },
+      })
+      const group = makeSlideGroup({
+        id: 'slot-song-0',
+        slotId: 'slot-song-0',
+        slides: [verseEntry, blackoutEntry, chorusEntry],
+      })
+      const groupResult = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({ songLyricsById: new Map([['song-1', lyrics]]), groupsBySlotId: new Map([['slot-song-0', group]]) }),
+      )
+
+      const fallbackKinds = fallbackResult.map((r) => r.slide.contentKind)
+      const groupKinds = groupResult.map((r) => r.slide.contentKind)
+      expect(fallbackKinds.filter((k) => k === 'blackout')).toHaveLength(1)
+      expect(groupKinds.filter((k) => k === 'blackout')).toHaveLength(1)
+
+      // Same relative surroundings: lyric immediately before and after the
+      // blackout on both paths.
+      const fallbackBlackoutIndex = fallbackKinds.indexOf('blackout')
+      const groupBlackoutIndex = groupKinds.indexOf('blackout')
+      expect(fallbackKinds[fallbackBlackoutIndex - 1]).toBe('lyric')
+      expect(fallbackKinds[fallbackBlackoutIndex + 1]).toBe('lyric')
+      expect(groupKinds[groupBlackoutIndex - 1]).toBe('lyric')
+      expect(groupKinds[groupBlackoutIndex + 1]).toBe('lyric')
     })
   })
 })
