@@ -317,6 +317,12 @@ describe('slideDisplay', () => {
       } as Slide
       expect(slideContentLabel(allLater)).toBe('ALL')
     })
+
+    // Phase 105 (R302/R303, 105-UI-SPEC.md Copywriting Contract).
+    it("returns BLACKOUT for a blackout slide", () => {
+      const blackout = { id: 's12', position: 0, contentKind: 'blackout' } as Slide
+      expect(slideContentLabel(blackout)).toBe('BLACKOUT')
+    })
   })
 
   describe('speakerDisplayName (Phase 38-03, widened Phase 47 R095)', () => {
@@ -454,6 +460,12 @@ describe('slideDisplay', () => {
       expect(slideBodyText(withFile)).toBe('Video: clip.mp4')
       expect(slideBodyText(withoutFile)).toBe('Video')
     })
+
+    // Phase 105 (R302/R303, 105-UI-SPEC.md Copywriting Contract).
+    it("returns 'Solid black' for a blackout slide", () => {
+      const blackout = { id: 's7', position: 0, contentKind: 'blackout' } as Slide
+      expect(slideBodyText(blackout)).toBe('Solid black')
+    })
   })
 
   describe('slideFooterLabel', () => {
@@ -539,6 +551,12 @@ describe('slideDisplay', () => {
       const withoutFile = { id: 's8', position: 0, contentKind: 'video', videoSrc: 'x' } as Slide
       expect(slideFooterLabel(withFile)).toBe('clip.mp4')
       expect(slideFooterLabel(withoutFile)).toBe('Video')
+    })
+
+    // Phase 105 (R302/R303, 105-UI-SPEC.md Copywriting Contract).
+    it("returns 'Black Slide' for a blackout slide", () => {
+      const blackout = { id: 's9', position: 0, contentKind: 'blackout' } as Slide
+      expect(slideFooterLabel(blackout)).toBe('Black Slide')
     })
   })
 

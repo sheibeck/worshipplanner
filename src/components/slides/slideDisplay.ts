@@ -173,6 +173,10 @@ export function slideContentLabel(slide: Slide): string {
       return 'IMAGE'
     case 'video':
       return 'VIDEO'
+    case 'blackout':
+      // Phase 105 (105-UI-SPEC.md Copywriting Contract): a blackout slide
+      // carries no text/label — the eyebrow names the kind itself.
+      return 'BLACKOUT'
   }
 }
 
@@ -223,6 +227,11 @@ export function slideBodyText(slide: Slide): string {
       return slide.altText ?? ''
     case 'video':
       return slide.originalFileName ? `Video: ${slide.originalFileName}` : 'Video'
+    case 'blackout':
+      // Phase 105 (105-UI-SPEC.md Copywriting Contract): the preview-body
+      // caption for a blackout card — the card itself renders solid black;
+      // this muted caption is what a planner sees in the grid/list view.
+      return 'Solid black'
   }
 }
 
@@ -247,6 +256,10 @@ export function slideFooterLabel(slide: Slide): string {
       return 'Image'
     case 'video':
       return slide.originalFileName ?? 'Video'
+    case 'blackout':
+      // Phase 105 (105-UI-SPEC.md Copywriting Contract): the natural-case
+      // footer label for a blackout card.
+      return 'Black Slide'
   }
 }
 
