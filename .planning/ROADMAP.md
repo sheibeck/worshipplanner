@@ -547,7 +547,7 @@ Plans:
 
 - [x] 107-01-PLAN.md — Data model (additive `Service.stageLayout` + `StageMarker`), pure drag/geometry helpers, shared read-only `StageLayoutView`, and resolve the Phase-104 `STAGELAYOUTS-RESET-OBLIGATION` marker [wave 1]
 - [x] 107-02-PLAN.md — `StageLayoutEditor` freeform Pointer-Events drag canvas (two zones, add/label/kind/move/delete, aria-labels, touch) + the editor's Stage Layout tab, draft/lock-gated, riding the existing autosave [wave 2]
-- [ ] 107-03-PLAN.md — Denormalize `stageLayout` into the frozen `ServiceSnapshot` and render it read-only on the public ShareView + print (reusing `StageLayoutView`, no new public rules) [wave 2]
+- [x] 107-03-PLAN.md — Denormalize `stageLayout` into the frozen `ServiceSnapshot` and render it read-only on the public ShareView + print (reusing `StageLayoutView`, no new public rules) [wave 2]
 
 **UI hint**: yes
 **Research flag**: this app's first freeform-drag surface (v1.4 phantom duplicates, v1.6 drag-into-section

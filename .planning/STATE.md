@@ -4,17 +4,17 @@ milestone: v2.7
 milestone_name: Rehearsal, Stage Plans & Presentation Polish
 current_phase: 107
 current_phase_name: Visual Stage Layout
-status: executing
-stopped_at: Completed 107-02-PLAN.md
-last_updated: "2026-09-01T09:22:39.313Z"
+status: verifying
+stopped_at: Completed 107-03-PLAN.md
+last_updated: "2026-09-01T09:38:13.491Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 107 execution started
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 10
-  completed_plans: 9
-  percent: 75
+  completed_plans: 10
+  percent: 100
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.7 Rehearsal, Stage Plans & Presentation Polish (roadmap created 2026-09-01)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 mapped with no orphans. Ready for `/gsd-plan-phase 104`.
 
 **Goal:** Give teams richer rehearsal and live-presentation tooling plus targeted Run-the-Service and
@@ -1141,7 +1141,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 107 (Visual Stage Layout) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-01 — Phase 107 execution started
 
 ## ★ v2.7 ROADMAP.md phase breakdown (created 2026-09-01)
@@ -2983,6 +2983,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 106 P02 | 45min | 3 tasks | 5 files |
 | Phase 107 P01 | 9min | 3 tasks | 6 files |
 | Phase 107-visual-stage-layout P02 | 30min | 2 tasks | 6 files |
+| Phase 107-visual-stage-layout P03 | 35min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3464,6 +3465,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 107-01: markerKindAccentClass uses static literal Tailwind classes per kind/theme (never string concatenation) for Tailwind v4 purge safety, mirroring kindBadgeClass().
 - [Phase ?]: onSave() must send stageLayout ?? null (not a bare pass-through) so removing the last marker actually clears the remote Firestore field, mirroring the existing sermonPassage precedent on this curated payload.
 - [Phase ?]: StageLayoutEditor built on native Pointer Events with drop-only persist (pointermove visual-only, pointerup emits one clamped zone-resolved move) -- editable zones omit overflow-hidden so a drag can visually cross zones.
+- [Phase ?]: 107-03: stageLayout snapshot projection uses an explicit per-marker field map (never a raw spread), with a test proving a smuggled non-display field cannot leak to the public share page.
+- [Phase ?]: 107-03: ShareView and ServicePrintLayout both reuse StageLayoutView.vue directly for the read-only stage plot render — no third rendering path was created.
 
 ### Roadmap Evolution
 
@@ -3790,8 +3793,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-09-01T09:22:39.251Z
-Stopped at: Completed 107-02-PLAN.md
+Last session: 2026-09-01T09:38:06.803Z
+Stopped at: Completed 107-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
