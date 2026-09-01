@@ -42,11 +42,17 @@
           >
             {{ toast.action.label }}
           </button>
+          <!-- 104-REVIEW WR-01: deliberately NO rel="noopener". The only current
+               consumer (useRunControl.ts's monitor-reassign sticky) links to
+               /monitor-setup, whose router guard depends on sessionStorage's
+               active-org choice — the HTML spec only copies that to a new tab
+               when the opener relationship survives. Mirrors openManage()'s
+               documented reasoning at useRunControl.ts:1124-1136 for the same
+               link/destination. -->
           <a
             v-if="toast.link"
             :href="toast.link.href"
             target="_blank"
-            rel="noopener"
             :class="[severity(toast.variant).text, 'underline']"
           >
             {{ toast.link.label }}
