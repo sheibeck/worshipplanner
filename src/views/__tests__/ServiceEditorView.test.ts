@@ -8962,3 +8962,60 @@ describe('Run entry button (R261/R275)', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/run/service-1?org=org-1')
   })
 })
+
+describe('church switch fail-safe nav (260901-lua)', () => {
+  async function mountView(overrides: Partial<Service> = {}) {
+    mockServicesList = [{ ...mockService, ...overrides }]
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockRouterPush.mockClear()
+  })
+
+  it('does not navigate to /services on first mount', async () => {
+    await mountView()
+    await flushPromises()
+    expect(mockRouterPush).not.toHaveBeenCalledWith('/services')
+  })
+
+  it('does not navigate to /services on the initial null -> value org resolution (WR-01 late auth)', async () => {
+    mockAuthState.orgId = null
+    await mountView()
+    await flushPromises()
+    mockRouterPush.mockClear()
+
+    // Initial org resolution — not a switch.
+    mockAuthState.orgId = 'org-1'
+    await flushPromises()
+
+    expect(mockRouterPush).not.toHaveBeenCalledWith('/services')
+  })
+
+  it('navigates to /services on a genuine org change (fail-safe on church switch)', async () => {
+    await mountView()
+    await flushPromises()
+    mockRouterPush.mockClear()
+
+    // In-place church switch — no route change, no remount.
+    mockAuthState.orgId = 'org-2'
+    await flushPromises()
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/services')
+  })
+})

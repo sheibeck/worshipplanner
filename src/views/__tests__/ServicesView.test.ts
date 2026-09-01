@@ -190,3 +190,24 @@ describe('ServicesView default-template cog (R113)', () => {
     expect(wrapper.find('[data-testid="open-template-editor"]').exists()).toBe(false)
   })
 })
+
+describe('church switch re-subscribe (260901-lua)', () => {
+  it('subscribes with the live new org id on switch and tears down the prior church', async () => {
+    mockAuthState.orgId = 'org-1'
+    mountServicesView()
+    await flushPromises()
+
+    expect(mockSubscribe).toHaveBeenCalledWith('org-1')
+
+    mockSubscribe.mockClear()
+    mockUnsubscribeAll.mockClear()
+
+    // In-place church switch — no route change, no remount.
+    mockAuthState.orgId = 'org-2'
+    await flushPromises()
+
+    expect(mockUnsubscribeAll).toHaveBeenCalled()
+    expect(mockSubscribe).toHaveBeenCalledWith('org-2')
+    expect(mockSubscribe).not.toHaveBeenCalledWith('org-1')
+  })
+})
