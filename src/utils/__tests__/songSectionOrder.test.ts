@@ -169,6 +169,75 @@ describe('buildSectionRows displayLabel (R120)', () => {
   })
 })
 
+// R304 (Phase 105) + PITFALLS Pitfall 5: a blackout section must be a
+// first-class row (position/occurrenceIndex/isRepeat computed normally) but
+// invisible to per-kind lyric numbering — inserting/moving/duplicating a
+// blackout must never renumber a Verse/Chorus row around it.
+describe('buildSectionRows — blackout sections (R304)', () => {
+  const blackout: LyricSection = { id: 'black-slide', label: 'Black Slide', lines: [], kind: 'blackout' }
+
+  it("a blackout row's displayLabel is its own stored label, not a derived Kind+number", () => {
+    const rows = buildSectionRows([verse1, blackout, chorus], ['verse-1', 'black-slide', 'chorus'])
+    const blackoutRow = rows.find((r) => r.sectionId === 'black-slide')
+    expect(blackoutRow?.displayLabel).toBe('Black Slide')
+  })
+
+  it('numbering-integrity: inserting a blackout between Verse 1 and Chorus leaves their displayLabels unchanged vs. the same order without the blackout', () => {
+    const withoutBlackout = buildSectionRows([verse1, chorus], ['verse-1', 'chorus'])
+    const withBlackout = buildSectionRows([verse1, blackout, chorus], ['verse-1', 'black-slide', 'chorus'])
+
+    const verseWithout = withoutBlackout.find((r) => r.sectionId === 'verse-1')
+    const chorusWithout = withoutBlackout.find((r) => r.sectionId === 'chorus')
+    const verseWith = withBlackout.find((r) => r.sectionId === 'verse-1')
+    const chorusWith = withBlackout.find((r) => r.sectionId === 'chorus')
+
+    expect(verseWith?.displayLabel).toBe(verseWithout?.displayLabel)
+    expect(chorusWith?.displayLabel).toBe(chorusWithout?.displayLabel)
+    expect(verseWith?.displayLabel).toBe('Verse 1')
+    expect(chorusWith?.displayLabel).toBe('Chorus 1')
+  })
+
+  it('numbering-integrity: a blackout between two Verse sections does not shift the second Verse\'s number', () => {
+    const v1: LyricSection = { id: 'verse-1', label: 'Verse 1', lines: ['a'] }
+    const v2: LyricSection = { id: 'verse-2', label: 'Verse 2', lines: ['b'] }
+
+    const withoutBlackout = buildSectionRows([v1, v2], ['verse-1', 'verse-2'])
+    const withBlackout = buildSectionRows([v1, blackout, v2], ['verse-1', 'black-slide', 'verse-2'])
+
+    expect(withBlackout.find((r) => r.sectionId === 'verse-2')?.displayLabel).toBe(
+      withoutBlackout.find((r) => r.sectionId === 'verse-2')?.displayLabel,
+    )
+    expect(withBlackout.find((r) => r.sectionId === 'verse-2')?.displayLabel).toBe('Verse 2')
+  })
+
+  it('assigns a blackout row a correct 1-based position, and treats a duplicated blackout as a repeat', () => {
+    const rows = buildSectionRows(
+      [verse1, blackout, chorus],
+      ['verse-1', 'black-slide', 'black-slide', 'chorus'],
+    )
+
+    expect(rows).toHaveLength(4)
+    const [verseRow, firstBlackout, secondBlackout, chorusRow] = rows
+
+    expect(verseRow?.position).toBe(1)
+    expect(firstBlackout).toMatchObject({ position: 2, occurrenceIndex: 0, isRepeat: false, repeatOfPosition: null })
+    expect(secondBlackout).toMatchObject({ position: 3, occurrenceIndex: 1, isRepeat: true, repeatOfPosition: 2 })
+    expect(chorusRow?.position).toBe(4)
+    // The repeat's displayLabel still reads the stored label, unaffected by
+    // the repeat/numbering machinery used for lyric kinds.
+    expect(secondBlackout?.displayLabel).toBe('Black Slide')
+  })
+
+  it('never mutates the stored section.kind/label for a blackout section', () => {
+    const sections = [verse1, blackout, chorus]
+    const snapshot = JSON.parse(JSON.stringify(sections))
+
+    buildSectionRows(sections, ['verse-1', 'black-slide', 'chorus'])
+
+    expect(sections).toEqual(snapshot)
+  })
+})
+
 describe('sliceSectionIntoSlides (R117)', () => {
   it('returns exactly one group (the section lines) when slideBreaks is undefined', () => {
     const section: LyricSection = { id: 'v', label: 'Verse', lines: ['a', 'b', 'c'] }
@@ -380,6 +449,50 @@ describe('addSection', () => {
 
     expect(sections).toEqual(sectionsClone)
     expect(order).toEqual(orderClone)
+  })
+
+  // R302: addSection('BLACKOUT') mints a distinct content kind, not a lyric
+  // kind — a fixed 'Black Slide' label, empty lines, kind: 'blackout'.
+  describe('addSection("BLACKOUT") (R302)', () => {
+    it('mints a section with kind "blackout", empty lines, and label "Black Slide", appended to both pool and order', () => {
+      const result = addSection([verse1], ['verse-1'], 'BLACKOUT')
+
+      expect(result.performanceOrder).toEqual(['verse-1', result.newSectionId])
+      const added = result.sections.find((section) => section.id === result.newSectionId)
+      expect(added).toBeDefined()
+      expect(added?.label).toBe('Black Slide')
+      expect(added?.lines).toEqual([])
+      expect(added?.kind).toBe('blackout')
+    })
+
+    it('mints "Black Slide 2" on a second addSection("BLACKOUT") in the same song (uniqueSectionLabel collision)', () => {
+      const first = addSection([verse1], ['verse-1'], 'BLACKOUT')
+      const second = addSection(first.sections, first.performanceOrder, 'BLACKOUT')
+
+      const addedSecond = second.sections.find((section) => section.id === second.newSectionId)
+      expect(addedSecond?.label).toBe('Black Slide 2')
+      expect(addedSecond?.kind).toBe('blackout')
+      expect(second.newSectionId).not.toBe(first.newSectionId)
+    })
+
+    it('a normal lyric kind add is byte-identical to today — no kind field written, absent = "lyric"', () => {
+      const result = addSection([verse1], ['verse-1'], 'Chorus')
+      const added = result.sections.find((section) => section.id === result.newSectionId)
+      expect(added).toBeDefined()
+      expect('kind' in (added as object)).toBe(false)
+    })
+
+    it('does not mutate its inputs', () => {
+      const sections = [verse1]
+      const order = ['verse-1']
+      const sectionsClone = JSON.parse(JSON.stringify(sections))
+      const orderClone = JSON.parse(JSON.stringify(order))
+
+      addSection(sections, order, 'BLACKOUT')
+
+      expect(sections).toEqual(sectionsClone)
+      expect(order).toEqual(orderClone)
+    })
   })
 })
 

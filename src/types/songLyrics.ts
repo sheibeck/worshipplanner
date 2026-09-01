@@ -28,6 +28,18 @@ export interface LyricSection {
    * field and therefore renders as one slide per section.
    */
   slideBreaks?: number[]
+  /**
+   * Optional content kind (Phase 105, R302/R303/R304). Absent means
+   * 'lyric' - every section persisted before this phase, and every section
+   * minted by the normal `addSection` path, carries no `kind` field at all
+   * (additive, no migration). 'blackout' marks an inline black interlude
+   * slide with no lyric text - minted only via
+   * `addSection(..., 'BLACKOUT')` (`src/utils/songSectionOrder.ts`), always
+   * with empty `lines`. `buildSectionRows` excludes a blackout section from
+   * per-kind position numbering (R304), and `slideshowAssembler.ts` resolves
+   * it to a `BlackoutSlide` (`src/types/slide.ts`) instead of lyric content.
+   */
+  kind?: 'lyric' | 'blackout'
 }
 
 /** CCLI copyright metadata extracted from a SongSelect paste. */

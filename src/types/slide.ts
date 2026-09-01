@@ -2,11 +2,15 @@
  * Unified Slide type with contentKind discriminator.
  *
  * S01 defines 'lyric' only; later slices add 'scripture', 'imported',
- * 'text', 'image', and 'video'.
+ * 'text', 'image', and 'video'. Phase 105 (R302/R303) adds 'blackout' —
+ * additive, no other kind's shape changes — a first-class slide kind that
+ * renders solid black with no text/background on every render surface
+ * (Audience/Confidence/preview/print), backing an authored inline black
+ * slide inside a song's slide sequence (105-CONTEXT.md).
  */
 
 /** All slide content kinds the system will eventually support. */
-export type SlideContentKind = 'lyric' | 'scripture' | 'imported' | 'text' | 'image' | 'video'
+export type SlideContentKind = 'lyric' | 'scripture' | 'imported' | 'text' | 'image' | 'video' | 'blackout'
 
 /** Fields shared by every slide regardless of content kind. */
 export interface SlideBase {
@@ -197,12 +201,28 @@ export interface VideoSlide extends SlideBase {
 }
 
 /**
+ * A blackout slide — an authored inline black interlude (R302/R303,
+ * 105-CONTEXT.md). Carries NO fields of its own beyond `SlideBase` — no
+ * text, no label, no background — because it renders as a full solid-black
+ * screen on every surface (Audience/Confidence/preview/print) with nothing
+ * to draw. Resolved from a `LyricSection` whose `kind` is `'blackout'`
+ * (`src/utils/songSectionOrder.ts`, `src/utils/slideshowAssembler.ts`) — a
+ * blackout slide still carries `audioUrl`/`audioLoop`/`backgroundImageUrl`
+ * inherited fields structurally (SlideBase), but the assembler never
+ * populates `backgroundImageUrl`/`backgroundSource` for one (rendering is a
+ * 105-02 concern; this type only shapes the data).
+ */
+export interface BlackoutSlide extends SlideBase {
+  contentKind: 'blackout'
+}
+
+/**
  * Discriminated union of all slide variants.
  *
  * Narrow on `contentKind` (and further on shape-specific fields) to access
  * variant-specific properties.
  */
-export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide | TextSlide | ImageSlide | VideoSlide
+export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide | TextSlide | ImageSlide | VideoSlide | BlackoutSlide
 
 /**
  * Wraps a single unified Slide with the service-slot provenance that produced it.

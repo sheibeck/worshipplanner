@@ -118,12 +118,27 @@ export function buildSectionRows(
     const position = rows.length + 1
     const isRepeat = occurrenceIndex > 0
 
-    const kind = deriveSectionKind(section.label)
-    let number = numberBySectionId.get(sectionId)
-    if (number === undefined) {
-      number = (kindOrdinals.get(kind) ?? 0) + 1
-      kindOrdinals.set(kind, number)
-      numberBySectionId.set(sectionId, number)
+    // R304 / PITFALLS Pitfall 5: a blackout section is excluded from
+    // per-kind lyric numbering ENTIRELY — it never consumes a kindOrdinals
+    // slot or a numberBySectionId entry, so inserting/duplicating/removing a
+    // blackout can never renumber a Verse/Chorus row. Its displayLabel is
+    // its own stored label (already unique — minted via addSection's
+    // uniqueSectionLabel collision guard), not a derived "Kind N" number.
+    // Everything else below (position, occurrenceIndex, isRepeat,
+    // repeatOfPosition, rowKey/stableKey) is computed identically to a
+    // lyric row — a blackout is a first-class row in the order.
+    let displayLabel: string
+    if (section.kind === 'blackout') {
+      displayLabel = section.label
+    } else {
+      const kind = deriveSectionKind(section.label)
+      let number = numberBySectionId.get(sectionId)
+      if (number === undefined) {
+        number = (kindOrdinals.get(kind) ?? 0) + 1
+        kindOrdinals.set(kind, number)
+        numberBySectionId.set(sectionId, number)
+      }
+      displayLabel = `${kind} ${number}`
     }
 
     if (!isRepeat) {
@@ -141,7 +156,7 @@ export function buildSectionRows(
       occurrenceIndex,
       isRepeat,
       repeatOfPosition: isRepeat ? (firstPositionBySectionId.get(sectionId) ?? null) : null,
-      displayLabel: `${kind} ${number}`,
+      displayLabel,
     })
   }
 
@@ -302,9 +317,27 @@ export function addSection(
   kind: string,
 ): { sections: LyricSection[]; performanceOrder: string[]; newSectionId: string } {
   const existingLabels = sections.map((section) => section.label)
-  const label = uniqueSectionLabel(kind, existingLabels)
-
   const existingIds = sections.map((section) => section.id)
+
+  // R302: the literal 'BLACKOUT' kind mints a distinct content kind, not a
+  // lyric kind — its own fixed label ('Black Slide', numbered 'Black Slide
+  // 2' on collision via the same uniqueSectionLabel collision guard every
+  // other kind uses) and `kind: 'blackout'`, so buildSectionRows below
+  // excludes it from per-kind lyric numbering (R304) and the assembler
+  // resolves it to a solid-black slide instead of lyric content. Every other
+  // kind keeps today's behavior byte-identical — no `kind` field written.
+  if (kind === 'BLACKOUT') {
+    const label = uniqueSectionLabel('Black Slide', existingLabels)
+    const id = mintSectionId(label, existingIds)
+    const newSection: LyricSection = { id, label, lines: [], kind: 'blackout' }
+    return {
+      sections: [...sections, newSection],
+      performanceOrder: [...order, id],
+      newSectionId: id,
+    }
+  }
+
+  const label = uniqueSectionLabel(kind, existingLabels)
   const id = mintSectionId(label, existingIds)
 
   const newSection: LyricSection = { id, label, lines: [] }
