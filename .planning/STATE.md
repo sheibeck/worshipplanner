@@ -1,21 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.7
-milestone_name: Rehearsal, Stage Plans & Presentation Polish
-current_phase: 107
-current_phase_name: Visual Stage Layout
-status: shipped
-closeout_type: verified_closeout
-stopped_at: Milestone v2.7 shipped, deployed to production, and archived
-last_updated: "2026-09-01T19:40:00.000Z"
+milestone: v2.8
+milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review"
+status: planning
+last_updated: "2026-09-01T20:27:20.512Z"
 last_activity: 2026-09-01
-last_activity_desc: v2.7 committed, tagged v2.7, pushed, deployed to production (hosting), owner-verified UAT, milestone closed
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## Human UAT — completed & PASSED
@@ -1152,10 +1147,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 107 (Visual Stage Layout) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-09-01 — Phase 107 execution started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-01 — Milestone v2.8 started
 
 ## ★ v2.7 ROADMAP.md phase breakdown (created 2026-09-01)
 

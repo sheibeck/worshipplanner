@@ -8,6 +8,29 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
+## Current Milestone: v2.8 Production Hardening — Comments-as-Specs, Architecture & Security Review
+
+**Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
+load-bearing comments into GSD's durable stores, then running architectural and security reviews and
+remediating the Critical/High findings.
+
+**Target work:**
+- **Comments-as-Specs sweep** — comments must never bear the load of how features work. Audit the codebase,
+  relocate decision *rationale* (the `R-`/`WR-`/`CR-`/`Pitfall` "why" notes) into **ADRs** (`docs/adr/`) and
+  *behavioral/architectural* "how it works" into **`.planning/codebase/`** map docs, shrinking comments to
+  short pointers, and document the go-forward comment convention (R316–R319).
+- **Architectural review** — module boundaries, store/Firestore-listener lifecycle (incl. org-scoped
+  teardown/re-subscription), multi-tenant isolation, data flow, coupling — report + remediate Critical/High
+  (R320–R321).
+- **Security review** — Firestore/Storage rules, auth/claims & route guards, tenant isolation, Cloud
+  Functions authorization, share-token/PII exposure, cost/abuse — report + remediate Critical/High
+  (R322–R323).
+
+**Key context:** Reviews produce reports AND fix Critical/High in-milestone; Medium/Low triaged to backlog.
+No research pass (internal hardening). Build/commit only — any production deploy of remediation (esp.
+rules/functions) is a separate, explicitly owner-confirmed step. Requirements R316–R323; phases continue
+from 108.
+
 ## Shipped Milestone: v2.7 Rehearsal, Stage Plans & Presentation Polish — ✅ SHIPPED & DEPLOYED 2026-09-01
 
 **Status:** Deployed to production (tag `v2.7`; hosting only — client-side changes, no rules/functions).
