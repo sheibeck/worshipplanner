@@ -52,11 +52,11 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 
 ### Multi-Org — church switcher
 
-- [ ] **R311**: A user who belongs to **multiple churches** can switch their active church from the
+- [x] **R311**: A user who belongs to **multiple churches** can switch their active church from the
   **top-bar user menu**, without signing out, using the existing multi-org membership path (distinct
   from the super-admin "enter any church" path).
 
-- [ ] **R312**: Switching active church **fully resets org-scoped app state** (no stale data from the
+- [x] **R312**: Switching active church **fully resets org-scoped app state** (no stale data from the
   previous church across any store, including stores added this milestone) and reflects the user's role
   in the newly selected church.
 
@@ -114,8 +114,8 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | R308 | Phase 106 | Pending |
 | R309 | Phase 104 | Complete |
 | R310 | Phase 104 | Complete |
-| R311 | Phase 104 | Pending |
-| R312 | Phase 104 | Pending |
+| R311 | Phase 104 | Complete |
+| R312 | Phase 104 | Complete |
 | R313 | Phase 107 | Pending |
 | R314 | Phase 107 | Pending |
 | R315 | Phase 107 | Pending |
