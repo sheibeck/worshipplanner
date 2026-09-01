@@ -41,6 +41,13 @@ vi.mock('@/stores/auth', () => ({
     exitSuperAdminView: mockExitSuperAdminView,
     isEditor: false,
     isSuperAdmin: false,
+    // Phase 104 (R311) — AppSidebar.vue's church-switcher gate reads
+    // memberships/orgId; a single-membership array here keeps the switcher
+    // inactive (matching this file's pre-104 no-switcher rendering) while
+    // still exercising the real, non-crashing shape.
+    memberships: [],
+    orgId: null,
+    superAdminOutsideOwnChurch: false,
     user: { uid: 'test-uid', email: 'test@example.com', displayName: 'Test User' },
     logout: vi.fn(),
   }),
