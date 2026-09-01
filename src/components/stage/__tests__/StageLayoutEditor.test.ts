@@ -140,6 +140,22 @@ describe('StageLayoutEditor', () => {
       expect(wrapper.get('[data-testid="add-marker-zone-offstage"]').classes()).toContain('bg-indigo-600')
     })
 
+    it('IN-01: offsets each new marker in a zone that already has markers, so sequential adds do not stack exactly on top of each other', async () => {
+      const existing: StageMarker[] = [
+        { id: 'm1', label: 'Guitar', zone: 'onstage', xPct: 50, yPct: 50 },
+        { id: 'm2', label: 'Bass', zone: 'onstage', xPct: 50, yPct: 50 },
+      ]
+      const wrapper = mount(StageLayoutEditor, { props: { elements: existing, editable: true } })
+      await wrapper.get('[data-testid="add-marker-button"]').trigger('click')
+      await wrapper.get('[data-testid="add-marker-label-input"]').setValue('Drums')
+      await wrapper.get('[data-testid="add-marker-submit"]').trigger('click')
+
+      const marker = wrapper.emitted('add')![0]![0] as StageMarker
+      // 2 existing onstage markers -> offset (2 % 5) * 4 = 8.
+      expect(marker.xPct).toBe(58)
+      expect(marker.yPct).toBe(58)
+    })
+
     it('Cancel closes the form without emitting add', async () => {
       const wrapper = mount(StageLayoutEditor, { props: { elements: [], editable: true } })
       await wrapper.get('[data-testid="add-marker-button"]').trigger('click')

@@ -95,15 +95,25 @@ function cancelAddForm() {
 function submitAdd() {
   const label = addForm.value.label.trim()
   if (!label) return
+  const zone = addForm.value.zone
+  // IN-01: without an offset, adding two or three markers back-to-back (no
+  // drag between adds) stacks them exactly on top of each other at 50/50,
+  // which can look like the click did nothing. A small deterministic
+  // per-existing-marker offset (cycling every 5th marker so it never drifts
+  // off a sane center range) keeps sequential adds visually distinguishable
+  // before the user drags them apart, while a brand-new zone (0 markers)
+  // still lands at the exact 50/50 center this component's own tests pin.
+  const countInZone = props.elements.filter((m) => m.zone === zone).length
+  const offset = (countInZone % 5) * 4
   const marker = createMarker({
     label,
-    zone: addForm.value.zone,
-    xPct: 50,
-    yPct: 50,
+    zone,
+    xPct: 50 + offset,
+    yPct: 50 + offset,
     ...(addForm.value.kind ? { kind: addForm.value.kind } : {}),
   })
   emit('add', marker)
-  lastInteractedZone.value = addForm.value.zone
+  lastInteractedZone.value = zone
   showAddForm.value = false
 }
 
