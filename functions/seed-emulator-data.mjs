@@ -98,6 +98,24 @@ function sundaysInQuarter(year, quarter) {
 
 const now = () => FieldValue.serverTimestamp()
 
+// Next upcoming Sunday (or today, if today is Sunday), local time, as YYYY-MM-DD.
+// Used for the seeded service's date so it ALWAYS lands in the app's "Upcoming"
+// section no matter what day the seed is run. ServicesView splits services on
+// `date >= todayStr` (src/views/ServicesView.vue:229-247), and todayStr is built
+// from LOCAL date parts — so this helper must be local-time too, or an off-by-one
+// could drop the service into "Past". (Previously the date was hardcoded, so the
+// seeded service silently fell into the collapsed Past section once that date
+// passed and looked like it "wasn't seeding".)
+function nextSunday() {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7)) // 0 when today is Sunday
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 // Fixed default-service-template entries (deterministic ids for idempotency) —
 // the 9-entry '1-2-2-3' suggested shape from functions/src/orgTemplateSeed.ts:58-68.
 function defaultServiceTemplate() {
@@ -339,7 +357,7 @@ async function seedOrg(orgId, name, uid, { aiMasterEnabled }) {
 
   // one draft service (services.ts:251-261 + service.ts:155-188)
   await db.collection('organizations').doc(orgId).collection('services').doc('service-1').set({
-    date: '2026-08-30',
+    date: nextSunday(),
     name: 'Sunday Morning Worship',
     progression: '1-2-2-3',
     teams: ['Choir'],
