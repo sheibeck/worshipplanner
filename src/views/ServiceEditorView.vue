@@ -3079,6 +3079,26 @@ watch(
   },
 )
 
+// 260901-lua: /services/:id is keyed to a serviceId that belongs to the
+// CURRENT (old) church. On the sidebar's in-place Switch Church, that same
+// serviceId cannot exist in the newly-selected church, so staying would
+// attempt a cross-org read/write. Fail safe by navigating away to /services
+// on a genuine org CHANGE only. Deliberately no `{ immediate: true }`, so this
+// never fires on first mount; the `if (oldOrgId)` guard also skips the
+// initial null -> value org resolution (WR-01 late auth, when a user lands
+// directly on this route before authStore.orgId resolves) — oldOrgId is
+// null/undefined on that first callback. It fires ONLY when an
+// already-established church changes to another value (or to null), i.e. a
+// genuine switch away. Because we navigate away, this view unmounts and
+// ServicesView's own orgId watcher subscribes the new church — no store
+// re-point needed here.
+watch(
+  () => authStore.orgId,
+  (orgId, oldOrgId) => {
+    if (oldOrgId) router.push('/services')
+  },
+)
+
 onMounted(() => {
   initStores()
 
