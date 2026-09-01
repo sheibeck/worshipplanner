@@ -493,7 +493,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useQuartersStore } from '@/stores/quarters'
 import { useRosterStore } from '@/stores/roster'
@@ -837,16 +837,27 @@ async function onCopyShareUrl() {
 }
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
-function initStores() {
-  const orgId = authStore.orgId
-  if (!orgId) return
+function initStores(orgId: string) {
   quartersStore.subscribe(orgId)
   rosterStore.subscribe(orgId)
 }
 
-onMounted(() => {
-  initStores()
-})
+// 260901-lua: the sidebar's in-place church switcher (AppSidebar.vue ->
+// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
+// remount, so an onMounted-only subscribe never re-fires on switch. Watching
+// with `immediate: true` replaces the old onMounted-only subscribe (mirrors
+// TeamView.vue 104-REVIEW CR-01). Always pass the LIVE new orgId the watcher
+// hands in — never a mount-time captured value — so no write can land on the
+// wrong church.
+watch(
+  () => authStore.orgId,
+  (orgId) => {
+    quartersStore.unsubscribeAll()
+    rosterStore.unsubscribeAll()
+    if (orgId) initStores(orgId)
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   quartersStore.unsubscribeAll()

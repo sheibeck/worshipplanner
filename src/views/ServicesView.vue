@@ -193,7 +193,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
@@ -360,10 +360,8 @@ function onYearChange(event: Event) {
   selectedMonth.value = null
 }
 
-// Subscribe to Firestore services collection once orgId is resolved
-function initStore() {
-  const orgId = authStore.orgId
-  if (!orgId) return
+// Subscribe to Firestore services collection for the given (live) orgId
+function initStore(orgId: string) {
   serviceStore.subscribe(orgId)
   // Phase 79 (R229/R241): this view mounts NewServiceDialog, whose team
   // checkbox row now reads the shared teams store — subscribe (and,
@@ -381,9 +379,21 @@ function initStore() {
   }
 }
 
-onMounted(() => {
-  initStore()
-})
+// 260901-lua: the sidebar's in-place church switcher (AppSidebar.vue ->
+// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
+// remount, so an onMounted-only subscribe never re-fires on switch and this
+// view sticks on "Loading services…" forever. Watching with `immediate: true`
+// replaces the old onMounted-only subscribe (mirrors TeamView.vue 104-REVIEW
+// CR-01). Always pass the LIVE new orgId the watcher hands in — never a
+// mount-time captured value — so no write can land on the wrong church.
+watch(
+  () => authStore.orgId,
+  (orgId) => {
+    serviceStore.unsubscribeAll()
+    if (orgId) initStore(orgId)
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   serviceStore.unsubscribeAll()

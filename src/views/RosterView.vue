@@ -727,9 +727,7 @@ const displayedPeople = computed(() => {
 let stopSeedWatch: (() => void) | null = null
 let stopTeamsSeedWatch: (() => void) | null = null
 
-function initStore() {
-  const orgId = authStore.orgId
-  if (!orgId) return
+function initStore(orgId: string) {
   rosterStore.subscribe(orgId)
   teamsStore.subscribe(orgId)
   // seedDefaultRolesIfEmpty() checks roles.value.length synchronously, but
@@ -756,9 +754,30 @@ function initStore() {
 }
 
 onMounted(() => {
-  initStore()
   applyEditQuery()
 })
+
+// 260901-lua: the sidebar's in-place church switcher (AppSidebar.vue ->
+// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
+// remount, so an onMounted-only subscribe never re-fires on switch. Watching
+// with `immediate: true` replaces the old onMounted-only subscribe (mirrors
+// TeamView.vue 104-REVIEW CR-01). Always pass the LIVE new orgId the watcher
+// hands in — never a mount-time captured value — so no write can land on the
+// wrong church. Stop any prior seed watches first so a switch never leaks the
+// old church's seed watchers.
+watch(
+  () => authStore.orgId,
+  (orgId) => {
+    stopSeedWatch?.()
+    stopSeedWatch = null
+    stopTeamsSeedWatch?.()
+    stopTeamsSeedWatch = null
+    rosterStore.unsubscribeAll()
+    teamsStore.unsubscribeAll()
+    if (orgId) initStore(orgId)
+  },
+  { immediate: true },
+)
 
 // Re-apply when the ?edit query changes (in-app navigation to a new person)
 // or once the roster finishes loading (the target person may not exist yet on

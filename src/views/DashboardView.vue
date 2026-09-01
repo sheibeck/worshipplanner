@@ -151,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
 import { useServiceStore } from '@/stores/services'
@@ -272,18 +272,29 @@ const songTiles = computed(() => [
   { label: 'Stale (6+ mo)', value: staleCount.value, to: '/songs', warn: true },
 ])
 
-// Subscribe to songs, services, and roster so dashboard data is reactive
-onMounted(() => {
-  const orgId = authStore.orgId
-  if (!orgId) return
-  if (!songStore.orgId) {
-    songStore.subscribe(orgId)
-  }
-  if (!serviceStore.orgId) {
-    serviceStore.subscribe(orgId)
-  }
-  if (!rosterStore.orgId) {
-    rosterStore.subscribe(orgId)
-  }
-})
+// 260901-lua: the sidebar's in-place church switcher (AppSidebar.vue ->
+// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
+// remount, so an onMounted-only subscribe (guarded by `if (!store.orgId)`,
+// which would also defeat re-subscription since resetOrgScopedStores() nulls
+// orgId before this fires) never re-points the shared stores on switch.
+// Watching with `immediate: true` replaces the onMounted-only subscribe
+// (mirrors TeamView.vue 104-REVIEW CR-01). Always pass the LIVE new orgId the
+// watcher hands in — never a mount-time captured value — so no write can land
+// on the wrong church. Dashboard shares these stores with other views and has
+// no onUnmounted of its own; the unsubscribe-then-resubscribe here is
+// idempotent and null-guarded.
+watch(
+  () => authStore.orgId,
+  (orgId) => {
+    songStore.unsubscribeAll()
+    serviceStore.unsubscribeAll()
+    rosterStore.unsubscribeAll()
+    if (orgId) {
+      songStore.subscribe(orgId)
+      serviceStore.subscribe(orgId)
+      rosterStore.subscribe(orgId)
+    }
+  },
+  { immediate: true },
+)
 </script>

@@ -345,12 +345,26 @@ async function removeBulkTag() {
   bulkTagInput.value = ''
 }
 
-// Subscribe to Firestore songs collection once orgId is resolved
-function initStore() {
-  const orgId = authStore.orgId
-  if (!orgId) return
+// Subscribe to Firestore songs collection for the given (live) orgId
+function initStore(orgId: string) {
   songStore.subscribe(orgId)
 }
+
+// 260901-lua: the sidebar's in-place church switcher (AppSidebar.vue ->
+// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
+// remount, so an onMounted-only subscribe never re-fires on switch. Watching
+// with `immediate: true` replaces the old onMounted-only subscribe (mirrors
+// TeamView.vue 104-REVIEW CR-01). Always pass the LIVE new orgId the watcher
+// hands in — never a mount-time captured value — so no write can land on the
+// wrong church.
+watch(
+  () => authStore.orgId,
+  (orgId) => {
+    songStore.unsubscribeAll()
+    if (orgId) initStore(orgId)
+  },
+  { immediate: true },
+)
 
 // 26-02 (D-14/D-15): honour an arriving "Edit in song" link — `?edit=<songId>`
 // with an optional `?tab=`. The song catalogue is a live subscription, so the
@@ -393,8 +407,6 @@ function resolveSongEditRequest() {
 }
 
 onMounted(async () => {
-  initStore()
-
   // Check for ?import=true query param — auto-open import modal
   if (route.query.import === 'true') {
     importModalOpen.value = true
