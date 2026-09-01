@@ -401,6 +401,12 @@ function handleRefreshSuccess(details: ScreenDetailsLike) {
 
 function handleDetectionFailure() {
   phase.value = 'denied'
+  // 104-REVIEW IN-01: the saveOutcome watcher only fires when saveOutcome
+  // itself changes, so a stale 'not-persisted-warning' sticky from the
+  // 'granted' phase would otherwise keep showing over this now-unrelated
+  // fallback panel until unmount. Mirrors resolveGrantedBranch()'s existing
+  // reset-to-'idle' pattern.
+  saveOutcome.value = 'idle'
 }
 
 // The single most gesture-sensitive line in this phase: getScreenDetails()
