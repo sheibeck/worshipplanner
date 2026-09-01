@@ -16,37 +16,31 @@
  *
  * MUST be called from inside a component setup() (it calls onUnmounted).
  */
-import { ref, onUnmounted } from 'vue'
-import type { Ref } from 'vue'
+import { onUnmounted } from 'vue'
 
 export interface UseLoopTimer {
   /** Arm a single interval, disarming any prior one first (never more than one live). */
   arm(intervalMs: number, tick: () => void): void
   /** Clear the active interval, if any. Idempotent. */
   disarm(): void
-  /** True while a timer is currently armed — exposed for tests. */
-  isArmed: Ref<boolean>
 }
 
 export function useLoopTimer(): UseLoopTimer {
   let intervalId: ReturnType<typeof setInterval> | null = null
-  const isArmed = ref(false)
 
   function disarm() {
     if (intervalId != null) {
       clearInterval(intervalId)
       intervalId = null
     }
-    isArmed.value = false
   }
 
   function arm(intervalMs: number, tick: () => void) {
     disarm()
     intervalId = setInterval(tick, intervalMs)
-    isArmed.value = true
   }
 
   onUnmounted(disarm)
 
-  return { arm, disarm, isArmed }
+  return { arm, disarm }
 }
