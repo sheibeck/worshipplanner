@@ -68,13 +68,14 @@ remediating the Critical/High findings.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R316 | TBD (roadmap) | Pending |
-| R317 | TBD (roadmap) | Pending |
-| R318 | TBD (roadmap) | Pending |
-| R319 | TBD (roadmap) | Pending |
-| R320 | TBD (roadmap) | Pending |
-| R321 | TBD (roadmap) | Pending |
-| R322 | TBD (roadmap) | Pending |
-| R323 | TBD (roadmap) | Pending |
+| R316 | Phase 108 | Pending |
+| R317 | Phase 108 | Pending |
+| R318 | Phase 109 | Pending |
+| R319 | Phase 109 | Pending |
+| R320 | Phase 110 | Pending |
+| R321 | Phase 111 | Pending |
+| R322 | Phase 112 | Pending |
+| R323 | Phase 113 | Pending |
 
-*(Filled in by the roadmapper.)*
+**Coverage:** 8/8 v2.8 requirements mapped, each to exactly one phase (Phases 108–113). No orphans, no
+duplicates.

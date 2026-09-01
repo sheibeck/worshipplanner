@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-09-01T20:27:20.512Z"
 last_activity: 2026-09-01
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -39,25 +39,55 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.7 Rehearsal, Stage Plans & Presentation Polish (roadmap created 2026-09-01)
+# ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
 
-**Status:** Phase complete — ready for verification
-mapped with no orphans. Ready for `/gsd-plan-phase 104`.
+**Status:** Roadmap created — 6 phases (108-113), 8/8 requirements mapped with no orphans. Ready for
+`/gsd-plan-phase 108`.
+
+**Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
+load-bearing comments into GSD's durable stores, then running architectural and security reviews and
+remediating the Critical/High findings.
+
+(v2.7 ended at Phase 107); this milestone is **Phases 108–113**.
+
+**Key context:** Reviews produce reports AND fix Critical/High in-milestone; Medium/Low triaged to
+backlog. No research pass (internal hardening). Build/commit only — any production deploy of remediation
+(esp. rules/functions) is a separate, explicitly owner-confirmed step per standing deploy policy.
+
+See the `## ★ v2.8 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
+phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.7 Rehearsal, Stage Plans & Presentation Polish (shipped & deployed to production 2026-09-01, archived 2026-09-01)
+
+**Status:** v2.7 milestone complete.
+
+> ✅ **Deployed to production 2026-09-01** (hosting only — client-side changes, no rules/functions; tag
+> `v2.7`). Audit PASSED (14/14 requirements, 6/6 integration seams WIRED). Closed on owner acceptance;
+> the batched human/visual/hardware UAT (`.planning/v2.7-DEFERRED-VERIFICATION.md`) was performed manually
+> by the owner 2026-09-01 and all three phases PASSED — a verified closeout, not an override.
 
 **Goal:** Give teams richer rehearsal and live-presentation tooling plus targeted Run-the-Service and
 multi-church usability fixes — an inline black slide in the lyric editor, "Go to black" scoped to the
 Audience output only, system-wide dismissible messages, a per-item loop with configurable interval, a
 user-menu church switcher for multi-org members, and a freeform visual stage-layout canvas per service.
+Requirements R302–R315, archived to `milestones/v2.7-REQUIREMENTS.md`.
 
-(v2.6 ended at Phase 103); this milestone is **Phases 104–107**.
+(v2.6 ended at Phase 103); this milestone was **Phases 104–107**.
 
 **Deferred out of v2.7 (owner decision 2026-08-31):** song rehearsal attachments (PDF/MP3/YouTube on a
 Song) and Rehearse mode on the shared service link — the storage/public-media cluster (highest
 security/cost surface researched this milestone) — carried to backlog 999.13, full research preserved in
 `seeds/SEED-003-rehearsal-attachments-and-storage-costs.md`.
 
+**Coverage:** 14/14 v2.7 requirements mapped and validated, each to exactly one phase; no orphans, no
+duplicates.
+
 See the `## ★ v2.7 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
 phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
+
+**Next step:** `/gsd-new-milestone` was already run to scope v2.8 — see the ACTIVE MILESTONE section above.
 
 ---
 
@@ -1137,7 +1167,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 107 — Visual Stage Layout
+**Current focus:** Phase 108 — Comment Audit & Decision-Rationale Extraction
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1147,10 +1177,42 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 108 — Comment Audit & Decision-Rationale Extraction (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-01 — Milestone v2.8 started
+Status: Roadmap created; ready for `/gsd-plan-phase 108`
+Last activity: 2026-09-01 — v2.8 ROADMAP.md created (6 phases, 108-113, 8/8 requirements mapped, no orphans)
+
+## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
+
+6 phases (108-113), derived from R316-R323 (8 requirements) with this project's `coarse` granularity
+setting applied as compression guidance, but not to the point of collapsing genuinely separate delivery
+boundaries: the milestone framing explicitly required review and remediation to be SEPARATE phases per
+review track (architectural, security) — the fixes aren't known until each review report exists — which
+alone forces 4 of the 6 phases. The remaining 2 phases handle the comments-as-specs sweep: R316's audit
+and R317's rationale extraction combine into one phase (Phase 108, both act on the same decision-rationale
+bucket of the audit's classification, ending in ADRs under `docs/adr/`), and R318+R319 combine into a
+second phase (Phase 109, the behavioral/architectural bucket plus writing the resulting convention down)
+— the two extraction phases the milestone framing called for, rather than a third standalone audit-only
+phase, since R316's audit alone is thin/task-like and naturally sequences as the first step inside Phase
+108's own plan. Numbering continues from v2.7, which ended at Phase 107 — v2.8 starts at Phase 108, not
+reset.
+
+| Phase | Goal | Requirements | Depends on |
+|-------|------|--------------|------------|
+| 108 Comment Audit & Decision-Rationale Extraction | Inventory + classify every load-bearing comment, then relocate decision-rationale (R-/WR-/CR-/Pitfall) comments into ADRs under `docs/adr/`, shrinking the source comment to a short pointer | R316-R317 | Nothing (first) |
+| 109 Behavioral/Architectural Extraction & Comment Convention | Relocate "how this works" comments into `.planning/codebase/` map docs and write the go-forward comment convention | R318-R319 | Phase 108 |
+| 110 Architectural Review | Severity-ranked report on module boundaries, store/Firestore-listener lifecycle (incl. org-scoped teardown/re-subscription), multi-tenant isolation architecture, data flow, and coupling | R320 | Phase 109 |
+| 111 Architectural Remediation | Fix or explicitly defer every Critical/High finding from Phase 110; triage Medium/Low to backlog | R321 | Phase 110 |
+| 112 Security Review | Severity-ranked report on Firestore/Storage rules, auth/claims + route guards, tenant isolation, Cloud Functions authorization, share-token/PII exposure, and cost/abuse controls | R322 | Phase 111 |
+| 113 Security Remediation | Fix or explicitly defer every Critical/High finding from Phase 112; triage Medium/Low to backlog | R323 | Phase 112 |
+
+**Cross-cutting constraint (all 6 phases):** build/commit only — no production deploy of remediation
+(esp. rules/functions) happens inside a phase; any deploy is a separate, explicitly owner-confirmed step
+per standing deploy policy (`deploy-policy-confirm-then-deploy`).
+
+See `.planning/ROADMAP.md` § v2.8 Production Hardening for the full phase detail table (goals,
+dependencies, success criteria). Next step: `/gsd-plan-phase 108` (optionally preceded by
+`/gsd-discuss-phase 108`).
 
 ## ★ v2.7 ROADMAP.md phase breakdown (created 2026-09-01)
 

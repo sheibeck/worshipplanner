@@ -554,6 +554,129 @@ Plans:
 bugs are the prior history) — flag for a dedicated UI-spec/research pass at plan time rather than a
 straight port of an existing pattern.
 
+### 🚧 v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)
+
+**Milestone Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by
+extracting load-bearing comments into GSD's durable stores, then running architectural and security
+reviews and remediating the Critical/High findings.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R316–R323 (8 mapped, 100% coverage)
+
+**Key context:** Reviews produce reports AND fix Critical/High in-milestone; Medium/Low findings are
+triaged to backlog, not fixed here. No research pass (internal hardening; security best-practice is
+applied during the review itself). Build/commit only — any production deploy of remediation (esp.
+rules/functions) is a separate, explicitly owner-confirmed step per standing deploy policy. Numbering
+continues from v2.7, which ended at Phase 107 — v2.8 starts at Phase 108, not reset.
+
+**Phase count rationale:** the milestone framing requires review and remediation to be SEPARATE phases
+per review track (architectural, security) — the fixes aren't knowable until each review report exists —
+which alone accounts for 4 of the 6 phases. The comments-as-specs sweep splits into the two extraction
+phases the milestone calls for: R316's audit + R317's rationale relocation share one delivery boundary
+(both act on the same decision-rationale bucket of the audit's classification, landing in ADRs under
+`docs/adr/`), and R318+R319 share a second (the behavioral/architectural bucket, landing in
+`.planning/codebase/` map docs, plus writing the resulting convention down) — rather than a third,
+standalone audit-only phase, since R316 alone is thin/task-like and naturally sequences as the first step
+inside Phase 108's own plan.
+
+- [ ] **Phase 108: Comment Audit & Decision-Rationale Extraction** - Inventory and classify every load-bearing comment, then relocate decision-rationale (R-/WR-/CR-/Pitfall) comments into ADRs with the source comment shrunk to a pointer
+- [ ] **Phase 109: Behavioral/Architectural Extraction & Comment Convention** - Relocate "how this works" comments into `.planning/codebase/` map docs and document the go-forward comment convention
+- [ ] **Phase 110: Architectural Review** - Severity-ranked report on module boundaries, store/Firestore-listener lifecycle, multi-tenant isolation architecture, data flow, and coupling
+- [ ] **Phase 111: Architectural Remediation** - Fix or explicitly defer every Critical/High architectural finding; triage Medium/Low to backlog
+- [ ] **Phase 112: Security Review** - Severity-ranked report on Firestore/Storage rules, auth/claims + route guards, tenant isolation, Cloud Functions authorization, share-token/PII exposure, and cost/abuse controls
+- [ ] **Phase 113: Security Remediation** - Fix or explicitly defer every Critical/High security finding; triage Medium/Low to backlog
+
+### Phase 108: Comment Audit & Decision-Rationale Extraction
+
+**Goal**: The codebase's load-bearing comments are inventoried and classified, and every decision-rationale
+("why we did it this way") comment is relocated into an ADR under `docs/adr/`, with the source comment
+reduced to a short pointer.
+**Depends on**: Nothing (first phase of v2.8; v2.7 ended at Phase 107)
+**Requirements**: R316, R317
+**Success Criteria** (what must be TRUE):
+
+  1. A written triage inventory exists enumerating every load-bearing comment found across the codebase, each classified as decision-rationale, behavioral/architectural, or genuinely-local, with file/line references (R316).
+  2. Every comment classified decision-rationale (the `R-`/`WR-`/`CR-`/`Pitfall`-tagged "why" notes) has a corresponding ADR under `docs/adr/` capturing that rationale, and the original source comment is reduced to a short pointer (e.g. the ADR id) instead of carrying the rationale itself (R317).
+  3. The behavioral/architectural subset of the Phase 108 inventory is handed off complete and unambiguous for Phase 109 — nothing dropped, nothing double-classified (R316).
+  4. `npm run type-check` and the full test suite pass unchanged after the comment-only edits — no behavior change results from relocating comments (R317).
+
+**Plans**: TBD
+
+### Phase 109: Behavioral/Architectural Extraction & Comment Convention
+
+**Goal**: Every behavioral/architectural "how this works" comment is relocated into `.planning/codebase/`
+map docs, source comments shrink to what the code alone cannot convey, and a written convention keeps
+future comments short.
+**Depends on**: Phase 108 (consumes its behavioral/architectural inventory subset)
+**Requirements**: R318, R319
+**Success Criteria** (what must be TRUE):
+
+  1. Every comment classified behavioral/architectural in Phase 108's inventory has its "how it works" content relocated into the relevant `.planning/codebase/` map doc (an updated existing doc or a new one), with the source comment reduced to what the code alone cannot convey (R318).
+  2. A written comment-convention document exists stating that comments stay short and ADRs/`.planning/codebase/` docs bear the load of rationale and behavior, discoverable for future work (R319).
+  3. A spot-check across the affected files shows no paragraph-length inline "how it works" narration remaining where a map doc now covers it (R318).
+  4. `npm run type-check` and the full test suite pass unchanged — comment-only changes (R318).
+
+**Plans**: TBD
+
+### Phase 110: Architectural Review
+
+**Goal**: A severity-ranked architectural review report exists, covering module boundaries, store/
+Firestore-listener lifecycle (incl. org-scoped teardown/re-subscription), multi-tenant (org) isolation
+architecture, data flow, and coupling.
+**Depends on**: Phase 109 (reviews the codebase after its load-bearing comments/docs have been relocated, so findings reference the current source of truth)
+**Requirements**: R320
+**Success Criteria** (what must be TRUE):
+
+  1. A written report enumerates findings across module boundaries, store/Firestore-listener lifecycle (incl. org-scoped teardown/re-subscription), multi-tenant (org) isolation architecture, data flow, and coupling (R320).
+  2. Every finding carries an explicit severity (Critical/High/Medium/Low) and a concrete file/module location or example (R320).
+  3. Critical/High findings are clearly distinguished from Medium/Low, giving Phase 111 an unambiguous remediation scope and the rest a clean path to backlog (R320).
+
+**Plans**: TBD
+
+### Phase 111: Architectural Remediation
+
+**Goal**: Every Critical/High architectural finding from Phase 110 is fixed, or explicitly deferred to
+backlog with recorded rationale.
+**Depends on**: Phase 110
+**Requirements**: R321
+**Success Criteria** (what must be TRUE):
+
+  1. Every Critical/High finding from the Phase 110 report has either a shipped code fix (built, tested, committed) or an explicit backlog entry recording why it was deferred (R321).
+  2. Medium/Low findings from Phase 110 are triaged into the backlog — not silently dropped, not fixed in-milestone (R321).
+  3. `npm run type-check` and the full test/regression suite pass after remediation, with no new regressions introduced by the fixes (R321).
+  4. No production deploy occurs as part of this phase — remediation ships built, tested, and committed only, per the milestone's build/commit-only constraint (R321).
+
+**Plans**: TBD
+
+### Phase 112: Security Review
+
+**Goal**: A severity-ranked security review report exists, covering Firestore & Storage security rules,
+auth/custom-claims and route guards, multi-tenant data isolation, Cloud Functions authorization,
+share-token/public-page exposure and PII handling, and cost/abuse controls.
+**Depends on**: Phase 111 (sequenced after the architecture review/remediation pass; touches overlapping auth/lifecycle surfaces the architecture work may have just changed)
+**Requirements**: R322
+**Success Criteria** (what must be TRUE):
+
+  1. A written report enumerates findings across Firestore & Storage security rules, auth/custom-claims and route guards, multi-tenant data isolation, Cloud Functions authorization, share-token/public-page exposure and PII handling, and cost/abuse controls (R322).
+  2. Every finding carries an explicit severity and a concrete location (rule path, function name, route, or code reference) (R322).
+  3. Critical/High findings are clearly distinguished from Medium/Low, giving Phase 113 an unambiguous remediation scope (R322).
+
+**Plans**: TBD
+
+### Phase 113: Security Remediation
+
+**Goal**: Every Critical/High security finding from Phase 112 is fixed, or explicitly deferred to backlog
+with recorded rationale.
+**Depends on**: Phase 112
+**Requirements**: R323
+**Success Criteria** (what must be TRUE):
+
+  1. Every Critical/High finding from the Phase 112 report has either a shipped fix (built, tested, committed) or an explicit backlog entry recording why it was deferred (R323).
+  2. Medium/Low findings are triaged into the backlog (R323).
+  3. Any Firestore/Storage rules or Cloud Functions authorization change carries a real ALLOW-case emulator test proving the fix — not only a deny-case pass — per this project's standing rules-testing discipline (R323).
+  4. `npm run type-check` and the full test/regression suite pass, and no production deploy occurs — remediation ships built/tested/committed/UNDEPLOYED, with the exact deploy command handed to the owner per standing deploy policy (R323).
+
+**Plans**: TBD
+
 ## Backlog
 
 ### Phase 999.2: Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG)
