@@ -128,10 +128,6 @@
               Change
             </button>
           </div>
-          <p v-if="saveOutcome === 'not-persisted-warning'" class="text-amber-300 text-sm mt-2">
-            We couldn't save this on your browser (this often happens in private browsing). Your
-            selections will work for now but will be forgotten once you close this tab.
-          </p>
         </div>
       </div>
     </div>
@@ -139,10 +135,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import AppShell from '@/components/AppShell.vue'
 import MonitorCard from '@/components/MonitorCard.vue'
 import MonitorFallbackPanel from '@/components/MonitorFallbackPanel.vue'
+import { useToasts } from '@/stores/toasts'
 import {
   computeFingerprint,
   saveMapping,
@@ -167,6 +164,13 @@ interface ScreenDetailsLike {
   addEventListener: (type: 'screenschange', listener: () => void) => void
   removeEventListener: (type: 'screenschange', listener: () => void) => void
 }
+
+// Phase 104 (R309/R310) — the app-wide dismissible-message store. The
+// save-outcome warning below is the second R310 proof case (alongside
+// RunControlView.vue's monitor-reassign sticky): keyed, cleared the moment
+// saveOutcome leaves 'not-persisted-warning', and manually dismissible via
+// the shared host in the meantime.
+const notifications = useToasts()
 
 const phase = ref<Phase>('prompt')
 const grantedView = ref<GrantedView>('fresh')
@@ -291,6 +295,24 @@ function onSave() {
     saveOutcome.value = 'not-persisted-warning'
   }
 }
+
+// Phase 104 (R310) — migrates the old inline v-if warning onto the shared
+// sticky store. A single watcher covers every path saveOutcome can take AWAY
+// from 'not-persisted-warning' (a successful save, picking a different role,
+// or a fresh detection re-resolving the granted branch) rather than
+// duplicating the clear call at each of those call sites; clearSticky is
+// idempotent, so this is harmless even when nothing is currently set.
+watch(saveOutcome, (value) => {
+  if (value === 'not-persisted-warning') {
+    notifications.setSticky('monitor-save-not-persisted', {
+      variant: 'warning',
+      heading: 'Setup not saved',
+      body: "We couldn't save this on your browser (this often happens in private browsing). Your selections will work for now but will be forgotten once you close this tab.",
+    })
+  } else {
+    notifications.clearSticky('monitor-save-not-persisted')
+  }
+})
 
 function resolveGrantedBranch() {
   // A full (re)resolution establishes a clean baseline from persisted state —
@@ -461,5 +483,9 @@ onUnmounted(() => {
   if (screenDetailsRef) {
     screenDetailsRef.removeEventListener('screenschange', onScreensChange)
   }
+  // R309 (no message may stay stuck on screen): the host is app-global, so a
+  // save-outcome sticky raised on this view must not survive into whatever
+  // screen the operator navigates to next. Idempotent no-op if already clear.
+  notifications.clearSticky('monitor-save-not-persisted')
 })
 </script>

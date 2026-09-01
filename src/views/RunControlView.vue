@@ -37,57 +37,14 @@
     <!-- OUTPUT-STATUS BANNERS (95-04/96-01) — INLINE + VERBATIM. A sibling band
          between the status cluster and the main region (pushes it down, never
          overlays). Fallback and blocked are MUTUALLY EXCLUSIVE by outputStatus. -->
-    <!-- REASSIGN (96-01): a monitor was unplugged/rearranged mid-service. First
-         in the band (visually senior), independent of outputStatus, and while it
-         shows the per-role reopen chip is suppressed (precedence). -->
-    <div
-      v-if="monitorChanged"
-      data-testid="run-reassign-banner"
-      class="flex-none m-4 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3 text-amber-200"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        class="mt-0.5 h-5 w-5 flex-none text-amber-400"
-        aria-hidden="true"
-      >
-        <path
-          fill-rule="evenodd"
-          d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
-          clip-rule="evenodd"
-        />
-      </svg>
-      <div class="min-w-0 flex-1">
-        <p class="font-medium">Your monitor setup changed</p>
-        <!-- WR-01 HONESTY: only the IN-PLACE reopen below preserves your slide. -->
-        <p class="mt-1 text-sm">
-          A display was unplugged or rearranged, so we can't place the {{ reassignRole }} output on its old
-          screen. Your service is still live — reopen the {{ reassignRole }} display below to keep going
-          without losing your place.
-        </p>
-        <div class="mt-2 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            data-testid="run-reassign-reopen"
-            :aria-label="`Reopen and replace the ${reassignRole} display on the current screen`"
-            class="min-h-11 rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            @click="reopenReassignedOutputs"
-          >
-            Reopen &amp; replace {{ reassignRole }}
-          </button>
-          <a
-            href="/monitor-setup"
-            target="_blank"
-            rel="noopener"
-            data-testid="run-reassign-setup-link"
-            class="text-amber-200 underline"
-          >
-            Open monitor setup in a new tab
-          </a>
-        </div>
-      </div>
-    </div>
+    <!-- REASSIGN (96-01) — MIGRATED (Phase 104, R310): a monitor was unplugged/
+         rearranged mid-service. This used to be an ad-hoc v-if banner here with
+         no dismiss path (the actual "stuck" bug); it now renders through the
+         app-wide notification host (App.vue root) as a sticky, keyed
+         'monitor-reassign', set/cleared from useRunControl.ts's
+         onScreensChange/reopenReassignedOutputs. `monitorChanged` stays the
+         source of truth that gates the (unchanged) reopen-chip precedence on
+         RunDisplaysPanel below. -->
 
     <!-- FALLBACK: windows DID open, just un-positioned. Amber, never red. -->
     <div
@@ -399,9 +356,7 @@ const {
   audienceClosed,
   confidenceClosed,
   monitorChanged,
-  reassignRole,
   reopenOutput,
-  reopenReassignedOutputs,
   fullscreenDisplay,
   audienceFullscreen,
   confidenceFullscreen,

@@ -26,6 +26,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import type { Service } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { BroadcastChannelLike, BroadcastChannelFactory } from '@/utils/runChannel'
@@ -34,6 +35,7 @@ import {
   saveMapping,
   type ScreenLike,
 } from '@/utils/monitorConfig'
+import { useToasts } from '@/stores/toasts'
 import RunControlView from '../RunControlView.vue'
 
 // onUnmounted must run so the document keydown listener + channel close this
@@ -321,6 +323,9 @@ async function goLiveFake(wrapper: ReturnType<typeof mountView>['wrapper']) {
 }
 
 beforeEach(() => {
+  // Phase 104: useRunControl now reads the notifications store (@/stores/toasts)
+  // for the monitor-reassign sticky — an active Pinia instance is required.
+  setActivePinia(createPinia())
   localStorage.clear()
   openedWins = []
   mockRouterPush.mockClear()
@@ -759,11 +764,20 @@ describe('RunControlView output — closed detection, per-role reopen, position 
   })
 })
 
-// ── 8. MONITOR-UNPLUG → REASSIGN (R274) ─────────────────────────────────────────
+// ── 8. MONITOR-UNPLUG → REASSIGN (R274; migrated to the shared notification
+//    store in Phase 104, R310) ────────────────────────────────────────────────
 //    The screenschange tests invoke the CAPTURED listener directly (no timers),
-//    avoiding the flushPromises/fake-timer interaction entirely.
-describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-14)', () => {
-  it('a screenschange that drops an assigned monitor (needs-reprompt) surfaces run-reassign-banner with the monitor-setup link', async () => {
+//    avoiding the flushPromises/fake-timer interaction entirely. The old
+//    run-reassign-banner/-reopen/-setup-link testids are gone (the inline v-if
+//    banner was removed); the host that would render this sticky is mounted at
+//    App.vue, not inside this RunControlView-only test tree, so these assert
+//    directly against the notifications store's 'monitor-reassign' sticky.
+function reassignSticky() {
+  return useToasts().toasts.find((t) => t.key === 'monitor-reassign')
+}
+
+describe('RunControlView output — monitor-unplug reassign sticky (R274/R310)', () => {
+  it('a screenschange that drops an assigned monitor (needs-reprompt) sets the monitor-reassign sticky with a working reopen action + monitor-setup link', async () => {
     seedMatchingMapping()
     const { control } = installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
@@ -771,7 +785,7 @@ describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-1
     await goLive(wrapper)
     // Go-live succeeded (audience green/ready in the Displays panel); no reassign yet.
     expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(false)
+    expect(reassignSticky()).toBeUndefined()
 
     // The confidence monitor (screenB) is unplugged → the live set drops it →
     // matchMapping returns needs-reprompt.
@@ -779,20 +793,18 @@ describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-1
     control.fireScreensChange()
     await flushPromises()
 
-    const banner = wrapper.find('[data-testid="run-reassign-banner"]')
-    expect(banner.exists()).toBe(true)
-    expect(banner.text()).toContain('Your monitor setup changed')
+    const sticky = reassignSticky()
+    expect(sticky).toBeTruthy()
+    expect(sticky?.variant).toBe('warning')
+    expect(sticky?.heading).toBe('Your monitor setup changed')
     // WR-01: the PRIMARY action is an in-place reopen (place-preserving), and the
-    // monitor-setup affordance opens in a NEW TAB (target=_blank) so the running
-    // control is not torn down — no more same-tab <router-link> navigation.
-    expect(banner.find('[data-testid="run-reassign-reopen"]').exists()).toBe(true)
-    const setupLink = banner.find('[data-testid="run-reassign-setup-link"]')
-    expect(setupLink.exists()).toBe(true)
-    expect(setupLink.attributes('href')).toBe('/monitor-setup')
-    expect(setupLink.attributes('target')).toBe('_blank')
+    // monitor-setup affordance opens in a NEW TAB so the running control is not
+    // torn down.
+    expect(sticky?.action?.label).toContain('Reopen')
+    expect(sticky?.link).toEqual({ label: 'Open monitor setup in a new tab', href: '/monitor-setup' })
   })
 
-  it('a still-matching screenschange (benign refresh) raises NO run-reassign-banner (no false alarm)', async () => {
+  it('a still-matching screenschange (benign refresh) sets NO monitor-reassign sticky (no false alarm)', async () => {
     seedMatchingMapping()
     const { control } = installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
@@ -803,10 +815,10 @@ describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-1
     control.fireScreensChange()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(false)
+    expect(reassignSticky()).toBeUndefined()
   })
 
-  it('the IN-PLACE reassign reopen re-opens the affected role WITHOUT unmounting the control and WITHOUT losing index (WR-01; R274)', async () => {
+  it('the IN-PLACE reassign reopen (the sticky action) re-opens the affected role WITHOUT unmounting the control and WITHOUT losing index (WR-01; R274)', async () => {
     seedMatchingMapping()
     const { control } = installGetScreenDetails([screenA, screenB])
     const { wrapper, fake } = mountView()
@@ -821,17 +833,18 @@ describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-1
     const preChangeIndex = before[before.length - 1]!.index
     expect(preChangeIndex).toBe(2)
 
-    // Unplug the CONFIDENCE monitor (screenB gone) → needs-reprompt → banner up,
+    // Unplug the CONFIDENCE monitor (screenB gone) → needs-reprompt → sticky up,
     // with the confidence role named as the one that lost its screen.
     control.setScreens([screenA])
     control.fireScreensChange()
     await flushPromises()
-    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(true)
+    const sticky = reassignSticky()
+    expect(sticky).toBeTruthy()
 
     const callsBefore = openSpy.mock.calls.length
-    // Click the PRIMARY in-place reopen — re-resolves confidence against the
+    // Invoke the sticky's PRIMARY action — re-resolves confidence against the
     // CURRENT screens (gone → un-positioned honest fallback) and reopens it.
-    await wrapper.find('[data-testid="run-reassign-reopen"]').trigger('click')
+    sticky!.action!.onClick()
     await flushPromises()
 
     // Exactly one reopen for the affected (confidence) role, un-positioned since
@@ -843,8 +856,8 @@ describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-1
     // channel was NOT closed — the running session survived the recovery.
     expect(wrapper.find('[data-testid="run-service-name"]').exists()).toBe(true)
     expect(fake.close).not.toHaveBeenCalled()
-    // Banner dismissed now that the reopen ran.
-    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(false)
+    // Sticky cleared now that the reopen ran.
+    expect(reassignSticky()).toBeUndefined()
 
     // The reopened output announces itself → onHello(resendCurrent) resends the
     // CURRENT index; position is restored by the handshake, nothing persisted.
@@ -856,9 +869,31 @@ describe('RunControlView output — monitor-unplug reassign banner (R274; T-96-1
     expect(lastState.index).toBe(2)
     expect(lastState.index).toBe(preChangeIndex)
   })
+
+  it('exiting the run while the sticky is up clears it (R309 — no message may stay stuck across routes)', async () => {
+    seedMatchingMapping()
+    const { control } = installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+    control.setScreens([screenA])
+    control.fireScreensChange()
+    await flushPromises()
+    expect(reassignSticky()).toBeTruthy()
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+    const confirmBtn = document.body.querySelector<HTMLElement>('[data-testid="run-exit-confirm"]')
+    confirmBtn!.click()
+    await flushPromises()
+
+    expect(reassignSticky()).toBeUndefined()
+  })
 })
 
-// ── 9. PRECEDENCE — reassign banner suppresses the reopen chip (R274; 96-UI-SPEC §B)
+// ── 9. PRECEDENCE — the reassign sticky's presence suppresses the reopen chip
+//    (R274; 96-UI-SPEC §B; the sticky itself migrated to the shared store in
+//    Phase 104) ─────────────────────────────────────────────────────────────
 describe('RunControlView output — closed-vs-unplug precedence (R274)', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -867,7 +902,7 @@ describe('RunControlView output — closed-vs-unplug precedence (R274)', () => {
     vi.useRealTimers()
   })
 
-  it('with BOTH a closed audience window AND a monitor change, run-reassign-banner shows and run-display-reopen-audience is SUPPRESSED', async () => {
+  it('with BOTH a closed audience window AND a monitor change, the monitor-reassign sticky is set and run-display-reopen-audience is SUPPRESSED', async () => {
     seedMatchingMapping()
     const { control } = installGetScreenDetails([screenA, screenB])
     const { wrapper } = mountView()
@@ -882,7 +917,7 @@ describe('RunControlView output — closed-vs-unplug precedence (R274)', () => {
     control.fireScreensChange()
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(wrapper.find('[data-testid="run-reassign-banner"]').exists()).toBe(true)
+    expect(reassignSticky()).toBeTruthy()
     // The reopen chip is gated on !monitorChanged → suppressed until reassignment.
     expect(wrapper.find('[data-testid="run-display-reopen-audience"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-display-closed-audience"]').exists()).toBe(false)

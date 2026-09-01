@@ -36,6 +36,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { reactive } from 'vue'
 import type { AssembledSlide } from '@/types/slide'
 import type { BroadcastChannelFactory } from '@/utils/runChannel'
@@ -247,6 +248,9 @@ function mountView(channelFactory: BroadcastChannelFactory) {
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
+  // Phase 104: useRunControl now reads the notifications store (@/stores/toasts)
+  // for the monitor-reassign sticky — an active Pinia instance is required.
+  setActivePinia(createPinia())
   // The on-mount path never opens a window (openOutputs runs only from Go live),
   // but stub window.open → null and DELETE getScreenDetails so no placement
   // orchestration can open a real window or throw during control assertions.

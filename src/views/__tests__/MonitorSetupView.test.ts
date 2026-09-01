@@ -13,7 +13,9 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import MonitorSetupView from '../MonitorSetupView.vue'
+import { useToasts } from '@/stores/toasts'
 import {
   MONITOR_CONFIG_STORAGE_KEY,
   computeFingerprint,
@@ -66,6 +68,7 @@ function mountView() {
 
 beforeEach(() => {
   localStorage.clear()
+  setActivePinia(createPinia())
 })
 
 afterEach(() => {
@@ -291,8 +294,8 @@ describe('MonitorSetupView — WR-02: a same-layout re-detect must not discard u
   })
 })
 
-describe('MonitorSetupView — save round-trip "not persisted" warning', () => {
-  it('shows the non-blocking amber not-persisted warning (not the green confirmation) when localStorage silently no-ops', async () => {
+describe('MonitorSetupView — save round-trip "not persisted" warning (Phase 104, R310)', () => {
+  it('sets the monitor-save-not-persisted sticky (not the green confirmation) when localStorage silently no-ops', async () => {
     const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
     const fpA = computeFingerprint(screens[0]!)
     const fpB = computeFingerprint(screens[1]!)
@@ -313,9 +316,48 @@ describe('MonitorSetupView — save round-trip "not persisted" warning', () => {
     await wrapper.get('[data-testid="save-button"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain("We couldn't save this on your browser")
+    // Ported off the inline v-if warning (removed) onto the shared sticky
+    // notification store — the host itself is mounted at App.vue, not inside
+    // this AppShell-stubbed test tree, so we assert store state directly.
+    const notifications = useToasts()
+    const sticky = notifications.toasts.find((t) => t.key === 'monitor-save-not-persisted')
+    expect(sticky).toBeTruthy()
+    expect(sticky?.variant).toBe('warning')
+    expect(sticky?.body).toContain("We couldn't save this on your browser")
     expect(wrapper.text()).not.toContain('Saved for this device')
 
     setItemSpy.mockRestore()
+  })
+
+  it('clears the monitor-save-not-persisted sticky once a retry succeeds', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const fpA = computeFingerprint(screens[0]!)
+    const fpB = computeFingerprint(screens[1]!)
+
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="detect-button"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).trigger('click')
+
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage disabled (private mode)')
+    })
+    await wrapper.get('[data-testid="save-button"]').trigger('click')
+    await flushPromises()
+
+    const notifications = useToasts()
+    expect(notifications.toasts.some((t) => t.key === 'monitor-save-not-persisted')).toBe(true)
+
+    // Retry with storage restored — the sticky auto-clears (R310).
+    setItemSpy.mockRestore()
+    await wrapper.get('[data-testid="save-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Saved for this device')
+    expect(notifications.toasts.some((t) => t.key === 'monitor-save-not-persisted')).toBe(false)
   })
 })

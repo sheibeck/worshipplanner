@@ -29,6 +29,7 @@ import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import type { RouteLocationNormalized } from 'vue-router'
 import { useServiceAssembly } from '@/composables/useServiceAssembly'
 import { useRunTimers } from '@/composables/useRunTimers'
+import { useToasts } from '@/stores/toasts'
 import {
   openRunChannel,
   type BroadcastChannelFactory,
@@ -79,6 +80,12 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   // channel-opening onMounted (subscribe-before-channel ordering preserved).
   const { serviceId, orgIdRef, localService, assembledSlideshow } = useServiceAssembly()
   const router = useRouter()
+
+  // Phase 104 (R309/R310) — the app-wide dismissible-message store. The
+  // monitor-reassign sticky ('monitor-reassign', below) is the R310 proof
+  // case: it auto-clears the moment monitors are reconfigured/reopened AND
+  // is manually dismissible in the meantime via the shared host.
+  const notifications = useToasts()
 
   // ── Wall clock + elapsed-since-go-live timers (R281) ───────────────────────
   // startElapsed() is idempotent (first go-live OR first rehearse records the
@@ -453,6 +460,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
       reopenOutput('confidence')
     }
     monitorChanged.value = false
+    notifications.clearSticky('monitor-reassign')
   }
 
   /**
@@ -466,6 +474,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     const saved = loadMapping()
     if (!saved) {
       monitorChanged.value = false
+      notifications.clearSticky('monitor-reassign')
       return
     }
     const result = matchMapping(saved, liveScreenDetails.screens)
@@ -475,8 +484,21 @@ export function useRunControl(options: UseRunControlOptions = {}) {
       const confMissing = resolveScreen(saved, 'confidence', liveScreenDetails.screens) == null
       reassignRole.value =
         audMissing && !confMissing ? 'audience' : confMissing && !audMissing ? 'confidence' : 'audience or confidence'
+      // Phase 104 (R310 proof case) — the sticky replaces the old ad-hoc
+      // v-if banner. Copy is verbatim from the removed RunControlView.vue
+      // markup; setSticky de-dupes on the 'monitor-reassign' key so a
+      // second screenschange while the card is still up updates it in
+      // place rather than stacking a duplicate.
+      notifications.setSticky('monitor-reassign', {
+        variant: 'warning',
+        heading: 'Your monitor setup changed',
+        body: `A display was unplugged or rearranged, so we can't place the ${reassignRole.value} output on its old screen. Your service is still live — reopen the ${reassignRole.value} display below to keep going without losing your place.`,
+        action: { label: `Reopen & replace ${reassignRole.value}`, onClick: reopenReassignedOutputs },
+        link: { label: 'Open monitor setup in a new tab', href: '/monitor-setup' },
+      })
     } else {
       monitorChanged.value = false
+      notifications.clearSticky('monitor-reassign')
     }
   }
 
@@ -876,6 +898,11 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // close + navigation, so ending run mode tears down the real displays (R266).
     closeOutputs()
     handle?.close()
+    // R309 (no message may stay stuck on screen): the notification host is
+    // app-global (mounted once at App.vue), so a reassign sticky raised
+    // during THIS session must not survive into whatever screen the operator
+    // navigates to next. Idempotent no-op if it was already cleared/dismissed.
+    notifications.clearSticky('monitor-reassign')
     // Leave the control-screen fullscreen entered on go-live (only when we are
     // actually fullscreen — a rehearse exit never entered it). Feature-detected +
     // .catch-swallowed so a reject/absence never blocks teardown or navigation.
@@ -1137,6 +1164,10 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     document.removeEventListener('keydown', handleKeydown)
     // Owner fix #6: never leak the live-only beforeunload listener past teardown.
     window.removeEventListener('beforeunload', handleBeforeUnload)
+    // R309 — defense-in-depth mirror of endServiceTeardown's clear, for any
+    // unmount path that does not run through confirmExit (e.g. leaving the
+    // route while not truly live). Idempotent no-op if already cleared.
+    notifications.clearSticky('monitor-reassign')
   })
 
   return {
