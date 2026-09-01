@@ -532,7 +532,7 @@ Plans:
 
 **Goal**: Tech/sound can see, at a glance, where every instrument, mic, and monitor goes for a given
 service via a freeform visual stage plot.
-**Depends on**: Phase 104 (must register its new `stageLayouts` store in the `resetOrgScopedStores()` reset path Phase 104 ships)
+**Depends on**: Phase 104 (resolves the `STAGELAYOUTS-RESET-OBLIGATION` marker Phase 104 left in `resetOrgScopedStores()`). Per 107-CONTEXT.md the layout is an additive optional field on the SERVICE document — NO new `stageLayouts` collection/store/rules — so R312 is satisfied by the already-reset services store and the marker is turned into a resolved note.
 **Requirements**: R313, R314, R315
 **Success Criteria** (what must be TRUE):
 
@@ -541,7 +541,13 @@ service via a freeform visual stage plot.
   3. Marker positions round-trip correctly on reload and stay stable across a viewport resize (R314).
   4. The stage layout is saved per service to Firestore (no file storage) and is viewable read-only wherever that service is shared or printed (R315).
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 107-01-PLAN.md — Data model (additive `Service.stageLayout` + `StageMarker`), pure drag/geometry helpers, shared read-only `StageLayoutView`, and resolve the Phase-104 `STAGELAYOUTS-RESET-OBLIGATION` marker [wave 1]
+- [ ] 107-02-PLAN.md — `StageLayoutEditor` freeform Pointer-Events drag canvas (two zones, add/label/kind/move/delete, aria-labels, touch) + the editor's Stage Layout tab, draft/lock-gated, riding the existing autosave [wave 2]
+- [ ] 107-03-PLAN.md — Denormalize `stageLayout` into the frozen `ServiceSnapshot` and render it read-only on the public ShareView + print (reusing `StageLayoutView`, no new public rules) [wave 2]
+
 **UI hint**: yes
 **Research flag**: this app's first freeform-drag surface (v1.4 phantom duplicates, v1.6 drag-into-section
 bugs are the prior history) — flag for a dedicated UI-spec/research pass at plan time rather than a
