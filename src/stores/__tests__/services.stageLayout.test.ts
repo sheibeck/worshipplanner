@@ -169,12 +169,11 @@ describe('buildServiceSnapshot stageLayout projection (T-107-01)', () => {
     const { buildServiceSnapshot } = await import('../services')
     const service = makeService({
       stageLayout: {
-        elements: [
-          // @ts-expect-error — deliberately out-of-range, simulating a bulk
-          // import / manual Firestore edit / future caller bug that bypassed
-          // the app's own UI-side clamping.
-          { id: 'm1', label: 'Off-canvas Mic', zone: 'onstage', xPct: 145, yPct: -20 },
-        ],
+        // Deliberately out-of-range xPct/yPct — StageMarker's type is a plain
+        // `number` (no range narrowing), so this simulates a bulk import /
+        // manual Firestore edit / future caller bug that bypassed the app's
+        // own UI-side clamping without needing a type-system escape hatch.
+        elements: [{ id: 'm1', label: 'Off-canvas Mic', zone: 'onstage', xPct: 145, yPct: -20 }],
       },
     })
 
