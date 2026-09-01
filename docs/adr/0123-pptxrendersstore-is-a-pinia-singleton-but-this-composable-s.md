@@ -6,13 +6,13 @@ Accepted
 
 ## Context
 
-This rationale is applied at 2 call site(s) within `src/composables/useSlideshowAssembly.ts`. Documented at the time in `42-REVIEW.md`.
+This rationale is applied at 1 call site within `src/composables/useSlideshowAssembly.ts`. Documented at the time in `42-REVIEW.md`.
 
-WR-02 (42-REVIEW.md): `pptxRendersStore` is a Pinia singleton, but this composable's `cleanup()` calls its `unsubscribeAll()`, which tears down EVERY outstanding listener in the store, not just the ones this particular i...
+WR-02 (42-REVIEW.md): `pptxRendersStore` is a Pinia singleton, but this composable's `cleanup()` calls its `unsubscribeAll()`, which tears down EVERY outstanding listener in the store, not just the ones this particular instance opened.
 
 ## Decision
 
-The rationale below is preserved verbatim from the source comment(s) it was extracted from (tag: `WR-02`):
+The rationale below is preserved verbatim from the source comment it was extracted from (tag: `WR-02`):
 
 **`src/composables/useSlideshowAssembly.ts:82-90`:**
 
@@ -28,11 +28,10 @@ The rationale below is preserved verbatim from the source comment(s) it was extr
 // here authorizes), it only makes a violation loud instead of silent.
 ```
 
-**`src/composables/useSlideshowAssembly.ts:870-870`:**
-
-```
-          'killed by this unmount. See WR-02, 42-REVIEW.md.',
-```
+**Note:** `src/composables/useSlideshowAssembly.ts:870` also names `WR-02, 42-REVIEW.md`, but
+that occurrence is inside a `console.warn()` string literal (the dev-mode tripwire message
+itself), not a comment — it is executable code, out of scope for the comment-only shrink in
+Task 2, and is intentionally left unedited.
 
 ## Consequences
 
@@ -41,4 +40,3 @@ Removing or reverting the behavior described above without re-deriving this rati
 ## Source comments
 
 - `src/composables/useSlideshowAssembly.ts:82-90`
-- `src/composables/useSlideshowAssembly.ts:870-870`
