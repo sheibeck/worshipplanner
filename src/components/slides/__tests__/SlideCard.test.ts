@@ -605,4 +605,39 @@ describe('SlideCard', () => {
       expect(wrapper.find('[data-testid="slide-card-background-chip"]').exists()).toBe(false)
     })
   })
+
+  // ── 105-02 (R303): blackout preview ────────────────────────────────────────
+
+  describe('blackout', () => {
+    function makeBlackout(): AssembledSlide {
+      return makeAssembled({
+        slide: { id: 'black-1', position: 0, contentKind: 'blackout' },
+      })
+    }
+
+    it('shows BLACKOUT / Solid black / Black Slide labels', () => {
+      const wrapper = mountCard({ assembledSlide: makeBlackout() })
+      expect(wrapper.get('[data-testid="slide-card-content-label"]').text()).toBe('BLACKOUT')
+      expect(wrapper.get('[data-testid="slide-card-body"]').text()).toBe('Solid black')
+      expect(wrapper.get('[data-testid="slide-card-label"]').text()).toBe('Black Slide')
+    })
+
+    it('renders a bg-black preview pane (in place of the default bg-gray-950/40)', () => {
+      const wrapper = mountCard({ assembledSlide: makeBlackout() })
+      const preview = wrapper.get('[data-testid="slide-card-preview"]')
+      expect(preview.classes()).toContain('bg-black')
+      expect(preview.classes()).not.toContain('bg-gray-950/40')
+    })
+
+    it('a non-blackout slide keeps the default bg-gray-950/40 preview pane', () => {
+      const wrapper = mountCard({
+        assembledSlide: makeAssembled({
+          slide: { id: 'text-1', position: 0, contentKind: 'text', body: 'Hello' },
+        }),
+      })
+      const preview = wrapper.get('[data-testid="slide-card-preview"]')
+      expect(preview.classes()).toContain('bg-gray-950/40')
+      expect(preview.classes()).not.toContain('bg-black')
+    })
+  })
 })

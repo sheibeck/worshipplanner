@@ -24,7 +24,11 @@
       />
     </div>
 
-    <div class="relative h-[140px] overflow-hidden rounded-md bg-gray-950/40" data-testid="slide-card-preview">
+    <div
+      class="relative h-[140px] overflow-hidden rounded-md"
+      :class="isBlackout ? 'bg-black' : 'bg-gray-950/40'"
+      data-testid="slide-card-preview"
+    >
       <span
         class="absolute left-2 top-1.5 text-[10px] uppercase tracking-wide text-indigo-300"
         data-testid="slide-card-content-label"
@@ -76,6 +80,14 @@
         class="h-full w-full object-contain"
         data-testid="slide-card-image"
       />
+      <!-- Blackout (R303, Phase 105): centered, since there is no multi-line
+           content to clamp — the card previews literally what will project
+           (bg-black pane above + this one short caption). -->
+      <p
+        v-else-if="isBlackout"
+        class="flex h-full w-full items-center justify-center px-2 text-center text-[13px] leading-normal text-gray-200"
+        data-testid="slide-card-body"
+      >{{ bodyText }}</p>
       <p
         v-else
         class="line-clamp-6 whitespace-pre-line px-2 pt-6 text-[13px] leading-normal text-gray-200"
@@ -231,6 +243,8 @@ const emit = defineEmits<{
 }>()
 
 const isImage = computed(() => props.assembledSlide.slide.contentKind === 'image')
+/** R303/UI-SPEC card contract: a blackout slide's preview pane goes bg-black and its body caption centers, so the card previews literally what will project. */
+const isBlackout = computed(() => props.assembledSlide.slide.contentKind === 'blackout')
 const imageSrc = computed(() => (props.assembledSlide.slide as ImageSlide).imageUrl)
 const imageAlt = computed(() => (props.assembledSlide.slide as ImageSlide).altText ?? '')
 
