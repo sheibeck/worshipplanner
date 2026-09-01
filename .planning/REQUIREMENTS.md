@@ -13,15 +13,15 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 
 ### Lyric Authoring — inline black slide
 
-- [ ] **R302**: From the Song Lyrics editor, a user can insert an inline **black (blackout) slide**
+- [x] **R302**: From the Song Lyrics editor, a user can insert an inline **black (blackout) slide**
   between a song's lyric slides to mark an instrumental/interlude, without creating a new blank service
   section.
 
-- [ ] **R303**: A black slide renders as a full black screen — no lyrics, no background image, no
+- [x] **R303**: A black slide renders as a full black screen — no lyrics, no background image, no
   organizational labels — on the Audience output, the Confidence monitor, the in-app preview, and
   print/export, and it participates in normal slide navigation.
 
-- [ ] **R304**: Adding, moving, duplicating, or deleting a black slide does not corrupt song section
+- [x] **R304**: Adding, moving, duplicating, or deleting a black slide does not corrupt song section
   numbering, the split-section-as-one-unit behavior, or the slide↔service-order mirroring.
 
 ### Live Presentation — blackout scoping & looping
@@ -105,9 +105,9 @@ Which phases cover which requirements. Filled in during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R302 | Phase 105 | Pending |
-| R303 | Phase 105 | Pending |
-| R304 | Phase 105 | Pending |
+| R302 | Phase 105 | Complete |
+| R303 | Phase 105 | Complete |
+| R304 | Phase 105 | Complete |
 | R305 | Phase 105 | Pending |
 | R306 | Phase 106 | Pending |
 | R307 | Phase 106 | Pending |
