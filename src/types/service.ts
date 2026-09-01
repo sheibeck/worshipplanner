@@ -58,6 +58,26 @@ export interface MediaAttachableSlot {
    * below — that is a service-level field on a different object.
    */
   notes?: string
+  /**
+   * Per-item Run auto-advance/loop configuration (R306/R307, Phase 106).
+   * Lives on the shared base so `slot.loop` is reachable cast-free on all
+   * five slot kinds, exactly like `notes` above. OPTIONAL and non-destructive:
+   * absent on every slot written before this field existed (no migration);
+   * absent OR `enabled: false` both mean "current (non-looping) behavior" —
+   * there is no third state. When the whole `loop` object is set back to
+   * `undefined` it is dropped by `stripUndefined` before the Firestore write,
+   * same lifecycle as `notes`.
+   *
+   * `intervalSeconds` is SECONDS, not milliseconds (default 10) — this is the
+   * approved 106-UI-SPEC.md contract and matches the v2.7 ARCHITECTURE
+   * research (`intervalSeconds: number // default 10`). An earlier
+   * 106-CONTEXT.md draft phrase ("intervalMs") is superseded by this
+   * approved field name/unit.
+   */
+  loop?: {
+    enabled: boolean
+    intervalSeconds: number
+  }
 }
 
 export interface SongSlot extends MediaAttachableSlot {
