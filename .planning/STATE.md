@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Per-Org Bible API Toggle & Manual Fallback (Phases 101-103, in progress)
-current_phase: 103
-current_phase_name: Manual Fallback When Bible API Is Off
-status: verifying
+current_phase: 999.2
+current_phase_name: BACKLOG
+status: planning
 stopped_at: Completed 103-02-PLAN.md
-last_updated: "2026-08-31T21:15:19.450Z"
+last_updated: "2026-08-31T22:11:31.548Z"
 last_activity: 2026-08-31
-last_activity_desc: "103-01-PLAN.md executed: added `bibleGatewayLink(ref, version?)` to `src/utils/scripture.ts`"
+last_activity_desc: Phase 103 complete, transitioned to Phase 999.2
 progress:
   total_phases: 3
   completed_phases: 3
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.6 Per-Org Bible API Toggle & Manual Fallback (roadmap created 2026-08-31)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to plan
 
 **Goal:** Put Bible API access behind a per-organization on/off switch controlled from the Owner Console,
 and when it is off give that org a zero-cost manual path (BibleGateway deep-link + paste-the-passage-in)
@@ -1125,10 +1125,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 103 — Manual Fallback When Bible API Is Off
-Plan: 103-01 — bibleGatewayLink deep-link builder (R298) + Settings card gate (R300) — COMPLETE (1 of 2 plans in Phase 103)
+Phase: 999.2 — Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG)
+Plan: Not started
 Status: Wave 1 (103-01) executed and verified; Plan 103-02 (fallback UI in ScriptureInput.vue/CongregationalEditor.vue) remains
-Last activity: 2026-08-31 — 103-01-PLAN.md executed: added `bibleGatewayLink(ref, version?)` to `src/utils/scripture.ts`
+Last activity: 2026-08-31 — Phase 103 complete, transitioned to Phase 999.2
 (delegates to `formatScriptureReference`, encodes reference + optional version, omits `&version=` when
 absent/empty) and gated the Settings "Bible Translation" card behind `authStore.isBibleApiEnabled`,
 mirroring the AI Features card's `aiMasterEnabled` gate exactly — no change to `bibleVersionInput`, the

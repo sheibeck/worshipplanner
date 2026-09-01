@@ -438,7 +438,7 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 
 - [x] **Phase 101: Per-Org Bible API Toggle — Owner Console Infrastructure** - A super-admin controls Bible API access per organization from the Owner Console, with every org defaulting to OFF (completed 2026-08-31)
 - [x] **Phase 102: Gated Scripture Fetch Dispatcher** - A single client/server choke point enforces the per-org gate, with zero regression when the API is enabled (completed 2026-08-31)
-- [ ] **Phase 103: Manual Fallback When Bible API Is Off** - An OFF org gets a working BibleGateway deep-link + paste-in path, and Settings hides the Bible Translation selector
+- [x] **Phase 103: Manual Fallback When Bible API Is Off** - An OFF org gets a working BibleGateway deep-link + paste-in path, and Settings hides the Bible Translation selector (completed 2026-08-31)
 
 ### Phase 101: Per-Org Bible API Toggle — Owner Console Infrastructure
 
