@@ -31,8 +31,11 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 
 - [ ] **R306**: A user can mark a service item as **looping** (a per-item checkbox in the editor) so
   that, during Run, that item's slides auto-advance and loop back to the item's first slide.
+  (Authoring half — the checkbox, interval config, and persisted `slot.loop` model — shipped in
+  106-01. The Run-time auto-advance/loop-back behavior itself is 106-02's scope; R306 stays open
+  until that lands.)
 
-- [ ] **R307**: A looping item auto-advances on a **configurable interval, defaulting to 10 seconds**,
+- [x] **R307**: A looping item auto-advances on a **configurable interval, defaulting to 10 seconds**,
   chosen from a dropdown of preset intervals with an option to enter a custom value; the interval
   persists with the item.
 
@@ -109,8 +112,8 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | R303 | Phase 105 | Complete |
 | R304 | Phase 105 | Complete |
 | R305 | Phase 105 | Complete |
-| R306 | Phase 106 | Pending |
-| R307 | Phase 106 | Pending |
+| R306 | Phase 106 | Pending (authoring half done in 106-01; Run-time half is 106-02) |
+| R307 | Phase 106 | Complete |
 | R308 | Phase 106 | Pending |
 | R309 | Phase 104 | Complete |
 | R310 | Phase 104 | Complete |

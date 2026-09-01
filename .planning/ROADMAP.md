@@ -519,11 +519,11 @@ with predictable, leak-free start/stop behavior.
   3. Navigating to a different item, leaving the Run screen, or manually clicking a slide stops/resets the loop timer cleanly, with no leaked timer continuing to fire and no control↔output desync (R308).
   4. The plan explicitly decides and implements whether "Go to black" pauses an active loop, and that behavior is verified in a real output window, not just the control screen (R308).
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
 
-- [ ] 106-01-PLAN.md — Per-item loop config model (additive `MediaAttachableSlot.loop`) + Service Order authoring UI (Loop checkbox + interval preset/custom, persisted, clamped) (R306, R307) [wave 1]
+- [x] 106-01-PLAN.md — Per-item loop config model (additive `MediaAttachableSlot.loop`) + Service Order authoring UI (Loop checkbox + interval preset/custom, persisted, clamped) (R306, R307) [wave 1]
 - [ ] 106-02-PLAN.md — Run-time loop timer (single `useLoopTimer` through `postIndex`) + wrap-to-first + Go-to-black PAUSE/resume + clean teardown, with output-window tests and a real-hardware checkpoint (R306, R308) [wave 2]
 
 **UI hint**: yes
