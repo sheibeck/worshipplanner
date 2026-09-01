@@ -240,10 +240,17 @@ const switcherPanelRef = ref<HTMLElement | null>(null)
 
 // SlideActionMenu.vue's ARIA-menu pattern, reused verbatim: opening the
 // panel moves focus to its first menuitem.
+//
+// 104-REVIEW WR-03: the active-church row renders as a non-focusable
+// `<div role="menuitem">` (no tabindex) — calling .focus() on it is a
+// browser no-op. Since authStore.memberships lists the active org first more
+// often than not, a plain `[role="menuitem"]` match frequently lands on that
+// row and silently focuses nothing. Scope to the first FOCUSABLE menuitem
+// (the `<button role="menuitem">` rows) instead.
 watch(switcherOpen, async (isOpen) => {
   if (!isOpen) return
   await nextTick()
-  switcherPanelRef.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+  switcherPanelRef.value?.querySelector<HTMLElement>('button[role="menuitem"]')?.focus()
 })
 
 function toggleSwitcher(): void {
@@ -276,7 +283,11 @@ async function handleSwitch(targetOrgId: string): Promise<void> {
     switcherOpen.value = false
   } catch (err) {
     console.error('[AppSidebar] church switch failed:', err)
-    toasts.push('Could not switch churches. Please try again.', { variant: 'error' })
+    // 104-REVIEW WR-02: `push()` only arms its auto-dismiss timer when `opts`
+    // is omitted entirely OR `opts.autoDismissMs` is set — passing
+    // `{ variant: 'error' }` alone falls into neither branch and stays sticky
+    // forever. 'error' is already push()'s default variant, so omit opts.
+    toasts.push('Could not switch churches. Please try again.')
   } finally {
     switchingId.value = null
   }

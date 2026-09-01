@@ -15,7 +15,9 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, enableAutoUnmount, flushPromises } from '@vue/test-utils'
+import { setActivePinia, createPinia } from 'pinia'
 import AppSidebar from '../AppSidebar.vue'
+import { useToasts } from '@/stores/toasts'
 
 enableAutoUnmount(afterEach)
 
@@ -65,14 +67,16 @@ vi.mock('@/stores/auth', () => ({
   }),
 }))
 
-const mockToastPush = vi.fn()
-vi.mock('@/stores/toasts', () => ({
-  useToasts: () => ({
-    push: mockToastPush,
-  }),
-}))
-
+// 104-REVIEW IN-02: @/stores/toasts is deliberately NOT mocked (unlike
+// @/stores/auth above). Mocking it out entirely — as this file used to —
+// meant no test exercised the real store's sticky-vs-transient `push()`
+// branching, which is exactly why WR-02 (a `{ variant: 'error' }` opts
+// object that accidentally suppressed the auto-dismiss timer) shipped
+// without a failing test. Using the real Pinia-backed store below lets the
+// "surfaces a failed switch..." test assert the toast's actual lifetime, not
+// just the call arguments.
 beforeEach(() => {
+  setActivePinia(createPinia())
   mockOrgId = 'org-1'
   mockOrgName = 'Test Church'
   mockIsEditor = false
@@ -83,7 +87,6 @@ beforeEach(() => {
   mockLogout.mockClear()
   mockSelectOrg.mockClear()
   mockSelectOrg.mockImplementation(() => Promise.resolve())
-  mockToastPush.mockClear()
 })
 
 function mountSidebar() {
@@ -215,22 +218,38 @@ describe('AppSidebar — church switcher (R311/R312, Phase 104)', () => {
     expect(option.attributes('disabled')).toBeDefined()
   })
 
-  it('surfaces a failed switch through the notification store with variant error and keeps the panel open', async () => {
-    mockMemberships = twoOrgs
-    mockOrgId = 'org-1'
-    mockSelectOrg.mockImplementation(() => Promise.reject(new Error('boom')))
-    const wrapper = mountSidebar()
-    await wrapper.find('[data-testid="church-switcher-trigger"]').trigger('click')
+  it('surfaces a failed switch through the notification store with variant error, keeps the panel open, and auto-dismisses the toast (104-REVIEW WR-02/IN-02)', async () => {
+    vi.useFakeTimers()
+    try {
+      mockMemberships = twoOrgs
+      mockOrgId = 'org-1'
+      mockSelectOrg.mockImplementation(() => Promise.reject(new Error('boom')))
+      const wrapper = mountSidebar()
+      await wrapper.find('[data-testid="church-switcher-trigger"]').trigger('click')
 
-    await wrapper.find('[data-testid="church-switcher-option"]').trigger('click')
-    await flushPromises()
+      await wrapper.find('[data-testid="church-switcher-option"]').trigger('click')
+      await flushPromises()
 
-    expect(mockToastPush).toHaveBeenCalledWith(
-      'Could not switch churches. Please try again.',
-      { variant: 'error' },
-    )
-    // Panel stays open on failure.
-    expect(wrapper.find('[data-testid="church-switcher-panel"]').exists()).toBe(true)
+      // Real store (not mocked) — asserts the actual resulting toast, not just
+      // the call arguments a mock would have recorded.
+      const toasts = useToasts()
+      expect(toasts.toasts).toHaveLength(1)
+      expect(toasts.toasts[0]).toMatchObject({
+        message: 'Could not switch churches. Please try again.',
+        variant: 'error',
+      })
+      // Panel stays open on failure.
+      expect(wrapper.find('[data-testid="church-switcher-panel"]').exists()).toBe(true)
+
+      // WR-02: push() called with no opts must arm the historical 6000ms
+      // auto-dismiss timer — it must NOT stay stuck on screen forever.
+      vi.advanceTimersByTime(5999)
+      expect(toasts.toasts).toHaveLength(1)
+      vi.advanceTimersByTime(1)
+      expect(toasts.toasts).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('Escape closes the panel', async () => {
