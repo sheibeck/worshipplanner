@@ -17,15 +17,16 @@
       </button>
     </div>
 
-    <!-- Bible API off: manual fallback (R298 deep-link, R299 paste -> rawPassage/text).
-         Rendered ONLY when the org's Bible API is disabled. The "Split with
-         AI" button below stays gated ONLY on authStore.isAiEnabled -- NEVER
-         on this gate -- so Bible-off + AI-on still splits the pasted text,
-         and Bible-off + AI-off still allows paste with manual sectioning. -->
+    <!-- Bible API off: manual fallback (R298 deep-link). Rendered ONLY when
+         the org's Bible API is disabled. The "Split with AI" button below
+         stays gated ONLY on authStore.isAiEnabled -- NEVER on this gate --
+         so Bible-off + AI-on still splits whatever is typed into the main
+         textarea below, and Bible-off + AI-off still allows composing the
+         reading by hand there. The paste-a-passage textarea (R299) was
+         removed per owner direction (v2.6 Phase-103 follow-up): congregational
+         readings are now composed directly in the existing bottom format
+         textarea, which can be pasted into normally. -->
     <div v-if="!authStore.isBibleApiEnabled" class="space-y-2">
-      <p class="text-xs text-gray-400">
-        Bible API is off for your church. Open the passage in BibleGateway, then paste the text below.
-      </p>
       <a
         v-if="props.reference"
         :href="fallbackBibleGatewayLink"
@@ -38,21 +39,6 @@
         </svg>
         Open in BibleGateway
       </a>
-      <div>
-        <label for="congregational-paste-textarea" class="block text-xs font-medium text-gray-300 mb-1">Paste the passage text</label>
-        <textarea
-          id="congregational-paste-textarea"
-          :value="pastedText"
-          @input="onPasteInput"
-          data-testid="congregational-paste-textarea"
-          placeholder="Paste the verses here (any version)"
-          rows="4"
-          class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-        ></textarea>
-        <p v-if="!pastedText" class="text-xs text-gray-500 mt-1">
-          No passage text yet — open BibleGateway above and paste it here.
-        </p>
-      </div>
     </div>
 
     <!-- Helper line -->
@@ -238,15 +224,6 @@ const rawPassage = ref('')
 const isSplitting = ref(false)
 const showDeleteConfirm = ref(false)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
-// R298/R299 (103-02): manual-fallback state, only rendered/used when the
-// org's Bible API is off (see template above).
-const pastedText = ref('')
-// CR-02 (103-REVIEW): the last "Leader\n<stripped>" string onPasteInput itself
-// wrote into `text`. Used to detect whether `text` still holds exactly what
-// paste last seeded — i.e. the user hasn't since diverged from it via a
-// manual edit or an AI split — so a further paste-box keystroke only
-// re-seeds `text` when it's safe to do so, never clobbering a split/edit.
-const lastPasteSeed = ref('')
 
 const AI_SPLIT_FAILURE_TEXT =
   "Couldn't split this passage — your reading is unchanged. Build it by hand or try again."
@@ -275,35 +252,6 @@ const fallbackBibleGatewayLink = computed(() => {
   const version = props.bibleVersion ?? authStore.settings.bibleVersion
   return bibleGatewayLink(props.reference, version ?? undefined)
 })
-
-// R299: routes pasted text into the SAME state autoFetch's ok-branch fills
-// (rawPassage + text, both stripVerseMarkers-applied / "Leader\n"-seeded) so
-// the existing hasPassageToSplit/onAiSplit/onSave paths operate on pasted
-// text exactly as they do on fetched text. Deliberately does NOT touch
-// authStore.isAiEnabled or the AI split gate -- the two gates stay
-// independent (Bible-off + AI-on still splits; Bible-off + AI-off still
-// allows paste with manual sectioning, no auto-split).
-//
-// CR-02 (103-REVIEW): fires on EVERY keystroke of the (permanently visible)
-// paste textarea, for the component's whole lifetime -- unlike autoFetch's
-// genuine one-shot seed. Unconditionally overwriting `text` here used to mean
-// paste -> Split with AI -> go fix a typo in the paste box -> the very next
-// keystroke reverted `text` back to the raw unsplit seed, silently discarding
-// the split (and any manual sectioning). The guard below only re-seeds `text`
-// when it still holds exactly what paste itself last seeded -- i.e. the user
-// hasn't since diverged from it via a split or a manual edit -- so seeding
-// stays a "seed, don't clobber" operation instead of a per-keystroke clobber.
-function onPasteInput(event: Event): void {
-  const value = (event.target as HTMLTextAreaElement).value
-  pastedText.value = value
-  const stripped = stripVerseMarkers(value)
-  rawPassage.value = stripped
-  const seeded = `Leader\n${stripped}`
-  if (text.value === lastPasteSeed.value) {
-    text.value = seeded
-  }
-  lastPasteSeed.value = seeded
-}
 
 function formatQuery(scriptureRef: ScriptureRef): string {
   const base = `${scriptureRef.book} ${scriptureRef.chapter}`
@@ -341,8 +289,8 @@ async function autoFetch(): Promise<void> {
     }
     // 'disabled' (Phase 102, R297): silent no-op — no fetch was attempted, no
     // fetchError shown; the textarea/rawPassage stay untouched and the
-    // component remains functional for manual entry. Phase 103 attaches the
-    // BibleGateway/paste UI here.
+    // component remains functional for manual entry via the main textarea.
+    // The BibleGateway deep-link fallback UI (R298) is attached above.
   } catch {
     // WR-02 (102-REVIEW): the refactor to status-branching dropped the
     // generic catch, leaving `stripVerseMarkers(result.text)` and the
@@ -398,12 +346,14 @@ async function onAiSplit(): Promise<void> {
       return
     }
     // WR-02 (103-REVIEW): the org's stored bibleVersion has no relationship to
-    // pasted "any version" text -- capturedVersion is only ever set inside
-    // autoFetch's 'ok' branch, which never runs while the API is off, so it
-    // always falls through to here on the paste path. Falling back to the
-    // org default there would falsely stamp e.g. ESV on pasted NIV text.
-    // Guarded so the org-default fallback is only used on the fetch-backed
-    // (enabled) path; the paste path leaves translationSource unset.
+    // "any version" text typed directly into the textarea while the Bible API
+    // is off -- capturedVersion is only ever set inside autoFetch's 'ok'
+    // branch, which never runs while the API is off, so it always falls
+    // through to here on the manual-entry path. Falling back to the org
+    // default there would falsely stamp e.g. ESV on manually-entered NIV
+    // text. Guarded so the org-default fallback is only used on the
+    // fetch-backed (enabled) path; the manual-entry path leaves
+    // translationSource unset.
     const stampVersion =
       capturedVersion.value ?? (authStore.isBibleApiEnabled ? authStore.settings.bibleVersion : null)
     const stamped: CongregationalSection[] = result.map((section) => ({
@@ -424,7 +374,7 @@ function onSave(): void {
   // per-item override (props.bibleVersion) is a deliberate, explicit choice
   // and still applies; only the final catch-all org-default fallback is
   // nulled out when the Bible API is off, since that setting has no
-  // relationship to whatever the user actually pasted.
+  // relationship to whatever the user actually typed into the textarea.
   const version =
     capturedVersion.value ??
     props.bibleVersion ??

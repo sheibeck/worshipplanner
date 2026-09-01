@@ -365,19 +365,16 @@ describe('CongregationalEditor', () => {
     expect(textareaEl(wrapper).value).toBe('')
   })
 
-  // ── Manual fallback when Bible API is off (103-02, R298/R299) ──────────
+  // ── Manual fallback when Bible API is off (103-02, R298) ────────────────
+  // The paste-a-passage textarea (R299) was removed per owner direction
+  // (v2.6 Phase-103 follow-up): congregational readings are now composed
+  // directly in the existing bottom format textarea, which can be pasted
+  // into normally.
 
-  function pasteTextarea(wrapper: ReturnType<typeof mountEditor>) {
-    return wrapper.find('[data-testid="congregational-paste-textarea"]')
-  }
-
-  it('renders the intro copy, a correct BibleGateway deep-link, and the paste textarea for a valid reference', async () => {
+  it('renders a correct BibleGateway deep-link for a valid reference', async () => {
     useAuthStore().bibleApiEnabled = false
     const wrapper = mountEditor()
     await flushPromises()
-
-    expect(wrapper.text()).toContain('Bible API is off for your church')
-    expect(wrapper.text()).toContain('Open the passage in BibleGateway')
 
     const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
     expect(link).toBeTruthy()
@@ -388,16 +385,30 @@ describe('CongregationalEditor', () => {
 
     // The existing `---`-delimited textarea remains present and functional.
     expect(wrapper.find('[data-testid="congregational-textarea"]').exists()).toBe(true)
-    expect(pasteTextarea(wrapper).exists()).toBe(true)
   })
 
-  it('pasting passage text populates rawPassage + the textarea, and a subsequent Save emits sections parsed from it', async () => {
+  // Regression (owner direction, v2.6 Phase-103 follow-up): the "Paste the
+  // passage text" textarea is gone entirely when the API is off.
+  it('does not render the paste textarea when the API is off, while the BibleGateway link is present', async () => {
     useAuthStore().bibleApiEnabled = false
     const wrapper = mountEditor()
     await flushPromises()
 
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
-    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
+    expect(wrapper.find('[data-testid="congregational-paste-textarea"]').exists()).toBe(false)
+    expect(wrapper.find('#congregational-paste-textarea').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Paste the passage text')
+    const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
+    expect(link).toBeTruthy()
+  })
+
+  it('typing passage text directly into the bottom format textarea, and a subsequent Save emits sections parsed from it', async () => {
+    useAuthStore().bibleApiEnabled = false
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    await wrapper
+      .find('[data-testid="congregational-textarea"]')
+      .setValue(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
 
     await wrapper.find('[data-testid="congregational-save"]').trigger('click')
     const sections = lastEmittedSections(wrapper)
@@ -406,15 +417,18 @@ describe('CongregationalEditor', () => {
     expect(sections[0]!.text).toBe(STRIPPED_PASSAGE_TEXT)
   })
 
-  // INDEPENDENCE (R299): Bible-off + AI-on -- the split still runs on the
-  // pasted text. The AI split gate must never be coupled to isBibleApiEnabled.
-  it('INDEPENDENCE: Bible off + AI on -- "Split with AI" is visible after paste and splits the pasted text', async () => {
+  // INDEPENDENCE (R299): Bible-off + AI-on -- "Split with AI" is visible and
+  // splits whatever is typed into the bottom textarea. The AI split gate
+  // must never be coupled to isBibleApiEnabled.
+  it('INDEPENDENCE: Bible off + AI on -- "Split with AI" is visible after typing into the bottom textarea and splits it', async () => {
     useAuthStore().bibleApiEnabled = false
     // aiMasterEnabled/settings.aiEnabled already true from the outer beforeEach.
     const wrapper = mountEditor()
     await flushPromises()
 
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+    await wrapper
+      .find('[data-testid="congregational-textarea"]')
+      .setValue(STRIPPED_PASSAGE_TEXT)
     expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(true)
 
     mockSplitCongregationalReading.mockResolvedValueOnce([
@@ -430,9 +444,9 @@ describe('CongregationalEditor', () => {
     )
   })
 
-  // INDEPENDENCE (R299): Bible-off + AI-off -- no split button, but the paste
-  // path (and manual sectioning) still works unchanged.
-  it('INDEPENDENCE: Bible off + AI off -- no split button is rendered, but paste still populates the reading', async () => {
+  // INDEPENDENCE (R299): Bible-off + AI-off -- no split button, but the
+  // bottom textarea still works for manual entry and sectioning.
+  it('INDEPENDENCE: Bible off + AI off -- no split button is rendered, but the bottom textarea still works', async () => {
     useAuthStore().bibleApiEnabled = false
     useAuthStore().aiMasterEnabled = false
     const wrapper = mountEditor()
@@ -440,111 +454,38 @@ describe('CongregationalEditor', () => {
 
     expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
 
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+    await wrapper
+      .find('[data-testid="congregational-textarea"]')
+      .setValue(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
     expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
     expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
   })
 
-  it('renders none of the fallback UI when the Bible API is enabled', async () => {
+  it('renders no BibleGateway fallback link when the Bible API is enabled', async () => {
     // bibleApiEnabled=true from the outer beforeEach.
     const wrapper = mountEditor()
     await flushPromises()
 
-    expect(wrapper.text()).not.toContain('Bible API is off for your church')
-    expect(pasteTextarea(wrapper).exists()).toBe(false)
+    const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
+    expect(link).toBeFalsy()
+    expect(wrapper.find('[data-testid="congregational-paste-textarea"]').exists()).toBe(false)
   })
 
-  // CR-02 (103-REVIEW) regression: onPasteInput used to unconditionally
-  // rewrite `text` on every keystroke of the paste textarea, so paste ->
-  // Split with AI -> edit the paste box again silently discarded the split.
-  it('CR-02: editing the paste box after an AI split does NOT discard the split', async () => {
+  // WR-02 (103-REVIEW): text typed directly (any version) must not be
+  // stamped with the org's stored bibleVersion -- that setting has no
+  // relationship to whatever the user actually typed.
+  it('WR-02: Save on a manually-entered reading (Bible API off, never fetched) does not stamp the org-default translationSource', async () => {
     useAuthStore().bibleApiEnabled = false
     const wrapper = mountEditor()
     await flushPromises()
 
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
-    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
-
-    mockSplitCongregationalReading.mockResolvedValueOnce([
-      { speaker: 'LEADER', text: 'Give thanks to the Lord.' },
-      { speaker: 'CONGREGATION', text: 'For his love endures.' },
-    ])
-    await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-    await flushPromises()
-
-    const afterSplit = textareaEl(wrapper).value
-    expect(afterSplit).toBe('Leader\nGive thanks to the Lord.\n---\nCongregation\nFor his love endures.')
-
-    // Go fix a typo in the original paste -- an ordinary follow-up edit that
-    // must not revert the main textarea back to the raw unsplit seed.
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT + ' Amen.')
-
-    expect(textareaEl(wrapper).value).toBe(afterSplit)
-  })
-
-  // CR-02 regression: the same protection applies to a manual hand-edit of
-  // the main textarea, not just an AI split.
-  it('CR-02: editing the paste box after a manual edit to the main textarea does NOT discard the manual edit', async () => {
-    useAuthStore().bibleApiEnabled = false
-    const wrapper = mountEditor()
-    await flushPromises()
-
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
-    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
-
-    // Manual hand-edit/sectioning of the main reading textarea.
     await wrapper
       .find('[data-testid="congregational-textarea"]')
-      .setValue('Leader\nGive thanks to the Lord.\n---\nCongregation\nFor his love endures.\n---\nAll\nAmen.')
-
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT + ' More text.')
-
-    expect(textareaEl(wrapper).value).toBe(
-      'Leader\nGive thanks to the Lord.\n---\nCongregation\nFor his love endures.\n---\nAll\nAmen.',
-    )
-  })
-
-  // CR-02: the seed-only-when-unchanged guard must still let ordinary
-  // successive paste keystrokes re-seed the textarea (the common case).
-  it('CR-02: successive paste-box keystrokes keep re-seeding the textarea when nothing else has diverged', async () => {
-    useAuthStore().bibleApiEnabled = false
-    const wrapper = mountEditor()
-    await flushPromises()
-
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
-    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
-
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT + ' Extra verse text.')
-    expect(textareaEl(wrapper).value).toBe(`Leader\n${STRIPPED_PASSAGE_TEXT} Extra verse text.`)
-  })
-
-  // WR-02 (103-REVIEW): pasted "any version" text must not be stamped with
-  // the org's stored bibleVersion -- that setting has no relationship to
-  // whatever the user actually pasted.
-  it('WR-02: Save on a purely-pasted reading does not stamp the org-default translationSource', async () => {
-    useAuthStore().bibleApiEnabled = false
-    const wrapper = mountEditor()
-    await flushPromises()
-
-    await pasteTextarea(wrapper).setValue(DEFAULT_PASSAGE_TEXT)
+      .setValue(`Leader\n${STRIPPED_PASSAGE_TEXT}`)
     await wrapper.find('[data-testid="congregational-save"]').trigger('click')
 
     const sections = lastEmittedSections(wrapper)
     expect(sections).toHaveLength(1)
     expect(sections[0]!.translationSource).toBeUndefined()
-  })
-
-  // IN-01 (103-REVIEW): the paste textarea's label is associated via
-  // for/id so a screen reader announces it on focus.
-  it('IN-01: associates the paste textarea with its label via for/id', async () => {
-    useAuthStore().bibleApiEnabled = false
-    const wrapper = mountEditor()
-    await flushPromises()
-
-    const textarea = pasteTextarea(wrapper)
-    const label = wrapper.findAll('label').find((l) => l.text().includes('Paste the passage text'))
-    expect(label).toBeTruthy()
-    expect(textarea.attributes('id')).toBeTruthy()
-    expect(label!.attributes('for')).toBe(textarea.attributes('id'))
   })
 })

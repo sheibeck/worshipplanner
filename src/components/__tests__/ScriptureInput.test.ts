@@ -708,14 +708,11 @@ describe('ESV/NLT preview routing (45-04, R090)', () => {
   })
 
   // Phase 102 (R297): a disabled org's dispatcher gate must produce ZERO
-  // proxy calls and no error UI — a graceful no-op, not a thrown error.
-  // CR-01 (103-REVIEW) updated this test: the "Preview passage" button used
-  // to still render (and, worse, wipe pasted fallback text) when the API was
-  // off even though clicking it was already a no-op. It is now hidden
-  // entirely in the disabled branch (see the dedicated CR-01 describe block
-  // below for the full pasted-text-survives regression coverage), so there is
-  // no button left to click -- the assertion here is simply that mounting
-  // with the API off never reaches either client and shows no error UI.
+  // proxy calls and no error UI — a graceful no-op, not a thrown error. The
+  // "Preview passage" button is hidden entirely when the API is off (no
+  // fetch is possible), so there is no button left to click -- the assertion
+  // here is simply that mounting with the API off never reaches either
+  // client and shows no error UI.
   it('bibleApiEnabled=false: no "Preview passage" button is rendered, so neither client is ever called and no previewError shows', async () => {
     mockBibleApiEnabled = false
     const { fetchPassageText } = await import('@/utils/esvApi')
@@ -818,10 +815,10 @@ describe('ESV/NLT preview routing (45-04, R090)', () => {
   })
 })
 
-// 103-02 (R298/R299): the manual fallback shown when an org's Bible API is
-// off — a BibleGateway deep-link for the entered reference and a paste
-// textarea that feeds the SAME previewText the fetched preview used.
-describe('Manual fallback when Bible API is off (103-02, R298/R299)', () => {
+// 103-02 (R298), paste box removed per owner direction (v2.6 Phase-103
+// follow-up, R299): the manual fallback shown when an org's Bible API is off
+// is now just a BibleGateway deep-link for the entered reference.
+describe('Manual fallback when Bible API is off (103-02, R298)', () => {
   const withRefProps = {
     modelValue: { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 },
     sermonPassage: null,
@@ -829,12 +826,9 @@ describe('Manual fallback when Bible API is off (103-02, R298/R299)', () => {
     label: 'Scripture Reading',
   }
 
-  it('renders the intro copy, a correct BibleGateway deep-link, and the paste textarea for a valid reference', () => {
+  it('renders a correct BibleGateway deep-link for a valid reference', () => {
     mockBibleApiEnabled = false
     const wrapper = mount(ScriptureInput, { props: withRefProps })
-
-    expect(wrapper.text()).toContain('Bible API is off for your church')
-    expect(wrapper.text()).toContain('Open the passage in BibleGateway')
 
     const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
     expect(link).toBeTruthy()
@@ -843,22 +837,9 @@ describe('Manual fallback when Bible API is off (103-02, R298/R299)', () => {
     expect(link!.attributes('href')).toContain('biblegateway.com/passage')
     expect(link!.attributes('href')).toContain(encodeURIComponent('Romans 8:1-11'))
     expect(link!.attributes('href')).toContain('version=')
-
-    expect(wrapper.text()).toContain('Paste the passage text')
-    expect(wrapper.find('textarea').attributes('placeholder')).toBe('Paste the verses here (any version)')
   })
 
-  it('pasting text into the paste textarea populates the same preview panel the fetched text used', async () => {
-    mockBibleApiEnabled = false
-    const wrapper = mount(ScriptureInput, { props: withRefProps })
-
-    const textarea = wrapper.find('textarea')
-    await textarea.setValue('For I am not ashamed of the gospel, because it is the power of God.')
-
-    expect(wrapper.text()).toContain('For I am not ashamed of the gospel, because it is the power of God.')
-  })
-
-  it('hides the deep-link and shows the empty-state helper when no reference is typed yet', () => {
+  it('hides the deep-link when no reference is typed yet', () => {
     mockBibleApiEnabled = false
     const wrapper = mount(ScriptureInput, {
       props: { modelValue: null, sermonPassage: null, showOverlapWarning: true, label: 'Scripture Reading' },
@@ -866,16 +847,29 @@ describe('Manual fallback when Bible API is off (103-02, R298/R299)', () => {
 
     const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
     expect(link).toBeFalsy()
-    expect(wrapper.text()).toContain('No passage text yet')
   })
 
-  it('renders none of the fallback UI when the Bible API is enabled', () => {
+  it('renders no BibleGateway fallback link when the Bible API is enabled', () => {
     mockBibleApiEnabled = true
     const wrapper = mount(ScriptureInput, { props: withRefProps })
 
-    expect(wrapper.text()).not.toContain('Bible API is off for your church')
-    expect(wrapper.text()).not.toContain('Paste the passage text')
+    const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
+    expect(link).toBeFalsy()
+  })
+
+  // Regression (owner direction, v2.6 Phase-103 follow-up): the "Paste the
+  // passage text" textarea is gone entirely -- for a plain scripture
+  // reference there is no text-entry affordance when the API is off, only
+  // the deep-link to look the passage up externally.
+  it('does not render the paste textarea when the API is off, while the BibleGateway link is present', () => {
+    mockBibleApiEnabled = false
+    const wrapper = mount(ScriptureInput, { props: withRefProps })
+
+    expect(wrapper.find('#scripture-paste-textarea').exists()).toBe(false)
     expect(wrapper.find('textarea').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Paste the passage text')
+    const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
+    expect(link).toBeTruthy()
   })
 
   // WR-01 (103-REVIEW): the pre-existing reader link and the fallback's own
@@ -896,63 +890,13 @@ describe('Manual fallback when Bible API is off (103-02, R298/R299)', () => {
     expect(wrapper.text()).not.toContain('View on BibleGateway')
   })
 
-  // CR-01 (103-REVIEW) regression: previously, showPreviewButton/onTextInput's
-  // clearing logic weren't gated on authStore.isBibleApiEnabled, so the
-  // now-pointless "Preview passage" button still rendered when the API was
-  // off, and fixing a typo in the reference field wiped previewText -- which
-  // in the disabled branch holds the user's PASTED content, not a fetch
-  // cache.
-  describe('CR-01: pasted fallback text is never silently erased', () => {
-    it('does not render the "Preview passage" button when the API is off (it would be a pointless no-op that used to wipe the paste)', () => {
-      mockBibleApiEnabled = false
-      const wrapper = mount(ScriptureInput, { props: withRefProps })
-
-      expect(wrapper.text()).not.toContain('Preview passage')
-    })
-
-    it('editing the reference field after pasting text does NOT erase the pasted text', async () => {
-      mockBibleApiEnabled = false
-      const wrapper = mount(ScriptureInput, { props: withRefProps })
-
-      const pasted = 'For I am not ashamed of the gospel, because it is the power of God.'
-      await wrapper.find('textarea').setValue(pasted)
-      expect(wrapper.text()).toContain(pasted)
-
-      // Fix a "typo" in the already-entered reference -- an ordinary,
-      // unrelated action that must not touch the pasted content.
-      const referenceInput = wrapper.find('input[type="text"]')
-      await referenceInput.setValue('Romans 8:1-12')
-      await referenceInput.trigger('input')
-
-      expect(wrapper.text()).toContain(pasted)
-    })
-
-    it('clearing the reference field entirely after pasting text does NOT erase the pasted text', async () => {
-      mockBibleApiEnabled = false
-      const wrapper = mount(ScriptureInput, { props: withRefProps })
-
-      const pasted = 'For I am not ashamed of the gospel, because it is the power of God.'
-      await wrapper.find('textarea').setValue(pasted)
-      expect(wrapper.text()).toContain(pasted)
-
-      const referenceInput = wrapper.find('input[type="text"]')
-      await referenceInput.setValue('')
-      await referenceInput.trigger('input')
-
-      expect(wrapper.text()).toContain(pasted)
-    })
-  })
-
-  // IN-01 (103-REVIEW): the paste textarea's label is associated via
-  // for/id so a screen reader announces it on focus.
-  it('associates the paste textarea with its label via for/id (IN-01)', () => {
+  // The "Preview passage" button has no fetch to back it when the API is
+  // off, so it stays hidden entirely (unchanged behavior from before the
+  // paste box removal).
+  it('does not render the "Preview passage" button when the API is off', () => {
     mockBibleApiEnabled = false
     const wrapper = mount(ScriptureInput, { props: withRefProps })
 
-    const textarea = wrapper.find('textarea')
-    const label = wrapper.findAll('label').find((l) => l.text().includes('Paste the passage text'))
-    expect(label).toBeTruthy()
-    expect(textarea.attributes('id')).toBeTruthy()
-    expect(label!.attributes('for')).toBe(textarea.attributes('id'))
+    expect(wrapper.text()).not.toContain('Preview passage')
   })
 })
