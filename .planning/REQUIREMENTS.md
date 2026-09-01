@@ -16,9 +16,11 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 - [ ] **R302**: From the Song Lyrics editor, a user can insert an inline **black (blackout) slide**
   between a song's lyric slides to mark an instrumental/interlude, without creating a new blank service
   section.
+
 - [ ] **R303**: A black slide renders as a full black screen — no lyrics, no background image, no
   organizational labels — on the Audience output, the Confidence monitor, the in-app preview, and
   print/export, and it participates in normal slide navigation.
+
 - [ ] **R304**: Adding, moving, duplicating, or deleting a black slide does not corrupt song section
   numbering, the split-section-as-one-unit behavior, or the slide↔service-order mirroring.
 
@@ -26,11 +28,14 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 
 - [ ] **R305**: Pressing **"Go to black"** blacks out **only the Audience output**; the Confidence
   monitor keeps showing the current/upcoming slide.
+
 - [ ] **R306**: A user can mark a service item as **looping** (a per-item checkbox in the editor) so
   that, during Run, that item's slides auto-advance and loop back to the item's first slide.
+
 - [ ] **R307**: A looping item auto-advances on a **configurable interval, defaulting to 10 seconds**,
   chosen from a dropdown of preset intervals with an option to enter a custom value; the interval
   persists with the item.
+
 - [ ] **R308**: Auto-advance never fights manual navigation and tears down correctly — it stops/pauses
   cleanly when the operator navigates to a different item, leaves the Run screen, or triggers
   "Go to black" (exact blackout-vs-loop interaction decided at plan time), with no leaked timers or
@@ -38,9 +43,10 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 
 ### Notifications — system-wide dismissible messages
 
-- [ ] **R309**: Every warning/error/info message surfaced in the app can be **manually dismissed** by
+- [x] **R309**: Every warning/error/info message surfaced in the app can be **manually dismissed** by
   the user, through one shared notification system — no message can get permanently stuck on screen.
-- [ ] **R310**: A message tied to a condition **auto-clears when that condition resolves**; specifically,
+
+- [x] **R310**: A message tied to a condition **auto-clears when that condition resolves**; specifically,
   the Run screen's "monitors not configured" warning disappears automatically once monitors are
   configured, and is manually dismissible in the meantime.
 
@@ -49,6 +55,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 - [ ] **R311**: A user who belongs to **multiple churches** can switch their active church from the
   **top-bar user menu**, without signing out, using the existing multi-org membership path (distinct
   from the super-admin "enter any church" path).
+
 - [ ] **R312**: Switching active church **fully resets org-scoped app state** (no stale data from the
   previous church across any store, including stores added this milestone) and reflects the user's role
   in the newly selected church.
@@ -58,9 +65,11 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 - [ ] **R313**: On a dedicated **Stage Layout tab** of a service, a user can place labeled markers
   (instruments, mics, monitors) on a freeform canvas via drag-and-drop, with **on-stage and off-stage
   (side) zones**.
+
 - [ ] **R314**: Markers support **free-text labels** and can be positioned anywhere within a zone,
   including a marker for a **one-off speaker's microphone**; positions round-trip on reload and stay
   stable across viewport resize.
+
 - [ ] **R315**: The stage layout is **saved per service** (persisted to Firestore, no file storage) and
   is viewable **read-only** where the service is shared/printed, so tech/sound can reference the setup.
 
@@ -72,8 +81,10 @@ Deferred to future releases. Tracked, not in this roadmap.
 
 - **REHEARSE-01**: Attach PDF chord charts/sheet music, MP3 practice tracks, and YouTube links to a Song
   (reusable across services).
+
 - **REHEARSE-02**: A Rehearse view (per song) to play the MP3 / YouTube and open the PDF, for volunteers
   to practice their part.
+
 - **REHEARSE-03**: Volunteers find the service where they're serving and open its rehearse view
   (leaning: require volunteer login rather than a public link — see SEED-003 cost/security analysis).
 
@@ -101,8 +112,8 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | R306 | Phase 106 | Pending |
 | R307 | Phase 106 | Pending |
 | R308 | Phase 106 | Pending |
-| R309 | Phase 104 | Pending |
-| R310 | Phase 104 | Pending |
+| R309 | Phase 104 | Complete |
+| R310 | Phase 104 | Complete |
 | R311 | Phase 104 | Pending |
 | R312 | Phase 104 | Pending |
 | R313 | Phase 107 | Pending |

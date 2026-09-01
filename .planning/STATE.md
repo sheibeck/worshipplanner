@@ -2,14 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Rehearsal, Stage Plans & Presentation Polish
-status: planning
-last_updated: "2026-09-01T03:51:15.404Z"
+current_phase: 104
+current_phase_name: Notification & Multi-Church Foundations
+status: executing
+stopped_at: Completed 104-01-PLAN.md
+last_updated: "2026-09-01T05:06:38.792Z"
 last_activity: 2026-09-01
+last_activity_desc: Phase 104 execution started
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -29,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.7 Rehearsal, Stage Plans & Presentation Polish (roadmap created 2026-09-01)
 
-**Status:** Roadmap created — 4 phases (104-107), `coarse` granularity, 14/14 requirements (R302-R315)
+**Status:** Ready to execute
 mapped with no orphans. Ready for `/gsd-plan-phase 104`.
 
 **Goal:** Give teams richer rehearsal and live-presentation tooling plus targeted Run-the-Service and
@@ -1125,7 +1129,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 100 — invite-login-onboarding-wiring
+**Current focus:** Phase 104 — Notification & Multi-Church Foundations
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1135,10 +1139,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 104 of 107 (Notification & Multi-Church Foundations) — ready to plan
-Plan: — (roadmap created, no plans yet)
-Status: Roadmap created (4 phases, 104-107, coarse granularity); ready for /gsd-plan-phase 104
-Last activity: 2026-09-01 — ROADMAP.md + REQUIREMENTS.md traceability written for v2.7 (14/14 requirements mapped)
+Phase: 104 (Notification & Multi-Church Foundations) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-09-01 — Phase 104 execution started
 
 ## ★ v2.7 ROADMAP.md phase breakdown (created 2026-09-01)
 
@@ -2970,6 +2974,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 102 P02 | 25min | 2 tasks | 2 files |
 | Phase 103 P01 | 25min | 2 tasks | 4 files |
 | Phase 103 P02 | 40min | 2 tasks | 4 files |
+| Phase 104 P01 | 12min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -3438,6 +3443,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 103-01: bibleGatewayLink(ref, version?) delegates its search string to the existing formatScriptureReference formatter rather than re-deriving book/chapter/verse formatting a second time; omits &version= for an absent or empty-string version so BibleGateway falls back to its own default
 - [Phase ?]: 103-01: Settings "Bible Translation" card gated by v-if="authStore.isBibleApiEnabled" mirroring the AI Features card's aiMasterEnabled gate exactly — hides the card, never deletes the stored bibleVersion field or its save logic
 - [Phase ?]: ScriptureInput's paste textarea binds directly to previewText; CongregationalEditor's paste textarea transforms via stripVerseMarkers into rawPassage/text, mirroring autoFetch exactly; AI split gate kept strictly independent of the Bible gate (verified by opposing tests)
+- [Phase ?]: Preserved store id 'toasts'/useToasts export (back-compat for existing call sites) while widening Toast with variant/key/heading/body/action/link and adding setSticky/clearSticky for keyed, auto-clearing sticky notifications (R309/R310).
+- [Phase ?]: Relocated the notification host mount from AppShell.vue to App.vue root so it renders on RunControlView.vue (which bypasses AppShell) — required for R310's proof case.
 
 ### Roadmap Evolution
 
@@ -3764,8 +3771,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-31T21:15:19.388Z
-Stopped at: Completed 103-02-PLAN.md
+Last session: 2026-09-01T05:06:38.724Z
+Stopped at: Completed 104-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

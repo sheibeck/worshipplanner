@@ -451,6 +451,7 @@ security/cost surface researched this milestone). Carried to backlog 999.13; ful
 - Phase 107 (Visual Stage Layout) is this app's first freeform-drag surface — v1.4/v1.6 both shipped
   drag-and-drop corruption bugs and there is no existing pattern to port. Needs a dedicated UI-spec/
   research pass at plan time (drag math, zone boundaries, marker interaction), not a straight port.
+
 - Phase 106 (Per-Item Loop Playback) must explicitly decide and test whether "Go to black" pauses an
   active loop — call this out at plan time rather than leaving it an accident of implementation order.
 
@@ -473,10 +474,11 @@ user menu without signing out.
   3. A user belonging to multiple churches can open the top-bar user menu, see each church with their role in it, and switch active church without signing out — distinct from the super-admin "enter any church" path (R311).
   4. After switching churches, every org-scoped store/view reflects only the newly selected church's data and the user's role there — no stale data from the previous church survives the switch (R312).
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
-- [ ] 104-01-PLAN.md — Generalize the toast store into the system-wide dismissible-message system (severities, manual dismiss on every message, keyed sticky lifetime), relocate the host to App.vue root, and migrate the stuck Run/Monitor warnings onto it (R309, R310) [wave 1]
+
+- [x] 104-01-PLAN.md — Generalize the toast store into the system-wide dismissible-message system (severities, manual dismiss on every message, keyed sticky lifetime), relocate the host to App.vue root, and migrate the stuck Run/Monitor warnings onto it (R309, R310) [wave 1]
 - [ ] 104-02-PLAN.md — Sidebar user-menu church switcher for multi-org members (role badges, reuse selectOrg + resetOrgScopedStores, distinct from super-admin enter-any-church, dogfood the notification store) (R311, R312) [wave 2]
 
 **UI hint**: yes
