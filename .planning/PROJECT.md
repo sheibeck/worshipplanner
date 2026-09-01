@@ -8,24 +8,33 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.6 Per-Org Bible API Toggle & Manual Fallback
+## Shipped Milestone: v2.6 Per-Org Bible API Toggle & Manual Fallback — ✅ SHIPPED & DEPLOYED 2026-08-31
 
-**Goal:** Put Bible API access behind a per-organization on/off switch controlled from the Owner Console, and when it is off give that org a zero-cost manual path (BibleGateway deep-link + paste-the-passage-in) so scripture and congregational-reading features always work without passing pay-only, non-commercial API costs to users.
+**Status:** Deployed to production (tag `v2.6`; rules + `functions:api`/`setOrgBibleEnabled`/
+`listOrganizations` + hosting). Audit PASSED (7/7 requirements, 5/5 integration seams). Closed on owner
+acceptance; human/visual UAT was deferred (`.planning/v2.6-DEFERRED-UAT.md`, batched per explicit owner
+instruction for this autonomous run). Full record: [milestones/v2.6-ROADMAP.md](milestones/v2.6-ROADMAP.md) ·
+[milestones/v2.6-REQUIREMENTS.md](milestones/v2.6-REQUIREMENTS.md) ·
+[v2.6-MILESTONE-AUDIT.md](v2.6-MILESTONE-AUDIT.md).
 
-**Target features:**
-- **Per-org Bible API toggle in the Owner Console** — a super-admin enables/disables Bible API access per church (Organizations tab → `OrgConfigDrawer`), backed by a super-admin-gated Cloud Function writing a master `Organization` field. Mirrors the v2.2 per-org AI enablement pattern. **Default OFF.**
-- **Single Bible-fetch choke point** — a new `scriptureApi.ts` dispatcher (the `isAiEnabled()` analog) unifies today's split ESV/NLT fetching and carries the per-org gate; server `esv`/`nlt` proxy branches enforce it too.
-- **Manual fallback when OFF** — "Open in BibleGateway" deep-link (any version) plus a paste-the-passage-in box whose text becomes the slide/reading content; LLM congregational split still runs on pasted text.
-- **Settings hides the Bible Translation selector** when the API is off for the org.
+**Goal:** Put Bible API access behind a per-organization on/off switch controlled from the Owner Console, and when it is off give that org a zero-cost manual path so scripture and congregational-reading features always work without passing pay-only, non-commercial API costs to users.
 
-**Key context / decisions:**
-- Promoted from backlog 999.3. ESV/NLT APIs are pay-only + non-commercial-licensed → the owner must be able to disable per church while every org keeps a working scripture path.
-- **Default OFF, no migration:** existing orgs (Berean) start disabled on rollout and use the BibleGateway/paste fallback until the owner enables them per-org — the intended cost-control posture. The manual path guarantees an OFF org is functional, not broken.
-- **Fallback = deep-link + paste (both).** Manual paste is offered **only when the API is OFF**; the auto-fetch experience is unchanged when ON.
-- Single super-admin master gate (no church-editable leaf) is sufficient for the cost-control goal.
-- Requirements R295–R301 in `.planning/REQUIREMENTS.md`. Architecture map: no existing single Bible-fetch choke point; toggle mirrors `setOrgAiEnabled`/`aiMasterEnabled`; BibleGateway link builder already in `src/utils/scripture.ts`.
+**Delivered:**
+- **Per-org Bible API toggle in the Owner Console** — a super-admin enables/disables Bible API access per church (Organizations tab → `OrgConfigDrawer`), backed by a super-admin-gated Cloud Function (`setOrgBibleEnabled`) writing a master `Organization` field, denied to direct client writes in `firestore.rules`. Mirrors the v2.2 per-org AI enablement pattern. **Default OFF** for every org, including the existing production org (Berean) — no data migration.
+- **Single Bible-fetch choke point** — `src/utils/scriptureApi.ts` (the `isAiEnabled()` analog) unified the previously split ESV/NLT fetching in `ScriptureInput.vue`/`CongregationalEditor.vue`; the server `api` proxy's `esv`/`nlt` branches independently enforce the same gate (`checkOrgBibleEnablement`) as defense-in-depth.
+- **Manual fallback when OFF** — an "Open in BibleGateway" deep-link (any version). **Owner refinement 2026-08-31, post-Phase-103:** the separate "paste the passage" textarea and the off-state explanatory message were removed before ship — a plain scripture slide is reference-only (deep-link only) when off, and a congregational reading is composed directly in the existing bottom reading/format textarea, with the LLM split still running on that text under the independent AI gate.
+- **Settings hides the Bible Translation selector** when the API is off for the org, mirroring the "AI Features" card.
 
-## Shipped Milestone: v2.5 Invite Email & Non-Google Onboarding — ✅ SHIPPED 2026-08-31
+**Issues caught & fixed:** two code-review rounds found and closed real defects before ship — Phase 102's
+review caught a live gate bypass in `planningCenterApi.ts`'s scripture-push branch; Phase 103's review
+caught two fallback data-loss bugs (pasted text erased by a reference edit or the still-visible Preview
+button; paste-box keystrokes clobbering an AI split or manual edit).
+
+**Standing owner follow-up:** because the default is OFF, each production org — including Berean — must
+be explicitly enabled for the Bible API via the Owner Console, or that org's ESV/NLT auto-fetch stops and
+it falls back to the manual/BibleGateway path.
+
+## Previous Milestone: v2.5 Invite Email & Non-Google Onboarding — ✅ SHIPPED 2026-08-31
 
 **Status:** Code-complete, audited PASSED (7/7 reqs, 4/4 integration seams), function deployed to production, and locally UAT'd (owner confirmed). No active milestone follows — run `/gsd-new-milestone` to start one. **Standing owner follow-ups:** deploy hosting (the client invite-UI/toggle/LoginView changes are live only in local dev), and complete Resend DNS domain verification so invite emails reach addresses other than the owner's own inbox.
 
@@ -83,12 +92,14 @@ confidence monitor from one Chrome/Edge browser.
 - **Deferred (out of scope this milestone):** instant blackout / logo-cut button; any non-Chromium
   monitor auto-detection.
 
-## Current State — between milestones (v2.5 shipped)
+## Current State — between milestones — v2.6 shipped; next scoped via /gsd-new-milestone
 
-All milestones through **v2.5** have shipped and are archived under `.planning/milestones/`. **No active
-milestone** — the next one is scoped via `/gsd-new-milestone`. v2.5's `functions:sendInviteOnboardingEmail`
-is deployed to production; its hosting deploy and Resend DNS domain verification remain standing owner
-follow-ups (below).
+All milestones through **v2.6** have shipped and are archived under `.planning/milestones/`. **No active
+milestone** — the next one is scoped via `/gsd-new-milestone`. v2.6 is deployed to production (tag `v2.6`;
+rules + `functions:api`/`setOrgBibleEnabled`/`listOrganizations` + hosting); each production org (incl.
+Berean) must be enabled for the Bible API by hand via the Owner Console since the default is OFF. v2.5's
+`functions:sendInviteOnboardingEmail` is deployed to production; its hosting deploy and Resend DNS domain
+verification remain standing owner follow-ups (below).
 
 <details>
 <summary>Shipped milestone — v2.3 Scheduling Accuracy & Song/Team Refinements (Phases 84–89, shipped & deployed 2026-08-27)</summary>
@@ -344,6 +355,7 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Validated
 
+- ✓ Per-org Bible API toggle & manual fallback — a super-admin enables/disables the paid ESV/NLT Bible API per church from the Owner Console (`setOrgBibleEnabled`, default OFF, client-write-denied); a single `scriptureApi.ts` dispatcher + server `checkOrgBibleEnablement` gate on the `api` proxy's esv/nlt branches enforce it with no regression when enabled; when disabled, scripture/congregational editors offer an "Open in BibleGateway" deep-link (owner removed the paste box + off-state message before ship — plain scripture is reference-only, congregational composed in the existing reading textarea, AI split still runs on that text under the independent AI gate); Settings hides the Bible Translation card when off (R295–R301) — **v2.6** (shipped & deployed to production 2026-08-31; tag `v2.6`; audit PASSED 7/7 reqs + 5/5 integration seams; two code-review rounds caught a Planning-Center-export gate bypass + two fallback data-loss bugs; human/visual UAT deferred; each production org incl. Berean must be enabled by hand via the Owner Console since default is OFF; archived: `milestones/v2.6-REQUIREMENTS.md`).
 - ✓ Invite email & non-Google onboarding — every TeamView invite now sends a real email: Gmail/Google invitees get a "sign in with Google" notice, non-Google invitees get a Cloud-Function-provisioned Auth account + `generatePasswordResetLink()` set-password link (an editor-only, invite-existence-gated `sendInviteOnboardingEmail` callable, reusing the Resend pattern); LoginView gains a discoverable set/reset-password path + a real `auth/operation-not-allowed` message; the Owner Console gets an `appConfig`-backed onboarding-email on/off toggle (R288–R294) — **v2.5** (shipped 2026-08-31; built autonomously via `/gsd-autonomous` + a local-UAT fix round; audit PASSED 7/7 reqs + 4/4 integration seams; code review caught & fixed an editor-can-email-arbitrary-addresses hole; `functions:sendInviteOnboardingEmail` deployed to prod; **hosting deploy + Resend DNS domain verification are standing owner follow-ups** — until the domain is verified the test sender only reaches the owner's own inbox; archived: `milestones/v2.5-REQUIREMENTS.md`).
 - ✓ Scheduling accuracy & song/team refinements + multi-role scheduling — last-used lock-gated derivation + prod backfill (R247–R248), Vocals folded into Band with a Band↔Tech one-team-per-date rule + sing-and-play exception (R250–R252), Nth-Sunday recurring team auto-select via a Volunteer→Teams `>` slideout (R254–R255), editable song Key + sermon-free Scripture rotation + corrected schedulable-roles copy (R249, R253, R256), Roles/Teams read-only-row slideouts + song Key type-ahead (R257–R258), and a generalized per-role multi-role flag + same-date scheduler bundling anchored on a person's rarest role (R259–R260) — **v2.3** (shipped & deployed to production 2026-08-27; hosting + all Cloud Functions incl. the Phase-85 messaging fix; no rules changes; R248 backfill applied to Berean prod; audit PASSED 14/14; owner-approved UAT; archived: `milestones/v2.3-REQUIREMENTS.md`).
 - ✓ Per-org configurable Teams + security/data-integrity hardening + polish/ops + per-org AI enablement (OFF by default) + Roles/Teams tab UX — own team list replacing hard-coded Berean rules & dropped ordinal-Sunday auto-select (R228–R231, R241); inviteLookup gate, createdBy immutability, deleteService share revocation, reprise-safe slide clear, pending-render guard (R232–R236); PC-export coverage, Resend domain runbook, Owner Console a11y, shared SongBrowser (R237–R240); super-admin AI master gate + fail-closed proxy (R242–R243); tab width/Delete button/copy (R244–R246) — **v2.2** (shipped 2026-08-25, hosting live; rules/functions owner-gated; audit PASSED 19/19). **R230 (per-team song-tag AI filter) delivered then removed 2026-08-25 by owner decision.**
@@ -392,18 +404,7 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-**v2.6 Per-Org Bible API Toggle & Manual Fallback** — ✅ BUILT & audited (Phases 101–103, R295–R301);
-awaiting the owner's batched visual UAT (`.planning/v2.6-DEFERRED-UAT.md`) and the owner-gated deploy, then
-`/gsd-complete-milestone`. A super-admin enables/disables the Bible API per church from the Owner Console
-(default OFF); a new `scriptureApi.ts` dispatcher carries the per-org gate (client + server esv/nlt
-branches). When OFF, scripture/congregational-reading UI offers an "Open in BibleGateway" deep-link plus a
-manual paste-the-passage-in box (any version), the LLM split runs on pasted text (gated independently on
-AI), and Settings hides the Bible Translation selector. Mirrors the v2.2 per-org AI pattern. Milestone
-audit PASSED 7/7 reqs + 5/5 integration seams; two code-review rounds caught & fixed real defects (a
-Planning-Center-export gate bypass; two fallback data-loss bugs). Built autonomously via `/gsd-autonomous`.
-**UNDEPLOYED** — deploy is hosting + `functions:api` (server esv/nlt gate), owner-gated, and must be
-sequenced with enabling the Bible API for the production org (Berean) so its scripture auto-fetch keeps
-working. Requirements R295–R301 in `.planning/REQUIREMENTS.md`.
+No active milestone — v2.6 shipped 2026-08-31; the next one is scoped via `/gsd-new-milestone`.
 
 **v2.5 Invite Email & Non-Google Onboarding** — ✅ shipped 2026-08-31. Every invited user receives an invite
 email (reusing the Resend pattern); non-Google invitees get a Cloud-Function-provisioned Auth account + a
@@ -579,6 +580,11 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
+*Last updated: 2026-08-31 — archived milestone v2.6 Per-Org Bible API Toggle & Manual Fallback (shipped &
+deployed to production; tag `v2.6`; audit PASSED 7/7 reqs + 5/5 integration seams). Archived to
+`milestones/v2.6-ROADMAP.md` · `milestones/v2.6-REQUIREMENTS.md`. No active milestone — next scoped via
+`/gsd-new-milestone`. Previous footer below.*
+
 *Last updated: 2026-08-31 — started milestone v2.6 Per-Org Bible API Toggle & Manual Fallback (promoted
 from backlog 999.3; requirements R295–R301). A super-admin per-org Bible-API toggle in the Owner Console
 (default OFF, mirroring the v2.2 per-org AI pattern), a new `scriptureApi.ts` choke point carrying the gate

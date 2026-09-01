@@ -1,5 +1,51 @@
 # Milestones
 
+## v2.6 Per-Org Bible API Toggle & Manual Fallback (Shipped: 2026-08-31)
+
+**Phases completed:** 3 phases (101–103), 6 plans
+
+**Audit:** [v2.6-MILESTONE-AUDIT.md](v2.6-MILESTONE-AUDIT.md) — PASSED (7/7 reqs, 5/5 integration seams
+WIRED).
+
+**Deployed to production 2026-08-31** (rules + `functions:api`/`setOrgBibleEnabled`/`listOrganizations` +
+hosting; tag `v2.6`). Closed on owner acceptance; human/visual UAT was deferred and batched into
+`.planning/v2.6-DEFERRED-UAT.md` per explicit owner instruction for this autonomous run.
+
+**Key accomplishments:**
+
+- **Phase 101 — Owner Console Infrastructure:** a super-admin-gated `setOrgBibleEnabled` Cloud Function
+  writes a new `Organization.bibleApiEnabled` master field (mirroring `setOrgAiEnabled`/`aiMasterEnabled`),
+  client-write-denied in `firestore.rules`, defaulting every org (including Berean) to OFF with no data
+  migration; an `authStore` mirror plus an `OrgConfigDrawer` checkbox and an at-a-glance Organizations-list
+  badge surface the state.
+- **Phase 102 — Gated Scripture Fetch Dispatcher:** a new `src/utils/scriptureApi.ts` choke point (the
+  `isAiEnabled()` analog) replaced the previously split direct calls to `esvApi.ts`/`nltApi.ts` from
+  `ScriptureInput.vue` and `CongregationalEditor.vue`, with an independent server-side
+  `checkOrgBibleEnablement` gate added to the `api` proxy's `esv`/`nlt` branches as defense-in-depth — zero
+  regression for an enabled org.
+- **Phase 103 — Manual Fallback When Off:** an "Open in BibleGateway" deep-link (any version, reusing the
+  existing `scripture.ts` link builder) and Settings' "Bible Translation" card hidden when the API is off,
+  mirroring the AI Features card. **Owner refinement post-Phase-103 (2026-08-31):** the originally-built
+  standalone paste-the-passage textarea and off-state message were removed — a plain scripture slide is
+  reference-only (deep-link only) when off, and a congregational reading is composed directly in the
+  existing bottom reading/format textarea, with the LLM split still operating on that text under the
+  independent AI gate.
+- **Two code-review rounds caught and fixed real defects before ship:** Phase 102's review caught a live
+  gate bypass in `planningCenterApi.ts`'s scripture-push branch (a Planning-Center-export path reaching
+  ESV/NLT without the new per-org gate); Phase 103's review caught two fallback data-loss bugs — pasted
+  text silently erased by a reference edit or the still-visible Preview button, and paste-box keystrokes
+  clobbering an AI split or a manual edit.
+- Milestone audit independently re-ran all three test/type gates (type-check clean; app suite 175/177
+  files with only the two pre-existing baseline failures; functions suite 636/636) and traced the full
+  toggle → dispatcher gate → fallback UI path end to end against live source — PASSED 7/7 requirements,
+  5/5 integration seams WIRED, zero blocking gaps.
+
+**Standing owner follow-up:** because the default is OFF, each production org — including Berean — must
+be explicitly enabled for the Bible API via the Owner Console, or that org's ESV/NLT auto-fetch stops
+working and it falls back to the manual/BibleGateway path.
+
+---
+
 ## v2.5 Invite Email & Non-Google Onboarding (Shipped: 2026-08-31)
 
 **Phases completed:** 2 phases, 3 plans, 3 tasks

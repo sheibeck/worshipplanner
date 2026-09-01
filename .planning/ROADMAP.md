@@ -18,6 +18,7 @@
 - ✅ **v2.3 — Scheduling Accuracy & Song/Team Refinements** — Phases 84-89 (shipped & deployed to production 2026-08-27; last-used date correctness + backfill (R247-R248), team conflict rules — Vocals folds into Band, one-team-per-date with the sing-and-play exception (R250-R252), pattern-based recurring team scheduling (R254-R255), song & rotation refinements — editable Key, sermon-free rotation, corrected copy (R249, R253, R256), Roles/Teams read-only-row slideouts + song Key type-ahead (R257-R258), and multi-role scheduling — generalized combinable flag + same-date bundling (R259-R260); audit PASSED 14/14, owner-approved UAT)
 - ✅ **v2.4 — Run the Service (Live Presentation)** — Phases 90-98 (shipped & deployed to production 2026-08-30; a non-technical projectionist runs a locked service's slides live from Chrome/Edge — Run button → standalone Run/control screen, persistent monitor-setup, fullscreen chrome-free audience output, black-background confidence output, Window Management multi-monitor delivery with a pop-out fallback, live-ops hardening, the Phase 97 owner redesign (blackout/timers/filmstrip/rehearse/confidence-left-right), and a hardware-UAT round landing reliable per-display "Go fullscreen" buttons after browser zero-click fullscreen proved a dead end — R261-R284; Phase 98/R285-R287 built then withdrawn; client-only, owner-approved)
 - ✅ **v2.5 — Invite Email & Non-Google Onboarding** — Phases 99-100 (shipped 2026-08-31; every TeamView invite sends a real email — Google/Gmail invitees get a "sign in with Google" notice, non-Google invitees get a Cloud-Function-provisioned Auth account + `generatePasswordResetLink()` set-password link — LoginView gains a discoverable password path + `auth/operation-not-allowed` handling, and the Owner Console gets an `appConfig`-backed onboarding-email on/off toggle; code review caught + fixed an editor-can-email-arbitrary-addresses hole (invite-existence gate), audit PASSED 7/7 + 4/4 integration seams; `functions:sendInviteOnboardingEmail` deployed to prod, hosting + Resend-domain verification are standing owner follow-ups — R288-R294)
+- ✅ **v2.6 — Per-Org Bible API Toggle & Manual Fallback** — Phases 101-103 (shipped & deployed to production 2026-08-31; a super-admin toggles the paid ESV/NLT Bible API on/off per church from the Owner Console — default OFF (each prod org enabled by hand, incl. Berean) — enforced by a single `scriptureApi.ts` client dispatcher + a server `checkOrgBibleEnablement` gate on the esv/nlt proxy branches; when OFF, scripture/congregational editors show an "Open in BibleGateway" look-up link (owner removed the paste box + off-state message before ship — plain scripture is reference-only, congregational composed in the existing reading textarea) and Settings hides the Bible Translation card — R295-R301; tag v2.6; audit PASSED 7/7 reqs + 5/5 seams; two code-review rounds caught a PC-export gate bypass + two fallback data-loss bugs; human/visual UAT deferred)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -428,72 +429,7 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 
 **UI hint**: yes
 
-### 🚧 v2.6 Per-Org Bible API Toggle & Manual Fallback (Phases 101-103, in progress)
-
-**Milestone Goal:** Put Bible API access behind a per-organization on/off switch controlled from the Owner Console, and when it is off give that org a zero-cost manual path (BibleGateway deep-link + paste-the-passage-in) so scripture and congregational-reading features always work without passing pay-only, non-commercial API costs to users.
-
-**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R295–R301 (7 mapped, 100% coverage)
-
-**Key context:** Promoted from backlog 999.3. Mirrors the v2.2 per-org AI enablement pattern (`aiMasterEnabled`/`setOrgAiEnabled`) — a super-admin master field on `Organization`, written only by a super-admin-gated Cloud Function, mirrored into `authStore`, and gated in `firestore.rules`. Default OFF, no data migration — the manual fallback makes an OFF org fully functional, not broken. There is no existing single Bible-fetch choke point today (fetching is split across `src/utils/esvApi.ts` and `src/utils/nltApi.ts`, with ESV/NLT version dispatch duplicated inline in `src/components/ScriptureInput.vue` and `src/components/CongregationalEditor.vue`) — this milestone introduces one (`src/utils/scriptureApi.ts`). The BibleGateway link builder already exists in `src/utils/scripture.ts` (`scriptureWebLink`/`nltLink`).
-
-- [x] **Phase 101: Per-Org Bible API Toggle — Owner Console Infrastructure** - A super-admin controls Bible API access per organization from the Owner Console, with every org defaulting to OFF (completed 2026-08-31)
-- [x] **Phase 102: Gated Scripture Fetch Dispatcher** - A single client/server choke point enforces the per-org gate, with zero regression when the API is enabled (completed 2026-08-31)
-- [x] **Phase 103: Manual Fallback When Bible API Is Off** - An OFF org gets a working BibleGateway deep-link + paste-in path, and Settings hides the Bible Translation selector (completed 2026-08-31)
-
-### Phase 101: Per-Org Bible API Toggle — Owner Console Infrastructure
-
-**Goal**: A super-admin can enable or disable Bible API access per organization from the Owner Console, mirroring the proven per-org AI enablement pattern, with every org defaulting to OFF and no client able to flip the field directly.
-**Depends on**: Nothing (first phase of v2.6)
-**Requirements**: R295, R301
-**Success Criteria** (what must be TRUE):
-
-  1. A super-admin can enable/disable Bible API access for a specific organization from the Owner Console's Organizations tab (`OrgConfigDrawer`), persisted via a new super-admin-gated Cloud Function (`setOrgBibleEnabled`) that writes a master field on the `Organization` document (R295).
-  2. `firestore.rules` denies any direct client write to that master field — only the Cloud Function can set it (R295).
-  3. A newly onboarded org and every existing org (including Berean) start with Bible API disabled, with no data migration performed (R295).
-  4. The Owner Console's Organizations list shows each org's current Bible API on/off state at a glance, mirroring the existing AI-enablement row/drawer treatment (R301).
-
-**Plans**: 2/2 plans executed
-
-- [x] 101-01-PLAN.md — Backend: Organization.bibleApiEnabled field + super-admin-gated setOrgBibleEnabled Cloud Function + listOrganizations echo + firestore.rules deny (R295, R301)
-- [x] 101-02-PLAN.md — Frontend: authStore bibleApiEnabled/isBibleApiEnabled mirror + OrgConfigDrawer checkbox + OrganizationsTab onToggleBible + per-row at-a-glance state (R295, R301)
-
-**UI hint**: yes
-
-### Phase 102: Gated Scripture Fetch Dispatcher
-
-**Goal**: Every ESV/NLT scripture fetch — client and server — passes through one per-org gate, so a disabled org makes zero proxy requests while an enabled org's experience is unchanged.
-**Depends on**: Phase 101 (needs the org master field + `authStore` mirror to gate against)
-**Requirements**: R296, R297
-**Success Criteria** (what must be TRUE):
-
-  1. When Bible API is enabled for an org, ESV/NLT passage preview and the LLM-assisted congregational-reading auto-fetch continue to work exactly as they do today, with no observable regression (R296).
-  2. A new single dispatcher (`src/utils/scriptureApi.ts`, the `isAiEnabled()` analog) is the only path `ScriptureInput.vue` and `CongregationalEditor.vue` use to fetch passage text — neither calls `esvApi.ts`/`nltApi.ts` directly anymore (R297).
-  3. When Bible API is disabled for an org, the app makes no ESV/NLT proxy request for that org, and scripture-text-dependent UI degrades gracefully rather than erroring (R297).
-  4. The server `api` proxy's `esv` and `nlt` branches independently enforce the same per-org gate (defense-in-depth), rejecting a fetch for a disabled org even if a client bypassed the dispatcher (R297).
-
-**Plans**: 2/2 plans executed
-
-- [x] 102-01-PLAN.md — Client `scriptureApi.ts` dispatcher (single gated choke point) + route ScriptureInput.vue/CongregationalEditor.vue through it; enabled=passthrough (R296), disabled=graceful no-op (R297)
-- [x] 102-02-PLAN.md — Server defense-in-depth: `checkOrgBibleEnablement` mirroring `checkOrgAiEnablement`, applied to the esv/nlt proxy branches (R297)
-
-### Phase 103: Manual Fallback When Bible API Is Off
-
-**Goal**: An organization with Bible API disabled has a fully functional, zero-cost path for scripture selection and congregational readings — a BibleGateway deep-link plus manual paste-in — so being OFF never breaks the workflow.
-**Depends on**: Phase 102 (the fallback UI is conditioned on the gate reporting OFF)
-**Requirements**: R298, R299, R300
-**Success Criteria** (what must be TRUE):
-
-  1. When disabled, scripture selection and congregational-reading UI offer an "Open in BibleGateway" deep-link for the entered reference in the desired version — any version, not just ESV/NLT — reusing the existing link builder in `src/utils/scripture.ts` (R298).
-  2. When disabled, a user can manually paste passage text into a scripture slide or congregational reading, and that pasted text becomes the slide/reading content, for any version (R299).
-  3. The LLM congregational split continues to operate on manually pasted text when Bible API is off, still subject to the independent AI gate (R299).
-  4. When disabled for an org, the "Bible Translation" selector is hidden in that org's Settings (`SettingsView.vue`), mirroring how the "AI Features" card hides when the AI master gate is off (R300).
-
-**Plans**: 2/2 plans executed
-
-- [x] 103-01-PLAN.md — bibleGatewayLink deep-link builder (R298) + hide the Settings "Bible Translation" card when off (R300)
-- [x] 103-02-PLAN.md — Bible-API-off fallback UI in both editors: deep-link + paste-in, congregational split on pasted text under the independent AI gate (R298, R299)
-
-**UI hint**: yes
+Full v2.6 details: [milestones/v2.6-ROADMAP.md](milestones/v2.6-ROADMAP.md) · requirements [milestones/v2.6-REQUIREMENTS.md](milestones/v2.6-REQUIREMENTS.md) · audit [v2.6-MILESTONE-AUDIT.md](v2.6-MILESTONE-AUDIT.md)
 
 ## Backlog
 
