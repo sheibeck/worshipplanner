@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)"
-current_phase: 108
-current_phase_name: in progress
+current_phase: 109
+current_phase_name: Behavioral/Architectural Extraction & Comment Convention
 status: planning
 stopped_at: Completed 108-02-PLAN.md (Decision-Rationale ADR Extraction)
-last_updated: "2026-09-01T22:20:37.517Z"
+last_updated: "2026-09-01T22:41:26.420Z"
 last_activity: 2026-09-01
-last_activity_desc: plan 108-01 executed (108-COMMENT-INVENTORY.md)
+last_activity_desc: Phase 108 complete, transitioned to Phase 109
 progress:
   total_phases: 6
   completed_phases: 1
@@ -45,7 +45,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
 
-**Status:** Roadmap created — 6 phases (108-113), 8/8 requirements mapped with no orphans. Ready for
+**Status:** Ready to plan
 `/gsd-plan-phase 108`.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
@@ -1181,10 +1181,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 108 — Comment Audit & Decision-Rationale Extraction (in progress)
-Plan: 108-01 complete (of 2: 108-01, 108-02)
+Phase: 109 — Behavioral/Architectural Extraction & Comment Convention
+Plan: Not started
 Status: 108-01 (comment audit + triage inventory, R316) complete — 108-COMMENT-INVENTORY.md created (382 Decision-Rationale / 309 Behavioral-Architectural / 5 Genuinely-Local entries). Next: 108-02 (R317, ADR extraction from Bucket A).
-Last activity: 2026-09-01 — plan 108-01 executed (108-COMMENT-INVENTORY.md)
+Last activity: 2026-09-01 — Phase 108 complete, transitioned to Phase 109
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
 

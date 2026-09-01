@@ -578,7 +578,7 @@ phases the milestone calls for: R316's audit + R317's rationale relocation share
 standalone audit-only phase, since R316 alone is thin/task-like and naturally sequences as the first step
 inside Phase 108's own plan.
 
-- [ ] **Phase 108: Comment Audit & Decision-Rationale Extraction** - Inventory and classify every load-bearing comment, then relocate decision-rationale (R-/WR-/CR-/Pitfall) comments into ADRs with the source comment shrunk to a pointer
+- [x] **Phase 108: Comment Audit & Decision-Rationale Extraction** - Inventory and classify every load-bearing comment, then relocate decision-rationale (R-/WR-/CR-/Pitfall) comments into ADRs with the source comment shrunk to a pointer (completed 2026-09-01)
 - [ ] **Phase 109: Behavioral/Architectural Extraction & Comment Convention** - Relocate "how this works" comments into `.planning/codebase/` map docs and document the go-forward comment convention
 - [ ] **Phase 110: Architectural Review** - Severity-ranked report on module boundaries, store/Firestore-listener lifecycle, multi-tenant isolation architecture, data flow, and coupling
 - [ ] **Phase 111: Architectural Remediation** - Fix or explicitly defer every Critical/High architectural finding; triage Medium/Low to backlog
