@@ -1,15 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.8
-milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review"
+milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)"
+current_phase: 108
+current_phase_name: in progress
 status: planning
-last_updated: "2026-09-01T20:27:20.512Z"
+stopped_at: Completed 108-01-PLAN.md
+last_updated: "2026-09-01T21:19:09.870Z"
 last_activity: 2026-09-01
+last_activity_desc: plan 108-01 executed (108-COMMENT-INVENTORY.md)
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -1177,10 +1181,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 108 — Comment Audit & Decision-Rationale Extraction (not started)
-Plan: —
-Status: Roadmap created; ready for `/gsd-plan-phase 108`
-Last activity: 2026-09-01 — v2.8 ROADMAP.md created (6 phases, 108-113, 8/8 requirements mapped, no orphans)
+Phase: 108 — Comment Audit & Decision-Rationale Extraction (in progress)
+Plan: 108-01 complete (of 2: 108-01, 108-02)
+Status: 108-01 (comment audit + triage inventory, R316) complete — 108-COMMENT-INVENTORY.md created (382 Decision-Rationale / 309 Behavioral-Architectural / 5 Genuinely-Local entries). Next: 108-02 (R317, ADR extraction from Bucket A).
+Last activity: 2026-09-01 — plan 108-01 executed (108-COMMENT-INVENTORY.md)
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
 
@@ -3054,6 +3058,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 107 P01 | 9min | 3 tasks | 6 files |
 | Phase 107-visual-stage-layout P02 | 30min | 2 tasks | 6 files |
 | Phase 107-visual-stage-layout P03 | 35min | 2 tasks | 6 files |
+| Phase 108 P01 | 13min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -3537,6 +3542,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: StageLayoutEditor built on native Pointer Events with drop-only persist (pointermove visual-only, pointerup emits one clamped zone-resolved move) -- editable zones omit overflow-hidden so a drag can visually cross zones.
 - [Phase ?]: 107-03: stageLayout snapshot projection uses an explicit per-marker field map (never a raw spread), with a test proving a smuggled non-display field cannot leak to the public share page.
 - [Phase ?]: 107-03: ShareView and ServicePrintLayout both reuse StageLayoutView.vue directly for the read-only stage plot render — no third rendering path was created.
+- [Phase ?]: 108-01: comment audit tag ids (WR-01/CR-01/etc.) are per-file/per-review scoped, not globally unique — plan 108-02 must group ADR candidates by (tag + qualifying doc), never by bare tag id alone
 
 ### Roadmap Evolution
 
@@ -3863,9 +3869,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 
 ## Session Continuity
 
-Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-09-01T09:38:06.803Z
-Stopped at: Completed 107-03-PLAN.md
+Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
+Last session: 2026-09-01T21:19:09.805Z
+Stopped at: Completed 108-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

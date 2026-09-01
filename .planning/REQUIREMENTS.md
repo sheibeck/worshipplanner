@@ -20,14 +20,17 @@ remediating the Critical/High findings.
 
 ### Comments-as-Specs Extraction
 
-- [ ] **R316**: The codebase is audited for load-bearing comments, each classified as decision-rationale,
+- [x] **R316**: The codebase is audited for load-bearing comments, each classified as decision-rationale,
   behavioral/architectural, or genuinely-local — producing a triage inventory that drives R317/R318.
+
 - [ ] **R317**: Decision-rationale comments (the `R-`/`WR-`/`CR-`/`Pitfall`-tagged "why we did it this
   way" notes) are relocated into ADRs under `docs/adr/`, and each affected code comment is reduced to a
   short pointer (e.g. the ADR id) rather than carrying the rationale itself.
+
 - [ ] **R318**: Behavioral/architectural "how this feature works" comments are relocated into
   `.planning/codebase/` map docs, and the affected code comment is reduced to what the code alone cannot
   convey.
+
 - [ ] **R319**: A written comment convention (comments are short; specifications/ADRs bear the load of how
   features work) is documented so the standard holds for future work.
 
@@ -36,6 +39,7 @@ remediating the Critical/High findings.
 - [ ] **R320**: An architectural review report is produced covering module boundaries, state/store and
   Firestore-listener lifecycle (incl. org-scoped teardown/re-subscription), multi-tenant (org) isolation
   architecture, data flow, and coupling — with severity-ranked findings.
+
 - [ ] **R321**: Critical and High architectural findings from R320 are remediated, or explicitly deferred
   to a backlog with recorded rationale.
 
@@ -45,6 +49,7 @@ remediating the Critical/High findings.
   auth/custom-claims and route guards, multi-tenant data isolation, Cloud Functions authorization,
   share-token / public-page exposure and PII handling, and cost/abuse controls — with severity-ranked
   findings.
+
 - [ ] **R323**: Critical and High security findings from R322 are remediated, or explicitly deferred to a
   backlog with recorded rationale.
 
@@ -60,6 +65,7 @@ remediating the Critical/High findings.
 - **New user-facing features** — this milestone is hardening and internal-quality only.
 - **Production deploys** — building/committing only; any prod deploy of remediation (esp. rules/functions)
   is a separate, explicitly owner-confirmed step per standing deploy policy.
+
 - **Rewriting comments that already are short and local** — only load-bearing comments are in scope.
 
 ---
@@ -68,7 +74,7 @@ remediating the Critical/High findings.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R316 | Phase 108 | Pending |
+| R316 | Phase 108 | Complete |
 | R317 | Phase 108 | Pending |
 | R318 | Phase 109 | Pending |
 | R319 | Phase 109 | Pending |

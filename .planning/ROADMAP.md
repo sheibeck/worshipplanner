@@ -599,10 +599,10 @@ reduced to a short pointer.
   3. The behavioral/architectural subset of the Phase 108 inventory is handed off complete and unambiguous for Phase 109 — nothing dropped, nothing double-classified (R316).
   4. `npm run type-check` and the full test suite pass unchanged after the comment-only edits — no behavior change results from relocating comments (R317).
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 **Wave 1**
 
-- [ ] 108-01-PLAN.md — Comment audit & triage inventory: grep-first enumeration + three-bucket classification of every load-bearing comment across src/**, functions/src/**, render-service/src/**, and the rules files, with a Phase 109 handoff section (R316)
+- [x] 108-01-PLAN.md — Comment audit & triage inventory: grep-first enumeration + three-bucket classification of every load-bearing comment across src/**, functions/src/**, render-service/src/**, and the rules files, with a Phase 109 handoff section (R316)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
