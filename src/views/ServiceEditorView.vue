@@ -772,9 +772,29 @@
           >
             Roles
           </button>
+          <!-- Stage Layout tab (Phase 107, R313/R314): inserted after Roles and
+               before Messages (Service Order · Slides · Roles · Stage Layout ·
+               Messages) — copies the Roles button verbatim, same editor-only gate. -->
+          <button
+            v-if="authStore.isEditor"
+            id="svc-tab-stage"
+            ref="stageTabButtonRef"
+            role="tab"
+            type="button"
+            :aria-selected="activeTab === 'stage'"
+            aria-controls="svc-panel-stage"
+            :tabindex="activeTab === 'stage' ? 0 : -1"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'stage'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'stage'"
+          >
+            Stage Layout
+          </button>
           <!-- Messages tab (63-01, R149): appended last (Service Order · Slides ·
-               Roles · Messages). Copies the Roles button verbatim; gated on the
-               Roles editor check PLUS the messaging kill-switch. -->
+               Roles · Stage Layout · Messages). Copies the Roles button verbatim;
+               gated on the Roles editor check PLUS the messaging kill-switch. -->
           <button
             v-if="authStore.isEditor && isMessagingEnabled()"
             id="svc-tab-messages"
@@ -1567,6 +1587,30 @@
           />
         </div>
 
+        <!-- Stage Layout tab (Phase 107, R313/R314/R315): the freeform drag canvas
+             for tech/sound to plot instruments/mics/monitors on-stage or off to the
+             side. Mounts StageLayoutEditor prop-driven off localService.stageLayout
+             — editable follows canEditService (Draft-only, same gate as every other
+             editable surface on this view); when locked it renders the SAME
+             read-only StageLayoutView the share/print pages use, no second lock
+             banner (the existing service-lock-banner already covers messaging). -->
+        <div
+          v-show="activeTab === 'stage'"
+          id="svc-panel-stage"
+          role="tabpanel"
+          aria-labelledby="svc-tab-stage"
+        >
+          <StageLayoutEditor
+            v-if="localService"
+            :elements="localService.stageLayout?.elements ?? []"
+            :editable="canEditService"
+            @add="onStageMarkerAdd"
+            @update="onStageMarkerUpdate"
+            @remove="onStageMarkerRemove"
+            @move="onStageMarkerMove"
+          />
+        </div>
+
         <!-- Messages tab (63-01, R149/R150): the messaging-defaults panel and the
              "Sent on this service" delivery history, relocated verbatim out of the
              Service Order tab. v-show (not v-if) so the moved selects keep their
@@ -1747,7 +1791,7 @@ import { getPrimaryKey } from '@/utils/songSearch'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
 import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
-import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, ScriptureRef, SlotKind, ServiceSection } from '@/types/service'
+import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, ScriptureRef, SlotKind, ServiceSection, StageMarker } from '@/types/service'
 import type { VWType, Song } from '@/types/song'
 import type { Person } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
@@ -1759,6 +1803,7 @@ import MiscLabelBadge from '@/components/MiscLabelBadge.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
+import StageLayoutEditor from '@/components/stage/StageLayoutEditor.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
 import ContextualActionBar from '@/components/ContextualActionBar.vue'
 import MessageComposer from '@/components/MessageComposer.vue'
@@ -1803,7 +1848,7 @@ const saveStatus = useSaveStatus()
 // the editor still opens on the Service Order tab (renamed from 'music' in
 // Phase 27, D-03); D-05's auto-selection is about which GROUP is selected
 // once the Slides tab itself is opened, not about which tab opens first.
-const activeTab = ref<'service-order' | 'roles' | 'slides' | 'messages'>('service-order')
+const activeTab = ref<'service-order' | 'roles' | 'slides' | 'messages' | 'stage'>('service-order')
 
 // WR-01 (81-REVIEW): roving tabindex on the tab bar (above) removes inactive
 // tabs from the Tab key order per the WAI-ARIA APG Tabs pattern, which
@@ -1811,16 +1856,22 @@ const activeTab = ref<'service-order' | 'roles' | 'slides' | 'messages'>('servic
 // conditionally rendered (authStore.isEditor / isMessagingEnabled()), so the
 // order used for Arrow/Home/End navigation is recomputed from what is
 // actually visible rather than a static list.
-type ServiceEditorTabId = 'service-order' | 'roles' | 'slides' | 'messages'
+// Stage Layout (Phase 107, R313/R314): inserted right after Roles in both the
+// rendered tab strip AND this navigation order — gated on the SAME
+// `authStore.isEditor` check as Roles (tech/sound planning is an editor
+// concern, matching Roles' own gate), independent of the messaging kill-switch.
+type ServiceEditorTabId = 'service-order' | 'roles' | 'slides' | 'messages' | 'stage'
 const visibleTabOrder = computed<ServiceEditorTabId[]>(() => {
   const tabs: ServiceEditorTabId[] = ['service-order', 'slides']
   if (authStore.isEditor) tabs.push('roles')
+  if (authStore.isEditor) tabs.push('stage')
   if (authStore.isEditor && isMessagingEnabled()) tabs.push('messages')
   return tabs
 })
 const serviceOrderTabButtonRef = ref<HTMLButtonElement | null>(null)
 const slidesTabButtonRef = ref<HTMLButtonElement | null>(null)
 const rolesTabButtonRef = ref<HTMLButtonElement | null>(null)
+const stageTabButtonRef = ref<HTMLButtonElement | null>(null)
 const messagesTabButtonRef = ref<HTMLButtonElement | null>(null)
 
 function tabButtonRef(tab: ServiceEditorTabId) {
@@ -1831,6 +1882,8 @@ function tabButtonRef(tab: ServiceEditorTabId) {
       return slidesTabButtonRef
     case 'roles':
       return rolesTabButtonRef
+    case 'stage':
+      return stageTabButtonRef
     case 'messages':
       return messagesTabButtonRef
   }
@@ -2434,6 +2487,53 @@ function onLoopCustomBlur(index: number, rawValue: string) {
   const fallback = slot.loop.intervalSeconds ?? 10
   const base = rawValue.trim() !== '' && Number.isFinite(parsed) ? parsed : fallback
   slot.loop.intervalSeconds = Math.min(3600, Math.max(1, Math.round(base)))
+}
+
+// ── Stage Layout authoring (R313/R314, Phase 107) ───────────────────────────
+// Each handler mutates `localService.value.stageLayout` directly (mirrors
+// onToggleLoop/onSectionChange above) so persistence rides the EXISTING single
+// useAutoSave(localService, ...) deep-watch — NO new save call, NO new rules
+// surface, NO new store. `stageLayout` is initialized to `{ elements: [] }` on
+// first add and set back to `undefined` when the last marker is removed
+// (dropped by stripUndefined before the Firestore write), same lifecycle as
+// notes/loop. Guarded the same way every other editor mutation on this view
+// is: `canEditService` first (draft-locked, T-107-05), then `localService`.
+function onStageMarkerAdd(marker: StageMarker) {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  if (!localService.value.stageLayout) {
+    localService.value.stageLayout = { elements: [] }
+  }
+  localService.value.stageLayout.elements.push(marker)
+}
+
+function onStageMarkerUpdate(marker: StageMarker) {
+  if (!canEditService.value) return
+  if (!localService.value?.stageLayout) return
+  const index = localService.value.stageLayout.elements.findIndex((m) => m.id === marker.id)
+  if (index === -1) return
+  localService.value.stageLayout.elements[index] = marker
+}
+
+function onStageMarkerMove(payload: { id: string; zone: StageMarker['zone']; xPct: number; yPct: number }) {
+  if (!canEditService.value) return
+  if (!localService.value?.stageLayout) return
+  const marker = localService.value.stageLayout.elements.find((m) => m.id === payload.id)
+  if (!marker) return
+  marker.zone = payload.zone
+  marker.xPct = payload.xPct
+  marker.yPct = payload.yPct
+}
+
+function onStageMarkerRemove(id: string) {
+  if (!canEditService.value) return
+  if (!localService.value?.stageLayout) return
+  const remaining = localService.value.stageLayout.elements.filter((m) => m.id !== id)
+  if (remaining.length === 0) {
+    localService.value.stageLayout = undefined
+  } else {
+    localService.value.stageLayout.elements = remaining
+  }
 }
 
 /** 260811-vsr: which row's ⋯ menu is open (keyed on the stable slot.id, so exactly
@@ -4718,6 +4818,16 @@ async function onSave() {
       notes: data.notes,
       status: data.status,
       slots: normalizedSlots,
+      // Phase 107 (R313/R314): stageLayout is a TOP-LEVEL optional field, unlike
+      // slot.loop/slot.notes which ride inside `slots` above and get cleared for
+      // free by that array's wholesale replacement. A bare `undefined` here would
+      // be stripped by stripUndefined inside updateService and the key would be
+      // OMITTED from the updateDoc call entirely — Firestore's partial update
+      // then leaves the REMOTE field untouched, so the last-marker-removed case
+      // would silently fail to clear it. Sending explicit `null` instead (same
+      // "nullable, not stripped" trick `sermonPassage` already uses on this exact
+      // payload) correctly overwrites the remote field every time.
+      stageLayout: data.stageLayout ?? null,
     }
     // CR-01: snapshot exactly what is about to be sent, so the "mark clean"
     // step below (after the WR-01 slots sync-back, which is also compared
@@ -4768,6 +4878,10 @@ async function onSave() {
         notes: localService.value.notes,
         status: localService.value.status,
         slots: localService.value.slots,
+        // Must mirror the SAME `?? null` substitution `payload` above used to
+        // build `sentSnapshot` — otherwise this comparison would never match
+        // once a stageLayout edit is in play, permanently stranding isDirty.
+        stageLayout: localService.value.stageLayout ?? null,
       }) === sentSnapshot
     ) {
       originalService.value = JSON.parse(JSON.stringify(localService.value))

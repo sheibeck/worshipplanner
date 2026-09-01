@@ -8937,12 +8937,14 @@ describe('ServiceEditorView - tab strip keyboard navigation (WR-01, 81-REVIEW)',
     expect(wrapper.get('#svc-tab-messages').attributes('tabindex')).toBe('-1')
   })
 
-  it('ArrowRight steps through Service Order -> Slides -> Roles -> Messages -> wraps to Service Order', async () => {
+  // Phase 107 (R313): 'svc-tab-stage' was inserted between Roles and Messages
+  // in visibleTabOrder, so the ArrowRight sequence now includes it.
+  it('ArrowRight steps through Service Order -> Slides -> Roles -> Stage Layout -> Messages -> wraps to Service Order', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
     const tablist = wrapper.get('[role="tablist"]')
-    const order = ['svc-tab-slides', 'svc-tab-roles', 'svc-tab-messages', 'svc-tab-service-order']
+    const order = ['svc-tab-slides', 'svc-tab-roles', 'svc-tab-stage', 'svc-tab-messages', 'svc-tab-service-order']
     for (const nextId of order) {
       await tablist.trigger('keydown', { key: 'ArrowRight' })
       expect(wrapper.get(`#${nextId}`).attributes('aria-selected')).toBe('true')

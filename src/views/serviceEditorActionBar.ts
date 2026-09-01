@@ -52,7 +52,7 @@
  */
 import type { ActionBarItem } from '@/components/actionBarItems'
 
-export type ActionBarTab = 'service-order' | 'roles' | 'slides' | 'messages'
+export type ActionBarTab = 'service-order' | 'roles' | 'slides' | 'messages' | 'stage'
 
 export interface ActionBarHandlers {
   suggestAllSongs: () => void
@@ -318,6 +318,10 @@ export function buildActionBarItems(tab: ActionBarTab, ctx: ActionBarContext): A
   // The ✉ Messages composer entry stays inside buildServiceOrderItems, reached
   // only on the Service Order tab (SC3 unchanged).
   if (tab === 'messages') return []
+  // Phase 107 (R313): the Stage Layout tab exposes no action-bar items either —
+  // same "expose nothing" precedent as Roles/Messages above. Marker persistence
+  // rides the existing autosave path with no dedicated Save/Present affordance.
+  if (tab === 'stage') return []
   if (tab === 'slides') return buildSlidesItems(ctx)
   return buildServiceOrderItems(ctx)
 }
