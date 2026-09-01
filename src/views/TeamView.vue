@@ -170,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onUnmounted, watch } from 'vue'
 import {
   doc,
   collection,
@@ -487,10 +487,14 @@ async function onConfirmRemove(uid: string) {
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
-onMounted(() => {
-  const orgId = authStore.orgId
-  if (!orgId) return
+function teardownTeamListeners() {
+  membersUnsub?.()
+  invitesUnsub?.()
+  membersUnsub = null
+  invitesUnsub = null
+}
 
+function subscribeTeamListeners(orgId: string) {
   membersUnsub = onSnapshot(
     collection(db, 'organizations', orgId, 'members'),
     (snap) => {
@@ -512,10 +516,30 @@ onMounted(() => {
     },
     ignorePermissionDenied('TeamView invites'),
   )
-})
+}
+
+// 104-REVIEW CR-01: the sidebar's in-place church switcher (AppSidebar.vue ->
+// authStore.selectOrg()) changes authStore.orgId WITHOUT a route change or
+// remount, so this view's own onSnapshot listeners — not covered by
+// resetOrgScopedStores(), which only knows about the Pinia store layer — must
+// react to the org id themselves instead of reading it once. Watching with
+// `immediate: true` replaces the old onMounted-only subscribe and guarantees a
+// switch tears down the previous church's listeners before pointing new ones
+// at the newly-selected church.
+watch(
+  () => authStore.orgId,
+  (orgId) => {
+    teardownTeamListeners()
+    // Clear stale data immediately so the previous church's roster/invites
+    // never flash under the new church's header while the new snapshot loads.
+    members.value = []
+    pendingInvites.value = []
+    if (orgId) subscribeTeamListeners(orgId)
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
-  membersUnsub?.()
-  invitesUnsub?.()
+  teardownTeamListeners()
 })
 </script>

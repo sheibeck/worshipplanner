@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onUnmounted, watch } from 'vue'
 import { collection, onSnapshot, type Unsubscribe } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
@@ -117,17 +117,29 @@ function onDismiss() {
   dismissed.value = true
 }
 
-onMounted(() => {
-  const orgId = authStore.orgId
-  if (!orgId) return
-  unsub = onSnapshot(
-    collection(db, 'organizations', orgId, 'members'),
-    (snap) => {
-      memberCount.value = snap.size
-    },
-    ignorePermissionDenied('GettingStarted memberCount'),
-  )
-})
+// 104-REVIEW CR-01: the sidebar's in-place church switcher changes
+// authStore.orgId without a route change/remount (this panel stays mounted
+// across a switch on the Dashboard), so the member-count listener must react
+// to the org id itself rather than only reading it once in onMounted —
+// otherwise it keeps counting the previous church's members after a switch.
+// `immediate: true` replaces the old onMounted-only subscribe.
+watch(
+  () => authStore.orgId,
+  (orgId) => {
+    unsub?.()
+    unsub = null
+    memberCount.value = 0
+    if (!orgId) return
+    unsub = onSnapshot(
+      collection(db, 'organizations', orgId, 'members'),
+      (snap) => {
+        memberCount.value = snap.size
+      },
+      ignorePermissionDenied('GettingStarted memberCount'),
+    )
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   unsub?.()
