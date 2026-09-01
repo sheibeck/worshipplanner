@@ -4,9 +4,9 @@ milestone: v2.7
 milestone_name: Rehearsal, Stage Plans & Presentation Polish
 status: planning
 last_updated: "2026-09-01T03:51:15.404Z"
-last_activity: 2026-08-31
+last_activity: 2026-09-01
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -24,6 +24,28 @@ All prior deploy *hygiene* still holds (build/test first; rebuild functions + re
 `functions/src/index.ts`; scope `--only`; `.env.local` present for a valid build). Also in ~/.claude
 memory as `deploy-policy-confirm-then-deploy`. Owner words: *"It's ok for you to deploy so long as you
 confirm with me before doing so."*
+
+---
+
+# ▶ ACTIVE MILESTONE — v2.7 Rehearsal, Stage Plans & Presentation Polish (roadmap created 2026-09-01)
+
+**Status:** Roadmap created — 4 phases (104-107), `coarse` granularity, 14/14 requirements (R302-R315)
+mapped with no orphans. Ready for `/gsd-plan-phase 104`.
+
+**Goal:** Give teams richer rehearsal and live-presentation tooling plus targeted Run-the-Service and
+multi-church usability fixes — an inline black slide in the lyric editor, "Go to black" scoped to the
+Audience output only, system-wide dismissible messages, a per-item loop with configurable interval, a
+user-menu church switcher for multi-org members, and a freeform visual stage-layout canvas per service.
+
+(v2.6 ended at Phase 103); this milestone is **Phases 104–107**.
+
+**Deferred out of v2.7 (owner decision 2026-08-31):** song rehearsal attachments (PDF/MP3/YouTube on a
+Song) and Rehearse mode on the shared service link — the storage/public-media cluster (highest
+security/cost surface researched this milestone) — carried to backlog 999.13, full research preserved in
+`seeds/SEED-003-rehearsal-attachments-and-storage-costs.md`.
+
+See the `## ★ v2.7 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
+phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
 
 ---
 
@@ -1113,10 +1135,49 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-08-31 — Milestone v2.7 started
+Phase: 104 of 107 (Notification & Multi-Church Foundations) — ready to plan
+Plan: — (roadmap created, no plans yet)
+Status: Roadmap created (4 phases, 104-107, coarse granularity); ready for /gsd-plan-phase 104
+Last activity: 2026-09-01 — ROADMAP.md + REQUIREMENTS.md traceability written for v2.7 (14/14 requirements mapped)
+
+## ★ v2.7 ROADMAP.md phase breakdown (created 2026-09-01)
+
+4 phases (104-107), derived directly from R302-R315 (14 requirements) with this project's `coarse`
+granularity setting applied: research (`research/SUMMARY.md`) recommended six phases in dependency order
+(notification store; church switcher; audience-only blackout; black slide; loop timer; stage layout), but
+at `coarse` granularity two adjacent, independently-small, decoupled quick-wins collapse together —
+dismissible messages (R309-R310) + the church switcher (R311-R312) into one Foundations phase, and
+audience-only blackout (R305) + the inline black slide (R302-R304) into one Presentation phase, since
+both touch the same Run-flow/lyric-editor subsystem and blackout scoping is the smaller of the two. The
+loop timer (R306-R308) stays its own phase — it is a distinct control/interaction feature (not just a
+data-model addition), carries an explicit decision to make (does "Go to black" pause the loop), and
+benefits from the black slide already existing for verification. Stage layout (R313-R315) stays its own
+phase, sequenced last per research: it is the milestone's only genuinely novel subsystem (new Firestore
+collection + rules block + this app's first freeform-drag interaction, with a documented drag-corruption
+history from v1.4/v1.6) and needs the most implementation runway. **Numbering continues from v2.6, which
+ended at Phase 103** — v2.7 starts at Phase 104, not reset.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 104 Notification & Multi-Church Foundations | Generalize toasts.ts into a system-wide dismissible-message store (fixing the stuck "monitors not configured" warning) and expose the existing selectOrg()/resetOrgScopedStores() path from the user menu so a multi-org member can switch active church without signing out | R309-R312 | Nothing (first) | yes |
+| 105 Presentation Blackout & Inline Black Slide | A new blackout-kind slide insertable in the Song Lyrics editor, rendering full black on every output/preview/print surface; "Go to black" scoped to the Audience output only, leaving the Confidence monitor visible | R302-R305 | Phase 104 | yes |
+| 106 Per-Item Loop Playback | A per-item loop checkbox + interval control (default 10s, dropdown + custom) that auto-advances and loops that item's slides during Run, armed/disarmed through the existing postIndex() choke point so manual nav resets rather than fights it; explicit decision on whether "Go to black" pauses the loop | R306-R308 | Phase 105 | yes |
+| 107 Visual Stage Layout | A new per-service Stage Layout tab — freeform Pointer-Events drag canvas with on-stage/off-stage zones and free-text-labeled markers (incl. one-off mics), persisted to a new stageLayouts/{serviceId} Firestore collection, read-only on the share/print surface | R313-R315 | Phase 104 | yes |
+
+**Phase 107 flag:** this app's first freeform-drag surface, with a documented drag-corruption history
+(v1.4 phantom duplicates, v1.6 drag-into-section bugs) — needs a UI-spec/research pass at plan time (drag
+math, zone boundaries, marker interaction), not a straight port of an existing pattern.
+
+**Phase 106 flag:** the "does the loop pause during 'Go to black'" interaction must be decided and tested
+explicitly at plan time, not left as an accident of implementation order.
+
+**Deferred (owner decision 2026-08-31, not part of this roadmap):** song rehearsal attachments
+(PDF/MP3/YouTube on a Song) + Rehearse mode on the shared link — the storage/public-media cluster, carried
+to backlog 999.13 (`seeds/SEED-003-rehearsal-attachments-and-storage-costs.md`).
+
+See `.planning/ROADMAP.md` § v2.7 Rehearsal, Stage Plans & Presentation Polish for the full phase detail
+table (goals, dependencies, success criteria). Next step: `/gsd-plan-phase 104` (optionally preceded by
+`/gsd-discuss-phase 104`).
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 

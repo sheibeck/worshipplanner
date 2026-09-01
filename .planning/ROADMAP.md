@@ -19,6 +19,7 @@
 - ✅ **v2.4 — Run the Service (Live Presentation)** — Phases 90-98 (shipped & deployed to production 2026-08-30; a non-technical projectionist runs a locked service's slides live from Chrome/Edge — Run button → standalone Run/control screen, persistent monitor-setup, fullscreen chrome-free audience output, black-background confidence output, Window Management multi-monitor delivery with a pop-out fallback, live-ops hardening, the Phase 97 owner redesign (blackout/timers/filmstrip/rehearse/confidence-left-right), and a hardware-UAT round landing reliable per-display "Go fullscreen" buttons after browser zero-click fullscreen proved a dead end — R261-R284; Phase 98/R285-R287 built then withdrawn; client-only, owner-approved)
 - ✅ **v2.5 — Invite Email & Non-Google Onboarding** — Phases 99-100 (shipped 2026-08-31; every TeamView invite sends a real email — Google/Gmail invitees get a "sign in with Google" notice, non-Google invitees get a Cloud-Function-provisioned Auth account + `generatePasswordResetLink()` set-password link — LoginView gains a discoverable password path + `auth/operation-not-allowed` handling, and the Owner Console gets an `appConfig`-backed onboarding-email on/off toggle; code review caught + fixed an editor-can-email-arbitrary-addresses hole (invite-existence gate), audit PASSED 7/7 + 4/4 integration seams; `functions:sendInviteOnboardingEmail` deployed to prod, hosting + Resend-domain verification are standing owner follow-ups — R288-R294)
 - ✅ **v2.6 — Per-Org Bible API Toggle & Manual Fallback** — Phases 101-103 (shipped & deployed to production 2026-08-31; a super-admin toggles the paid ESV/NLT Bible API on/off per church from the Owner Console — default OFF (each prod org enabled by hand, incl. Berean) — enforced by a single `scriptureApi.ts` client dispatcher + a server `checkOrgBibleEnablement` gate on the esv/nlt proxy branches; when OFF, scripture/congregational editors show an "Open in BibleGateway" look-up link (owner removed the paste box + off-state message before ship — plain scripture is reference-only, congregational composed in the existing reading textarea) and Settings hides the Bible Translation card — R295-R301; tag v2.6; audit PASSED 7/7 reqs + 5/5 seams; two code-review rounds caught a PC-export gate bypass + two fallback data-loss bugs; human/visual UAT deferred)
+- 🚧 **v2.7 — Rehearsal, Stage Plans & Presentation Polish** — Phases 104-107 (roadmap created 2026-09-01; inline black slide + audience-only "Go to black", system-wide dismissible messages, per-item loop, user-menu church switcher, and a freeform visual stage-layout canvas — R302–R315; rehearsal attachments/Rehearse mode deferred to backlog 999.13)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -430,6 +431,101 @@ Full details: [milestones/v2.4-ROADMAP.md](milestones/v2.4-ROADMAP.md) · requir
 **UI hint**: yes
 
 Full v2.6 details: [milestones/v2.6-ROADMAP.md](milestones/v2.6-ROADMAP.md) · requirements [milestones/v2.6-REQUIREMENTS.md](milestones/v2.6-REQUIREMENTS.md) · audit [v2.6-MILESTONE-AUDIT.md](v2.6-MILESTONE-AUDIT.md)
+
+### 🚧 v2.7 Rehearsal, Stage Plans & Presentation Polish (Phases 104-107, in planning)
+
+**Milestone Goal:** Give teams richer rehearsal and live-presentation tooling — an inline black slide,
+audience-only blackout, system-wide dismissible messages, per-item slide looping, a user-menu church
+switcher, and a freeform visual stage-layout canvas per service — plus targeted Run-the-Service and
+multi-church usability fixes.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R302–R315 (14 mapped, 100% coverage)
+
+**Deferred out of v2.7 (owner decision 2026-08-31):** song rehearsal attachments (PDF/MP3/YouTube on a
+Song) and Rehearse mode on the shared service link — the storage/public-media cluster (highest
+security/cost surface researched this milestone). Carried to backlog 999.13; full research preserved in
+`seeds/SEED-003-rehearsal-attachments-and-storage-costs.md`.
+
+**Flagged at roadmap time:**
+
+- Phase 107 (Visual Stage Layout) is this app's first freeform-drag surface — v1.4/v1.6 both shipped
+  drag-and-drop corruption bugs and there is no existing pattern to port. Needs a dedicated UI-spec/
+  research pass at plan time (drag math, zone boundaries, marker interaction), not a straight port.
+- Phase 106 (Per-Item Loop Playback) must explicitly decide and test whether "Go to black" pauses an
+  active loop — call this out at plan time rather than leaving it an accident of implementation order.
+
+- [ ] **Phase 104: Notification & Multi-Church Foundations** - Generalize the toast store into a system-wide dismissible-message system and let multi-org members switch active church from the user menu
+- [ ] **Phase 105: Presentation Blackout & Inline Black Slide** - Insert a black interlude slide in the lyric editor and scope "Go to black" to the Audience output only
+- [ ] **Phase 106: Per-Item Loop Playback** - A per-item loop checkbox with a configurable interval auto-advances and loops a service item's slides during Run
+- [ ] **Phase 107: Visual Stage Layout** - A freeform drag-and-drop stage plot per service, with on-stage/off-stage zones and free-text-labeled markers
+
+### Phase 104: Notification & Multi-Church Foundations
+
+**Goal**: Every warning/error/info message in the app can be dismissed and stops reappearing once its
+underlying condition resolves, and a multi-org member can switch their active church from the top-bar
+user menu without signing out.
+**Depends on**: Nothing (first phase of v2.7)
+**Requirements**: R309, R310, R311, R312
+**Success Criteria** (what must be TRUE):
+
+  1. Every warning/error/info message surfaced anywhere in the app has a working manual-dismiss control, through one shared notification system (R309).
+  2. The Run screen's "monitors not configured" warning disappears automatically once monitors are configured, with no manual dismiss required for it to clear (R310).
+  3. A user belonging to multiple churches can open the top-bar user menu, see each church with their role in it, and switch active church without signing out — distinct from the super-admin "enter any church" path (R311).
+  4. After switching churches, every org-scoped store/view reflects only the newly selected church's data and the user's role there — no stale data from the previous church survives the switch (R312).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 105: Presentation Blackout & Inline Black Slide
+
+**Goal**: A presenter can insert a genuine black interlude slide into a song's slide sequence, and
+"Go to black" during Run no longer blinds the band's confidence monitor.
+**Depends on**: Phase 104 (touches the same Run-flow banner/messaging surfaces the new notification store generalizes)
+**Requirements**: R302, R303, R304, R305
+**Success Criteria** (what must be TRUE):
+
+  1. From the Song Lyrics editor, a user can insert a black (blackout) slide between existing lyric slides without creating a new blank service section (R302).
+  2. The black slide renders as a full black screen — no lyrics, background image, or organizational labels — on the Audience output, Confidence monitor, in-app preview, and print/export, and participates in normal next/prev slide navigation (R303).
+  3. Adding, moving, duplicating, or deleting a black slide leaves song section numbering, the split-section-as-one-unit behavior, and the slide↔service-order mirroring intact (R304).
+  4. Pressing "Go to black" during Run blacks out only the Audience output; the Confidence monitor keeps showing the current/upcoming slide the entire time (R305).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 106: Per-Item Loop Playback
+
+**Goal**: An operator can mark any service item to auto-advance and loop its own slides during Run,
+with predictable, leak-free start/stop behavior.
+**Depends on**: Phase 105 (loop verification exercises an item containing the new black slide; shares Run-flow/`useRunControl.ts` code paths Phase 105 already touches)
+**Requirements**: R306, R307, R308
+**Success Criteria** (what must be TRUE):
+
+  1. A user can check a per-item "loop" box in the service editor and the item's slides auto-advance and loop back to the item's first slide once the last is reached during Run (R306).
+  2. The loop interval defaults to 10 seconds and is changeable via a preset dropdown or a custom value, and the chosen interval persists with the item (R307).
+  3. Navigating to a different item, leaving the Run screen, or manually clicking a slide stops/resets the loop timer cleanly, with no leaked timer continuing to fire and no control↔output desync (R308).
+  4. The plan explicitly decides and implements whether "Go to black" pauses an active loop, and that behavior is verified in a real output window, not just the control screen (R308).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 107: Visual Stage Layout
+
+**Goal**: Tech/sound can see, at a glance, where every instrument, mic, and monitor goes for a given
+service via a freeform visual stage plot.
+**Depends on**: Phase 104 (must register its new `stageLayouts` store in the `resetOrgScopedStores()` reset path Phase 104 ships)
+**Requirements**: R313, R314, R315
+**Success Criteria** (what must be TRUE):
+
+  1. On a service's dedicated Stage Layout tab, a user can drag labeled markers (instruments, mics, monitors) onto a freeform canvas, placing them into an on-stage or an off-stage (side) zone (R313).
+  2. A user can give a marker a free-text label, including one for a one-off speaker's microphone, and position it anywhere within a zone (R314).
+  3. Marker positions round-trip correctly on reload and stay stable across a viewport resize (R314).
+  4. The stage layout is saved per service to Firestore (no file storage) and is viewable read-only wherever that service is shared or printed (R315).
+
+**Plans**: TBD
+**UI hint**: yes
+**Research flag**: this app's first freeform-drag surface (v1.4 phantom duplicates, v1.6 drag-into-section
+bugs are the prior history) — flag for a dedicated UI-spec/research pass at plan time rather than a
+straight port of an existing pattern.
 
 ## Backlog
 

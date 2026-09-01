@@ -94,17 +94,17 @@ Which phases cover which requirements. Filled in during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R302 | TBD | Pending |
-| R303 | TBD | Pending |
-| R304 | TBD | Pending |
-| R305 | TBD | Pending |
-| R306 | TBD | Pending |
-| R307 | TBD | Pending |
-| R308 | TBD | Pending |
-| R309 | TBD | Pending |
-| R310 | TBD | Pending |
-| R311 | TBD | Pending |
-| R312 | TBD | Pending |
-| R313 | TBD | Pending |
-| R314 | TBD | Pending |
-| R315 | TBD | Pending |
+| R302 | Phase 105 | Pending |
+| R303 | Phase 105 | Pending |
+| R304 | Phase 105 | Pending |
+| R305 | Phase 105 | Pending |
+| R306 | Phase 106 | Pending |
+| R307 | Phase 106 | Pending |
+| R308 | Phase 106 | Pending |
+| R309 | Phase 104 | Pending |
+| R310 | Phase 104 | Pending |
+| R311 | Phase 104 | Pending |
+| R312 | Phase 104 | Pending |
+| R313 | Phase 107 | Pending |
+| R314 | Phase 107 | Pending |
+| R315 | Phase 107 | Pending |
