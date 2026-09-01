@@ -460,6 +460,10 @@ export function useRunControl(options: UseRunControlOptions = {}) {
       reopenOutput('confidence')
     }
     monitorChanged.value = false
+    // 104-REVIEW IN-03: reset alongside monitorChanged so a future consumer
+    // reading reassignRole without also gating on monitorChanged never sees a
+    // stale role name left over from the last reassign.
+    reassignRole.value = 'audience or confidence'
     notifications.clearSticky('monitor-reassign')
   }
 
@@ -474,6 +478,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     const saved = loadMapping()
     if (!saved) {
       monitorChanged.value = false
+      // 104-REVIEW IN-03: see reopenReassignedOutputs()'s matching comment.
+      reassignRole.value = 'audience or confidence'
       notifications.clearSticky('monitor-reassign')
       return
     }
@@ -498,6 +504,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
       })
     } else {
       monitorChanged.value = false
+      // 104-REVIEW IN-03: see reopenReassignedOutputs()'s matching comment.
+      reassignRole.value = 'audience or confidence'
       notifications.clearSticky('monitor-reassign')
     }
   }
@@ -903,6 +911,13 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // during THIS session must not survive into whatever screen the operator
     // navigates to next. Idempotent no-op if it was already cleared/dismissed.
     notifications.clearSticky('monitor-reassign')
+    // 104-REVIEW WR-04: monitorChanged is RunDisplaysPanel's own source of
+    // truth for the per-output "reassigning" chip (:reassigning="monitorChanged"
+    // in RunControlView.vue) and must be reset in lockstep with the sticky
+    // above, or a later go-live in the SAME mounted instance (no unmount, so
+    // onMounted never re-initializes it) renders a stale "reassigning" chip
+    // before anything has actually changed in the new session.
+    monitorChanged.value = false
     // Leave the control-screen fullscreen entered on go-live (only when we are
     // actually fullscreen — a rehearse exit never entered it). Feature-detected +
     // .catch-swallowed so a reject/absence never blocks teardown or navigation.
@@ -1168,6 +1183,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // unmount path that does not run through confirmExit (e.g. leaving the
     // route while not truly live). Idempotent no-op if already cleared.
     notifications.clearSticky('monitor-reassign')
+    // 104-REVIEW WR-04: keep monitorChanged in lockstep with the sticky clear
+    // above — see the matching comment in endServiceTeardown().
+    monitorChanged.value = false
   })
 
   return {
