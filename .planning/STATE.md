@@ -5,15 +5,15 @@ milestone_name: Rehearsal, Stage Plans & Presentation Polish
 current_phase: 107
 current_phase_name: Visual Stage Layout
 status: executing
-stopped_at: Completed 107-01-PLAN.md
-last_updated: "2026-09-01T08:50:02.502Z"
+stopped_at: Completed 107-02-PLAN.md
+last_updated: "2026-09-01T09:22:39.313Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 107 execution started
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 75
 ---
 
@@ -1140,7 +1140,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 107 (Visual Stage Layout) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-01 — Phase 107 execution started
 
@@ -2982,6 +2982,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 106 P01 | 20min | 3 tasks | 3 files |
 | Phase 106 P02 | 45min | 3 tasks | 5 files |
 | Phase 107 P01 | 9min | 3 tasks | 6 files |
+| Phase 107-visual-stage-layout P02 | 30min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3461,6 +3462,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 106-02: the run-time loop timer lives in useLoopTimer.ts (single interval id) driven from useRunControl.ts; every advance routes through postIndex(); reconcileLoop() arms/disarms on postIndex/postBlackout/watch(currentSlotIndex)/watch(live); Go to black PAUSES the loop and restoring RESUMES it, proven against fake.posted on a matched go-live with both output windows open.
 - [Phase ?]: 107-01: Additive Service.stageLayout field (not a new collection/store) resolves the Phase-104 STAGELAYOUTS-RESET-OBLIGATION marker — R312 satisfied by the already-reset services store.
 - [Phase ?]: 107-01: markerKindAccentClass uses static literal Tailwind classes per kind/theme (never string concatenation) for Tailwind v4 purge safety, mirroring kindBadgeClass().
+- [Phase ?]: onSave() must send stageLayout ?? null (not a bare pass-through) so removing the last marker actually clears the remote Firestore field, mirroring the existing sermonPassage precedent on this curated payload.
+- [Phase ?]: StageLayoutEditor built on native Pointer Events with drop-only persist (pointermove visual-only, pointerup emits one clamped zone-resolved move) -- editable zones omit overflow-hidden so a drag can visually cross zones.
 
 ### Roadmap Evolution
 
@@ -3787,8 +3790,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-09-01T08:50:02.436Z
-Stopped at: Completed 107-01-PLAN.md
+Last session: 2026-09-01T09:22:39.251Z
+Stopped at: Completed 107-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
