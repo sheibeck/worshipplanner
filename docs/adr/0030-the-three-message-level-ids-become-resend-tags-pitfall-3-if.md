@@ -1,4 +1,4 @@
-# 0026. NOTE: orphanCount, NOT deletedObjectCount -- deletedObjectCount only
+# 0030. The three message-level ids become Resend tags (Pitfall 3). If any is
 
 ## Status
 
@@ -8,18 +8,18 @@ Accepted
 
 This rationale is applied at 1 call site(s) within `functions/src/index.ts`. No external review/research document is cited for this decision — it was a file-local judgment call.
 
-NOTE: orphanCount, NOT deletedObjectCount -- deletedObjectCount only increments on the live-delete branch and is always 0 in forced-dry-run mode for this handler (71-PATTERNS.md Pitfall 1).
+The three message-level ids become Resend tags (Pitfall 3). If any is not tag-safe the send is unsafe for the whole message — fail closed.
 
 ## Decision
 
 The rationale below is preserved verbatim from the source comment(s) it was extracted from (tag: `Pitfall`):
 
-**`functions/src/index.ts:2067-2069`:**
+**`functions/src/index.ts:2975-2977`:**
 
 ```
-      // NOTE: orphanCount, NOT deletedObjectCount -- deletedObjectCount only
-      // increments on the live-delete branch and is always 0 in forced-dry-run
-      // mode for this handler (71-PATTERNS.md Pitfall 1).
+
+  // The three message-level ids become Resend tags (Pitfall 3). If any is not
+  // tag-safe the send is unsafe for the whole message — fail closed.
 ```
 
 ## Consequences
@@ -28,4 +28,4 @@ Removing or reverting the behavior described above without re-deriving this rati
 
 ## Source comments
 
-- `functions/src/index.ts:2067-2069`
+- `functions/src/index.ts:2975-2977`
