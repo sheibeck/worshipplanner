@@ -4,9 +4,9 @@ milestone: v2.7
 milestone_name: Rehearsal, Stage Plans & Presentation Polish
 current_phase: 106
 current_phase_name: Per-Item Loop Playback
-status: executing
-stopped_at: Completed 106-01-PLAN.md
-last_updated: "2026-09-01T07:41:47.231Z"
+status: verifying
+stopped_at: Completed 106-02-PLAN.md (Task 4 human-verify deferred to milestone-end UAT)
+last_updated: "2026-09-01T07:53:44.554Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 106 execution started
 progress:
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.7 Rehearsal, Stage Plans & Presentation Polish (roadmap created 2026-09-01)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 mapped with no orphans. Ready for `/gsd-plan-phase 104`.
 
 **Goal:** Give teams richer rehearsal and live-presentation tooling plus targeted Run-the-Service and
@@ -1141,7 +1141,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 106 (Per-Item Loop Playback) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-01 — Phase 106 execution started
 
 ## ★ v2.7 ROADMAP.md phase breakdown (created 2026-09-01)
@@ -2980,6 +2980,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 105 P03 | 15min | 1 tasks | 2 files |
 | Phase 105 P02 | 35min | 3 tasks | 6 files |
 | Phase 106 P01 | 20min | 3 tasks | 3 files |
+| Phase 106 P02 | 45min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -3456,6 +3457,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: SlideCanvas checks contentKind==='blackout' first in currentBackgroundUrl (ahead of suppressBackground/video) so a blackout slide never paints a background regardless of a stale backgroundImageUrl (T-105-03).
 - [Phase ?]: loop field lives on MediaAttachableSlot (like notes?), intervalSeconds is authoritative (not intervalMs)
 - [Phase ?]: explicitCustomLoopSlotIds mount-scoped override added so selecting Custom reliably reveals the seconds input even when intervalSeconds already matches a preset (e.g. the 10s default)
+- [Phase ?]: 106-02: the run-time loop timer lives in useLoopTimer.ts (single interval id) driven from useRunControl.ts; every advance routes through postIndex(); reconcileLoop() arms/disarms on postIndex/postBlackout/watch(currentSlotIndex)/watch(live); Go to black PAUSES the loop and restoring RESUMES it, proven against fake.posted on a matched go-live with both output windows open.
 
 ### Roadmap Evolution
 
@@ -3782,8 +3784,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-09-01T07:41:47.176Z
-Stopped at: Completed 106-01-PLAN.md
+Last session: 2026-09-01T07:53:36.801Z
+Stopped at: Completed 106-02-PLAN.md (Task 4 human-verify deferred to milestone-end UAT)
 Resume file: None
 
 ## Operator Next Steps

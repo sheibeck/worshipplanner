@@ -29,17 +29,16 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 - [x] **R305**: Pressing **"Go to black"** blacks out **only the Audience output**; the Confidence
   monitor keeps showing the current/upcoming slide.
 
-- [ ] **R306**: A user can mark a service item as **looping** (a per-item checkbox in the editor) so
+- [x] **R306**: A user can mark a service item as **looping** (a per-item checkbox in the editor) so
   that, during Run, that item's slides auto-advance and loop back to the item's first slide.
   (Authoring half — the checkbox, interval config, and persisted `slot.loop` model — shipped in
-  106-01. The Run-time auto-advance/loop-back behavior itself is 106-02's scope; R306 stays open
-  until that lands.)
+  106-01. The Run-time auto-advance/loop-back behavior shipped in 106-02.)
 
 - [x] **R307**: A looping item auto-advances on a **configurable interval, defaulting to 10 seconds**,
   chosen from a dropdown of preset intervals with an option to enter a custom value; the interval
   persists with the item.
 
-- [ ] **R308**: Auto-advance never fights manual navigation and tears down correctly — it stops/pauses
+- [x] **R308**: Auto-advance never fights manual navigation and tears down correctly — it stops/pauses
   cleanly when the operator navigates to a different item, leaves the Run screen, or triggers
   "Go to black" (exact blackout-vs-loop interaction decided at plan time), with no leaked timers or
   control↔output desync.
@@ -112,9 +111,9 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | R303 | Phase 105 | Complete |
 | R304 | Phase 105 | Complete |
 | R305 | Phase 105 | Complete |
-| R306 | Phase 106 | Pending (authoring half done in 106-01; Run-time half is 106-02) |
+| R306 | Phase 106 | Complete |
 | R307 | Phase 106 | Complete |
-| R308 | Phase 106 | Pending |
+| R308 | Phase 106 | Complete |
 | R309 | Phase 104 | Complete |
 | R310 | Phase 104 | Complete |
 | R311 | Phase 104 | Complete |
