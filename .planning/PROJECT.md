@@ -18,17 +18,17 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 - **Dismissible messages, system-wide** — no warning/error that gets stuck on screen; the "monitors not configured" warning auto-clears once monitors are set up, and every message is manually dismissible app-wide.
 - **Loop a service item** — a per-item "loop" checkbox that auto-advances the item's slides and loops back to its start; default every 10s, with an interval dropdown + custom value.
 - **Switch churches from the user menu** — a multi-org member switches active church from the top-bar user menu (builds on the existing multi-org `orgs:{orgId:role}` claim infra from v2.0/v2.1).
-- **Rehearsal attachments on songs** — attach PDF chord charts, MP3s, and YouTube links to a song in the stable (reusable across services), stored in Firebase Storage / as links.
-- **Rehearse mode on the shared service link** — a Rehearse button on the read-only shared link opens a per-song list to play the attached MP3 / YouTube and view the PDF; volunteers reach the service they're serving via this public link (no login this milestone).
 - **Visual stage layout per service** — a freeform drag-and-drop canvas (a tab on the service) placing instruments/mics in on-stage and off-stage (side) zones, including extra mics for one-off speakers, so tech/sound know the setup.
+
+**Deferred out of v2.7 (owner decision 2026-08-31 — "defer the storage/rehearsal for now"), carried to a future milestone:**
+- **Rehearsal attachments on songs** — attach PDF chord charts, MP3s, and YouTube links to a song in the stable.
+- **Rehearse mode on the shared service link** — a Rehearse button opening a per-song list to play the attached MP3 / YouTube and view the PDF.
+- These form the storage/public-media cluster (Firebase Storage + unauthenticated share-page media playback + egress cost) — the milestone's biggest security/cost surface — and are held for their own milestone.
 
 **Key context / decisions:**
 - Church switching builds on the existing multi-org custom-claim infra (v2.0 additive `orgs:{orgId:role}` map; v2.1 super-admin enter-any-church already switches active org) — this exposes it to regular multi-org members from the user menu.
-- Rehearsal attachments live on the **Song** (stable), reusable across services; PDFs/MP3s in Firebase Storage (already used for media/PPTX), plus YouTube links.
-- **Volunteer rehearse access is the public shared link only** — no volunteer login/self-service portal this milestone; the planner shares the read-only link and the Rehearse button lives there (owner decision 2026-08-31).
-- Stage layout is a **freeform visual canvas** with on-stage / off-stage (side) zones.
+- Stage layout is a **freeform visual canvas** with on-stage / off-stage (side) zones; positions saved to Firestore (no file storage).
 - Research requested → domain research runs before requirements.
-- Large milestone (8 features) — decomposes into many phases continuing from Phase 103.
 
 ## Shipped Milestone: v2.6 Per-Org Bible API Toggle & Manual Fallback — ✅ SHIPPED & DEPLOYED 2026-08-31
 
