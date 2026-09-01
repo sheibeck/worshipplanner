@@ -36,7 +36,7 @@
  * SAME shared read-only `StageLayoutView` used by share/print — no third
  * rendering path, no drag handles, no add/edit/delete controls.
  */
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onUnmounted } from 'vue'
 import type { StageMarker } from '@/types/service'
 import { clampPct, pctWithinRect, zoneFromPoint, createMarker, markerKindAccentClass, MARKER_KINDS } from '@/utils/stageLayout'
 import StageLayoutView from '@/components/stage/StageLayoutView.vue'
@@ -192,8 +192,49 @@ const dragState = ref<DragState | null>(null)
 const onstageZoneEl = ref<HTMLElement | null>(null)
 const offstageZoneEl = ref<HTMLElement | null>(null)
 
+/** A resize/orientation-change or a scroll happening strictly BETWEEN
+ *  pointerdown and pointerup (mid-drag) would leave `dragState`'s
+ *  pointerdown-time `onstageRect`/`offstageRect` stale against the DOM's
+ *  actual on-screen geometry, producing a wrong-zone or off-by-N% drop.
+ *  Rather than re-measuring on every pointermove (expensive, and drop
+ *  math only ever runs at pointerup), treat a reflow mid-drag exactly like
+ *  `pointercancel` — the platform changed the ground out from under the
+ *  gesture, so abort with no emit. Listeners are only ever live WHILE a
+ *  drag is in flight (registered in `onChipPointerDown`, torn down as soon
+ *  as the drag ends by any path), so this never manipulates the actual
+ *  editor position and stays cheap to poll indefinitely. `scroll` is
+ *  registered in the capture phase because a scroll on an ancestor
+ *  container (not just `window`) does not bubble by default. */
+function onWindowReflow() {
+  if (!dragState.value) return
+  dragState.value = null
+  stopReflowGuard()
+}
+
+function startReflowGuard() {
+  window.addEventListener('resize', onWindowReflow)
+  window.addEventListener('scroll', onWindowReflow, true)
+}
+
+function stopReflowGuard() {
+  window.removeEventListener('resize', onWindowReflow)
+  window.removeEventListener('scroll', onWindowReflow, true)
+}
+
+onUnmounted(stopReflowGuard)
+
+/** Guards against a SECOND pointer starting a drag while one is already in
+ *  flight — without this, a second finger landing on another chip (or the
+ *  same chip) reassigns `dragState` mid-drag, which orphans the first
+ *  chip's `setPointerCapture` (its own pointerup/pointercancel then no
+ *  longer match `ds.markerId` and bail before releasing capture) and
+ *  silently abandons the first drag. Ignoring the second pointerdown
+ *  entirely — never calling `setPointerCapture` for it — means the first
+ *  drag runs to completion untouched and the second pointer's own
+ *  move/up/cancel events simply no-op below (`ds.markerId !== marker.id`). */
 function onChipPointerDown(event: PointerEvent, marker: StageMarker) {
   if (!props.editable) return
+  if (dragState.value) return // a drag is already in progress — ignore additional pointers
   const target = event.currentTarget as HTMLElement
   target.setPointerCapture?.(event.pointerId)
   // Recomputed fresh at the START of every drag — never cached across mount
@@ -209,6 +250,7 @@ function onChipPointerDown(event: PointerEvent, marker: StageMarker) {
     onstageRect: onstageZoneEl.value!.getBoundingClientRect(),
     offstageRect: offstageZoneEl.value!.getBoundingClientRect(),
   }
+  startReflowGuard()
 }
 
 function onChipPointerMove(event: PointerEvent, marker: StageMarker) {
@@ -239,6 +281,7 @@ function onChipPointerUp(event: PointerEvent, marker: StageMarker) {
     ds.movedEnough = true
   }
   dragState.value = null
+  stopReflowGuard()
   const target = event.currentTarget as HTMLElement
   if (target.hasPointerCapture?.(event.pointerId)) target.releasePointerCapture(event.pointerId)
 
@@ -267,6 +310,7 @@ function onChipPointerCancel(event: PointerEvent, marker: StageMarker) {
   const ds = dragState.value
   if (!ds || ds.markerId !== marker.id) return
   dragState.value = null
+  stopReflowGuard()
   const target = event.currentTarget as HTMLElement
   if (target.hasPointerCapture?.(event.pointerId)) target.releasePointerCapture(event.pointerId)
 }

@@ -240,6 +240,89 @@ describe('StageLayoutEditor', () => {
       expect(wrapper.get('[data-testid="stage-zone-offstage"]').classes()).toContain('touch-none')
       expect(wrapper.get('[data-testid="stage-marker"]').classes()).toContain('touch-none')
     })
+
+    it('WR-01: a second pointerdown on another chip while the first drag is in flight is ignored — the first drag completes untouched, releases capture, and the second chip never gets pointer capture', async () => {
+      // jsdom does not implement Pointer Capture at all (setPointerCapture is
+      // `undefined` on every Element — verified directly against the
+      // installed jsdom), which is exactly why the component guards every
+      // call with `?.`. To assert this fix's capture/release behavior (not
+      // just its move-emit behavior) this test installs its own stub
+      // methods on the two chip elements, mirroring a real browser.
+      const twoMarkers: StageMarker[] = [
+        { id: 'm1', label: 'Lead Vocal', zone: 'onstage', xPct: 25, yPct: 60 },
+        { id: 'm2', label: 'Drums', zone: 'onstage', xPct: 75, yPct: 60 },
+      ]
+      const wrapper = mount(StageLayoutEditor, { props: { elements: twoMarkers, editable: true } })
+      stubZoneRects(wrapper)
+      const chips = wrapper.findAll('[data-testid="stage-marker"]')
+      type PointerCaptureStubs = {
+        setPointerCapture: (id: number) => void
+        hasPointerCapture: (id: number) => boolean
+        releasePointerCapture: (id: number) => void
+      }
+      const chip1 = chips[0]!.element as Element & PointerCaptureStubs
+      const chip2 = chips[1]!.element as Element & PointerCaptureStubs
+      chip1.setPointerCapture = vi.fn()
+      chip1.hasPointerCapture = vi.fn(() => true)
+      chip1.releasePointerCapture = vi.fn()
+      chip2.setPointerCapture = vi.fn()
+      chip2.hasPointerCapture = vi.fn(() => true)
+      chip2.releasePointerCapture = vi.fn()
+
+      // First pointer starts a drag on chip1.
+      dispatchPointer(chip1, 'pointerdown', { clientX: 100, clientY: 100, pointerId: 1 })
+      expect(chip1.setPointerCapture).toHaveBeenCalledWith(1)
+
+      // A second finger lands on chip2 mid-drag — must be ignored entirely.
+      dispatchPointer(chip2, 'pointerdown', { clientX: 200, clientY: 100, pointerId: 2 })
+      expect(chip2.setPointerCapture).not.toHaveBeenCalled()
+
+      // The second pointer's own move/up are no-ops (dragState still tracks chip1).
+      dispatchPointer(chip2, 'pointermove', { clientX: 210, clientY: 100, pointerId: 2 })
+      dispatchPointer(chip2, 'pointerup', { clientX: 210, clientY: 100, pointerId: 2 })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('move')).toBeUndefined()
+      expect(chip2.releasePointerCapture).not.toHaveBeenCalled()
+
+      // The first drag completes normally: move emitted for m1, capture released.
+      dispatchPointer(chip1, 'pointermove', { clientX: 460, clientY: 60, pointerId: 1 })
+      dispatchPointer(chip1, 'pointerup', { clientX: 460, clientY: 60, pointerId: 1 })
+      await wrapper.vm.$nextTick()
+
+      const moveEvents = wrapper.emitted('move')
+      expect(moveEvents).toHaveLength(1)
+      expect((moveEvents![0]![0] as { id: string }).id).toBe('m1')
+      expect(chip1.releasePointerCapture).toHaveBeenCalledWith(1)
+    })
+
+    it('WR-02: a window resize event mid-drag aborts the drag exactly like pointercancel — no move emitted', async () => {
+      const wrapper = mount(StageLayoutEditor, { props: { elements: markers, editable: true } })
+      stubZoneRects(wrapper)
+      const chip = wrapper.get('[data-testid="stage-marker"]')
+
+      dispatchPointer(chip.element, 'pointerdown', { clientX: 100, clientY: 100, pointerId: 1 })
+      dispatchPointer(chip.element, 'pointermove', { clientX: 460, clientY: 60, pointerId: 1 })
+      window.dispatchEvent(new Event('resize'))
+      dispatchPointer(chip.element, 'pointerup', { clientX: 460, clientY: 60, pointerId: 1 })
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.emitted('move')).toBeUndefined()
+      expect(wrapper.find('[data-testid="marker-edit-popover"]').exists()).toBe(false)
+    })
+
+    it('WR-02: a window scroll event mid-drag aborts the drag with no move emitted', async () => {
+      const wrapper = mount(StageLayoutEditor, { props: { elements: markers, editable: true } })
+      stubZoneRects(wrapper)
+      const chip = wrapper.get('[data-testid="stage-marker"]')
+
+      dispatchPointer(chip.element, 'pointerdown', { clientX: 100, clientY: 100, pointerId: 1 })
+      window.dispatchEvent(new Event('scroll'))
+      dispatchPointer(chip.element, 'pointermove', { clientX: 460, clientY: 60, pointerId: 1 })
+      dispatchPointer(chip.element, 'pointerup', { clientX: 460, clientY: 60, pointerId: 1 })
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.emitted('move')).toBeUndefined()
+    })
   })
 
   describe('edit popover', () => {
