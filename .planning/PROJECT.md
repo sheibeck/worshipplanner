@@ -8,6 +8,28 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
+## Current Milestone: v2.7 Rehearsal, Stage Plans & Presentation Polish
+
+**Goal:** Give teams richer rehearsal and live-presentation tooling — song rehearsal attachments with a shared rehearse view, a visual per-service stage layout — plus targeted Run-the-Service and multi-church usability fixes.
+
+**Target features:**
+- **Inline black slide in the lyric editor** — insert a black "interlude" slide within a song's slides (long instrumental/interlude sections) without creating a new blank section.
+- **"Go to black" affects only the Audience output** — today it also blacks the confidence monitor; leave the confidence monitor visible.
+- **Dismissible messages, system-wide** — no warning/error that gets stuck on screen; the "monitors not configured" warning auto-clears once monitors are set up, and every message is manually dismissible app-wide.
+- **Loop a service item** — a per-item "loop" checkbox that auto-advances the item's slides and loops back to its start; default every 10s, with an interval dropdown + custom value.
+- **Switch churches from the user menu** — a multi-org member switches active church from the top-bar user menu (builds on the existing multi-org `orgs:{orgId:role}` claim infra from v2.0/v2.1).
+- **Rehearsal attachments on songs** — attach PDF chord charts, MP3s, and YouTube links to a song in the stable (reusable across services), stored in Firebase Storage / as links.
+- **Rehearse mode on the shared service link** — a Rehearse button on the read-only shared link opens a per-song list to play the attached MP3 / YouTube and view the PDF; volunteers reach the service they're serving via this public link (no login this milestone).
+- **Visual stage layout per service** — a freeform drag-and-drop canvas (a tab on the service) placing instruments/mics in on-stage and off-stage (side) zones, including extra mics for one-off speakers, so tech/sound know the setup.
+
+**Key context / decisions:**
+- Church switching builds on the existing multi-org custom-claim infra (v2.0 additive `orgs:{orgId:role}` map; v2.1 super-admin enter-any-church already switches active org) — this exposes it to regular multi-org members from the user menu.
+- Rehearsal attachments live on the **Song** (stable), reusable across services; PDFs/MP3s in Firebase Storage (already used for media/PPTX), plus YouTube links.
+- **Volunteer rehearse access is the public shared link only** — no volunteer login/self-service portal this milestone; the planner shares the read-only link and the Rehearse button lives there (owner decision 2026-08-31).
+- Stage layout is a **freeform visual canvas** with on-stage / off-stage (side) zones.
+- Research requested → domain research runs before requirements.
+- Large milestone (8 features) — decomposes into many phases continuing from Phase 103.
+
 ## Shipped Milestone: v2.6 Per-Org Bible API Toggle & Manual Fallback — ✅ SHIPPED & DEPLOYED 2026-08-31
 
 **Status:** Deployed to production (tag `v2.6`; rules + `functions:api`/`setOrgBibleEnabled`/
@@ -404,7 +426,12 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-No active milestone — v2.6 shipped 2026-08-31; the next one is scoped via `/gsd-new-milestone`.
+**v2.7 Rehearsal, Stage Plans & Presentation Polish** — 🚧 in planning (started 2026-08-31). Eight features:
+inline black slide in the lyric editor; "Go to black" limited to the Audience output; system-wide dismissible
+messages (stuck monitor-warning auto-clears once configured); per-item loop with interval; user-menu church
+switcher for multi-org members; song rehearsal attachments (PDF/MP3/YouTube); a Rehearse mode on the public
+shared service link; and a freeform visual per-service stage-layout canvas. Requirements defined via
+`/gsd-new-milestone` (research-first). See `.planning/REQUIREMENTS.md`.
 
 **v2.5 Invite Email & Non-Google Onboarding** — ✅ shipped 2026-08-31. Every invited user receives an invite
 email (reusing the Resend pattern); non-Google invitees get a Cloud-Function-provisioned Auth account + a
@@ -580,6 +607,14 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
+*Last updated: 2026-08-31 — started milestone v2.7 Rehearsal, Stage Plans & Presentation Polish (8 features:
+inline black lyric slide, Audience-only "Go to black", system-wide dismissible messages, per-item loop,
+user-menu church switcher, song rehearsal attachments PDF/MP3/YouTube, Rehearse mode on the shared link, and
+a freeform per-service stage-layout canvas). Decisions: church switch in the user menu (on existing multi-org
+claim infra); attachments on the Song in Firebase Storage + YouTube links; volunteer rehearse via the public
+shared link only (no login this milestone); stage layout a freeform visual canvas. Research-first. Previous
+footer below.*
+
 *Last updated: 2026-08-31 — archived milestone v2.6 Per-Org Bible API Toggle & Manual Fallback (shipped &
 deployed to production; tag `v2.6`; audit PASSED 7/7 reqs + 5/5 integration seams). Archived to
 `milestones/v2.6-ROADMAP.md` · `milestones/v2.6-REQUIREMENTS.md`. No active milestone — next scoped via

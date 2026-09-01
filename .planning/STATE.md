@@ -1,14 +1,10 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: between milestones (v2.6 shipped 2026-08-31)
-current_phase: none
-current_phase_name: BETWEEN MILESTONES
-status: idle
-stopped_at: Archived v2.6 milestone
-last_updated: "2026-08-31T23:00:00.000Z"
+milestone: v2.7
+milestone_name: Rehearsal, Stage Plans & Presentation Polish
+status: planning
+last_updated: "2026-09-01T03:51:15.404Z"
 last_activity: 2026-08-31
-last_activity_desc: v2.6 milestone archived; next milestone scoped via /gsd-new-milestone
 progress:
   total_phases: 0
   completed_phases: 0
@@ -55,9 +51,11 @@ to `milestones/v2.6-REQUIREMENTS.md`.
 - **Phase 101 — Owner Console Infrastructure (R295, R301):** super-admin-gated `setOrgBibleEnabled` Cloud
   Function writes `Organization.bibleApiEnabled` (default OFF, client-write-denied), surfaced via
   `OrgConfigDrawer` + an Organizations-list badge.
+
 - **Phase 102 — Gated Scripture Fetch Dispatcher (R296, R297):** new `src/utils/scriptureApi.ts` choke
   point (client) + `checkOrgBibleEnablement` (server `api` proxy esv/nlt branches, defense-in-depth); no
   regression when enabled.
+
 - **Phase 103 — Manual Fallback When Off (R298, R299, R300):** "Open in BibleGateway" deep-link (any
   version) + Settings hides the Bible Translation card when off. Owner refinement post-Phase-103: the
   paste textarea + off-state message were removed — plain scripture is reference-only, congregational
@@ -1115,16 +1113,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 999.2 — Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG)
-Plan: Not started
-Status: Wave 1 (103-01) executed and verified; Plan 103-02 (fallback UI in ScriptureInput.vue/CongregationalEditor.vue) remains
-Last activity: 2026-08-31 — Phase 103 complete, transitioned to Phase 999.2
-(delegates to `formatScriptureReference`, encodes reference + optional version, omits `&version=` when
-absent/empty) and gated the Settings "Bible Translation" card behind `authStore.isBibleApiEnabled`,
-mirroring the AI Features card's `aiMasterEnabled` gate exactly — no change to `bibleVersionInput`, the
-radios, `onChangeBibleVersion`, or the save path. `npm run type-check` clean; `npx vitest run` shows only
-the documented 2-file baseline (`storage.rules.test.ts`, `stores/appConfig.test.ts`) — no regression. See
-`.planning/phases/103-manual-fallback-when-bible-api-is-off/103-01-SUMMARY.md`.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-08-31 — Milestone v2.7 started
 
 ### Prior: Phase 92 — Monitor Configuration Screen (v2.4)
 
