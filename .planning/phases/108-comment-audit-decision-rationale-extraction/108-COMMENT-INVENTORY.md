@@ -6297,3 +6297,580 @@ For each bare tag id below, every file:line occurrence and its qualifier. Occurr
 - `src/stores/services.ts:878` — unqualified
 - `src/stores/services.ts:1023` — unqualified
 
+
+## Bucket B — Behavioral/Architectural
+
+Untagged, load-bearing multi-line "how this works" narration and non-obvious cross-cutting behavior notes, found via a lightweight grep-first scan (block comments >= ~10 lines, plus any comment carrying an explicit `NOTE:`/`WARNING:`/`HACK:`/`IMPORTANT:` label) across the same four in-scope trees, EXCLUDING every range already claimed by a Bucket A entry above. This is the Phase 109 / R318 relocation target — each entry below is re-listed verbatim in the "Phase 109 Handoff" section at the end of this document. Every entry carries a `file:line`, a short description, and a suggested `.planning/codebase/` target doc.
+
+**Method note (scope, not exhaustiveness claim):** this scan is deliberately "lightweight," per the plan's own framing of Task 2 — it surfaces the highest-confidence untagged load-bearing comments (long block comments and explicitly-labeled notes) rather than manually re-reading every comment in every file. This codebase's comment density is unusually high (see CLAUDE.md), so a maximal scan would revisit thousands of ordinary JSDoc blocks with no rationale content. Every entry below was individually read and classified, not just pattern-matched — but a handful of shorter untagged comments elsewhere in the tree may carry load-bearing behavioral content this pass did not surface. Recommend a targeted follow-up pass in Phase 109 for any file this inventory shows zero hits against, if that file is known to carry complex behavior.
+
+### `firestore.rules`
+- **`firestore.rules:11-27`** -> _ARCHITECTURE.md_ — Phase 76 (R213): org lifecycle gate. `active` is absent on every org created before this phase and must read as active (default-true, backward-compatible) -- only an EXPLICIT `active: false` denies.
+- **`firestore.rules:35-45`** -> _ARCHITECTURE.md_ — Phase 78 (R225): checked FIRST, before the exists() cross-document read, both for correctness (no membership doc will ever exist for a super-admin entering a church they don't belong to) and for cost (Firestore rules short-circuit && / ||,...
+- **`firestore.rules:60-67`** -> _ARCHITECTURE.md_ — Phase 78 (R225): same outer-arm shape as isOrgMember above -- a super-admin is granted editor-tier access on ANY org with zero membership doc, replacing the exists()+role check entirely (not merely waiving isOrgActive()).
+- **`firestore.rules:75-84`** -> _ARCHITECTURE.md_ — Phase 68 (R178): super-admin gate. Deliberately CLAIM-ONLY — NO get()/exists() cross-document lookup — unlike isOrgMember/isOrgEditor above.
+- **`firestore.rules:233-248`** -> _ARCHITECTURE.md_ — Members subcollection IN-02 (78-REVIEW.md) / T-78-03 accepted residual: Phase 78's super-admin arm makes isOrgEditor(orgId) true for EVERY super-admin on EVERY org (see isOrgEditor above), which means `allow write` below legally permits a s...
+- **`firestore.rules:335-346`** -> _INTEGRATIONS.md_ — Messages — the queue of volunteer notifications for this service (R130). No client code writes this collection yet (Phase 58); the Admin SDK (a Phase 59+ Cloud Function) is the intended sole owner of the send lifecycle.
+- **`firestore.rules:405-418`** -> _ARCHITECTURE.md_ — resource == null MUST be the first operand and MUST stay first.
+- **`firestore.rules:446-458`** -> _INTEGRATIONS.md_ — pptxRenders — render-status doc for an imported PowerPoint deck (R062, Phase 42).
+- **`firestore.rules:463-504`** -> _ARCHITECTURE.md_ — All other nested collections — editors only. ★ `collection != 'services'`, `collection != 'slideGroups'` AND `collection != 'pptxRenders'` are all LOAD-BEARING. Do not remove any of the three.
+- **`firestore.rules:567-579`** -> _ARCHITECTURE.md_ — T-41-09: the `resource == null` branch is load-bearing, not decorative.
+- **`firestore.rules:644-654`** -> _INTEGRATIONS.md_ — AI usage ledger (R163) — one entry per proxied Claude request, written ONLY by the api Cloud Function via the Admin SDK (functions/src/index.ts, Phase 65 Plan 01), which bypasses rules entirely.
+
+### `functions/src/adminEmail.ts`
+- **`functions/src/adminEmail.ts:11-32`** -> _INTEGRATIONS.md_ — --- adminEmail (quick task 260823) ------------------------------------------ A reusable, best-effort admin-notification email helper.
+
+### `functions/src/appConfig.ts`
+- **`functions/src/appConfig.ts:3-22`** -> _ARCHITECTURE.md_ — --- appConfig (R180-R184: Firestore-backed runtime config) -------------- This module deliberately does NOT call initializeApp()/getFirestore() at module scope -- mirrors claimsHelpers.ts's convention.
+- **`functions/src/appConfig.ts:63-73`** -> _ARCHITECTURE.md_ — DEFAULT_APP_CONFIG holds the EXACT current env/defineString fallback values (R182 source of truth) -- every field cites its origin read-site in index.ts so a future diff of that file's defaults can be checked against this constant.
+- **`functions/src/appConfig.ts:285-303`** -> _ARCHITECTURE.md_ — Reads appConfig/global, deep-merges it onto DEFAULT_APP_CONFIG, and returns the resolved config.
+
+### `functions/src/backfillLastUsed.ts`
+- **`functions/src/backfillLastUsed.ts:4-48`** -> _INTEGRATIONS.md_ — --- backfillLastUsedForOrg (R248: retroactively correct existing songs' lastUsedAt) --- PURPOSE: the live R247 fix (84-01-PLAN.md) corrects `lastUsedAt` GOING FORWARD by recomputing it on the service lock/unlock lifecycle -- but songs whose...
+- **`functions/src/backfillLastUsed.ts:156-166`** -> _ARCHITECTURE.md_ — Reads all `organizations/{orgId}/services` and `organizations/{orgId}/songs` docs ONCE (SCALE note above), then for each song computes `MAX(locked service date)` via the mirrored `computeLastUsedDate` and applies the conservative write rule...
+- **`functions/src/backfillLastUsed.ts:273-291`** -> _ARCHITECTURE.md_ — --- CLI wrapper ----------------------------------------------------------- Guarded so importing this module (as backfillLastUsed.test.ts does) never calls initializeApp() or touches a live project -- only running it directly does (mirrors...
+
+### `functions/src/backfillOrgClaims.ts`
+- **`functions/src/backfillOrgClaims.ts:15-72`** -> _ARCHITECTURE.md_ — --- backfillOrgMembershipClaims (R074/R075: give the two existing users the claim) --- PURPOSE: syncOrgMembershipClaim (./orgMembershipClaims.ts) only fires on FUTURE writes to organizations/{orgId}/members/{uid}.
+- **`functions/src/backfillOrgClaims.ts:125-141`** -> _ARCHITECTURE.md_ — Iterates every organizations/*\/members/* document ONCE, grouped by uid in memory, and for each uid reconciles ONE Admin SDK write carrying: - the PRIMARY `{ orgId, role }` claim, via the shared decideMembershipClaim on the user's primary-o...
+
+### `functions/src/index.ts`
+- **`functions/src/index.ts:59-69`** -> _INTEGRATIONS.md_ — The Resend email provider key (RESEND_API_KEY) now lives in ./params (moved so orgProvisioning.ts can bind it too without a circular import) -- imported and re-exported at the top of this file.
+- **`functions/src/index.ts:147-149`** -> _ARCHITECTURE.md_ — Headers we forward from the client to the upstream API. Note: `x-api-key` and `authorization` for secret-injected services are overwritten below, never trusted from the client.
+- **`functions/src/index.ts:159-168`** -> _INTEGRATIONS.md_ — verifyAppCaller replaces the old boolean `callerIsAuthenticated` gate with the SAME accept/reject decision (valid token -> proceed, missing/invalid -> 401), but resolves to the decoded ID token itself rather than throwing it away -- the ant...
+- **`functions/src/index.ts:345-363`** -> _INTEGRATIONS.md_ — R242/R243: the real, server-side half of the per-org master AI gate -- a live `organizations/{orgId}` read on EVERY anthropic call, extracted so it is unit-testable without an HTTP harness (the `api` onRequest has none, see the "AI proxy co...
+- **`functions/src/index.ts:391-400`** -> _INTEGRATIONS.md_ — R297: the server-side half of the per-org Bible-API (ESV/NLT) gate -- defense-in-depth behind the client dispatcher (Plan 102-01).
+- **`functions/src/index.ts:435-447`** -> _INTEGRATIONS.md_ — R161: per-uid fixed-window Firestore rate limit. Two top-level `aiRateLimits` counter docs per call -- `${uid}__min__${minuteWindow}` and `${uid}__day__${dayWindow}` -- read inside a single transaction so the check-then-increment is atomic...
+- **`functions/src/index.ts:812-822`** -> _CONCERNS.md_ — --- pptxRenders queue (R062: async server-side render bridge) ---------- One canonical path builder so parsePptxHandler (37-03, this plan), the requestPptxRenderHandler trigger (37-04), and cleanupOrphanRendersHandler (37-05) cannot drift a...
+- **`functions/src/index.ts:965-985`** -> _INTEGRATIONS.md_ — The requestPptxRender trigger body, exported separately from the onDocumentCreated wrapper (mirroring parsePptxHandler/parsePptx and cleanupExpiredMediaHandler/cleanupExpiredMedia) so it is directly unit-testable against mocked Firestore/St...
+- **`functions/src/index.ts:1072-1081`** -> _ARCHITECTURE.md_ — ★ The gate (T-37-13). Three independent conjuncts, all required: - actualCount > 0 -- the empty-render guard. A deck that rendered nothing must be "failed", never "ready" -- its parsed text layer stays usable either way.
+- **`functions/src/index.ts:1114-1129`** -> _ARCHITECTURE.md_ — --- Shared cleanup-sweep safety knob (66-01: T-66-01-02) ---------------- Bounds how many objects a SINGLE LIVE cleanup run may delete.
+- **`functions/src/index.ts:1134-1170`** -> _ARCHITECTURE.md_ — --- cleanupExpiredMedia (R015: 2-week Storage retention) --------------- SAFETY CONTRACT (see 22-03 threat model, T-22-03-01..05): - MEDIA_PATH_GUARD is applied to every candidate BEFORE any delete decision.
+- **`functions/src/index.ts:1292-1337`** -> _ARCHITECTURE.md_ — --- cleanupOrphanRenders (R062: dry-run-by-default orphan sweep) -------- A second, SEPARATE scheduled job from cleanupExpiredMedia above.
+- **`functions/src/index.ts:1503-1563`** -> _ARCHITECTURE.md_ — --- cleanupOrphanBackgrounds (R167: orphan+age background sweep) -------- A NEW sweep, never shipped before this phase.
+- **`functions/src/index.ts:1768-1815`** -> _CONCERNS.md_ — --- cleanupPptxSources (R168: prune consumed/failed import sources) ----- A NEW sweep, never shipped before this phase.
+- **`functions/src/index.ts:1960-1985`** -> _ARCHITECTURE.md_ — --- previewCleanupDryRun (R188/R190: on-demand blast-radius preview) ---- A super-admin-only onCall that gives the Owner Console a truthful, on-demand "what would this cleanup delete right now" count for any of the four *_CLEANUP_ENABLED sw...
+- **`functions/src/index.ts:2090-2114`** -> _ARCHITECTURE.md_ — --- sendScheduledReminders daily reminder cron (61-02: R145/R133/SC3/SC4) -- The R145 reminder engine: a daily onSchedule cron that auto-enqueues the shared service link to everyone assigned N days before a service, reckoned in the org's LO...
+- **`functions/src/index.ts:2286-2313`** -> _ARCHITECTURE.md_ — NO secrets: array -- the cron only ENQUEUES; RESEND_API_KEY binds solely to sendQueuedMessage (R131). 04:00 UTC is a NEW slot, offset from the taken 02:00 (media) and 03:00 (renders) so the three daily sweeps never overlap.
+- **`functions/src/index.ts:2349-2360`** -> _ARCHITECTURE.md_ — --- dispatchDueScheduledMessagesHandler (61-03: R141 schedule-for-later) --- The Phase 59 carryover -- actually SEND user-scheduled messages.
+- **`functions/src/index.ts:2390-2401`** -> _ARCHITECTURE.md_ — Finds due user-scheduled messages and dispatches each by (1) transactionally claiming the ORIGINAL scheduled->dispatched (only if still 'scheduled' -- the idempotency guard that makes an at-least-once cron retry a no-op) and (2) creating a...
+- **`functions/src/index.ts:2496-2514`** -> _ARCHITECTURE.md_ — --- queueServiceMessage send-path enqueue (59-02: R131/R137/R141) ------ The thin enqueue half of the send path, mirroring the parsePptxHandler -> pptxRenders queue -> requestPptxRender triad above: an onCall Function whose handler body (qu...
+- **`functions/src/index.ts:2619-2629`** -> _ARCHITECTURE.md_ — The single canonical messages/{id} doc-shaper — pure, no Firestore I/O (its role mirrors pptxRenderDocRef's "one canonical shape so the callable and the trigger cannot drift", and buildServiceSnapshot's pure field-assembly).
+- **`functions/src/index.ts:2648-2669`** -> _ARCHITECTURE.md_ — The queueServiceMessage handler body, exported separately from the onCall wrapper (parsePptxHandler/parsePptx precedent) so tests invoke it directly with a fake CallableRequest.
+- **`functions/src/index.ts:3249-3265`** -> _INTEGRATIONS.md_ — --- messageWebhook (60-02: R143 — Resend delivery/bounce receiver) --------- The milestone's new UNAUTHENTICATED trust boundary.
+- **`functions/src/index.ts:3272-3289`** -> _INTEGRATIONS.md_ — Resolve the bounced recipient's DocumentReference. PRIMARY (tags): when the echoed Resend tags carry all four path segments, build the recipients/{id} ref DIRECTLY at the exact nested path — a single doc() with NO query and NO index depende...
+- **`functions/src/index.ts:3311-3323`** -> _ARCHITECTURE.md_ — Idempotently record a hard bounce against an addressed recipient. Runs ONE transaction that reads the recipient status AND the message's current count BEFORE any write (mirrors sendQueuedMessageHandler's transition-guarded claim).
+- **`functions/src/index.ts:3350-3371`** -> _INTEGRATIONS.md_ — The messageWebhook handler body, exported separately from the onRequest wrapper (the sendQueuedMessageHandler/parsePptxHandler convention) so it is unit-testable directly with a fake rawBody+headers and no res — firebase-functions/v2/https...
+- **`functions/src/index.ts:3424-3438`** -> _ARCHITECTURE.md_ — --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) -- Sets the { orgId, role } custom auth claim that storage.rules' dual-read isOrgMemberByClaim(orgId) arm reads as request.auth.token.orgId / request.auth.token.role (pla...
+- **`functions/src/index.ts:3441-3451`** -> _ARCHITECTURE.md_ — --- superAdminClaims (68-02: syncSuperAdminClaim trigger + setSuperAdminClaim onCall, R174/R175-B/R176/R179) ------------------------------------------ Implementation lives in ./superAdminClaims so its testable handlers (syncSuperAdminClaim...
+- **`functions/src/index.ts:3454-3466`** -> _ARCHITECTURE.md_ — --- orgProvisioning (Phase 74: onboardOrganization/assignOrgAdmin/ listOrganizations, R196-R206; Phase 76: setOrgActive, R212-R214) ---------- Implementation lives in ./orgProvisioning so its testable handlers (onboardOrganizationHandler/as...
+
+### `functions/src/inviteOnboarding.ts`
+- **`functions/src/inviteOnboarding.ts:90-99`** -> _ARCHITECTURE.md_ — Domain-suffix classifier for the invitee-type branch (99-CONTEXT.md's leaning default). Normalize FIRST (.trim().toLowerCase()) before calling -- mirrors resolveAdminTarget's normalizedEmail discipline.
+- **`functions/src/inviteOnboarding.ts:136-152`** -> _INTEGRATIONS.md_ — The testable handler body, exported separately from the onCall wrapper below -- mirrors onboardOrganizationHandler/queueServiceMessageHandler.
+
+### `functions/src/messageTokens.ts`
+- **`functions/src/messageTokens.ts:1-17`** -> _STACK.md_ — Pure server-side token renderer for the send path (Phase 59, R138/R139). `sendQueuedMessage` (functions/src/index.ts) renders each recipient's subject and body from the RAW token template stored on the message doc.
+
+### `functions/src/orgMembershipClaims.ts`
+- **`functions/src/orgMembershipClaims.ts:6-20`** -> _ARCHITECTURE.md_ — --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) -- This module deliberately does NOT call initializeApp() at module scope.
+- **`functions/src/orgMembershipClaims.ts:93-102`** -> _ARCHITECTURE.md_ — Structural guard, in the spirit of index.ts's MEDIA_PATH_GUARD -- mirrors backfillOrgClaims.ts's resolveOrgId byte-for-byte (D-11: one guard shared by the trigger and the backfill).
+- **`functions/src/orgMembershipClaims.ts:110-137`** -> _ARCHITECTURE.md_ — Recomputes the full `orgs` map for `uid` from the SURVIVING organizations/*\/members/{uid} documents -- NEVER from users/{uid}.orgIds.
+- **`functions/src/orgMembershipClaims.ts:228-242`** -> _CONCERNS.md_ — The single shared decision function (40-02-PLAN.md DISC-02). Both the trigger below and plan 40-04's backfill import this rather than reimplementing the rule, so the two can never drift.
+- **`functions/src/orgMembershipClaims.ts:318-331`** -> _ARCHITECTURE.md_ — Shallow-equal for two `orgs` maps. `undefined` (no `orgs` claim key at all -- a legacy pre-widening token) is treated as equivalent to `{}` (a freshly-computed empty map for a user with zero surviving memberships), so a legacy claim for a u...
+
+### `functions/src/orgProvisioning.ts`
+- **`functions/src/orgProvisioning.ts:15-44`** -> _ARCHITECTURE.md_ — --- orgProvisioning (Phase 74, R196-R206: the owner-console org-provisioning callables) ---------------------------------------------------------------- This module deliberately does NOT call initializeApp() at module scope -- mirrors super...
+- **`functions/src/orgProvisioning.ts:87-96`** -> _ARCHITECTURE.md_ — The single caller-gate helper applied verbatim by all three handlers below (R200/R204) -- mirrors setSuperAdminClaimHandler (superAdminClaims.ts:106-128) exactly.
+- **`functions/src/orgProvisioning.ts:239-254`** -> _ARCHITECTURE.md_ — The testable handler body, exported separately from the onCall wrapper below -- mirrors setSuperAdminClaimHandler/setSuperAdminClaim.
+- **`functions/src/orgProvisioning.ts:342-354`** -> _ARCHITECTURE.md_ — The testable handler body, exported separately from the onCall wrapper below. Orphan guard (T-74-06): rejects a typo'd/nonexistent `orgId` BEFORE any write, so no orphaned membership is ever created under an id with no matching org.
+- **`functions/src/orgProvisioning.ts:757-769`** -> _INTEGRATIONS.md_ — The testable handler body, exported separately from the onCall wrapper below -- modeled on setOrgActiveHandler's SIMPLER shape (caller gate, input validation, org-existence check, same-state-aware merge write), NOT setOrgAiEnabledHandler's...
+
+### `functions/src/orgTemplateSeed.ts`
+- **`functions/src/orgTemplateSeed.ts:3-28`** -> _ARCHITECTURE.md_ — Phase 74 (R197/R198): pure, data-only ported seed content for a newly onboarded org — the Suggested Template (`buildSuggestedTemplateEntries()`) and the default `OrgSettings` literal.
+
+### `functions/src/params.ts`
+- **`functions/src/params.ts:3-18`** -> _INTEGRATIONS.md_ — --- params (shared, dependency-free) ---------------------------------------- A tiny module with NO local imports beyond firebase-functions/params, so it can be imported by BOTH index.ts and orgProvisioning.ts/adminEmail.ts without creating...
+
+### `functions/src/pptxParser.ts`
+- **`functions/src/pptxParser.ts:1-10`** -> _ARCHITECTURE.md_ — PPTX -> native slide mapping (Phase 21, R010/R011/R012). `functions/` is a standalone TypeScript project (its own tsconfig, cannot import from `src/`), so the slide shapes below are hand-mirrored from the app's canonical types rather than i...
+- **`functions/src/pptxParser.ts:87-111`** -> _INTEGRATIONS.md_ — Pure mapping from an officeparser AST to an ordered array of native (text | image) slide objects, using the mixed-content heuristic documented above.
+- **`functions/src/pptxParser.ts:193-202`** -> _INTEGRATIONS.md_ — Validates, parses, and maps a .pptx buffer into native slides, uploading any extracted images to org-scoped Storage along the way.
+
+### `functions/src/renderInvoker.ts`
+- **`functions/src/renderInvoker.ts:3-15`** -> _INTEGRATIONS.md_ — The single, mockable seam that mints a Google-issued ID token and invokes the private "pptx-render" Cloud Run service (R062: bridging function's IAM-authenticated invocation of a Cloud Run service).
+
+### `functions/src/serviceRoles.ts`
+- **`functions/src/serviceRoles.ts:1-33`** -> _ARCHITECTURE.md_ — Server-side recipient resolver (Phase 59, R131/R139). `functions/` is a standalone TypeScript project (its own tsconfig with include:["src"], no `@/` alias — it cannot import from the client `src/` tree), so this file is a DUPLICATE of the...
+- **`functions/src/serviceRoles.ts:152-172`** -> _ARCHITECTURE.md_ — Resolves a { teams, individualPersonIds, includeEveryone } selection into deduped (by person id), reachability-split recipient lists with per-recipient roleNames. Server-side enrichment of the client resolveRecipients split.
+
+### `functions/src/superAdminClaims.ts`
+- **`functions/src/superAdminClaims.ts:7-22`** -> _ARCHITECTURE.md_ — --- superAdminClaims (R174/R175-B/R176/R179: the owner-console access gate) --- This module deliberately does NOT call initializeApp() at module scope -- mirrors orgMembershipClaims.ts: functions/src/index.ts already does that for the deplo...
+- **`functions/src/superAdminClaims.ts:36-49`** -> _ARCHITECTURE.md_ — The testable handler body, exported separately from the onDocumentWritten wrapper below -- mirrors syncOrgMembershipClaimHandler/syncOrgMembershipClaim.
+- **`functions/src/superAdminClaims.ts:93-105`** -> _ARCHITECTURE.md_ — The testable handler body, exported separately from the onCall wrapper below -- mirrors parsePptxHandler/parsePptx and queueServiceMessageHandler/queueServiceMessage.
+
+### `functions/src/webhookSignature.ts`
+- **`functions/src/webhookSignature.ts:26-47`** -> _INTEGRATIONS.md_ — Verify a Resend/Svix (Standard Webhooks) HMAC-SHA256 signature over the RAW request body.
+
+### `src/components/ContextualActionBar.vue`
+- **`src/components/ContextualActionBar.vue:136-158`** -> _ARCHITECTURE.md_ — ContextualActionBar.vue — the one shared action bar (36-02, R068).
+
+### `src/components/MiscLabelBadge.vue`
+- **`src/components/MiscLabelBadge.vue:2-14`** -> _ARCHITECTURE.md_ — Inline-editable MISC label pill (2026-08-12 owner request). Replaces the separate MISC "label" input added in Phase 56 (R127): the colored badge pill IS the editable surface — click it (or its pencil) to rename a Miscellaneous item directly...
+
+### `src/components/PptxImportModal.vue`
+- **`src/components/PptxImportModal.vue:449-461`** -> _ARCHITECTURE.md_ — ── External drop-zone entry point (25-07 Task 1, D-15) ───────────────────── Lets an external drop zone (the Slides tab's grid-wide/tile drop handling, 25-07) hand this modal an already-picked File without touching its own <input> elements...
+
+### `src/components/SongLyricEditor.vue`
+- **`src/components/SongLyricEditor.vue:793-804`** -> _STACK.md_ — ── Drag reorder (D-01): the list is always draggable by handle, no mode to enter first.
+
+### `src/components/SongSlotPicker.vue`
+- **`src/components/SongSlotPicker.vue:267-277`** -> _ARCHITECTURE.md_ — Visible songs filtered by the shared store tag-filter state (D-09/D-10: independent per-tag Show/Hide sets — exclusion always wins; include set OR-combines when non-empty).
+
+### `src/components/SongTable.vue`
+- **`src/components/SongTable.vue:438-444`** -> _ARCHITECTURE.md_ — Note: Tags/Themes on this listing are display-only + click-to-filter (filterByPill above).
+
+### `src/components/actionBarItems.ts`
+- **`src/components/actionBarItems.ts:1-31`** -> _ARCHITECTURE.md_ — ActionBarItem contract — 36-02, R068. The declarative shape `ContextualActionBar.vue` renders and `buildActionBarItems` (`src/views/serviceEditorActionBar.ts`) produces.
+
+### `src/components/admin/CleanupEnableConfirmDialog.vue`
+- **`src/components/admin/CleanupEnableConfirmDialog.vue:112-123`** -> _ARCHITECTURE.md_ — Phase 71-02 (R189/R190) — Confirm-to-flip modal for the Owner Console's Cleanup card.
+
+### `src/components/admin/DeactivateOrgConfirmDialog.vue`
+- **`src/components/admin/DeactivateOrgConfirmDialog.vue:88-99`** -> _ARCHITECTURE.md_ — Quick task 260824 — reversible-lifecycle confirm dialog for deactivating a church.
+
+### `src/components/run/RunDisplaysPanel.vue`
+- **`src/components/run/RunDisplaysPanel.vue:2-28`** -> _CONCERNS.md_ — RunDisplaysPanel — the State-B Displays panel (R276), now relocated to the right column beside/under the next-up preview (owner fix #4) and carrying the closed-window RECOVERY (R274) that the removed top status band used to surface (owner f...
+
+### `src/components/run/RunFilmstrip.vue`
+- **`src/components/run/RunFilmstrip.vue:41-51`** -> _ARCHITECTURE.md_ — R282 — the in-item filmstrip, extracted as a PURE presentational child (97-05).
+
+### `src/components/run/RunHeader.vue`
+- **`src/components/run/RunHeader.vue:2-20`** -> _ARCHITECTURE.md_ — RunHeader — the State-B live header (R277). PURE presentation: props-in / emits-out, no channel, no store, no timer logic.
+
+### `src/components/run/RunPreviewPair.vue`
+- **`src/components/run/RunPreviewPair.vue:114-134`** -> _ARCHITECTURE.md_ — R276 owner fix #2/#4 — the program + next-up preview pair, extracted as a PURE display child (97-05).
+
+### `src/components/run/RunRail.vue`
+- **`src/components/run/RunRail.vue:2-16`** -> _ARCHITECTURE.md_ — RunRail — the order-of-service rail (R276, R262/R263), extracted as PURE presentation from RunControlView.vue (:388-463 markup + the Phase 95 captureActiveRow/watch(index) auto-scroll at useRunControl.ts:184-193).
+
+### `src/components/run/RunTransportBar.vue`
+- **`src/components/run/RunTransportBar.vue:2-11`** -> _ARCHITECTURE.md_ — RunTransportBar — the State-B bottom transport bar (R276). PURE presentation: props-in / emits-out, no channel, no store.
+
+### `src/components/settings/ServiceTemplateEditor.vue`
+- **`src/components/settings/ServiceTemplateEditor.vue:309-318`** -> _ARCHITECTURE.md_ — The six kinds a church can add here — a closed set, never derived from the `SlotKind` union (which also contains HYMN, palette-retired in Phase 43/R084, and IMPORTED, which has no pre-creation meaning).
+
+### `src/components/slides/BackgroundControl.vue`
+- **`src/components/slides/BackgroundControl.vue:73-101`** -> _ARCHITECTURE.md_ — Shared, presentational background-image control (R055/R057, Phase 33 Plan 03) — mounted at BOTH the group level (`SlideGrid.vue`, 33-08) and the song level (`SongLyricEditor.vue`, 33-06), a mechanical sibling of `SlideGroupMusicControl.vue`...
+- **`src/components/slides/BackgroundControl.vue:139-151`** -> _ARCHITECTURE.md_ — Owner follow-up (side-by-side group media panel): when true, this control renders NO caption line of its own in either state — the caller is taking responsibility for placing `caption`'s copy itself.
+
+### `src/components/slides/EditSlideDrawer.vue`
+- **`src/components/slides/EditSlideDrawer.vue:542-555`** -> _ARCHITECTURE.md_ — R036 — the service's lifecycle lock, kept DISTINCT from `isEditor` because this drawer is the one surface that must tell the two apart: a viewer and a locked editor need different read-only copy (31-UI-SPEC § 6).
+- **`src/components/slides/EditSlideDrawer.vue:565-577`** -> _CONCERNS.md_ — Phase 33 UI-audit fix — the selected slide's GROUP siblings, already resolved (same array `SlidesTab.vue`'s `selectedGroupAssembledSlides` computes for the position/total props above, at the same altitude, no new resolver).
+- **`src/components/slides/EditSlideDrawer.vue:827-836`** -> _ARCHITECTURE.md_ — `scripture`-kind entries: the UI-SPEC calls for the passage text alone, not `slideBodyText`'s reference-prefixed form (the reference is already shown in the context line above).
+- **`src/components/slides/EditSlideDrawer.vue:1023-1035`** -> _ARCHITECTURE.md_ — ★ Deliberately NOT `canMutate` — omits the song-group exclusion.
+- **`src/components/slides/EditSlideDrawer.vue:1038-1059`** -> _ARCHITECTURE.md_ — ★ Phase 33 UI-audit fix (previously a known, scoped gap documented in 33-07-SUMMARY.md): this drawer still receives no `song` document, so the GROUP branch keeps reading `props.group.backgroundImageUrl` directly (a raw field read, not a re-...
+- **`src/components/slides/EditSlideDrawer.vue:1390-1408`** -> _ARCHITECTURE.md_ — ── Phase 26-09 Task 2: Duplicate — insert a copy directly after the original ── Mints a FRESH id for the copy (D-04, this plan's key_links) — never the original's, and never derived from label/source/position: `PresentationViewer.vue` keys...
+- **`src/components/slides/EditSlideDrawer.vue:1448-1458`** -> _ARCHITECTURE.md_ — Filters the entry out and renumbers the rest contiguous, writing through the same fresh-base helper every other write in this drawer uses.
+- **`src/components/slides/EditSlideDrawer.vue:1485-1502`** -> _ARCHITECTURE.md_ — ★ P-01: the delete key sets the EXISTING `showDeleteConfirm` state and never calls the delete action directly. A menu puts destruction one click closer than the drawer did; it must not also make it quieter.
+
+### `src/components/slides/SlideCanvas.vue`
+- **`src/components/slides/SlideCanvas.vue:360-372`** -> _ARCHITECTURE.md_ — R070 (UAT F3) — the slide → group → song background cascade was already resolved upstream, once, by the assembler; this reads only the single winning value already sitting on the current slide.
+- **`src/components/slides/SlideCanvas.vue:542-555`** -> _STACK.md_ — R093 (46-04) — per-element font-weight/font-size overrides reading the `--slide-font-*` custom properties `PresentationViewer`'s `typographyStyle` sets on its viewer root, which these elements inherit into (moved here unchanged, Phase 90).
+
+### `src/components/slides/SlideCard.vue`
+- **`src/components/slides/SlideCard.vue:169-194`** -> _CONCERNS.md_ — Presentational, prop-driven slide card (Phase 25 Task 1, drag grip added 25-05 Task 3). Renders one assembled slide inside `SlideGrid.vue` — text body plus metadata only; real formatted-slide rendering remains deferred (D-10).
+
+### `src/components/slides/SlideDropTarget.vue`
+- **`src/components/slides/SlideDropTarget.vue:33-60`** -> _STACK.md_ — The drop tile itself (D-13) — always the LAST item the grid renders, including at zero slides (D-08), and NEVER inside SortableJS's draggable set: `.slide-card` is deliberately absent from this component's root class, so a tile mounted insi...
+
+### `src/components/slides/SlideGrid.vue`
+- **`src/components/slides/SlideGrid.vue:537-552`** -> _ARCHITECTURE.md_ — ★ R036 — the two composed gates this component uses everywhere. Both fold the lifecycle lock into the existing R054 seam rather than running beside it. `canMutateGroup` — create/import/reorder the group's SLIDES.
+- **`src/components/slides/SlideGrid.vue:797-808`** -> _ARCHITECTURE.md_ — --- R050: the one append contract every write path below routes through --- Sorts a copy of `entries` by `order`, concatenates `additions` (in the order given), then renumbers every element to its array index — so array order and `order` ar...
+- **`src/components/slides/SlideGrid.vue:1100-1109`** -> _STACK.md_ — --- Task 3: drag-reorder within the selected group (D-11) --- Reuses the exact SortableJS pattern already established in `ServiceEditorView.vue`'s slot list: `handle`/`draggable` scoping and splice-and-reindex.
+- **`src/components/slides/SlideGrid.vue:1192-1201`** -> _ARCHITECTURE.md_ — T-29-13: surface the failure inline and force the card list to rebuild from props (via `gridRenderNonce`) — the DOM revert this used to lean on is gone, and `props.assembledSlideshow` changes no prop on a rejected write, so nothing re-rende...
+
+### `src/components/slides/SlideGroupMusicControl.vue`
+- **`src/components/slides/SlideGroupMusicControl.vue:76-91`** -> _ARCHITECTURE.md_ — Group-level audio bed control (Phase 25 Task 1, R032) — scoped to the SELECTED GROUP rather than a service slot, and audio-only per D-14 (group music is never a slide; dropped video is a slide, that path is 25-07's).
+
+### `src/components/slides/SlidesTab.vue`
+- **`src/components/slides/SlidesTab.vue:137-148`** -> _ARCHITECTURE.md_ — ★ R036 — the lifecycle lock, threaded DISTINCT from `isEditor` rather than folded into it upstream.
+- **`src/components/slides/SlidesTab.vue:184-196`** -> _ARCHITECTURE.md_ — Whether there is anything assembled to present — the same condition SlideshowPreview's own `canPresent` (aliased to `hasAnySlides`, Phase 23-04) used, restated directly against `assembledSlideshow` rather than reintroducing the `AssembledSe...
+- **`src/components/slides/SlidesTab.vue:272-281`** -> _ARCHITECTURE.md_ — Phase 33-09 — a menu-dispatched Duplicate/Delete request, relayed verbatim into the drawer's own `pendingAction` prop (33-07's seam).
+- **`src/components/slides/SlidesTab.vue:383-392`** -> _ARCHITECTURE.md_ — R061 — the (group, slide) → flat-deck-index mapping `present` hands to `PresentationViewer`.
+
+### `src/components/slides/SlotLoopControl.vue`
+- **`src/components/slides/SlotLoopControl.vue:2-15`** -> _ARCHITECTURE.md_ — Per-item Run auto-advance / LOOP authoring control (R306/R307, Phase 106).
+
+### `src/components/slides/dropRouting.ts`
+- **`src/components/slides/dropRouting.ts:1-19`** -> _ARCHITECTURE.md_ — Pure module partitioning a native drop's raw `File[]` into the four accepted kinds (PPTX deck, image, video, audio) plus a rejected bucket (25-07 Task 2, R018/R032).
+- **`src/components/slides/dropRouting.ts:97-106`** -> _ARCHITECTURE.md_ — Applies the documented resolution order for a multi-kind drop (25-07 Task 2, D-14 discretion): the first audio file becomes the group's music; every video file appends a slide, in drop order; for the two modal-backed kinds, a PPTX takes pre...
+
+### `src/components/slides/slideDisplay.ts`
+- **`src/components/slides/slideDisplay.ts:58-69`** -> _ARCHITECTURE.md_ — Static, fully-spelled-out failure-reason → human-sentence lookup — the copywriting-contract table from 42-UI-SPEC.md, reproduced verbatim, in the same shape as `KIND_BADGE_CLASSES` above: a complete literal `Record`, never a value built by...
+- **`src/components/slides/slideDisplay.ts:78-91`** -> _ARCHITECTURE.md_ — The ONE sanctioned route from a render document's raw `failureReason` slug to the DOM (`SlideBase.renderFailureReason`'s own doc comment names this function as its only legal consumer). Never render `failureReason` any other way.
+- **`src/components/slides/slideDisplay.ts:131-142`** -> _ARCHITECTURE.md_ — Readable, natural-case speaker name for a congregational section's `speaker` enum value (Phase 38-03, widened Phase 47 R095) — `'LEADER'` -> `'Leader'`, `'CONGREGATION'` -> `'Congregation'`, `'ALL'` -> `'All'`.
+- **`src/components/slides/slideDisplay.ts:197-219`** -> _INTEGRATIONS.md_ — R047: a Reference-state slide (no congregational section) defaults to reference-only (empty text) — return just the reference, with no trailing blank line.
+- **`src/components/slides/slideDisplay.ts:278-287`** -> _ARCHITECTURE.md_ — The Edit Slide drawer's delete-confirm body (26-UI-SPEC.md § "Duplicate and Delete Slide", Phase 24 D-03 precedent) — the four wordings, reproduced verbatim, branching on whether THIS entry (never the group) has its own attached audio and/o...
+- **`src/components/slides/slideDisplay.ts:346-365`** -> _ARCHITECTURE.md_ — 34-07 (owner UAT F1): this key now opens the congregational-reading editor in place (a modal over the Slides tab), not a navigation away from it — 'edit-in-song' stays 'nav' below because IT still routes to the song editor.
+- **`src/components/slides/slideDisplay.ts:384-435`** -> _ARCHITECTURE.md_ — Pure per-kind 3-dot slide action menu item list (R063). Synchronous, no store/composable reads — follows this file's established pure-helper convention (`KIND_BADGE_CLASSES`, `deleteSlideConfirmBody`).
+
+### `src/components/stage/StageKindIcon.vue`
+- **`src/components/stage/StageKindIcon.vue:2-13`** -> _ARCHITECTURE.md_ — Inline-SVG glyph for a stage-marker kind (Phase 107 redesign).
+
+### `src/components/stage/StageLayoutEditor.vue`
+- **`src/components/stage/StageLayoutEditor.vue:2-28`** -> _ARCHITECTURE.md_ — The AUTHORING half of the visual stage layout (R313/R314, Phase 107), redesigned to the single-room "Nocturne" diagram: a left PALETTE of typed chips, one continuous room CANVAS (StageRoom), and — for editing a marker — the app's existing r...
+
+### `src/components/stage/StageLayoutPrintDocument.vue`
+- **`src/components/stage/StageLayoutPrintDocument.vue:2-14`** -> _ARCHITECTURE.md_ — The tech team's printable STAGE LAYOUT sheet (quick task 2026-09-01): hidden on screen, shown only when printing, and printed LANDSCAPE + BLACK AND WHITE (see ServiceEditorView.printStageLayout, which injects the `@page { size: landscape }`...
+
+### `src/components/stage/StageLayoutView.vue`
+- **`src/components/stage/StageLayoutView.vue:2-14`** -> _STACK.md_ — Shared READ-ONLY stage-plot renderer (R313/R314/R315, Phase 107; redesigned to the single-room diagram).
+
+### `src/components/stage/StageMarkerChip.vue`
+- **`src/components/stage/StageMarkerChip.vue:2-17`** -> _ARCHITECTURE.md_ — A single stage-marker tile (Phase 107 redesign): a rounded icon tile with the kind glyph, the label beneath it, plus the type, an assigned person, and a tech note.
+
+### `src/components/stage/StageRoom.vue`
+- **`src/components/stage/StageRoom.vue:2-20`** -> _ARCHITECTURE.md_ — The stage-room BACKDROP (Phase 107 redesign): one continuous room drawn the way it reads when you stand in it — the platform is a shape at the top, the audience sits below, and "off stage" is the floor in the side wings.
+
+### `src/composables/useAutoSave.ts`
+- **`src/composables/useAutoSave.ts:19-44`** -> _ARCHITECTURE.md_ — Reusable auto-save composable extracted from ServiceEditorView's pattern. Watches a reactive source with a deep watcher, debounces changes, and calls `saveFn` after the debounce period elapses.
+
+### `src/composables/useBackgroundUpload.ts`
+- **`src/composables/useBackgroundUpload.ts:5-14`** -> _ARCHITECTURE.md_ — Background-image-cap constant (R055/R057, Phase 33 Plan 03) — a client-side pre-validation figure that sits well under the authoritative server-side cap for this prefix.
+- **`src/composables/useBackgroundUpload.ts:48-69`** -> _INTEGRATIONS.md_ — Firebase Storage upload composable for background images (R055/R057, Phase 33 Plan 03).
+
+### `src/composables/useLoopTimer.ts`
+- **`src/composables/useLoopTimer.ts:1-18`** -> _ARCHITECTURE.md_ — useLoopTimer — the single-active-timer primitive behind per-item Run loop playback (Phase 106, R306/R308). Owns EXACTLY ONE interval id.
+
+### `src/composables/useMediaUpload.ts`
+- **`src/composables/useMediaUpload.ts:41-50`** -> _INTEGRATIONS.md_ — Firebase Storage upload composable for audio/video media attachments (Phase 22, R013/R014). Mirrors `src/utils/pptxUpload.ts`'s resumable-upload + createdAt-custom-metadata pattern, reactively, for the media-attachment upload UI.
+
+### `src/composables/useOutputWindow.ts`
+- **`src/composables/useOutputWindow.ts:41-51`** -> _STACK.md_ — Each output view passes its OWN static role ('audience' | 'confidence') — the routes /present/audience|confidence make the role statically known. Retained as a harmless identity option; fullscreen is no longer resolved from it.
+- **`src/composables/useOutputWindow.ts:137-148`** -> _STACK.md_ — ── Fullscreen Capability Delegation (best-effort zero-tap) ───────────────── A popup opened via window.open loses its OWN transient user-activation the moment its SPA/auth bootstrap runs, so a mount-time requestFullscreen() here always reje...
+- **`src/composables/useOutputWindow.ts:164-191`** -> _ARCHITECTURE.md_ — ── Automatic Fullscreen content setting (Chrome 126+ — the ZERO-CLICK primary) ─ Chrome's "Automatic Fullscreen" content setting (a one-time per-computer allow, or the AutomaticFullscreenAllowedForUrls enterprise policy) lets an allowed ori...
+- **`src/composables/useOutputWindow.ts:284-286`** -> _CONCERNS.md_ — NOTE: the deferred first-play (audience old onMounted 256-259) is NOT here — it references the view's canvas ref and is re-homed to a view-local watch(fontReady) in each consuming view.
+
+### `src/composables/useRunControl.ts`
+- **`src/composables/useRunControl.ts:336-352`** -> _ARCHITECTURE.md_ — ── Output-window orchestration (R261 / R266) ────────────────────────────── The Go live gesture opens BOTH standalone output windows and (when the live monitors match a saved mapping) places each on its assigned screen.
+- **`src/composables/useRunControl.ts:574-588`** -> _STACK.md_ — Owner UAT — auto-fullscreen the output windows. Chrome's Window Management API supports opening a popup DIRECTLY in fullscreen via the `fullscreen` window feature (with the window-management permission — already granted in monitor setup — a...
+- **`src/composables/useRunControl.ts:605-614`** -> _STACK.md_ — ── Fullscreen Capability Delegation (opener side) ────────────────────────── A popup cannot self-fullscreen (it loses its own activation to its bootstrap), but WE (the control window) still hold transient activation from the Go-live click.
+- **`src/composables/useRunControl.ts:635-645`** -> _ARCHITECTURE.md_ — Owner UAT — per-display fullscreen. Bound to a "Go fullscreen" button on each card in the control's Displays panel.
+- **`src/composables/useRunControl.ts:847-858`** -> _CONCERNS.md_ — Owner UAT — keep the CONTROL screen fullscreen while running. openOutputs requests control fullscreen SYNCHRONOUSLY in the click path (so a non-policy machine still gets its one gesture-authorized attempt), but opening the two output popups...
+- **`src/composables/useRunControl.ts:954-966`** -> _INTEGRATIONS.md_ — END REHEARSAL (owner UAT) — return to the pre-flight "Ready when you are" screen (State A) WITHOUT tearing down or navigating away.
+- **`src/composables/useRunControl.ts:1129-1139`** -> _ARCHITECTURE.md_ — ── Per-item loop timer (R306/R308, Phase 106) ────────────────────────────── The SINGLE loop timer lives HERE — never in an output window (AudienceOutputView/ConfidenceOutputView stay receive-only, ARCHITECTURE anti-patterns).
+- **`src/composables/useRunControl.ts:1249-1258`** -> _ARCHITECTURE.md_ — Open the monitor-setup screen in a NEW TAB so the running control (index/seq/ channel + any open outputs) survives — mirrors the reassign banner's new-tab rule. Owner fix #5: NO 'noopener'.
+
+### `src/composables/useRunTimers.ts`
+- **`src/composables/useRunTimers.ts:3-19`** -> _ARCHITECTURE.md_ — useRunTimers — the Run screen's wall clock + elapsed-since-go-live timer (R281).
+
+### `src/composables/useSlideshowAssembly.ts`
+- **`src/composables/useSlideshowAssembly.ts:1-14`** -> _STACK.md_ — Reactive wrapper over the pure `assembleSlideshow` engine (20-02), delivering R006: reorder/add/remove a service element and the assembled slideshow follows with no manual re-sync.
+- **`src/composables/useSlideshowAssembly.ts:34-43`** -> _ARCHITECTURE.md_ — Opens a LIVE subscription to a song's current (newest) lyrics document.
+- **`src/composables/useSlideshowAssembly.ts:127-139`** -> _ARCHITECTURE.md_ — On-demand group materializer (25-05 Task 1): resolves to `{ entries, sourceSignature }` for `slotId`'s group, creating it first if it does not exist yet — including when the derived input has ZERO slides, unlike the automatic `materializeCa...
+- **`src/composables/useSlideshowAssembly.ts:141-157`** -> _ARCHITECTURE.md_ — ME-04 (R045 membership). Marks `slotId` as having a delete in flight and returns the release; call it in a `finally`.
+- **`src/composables/useSlideshowAssembly.ts:159-169`** -> _ARCHITECTURE.md_ — HI-01. Resolves once no group write issued by this composable is still in flight.
+- **`src/composables/useSlideshowAssembly.ts:253-262`** -> _ARCHITECTURE.md_ — 2. `imported` ENTRIES living inside ANY slot's slide group. A PPTX deck's rendered slides can be added straight into a non-IMPORTED slot's group (e.g.
+- **`src/composables/useSlideshowAssembly.ts:456-467`** -> _ARCHITECTURE.md_ — --- Part 2: live structure for a stale SONG group, in-memory only --- True when a SONG slot's PERSISTED slide group no longer matches the verse structure the song's CURRENT lyrics would produce — a verse added, removed, or reordered in `per...
+- **`src/composables/useSlideshowAssembly.ts:482-493`** -> _ARCHITECTURE.md_ — The group map the assembler renders from. For an EDITABLE session (`canWrite`) this is the store's map UNCHANGED — the rebuild loop persists any regenerated group, so the stored group is authoritative and behavior is identical to before.
+- **`src/composables/useSlideshowAssembly.ts:529-538`** -> _ARCHITECTURE.md_ — --- Task 2: lazy materialization, zero writes on reorder --- `materializationCandidates` is a fully SYNCHRONOUS computed that decides WHAT needs materializing.
+- **`src/composables/useSlideshowAssembly.ts:600-610`** -> _ARCHITECTURE.md_ — HI-01. Both apply loops below are invoked fire-and-forget (`void …`) from `{ immediate: true }` watchers, so nothing awaits them and nothing can observe when their writes settle.
+- **`src/composables/useSlideshowAssembly.ts:659-668`** -> _ARCHITECTURE.md_ — --- 25-05 Task 1: on-demand materialization for an explicit user write --- Concurrent calls for the SAME slot are deduped through `ensureInFlight` so at most one create is issued and every caller resolves the same result.
+
+### `src/composables/useUnsavedGuard.ts`
+- **`src/composables/useUnsavedGuard.ts:3-22`** -> _ARCHITECTURE.md_ — Tracks a baseline snapshot of a drawer's editable form state (captured when the drawer opens) and exposes a reactive dirty-check plus a confirm-before-discard guard for Cancel / backdrop / × close actions.
+
+### `src/config/appConfigDefaults.ts`
+- **`src/config/appConfigDefaults.ts:108-119`** -> _ARCHITECTURE.md_ — A client-side mirror of functions/src/appConfig.ts's mergeAppConfig — deliberately a PER-GROUP merge (not a naive recursive deep-merge or a generic deep-merge library), so a doc that sets only e.g.
+
+### `src/config/slideFonts.ts`
+- **`src/config/slideFonts.ts:1-41`** -> _CONCERNS.md_ — Curated registry of self-hosted slide fonts (R093 success criterion 4).
+
+### `src/firebase/index.ts`
+- **`src/firebase/index.ts:23-41`** -> _STACK.md_ — Emulator wiring — DEV BUILDS ONLY. ★ `import.meta.env.DEV` is load-bearing, not belt-and-braces. Do not remove it, and do not "simplify" this back to a bare VITE_USE_EMULATORS check.
+
+### `src/main.ts`
+- **`src/main.ts:16-25`** -> _STACK.md_ — NOTE (output-window fullscreen): there is deliberately NO module-load requestFullscreen() here for /present/* windows.
+
+### `src/stores/appConfig.ts`
+- **`src/stores/appConfig.ts:52-65`** -> _ARCHITECTURE.md_ — Every appConfig/global write MUST use setDoc(..., {merge:true}), NEVER updateDoc — R182 made an absent doc a valid, expected state (e.g.
+
+### `src/stores/auth.ts`
+- **`src/stores/auth.ts:142-153`** -> _ARCHITECTURE.md_ — The organizations the signed-in user belongs to ({id, name, active, role}) — the source the login church-picker AND (Phase 104, R311/R312) the sidebar church switcher render when a user belongs to more than one.
+- **`src/stores/auth.ts:296-319`** -> _ARCHITECTURE.md_ — R075 (D-06/D-07) / P-01 — force the custom `orgId`/`role` claim (set by functions/src/orgMembershipClaims.ts's syncOrgMembershipClaim trigger) onto the active session's ID token so a member does not wait out a full 1-hour token lifetime for...
+- **`src/stores/auth.ts:414-423`** -> _ARCHITECTURE.md_ — Dual-read migration (R073): nested settings value first, then the legacy flat field, then the hardcoded default.
+- **`src/stores/auth.ts:508-519`** -> _ARCHITECTURE.md_ — Bug 1b (quick 260830-l9c) — self-heal a clobbered orgIds array from the authoritative `orgs` custom claim.
+- **`src/stores/auth.ts:537-549`** -> _ARCHITECTURE.md_ — Build the membership list ({id, name, active}) the church picker renders. Each org doc is read individually and guarded: an org the user has an orgIds entry for but can't cleanly read (e.g.
+
+### `src/stores/orgScopedStores.ts`
+- **`src/stores/orgScopedStores.ts:13-47`** -> _STACK.md_ — Tear down EVERY org-scoped Pinia store — unsubscribe its Firestore listener and clear its cached state — in one call.
+
+### `src/stores/pptxRenders.ts`
+- **`src/stores/pptxRenders.ts:7-33`** -> _STACK.md_ — Pinia store for render-status documents (Phase 42, R079/R080) — `organizations/{orgId}/pptxRenders/{importId}`. ★ Genuinely new design (42-PATTERNS.md "No Analog Found").
+
+### `src/stores/quarters.ts`
+- **`src/stores/quarters.ts:215-224`** -> _ARCHITECTURE.md_ — D-03/D-05/D-06: single-person quarter-data save from the availability drawer.
+
+### `src/stores/services.ts`
+- **`src/stores/services.ts:49-66`** -> _ARCHITECTURE.md_ — R036 — thrown by the store's draft-only write guard (enforcement layer 2 of 3). The guard is defence-in-depth, NOT the primary enforcement: the Firestore rule added in 31-01 is what actually stops a determined client.
+- **`src/stores/services.ts:103-114`** -> _ARCHITECTURE.md_ — Read-only public projection of `Service.stageLayout` (R315, Phase 107).
+- **`src/stores/services.ts:166-180`** -> _ARCHITECTURE.md_ — Stage layout projection (T-107-01): map to EXACTLY the 6 display fields — id, label, kind, zone, xPct, yPct — never a raw spread of the source marker, so a future non-display StageMarker field cannot silently reach the public page.
+- **`src/stores/services.ts:188-192`** -> _ARCHITECTURE.md_ — `note` is planner-authored tech instruction (non-PII free text, e.g. "XLR run from stage left") and belongs on the printed/shared plot the tech team reads.
+- **`src/stores/services.ts:359-375`** -> _ARCHITECTURE.md_ — ── R036 draft-only write guard ────────────────────────────────────────────── The three shapes below mirror `firestore.rules`' `/services` `allow update` clause one-for-one.
+- **`src/stores/services.ts:380-393`** -> _ARCHITECTURE.md_ — ── R247 (84-01) — lastUsedAt recompute on lock/unlock ────────────────────── A song's lastUsedAt reflects MAX(service.date) over the LOCKED (non-draft) services it's in — never the wall-clock moment it was assigned to a draft (see src/utils...
+- **`src/stores/services.ts:481-491`** -> _ARCHITECTURE.md_ — ── R037 status transitions ────────────────────────────────────────────────── D-02: explicit, named actions — one per legal transition — replacing the deleted `toggleStatus` cycle.
+- **`src/stores/services.ts:529-539`** -> _INTEGRATIONS.md_ — R037 — reopen a locked service for editing. ★ The payload is `status` + `updatedAt` and NOTHING ELSE.
+- **`src/stores/services.ts:575-596`** -> _INTEGRATIONS.md_ — D-15: deliberately NOT guarded. Delete stays available at every status — the UI warns about an orphaned Planning Center plan instead of locking.
+- **`src/stores/services.ts:848-867`** -> _ARCHITECTURE.md_ — The `shareTokens/{token}` payload write plus the soft-fail memorable-URL `serviceShares/{slug}__service-{date}` write.
+- **`src/stores/services.ts:919-928`** -> _ARCHITECTURE.md_ — R076/R078 — resolves THE one stable token for a service: reading the `serviceShareLinks/{serviceId}` identity doc if it exists, else adopting the most recent compatible already-circulated `shareTokens` document, else minting a fresh one — t...
+
+### `src/stores/slideGroups.ts`
+- **`src/stores/slideGroups.ts:22-37`** -> _STACK.md_ — Pinia store for slide groups (Phase 24). Mirrors useImportedSlides / useScriptureSlides (src/stores/importedSlides.ts, src/stores/scriptureSlides.ts) against the organizations/{orgId}/slideGroups sibling collection, with `slides` as an EMBE...
+
+### `src/stores/songLyrics.ts`
+- **`src/stores/songLyrics.ts:136-153`** -> _ARCHITECTURE.md_ — Sets or clears the song-level background image (R057) — the least specific tier of the slide/group/song cascade `resolveEntryMedia` resolves.
+
+### `src/stores/toasts.ts`
+- **`src/stores/toasts.ts:55-66`** -> _ARCHITECTURE.md_ — The app-wide dismissible-message store (R309/R310), generalized in place from the original narrow failure-toast store (R041).
+
+### `src/types/importedDeck.ts`
+- **`src/types/importedDeck.ts:19-29`** -> _STACK.md_ — The Storage-side import id (Phase 37, R062) -- the same crypto.randomUUID() value pptxUpload.ts's generateImportId() produces, which scopes orgs/{orgId}/pptx-imports/{importId}/ and organizations/{orgId}/pptxRenders/{importId}.
+
+### `src/types/organization.ts`
+- **`src/types/organization.ts:3-14`** -> _ARCHITECTURE.md_ — A single entry in a church's default service template (R086/R087).
+- **`src/types/organization.ts:30-51`** -> _ARCHITECTURE.md_ — Church-level settings stored on `organizations/{orgId}.settings` (R073).
+- **`src/types/organization.ts:72-83`** -> _ARCHITECTURE.md_ — Church-defined default set/order of items for a new service (R086/R087).
+- **`src/types/organization.ts:93-108`** -> _CONCERNS.md_ — Church's one house font, applied to every slide surface — the Slides grid, the Edit Slide drawer preview, and the presenter (`PresentationViewer.vue`) — via CSS custom properties (R093).
+- **`src/types/organization.ts:170-180`** -> _CONCERNS.md_ — LEGACY flat storage location for the Vertical Worship toggle, in use before this phase (Phase 16.1, D-15/D-16).
+- **`src/types/organization.ts:197-209`** -> _INTEGRATIONS.md_ — Phase 101 (R295) — the super-admin MASTER gate for the Bible **API** (paid ESV/NLT proxy), NOT scripture features in general — an OFF org still does scripture manually (Phases 102/103).
+
+### `src/types/pptxRender.ts`
+- **`src/types/pptxRender.ts:1-18`** -> _ARCHITECTURE.md_ — Client-side render-status type for `organizations/{orgId}/pptxRenders/{importId}` (Phase 42, R079/R080). This is a CONSUMED-FIELDS PROJECTION of the server document defined in `functions/src/index.ts:150-157`, not a wire mirror.
+
+### `src/types/service.ts`
+- **`src/types/service.ts:48-59`** -> _ARCHITECTURE.md_ — Slot-level free-text notes (R122, Phase 54). Plain text only — a planner jots who leads / who sings which parts beside the item's selector. Lives on the shared base so `slot.notes` is reachable cast-free on all five slot kinds.
+- **`src/types/service.ts:61-76`** -> _ARCHITECTURE.md_ — Per-item Run auto-advance/loop configuration (R306/R307, Phase 106). Lives on the shared base so `slot.loop` is reachable cast-free on all five slot kinds, exactly like `notes` above.
+- **`src/types/service.ts:130-140`** -> _INTEGRATIONS.md_ — Optional custom display name for a MISC item (R127, Phase 56).
+- **`src/types/service.ts:175-191`** -> _ARCHITECTURE.md_ — A single stage-plot marker (R313/R314/R315, Phase 107). `label` is free text and the source of truth (an owner may label a marker for a one-off speaker's mic); `kind` is an OPTIONAL light visual accent only — never a required constrained pi...
+- **`src/types/service.ts:280-298`** -> _STACK.md_ — Visual stage plot for tech/sound (R313/R314/R315, Phase 107). Additive, optional, no-migration — mirrors `messaging`/`notes`/`loop`'s lifecycle exactly: absent on every service written before this field existed (old behavior, no backfill ne...
+
+### `src/types/slide.ts`
+- **`src/types/slide.ts:1-12`** -> _ARCHITECTURE.md_ — Unified Slide type with contentKind discriminator. S01 defines 'lyric' only; later slices add 'scripture', 'imported', 'text', 'image', and 'video'.
+- **`src/types/slide.ts:20-29`** -> _ARCHITECTURE.md_ — Render carrier for attached audio (Phase 22 R013/R014, refactored Phase 24 D-04).
+- **`src/types/slide.ts:54-65`** -> _ARCHITECTURE.md_ — Phase 42 (R079/R080) render-state discriminator for a slide sourced from a PPTX deck whose server-side render (`organizations/{orgId}/pptxRenders/ {importId}`) has not yet produced a usable page for it.
+- **`src/types/slide.ts:67-76`** -> _ARCHITECTURE.md_ — The raw machine slug copied unchanged off the render document's own `failureReason` (e.g. `'incomplete-render'`, `'render-service-error'`). Present only alongside `renderState: 'failed'`.
+- **`src/types/slide.ts:109-118`** -> _INTEGRATIONS.md_ — R092 (Phase 45): which Bible translation this section's text was fetched from, stamped ONCE by `CongregationalEditor.vue` at fetch time from the church's CURRENT `bibleVersion` setting.
+- **`src/types/slide.ts:203-214`** -> _ARCHITECTURE.md_ — A blackout slide — an authored inline black interlude (R302/R303, 105-CONTEXT.md).
+
+### `src/types/slideGroup.ts`
+- **`src/types/slideGroup.ts:54-63`** -> _ARCHITECTURE.md_ — Opaque signature of the source content this group was last rebuilt against.
+- **`src/types/slideGroup.ts:97-164`** -> _ARCHITECTURE.md_ — Discriminated union of every kind of content a `GroupSlideEntry` can point at, narrowed on `kind`.
+
+### `src/types/songLyrics.ts`
+- **`src/types/songLyrics.ts:3-13`** -> _ARCHITECTURE.md_ — A single section of song lyrics (e.g. Verse 1, Chorus). A member of the canonical POOL (`SongLyrics.sections` / `ParsedCCLI.sections`) — each `id` appears at most once across a document's pool.
+- **`src/types/songLyrics.ts:31-41`** -> _ARCHITECTURE.md_ — Optional content kind (Phase 105, R302/R303/R304). Absent means 'lyric' - every section persisted before this phase, and every section minted by the normal `addSection` path, carries no `kind` field at all (additive, no migration).
+
+### `src/utils/claudeApi.ts`
+- **`src/utils/claudeApi.ts:165-178`** -> _INTEGRATIONS.md_ — Classifies and logs a failed proxied AI call. Phase 65's cost controls (R161/R162) mean the proxy can now legitimately reject a request with HTTP 429 (per-uid rate/cost limit exceeded) or HTTP 400 (disallowed model / server-side policy reje...
+- **`src/utils/claudeApi.ts:444-462`** -> _ARCHITECTURE.md_ — The structural contract the model is allowed to speak — nothing else.
+
+### `src/utils/congregationalText.ts`
+- **`src/utils/congregationalText.ts:1-10`** -> _ARCHITECTURE.md_ — Pure, testable text<->sections conversion for the `---`-delimited congregational-reading editor (supersedes Phase 47's click-between-verses divider model per owner feedback: the divider UX was unintuitive). The editor is a plain textarea.
+- **`src/utils/congregationalText.ts:32-43`** -> _ARCHITECTURE.md_ — Parse `---`-delimited textarea content into congregational sections. - Chunks are split on lines that are exactly `---`. - An empty (whitespace-only) chunk is skipped.
+
+### `src/utils/firestoreListener.ts`
+- **`src/utils/firestoreListener.ts:1-10`** -> _ARCHITECTURE.md_ — Bug 2b (quick 260830-l9c) — shared onSnapshot error-handling helper. A handful of Firestore snapshot listeners only unsubscribe on view unmount, which happens AFTER the router redirects to /login on sign-out.
+
+### `src/utils/importedRenderReconciler.ts`
+- **`src/utils/importedRenderReconciler.ts:239-261`** -> _ARCHITECTURE.md_ — R108 (Phase 50, part 2 of 2 — CONSUME the page): an imported deck's slides can be manually added into ANOTHER slot's group (e.g. a Prayer group, alongside auto-generated slides).
+- **`src/utils/importedRenderReconciler.ts:281-308`** -> _ARCHITECTURE.md_ — Cheap change-detection proxy for the IMPORTED slot kind, mirroring `slideGroupMaterializer.ts`'s `sourceSignature` contract for every other slot kind.
+
+### `src/utils/lastUsed.ts`
+- **`src/utils/lastUsed.ts:1-27`** -> _ARCHITECTURE.md_ — Canonical last-used-date derivation (R247/R248, Phase 84). Pure and framework-free — NO firebase, NO vue imports — so this module can be copied verbatim into `functions/src/backfillLastUsed.ts` (84-02).
+
+### `src/utils/messaging.ts`
+- **`src/utils/messaging.ts:3-18`** -> _STACK.md_ — ─── Messaging Toggle Guard ───────────────────────────────────────────────── Single shared choke point for the org-level volunteer-email messaging kill switch (`authStore.settings.messaging.enabled`, R130).
+
+### `src/utils/messagingRecipients.ts`
+- **`src/utils/messagingRecipients.ts:35-50`** -> _ARCHITECTURE.md_ — Resolves a { teams, individualPersonIds, includeEveryone } selection into deduped (by person id), reachability-split recipient lists.
+
+### `src/utils/monitorConfig.ts`
+- **`src/utils/monitorConfig.ts:137-148`** -> _ARCHITECTURE.md_ — Decides whether a saved mapping can be silently reused against the CURRENT live screens, or whether a genuine layout change requires re-prompting (R268).
+
+### `src/utils/nltApi.ts`
+- **`src/utils/nltApi.ts:3-15`** -> _INTEGRATIONS.md_ — Fetches an NLT passage and returns it reformatted into the exact `[N] text` bracketed-verse-number convention `scriptureSplitter.ts::parseVerses` (and, transitively, `scriptureBoundaries.ts::computeBoundaries`'s VERSE_MARKER_PATTERN) depend...
+- **`src/utils/nltApi.ts:64-92`** -> _INTEGRATIONS.md_ — Parses NLT's HTML response with native `DOMParser` and reduces it to plain `[N] text` verse strings joined with a single space.
+
+### `src/utils/orgName.ts`
+- **`src/utils/orgName.ts:5-15`** -> _ARCHITECTURE.md_ — Normalize an organization display name into a stable, Firestore-doc-id-safe uniqueness KEY (for the `orgNames/{key}` registry).
+- **`src/utils/orgName.ts:27-37`** -> _ARCHITECTURE.md_ — Claim a unique org name via a create-only write against `orgNames/{nameKey}`, mirroring `claimSlug`'s `orgSlugs` pattern (the rule denies any overwrite, so a create against an existing doc fails permission-denied).
+
+### `src/utils/pcSongImport.ts`
+- **`src/utils/pcSongImport.ts:252-264`** -> _ARCHITECTURE.md_ — Split mapped PC songs into "new" (not yet in the library) and "already-imported" (matches an existing song) based on the shared triple-key matching rule: pcSongId (exact) OR ccliNumber (exact, non-empty) OR title (case-insensitive).
+
+### `src/utils/planningCenterApi.ts`
+- **`src/utils/planningCenterApi.ts:1091-1101`** -> _ARCHITECTURE.md_ — Exhaustiveness backstop (R085). Binds on `slot.kind` rather than `slot` itself: PRAYER/ANNOUNCEMENTS/MISC/MESSAGE all share the single `NonAssignableSlot` interface (one object type, a 4-literal `kind` union), and TypeScript's control-flow...
+
+### `src/utils/pptxUpload.ts`
+- **`src/utils/pptxUpload.ts:4-20`** -> _CONCERNS.md_ — Client-side upload helpers for the PPTX/image import flow (Phase 21, R010/R011). Uploads always land under orgs/{orgId}/pptx-imports/{importId}/...
+- **`src/utils/pptxUpload.ts:25-44`** -> _ARCHITECTURE.md_ — 25MB — the SAME ceiling `storage.rules` enforces on the generic `orgs/{orgId}/{allPaths=**}` match (`request.resource.size < 26214400`), which is the match `pptx-imports/` falls into. ★ These two numbers must stay in lockstep.
+- **`src/utils/pptxUpload.ts:47-56`** -> _ARCHITECTURE.md_ — Thrown when a file exceeds PPTX_MAX_BYTES. A distinct class rather than a bare Error because `PptxImportModal.vue`'s catch block replaces every failure with one generic "we couldn't read this file" message.
+- **`src/utils/pptxUpload.ts:69-79`** -> _ARCHITECTURE.md_ — Narrows an unknown caught value to a too-large error, by NAME rather than `instanceof`. Callers live in components whose tests `vi.mock` this module with a full-replacement factory.
+
+### `src/utils/quarterDates.ts`
+- **`src/utils/quarterDates.ts:25-42`** -> _ARCHITECTURE.md_ — R038 / D-12 / D-13: the nearest FUTURE Sunday that does not already have a plan.
+
+### `src/utils/renderedPagePaths.ts`
+- **`src/utils/renderedPagePaths.ts:1-22`** -> _ARCHITECTURE.md_ — Client-side rendered-page Storage-path convention (Phase 42, R079/R080).
+
+### `src/utils/rotationTable.ts`
+- **`src/utils/rotationTable.ts:9-22`** -> _ARCHITECTURE.md_ — Computes a rotation table from an array of services. For each song that appears in at least one service, returns an entry with the song's ID, title, and the ISO date strings of services where it appears.
+
+### `src/utils/runChannel.ts`
+- **`src/utils/runChannel.ts:1-25`** -> _STACK.md_ — Run-mode control->output message protocol (Phase 91, consumed by Phases 92-96's multi-window Run mode).
+
+### `src/utils/scheduler.ts`
+- **`src/utils/scheduler.ts:12-29`** -> _ARCHITECTURE.md_ — Pure group co-occurrence rule (D-10, derived purely from group + the multi-role flag, NOT configurable).
+- **`src/utils/scheduler.ts:283-293`** -> _ARCHITECTURE.md_ — Only 'regular'-tier people are auto-scheduled. 'fillin'-tier is manual-only — the coordinator fills those gaps by hand (there is intentionally NO last-resort fillin auto-fill), and 'out'-tier is excluded for the whole quarter.
+
+### `src/utils/scripture.ts`
+- **`src/utils/scripture.ts:106-119`** -> _INTEGRATIONS.md_ — R298: BibleGateway deep-link for a reference, usable with ANY version — the manual fallback when an org's Bible API is off.
+- **`src/utils/scripture.ts:192-209`** -> _INTEGRATIONS.md_ — The canonical human-readable form of a reference: "Romans 8:1-11", "Romans 8:28", or "Romans 8".
+- **`src/utils/scripture.ts:218-230`** -> _INTEGRATIONS.md_ — R047: a SCRIPTURE slot's OWN reference fields are the slide's source.
+- **`src/utils/scripture.ts:245-266`** -> _ARCHITECTURE.md_ — R064/D1: the ONE congregational-ness predicate on the SLOT side — which sections seed a Reference -> Congregational conversion (`deriveGroupEntries` SCRIPTURE case) and, once seeded, which sections a rebuild diffs the stored signature again...
+- **`src/utils/scripture.ts:274-284`** -> _ARCHITECTURE.md_ — R064/D1: the mirror predicate on the ENTRY side — the ONLY place any consumer decides whether a stored `GroupSlideEntry` is a congregational section slide (`resolveEntryContent`'s scripture case, and `rebuildScriptureGroup`'s cleared-refere...
+- **`src/utils/scripture.ts:313-324`** -> _INTEGRATIONS.md_ — R092: the ONE field-less-fallback decision point for translation provenance.
+- **`src/utils/scripture.ts:329-345`** -> _ARCHITECTURE.md_ — Writes a new reference onto a `ScriptureSlot` (the same four-field spread `ServiceEditorView.onScriptureChange` performs inline today) and owns ONE additional rule: a stored congregational reading is never carried onto a passage it was not...
+
+### `src/utils/scriptureApi.ts`
+- **`src/utils/scriptureApi.ts:19-43`** -> _INTEGRATIONS.md_ — ─── Dispatcher ────────────────────────────────────────────────────────────── The single client-side choke point for scripture-passage fetches — the `isAiEnabled()` analog for the Bible API (Phase 102, R296/R297).
+
+### `src/utils/scriptureBoundaries.ts`
+- **`src/utils/scriptureBoundaries.ts:1-15`** -> _INTEGRATIONS.md_ — Pure functions computing and using the "legal boundary index" contract that makes AI-assisted congregational-reading splitting structurally safe (R064).
+- **`src/utils/scriptureBoundaries.ts:76-85`** -> _ARCHITECTURE.md_ — Produces a model-facing copy of `text` with a `⟦i⟧` marker inserted immediately before the character at `boundaries[i]`, for every boundary.
+- **`src/utils/scriptureBoundaries.ts:100-110`** -> _INTEGRATIONS.md_ — THE ENCODING BACKSTOP. This is the byte-exactness guarantee at the core of R064: it performs exactly one `String.prototype.slice` call against the untouched source and nothing else.
+
+### `src/utils/serviceLockDiff.ts`
+- **`src/utils/serviceLockDiff.ts:1-19`** -> _CONCERNS.md_ — Pure service-lock diff + slide-group fingerprint (Phase 62, R146/R147).
+- **`src/utils/serviceLockDiff.ts:141-153`** -> _ARCHITECTURE.md_ — PURE diff of two locked ServiceSnapshots plus their two slide fingerprint maps.
+
+### `src/utils/serviceSlots.ts`
+- **`src/utils/serviceSlots.ts:1-17`** -> _STACK.md_ — The slotIndex <-> first-assembled-slide-index lookup (Phase 91, consumed by the Run rail in Phases 92-96).
+
+### `src/utils/shareTokens.ts`
+- **`src/utils/shareTokens.ts:1-23`** -> _STACK.md_ — R078 — share-token minting and adoption selection, extracted into a pure module so both decisions ("what does a freshly-minted token look like" and "which of several already- circulated tokens is the one to adopt") can be proven exhaustivel...
+- **`src/utils/shareTokens.ts:42-57`** -> _ARCHITECTURE.md_ — Coerces any timestamp shape a `shareTokens` document can actually carry in this codebase into milliseconds, without ever throwing and without ever returning `NaN` (a `NaN` leaking into a comparator would silently destroy sort order rather t...
+- **`src/utils/shareTokens.ts:89-107`** -> _ARCHITECTURE.md_ — Selects which already-circulated `shareTokens` document to adopt for a service, or `null` when there is nothing adoptable (the caller mints instead). Three steps, in this order — the order matters: 1.
+
+### `src/utils/slideGroupMaterializer.ts`
+- **`src/utils/slideGroupMaterializer.ts:36-50`** -> _ARCHITECTURE.md_ — Derives a slide group's structure from its slot's canonical source.
+- **`src/utils/slideGroupMaterializer.ts:83-102`** -> _ARCHITECTURE.md_ — R047/D1: no reference means no slides, exactly as before. Once a reference exists, the group has exactly two possible shapes — never a mix — decided by `congregationalSectionsFromSlot`, R064's ONE congregational-ness predicate: - Reference...
+- **`src/utils/slideGroupMaterializer.ts:199-214`** -> _INTEGRATIONS.md_ — R047/D1: the slot's reference is always the base of the signature.
+- **`src/utils/slideGroupMaterializer.ts:232-243`** -> _ARCHITECTURE.md_ — D-09: `importedSourceSignature` folds in BOTH the resolved mode and, for a ready render, the page count — a re-render that changes the count while staying `ready` therefore produces a different signature.
+- **`src/utils/slideGroupMaterializer.ts:277-299`** -> _ARCHITECTURE.md_ — True when an entry's `sourceRef` is something THIS SLOT's own derivation could have produced — i.e. the entry is source-derived and the rebuild owns it. Everything else on the group is user work.
+- **`src/utils/slideGroupMaterializer.ts:317-330`** -> _ARCHITECTURE.md_ — The one place any rebuild path decides what a user added by hand — every stored entry this slot's own derivation could not have produced, in stored order.
+- **`src/utils/slideGroupMaterializer.ts:335-359`** -> _ARCHITECTURE.md_ — The content-stable identity a stored entry of an unstable-id kind (scripture, imported) is matched against by `carryStoredDerivedEntries`.
+- **`src/utils/slideGroupMaterializer.ts:379-411`** -> _ARCHITECTURE.md_ — Re-sorts a rebuilt slide list into the group's STORED order (BL-02, Phase 30 review). The stored order is the USER's: `SlideGrid.vue` offers drag-reorder on every non-song group, and the drop paths append at a user-chosen position.
+- **`src/utils/slideGroupMaterializer.ts:458-490`** -> _ARCHITECTURE.md_ — Generalized survival+carry for the two unstable-id source kinds (scripture, imported deck) — the exact positional-consumption-plus-last-occurrence- surplus shape `rebuildSongGroup`'s additive merge already uses for lyric sections (28-03's f...
+- **`src/utils/slideGroupMaterializer.ts:530-552`** -> _ARCHITECTURE.md_ — R047 (HI-01): surplus is meaningful only for kinds with real fresh-side multiplicity.
+- **`src/utils/slideGroupMaterializer.ts:656-681`** -> _ARCHITECTURE.md_ — Phase 26-09 Task 1 + Plan 28-03 (D-02): indexed as an ARRAY per sectionId, never collapsed to a single entry, and consumed POSITIONALLY below rather than re-emitted wholesale.
+- **`src/utils/slideGroupMaterializer.ts:796-816`** -> _ARCHITECTURE.md_ — Unconditional rebuild for the two unstable-id source kinds (scripture, imported deck).
+- **`src/utils/slideGroupMaterializer.ts:830-886`** -> _ARCHITECTURE.md_ — Scripture inner slide ids are purely positional (`id: \`scripture-${position}\``, minted in `src/utils/scriptureSplitter.ts::buildSlide`) and are reassigned wholesale by every re-split of the passage — there is no content-stable key to diff...
+
+### `src/utils/slideTypography.ts`
+- **`src/utils/slideTypography.ts:3-13`** -> _ARCHITECTURE.md_ — Pure, independently-testable slide-typography helpers (46-RESEARCH.md Pattern 1-3).
+- **`src/utils/slideTypography.ts:70-79`** -> _ARCHITECTURE.md_ — Computes the three `--slide-font-*` CSS custom properties from a stored (or possibly undefined/tampered) `slideTypography` value.
+- **`src/utils/slideTypography.ts:145-167`** -> _STACK.md_ — On-demand loader for a non-eager curated family (RESEARCH's "bundle strategy": only the org's chosen default face is eager-imported in `main.ts`; the other five curated families load lazily when previewed in Settings — 46-03 — or requested...
+
+### `src/utils/slideshowAssembler.ts`
+- **`src/utils/slideshowAssembler.ts:58-68`** -> _ARCHITECTURE.md_ — Phase 42 (R079/R080) render-status documents, keyed by `ImportedDeck.renderImportId` — NOT by `ImportedDeck.id`/ `ImportedSlot.importId`, which is what the sibling `importedDecksById` above is keyed by.
+- **`src/utils/slideshowAssembler.ts:70-79`** -> _ARCHITECTURE.md_ — Phase 42 (R079/R080) resolved rendered-page download URLs, keyed by `ImportedDeck.renderImportId` (same keying caveat as `pptxRendersByImportId` above — NOT `ImportedDeck.id`).
+- **`src/utils/slideshowAssembler.ts:87-96`** -> _ARCHITECTURE.md_ — R105 (Phase 49): the SINGLE producer of reference-only scripture slide content — a plain scripture reference slide AND the dedicated leading reference slide of a congregational reading are byte-identical by construction (AC3).
+- **`src/utils/slideshowAssembler.ts:217-230`** -> _ARCHITECTURE.md_ — D1/D2: `congregationalSectionFromRef` is the ONE place this function decides which of the group's two states `entry` belongs to.
+
+### `src/utils/slotTypes.ts`
+- **`src/utils/slotTypes.ts:189-213`** -> _ARCHITECTURE.md_ — Groups any section-bearing collection into `SERVICE_SECTIONS`-ordered buckets, plus a trailing `legacy` bucket for members whose section is absent or not a recognized `SERVICE_SECTIONS` member (D005).
+- **`src/utils/slotTypes.ts:250-265`** -> _ARCHITECTURE.md_ — Composition of `groupBySection` + `flattenBySection` over `slot.section` — the one source of truth for "what order are the slots in," shared by the rendered grouping and the array that gets persisted, so the two can never disagree.
+- **`src/utils/slotTypes.ts:274-293`** -> _CONCERNS.md_ — Backfills a missing `ServiceSlot.id` (D-01) for services read before this field existed.
+- **`src/utils/slotTypes.ts:306-318`** -> _ARCHITECTURE.md_ — Default position -> section mapping for the M001 progression template (D005).
+- **`src/utils/slotTypes.ts:391-419`** -> _ARCHITECTURE.md_ — Builds a new service's `ServiceSlot[]` from the church's stored `defaultServiceTemplate` (R086/R087). Composes `progressionVwTypeSequence`, `createSlot`, and `reindexSlots` — no duplicated logic.
+- **`src/utils/slotTypes.ts:440-452`** -> _STACK.md_ — Builds the Suggested Template's `ServiceTemplateEntry[]` — the single shared definition of the suggested-template content (R114 button `applyReset` in plan 52-02 and the R115 `createService` empty-template fallback BOTH call this, so the pr...
+
+### `src/utils/songSearch.ts`
+- **`src/utils/songSearch.ts:82-93`** -> _ARCHITECTURE.md_ — Multi-term AND search over a song's metadata. Supports field-scoped prefixes (`type:`, `key:`, `tag:`, `theme:`, `team:`, with optional space after the colon) whose value may contain multiple words (e.g.
+- **`src/utils/songSearch.ts:131-141`** -> _ARCHITECTURE.md_ — Filters a song list by the shared per-tag Show/Hide include/exclude sets (D-08/D-09/D-10, R240 extraction). Both sets empty returns `songs` unchanged.
+
+### `src/utils/songSectionOrder.ts`
+- **`src/utils/songSectionOrder.ts:3-14`** -> _ARCHITECTURE.md_ — PURE module — imports only types from `@/types/songLyrics`. No Vue, no store, no Firestore. Mirrors the purity contract of `slideshowAssembler.ts`.
+- **`src/utils/songSectionOrder.ts:166-178`** -> _ARCHITECTURE.md_ — Slices a section's `lines` into consecutive slide line-groups at its `slideBreaks` (R117).
+- **`src/utils/songSectionOrder.ts:198-213`** -> _ARCHITECTURE.md_ — Enforces the pool/order invariants over a (sections, order) pair: - the pool is de-duplicated by id, keeping the first occurrence; - order ids with no pooled section are dropped; - if the surviving order is empty while the pool is not, the...
+- **`src/utils/songSectionOrder.ts:413-436`** -> _ARCHITECTURE.md_ — Normalises freshly-parsed CCLI sections into the pool/order model.
+
+### `src/utils/stageLayout.ts`
+- **`src/utils/stageLayout.ts:3-19`** -> _STACK.md_ — Pure geometry + kind-registry helpers for the visual stage layout (R313/R314, Phase 107; redesigned to the single-room "Nocturne" diagram).
+
+### `src/utils/stripUndefined.ts`
+- **`src/utils/stripUndefined.ts:1-11`** -> _ARCHITECTURE.md_ — Recursively remove properties whose value is `undefined` so the result is safe to write to Firestore, which rejects any `undefined` field value at any depth with "Unsupported field value: undefined (found in document ...)".
+
+### `src/utils/suggestions.ts`
+- **`src/utils/suggestions.ts:14-29`** -> _ARCHITECTURE.md_ — Returns songs ranked for a given slot. Every song is always eligible — there is no hard team filter (D-03).
+
+### `src/utils/teamRecurrence.ts`
+- **`src/utils/teamRecurrence.ts:1-19`** -> _ARCHITECTURE.md_ — Nth-Sunday-of-month recurrence matching (R254/R255, Phase 86).
+
+### `src/views/ServiceEditorView.vue`
+- **`src/views/ServiceEditorView.vue:2044-2057`** -> _INTEGRATIONS.md_ — D-15 — Delete stays available at every status, but must not stay un-warned. The reasoning that justifies NO friction on Reopen runs the opposite way here: reopening is reversible, deleting is not.
+- **`src/views/ServiceEditorView.vue:2087-2102`** -> _ARCHITECTURE.md_ — Handles the "Set up congregational reading" request (relabelled from "Edit scripture text" on 2026-08-05 — see slideDisplay.ts) relayed up through SlidesTab's `navigate-to-scripture-editor` event (T-26-03-01: the index is validated against...
+- **`src/views/ServiceEditorView.vue:2173-2182`** -> _ARCHITECTURE.md_ — ── Computed: editing guard ───────────────────────────────────────────────────── ── R036 / R037 — the lifecycle lock seams ──────────────────────────────────── `isLocked` widened the retired `isExportedLocked` (`=== 'exported'`) to `!== 'dr...
+- **`src/views/ServiceEditorView.vue:2225-2235`** -> _INTEGRATIONS.md_ — ★ D-04 — the Planning Center warning gates on EVIDENCE, never on the status string.
+- **`src/views/ServiceEditorView.vue:2271-2281`** -> _ARCHITECTURE.md_ — ── Sections (D005/R007/R043/R044) + live slideshow assembly (R005/R006 visible) ─ `{ slot, index }` pairs (index = the slot's ABSOLUTE position in `localService.slots`) grouped into `SERVICE_SECTIONS`-ordered buckets plus a trailing `legacy...
+- **`src/views/ServiceEditorView.vue:2431-2449`** -> _ARCHITECTURE.md_ — R036 — whether this session may write slide-group documents at all. ★ This is NOT only a UI concern, and narrowing it is not optional. The `/slideGroups` Firestore rule rejects every write whose parent service is not draft.
+- **`src/views/ServiceEditorView.vue:2495-2509`** -> _STACK.md_ — ── Sortable ─────────────────────────────────────────────────────────────────── One Sortable instance PER SECTION list container (29-03/R044) — this codebase's first multi-instance Sortable and first use of SortableJS `group` (cross-section...
+- **`src/views/ServiceEditorView.vue:2571-2583`** -> _STACK.md_ — R110: reclaim any node SortableJS physically relocated across containers.
+- **`src/views/ServiceEditorView.vue:2711-2723`** -> _ARCHITECTURE.md_ — 36-03 (R068) — the page-header's per-tab action list, replacing the four unconditional buttons that used to render regardless of `activeTab`.
+- **`src/views/ServiceEditorView.vue:2988-2998`** -> _ARCHITECTURE.md_ — ── Autosave failure handling ──────────────────────────────────────────────── BL-02 — a rejected autosave must leave the view USABLE, never stranded at 'saving'.
+- **`src/views/ServiceEditorView.vue:3225-3237`** -> _ARCHITECTURE.md_ — R247 (84-01) — `lastUsedAt` for a service's scheduled songs is now recomputed by `serviceStore.markAsPlanned` itself (lock-gated `MAX(locked service date)`, see `src/utils/lastUsed.ts`), not by a view-level `serverTimestamp()` stamp.
+- **`src/views/ServiceEditorView.vue:3262-3277`** -> _ARCHITECTURE.md_ — R247 (84-01) — the `lastUsedAt` recompute for this service's scheduled songs already happened inside `serviceStore.markAsPlanned` above, gated on the service's locked date.
+- **`src/views/ServiceEditorView.vue:3475-3487`** -> _ARCHITECTURE.md_ — ── Dynamic slot add/remove ──────────────────────────────────────────────────── Per-band assembled-slide count for a section-band header's "{n} slides" caption (36-04, UI-SPEC §9).
+- **`src/views/ServiceEditorView.vue:3890-3902`** -> _ARCHITECTURE.md_ — ── Scripture ────────────────────────────────────────────────────────────────── ME-02: the canonical primitive, not a private four-field variant.
+- **`src/views/ServiceEditorView.vue:4089-4101`** -> _INTEGRATIONS.md_ — ME-01 — pre-flight against the STORED status, before any Planning Center work.
+- **`src/views/ServiceEditorView.vue:4762-4771`** -> _ARCHITECTURE.md_ — ★ 31-PATTERNS § 4a row 24 (BL-02). 31-04-SUMMARY recorded the decision to leave this ungated because "the store guard already refuses it" — but this phase made that refusal a THROW, so an ungated `onSave` is not a harmless no-op, it is a re...
+
+### `src/views/serviceEditorActionBar.ts`
+- **`src/views/serviceEditorActionBar.ts:1-52`** -> _INTEGRATIONS.md_ — serviceEditorActionBar.ts — the pure per-tab item builder behind R068 (36-02 Task 2). `buildActionBarItems(tab, ctx)` turns `ServiceEditorView.vue`'s header state into the declarative list `ContextualActionBar.vue` renders.
+- **`src/views/serviceEditorActionBar.ts:129-140`** -> _INTEGRATIONS.md_ — Owner follow-up (post-36-02): returns `undefined` — no item at all — when there are no Planning Center credentials, instead of the `copy-pc` fallback button this used to build.
+
+### `storage.rules`
+- **`storage.rules:3-21`** -> _ARCHITECTURE.md_ — Org-scoped Storage access control, mirroring firestore.rules' isOrgMember pattern.
+- **`storage.rules:24-43`** -> _INTEGRATIONS.md_ — Reads request.auth.token.orgId / .role — a direct JWT claim read set server-side by Cloud Function syncOrgMembershipClaim (functions/src/orgMembershipClaims.ts, phase 40-02) via the Admin SDK, plus the one-off backfill.
+
+_Bucket B total: 309 entries._
+
+## Bucket C — Genuinely-Local
+
+Load-bearing but inherently tied to one exact call site — removing the comment loses information, but the information has no cross-cutting relevance beyond that one spot, so it stays in the code rather than relocating to a `.planning/codebase/` map doc or an ADR.
+
+### `src/components/slides/SlideCard.vue`
+- **`src/components/slides/SlideCard.vue:222-231`** — CSS custom-property + font-family style for this card's own root (46-04, R093) — computed once by `SlideGrid.vue` from `cssVarsFor(authStore.settings.slideTypography)` and passed down rather than read from the store here: this component sti...
+
+### `src/components/slides/SlidePlanRail.vue`
+- **`src/components/slides/SlidePlanRail.vue:106-115`** — R036 — used ONLY to swap the empty-state body copy. This rail renders no mutation control at all (D-06: no drag handle, no drop handler), so the lock has nothing else to close here.
+
+### `src/utils/planningCenterApi.ts`
+- **`src/utils/planningCenterApi.ts:226-231`** — Create a new plan in Planning Center. Returns the plan ID. Note: PC API only allows title, public, series_title, reminders_disabled on creation. Dates and templates must be handled separately.
+
+### `src/views/ServiceEditorView.vue`
+- **`src/views/ServiceEditorView.vue:3539-3548`** — ── Per-kind badge tint (260811-vsr / DESIGN-SPEC) ────────────────────────────── kindBadgeClass now lives in @/utils/slotTypes (Phase 57 — shared by both the service editor and the template editor so their per-kind badge tints can never for...
+
+### `src/views/SettingsView.vue`
+- **`src/views/SettingsView.vue:673-676`** — ── Messaging kill-switch + automatic email defaults state (R130/R132, Phase 58) ── IMPORTANT: seeded from authStore.settings.messaging.enabled, which resolves to `false` for a fresh org via DEFAULT_ORG_SETTINGS — the one deliberate divergen...
+
+_Bucket C total: 5 entries._
+
+### Excluded as not load-bearing (trivial JSDoc restatement)
+
+The untagged scan's grep patterns also surfaced a few pure `@param`/`@returns` function-doc blocks with no rationale content — trivial restatements per this plan's own exclusion rule, not load-bearing, and not classified into any bucket:
+- `src/utils/pcSongImport.ts:43`
+- `src/utils/pcSongImport.ts:211`
+- `src/utils/pcSongImport.ts:292`
