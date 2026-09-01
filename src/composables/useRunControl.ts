@@ -61,6 +61,13 @@ export interface RailRow {
   count: number
   hasSlides: boolean
   isActive: boolean
+  /**
+   * Phase 106 (R306): a clean boolean pass-through of the item's
+   * `slot.loop?.enabled`, for the optional Run-rail "Loop" indicator
+   * (106-UI-SPEC.md § 2). Absent/`false` both mean "not looping" — no third
+   * state — mirroring the underlying `loop?.enabled` field itself.
+   */
+  loop?: boolean
 }
 
 export interface UseRunControlOptions {
@@ -218,6 +225,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
         count,
         hasSlides: firstIndexBySlot.value.has(item.index),
         isActive: item.index === currentSlotIndex.value,
+        loop: item.slot.loop?.enabled ?? false,
       }
     }),
   )

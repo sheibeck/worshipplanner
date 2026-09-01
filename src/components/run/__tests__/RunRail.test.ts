@@ -97,3 +97,20 @@ describe('RunRail — order-of-service rail (R276)', () => {
     expect(wrapper.find('[data-testid="rail-item"]').exists()).toBe(false)
   })
 })
+
+// ── Phase 106 (R306) — optional "Loop" badge, drop-if-costly UI-SPEC § 2 ────────
+describe('RunRail — optional "Loop" indicator (R306, 106-UI-SPEC.md § 2)', () => {
+  it('shows the Loop badge for a looping row and hides it for a non-looping row', () => {
+    const rows: RailRow[] = [
+      row({ index: 0, title: 'Looping Song', loop: true }),
+      row({ index: 1, title: 'Regular Song', loop: false }),
+    ]
+    const wrapper = mount(RunRail, { props: { rows, activeIndex: 0 } })
+
+    const looping = wrapper.findAll('[data-testid="rail-item"]').find((w) => w.text().includes('Looping Song'))
+    const regular = wrapper.findAll('[data-testid="rail-item"]').find((w) => w.text().includes('Regular Song'))
+
+    expect(looping!.find('[data-testid="rail-loop-badge"]').exists()).toBe(true)
+    expect(regular!.find('[data-testid="rail-loop-badge"]').exists()).toBe(false)
+  })
+})

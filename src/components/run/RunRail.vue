@@ -114,6 +114,12 @@ watch(
                 {{ row.title }}
               </span>
             </span>
+            <span
+              v-if="row.loop"
+              class="flex-none rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-300 bg-indigo-950/40"
+              data-testid="rail-loop-badge"
+              aria-label="Looping"
+            >Loop</span>
             <span class="flex-none text-xs text-gray-500">{{ countLabel(row.count) }}</span>
           </button>
 
