@@ -64,15 +64,15 @@ Requirements for this milestone. Each maps to exactly one roadmap phase.
 
 ### Stage Layout — visual per-service stage plot
 
-- [ ] **R313**: On a dedicated **Stage Layout tab** of a service, a user can place labeled markers
+- [x] **R313**: On a dedicated **Stage Layout tab** of a service, a user can place labeled markers
   (instruments, mics, monitors) on a freeform canvas via drag-and-drop, with **on-stage and off-stage
   (side) zones**.
 
-- [ ] **R314**: Markers support **free-text labels** and can be positioned anywhere within a zone,
+- [x] **R314**: Markers support **free-text labels** and can be positioned anywhere within a zone,
   including a marker for a **one-off speaker's microphone**; positions round-trip on reload and stay
   stable across viewport resize.
 
-- [ ] **R315**: The stage layout is **saved per service** (persisted to Firestore, no file storage) and
+- [x] **R315**: The stage layout is **saved per service** (persisted to Firestore, no file storage) and
   is viewable **read-only** where the service is shared/printed, so tech/sound can reference the setup.
 
 ## v2 Requirements (Future)
@@ -118,6 +118,6 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | R310 | Phase 104 | Complete |
 | R311 | Phase 104 | Complete |
 | R312 | Phase 104 | Complete |
-| R313 | Phase 107 | Pending |
-| R314 | Phase 107 | Pending |
-| R315 | Phase 107 | Pending |
+| R313 | Phase 107 | Complete |
+| R314 | Phase 107 | Complete |
+| R315 | Phase 107 | Complete |

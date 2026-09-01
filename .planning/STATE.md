@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Rehearsal, Stage Plans & Presentation Polish
-current_phase: 106
-current_phase_name: Per-Item Loop Playback
-status: verifying
-stopped_at: Completed 106-02-PLAN.md (Task 4 human-verify deferred to milestone-end UAT)
-last_updated: "2026-09-01T07:53:44.554Z"
+current_phase: 107
+current_phase_name: Visual Stage Layout
+status: executing
+stopped_at: Completed 107-01-PLAN.md
+last_updated: "2026-09-01T08:50:02.502Z"
 last_activity: 2026-09-01
-last_activity_desc: Phase 106 execution started
+last_activity_desc: Phase 107 execution started
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 6
-  percent: 50
+  completed_phases: 3
+  total_plans: 10
+  completed_plans: 8
+  percent: 75
 ---
 
 ## ★ STANDING POLICY CHANGE (2026-08-25) — Claude may deploy, with per-deploy confirmation
@@ -33,7 +33,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.7 Rehearsal, Stage Plans & Presentation Polish (roadmap created 2026-09-01)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 mapped with no orphans. Ready for `/gsd-plan-phase 104`.
 
 **Goal:** Give teams richer rehearsal and live-presentation tooling plus targeted Run-the-Service and
@@ -1129,7 +1129,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 106 — Per-Item Loop Playback
+**Current focus:** Phase 107 — Visual Stage Layout
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1139,10 +1139,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 106 (Per-Item Loop Playback) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-09-01 — Phase 106 execution started
+Phase: 107 (Visual Stage Layout) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-09-01 — Phase 107 execution started
 
 ## ★ v2.7 ROADMAP.md phase breakdown (created 2026-09-01)
 
@@ -2981,6 +2981,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 105 P02 | 35min | 3 tasks | 6 files |
 | Phase 106 P01 | 20min | 3 tasks | 3 files |
 | Phase 106 P02 | 45min | 3 tasks | 5 files |
+| Phase 107 P01 | 9min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3458,6 +3459,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: loop field lives on MediaAttachableSlot (like notes?), intervalSeconds is authoritative (not intervalMs)
 - [Phase ?]: explicitCustomLoopSlotIds mount-scoped override added so selecting Custom reliably reveals the seconds input even when intervalSeconds already matches a preset (e.g. the 10s default)
 - [Phase ?]: 106-02: the run-time loop timer lives in useLoopTimer.ts (single interval id) driven from useRunControl.ts; every advance routes through postIndex(); reconcileLoop() arms/disarms on postIndex/postBlackout/watch(currentSlotIndex)/watch(live); Go to black PAUSES the loop and restoring RESUMES it, proven against fake.posted on a matched go-live with both output windows open.
+- [Phase ?]: 107-01: Additive Service.stageLayout field (not a new collection/store) resolves the Phase-104 STAGELAYOUTS-RESET-OBLIGATION marker — R312 satisfied by the already-reset services store.
+- [Phase ?]: 107-01: markerKindAccentClass uses static literal Tailwind classes per kind/theme (never string concatenation) for Tailwind v4 purge safety, mirroring kindBadgeClass().
 
 ### Roadmap Evolution
 
@@ -3784,8 +3787,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-09-01T07:53:36.801Z
-Stopped at: Completed 106-02-PLAN.md (Task 4 human-verify deferred to milestone-end UAT)
+Last session: 2026-09-01T08:50:02.436Z
+Stopped at: Completed 107-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

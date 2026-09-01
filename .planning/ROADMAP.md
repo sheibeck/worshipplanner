@@ -541,10 +541,11 @@ service via a freeform visual stage plot.
   3. Marker positions round-trip correctly on reload and stay stable across a viewport resize (R314).
   4. The stage layout is saved per service to Firestore (no file storage) and is viewable read-only wherever that service is shared or printed (R315).
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 
 Plans:
-- [ ] 107-01-PLAN.md — Data model (additive `Service.stageLayout` + `StageMarker`), pure drag/geometry helpers, shared read-only `StageLayoutView`, and resolve the Phase-104 `STAGELAYOUTS-RESET-OBLIGATION` marker [wave 1]
+
+- [x] 107-01-PLAN.md — Data model (additive `Service.stageLayout` + `StageMarker`), pure drag/geometry helpers, shared read-only `StageLayoutView`, and resolve the Phase-104 `STAGELAYOUTS-RESET-OBLIGATION` marker [wave 1]
 - [ ] 107-02-PLAN.md — `StageLayoutEditor` freeform Pointer-Events drag canvas (two zones, add/label/kind/move/delete, aria-labels, touch) + the editor's Stage Layout tab, draft/lock-gated, riding the existing autosave [wave 2]
 - [ ] 107-03-PLAN.md — Denormalize `stageLayout` into the frozen `ServiceSnapshot` and render it read-only on the public ShareView + print (reusing `StageLayoutView`, no new public rules) [wave 2]
 
