@@ -28,6 +28,7 @@ import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { buildSlotsFromTemplate, buildSuggestedTemplateEntries, orderSlotsBySection } from '@/utils/slotTypes'
 import { stripUndefined } from '@/utils/stripUndefined'
+import { clampPct } from '@/utils/stageLayout'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import {
   computeLastUsedDate,
@@ -169,13 +170,21 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
   // conditional spread here keeps it absent (not `undefined`) on a marker
   // that never set one, matching this whole projection's absent-not-
   // undefined contract one level down.
+  //
+  // IN-03: every UI-driven write path already clamps xPct/yPct to [0,100]
+  // before it reaches Service.stageLayout, so this is unreachable through
+  // the app's own UI — but this projection is the last line of defense
+  // before an unauthenticated public page renders these values, so
+  // defensively re-clamp here too. A stored value that reached this field
+  // by some other path (bulk import, manual Firestore edit, a future
+  // caller bug) can then never push a marker off-canvas on ShareView.
   const stageLayoutElements: StageMarker[] = (service.stageLayout?.elements ?? []).map((marker) => ({
     id: marker.id,
     label: marker.label,
     ...(marker.kind ? { kind: marker.kind } : {}),
     zone: marker.zone,
-    xPct: marker.xPct,
-    yPct: marker.yPct,
+    xPct: clampPct(marker.xPct),
+    yPct: clampPct(marker.yPct),
   }))
 
   return {

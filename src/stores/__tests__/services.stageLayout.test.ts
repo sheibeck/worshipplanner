@@ -165,6 +165,26 @@ describe('buildServiceSnapshot stageLayout projection (T-107-01)', () => {
     expect('kind' in (marker as object)).toBe(false)
   })
 
+  it('IN-03: defensively re-clamps xPct/yPct to [0,100] for a stored value that reached the field through some path other than the app UI', async () => {
+    const { buildServiceSnapshot } = await import('../services')
+    const service = makeService({
+      stageLayout: {
+        elements: [
+          // @ts-expect-error — deliberately out-of-range, simulating a bulk
+          // import / manual Firestore edit / future caller bug that bypassed
+          // the app's own UI-side clamping.
+          { id: 'm1', label: 'Off-canvas Mic', zone: 'onstage', xPct: 145, yPct: -20 },
+        ],
+      },
+    })
+
+    const snapshot = buildServiceSnapshot(service)
+    const marker = snapshot.stageLayout?.elements[0]
+
+    expect(marker?.xPct).toBe(100)
+    expect(marker?.yPct).toBe(0)
+  })
+
   it('preserves xPct/yPct verbatim through the projection', async () => {
     const { buildServiceSnapshot } = await import('../services')
     const service = makeService({
