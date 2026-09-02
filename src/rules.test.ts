@@ -6,7 +6,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch, getDocs, collection } from 'firebase/firestore'
 
 let testEnv: RulesTestEnvironment
 
@@ -979,6 +979,18 @@ describe('quarterShares — public read, org-editor-scoped create/update (CR-01)
     await assertSucceeds(getDoc(doc(db, 'quarterShares', 'grace-church__q3-2026')))
   })
 
+  // SEC-S-01 (Phase 112, Critical) DENY-case regression proof: the unsplit
+  // `allow read: if true` granted list as well as get, letting an
+  // unauthenticated caller enumerate every org's quarterShares docs via
+  // getDocs(collection(...)). After the get/list split this must fail-closed
+  // while the get-by-id test above keeps succeeding.
+  it('denies unauthenticated collection listing of quarterShares (SEC-S-01)', async () => {
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDocs(collection(db, 'quarterShares')))
+  })
+
   it('allows an editor of the owning org to create a quarterShares doc', async () => {
     await seedMembershipDoc('orgA', 'userA', 'editor')
     const context = testEnv.authenticatedContext('userA')
@@ -1114,6 +1126,14 @@ describe('serviceShares — public read, org-editor-scoped create/update', () =>
     await assertSucceeds(getDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02')))
   })
 
+  // SEC-S-01 (Phase 112, Critical) DENY-case regression proof: see quarterShares above.
+  it('denies unauthenticated collection listing of serviceShares (SEC-S-01)', async () => {
+    await seedDoc('serviceShares/grace-church__service-2026-08-02', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDocs(collection(db, 'serviceShares')))
+  })
+
   it('allows an editor of the owning org to create a serviceShares doc', async () => {
     await seedMembershipDoc('orgA', 'userA', 'editor')
     const context = testEnv.authenticatedContext('userA')
@@ -1244,6 +1264,17 @@ describe('shareTokens — public read, editor-scoped create, editor-scoped in-pl
     const context = testEnv.unauthenticatedContext()
     const db = context.firestore()
     await assertSucceeds(getDoc(doc(db, 'shareTokens', 'tok-abc')))
+  })
+
+  // SEC-S-01 (Phase 112, Critical) DENY-case regression proof: see quarterShares/
+  // serviceShares equivalents above. Against the unsplit `allow read: if true`
+  // this getDocs(collection(...)) would SUCCEED (the live prod leak); after the
+  // get/list split it must fail-closed.
+  it('denies unauthenticated collection listing of shareTokens (SEC-S-01)', async () => {
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDocs(collection(db, 'shareTokens')))
   })
 
   // CREATE (4) — CR-01 (41-REVIEW): the rule used to be `isSignedIn()` alone,

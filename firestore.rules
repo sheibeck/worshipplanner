@@ -338,7 +338,14 @@ service cloud.firestore {
     // Share tokens: public read (anyone with token URL), editor-scoped create,
     // editor-scoped update, editor-scoped delete.
     match /shareTokens/{token} {
-      allow read: if true;
+      // SEC-S-01 (Phase 112, Critical -- closed Phase 113): split get/list.
+      // `allow read: if true` grants BOTH get and list -- an unauthenticated
+      // getDocs(collection(db, 'shareTokens')) could enumerate every org's
+      // share tokens (and via them every shared service/quarter). The public
+      // share-link flow only ever does a getDoc()-by-id, so narrowing to
+      // get-only preserves it while closing the enumeration leak.
+      allow get: if true;
+      allow list: if false;
       // See ADR-0006 (docs/adr/0006-was-issignedin-with-no-org-check-phase-41-s-adoption-logic.md)
       // a behavior change for any sanctioned path — mirrors
       // serviceShareLinks/quarterShares/serviceShares' isOrgEditor idiom.
@@ -385,7 +392,9 @@ service cloud.firestore {
 
     // See ADR-0004 (docs/adr/0004-flow-1-org-creation-cr-01-getafter-alone-only-proves-created.md)
     match /quarterShares/{shareId} {
-      allow read: if true;
+      // SEC-S-01 (Phase 112, Critical -- closed Phase 113): see shareTokens above.
+      allow get: if true;
+      allow list: if false;
       allow create: if isOrgEditor(request.resource.data.orgId);
       allow update: if isOrgEditor(resource.data.orgId)
                        && request.resource.data.orgId == resource.data.orgId;
@@ -402,7 +411,9 @@ service cloud.firestore {
     // require the caller to be an editor of the orgId embedded in the doc, and update
     // additionally forbids changing orgId (no reassigning a share to a different org).
     match /serviceShares/{shareId} {
-      allow read: if true;
+      // SEC-S-01 (Phase 112, Critical -- closed Phase 113): see shareTokens above.
+      allow get: if true;
+      allow list: if false;
       allow create: if isOrgEditor(request.resource.data.orgId);
       allow update: if isOrgEditor(resource.data.orgId)
                        && request.resource.data.orgId == resource.data.orgId;
