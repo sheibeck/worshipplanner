@@ -363,7 +363,11 @@ service cloud.firestore {
       // resource.data.orgId check is satisfiable (Firestore requires an
       // equality filter on any field a list rule reads from resource.data).
       allow get: if true;
-      allow list: if isSignedIn() && isOrgEditor(resource.data.orgId);
+      // IN-02 (113-REVIEW-2): isOrgEditor() already opens with isSignedIn()
+      // (see helper above), so the outer isSignedIn() here was dead weight.
+      // Dropped for consistency with every other isOrgEditor-gated rule in
+      // this file (orgSlugs, orgNames, serviceShareLinks, ...).
+      allow list: if isOrgEditor(resource.data.orgId);
       // See ADR-0006 (docs/adr/0006-was-issignedin-with-no-org-check-phase-41-s-adoption-logic.md)
       // a behavior change for any sanctioned path — mirrors
       // serviceShareLinks/quarterShares/serviceShares' isOrgEditor idiom.
