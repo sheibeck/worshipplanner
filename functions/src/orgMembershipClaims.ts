@@ -279,6 +279,20 @@ export async function syncOrgMembershipClaimHandler(
           set: { orgs: desiredOrgs, deactivatedOrgs: desiredDeactivatedOrgs },
           clear: ORG_CLAIM_KEYS,
         });
+        // SEC-ISO-02: force re-auth so a stale, already-issued token stops
+        // being honored by Storage's claim-only membership check. Mirrors
+        // orgProvisioning.ts:461 (ADR-0049): attempted only AFTER the claim
+        // clear has landed, logged-and-swallowed on failure -- a revoke
+        // hiccup must never undo or block the claim clear (the Firestore/
+        // Storage deny) that already happened.
+        try {
+          await getAuth().revokeRefreshTokens(uid);
+        } catch (err) {
+          console.error(
+            `[orgMembershipClaims] syncOrgMembershipClaim: revokeRefreshTokens failed for uid=${uid}:`,
+            err,
+          );
+        }
         return { action: "clear" };
       }
       case "skip": {

@@ -15,7 +15,7 @@ import {
 
 // Mirrors functions/src/index.test.ts's established mocking seams.
 vi.mock("firebase-admin/auth", () => ({
-  getAuth: vi.fn(() => ({ setCustomUserClaims: vi.fn(), getUser: vi.fn() })),
+  getAuth: vi.fn(() => ({ setCustomUserClaims: vi.fn(), getUser: vi.fn(), revokeRefreshTokens: vi.fn() })),
 }));
 vi.mock("firebase-admin/firestore", () => ({
   getFirestore: vi.fn(),
@@ -122,14 +122,19 @@ function mockFirestore(
 function mockAuth(opts: {
   existingClaims?: Record<string, unknown>;
   getUserImpl?: () => Promise<{ customClaims?: Record<string, unknown> }>;
+  revokeRefreshTokensImpl?: (uid: string) => Promise<void>;
 } = {}) {
   const setCustomUserClaims = vi.fn(async () => undefined);
   const getUser =
     opts.getUserImpl !== undefined
       ? vi.fn(opts.getUserImpl)
       : vi.fn(async () => ({ customClaims: opts.existingClaims }));
-  vi.mocked(getAuth).mockReturnValue({ setCustomUserClaims, getUser } as never);
-  return { setCustomUserClaims, getUser };
+  const revokeRefreshTokens =
+    opts.revokeRefreshTokensImpl !== undefined
+      ? vi.fn(opts.revokeRefreshTokensImpl)
+      : vi.fn(async () => undefined);
+  vi.mocked(getAuth).mockReturnValue({ setCustomUserClaims, getUser, revokeRefreshTokens } as never);
+  return { setCustomUserClaims, getUser, revokeRefreshTokens };
 }
 
 /**
@@ -143,14 +148,21 @@ function mockAuth(opts: {
  * cases rather than asserting them by construction against a mock that
  * silently ignores its own prior writes.
  */
-function statefulAuth(initialClaims?: Record<string, unknown>) {
+function statefulAuth(
+  initialClaims?: Record<string, unknown>,
+  opts: { revokeRefreshTokensImpl?: (uid: string) => Promise<void> } = {},
+) {
   let claims = initialClaims;
   const setCustomUserClaims = vi.fn(async (_uid: string, patch: Record<string, unknown> | null) => {
     claims = patch ?? undefined;
   });
   const getUser = vi.fn(async () => ({ customClaims: claims }));
-  vi.mocked(getAuth).mockReturnValue({ setCustomUserClaims, getUser } as never);
-  return { setCustomUserClaims, getUser };
+  const revokeRefreshTokens =
+    opts.revokeRefreshTokensImpl !== undefined
+      ? vi.fn(opts.revokeRefreshTokensImpl)
+      : vi.fn(async () => undefined);
+  vi.mocked(getAuth).mockReturnValue({ setCustomUserClaims, getUser, revokeRefreshTokens } as never);
+  return { setCustomUserClaims, getUser, revokeRefreshTokens };
 }
 
 afterEach(() => {
@@ -566,7 +578,7 @@ describe("syncOrgMembershipClaimHandler", () => {
   it("primary-org DELETE while the user still belongs to a second org: SINGLE atomic write clears orgId/role and sets orgs to the survivors (highest-risk case, R208, WR-01)", async () => {
     // Org A's member doc is gone (deleted); org B survives.
     mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "viewer", orgId: ORG_B })]);
-    const { setCustomUserClaims } = statefulAuth({
+    const { setCustomUserClaims, revokeRefreshTokens } = statefulAuth({
       orgId: ORG_A,
       role: "editor",
       orgs: { orgA: "editor", orgB: "viewer" },
@@ -586,11 +598,19 @@ describe("syncOrgMembershipClaimHandler", () => {
     expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
     expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgs: { orgB: "viewer" }, deactivatedOrgs: {} });
     expect(outcome).toEqual({ action: "clear" });
+    // SEC-ISO-02: the removed uid's refresh tokens are revoked so a stale,
+    // already-issued token stops being honored by Storage's claim-only check.
+    expect(revokeRefreshTokens).toHaveBeenCalledWith(UID);
+    expect(revokeRefreshTokens).toHaveBeenCalledTimes(1);
   });
 
   it("primary-org DELETE when the user belongs to no other org: SINGLE atomic write clears orgId/role and orgs becomes {} (WR-01)", async () => {
     mockFirestore(fakeUserDoc(true, [ORG_A]), []);
-    const { setCustomUserClaims } = statefulAuth({ orgId: ORG_A, role: "editor", orgs: { orgA: "editor" } });
+    const { setCustomUserClaims, revokeRefreshTokens } = statefulAuth({
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor" },
+    });
 
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_A,
@@ -601,6 +621,34 @@ describe("syncOrgMembershipClaimHandler", () => {
     expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
     expect(setCustomUserClaims).toHaveBeenCalledWith(UID, { orgs: {}, deactivatedOrgs: {} });
     expect(outcome).toEqual({ action: "clear" });
+    expect(revokeRefreshTokens).toHaveBeenCalledWith(UID);
+    expect(revokeRefreshTokens).toHaveBeenCalledTimes(1);
+  });
+
+  it("SEC-ISO-02 WR-02: a revokeRefreshTokens failure on the clear path is logged and swallowed -- the outcome stays { action: 'clear' }, never surfaced as 'failed'", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), []);
+    const { setCustomUserClaims, revokeRefreshTokens } = statefulAuth(
+      { orgId: ORG_A, role: "editor", orgs: { orgA: "editor" } },
+      { revokeRefreshTokensImpl: async () => { throw new Error("internal-error"); } },
+    );
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: undefined,
+    });
+
+    // The claim clear (the Firestore/Storage deny) already landed -- a revoke
+    // hiccup must never undo it or change the returned outcome.
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(revokeRefreshTokens).toHaveBeenCalledWith(UID);
+    expect(outcome).toEqual({ action: "clear" });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[orgMembershipClaims] syncOrgMembershipClaim: revokeRefreshTokens failed"),
+      expect.any(Error),
+    );
+    consoleErrorSpy.mockRestore();
   });
 
   it("preserves superAdmin (direction A): a widened create/update on an account with superAdmin:true leaves it intact", async () => {
