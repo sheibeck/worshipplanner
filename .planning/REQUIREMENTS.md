@@ -45,7 +45,7 @@ remediating the Critical/High findings.
 
 ### Security Review
 
-- [ ] **R322**: A security review report is produced covering Firestore & Storage security rules,
+- [x] **R322**: A security review report is produced covering Firestore & Storage security rules,
   auth/custom-claims and route guards, multi-tenant data isolation, Cloud Functions authorization,
   share-token / public-page exposure and PII handling, and cost/abuse controls — with severity-ranked
   findings.
@@ -80,7 +80,7 @@ remediating the Critical/High findings.
 | R319 | Phase 109 | Complete |
 | R320 | Phase 110 | Complete |
 | R321 | Phase 111 | Complete |
-| R322 | Phase 112 | Pending |
+| R322 | Phase 112 | Complete |
 | R323 | Phase 113 | Pending |
 
 **Coverage:** 8/8 v2.8 requirements mapped, each to exactly one phase (Phases 108–113). No orphans, no

@@ -110,3 +110,10 @@ None - no external service configuration required.
 ---
 *Phase: 112-security-review*
 *Completed: 2026-09-02*
+
+## Self-Check: PASSED
+
+- FOUND: `.planning/phases/112-security-review/112-FINDINGS-rules-isolation.md`
+- FOUND: `.planning/phases/112-security-review/112-01-SUMMARY.md`
+- FOUND commit `b835704a` (findings file)
+- FOUND commit `a9b3ac5c` (summary file)
