@@ -5,15 +5,15 @@ milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Securit
 current_phase: 111
 current_phase_name: Architectural Remediation
 status: executing
-stopped_at: Completed 110-03-PLAN.md
-last_updated: "2026-09-02T12:50:48.696Z"
+stopped_at: Completed 111-01-PLAN.md
+last_updated: "2026-09-02T13:12:32.119Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 110 complete, transitioned to Phase 111
+last_activity_desc: Phase 111 execution started
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 12
+  completed_plans: 11
   percent: 50
 ---
 
@@ -1171,7 +1171,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 110 — Architectural Review
+**Current focus:** Phase 111 — Architectural Remediation
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1181,10 +1181,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 111 — Architectural Remediation
-Plan: Not started
+Phase: 111 (Architectural Remediation) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-09-02 — Phase 110 complete, transitioned to Phase 111
+Last activity: 2026-09-02 — Phase 111 execution started
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
 
@@ -3068,6 +3068,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 110 P01 | 50m | 2 tasks | 2 files |
 | Phase 110-architectural-review P02 | 55m | 3 tasks | 1 files |
 | Phase 110 P03 | 10min | 1 tasks | 1 files |
+| Phase 111 P01 | 45min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -3564,6 +3565,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: No Critical/High findings in module boundaries, coupling, or data flow (110-02) — every finding is Medium/Low per severity rubric; consolidated into 110-ARCHITECTURE-REVIEW.md by 110-03
 - [Phase ?]: CONCERNS.md's ServiceEditorView size (2176 lines) and JSON.parse-on-snapshots fragility notes are stale (dated 2026-07-16) — live file is 4612 lines and the snapshot-merge path is substantially more hardened than described
 - [Phase ?]: 110-03: consolidated 110-01+110-02 findings into 110-ARCHITECTURE-REVIEW.md — 23 global IDs (ARCH-001..023), exactly 1 High (ARCH-001, Phase 111 scope), 22 Medium/Low (backlog); Phase 112 handoff flagged for ARCH-005/ARCH-018
+- [Phase ?]: ARCH-001 epoch guard scoped strictly to the memberUnsub onSnapshot assignment (not full org-data staleness) per locked 111-CONTEXT.md — listener-leak fix, not a cross-tenant data-bleed fix
 
 ### Roadmap Evolution
 
@@ -3891,8 +3893,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-02T12:23:35.745Z
-Stopped at: Completed 110-03-PLAN.md
+Last session: 2026-09-02T13:12:32.061Z
+Stopped at: Completed 111-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
