@@ -460,6 +460,93 @@ rotation) — accept if ANY entry matches. Returns a boolean and NEVER throws on
 missing header, non-finite timestamp, stale timestamp, or wrong-length candidate signature all
 yield `false`.
 
+## Utils Integration Notes (R318)
+
+### src/utils/scripture.ts
+
+**`bibleGatewayLink` (R298):** BibleGateway deep-link for a reference, usable with ANY version — the
+manual fallback when an org's Bible API is off. Delegates the search string to
+`formatScriptureReference` (the one canonical "Book Chapter:Start-End" formatter) rather than
+re-deriving it, so this link and every other rendering of the reference can never disagree.
+`version` is appended as `&version=<version>` ONLY when it is a non-empty string; an org with no
+stored `bibleVersion` (or one that never had one because the translation selector is hidden per
+R300) omits the param and BibleGateway falls back to its own default. Both the reference and the
+version are `encodeURIComponent`-ed before interpolation (T-103-01) so a crafted reference cannot
+inject extra query params.
+
+**`formatScriptureReference`:** the canonical human-readable form of a reference: "Romans 8:1-11",
+"Romans 8:28", or "Romans 8". Single source of truth — the projector slide (R047), the Planning
+Center export, and the Service Order row must never disagree about how a passage is written. A
+DEGENERATE range (`verseEnd === verseStart`) collapses to the single verse (HI-02) — reachable both
+via `parseScriptureInput` on "John 3:16-16" (Math.min/Math.max over `[16,16]`) and via an AI-written
+range — and every surface has always collapsed it; spelling the rule out here keeps the projected
+slide and the Planning Center plan title consistent with every other surface.
+
+**`scriptureRefFromSlot` (R047):** a SCRIPTURE slot's OWN reference fields are the slide's source.
+The reference the user types on the Service Order tab is the canonical record — there is no
+separate reading document to fetch first, and no `scriptureReadingId` to link (that indirection is
+why a scripture item used to produce no slide at all: the id was minted only by an ESV fetch inside
+a separate editor panel and never written back to the slot). Requires only book + chapter, so a
+whole-chapter reading is a valid source. Returns `null` for a slot whose reference has not been
+filled in yet, which is what makes `deriveGroupEntries` correctly derive zero slides for it.
+
+**`resolveTranslationSource` (R092):** the ONE field-less-fallback decision point for translation
+provenance. A slide/section with no stored `translationSource` predates this phase, when ESV was
+the only source — resolves to `'ESV'`, never to the org's CURRENT `bibleVersion` setting. This
+function MUST NEVER import or read `authStore`/`OrgSettings`/`DEFAULT_ORG_SETTINGS` — reading the
+church's current setting here would silently violate "changing the setting never retroactively
+alters an existing slide" (45-RESEARCH.md). The fallback is deliberately the hardcoded literal
+`'ESV'`, not a lookup of any kind.
+
+### src/utils/scriptureApi.ts
+
+**Dispatcher (`fetchScriptureText`, Phase 102, R296/R297):** the single client-side choke point for
+scripture-passage fetches — the `isAiEnabled()` analog for the Bible API. `ScriptureInput.vue` and
+`CongregationalEditor.vue` route every ESV/NLT fetch through this function; neither imports
+`esvApi`/`nltApi` directly. Order of operations: (1) read the auth store INSIDE the function body
+via `useAuthStore()` — NEVER at module-evaluation time, since Pinia requires an active app instance
+that does not exist when this module is first imported (same constraint as
+`claudeApi.ts::isAiEnabled`); (2) gate FIRST — if the org's Bible API is off
+(`authStore.isBibleApiEnabled`, false-when-absent), return `{ status: 'disabled' }` WITHOUT calling
+any proxy — the R297 core assertion is that a disabled org must produce zero requests; (3)
+otherwise dispatch by version, relocated verbatim from the two components' previously-duplicated
+inline dispatch, with no ESV/NLT parsing/trimming re-implemented here; (4) any thrown error from
+the underlying fetch maps to `{ status: 'error' }` — never re-thrown — so the enabled-path failure
+mode stays byte-for-byte identical to what each component's own try/catch did before this
+refactor.
+
+### src/utils/scriptureBoundaries.ts
+
+**Module overview (R064):** pure functions computing and using the "legal boundary index" contract
+that makes AI-assisted congregational-reading splitting structurally safe. The model is never
+shown raw character offsets and never asked to reproduce scripture words. It is shown a copy of the
+ESV passage with a visible marker embedded at every position where a legal split is allowed
+(immediately after a verse number, and immediately after clause-ending punctuation followed by
+whitespace) and asked only to choose indices INTO that pre-computed array. Because every value the
+model can represent is, by construction, a real position in the untouched source text, a
+mid-sentence split cannot be expressed by the model at all.
+
+**`sliceAtBoundaries` — THE ENCODING BACKSTOP (R064):** the byte-exactness guarantee at the core of
+the module: it performs exactly one `String.prototype.slice` call against the untouched source and
+nothing else. Do NOT add `.normalize()`, `.trim()`, `.replace()`, `.toLowerCase()`, or any
+comparison — any such transform would silently defeat the structural claim that a sliced section is
+character-for-character identical to the ESV source, including non-ASCII punctuation (curly quotes,
+curly apostrophes, em dashes, etc.). The boundary array passed in must be the exact same array used
+to build the prompt — never recomputed here.
+
+### src/utils/slideGroupMaterializer.ts
+
+**`sourceSignature`'s SCRIPTURE case (R047/D1):** the slot's reference is always the base of the
+signature. With no sections it is the WHOLE signature, byte-identical to before Phase 38 — every
+existing Reference-state group's stored signature stays unchanged, so deploying that phase rebuilt
+nothing that was not already congregational. With sections present, this is no longer only a
+stored change-detector: `rebuildScriptureGroup` reads it back as the ONE durable marker of "already
+materialized from THIS reading" (detached) vs "not yet" (rebuild) — so the encoding must be
+deterministic, order-sensitive and field-explicit, NOT `JSON.stringify` on the section objects
+(whose key order is not guaranteed to match between the AI-split path and the manual path — a
+signature that flips on key order would rebuild groups at random). Separators are ASCII control
+characters (`\x1e`/`\x1f`) that cannot occur in typed or ESV-sourced scripture text.
+
 ---
 
 *Integration audit: 2026-07-16*

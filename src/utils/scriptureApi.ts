@@ -19,27 +19,12 @@ export type ScriptureFetchResult =
 // ─── Dispatcher ──────────────────────────────────────────────────────────────
 
 /**
- * The single client-side choke point for scripture-passage fetches — the
- * `isAiEnabled()` analog for the Bible API (Phase 102, R296/R297).
- * `ScriptureInput.vue` and `CongregationalEditor.vue` route every ESV/NLT
- * fetch through this function; neither imports `esvApi`/`nltApi` directly.
- *
- * Order of operations matters:
- * 1. Read the auth store INSIDE the function body via `useAuthStore()` —
- *    NEVER at module-evaluation time. Pinia requires an active app instance
- *    that does not exist when this module is first imported (same
- *    constraint documented on `claudeApi.ts::isAiEnabled`).
- * 2. Gate FIRST: if the org's Bible API is off (Phase 101's single-leg
- *    `authStore.isBibleApiEnabled`, false-when-absent), return `{ status:
- *    'disabled' }` WITHOUT calling any proxy. This is the R297 core
- *    assertion — a disabled org must produce zero requests.
- * 3. Otherwise dispatch by version — relocated verbatim from the two
- *    components' previously-duplicated inline `version === 'NLT' ? ... :
- *    ...` dispatch. No ESV/NLT parsing/trimming is re-implemented here.
- * 4. Any thrown error from the underlying fetch maps to `{ status: 'error'
- *    }` — never re-thrown — so the enabled-path failure mode stays
- *    byte-for-byte identical to what each component's own try/catch did
- *    before this refactor (R296).
+ * The single client-side choke point for scripture-passage fetches (Phase
+ * 102, R296/R297). Gate FIRST (before calling either version's fetcher) —
+ * this is the R297 core assertion that a disabled org must produce zero
+ * requests. Reads the auth store INSIDE the function body, never at
+ * module-evaluation time (Pinia has no active app instance that early).
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/scriptureApi.ts)
  */
 export async function fetchScriptureText(
   query: string,

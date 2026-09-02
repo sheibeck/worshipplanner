@@ -133,6 +133,39 @@ and calls this once PER RECIPIENT so `{{their_roles}}` and `{{name}}` reflect th
 roles/name (R139/R154). The supported tokens are substituted GLOBALLY; every other `{{token}}` is
 left verbatim, and a template with no tokens is returned unchanged.
 
+## Utils Stack Notes (R318)
+
+Behavioral/architectural "how it works" narration relocated out of `src/utils/**` source comments
+per the Phase 109 comment convention (CONVENTIONS.md § Comment Convention). Each entry cites the
+file:line range at the time of relocation (109-03).
+
+### src/utils/slideTypography.ts
+
+**`FONT_CSS_LOADERS` (RESEARCH's "bundle strategy"):** on-demand loader for a non-eager curated
+family — only the org's chosen default face is eager-imported in `main.ts`; the other five curated
+families load lazily when previewed in Settings or requested by the presenter gate. Every
+`import()` inside this table is a FULLY STATIC string literal — one per `{family, weight}` pair
+drawn from `SLIDE_FONTS` — so Vite's import-analysis discovers and bundles each per-weight chunk on
+its own. Do NOT collapse these back to a templated `import(\`…/${weight}.css\`)`: a
+`@fontsource/*` specifier is a BARE (node_modules) import, and Vite 7's `dynamic-import-vars`
+cannot statically analyze a variable inside a bare specifier ("must start with ./ or ../") — it
+warns at build/dev time AND leaves the import un-bundled, so the lazy font load would throw at
+runtime in a production build. The verbose per-weight literals are the price of correctness. Each
+family value stays a `(weight) => Promise` function so `loadFontCss` and the `FONT_CSS_LOADERS`
+membership test are unaffected; an unlisted weight resolves to a no-op, mirroring the `snapWeight`
+ramp.
+
+### src/utils/slotTypes.ts
+
+**`buildSuggestedTemplateEntries`:** builds the Suggested Template's `ServiceTemplateEntry[]` — the
+single shared definition of the suggested-template content (the R114 `applyReset` button and the
+R115 `createService` empty-template fallback BOTH call this, so the preset can never fork into two
+copies). Derived from `buildSlots('1-2-2-3')` so the suggested order and section defaults stay in
+lockstep with the canonical progression preset. Fresh `crypto.randomUUID()` ids are minted per call
+(the editor draft needs unique per-row keys; `buildSlotsFromTemplate` never reads `entry.id`, so
+fresh ids are harmless on the createService path). Carries no `body` — the suggested entries are
+bodyless; a church adds recurring MISC body text itself.
+
 ---
 
 *Stack analysis: 2026-07-16*

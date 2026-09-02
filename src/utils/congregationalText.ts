@@ -1,12 +1,7 @@
 /**
  * Pure, testable text<->sections conversion for the `---`-delimited
- * congregational-reading editor (supersedes Phase 47's click-between-verses
- * divider model per owner feedback: the divider UX was unintuitive).
- *
- * The editor is a plain textarea. Slides are separated by a line containing
- * only `---`; within each slide the speaker (Leader / Congregation / All) may
- * sit on its own first line above that slide's text. This module is the single
- * source of truth for that grammar in both directions.
+ * congregational-reading editor.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/congregationalText.ts)
  */
 import type { CongregationalSection } from '@/types/slide'
 
@@ -31,15 +26,7 @@ const SLIDE_DELIMITER = /^\s*---\s*$/m
 
 /**
  * Parse `---`-delimited textarea content into congregational sections.
- *
- * - Chunks are split on lines that are exactly `---`.
- * - An empty (whitespace-only) chunk is skipped.
- * - The first non-empty line of a chunk, if it (case-insensitively) reads
- *   `leader`, `congregation`, or `all`, is consumed as the speaker and the
- *   remaining lines become the section text. Otherwise the whole chunk is the
- *   text and the speaker defaults to LEADER.
- * - A lone speaker label with no following text is skipped (not a slide).
- * - `translationSource` is stamped only when the arg is provided (R092).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/congregationalText.ts)
  */
 export function parseCongregationalText(
   text: string,

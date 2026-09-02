@@ -180,29 +180,10 @@ export function importedEntryContent(
       }
 
     case 'ready': {
-      // R108 (Phase 50, part 2 of 2 — CONSUME the page): an imported deck's
-      // slides can be manually added into ANOTHER slot's group (e.g. a Prayer
-      // group, alongside auto-generated slides). Such a hand-added entry keeps
-      // the deck's PARSED-slide id as its innerSlideId — the synthetic
-      // `rendered-page-N` identity is only ever minted by the IMPORTED-slot
-      // materializer, never for an entry dropped into a non-imported group.
-      // Resolution order, strictly extending the ec217aa positional stopgap:
-      //   1. A synthetic `rendered-page-N` identity (the materializer's own
-      //      entries) resolves by N — unconditional on renderedPage.
-      //   2. Else a supplied `renderedPage` (the 50-03 render-stable reference
-      //      recorded on a hand-added entry's sourceRef at add-time) resolves
-      //      directly — this is what makes a MULTI-IMAGE deck (parsed-slide
-      //      count != rendered-page count) work, closing the gap the ec217aa
-      //      positional resolver could not.
-      //   3. Else, when parsed/rendered counts match 1:1 (the common
-      //      single-image-per-slide deck), fall back to the ec217aa positional
-      //      resolver: map the entry to its page by its position in
-      //      `deck.slides`. Kept in place for legacy entries added before
-      //      50-03 recorded renderedPage (50-CONTEXT.md: fallback, no
-      //      migration).
-      //   4. Else — a multi-image deck with no renderedPage (a legacy entry
-      //      that has never worked) — leave it pending rather than risk
-      //      pairing to the wrong page.
+      // R108 (Phase 50 part 2): resolution order — synthetic rendered-page-N
+      // identity, then a supplied renderedPage, then the legacy 1:1 positional
+      // fallback, else pending. See .planning/codebase/ARCHITECTURE.md
+      // (Utils Behavioral Notes — src/utils/importedRenderReconciler.ts)
       let pageNumber = renderedPageNumberFromIdentity(innerSlideId)
       if (pageNumber === null && renderedPage !== undefined) {
         pageNumber = renderedPage
@@ -225,30 +206,8 @@ export function importedEntryContent(
 /**
  * Cheap change-detection proxy for the IMPORTED slot kind, mirroring
  * `slideGroupMaterializer.ts`'s `sourceSignature` contract for every other
- * slot kind. Encoded with the ASCII control-character separators the
- * SCRIPTURE branch there already uses and justifies (`\x1e` between fields,
- * `\x1f` between joined texts) — NOT the pre-existing IMPORTED branch's
- * `` `${texts.length}:${texts.join('|')}` `` form, which this function
- * deliberately replaces rather than inherits.
- *
- * Why the replacement is necessary: PPTX slide text can itself contain both
- * `|` and `:`, so two decks whose slide boundaries differ only in WHERE a
- * literal pipe falls could produce an identical `texts.join('|')` string
- * (e.g. one slide's body `"x|y"` next to another slide's body `"z"` joins to
- * the same string as two slides `"x"` and `"y|z"`, when both decks have the
- * same slide count). Neither `\x1e` nor `\x1f` can occur in PPTX-parsed text
- * (both are invalid XML 1.0 characters) nor in a Storage path, so no field
- * value can forge a field boundary.
- *
- * This encoding change is inert for stored data: nothing reads an IMPORTED
- * signature back — only `rebuildScriptureGroup` reads a stored signature —
- * so no group is rebuilt merely because the encoding changed.
- *
- * Fields, in order: mode, then the resolved `renderedCount` (the empty
- * string when the mode isn't `ready`, so pending/failed/parsed never
- * fabricate a count), then the parsed slide count, then the joined parsed
- * texts. Including `mode` keeps `pending`/`failed`/`ready` distinguishable
- * even when `deck.slides` is unchanged across all three.
+ * slot kind.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/importedRenderReconciler.ts)
  */
 export function importedSourceSignature(
   deck: Pick<ImportedDeck, 'slides'>,

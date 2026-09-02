@@ -2,11 +2,8 @@ import { SLIDE_FONTS } from '@/config/slideFonts'
 
 /**
  * Pure, independently-testable slide-typography helpers (46-RESEARCH.md
- * Pattern 1-3). This module is the single implementation all three render
- * sites (`PresentationViewer.vue`, the Slides grid, the Edit Slide drawer
- * preview — 46-04), the Settings "Slide Typography" card preview (46-03),
- * and the app-init font-load gate (R094) share — no consumer computes CSS
- * variables or re-derives the font-load gate on its own.
+ * Pattern 1-3) — the single implementation every render site shares.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideTypography.ts)
  */
 
 /** Locked scale multipliers (46-CONTEXT.md): Medium is the identity scale —
@@ -68,14 +65,11 @@ function defaultCssVars(): SlideTypographyCssVars {
 }
 
 /**
- * Computes the three `--slide-font-*` CSS custom properties from a stored
- * (or possibly undefined/tampered) `slideTypography` value. DEFENSIVELY
- * falls back to Inter/400/md — never partially — when the family key is
- * unknown, the weight is not reachable for that family (via `snapWeight`),
- * or the scale is not one of `sm`/`md`/`lg` (T-46-03, ASVS V5): the value
- * written into `--slide-font-family` and, downstream, into a
- * `document.fonts.load()` template string is therefore always drawn from
- * the curated `SLIDE_FONTS` set, never free text.
+ * Computes the three `--slide-font-*` CSS custom properties. DEFENSIVELY
+ * falls back to Inter/400/md — never partially — on any invalid input
+ * (T-46-03, ASVS V5): the value fed downstream into `document.fonts.load()`
+ * is therefore always drawn from the curated `SLIDE_FONTS` set, never free text.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideTypography.ts)
  */
 export function cssVarsFor(
   typography: Partial<SlideTypographySettings> | undefined,
@@ -139,27 +133,12 @@ export function waitForSlideFont(
 }
 
 /**
- * On-demand loader for a non-eager curated family (RESEARCH's "bundle
- * strategy": only the org's chosen default face is eager-imported in
- * `main.ts`; the other five curated families load lazily when previewed in
- * Settings — 46-03 — or requested by the presenter gate — 46-04).
- *
- * Every `import()` below is a FULLY STATIC string literal — one per
- * `{family, weight}` pair drawn from `SLIDE_FONTS` — so Vite's
- * import-analysis discovers and bundles each per-weight chunk on its own.
- *
- * Do NOT collapse these back to a templated `import(\`…/${weight}.css\`)`.
- * A `@fontsource/*` specifier is a BARE (node_modules) import, and Vite 7's
- * `dynamic-import-vars` cannot statically analyze a variable inside a bare
- * specifier ("must start with ./ or ../"). It warns at build/dev time AND,
- * worse, leaves the import un-bundled — so the lazy font load would throw at
- * runtime in a production build (a bare specifier can't resolve in the
- * browser). The verbose per-weight literals are the price of correctness.
- *
- * Each family value stays a `(weight) => Promise` function so `loadFontCss`
- * and the FONT_CSS_LOADERS membership test are unaffected; an unlisted
- * weight (e.g. a stale 300 for Lora) resolves to a no-op, mirroring the
- * `snapWeight` ramp.
+ * On-demand loader for a non-eager curated family. Every `import()` below is
+ * a FULLY STATIC string literal — do NOT collapse to a templated
+ * `import(\`…/${weight}.css\`)`; Vite 7's `dynamic-import-vars` cannot
+ * statically analyze a variable inside a bare `@fontsource/*` specifier, and
+ * the lazy font load would throw at runtime in a production build.
+ * See .planning/codebase/STACK.md (Utils Stack Notes — src/utils/slideTypography.ts)
  */
 export const FONT_CSS_LOADERS: Record<string, (weight: number) => Promise<unknown>> = {
   Inter: (weight) => {

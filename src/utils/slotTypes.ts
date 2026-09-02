@@ -188,28 +188,10 @@ export function reindexSlots(slots: ServiceSlot[]): ServiceSlot[] {
 
 /**
  * Groups any section-bearing collection into `SERVICE_SECTIONS`-ordered
- * buckets, plus a trailing `legacy` bucket for members whose section is
- * absent or not a recognized `SERVICE_SECTIONS` member (D005). Total and
- * stable: every input item lands in exactly one bucket, in its original
- * relative order within that bucket — nothing is dropped, cloned, or
- * reordered within a bucket.
- *
- * Generic on purpose: the editor view groups `{ slot, index }` pairs for
- * rendering while a reorder handler groups bare `ServiceSlot`s for
- * persistence, and both must use the identical bucketing rule.
- *
- * Every `SERVICE_SECTIONS` key is initialized to an empty array up front, so
- * an empty section is always present as a key — this is what lets the view
- * render an empty section unconditionally (R043), and it's why the "adding a
- * fifth section" story is free: this function iterates `SERVICE_SECTIONS`
- * and never names a section as a string literal.
- *
- * `legacy` mirrors the trailing "Ungrouped" bucket `useSlideshowAssembly.ts`'s
- * `assembledSections` (lines 544-559) already ships for section-less slides —
- * do not invent a second placement rule for section-less members. A section
- * value that is present but outside `SERVICE_SECTIONS` (production data
- * corruption, or a stale value from a since-removed section) also routes to
- * `legacy` rather than being silently dropped (T-29-03).
+ * buckets, plus a trailing `legacy` bucket (D005). Total and stable — nothing
+ * is dropped, cloned, or reordered within a bucket. Generic on purpose so the
+ * editor view and a reorder handler share the identical bucketing rule.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slotTypes.ts)
  */
 export function groupBySection<T>(
   items: readonly T[],
@@ -249,19 +231,11 @@ export function flattenBySection<T>(grouped: { sections: Record<ServiceSection, 
 
 /**
  * Composition of `groupBySection` + `flattenBySection` over `slot.section` —
- * the one source of truth for "what order are the slots in," shared by the
- * rendered grouping and the array that gets persisted, so the two can never
- * disagree.
- *
- * Identity-preserving: when the section-major result is element-for-element
- * reference-equal to the input, returns the ORIGINAL `slots` array rather
- * than the freshly-built one. Same reason `backfillSlotIds` (above) returns
- * the original `service` reference when nothing changed — a fresh array
- * reference in an autosave-watched view manufactures a false `isDirty`, and
- * on the load path's remote-merge branch, a comparison that never converges.
- *
- * Does NOT call `reindexSlots` — ordering and position-renumbering are
- * separate concerns. Callers compose `reindexSlots(orderSlotsBySection(slots))`.
+ * the one source of truth for "what order are the slots in." Identity-
+ * preserving: returns the ORIGINAL `slots` array when nothing changed (avoids
+ * a false `isDirty`). Does NOT call `reindexSlots` — callers compose
+ * `reindexSlots(orderSlotsBySection(slots))`.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slotTypes.ts)
  */
 export function orderSlotsBySection(slots: ServiceSlot[]): ServiceSlot[] {
   const ordered = flattenBySection(groupBySection(slots, (slot) => slot.section))
@@ -273,23 +247,10 @@ export function orderSlotsBySection(slots: ServiceSlot[]): ServiceSlot[] {
 
 /**
  * Backfills a missing `ServiceSlot.id` (D-01) for services read before this
- * field existed. Pure — returns the ORIGINAL `service` object reference when
- * every slot already has an id, so folding this into a load watcher can never
- * manufacture a false `isDirty`.
- *
- * Two-argument form (a planner correction to a single-argument backfill):
- * `ServiceEditorView`'s load watcher has a remote-merge branch that compares
- * `JSON.stringify(remote)` against `JSON.stringify(local)`. A legacy
- * Firestore document has no slot ids, so a one-argument backfill would mint
- * fresh UUIDs on every snapshot; the comparison would never match, and each
- * snapshot would re-anchor every group to a brand-new slot id, silently
- * orphaning group documents. Reusing the `reference` service's id at the
- * same array index (guarded by matching `kind`) makes the comparison stable.
- *
- * Accepted residual limitation: if a concurrent editor inserts or removes a
- * slot in the same window, positional alignment can shift and one slot may
- * take a fresh id. The window closes permanently on the first real save,
- * which persists the ids to Firestore.
+ * field existed. Pure — returns the ORIGINAL `service` reference when every
+ * slot already has an id. Accepted residual limitation: a concurrent editor
+ * insert/remove in the same window can shift positional alignment.
+ * See .planning/codebase/CONCERNS.md (Utils Concern Notes — src/utils/slotTypes.ts)
  */
 export function backfillSlotIds(service: Service, reference?: Service | null): Service {
   let changed = false
@@ -304,17 +265,11 @@ export function backfillSlotIds(service: Service, reference?: Service | null): S
 }
 
 /**
- * Default position -> section mapping for the M001 progression template (D005).
- * There is no default Pre-Service slot in the template (announcements arrive
- * in Phase 21) — positions 0-6 are 'worship', 7 (MESSAGE) is 'message',
- * 8 (sending song) is 'sending'.
- *
- * Intentionally position-keyed, not section-count-keyed: it contains no
- * arithmetic over `SERVICE_SECTIONS.length` and no "last section" derivation,
- * so widening `SERVICE_SECTIONS` (Phase 29 adds Post-Service) does not change
- * which default section a template slot gets. Audited by reading during
- * Phase 29 plan 02 — confirmed, not assumed; pinned by the
- * `buildSlots section defaults` test block for both progressions.
+ * Default position -> section mapping for the M001 progression template
+ * (D005): positions 0-6 'worship', 7 (MESSAGE) 'message', 8 (sending) 'sending'.
+ * Intentionally position-keyed, not section-count-keyed, so widening
+ * `SERVICE_SECTIONS` does not change which default section a slot gets.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slotTypes.ts)
  */
 function defaultSectionForPosition(position: number): ServiceSection {
   if (position === 7) return 'message'
@@ -381,32 +336,12 @@ export function progressionVwTypeSequence(progression: Progression): VWType[] {
 
 /**
  * Builds a new service's `ServiceSlot[]` from the church's stored
- * `defaultServiceTemplate` (R086/R087). Composes `progressionVwTypeSequence`,
- * `createSlot`, and `reindexSlots` — no duplicated logic.
- *
- * VW typing is computed HERE, at creation, and never read back from the
- * template: a running `songOrdinal` counter (starting at 0) increments only
- * on `SONG` entries, indexing `sequence[songOrdinal % sequence.length]` —
- * the modulo-cycle choice for templates with more than 5 SONG entries is a
- * deliberate discretionary decision (Open Question 1 / Assumption A1 in
- * 44-RESEARCH.md); the alternative considered and rejected was clamping to
- * the sequence's last value instead of cycling. When `vwModeEnabled` is
- * false, `vwType` is left `undefined` so `createSlot`'s own `?? 2` default
- * applies — the ordinal sequence is not consulted at all in that case.
- *
- * An entry whose `kind` is not a recognized `SlotKind` is skipped (T-44-03
- * defensive guard) rather than passed into `createSlot`'s exhaustive switch.
- *
- * An empty `entries` array returns `[]` — buildSlotsFromTemplate is NEVER a
- * vehicle for reinstating `buildSlots()` as a fallback; that call is the
- * caller's decision. Under R115, `services.ts::createService` DOES resolve a
- * fallback (empty stored template → `buildSuggestedTemplateEntries()`), but it
- * does so at the call site before calling this function — this function stays
- * pure (`[]` → `[]`, pinned by `slotTypes.test.ts:798`).
- *
- * An entry's optional `body` (R116) is threaded through to `createSlot` for
- * body-bearing kinds; a bodyless entry leaves the created slot's `body` key
- * absent.
+ * `defaultServiceTemplate` (R086/R087). VW typing is computed HERE, at
+ * creation, via a cycling `songOrdinal` counter — never read back from the
+ * template. An empty `entries` array returns `[]`; this function is NEVER a
+ * vehicle for reinstating `buildSlots()` as a fallback (pinned by
+ * `slotTypes.test.ts:798`).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slotTypes.ts)
  */
 export function buildSlotsFromTemplate(
   entries: ServiceTemplateEntry[],
@@ -429,17 +364,9 @@ export function buildSlotsFromTemplate(
 }
 
 /**
- * Builds the Suggested Template's `ServiceTemplateEntry[]` — the single shared
- * definition of the suggested-template content (R114 button `applyReset` in
- * plan 52-02 and the R115 `createService` empty-template fallback BOTH call
- * this, so the preset can never fork into two copies).
- *
- * Derived from `buildSlots('1-2-2-3')` so the suggested order and section
- * defaults stay in lockstep with the canonical progression preset. Fresh
- * `crypto.randomUUID()` ids are minted per call (the editor draft needs unique
- * per-row keys; `buildSlotsFromTemplate` never reads `entry.id`, so fresh ids
- * are harmless on the createService path). Carries no `body` — the suggested
- * entries are bodyless; a church adds recurring MISC body text itself.
+ * Builds the Suggested Template's `ServiceTemplateEntry[]` — the single
+ * shared definition (R114/R115) so the preset can never fork into two copies.
+ * See .planning/codebase/STACK.md (Utils Stack Notes — src/utils/slotTypes.ts)
  */
 export function buildSuggestedTemplateEntries(): ServiceTemplateEntry[] {
   return buildSlots('1-2-2-3').map((slot) => ({

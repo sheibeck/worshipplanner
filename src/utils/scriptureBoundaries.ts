@@ -1,15 +1,7 @@
 /**
  * Pure functions computing and using the "legal boundary index" contract that
  * makes AI-assisted congregational-reading splitting structurally safe (R064).
- *
- * The model is never shown raw character offsets and never asked to reproduce
- * scripture words. It is shown a copy of the ESV passage with a visible marker
- * embedded at every position where a legal split is allowed (immediately after
- * a verse number, and immediately after clause-ending punctuation followed by
- * whitespace) and asked only to choose indices INTO that pre-computed array.
- * Because every value the model can represent is, by construction, a real
- * position in the untouched source text, a mid-sentence split is not merely
- * discouraged — it cannot be expressed by the model at all.
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/scriptureBoundaries.ts)
  */
 
 /** Matches an inline ESV verse-number marker, e.g. "[12] ", "[3]". */
@@ -55,14 +47,9 @@ export const BOUNDARY_MARKER_OPEN = '⟦'
 export const BOUNDARY_MARKER_CLOSE = '⟧'
 
 /**
- * Produces a model-facing copy of `text` with a `⟦i⟧` marker inserted
- * immediately before the character at `boundaries[i]`, for every boundary.
- * The untouched `text` remains the only slicing source — this output is for
- * display to the model only, never fed back into `sliceAtBoundaries`.
- *
- * Returns `null` — a hard refusal — when `text` already contains either
- * marker delimiter, since an ambiguous marker set would let the model index
- * into text the caller did not mean.
+ * Produces a model-facing copy of `text` marked at each legal boundary.
+ * Returns `null` (hard refusal) if `text` already contains a marker delimiter.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/scriptureBoundaries.ts)
  */
 export function embedBoundaryMarkers(text: string, boundaries: number[]): string | null {
   if (text.includes(BOUNDARY_MARKER_OPEN) || text.includes(BOUNDARY_MARKER_CLOSE)) {
@@ -79,15 +66,10 @@ export function embedBoundaryMarkers(text: string, boundaries: number[]): string
 }
 
 /**
- * THE ENCODING BACKSTOP. This is the byte-exactness guarantee at the core of
- * R064: it performs exactly one `String.prototype.slice` call against the
- * untouched source and nothing else. Do NOT add `.normalize()`, `.trim()`,
- * `.replace()`, `.toLowerCase()`, or any comparison here — any such
- * transform would silently defeat the structural claim that a sliced
- * section is character-for-character identical to the ESV source,
- * including non-ASCII punctuation (curly quotes, curly apostrophes, em
- * dashes, etc.). The boundary array passed in must be the exact same array
- * used to build the prompt — never recomputed here.
+ * THE ENCODING BACKSTOP (R064): exactly one untouched `.slice()` call — do
+ * NOT add `.normalize()`, `.trim()`, `.replace()`, `.toLowerCase()`, or any
+ * comparison here.
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/scriptureBoundaries.ts)
  */
 export function sliceAtBoundaries(
   text: string,

@@ -244,6 +244,23 @@ limitation is computed separately, by `computeOrgsClaimForUid`, and merged in by
 `syncOrgMembershipClaimHandler` on every write regardless of what this function decides for the
 primary keys (R207/R208).
 
+## Utils Concern Notes (R318)
+
+### src/utils/slotTypes.ts
+
+**`backfillSlotIds` (D-01):** backfills a missing `ServiceSlot.id` for services read before this
+field existed. Pure — returns the ORIGINAL `service` object reference when every slot already has
+an id, so folding this into a load watcher can never manufacture a false `isDirty`. Two-argument
+form (a planner correction to a single-argument backfill): `ServiceEditorView`'s load watcher has a
+remote-merge branch that compares `JSON.stringify(remote)` against `JSON.stringify(local)`. A
+legacy Firestore document has no slot ids, so a one-argument backfill would mint fresh UUIDs on
+every snapshot — the comparison would never match, and each snapshot would re-anchor every group to
+a brand-new slot id, silently orphaning group documents. Reusing the `reference` service's id at the
+same array index (guarded by matching `kind`) makes the comparison stable. Accepted residual
+limitation: if a concurrent editor inserts or removes a slot in the same window, positional
+alignment can shift and one slot may take a fresh id — the window closes permanently on the first
+real save, which persists the ids to Firestore.
+
 ---
 
 *Concerns audit: 2026-07-16*

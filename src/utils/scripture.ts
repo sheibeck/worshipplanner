@@ -104,18 +104,10 @@ export function scriptureWebLink(
 }
 
 /**
- * R298: BibleGateway deep-link for a reference, usable with ANY version —
- * the manual fallback when an org's Bible API is off. Delegates the search
- * string to `formatScriptureReference` (the one canonical "Book
- * Chapter:Start-End" formatter, ~line 190) rather than re-deriving it, so
- * this link and every other rendering of the reference can never disagree.
- *
- * `version` is appended as `&version=<version>` ONLY when it is a non-empty
- * string; an org with no stored `bibleVersion` (or an org that never had one
- * because the translation selector is hidden per R300) omits the param and
- * BibleGateway falls back to its own default. Both the reference and the
- * version are `encodeURIComponent`-ed before interpolation (T-103-01) so a
- * crafted reference cannot inject extra query params.
+ * R298: BibleGateway deep-link for a reference, usable with ANY version — the
+ * manual fallback when an org's Bible API is off. Both the reference and the
+ * version are `encodeURIComponent`-ed before interpolation (T-103-01).
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/scripture.ts)
  */
 export function bibleGatewayLink(ref: ScriptureRef, version?: string): string {
   const search = encodeURIComponent(formatScriptureReference(ref))
@@ -191,21 +183,9 @@ export function parseScriptureInput(text: string): ScriptureRef | null {
 
 /**
  * The canonical human-readable form of a reference: "Romans 8:1-11",
- * "Romans 8:28", or "Romans 8". Single source of truth — the projector slide
- * (R047), the Planning Center export (`formatScriptureRef` delegates here) and
- * the Service Order row must never disagree about how a passage is written.
- *
- * `parseScriptureInput` can produce a verseStart with no verseEnd (a single
- * verse), which the Planning Center formatter used to collapse to a bare
- * chapter; that case is handled explicitly here.
- *
- * A DEGENERATE range (`verseEnd === verseStart`) collapses to the single verse
- * (HI-02). That state is reachable two ways — `parseScriptureInput` on
- * "John 3:16-16" runs Math.min/Math.max over [16,16], and
- * `ScriptureInput.onSelectAiScripture` writes whatever the AI returns — and the
- * rail row, the grid header and the drawer context line have always collapsed
- * it. Spelling it out here made the projected slide and the Planning Center
- * plan title read "John 3:16-16" while every other surface read "John 3:16".
+ * "Romans 8:28", or "Romans 8". Single source of truth — the projector slide,
+ * the Planning Center export, and the Service Order row must never disagree.
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/scripture.ts)
  */
 export function formatScriptureReference(ref: ScriptureRef): string {
   if (ref.verseStart && ref.verseEnd && ref.verseEnd !== ref.verseStart) {
@@ -217,16 +197,8 @@ export function formatScriptureReference(ref: ScriptureRef): string {
 
 /**
  * R047: a SCRIPTURE slot's OWN reference fields are the slide's source.
- *
- * The reference the user types on the Service Order tab is the canonical
- * record — there is no separate reading document to fetch first, and no
- * `scriptureReadingId` to link. That indirection is why a scripture item used
- * to produce no slide at all: the id was minted only by an ESV fetch inside a
- * separate editor panel and never written back to the slot.
- *
- * Requires only book + chapter, so a whole-chapter reading is a valid source.
- * Returns `null` for a slot whose reference has not been filled in yet, which
- * is what makes `deriveGroupEntries` correctly derive zero slides for it.
+ * Returns `null` for a slot whose reference has not been filled in yet.
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/scripture.ts)
  */
 export function scriptureRefFromSlot(slot: ScriptureSlot): ScriptureRef | null {
   if (!slot.book || !slot.chapter) return null
@@ -243,26 +215,12 @@ export function scripturesOverlap(reading: ScriptureRef, sermon: ScriptureRef): 
 }
 
 /**
- * R064/D1: the ONE congregational-ness predicate on the SLOT side — which
- * sections seed a Reference -> Congregational conversion (`deriveGroupEntries`
- * SCRIPTURE case) and, once seeded, which sections a rebuild diffs the stored
- * signature against (`sourceSignature` SCRIPTURE case).
- *
- * Deliberately ignores `ScriptureSlot.readingMode` — that field is declared
- * but written by no code today, and gating on both it and the sections array
- * would create two fields that can disagree, the same defect shape as Phase
- * 28's two competing `performanceOrder` fields and Phase 33's
- * partially-applied cascade. The single rule, matching `PresentationViewer`'s
- * `isCongregational` computed: sections present and non-empty means
- * congregational.
- *
- * Pure passthrough — no copying, sorting, filtering, mapping, slicing or
- * string transformation of any kind. Section text is projected verbatim to a
- * congregation, so this function must be provably byte-exact by source
- * inspection, not merely by sampling. Returns the slot's OWN array by
- * reference when non-empty (never a copy); returns `[]` — never `undefined`,
- * never the stored array with elements removed — for a slot with no sections
- * or an empty sections array.
+ * R064/D1: the ONE congregational-ness predicate on the SLOT side. Pure
+ * passthrough (no copy/sort/filter/transform) — section text is projected
+ * verbatim to a congregation, so this must be provably byte-exact by
+ * inspection. Returns the slot's OWN array by reference when non-empty, `[]`
+ * otherwise (never `undefined`).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/scripture.ts)
  */
 export function congregationalSectionsFromSlot(slot: ScriptureSlot): CongregationalSection[] {
   if (Array.isArray(slot.congregationalSections) && slot.congregationalSections.length > 0) {
@@ -274,13 +232,8 @@ export function congregationalSectionsFromSlot(slot: ScriptureSlot): Congregatio
 /**
  * R064/D1: the mirror predicate on the ENTRY side — the ONLY place any
  * consumer decides whether a stored `GroupSlideEntry` is a congregational
- * section slide (`resolveEntryContent`'s scripture case, and
- * `rebuildScriptureGroup`'s cleared-reference branch). `speaker` present is
- * the discriminator (matching the `text` member's authored-`body` precedent
- * in `SourceRef`'s doc comment) — a Reference-state entry and a legacy
- * pre-Phase-38 entry both have no `speaker`, so both correctly return `null`
- * here regardless of any `scriptureReadingId`/`innerSlideId` they still
- * carry.
+ * section slide. `speaker` present is the discriminator.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/scripture.ts)
  */
 export function congregationalSectionFromRef(ref: SourceRef): CongregationalSection | null {
   if (ref.kind !== 'scripture' || ref.speaker === undefined) return null
@@ -312,36 +265,19 @@ export function scriptureAttribution(version: 'ESV' | 'NLT'): string {
 
 /**
  * R092: the ONE field-less-fallback decision point for translation
- * provenance. A slide/section with no stored `translationSource` predates
- * this phase, when ESV was the only source — resolves to `'ESV'`, never to
- * the org's CURRENT `bibleVersion` setting.
- *
- * This function MUST NEVER import or read `authStore`/`OrgSettings`/
- * `DEFAULT_ORG_SETTINGS` — reading the church's current setting here would
- * silently violate "changing the setting never retroactively alters an
- * existing slide" (45-RESEARCH.md § Don't Hand-Roll #4). The fallback is
- * deliberately the hardcoded literal `'ESV'`, not a lookup of any kind.
+ * provenance. MUST NEVER import or read `authStore`/`OrgSettings`/
+ * `DEFAULT_ORG_SETTINGS` — the fallback is the hardcoded literal `'ESV'`.
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/scripture.ts)
  */
 export function resolveTranslationSource(slide: { translationSource?: 'ESV' | 'NLT' }): 'ESV' | 'NLT' {
   return slide.translationSource ?? 'ESV'
 }
 
 /**
- * Writes a new reference onto a `ScriptureSlot` (the same four-field spread
- * `ServiceEditorView.onScriptureChange` performs inline today) and owns ONE
- * additional rule: a stored congregational reading is never carried onto a
- * passage it was not derived from. Section text is projected verbatim to a
- * congregation, so leaving one passage's words attached to a slot that now
- * reads a different reference would project scripture under the wrong
- * heading — a correctness failure the assembler cannot detect, because by
- * then the sections look perfectly valid. Clearing on a reference change is
- * the only clearing rule; no other slot mutation clears sections, because the
- * reference is the only thing that changes which passage a stored reading
- * belongs to.
- *
- * Uses the canonical `formatScriptureReference` formatter on both sides
- * (ME-02: one canonical formatter, not a second inline copy of the
- * book/chapter/verse comparison).
+ * Writes a new reference onto a `ScriptureSlot` and owns ONE additional rule:
+ * a stored congregational reading is never carried onto a passage it was not
+ * derived from — clearing on a reference change is the only clearing rule.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/scripture.ts)
  */
 export function scriptureSlotAfterReferenceChange(
   slot: ScriptureSlot,

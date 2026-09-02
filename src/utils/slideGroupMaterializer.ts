@@ -20,19 +20,9 @@ import {
 import { resolveImportedRender, importedEntryIdentities, importedSourceSignature } from '@/utils/importedRenderReconciler'
 
 /**
- * Derives a slide group's structure from its slot's canonical source.
- * Reproduces `assembleSlideshow`'s CURRENT per-kind emission order exactly —
- * a group derived today must produce a slideshow byte-identical to what the
- * pre-group assembler produced. Slide TEXT is never read or stored here
- * (D-02) for every kind EXCEPT the SCRIPTURE Congregational state (Phase 38,
- * D1/D2): there, `sourceRef` mints the section's own `speaker`/`text`
- * directly, because a converted section slide has no live source left to
- * resolve against — the words themselves ARE what makes it detached (see
- * `SourceRef`'s doc comment in `slideGroup.ts`). Every other kind, and a
- * scripture slot with no sections, still mints only structural references.
- *
- * Every entry this returns is NEW, so every id here is freshly minted. It is
- * not the only minting site in the codebase — see the module doc comment.
+ * Derives a slide group's structure from its slot's canonical source. Every
+ * entry this returns is NEW, so every id here is freshly minted.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
  */
 export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): GroupSlideEntry[] {
   switch (slot.kind) {
@@ -66,26 +56,11 @@ export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): G
     }
 
     case 'SCRIPTURE': {
-      // R047/D1: no reference means no slides, exactly as before. Once a
-      // reference exists, the group has exactly two possible shapes — never a
-      // mix — decided by `congregationalSectionsFromSlot`, R064's ONE
-      // congregational-ness predicate:
-      //
-      // - Reference state (default, unchanged): no sections, so ONE
-      //   reference-only entry, derived from the slot's OWN reference fields —
-      //   the passage the user typed on the Service Order tab. The ref
-      //   carries no payload. `derivedIdentityKey` treats the ref KIND alone
-      //   as this group's identity, which is what lets a passage change carry
-      //   the stored entry's id/audio forward through
-      //   `carryStoredDerivedEntries` instead of minting a fresh id and
-      //   silently dropping attached audio.
-      // - Congregational state (D1, opt-in): sections present, so ONE entry
-      //   PER SECTION — the same one-entry-per-fragment shape the IMPORTED
-      //   case above already uses — each carrying that section's own
-      //   `speaker`/`text`/`verseRange`. This is what `deriveGroupEntries`
-      //   produces on a fresh conversion; `rebuildScriptureGroup` below is
-      //   what keeps a group that has ALREADY converted from re-deriving
-      //   here on every pass.
+      // R047/D1: no reference means no slides. Once a reference exists, the
+      // group has exactly two shapes (Reference vs Congregational) — never a
+      // mix — decided by congregationalSectionsFromSlot.
+      // See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes —
+      // src/utils/slideGroupMaterializer.ts)
       if (!scriptureRefFromSlot(slot)) return []
       const sections = congregationalSectionsFromSlot(slot)
       if (sections.length === 0) {
@@ -176,22 +151,10 @@ export function sourceSignature(slot: ServiceSlot, inputs: AssemblyInputs): stri
     }
 
     case 'SCRIPTURE': {
-      // R047/D1: the slot's reference is always the base of the signature.
-      // With no sections it is the WHOLE signature, byte-identical to before
-      // this phase — every existing Reference-state group's stored signature
-      // stays unchanged, so deploying this phase rebuilds nothing that was
-      // not already congregational.
-      //
-      // With sections present, this is no longer only a stored
-      // change-detector: `rebuildScriptureGroup` reads it back as the ONE
-      // durable marker of "already materialized from THIS reading" (detached)
-      // vs "not yet" (rebuild). So the encoding must be deterministic,
-      // order-sensitive and field-explicit — NOT `JSON.stringify` on the
-      // section objects, whose key order is not guaranteed to match between
-      // the AI-split path and the manual path; a signature that flips on key
-      // order would rebuild groups at random. Separators are ASCII control
-      // characters (\x1e/\x1f) that cannot occur in typed or ESV-sourced
-      // scripture text.
+      // R047/D1: the slot's reference is always the base of the signature;
+      // rebuildScriptureGroup reads it back as the marker of "already
+      // materialized from THIS reading." See .planning/codebase/
+      // INTEGRATIONS.md (Utils Integration Notes — src/utils/slideGroupMaterializer.ts)
       const scriptureRef = scriptureRefFromSlot(slot)
       if (!scriptureRef) return undefined
       const formatted = formatScriptureReference(scriptureRef)
@@ -209,18 +172,9 @@ export function sourceSignature(slot: ServiceSlot, inputs: AssemblyInputs): stri
       const deck = inputs.importedDecksById.get(slot.importId)
       if (!deck) return undefined
 
-      // D-09: `importedSourceSignature` folds in BOTH the resolved mode and,
-      // for a ready render, the page count — a re-render that changes the
-      // count while staying `ready` therefore produces a different
-      // signature. It also replaces the old pipe/colon-delimited
-      // count-then-texts form with the `\x1e`/`\x1f` ASCII control-character
-      // encoding the SCRIPTURE branch above already uses and justifies:
-      // PPTX-parsed text can itself contain either legacy delimiter
-      // character, so two distinct decks or render states could otherwise
-      // collide on one signature (T-42-10). A deck with no `renderImportId`
-      // resolves to `parsed` mode, which signs byte-identically to the old
-      // parsed-only path's slide count/text (D-16) — only the delimiter
-      // changed, not what is compared.
+      // D-09: importedSourceSignature folds in BOTH the resolved mode and the
+      // ready-render page count (T-42-10).
+      // See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/importedRenderReconciler.ts)
       const render = deck.renderImportId ? inputs.pptxRendersByImportId?.get(deck.renderImportId) : undefined
       return importedSourceSignature(deck, resolveImportedRender(deck, render))
     }
@@ -256,26 +210,9 @@ export function buildInitialGroup(slot: ServiceSlot, serviceId: string, inputs: 
 
 /**
  * True when an entry's `sourceRef` is something THIS SLOT's own derivation
- * could have produced — i.e. the entry is source-derived and the rebuild owns
- * it. Everything else on the group is user work.
- *
- * Keying off the SLOT rather than the ref kind alone is the whole point (BL-01,
- * Phase 30 review). The predicate this replaced returned "non-derivable" only
- * for `video` and authored-`text`, which meant an imported deck or a set of
- * dropped images the user appended into a SCRIPTURE or IMPORTED group was in
- * neither the carried list nor the surviving list, and the first unconditional
- * rebuild destroyed it silently — the D-02 regression the deleted confirm gate
- * used to stall. `＋ Add slide` and `⇪ Import into this group` are offered on
- * every non-song group (`SlideGrid.vue`), so those entries are reachable and
- * are, by definition, user work: no SCRIPTURE derivation ever emits an
- * `imported` ref, and no IMPORTED derivation ever emits one for a deck other
- * than the slot's own `importId`.
- *
- * SONG deliberately answers on ref KIND alone, not on `songId`: a full
- * song-identity swap is detected and handled by `rebuildSongGroup` itself,
- * which rebuilds from the new song's derivation. Matching `songId` here would
- * classify the OLD song's lyric/copyright entries as user work and splice the
- * entire previous song back into the swapped group.
+ * could have produced. Keying off the SLOT rather than the ref kind alone is
+ * the whole point (BL-01, Phase 30 review).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
  */
 function isSlotDerivableRef(slot: ServiceSlot, ref: SourceRef): boolean {
   switch (slot.kind) {
@@ -295,18 +232,8 @@ function isSlotDerivableRef(slot: ServiceSlot, ref: SourceRef): boolean {
 }
 
 /**
- * The one place any rebuild path decides what a user added by hand — every
- * stored entry this slot's own derivation could not have produced, in stored
- * order. Every `rebuild*Group` function splices this back into its fresh
- * derivation so a song swap, a passage change, or a deck re-import can never
- * silently drop a dropped video, a hand-authored slide, or a deck the user
- * imported into the group (T-30-02-01, BL-01).
- *
- * The IMPORTED case still DROPS an entry whose `importId` matches the slot but
- * whose `innerSlideId` the current deck no longer contains — that is the
- * intended re-import behaviour, and it stays where it was, inside
- * `carryStoredDerivedEntries`. This function only ever rescues refs a FOREIGN
- * source produced.
+ * The one place any rebuild path decides what a user added by hand (T-30-02-01, BL-01).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
  */
 function survivingEntries(group: SlideGroup, slot: ServiceSlot): GroupSlideEntry[] {
   return group.slides.filter((entry) => !isSlotDerivableRef(slot, entry.sourceRef))
@@ -315,27 +242,9 @@ function survivingEntries(group: SlideGroup, slot: ServiceSlot): GroupSlideEntry
 /**
  * The content-stable identity a stored entry of an unstable-id kind
  * (scripture, imported) is matched against by `carryStoredDerivedEntries`.
- * Returns `null` for kinds that either have their own dedicated identity
- * scheme (`lyric`/`copyright` diff by `sectionId` in `rebuildSongGroup`) or
- * are never derived at all (`text`, `video` — always non-derivable).
- *
- * Scripture returns the constant `'scripture'` regardless of any
- * `innerSlideId` the ref still carries: R047 narrows a REFERENCE-state
- * scripture group to exactly ONE derived entry, so the ref's KIND alone is
- * its identity — this is what lets a passage change or a reading swap carry
- * the stored entry's id, label, notes and audio forward onto the new
- * reference (T-30-02-03). Phase 38 (D1) widens the Congregational state to N
- * derived entries — one per section — but every one of them still returns
- * this SAME constant key, not a per-section key. That is deliberate: it is
- * what lets `carryStoredDerivedEntries` match N fresh section entries against
- * N stored ones positionally (survives an edit/delete/reorder) and, on a
- * DESTROY back to the Reference state, is exactly what makes the surplus
- * suppression below collapse the group to one entry instead of stranding the
- * other N-1.
- * Imported entries key on `importId` AND `innerSlideId` together — a deck
- * has no reference-only collapse, so each inner slide keeps its own
- * identity (before this phase, the whole group was gated by a stored
- * signature instead; this generalizes survival down to the entry level).
+ * Scripture always returns the constant `'scripture'` (T-30-02-03); imported
+ * entries key on `importId` + `innerSlideId` together.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
  */
 function derivedIdentityKey(ref: SourceRef): string | null {
   switch (ref.kind) {
@@ -358,36 +267,9 @@ function renumbered(entries: GroupSlideEntry[]): GroupSlideEntry[] {
 
 /**
  * Re-sorts a rebuilt slide list into the group's STORED order (BL-02, Phase 30
- * review). The stored order is the USER's: `SlideGrid.vue` offers drag-reorder
- * on every non-song group, and the drop paths append at a user-chosen position.
- * Before this, `rebuildUnstableIdGroup` rebuilt the array from `fresh` and
- * concatenated survivors after it, so the derivation's order always won — a
- * drag-reorder committed successfully and was then reverted by the very next
- * rebuild, with no error shown, and a hand-added video was relocated to the end
- * of the group.
- *
- * Every entry that already exists in the group sorts by its stored index. A
- * NEWLY derived entry has no stored index, so it is anchored to the nearest
- * carried entry that does have one — just after the closest preceding one, or
- * just before the closest following one, or ahead of the whole group when NO
- * derived entry has a stored index at all. That last case is the re-import: a
- * re-import mints entirely fresh `innerSlideId`s (`PptxImportModal.vue` mints
- * per import), so every derived entry is new, and the whole fresh deck block
- * lands where the previous deck's block was rather than behind an entry the
- * user appended after it.
- *
- * Anchor fractions are strictly increasing across the derived run and stay
- * inside `(0, 1)`, so an anchored entry can never sort past the stored
- * neighbour it was anchored to, a run of new entries keeps its derivation
- * order, and no anchored key can ever collide with an integer stored index.
- *
- * Idempotent by construction: after one pass every entry has a stored index
- * equal to its own position, so a second pass is the identity sort.
- *
- * NOT used by `rebuildSongGroup`. A song's slide order is dictated by the
- * lyrics document's `performanceOrder` — the single source of truth, no
- * precedence chain (R035/D-03) — and a song group is read-only in the Slides
- * tab (R054), so there is no user order to preserve there.
+ * review) — the stored order is the USER's, not the derivation's. Idempotent
+ * by construction; NOT used by `rebuildSongGroup` (R035/D-03).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
  */
 function orderedByStoredPosition(
   carried: GroupSlideEntry[],
@@ -437,36 +319,9 @@ function slidesEqual(a: GroupSlideEntry[], b: GroupSlideEntry[]): boolean {
 
 /**
  * Generalized survival+carry for the two unstable-id source kinds (scripture,
- * imported deck) — the exact positional-consumption-plus-last-occurrence-
- * surplus shape `rebuildSongGroup`'s additive merge already uses for lyric
- * sections (28-03's fix for the 2->4->8->16 compounding defect; 26-09's fix
- * for the Map-keying defect that silently dropped a duplicated entry),
- * generalized here so idempotence is provable on EVERY rebuild path, not
- * just SONG's (T-30-02-02).
- *
- * `fresh` is this pass's freshly DERIVED entries (`deriveGroupEntries`'s
- * output). A stored entry whose `derivedIdentityKey` appears one or more
- * times in `fresh` is CARRIED forward positionally: occurrence `i` of a key
- * in `fresh` consumes the `i`-th stored entry for that key — keeping the
- * stored entry's id/label/notes/audio/loop, but taking the FRESH entry's
- * `sourceRef` so a changed passage or a re-import renders through the SAME
- * slide (T-30-02-03). Any stored entries beyond a key's occurrence count in
- * `fresh` are that key's surplus and are emitted once, immediately after the
- * key's LAST occurrence, each carrying that occurrence's fresh `sourceRef` —
- * never re-emitted on an earlier occurrence, mirroring 26-09's
- * duplicate-survival guarantee for a kind with no fresh-side multiplicity
- * concept of its own — EXCEPT for scripture, whose surplus is ALWAYS
- * discarded rather than emitted, in EVERY state (R047 Reference; Phase 38 D1
- * Congregational alike), because `derivedIdentityKey` keys every scripture
- * ref — one or N of them — on the same constant (HI-01: otherwise a
- * pre-5c531b1 group stabilised at N identical reference slides and never
- * converged; the same suppression is what keeps a Congregational RE-SPLIT
- * from growing — a re-split from 3 sections to 2 must yield exactly 2, never
- * 5). A stored entry whose key never appears in `fresh` at
- * all (an obsolete imported `innerSlideId` a re-import no longer produces)
- * is DROPPED — it is source-derived and the source no longer produces it;
- * only `isNonDerivableEntry` entries are user work, and those always survive
- * via `survivingEntries`, not this function.
+ * imported deck) — positional-consumption-plus-last-occurrence-surplus,
+ * generalized so idempotence is provable on EVERY rebuild path (T-30-02-02).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
  */
 function carryStoredDerivedEntries(fresh: GroupSlideEntry[], group: SlideGroup): GroupSlideEntry[] {
   const storedByKey = new Map<string, GroupSlideEntry[]>()
@@ -507,29 +362,10 @@ function carryStoredDerivedEntries(fresh: GroupSlideEntry[], group: SlideGroup):
       carried.push(freshEntry)
     }
 
-    // R047 (HI-01): surplus is meaningful only for kinds with real fresh-side
-    // multiplicity. `derivedIdentityKey` returns the constant 'scripture' for
-    // every scripture ref regardless of state — so a group written before
-    // 5c531b1 (one entry per split passage fragment, each with its own
-    // innerSlideId) had N stored entries under that one key, and the surplus
-    // loop below re-emitted stored[1..N-1] rewritten to the fresh
-    // reference-only ref. That is STABLE, so such a group never converged: it
-    // projected the same reference string N times forever. Suppressing
-    // surplus for scripture is what makes a Reference-state rebuild converge
-    // to exactly ONE reference-only slide, true for stored data as well as
-    // for a fresh derivation.
-    //
-    // Phase 38 (D1): the SAME suppression applies unconditionally in the
-    // Congregational state too, not just Reference — `fresh` there can
-    // legitimately have N>1 entries (one per section), and a re-split that
-    // shrinks the section count (e.g. 3 sections down to 2) relies on this
-    // exact line to discard the now-stale stored entries beyond the new
-    // count rather than re-emitting them as "surplus". A future edit that
-    // widened `carriesSurplus` to admit scripture surplus in the
-    // Congregational state would make RE-SPLIT grow instead of replace.
-    //
-    // In every case the first stored entry at each position is still
-    // carried, so its id, label, notes and audio come forward.
+    // R047 (HI-01): scripture surplus is ALWAYS discarded, never emitted — do
+    // NOT widen this to admit scripture surplus (a re-split would grow
+    // instead of replace). See .planning/codebase/ARCHITECTURE.md
+    // (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
     const carriesSurplus = freshEntry.sourceRef.kind !== 'scripture'
     const totalOccurrences = occurrenceTotals.get(key)!
     const isLastOccurrence = occurrenceIndex + 1 === totalOccurrences
@@ -610,28 +446,13 @@ export function rebuildSongGroup(group: SlideGroup, slot: SongSlot, inputs: Asse
 
   const storedLyricEntries = group.slides.filter(isLyricEntry)
   // Phase 26-09 Task 1 + Plan 28-03 (D-02): indexed as an ARRAY per
-  // sectionId, never collapsed to a single entry, and consumed POSITIONALLY
-  // below rather than re-emitted wholesale.
+  // sectionId, consumed POSITIONALLY — re-emitting the whole array per
+  // occurrence would compound (2 stored x 2 occurrences -> 4, 8, 16...).
+  // See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes —
+  // src/utils/slideGroupMaterializer.ts)
   //
-  // Why an array (26-09): the panel's Duplicate action can create a SECOND
-  // stored entry referencing the SAME sectionId (a copy of a song-section
-  // slide) — a map keyed one-entry-per-section would keep only the last
-  // entry seen for a repeated key, so a copy would be silently swallowed the
-  // very next time this song's sections changed, with no confirm gate,
-  // because this additive merge never confirm-gates (it is the same path a
-  // plain within-song edit takes).
-  //
-  // Why positional consumption (D-02, this plan): once a section can be
-  // REFERENCED more than once in the order (a repeated chorus), the merge
-  // loop below walks `freshOrder` and reaches this section's key once per
-  // occurrence. Re-emitting the WHOLE array on every occurrence — the
-  // pre-fix behavior — multiplies entries on every reconciliation pass (a
-  // chorus with 2 stored entries and 2 occurrences would yield 4, then 8,
-  // then 16). Occurrence `i` of a section now consumes stored entry `i`;
-  // any stored entries beyond the section's occurrence count are surplus and
-  // are emitted once, immediately after the section's LAST occurrence. When
-  // occurrences and stored entries are equal in count there is no surplus
-  // and no growth; when a section has exactly one occurrence and two stored
+  // When occurrences and stored entries are equal in count there is no
+  // surplus and no growth; when a section has exactly one occurrence and two stored
   // entries (the 26-09 Duplicate case), that occurrence is also the last, so
   // both entries still emit adjacently — byte-identical to what 26-09
   // shipped.
@@ -731,24 +552,12 @@ export interface RebuildResult {
 
 /**
  * Unconditional rebuild for the two unstable-id source kinds (scripture,
- * imported deck). Derives fresh; if the derivation is empty (source not yet
- * loaded), returns the group untouched with `changed: false` (T-30-02-04) —
- * never blanking a group as a side effect of a loading race. Otherwise the
- * new slides are `carryStoredDerivedEntries`'s carried derived entries plus
- * the group's surviving user-added entries, re-sorted into the group's STORED
- * order by `orderedByStoredPosition` (BL-02 — the stored order is the user's
- * and a rebuild must not overwrite it) and renumbered.
- * THIS FUNCTION deliberately does not gate on the stored `sourceSignature` —
- * the carry helper makes this path idempotent on its own, and a signature
- * gate would be a second, redundant correctness mechanism here.
- *
- * That is no longer true of the module as a whole: Phase 38 (D1) gave
- * `sourceSignature` a real reader. `rebuildScriptureGroup` consults it BEFORE
- * ever calling this function, as the one durable marker of "already
- * materialized from this reading" (detached, Congregational) vs "not yet"
- * (delegate here) — see that function's own doc comment. So `sourceSignature`
- * is a decision input for scripture groups now; it is simply not read a
- * second time once execution reaches this function.
+ * imported deck). Returns the group untouched with `changed: false`
+ * (T-30-02-04) if the derivation is empty (source not yet loaded) — never
+ * blanking a group as a side effect of a loading race. Does not gate on the
+ * stored `sourceSignature` itself; `rebuildScriptureGroup` consults that
+ * BEFORE calling this function instead.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
  */
 function rebuildUnstableIdGroup(
   group: SlideGroup,
@@ -764,73 +573,22 @@ function rebuildUnstableIdGroup(
 }
 
 /**
- * Scripture inner slide ids are purely positional (`id: \`scripture-${position}\``,
- * minted in `src/utils/scriptureSplitter.ts::buildSlide`) and are reassigned
- * wholesale by every re-split of the passage — there is no content-stable key
- * to diff a single inner slide against. R047 sidesteps this entirely for the
- * Reference state: a scripture group derives exactly ONE reference-only
- * entry, so `derivedIdentityKey` treats the ref kind alone as identity,
- * letting a passage change or a reading swap carry the stored entry's
- * id/audio forward (T-30-02-03) with no id-matching scheme needed.
- *
- * D1 adds a second state on top of that: once a scripture group has been
- * materialized from the slot's CURRENT congregational reading, it is
- * DETACHED — freely editable, and no longer re-derived on every rebuild pass,
- * even when entries have been edited or deleted. Two states, decided in
- * order:
- *
- * 1. DETACHED: the slot has sections AND the group's stored
- *    `sourceSignature` already equals `sourceSignature(slot, inputs)` — this
- *    group was materialized from EXACTLY this reading. Return the stored
- *    slides untouched, `changed: false`, unconditionally — not gated on the
- *    group being non-empty, because a user who deleted every section slide
- *    must get an empty group that STAYS empty until the scripture itself
- *    changes. This is the one branch that makes a per-slide edit survive and
- *    a deletion stick.
- * 2. NOT YET MATERIALIZED: the slot has sections but the signature does not
- *    match — first conversion, a re-split from the congregational editor, or
- *    an existing Phase-34 service reaching this code for the first time.
- *    Delegate to `rebuildUnstableIdGroup` exactly as the Reference state
- *    always has: `deriveGroupEntries` now yields the N section entries, and
- *    the existing carry/order/renumber machinery does the rest with no
- *    change. `carryStoredDerivedEntries`'s scripture-surplus suppression
- *    (HI-01) is what collapses this back down to exactly one entry on a
- *    DESTROY (case 4 below) — that suppression was written for pre-5c531b1
- *    multi-fragment groups, which is structurally the SAME shape a
- *    congregational group has. It is reused here, not reimplemented; do not
- *    "fix" it into re-emitting surplus, or a destroyed conversion will
- *    silently resurrect N reference slides instead of collapsing to one.
- * 3. CLEARED REFERENCE: the slot has no sections AND no reference at all, AND
- *    the group still holds at least one section entry — the reference is
- *    gone, so the group must be emptied of its derived section entries,
- *    retaining only what `survivingEntries` classifies as user work
- *    (renumbered). For SCRIPTURE an absent reference is a REAL absent
- *    reference, never a loading race (R047: the slot IS the source) — unlike
- *    `rebuildUnstableIdGroup`'s loading-race guard, which exists for
- *    IMPORTED's asynchronously-arriving deck. Without this branch a section
- *    entry keeps projecting its stored words under a reference that no
- *    longer exists, because its content comes from ITSELF, not the slot. A
- *    group with NO section entries and an absent reference falls through to
- *    case 4 unchanged — `rebuildUnstableIdGroup`'s own loading-race guard
- *    already leaves it alone (T-30-02-04), and widening this branch to cover
- *    it too would be a behaviour change this plan does not make.
- * 4. Otherwise (Reference state throughout, or a DESTROY — sections were
- *    just cleared by a reference change): delegate to `rebuildUnstableIdGroup`
- *    unchanged. Its carry/collapse machinery (case 2's HI-01 note) is what
- *    turns N stored section entries into exactly ONE payload-free entry when
- *    the fresh derivation is the single-entry Reference shape.
+ * Scripture inner slide ids are purely positional and are reassigned
+ * wholesale by every re-split of the passage. Four cases, decided in order:
+ * (1) DETACHED — sections present and the stored signature already matches;
+ * (2) NOT YET MATERIALIZED — sections present but signature differs, delegate
+ * to `rebuildUnstableIdGroup`; (3) CLEARED REFERENCE — no sections, no
+ * reference, but stored section entries remain — empty them; (4) otherwise
+ * delegate to `rebuildUnstableIdGroup` unchanged.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
  */
 export function rebuildScriptureGroup(group: SlideGroup, slot: ScriptureSlot, inputs: AssemblyInputs): RebuildResult {
   const sections = congregationalSectionsFromSlot(slot)
 
-  // Phase 38 (D1) in one paragraph, for a reader who skipped the doc comment
-  // above: a scripture group has exactly two states — Reference (no
-  // sections) and Congregational (sections present). The ONE marker that
-  // tells them apart is `sourceSignature`: once it equals THIS reading's
-  // current signature, the group was already materialized from it and is
-  // detached — return its stored slides untouched, unconditionally, even if
-  // every section has been deleted. Anything else falls through to the
-  // ordinary derive/carry machinery below.
+  // Phase 38 (D1): a scripture group has exactly two states — Reference (no
+  // sections) and Congregational (sections present) — told apart by
+  // `sourceSignature`. See .planning/codebase/ARCHITECTURE.md
+  // (Utils Behavioral Notes — src/utils/slideGroupMaterializer.ts)
   if (sections.length > 0) {
     if (group.sourceSignature !== undefined && group.sourceSignature === sourceSignature(slot, inputs)) {
       return { changed: false, slides: group.slides }

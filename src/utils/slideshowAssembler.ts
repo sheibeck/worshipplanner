@@ -43,25 +43,16 @@ export interface AssemblyInputs {
   groupsBySlotId: Map<string, SlideGroup>
   /**
    * Phase 42 (R079/R080) render-status documents, keyed by
-   * `ImportedDeck.renderImportId` — NOT by `ImportedDeck.id`/
-   * `ImportedSlot.importId`, which is what the sibling `importedDecksById`
-   * above is keyed by. The two identifiers are deliberately distinct
-   * (`src/types/importedDeck.ts:19-30`); conflating them shows one deck's
-   * render status under another deck's identity (T-42-07). OPTIONAL — an
-   * absent map is the legitimate "no render data loaded" state, and for a
-   * deck with no `renderImportId` this must behave byte-identically to
-   * today's parsed-text-only path regardless of whether this map is present.
+   * `ImportedDeck.renderImportId` — NOT by `ImportedDeck.id` (T-42-07).
+   * OPTIONAL — absent is the legitimate "no render data loaded" state.
+   * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideshowAssembler.ts)
    */
   pptxRendersByImportId?: Map<string, PptxRenderDoc>
   /**
-   * Phase 42 (R079/R080) resolved rendered-page download URLs, keyed by
-   * `ImportedDeck.renderImportId` (same keying caveat as
-   * `pptxRendersByImportId` above — NOT `ImportedDeck.id`). Array index `i`
-   * holds the URL for page `i + 1` — the single 1-based↔0-based boundary in
-   * the whole phase; every other consumer goes through
-   * `renderedPageNumberFromIdentity` instead of touching this index
-   * directly. OPTIONAL for the same "no render data loaded yet" reason as
-   * `pptxRendersByImportId`.
+   * Phase 42 (R079/R080) resolved rendered-page URLs, keyed by
+   * `ImportedDeck.renderImportId`. Array index `i` holds the URL for page
+   * `i + 1` — go through `renderedPageNumberFromIdentity`, not this index.
+   * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideshowAssembler.ts)
    */
   renderedImageUrlsByImportId?: Map<string, string[]>
 }
@@ -72,13 +63,9 @@ type SlideContent = DistributiveOmit<Slide, 'id' | 'position'>
 
 /**
  * R105 (Phase 49): the SINGLE producer of reference-only scripture slide
- * content — a plain scripture reference slide AND the dedicated leading
- * reference slide of a congregational reading are byte-identical by
- * construction (AC3). Called from all THREE reference-slide sites:
- * `resolveEntryContent`'s `section === null` branch, the SCRIPTURE fallback's
- * `sections.length === 0` branch, and the new synthetic leading-slide emission
- * on both assembly paths. `readingMode: 'normal'`, empty `text`/`verseRange`,
- * and NO `section` field — exactly today's plain reference-slide shape.
+ * content — a plain reference slide and a congregational reading's leading
+ * reference slide are byte-identical by construction (AC3).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideshowAssembler.ts)
  */
 function buildScriptureReferenceContent(ref: ScriptureRef): Omit<ScriptureSlide, 'id' | 'position'> {
   return {
@@ -194,20 +181,10 @@ function resolveEntryContent(
       const scriptureRef = scriptureRefFromSlot(slot)
       if (!scriptureRef) return undefined
 
-      // D1/D2: `congregationalSectionFromRef` is the ONE place this function
+      // D1/D2: congregationalSectionFromRef is the ONE place this function
       // decides which of the group's two states `entry` belongs to.
-      // - null (a Reference entry): today's shape exactly — empty text/verseRange,
-      //   readingMode 'normal', no `section` key at all.
-      // - a section (a Congregational entry, D2): the entry's OWN stored words
-      //   — there is no canonical record to resolve against once detached —
-      //   with readingMode 'congregational' and the singular `section` field.
-      //   Each assembled slide carries exactly one section (38-02).
-      //
-      // R105 (Phase 49): the reference eyebrow no longer lives on the first
-      // section slide — it has its own dedicated leading slide, emitted at
-      // assembly time (see the synthetic emission in `assembleSlideshow`). So
-      // a section slide no longer carries any first/later distinction, and
-      // `isFirstSection` is gone from the type entirely.
+      // See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes —
+      // src/utils/slideshowAssembler.ts)
       const section = congregationalSectionFromRef(entry.sourceRef)
       const content: Omit<ScriptureSlide, 'id' | 'position'> =
         section === null

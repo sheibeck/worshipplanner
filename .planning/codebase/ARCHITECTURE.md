@@ -948,6 +948,331 @@ Firestore re-read of `superAdmins/{callerUid}` — never trusting a client-decla
 The TARGET is resolved exclusively via `getAuth().getUserByEmail()`, never a client-supplied uid,
 so a caller can never point this at an arbitrary uid they merely guessed.
 
+## Utils Behavioral Notes (R318)
+
+### src/utils/congregationalText.ts
+
+**Module overview:** pure, testable text<->sections conversion for the `---`-delimited
+congregational-reading editor (supersedes Phase 47's click-between-verses divider model per owner
+feedback: the divider UX was unintuitive). The editor is a plain textarea. Slides are separated by
+a line containing only `---`; within each slide the speaker (Leader / Congregation / All) may sit
+on its own first line above that slide's text. This module is the single source of truth for that
+grammar in both directions.
+
+**`parseCongregationalText`:** chunks are split on lines that are exactly `---`. An empty
+(whitespace-only) chunk is skipped. The first non-empty line of a chunk, if it (case-insensitively)
+reads `leader`, `congregation`, or `all`, is consumed as the speaker and the remaining lines become
+the section text. Otherwise the whole chunk is the text and the speaker defaults to LEADER. A lone
+speaker label with no following text is skipped (not a slide). `translationSource` is stamped only
+when the arg is provided (R092).
+
+### src/utils/importedRenderReconciler.ts
+
+**`importedEntryContent`'s `'ready'` case (R108, Phase 50 part 2 — CONSUME the page):** an imported
+deck's slides can be manually added into ANOTHER slot's group (e.g. a Prayer group, alongside
+auto-generated slides). Such a hand-added entry keeps the deck's PARSED-slide id as its
+`innerSlideId` — the synthetic `rendered-page-N` identity is only ever minted by the IMPORTED-slot
+materializer, never for an entry dropped into a non-imported group. Resolution order, strictly
+extending the ec217aa positional stopgap: (1) a synthetic `rendered-page-N` identity (the
+materializer's own entries) resolves by N, unconditional on `renderedPage`; (2) else a supplied
+`renderedPage` (the 50-03 render-stable reference recorded on a hand-added entry's `sourceRef` at
+add-time) resolves directly — this is what makes a MULTI-IMAGE deck (parsed-slide count !=
+rendered-page count) work, closing the gap the ec217aa positional resolver could not; (3) else, when
+parsed/rendered counts match 1:1 (the common single-image-per-slide deck), fall back to the ec217aa
+positional resolver: map the entry to its page by its position in `deck.slides` — kept in place for
+legacy entries added before 50-03 recorded `renderedPage` (fallback, no migration); (4) else — a
+multi-image deck with no `renderedPage` (a legacy entry that has never worked) — leave it pending
+rather than risk pairing to the wrong page.
+
+**`importedSourceSignature`:** cheap change-detection proxy for the IMPORTED slot kind, mirroring
+`slideGroupMaterializer.ts`'s `sourceSignature` contract for every other slot kind. Encoded with the
+ASCII control-character separators the SCRIPTURE branch there already uses and justifies (`\x1e`
+between fields, `\x1f` between joined texts) — NOT the pre-existing IMPORTED branch's
+`` `${texts.length}:${texts.join('|')}` `` form, which this function deliberately replaces rather
+than inherits, because PPTX slide text can itself contain both `|` and `:`, so two decks whose
+slide boundaries differ only in WHERE a literal pipe falls could produce an identical joined
+string. Neither `\x1e` nor `\x1f` can occur in PPTX-parsed text (both are invalid XML 1.0
+characters) nor in a Storage path, so no field value can forge a field boundary. This encoding
+change is inert for stored data: nothing reads an IMPORTED signature back — only
+`rebuildScriptureGroup` reads a stored signature — so no group is rebuilt merely because the
+encoding changed. Fields, in order: mode, then the resolved `renderedCount` (empty string when the
+mode isn't `ready`), then the parsed slide count, then the joined parsed texts. Including `mode`
+keeps `pending`/`failed`/`ready` distinguishable even when `deck.slides` is unchanged across all
+three.
+
+### src/utils/scripture.ts
+
+**`congregationalSectionsFromSlot` (R064/D1):** the ONE congregational-ness predicate on the SLOT
+side — which sections seed a Reference -> Congregational conversion (`deriveGroupEntries` SCRIPTURE
+case) and, once seeded, which sections a rebuild diffs the stored signature against
+(`sourceSignature` SCRIPTURE case). Deliberately ignores `ScriptureSlot.readingMode` — that field is
+declared but written by no code today, and gating on both it and the sections array would create
+two fields that can disagree. The single rule, matching `PresentationViewer`'s `isCongregational`
+computed: sections present and non-empty means congregational. Pure passthrough — no copying,
+sorting, filtering, mapping, slicing or string transformation of any kind, because section text is
+projected verbatim to a congregation. Returns the slot's OWN array by reference when non-empty
+(never a copy); returns `[]` — never `undefined`, never the stored array with elements removed —
+for a slot with no sections or an empty sections array.
+
+**`congregationalSectionFromRef` (R064/D1):** the mirror predicate on the ENTRY side — the ONLY
+place any consumer decides whether a stored `GroupSlideEntry` is a congregational section slide
+(`resolveEntryContent`'s scripture case, and `rebuildScriptureGroup`'s cleared-reference branch).
+`speaker` present is the discriminator — a Reference-state entry and a legacy pre-Phase-38 entry
+both have no `speaker`, so both correctly return `null` here regardless of any
+`scriptureReadingId`/`innerSlideId` they still carry.
+
+**`scriptureSlotAfterReferenceChange`:** writes a new reference onto a `ScriptureSlot` and owns ONE
+additional rule: a stored congregational reading is never carried onto a passage it was not derived
+from. Section text is projected verbatim to a congregation, so leaving one passage's words attached
+to a slot that now reads a different reference would project scripture under the wrong heading — a
+correctness failure the assembler cannot detect, because by then the sections look perfectly valid.
+Clearing on a reference change is the only clearing rule; no other slot mutation clears sections,
+because the reference is the only thing that changes which passage a stored reading belongs to.
+Uses the canonical `formatScriptureReference` formatter on both sides (one canonical formatter, not
+a second inline copy of the book/chapter/verse comparison).
+
+### src/utils/scriptureBoundaries.ts
+
+**`embedBoundaryMarkers`:** produces a model-facing copy of `text` with a `⟦i⟧` marker inserted
+immediately before the character at `boundaries[i]`, for every boundary. The untouched `text`
+remains the only slicing source — this output is for display to the model only, never fed back
+into `sliceAtBoundaries`. Returns `null` — a hard refusal — when `text` already contains either
+marker delimiter, since an ambiguous marker set would let the model index into text the caller did
+not mean.
+
+### src/utils/slideGroupMaterializer.ts
+
+**`deriveGroupEntries`:** derives a slide group's structure from its slot's canonical source.
+Reproduces `assembleSlideshow`'s CURRENT per-kind emission order exactly — a group derived today
+must produce a slideshow byte-identical to what the pre-group assembler produced. Slide TEXT is
+never read or stored here (D-02) for every kind EXCEPT the SCRIPTURE Congregational state (Phase
+38, D1/D2): there, `sourceRef` mints the section's own `speaker`/`text` directly, because a
+converted section slide has no live source left to resolve against. Every entry this returns is
+NEW, so every id here is freshly minted.
+
+**`deriveGroupEntries`'s SCRIPTURE case (R047/D1):** no reference means no slides, exactly as
+before. Once a reference exists, the group has exactly two possible shapes — never a mix — decided
+by `congregationalSectionsFromSlot`, R064's ONE congregational-ness predicate: Reference state
+(default, unchanged) is no sections, so ONE reference-only entry derived from the slot's OWN
+reference fields; `derivedIdentityKey` treats the ref KIND alone as this group's identity, which is
+what lets a passage change carry the stored entry's id/audio forward through
+`carryStoredDerivedEntries` instead of minting a fresh id and silently dropping attached audio.
+Congregational state (D1, opt-in) is sections present, so ONE entry PER SECTION — the same
+one-entry-per-fragment shape the IMPORTED case uses — each carrying that section's own
+`speaker`/`text`/`verseRange`.
+
+**`isSlotDerivableRef`:** true when an entry's `sourceRef` is something THIS SLOT's own derivation
+could have produced — i.e. the entry is source-derived and the rebuild owns it. Everything else on
+the group is user work. Keying off the SLOT rather than the ref kind alone is the whole point
+(BL-01, Phase 30 review) — the predicate this replaced returned "non-derivable" only for `video`
+and authored-`text`, which meant an imported deck or a set of dropped images the user appended into
+a SCRIPTURE or IMPORTED group was in neither the carried list nor the surviving list, and the first
+unconditional rebuild destroyed it silently. SONG deliberately answers on ref KIND alone, not on
+`songId`: a full song-identity swap is detected and handled by `rebuildSongGroup` itself, which
+rebuilds from the new song's derivation — matching `songId` here would classify the OLD song's
+lyric/copyright entries as user work and splice the entire previous song back into the swapped
+group.
+
+**`survivingEntries`:** the one place any rebuild path decides what a user added by hand — every
+stored entry this slot's own derivation could not have produced, in stored order. Every
+`rebuild*Group` function splices this back into its fresh derivation so a song swap, a passage
+change, or a deck re-import can never silently drop a dropped video, a hand-authored slide, or a
+deck the user imported into the group (T-30-02-01, BL-01). The IMPORTED case still DROPS an entry
+whose `importId` matches the slot but whose `innerSlideId` the current deck no longer contains —
+that is the intended re-import behaviour, and it stays inside `carryStoredDerivedEntries`; this
+function only ever rescues refs a FOREIGN source produced.
+
+**`derivedIdentityKey`:** the content-stable identity a stored entry of an unstable-id kind
+(scripture, imported) is matched against by `carryStoredDerivedEntries`. Returns `null` for kinds
+that either have their own dedicated identity scheme (`lyric`/`copyright` diff by `sectionId` in
+`rebuildSongGroup`) or are never derived at all (`text`, `video`). Scripture returns the constant
+`'scripture'` regardless of any `innerSlideId` the ref still carries: R047 narrows a
+REFERENCE-state scripture group to exactly ONE derived entry, so the ref's KIND alone is its
+identity; Phase 38 (D1) widens the Congregational state to N derived entries but every one still
+returns this SAME constant key, which is what lets `carryStoredDerivedEntries` match N fresh
+section entries against N stored ones positionally, and, on a DESTROY back to the Reference state,
+is exactly what makes the surplus suppression collapse the group to one entry instead of stranding
+the other N-1. Imported entries key on `importId` AND `innerSlideId` together — a deck has no
+reference-only collapse, so each inner slide keeps its own identity.
+
+**`orderedByStoredPosition` (BL-02, Phase 30 review):** re-sorts a rebuilt slide list into the
+group's STORED order — the stored order is the USER's: `SlideGrid.vue` offers drag-reorder on
+every non-song group, and the drop paths append at a user-chosen position. Before this,
+`rebuildUnstableIdGroup` rebuilt the array from `fresh` and concatenated survivors after it, so the
+derivation's order always won — a drag-reorder committed successfully and was then reverted by the
+very next rebuild. Every entry that already exists in the group sorts by its stored index. A newly
+derived entry has no stored index, so it is anchored to the nearest carried entry that does have
+one — just after the closest preceding one, or just before the closest following one, or ahead of
+the whole group when NO derived entry has a stored index at all (the re-import case: a re-import
+mints entirely fresh `innerSlideId`s, so the whole fresh deck block lands where the previous
+deck's block was rather than behind an entry the user appended after it). Anchor fractions are
+strictly increasing and stay inside `(0, 1)`, so an anchored entry can never sort past its stored
+neighbour, and idempotent by construction: after one pass every entry has a stored index equal to
+its own position. NOT used by `rebuildSongGroup` — a song's slide order is dictated by the lyrics
+document's `performanceOrder`, and a song group is read-only in the Slides tab (R054).
+
+**`carryStoredDerivedEntries`:** generalized survival+carry for the two unstable-id source kinds
+(scripture, imported deck) — the exact positional-consumption-plus-last-occurrence-surplus shape
+`rebuildSongGroup`'s additive merge already uses for lyric sections, generalized here so idempotence
+is provable on EVERY rebuild path (T-30-02-02). `fresh` is this pass's freshly DERIVED entries. A
+stored entry whose `derivedIdentityKey` appears one or more times in `fresh` is CARRIED forward
+positionally: occurrence `i` of a key in `fresh` consumes the `i`-th stored entry for that key —
+keeping the stored entry's id/label/notes/audio/loop, but taking the FRESH entry's `sourceRef` so a
+changed passage or a re-import renders through the SAME slide. Any stored entries beyond a key's
+occurrence count in `fresh` are that key's surplus and are emitted once, immediately after the
+key's LAST occurrence — EXCEPT for scripture, whose surplus is ALWAYS discarded rather than
+emitted, in EVERY state, because `derivedIdentityKey` keys every scripture ref on the same
+constant (HI-01: otherwise a pre-5c531b1 group stabilised at N identical reference slides and never
+converged, and a Congregational RE-SPLIT would grow instead of replace). A stored entry whose key
+never appears in `fresh` at all (an obsolete imported `innerSlideId` a re-import no longer
+produces) is DROPPED.
+
+**`carryStoredDerivedEntries`'s surplus-suppression comment (R047, HI-01):** surplus is meaningful
+only for kinds with real fresh-side multiplicity. `derivedIdentityKey` returns the constant
+`'scripture'` for every scripture ref regardless of state, so a group written before 5c531b1 (one
+entry per split passage fragment) had N stored entries under that one key, and re-emitting
+`stored[1..N-1]` on every pass would never converge. Suppressing surplus for scripture is what
+makes a Reference-state rebuild converge to exactly ONE reference-only slide. Phase 38 (D1): the
+SAME suppression applies unconditionally in the Congregational state too — `fresh` there can
+legitimately have N>1 entries (one per section), and a re-split that shrinks the section count
+relies on this exact suppression to discard the now-stale stored entries beyond the new count
+rather than re-emitting them as "surplus." In every case the first stored entry at each position is
+still carried, so its id, label, notes and audio come forward.
+
+**`rebuildSongGroup`'s lyric-entry merge comment (Phase 26-09 Task 1 + Plan 28-03, D-02):** stored
+lyric entries are indexed as an ARRAY per sectionId, never collapsed to a single entry, and
+consumed POSITIONALLY rather than re-emitted wholesale. Why an array (26-09): the panel's Duplicate
+action can create a SECOND stored entry referencing the SAME sectionId — a map keyed
+one-entry-per-section would silently swallow a copy the next time this song's sections changed.
+Why positional consumption (D-02): once a section can be REFERENCED more than once in the order (a
+repeated chorus), re-emitting the WHOLE array on every occurrence multiplies entries on every
+reconciliation pass (2 stored entries × 2 occurrences → 4, then 8, then 16). Occurrence `i` of a
+section now consumes stored entry `i`; any stored entries beyond the section's occurrence count are
+surplus and are emitted once, immediately after the section's LAST occurrence.
+
+**`rebuildUnstableIdGroup`:** unconditional rebuild for the two unstable-id source kinds (scripture,
+imported deck). Derives fresh; if the derivation is empty (source not yet loaded), returns the
+group untouched with `changed: false` (T-30-02-04) — never blanking a group as a side effect of a
+loading race. Otherwise the new slides are `carryStoredDerivedEntries`'s carried derived entries
+plus the group's surviving user-added entries, re-sorted into the group's STORED order by
+`orderedByStoredPosition` and renumbered. This function deliberately does not gate on the stored
+`sourceSignature` — the carry helper makes this path idempotent on its own. Phase 38 (D1) gave
+`sourceSignature` a real reader: `rebuildScriptureGroup` consults it BEFORE ever calling this
+function, as the one durable marker of "already materialized from this reading" (detached,
+Congregational) vs "not yet" (delegate here).
+
+**`rebuildScriptureGroup`:** scripture inner slide ids are purely positional
+(`id: \`scripture-${position}\``, minted in `scriptureSplitter.ts::buildSlide`) and are reassigned
+wholesale by every re-split of the passage — there is no content-stable key to diff a single inner
+slide against. R047 sidesteps this for the Reference state: a scripture group derives exactly ONE
+reference-only entry, so `derivedIdentityKey` treats the ref kind alone as identity. D1 adds a
+second state: once a scripture group has been materialized from the slot's CURRENT congregational
+reading, it is DETACHED — freely editable, and no longer re-derived on every rebuild pass. Two
+states, decided in order: (1) DETACHED — the slot has sections AND the group's stored
+`sourceSignature` already equals `sourceSignature(slot, inputs)` — return the stored slides
+untouched, `changed: false`, unconditionally, even if every section has been deleted; (2) NOT YET
+MATERIALIZED — the slot has sections but the signature does not match (first conversion, a
+re-split, or an existing pre-Phase-34 service) — delegate to `rebuildUnstableIdGroup`; (3) CLEARED
+REFERENCE — the slot has no sections AND no reference at all, AND the group still holds at least
+one section entry — empty the group of its derived section entries, retaining only
+`survivingEntries`'s user work; a group with NO section entries and an absent reference falls
+through unchanged (the loading-race guard already handles it); (4) otherwise (Reference state
+throughout, or a DESTROY) — delegate to `rebuildUnstableIdGroup` unchanged, whose carry/collapse
+machinery turns N stored section entries into exactly ONE payload-free entry.
+
+### src/utils/slideshowAssembler.ts
+
+**`AssemblyInputs.pptxRendersByImportId` (Phase 42, R079/R080):** render-status documents, keyed by
+`ImportedDeck.renderImportId` — NOT by `ImportedDeck.id`/`ImportedSlot.importId`, which is what the
+sibling `importedDecksById` is keyed by. The two identifiers are deliberately distinct
+(`src/types/importedDeck.ts`); conflating them shows one deck's render status under another deck's
+identity (T-42-07). OPTIONAL — an absent map is the legitimate "no render data loaded" state, and
+for a deck with no `renderImportId` this must behave byte-identically to the parsed-text-only path
+regardless of whether this map is present.
+
+**`AssemblyInputs.renderedImageUrlsByImportId` (Phase 42, R079/R080):** resolved rendered-page
+download URLs, keyed by `ImportedDeck.renderImportId` (same keying caveat as `pptxRendersByImportId`
+above). Array index `i` holds the URL for page `i + 1` — the single 1-based↔0-based boundary in the
+whole phase; every other consumer goes through `renderedPageNumberFromIdentity` instead of touching
+this index directly. OPTIONAL for the same "no render data loaded yet" reason.
+
+**`buildScriptureReferenceContent` (R105, Phase 49):** the SINGLE producer of reference-only
+scripture slide content — a plain scripture reference slide AND the dedicated leading reference
+slide of a congregational reading are byte-identical by construction (AC3). Called from all THREE
+reference-slide sites: `resolveEntryContent`'s `section === null` branch, the SCRIPTURE fallback's
+`sections.length === 0` branch, and the synthetic leading-slide emission on both assembly paths.
+`readingMode: 'normal'`, empty `text`/`verseRange`, and NO `section` field — exactly the plain
+reference-slide shape.
+
+**`resolveEntryContent`'s scripture case (D1/D2):** `congregationalSectionFromRef` is the ONE place
+this function decides which of the group's two states `entry` belongs to — `null` (a Reference
+entry) reproduces today's shape exactly (empty text/verseRange, readingMode 'normal', no `section`
+key), while a section (a Congregational entry, D2) uses the entry's OWN stored words, with
+readingMode 'congregational' and the singular `section` field; each assembled slide carries exactly
+one section (38-02). R105 (Phase 49): the reference eyebrow no longer lives on the first section
+slide — it has its own dedicated leading slide emitted at assembly time, so `isFirstSection` no
+longer exists on the type.
+
+### src/utils/slideTypography.ts
+
+**Module overview (46-RESEARCH.md Pattern 1-3):** pure, independently-testable slide-typography
+helpers — the single implementation all three render sites (`PresentationViewer.vue`, the Slides
+grid, the Edit Slide drawer preview), the Settings "Slide Typography" card preview, and the
+app-init font-load gate (R094) share; no consumer computes CSS variables or re-derives the
+font-load gate on its own.
+
+**`cssVarsFor`:** computes the three `--slide-font-*` CSS custom properties from a stored (or
+possibly undefined/tampered) `slideTypography` value. DEFENSIVELY falls back to Inter/400/md —
+never partially — when the family key is unknown, the weight is not reachable for that family (via
+`snapWeight`), or the scale is not one of `sm`/`md`/`lg` (T-46-03, ASVS V5): the value written into
+`--slide-font-family` and, downstream, into a `document.fonts.load()` template string is therefore
+always drawn from the curated `SLIDE_FONTS` set, never free text.
+
+### src/utils/slotTypes.ts
+
+**`groupBySection` (D005):** groups any section-bearing collection into `SERVICE_SECTIONS`-ordered
+buckets, plus a trailing `legacy` bucket for members whose section is absent or not a recognized
+`SERVICE_SECTIONS` member. Total and stable: every input item lands in exactly one bucket, in its
+original relative order within that bucket. Generic on purpose: the editor view groups `{ slot,
+index }` pairs for rendering while a reorder handler groups bare `ServiceSlot`s for persistence, and
+both must use the identical bucketing rule. Every `SERVICE_SECTIONS` key is initialized to an empty
+array up front (R043), so the "adding a fifth section" story is free — this function iterates
+`SERVICE_SECTIONS` and never names a section as a string literal. `legacy` mirrors the trailing
+"Ungrouped" bucket `useSlideshowAssembly.ts`'s `assembledSections` already ships for section-less
+slides. A section value present but outside `SERVICE_SECTIONS` (production data corruption, or a
+stale value from a since-removed section) also routes to `legacy` rather than being silently
+dropped (T-29-03).
+
+**`orderSlotsBySection`:** composition of `groupBySection` + `flattenBySection` over `slot.section`
+— the one source of truth for "what order are the slots in," shared by the rendered grouping and
+the array that gets persisted, so the two can never disagree. Identity-preserving: when the
+section-major result is element-for-element reference-equal to the input, returns the ORIGINAL
+`slots` array rather than the freshly-built one — a fresh array reference in an autosave-watched
+view manufactures a false `isDirty`. Does NOT call `reindexSlots` — ordering and
+position-renumbering are separate concerns; callers compose
+`reindexSlots(orderSlotsBySection(slots))`.
+
+**`defaultSectionForPosition` (D005):** default position -> section mapping for the M001
+progression template. There is no default Pre-Service slot in the template (announcements arrive
+in Phase 21) — positions 0-6 are 'worship', 7 (MESSAGE) is 'message', 8 (sending song) is
+'sending'. Intentionally position-keyed, not section-count-keyed: it contains no arithmetic over
+`SERVICE_SECTIONS.length` and no "last section" derivation, so widening `SERVICE_SECTIONS` (Phase
+29 adds Post-Service) does not change which default section a template slot gets.
+
+**`buildSlotsFromTemplate` (R086/R087):** builds a new service's `ServiceSlot[]` from the church's
+stored `defaultServiceTemplate`. Composes `progressionVwTypeSequence`, `createSlot`, and
+`reindexSlots`. VW typing is computed HERE, at creation, and never read back from the template: a
+running `songOrdinal` counter (starting at 0) increments only on `SONG` entries, indexing
+`sequence[songOrdinal % sequence.length]` — the modulo-cycle choice for templates with more than 5
+SONG entries is a deliberate discretionary decision; the alternative considered and rejected was
+clamping to the sequence's last value instead of cycling. When `vwModeEnabled` is false, `vwType`
+is left `undefined` so `createSlot`'s own `?? 2` default applies. An entry whose `kind` is not a
+recognized `SlotKind` is skipped (T-44-03 defensive guard). An empty `entries` array returns `[]` —
+this function is NEVER a vehicle for reinstating `buildSlots()` as a fallback; under R115,
+`services.ts::createService` resolves that fallback at the call site, not inside this function
+(pinned by `slotTypes.test.ts:798`). An entry's optional `body` (R116) is threaded through to
+`createSlot` for body-bearing kinds; a bodyless entry leaves the created slot's `body` key absent.
+
 ---
 
 *Architecture analysis: 2026-07-16*
