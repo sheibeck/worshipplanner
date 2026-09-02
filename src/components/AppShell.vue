@@ -46,7 +46,8 @@
         <button
           type="button"
           @click="onExitSuperAdminView"
-          class="text-xs font-medium text-amber-100 hover:text-white underline underline-offset-2 transition-colors"
+          :disabled="exiting"
+          class="text-xs font-medium text-amber-100 hover:text-white underline underline-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
         >
           Exit to owner console
         </button>
@@ -71,10 +72,22 @@ const sidebarOpen = ref(false)
 const router = useRouter()
 const authStore = useAuthStore()
 
+// ARCH-001 (Phase 111, T-111-02) — in-flight re-entrancy guard mirroring
+// switchingId (AppSidebar.vue) / enteringOrgId (OrganizationsTab.vue).
+// Belt-and-braces alongside auth.ts's store-layer epoch guard: prevents a
+// rapid double-click from firing exitSuperAdminView twice concurrently.
+const exiting = ref(false)
+
 async function onExitSuperAdminView(): Promise<void> {
-  // Quick 260823: exitSuperAdminView is now async (it reloads the super-admin's
-  // own church context). Await it so the nav has settled before we navigate.
-  await authStore.exitSuperAdminView()
-  router?.push('/owner-console')
+  if (exiting.value) return
+  exiting.value = true
+  try {
+    // Quick 260823: exitSuperAdminView is now async (it reloads the super-admin's
+    // own church context). Await it so the nav has settled before we navigate.
+    await authStore.exitSuperAdminView()
+    router?.push('/owner-console')
+  } finally {
+    exiting.value = false
+  }
 }
 </script>
