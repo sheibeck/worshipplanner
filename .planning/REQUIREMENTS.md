@@ -27,7 +27,7 @@ remediating the Critical/High findings.
   way" notes) are relocated into ADRs under `docs/adr/`, and each affected code comment is reduced to a
   short pointer (e.g. the ADR id) rather than carrying the rationale itself.
 
-- [ ] **R318**: Behavioral/architectural "how this feature works" comments are relocated into
+- [x] **R318**: Behavioral/architectural "how this feature works" comments are relocated into
   `.planning/codebase/` map docs, and the affected code comment is reduced to what the code alone cannot
   convey.
 
@@ -76,7 +76,7 @@ remediating the Critical/High findings.
 |-------------|-------|--------|
 | R316 | Phase 108 | Complete |
 | R317 | Phase 108 | Complete |
-| R318 | Phase 109 | In Progress (109-02 backend + 109-03 utils + 109-04 components/composables subsets done; 109-05 pending) |
+| R318 | Phase 109 | Complete (109-02 backend + 109-03 utils + 109-04 components/composables + 109-05 stores/types/config/entry-points/views — 309/309 entries reconciled, zero drops) |
 | R319 | Phase 109 | Complete |
 | R320 | Phase 110 | Pending |
 | R321 | Phase 111 | Pending |
