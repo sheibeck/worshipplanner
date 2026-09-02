@@ -6,7 +6,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, setDoc, deleteDoc } from 'firebase/firestore'
 import { ref, uploadBytes, getBytes } from 'firebase/storage'
 
 let testEnv: RulesTestEnvironment
@@ -390,6 +390,54 @@ describe('storage.rules — media path', () => {
     const fileRef = ref(storage, 'orgs/orgA/media/m4/clip.mp4')
 
     await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
+})
+
+// SEC-ISO-02 (Phase 113): syncOrgMembershipClaimHandler's "clear" branch now
+// calls getAuth().revokeRefreshTokens(uid) on member-doc delete
+// (functions/src/orgMembershipClaims.ts, functions/src/orgMembershipClaims.test.ts
+// is the primary, emulator-independent proof that the revoke fires with the
+// removed uid). This is the secondary proof, at the rules layer: removing one
+// member's doc must NOT affect a DIFFERENT, remaining member's Storage access
+// -- the revoke's blast radius is scoped to the removed uid alone, never the
+// whole org. Storage membership is claim-only (see the describe block above),
+// so a remaining member's own valid orgId/role claim is unaffected by a
+// sibling's member-doc deletion; this test pins that no over-broad
+// revocation/denial is ever introduced for the org's survivors.
+//
+// RUN-WHEN-STORAGE-EMULATOR-AVAILABLE: the Storage emulator (127.0.0.1:9199)
+// was unreachable during Phase 113's authoring session (2026-09-02) -- see
+// CLAUDE.md's documented emulator-availability caveats. This test is authored
+// and left in the suite (it runs automatically once 9199 is up, e.g. via
+// `firebase emulators:start` or `npm run test:rules`); it must NOT be treated
+// as a regression if it cannot execute due to the emulator being down. It
+// does not touch storage.rules and does not relax any rule.
+describe('storage.rules — SEC-ISO-02 revoke blast radius (Phase 113)', () => {
+  it('a REMAINING member of an org still has read/write access after an UNRELATED member of the same org is removed', async () => {
+    // Seed membership docs for both members (Firestore side; unused by the
+    // claim-only Storage rule itself, but models the real member-removal
+    // shape: an org with two members, one of whom is about to be removed).
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedMembershipDoc('orgA', 'userB', 'editor')
+
+    // Simulate userB's removal: their member doc is deleted. In production
+    // this is exactly what triggers syncOrgMembershipClaimHandler's "clear"
+    // branch and the new revokeRefreshTokens(uid) call for userB (proven by
+    // functions/src/orgMembershipClaims.test.ts) -- NOT for userA.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore()
+      await deleteDoc(doc(db, 'organizations', 'orgA', 'members', 'userB'))
+    })
+
+    // userA (the remaining member) still carries a valid, unrevoked claim and
+    // must retain full read/write access under the org's Storage path --
+    // proving the revoke's blast radius is scoped to userB alone.
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/sec-iso-02-remaining/source.pptx')
+
+    await assertSucceeds(uploadBytes(fileRef, SMALL_BYTES))
+    await assertSucceeds(getBytes(fileRef))
   })
 })
 
