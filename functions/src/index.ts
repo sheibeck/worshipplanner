@@ -56,9 +56,7 @@ const CLAUDE_API_KEY = defineSecret("CLAUDE_API_KEY");
 const ESV_API_KEY = defineSecret("ESV_API_KEY");
 const NLT_API_KEY = defineSecret("NLT_API_KEY");
 
-// The Resend email provider key (RESEND_API_KEY) now lives in ./params (moved
-// so orgProvisioning.ts can bind it too without a circular import) -- imported
-// and re-exported at the top of this file.
+// See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts)
 
 // The Resend/Svix webhook SIGNING secret (whsec_-prefixed base64) — DISTINCT
 // from RESEND_API_KEY. It is the HMAC key verifySvixSignature checks the raw
@@ -123,9 +121,8 @@ export function redactUrl(url: string): string {
   }
 }
 
-// Headers we forward from the client to the upstream API. Note: `x-api-key` and
-// `authorization` for secret-injected services are overwritten below, never trusted
-// from the client.
+// Headers we forward from the client to the upstream API.
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 const FORWARDED_HEADERS = [
   "authorization",
   "content-type",
@@ -135,16 +132,7 @@ const FORWARDED_HEADERS = [
   "anthropic-dangerous-direct-browser-access",
 ];
 
-/**
- * verifyAppCaller replaces the old boolean `callerIsAuthenticated` gate with
- * the SAME accept/reject decision (valid token -> proceed, missing/invalid ->
- * 401), but resolves to the decoded ID token itself rather than throwing it
- * away -- the anthropic-only controls below (Tasks 2-3, R161/R162/R163) need
- * `decoded.uid` for the rate limiter/ledger and the `orgId` custom claim for
- * the ledger's org attribution. Every other SECRET_INJECTED service
- * (esv/nlt) keeps the identical "any valid caller" behavior; only the
- * anthropic branch reads anything off the returned token.
- */
+/** See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts) */
 export async function verifyAppCaller(idToken: string | undefined): Promise<DecodedIdToken | null> {
   if (!idToken) return null;
   try {
@@ -299,23 +287,9 @@ export interface OrgAiEnablementReject {
 export type OrgAiEnablementResult = OrgAiEnablementOk | OrgAiEnablementReject;
 
 /**
- * R242/R243: the real, server-side half of the per-org master AI gate --
- * a live `organizations/{orgId}` read on EVERY anthropic call, extracted so
- * it is unit-testable without an HTTP harness (the `api` onRequest has none,
- * see the "AI proxy cost controls" describe block below). The caller's
- * `orgId` custom claim (resolved via `resolveOrgId`) is used ONLY as a
- * pointer to WHICH org to read -- never trusted for the enablement VALUE
- * itself, since claims are stale until the next ID-token mint (sign-in, org
- * switch, or an explicit revoke). A live get() here is fresh on every
- * request, closing the gap a claims-embedded flag would leave open for
- * however long a disabled org's members' tokens happen to still be valid.
- *
- * FAIL CLOSED on a read error -- a DELIBERATE departure from the rate
- * limiter's fail-open posture a few lines below (`checkAndConsumeRateLimit`'s
- * caller, "the limiter is a cost guardrail, not a security control"). This
- * check IS the security control the owner asked to be "real" (not just UI
- * hiding, 82-RESEARCH.md Assumption A2): a Firestore hiccup here must never
- * silently let a disabled org spend money on Anthropic.
+ * R242/R243: the real, server-side half of the per-org master AI gate.
+ * See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts)
+ * FAIL CLOSED on a read error -- a DELIBERATE departure from the rate limiter's fail-open posture.
  */
 export async function checkOrgAiEnablement(
   db: Firestore,
@@ -345,14 +319,8 @@ export async function checkOrgAiEnablement(
 }
 
 /**
- * R297: the server-side half of the per-org Bible-API (ESV/NLT) gate --
- * defense-in-depth behind the client dispatcher (Plan 102-01). Mirrors
- * checkOrgAiEnablement 1:1 (same live `organizations/{orgId}` read, same
- * fail-closed posture, same "claim is only a pointer, never the enforcement
- * value" rationale -- see that function's doc comment above for the full
- * reasoning, which applies unchanged here). Reuses the existing
- * OrgAiEnablementResult union rather than declaring a redundant type, since
- * the shape ({ ok: true } | { ok: false, status, error }) is identical.
+ * R297: the server-side half of the per-org Bible-API (ESV/NLT) gate. Mirrors checkOrgAiEnablement 1:1.
+ * See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts)
  */
 export type OrgBibleEnablementResult = OrgAiEnablementResult;
 
@@ -389,17 +357,9 @@ export interface RateLimitResult {
 }
 
 /**
- * R161: per-uid fixed-window Firestore rate limit. Two top-level
- * `aiRateLimits` counter docs per call -- `${uid}__min__${minuteWindow}` and
- * `${uid}__day__${dayWindow}` -- read inside a single transaction so the
- * check-then-increment is atomic across concurrent requests from the same
- * user. A rejected request (either ceiling already met) does NOT increment
- * either counter. Kept TOP-LEVEL (not nested under organizations/{orgId}) so
- * the firestore.rules catch-all deny already blocks client reads (T-37-15).
- *
- * Deliberately does NOT catch its own Firestore errors -- the caller (the
- * anthropic branch below) decides the fail-open policy so a limiter
- * datastore hiccup never takes AI down (locked decision, 65-CONTEXT.md).
+ * R161: per-uid fixed-window Firestore rate limit.
+ * See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts)
+ * Deliberately does NOT catch its own Firestore errors -- caller decides fail-open policy.
  */
 export async function checkAndConsumeRateLimit(
   db: Firestore,
@@ -722,17 +682,8 @@ interface ParsePptxRequestData {
   storagePath?: string;
 }
 
-// --- pptxRenders queue (R062: async server-side render bridge) ----------
-//
-// One canonical path builder so parsePptxHandler (37-03, this plan), the
-// requestPptxRenderHandler trigger (37-04), and cleanupOrphanRendersHandler
-// (37-05) cannot drift apart on the collection path.
-//
-// No firestore.rules change is needed or made: the rules file's catch-all
-// `match /{document=**} { allow read, write: if false; }` already denies
-// client access to this collection by default, and the Admin SDK (used here
-// and by every handler that touches it) bypasses rules entirely. Rules
-// deployment is separately deferred as backlog 999.3.
+// pptxRenders queue (R062: async server-side render bridge)
+// See .planning/codebase/CONCERNS.md (Backend Concern Notes (R318) § functions/src/index.ts)
 
 export type PptxRenderStatus = "pending" | "ready" | "failed";
 
@@ -862,25 +813,9 @@ export interface RenderOutcome {
 }
 
 /**
- * The requestPptxRender trigger body, exported separately from the
- * onDocumentCreated wrapper (mirroring parsePptxHandler/parsePptx and
- * cleanupExpiredMediaHandler/cleanupExpiredMedia) so it is directly
- * unit-testable against mocked Firestore/Storage/renderInvoker seams.
- *
- * ★ Trap 1 (37-CONTEXT.md / 37-VALIDATION.md): this handler must NEVER
- * import, reference, or reason about parsePptxBuffer, MappedSlide, or a
- * parsed slide array. mapAstToSlides (pptxParser.ts) SKIPS slides with
- * neither substantial text nor images, and emits ONE ENTRY PER IMAGE on a
- * multi-image slide -- its length is structurally decoupled from the deck's
- * real page count (a 6-slide deck can yield 4 entries, or more than 6 with a
- * multi-image collage). Deriving the expected render page count from it
- * would be silently wrong in BOTH directions. The expected count comes only
- * from the render service's own self-report, cross-checked below.
- *
- * ★ The ready gate (T-37-13): status flips to "ready" only when THREE
- * independent signals agree -- never on the render service's self-report
- * alone, mirroring parsePptxHandler's own "never trust the caller alone"
- * pattern (independent org-membership re-check) at lines 172-181 above.
+ * The requestPptxRender trigger body, exported separately from the onDocumentCreated wrapper.
+ * See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts)
+ * ★ Trap 1: never derive the expected render page count from mapAstToSlides' output length.
  */
 export async function requestPptxRenderHandler(params: {
   orgId: string;
@@ -968,16 +903,8 @@ export async function requestPptxRenderHandler(params: {
 
   const actualCount = pageNumbers.length;
 
-  // ★ The gate (T-37-13). Three independent conjuncts, all required:
-  //   - actualCount > 0        -- the empty-render guard. A deck that
-  //                                rendered nothing must be "failed", never
-  //                                "ready" -- its parsed text layer stays
-  //                                usable either way.
-  //   - actualCount === reportedCount -- the self-report cross-check.
-  //   - contiguous              -- catches the partial render that count
-  //                                alone misses: pages 1, 2 and 4 uploaded
-  //                                against a reported count of 3 would
-  //                                otherwise pass the count check above.
+  // ★ The gate (T-37-13). Three independent conjuncts, all required.
+  // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
   const contiguous = pageNumbers.every((n, i) => n === i + 1);
   const complete = actualCount > 0 && actualCount === reportedCount && contiguous;
 
@@ -1010,57 +937,15 @@ export const requestPptxRender = onDocumentCreated(
   },
 );
 
-// --- Shared cleanup-sweep safety knob (66-01: T-66-01-02) ----------------
-//
-// Bounds how many objects a SINGLE LIVE cleanup run may delete. The first
-// LIVE enablement of MEDIA_CLEANUP_ENABLED/PPTX_RENDER_CLEANUP_ENABLED (and
-// any future sweep built on this same helper, e.g. 66-02's background/pptx-
-// source sweeps) may hit a large accumulated backlog; without a cap that
-// first run could fan out an unbounded number of deletes/cost in one shot.
-// Both sweeps below are idempotent-by-age, so anything left uncapped this
-// run is picked up by the next daily invocation -- capping never leaves an
-// object stuck past its retention window, only spreads its deletion over
-// more runs. Dry-run summaries are NEVER capped: the owner needs the true
-// backlog count/bytes before flipping the enable flag, not a truncated one.
-//
-// R181/R184: this is now a thin passthrough over a resolved AppConfig
-// (appConfig.ts owns the coercion/fail-open-capped default logic) rather
-// than a direct process.env read -- see appConfig.ts's coercePositiveInt.
+// Shared cleanup-sweep safety knob (66-01: T-66-01-02)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 export function readDeleteCap(config: AppConfig): number {
   return config.deleteCapPerRun;
 }
 
-// --- cleanupExpiredMedia (R015: 2-week Storage retention) ---------------
-//
-// SAFETY CONTRACT (see 22-03 threat model, T-22-03-01..05):
-// - MEDIA_PATH_GUARD is applied to every candidate BEFORE any delete decision.
-//   Only objects under orgs/{orgId}/media/ are ever eligible; pptx-imports and
-//   every other Storage path are structurally excluded, even when old.
-// - getFiles() is scoped with prefix "orgs/" -- never the bucket root -- as a
-//   second, independent bound on the blast radius.
-// - Age is keyed on the object's native GCS `timeCreated` (server-set at
-//   upload time), NEVER on client-settable custom metadata -- a user cannot
-//   backdate metadata to force-expire another org's media early.
-// - R181: this handler now reads appConfig/global via the Admin SDK (Plan
-//   69-01's getAppConfig, bypassing rules) for its enable flag/retention/cap
-//   -- its first-ever Firestore read. It still touches NO slide documents,
-//   slot metadata, or slide text: appConfig/global is the only doc it ever
-//   reads, so the letter of "no Firestore API" changed but the spirit --
-//   structurally incapable of touching content documents -- did not.
-// - FAILS SAFE: deletion requires an explicit opt-in, cleanup.mediaEnabled=true
-//   in the resolved config. With it unset/false/malformed the run is a
-//   dry-run: it scans and logs what WOULD be deleted and deletes nothing. A
-//   human must review a dry-run before enabling live deletion.
-//
-//   History: this shipped in 22-03 gated on `MEDIA_CLEANUP_DRY_RUN === "true"`,
-//   which meant an UNSET env var produced LIVE deletion -- while the comment here
-//   claimed the opposite. A destructive daily scheduled job must default to safe,
-//   so the gate was inverted to an explicit enable. `MEDIA_CLEANUP_DRY_RUN` is no
-//   longer read at all; setting it has no effect.
-// - Idempotent by age: deletion eligibility depends only on an object's own
-//   timeCreated vs "now", never on prior-run state, so a partially-failed run
-//   is safely retried by the next daily invocation. Per-file deletes are each
-//   wrapped in try/catch so one failure never aborts the whole run.
+// cleanupExpiredMedia (R015: 2-week Storage retention)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
+// FAILS SAFE by default -- do not flip the historical MEDIA_CLEANUP_DRY_RUN env var, it is dead.
 
 /**
  * Default retention window (days), used when MEDIA_RETENTION_DAYS is
@@ -1188,46 +1073,9 @@ export const cleanupExpiredMedia = onSchedule(
   },
 );
 
-// --- cleanupOrphanRenders (R062: dry-run-by-default orphan sweep) --------
-//
-// A second, SEPARATE scheduled job from cleanupExpiredMedia above. It is not
-// folded into that handler because it must read the pptxRenders queue
-// (Firestore) -- historically something cleanupExpiredMedia never touched at
-// all; as of R181 (69-02) BOTH handlers now also read appConfig/global via
-// getAppConfig(), but neither ever reads slide/service/song content docs.
-//
-// SAFETY CONTRACT:
-// - FAILS SAFE: real deletion requires an explicit opt-in,
-//   cleanup.pptxRenderEnabled=true in the resolved config. With it unset,
-//   false, or a malformed value, this is a dry run: it scans and logs what
-//   WOULD be deleted and deletes nothing.
-//   This is the same gate shape as cleanupExpiredMediaHandler's own
-//   post-incident fix above, in the same direction -- the 2026-07-28 incident
-//   (9f1b881) was precisely an inverted gate whose doc comment claimed the
-//   opposite default from what the code implemented. This comment describes
-//   only the default the code below actually implements.
-// - RENDERED_OBJECT_GUARD is applied to every listed Storage object BEFORE
-//   any delete decision. Only objects under
-//   orgs/{orgId}/pptx-imports/{importId}/rendered/ are ever eligible; a
-//   deck's source.pptx and its extracted images/ are structurally
-//   unreachable through this guard, no matter how stale the render doc is.
-// - Only pptxRenders docs whose status is "pending" or "failed" AND whose
-//   createdAt is older than ORPHAN_RENDER_STALE_HOURS are ever candidates. A
-//   "ready" render is never a candidate (excluded by the status filter), and
-//   an in-flight "pending" render younger than the staleness window is
-//   skipped. A doc with an unreadable createdAt is skipped rather than
-//   treated as old -- fail safe, matching cleanupExpiredMediaHandler's own
-//   NaN handling of an unparseable timeCreated.
-// - Age is keyed on the server-set Firestore createdAt timestamp
-//   (FieldValue.serverTimestamp(), written by parsePptxHandler's queue
-//   write), never on client-settable input.
-// - Per-object deletes are each wrapped in their own try/catch so one
-//   failure never aborts the run, mirroring cleanupExpiredMediaHandler's
-//   partial-failure tolerance. The render doc's own delete is likewise
-//   wrapped so a doc-delete failure cannot abort the scan of remaining
-//   candidates.
-// - Runs on its own daily schedule, 03:00 UTC -- deliberately one hour after
-//   cleanupExpiredMedia's 02:00 UTC, so the two sweeps never overlap.
+// cleanupOrphanRenders (R062: dry-run-by-default orphan sweep)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
+// Runs 03:00 UTC (one hour after cleanupExpiredMedia's 02:00, so the two sweeps never overlap).
 
 /**
  * Default staleness window (hours), used when ORPHAN_RENDER_STALE_HOURS
@@ -1399,61 +1247,10 @@ export const cleanupOrphanRenders = onSchedule(
 /** Shared day-length constant for the two 66-02 retention sweeps below. */
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// --- cleanupOrphanBackgrounds (R167: orphan+age background sweep) --------
-//
-// A NEW sweep, never shipped before this phase. Backgrounds
-// (orgs/{orgId}/backgrounds/{backgroundId}/{fileName}, written by
-// src/composables/useBackgroundUpload.ts:103) are structurally exempt from
-// cleanupExpiredMediaHandler's MEDIA_PATH_GUARD and were never pruned at
-// all until now.
-//
-// SAFETY CONTRACT (66-02 threat model T-66-02-01/T-66-02-03/T-66-02-05):
-// - This is ORPHAN+AGE, deliberately NEVER pure age. A background is only a
-//   deletion candidate once it is BOTH (a) unreferenced by any live
-//   document, at ANY of the three tiers below, AND (b) older than
-//   BACKGROUND_RETENTION_DAYS. A 90-day-old background still set on an
-//   active slide is never eligible, regardless of age.
-// - The three reference tiers, all enumerated via plain collectionGroup()
-//   scans (no composite index required):
-//     1. Group tier   -- organizations/{orgId}/slideGroups/{slotId}.backgroundImageUrl
-//     2. Slide tier   -- the SAME doc's embedded slides[] array, each
-//                        entry.backgroundImageUrl (an array field, not a
-//                        subcollection -- read via doc.data().slides).
-//     3. Song tier    -- organizations/{orgId}/songs/{songId}/lyrics/{lyricsId}.backgroundImageUrl
-// - References are stored as full Firebase download URLs
-//   (https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{ENCODED_PATH}?...).
-//   extractBackgroundObjectPath() recovers the exact object name from the
-//   /o/{path} segment (URL-decoded) so it can be compared 1:1 against
-//   file.name from the bucket listing.
-// - REFERENCES-INCOMPLETE FAIL-SAFE: if any non-empty backgroundImageUrl
-//   cannot be parsed to an object path, or either collectionGroup scan
-//   throws, referencesComplete is set to false and the ENTIRE run is forced
-//   to dry-run -- it deletes NOTHING that run, regardless of
-//   BACKGROUND_CLEANUP_ENABLED. The sweep never deletes when it cannot
-//   prove an object is unreferenced. Under-deletion (leaving an orphan
-//   another day) is always preferred over deleting a live background.
-// - FLOOR GUARD (beyond the above): a reference scan that returns silently
-//   EMPTY -- no throw, no unparseable URL, just zero docs/zero references
-//   -- must never be trusted as "nothing anywhere is referenced". If there
-//   are background objects to consider at all (candidates.length > 0) but
-//   the reference Set ended up with zero entries, references are ALSO
-//   treated as incomplete and the run stays dry-run. This closes the one
-//   gap the throw/parse-failure fail-safe alone doesn't cover: a scan that
-//   "succeeds" against the wrong collection, an empty project, or a
-//   permissions issue that silently returns no docs.
-// - BACKGROUND_PATH_GUARD is applied to every candidate BEFORE any delete
-//   decision, mirroring MEDIA_PATH_GUARD/RENDERED_OBJECT_GUARD -- only
-//   objects under orgs/{orgId}/backgrounds/ are ever eligible.
-// - FAILS SAFE: real deletion requires cleanup.backgroundEnabled=true in the
-//   resolved appConfig (R181); anything else (unset, false, malformed) is a
-//   dry run, matching the gate direction of every other sweep in this file
-//   (the 9f1b881 inverted-gate incident).
-// - Per-object deletes are wrapped in try/catch so one failure never aborts
-//   the run; readDeleteCap() bounds a single LIVE run's blast radius, and
-//   dry-run is never capped so the owner sees the true backlog first.
-// - Runs on its own daily schedule, 05:00 UTC -- after media (02:00),
-//   orphan-renders (03:00), and reminders (04:00), so the sweeps never
-//   overlap.
+// cleanupOrphanBackgrounds (R167: orphan+age background sweep, Phase 66-02)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
+// FLOOR GUARD: a reference scan returning silently EMPTY must never be trusted as "nothing
+// referenced" -- treated as incomplete (forces dry-run) too. Runs 05:00 UTC (after the other sweeps).
 
 /**
  * Default retention window (days), used when the BACKGROUND_RETENTION_DAYS
@@ -1664,48 +1461,8 @@ export const cleanupOrphanBackgrounds = onSchedule(
   },
 );
 
-// --- cleanupPptxSources (R168: prune consumed/failed import sources) -----
-//
-// A NEW sweep, never shipped before this phase. cleanupOrphanRendersHandler
-// (above) already prunes a stale pending/failed import's rendered/ pages,
-// but it has never touched the heavier source.pptx deck or the extracted
-// images/ intermediate files -- those grow forever today. This sweep closes
-// that gap while NEVER touching rendered/, the PNGs the app actually
-// displays.
-//
-// SAFETY CONTRACT (66-02 threat model T-66-02-02/T-66-02-03/T-66-02-05):
-// - PPTX_SOURCE_GUARD is a POSITIVE guard: it matches ONLY
-//   orgs/{orgId}/pptx-imports/{importId}/source.pptx and
-//   orgs/{orgId}/pptx-imports/{importId}/images/*. It is structurally
-//   unable to match .../rendered/* -- rendered/ is excluded by construction,
-//   not by a runtime exception list.
-// - Driven by the pptxRenders collectionGroup (status "ready" or "failed"),
-//   the same collection cleanupOrphanRendersHandler reads. "ready" = the
-//   import is CONSUMED -- the app now displays from rendered/, so the
-//   source deck and its extracted images are dead weight. "failed" = an
-//   orphaned import whose source is also dead weight; its rendered/ +
-//   doc lifecycle stay owned by cleanupOrphanRendersHandler, unchanged by
-//   this sweep. An image-only import (no pptxRenders doc at all, whose
-//   images/ ARE the only display) is structurally out of scope -- this scan
-//   never sees it because it is driven entirely by render docs.
-// - Age is keyed on the server-set Firestore createdAt timestamp
-//   (FieldValue.serverTimestamp(), written by parsePptxHandler's queue
-//   write), never on client-settable input. A "ready" doc younger than
-//   PPTX_SOURCE_RETENTION_DAYS is skipped -- consumption alone is not
-//   sufficient, only consumption AND age.
-// - Disclosed benign race: if cleanupOrphanRendersHandler (once owner-
-//   enabled) deletes a "failed" doc before this sweep first observes it,
-//   that failed import's source may be missed this run. This is
-//   under-deletion only -- never over-deletion -- and the source stays
-//   in place (safe) until manually cleared or the doc reappears.
-// - FAILS SAFE: real deletion requires cleanup.pptxSourceEnabled=true in the
-//   resolved appConfig (R181); anything else (unset, false, malformed) is a
-//   dry run, matching the gate direction of every other sweep in this file.
-// - Per-object deletes are wrapped in try/catch so one failure never aborts
-//   the run; readDeleteCap() bounds a single LIVE run's blast radius across
-//   the WHOLE run (all imports), and dry-run is never capped.
-// - Runs on its own daily schedule, 06:00 UTC -- after the 05:00 background
-//   sweep, so the sweeps never overlap.
+// cleanupPptxSources (R168: prune consumed/failed import sources)
+// See .planning/codebase/CONCERNS.md (Backend Concern Notes (R318) § functions/src/index.ts)
 
 /**
  * Default retention window (days), used when the PPTX_SOURCE_RETENTION_DAYS
@@ -1856,32 +1613,8 @@ export const cleanupPptxSources = onSchedule(
   },
 );
 
-// --- previewCleanupDryRun (R188/R190: on-demand blast-radius preview) ----
-//
-// A super-admin-only onCall that gives the Owner Console a truthful,
-// on-demand "what would this cleanup delete right now" count for any of the
-// four *_CLEANUP_ENABLED sweeps above, WITHOUT ever deleting anything and
-// WITHOUT depending on the sweep's stored enable flag. It is the server half
-// of the safe-flip flow this phase adds in front of those flags (R189 is the
-// client confirm-to-flip UI, a separate plan).
-//
-// SAFETY CONTRACT:
-// - Reuses the SAME scan/reference-detection code the real cron uses --
-//   dispatches to the four handlers above with { forceDryRun: true } rather
-//   than forking a second scan-and-count implementation, so the preview can
-//   never under/over-count relative to what a live run would actually do
-//   (71-RESEARCH.md "Alternatives Considered": a forked pure function was
-//   explicitly rejected as strictly higher risk for zero benefit).
-// - forceDryRun structurally short-circuits each handler's dryRun/
-//   effectiveDryRun to true BEFORE any delete branch is reached (the
-//   forceDryRun-FIRST ternary added to each handler above) -- independent of
-//   the live cleanup.*Enabled config value. The belt-and-suspenders
-//   `if (!s.dryRun) throw` below is a defense-in-depth assertion of that
-//   guarantee, not the guarantee itself.
-// - Caller re-verification mirrors setSuperAdminClaimHandler
-//   (superAdminClaims.ts) EXACTLY: two independent server-side checks (the
-//   ID-token superAdmin claim AND a fresh superAdmins/{uid} Firestore read)
-//   -- a client-declared authority flag is never trusted.
+// previewCleanupDryRun (R188/R190: on-demand blast-radius preview)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 
 export type CleanupPreviewType = "media" | "orphanRenders" | "backgrounds" | "pptxSources";
 
@@ -1984,22 +1717,8 @@ export async function previewCleanupDryRunHandler(
 
 export const previewCleanupDryRun = onCall(previewCleanupDryRunHandler);
 
-// --- sendScheduledReminders daily reminder cron (61-02: R145/R133/SC3/SC4) --
-//
-// The R145 reminder engine: a daily onSchedule cron that auto-enqueues the
-// shared service link to everyone assigned N days before a service, reckoned in
-// the org's LOCAL timezone (R133), exactly once (SC4). It mirrors
-// cleanupOrphanRendersHandler (729-817) EXACTLY -- a broad
-// collectionGroup('services').where('status','in',['planned','exported']) scan
-// (NEVER 'draft', so a draft is structurally unreachable -- SC4), the org id
-// recovered from the parent chain (never a client field), a per-item try/catch
-// so one bad service never aborts the daily run, the handler body exported
-// separately from the wrapper for direct unit test, and its own 04:00 UTC slot
-// (offset from cleanupExpiredMedia's 02:00 and cleanupOrphanRenders' 03:00 so
-// the three daily sweeps never overlap). It enqueues via the SHARED
-// createQueuedMessage() shaper, so a cron-created reminder is byte-identical to
-// a human send at the sendQueuedMessage trigger. It holds NO secret -- only
-// sendQueuedMessage binds RESEND_API_KEY (R131 smallest key-holding surface).
+// sendScheduledReminders daily reminder cron (61-02: R145/R133/SC3/SC4)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 
 /**
  * A reminderDaysBefore further ahead than this is treated as a misconfiguration
@@ -2179,34 +1898,7 @@ export async function sendScheduledRemindersHandler(
   return summary;
 }
 
-// NO secrets: array -- the cron only ENQUEUES; RESEND_API_KEY binds solely to
-// sendQueuedMessage (R131). 04:00 UTC is a NEW slot, offset from the taken 02:00
-// (media) and 03:00 (renders) so the three daily sweeps never overlap.
-//
-// TWO sweeps share this ONE daily invocation (one Cloud Scheduler job, one
-// deploy): the reminder sweep (R145) and the schedule-for-later dispatch sweep
-// (R141, 61-03). Each runs in its OWN try/catch so a failure in one never aborts
-// the other. No new onSchedule wrapper and no secret is added for the dispatch
-// sweep -- it only re-creates a 'queued' doc; only sendQueuedMessage holds the
-// key (R131).
-//
-// R170: the body used to live directly in the onSchedule callback below;
-// it is now extracted into this EXPORTED orchestrator, exclusively so a
-// config gate can sit at its very top, before EITHER sweep -- and therefore
-// before the first collectionGroup call either sweep makes. Default OFF
-// (unset, false, or malformed -- the same fail-CLOSED idiom as the cleanup
-// enable flags above, R181/R184): gating the WHOLE function off is the
-// lowest-cost option and kills BOTH the reminder collectionGroup('services')
-// scan AND the schedule-for-later collectionGroup('messages') scan -- zero
-// cross-org reads when disabled.
-//
-// DISCLOSED behavior change: gating the whole function off also disables
-// dispatchDueScheduledMessagesHandler, i.e. the composer's "schedule for
-// later" send. To restore reminders OR schedule-for-later dispatch, flip
-// messaging.scheduledCronEnabled=true in appConfig/global -- no redeploy
-// needed (R181), and takes effect on the very next scheduled run since this
-// is a cron path reading {fresh:true} (R183). Fully reversible, no data loss
-// either way.
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 export async function runScheduledMessagingCron(
   db: Firestore = getFirestore(),
 ): Promise<void> {
@@ -2242,16 +1934,8 @@ export const sendScheduledReminders = onSchedule(
   },
 );
 
-// --- dispatchDueScheduledMessagesHandler (61-03: R141 schedule-for-later) ---
-//
-// The Phase 59 carryover -- actually SEND user-scheduled messages. The composer
-// (59-02) writes a status:'scheduled' messages doc (createQueuedMessage :1141)
-// that sendQueuedMessage, an onDocumentCreated trigger, leaves inert by design
-// (:1440 comment). Flipping that existing doc's status to 'queued' would NOT
-// re-fire the create trigger (the whole trap), so this sweep CREATES A FRESH
-// 'queued' doc instead -- a genuine onDocumentCreated. It is exported separately
-// from the wrapper (the sendScheduledRemindersHandler convention) so it is unit
-// -tested with a fixed clock and a fake Firestore.
+// dispatchDueScheduledMessagesHandler (61-03: R141 schedule-for-later)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 
 /** The rolled-up outcome of one dispatch sweep. */
 export interface DispatchSummary {
@@ -2284,17 +1968,7 @@ function scheduledForMillis(value: unknown): number | null {
 }
 
 /**
- * Finds due user-scheduled messages and dispatches each by (1) transactionally
- * claiming the ORIGINAL scheduled->dispatched (only if still 'scheduled' -- the
- * idempotency guard that makes an at-least-once cron retry a no-op) and (2)
- * creating a FRESH status:'queued' doc via the shared createQueuedMessage shaper
- * so onDocumentCreated fires sendQueuedMessage exactly as for a human send.
- *
- * The scan is a single-field equality collectionGroup('messages').where(
- * 'status','==','scheduled') -- the SAME no-index class as the reminder scan.
- * Due-ness (scheduledFor <= now) is filtered in CODE, NOT the query, so NO
- * composite index is introduced. `now` defaults to the real clock; tests pin it.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts) */
 export async function dispatchDueScheduledMessagesHandler(
   now: Date = new Date(),
 ): Promise<DispatchSummary> {
@@ -2389,17 +2063,8 @@ export async function dispatchDueScheduledMessagesHandler(
   return summary;
 }
 
-// --- queueServiceMessage send-path enqueue (59-02: R131/R137/R141) ------
-//
-// The thin enqueue half of the send path, mirroring the parsePptxHandler ->
-// pptxRenders queue -> requestPptxRender triad above: an onCall Function whose
-// handler body (queueServiceMessageHandler) is exported separately from the
-// wrapper for direct unit testing. It re-authorizes the caller server-side
-// (editor-tier of the PATH-derived org, never the client-declared orgId),
-// re-reads the org messaging kill-switch, validates the request, and writes
-// ONE messages/{id} doc via the shared createQueuedMessage() shaper. It
-// resolves no recipients and sends nothing — the 59-03 trigger does that, and
-// is the only Function that holds RESEND_API_KEY.
+// queueServiceMessage send-path enqueue (59-02: R131/R137/R141)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 
 /**
  * The message types a composer or an automatic trigger can queue (R137).
@@ -2513,16 +2178,7 @@ export interface QueuedMessageDoc {
 export type CreateQueuedMessageInput = QueueMessageRequest & { requestedByUid: string };
 
 /**
- * The single canonical messages/{id} doc-shaper — pure, no Firestore I/O (its
- * role mirrors pptxRenderDocRef's "one canonical shape so the callable and the
- * trigger cannot drift", and buildServiceSnapshot's pure field-assembly). It is
- * factored out precisely so queueServiceMessage now and Phase 61's cron later
- * produce an IDENTICAL shape (R141).
- *
- * Status is 'scheduled' when a scheduledFor instant is present, else 'queued'
- * (send-now). Optional/absent leaves are normalized to null (scheduledFor,
- * changeDiff, sentAt) rather than left undefined — Firestore rejects undefined.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts) */
 export function createQueuedMessage(input: CreateQueuedMessageInput): QueuedMessageDoc {
   const scheduledFor = input.scheduledFor ?? null;
   return {
@@ -2542,26 +2198,9 @@ export function createQueuedMessage(input: CreateQueuedMessageInput): QueuedMess
 }
 
 /**
- * The queueServiceMessage handler body, exported separately from the onCall
- * wrapper (parsePptxHandler/parsePptx precedent) so tests invoke it directly
- * with a fake CallableRequest.
- *
- * Security contract (59-02 threat model T-59-02a..e):
- * - Requires Firebase Auth (request.auth).
- * - Independently re-reads organizations/{orgId}/members/{uid} and requires the
- *   member's role ∈ ['editor','admin'] — a viewer or a wrong-org caller is
- *   rejected. The client-declared orgId is used ONLY to scope the Firestore
- *   path; membership and role are re-verified for THAT path, never trusted
- *   (mirrors parsePptxHandler's membership re-check and firestore.rules'
- *   isOrgEditor).
- * - Re-reads the org messaging kill-switch (settings.messaging.enabled) server
- *   -side and rejects when off — the composer's disabled entry point is
- *   convenience; this is the boundary.
- * - Validates the type enum (R137) and scheduledFor sanity before any write.
- * - Writes exactly ONE messages/{id} doc via the shared createQueuedMessage
- *   shaper and returns its id. It resolves NO recipients and sends nothing —
- *   the 59-03 trigger does that. This Function holds NO secret (see the wrapper
- *   below: no secrets: array — only sendQueuedMessage gets RESEND_API_KEY).
+/**
+ * The queueServiceMessage handler body (59-02 threat model T-59-02a..e).
+ * See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
  */
 export async function queueServiceMessageHandler(
   request: CallableRequest<QueueMessageRequest>,
@@ -3106,15 +2745,8 @@ export const sendQueuedMessage = onDocumentCreated(
   },
 );
 
-// --- messageWebhook (60-02: R143 — Resend delivery/bounce receiver) ---------
-//
-// The milestone's new UNAUTHENTICATED trust boundary. Resend POSTs delivery and
-// bounce events here; the only thing that gates a Firestore write is the Svix
-// HMAC over the RAW request body (verifySvixSignature, 60-01), checked FIRST.
-// Only a hard (Permanent) bounce surfaces: it idempotently flips the addressed
-// recipients/{id} to status:'bounced' and increments
-// messages/{id}.deliveryCounts.bounced. See messageWebhookHandler for the
-// verify-first order contract.
+// messageWebhook (60-02: R143 — Resend delivery/bounce receiver)
+// See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts)
 
 /**
  * The subset of a Resend `email.bounced` event's `data` object this handler
@@ -3129,24 +2761,7 @@ interface ResendBounceData {
   bounce?: { type?: string; subType?: string; message?: string };
 }
 
-/**
- * Resolve the bounced recipient's DocumentReference.
- *
- * PRIMARY (tags): when the echoed Resend tags carry all four path segments,
- * build the recipients/{id} ref DIRECTLY at the exact nested path — a single
- * doc() with NO query and NO index dependency (60-RESEARCH § Tags Echo). All
- * ids are untrusted strings that only form path segments scoped under the org
- * (Admin SDK), never a broader query (T-60-02e).
- *
- * FALLBACK (providerMessageId): when tags are absent/incomplete, look the
- * recipient up by the provider message id 59-03 stored, via
- * collectionGroup('recipients').where('providerMessageId','==',email_id) — the
- * true safety net (tags echo is only MEDIUM confidence). Requires 60-01's
- * deploy-gated collection-group index at run time.
- *
- * Returns null (never throws) when neither resolves — the caller 200s an
- * unresolvable event rather than triggering a Resend retry storm.
- */
+/** See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts) */
 export async function resolveRecipientRef(
   db: Firestore,
   data: ResendBounceData,
@@ -3170,16 +2785,7 @@ export async function resolveRecipientRef(
 
 /**
  * Idempotently record a hard bounce against an addressed recipient.
- *
- * Runs ONE transaction that reads the recipient status AND the message's
- * current count BEFORE any write (mirrors sendQueuedMessageHandler's
- * transition-guarded claim). Only on the not-bounced -> bounced transition does
- * it set status:'bounced' + bounceReason + bouncedAt and write
- * deliveryCounts.bounced as a LITERAL prev+1 (NOT FieldValue.increment). A
- * duplicate at-least-once delivery finds status already 'bounced' and no-ops,
- * so the count never double-counts (success criterion 4). The dot-path
- * 'deliveryCounts.bounced' merges into the existing {sent,failed} leaf; a
- * missing leaf is treated as 0, so older docs need no migration.
+ * See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
  */
 export async function recordBounce(
   db: Firestore,
@@ -3208,26 +2814,8 @@ export async function recordBounce(
 }
 
 /**
- * The messageWebhook handler body, exported separately from the onRequest
- * wrapper (the sendQueuedMessageHandler/parsePptxHandler convention) so it is
- * unit-testable directly with a fake rawBody+headers and no res —
- * firebase-functions/v2/https is not mocked in the test harness.
- *
- * VERIFY-FIRST ORDER CONTRACT (security-critical, 60-CONTEXT.md):
- *   1. rawBody MUST be a Buffer (Cloud Functions supplies req.rawBody as the
- *      exact received bytes). A non-Buffer body is malformed -> 400. Do NOT fall
- *      back to a re-serialized req.body — the HMAC is over the raw bytes.
- *   2. Verify the Svix HMAC over rawBody BEFORE any Firestore access. Any
- *      missing/malformed/invalid/stale signature -> 401, with ZERO state access.
- *      401 is reserved for signature failure ONLY.
- *   3. Parse the JSON only AFTER the signature passes; unparseable -> 400.
- *   4. Only email.bounced with a Permanent (hard) bounce surfaces. Every other
- *      valid event (soft/Transient, delivered, complaint, unknown type, or an
- *      unresolvable recipient) -> 200 with no write: a non-2xx would make Resend
- *      retry the event forever.
- *
- * The webhook is provider-facing, so it is NOT gated on isMessagingEnabled()
- * (a client concept) — only the signature gates it.
+ * The messageWebhook handler body -- VERIFY-FIRST ORDER CONTRACT (security-critical, 60-CONTEXT.md).
+ * See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts)
  */
 export async function messageWebhookHandler(
   rawBody: Buffer,
@@ -3281,49 +2869,16 @@ export const messageWebhook = onRequest(
   },
 );
 
-// --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
-//
-// Sets the { orgId, role } custom auth claim that storage.rules' dual-read
-// isOrgMemberByClaim(orgId) arm reads as request.auth.token.orgId /
-// request.auth.token.role (plan 40-01). One onDocumentWritten trigger on
-// organizations/{orgId}/members/{uid} covers create, role change and delete.
-// Invite acceptance (ensureUserDocument's batch .set() on this same
-// document) flows through this trigger too, so no separate invite-specific
-// code path is needed. Implementation lives in ./orgMembershipClaims so its
-// shared decision logic (decideMembershipClaim) can be imported by plan
-// 40-04's backfill script without duplicating it. Only the deployed trigger
-// is re-exported here -- decideMembershipClaim, buildOrgMembershipClaim and
-// syncOrgMembershipClaimHandler are intentionally NOT part of this module's
-// exports, mirroring how requestPptxRenderHandler is reachable only via a
-// direct module import in tests.
+// syncOrgMembershipClaim (R074/R075: the claim storage.rules reads)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 export { syncOrgMembershipClaim };
 
-// --- superAdminClaims (68-02: syncSuperAdminClaim trigger + setSuperAdminClaim
-// onCall, R174/R175-B/R176/R179) ------------------------------------------
-//
-// Implementation lives in ./superAdminClaims so its testable handlers
-// (syncSuperAdminClaimHandler, setSuperAdminClaimHandler) can be imported
-// directly by tests without going through the deployed wrappers. Only the
-// two deployed Functions are re-exported here -- the handlers are
-// intentionally NOT part of this module's exports, mirroring
-// syncOrgMembershipClaim above. bootstrapSuperAdmin.ts (the owner-run first-
-// grant script) is deliberately NOT imported or exported here -- it is a
-// Node script, not a deployed Function.
+// superAdminClaims (68-02: syncSuperAdminClaim trigger + setSuperAdminClaim onCall, R174/R175-B/R176/R179)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 export { syncSuperAdminClaim, setSuperAdminClaim };
 
-// --- orgProvisioning (Phase 74: onboardOrganization/assignOrgAdmin/
-// listOrganizations, R196-R206; Phase 76: setOrgActive, R212-R214) ----------
-//
-// Implementation lives in ./orgProvisioning so its testable handlers
-// (onboardOrganizationHandler/assignOrgAdminHandler/listOrganizationsHandler/
-// setOrgActiveHandler/setOrgAiEnabledHandler) can be imported directly by tests
-// without going through the deployed wrappers. The deployed Functions are
-// re-exported here so Firebase discovers them from the entry point -- mirrors
-// syncOrgMembershipClaim/setSuperAdminClaim above. Ship built + tested +
-// UNDEPLOYED per 74-01-PLAN.md's/76-01-PLAN.md's hand-over deploy notes
-// (setOrgAiEnabled added Phase 82, R242-R243; setOrgBibleEnabled added Phase
-// 101, R295 -- a callable not re-exported here is silently missed by
-// `firebase deploy`, see functions-must-reexport-from-index.md).
+// orgProvisioning (Phase 74: onboardOrganization/assignOrgAdmin/listOrganizations, R196-R206; Phase 76: setOrgActive, R212-R214)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 export { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive, setOrgAiEnabled, setOrgBibleEnabled };
 
 // --- inviteOnboarding (Phase 99: sendInviteOnboardingEmail, R289-R291/R293 --

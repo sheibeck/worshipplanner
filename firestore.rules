@@ -8,23 +8,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Phase 76 (R213): org lifecycle gate. `active` is absent on every org
-    // created before this phase and must read as active (default-true,
-    // backward-compatible) -- only an EXPLICIT `active: false` denies. A
-    // live get() (not a claim) is used because firestore.rules, unlike
-    // storage.rules, CAN read a sibling document -- no propagation lag on
-    // this side (76-RESEARCH.md). isOrgActive itself carries no super-admin
-    // awareness; the super-admin arm lives one level up, in isOrgMember/
-    // isOrgEditor below (Phase 78, R225).
-    //
-    // exists()-guarded FIRST, mirroring isOrgEditor's own established
-    // Null-value-error avoidance immediately below: an unguarded
-    // get(...).data on a non-existent organizations/{orgId} doc throws
-    // (Firestore treats the error as DENY, not false), and this codebase's
-    // own test suite has long-established members/{uid}-doc-only fixtures
-    // that never seed the parent org doc — a missing org doc must read as
-    // active (same default-true posture as a present doc with no `active`
-    // field), not silently deny every one of those call sites.
+    // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
+    // exists()-guarded FIRST: an unguarded get() on a missing org doc throws (DENY, not false).
     function isOrgActive(orgId) {
       return !exists(/databases/$(database)/documents/organizations/$(orgId)) ||
         get(/databases/$(database)/documents/organizations/$(orgId)).data.get('active', true) == true;
@@ -32,17 +17,8 @@ service cloud.firestore {
 
     function isOrgMember(orgId) {
       return isSignedIn() && (
-        // Phase 78 (R225): checked FIRST, before the exists() cross-document
-        // read, both for correctness (no membership doc will ever exist for
-        // a super-admin entering a church they don't belong to) and for
-        // cost (Firestore rules short-circuit && / ||, so this skips the
-        // billed exists() read entirely on the super-admin path).
-        // Deliberately unconditional on isOrgActive() too -- a super-admin
-        // can enter a DEACTIVATED org for support (same posture Phase 76
-        // already granted a super-admin WITH a membership doc; R225 extends
-        // it to one without). The old inner `|| isSuperAdmin()` that used
-        // to sit beside isOrgActive() is removed as dead code -- this outer
-        // arm already subsumes it.
+        // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
+        // Checked FIRST for cost (short-circuits the billed exists() read) and correctness.
         isSuperAdmin() ||
         (exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
           isOrgActive(orgId))
@@ -57,14 +33,8 @@ service cloud.firestore {
       // (evaluation error @ L153) from ever reaching its own conditions. Now it
       // resolves to a clean false instead of erroring.
       return isSignedIn() && (
-        // Phase 78 (R225): same outer-arm shape as isOrgMember above -- a
-        // super-admin is granted editor-tier access on ANY org with zero
-        // membership doc, replacing the exists()+role check entirely (not
-        // merely waiving isOrgActive()). The old inner `|| isSuperAdmin()`
-        // is removed as dead code for the same reason. NOTE: this makes
-        // isOrgEditor(orgId) true for every super-admin on every org --
-        // see the org-doc `allow update` rule below, which had to drop its
-        // OWN `|| isSuperAdmin()` disjunct as a direct consequence.
+        // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
+        // NOTE: this makes isOrgEditor(orgId) true for every super-admin on every org.
         isSuperAdmin() ||
         (exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
           get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('role', '') in ['editor', 'admin'] &&
@@ -72,16 +42,8 @@ service cloud.firestore {
       );
     }
 
-    // Phase 68 (R178): super-admin gate. Deliberately CLAIM-ONLY — NO
-    // get()/exists() cross-document lookup — unlike isOrgMember/isOrgEditor
-    // above. This repo has a documented production incident (CLAUDE.md,
-    // 2026-08-06) where a cross-document/cross-service rules lookup produced
-    // a deny-everyone outage on storage.rules; isSuperAdmin() avoids that
-    // fragility class entirely by reading only the request's own auth token.
-    // `superAdmin` is a wholly separate top-level boolean claim — it never
-    // reuses `role` or the string "admin" from isOrgEditor's per-org role
-    // normalization above, so an org 'editor'/'admin' role claim can never
-    // satisfy this check (naming-collision guard, proven in src/rules.test.ts).
+    // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
+    // Deliberately CLAIM-ONLY -- avoids the cross-document lookup fragility class (CLAUDE.md, 2026-08-06 incident).
     function isSuperAdmin() {
       return request.auth != null && request.auth.token.superAdmin == true;
     }
@@ -174,21 +136,8 @@ service cloud.firestore {
       allow delete: if false;
 
       // Members subcollection
-      //
-      // IN-02 (78-REVIEW.md) / T-78-03 accepted residual: Phase 78's
-      // super-admin arm makes isOrgEditor(orgId) true for EVERY super-admin
-      // on EVERY org (see isOrgEditor above), which means `allow write`
-      // below legally permits a super-admin's client SDK to `create` its
-      // own membership doc for any org. R226 ("entering a church as a
-      // super-admin creates NO member doc") therefore holds only as a
-      // CLIENT-CODE contract -- enterOrgAsSuperAdmin (src/stores/auth.ts)
-      // deliberately calls no setDoc/writeBatch -- not as a rules
-      // invariant. Deliberately accepted, not a functional gap: this
-      // matches the phase's documented posture that a super-admin is fully
-      // trusted, and the residual is tracked in both 78-01-PLAN.md and
-      // 78-02-PLAN.md's threat models. Do NOT "fix" this by narrowing
-      // isOrgEditor here -- see the organizations/{orgId} comments above
-      // for why the super-admin arm is placed exactly where it is.
+      // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
+      // IN-02 accepted residual: do NOT "fix" by narrowing isOrgEditor here.
       match /members/{uid} {
         allow read: if isOrgMember(orgId);
         allow write: if isOrgEditor(orgId);
@@ -268,17 +217,7 @@ service cloud.firestore {
         );
 
         // Messages — the queue of volunteer notifications for this service (R130).
-        // No client code writes this collection yet (Phase 58); the Admin SDK
-        // (a Phase 59+ Cloud Function) is the intended sole owner of the send
-        // lifecycle. Nested one level deeper inside it: recipients.
-        //
-        // read is member-tier (mirrors pptxRenders/services); create is
-        // editor-tier so an editor can queue a message. update/delete are
-        // unconditionally denied — status transitions (queued -> sending ->
-        // sent, delivery counts) are Admin-SDK-only, so no client, editor or
-        // not, can forge a "sent" status. Proven by src/rules.test.ts's
-        // messages describe block (genuine ALLOW-case + Admin-SDK-only
-        // DENY-cases against the full nested path).
+        // See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § firestore.rules)
         match /messages/{messageId} {
           allow read:   if isOrgMember(orgId);
           allow create: if isOrgEditor(orgId);
@@ -337,28 +276,10 @@ service cloud.firestore {
         // service deleted) or a legacy doc with no serviceId must remain
         // deletable, or it is wedged in the database forever with no cleanup path.
         allow delete: if isOrgEditor(orgId)
-          // resource == null MUST be the first operand and MUST stay first. A slot
-          // whose slideGroup was never materialized (a slot that never carried
-          // slides) is deleted by confirmSlotDelete → deleteGroup → deleteDoc
-          // against a NON-EXISTENT doc, so `resource` is null. Every branch below
-          // reads `resource.data.…`; without this guard the very first one
-          // (`resource.data.keys()`) dereferences null → "Null value error" → the
-          // rule ERRORS → DENY, so the delete is refused and confirmSlotDelete
-          // aborts, leaving the slot in place. This is the same load-bearing
-          // pattern as serviceShareLinks' `resource == null` guard (T-41-09). It
-          // stays behind isOrgEditor(orgId) above, so org isolation is preserved —
-          // only an editor of THIS org may delete a non-existent doc under it, and
-          // deleting a non-existent doc is a harmless no-op. (2026-08-12: third
-          // recurrence of the "Null value error"; the two prior fixes guarded the
-          // group document's FIELD shapes but never the document not existing.)
+          // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
+          // resource == null MUST be the first operand and MUST stay first (third recurrence, 2026-08-12).
           && (resource == null
               || !resource.data.keys().hasAll(['serviceId'])
-              // A present-but-null serviceId is an orphan too: without this guard
-              // the OR below would evaluate parentGone/parentDraft(null), and
-              // svcPath(null) raises a "Null value error" → the delete is denied
-              // and the group is wedged undeletable. Reached only when the key is
-              // present (the hasAll clause short-circuits the absent case first),
-              // so this dot-access is null-safe.
               || resource.data.serviceId == null
               || parentGone(resource.data.serviceId)
               || parentDraft(resource.data.serviceId));
@@ -378,65 +299,16 @@ service cloud.firestore {
         }
       }
 
-      // pptxRenders — render-status doc for an imported PowerPoint deck
-      // (R062, Phase 42). READ ONLY — member tier, not editor tier: a viewer
-      // already reads the deck's full parsed content and structure through
-      // importedSlides/slideGroups, so render status (`status`,
-      // `renderedCount`, `failureReason`) carries no additional sensitivity
-      // (T-42-02, accepted risk). Nothing client-side writes this document —
-      // the render service (Admin SDK, functions/src/index.ts) is the sole
-      // writer, bypassing rules entirely — so no create/update/delete is
-      // granted here. See the generic wildcard's `collection !=
-      // 'pptxRenders'` exclusion immediately below: without it, Firestore's
-      // OR-evaluation means this block's read-only intent is a complete
-      // no-op for writes, and an org editor can forge a `ready` flip
-      // (T-42-01, inheriting T-37-15).
+      // pptxRenders — render-status doc for an imported PowerPoint deck (R062, Phase 42).
+      // See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § firestore.rules)
       match /pptxRenders/{importId} {
         allow read: if isOrgMember(orgId);
       }
 
       // All other nested collections — editors only.
-      //
-      // ★ `collection != 'services'`, `collection != 'slideGroups'` AND
-      // `collection != 'pptxRenders'` are all LOAD-BEARING. Do not remove any
-      // of the three.
-      // `{collection}` is a single-segment wildcard, so this rule also matches
-      // /organizations/{orgId}/services/{docId}, and Firestore rules are
-      // OR-evaluated: a broader rule that grants access wins over a narrower one
-      // that denies. Without this exclusion the status guard in the /services
-      // block above is a complete NO-OP — an editor's write to a planned or
-      // exported service succeeds through THIS rule, 20 lines away, even if the
-      // /services block reads literally `allow write: if false`. Verified against
-      // the Firestore emulator (31-RESEARCH.md, probe A1/A2).
-      //
-      // Because the exclusion removes the backstop, the /services block must
-      // itself grant read, create, update AND delete — it does.
-      //
-      // The pptxRenders exclusion (Phase 42, T-42-01) is the same mechanism a
-      // third time: without it, the read-only `match /pptxRenders/{importId}`
-      // block above grants no protection at all against writes, because THIS
-      // wildcard — 20 lines below it — independently grants write to any
-      // org editor on any single-segment nested collection, pptxRenders
-      // included. An org editor could otherwise forge `status: 'ready'` and
-      // an arbitrary `renderedCount`, which is exactly threat T-37-15 —
-      // `functions/src/index.ts:342` names it the one outcome the render
-      // service "must never be able to produce." Proven RED (write
-      // succeeding) then GREEN (write denied) against the real emulator in
-      // src/rules.test.ts's `pptxRenders` describe block.
-      //
-      // NOTE: only `write` is excluded for services/slideGroups. `read` still
-      // falls through here harmlessly for those two; both blocks grant read
-      // to any org member, which is strictly broader than isOrgEditor. The
-      // pptxRenders block above is the one exception — its read is also
-      // handled by its own dedicated block (member tier, not editor tier),
-      // so this wildcard's editor-tier read is redundant but harmless for it
-      // too.
-      //
-      // The slideGroups exclusion had to land in the SAME commit as the
-      // /slideGroups block above: before that block existed, THIS wildcard was
-      // the only rule granting write to slide groups, so excluding it alone
-      // would have denied every slide-group write — including the load-time
-      // materialization that runs on DRAFT services.
+      // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
+      // ★ `collection != 'services'`, `collection != 'slideGroups'` AND `collection != 'pptxRenders'`
+      // are all LOAD-BEARING. Do not remove any of the three.
       match /{collection}/{docId} {
         allow read: if isOrgEditor(orgId);
         allow write: if isOrgEditor(orgId)
@@ -482,19 +354,8 @@ service cloud.firestore {
 
     // See ADR-0004 (docs/adr/0004-flow-1-org-creation-cr-01-getafter-alone-only-proves-created.md)
     match /serviceShareLinks/{serviceId} {
-      // T-41-09: the `resource == null` branch is load-bearing, not decorative.
-      // On a `get`/`getDoc` against a document that does not yet exist,
-      // `resource` is null; dereferencing `resource.data.orgId` in a bare
-      // `isOrgEditor(resource.data.orgId)` clause ERRORS, and an erroring rule
-      // DENIES — so the caller would see PERMISSION_DENIED instead of a clean
-      // not-found snapshot. `ensureShareLink`'s very first Firestore operation
-      // (Plan 03) is exactly that read on a not-yet-created link doc, and it
-      // recurs inside `runTransaction`, so without this branch the entire
-      // adopt-or-create flow is unreachable on its first call. Accepted
-      // low-severity residual (T-41-09, ASVS L1): a signed-in non-member can
-      // distinguish "absent" from "denied" for a serviceId they already know.
-      // serviceId is an unguessable Firestore auto-ID and is org-private, and no
-      // document content leaks — do not close this by removing the null branch.
+      // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
+      // T-41-09: the `resource == null` branch is load-bearing, not decorative -- do not remove it.
       allow read: if isSignedIn()
                      && (resource == null || isOrgEditor(resource.data.orgId));
       allow create: if isOrgEditor(request.resource.data.orgId);
@@ -550,25 +411,13 @@ service cloud.firestore {
       allow delete: if isOrgEditor(resource.data.orgId);
     }
 
-    // AI usage ledger (R163) — one entry per proxied Claude request, written
-    // ONLY by the api Cloud Function via the Admin SDK (functions/src/index.ts,
-    // Phase 65 Plan 01), which bypasses rules entirely. This top-level
-    // collection is already denied by the catch-all below; this explicit deny
-    // is defense-in-depth documenting the intent (Admin-SDK-only, never
-    // client-readable/writable) and future-proofs against a refactor that
-    // might nest it under organizations/{orgId} — where it would otherwise
-    // fall through the org-scoped /{collection}/{docId} wildcard above
-    // (T-37-15) and become editor-writable. Owner-gated: see 65-02 PLAN/
-    // SUMMARY for the UNDEPLOYED handover; the api function does not depend
-    // on this rule to operate.
+    // AI usage ledger (R163) — one entry per proxied Claude request.
+    // See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § firestore.rules)
     match /aiUsage/{docId} {
       allow read, write: if false;
     }
 
-    // AI proxy rate-limit counters (R161) — fixed-window per-uid request
-    // counters, written ONLY by the api Cloud Function via the Admin SDK
-    // (functions/src/index.ts, Phase 65 Plan 01). Same rationale and
-    // owner-gated/UNDEPLOYED status as the aiUsage block above.
+    // AI proxy rate-limit counters (R161) — same rationale/status as aiUsage above.
     match /aiRateLimits/{docId} {
       allow read, write: if false;
     }

@@ -191,6 +191,152 @@ All external API calls route through a proxy layer to centralize authentication 
 | Firebase Auth | `https://identitytoolkit.googleapis.com` | SDK | Various | N/A (SDK direct) | Project config |
 | Firestore | `https://firestore.googleapis.com` | ID token + rules | REST/gRPC | N/A (SDK direct) | Project config |
 
+## Backend Integration Notes (R318)
+
+Behavioral/architectural "how it works" narration relocated out of backend source comments
+(`functions/src/**`, `firestore.rules`, `storage.rules`) per the Phase 109 comment convention
+(CONVENTIONS.md § Comment Convention). Grouped by source file; each entry cites the file:line
+range at the time of relocation (109-02).
+
+### firestore.rules
+
+**`organizations/{orgId}/services/{docId}/messages/{messageId}` (R130):** the queue of volunteer
+notifications for this service. No client code writes this collection (Phase 58); the Admin SDK
+(a Phase 59+ Cloud Function) is the intended sole owner of the send lifecycle. `read` is
+member-tier (mirrors `pptxRenders`/`services`); `create` is editor-tier so an editor can queue a
+message; `update`/`delete` are unconditionally denied — status transitions (`queued`→`sending`→
+`sent`, delivery counts) are Admin-SDK-only, so no client, editor or not, can forge a `"sent"`
+status. Proven by `src/rules.test.ts`'s `messages` describe block (genuine ALLOW-case + Admin-SDK
+-only DENY-cases against the full nested path). Recipients — per-recipient delivery status —
+is Admin-SDK-only end to end: even the editor who created the parent message cannot write there.
+
+**`organizations/{orgId}/pptxRenders/{importId}` (R062, Phase 42):** render-status doc for an
+imported PowerPoint deck. READ ONLY — member tier, not editor tier: a viewer already reads the
+deck's full parsed content and structure through `importedSlides`/`slideGroups`, so render status
+(`status`, `renderedCount`, `failureReason`) carries no additional sensitivity (T-42-02, accepted
+risk). Nothing client-side writes this document — the render service (Admin SDK,
+`functions/src/index.ts`) is the sole writer, bypassing rules entirely — so no
+create/update/delete is granted. See the `/{collection}/{docId}` wildcard's `collection !=
+'pptxRenders'` exclusion (ARCHITECTURE.md § functions/src/index.ts and § firestore.rules): without
+it, this block's read-only intent would be a complete no-op for writes, and an org editor could
+forge a `ready` flip (T-42-01, inheriting T-37-15).
+
+**`aiUsage/{docId}` (R163):** one entry per proxied Claude request, written ONLY by the `api`
+Cloud Function via the Admin SDK (`functions/src/index.ts`, Phase 65 Plan 01), which bypasses
+rules entirely. This top-level collection is already denied by the catch-all; this explicit deny
+is defense-in-depth documenting the intent (Admin-SDK-only, never client-readable/writable) and
+future-proofs against a refactor that might nest it under `organizations/{orgId}` — where it would
+otherwise fall through the org-scoped `/{collection}/{docId}` wildcard (T-37-15) and become
+editor-writable. Owner-gated: see 65-02 PLAN/SUMMARY for the UNDEPLOYED handover; the `api`
+function does not depend on this rule to operate. `aiRateLimits/{docId}` (R161, fixed-window
+per-uid request counters written the same way) has the same rationale and owner-gated/UNDEPLOYED
+status.
+
+### storage.rules
+
+**JWT claim read (`isOrgMemberByClaim`):** reads `request.auth.token.orgId`/`.role` — a direct JWT
+claim read set server-side by Cloud Function `syncOrgMembershipClaim`
+(`functions/src/orgMembershipClaims.ts`, phase 40-02) via the Admin SDK, plus the one-off backfill.
+No cross-service call is involved, so this is fully verifiable in the emulator. `role != null`
+(not a specific role) is the gate — any assigned role counts as membership. WIDENED (phase 73,
+D-01/D-04 closed): the claim now carries every org the user belongs to via the `orgs` map, not
+just the primary; the multi-org arm checks the requested orgId against that full map, while the
+legacy arm (unchanged) still matches the primary orgId/role alone, so a not-yet-backfilled token
+is never left without access to its own primary org during rollout (R211 backward-compat). Phase
+76 (R213) org lifecycle gate, Storage side: Storage CANNOT read `organizations/{orgId}.active`
+live (`firestore.get()`/`exists()` is inert in the Storage emulator/service —
+firebase-js-sdk#6803, the exact documented 2026-08-06 deny-everyone incident in CLAUDE.md), so
+deactivation must flow through a custom claim instead — `deactivatedOrgs`, fanned out by
+`setOrgActive` (`functions/src/orgProvisioning.ts`) to every affected member. `!= null` guards the
+absent-key case (a legacy, pre-this-phase token shape) so it reads as "not deactivated" rather
+than erroring.
+
+### functions/src/index.ts
+
+**Resend email provider key location:** `RESEND_API_KEY` lives in `./params` (moved so
+`orgProvisioning.ts` can bind it too without a circular import) — imported and re-exported at the
+top of `index.ts`.
+
+**`verifyAppCaller`:** replaces the old boolean `callerIsAuthenticated` gate with the SAME
+accept/reject decision (valid token → proceed, missing/invalid → 401), but resolves to the
+decoded ID token itself rather than throwing it away — the anthropic-only controls (R161/R162/
+R163) need `decoded.uid` for the rate limiter/ledger and the `orgId` custom claim for the ledger's
+org attribution. Every other `SECRET_INJECTED` service (esv/nlt) keeps the identical "any valid
+caller" behavior; only the anthropic branch reads anything off the returned token.
+
+**`checkOrgAiEnablement` (R242/R243, the real server-side half of the per-org master AI gate):** a
+live `organizations/{orgId}` read on EVERY anthropic call, extracted so it is unit-testable
+without an HTTP harness (the `api` onRequest has none). The caller's `orgId` custom claim
+(resolved via `resolveOrgId`) is used ONLY as a pointer to WHICH org to read — never trusted for
+the enablement VALUE itself, since claims are stale until the next ID-token mint (sign-in, org
+switch, or an explicit revoke). A live `get()` here is fresh on every request, closing the gap a
+claims-embedded flag would leave open for however long a disabled org's members' tokens happen to
+still be valid. FAIL CLOSED on a read error — a DELIBERATE departure from the rate limiter's
+fail-open posture (`checkAndConsumeRateLimit`'s caller treats the limiter as a cost guardrail, not
+a security control): this check IS the security control the owner asked to be "real" (not just UI
+hiding, 82-RESEARCH.md Assumption A2) — a Firestore hiccup here must never silently let a disabled
+org spend money on Anthropic.
+
+**`checkOrgBibleEnablement` (R297, server-side half of the per-org Bible-API gate):** defense-in-
+depth behind the client dispatcher (Plan 102-01). Mirrors `checkOrgAiEnablement` 1:1 — same live
+`organizations/{orgId}` read, same fail-closed posture, same "claim is only a pointer, never the
+enforcement value" rationale. Reuses the existing `OrgAiEnablementResult` union rather than
+declaring a redundant type, since the shape (`{ ok: true } | { ok: false, status, error }`) is
+identical.
+
+**`checkAndConsumeRateLimit` (R161, per-uid fixed-window Firestore rate limit):** two top-level
+`aiRateLimits` counter docs per call — `${uid}__min__${minuteWindow}` and
+`${uid}__day__${dayWindow}` — read inside a single transaction so the check-then-increment is
+atomic across concurrent requests from the same user. A rejected request (either ceiling already
+met) does NOT increment either counter. Kept TOP-LEVEL (not nested under
+`organizations/{orgId}`) so the `firestore.rules` catch-all deny already blocks client reads
+(T-37-15). Deliberately does NOT catch its own Firestore errors — the caller (the anthropic
+branch) decides the fail-open policy so a limiter datastore hiccup never takes AI down (locked
+decision, 65-CONTEXT.md).
+
+**`requestPptxRenderHandler`:** exported separately from the `onDocumentCreated` wrapper
+(mirroring `parsePptxHandler`/`parsePptx` and `cleanupExpiredMediaHandler`/`cleanupExpiredMedia`)
+so it is directly unit-testable against mocked Firestore/Storage/`renderInvoker` seams. ★ Trap 1
+(37-CONTEXT.md/37-VALIDATION.md): this handler must NEVER import, reference, or reason about
+`parsePptxBuffer`, `MappedSlide`, or a parsed slide array — `mapAstToSlides` (`pptxParser.ts`)
+SKIPS slides with neither substantial text nor images, and emits ONE ENTRY PER IMAGE on a
+multi-image slide, so its length is structurally decoupled from the deck's real page count (a
+6-slide deck can yield 4 entries, or more than 6 with a multi-image collage) — deriving the
+expected render page count from it would be silently wrong in BOTH directions. The expected count
+comes only from the render service's own self-report, cross-checked against an independent
+recount (see ARCHITECTURE.md § functions/src/index.ts "the ready gate").
+
+**`messageWebhook` (60-02: R143 — Resend delivery/bounce receiver):** the milestone's new
+UNAUTHENTICATED trust boundary. Resend POSTs delivery and bounce events here; the only thing that
+gates a Firestore write is the Svix HMAC over the RAW request body (`verifySvixSignature`),
+checked FIRST. Only a hard (Permanent) bounce surfaces: it idempotently flips the addressed
+`recipients/{id}` to `status:'bounced'` and increments `messages/{id}.deliveryCounts.bounced`.
+
+**`resolveRecipientRef` — resolve the bounced recipient's `DocumentReference`:** PRIMARY (tags):
+when the echoed Resend tags carry all four path segments (`orgId`, `serviceId`, `messageId`,
+`recipientId`), build the `recipients/{id}` ref DIRECTLY at the exact nested path — a single
+`doc()` with NO query and NO index dependency. All ids are untrusted strings that only form path
+segments scoped under the org (Admin SDK), never a broader query (T-60-02e). FALLBACK
+(providerMessageId): when tags are absent/incomplete, look the recipient up by the provider
+message id 59-03 stored, via
+`collectionGroup('recipients').where('providerMessageId','==',email_id)` — the true safety net
+(tags echo is only MEDIUM confidence); requires 60-01's deploy-gated collection-group index at run
+time. Returns null (never throws) when neither resolves — the caller 200s an unresolvable event
+rather than triggering a Resend retry storm.
+
+**`messageWebhookHandler` — VERIFY-FIRST ORDER CONTRACT (security-critical, 60-CONTEXT.md):**
+exported separately from the `onRequest` wrapper so it is unit-testable directly with a fake
+rawBody+headers and no `res` (`firebase-functions/v2/https` is not mocked in the test harness).
+(1) `rawBody` MUST be a `Buffer` (Cloud Functions supplies `req.rawBody` as the exact received
+bytes) — a non-Buffer body is malformed → 400; never fall back to a re-serialized `req.body`, the
+HMAC is over the raw bytes. (2) Verify the Svix HMAC over `rawBody` BEFORE any Firestore access —
+any missing/malformed/invalid/stale signature → 401, with ZERO state access; 401 is reserved for
+signature failure ONLY. (3) Parse the JSON only AFTER the signature passes; unparseable → 400. (4)
+Only `email.bounced` with a Permanent (hard) bounce surfaces — every other valid event
+(soft/Transient, delivered, complaint, unknown type, or an unresolvable recipient) → 200 with no
+write, since a non-2xx would make Resend retry the event forever. The webhook is provider-facing,
+so it is NOT gated on `isMessagingEnabled()` (a client concept) — only the signature gates it.
+
 ---
 
 *Integration audit: 2026-07-16*

@@ -191,6 +191,46 @@
 - Risk: Scheduler could produce invalid or unexpected assignments
 - Priority: Medium
 
+## Backend Concern Notes (R318)
+
+Behavioral/architectural "how it works" narration relocated out of backend source comments
+(`functions/src/**`) per the Phase 109 comment convention (CONVENTIONS.md § Comment Convention).
+Each entry cites the file:line range at the time of relocation (109-02).
+
+### functions/src/index.ts
+
+**pptxRenders queue path builder (R062: async server-side render bridge):** one canonical path
+builder so `parsePptxHandler` (37-03), the `requestPptxRenderHandler` trigger (37-04), and
+`cleanupOrphanRendersHandler` (37-05) cannot drift apart on the collection path. No
+`firestore.rules` change is needed: the rules file's catch-all
+`match /{document=**} { allow read, write: if false; }` already denies client access to this
+collection by default, and the Admin SDK (used here and by every handler that touches it) bypasses
+rules entirely. Rules deployment for this collection is separately deferred as backlog 999.3.
+
+**`cleanupPptxSources` (R168: prune consumed/failed import sources, Phase 66-02):** a NEW sweep,
+never shipped before this phase. `cleanupOrphanRendersHandler` already prunes a stale
+pending/failed import's `rendered/` pages, but never touched the heavier `source.pptx` deck or the
+extracted `images/` intermediate files — those grow forever otherwise. This sweep closes that gap
+while NEVER touching `rendered/`, the PNGs the app actually displays. Safety contract (T-66-02-02/
+T-66-02-03/T-66-02-05): `PPTX_SOURCE_GUARD` is a POSITIVE guard matching ONLY
+`orgs/{orgId}/pptx-imports/{importId}/source.pptx` and
+`orgs/{orgId}/pptx-imports/{importId}/images/*` — structurally unable to match `.../rendered/*`.
+Driven by the `pptxRenders` collectionGroup (status `"ready"` or `"failed"`), the same collection
+`cleanupOrphanRendersHandler` reads: `"ready"` = the import is CONSUMED (the app now displays from
+`rendered/`, so the source deck and its extracted images are dead weight); `"failed"` = an
+orphaned import whose source is also dead weight (its `rendered/` + doc lifecycle stay owned by
+`cleanupOrphanRendersHandler`, unchanged by this sweep). An image-only import (no `pptxRenders`
+doc at all, whose `images/` ARE the only display) is structurally out of scope. Age is keyed on
+the server-set Firestore `createdAt` timestamp, never client-settable input — a `"ready"` doc
+younger than `PPTX_SOURCE_RETENTION_DAYS` is skipped (consumption alone is not sufficient, only
+consumption AND age). Disclosed benign race: if `cleanupOrphanRendersHandler` (once owner-enabled)
+deletes a `"failed"` doc before this sweep first observes it, that failed import's source may be
+missed this run — under-deletion only, never over-deletion; the source stays in place until
+manually cleared or the doc reappears. FAILS SAFE: real deletion requires
+`cleanup.pptxSourceEnabled=true` in the resolved `appConfig`; otherwise a dry run, matching the
+gate direction of every other sweep in this file. Runs on its own daily schedule, 06:00 UTC —
+after the 05:00 background sweep, so the sweeps never overlap.
+
 ---
 
 *Concerns audit: 2026-07-16*

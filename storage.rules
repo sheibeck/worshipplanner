@@ -1,46 +1,11 @@
 rules_version = '2';
 
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § storage.rules)
 // Org-scoped Storage access control, mirroring firestore.rules' isOrgMember pattern.
-// The generic orgs/{orgId} prefix is intentional (not PPTX-specific) so Phase 22's media
-// attachments and any future Storage-backed feature can reuse this same rule.
-//
-// v1.5 claim migration (phase 40) — COMPLETE (Deploy 2, 2026-08-12). Membership is now
-// proven SOLELY by the custom auth claim: the pre-existing cross-service
-// firestore.exists() fallback arm has been removed. The claim arm is emulator-verifiable,
-// whereas firestore.exists() is inert in the Storage emulator (firebase-js-sdk#6803) —
-// the exact defect that once let a deny-everyone rule reach production undetected for a
-// milestone (see CLAUDE.md). Before the fallback was removed, every user was confirmed
-// single-org (backfill dry-run + mandatory pre-check) and all live tokens were soaked so
-// they carry the claim. Full runbook: functions/DEPLOY-ORG-CLAIMS.md.
-//
-// v2.0 multi-org claim widening (phase 73) — the claim now ALSO carries a full
-// `orgs: {[orgId]: role}` map alongside the unchanged primary `orgId`/`role` keys (see
-// functions/src/orgMembershipClaims.ts). isOrgMemberByClaim below checks the requested
-// orgId against the full `orgs` map first, ORed with the still-present legacy primary-only
-// arm — old/not-yet-backfilled tokens keep working on their primary org with no access gap
-// while the backfill (functions/src/backfillOrgClaims.ts) rolls out.
 service firebase.storage {
   match /b/{bucket}/o {
-    // Reads request.auth.token.orgId / .role — a direct JWT claim read set server-side by
-    // Cloud Function syncOrgMembershipClaim (functions/src/orgMembershipClaims.ts,
-    // phase 40-02) via the Admin SDK, plus the one-off backfill. No cross-service call is
-    // involved, so this is fully verifiable in the emulator. `role != null` (not a specific
-    // role) is the gate — any assigned role counts as membership.
-    //
-    // WIDENED (phase 73, D-01/D-04 closed): the claim now carries every org the user
-    // belongs to via the `orgs` map, not just the primary. The multi-org arm below checks
-    // the requested orgId against that full map; the legacy arm (unchanged) still matches
-    // the primary orgId/role alone, so a not-yet-backfilled token is never left without
-    // access to its own primary org during rollout (R211 backward-compat).
-    // Phase 76 (R213): org lifecycle gate, Storage side. Storage CANNOT read
-    // organizations/{orgId}.active live (firestore.get()/exists() is inert
-    // in the Storage emulator/service -- firebase-js-sdk#6803, the exact
-    // documented 2026-08-06 deny-everyone incident in CLAUDE.md), so
-    // deactivation must flow through a custom claim instead:
-    // deactivatedOrgs, fanned out by setOrgActive (functions/src/
-    // orgProvisioning.ts) to every affected member. `!= null` guards the
-    // absent-key case (a legacy, pre-this-phase token shape) so it reads as
-    // "not deactivated" rather than erroring.
+    // See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § storage.rules)
+    // `!= null` guards the absent-key case (a legacy, pre-Phase-76 token shape) as "not deactivated".
     function isOrgDeactivatedForCaller(orgId) {
       return request.auth.token.get('deactivatedOrgs', {}).get(orgId, false) == true;
     }
