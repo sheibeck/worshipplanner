@@ -50,7 +50,7 @@ remediating the Critical/High findings.
   share-token / public-page exposure and PII handling, and cost/abuse controls — with severity-ranked
   findings.
 
-- [ ] **R323**: Critical and High security findings from R322 are remediated, or explicitly deferred to a
+- [x] **R323**: Critical and High security findings from R322 are remediated, or explicitly deferred to a
   backlog with recorded rationale.
 
 ---
@@ -81,7 +81,7 @@ remediating the Critical/High findings.
 | R320 | Phase 110 | Complete |
 | R321 | Phase 111 | Complete |
 | R322 | Phase 112 | Complete |
-| R323 | Phase 113 | Pending |
+| R323 | Phase 113 | Complete |
 
 **Coverage:** 8/8 v2.8 requirements mapped, each to exactly one phase (Phases 108–113). No orphans, no
 duplicates.
