@@ -4,9 +4,9 @@ milestone: v2.8
 milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)"
 current_phase: 109
 current_phase_name: Behavioral/Architectural Extraction & Comment Convention
-status: planning
+status: executing
 stopped_at: Completed 108-02-PLAN.md (Decision-Rationale ADR Extraction)
-last_updated: "2026-09-01T22:41:26.420Z"
+last_updated: "2026-09-02T03:00:17.888Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 108 complete, transitioned to Phase 109
 progress:
@@ -45,7 +45,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 `/gsd-plan-phase 108`.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting

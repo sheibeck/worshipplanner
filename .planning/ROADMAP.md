@@ -625,12 +625,26 @@ future comments short.
 **Plans**: 5 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 109-01-PLAN.md — Comment convention (R319): "## Comment Convention" section in `.planning/codebase/CONVENTIONS.md` + one-line CLAUDE.md pointer [wave 1]
 - [ ] 109-02-PLAN.md — R318 backend sweep: relocate + shrink `functions/src/**` + `firestore.rules` + `storage.rules` Bucket B comments into the map docs [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 109-03-PLAN.md — R318 utils sweep: relocate + shrink `src/utils/**` Bucket B comments into the map docs [wave 2]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 109-04-PLAN.md — R318 components/composables sweep: relocate + shrink `src/components/**` + `src/composables/**` Bucket B comments [wave 3]
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 109-05-PLAN.md — R318 stores/types/views sweep + phase-wide 309 reconciliation: relocate + shrink `src/stores/**`, `src/types/**`, `src/config/**`, `src/firebase/index.ts`, `src/main.ts`, `src/views/**` [wave 4]
+
+**Cross-cutting constraints:**
+
+- The comment-only edits change no behavior: type-check passes and the app test suite shows no NEW failures versus the pre-edit baseline (R318).
 
 ### Phase 110: Architectural Review
 
