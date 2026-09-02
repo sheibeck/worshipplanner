@@ -688,13 +688,13 @@ backlog with recorded rationale.
   3. `npm run type-check` and the full test/regression suite pass after remediation, with no new regressions introduced by the fixes (R321).
   4. No production deploy occurs as part of this phase — remediation ships built, tested, and committed only, per the milestone's build/commit-only constraint (R321).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 Plans:
 **Wave 1**
 
 - [x] 111-01-PLAN.md — ARCH-001 code fix: store-layer generation/epoch guard on the `memberUnsub` `onSnapshot` assignment in `src/stores/auth.ts` `loadOrgContext` + UI in-flight guard on `AppShell.vue`'s exit button + regression test; no-regression gate (type-check + app-suite baseline + render-service) (R321) [wave 1]
-- [ ] 111-02-PLAN.md — Medium/Low triage: ONE consolidated `## Backlog` entry in `ROADMAP.md` for ARCH-002..023 referencing `110-ARCHITECTURE-REVIEW.md` (no stubs, none fixed) (R321) [wave 1]
+- [x] 111-02-PLAN.md — Medium/Low triage: ONE consolidated `## Backlog` entry in `ROADMAP.md` for ARCH-002..023 referencing `110-ARCHITECTURE-REVIEW.md` (no stubs, none fixed) (R321) [wave 1]
 
 **Cross-cutting constraints:**
 
@@ -755,8 +755,10 @@ it, so nothing found by the Phase 110 review is silently dropped.
   a per-item update loop with no per-item error isolation (ARCH-011), unreachable dead code from a
   deep-clone Timestamp strip (ARCH-012), an autosave/reorder-save coordination gap (ARCH-013), and an
   unbatched sequential PCO song-import write path (ARCH-014).
+
 - **9 Low** (ARCH-015 through ARCH-023): mostly confirmed-correct/no-new-finding verification notes plus
   one utility-layer dependency-direction nit (ARCH-020).
+
 - **Phase 112 security handoffs (already carried forward there, listed here only for traceability):**
   **ARCH-005** — org-provisioning Cloud Functions are built/tested but UNDEPLOYED, so isolation cannot be
   verified against live production state until deployed; and **ARCH-018** — super-admin's `isOrgEditor`
