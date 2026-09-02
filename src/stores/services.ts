@@ -509,8 +509,17 @@ export const useServiceStore = defineStore('services', () => {
     // 1. shareTokens — query-based (a service can have 2+ via adoption).
     // A query's result set is already known to exist; no existence guard
     // needed the way the direct-keyed deletes below require one.
+    // CR-01 (113-REVIEW): also filtered by orgId — firestore.rules'
+    // `allow list` on shareTokens is org-gated (isOrgEditor(resource.data.orgId)),
+    // and Firestore can only admit a `list` against a data-dependent rule
+    // when the query itself carries a matching equality filter. Without this
+    // clause the query is a bare `where('serviceId','==',id)`, which the
+    // rule can't verify is scoped to this editor's org, and Firestore denies
+    // the whole list — silently no-op'ing this cleanup (see try/catch below).
     try {
-      const tokensSnap = await getDocs(query(collection(db, 'shareTokens'), where('serviceId', '==', id)))
+      const tokensSnap = await getDocs(
+        query(collection(db, 'shareTokens'), where('serviceId', '==', id), where('orgId', '==', orgId.value)),
+      )
       for (const tokenDoc of tokensSnap.docs) {
         await deleteDoc(doc(db, 'shareTokens', tokenDoc.id))
       }

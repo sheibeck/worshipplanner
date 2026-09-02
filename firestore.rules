@@ -343,8 +343,23 @@ service cloud.firestore {
       // share tokens (and via them every shared service/quarter). The public
       // share-link flow only ever does a getDoc()-by-id, so narrowing to
       // get-only preserves it while closing the enumeration leak.
+      //
+      // CR-01 (113-REVIEW, closed same phase): `allow list: if false;` also
+      // denied the ONE legitimate `list` this collection needs --
+      // deleteService() (src/stores/services.ts) queries
+      // `where('serviceId','==',id)` to revoke every token adopted for a
+      // deleted service, since a service can have 2+ tokens and their ids
+      // aren't known up front. An unconditional deny silently no-op'd that
+      // cleanup (caught by the store's own try/catch), leaving deleted
+      // services' public share links live forever. Org-gating instead of
+      // flat-denying closes the enumeration leak (still no unauthenticated
+      // or cross-org list) while letting an org editor list their OWN org's
+      // tokens -- deleteService is updated to add `where('orgId','==',
+      // orgId)` to its query so this resource.data.orgId check is
+      // satisfiable (Firestore requires an equality filter on any field a
+      // list rule reads from resource.data).
       allow get: if true;
-      allow list: if false;
+      allow list: if isSignedIn() && isOrgEditor(resource.data.orgId);
       // See ADR-0006 (docs/adr/0006-was-issignedin-with-no-org-check-phase-41-s-adoption-logic.md)
       // a behavior change for any sanctioned path — mirrors
       // serviceShareLinks/quarterShares/serviceShares' isOrgEditor idiom.

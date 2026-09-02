@@ -6,7 +6,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch, getDocs, collection } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch, getDocs, collection, query, where } from 'firebase/firestore'
 
 let testEnv: RulesTestEnvironment
 
@@ -1278,6 +1278,45 @@ describe('shareTokens — public read, editor-scoped create, editor-scoped in-pl
   it('denies unauthenticated collection listing of shareTokens (SEC-S-01)', async () => {
     await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
     const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDocs(collection(db, 'shareTokens')))
+  })
+
+  // CR-01 (113-REVIEW): `allow list: if false;` also denied the ONE legitimate
+  // list this collection needs -- deleteService()'s org-scoped
+  // where('serviceId','==',id) + where('orgId','==',orgId) cleanup query.
+  // Org-gating (isOrgEditor(resource.data.orgId)) instead of a flat deny lets
+  // an org editor list their OWN org's tokens while keeping the SEC-S-01
+  // enumeration leak closed for everyone else. This mirrors the exact query
+  // shape deleteService now issues.
+  it('ALLOWS (CR-01) an org editor to list their OWN org\'s shareTokens, org-scoped like deleteService', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('shareTokens/tok-1', { orgId: 'orgA', serviceId: 'service-1' })
+    await seedDoc('shareTokens/tok-2', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    const snap = await assertSucceeds(
+      getDocs(query(collection(db, 'shareTokens'), where('serviceId', '==', 'service-1'), where('orgId', '==', 'orgA'))),
+    )
+    expect(snap.docs.map((d) => d.id).sort()).toEqual(['tok-1', 'tok-2'])
+  })
+
+  // CR-01 regression proof: an authenticated editor of a DIFFERENT org (or
+  // an unconstrained list) must still be denied -- org-gating the list rule
+  // must not reopen the SEC-S-01 cross-org enumeration leak.
+  it('DENIES (CR-01) an authenticated user from listing ANOTHER org\'s shareTokens (cross-org enumeration)', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('shareTokens/tok-1', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      getDocs(query(collection(db, 'shareTokens'), where('serviceId', '==', 'service-1'), where('orgId', '==', 'orgA'))),
+    )
+  })
+
+  it('DENIES (CR-01) an authenticated user with no org membership from an unconstrained shareTokens list', async () => {
+    await seedDoc('shareTokens/tok-1', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userC')
     const db = context.firestore()
     await assertFails(getDocs(collection(db, 'shareTokens')))
   })
