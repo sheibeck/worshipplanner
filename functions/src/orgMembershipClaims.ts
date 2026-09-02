@@ -314,7 +314,37 @@ export async function syncOrgMembershipClaimHandler(
         if (ordersUnchanged && deactivatedUnchanged) {
           return { action: "skip", reason: decision.reason };
         }
+
+        // WR-01 (113-REVIEW): a member removed from a NON-primary org lands
+        // in THIS branch (decideMembershipClaim returns "not-primary-org"
+        // for any write to a non-primary org, delete included -- it never
+        // reaches the primary-org `clear` case above), so it never got the
+        // SEC-ISO-02 revokeRefreshTokens call. Detect a genuine removal by
+        // diffing org keys BEFORE the write below: if `desiredOrgs` no
+        // longer carries a key the existing claim had, a membership just
+        // disappeared -- a role change or an unrelated org's active-flag
+        // flip only ever adds/modifies entries, never drops one outright.
+        const removedOrgKeys = Object.keys(existingClaims?.orgs ?? {}).filter(
+          (orgKey) => !(orgKey in desiredOrgs),
+        );
+
         await mergeAndSetCustomClaims(uid, { orgs: desiredOrgs, deactivatedOrgs: desiredDeactivatedOrgs });
+
+        if (removedOrgKeys.length > 0) {
+          // Mirrors the primary-org `clear` branch above: revoke ONLY AFTER
+          // the claim write has landed, logged-and-swallowed on failure -- a
+          // revoke hiccup must never undo or block the claim update that
+          // already happened.
+          try {
+            await getAuth().revokeRefreshTokens(uid);
+          } catch (err) {
+            console.error(
+              `[orgMembershipClaims] syncOrgMembershipClaim: revokeRefreshTokens failed for uid=${uid}:`,
+              err,
+            );
+          }
+        }
+
         return { action: "set" };
       }
     }

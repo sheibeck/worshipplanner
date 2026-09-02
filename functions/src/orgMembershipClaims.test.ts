@@ -509,6 +509,68 @@ describe("syncOrgMembershipClaimHandler", () => {
     expect(outcome).toEqual({ action: "skip", reason: "not-primary-org" });
   });
 
+  // WR-01 (113-REVIEW): a member's REMOVAL from a non-primary org used to
+  // never call revokeRefreshTokens -- decideMembershipClaim returns
+  // "not-primary-org" for this write (it never reaches the primary-org
+  // `clear` branch), so the SEC-ISO-02 hardening only ever covered the
+  // primary-org case. Distinct from the test immediately above: there,
+  // orgB was never a member of `existingClaims.orgs` in the first place
+  // (nothing to lose); here, orgB genuinely disappears from the recomputed
+  // `orgs` map, which is the real-world removal shape this fix closes.
+  it("non-primary org DELETE that actually drops an org key: recomputes orgs AND revokes the removed uid's refresh tokens (WR-01)", async () => {
+    // Org B's member doc is gone (deleted); org A survives as primary.
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A })]);
+    const { setCustomUserClaims, revokeRefreshTokens } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", orgs: { orgA: "editor", orgB: "viewer" } },
+    });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_B,
+      uid: UID,
+      after: undefined,
+    });
+
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor" },
+      deactivatedOrgs: {},
+    });
+    expect(outcome).toEqual({ action: "set" });
+    expect(revokeRefreshTokens).toHaveBeenCalledWith(UID);
+    expect(revokeRefreshTokens).toHaveBeenCalledTimes(1);
+  });
+
+  // WR-01 negative case: a non-primary org ROLE CHANGE (not a removal) must
+  // NOT trigger a revoke -- orgs changes (viewer -> editor) but no key is
+  // dropped, so removedOrgKeys stays empty.
+  it("non-primary org ROLE CHANGE (not a removal): recomputes orgs but does NOT revoke", async () => {
+    mockFirestore(fakeUserDoc(true, [ORG_A]), [
+      fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_A }),
+      fakeMemberDoc({ uid: UID, role: "editor", orgId: ORG_B }),
+    ]);
+    const { setCustomUserClaims, revokeRefreshTokens } = mockAuth({
+      existingClaims: { orgId: ORG_A, role: "editor", orgs: { orgA: "editor", orgB: "viewer" } },
+    });
+
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_B,
+      uid: UID,
+      after: { role: "editor" },
+    });
+
+    expect(setCustomUserClaims).toHaveBeenCalledTimes(1);
+    expect(setCustomUserClaims).toHaveBeenCalledWith(UID, {
+      orgId: ORG_A,
+      role: "editor",
+      orgs: { orgA: "editor", orgB: "editor" },
+      deactivatedOrgs: {},
+    });
+    expect(outcome).toEqual({ action: "set" });
+    expect(revokeRefreshTokens).not.toHaveBeenCalled();
+  });
+
   it("missing user document: no claims call, no throw, orgs scan never runs (fully-conservative skip)", async () => {
     const { collectionGroupSpy } = mockFirestore(fakeUserDoc(false));
     const { setCustomUserClaims } = mockAuth();
