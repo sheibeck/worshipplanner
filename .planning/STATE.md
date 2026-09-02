@@ -4,16 +4,16 @@ milestone: v2.8
 milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)"
 current_phase: 109
 current_phase_name: Behavioral/Architectural Extraction & Comment Convention
-status: executing
-stopped_at: Completed 109-03-PLAN.md
-last_updated: "2026-09-02T04:32:24.219Z"
+status: verifying
+stopped_at: Completed 109-04-PLAN.md
+last_updated: "2026-09-02T05:08:52.287Z"
 last_activity: 2026-09-01
 last_activity_desc: Phase 109 execution started
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 `/gsd-plan-phase 108`.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
@@ -1183,7 +1183,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 109 (Behavioral/Architectural Extraction & Comment Convention) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-01 — Phase 109 execution started
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
@@ -3063,6 +3063,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 109 P01 | 10min | 2 tasks | 2 files |
 | Phase 109 P02 | 60min | 3 tasks | 22 files |
 | Phase 109 P03 | 50min | 3 tasks | 38 files |
+| Phase 109 P04 | 14min | 3 tasks | 46 files |
 
 ## Accumulated Context
 
@@ -3552,6 +3553,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 109]: Comment Convention section co-located in CONVENTIONS.md (per 109-CONTEXT); CLAUDE.md pointer kept to one line, no restated rationale.
 - [Phase ?]: Grouped R318 backend narration under new per-source-file '### ' subsections in each map doc rather than fitting into pre-existing thematic sections.
 - [Phase ?]: R318 src/utils subset relocated to map docs, mirroring 109-02's Backend Notes section pattern (Utils Behavioral/Integration/Concern/Stack Notes).
+- [Phase ?]: R318 components/composables relocated (109-04): 85 Bucket B entries moved into codebase map docs, source comments shrunk to pointers; useUnsavedGuard.ts's usage-doc JSDoc kept inline as legitimate short documentation.
 
 ### Roadmap Evolution
 
@@ -3879,8 +3881,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-02T04:32:24.153Z
-Stopped at: Completed 109-03-PLAN.md
+Last session: 2026-09-02T05:08:52.223Z
+Stopped at: Completed 109-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
