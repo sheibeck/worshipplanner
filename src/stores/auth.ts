@@ -662,6 +662,15 @@ export const useAuthStore = defineStore('auth', () => {
   // See ADR-0098 (docs/adr/0098-enterorgassuperadmin-now-signals-success-failure-instead-of.md)
   async function enterOrgAsSuperAdmin(targetOrgId: string): Promise<boolean> {
     if (!user.value || !isSuperAdmin.value) return false
+    // WR-02 (111-REVIEW.md) — bump the shared epoch so a loadOrgContext call
+    // already in flight (e.g. the initial post-login load, still awaiting
+    // refreshOrgClaim) is superseded by its own isStale() checks and cannot
+    // overwrite this super-admin view's orgId/orgName/settings or reattach a
+    // memberUnsub listener over it (R226: the super-admin view is
+    // deliberately listener-less). Capture myEpoch so this call ALSO bails
+    // before its own writes below if something newer (another
+    // enterOrgAsSuperAdmin/loadOrgContext) supersedes it first.
+    const myEpoch = ++loadOrgContextEpoch
     resetOrgContext()
     // Quick 260823-switch-church-cache: clear all org-scoped store data so the
     // church being entered never briefly shows the previous church's services/
@@ -676,6 +685,7 @@ export const useAuthStore = defineStore('auth', () => {
       return false
     }
     if (!orgSnap.exists()) return false
+    if (myEpoch !== loadOrgContextEpoch) return false
     orgId.value = targetOrgId
     viewingAsSuperAdmin.value = targetOrgId
     applyOrgSnapshot(orgSnap.data())
