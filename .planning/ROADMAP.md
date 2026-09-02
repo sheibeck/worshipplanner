@@ -688,7 +688,18 @@ backlog with recorded rationale.
   3. `npm run type-check` and the full test/regression suite pass after remediation, with no new regressions introduced by the fixes (R321).
   4. No production deploy occurs as part of this phase — remediation ships built, tested, and committed only, per the milestone's build/commit-only constraint (R321).
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 111-01-PLAN.md — ARCH-001 code fix: store-layer generation/epoch guard on the `memberUnsub` `onSnapshot` assignment in `src/stores/auth.ts` `loadOrgContext` + UI in-flight guard on `AppShell.vue`'s exit button + regression test; no-regression gate (type-check + app-suite baseline + render-service) (R321) [wave 1]
+- [ ] 111-02-PLAN.md — Medium/Low triage: ONE consolidated `## Backlog` entry in `ROADMAP.md` for ARCH-002..023 referencing `110-ARCHITECTURE-REVIEW.md` (no stubs, none fixed) (R321) [wave 1]
+
+**Cross-cutting constraints:**
+
+- Build/commit only — NO production deploy (ARCH-001 is client-only; no rules/functions/storage changed).
+- `npm run type-check` clean + bare `npx vitest run` at documented baseline (only `src/storage.rules.test.ts` failing) + `render-service` 39/39; no new regressions.
 
 ### Phase 112: Security Review
 
