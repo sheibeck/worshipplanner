@@ -287,4 +287,205 @@ ranked `.planning/phases/112-security-review/112-SECURITY-REVIEW.md`, which Phas
 its Critical/High remediation (Medium/Low findings route to backlog per the CONTEXT-locked severity
 rubric).
 
-<!-- gsd:write-continue -->
+---
+
+## Cost/Abuse Controls Review (dimension C)
+
+### Medium/Low
+
+### SEC-C-01 — [Medium] The ESV/NLT Bible-API proxy branches require auth + per-org enablement but are NOT covered by the per-uid rate limiter — unlike `anthropic`, they can be called at unlimited frequency
+
+**Location:** `functions/src/index.ts:543-603` (the `if (service === "anthropic")` block — the ONLY
+branch that calls `checkAndConsumeRateLimit`/`enforceModelAndTokens`); `functions/src/index.ts:605-624`
+(the `if (service === "esv" || service === "nlt")` block — auth + `checkOrgBibleEnablement` only, no
+rate limit, no request-shape enforcement).
+
+**Observed behavior:** `SECRET_INJECTED` (`functions/src/index.ts:87`) requires a valid Firebase ID
+token for all three of `anthropic`/`esv`/`nlt`, and R297's `checkOrgBibleEnablement` correctly gates
+`esv`/`nlt` behind the caller's org having Bible API features enabled (`functions/src/index.ts:613-624`,
+confirmed present and correctly ordered). But `checkAndConsumeRateLimit` (R161, per-uid fixed-window)
+and `enforceModelAndTokens` (R162, model allow-list + token clamp — not applicable to Bible lookups
+anyway) are both scoped exclusively inside the `service === "anthropic"` conditional
+(`functions/src/index.ts:547`). Once an authenticated caller from an org with `bibleApiEnabled: true`
+passes the enablement check, there is no per-uid or per-org THROTTLE on how many ESV/NLT requests they
+can issue per minute or per day — only the `api` function's own `AI_PROXY_MAX_INSTANCES=10` concurrency
+ceiling (shared across all four proxy targets) bounds simultaneous in-flight requests.
+
+**Impact:** Any authenticated member of an org with Bible API enabled can hammer `/api/esv/...` or
+`/api/nlt/...` at whatever rate the 10-instance concurrency ceiling allows, consuming the owner's ESV/
+NLT API quota (a shared, billed-or-rate-limited third-party credential) with no per-caller throttle.
+Rated Medium, not High: the attacker must already be an authenticated org member (not an anonymous
+caller — this is not a `SEC-S-01`-style unauthenticated cross-tenant leak), ESV/NLT are typically
+free-tier/low-cost Bible-lookup APIs (materially cheaper to abuse than the metered Anthropic API this
+same limiter WAS built to protect), and the shared 10-instance ceiling caps worst-case concurrency
+regardless. Still a genuine, concrete inconsistency worth fixing: the R161 limiter's own doc comment
+frames it as protecting "the anthropic upstream" cost, but the SAME class of risk (a shared credential,
+billed to the owner, gated only by org-enablement) applies to `esv`/`nlt` and was left out.
+
+**Suggested remediation direction (not applied — review-only):** extend `checkAndConsumeRateLimit`'s
+call site to cover `esv`/`nlt` as well as `anthropic` (the function itself is already generic — it
+takes `uid` and a `limits` object, not an anthropic-specific shape), with either the same or a
+separately-tunable `AiProxyLimits`-shaped config for Bible-API rate limits.
+
+---
+
+### SEC-C-02 — [Confirmed sound, no finding] The `anthropic` proxy path itself is thoroughly capped end-to-end
+
+**Location:** `functions/src/index.ts:496-505` (`verifyAppCaller` auth gate), `:547-560`
+(`checkOrgAiEnablement`, fail-closed, runs FIRST per ADR-0024), `:562-577` (`enforceModelAndTokens` —
+server-side model allow-list + `max_tokens` clamp, IN-01-hardened against a numeric-string bypass),
+`:581-602` (`checkAndConsumeRateLimit`, R161, per-uid fixed-window, fail-open per the locked 65-CONTEXT
+decision), `:194,204` (`AI_PROXY_MAX_INSTANCES=10` function-level + `GLOBAL_MAX_INSTANCES=20`
+project-wide fallback, R172), `:641-661` (`writeUsageLedger`, R163, per-call `aiUsage` ledger entry).
+
+**Observed behavior:** Reviewed per the plan's explicit instruction to assess "whether the api proxy
+can be driven as an open relay or past the owner's billed AI/Bible quota." All five independent
+controls are present, correctly ordered (enablement gate before any Firestore/rate-limit work per
+ADR-0024's explicit rationale — "a disabled org must never reach even the cheapest of those checks"),
+and each does what its own doc comment claims. No gap found on the `anthropic` path itself — the gap
+identified in this review is `SEC-C-01`'s narrower scope (the SAME controls not extended to `esv`/
+`nlt`), not a weakness in the `anthropic` path. Recorded as a confirms-sound result per the plan's own
+convention of stating a null result explicitly (mirrors 112-02's `SEC-A-02`).
+
+---
+
+### SEC-C-03 — [Confirmed sound, no finding] The rate-limiter's fail-OPEN posture is correctly differentiated from the enablement checks' fail-CLOSED posture
+
+**Location:** `functions/src/index.ts:595-602` (`checkAndConsumeRateLimit`'s catch block — explicit
+comment: "Fail OPEN: the limiter is a cost guardrail, not a security control (locked decision,
+65-CONTEXT.md)"); `functions/src/index.ts:309-318` (`checkOrgAiEnablement`'s catch block — explicit
+comment: "FAIL CLOSED on a read error"); `functions/src/index.ts:342-351` (`checkOrgBibleEnablement`,
+identical fail-closed shape); `functions/src/index.ts:2624-2634` (`checkAndConsumeOrgEmailQuota`'s call
+site — same fail-open posture, same "cost guardrail, not a security control" rationale, applied
+consistently to the email-quota check).
+
+**Observed behavior:** Reviewed per the plan's explicit instruction to assess "whether the
+rate-limiter's fail-open posture vs the enablement checks' fail-closed posture is correct for each
+path." The two postures protect DIFFERENT properties and are each assigned correctly: the
+enablement/kill-switch checks (`checkOrgAiEnablement`/`checkOrgBibleEnablement`) are AUTHORIZATION —
+"is this org even allowed to use this feature at all" — and fail closed so a Firestore read hiccup
+never accidentally grants access to a disabled org. The rate limiter and email quota are COST
+guardrails, not authorization, and fail open so a Firestore hiccup never takes down an already-
+authorized feature for every legitimate user over one transient error. This is a deliberate,
+consistently-applied, and correctly-reasoned split — no finding.
+
+---
+
+### SEC-C-04 — [Confirmed sound, live-verified, no finding] The render-service (R173) and project-wide (R172) instance ceilings are live in production, not merely documented
+
+**Location:** `render-service/DEPLOY.md` (`--concurrency=1 --max-instances=3 --no-allow-unauthenticated`,
+staged deploy command); `functions/src/renderInvoker.ts:20-50` (`invokeRenderService` — Google-signed
+ID-token client, audience pinned to the exact service URL, "There is no fallback path" to an
+unauthenticated call); `functions/src/index.ts:194,203-204` (`AI_PROXY_MAX_INSTANCES=10`,
+`GLOBAL_MAX_INSTANCES=20` applied via `setGlobalOptions`, R172 — bounds every OTHER function's
+fan-out, including `esv`/`nlt` (`SEC-C-01`) and the messaging queue path (`SEC-C-05` below)).
+
+**Observed behavior:** See "Live evidence gathered this session" above — `gcloud run services
+describe pptx-render` (read-only) confirms the live Cloud Run service's `containerConcurrency=1` and
+`autoscaling.knative.dev/maxScale=3`, an exact match to `DEPLOY.md`'s staged R173 flags; `gcloud run
+services get-iam-policy pptx-render` (read-only) confirms the `roles/run.invoker` binding is scoped to
+exactly the Cloud Functions runtime service account, with no public/`allUsers` binding. Combined with
+`renderInvoker.ts`'s own refusal to call an unauthenticated fallback, this closes the render service as
+an abuse surface: it cannot be reached by any caller except this project's own `parsePptx`→
+`requestPptxRenderHandler` trigger chain, and even that chain's worst-case fan-out is capped at 3
+concurrent instances, serialized to 1 conversion each.
+
+**Impact:** None — recorded as a confirms-sound, live-verified result (not merely a static-code read)
+per the plan's own convention.
+
+---
+
+### SEC-C-05 — [Low] `queueServiceMessage` has no per-uid/per-org enqueue-rate limit of its own — bounded only by downstream per-message and per-org-daily caps, not the enqueue call itself
+
+**Location:** `functions/src/index.ts:2205-2303` (`queueServiceMessageHandler` — independent
+editor-tier re-check at `:2256-2264`, no rate-limit call anywhere in the body);
+`functions/src/index.ts:2581-2635` (`sendQueuedMessageHandler`'s downstream `MESSAGE_MAX_RECIPIENTS`
+per-message cap and `checkAndConsumeOrgEmailQuota`/`ORG_MAX_EMAILS_PER_DAY` per-org-daily cap, R171 —
+both enforced at SEND time, not at ENQUEUE time).
+
+**Observed behavior:** Reviewed per the plan's explicit instruction to assess "whether the email/
+message send path... can be abused to send excessive or unauthorized email." `queueServiceMessage` is
+an `onCall` with no rate-limiter call comparable to `checkAndConsumeRateLimit` (R161) guarding it — an
+already-authenticated editor of the target org (the only role permitted, independently re-verified
+server-side) could call it in a tight loop, cheaply creating many `messages/{id}` docs in rapid
+succession. Each resulting `sendQueuedMessage` trigger invocation IS correctly capped downstream (the
+per-message recipient cap rejects any single message resolving to too many recipients, and the
+per-org daily Resend quota rejects sends once the org's own daily total is exhausted) — but nothing
+throttles the RATE of enqueue calls themselves, and both `queueServiceMessage` and `sendQueuedMessage`
+inherit only the shared `GLOBAL_MAX_INSTANCES=20` fan-out ceiling (R172), not a per-uid limiter.
+
+**Impact:** Low — the abuse is self-inflicted (an org can only exhaust its OWN daily email quota this
+way, never another org's — `checkAndConsumeOrgEmailQuota` is scoped to the caller's own `orgId`),
+requires an already-trusted editor credential (not an anonymous or cross-tenant attacker), and is
+bounded to at most 20 concurrent Cloud Function invocations project-wide. Flagged because the plan's
+review scope explicitly asks whether the enqueue path itself is bounded, and the literal answer is: not
+by a rate limiter of its own, only by what happens after the doc is already created.
+
+---
+
+### SEC-C-06 — [Low] `parsePptx` has no per-uid/per-org daily import quota comparable to R161 (AI) or R171 (email) — bounded only by auth, the render service's own concurrency ceiling, and the shared function-level instance cap
+
+**Location:** `functions/src/index.ts:716-777` (`parsePptxHandler` — independent org-membership
+re-check at `:738-746`, storage-path-prefix guard at `:732-734`, no rate-limit call anywhere in the
+body); `functions/src/index.ts:779-782` (`parsePptx` onCall wrapper — no `maxInstances` override,
+inherits `GLOBAL_MAX_INSTANCES=20`).
+
+**Observed behavior:** Every `parsePptx` call requires org membership (independently re-verified
+server-side, never trusting the client-declared `orgId` alone) and a storage path already uploaded
+under that exact org's own prefix (enforced by both the handler's own string-prefix check and
+`storage.rules` at the Storage layer) — so this is not reachable by an anonymous or cross-tenant
+caller. But unlike the AI proxy (R161, per-uid rate limit) and the messaging fan-out (R171, per-org
+daily email quota), there is no per-uid or per-org DAILY cap on how many PPTX imports (each triggering
+a real LibreOffice conversion via the render service) a member can request.
+
+**Impact:** Low — bounded to the caller's own org (no cross-tenant reach), and the downstream render
+service's live-confirmed `--concurrency=1 --max-instances=3` ceiling (`SEC-C-04`) throttles CONCURRENT
+cost regardless of how many requests are made, but there is no circuit-breaker analogous to R171 if a
+compromised or malicious org member decided to trigger many SEQUENTIAL imports over an extended
+period — each one bounded in cost (`--timeout=300s --memory=2Gi --cpu=2`) but with no daily ceiling on
+count. Kept Low rather than Medium because the per-request cost is fixed and linear (no amplification
+factor beyond 1:1 with requests made), and reaching this path at all already requires a trusted,
+already-authenticated org credential.
+
+---
+
+### Cross-Reference Note — SEC-A-01 (112-02, Medium) sharpened under the cost/abuse lens: the unauthenticated `planningcenter` route shares the SAME 10-instance concurrency pool as the billed `anthropic`/`esv`/`nlt` routes
+
+112-02's `SEC-A-01` documents that `/api/planningcenter` is reachable with zero authentication, unlike
+its three sibling proxy routes — scored Medium there because no `worship-planner` secret is exposed
+(the caller supplies their own PC token) and `PROXY_TARGETS` is a fixed, non-arbitrary host map. This
+plan's cost/abuse review adds one load-bearing fact 112-02's own authorization-focused pass did not
+score: `AI_PROXY_MAX_INSTANCES=10` (`functions/src/index.ts:194,476`) applies to the **entire** `api`
+Cloud Function — ALL FOUR proxy targets (`planningcenter`/`anthropic`/`esv`/`nlt`) share the SAME
+10-instance concurrency ceiling, because `maxInstances` is a function-level option, not a per-route
+one. An attacker driving high-volume, unauthenticated `planningcenter` traffic (trivial — no
+credential needed at all) can saturate that shared 10-instance pool, starving legitimate authenticated
+`anthropic`/`esv`/`nlt` requests from every real app user — a de facto denial-of-service on the paid AI
+and Bible-lookup features, mounted entirely through the one route that requires no authentication.
+This does not change `SEC-A-01`'s own severity call (112-02 is authoritative for that finding); it is
+recorded here as a cross-dimension amplification the consolidator should weigh when prioritizing
+`SEC-A-01`'s remediation urgency, since fixing the authentication gap on `planningcenter` would also
+close this shared-pool starvation vector as a side effect.
+
+---
+
+## Summary
+
+| ID | Severity | Dimension | Location |
+|----|----------|-----------|----------|
+| SEC-S-01 | Critical | Share-token/public-page exposure | firestore.rules:341,388,405 (shareTokens/quarterShares/serviceShares publicly listable) |
+| SEC-S-02 | Medium | Share-token/public-page exposure | src/stores/services.ts:761; src/stores/quarters.ts:416; firestore.rules:369 (deterministic memorable-URL ids) |
+| SEC-S-03 | Low | Share-token/public-page exposure | src/stores/services.ts:860-934 (no link expiry/rotation) |
+| SEC-S-04 | Low | PII handling | src/stores/services.ts:70-99; src/views/ShareView.vue:105,110-113 (unfiltered free-text notes) |
+| SEC-S-05 | Confirmed sound | PII handling | src/stores/services.ts:133-172; ShareView.vue/QuarterShareView.vue error handling |
+| SEC-C-01 | Medium | Cost/abuse controls | functions/src/index.ts:543-624 (esv/nlt not rate-limited) |
+| SEC-C-02 | Confirmed sound | Cost/abuse controls | functions/src/index.ts:496-661 (anthropic path fully capped) |
+| SEC-C-03 | Confirmed sound | Cost/abuse controls | functions/src/index.ts:595-602,309-351,2624-2634 (fail-open vs fail-closed correctly split) |
+| SEC-C-04 | Confirmed sound (live-verified) | Cost/abuse controls | render-service/DEPLOY.md; live gcloud run evidence |
+| SEC-C-05 | Low | Cost/abuse controls | functions/src/index.ts:2205-2303 (queueServiceMessage enqueue not rate-limited) |
+| SEC-C-06 | Low | Cost/abuse controls | functions/src/index.ts:716-782 (parsePptx no daily import quota) |
+
+No source, functions, or `*.rules` files were modified during this review (`git status --porcelain --
+src functions firestore.rules storage.rules` is empty, verified above and re-verified after this
+task). No deploy occurred (the `gcloud run` commands run this session are read-only listing/IAM-policy
+queries, not deploy actions).
