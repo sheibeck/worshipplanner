@@ -622,7 +622,15 @@ future comments short.
   3. A spot-check across the affected files shows no paragraph-length inline "how it works" narration remaining where a map doc now covers it (R318).
   4. `npm run type-check` and the full test suite pass unchanged — comment-only changes (R318).
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+
+- [ ] 109-01-PLAN.md — Comment convention (R319): "## Comment Convention" section in `.planning/codebase/CONVENTIONS.md` + one-line CLAUDE.md pointer [wave 1]
+- [ ] 109-02-PLAN.md — R318 backend sweep: relocate + shrink `functions/src/**` + `firestore.rules` + `storage.rules` Bucket B comments into the map docs [wave 1]
+- [ ] 109-03-PLAN.md — R318 utils sweep: relocate + shrink `src/utils/**` Bucket B comments into the map docs [wave 2]
+- [ ] 109-04-PLAN.md — R318 components/composables sweep: relocate + shrink `src/components/**` + `src/composables/**` Bucket B comments [wave 3]
+- [ ] 109-05-PLAN.md — R318 stores/types/views sweep + phase-wide 309 reconciliation: relocate + shrink `src/stores/**`, `src/types/**`, `src/config/**`, `src/firebase/index.ts`, `src/main.ts`, `src/views/**` [wave 4]
 
 ### Phase 110: Architectural Review
 
