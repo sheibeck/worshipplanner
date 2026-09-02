@@ -66,11 +66,13 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useToasts } from '@/stores/toasts'
 
 const sidebarOpen = ref(false)
 
 const router = useRouter()
 const authStore = useAuthStore()
+const toasts = useToasts()
 
 // ARCH-001 (Phase 111, T-111-02) — in-flight re-entrancy guard mirroring
 // switchingId (AppSidebar.vue) / enteringOrgId (OrganizationsTab.vue).
@@ -86,6 +88,13 @@ async function onExitSuperAdminView(): Promise<void> {
     // own church context). Await it so the nav has settled before we navigate.
     await authStore.exitSuperAdminView()
     router.push('/owner-console')
+  } catch (err) {
+    // IN-02 (111-REVIEW.md) — previously an unhandled promise rejection with
+    // no user-facing feedback: the button re-enabled (via finally below) but
+    // gave no indication the exit didn't happen. Same catch+toast pattern as
+    // AppSidebar.vue's church-switch failure handling.
+    console.error('[AppShell] exitSuperAdminView failed:', err)
+    toasts.push('Could not exit super-admin view. Please try again.')
   } finally {
     exiting.value = false
   }
