@@ -2727,6 +2727,18 @@ projected a correct slide while this row handed `null` to `ScriptureInput`: the 
 empty, the read-only lines rendered "Scripture — Empty", and "Edit in scripture" scrolled to a
 blank field.
 
+**`onMarkAsPlanned`'s deleted `bumpScheduledSongsLastUsed` (R247, 84-01):** `lastUsedAt` for a
+service's scheduled songs is now recomputed by `serviceStore.markAsPlanned` itself (lock-gated
+`MAX(locked service date)`, see `src/utils/lastUsed.ts`), not by a view-level `serverTimestamp()`
+stamp. A `bumpScheduledSongsLastUsed` helper used to run here immediately after the transition and
+re-stamp every scheduled song with wall-clock `now()` — unconditionally clobbering the store's
+correct recompute on every single "Mark as Planned" click, and silently reproducing the root-cause
+bug 84-01 exists to fix (the service date was never being used). Deleted rather than delegated: the
+store already owns this write, and a second write path racing/overwriting the first is exactly the
+hazard, not a redundancy worth preserving. The follow-up recompute inside `onMarkAsPlanned` (after
+`serviceStore.markAsPlanned` resolves) deliberately performs NO second write — a view-level re-stamp
+would clobber the store's correct value with wall-clock time on every click.
+
 **`onSave` (31-PATTERNS § 4a row 24, BL-02):** 31-04-SUMMARY recorded the decision to leave this
 ungated because "the store guard already refuses it" — but this phase made that refusal a THROW, so
 an ungated `onSave` is not a harmless no-op, it is a rejected promise. Refusing here, like every

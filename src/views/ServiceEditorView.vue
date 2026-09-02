@@ -3058,17 +3058,9 @@ function applyTransitionLocally(status: 'draft' | 'planned'): void {
 }
 
 /**
- * R247 (84-01) — `lastUsedAt` for a service's scheduled songs is now
- * recomputed by `serviceStore.markAsPlanned` itself (lock-gated
- * `MAX(locked service date)`, see `src/utils/lastUsed.ts`), not by a
- * view-level `serverTimestamp()` stamp. A `bumpScheduledSongsLastUsed`
- * helper used to run here immediately after the transition and re-stamp
- * every scheduled song with wall-clock `now()` — unconditionally clobbering
- * the store's correct recompute on every single "Mark as Planned" click, and
- * silently reproducing the root-cause bug 84-01 exists to fix (the service
- * date was never being used). Deleted rather than delegated: the store
- * already owns this write, and a second write path racing/overwriting the
- * first is exactly the hazard, not a redundancy worth preserving.
+ * R247 (84-01) — the deleted `bumpScheduledSongsLastUsed` helper; the store now owns
+ * this recompute. See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral
+ * Notes (R318) -> src/views/ServiceEditorView.vue).
  */
 async function onMarkAsPlanned(): Promise<void> {
   if (!localService.value || isTransitioning.value) return
@@ -3094,12 +3086,9 @@ async function onMarkAsPlanned(): Promise<void> {
     await serviceStore.markAsPlanned(localService.value.id)
     applyTransitionLocally('planned')
 
-    // R247 (84-01) — the `lastUsedAt` recompute for this service's scheduled
-    // songs already happened inside `serviceStore.markAsPlanned` above, gated
-    // on the service's locked date. There is deliberately no second write
-    // here (see the doc comment where `bumpScheduledSongsLastUsed` used to
-    // live) — a view-level re-stamp would clobber the store's correct value
-    // with wall-clock time on every click.
+    // R247 (84-01) — deliberately no second lastUsedAt write here (store already did it).
+    // See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+    // src/views/ServiceEditorView.vue).
 
     // ★ R144 (61-04) — first-lock auto-notification + lockSnapshots write.
     //

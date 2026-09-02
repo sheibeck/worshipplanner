@@ -128,8 +128,8 @@ export const useAuthStore = defineStore('auth', () => {
   // ONLY gate. Consumed by Phases 102/103's scripture-fetch gate.
   const bibleApiEnabled = ref(false)
 
-  // Login church-picker + sidebar church-switcher source. See
-  // .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+  // Login church-picker + sidebar church-switcher source.
+  // See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
   // src/stores/auth.ts).
   const memberships = ref<{ id: string; name: string; active: boolean; role: 'editor' | 'viewer' }[]>([])
 
@@ -332,8 +332,8 @@ export const useAuthStore = defineStore('auth', () => {
     // chain below is mandatory because noUncheckedIndexedAccess is on.
     const orgSettings = (orgData.settings as Partial<OrgSettings> | undefined) ?? {}
 
-    // Dual-read migration (R073) — do NOT collapse to `?? true`; see
-    // .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+    // Dual-read migration (R073) — do NOT collapse to `?? true`.
+    // See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
     // src/stores/auth.ts).
     const resolvedVwModeEnabled =
       orgSettings.vwModeEnabled ?? (orgData.vwModeEnabled as boolean | undefined) ?? true

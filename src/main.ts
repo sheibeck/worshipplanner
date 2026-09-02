@@ -9,8 +9,8 @@ import App from './App.vue'
 import router from './router'
 
 // NOTE: deliberately NO module-load requestFullscreen() here for /present/* windows —
-// a popup loses transient activation before its bootstrap completes. See
-// .planning/codebase/STACK.md (Store & Entry-Point Stack Notes (R318) -> src/main.ts).
+// a popup loses transient activation before its bootstrap completes.
+// See .planning/codebase/STACK.md (Store & Entry-Point Stack Notes (R318) -> src/main.ts).
 
 const app = createApp(App)
 
