@@ -122,12 +122,16 @@ service cloud.firestore {
       // isOrgEditor(orgId) required a genuine membership doc, so a
       // See ADR-0004 (docs/adr/0004-flow-1-org-creation-cr-01-getafter-alone-only-proves-created.md)
       allow update: if isOrgEditor(orgId) && preservesLifecycleFields() && preservesCreatedBy();
-      // Allow authenticated users to create a new org if they are the creator.
-      // Same lifecycle-field guard applies (defense-in-depth) -- no legitimate
-      // client-side org-creation flow sets these fields; org provisioning
-      // (orgProvisioning.ts) always writes via the Admin SDK, bypassing rules.
-      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid
-        && preservesLifecycleFields();
+      // SEC-ISO-01 (Phase 112, High -- closed Phase 113): the legacy client-side
+      // org self-provisioning path (the `allow create` that used to live here,
+      // plus the members/{uid} Flow-1 disjunct below) is REMOVED outright.
+      // `onboardOrganization` (Admin SDK, functions/src/orgProvisioning.ts) is
+      // the ONLY sanctioned provisioner and bypasses these rules entirely --
+      // any signed-in user could previously self-provision an org here
+      // directly via the client SDK and squat a slug/name, bypassing that
+      // super-admin-gated path. No `allow create` clause remains on this
+      // collection; organizations have no client create path (falls through
+      // to the file's catch-all deny).
 
       // Phase 77 (R216/T-77-04): deletion is Admin-SDK-only. The
       // deleteOrganization callable (orgDeletion.ts) uses the Admin SDK,
@@ -147,18 +151,13 @@ service cloud.firestore {
         // Both legitimate flows (see 40.1-RESEARCH.md, ensureUserDocument in
         // src/stores/auth.ts:264-350) are handled explicitly; nothing else authorizes
         // a create.
+        // SEC-ISO-01 (Phase 112, High -- closed Phase 113): the Flow-1
+        // org-creation disjunct that used to live here (the
+        // !exists(.../organizations/$(orgId)) && getAfter(...).createdBy ==
+        // request.auth.uid && role == 'editor' branch, see ADR-0004) is
+        // REMOVED outright, alongside the organizations/{orgId} `allow create`
+        // above. Only Flow 2 (invite acceptance) remains.
         allow create: if isSignedIn() && request.auth.uid == uid && (
-          // See ADR-0004 (docs/adr/0004-flow-1-org-creation-cr-01-getafter-alone-only-proves-created.md)
-          // together prove genuine same-batch creation ("this org is being created
-          // right now, by me"), not merely a createdBy field match. Role is forced
-          // to 'editor', matching the hardcoded value the client already sends on
-          // this path — no client discretion is lost.
-          (!exists(/databases/$(database)/documents/organizations/$(orgId))
-            && getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.createdBy == request.auth.uid
-            && request.resource.data.role == 'editor')
-
-          ||
-
           // Flow 2: invite acceptance. The invite doc predates this batch (created
           // earlier by an org editor via TeamView) and is being DELETED later in
           // THIS SAME batch (auth.ts:301) -- plain get()/exists() is correct here

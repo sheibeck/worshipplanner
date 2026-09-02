@@ -265,11 +265,14 @@ describe('Members create — R104 self-service membership hole', () => {
     await assertSucceeds(batch.commit())
   })
 
-  it('ALLOWS the founder of a brand-new org to create their own first membership, via a real writeBatch matching ensureUserDocument', async () => {
-    // Test C — criterion 3, THE TRAP. Nothing seeded. The org doc and the
-    // member doc are created in the SAME batch, matching auth.ts:322-345
-    // exactly -- proving the org-creation branch's getAfter()/get() choice
-    // against the emulator, not documentation.
+  it('DENIES a non-super-admin self-provisioning a brand-new org + first membership (SEC-ISO-01 legacy path removed)', async () => {
+    // Test C — formerly THE TRAP proving the Flow-1 org-creation branch (an
+    // org doc and its first member doc created in the SAME batch, matching
+    // auth.ts:322-345). SEC-ISO-01 (Phase 112, High) removed that branch
+    // outright: organizations/{orgId} has no client `allow create`, and the
+    // members/{uid} create rule now permits ONLY Flow 2 (invite acceptance).
+    // onboardOrganization (Admin SDK) is the only sanctioned provisioner.
+    // This same batch must now fail-closed.
     const context = testEnv.authenticatedContext('founder', { email: 'founder@example.com' })
     const db = context.firestore()
     const batch = writeBatch(db)
@@ -284,7 +287,7 @@ describe('Members create — R104 self-service membership hole', () => {
       displayName: 'Founder',
       email: 'founder@example.com',
     })
-    await assertSucceeds(batch.commit())
+    await assertFails(batch.commit())
   })
 
   it('DENIES a user with a genuine viewer invite from escalating their role to editor on accept', async () => {
@@ -647,17 +650,19 @@ describe('Org lifecycle field guard (T-76-10/T-76-06)', () => {
     )
   })
 
-  // Phase 82 Pitfall 3 regression guard: `preservesLifecycleFields()`'s array
-  // is shared between the update-time diff check (above) and the create-time
-  // "keys absent" check -- a normal org-create payload (no aiMasterEnabled
-  // key at all) must still succeed. onboardOrganizationHandler writes via the
-  // Admin SDK (bypasses rules) and never sets this field, so absence at
-  // create time IS the OFF-by-default posture (R242) -- this proves the
-  // client-side create path is unaffected by the new allow-list entry.
-  it('ALLOWS a normal org-create payload with no aiMasterEnabled key -- no regression (Pitfall 3)', async () => {
+  // Phase 82 Pitfall 3 regression guard, UPDATED by SEC-ISO-01 (Phase 112/113):
+  // this test used to prove the create-time "keys absent" check let a normal
+  // client-side org-create payload through unaffected by the new
+  // aiMasterEnabled allow-list entry. SEC-ISO-01 removed the client-side
+  // organizations/{orgId} `allow create` clause entirely -- onboardOrganization
+  // (Admin SDK, bypasses rules) is now the ONLY org-creation path -- so ANY
+  // client-side create, lifecycle-field-free or not, must fail-closed.
+  // preservesLifecycleFields() is now unreachable for create (no `allow
+  // create` remains to guard); this test now pins that outcome instead.
+  it('DENIES a normal org-create payload via the client SDK -- no client create path remains (SEC-ISO-01)', async () => {
     const context = testEnv.authenticatedContext('founder', { email: 'founder@example.com' })
     const db = context.firestore()
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(db, 'organizations', 'freshOrg'), {
         name: "Founder's Fresh Church",
         createdAt: new Date(),
