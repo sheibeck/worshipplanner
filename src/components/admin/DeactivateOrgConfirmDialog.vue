@@ -85,18 +85,7 @@
 </template>
 
 <script setup lang="ts">
-// Quick task 260824 — reversible-lifecycle confirm dialog for deactivating a
-// church. Structural shell (Teleport + backdrop/panel Transition, hand-rolled
-// focus trap, focus-on-open/close, `confirming` guard on every dismissal
-// path) is copied verbatim from DeleteOrgConfirmDialog.vue (Phase 77-02),
-// which establishes this shell for the admin org-list dialogs.
-//
-// Deliberate divergence from DeleteOrgConfirmDialog.vue: NO type-to-confirm
-// text input. Deleting an org is irreversible, so DeleteOrgConfirmDialog
-// gates its Delete button on an exact name match as a slip-proof safeguard.
-// Deactivating is reversible (a super-admin can reactivate at any time), so a
-// single Confirm/Cancel pair with plain consequence copy is proportionate —
-// see this quick task's PLAN.md "Considered tradeoffs".
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/admin/DeactivateOrgConfirmDialog.vue)
 import { nextTick, ref, useId, watch } from 'vue'
 
 const props = defineProps<{

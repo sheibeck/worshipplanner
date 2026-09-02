@@ -1,31 +1,5 @@
 <script setup lang="ts">
-/**
- * RunDisplaysPanel — the State-B Displays panel (R276), now relocated to the right
- * column beside/under the next-up preview (owner fix #4) and carrying the
- * closed-window RECOVERY (R274) that the removed top status band used to surface
- * (owner fix #3).
- *
- * Each real output (Audience / Confidence) renders ONE of four honest states,
- * colorblind-safe (dot + word):
- *   - open        GREEN — live AND the output is open (card.open, already gated on
- *                 !closed by the parent's audienceOpen/confidenceOpen computed).
- *   - closed      AMBER "… display closed" + a Reopen button (run-display-reopen-{role})
- *                 + a "won't lose your place" reassurance — the R274 one-click reopen.
- *   - closed-muted AMBER muted "Reassign displays to reopen", NO reopen button —
- *                 shown when a monitor unplug (reassigning) is up: the reassign
- *                 banner is the senior action, so the per-role chip is SUPPRESSED
- *                 (precedence, 96-UI-SPEC §B). A closed window is NEVER rendered green.
- *   - not-open    AMBER "Not open" — pre-real-live (e.g. rehearse) or otherwise not open.
- *
- * Stage stays a DISABLED "Off" placeholder only (no 3rd-output build — out of scope).
- *
- * Pure props-in/emits-out: no store, channel, getScreenDetails, or monitorConfig
- * side-effect. The parent supplies each card's open/label, the live flag, the
- * per-output closed latches, and the reassigning flag, and maps @reopen(role) /
- * @manage back onto its own reopen/manage handlers. The closed-detection poll +
- * position-preserved reopen BEHAVIOR (useRunControl) is unchanged — only the SURFACE
- * moved here from the deleted header band.
- */
+// See .planning/codebase/CONCERNS.md (§ Component & Composable Concern Notes (R318) -> src/components/run/RunDisplaysPanel.vue)
 import { computed } from 'vue'
 
 type Role = 'audience' | 'confidence'

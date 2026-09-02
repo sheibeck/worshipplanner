@@ -304,13 +304,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const authStore = useAuthStore()
 
-/**
- * The six kinds a church can add here — a closed set, never derived from the
- * `SlotKind` union (which also contains HYMN, palette-retired in Phase 43/R084,
- * and IMPORTED, which has no pre-creation meaning). Kept only as the palette's
- * click targets in the template above; this array itself is not iterated to
- * build the markup, matching this plan's "verbatim, not derived" requirement.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/settings/ServiceTemplateEditor.vue)
 
 /** Human-readable label for a kind, reusing `slotLabel`'s existing exhaustive
  *  switch via a throwaway `createSlot` rather than duplicating that switch here. */

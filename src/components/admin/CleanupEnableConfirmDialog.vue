@@ -109,18 +109,7 @@
 </template>
 
 <script setup lang="ts">
-// Phase 71-02 (R189/R190) — Confirm-to-flip modal for the Owner Console's
-// Cleanup card. Structural shell (Teleport + backdrop/panel Transition) is
-// copied from src/components/NewServiceDialog.vue; the hand-rolled focus
-// trap is new to this codebase (no prior precedent), per 71-UI-SPEC.md.
-//
-// R190 hard block: when `referencesComplete === false` (only ever passed for
-// the backgrounds type — the other three types never send this prop), the
-// Confirm button is NOT rendered as a clickable element at all — a separate,
-// permanently-disabled `<button disabled>` with NO @click handler is
-// rendered in its place. There is no code path that can wire a click
-// handler to that element; this is what makes the hard block structural
-// rather than just visually disabled.
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/admin/CleanupEnableConfirmDialog.vue)
 import { computed, nextTick, ref, useId, watch } from 'vue'
 
 const props = withDefaults(

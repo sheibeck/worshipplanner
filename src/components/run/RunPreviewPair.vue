@@ -111,27 +111,7 @@
 </template>
 
 <script setup lang="ts">
-/**
- * R276 owner fix #2/#4 — the program + next-up preview pair, extracted as a PURE
- * display child (97-05). Both panes render the REAL SlideCanvas with
- * :interactive="false"; the previews own NO navigation (the transport/rail
- * posts index changes), so there is deliberately no emit and no run-take /
- * run-push-live control here — that keeps the single-selection contract intact.
- * The live frame is GREEN when `live` is true (owner fix #4).
- *
- * OWNER UAT FIX (Next-up font too big) — SlideCanvas has no font-size prop; its
- * text is sized in fixed projector px (text-5xl/6xl) scaled only by
- * `--slide-font-scale`, so scaling a box-sized canvas by 0.8 (the old approach)
- * still left the font enormous in the small preview box. Instead each canvas is
- * rendered at a fixed REFERENCE_WIDTH × REFERENCE_HEIGHT (1280×720, 16:9) stage —
- * where the projector-sized fonts are proportionally correct — and the whole
- * stage is CSS `transform: scale(f)`-ed down to fit its pane, with
- * `f = paneWidth / REFERENCE_WIDTH`, `transform-origin: top left`, and the pane
- * `overflow-hidden`. Font and layout therefore shrink together and each preview
- * reads as a true mini-slide. A ResizeObserver per pane keeps `f` correct across
- * layout/resize; both panes and the stage are 16:9, so the scaled stage fills its
- * pane exactly (no letterboxing).
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/run/RunPreviewPair.vue)
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import SlideCanvas from '@/components/slides/SlideCanvas.vue'
 import type { AssembledSlide } from '@/types/slide'

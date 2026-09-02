@@ -22,12 +22,7 @@
         :class="thumb.index === currentIndex ? 'ring-green-500' : 'ring-gray-700 hover:ring-indigo-500'"
         @click="emit('jump', thumb.index)"
       >
-        <!-- Owner UAT: render each thumb as a true mini-slide. SlideCanvas uses
-             projector-sized fonts; laying it out at the tiny thumb width wrapped
-             every word into a stacked mess. Instead render at the 1280×720
-             reference stage (where the fonts are proportionally correct) and
-             scale the WHOLE stage down to the thumb, so text + layout shrink
-             together (same technique as RunPreviewPair). -->
+        <!-- See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/run/RunFilmstrip.vue) -->
         <div class="absolute left-0 top-0" :style="thumbStageStyle">
           <SlideCanvas :slide="thumb.slide" :interactive="false" />
         </div>
@@ -38,17 +33,7 @@
 </template>
 
 <script setup lang="ts">
-/**
- * R282 — the in-item filmstrip, extracted as a PURE presentational child
- * (97-05). It does NOT compute which slides belong to the active item — the
- * parent (97-08) supplies the already-filtered `slides` and the PARALLEL
- * `indices` array (indices[i] is slides[i]'s array index in assembledSlideshow).
- * The click contract is the whole point: @jump emits indices[i], the GLOBAL
- * array index, so the parent maps it straight to postIndex; emitting the local
- * loop index `i` would jump to the wrong slide (T-97-05-01). Renders each thumb
- * as a scaled non-interactive SlideCanvas; the current slide (indices[i] ===
- * currentIndex) gets the green live frame.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/run/RunFilmstrip.vue)
 import { computed, onMounted, watch } from 'vue'
 import SlideCanvas from '@/components/slides/SlideCanvas.vue'
 import type { AssembledSlide } from '@/types/slide'

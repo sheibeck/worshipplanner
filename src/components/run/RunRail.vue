@@ -1,19 +1,5 @@
 <script setup lang="ts">
-/**
- * RunRail — the order-of-service rail (R276, R262/R263), extracted as PURE
- * presentation from RunControlView.vue (:388-463 markup + the Phase 95
- * captureActiveRow/watch(index) auto-scroll at useRunControl.ts:184-193).
- *
- * The parent (97-09) owns all state and navigation: it supplies `rows`
- * (RailRow[] from useRunControl), the current `activeIndex` (a slotIndex, or
- * null pre-live), and — for the active item only — its `expandedSlides`. Every
- * interaction is emitted as intent (@jump / @jump-slide); the parent maps those
- * to jumpToSlot / postIndex. No store, channel, or side-effects here.
- *
- * The rail testids (rail-item, rail-item-empty, run-rail-empty) and the
- * has-slides-vs-empty branching are reproduced EXACTLY so the wired-view control
- * suite (RunControlView.test.ts rail tests) stays green.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/run/RunRail.vue)
 import { ref, computed, watch, nextTick } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import type { RailRow } from '@/composables/useRunControl'

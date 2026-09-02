@@ -1,23 +1,5 @@
 <script setup lang="ts">
-/**
- * RunHeader — the State-B live header (R277). PURE presentation: props-in /
- * emits-out, no channel, no store, no timer logic. The parent (RunControlView,
- * wired in 97-09) owns all state and passes the `live` flag + the clock/elapsed
- * strings from useRunTimers.
- *
- * Owner fix #4: the live status is GREEN only when truly live, and a muted/amber
- * "Not open" otherwise — NEVER a pre-live red. Owner fix #7: a REHEARSAL is a
- * distinct third state — YELLOW "Rehearsing" (never green) with an "End Rehearsal"
- * exit label — so green unambiguously means the outputs are really live. All three
- * are driven by the `live`/`rehearsing` props the parent sets, NOT derived from any
- * output-status machine here:
- *   - green "Live"       when live && !rehearsing (a real go-live)
- *   - amber "Rehearsing" when rehearsing
- *   - muted "Not open"   when not live
- *
- * Nocturne Run-scoped palette (97-UI-SPEC) is applied via local CSS custom
- * properties on the root only — this does NOT retheme the app.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/run/RunHeader.vue)
 import { computed } from 'vue'
 
 const props = defineProps<{

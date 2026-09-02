@@ -1,14 +1,5 @@
 <script setup lang="ts">
-/**
- * RunTransportBar — the State-B bottom transport bar (R276). PURE presentation:
- * props-in / emits-out, no channel, no store. Previous / Next emit intent; the
- * parent (97-09) posts the actual navigation immediately (single-selection: nav
- * posts on click, there is NO take/stage step — so this bar introduces NO
- * run-take / run-push-live testid, which the control's single-selection test
- * asserts are absent).
- *
- * Nocturne Run-scoped palette (97-UI-SPEC) via local CSS custom properties only.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/run/RunTransportBar.vue)
 defineProps<{
   /** Service progress 0–100 (fill width of the progress bar). */
   progress: number
