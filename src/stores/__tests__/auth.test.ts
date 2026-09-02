@@ -2027,5 +2027,147 @@ describe('useAuthStore', () => {
       expect(mockOnSnapshotUnsubs[1]).not.toHaveBeenCalled()
       expect(store.orgId).toBe('org-2')
     })
+
+    // 111-REVIEW.md CR-01 — the two tests above both resolve concurrent
+    // calls to the SAME org, so neither ever reaches loadOrgContext's
+    // resetOrgContext()/deactivation branches under a race. This test
+    // drives two OVERLAPPING calls to DIFFERENT orgs, with the OLDER call
+    // (org-A) deliberately made to resolve its org-doc read LAST — after
+    // the NEWER call (org-B) has already fully completed and attached its
+    // live listener — and made to hit the denied-read/deactivation branch
+    // on resume. Pre-fix, that branch's resetOrgContext() ran
+    // unconditionally and would tear down org-B's live memberUnsub and
+    // flash a stale deactivation message over a perfectly healthy org-B
+    // session; post-fix, the branch's isStale() check catches it first.
+    it('a superseded call resolving to a DIFFERENT (denied/deactivated) org never clobbers a newer call\'s live org context (CR-01 fix)', async () => {
+      // Deferred control for call A's SECOND getDoc('organizations/org-A')
+      // (the activeId org-doc read, not the membership-list-building read)
+      // so we can force it to reject only once call B has fully finished.
+      let rejectOrgARead!: (err: unknown) => void
+      const orgAActiveReadPromise = new Promise<never>((_resolve, reject) => {
+        rejectOrgARead = reject
+      })
+
+      let userDocCallCount = 0
+      let orgACallCount = 0
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          userDocCallCount++
+          const orgIds = userDocCallCount === 1 ? ['org-A'] : ['org-B']
+          return Promise.resolve({ exists: () => true, data: () => ({ orgIds }) }) as never
+        }
+        if (path === 'organizations/org-A') {
+          orgACallCount++
+          // 1st call: the membership-list builder's read (resolves normally
+          // so call A's `memberships.value` assignment isn't itself stuck).
+          if (orgACallCount === 1) {
+            return Promise.resolve({
+              exists: () => true,
+              data: () => ({ name: 'Org A', active: true }),
+            }) as never
+          }
+          // 2nd call: the activeId org-doc read — deferred until triggered.
+          return orgAActiveReadPromise as never
+        }
+        if (path === 'organizations/org-B') {
+          return Promise.resolve({ exists: () => true, data: () => ({ name: 'Org B' }) }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+
+      // Fire call A (older, resolves to org-A) WITHOUT awaiting — it runs
+      // through memberships/orgId for org-A and then suspends on the
+      // deferred activeId read for organizations/org-A.
+      const callA = triggerAuthStateChange(mockUser)
+      await flushPromises()
+      expect(store.orgId).toBe('org-A')
+
+      // Fire call B (newer, resolves to org-B) and let it run to FULL
+      // completion before call A resumes — the exact "older call resolves
+      // last" ordering CR-01 left unguarded.
+      await triggerAuthStateChange(mockUser)
+      expect(store.orgId).toBe('org-B')
+      expect(store.orgName).toBe('Org B')
+      expect(onSnapshot).toHaveBeenCalledTimes(1)
+      expect(mockOnSnapshotUnsubs).toHaveLength(1)
+
+      // Now let call A's stalled activeId read reject — pre-fix, its catch
+      // branch would unconditionally call resetOrgContext() (wiping org-B's
+      // orgId/orgName and tearing down org-B's live memberUnsub) and set
+      // deactivatedOrgMessage.
+      rejectOrgARead(new Error('permission-denied'))
+      await callA
+
+      // Post-fix: call A's epoch is stale by the time its catch block runs,
+      // so isStale() returns true and it bails before touching anything.
+      expect(store.orgId).toBe('org-B')
+      expect(store.orgName).toBe('Org B')
+      expect(store.deactivatedOrgMessage).toBeNull()
+      // Org-B's live listener was never torn down by call A's stale
+      // resetOrgContext().
+      expect(mockOnSnapshotUnsubs[0]).not.toHaveBeenCalled()
+      expect(onSnapshot).toHaveBeenCalledTimes(1)
+    })
+
+    // WR-01 (111-REVIEW.md) — logout() (and onAuthStateChanged's sign-out
+    // branch) must invalidate any loadOrgContext call still in flight, so a
+    // slow call cannot attach a fresh members listener for an
+    // already-signed-out session. Drives a loadOrgContext call that
+    // suspends on its very FIRST await (the users/{uid} read), runs
+    // logout() to completion while it's still suspended, then lets the
+    // stale call resume and asserts it never reaches onSnapshot.
+    it('a loadOrgContext call still in flight when logout() runs attaches no listener afterward (WR-01 fix)', async () => {
+      let resolveUserDoc!: (value: unknown) => void
+      const userDocPromise = new Promise((resolve) => {
+        resolveUserDoc = resolve
+      })
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return userDocPromise as never
+        }
+        if (path === 'organizations/org-1') {
+          return Promise.resolve({ exists: () => true, data: () => ({ name: 'Org One' }) }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+
+      // Fire the sign-in (and its loadOrgContext) WITHOUT awaiting — it
+      // suspends on the deferred users/test-uid read.
+      const signInCall = triggerAuthStateChange(mockUser)
+      await flushPromises()
+
+      // logout() runs to completion while the sign-in's loadOrgContext call
+      // is still suspended on its first await.
+      await store.logout()
+      expect(store.orgId).toBeNull()
+
+      // Now let the stale sign-in's userDoc read resolve, well after logout.
+      resolveUserDoc({ exists: () => true, data: () => ({ orgIds: ['org-1'] }) })
+      await signInCall
+      await flushPromises()
+
+      // Pre-fix: nothing had incremented loadOrgContextEpoch on logout, so
+      // the stale call's checkpoints would all still pass and it would
+      // attach a fresh members listener for an already-signed-out session.
+      // Post-fix: logout() bumped the epoch, so the very first isStale()
+      // checkpoint (right after the read that just resolved) returns true.
+      expect(onSnapshot).not.toHaveBeenCalled()
+      expect(store.orgId).toBeNull()
+    })
   })
 })
