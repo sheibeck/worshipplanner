@@ -714,7 +714,7 @@ share-token/public-page exposure and PII handling, and cost/abuse controls.
   2. Every finding carries an explicit severity and a concrete location (rule path, function name, route, or code reference) (R322).
   3. Critical/High findings are clearly distinguished from Medium/Low, giving Phase 113 an unambiguous remediation scope (R322).
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans executed
 **Wave 1**
 
 - [x] 112-01-PLAN.md — Firestore & Storage rules + multi-tenant isolation review (runs the live rules suite) → 112-FINDINGS-rules-isolation.md
@@ -723,7 +723,7 @@ share-token/public-page exposure and PII handling, and cost/abuse controls.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 112-04-PLAN.md — consolidate all findings into the ranked 112-SECURITY-REVIEW.md (C/High → Phase 113, M/Low → backlog)
+- [x] 112-04-PLAN.md — consolidate all findings into the ranked 112-SECURITY-REVIEW.md (C/High → Phase 113, M/Low → backlog)
 
 **Cross-cutting constraints:**
 

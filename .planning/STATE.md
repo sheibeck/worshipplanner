@@ -4,17 +4,17 @@ milestone: v2.8
 milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)"
 current_phase: 112
 current_phase_name: Security Review
-status: executing
-stopped_at: Completed 112-03-PLAN.md
-last_updated: "2026-09-02T16:25:23.572Z"
+status: verifying
+stopped_at: Completed 112-04-PLAN.md
+last_updated: "2026-09-02T16:31:06.369Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 112 execution started
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 16
-  completed_plans: 15
-  percent: 67
+  completed_plans: 16
+  percent: 83
 ---
 
 ## Human UAT — completed & PASSED
@@ -45,7 +45,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 `/gsd-plan-phase 108`.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
@@ -1183,7 +1183,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 112 (Security Review) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-02 — Phase 112 execution started
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
@@ -3073,6 +3073,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 112 P01 | 45min | 2 tasks | 1 files |
 | Phase 112 P02 | 45min | 2 tasks | 1 files |
 | Phase 112 P03 | 50min | 2 tasks | 1 files |
+| Phase 112 P04 | 25min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -3577,6 +3578,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 112-02: ARCH-018 (super-admin universal isOrgEditor grant) re-scored Medium under a security lens rather than deferred to its Phase 78 'accepted' status
 - [Phase ?]: 112-03: SEC-S-01 (Critical) — shareTokens/quarterShares/serviceShares are publicly listable via allow read: if true, live-proved via emulator probe; cross-tenant PII leak, needs a get/list rules split in Phase 113
 - [Phase ?]: 112-03: live gcloud run evidence confirms R173 render-service instance/concurrency ceilings and no-public-invoker IAM policy are deployed in production
+- [Phase ?]: 112-04: Deduped SEC-ISO-04 into ARCH-018 and SEC-ISO-06 into SEC-S-01/residual when consolidating the security review report; no severities re-classified from source findings.
 
 ### Roadmap Evolution
 
@@ -3904,8 +3906,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-02T16:25:23.512Z
-Stopped at: Completed 112-03-PLAN.md
+Last session: 2026-09-02T16:31:06.309Z
+Stopped at: Completed 112-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
