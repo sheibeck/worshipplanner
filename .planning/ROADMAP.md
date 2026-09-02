@@ -754,6 +754,38 @@ with recorded rationale.
 
 ## Backlog
 
+### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (BACKLOG)
+
+**Goal:** [Captured for future planning] Consolidates all 11 Medium/Low security findings
+(5 Medium, 6 Low) deferred from Phase 113 remediation, per 113-CONTEXT.md's locked triage decision
+("ONE consolidated backlog entry", not 11 near-empty stubs).
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Source: `.planning/phases/112-security-review/112-SECURITY-REVIEW.md`'s `## Medium/Low (→ backlog)`
+section carries the full per-finding detail — location, behavior, impact, and suggested remediation
+direction for each. This entry does not duplicate that detail; it is the durable backlog pointer to
+it, so nothing found by the Phase 112 review is silently dropped.
+
+- **5 Medium:** **SEC-A-01** — `/api/planningcenter` proxy route has zero authentication (unauthenticated
+  open-relay/DoS risk on a shared concurrency pool; **highest-priority Medium, worth early attention**).
+  **ARCH-018** — super-admin's unconditional `isOrgEditor` disjunct grants universal editor-tier write on
+  every org's `members/{uid}` (folds in `SEC-ISO-04`). **SEC-R-03** — `services/{docId}` draft-edit branch
+  has no field-diff restriction, permitting `createdBy`/provenance-field forgery. **SEC-S-02** —
+  memorable-URL share ids (`{slug}__service-{date}`, `{slug}__q{Q}-{Y}`) are deterministic and guessable.
+  **SEC-C-01** — ESV/NLT Bible-API proxy branches are not covered by the per-uid rate limiter that guards
+  `anthropic`.
+
+- **6 Low:** **SEC-ISO-05** — org role `'admin'` is functionally identical to `'editor'` everywhere
+  checked today (self-escalation possible but currently grants nothing extra). **SEC-ISO-06 (residual)**
+  — `orgSlugs`/`orgNames` use the same unsplit `allow read: if true` as `SEC-S-01`'s three collections and
+  are therefore also fully listable. **SEC-S-03** — share links never expire or rotate (deliberate product
+  design, recorded for completeness). **SEC-S-04** — free-text `notes`/slot-body fields render verbatim on
+  the public share page with no PII filter. **SEC-C-05** — `queueServiceMessage` has no per-uid/per-org
+  enqueue-rate limit of its own. **SEC-C-06** — `parsePptx` has no per-uid/per-org daily import quota.
+
+Promote with `/gsd-review-backlog` when ready.
+
 ### Phase 999.4: v2.8 Architectural Review — Medium/Low findings (ARCH-002..023) (BACKLOG)
 
 **Goal:** [Captured for future planning] Consolidates all 22 Medium/Low architectural findings
