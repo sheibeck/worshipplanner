@@ -36,7 +36,8 @@ Out of scope: fixing Medium/Low findings (deferred to backlog), security finding
   `## Medium/Low (→ backlog)` section (which already carries full per-finding detail). Nothing is
   dropped; we avoid 22 near-empty stubs.
 - **Strictly defer all Medium/Low** — do NOT fix any Medium/Low in this milestone, including trivial
-  ones (e.g. ARCH-D-01's never-rendering `reopenPcWarning` date clause). Per locked milestone scope.
+  ones (e.g. the never-rendering `reopenPcWarning` date clause — a Medium data-flow finding in the
+  report). Per locked milestone scope.
 
 ### Locked at milestone start (REQUIREMENTS.md v2.8 scope)
 - Fix Critical/High; triage Medium/Low to backlog (not fixed here).
