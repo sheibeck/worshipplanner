@@ -580,7 +580,7 @@ inside Phase 108's own plan.
 
 - [x] **Phase 108: Comment Audit & Decision-Rationale Extraction** - Inventory and classify every load-bearing comment, then relocate decision-rationale (R-/WR-/CR-/Pitfall) comments into ADRs with the source comment shrunk to a pointer (completed 2026-09-01)
 - [x] **Phase 109: Behavioral/Architectural Extraction & Comment Convention** - Relocate "how this works" comments into `.planning/codebase/` map docs and document the go-forward comment convention (completed 2026-09-02)
-- [ ] **Phase 110: Architectural Review** - Severity-ranked report on module boundaries, store/Firestore-listener lifecycle, multi-tenant isolation architecture, data flow, and coupling
+- [x] **Phase 110: Architectural Review** - Severity-ranked report on module boundaries, store/Firestore-listener lifecycle, multi-tenant isolation architecture, data flow, and coupling (completed 2026-09-02)
 - [ ] **Phase 111: Architectural Remediation** - Fix or explicitly defer every Critical/High architectural finding; triage Medium/Low to backlog
 - [ ] **Phase 112: Security Review** - Severity-ranked report on Firestore/Storage rules, auth/claims + route guards, tenant isolation, Cloud Functions authorization, share-token/PII exposure, and cost/abuse controls
 - [ ] **Phase 113: Security Remediation** - Fix or explicitly defer every Critical/High security finding; triage Medium/Low to backlog
@@ -735,9 +735,11 @@ Reported by owner 2026-09-02. Current behavior (defect): signal→monitor assign
 
 - [ ] One signal (Audience / Confidence / Livestream / etc.) can be routed to **multiple monitors**
   simultaneously (e.g. Audience mirrored to both Monitor A and Monitor B).
+
 - [ ] Assigning a signal to a monitor must **not** steal it from another monitor.
 - [ ] **No signal is mandatory** — if the user only wants Audience, they should not be required to
   assign Confidence, Livestream, or any other output.
+
 - [ ] Verify the audience/confidence output windows + `useRunControl` channel routing handle a
   one-signal→many-monitors fan-out (BroadcastChannel/window management) without desync.
 
