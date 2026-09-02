@@ -1,16 +1,5 @@
 <script setup lang="ts">
-/**
- * Inline-SVG glyph for a stage-marker kind (Phase 107 redesign). The app has
- * no icon-font dependency and renders icons as inline SVGs by convention, so
- * the imported design's Phosphor web font is intentionally NOT used — each
- * `icon` name from STAGE_KIND_META maps to a hand-authored 24×24 stroke glyph
- * here. One component, reused by the palette chip, the marker tile
- * (editor + read-only view), and the inspector drawer, so there is exactly
- * one place a kind's glyph is defined.
- *
- * Pure/presentational (no store, no Firebase) so it is safe on the public
- * ShareView via StageLayoutView. Colour comes from `currentColor`.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/stage/StageKindIcon.vue)
 defineProps<{
   /** Glyph name from `stageKindIcon()` / STAGE_KIND_META.icon. */
   name: string

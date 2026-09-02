@@ -1,20 +1,5 @@
 <script setup lang="ts">
-/**
- * A single stage-marker tile (Phase 107 redesign): a rounded icon tile with
- * the kind glyph, the label beneath it, plus the type, an assigned person, and
- * a tech note. Purely PRESENTATIONAL and single-root, so both callers drive it
- * by fallthrough:
- *   • StageLayoutEditor positions it (`:style`), marks it interactive, and
- *     attaches the native pointer handlers for drag + the click-to-select.
- *   • StageLayoutView (read-only: locked editor / share / print) just
- *     positions it — no handlers, not interactive.
- * No store/Firebase import — safe on the public ShareView.
- *
- * `print` mode renders a larger, high-contrast BLACK-AND-WHITE tile for the
- * tech team's printed sheet (bigger legible type, black text, a white tile with
- * a black outline). The label is bound via Vue text interpolation ONLY, so a
- * label containing markup renders as literal text (XSS-safe, R315).
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/stage/StageMarkerChip.vue)
 import { computed } from 'vue'
 import type { StageMarker } from '@/types/service'
 import { stageMarkerIcon, stageMarkerSkinClass, stageMarkerTypeLabel } from '@/utils/stageLayout'

@@ -1,31 +1,5 @@
 <script setup lang="ts">
-/**
- * The AUTHORING half of the visual stage layout (R313/R314, Phase 107),
- * redesigned to the single-room "Nocturne" diagram: a left PALETTE of typed
- * chips, one continuous room CANVAS (StageRoom), and — for editing a marker —
- * the app's existing right-hand slide-over pattern (matching RoleSlideOver /
- * TeamSlideOver: a Teleport modal with a backdrop and a buffered Save/Cancel
- * form). Click a chip to drop a marker, drag it where it stands, click it to
- * edit its label / assigned person / type / note.
- *
- * Placement is FREE (never snapped to a grid): pointerup resolves the exact
- * clamped `xPct/yPct` within the single room rect and derives the stored
- * `zone` from that position. Still native Pointer Events (never
- * Konva/interactjs/HTML5-DnD, which is mouse-only and dead on touch).
- *
- * The parent owns `elements`; this component NEVER mutates the prop array —
- * every change round-trips through an emit (add/update/remove/move) so the
- * parent's single autosave path stays the one source of truth.
- *
- * A marker can be named by picking a PERSON already serving this service (via
- * `assignablePeople`, resolved from the service's role assignments) OR by a
- * free-text LABEL — the label stays editable for a spot with no matching
- * assigned person (a guest, a spare, gear). The kind's TYPE is always shown
- * on the tile alongside the label, so a tile reads as both a name and a type.
- *
- * When `editable` is false (locked service) this renders the SAME shared
- * read-only `StageLayoutView` used by share/print — no third rendering path.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/stage/StageLayoutEditor.vue)
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { StageMarker, StageMarkerKind } from '@/types/service'
 import {

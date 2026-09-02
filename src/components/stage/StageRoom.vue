@@ -1,23 +1,5 @@
 <script setup lang="ts">
-/**
- * The stage-room BACKDROP (Phase 107 redesign): one continuous room drawn the
- * way it reads when you stand in it — the platform is a shape at the top, the
- * audience sits below, and "off stage" is the floor in the side wings. Shared
- * verbatim by the read-only `StageLayoutView` (locked editor / share / print)
- * and the live `StageLayoutEditor`, so the diagram is defined in exactly ONE
- * place and can never drift between authoring and the printed/shared plot.
- *
- * Pure/presentational: no store, no Firebase — safe on the public ShareView.
- * Markers are projected in through the default slot, absolutely positioned by
- * the caller over this same rect. The root element is exposed as `roomEl` so
- * the editor can read its bounding rect for drop math (drag never measures a
- * marker, only this room, keeping placement resize-stable — R314).
- *
- * `print` mode renders a high-contrast BLACK-AND-WHITE plot for the tech team's
- * printed sheet: the stage platform is an OUTLINE (a line, not a filled shape)
- * so it costs no ink and reads clearly, labels are larger and black, and the
- * audience seats become hollow outlines.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/stage/StageRoom.vue)
 import { ref } from 'vue'
 
 const props = withDefaults(defineProps<{ theme?: 'dark' | 'light'; print?: boolean }>(), {

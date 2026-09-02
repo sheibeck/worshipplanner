@@ -1,17 +1,5 @@
 <script setup lang="ts">
-/**
- * The tech team's printable STAGE LAYOUT sheet (quick task 2026-09-01):
- * hidden on screen, shown only when printing, and printed LANDSCAPE + BLACK
- * AND WHITE (see ServiceEditorView.printStageLayout, which injects the
- * `@page { size: landscape }` rule and toggles this doc in over the normal
- * service print). It pairs the high-contrast outline diagram with a large,
- * legible list of every marker grouped by placement, so a tech setting up the
- * stage can read it at a glance. Available whether the service is a draft or
- * locked/planned — printing is read-only.
- *
- * Pure/presentational (props only) — safe to render from the read-only,
- * possibly-locked editor.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/stage/StageLayoutPrintDocument.vue)
 import { computed } from 'vue'
 import type { Service, StageMarker } from '@/types/service'
 import { stageMarkerTypeLabel } from '@/utils/stageLayout'

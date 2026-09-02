@@ -1,17 +1,5 @@
 <script setup lang="ts">
-/**
- * Shared READ-ONLY stage-plot renderer (R313/R314/R315, Phase 107; redesigned
- * to the single-room diagram). Pure presentational — props only, NO Pinia
- * store import and NO Firebase import — so it is safe to mount on the public,
- * unauthenticated ShareView as well as the locked-service editor and the
- * print layout. This is the ONE component all three surfaces reuse; do not
- * fork a second read-only rendering path.
- *
- * Positions render directly from the stored `xPct`/`yPct` percentages as
- * inline `left`/`top` over the shared `StageRoom` rect — never computed from a
- * measured container — so placement is resize-stable and reload-exact (R314)
- * by construction. Labels/notes are Vue text interpolation only (XSS-safe).
- */
+// See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/components/stage/StageLayoutView.vue)
 import type { StageMarker } from '@/types/service'
 import StageRoom from '@/components/stage/StageRoom.vue'
 import StageMarkerChip from '@/components/stage/StageMarkerChip.vue'
