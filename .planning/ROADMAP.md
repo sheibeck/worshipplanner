@@ -579,7 +579,7 @@ standalone audit-only phase, since R316 alone is thin/task-like and naturally se
 inside Phase 108's own plan.
 
 - [x] **Phase 108: Comment Audit & Decision-Rationale Extraction** - Inventory and classify every load-bearing comment, then relocate decision-rationale (R-/WR-/CR-/Pitfall) comments into ADRs with the source comment shrunk to a pointer (completed 2026-09-01)
-- [ ] **Phase 109: Behavioral/Architectural Extraction & Comment Convention** - Relocate "how this works" comments into `.planning/codebase/` map docs and document the go-forward comment convention
+- [x] **Phase 109: Behavioral/Architectural Extraction & Comment Convention** - Relocate "how this works" comments into `.planning/codebase/` map docs and document the go-forward comment convention (completed 2026-09-02)
 - [ ] **Phase 110: Architectural Review** - Severity-ranked report on module boundaries, store/Firestore-listener lifecycle, multi-tenant isolation architecture, data flow, and coupling
 - [ ] **Phase 111: Architectural Remediation** - Fix or explicitly defer every Critical/High architectural finding; triage Medium/Low to backlog
 - [ ] **Phase 112: Security Review** - Severity-ranked report on Firestore/Storage rules, auth/claims + route guards, tenant isolation, Cloud Functions authorization, share-token/PII exposure, and cost/abuse controls
