@@ -235,6 +235,43 @@ export const useAuthStore = defineStore('auth', () => {
 - Always type-annotate refs and computed values
 - Return all public state/actions at end of function
 
+## Comment Convention
+
+**Established:** 2026-09-01 (v2.8 Phase 109, R319). This section is distinct from — and extends
+rather than replaces — the "Comments" section above; that section covers JSDoc and general style,
+this section covers where the *load-bearing* content of a comment should live.
+
+**The rule:** comments stay short. Keep inline only what the code alone cannot convey at the point
+of reading — a non-obvious "why," a gotcha, or an invariant. Anything longer belongs in one of two
+durable stores, cited from source by a short pointer:
+
+1. **Decision rationale** ("why we chose this over the alternatives") lives in an ADR under
+   `docs/adr/` (established Phase 108, R317). Cite it from source with:
+   ```
+   // See ADR-NNNN (<short description>)
+   ```
+2. **Behavioral/architectural narration** ("how this feature works end-to-end") lives in the
+   `.planning/codebase/` map docs (established Phase 109, R318). Cite it from source with:
+   ```
+   // See .planning/codebase/<DOC>.md (<section>)
+   ```
+   — a relative path to the doc plus the section name, mirroring the ADR-pointer style above.
+
+Multi-paragraph "how the whole feature works" narration that used to sit inline is relocated to the
+relevant map doc and replaced with a short pointer of this form — it is not paraphrased or kept
+inline alongside the pointer.
+
+**Where things live, at a glance:**
+
+| Content | Home | Pointer form |
+|---|---|---|
+| Short, local "why" / gotcha / invariant that the code alone can't convey | Inline, at the point of reading | (no pointer needed — it stays put) |
+| Decision rationale — why this approach was chosen | `docs/adr/` | `// See ADR-NNNN (...)` |
+| Behavioral/architectural "how it works" | `.planning/codebase/` map docs | `// See .planning/codebase/<DOC>.md (<section>)` |
+
+Both pointer forms exist so a future comment can be traced back to its durable source in one line,
+without re-deriving rationale or behavior narration that already lives elsewhere.
+
 ---
 
 *Convention analysis: 2026-07-16*

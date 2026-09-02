@@ -1,3 +1,8 @@
+## Comment convention
+
+Comments stay short; rationale goes in ADRs and behavior narration goes in map docs — see
+`.planning/codebase/CONVENTIONS.md` ("Comment Convention" section) before writing a long inline comment.
+
 ## graphify
 
 This project has a knowledge graph at `.planning/graphs/`, built and maintained by the
