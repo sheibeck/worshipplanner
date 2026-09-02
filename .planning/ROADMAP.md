@@ -714,12 +714,12 @@ share-token/public-page exposure and PII handling, and cost/abuse controls.
   2. Every finding carries an explicit severity and a concrete location (rule path, function name, route, or code reference) (R322).
   3. Critical/High findings are clearly distinguished from Medium/Low, giving Phase 113 an unambiguous remediation scope (R322).
 
-**Plans**: 2/4 plans executed
+**Plans**: 3/4 plans executed
 **Wave 1**
 
 - [x] 112-01-PLAN.md — Firestore & Storage rules + multi-tenant isolation review (runs the live rules suite) → 112-FINDINGS-rules-isolation.md
 - [x] 112-02-PLAN.md — auth/custom-claims + route guards + Cloud Functions authorization review (incl. ARCH-005, ARCH-018) → 112-FINDINGS-auth-functions.md
-- [ ] 112-03-PLAN.md — share-token/public-page exposure + PII + cost/abuse controls review → 112-FINDINGS-sharetoken-pii-abuse.md
+- [x] 112-03-PLAN.md — share-token/public-page exposure + PII + cost/abuse controls review → 112-FINDINGS-sharetoken-pii-abuse.md
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
