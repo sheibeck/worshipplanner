@@ -83,16 +83,21 @@ service cloud.firestore {
                 'aiMasterEnabled', 'aiEnabledAt', 'aiEnabledBy', 'aiDisabledAt', 'aiDisabledBy',
                 'bibleApiEnabled', 'bibleApiEnabledAt', 'bibleApiEnabledBy', 'bibleApiDisabledAt', 'bibleApiDisabledBy'];
       }
+      // IN-01 (113-REVIEW): the former "create (no prior doc)" branch is
+      // removed -- SEC-ISO-01 deleted the only `allow create` on
+      // organizations/{orgId} that ever invoked this function in create
+      // context, so it is now called exclusively from `allow update` below,
+      // where `resource` is guaranteed non-null by Firestore's own operation
+      // semantics (an `update` cannot target a nonexistent document). The
+      // dead branch, if it somehow ran, was at least as restrictive as this
+      // one -- removing it is not a security-relevant change.
       function preservesLifecycleFields() {
         return request.resource == null
           // Delete: nothing being written, nothing to restrict.
           ? true
-          : (resource == null
-              // Create (no prior doc): check the incoming doc's own keys.
-              ? !request.resource.data.keys().hasAny(lifecycleFields())
-              // Update (prior doc exists): diff against the stored doc, exactly
-              // like the services/{docId} block's keys() helper below.
-              : !request.resource.data.diff(resource.data).affectedKeys().hasAny(lifecycleFields()));
+          // Update (prior doc exists): diff against the stored doc, exactly
+          // like the services/{docId} block's keys() helper below.
+          : !request.resource.data.diff(resource.data).affectedKeys().hasAny(lifecycleFields());
       }
 
       // See ADR-0003 (docs/adr/0003-r233-t-80-02-t-80-03-createdby-is-a-provenance-audit-field-t.md)
