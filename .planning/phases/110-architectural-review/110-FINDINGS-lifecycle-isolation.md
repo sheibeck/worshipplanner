@@ -195,3 +195,112 @@ considered — ADR-0137).
 
 ---
 
+## Dimension 3: Multi-Tenant (Org) Isolation Architecture
+
+### Isolation implications of the church-switch flow (Task 1 cross-reference)
+
+Per the plan's Task 2 instruction to assess whether the church-switch flow reviewed in Task 1 leaves
+any store bound to the prior org: **no proven cross-tenant read/write vector was found.** The listener
+teardown ordering (F-LC-01) structurally prevents a stale-org `onSnapshot` from ever firing into the
+new org's UI at all 4 real org-switch call sites. F-LC-02 (the `exitSuperAdminView` re-entrancy gap)
+is a listener-leak/race, not a cross-tenant leak, because both racing calls resolve to the identical
+destination org. F-LC-03 (`ServicesView.vue`'s local teardown drift) IS the one finding with a genuine
+isolation dimension: it is entirely reset-order-dependent rather than self-defending, so it is recorded
+under both dimensions — see F-LC-03 above for full detail; not duplicated here.
+
+---
+
+### F-ISO-01 — Low (confirmed, no new residual) — `orgId` derivation has exactly one source of truth; no hardcoded org IDs or route-param-driven org access found in production `src/`
+
+**Location:** `src/stores/auth.ts:90,464` (`authStore.orgId` set only inside `loadOrgContext`/
+`enterOrgAsSuperAdmin`, sourced from the user's `orgIds` doc field + the `orgs` custom-claim map —
+never a literal string); every org-scoped store's `subscribe(orgId: string)` signature takes `orgId` as
+a caller-supplied parameter, and every call site reviewed (`ServicesView.vue`, `SongsView.vue`,
+`DashboardView.vue`, `RosterView.vue`, `QuarterView.vue`, `ServiceEditorView.vue`, `TeamView.vue`)
+reads it from `authStore.orgId` at the point of the `watch()`/`initStore()` call, never from a literal.
+
+**Verification performed:** `grep -rE "doc\(db, 'organizations', '[a-zA-Z]" src/` (excluding
+`src/rules.test.ts`, which intentionally hardcodes `orgA`/`orgB` fixture IDs for the rules emulator
+suite) returns zero matches in production source — the `ARCHITECTURE.md` "Hardcoded Org IDs"
+anti-pattern is not present today. `grep -rE "params\.orgId|route\.params\.org|:orgId" src/` (routes +
+views) also returns zero matches — no authenticated route accepts an org id as a URL/route parameter;
+the only org-scoped public route is the pre-existing share-token flow (`QuarterShareView.vue`, gated by
+an unguessable Firestore-doc token, not by an org id in the URL — already documented as an accepted
+low-severity residual in `firestore.rules`' `serviceShareLinks` note, ARCHITECTURE.md). No new finding;
+recorded because the plan explicitly asked this to be assessed.
+
+---
+
+### F-ISO-02 — Low (confirmed, matches documented accepted residual — no new finding) — super-admin's `isOrgEditor` grant is universal by design, already accepted (Phase 78 R225/T-78-03)
+
+**Location:** `firestore.rules:28-43` (`isOrgEditor(orgId)`, the `isSuperAdmin() ||` disjunct at line
+38 makes this true for every super-admin on every org, unconditional on `isOrgActive()`); `src/stores/
+auth.ts:592-613` (`enterOrgAsSuperAdmin`, deliberately writes NO `setDoc`/`writeBatch` per its own
+comment at lines 588-591, so R226 — "entering a church as a super-admin creates no member doc" — holds
+only as a client-code contract, not a rules invariant, per `ARCHITECTURE.md`'s own IN-02 note).
+
+**Confirmed, not re-litigated:** This is architecturally as documented in `ARCHITECTURE.md`'s
+"Backend Behavioral Notes" for `firestore.rules` — a super-admin's client SDK COULD legally `create` a
+membership doc for any org via this rule shape, and the only reason it does not happen in practice is
+`enterOrgAsSuperAdmin`'s client code choosing not to call `setDoc`. This was already reviewed and
+accepted at Phase 78 (T-78-03, both 78-01-PLAN.md and 78-02-PLAN.md threat models). Re-confirmed here
+per the plan's read_first instruction; recorded as Low/no-new-finding rather than re-opening an
+already-accepted residual. If Phase 111 wants to close it anyway (e.g. an explicit rules-level
+membership-doc-write guard scoped to `isOrgMember(orgId)` rather than the broader `isOrgEditor`),
+that is a Phase 112 (security review) scoping decision, not this phase's.
+
+---
+
+### F-ISO-03 — Medium — `functions/src/orgProvisioning.ts` and Cloud Functions org-context callables are built and tested but UNDEPLOYED per their own hand-over notes; isolation architecture correctness cannot be verified in production until deployed
+
+**Location:** `functions/src/index.ts` re-exports of `onboardOrganization`/`assignOrgAdmin`/
+`listOrganizations`/`setOrgActive` (per `ARCHITECTURE.md`'s Backend Behavioral Notes, "shipped
+built+tested+UNDEPLOYED per 74-01-PLAN.md's/76-01-PLAN.md's hand-over deploy notes").
+
+**Handoff note (Phase 112, not fixed here):** This is a deployment-state observation, not a code defect
+— the client-side and Cloud Functions code paths for org provisioning/deactivation are architecturally
+sound as reviewed (independent server-side re-verification patterns match `parsePptxHandler`'s "never
+trust the client-declared value alone" precedent throughout `functions/src/*.ts`), but the review
+cannot confirm the LIVE production Firestore/Functions state matches what's in this repo without a
+deploy-state audit, which is out of this review-only phase's scope. Flagged for Phase 112/deploy
+verification rather than fixed or deep-dived here, per the plan's "genuine security findings noticed
+incidentally are out of scope for fixing here" instruction.
+
+---
+
+### F-ISO-04 — Low (confirmed, no new finding) — `functions/src/index.ts`'s proxy and callable handlers consistently re-derive org membership server-side rather than trusting the client-declared `orgId`
+
+**Location:** `functions/src/index.ts:723-751` (`parsePptxHandler`, "Independent org-membership check
+-- never trust the client-declared orgId", lines 736-751); `functions/src/orgMembershipClaims.ts:151-
+201` (`decideMembershipClaim`, "never fall back to trusting the event's orgId param alone", lines
+156-160, independently re-derives the user's primary org from the `users/{uid}` doc rather than the
+Firestore-trigger event's own path segment); `functions/src/index.ts:1859` /
+`queueServiceMessageHandler` (per ARCHITECTURE.md's Backend Behavioral Notes, "the client-declared
+orgId is used ONLY to scope the Firestore path, membership and role are re-verified for THAT path").
+
+**Confirmed:** every server-side handler reviewed re-verifies org membership from Firestore/Auth-claim
+state rather than trusting a client-supplied `orgId` field at face value — the architectural invariant
+the plan asked to assess ("whether any client path can construct a Firestore reference for an org the
+user is not currently scoped to") holds throughout the Cloud Functions surface reviewed. No new
+finding; recorded as explicit confirmation per the plan's assessment instruction.
+
+---
+
+## Summary Table
+
+| ID | Dimension | Severity | Location |
+|----|-----------|----------|----------|
+| F-LC-02 | Lifecycle | **High** | `src/stores/auth.ts:31,301-316,506-532,617-636`; `src/components/AppShell.vue:46-48,74-79` |
+| F-LC-03 | Lifecycle + Isolation | **Medium** | `src/views/ServicesView.vue:364-390` |
+| F-LC-04 | Lifecycle | Medium | `src/components/SongLyricEditor.vue:848-856`; `src/components/ScriptureSlideEditor.vue:230-247` |
+| F-LC-06 | Lifecycle | Medium | `src/stores/pptxRenders.ts:37-70`; `src/composables/useSlideshowAssembly.ts:206-212` |
+| F-ISO-03 | Isolation | Medium (Phase 112/deploy-audit handoff) | `functions/src/index.ts` re-exports of `orgProvisioning.ts` |
+| F-LC-01 | Lifecycle | Informational (verification, no action) | `src/stores/orgScopedStores.ts:22-34` |
+| F-LC-05 | Lifecycle | Low (confirms correct design) | `src/views/ServiceEditorView.vue:2937-2942` |
+| F-ISO-01 | Isolation | Low (confirmed, no new residual) | `src/stores/auth.ts`; all org-scoped store `subscribe()` call sites |
+| F-ISO-02 | Isolation | Low (confirmed, matches accepted Phase 78 residual) | `firestore.rules:28-43`; `src/stores/auth.ts:592-613` |
+| F-ISO-04 | Isolation | Low (confirmed, no new finding) | `functions/src/index.ts`; `functions/src/orgMembershipClaims.ts:151-201` |
+
+**Critical+High findings for Phase 111 remediation:** F-LC-02 only.
+**Medium findings for backlog triage:** F-LC-03, F-LC-04, F-LC-06, F-ISO-03.
+**Low/informational (no action required):** F-LC-01, F-LC-05, F-ISO-01, F-ISO-02, F-ISO-04.
