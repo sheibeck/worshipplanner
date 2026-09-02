@@ -128,18 +128,9 @@ export const useAuthStore = defineStore('auth', () => {
   // ONLY gate. Consumed by Phases 102/103's scripture-fetch gate.
   const bibleApiEnabled = ref(false)
 
-  // The organizations the signed-in user belongs to ({id, name, active, role})
-  // — the source the login church-picker AND (Phase 104, R311/R312) the
-  // sidebar church switcher render when a user belongs to more than one.
-  // Populated by loadOrgContext. `active` defaults to `true` for a readable
-  // org doc with no `active` field (legacy orgs); a caught read failure
-  // (deactivation OR a stale/orphaned membership) conservatively defaults to
-  // `false` (R213/T-76-08). `role` (Phase 104, R311) is resolved per-entry
-  // from the `orgs` custom claim (`claimOrgs[id]`, read just above in
-  // loadOrgContext) — 'editor' only when the claim explicitly says so,
-  // 'viewer' otherwise, INCLUDING an org present in orgIds but not yet caught
-  // up in the claim (never crashes or drops the entry — same
-  // never-blank-the-list posture as name/active above).
+  // Login church-picker + sidebar church-switcher source. See
+  // .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+  // src/stores/auth.ts).
   const memberships = ref<{ id: string; name: string; active: boolean; role: 'editor' | 'viewer' }[]>([])
 
   // R213 (Phase 76) — set by loadOrgContext when the active/selected org's
@@ -262,30 +253,9 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
-  // R075 (D-06/D-07) / P-01 — force the custom `orgId`/`role` claim (set by
-  // functions/src/orgMembershipClaims.ts's syncOrgMembershipClaim trigger)
-  // onto the active session's ID token so a member does not wait out a full
-  // 1-hour token lifetime for it to propagate. `getIdTokenResult` is used
-  // (rather than `getIdToken`) because it returns the decoded `claims`
-  // object, which is what lets the retry below know when to stop.
-  //
-  // `awaitClaim` scopes the retry (P-01) to the just-created-membership
-  // window only: false loops at most once with no delay (the ordinary,
-  // already-a-member path — latency must stay unchanged), true loops up to
-  // CLAIM_REFRESH_MAX_ATTEMPTS times spaced CLAIM_REFRESH_DELAY_MS apart,
-  // stopping the instant `claims.orgId` strictly equals `targetOrgId` (a
-  // claim naming a different org, e.g. a stale claim from a previous org,
-  // never satisfies the wait).
-  //
-  // Known limitation (D-01/D-04, documented not accidental): the claim only
-  // ever carries the user's PRIMARY org (orgIds[0]). For a multi-org user,
-  // a non-primary org load passes a targetOrgId the claim will never carry —
-  // that load is, and stays, served by the Firestore-membership arm of the
-  // dual-read alone. That is expected, not a bug in this retry.
-  //
-  // Never throws: a failed or exhausted refresh is not a failed sign-in —
-  // storage.rules' Firestore-membership arm still grants access while the
-  // claim is missing, so loadOrgContext must still resolve either way.
+  // R075 (D-06/D-07) / P-01 — forces the orgId/role claim onto the token; never throws.
+  // See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+  // src/stores/auth.ts).
   async function refreshOrgClaim(targetOrgId: string, awaitClaim: boolean): Promise<void> {
     const currentUser = user.value
     if (!currentUser) return
@@ -362,16 +332,9 @@ export const useAuthStore = defineStore('auth', () => {
     // chain below is mandatory because noUncheckedIndexedAccess is on.
     const orgSettings = (orgData.settings as Partial<OrgSettings> | undefined) ?? {}
 
-    // Dual-read migration (R073): nested settings value first, then the
-    // legacy flat field, then the hardcoded default. This is live
-    // production data — do NOT collapse this to `orgSettings.vwModeEnabled
-    // ?? true`, which would silently turn Vertical Worship back ON for a
-    // church that deliberately turned it off via the flat field. No
-    // read-triggered backfill is performed here; the backfill is
-    // write-triggered, delivered by the Settings toggle's save handler
-    // switching its write target to the `settings.vwModeEnabled` dot-path.
-    // Computed once and applied to BOTH `settings.value.vwModeEnabled` and
-    // the standalone `vwModeEnabled` ref so they can never disagree.
+    // Dual-read migration (R073) — do NOT collapse to `?? true`; see
+    // .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+    // src/stores/auth.ts).
     const resolvedVwModeEnabled =
       orgSettings.vwModeEnabled ?? (orgData.vwModeEnabled as boolean | undefined) ?? true
 
@@ -436,18 +399,9 @@ export const useAuthStore = defineStore('auth', () => {
     const userData = userSnap.exists() ? userSnap.data() : null
     const orgIds: string[] = userData?.orgIds ?? []
 
-    // Bug 1b (quick 260830-l9c) — self-heal a clobbered orgIds array from the
-    // authoritative `orgs` custom claim. functions/src/orgMembershipClaims.ts
-    // computes the FULL multi-org set server-side
-    // (collectionGroup('members') scan) on every membership write, so an
-    // account whose client-side orgIds was already clobbered down to a
-    // single element (the pre-1a REPLACE bug) still has every org listed in
-    // its claim — unioning it in here means the picker self-heals with no
-    // manual Firestore repair. Read WITHOUT forcing a network refresh (the
-    // separate forced refreshOrgClaim(activeId, ...) below still runs once
-    // activeId is known) so this stays cheap on the ordinary
-    // already-a-member path. Never throws: a failed claim read must still
-    // let an orgIds-only login proceed.
+    // Bug 1b (quick 260830-l9c) — self-heals a clobbered orgIds array from the claim.
+    // See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+    // src/stores/auth.ts).
     let claimOrgs: Record<string, unknown> = {}
     const currentUser = user.value
     if (currentUser) {
@@ -465,13 +419,9 @@ export const useAuthStore = defineStore('auth', () => {
       ...Object.keys(claimOrgs).filter((id) => !orgIds.includes(id)),
     ]
 
-    // Build the membership list ({id, name, active}) the church picker
-    // renders. Each org doc is read individually and guarded: an org the user
-    // has an orgIds entry for but can't cleanly read (e.g. a stale/orphaned id
-    // with no member doc, or — post-76-01 — a deactivated org's own member
-    // being denied) falls back to its id and `active: false` instead of
-    // rejecting the whole list, so one bad membership never blanks or breaks
-    // the picker (R213/T-76-08).
+    // Builds the church-picker membership list; one bad org read never blanks the list.
+    // See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+    // src/stores/auth.ts).
     // Phase 104 (R311) — per-org role, threaded from claimOrgs onto every
     // membership entry so the sidebar church switcher's role badge has data
     // to render. 'editor' only on an explicit 'editor' claim value; every

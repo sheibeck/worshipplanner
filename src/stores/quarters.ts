@@ -209,16 +209,9 @@ export const useQuartersStore = defineStore('quarters', () => {
     await updateQuarter(quarterId, { personQuarterData })
   }
 
-  // D-03/D-05/D-06: single-person quarter-data save from the availability drawer. Writes ONLY
-  // the scoped `personQuarterData.${id}` dot-path — never the whole `personQuarterData` map — so
-  // concurrent edits to other people's entries aren't clobbered (T-14-03-01).
-  //
-  // Pairing is ONE-WAY (directional): `pairedWith` on this person is the list of people THEY
-  // must serve with (the scheduler pulls those partners in when this person is scheduled — see
-  // propagatePairing in scheduler.ts, which follows each person's OWN pairedWith). This save
-  // therefore touches only this person's entry: no reciprocal write is mirrored onto a partner,
-  // so "Nolan must serve with Tim" does not imply "Tim must serve with Nolan". Removing a partner
-  // here likewise only edits this person's list, leaving the partner's own record untouched.
+  // D-03/D-05/D-06 — scoped dot-path save; pairedWith is ONE-WAY, never reciprocal-written.
+  // See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+  // src/stores/quarters.ts).
   async function setPersonAvailability(
     quarterId: string,
     personId: string,

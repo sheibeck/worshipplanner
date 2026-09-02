@@ -1,43 +1,6 @@
 /**
- * Curated registry of self-hosted slide fonts (R093 success criterion 4).
- *
- * Every family here ships as a static (non-variable) `@fontsource/*` package
- * — self-hosted woff2, never the runtime Google Fonts API (a projector
- * without internet at service time cannot fetch a remote font). This is the
- * single source of truth the Settings "Slide Typography" card (46-03) reads
- * for the family list and per-family weight ramp, the `snapWeight` helper
- * (46-02) reads to validate/correct a stored weight, and the on-demand
- * font-CSS loader (46-02 `loadFontCss`) reads for the `package` + `category`
- * used to build the CSS `@import` path and the font-family CSS stack.
- *
- * `weights` is intentionally the "standard 300-700 ramp" subset of each
- * package's full shipped weight list, NOT every weight the package ships —
- * CONTEXT.md locks the picker to 300/400/500/600/700 only (no 100/200/800/
- * 900). A family that doesn't ship a given ramp weight simply omits it here
- * (e.g. Lora has no 300) rather than listing a weight that would 404.
- *
- * `license` and `licenseUrl` were each verified directly against that
- * package's own installed `node_modules/@fontsource/<package>/LICENSE` file
- * (2026-08-08; Roboto 2026-08-11) — not assumed by analogy to Inter. All six
- * are SIL Open Font License 1.1 ("OFL-1.1"), confirmed by the "This Font
- * Software is licensed under the SIL Open Font License, Version 1.1" text
- * present verbatim in every package's LICENSE file. See 46-RESEARCH.md
- * § "Curated Font List" and 55-RESEARCH.md § "R126" for
- * the source table this registry is built from (CORRECTED from
- * 46-UI-SPEC.md's table — Open Sans ships 500, Source Serif 4 ships 300 and
- * 500, both omitted by the UI-SPEC's unverified draft).
- *
- * Package legitimacy: `gsd-tools query package-legitimacy check` flagged all
- * six packages `SUS` with reason `too-new`. This is a structural false
- * positive from `@fontsource`'s catalog-wide lockstep release cadence (the
- * entire multi-hundred-package catalog re-publishes together on every
- * upstream Google Fonts refresh), not a genuine supply-chain signal — all
- * six resolve to the canonical `github.com/fontsource/font-files` repo,
- * weekly downloads range 104K-2.37M (Roboto ~1.26M), and `postinstall` is
- * `null` on every package. Recorded in `.planning/PENDING-VERIFICATION.md`
- * § Phase 46 (the original five) and § Phase 55 (Roboto) as DEFERRED (not
- * self-approved) per the STATE.md v1.5/v1.6 standing autonomy grant, since
- * RESEARCH.md already performed direct tarball + registry verification.
+ * See .planning/codebase/CONCERNS.md (Store & Config Concern Notes (R318) ->
+ * src/config/slideFonts.ts).
  */
 
 export interface SlideFontDefinition {

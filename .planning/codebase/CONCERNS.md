@@ -345,6 +345,35 @@ settled. With the Automatic Fullscreen policy granted (the multi-monitor target)
 NO gesture; without it it is a silently-rejected no-op. Idempotent (skips when already fullscreen)
 and guarded against a fast exit. Exited again in `endServiceTeardown`.
 
+## Store & Config Concern Notes (R318)
+
+### src/config/slideFonts.ts
+
+**Module overview (R093 success criterion 4):** curated registry of self-hosted slide fonts. Every
+family ships as a static (non-variable) `@fontsource/*` package — self-hosted woff2, never the
+runtime Google Fonts API (a projector without internet at service time cannot fetch a remote font).
+This is the single source of truth the Settings "Slide Typography" card (46-03) reads for the
+family list and per-family weight ramp, the `snapWeight` helper (46-02) reads to validate/correct a
+stored weight, and the on-demand font-CSS loader (46-02 `loadFontCss`) reads for the `package` +
+`category` used to build the CSS `@import` path and the font-family CSS stack. `weights` is
+intentionally the "standard 300-700 ramp" subset of each package's full shipped weight list, NOT
+every weight the package ships — CONTEXT.md locks the picker to 300/400/500/600/700 only (no
+100/200/800/900); a family that doesn't ship a given ramp weight simply omits it (e.g. Lora has no
+300) rather than listing a weight that would 404. `license`/`licenseUrl` were each verified directly
+against that package's own installed `node_modules/@fontsource/<package>/LICENSE` file (2026-08-08;
+Roboto 2026-08-11) — not assumed by analogy to Inter. All six are SIL Open Font License 1.1
+("OFL-1.1"), confirmed by the license text present verbatim in every package's LICENSE file (see
+46-RESEARCH.md § "Curated Font List" and 55-RESEARCH.md § "R126" for the source table). Package
+legitimacy: `gsd-tools query package-legitimacy check` flagged all six packages `SUS` with reason
+`too-new` — a structural false positive from `@fontsource`'s catalog-wide lockstep release cadence
+(the entire multi-hundred-package catalog re-publishes together on every upstream Google Fonts
+refresh), not a genuine supply-chain signal: all six resolve to the canonical
+`github.com/fontsource/font-files` repo, weekly downloads range 104K-2.37M (Roboto ~1.26M), and
+`postinstall` is `null` on every package. Recorded in `.planning/PENDING-VERIFICATION.md` § Phase 46
+(the original five) and § Phase 55 (Roboto) as DEFERRED (not self-approved) per the STATE.md
+v1.5/v1.6 standing autonomy grant, since RESEARCH.md already performed direct tarball + registry
+verification.
+
 ---
 
 *Concerns audit: 2026-07-16*

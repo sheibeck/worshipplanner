@@ -20,20 +20,8 @@ import { stripUndefined } from '@/utils/stripUndefined'
 import type { SlideGroup, SlideGroupInput, GroupSlideEntry } from '@/types/slideGroup'
 
 /**
- * Pinia store for slide groups (Phase 24). Mirrors useImportedSlides /
- * useScriptureSlides (src/stores/importedSlides.ts, src/stores/scriptureSlides.ts)
- * against the organizations/{orgId}/slideGroups sibling collection, with `slides`
- * as an EMBEDDED ARRAY field (never a nested subcollection — see src/types/slideGroup.ts).
- *
- * This is the ONLY module in the phase that talks to Firestore about groups —
- * every group write (materialize, delete, bed media, slide replace) lives here
- * so a second, competing save path never appears next to ServiceEditorView's
- * existing whole-document autosave (R018).
- *
- * NEVER use the random-auto-id create function here. Every group document's id
- * IS the anchoring slot's stable id (D-01) — a deterministic doc id — so that
- * lazy materialization from two simultaneously-open tabs can never create two
- * divergent documents for the same slot (RESEARCH.md Pattern 1).
+ * See .planning/codebase/STACK.md (Store & Entry-Point Stack Notes (R318) ->
+ * src/stores/slideGroups.ts).
  */
 export const useSlideGroups = defineStore('slideGroups', () => {
   const groups = ref<SlideGroup[]>([])

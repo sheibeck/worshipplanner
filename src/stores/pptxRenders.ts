@@ -5,31 +5,8 @@ import { db } from '@/firebase'
 import type { PptxRenderDoc } from '@/types/pptxRender'
 
 /**
- * Pinia store for render-status documents (Phase 42, R079/R080) —
- * `organizations/{orgId}/pptxRenders/{importId}`.
- *
- * ★ Genuinely new design (42-PATTERNS.md "No Analog Found"). Every other store in this
- * codebase either subscribes to ONE whole-collection query (`importedSlides.ts`,
- * `scriptureSlides.ts`) or does a one-shot per-id fetch (`useSlideshowAssembly.ts`'s
- * `loadMissingLyrics`). This store manages a DYNAMIC SET of live per-document
- * `onSnapshot` listeners — one per distinct `renderImportId` the current service
- * references — opened when an id joins the set and closed when it leaves (D-04, D-20;
- * T-42-06 listener-leak guard). `renderImportId` is `ImportedDeck.renderImportId`, NOT
- * `ImportedDeck.id`/`ImportedSlot.importId` — the two identifiers are deliberately
- * distinct (`src/types/importedDeck.ts:19-30`); every map here is keyed by the former.
- *
- * An id absent from `rendersByImportId` means "no render document yet" (or "its
- * listener has been torn down") — never a synthesized placeholder. Callers must be able
- * to tell "not written yet" from "written as pending" (T-42-07's stale-render guard: an
- * id's cached state can never outlive its subscription).
- *
- * **Recorded default (42-RESEARCH.md Assumption A2, D-20):** one listener per
- * `renderImportId` rather than a single `where(documentId(), 'in', [...])` query.
- * Imported decks per service are typically 1-3; a per-id listener set has a trivially
- * correct teardown story, and the `in`-query alternative would need re-issuing the
- * whole query on every id-set change. Revisit only if listener count becomes a measured
- * problem — no `firestore.indexes.json` entry is needed for either shape
- * (42-RESEARCH.md Open Question 3).
+ * See .planning/codebase/STACK.md (Store & Entry-Point Stack Notes (R318) ->
+ * src/stores/pptxRenders.ts).
  */
 export const usePptxRenders = defineStore('pptxRenders', () => {
   const rendersByImportId = reactive(new Map<string, PptxRenderDoc>())

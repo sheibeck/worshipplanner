@@ -8,16 +8,9 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 
-// NOTE (output-window fullscreen): there is deliberately NO module-load
-// requestFullscreen() here for /present/* windows. A popup opened via
-// window.open does NOT retain transient user-activation once its SPA/auth
-// bootstrap runs, so a requestFullscreen() at module load ALWAYS rejected with
-// "API can only be initiated by a user gesture" — the console error the owner
-// saw, and it never actually went fullscreen. Auto-fullscreen for output
-// windows is now driven by Fullscreen Capability Delegation from the opener
-// (the control window, which HAS activation from the Go-live click) — see
-// useRunControl.ts (delegates) + useOutputWindow.ts (requests on delegation) —
-// with a guaranteed one-tap-anywhere affordance as the fallback.
+// NOTE: deliberately NO module-load requestFullscreen() here for /present/* windows —
+// a popup loses transient activation before its bootstrap completes. See
+// .planning/codebase/STACK.md (Store & Entry-Point Stack Notes (R318) -> src/main.ts).
 
 const app = createApp(App)
 

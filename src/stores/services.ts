@@ -47,22 +47,10 @@ type CreateServiceInput = {
 }
 
 /**
- * R036 — thrown by the store's draft-only write guard (enforcement layer 2 of 3).
- *
- * The guard is defence-in-depth, NOT the primary enforcement: the Firestore rule
- * added in 31-01 is what actually stops a determined client. This exists so a
- * client-side bug — a control that should have been removed when the service
- * locked, or a handler that forgot its early return — surfaces as a named local
- * error naming R036 and the stored status, instead of an opaque
- * `FirebaseError: Missing or insufficient permissions` from a round trip.
- *
- * It THROWS rather than silently returning (`createService`'s precedent, not
- * `updateService`'s `if (!orgId.value) return`) deliberately. A swallowed write
- * is indistinguishable from a successful one to the caller, which is precisely
- * the "it didn't save" defect class this milestone exists to close. Note this is
- * not a new failure mode for any caller: since 31-01 these same writes already
- * rejected at the rules layer — the guard only makes the rejection immediate and
- * legible.
+ * R036 — thrown by the store's draft-only write guard (enforcement layer 2 of 3,
+ * defense-in-depth behind the firestore.rules layer). See
+ * .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+ * src/stores/services.ts).
  */
 export class ServiceLockedError extends Error {
   readonly serviceId: string
@@ -101,16 +89,9 @@ export interface ServiceSnapshot {
     personNames: string[]
   }[]
   /**
-   * Read-only public projection of `Service.stageLayout` (R315, Phase 107).
-   * Mirrors `roleAssignments`'s PII-safe-projection precedent: an explicit
-   * per-field map, never a raw spread, so a future non-display `StageMarker`
-   * field cannot silently leak to the public page. There is no PII here (a
-   * marker is only planner free text), but the explicit shape still guards
-   * against scope creep on this field. OPTIONAL and only ever present when
-   * the service has at least one marker — see `buildServiceSnapshot`'s
-   * conditional spread below. Absent (never `undefined`), matching the
-   * `roleAssignments?.length` omit convention `ShareView.vue` already relies
-   * on for its own optional sections.
+   * Read-only public projection of `Service.stageLayout` (R315, Phase 107); field-allowlist,
+   * never a raw spread. See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral
+   * Notes (R318) -> src/stores/services.ts).
    */
   stageLayout?: {
     elements: StageMarker[]
@@ -163,21 +144,10 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     personNames: r.effectivePersonIds.map((id) => nameById.get(id) ?? id),
   }))
 
-  // Stage layout projection (T-107-01): map to EXACTLY the 6 display fields
-  // — id, label, kind, zone, xPct, yPct — never a raw spread of the source
-  // marker, so a future non-display StageMarker field cannot silently reach
-  // the public page. `kind` is optional on StageMarker itself; the
-  // conditional spread here keeps it absent (not `undefined`) on a marker
-  // that never set one, matching this whole projection's absent-not-
-  // undefined contract one level down.
-  //
-  // IN-03: every UI-driven write path already clamps xPct/yPct to [0,100]
-  // before it reaches Service.stageLayout, so this is unreachable through
-  // the app's own UI — but this projection is the last line of defense
-  // before an unauthenticated public page renders these values, so
-  // defensively re-clamp here too. A stored value that reached this field
-  // by some other path (bulk import, manual Firestore edit, a future
-  // caller bug) can then never push a marker off-canvas on ShareView.
+  // Stage layout projection (T-107-01): field-allowlist to EXACTLY 6 display fields,
+  // defensively re-clamped (IN-03) as the last line of defense before an unauthenticated
+  // public page renders these values. See .planning/codebase/ARCHITECTURE.md
+  // (Store & Config Behavioral Notes (R318) -> src/stores/services.ts).
   const stageLayoutElements: StageMarker[] = (service.stageLayout?.elements ?? []).map((marker) => ({
     id: marker.id,
     label: marker.label,
@@ -185,11 +155,9 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     zone: marker.zone,
     xPct: clampPct(marker.xPct),
     yPct: clampPct(marker.yPct),
-    // `note` is planner-authored tech instruction (non-PII free text, e.g.
-    // "XLR run from stage left") and belongs on the printed/shared plot the
-    // tech team reads. Conditional spread keeps the key ABSENT (never
-    // `note: undefined`) on a marker that never set one, same discipline as
-    // `kind` above and the whole projection's absent-not-undefined contract.
+    // `note` is planner-authored tech instruction (non-PII); conditional spread keeps
+    // it ABSENT (never undefined). See .planning/codebase/ARCHITECTURE.md
+    // (Store & Config Behavioral Notes (R318) -> src/stores/services.ts).
     ...(marker.note ? { note: marker.note } : {}),
     // Band-role instrument: project the display role NAME (needed for the tile's
     // type/icon/skin on the read-only page), never the internal roleId.
@@ -354,18 +322,9 @@ export const useServiceStore = defineStore('services', () => {
   }
 
   // ── R036 draft-only write guard ──────────────────────────────────────────────
-  //
-  // The three shapes below mirror `firestore.rules`' `/services` `allow update`
-  // clause one-for-one. They deliberately do NOT invent a fourth policy: any
-  // divergence would either refuse a write the server accepts (a phantom lock)
-  // or wave through one the server denies (an opaque round-trip failure).
-  //
-  //   rule 1  storedStatus() == 'draft'                       → ordinary editing
-  //   rule 2  planned → exported carrying export evidence     → D-09
-  //   rule 3  → draft, touching only status                   → R037 reopen
-  //
-  // `updateService` appends `updatedAt` itself, so the caller-supplied key sets
-  // checked here are the rules' `affectedKeys()` minus `updatedAt`.
+  // Mirrors firestore.rules' /services allow-update clause one-for-one (3 rules).
+  // See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+  // src/stores/services.ts).
 
   /** The status as STORED, from the live snapshot — never an incoming value.
    *  `?? 'draft'` matches the rule's own `resource.data.get('status','draft')`
@@ -375,10 +334,8 @@ export const useServiceStore = defineStore('services', () => {
   }
 
   // ── R247 (84-01) — lastUsedAt recompute on lock/unlock ──────────────────────
-  //
-  // A song's lastUsedAt reflects MAX(service.date) over the LOCKED (non-draft)
-  // services it's in — never the wall-clock moment it was assigned to a draft
-  // (see src/utils/lastUsed.ts for the canonical derivation and rationale).
+  // See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+  // src/stores/services.ts); canonical derivation in src/utils/lastUsed.ts.
 
   /**
    * Builds the pure snapshot `computeLastUsedDate` consumes, with the ONE
@@ -471,16 +428,9 @@ export const useServiceStore = defineStore('services', () => {
   }
 
   // ── R037 status transitions ──────────────────────────────────────────────────
-  //
-  // D-02: explicit, named actions — one per legal transition — replacing the
-  // deleted `toggleStatus` cycle. There is deliberately NO generic status
-  // setter: a `setStatus(id, s)` would re-admit hand-setting `exported` without
-  // an export, which is exactly the defect D-03 closes. `exported` is reachable
-  // ONLY through the export write above.
-  //
-  // Both throw on refusal. The caller must AWAIT them and only then reflect the
-  // new status in the UI — a status that flips before the write lands is the
-  // "it didn't save" defect class this milestone exists to close.
+  // D-02: explicit named actions, no generic setter; both throw on refusal. See
+  // .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+  // src/stores/services.ts).
 
   async function markAsPlanned(id: string): Promise<void> {
     if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
@@ -509,15 +459,9 @@ export const useServiceStore = defineStore('services', () => {
   }
 
   /**
-   * R037 — reopen a locked service for editing.
-   *
-   * ★ The payload is `status` + `updatedAt` and NOTHING ELSE. The rule's
-   * `keys().hasOnly(['status','updatedAt'])` reads `affectedKeys()`, so adding
-   * `pcExportedAt`/`pcPlanId` here — even to re-write their existing values —
-   * can surface in that diff and get the whole write denied. D-11 keeps both
-   * fields precisely by NOT touching them: the Planning Center plan stays
-   * linked, so a re-export updates it instead of creating a duplicate, and
-   * D-04's evidence gate still fires on a second reopen.
+   * R037 — reopen a locked service for editing. Payload is `status` + `updatedAt`
+   * ONLY (D-11). See .planning/codebase/INTEGRATIONS.md (Store Integration Notes
+   * (R318) -> src/stores/services.ts).
    */
   async function reopenService(id: string): Promise<void> {
     if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
@@ -547,21 +491,10 @@ export const useServiceStore = defineStore('services', () => {
     }
   }
 
-  // D-15: deliberately NOT guarded. Delete stays available at every status —
-  // the UI warns about an orphaned Planning Center plan instead of locking.
-  // `firestore.rules`' `allow delete` carries no status condition for the same
-  // reason; keep the two in step.
-  //
-  // R247 (84-01) scope note: deleteService deliberately does NOT trigger a
-  // lastUsedAt recompute. Per 84-CONTEXT.md, the recompute triggers are the
-  // lock/unlock lifecycle (markAsPlanned/reopenService) and locked-service
-  // song-membership changes only — a deleted-locked-service correction, if
-  // ever needed, is a job for the one-time 84-02 backfill, not this delete
-  // path. This is a deliberate scope boundary, not an oversight.
-  //
-  // R234 (80-02): a deleted service must not leave a live, unauthenticated
-  // share URL behind — revoke every public share artifact FIRST, then delete
-  // the service doc LAST, mirroring `deleteQuarter`'s precedent
+  // D-15: deliberately NOT guarded (delete stays available at every status).
+  // See .planning/codebase/INTEGRATIONS.md (Store Integration Notes (R318) ->
+  // src/stores/services.ts). R234 (80-02): revoke every public share artifact
+  // FIRST, then delete the service doc LAST, mirroring `deleteQuarter`'s precedent
   // (`quarters.ts`). Unlike a quarter's single denormalized `shareToken`
   // field, a service can accumulate MULTIPLE `shareTokens` docs (adoption/
   // re-share via `ensureShareLink`), so that step is a QUERY, not a
@@ -803,24 +736,10 @@ export const useServiceStore = defineStore('services', () => {
   const shareLinkCache = new Map<string, string | false>()
 
   /**
-   * The `shareTokens/{token}` payload write plus the soft-fail memorable-URL
-   * `serviceShares/{slug}__service-{date}` write. Runs on EVERY
-   * `ensureShareLink` path, including adoption, so a link already emailed to
-   * a congregation starts showing current data immediately rather than
-   * waiting for the next edit.
-   *
-   * This is an unconditional full-document `setDoc`, not a partial update —
-   * deliberately. That makes the write idempotent and self-healing (a token
-   * document that was deleted is recreated rather than silently failing).
-   * `shareTokens` is a payload surface, not the authoritative creation
-   * record — that lives on `serviceShareLinks/{serviceId}` — so re-stamping
-   * `createdAt` here is harmless and keeps the live token sorting first if
-   * adoption ever runs again.
-   *
-   * The token is used VERBATIM as the document id: no case-folding, no
-   * whitespace trimming, no Unicode normalization. `ShareView.vue` resolves
-   * `/share/:token` by using the route parameter verbatim as the document
-   * id, and any asymmetry here breaks every adopted mixed-case legacy token.
+   * The `shareTokens/{token}` payload write plus the soft-fail memorable-URL write.
+   * Unconditional full-document `setDoc` (idempotent/self-healing); token used
+   * VERBATIM as the doc id. See .planning/codebase/ARCHITECTURE.md
+   * (Store & Config Behavioral Notes (R318) -> src/stores/services.ts).
    */
   async function writeSharePayload(service: Service, orgIdValue: string, token: string): Promise<void> {
     const serviceSnapshot = buildServiceSnapshot(service)
@@ -864,14 +783,9 @@ export const useServiceStore = defineStore('services', () => {
   }
 
   /**
-   * R076/R078 — resolves THE one stable token for a service: reading the
-   * `serviceShareLinks/{serviceId}` identity doc if it exists, else adopting
-   * the most recent compatible already-circulated `shareTokens` document, else
-   * minting a fresh one — then always writing the current payload in place.
-   *
-   * `createShareToken` is a thin wrapper around this; both are exposed on the
-   * store so a future caller can distinguish "resolve the link" from "share
-   * and get the token", though today they're the same operation.
+   * R076/R078 — resolves THE one stable token for a service (identity doc, else
+   * adopt, else mint). See .planning/codebase/ARCHITECTURE.md
+   * (Store & Config Behavioral Notes (R318) -> src/stores/services.ts).
    */
   async function ensureShareLink(service: Service, orgIdValue: string): Promise<string> {
     const linkRef = doc(db, 'serviceShareLinks', service.id)

@@ -648,6 +648,30 @@ re-drives everything and the freshly-opened outputs sync via the hello→resend 
 NEVER `window.open`, `router.push`, or the `confirmExit` teardown — ending a rehearsal is low-stakes
 and needs no confirm.
 
+## Store Integration Notes (R318)
+
+### src/stores/services.ts
+
+**`reopenService` (R037):** reopens a locked service for editing. The payload is `status` +
+`updatedAt` and NOTHING ELSE — the rule's `keys().hasOnly(['status','updatedAt'])` reads
+`affectedKeys()`, so adding `pcExportedAt`/`pcPlanId` here, even to re-write their existing values,
+can surface in that diff and get the whole write denied. D-11 keeps both fields precisely by NOT
+touching them: the Planning Center plan stays linked, so a re-export updates it instead of creating
+a duplicate, and D-04's evidence gate still fires on a second reopen.
+
+**`deleteService` (D-15):** deliberately NOT guarded. Delete stays available at every status — the
+UI warns about an orphaned Planning Center plan instead of locking. `firestore.rules`' `allow
+delete` carries no status condition for the same reason; keep the two in step. R247 (84-01) scope
+note: `deleteService` deliberately does NOT trigger a `lastUsedAt` recompute — per 84-CONTEXT.md,
+the recompute triggers are the lock/unlock lifecycle (`markAsPlanned`/`reopenService`) and
+locked-service song-membership changes only; a deleted-locked-service correction, if ever needed, is
+a job for the one-time 84-02 backfill, not this delete path. This is a deliberate scope boundary,
+not an oversight. R234 (80-02): a deleted service must not leave a live, unauthenticated share URL
+behind — revoke every public share artifact FIRST, then delete the service doc LAST, mirroring
+`deleteQuarter`'s precedent. Unlike a quarter's single denormalized `shareToken` field, a service can
+accumulate MULTIPLE `shareTokens` docs (adoption/re-share via `ensureShareLink`), so that step is a
+QUERY, not a single-doc lookup.
+
 ---
 
 *Integration audit: 2026-07-16*

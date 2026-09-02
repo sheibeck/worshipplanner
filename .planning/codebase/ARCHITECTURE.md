@@ -2256,6 +2256,219 @@ after resuming from an await happen outside the effect's tracking window, silent
 dependencies. Keeping the decision synchronous (mirroring `distinctSongIds`'s shape) and only
 performing the actual (async) writes in the watch callback avoids that pitfall entirely.
 
+## Store & Config Behavioral Notes (R318)
+
+### src/config/appConfigDefaults.ts
+
+**`mergeAppConfig`:** a client-side mirror of `functions/src/appConfig.ts`'s `mergeAppConfig` —
+deliberately a PER-GROUP merge (not a naive recursive deep-merge or a generic deep-merge library),
+so a doc that sets only e.g. `cleanup.mediaEnabled` never wipes sibling `cleanup.*` defaults
+(R182/R186). This mirror does not need the server copy's full fail-open/fail-closed `coerce*`
+discipline (the field components' own min/max/required validation already blocks obviously-bad
+saves before they reach Firestore) — it only needs to be forgiving of a partial/absent doc,
+matching R182's guarantee that an absent `appConfig/global` doc resolves to `DEFAULT_APP_CONFIG`.
+
+### src/stores/appConfig.ts
+
+**Module overview (Phase 70, R186/R187):** Pinia store over the single `appConfig/global`
+Firestore doc. Mirrors `src/stores/auth.ts`'s onSnapshot/Unsubscribe lifecycle and the roster
+subscription shape (subscribe()/unsubscribe() as explicit actions called from a component's
+onMounted/onUnmounted, not module-scope side effects — keeps the store mockable/testable without a
+component mount).
+
+**`saveField` write discipline (R182):** every `appConfig/global` write MUST use
+`setDoc(..., {merge:true})`, NEVER `updateDoc` — R182 made an absent doc a valid, expected state
+(e.g. a fresh deploy that has never been saved through this console); `updateDoc` throws not-found
+against a document that has never been created. CRITICAL (bug fix 2026-08-31):
+`setDoc(..., {merge:true})` treats a KEY that contains dots as a LITERAL field name, NOT a nested
+path — only `updateDoc` interprets `a.b` as nesting. Writing `{ 'onboarding.emailsEnabled': true }`
+therefore created a flat field literally named `"onboarding.emailsEnabled"`, which `mergeAppConfig`
+(reading the NESTED `onboarding.emailsEnabled`) never saw — so every Owner Console toggle silently
+failed to persist (the value reverted to its default on reload). `buildNestedField` expands the
+dot-path into a nested object instead; setDoc merge deep-merges the leaf, leaving sibling keys
+untouched, and the read side round-trips correctly.
+
+### src/stores/auth.ts
+
+**`memberships`:** the organizations the signed-in user belongs to (`{id, name, active, role}`) —
+the source the login church-picker AND (Phase 104, R311/R312) the sidebar church switcher render
+when a user belongs to more than one. Populated by `loadOrgContext`. `active` defaults to `true`
+for a readable org doc with no `active` field (legacy orgs); a caught read failure (deactivation OR
+a stale/orphaned membership) conservatively defaults to `false` (R213/T-76-08). `role` (Phase 104,
+R311) is resolved per-entry from the `orgs` custom claim (`claimOrgs[id]`, read in
+`loadOrgContext`) — `'editor'` only when the claim explicitly says so, `'viewer'` otherwise,
+INCLUDING an org present in `orgIds` but not yet caught up in the claim (never crashes or drops the
+entry — same never-blank-the-list posture as name/active).
+
+**`refreshOrgClaim` (R075 D-06/D-07 / P-01):** forces the custom `orgId`/`role` claim (set by
+`functions/src/orgMembershipClaims.ts`'s `syncOrgMembershipClaim` trigger) onto the active session's
+ID token so a member does not wait out a full 1-hour token lifetime for it to propagate.
+`getIdTokenResult` is used (rather than `getIdToken`) because it returns the decoded `claims`
+object, which is what lets the retry loop know when to stop. `awaitClaim` scopes the retry (P-01)
+to the just-created-membership window only: `false` loops at most once with no delay (the ordinary,
+already-a-member path — latency must stay unchanged), `true` loops up to `CLAIM_REFRESH_MAX_ATTEMPTS`
+times spaced `CLAIM_REFRESH_DELAY_MS` apart, stopping the instant `claims.orgId` strictly equals
+`targetOrgId` (a claim naming a different org never satisfies the wait). Known limitation (D-01/D-04,
+documented not accidental): the claim only ever carries the user's PRIMARY org (`orgIds[0]`). For a
+multi-org user, a non-primary org load passes a `targetOrgId` the claim will never carry — that load
+is, and stays, served by the Firestore-membership arm of the dual-read alone; that is expected, not a
+bug in this retry. Never throws: a failed or exhausted refresh is not a failed sign-in —
+`storage.rules`' Firestore-membership arm still grants access while the claim is missing, so
+`loadOrgContext` must still resolve either way.
+
+**`vwModeEnabled` dual-read (R073):** nested `settings` value first, then the legacy flat field,
+then the hardcoded default. This is live production data — do NOT collapse this to
+`orgSettings.vwModeEnabled ?? true`, which would silently turn Vertical Worship back ON for a church
+that deliberately turned it off via the flat field. No read-triggered backfill is performed; the
+backfill is write-triggered, delivered by the Settings toggle's save handler switching its write
+target to the `settings.vwModeEnabled` dot-path. Computed once and applied to BOTH
+`settings.value.vwModeEnabled` and the standalone `vwModeEnabled` ref so they can never disagree.
+
+**`loadOrgContext` orgIds self-heal (Bug 1b, quick 260830-l9c):** self-heals a clobbered `orgIds`
+array from the authoritative `orgs` custom claim. `functions/src/orgMembershipClaims.ts` computes
+the FULL multi-org set server-side (`collectionGroup('members')` scan) on every membership write,
+so an account whose client-side `orgIds` was already clobbered down to a single element (the
+pre-1a REPLACE bug) still has every org listed in its claim — unioning it in here means the picker
+self-heals with no manual Firestore repair. Read WITHOUT forcing a network refresh (the separate
+forced `refreshOrgClaim(activeId, ...)` still runs once `activeId` is known) so this stays cheap on
+the ordinary already-a-member path. Never throws: a failed claim read must still let an
+orgIds-only login proceed.
+
+**`loadOrgContext` membership-list build:** builds the membership list (`{id, name, active}`) the
+church picker renders. Each org doc is read individually and guarded: an org the user has an
+`orgIds` entry for but can't cleanly read (e.g. a stale/orphaned id with no member doc, or —
+post-76-01 — a deactivated org's own member being denied) falls back to its id and `active: false`
+instead of rejecting the whole list, so one bad membership never blanks or breaks the picker
+(R213/T-76-08).
+
+### src/stores/quarters.ts
+
+**`setPersonAvailability` (D-03/D-05/D-06):** single-person quarter-data save from the availability
+drawer. Writes ONLY the scoped `personQuarterData.${id}` dot-path — never the whole
+`personQuarterData` map — so concurrent edits to other people's entries aren't clobbered
+(T-14-03-01). Pairing is ONE-WAY (directional): `pairedWith` on this person is the list of people
+THEY must serve with (the scheduler pulls those partners in when this person is scheduled — see
+`propagatePairing` in `scheduler.ts`, which follows each person's OWN `pairedWith`). This save
+therefore touches only this person's entry: no reciprocal write is mirrored onto a partner, so
+"Nolan must serve with Tim" does not imply "Tim must serve with Nolan". Removing a partner here
+likewise only edits this person's list, leaving the partner's own record untouched.
+
+### src/stores/services.ts
+
+**`ServiceLockedError` (R036 draft-only write guard, enforcement layer 2 of 3):** thrown by the
+store's draft-only write guard. The guard is defence-in-depth, NOT the primary enforcement: the
+Firestore rule added in 31-01 is what actually stops a determined client. This exists so a
+client-side bug — a control that should have been removed when the service locked, or a handler
+that forgot its early return — surfaces as a named local error naming R036 and the stored status,
+instead of an opaque `FirebaseError: Missing or insufficient permissions` from a round trip. It
+THROWS rather than silently returning (`createService`'s precedent, not `updateService`'s
+`if (!orgId.value) return`) deliberately. A swallowed write is indistinguishable from a successful
+one to the caller, which is precisely the "it didn't save" defect class this milestone exists to
+close. This is not a new failure mode for any caller: since 31-01 these same writes already
+rejected at the rules layer — the guard only makes the rejection immediate and legible.
+
+**`ServiceSnapshot.stageLayout` (R315, Phase 107):** read-only public projection of
+`Service.stageLayout`. Mirrors `roleAssignments`'s PII-safe-projection precedent: an explicit
+per-field map, never a raw spread, so a future non-display `StageMarker` field cannot silently leak
+to the public page. There is no PII here (a marker is only planner free text), but the explicit
+shape still guards against scope creep. OPTIONAL and only ever present when the service has at
+least one marker — see `buildServiceSnapshot`'s conditional spread. Absent (never `undefined`),
+matching the `roleAssignments?.length` omit convention `ShareView.vue` already relies on for its own
+optional sections.
+
+**`buildServiceSnapshot` stage layout projection (T-107-01):** maps to EXACTLY the 6 display fields
+— id, label, kind, zone, xPct, yPct — never a raw spread of the source marker, so a future
+non-display `StageMarker` field cannot silently reach the public page. `kind` is optional on
+`StageMarker` itself; the conditional spread keeps it absent (not `undefined`) on a marker that
+never set one. IN-03: every UI-driven write path already clamps xPct/yPct to [0,100] before it
+reaches `Service.stageLayout`, so this is unreachable through the app's own UI — but this
+projection is the last line of defense before an unauthenticated public page renders these values,
+so defensively re-clamp here too. A stored value that reached this field by some other path (bulk
+import, manual Firestore edit, a future caller bug) can then never push a marker off-canvas on
+ShareView. `note` is planner-authored tech instruction (non-PII free text, e.g. "XLR run from stage
+left") and belongs on the printed/shared plot the tech team reads; the conditional spread keeps the
+key ABSENT (never `note: undefined`) on a marker that never set one, same discipline as `kind` and
+the whole projection's absent-not-undefined contract.
+
+**R036 draft-only write guard (`assertWritable`/`storedStatusOf`/`isExportWrite`/`isReopenWrite`):**
+the three shapes mirror `firestore.rules`' `/services` `allow update` clause one-for-one. They
+deliberately do NOT invent a fourth policy: any divergence would either refuse a write the server
+accepts (a phantom lock) or wave through one the server denies (an opaque round-trip failure).
+Rule 1: `storedStatus() == 'draft'` → ordinary editing. Rule 2: `planned` → `exported` carrying
+export evidence → D-09. Rule 3: → `draft`, touching only status → R037 reopen. `updateService`
+appends `updatedAt` itself, so the caller-supplied key sets checked here are the rules'
+`affectedKeys()` minus `updatedAt`. `storedStatusOf`'s `?? 'draft'` matches the rule's own
+`resource.data.get('status','draft')` so legacy documents with no status field agree across both
+layers.
+
+**R247 (84-01) lastUsedAt recompute on lock/unlock:** a song's `lastUsedAt` reflects
+`MAX(service.date)` over the LOCKED (non-draft) services it's in — never the wall-clock moment it
+was assigned to a draft (see `src/utils/lastUsed.ts` for the canonical derivation and rationale).
+`buildLastUsedSnapshot` builds the pure snapshot `computeLastUsedDate` consumes, with the ONE
+service that triggered the recompute forced to its post-transition status — the Firestore status
+write lands asynchronously through `onSnapshot`, so `services.value` at call time can still report
+the OLD status; the override makes the recompute deterministic and timing-independent instead of
+racing the snapshot listener. `recomputeLastUsedFor` derives, for each affected songId,
+`MAX(locked service date)` via the canonical `computeLastUsedDate` and writes it through
+`songStore.updateSong`. A non-null date becomes a `Timestamp` at local midnight (the same parse
+convention the 84-02 backfill mirrors); no remaining locked service writes `lastUsedAt: null` — an
+intentional blank, since the song IS in a service, just none currently locked.
+
+**R037 status transitions (`markAsPlanned`/`reopenService`):** D-02: explicit, named actions — one
+per legal transition — replacing the deleted `toggleStatus` cycle. There is deliberately NO generic
+status setter: a `setStatus(id, s)` would re-admit hand-setting `exported` without an export, which
+is exactly the defect D-03 closes. `exported` is reachable ONLY through the export write. Both
+throw on refusal; the caller must AWAIT them and only then reflect the new status in the UI — a
+status that flips before the write lands is the "it didn't save" defect class this milestone exists
+to close. `reopenService` — the payload is `status` + `updatedAt` and NOTHING ELSE: the rule's
+`keys().hasOnly(['status','updatedAt'])` reads `affectedKeys()`, so adding `pcExportedAt`/`pcPlanId`
+— even to re-write their existing values — can surface in that diff and get the whole write denied.
+D-11 keeps both fields precisely by NOT touching them: the Planning Center plan stays linked, so a
+re-export updates it instead of creating a duplicate, and D-04's evidence gate still fires on a
+second reopen.
+
+**`writeSharePayload` (R076/R078, 41-03):** the `shareTokens/{token}` payload write plus the
+soft-fail memorable-URL `serviceShares/{slug}__service-{date}` write. Runs on EVERY
+`ensureShareLink` path, including adoption, so a link already emailed to a congregation starts
+showing current data immediately rather than waiting for the next edit. This is an unconditional
+full-document `setDoc`, not a partial update — deliberately. That makes the write idempotent and
+self-healing (a token document that was deleted is recreated rather than silently failing).
+`shareTokens` is a payload surface, not the authoritative creation record — that lives on
+`serviceShareLinks/{serviceId}` — so re-stamping `createdAt` is harmless and keeps the live token
+sorting first if adoption ever runs again. The token is used VERBATIM as the document id: no
+case-folding, no whitespace trimming, no Unicode normalization — `ShareView.vue` resolves
+`/share/:token` using the route parameter verbatim as the document id, and any asymmetry here
+breaks every adopted mixed-case legacy token.
+
+**`ensureShareLink` (R076/R078):** resolves THE one stable token for a service: reading the
+`serviceShareLinks/{serviceId}` identity doc if it exists, else adopting the most recent compatible
+already-circulated `shareTokens` document, else minting a fresh one — then always writing the
+current payload in place. `createShareToken` is a thin wrapper around this; both are exposed on the
+store so a future caller can distinguish "resolve the link" from "share and get the token", though
+today they're the same operation.
+
+### src/stores/songLyrics.ts
+
+**`setSongBackground` (R057):** sets or clears the song-level background image — the least specific
+tier of the slide/group/song cascade `resolveEntryMedia` resolves. Writes exactly one field (plus
+`updatedAt`) against the same lyrics document `updateCurrentLyrics` already targets; never touches
+`sections`/`performanceOrder`. A dedicated single-purpose action rather than a call through
+`updateCurrentLyrics` — that action is the autosave path and is typed as a partial of the document;
+threading a deletion sentinel through it would widen its type for one caller. `null` clears the
+field via an explicit `deleteField()` sentinel rather than an undefined value — same reason
+`setGroupBedMedia` documents for itself in `slideGroups.ts`: an undefined value would be stripped
+before the intent ever reached Firestore, so a clear would silently become a no-op.
+
+### src/stores/toasts.ts
+
+**Module overview (R309/R310):** the app-wide dismissible-message store, generalized in place from
+the original narrow failure-toast store (R041). Every item — transient or sticky — gets a working
+manual-dismiss (`dismiss()`); a sticky item ALSO clears when its owning view calls `clearSticky()`
+once the condition it was warning about resolves. The auto-dismiss timer is armed HERE, inside the
+store, not inside `ToastHost.vue` — a toast raised by a surface that unmounts a moment later must
+still self-dismiss; if the timer lived in the component it would die with it and the toast would be
+stranded on screen forever.
+
 ---
 
 *Architecture analysis: 2026-07-16*

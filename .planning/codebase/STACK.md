@@ -360,6 +360,92 @@ R006: reorder/add/remove a service element and the assembled slideshow follows w
 re-sync. See the fuller module overview relocated to ARCHITECTURE.md § "src/composables/useSlideshowAssembly.ts"
 for the content-map construction and `performanceOrder` ordering contract this wrapper builds on.
 
+## Store & Entry-Point Stack Notes (R318)
+
+### src/firebase/index.ts
+
+**Emulator wiring (dev builds only):** `import.meta.env.DEV` is load-bearing, not belt-and-braces —
+do not remove it, and do not "simplify" this back to a bare `VITE_USE_EMULATORS` check. This
+shipped to production on 2026-08-05 gated on `VITE_USE_EMULATORS` alone, and the live site tried to
+authenticate against `http://127.0.0.1:9099`. The reason: **Vite loads `.env.local` during a
+production build too** — it is not a dev-only file. `.env.local` legitimately carries
+`VITE_USE_EMULATORS=true` for local work (and must also carry the `VITE_FIREBASE_*` values the
+build needs), so the flag was baked straight into the production bundle. Nothing warned: the build
+succeeded, the deploy succeeded, and the breakage only appeared when a real user hit sign-in.
+`import.meta.env.DEV` is statically `false` in a production build, so this whole block is
+tree-shaken out of the bundle entirely — the emulator hosts cannot appear in shipped output even by
+accident. That is the property `firebase.emulators.test.ts` asserts against the real built
+artifact, rather than trusting this comment.
+
+### src/main.ts
+
+**Output-window fullscreen (module-load note):** there is deliberately NO module-load
+`requestFullscreen()` here for `/present/*` windows. A popup opened via `window.open` does NOT
+retain transient user-activation once its SPA/auth bootstrap runs, so a `requestFullscreen()` at
+module load ALWAYS rejected with "API can only be initiated by a user gesture" — the console error
+the owner saw, and it never actually went fullscreen. Auto-fullscreen for output windows is now
+driven by Fullscreen Capability Delegation from the opener (the control window, which HAS
+activation from the Go-live click) — see `useRunControl.ts` (delegates) + `useOutputWindow.ts`
+(requests on delegation) — with a guaranteed one-tap-anywhere affordance as the fallback.
+
+### src/stores/orgScopedStores.ts
+
+**`resetOrgScopedStores`:** tears down EVERY org-scoped Pinia store — unsubscribe its Firestore
+listener and clear its cached state — in one call. Quick 260823-switch-church-cache: each store's
+`subscribe()` re-points its listener to the new org but keeps the previous org's `.value` array
+until the new snapshot's first emission arrives. Because Vue Router mounts the destination view
+before the source view unmounts, that stale array flashes on screen for a moment right after
+switching churches (own church -> Enter Church, or the multi-church picker). Calling this at the
+moment `orgId` changes — BEFORE any destination view mounts — guarantees no view can render the
+prior church's data during the switch. Each teardown is null-guarded, so calling it while a view is
+still mounted (its own `onUnmounted` will call the same teardown again) is harmless. Imported
+dynamically from `auth.ts` to avoid the auth <-> store import cycle. STAGELAYOUTS-RESET-OBLIGATION —
+RESOLVED (Phase 107): the forward obligation Phase 104 left here (R312) assumed Phase 107 would add
+a `stageLayouts` org-scoped store needing its own teardown call. It did not — Phase 107 stores the
+stage layout as an additive, optional field (`Service.stageLayout`) on the SERVICE document itself
+(107-CONTEXT.md, superseding an earlier ARCHITECTURE.md draft that proposed a separate
+`stageLayouts/{serviceId}` collection + store), owned end-to-end by `useServiceStore()`, whose
+`unsubscribeAll()` is already called above. There is NO separate org-scoped stage-layout store to
+register here, so a church switch cannot leak a prior church's stage layout — R312 is satisfied
+with NO code change to this function. The literal token `STAGELAYOUTS-RESET-OBLIGATION` is kept
+here (Phase 104 verification greps for it) purely as a resolved historical marker; do not add a new
+`useStageLayout*()` teardown call.
+
+### src/stores/pptxRenders.ts
+
+**Module overview (Phase 42, R079/R080):** Pinia store for render-status documents —
+`organizations/{orgId}/pptxRenders/{importId}`. Genuinely new design (42-PATTERNS.md "No Analog
+Found"): every other store in this codebase either subscribes to ONE whole-collection query
+(`importedSlides.ts`, `scriptureSlides.ts`) or does a one-shot per-id fetch
+(`useSlideshowAssembly.ts`'s `loadMissingLyrics`). This store manages a DYNAMIC SET of live
+per-document `onSnapshot` listeners — one per distinct `renderImportId` the current service
+references — opened when an id joins the set and closed when it leaves (D-04, D-20; T-42-06
+listener-leak guard). `renderImportId` is `ImportedDeck.renderImportId`, NOT
+`ImportedDeck.id`/`ImportedSlot.importId` — the two identifiers are deliberately distinct
+(`src/types/importedDeck.ts`); every map here is keyed by the former. An id absent from
+`rendersByImportId` means "no render document yet" (or "its listener has been torn down") — never a
+synthesized placeholder; callers must be able to tell "not written yet" from "written as pending"
+(T-42-07's stale-render guard: an id's cached state can never outlive its subscription). Recorded
+default (42-RESEARCH.md Assumption A2, D-20): one listener per `renderImportId` rather than a
+single `where(documentId(), 'in', [...])` query — imported decks per service are typically 1-3, a
+per-id listener set has a trivially correct teardown story, and the `in`-query alternative would
+need re-issuing the whole query on every id-set change; revisit only if listener count becomes a
+measured problem.
+
+### src/stores/slideGroups.ts
+
+**Module overview (Phase 24):** Pinia store for slide groups. Mirrors
+`useImportedSlides`/`useScriptureSlides` (`src/stores/importedSlides.ts`,
+`src/stores/scriptureSlides.ts`) against the `organizations/{orgId}/slideGroups` sibling
+collection, with `slides` as an EMBEDDED ARRAY field (never a nested subcollection — see
+`src/types/slideGroup.ts`). This is the ONLY module in the phase that talks to Firestore about
+groups — every group write (materialize, delete, bed media, slide replace) lives here so a second,
+competing save path never appears next to `ServiceEditorView`'s existing whole-document autosave
+(R018). NEVER use the random-auto-id create function here: every group document's id IS the
+anchoring slot's stable id (D-01) — a deterministic doc id — so that lazy materialization from two
+simultaneously-open tabs can never create two divergent documents for the same slot (RESEARCH.md
+Pattern 1).
+
 ---
 
 *Stack analysis: 2026-07-16*

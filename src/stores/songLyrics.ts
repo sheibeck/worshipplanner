@@ -134,22 +134,8 @@ export const useSongLyricsStore = defineStore('songLyrics', () => {
   }
 
   /**
-   * Sets or clears the song-level background image (R057) — the least
-   * specific tier of the slide/group/song cascade `resolveEntryMedia`
-   * resolves. Writes exactly one field (plus `updatedAt`) against the same
-   * lyrics document `updateCurrentLyrics` already targets; never touches
-   * `sections`/`performanceOrder`.
-   *
-   * A dedicated single-purpose action rather than a call through
-   * `updateCurrentLyrics` — that action is the autosave path and is typed as
-   * a partial of the document; threading a deletion sentinel through it
-   * would widen its type for one caller.
-   *
-   * `null` clears the field via an explicit `deleteField()` sentinel rather
-   * than an undefined value — same reason `setGroupBedMedia` already
-   * documents for itself in `slideGroups.ts`: an undefined value would be
-   * stripped before the intent ever reached Firestore, so a clear would
-   * silently become a no-op.
+   * See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+   * src/stores/songLyrics.ts).
    */
   async function setSongBackground(
     orgId: string,

@@ -94,16 +94,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
 }
 
 /**
- * A client-side mirror of functions/src/appConfig.ts's mergeAppConfig —
- * deliberately a PER-GROUP merge (not a naive recursive deep-merge or a
- * generic deep-merge library), so a doc that sets only e.g.
- * cleanup.mediaEnabled never wipes sibling cleanup.* defaults (R182/R186).
- *
- * This mirror does not need the server copy's full fail-open/fail-closed
- * coerce* discipline (the field components' own min/max/required validation
- * already blocks obviously-bad saves before they reach Firestore) — it only
- * needs to be forgiving of a partial/absent doc, matching R182's guarantee
- * that an absent appConfig/global doc resolves to DEFAULT_APP_CONFIG.
+ * See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+ * src/config/appConfigDefaults.ts).
  */
 export function mergeAppConfig(raw: AppConfigInput | undefined): AppConfig {
   const p = raw ?? {}

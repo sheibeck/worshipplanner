@@ -53,16 +53,8 @@ export interface Toast {
 }
 
 /**
- * The app-wide dismissible-message store (R309/R310), generalized in place
- * from the original narrow failure-toast store (R041). Every item — transient
- * or sticky — gets a working manual-dismiss (dismiss()); a sticky item ALSO
- * clears when its owning view calls clearSticky() once the condition it was
- * warning about resolves.
- *
- * The auto-dismiss timer (see the setTimeout below) is armed HERE, inside the
- * store, not inside ToastHost.vue. A toast raised by a surface that unmounts a
- * moment later must still self-dismiss — if the timer lived in the component
- * it would die with it and the toast would be stranded on screen forever.
+ * See .planning/codebase/ARCHITECTURE.md (Store & Config Behavioral Notes (R318) ->
+ * src/stores/toasts.ts).
  */
 export const useToasts = defineStore('toasts', () => {
   const toasts = ref<Toast[]>([])

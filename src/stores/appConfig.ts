@@ -49,20 +49,10 @@ export const useAppConfigStore = defineStore('appConfig', () => {
     unsub = null
   }
 
-  // Every appConfig/global write MUST use setDoc(..., {merge:true}), NEVER
-  // updateDoc — R182 made an absent doc a valid, expected state (e.g. a fresh
-  // deploy that has never been saved through this console); updateDoc throws
-  // not-found against a document that has never been created.
-  //
-  // CRITICAL (bug fix 2026-08-31): setDoc(..., {merge:true}) treats a KEY that
-  // contains dots as a LITERAL field name, NOT a nested path — only updateDoc
-  // interprets `a.b` as nesting. Writing `{ 'onboarding.emailsEnabled': true }`
-  // therefore created a flat field literally named "onboarding.emailsEnabled",
-  // which mergeAppConfig (reading the NESTED `onboarding.emailsEnabled`) never
-  // saw — so every Owner Console toggle silently failed to persist (the value
-  // reverted to its default on reload). Expand the dot-path into a nested
-  // object instead; setDoc merge deep-merges the leaf, leaving sibling keys
-  // untouched, and the read side round-trips correctly.
+  // R182 write discipline: setDoc({merge:true}) only, never updateDoc; dot-path
+  // keys must be expanded to nested objects first (setDoc merge treats a dotted
+  // key literally, unlike updateDoc). See .planning/codebase/ARCHITECTURE.md
+  // (Store & Config Behavioral Notes (R318) -> src/stores/appConfig.ts).
   async function saveField(path: string, value: unknown): Promise<void> {
     const authStore = useAuthStore()
     await setDoc(
