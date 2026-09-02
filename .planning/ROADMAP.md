@@ -742,7 +742,10 @@ with recorded rationale.
   3. Any Firestore/Storage rules or Cloud Functions authorization change carries a real ALLOW-case emulator test proving the fix — not only a deny-case pass — per this project's standing rules-testing discipline (R323).
   4. `npm run type-check` and the full test/regression suite pass, and no production deploy occurs — remediation ships built/tested/committed/UNDEPLOYED, with the exact deploy command handed to the owner per standing deploy policy (R323).
 
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 113-01-PLAN.md — SEC-S-01 (get/list split on shareTokens/quarterShares/serviceShares) + SEC-ISO-01 (remove legacy client org self-provisioning) in firestore.rules + src/rules.test.ts (DENY + ALLOW cases)
+- [ ] 113-02-PLAN.md — SEC-ISO-02 (revokeRefreshTokens on member-removal clear branch) in functions/src/orgMembershipClaims.ts + unit test; Storage ALLOW-case test authored
+- [ ] 113-03-PLAN.md — consolidated 999.x backlog entry for the 11 Medium/Low security findings (ROADMAP-only triage)
 
 ## Backlog
 
