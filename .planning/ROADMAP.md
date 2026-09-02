@@ -659,13 +659,13 @@ architecture, data flow, and coupling.
   2. Every finding carries an explicit severity (Critical/High/Medium/Low) and a concrete file/module location or example (R320).
   3. Critical/High findings are clearly distinguished from Medium/Low, giving Phase 111 an unambiguous remediation scope and the rest a clean path to backlog (R320).
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 Plans:
 **Wave 1**
 
 - [x] 110-01-PLAN.md — Review pass: store/Firestore-listener lifecycle (incl. org-scoped teardown/re-subscription) + multi-tenant isolation architecture → 110-FINDINGS-lifecycle-isolation.md
-- [ ] 110-02-PLAN.md — Review pass: module boundaries + coupling + data flow → 110-FINDINGS-boundaries-coupling-dataflow.md
+- [x] 110-02-PLAN.md — Review pass: module boundaries + coupling + data flow → 110-FINDINGS-boundaries-coupling-dataflow.md
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
