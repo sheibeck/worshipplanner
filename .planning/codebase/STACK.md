@@ -115,6 +115,24 @@
 - Firestore database (Google Cloud)
 - Google Secret Manager (for API keys)
 
+## Backend Stack Notes (R318)
+
+Behavioral/architectural "how it works" narration relocated out of backend source comments
+(`functions/src/**`) per the Phase 109 comment convention (CONVENTIONS.md § Comment Convention).
+Each entry cites the file:line range at the time of relocation (109-02).
+
+### functions/src/messageTokens.ts
+
+**Module overview (pure server-side token renderer for the send path, Phase 59, R138/R139):**
+`sendQueuedMessage` (`functions/src/index.ts`) renders each recipient's subject and body from the
+RAW token template stored on the message doc. This file is deliberately PURE — string in, string
+out, no Firestore/Pinia/`@/` alias and no import of the client `buildServiceSnapshot` (which is
+store-bound and not importable in the functions project, 59-RESEARCH.md Anti-Pattern). The caller
+(the send trigger) Admin-SDK-loads the service/quarters/roles/people, derives the token values,
+and calls this once PER RECIPIENT so `{{their_roles}}` and `{{name}}` reflect that person's own
+roles/name (R139/R154). The supported tokens are substituted GLOBALLY; every other `{{token}}` is
+left verbatim, and a template with no tokens is returned unchanged.
+
 ---
 
 *Stack analysis: 2026-07-16*

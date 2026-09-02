@@ -12,25 +12,8 @@ import { DEACTIVATED_ORGS_CLAIM_KEY } from "./orgMembershipClaims";
 import { RESEND_API_KEY } from "./params";
 import { sendAdminOnboardingEmail } from "./adminEmail";
 
-// --- orgProvisioning (Phase 74, R196-R206: the owner-console org-provisioning
-// callables) ----------------------------------------------------------------
-//
-// This module deliberately does NOT call initializeApp() at module scope --
-// mirrors superAdminClaims.ts / orgMembershipClaims.ts: functions/src/index.ts
-// already does that for the deployed runtime. Calling it here would break
-// that caller.
-//
-// All three callables are gated by the SAME dual super-admin caller check
-// (assertSuperAdminCaller) that setSuperAdminClaimHandler established:
-// reject an unauthenticated caller, reject a caller whose ID-token claim
-// lacks superAdmin, AND independently re-read superAdmins/{callerUid} from
-// Firestore -- never trust a client-declared authority flag alone.
-//
-// Neither callable ever writes a custom claim itself -- the members/{uid}
-// write below is what fires syncOrgMembershipClaim (orgMembershipClaims.ts),
-// which is the SOLE claim writer for org membership, mirroring the
-// source-doc -> trigger -> claim indirection already established elsewhere
-// in this codebase.
+// orgProvisioning (Phase 74, R196-R206: the owner-console org-provisioning callables)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/orgProvisioning.ts)
 
 /**
  * Normalize an organization display name into a stable, Firestore-doc-id-safe
@@ -74,16 +57,7 @@ function assertValidEmailFormat(email: string): void {
   }
 }
 
-/**
- * The single caller-gate helper applied verbatim by all three handlers below
- * (R200/R204) -- mirrors setSuperAdminClaimHandler (superAdminClaims.ts:106-128)
- * exactly. Factoring it into one function keeps the dual re-verification from
- * drifting between handlers. Returns the verified caller uid.
- *
- * Exported (Phase 77, R216) so `deleteOrganizationHandler` (orgDeletion.ts)
- * reuses this SAME gate verbatim rather than forking a second implementation
- * -- T-77-01.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/orgProvisioning.ts) */
 export async function assertSuperAdminCaller(request: CallableRequest<unknown>): Promise<string> {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in required.");
@@ -201,22 +175,7 @@ export interface OnboardOrganizationResponse {
   emailSent: boolean;
 }
 
-/**
- * The testable handler body, exported separately from the onCall wrapper
- * below -- mirrors setSuperAdminClaimHandler/setSuperAdminClaim.
- *
- * R202 ATOMICITY: `resolveAdminTarget` (the ONLY Auth network call) runs
- * BEFORE any Firestore write, then ALL writes happen inside ONE
- * `runTransaction` -- the single read is `tx.get(orgNames/{nameKey})` first
- * (all tx.get calls must precede all tx writes, a hard Firestore
- * constraint); if that doc exists, throw `already-exists` before any write.
- * Otherwise every write -- orgNames claim, organizations/{orgId} + seeded
- * settings, AND the first-admin membership/invite via writeAdminAssignment
- * -- is enqueued on that SAME transaction. There is NO post-commit
- * admin-assignment step, so a transient failure (an aborted transaction, or
- * a non-user-not-found error from resolveAdminTarget before it) commits
- * nothing, and a clean same-name retry succeeds without manual cleanup.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/orgProvisioning.ts) */
 export async function onboardOrganizationHandler(
   request: CallableRequest<OnboardOrganizationRequest>,
 ): Promise<OnboardOrganizationResponse> {
@@ -304,19 +263,7 @@ export interface AssignOrgAdminResponse {
   uid?: string;
 }
 
-/**
- * The testable handler body, exported separately from the onCall wrapper
- * below.
- *
- * Orphan guard (T-74-06): rejects a typo'd/nonexistent `orgId` BEFORE any
- * write, so no orphaned membership is ever created under an id with no
- * matching org.
- *
- * Reuses the EXACT same `writeAdminAssignment` helper `onboardOrganization`
- * uses -- here the `writer` is a `WriteBatch` (there, a `Transaction`) --
- * so the R206 additive `arrayUnion` guarantee never forks into two
- * implementations.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/orgProvisioning.ts) */
 export async function assignOrgAdminHandler(
   request: CallableRequest<AssignOrgAdminRequest>,
 ): Promise<AssignOrgAdminResponse> {
@@ -642,19 +589,7 @@ export interface SetOrgBibleEnabledResponse {
   enabled: boolean;
 }
 
-/**
- * The testable handler body, exported separately from the onCall wrapper
- * below -- modeled on setOrgActiveHandler's SIMPLER shape (caller gate,
- * input validation, org-existence check, same-state-aware merge write), NOT
- * setOrgAiEnabledHandler's dual-write shape: there is no church-editable
- * `settings.*` leaf for the Bible API this milestone (R295 decision -- that
- * leaf is deferred), so the DISABLE branch writes ONLY the master field plus
- * its audit siblings, never a forced-off `settings.*` dot-path key.
- *
- * Governs the Bible **API** (paid ESV/NLT proxy) only, not scripture
- * features in general -- an OFF org still does scripture manually (Phases
- * 102/103).
- */
+/** See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/orgProvisioning.ts) */
 export async function setOrgBibleEnabledHandler(
   request: CallableRequest<SetOrgBibleEnabledRequest>,
 ): Promise<SetOrgBibleEnabledResponse> {

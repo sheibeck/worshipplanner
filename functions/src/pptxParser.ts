@@ -1,13 +1,4 @@
-/**
- * PPTX -> native slide mapping (Phase 21, R010/R011/R012).
- *
- * `functions/` is a standalone TypeScript project (its own tsconfig, cannot import
- * from `src/`), so the slide shapes below are hand-mirrored from the app's canonical
- * types rather than imported. Keep field names identical to:
- *   src/types/slide.ts -> TextSlide { contentKind: 'text', title?, body }
- *   src/types/slide.ts -> ImageSlide { contentKind: 'image', imageUrl, altText? }
- * If those app-side shapes change, update MappedTextSlide/MappedImageSlide here too.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/pptxParser.ts) */
 
 import { getStorage } from "firebase-admin/storage";
 import { parseOffice } from "officeparser";
@@ -76,30 +67,7 @@ interface MinimalOfficeAst {
 }
 
 /**
- * Pure mapping from an officeparser AST to an ordered array of native
- * (text | image) slide objects, using the mixed-content heuristic documented
- * above. No officeparser or Storage calls happen in this function; all image
- * path resolution (including any upload) is delegated to `resolveImagePath`.
- *
- * Heuristic (per slide, in AST order):
- *   1. Flatten all non-image children's text (trimmed, joined by newline).
- *   2. If that flattened text exceeds TEXT_DOMINANT_THRESHOLD chars, emit one
- *      TextSlide (title = first heading child's text, if any; body = the full
- *      flattened text).
- *   3. Else if the slide has one or more image children, emit one ImageSlide
- *      per image, in order, via resolveImagePath.
- *   4. Else (no substantial text, no images) skip the slide entirely.
- *
- * Source-slide-index = rendered-page-number contract (R108): every emitted
- * slide carries `sourcePage`, the 1-based index of the `ast.content` node it
- * came from -- incremented per source slide BEFORE any skip, so a skipped
- * (empty) slide still consumes a page number and the next emitted slide's
- * sourcePage reflects its true position in the original deck. The render
- * service (functions/src/... render pipeline, see src/utils/renderedPagePaths.ts)
- * renders one page per source .pptx slide in the same order, from the same
- * file, so this index IS the slide's rendered page number. A multi-image
- * slide's several MappedImageSlides all share that one sourcePage.
- */
+/** See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/pptxParser.ts) */
 export async function mapAstToSlides(
   ast: MinimalOfficeAst,
   resolveImagePath: ImagePathResolver,
@@ -181,16 +149,7 @@ function hasZipSignature(buffer: Buffer): boolean {
   return buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b;
 }
 
-/**
- * Validates, parses, and maps a .pptx buffer into native slides, uploading any
- * extracted images to org-scoped Storage along the way.
- *
- * Never deletes the source object -- this function has no knowledge of the
- * source's Storage path at all, and only ever writes new image objects under
- * orgs/{orgId}/pptx-imports/{importId}/images/. On any failure (bad
- * signature, officeparser throwing), a typed PptxParseError propagates for
- * index.ts to convert into a friendly HttpsError.
- */
+/** See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/pptxParser.ts) */
 export async function parsePptxBuffer(
   buffer: Buffer,
   orgId: string,

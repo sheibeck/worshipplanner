@@ -1,18 +1,6 @@
 import { GoogleAuth } from "google-auth-library";
 
-/**
- * The single, mockable seam that mints a Google-issued ID token and invokes
- * the private "pptx-render" Cloud Run service (R062: bridging function's
- * IAM-authenticated invocation of a Cloud Run service).
- *
- * ★ Security contract (37-RESEARCH.md T-37-09, "no unauthenticated fallback"):
- * this module NEVER calls `globalThis.fetch` or any bare HTTP client. The
- * only egress is `client.request(...)` on the client returned by
- * `GoogleAuth#getIdTokenClient`. An unauthenticated call to a service that is
- * supposed to be private is a strictly worse outcome than a failed render --
- * a failed render is already handled safely elsewhere (the parsed text layer
- * stays usable), so there is deliberately no degrade-to-plain-fetch path.
- */
+/** See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/renderInvoker.ts) */
 
 export interface InvokeRenderServiceArgs {
   orgId: string;

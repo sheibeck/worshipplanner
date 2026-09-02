@@ -67,15 +67,7 @@ function sanitizeHeader(value: string): string {
 }
 
 /**
- * Domain-suffix classifier for the invitee-type branch (99-CONTEXT.md's
- * leaning default). Normalize FIRST (.trim().toLowerCase()) before calling --
- * mirrors resolveAdminTarget's normalizedEmail discipline. googlemail.com is
- * a real, still-valid Gmail alias domain (older/UK-registered accounts) and
- * must be checked alongside gmail.com. A custom Google Workspace domain
- * (e.g. bob@somechurch.org) is deliberately NOT detected here -- it takes the
- * non-Google branch, whose set-password email also offers a Google
- * sign-in fallback line so that user is never stranded.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/inviteOnboarding.ts) */
 function isGoogleEmail(normalizedEmail: string): boolean {
   return normalizedEmail.endsWith("@gmail.com") || normalizedEmail.endsWith("@googlemail.com");
 }
@@ -113,22 +105,7 @@ function buildSetPasswordContent(
 }
 
 /**
- * The testable handler body, exported separately from the onCall wrapper
- * below -- mirrors onboardOrganizationHandler/queueServiceMessageHandler.
- *
- * Order (99-PATTERNS.md / 99-RESEARCH.md): auth presence -> input validation
- * -> org-editor caller gate (inline, mirrors queueServiceMessageHandler,
- * index.ts:2609-2668) -> org-name read -> appConfig on/off gate -> invitee
- * classification -> Auth provisioning (non-Google only) -> Resend send.
- *
- * Error tiers: a createUser/generatePasswordResetLink failure THROWS an
- * HttpsError('internal', ...) -- the invitee would otherwise have no usable
- * path at all. A getUserByEmail failure that is NOT auth/user-not-found is
- * RETHROWN as-is (mirrors resolveAdminTarget's discrimination). Only the
- * final Resend send is best-effort: caught, logged, resolved as
- * { emailSent: false, kind } so a failure there never masquerades as a
- * thrown error once the Auth side has already succeeded.
- */
+/** See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/inviteOnboarding.ts) */
 export async function sendInviteOnboardingEmailHandler(
   request: CallableRequest<SendInviteOnboardingEmailRequest>,
 ): Promise<SendInviteOnboardingEmailResponse> {

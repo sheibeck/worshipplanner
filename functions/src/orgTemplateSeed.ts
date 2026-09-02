@@ -1,29 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-/**
- * Phase 74 (R197/R198): pure, data-only ported seed content for a newly
- * onboarded org — the Suggested Template (`buildSuggestedTemplateEntries()`)
- * and the default `OrgSettings` literal.
- *
- * `functions/` is a standalone TypeScript project (its own tsconfig, `include:
- * ["src"]`, no `@/` alias) — it cannot import from the client `src/` tree, so
- * this file is a DUPLICATE of the pure client helpers, kept in lockstep with:
- *   src/utils/slotTypes.ts       -> buildSuggestedTemplateEntries/buildSlots('1-2-2-3')
- *   src/types/organization.ts    -> DEFAULT_ORG_SETTINGS
- * following the same precedent as `functions/src/serviceRoles.ts` (which
- * hand-mirrors `src/utils/serviceRoles.ts`). A drift here would seed a new
- * org's default template/settings differently from a normally-created org's.
- *
- * There is NO VW-typing/`buildSlots` logic to port: for the fixed `'1-2-2-3'`
- * progression, `buildSlots` reduces to a FIXED 9-entry `{kind, section}`
- * sequence (traced directly from `src/utils/slotTypes.ts`'s `buildSlots`/
- * `defaultSectionForPosition`) — only that resulting static table is ported,
- * not the progression machinery that produced it.
- *
- * Kept PURE — no Firestore/Auth access anywhere in this module. The caller
- * (`orgProvisioning.ts`'s `onboardOrganizationHandler`) writes the returned
- * objects into the org document itself.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/orgTemplateSeed.ts) */
 
 /** Mirrors `src/types/service.ts`'s `SlotKind` union. */
 export type PortedSlotKind =

@@ -662,6 +662,292 @@ built+tested+UNDEPLOYED per 74-01-PLAN.md's/76-01-PLAN.md's hand-over deploy not
 callable not re-exported here is silently missed by `firebase deploy`, see
 `functions-must-reexport-from-index.md`).
 
+### functions/src/appConfig.ts
+
+**Module overview (R180-R184: Firestore-backed runtime config):** deliberately does NOT call
+`initializeApp()`/`getFirestore()` at module scope — mirrors `claimsHelpers.ts`'s convention.
+`getAppConfig(db)` always takes an injected Firestore instance as its first parameter so both the
+deployed runtime (which initializes the Admin SDK itself) and unit tests (a fake db) can call it
+identically. `appConfig/global` is a single admin-only Firestore doc (Phase 68 rules gate WHO may
+write it to super-admins; the Admin SDK bypasses rules to read it here). Its shape mirrors the
+v1.8 `process.env`/`defineString` knobs, grouped by area. A missing or partial doc is deep-merged
+onto `DEFAULT_APP_CONFIG` (R182) so today's behavior is reproduced byte-for-byte until an operator
+explicitly writes a value. The `coerce*` layer is the input-validation boundary: the Phase 68
+rules enforce WHO writes `appConfig/global`; this layer enforces WHAT shape is trusted once read
+back, per-knob, per the R184 fail-open/fail-closed table (see CONTEXT.md/RESEARCH.md for the full
+rationale per knob).
+
+**`DEFAULT_APP_CONFIG`:** holds the EXACT current env/`defineString` fallback values (R182 source
+of truth) — every field cites its origin read-site in `index.ts` so a future diff of that file's
+defaults can be checked against this constant. Phase 70 (R186): `src/config/appConfigDefaults.ts`
+is a DELIBERATE CLIENT-SIDE DUPLICATE of this interface + constant (`src/` cannot import
+`functions/` — separate build targets). If you change a default value here, mirror the change
+there too, or the Owner Console's (default) badge will show a stale value —
+`src/config/__tests__/appConfigDefaults.test.ts`'s drift-guard snapshot test will fail if the two
+fall out of sync.
+
+**`getAppConfig` caching (R183):** asymmetric by design — hot request-path callers (the `api`
+proxy, `sendQueuedMessage`) use the default cached form (a module-scope `{ value, fetchedAt }` TTL
+cache, refreshed every ~60s); cron callers (the cleanup handlers, `sendScheduledReminders`) MUST
+pass `{ fresh: true }` to always re-read. WHY a TTL and not an `onDocumentWritten` cache-bust: a
+Cloud Functions v2 instance's global scope is per-instance-process memory. A trigger firing on
+`appConfig/global`'s update runs as its own invocation, routed to whichever instance the platform
+happens to pick — it cannot reach into a sibling warm instance's in-memory cache to clear it. A
+cache-bust design is therefore correct for at most one of N warm instances, leaving every other
+one serving a stale value until it independently re-reads. A TTL is the only pattern that is
+correct regardless of instance count.
+
+### functions/src/backfillLastUsed.ts
+
+**`backfillLastUsedForOrg` body:** reads all `organizations/{orgId}/services` and
+`organizations/{orgId}/songs` docs ONCE (see SCALE note, INTEGRATIONS.md § this file), then for
+each song computes `MAX(locked service date)` via the mirrored `computeLastUsedDate` and applies
+the conservative write rule — `maxDate === null` (no locked service contains the song) → SKIP,
+never write; `maxDate !== null` and the song's existing `lastUsedAt` already equals the computed
+Timestamp → SKIP (idempotent, already-current); otherwise → WRITE (only when `apply`)
+`lastUsedAt` to `Timestamp.fromMillis(serviceDateToMillis(maxDate))` — always counts as processed,
+even in a dry run, so the summary reflects the INTENDED change.
+
+**CLI wrapper (`runBackfillCli`):** guarded so importing this module (as
+`backfillLastUsed.test.ts` does) never calls `initializeApp()` or touches a live project — only
+running it directly does (mirrors `backfillOrgClaims.ts`'s identical guard). Usage (after
+`npm run build` from `functions/`): `node lib/backfillLastUsed.js` (dry run, sole org),
+`--apply` (writes for real), `--org berean` (explicit org). Credentials resolve from
+`GOOGLE_APPLICATION_CREDENTIALS` or `gcloud auth application-default login`. The whole body is
+wrapped in try/catch, mirroring `backfillOrgClaims.ts`'s `runBackfillCli` — a rejection before any
+song is processed (bad/expired credentials, wrong project, multi-org abort, network failure)
+produces a readable diagnostic and a non-zero exit code instead of an unhandled rejection.
+
+### functions/src/backfillOrgClaims.ts
+
+**Module overview (R074/R075: give the two existing users the claim):** PURPOSE —
+`syncOrgMembershipClaim` (`./orgMembershipClaims.ts`) only fires on FUTURE writes to
+`organizations/{orgId}/members/{uid}`. Members whose document was already in place before that
+trigger was deployed have never had it rewritten, so without this backfill they carry no claim
+until something touches their member doc again. WIDENED (73-03-PLAN.md, R210): this script also
+backfills the additive `orgs` map (73-01-PLAN.md, R207) for every existing user, not just the
+primary `{ orgId, role }` claim — the trigger's per-write orgs recompute
+(`computeOrgsClaimForUid`) only ever runs on a FUTURE membership write, exactly the same gap the
+original backfill closed for the primary claim; this backfill closes it for `orgs` too, from a
+single grouped scan, and writes through `mergeAndSetCustomClaims` rather than a bare
+`setCustomUserClaims` so a superAdmin grant (Phase 68) is never wiped by a backfill run
+(R208/T-73-01). THIS IS A NODE SCRIPT, NOT A DEPLOYED FUNCTION (D-12) — run by the owner with
+admin credentials, deliberately NOT exported from `functions/src/index.ts`. SCALE (D-10):
+population is 2 active users + 1 never-accepted invite (owner, 2026-08-06) — no cursor, no
+pagination, no batching, no rate limiting, no resume-from-offset; a single
+`collectionGroup('members').get()` is correct and complete at this size — do not add scale
+machinery here. SINGLE SCAN, GROUPED BY UID IN MEMORY (73-RESEARCH.md Pattern 4): the ONE
+`collectionGroup('members').get()` is grouped by uid in memory into a per-uid membership list —
+deliberately NOT the trigger's per-write `computeOrgsClaimForUid` (`orgMembershipClaims.ts`),
+which does its OWN fresh `collectionGroup('members').get()` scan (correct for a single uid on a
+single write, but would turn this backfill into an O(n) re-scan if called from inside this loop —
+exactly the anti-pattern 73-RESEARCH.md warns against). SHARED DECISION LOGIC (DISC-02, T-40-05,
+D-11): imports `decideMembershipClaim`, `buildOrgsMapClaim`, and `resolveOrgId` from
+`./orgMembershipClaims` rather than reimplementing primary-org resolution, role normalisation, the
+orgs-map shape, or the structural members-doc guard — a second implementation would drift from
+the trigger and could write a disagreeing claim to production. SAFETY (D-13/D-14, T-40-10): dry
+run is the default; nothing is written to Auth unless `--apply` is passed; the CLI wrapper prints
+the resolved project id and a dry-run banner before doing any work. THE NEVER-ACCEPTED INVITE: a
+pending invite lives at `organizations/{orgId}/invites/{email}` and `inviteLookup/{email}` — it
+has NO `organizations/{orgId}/members/{uid}` document, so it is structurally never visited by this
+script; its claim is set by the trigger at the moment the invite is accepted
+(`src/stores/auth.ts`'s `ensureUserDocument`/`loadOrgContext`), not by this backfill.
+
+**`backfillOrgMembershipClaims`:** iterates every `organizations/*/members/*` document ONCE,
+grouped by uid in memory, and for each uid reconciles ONE Admin SDK write carrying the PRIMARY
+`{ orgId, role }` claim (via `decideMembershipClaim` on the user's primary-org membership,
+unchanged primary logic, D-11) and the additive `orgs` map (via `buildOrgsMapClaim` applied to
+this uid's in-memory group — no second scan, no second "what orgs" implementation). Idempotent by
+skip-if-already-matching (D-11, extended to `orgs`): re-running after an interruption is always
+safe — every already-current account (primary keys AND orgs both matching) is reported as
+skipped, not re-written, and there is no cursor state that could itself go stale. Writes via
+`mergeAndSetCustomClaims` (R208/T-73-01), never a bare `setCustomUserClaims` — a bare replace
+would silently wipe an unrelated claim (e.g. Phase 68's `superAdmin:true`) the moment this
+backfill next ran for that uid.
+
+### functions/src/inviteOnboarding.ts
+
+**`isGoogleEmail` domain-suffix classifier (99-CONTEXT.md's leaning default):** for the invitee-
+type branch. Normalize FIRST (`.trim().toLowerCase()`) before calling — mirrors
+`resolveAdminTarget`'s `normalizedEmail` discipline. `googlemail.com` is a real, still-valid Gmail
+alias domain (older/UK-registered accounts) and must be checked alongside `gmail.com`. A custom
+Google Workspace domain (e.g. `bob@somechurch.org`) is deliberately NOT detected here — it takes
+the non-Google branch, whose set-password email also offers a Google sign-in fallback line so
+that user is never stranded.
+
+### functions/src/orgMembershipClaims.ts
+
+**Module overview (R074/R075: the claim `storage.rules` reads):** deliberately does NOT call
+`initializeApp()` at module scope — `functions/src/index.ts` already does that for the deployed
+runtime, and the backfill script does it for the owner-run CLI runtime; calling it here would
+break one of the two callers. The claim this module computes is consumed directly by
+`storage.rules`' `isOrgMemberByClaim(orgId)` helper as `request.auth.token.orgId`/
+`request.auth.token.role`. The two readable top-level key names (`ORG_CLAIM_KEYS`) are
+byte-for-byte what that rule reads — changing either name here without updating `storage.rules`
+would silently break the claim arm while every test on both sides kept passing.
+
+**`resolveOrgId` structural guard:** in the spirit of `index.ts`'s `MEDIA_PATH_GUARD` — mirrors
+`backfillOrgClaims.ts`'s `resolveOrgId` byte-for-byte (D-11: one guard shared by the trigger and
+the backfill). A `members` document is only ever a real membership candidate when it is a child of
+an `organizations/{orgId}` document. `collectionGroup('members')` matches ANY subcollection
+literally named `members` anywhere in the database, so this guard is applied to every candidate
+before it can affect a claim. Returns the org id on success, `undefined` when the guard fails.
+
+**`computeOrgsClaimForUid`:** recomputes the full `orgs` map for `uid` from the SURVIVING
+`organizations/*/members/{uid}` documents — NEVER from `users/{uid}.orgIds`. 73-RESEARCH.md
+Pattern 1 proves `orgIds` is structurally overwrite-broken: both the invite-acceptance and
+org-auto-create paths in `src/stores/auth.ts` RESET it to a single-element array rather than
+appending, so it can never list a second org, and it is also never updated on a client-side
+member deletion — a live collectionGroup scan of the actual membership documents is the only
+authoritative source for "which orgs does this uid currently belong to". This runs an UNFILTERED
+`collectionGroup('members')` scan, filtered client-side to `doc.id === uid` — Firestore
+collection-group queries cannot filter by document-ID equality across differing parent paths
+(73-RESEARCH.md Pattern 2), so this is the correct query shape, not a missed optimisation; it is
+proportionate at this project's current scale (a handful of users per org) — if a future cost
+audit finds the per-write full scan material, the documented scale-out path is a denormalised
+`uid` field on every member doc plus a collection-group field-override index (do not build that
+speculatively). Firestore's default read/query mode is strongly consistent, so calling this
+immediately after the SAME event's own triggering write has committed is race-free — a delete just
+committed by this very trigger is guaranteed to already be absent from this scan.
+
+**`orgsMapsEqual`:** shallow-equal for two `orgs` maps. `undefined` (no `orgs` claim key at all —
+a legacy pre-widening token) is treated as equivalent to `{}` (a freshly-computed empty map for a
+user with zero surviving memberships), so a legacy claim for a user with no memberships correctly
+compares as "already current" rather than triggering a spurious write. Exported (IN-01,
+73-REVIEW.md) so `backfillOrgClaims.ts` imports this SAME implementation rather than maintaining
+its own verbatim copy — the two signatures had already started to drift (this one accepts
+`undefined` for `current`, the old backfill copy required a non-optional `Record`), which is
+exactly the kind of divergence a shared helper (mirroring `buildOrgsMapClaim`/`resolveOrgId`'s
+existing pattern) prevents.
+
+### functions/src/orgProvisioning.ts
+
+**Module overview (Phase 74, R196-R206: the owner-console org-provisioning callables):**
+deliberately does NOT call `initializeApp()` at module scope — mirrors
+`superAdminClaims.ts`/`orgMembershipClaims.ts`: `functions/src/index.ts` already does that for the
+deployed runtime; calling it here would break that caller. All three callables are gated by the
+SAME dual super-admin caller check (`assertSuperAdminCaller`) that `setSuperAdminClaimHandler`
+established: reject an unauthenticated caller, reject a caller whose ID-token claim lacks
+`superAdmin`, AND independently re-read `superAdmins/{callerUid}` from Firestore — never trust a
+client-declared authority flag alone. Neither callable ever writes a custom claim itself — the
+`members/{uid}` write is what fires `syncOrgMembershipClaim` (`orgMembershipClaims.ts`), which is
+the SOLE claim writer for org membership, mirroring the source-doc → trigger → claim indirection
+already established elsewhere in this codebase.
+
+**`assertSuperAdminCaller` (the single caller-gate helper, R200/R204):** applied verbatim by all
+three handlers — mirrors `setSuperAdminClaimHandler` exactly. Factoring it into one function keeps
+the dual re-verification from drifting between handlers. Returns the verified caller uid.
+Exported (Phase 77, R216) so `deleteOrganizationHandler` (`orgDeletion.ts`) reuses this SAME gate
+verbatim rather than forking a second implementation (T-77-01).
+
+**`onboardOrganizationHandler` — R202 ATOMICITY:** `resolveAdminTarget` (the ONLY Auth network
+call) runs BEFORE any Firestore write, then ALL writes happen inside ONE `runTransaction` — the
+single read is `tx.get(orgNames/{nameKey})` first (all `tx.get` calls must precede all tx writes,
+a hard Firestore constraint); if that doc exists, throw `already-exists` before any write.
+Otherwise every write — orgNames claim, `organizations/{orgId}` + seeded settings, AND the
+first-admin membership/invite via `writeAdminAssignment` — is enqueued on that SAME transaction.
+There is NO post-commit admin-assignment step, so a transient failure (an aborted transaction, or
+a non-`user-not-found` error from `resolveAdminTarget` before it) commits nothing, and a clean
+same-name retry succeeds without manual cleanup.
+
+**`assignOrgAdminHandler` — Orphan guard (T-74-06):** rejects a typo'd/nonexistent `orgId` BEFORE
+any write, so no orphaned membership is ever created under an id with no matching org. Reuses the
+EXACT same `writeAdminAssignment` helper `onboardOrganization` uses — here the `writer` is a
+`WriteBatch` (there, a `Transaction`) — so the R206 additive `arrayUnion` guarantee never forks
+into two implementations.
+
+### functions/src/orgTemplateSeed.ts
+
+**Module overview (Phase 74, R197/R198):** pure, data-only ported seed content for a newly
+onboarded org — the Suggested Template (`buildSuggestedTemplateEntries()`) and the default
+`OrgSettings` literal. `functions/` is a standalone TypeScript project (its own tsconfig,
+`include: ["src"]`, no `@/` alias) — it cannot import from the client `src/` tree, so this file is
+a DUPLICATE of the pure client helpers, kept in lockstep with `src/utils/slotTypes.ts`
+(`buildSuggestedTemplateEntries`/`buildSlots('1-2-2-3')`) and `src/types/organization.ts`
+(`DEFAULT_ORG_SETTINGS`), following the same precedent as `functions/src/serviceRoles.ts` (which
+hand-mirrors `src/utils/serviceRoles.ts`). A drift here would seed a new org's default
+template/settings differently from a normally-created org's. There is NO VW-typing/`buildSlots`
+logic to port: for the fixed `'1-2-2-3'` progression, `buildSlots` reduces to a FIXED 9-entry
+`{kind, section}` sequence (traced directly from `src/utils/slotTypes.ts`'s `buildSlots`/
+`defaultSectionForPosition`) — only that resulting static table is ported, not the progression
+machinery that produced it. Kept PURE — no Firestore/Auth access anywhere in this module; the
+caller (`orgProvisioning.ts`'s `onboardOrganizationHandler`) writes the returned objects into the
+org document itself.
+
+### functions/src/pptxParser.ts
+
+**Module overview (PPTX → native slide mapping, Phase 21, R010/R011/R012):** `functions/` is a
+standalone TypeScript project (its own tsconfig, cannot import from `src/`), so the slide shapes
+in this file are hand-mirrored from the app's canonical types rather than imported. Keep field
+names identical to `src/types/slide.ts`'s `TextSlide { contentKind: 'text', title?, body }` and
+`ImageSlide { contentKind: 'image', imageUrl, altText? }` — if those app-side shapes change,
+update `MappedTextSlide`/`MappedImageSlide` here too.
+
+### functions/src/serviceRoles.ts
+
+**Module overview (server-side recipient resolver, Phase 59, R131/R139):** `functions/` is a
+standalone TypeScript project (its own tsconfig with `include:["src"]`, no `@/` alias — it cannot
+import from the client `src/` tree), so this file is a DUPLICATE of the pure client resolvers
+rather than an import, following the same precedent as `functions/src/pptxParser.ts` (which
+hand-mirrors the app slide types). Ported verbatim from `src/utils/serviceRoles.ts`
+(`findQuarterForDate`, `resolveServiceRoleAssignments`) and `src/utils/messagingRecipients.ts`
+(the reachability split of `resolveRecipients`). The port is PURE (types only, no Firestore):
+59-03's `sendQueuedMessageHandler` Admin-SDK-loads the service/quarters/roles/people arrays in the
+CALLER and feeds them through these functions. Keep the resolve body in lockstep with the client
+originals — a drift would make the server send list disagree with the composer's "Reaches N"
+estimate. The ONLY behavioral addition over the client resolver is per-recipient `roleNames`
+(`resolveMessageRecipients`), which the send trigger needs to render `{{their_roles}}` correctly
+for each recipient (R139). Phase 85 (R250): the client narrowed `RoleGroup` to
+`"band" | "tech" | "other"` and folded vocals into Band via a `vocal` flag, with a read-time
+compat shim (`src/stores/roster.ts`) coercing any legacy `group: 'vocals'` doc to
+`{ group: 'band', vocal: true }`. This file's `RoleGroup` is narrowed to match, and the equivalent
+coercion is applied where roles are Admin-SDK-loaded (`functions/src/index.ts`,
+`sendQueuedMessageHandler`) — the ONE read boundary on the server side, mirroring the client's ONE
+read boundary in `roster.ts`'s `onSnapshot`.
+
+**`resolveMessageRecipients`:** resolves a `{ teams, individualPersonIds, includeEveryone }`
+selection into deduped (by person id), reachability-split recipient lists with per-recipient
+`roleNames` — server-side enrichment of the client `resolveRecipients` split. `includeEveryone`
+matches every assigned role regardless of group. A person assigned to two matching roles/teams is
+deduped to one entry and accumulates BOTH role names (in resolve order) onto `roleNames`. A
+matched person with `email === ''` is excluded from `reachable` and increments
+`unreachableCount`. An unfilled role (`effectivePersonIds === []`) contributes 0 recipients and
+does NOT change `unreachableCount`. A matched personId absent from `people` (stale/deleted) is
+silently skipped and does NOT increment `unreachableCount`. `individualPersonIds` are always
+included; a person matched ONLY as an individual carries `roleNames === []` (no team role accrues
+to them). PURE: the caller (59-03 `sendQueuedMessageHandler`) resolves `assignments` via
+`resolveServiceRoleAssignments` and loads `people` from Firestore, then feeds both arrays here —
+no Firestore access inside this function.
+
+### functions/src/superAdminClaims.ts
+
+**Module overview (R174/R175-B/R176/R179: the owner-console access gate):** deliberately does NOT
+call `initializeApp()` at module scope — mirrors `orgMembershipClaims.ts`: `functions/src/index.ts`
+already does that for the deployed runtime, and `bootstrapSuperAdmin.ts`'s `runBootstrapCli` does
+it for the owner-run CLI runtime; calling it here would break one of those two callers.
+`superAdmins/{uid}` document existence IS the source of truth (68-CONTEXT.md "Claim model"): the
+`syncSuperAdminClaim` trigger is the SOLE writer of the `superAdmin` claim, mirroring the existing
+source-doc → trigger → claim indirection already established by `orgMembershipClaims.ts`.
+`setSuperAdminClaimHandler` (the `onCall`) never sets the claim itself — it only writes/deletes the
+source document and lets the trigger react.
+
+**`syncSuperAdminClaimHandler`:** exported separately from the `onDocumentWritten` wrapper —
+mirrors `syncOrgMembershipClaimHandler`/`syncOrgMembershipClaim`. Every write routes through
+`claimsHelpers` (R175): a grant MERGES `{ superAdmin: true }` onto the user's existing claims
+(preserving `{ orgId, role }` if present — SC1 direction B in reverse), and a revoke clears ONLY
+the `superAdmin` key, preserving `{ orgId, role }` (SC1 direction B). The whole body is wrapped in
+try/catch and resolves with a failure outcome rather than rethrowing — a throw out of a Firestore
+trigger causes Cloud Functions retries that would hammer the Auth API (mirrors T-40-08's fix in
+`orgMembershipClaims.ts`).
+
+**`setSuperAdminClaimHandler`:** exported separately from the `onCall` wrapper — mirrors
+`parsePptxHandler`/`parsePptx` and `queueServiceMessageHandler`/`queueServiceMessage`. Security
+contract (T-68-03, defense-in-depth): the CALLER's authority is re-verified server-side TWO
+independent ways — the caller's own ID-token claim (`request.auth.token.superAdmin`) AND a fresh
+Firestore re-read of `superAdmins/{callerUid}` — never trusting a client-declared authority flag.
+The TARGET is resolved exclusively via `getAuth().getUserByEmail()`, never a client-supplied uid,
+so a caller can never point this at an arbitrary uid they merely guessed.
+
 ---
 
 *Architecture analysis: 2026-07-16*

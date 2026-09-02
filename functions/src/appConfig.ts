@@ -1,25 +1,7 @@
 import type { Firestore } from "firebase-admin/firestore";
 
-// --- appConfig (R180-R184: Firestore-backed runtime config) --------------
-//
-// This module deliberately does NOT call initializeApp()/getFirestore() at
-// module scope -- mirrors claimsHelpers.ts's convention. getAppConfig(db)
-// always takes an injected Firestore instance as its first parameter so
-// both the deployed runtime (which initializes the Admin SDK itself) and
-// unit tests (a fake db) can call it identically.
-//
-// appConfig/global is a single admin-only Firestore doc (Phase 68 rules
-// gate WHO may write it to super-admins; the Admin SDK bypasses rules to
-// read it here). Its shape mirrors the v1.8 process.env/defineString knobs,
-// grouped by area. A missing or partial doc is deep-merged onto
-// DEFAULT_APP_CONFIG (R182) so today's behavior is reproduced byte-for-byte
-// until an operator explicitly writes a value -- this phase's read-site
-// swap (Plan 02) is a behavior-neutral no-op deploy until then.
-//
-// The coerce* layer below is the input-validation boundary: the Phase 68
-// rules enforce WHO writes appConfig/global; this layer enforces WHAT shape
-// is trusted once read back, per-knob, per the R184 fail-open/fail-closed
-// table (see CONTEXT.md / RESEARCH.md for the full rationale per knob).
+// appConfig (R180-R184: Firestore-backed runtime config)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/appConfig.ts)
 
 export interface AppConfig {
   cleanup: {
@@ -60,17 +42,8 @@ export interface AppConfig {
   updatedAt?: unknown;
 }
 
-// DEFAULT_APP_CONFIG holds the EXACT current env/defineString fallback
-// values (R182 source of truth) -- every field cites its origin read-site
-// in index.ts so a future diff of that file's defaults can be checked
-// against this constant.
-//
-// Phase 70 (R186): src/config/appConfigDefaults.ts is a DELIBERATE CLIENT-
-// SIDE DUPLICATE of this interface + constant (src/ cannot import functions/
-// -- separate build targets). If you change a default value here, mirror the
-// change there too, or the Owner Console's (default) badge will show a
-// stale value. src/config/__tests__/appConfigDefaults.test.ts's drift-guard
-// snapshot test will fail if the two fall out of sync.
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/appConfig.ts)
+// Phase 70 (R186): src/config/appConfigDefaults.ts is a DELIBERATE CLIENT-SIDE DUPLICATE -- keep in sync.
 export const DEFAULT_APP_CONFIG: AppConfig = {
   cleanup: {
     mediaEnabled: false, // MEDIA_CLEANUP_ENABLED unset today == dry-run (index.ts:1038)
@@ -273,23 +246,8 @@ const TTL_MS = 60_000; // ~60s -- CONTEXT.md's own suggested number (30-60s all 
 let cache: { value: AppConfig; fetchedAt: number } | null = null;
 
 /**
- * Reads appConfig/global, deep-merges it onto DEFAULT_APP_CONFIG, and
- * returns the resolved config.
- *
- * Caching is asymmetric by design (R183): hot request-path callers (the
- * `api` proxy, `sendQueuedMessage`) use the default cached form -- a
- * module-scope { value, fetchedAt } TTL cache, refreshed every ~60s. Cron
- * callers (the cleanup handlers, sendScheduledReminders) MUST pass
- * { fresh: true } to always re-read.
- *
- * WHY a TTL and not an onDocumentWritten cache-bust: a Cloud Functions v2
- * instance's global scope is per-instance-process memory. A trigger firing
- * on appConfig/global's update runs as its own invocation, routed to
- * whichever instance the platform happens to pick -- it cannot reach into a
- * sibling warm instance's in-memory cache to clear it. A cache-bust design
- * is therefore correct for at most one of N warm instances, leaving every
- * other one serving a stale value until it independently re-reads. A TTL is
- * the only pattern that is correct regardless of instance count.
+ * Reads appConfig/global, deep-merges it onto DEFAULT_APP_CONFIG, and returns the resolved config.
+ * See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/appConfig.ts)
  */
 export async function getAppConfig(
   db: Firestore,

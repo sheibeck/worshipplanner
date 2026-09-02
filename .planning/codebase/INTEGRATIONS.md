@@ -337,6 +337,129 @@ Only `email.bounced` with a Permanent (hard) bounce surfaces — every other val
 write, since a non-2xx would make Resend retry the event forever. The webhook is provider-facing,
 so it is NOT gated on `isMessagingEnabled()` (a client concept) — only the signature gates it.
 
+### functions/src/backfillLastUsed.ts
+
+**`backfillLastUsedForOrg` (R248: retroactively correct existing songs' `lastUsedAt`):**
+PURPOSE — the live R247 fix (84-01-PLAN.md) corrects `lastUsedAt` GOING FORWARD by recomputing it
+on the service lock/unlock lifecycle, but songs whose `lastUsedAt` was already stamped by the old
+`serverTimestamp()`-on-assignment bug stay wrong in production until something re-triggers that
+recompute. This script performs the one-time retroactive correction for the single production
+(Berean) org. THIS IS A NODE SCRIPT, NOT A DEPLOYED FUNCTION — run by the owner with admin
+credentials and deliberately NOT exported from `functions/src/index.ts` (mirrors
+`backfillOrgClaims.ts`, D-12). SCALE: production is a SINGLE org (84-CONTEXT.md Area 2) — no
+cursor, no pagination, no batching, no rate limiting, no all-orgs sweep; a single `.get()` per
+collection (services, songs) within the one target org is correct and complete at this size
+(mirrors `backfillOrgClaims.ts`'s identical SCALE note) — NEVER widen this to iterate every
+`organizations/*` doc. CONSERVATIVE WRITE RULE (84-CONTEXT.md Area 2, owner-locked): write
+`lastUsedAt = MAX(locked-service date containing the song)` ONLY for songs that have ≥1 LOCKED
+(`status !== 'draft'`) service; every other song — draft-only, or in no service at all — is
+SKIPPED and left completely untouched (this script NEVER writes null/blank to `lastUsedAt`, which
+would destroy Planning-Center-imported dates on songs never in any service). SAFETY: dry run is
+the default; nothing is written unless `--apply` is passed; the CLI wrapper prints the resolved
+project id, resolved org id, and a dry-run banner before doing any work (mirrors
+`backfillOrgClaims.ts`'s D-13/D-14 safety posture), owner-confirmed before the real `--apply` run
+per the standing 2026-08-25 confirm-then-deploy policy. IDEMPOTENT: a song whose existing
+`lastUsedAt` already equals the computed MAX (compared via `Timestamp.isEqual`) is reported
+skipped, not rewritten — a re-run after an interruption, or a repeat run for auditing, never
+touches already-correct songs.
+
+### functions/src/inviteOnboarding.ts
+
+**`sendInviteOnboardingEmailHandler`:** the testable handler body, exported separately from the
+`onCall` wrapper — mirrors `onboardOrganizationHandler`/`queueServiceMessageHandler`. Order
+(99-PATTERNS.md/99-RESEARCH.md): auth presence → input validation → org-editor caller gate
+(inline, mirrors `queueServiceMessageHandler`, `index.ts`) → org-name read → appConfig on/off gate
+→ invitee classification → Auth provisioning (non-Google only) → Resend send. Error tiers: a
+`createUser`/`generatePasswordResetLink` failure THROWS an `HttpsError('internal', ...)` — the
+invitee would otherwise have no usable path at all. A `getUserByEmail` failure that is NOT
+`auth/user-not-found` is RETHROWN as-is (mirrors `resolveAdminTarget`'s discrimination). Only the
+final Resend send is best-effort: caught, logged, resolved as `{ emailSent: false, kind }` so a
+failure there never masquerades as a thrown error once the Auth side has already succeeded.
+
+### functions/src/orgProvisioning.ts
+
+**`setOrgBibleEnabledHandler`:** modeled on `setOrgActiveHandler`'s SIMPLER shape (caller gate,
+input validation, org-existence check, same-state-aware merge write), NOT
+`setOrgAiEnabledHandler`'s dual-write shape — there is no church-editable `settings.*` leaf for
+the Bible API this milestone (R295 decision, that leaf is deferred), so the DISABLE branch writes
+ONLY the master field plus its audit siblings, never a forced-off `settings.*` dot-path key.
+Governs the Bible **API** (paid ESV/NLT proxy) only, not scripture features in general — an OFF
+org still does scripture manually (Phases 102/103).
+
+### functions/src/pptxParser.ts
+
+**`mapAstToSlides`:** pure mapping from an officeparser AST to an ordered array of native
+(text | image) slide objects, using a mixed-content heuristic. No officeparser or Storage calls
+happen in this function; all image path resolution (including any upload) is delegated to
+`resolveImagePath`. Heuristic (per slide, in AST order): (1) flatten all non-image children's text
+(trimmed, joined by newline); (2) if that flattened text exceeds `TEXT_DOMINANT_THRESHOLD` chars,
+emit one `TextSlide` (title = first heading child's text, if any; body = the full flattened text);
+(3) else if the slide has one or more image children, emit one `ImageSlide` per image, in order,
+via `resolveImagePath`; (4) else (no substantial text, no images) skip the slide entirely.
+Source-slide-index = rendered-page-number contract (R108): every emitted slide carries
+`sourcePage`, the 1-based index of the `ast.content` node it came from — incremented per source
+slide BEFORE any skip, so a skipped (empty) slide still consumes a page number and the next
+emitted slide's `sourcePage` reflects its true position in the original deck. The render service
+renders one page per source `.pptx` slide in the same order, from the same file, so this index IS
+the slide's rendered page number. A multi-image slide's several `MappedImageSlide`s all share
+that one `sourcePage`.
+
+**`parsePptxBuffer`:** validates, parses, and maps a `.pptx` buffer into native slides, uploading
+any extracted images to org-scoped Storage along the way. Never deletes the source object — this
+function has no knowledge of the source's Storage path at all, and only ever writes new image
+objects under `orgs/{orgId}/pptx-imports/{importId}/images/`. On any failure (bad signature,
+officeparser throwing), a typed `PptxParseError` propagates for `index.ts` to convert into a
+friendly `HttpsError`.
+
+### functions/src/adminEmail.ts
+
+**Module overview (quick task 260823):** a reusable, best-effort admin-notification email helper.
+Today it is wired into `onboardOrganization` (super-admin onboards a new church → tell the
+assigned admin), but it is deliberately kept generic (`kind: 'added' | 'invited'`) so
+`assignOrgAdmin` can adopt it later with a one-line call. Mirrors `index.ts`'s `sendQueuedMessage`
+From-header construction verbatim (via the shared `params.ts` helpers): the org's own name is the
+RFC 5322 display name (header-sanitized) over the app's configured sending address
+(`config.sender.fromAddress`, resolved live from `appConfig/global`). The bare address is peeled
+first so a legacy `"Name <email>"` configured value never nests angle brackets. Delivery caveat:
+`DEFAULT_APP_CONFIG.sender.fromAddress` is Resend's test sender `onboarding@resend.dev`, which
+only delivers to the Resend account owner until a real domain is verified + configured (v1.9
+R191/R192) — this helper builds the SEND PATH; real delivery to arbitrary admins still awaits that
+domain verification.
+
+### functions/src/params.ts
+
+**Module overview (shared, dependency-free):** a tiny module with NO local imports beyond
+`firebase-functions/params`, so it can be imported by BOTH `index.ts` and
+`orgProvisioning.ts`/`adminEmail.ts` without creating a circular import (`index.ts` imports
+`orgProvisioning.ts`, which needs `RESEND_API_KEY` for its `onCall` secrets binding). The secret +
+the two pure From-header helpers + the share-base-url param used to live in `index.ts`; they moved
+here verbatim so a second holder can reuse them without importing the whole `index.ts` surface.
+
+### functions/src/renderInvoker.ts
+
+**Module overview (the single, mockable seam that mints a Google-issued ID token and invokes the
+private "pptx-render" Cloud Run service, R062):** bridging function's IAM-authenticated invocation
+of a Cloud Run service. ★ Security contract (37-RESEARCH.md T-37-09, "no unauthenticated
+fallback"): this module NEVER calls `globalThis.fetch` or any bare HTTP client — the only egress
+is `client.request(...)` on the client returned by `GoogleAuth#getIdTokenClient`. An
+unauthenticated call to a service that is supposed to be private is a strictly worse outcome than
+a failed render — a failed render is already handled safely elsewhere (the parsed text layer stays
+usable), so there is deliberately no degrade-to-plain-fetch path.
+
+### functions/src/webhookSignature.ts
+
+**`verifySvixSignature`:** verify a Resend/Svix (Standard Webhooks) HMAC-SHA256 signature over the
+RAW request body. Pure and dependency-free (`node:crypto` only) — no Firestore, no
+`firebase-admin`, no `svix` package — so the webhook trust boundary is unit-testable in isolation
+and can be called BEFORE any state access (research Pattern 4). Scheme (CONFIRMED,
+60-RESEARCH.md § Confirmed Resend/Svix Signature Scheme): signed content =
+`${svix-id}.${svix-timestamp}.${rawBody}` (rawBody as UTF-8 string); HMAC-SHA256 → base64; secret
+is `whsec_`-prefixed — strip the prefix and base64-decode the remainder for the HMAC key bytes;
+`svix-signature` is a SPACE-delimited list of `v1,<base64sig>` entries (multiple during key
+rotation) — accept if ANY entry matches. Returns a boolean and NEVER throws on bad input: a
+missing header, non-finite timestamp, stale timestamp, or wrong-length candidate signature all
+yield `false`.
+
 ---
 
 *Integration audit: 2026-07-16*

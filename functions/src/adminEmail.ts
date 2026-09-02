@@ -8,25 +8,8 @@ import {
   fromDisplayName,
 } from "./params";
 
-// --- adminEmail (quick task 260823) ------------------------------------------
-//
-// A reusable, best-effort admin-notification email helper. Today it is wired
-// into onboardOrganization (super-admin onboards a new church -> tell the
-// assigned admin), but it is deliberately kept generic (kind: 'added' |
-// 'invited') so assignOrgAdmin can adopt it later with a one-line call.
-//
-// Mirrors index.ts's sendQueuedMessage From-header construction verbatim (via
-// the shared params.ts helpers): the org's own name is the RFC 5322 display
-// name (header-sanitized) over the app's configured sending address
-// (config.sender.fromAddress, resolved live from appConfig/global). The bare
-// address is peeled first so a legacy "Name <email>" configured value never
-// nests angle brackets.
-//
-// ⚠ Delivery caveat: DEFAULT_APP_CONFIG.sender.fromAddress is Resend's test
-// sender `onboarding@resend.dev`, which only delivers to the Resend account
-// owner until a real domain is verified + configured (v1.9 R191/R192). This
-// helper builds the SEND PATH; real delivery to arbitrary admins still awaits
-// that domain verification.
+// adminEmail (quick task 260823)
+// See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/adminEmail.ts)
 
 /** Whether the assigned admin already had an account ('added') or is a brand
  * new invite ('invited') -- selects the subject + body copy. */

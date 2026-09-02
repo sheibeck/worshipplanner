@@ -1,32 +1,4 @@
-/**
- * Server-side recipient resolver (Phase 59, R131/R139).
- *
- * `functions/` is a standalone TypeScript project (its own tsconfig with
- * include:["src"], no `@/` alias — it cannot import from the client `src/` tree),
- * so this file is a DUPLICATE of the pure client resolvers rather than an import,
- * following the same precedent as `functions/src/pptxParser.ts` (which hand-mirrors
- * the app slide types). Ported verbatim from:
- *   src/utils/serviceRoles.ts        -> findQuarterForDate, resolveServiceRoleAssignments
- *   src/utils/messagingRecipients.ts -> the reachability split of resolveRecipients
- *
- * The port is PURE (types only, no Firestore): 59-03's sendQueuedMessageHandler
- * Admin-SDK-loads the service/quarters/roles/people arrays in the CALLER and feeds
- * them through these functions. Keep the resolve body in lockstep with the client
- * originals — a drift would make the server send list disagree with the composer's
- * "Reaches N" estimate.
- *
- * The ONLY behavioral addition over the client resolver is per-recipient roleNames
- * (resolveMessageRecipients), which the send trigger needs to render {{their_roles}}
- * correctly for each recipient (R139).
- *
- * Phase 85 (R250): the client narrowed RoleGroup to "band" | "tech" | "other" and
- * folded vocals into Band via a `vocal` flag, with a read-time compat shim
- * (src/stores/roster.ts) coercing any legacy `group: 'vocals'` doc to
- * `{ group: 'band', vocal: true }`. This file's RoleGroup is narrowed to match, and
- * the equivalent coercion is applied where roles are Admin-SDK-loaded
- * (functions/src/index.ts, sendQueuedMessageHandler) — the ONE read boundary on the
- * server side, mirroring the client's ONE read boundary in roster.ts's onSnapshot.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/serviceRoles.ts) */
 
 // Minimal functions-local domain types, hand-mirrored from the app's canonical
 // types (src/types/roster.ts, src/types/service.ts). Only the fields the algorithm
@@ -140,24 +112,8 @@ export function resolveServiceRoleAssignments(
 
 /**
  * Resolves a { teams, individualPersonIds, includeEveryone } selection into
- * deduped (by person id), reachability-split recipient lists with per-recipient
- * roleNames. Server-side enrichment of the client resolveRecipients split.
- *
- * - includeEveryone matches every assigned role regardless of group.
- * - A person assigned to two matching roles/teams is deduped to one entry and
- *   accumulates BOTH role names (in resolve order) onto roleNames.
- * - A matched person with email === '' is excluded from `reachable` and
- *   increments `unreachableCount`.
- * - An unfilled role (effectivePersonIds === []) contributes 0 recipients and
- *   does NOT change unreachableCount.
- * - A matched personId absent from `people` (stale/deleted) is silently skipped
- *   and does NOT increment unreachableCount.
- * - individualPersonIds are always included; a person matched ONLY as an
- *   individual carries roleNames === [] (no team role accrues to them).
- *
- * PURE: the caller (59-03 sendQueuedMessageHandler) resolves `assignments` via
- * resolveServiceRoleAssignments and loads `people` from Firestore, then feeds
- * both arrays here — no Firestore access inside this function.
+ * deduped (by person id), reachability-split recipient lists with per-recipient roleNames.
+ * See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/serviceRoles.ts)
  */
 export function resolveMessageRecipients(
   assignments: ResolvedRoleAssignment[],

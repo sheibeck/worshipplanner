@@ -1,42 +1,9 @@
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
-// --- backfillLastUsedForOrg (R248: retroactively correct existing songs' lastUsedAt) ---
-//
-// PURPOSE: the live R247 fix (84-01-PLAN.md) corrects `lastUsedAt` GOING FORWARD by
-// recomputing it on the service lock/unlock lifecycle -- but songs whose lastUsedAt was
-// already stamped by the old `serverTimestamp()`-on-assignment bug stay wrong in
-// production until something re-triggers that recompute. This script performs the
-// one-time retroactive correction for the single production (Berean) org.
-//
-// THIS IS A NODE SCRIPT, NOT A DEPLOYED FUNCTION. It is run by the owner with admin
-// credentials and is deliberately NOT exported from functions/src/index.ts -- it is
-// not part of the deployable function surface (mirrors backfillOrgClaims.ts, D-12).
-//
-// SCALE: production is a SINGLE org (84-CONTEXT.md Area 2, owner: "we only have one
-// org in production anyway"). No cursor, no pagination, no batching, no rate limiting,
-// no all-orgs sweep -- a single `.get()` per collection (services, songs) within the
-// one target org is correct and complete at this size (mirrors backfillOrgClaims.ts's
-// identical SCALE note). NEVER widen this to iterate every organizations/* doc.
-//
-// CONSERVATIVE WRITE RULE (84-CONTEXT.md Area 2, owner-locked): write
-// `lastUsedAt = MAX(locked-service date containing the song)` ONLY for songs that have
-// >=1 LOCKED (status !== 'draft') service. Every other song -- draft-only, or in no
-// service at all -- is SKIPPED and left completely untouched. This script NEVER writes
-// null/blank to lastUsedAt; that would destroy the Planning-Center-imported dates on
-// songs that were never in any service ("don't touch songs that are not in any
-// service... those came from planning center").
-//
-// SAFETY: dry run is the default. Nothing is written to Firestore unless --apply is
-// passed. The CLI wrapper below prints the resolved project id, the resolved org id,
-// and a dry-run banner before doing any work (mirrors backfillOrgClaims.ts's D-13/D-14
-// safety posture). Owner-confirmed before the real --apply run, per the standing
-// 2026-08-25 confirm-then-deploy policy (84-CONTEXT.md).
-//
-// IDEMPOTENT: a song whose existing lastUsedAt already equals the computed MAX
-// (compared via Timestamp.isEqual) is reported skipped, not rewritten -- a re-run
-// after an interruption, or a repeat run for auditing, never touches already-correct
-// songs.
+// backfillLastUsedForOrg (R248: retroactively correct existing songs' lastUsedAt)
+// See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/backfillLastUsed.ts)
+// THIS IS A NODE SCRIPT, NOT A DEPLOYED FUNCTION. SCALE: production is a SINGLE org -- never widen to all orgs.
 
 // --- Mirrored from src/utils/lastUsed.ts (canonical). Keep byte-identical; mirrored
 // tests (backfillLastUsed.test.ts) enforce parity across the package boundary. The
@@ -127,17 +94,7 @@ export interface BackfillSummary {
   malformedServices: string[];
 }
 
-/**
- * Reads all `organizations/{orgId}/services` and `organizations/{orgId}/songs` docs
- * ONCE (SCALE note above), then for each song computes `MAX(locked service date)` via
- * the mirrored `computeLastUsedDate` and applies the conservative write rule:
- *  - `maxDate === null` (no locked service contains the song) -> SKIP, never write.
- *  - `maxDate !== null` and the song's existing `lastUsedAt` already equals the
- *    computed Timestamp -> SKIP (idempotent, already-current).
- *  - otherwise -> WRITE (only when `apply`) `lastUsedAt` to
- *    `Timestamp.fromMillis(serviceDateToMillis(maxDate))`; always counts as processed,
- *    even in a dry run, so the summary reflects the INTENDED change.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/backfillLastUsed.ts) */
 export async function backfillLastUsedForOrg(options: BackfillOptions): Promise<BackfillSummary> {
   const { orgId, apply } = options;
   const db = getFirestore();
@@ -238,25 +195,8 @@ export async function resolveOrgIdFromArgsOrSoleOrg(argv: string[]): Promise<str
   return orgsSnap.docs[0]!.id;
 }
 
-// --- CLI wrapper -----------------------------------------------------------
-//
-// Guarded so importing this module (as backfillLastUsed.test.ts does) never calls
-// initializeApp() or touches a live project -- only running it directly does
-// (mirrors backfillOrgClaims.ts's identical guard).
-//
-// Usage (after `npm run build` from functions/):
-//   node lib/backfillLastUsed.js                    # dry run (default), sole org
-//   node lib/backfillLastUsed.js --apply             # writes for real, sole org
-//   node lib/backfillLastUsed.js --org berean         # dry run, explicit org
-//   node lib/backfillLastUsed.js --org berean --apply # writes for real, explicit org
-//
-// Credentials resolve from GOOGLE_APPLICATION_CREDENTIALS or
-// `gcloud auth application-default login`, exactly like any other Admin SDK script.
-//
-// The whole body is wrapped in try/catch, mirroring backfillOrgClaims.ts's
-// runBackfillCli -- a rejection before any song is processed (bad/expired
-// credentials, wrong project, multi-org abort, network failure) produces a readable
-// diagnostic and a non-zero exit code instead of an unhandled rejection.
+// CLI wrapper
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/backfillLastUsed.ts)
 export async function runBackfillCli(): Promise<void> {
   try {
     initializeApp();

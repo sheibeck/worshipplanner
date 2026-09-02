@@ -12,62 +12,9 @@ import {
 } from "./orgMembershipClaims";
 import { isClaimsTooLargeError, mergeAndSetCustomClaims } from "./claimsHelpers";
 
-// --- backfillOrgMembershipClaims (R074/R075: give the two existing users the claim) ---
-//
-// PURPOSE: syncOrgMembershipClaim (./orgMembershipClaims.ts) only fires on FUTURE
-// writes to organizations/{orgId}/members/{uid}. Members whose document was already
-// in place before that trigger was deployed have never had it rewritten, so without
-// this backfill they carry no claim until something touches their member doc again.
-//
-// WIDENED (73-03-PLAN.md, R210): this script now also backfills the additive `orgs`
-// map (73-01-PLAN.md, R207) for every existing user, not just the primary
-// `{ orgId, role }` claim -- the trigger's per-write orgs recompute
-// (computeOrgsClaimForUid) only ever runs on a FUTURE membership write, exactly the
-// same gap the original backfill closed for the primary claim. This backfill closes
-// it for `orgs` too, from a single grouped scan (see "SINGLE SCAN" below), and writes
-// through mergeAndSetCustomClaims rather than a bare setCustomUserClaims so a
-// superAdmin grant (Phase 68) is never wiped by a backfill run (R208/T-73-01).
-//
-// THIS IS A NODE SCRIPT, NOT A DEPLOYED FUNCTION (D-12). It is run by the owner with
-// admin credentials and is deliberately NOT exported from functions/src/index.ts --
-// it is not part of the deployable function surface.
-//
-// SCALE (D-10): population is 2 active users + 1 never-accepted invite (owner,
-// 2026-08-06 -- see 40-CONTEXT.md "the population is two users"). No cursor, no
-// pagination, no batching, no rate limiting, no resume-from-offset. A single
-// collectionGroup('members').get() is correct and complete at this size. Do not add
-// any scale machinery here -- it would be speculative complexity for a set that fits
-// on one screen.
-//
-// SINGLE SCAN, GROUPED BY UID IN MEMORY (73-RESEARCH.md Pattern 4): the ONE
-// collectionGroup('members').get() below is grouped by uid in memory into a per-uid
-// membership list. This is deliberately NOT the trigger's per-write
-// computeOrgsClaimForUid (orgMembershipClaims.ts) -- that helper does its OWN fresh
-// collectionGroup('members').get() scan, which is correct for a single uid on a
-// single write but would turn this backfill into an O(n) re-scan (one full-collection
-// scan per user) if called from inside this loop. Reusing it here would be exactly
-// the anti-pattern 73-RESEARCH.md warns against.
-//
-// SHARED DECISION LOGIC (DISC-02, T-40-05, D-11): this script imports
-// decideMembershipClaim AND buildOrgsMapClaim AND resolveOrgId from
-// ./orgMembershipClaims rather than reimplementing primary-org resolution, role
-// normalisation, the orgs-map shape, or the structural members-doc guard. A second
-// implementation of "what should this user's claim be" would drift from the trigger
-// and could write a claim to production that disagrees with what the trigger would
-// have written.
-//
-// SAFETY (D-13/D-14, T-40-10): dry run is the default. Nothing is written to Auth
-// unless --apply is passed. The CLI wrapper below prints the resolved project id and a
-// dry-run banner before doing any work, so a rehearsal can never be mistaken for the
-// real thing.
-//
-// THE NEVER-ACCEPTED INVITE: a pending invite lives at
-// organizations/{orgId}/invites/{email} and inviteLookup/{email} -- it has NO
-// organizations/{orgId}/members/{uid} document. Because this script only ever reads
-// the `members` collection group, a pending invite is structurally never visited. Its
-// claim is set by the trigger at the moment the invite is accepted (see
-// src/stores/auth.ts's ensureUserDocument / loadOrgContext, plan 40-03), not by this
-// backfill.
+// backfillOrgMembershipClaims (R074/R075: give the two existing users the claim)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/backfillOrgClaims.ts)
+// THIS IS A NODE SCRIPT, NOT A DEPLOYED FUNCTION. SCALE (D-10): population is 2 users -- do not add scale machinery.
 
 /** Options controlling whether decisions are actually written to Firebase Auth. */
 export interface BackfillOptions {
@@ -123,21 +70,8 @@ async function decidePrimaryClaim(
 }
 
 /**
- * Iterates every organizations/*\/members/* document ONCE, grouped by uid in memory,
- * and for each uid reconciles ONE Admin SDK write carrying:
- *  - the PRIMARY `{ orgId, role }` claim, via the shared decideMembershipClaim on
- *    the user's primary-org membership (unchanged primary logic, D-11), and
- *  - the additive `orgs` map, via the shared buildOrgsMapClaim applied to this
- *    uid's in-memory group (no second scan, no second "what orgs" implementation).
- *
- * Idempotent by skip-if-already-matching (D-11, extended to `orgs`): re-running
- * this after an interruption is always safe -- every already-current account
- * (primary keys AND orgs both matching) is reported as skipped, not re-written,
- * and there is no cursor state that could itself go stale.
- *
- * Writes via mergeAndSetCustomClaims (R208/T-73-01), never a bare
- * setCustomUserClaims -- a bare replace would silently wipe an unrelated claim
- * (e.g. Phase 68's superAdmin:true) the moment this backfill next ran for that uid.
+ * Iterates every organizations/*\/members/* document ONCE, grouped by uid in memory.
+ * See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/backfillOrgClaims.ts)
  */
 export async function backfillOrgMembershipClaims(
   options: BackfillOptions,

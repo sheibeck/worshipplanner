@@ -231,6 +231,19 @@ manually cleared or the doc reappears. FAILS SAFE: real deletion requires
 gate direction of every other sweep in this file. Runs on its own daily schedule, 06:00 UTC —
 after the 05:00 background sweep, so the sweeps never overlap.
 
+### functions/src/orgMembershipClaims.ts
+
+**`decideMembershipClaim` (the single shared decision function, 40-02-PLAN.md DISC-02):** both
+the `syncOrgMembershipClaim` trigger and the backfill script import this rather than
+reimplementing the rule, so the two can never drift. SCOPE (unchanged by 73-01-PLAN.md,
+deliberate): this function decides ONLY the primary `{ orgId, role }` claim — it never sets or
+clears a claim for a non-primary org, and its return contract stays exactly what it was before the
+multi-org widening so the backfill (untouched that wave) keeps working unmodified. The MULTI-ORG
+`orgs` map that closes the "non-primary org" gap this docblock used to describe as a known
+limitation is computed separately, by `computeOrgsClaimForUid`, and merged in by
+`syncOrgMembershipClaimHandler` on every write regardless of what this function decides for the
+primary keys (R207/R208).
+
 ---
 
 *Concerns audit: 2026-07-16*

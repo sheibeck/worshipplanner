@@ -3,19 +3,8 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { isClaimsTooLargeError, mergeAndSetCustomClaims, mergeSetAndClearCustomClaims } from "./claimsHelpers";
 
-// --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
-//
-// This module deliberately does NOT call initializeApp() at module scope.
-// functions/src/index.ts already does that for the deployed runtime, and
-// plan 40-04's backfill script does it for the owner-run CLI runtime.
-// Calling it here would break one of the two callers.
-//
-// The claim this module computes is consumed directly by storage.rules'
-// isOrgMemberByClaim(orgId) helper (plan 40-01) as
-// request.auth.token.orgId / request.auth.token.role. The two readable
-// top-level key names below are byte-for-byte what that rule reads --
-// changing either name here without updating storage.rules would silently
-// break the claim arm while every test on both sides kept passing.
+// syncOrgMembershipClaim (R074/R075: the claim storage.rules reads)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/orgMembershipClaims.ts)
 
 /** The exact top-level custom-claim keys this module ever writes for the primary org. */
 export const ORG_CLAIM_KEYS = ["orgId", "role"] as const;
@@ -90,16 +79,7 @@ export function buildOrgsMapClaim(
   return orgs;
 }
 
-/**
- * Structural guard, in the spirit of index.ts's MEDIA_PATH_GUARD -- mirrors
- * backfillOrgClaims.ts's resolveOrgId byte-for-byte (D-11: one guard shared
- * by the trigger and the backfill). A `members` document is only ever a real
- * membership candidate when it is a child of an `organizations/{orgId}`
- * document. `collectionGroup('members')` matches ANY subcollection literally
- * named `members` anywhere in the database, so this guard is applied to
- * every candidate before it can affect a claim. Returns the org id on
- * success, undefined when the guard fails.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/orgMembershipClaims.ts) */
 export function resolveOrgId(memberDoc: QueryDocumentSnapshot): string | undefined {
   const orgDoc = memberDoc.ref.parent.parent;
   if (!orgDoc) return undefined;
@@ -107,34 +87,7 @@ export function resolveOrgId(memberDoc: QueryDocumentSnapshot): string | undefin
   return orgDoc.id;
 }
 
-/**
- * Recomputes the full `orgs` map for `uid` from the SURVIVING
- * organizations/*\/members/{uid} documents -- NEVER from users/{uid}.orgIds.
- * 73-RESEARCH.md Pattern 1 proves `orgIds` is structurally overwrite-broken:
- * both the invite-acceptance and org-auto-create paths in src/stores/auth.ts
- * RESET it to a single-element array rather than appending, so it can never
- * list a second org, and it is also never updated on a client-side member
- * deletion. A live collectionGroup scan of the actual membership documents
- * is the only authoritative source for "which orgs does this uid currently
- * belong to".
- *
- * This runs an UNFILTERED collectionGroup('members') scan, filtered
- * client-side to `doc.id === uid` -- Firestore collection-group queries
- * cannot filter by document-ID equality across differing parent paths
- * (73-RESEARCH.md Pattern 2: FieldPath.documentId() equality requires the
- * full path, including the not-yet-known parent org id), so this is the
- * correct query shape, not a missed optimisation. This is proportionate at
- * this project's current scale (a handful of users per org); if a future
- * cost audit finds the per-write full scan material, the documented
- * scale-out path is a denormalised `uid` field on every member doc plus a
- * collection-group field-override index (see backfillOrgClaims.ts's own D-10
- * scale note for the sibling pattern) -- do not build that speculatively.
- *
- * Firestore's default read/query mode is strongly consistent, so calling
- * this immediately after the SAME event's own triggering write has
- * committed is race-free -- a delete just committed by this very trigger is
- * guaranteed to already be absent from this scan.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/orgMembershipClaims.ts) */
 export async function computeOrgsClaimForUid(uid: string): Promise<Record<string, OrgMembershipRole>> {
   const snapshot = await getFirestore().collectionGroup("members").get();
   const memberships: Array<{ orgId: string; role: string | undefined }> = [];
@@ -194,21 +147,7 @@ export type MembershipClaimDecision =
   | { action: "clear" }
   | { action: "skip"; reason: MembershipClaimSkipReason };
 
-/**
- * The single shared decision function (40-02-PLAN.md DISC-02). Both the
- * trigger below and plan 40-04's backfill import this rather than
- * reimplementing the rule, so the two can never drift.
- *
- * SCOPE (unchanged by 73-01-PLAN.md, deliberate): this function decides ONLY
- * the primary `{ orgId, role }` claim -- it never sets or clears a claim for
- * a non-primary org, and its return contract stays exactly what it was
- * before the multi-org widening so plan 40-04's backfill (untouched this
- * wave) keeps working unmodified. The MULTI-ORG `orgs` map that closes the
- * "non-primary org" gap this docblock used to describe as a known limitation
- * is computed separately, by computeOrgsClaimForUid below, and merged in by
- * syncOrgMembershipClaimHandler on every write regardless of what this
- * function decides for the primary keys (R207/R208).
- */
+/** See .planning/codebase/CONCERNS.md (Backend Concern Notes (R318) § functions/src/orgMembershipClaims.ts) */
 export async function decideMembershipClaim(
   params: DecideMembershipClaimParams,
 ): Promise<MembershipClaimDecision> {
@@ -278,20 +217,7 @@ export type SyncOrgMembershipClaimOutcome =
   | { action: "skip"; reason: MembershipClaimSkipReason }
   | { action: "failed"; error: string };
 
-/**
- * Shallow-equal for two `orgs` maps. `undefined` (no `orgs` claim key at
- * all -- a legacy pre-widening token) is treated as equivalent to `{}` (a
- * freshly-computed empty map for a user with zero surviving memberships), so
- * a legacy claim for a user with no memberships correctly compares as
- * "already current" rather than triggering a spurious write.
- *
- * Exported (IN-01, 73-REVIEW.md) so backfillOrgClaims.ts imports this SAME
- * implementation rather than maintaining its own verbatim copy -- the two
- * signatures had already started to drift (this one accepts `undefined` for
- * `current`, the old backfill copy required a non-optional `Record`), which
- * is exactly the kind of divergence a shared helper (mirroring
- * buildOrgsMapClaim/resolveOrgId's existing pattern) prevents.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/orgMembershipClaims.ts) */
 export function orgsMapsEqual(
   current: Record<string, OrgMembershipRole> | undefined,
   next: Record<string, OrgMembershipRole>,

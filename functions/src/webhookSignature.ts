@@ -24,22 +24,7 @@ function hdr(
 }
 
 /**
- * Verify a Resend/Svix (Standard Webhooks) HMAC-SHA256 signature over the RAW request
- * body. Pure and dependency-free (node:crypto only) — no Firestore, no firebase-admin,
- * no `svix` package — so the webhook trust boundary is unit-testable in isolation and
- * can be called BEFORE any state access (research Pattern 4).
- *
- * Scheme (CONFIRMED, 60-RESEARCH.md § Confirmed Resend / Svix Signature Scheme):
- *   - signed content = `${svix-id}.${svix-timestamp}.${rawBody}` (rawBody as UTF-8 string)
- *   - HMAC-SHA256 → base64
- *   - secret is `whsec_`-prefixed; strip the prefix and base64-decode the remainder for
- *     the HMAC key bytes
- *   - `svix-signature` is a SPACE-delimited list of `v1,<base64sig>` entries (multiple
- *     during key rotation); accept if ANY entry matches
- *
- * Returns a boolean and NEVER throws on bad input: a missing header, non-finite
- * timestamp, stale timestamp, or wrong-length candidate signature all yield `false`.
- *
+ * See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/webhookSignature.ts)
  * @param rawBody   The exact received bytes (Cloud Functions `req.rawBody`).
  * @param headers   Request headers (values may be string | string[] | undefined).
  * @param secret    The `whsec_`-prefixed base64 signing secret.

@@ -1,18 +1,4 @@
-/**
- * Pure server-side token renderer for the send path (Phase 59, R138/R139).
- *
- * `sendQueuedMessage` (functions/src/index.ts) renders each recipient's subject
- * and body from the RAW token template stored on the message doc. This file is
- * deliberately PURE — string in, string out, no Firestore / Pinia / `@/` alias
- * and no import of the client `buildServiceSnapshot` (which is store-bound and
- * not importable in the functions project, 59-RESEARCH.md Anti-Pattern). The
- * caller (the send trigger) Admin-SDK-loads the service/quarters/roles/people,
- * derives the token values, and calls this once PER RECIPIENT so
- * `{{their_roles}}` and `{{name}}` reflect that person's own roles/name (R139/R154).
- *
- * The supported tokens are substituted GLOBALLY; every other `{{token}}`
- * is left verbatim, and a template with no tokens is returned unchanged.
- */
+/** See .planning/codebase/STACK.md (Backend Stack Notes (R318) § functions/src/messageTokens.ts) */
 
 /** The token values a message is rendered against, for ONE recipient. */
 export interface MessageTokenContext {

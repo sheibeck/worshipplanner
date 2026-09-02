@@ -4,20 +4,8 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { clearClaimKeys, mergeAndSetCustomClaims } from "./claimsHelpers";
 
-// --- superAdminClaims (R174/R175-B/R176/R179: the owner-console access gate) ---
-//
-// This module deliberately does NOT call initializeApp() at module scope --
-// mirrors orgMembershipClaims.ts: functions/src/index.ts already does that
-// for the deployed runtime, and bootstrapSuperAdmin.ts's runBootstrapCli does
-// it for the owner-run CLI runtime. Calling it here would break one of those
-// two callers.
-//
-// superAdmins/{uid} document existence IS the source of truth (68-CONTEXT.md
-// "Claim model"): the trigger below is the SOLE writer of the superAdmin
-// claim, mirroring the existing source-doc -> trigger -> claim indirection
-// already established by orgMembershipClaims.ts. setSuperAdminClaimHandler
-// (the onCall below) never sets the claim itself -- it only writes/deletes
-// the source document and lets the trigger react.
+// superAdminClaims (R174/R175-B/R176/R179: the owner-console access gate)
+// See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/superAdminClaims.ts)
 
 /** The exact top-level custom-claim key this module ever writes. */
 export const SUPER_ADMIN_CLAIM_KEYS = ["superAdmin"] as const;
@@ -33,20 +21,7 @@ export type SyncSuperAdminClaimOutcome =
   | { action: "clear" }
   | { action: "failed"; error: string };
 
-/**
- * The testable handler body, exported separately from the onDocumentWritten
- * wrapper below -- mirrors syncOrgMembershipClaimHandler/syncOrgMembershipClaim.
- *
- * Every write routes through claimsHelpers (R175): a grant MERGES { superAdmin:
- * true } onto the user's existing claims (preserving { orgId, role } if
- * present -- SC1 direction B in reverse), and a revoke clears ONLY the
- * superAdmin key, preserving { orgId, role } (SC1 direction B).
- *
- * The whole body is wrapped in try/catch and resolves with a failure outcome
- * rather than rethrowing -- a throw out of a Firestore trigger causes Cloud
- * Functions retries that would hammer the Auth API (mirrors T-40-08's fix in
- * orgMembershipClaims.ts).
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/superAdminClaims.ts) */
 export async function syncSuperAdminClaimHandler(
   params: SyncSuperAdminClaimParams,
 ): Promise<SyncSuperAdminClaimOutcome> {
@@ -90,19 +65,7 @@ export interface SetSuperAdminClaimResponse {
   ok: true;
 }
 
-/**
- * The testable handler body, exported separately from the onCall wrapper
- * below -- mirrors parsePptxHandler/parsePptx and
- * queueServiceMessageHandler/queueServiceMessage.
- *
- * Security contract (T-68-03, defense-in-depth): the CALLER's authority is
- * re-verified server-side TWO independent ways -- the caller's own ID-token
- * claim (request.auth.token.superAdmin) AND a fresh Firestore re-read of
- * superAdmins/{callerUid} -- never trusting a client-declared authority flag.
- * The TARGET is resolved exclusively via getAuth().getUserByEmail(), never a
- * client-supplied uid, so a caller can never point this at an arbitrary uid
- * they merely guessed.
- */
+/** See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/superAdminClaims.ts) */
 export async function setSuperAdminClaimHandler(
   request: CallableRequest<SetSuperAdminClaimRequest>,
 ): Promise<SetSuperAdminClaimResponse> {

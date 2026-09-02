@@ -1,14 +1,7 @@
 import { defineSecret, defineString } from "firebase-functions/params";
 
-// --- params (shared, dependency-free) ----------------------------------------
-//
-// A tiny module with NO local imports beyond firebase-functions/params, so it
-// can be imported by BOTH index.ts and orgProvisioning.ts/adminEmail.ts without
-// creating a circular import (index.ts imports orgProvisioning.ts, which now
-// needs RESEND_API_KEY for its onCall secrets binding). The secret + the two
-// pure From-header helpers + the share-base-url param used to live in index.ts;
-// they moved here verbatim so a second holder can reuse them without importing
-// the whole index.ts surface.
+// params (shared, dependency-free)
+// See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/params.ts)
 
 /**
  * The Resend email provider key. DECLARED once here (Google Secret Manager),
