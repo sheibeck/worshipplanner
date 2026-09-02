@@ -308,23 +308,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     }
   }
 
-  // ── Output-window orchestration (R261 / R266) ──────────────────────────────
-  // The Go live gesture opens BOTH standalone output windows and (when the live
-  // monitors match a saved mapping) places each on its assigned screen. This runs
-  // ONLY from the run-go-live-btn click — NEVER onMounted. window.open (pop-up
-  // blocker) + requestFullscreen({ screen }) require a live transient activation
-  // traceable to a gesture task; after the Run click's router.push + the lazy
-  // route-chunk import() + the async auth/org beforeEach guard + the mount tick,
-  // Chrome/Edge no longer honor that activation on mount, so an onMounted open
-  // would silently open ZERO windows on a cold first Run while claiming success.
-  // The operator clicks Go live on the control screen to supply a FRESH, live
-  // activation for both window.open and requestFullscreen.
-  //
-  // HANDSHAKE (95-03): the channel is the single writer from mount and postIndex
-  // drives state whether or not a display is open; when Go live opens a window it
-  // postHellos and the control's onHello (resendCurrent) resends the current
-  // index — so the operator may click Go live at ANY time (even after navigating
-  // several slides) and the freshly-opened output syncs to the live slide.
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useRunControl.ts, "Output-window orchestration")
   type OutputStatus = 'idle' | 'opening' | 'placed' | 'partial' | 'fallback' | 'blocked'
   const outputStatus = ref<OutputStatus>('idle')
   const readyAudienceLabel = ref<string | null>(null)
@@ -508,21 +492,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
    * relationship is preserved.
    */
   function openWindow(url: string, name: string, screen: ScreenLike | null): Window | null {
-    // Owner UAT — auto-fullscreen the output windows. Chrome's Window Management
-    // API supports opening a popup DIRECTLY in fullscreen via the `fullscreen`
-    // window feature (with the window-management permission — already granted in
-    // monitor setup — and this Go-live user gesture). `left`/`top` pick the
-    // target monitor; `fullscreen` fills it with no chrome. These features are
-    // harmless best-effort positioning.
-    //
-    // NOTE: we DELIBERATELY do NOT call win.document.documentElement.request-
-    // Fullscreen() here. That cross-document call targets the child's still-
-    // loading/blank document from the OPENER and never worked. Reliable auto-
-    // fullscreen is now Fullscreen Capability Delegation: the child announces
-    // { type:'wp-output-ready' } and we delegate our fullscreen capability back
-    // to it (see installFullscreenDelegation / handleOutputReady) while this
-    // Go-live click's transient activation is still valid — plus the child's
-    // one-tap-anywhere affordance as the guaranteed fallback.
+    // See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/composables/useRunControl.ts, "openWindow auto-fullscreen")
     const features = screen
       ? `fullscreen,popup,left=${screen.left},top=${screen.top},width=${screen.width},height=${screen.height}`
       : ''
@@ -539,16 +509,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     return win
   }
 
-  // ── Fullscreen Capability Delegation (opener side) ──────────────────────────
-  // A popup cannot self-fullscreen (it loses its own activation to its bootstrap),
-  // but WE (the control window) still hold transient activation from the Go-live
-  // click. When an opened output posts { type:'wp-output-ready' } back to us, we
-  // delegate our fullscreen capability to that exact window via postMessage with
-  // the non-standard { delegate:'fullscreen' } option, so the child may then
-  // requestFullscreen() with no gesture of its own. Trust is gated on same-origin
-  // AND event.source being one of OUR opened output handles. Feature-detected by
-  // being ignored: a browser without capability delegation simply drops the option
-  // and the child uses its one-tap-anywhere fallback. Never throws.
+  // See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/composables/useRunControl.ts, "Fullscreen Capability Delegation (opener side)")
   let fullscreenDelegationInstalled = false
 
   /**
@@ -569,17 +530,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     }
   }
 
-  /**
-   * Owner UAT — per-display fullscreen. Bound to a "Go fullscreen" button on each card
-   * in the control's Displays panel. The automatic no-gesture path is unreliable across
-   * browsers (proven on Chrome 151 + Edge with a correct machine-wide policy), so
-   * fullscreen is driven by an explicit operator click — ONE per display, all in one
-   * place at the booth, so nobody chases the mouse across monitors that may not even be
-   * visible. Runs synchronously in the button's click handler, so the click's transient
-   * activation is delegated to the already-open, already-loaded output window, which
-   * then requestFullscreen()s reliably (no load-race to eat the gesture). No-op if the
-   * window is closed. Generalizes to any future output role (e.g. Live Stream).
-   */
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useRunControl.ts, "Per-display fullscreen")
   function fullscreenDisplay(role: MonitorRole) {
     const name = role === 'audience' ? 'wp-audience' : 'wp-confidence'
     const win = outputWindows[name]
@@ -753,18 +704,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
       })
   }
 
-  /**
-   * Owner UAT — keep the CONTROL screen fullscreen while running. openOutputs
-   * requests control fullscreen SYNCHRONOUSLY in the click path (so a non-policy
-   * machine still gets its one gesture-authorized attempt), but opening the two
-   * output popups immediately after makes Chrome DROP the opener's fullscreen — so
-   * the control flashed to fullscreen and fell back out. Re-assert AFTER both
-   * outputs are open, deferred a tick so the popup-driven fullscreen-exit has
-   * settled. With the Automatic Fullscreen policy granted (the multi-monitor target)
-   * this re-entry needs NO gesture; without it it is a silently-rejected no-op.
-   * Idempotent (skips when already fullscreen) and guarded against a fast exit.
-   * Exited again in endServiceTeardown.
-   */
+  // See .planning/codebase/CONCERNS.md (§ Component & Composable Concern Notes (R318) -> src/composables/useRunControl.ts, "reassertControlFullscreen")
   function reassertControlFullscreen() {
     window.setTimeout(() => {
       if (isUnmounted || !live.value) return
@@ -854,19 +794,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     }
   }
 
-  /**
-   * END REHEARSAL (owner UAT) — return to the pre-flight "Ready when you are"
-   * screen (State A) WITHOUT tearing down or navigating away. A rehearsal opened
-   * NO output windows and holds no getScreenDetails (liveScreenDetails===null), so
-   * there is nothing on the congregation screens to close: we simply drop live +
-   * rehearsing (→ State A renders via v-if="!live"), reset the elapsed timer, and
-   * clear blackout so a later Go live starts clean. The run channel handle stays
-   * open (the operator is still in the console); when they click Go live the
-   * existing openOutputs path re-drives everything and the freshly-opened outputs
-   * sync via the hello→resend handshake. Deliberately NEVER window.open,
-   * router.push, or the confirmExit teardown — ending a rehearsal is low-stakes and
-   * needs no confirm.
-   */
+  // See .planning/codebase/INTEGRATIONS.md (§ Component & Composable Integration Notes (R318) -> src/composables/useRunControl.ts, "endRehearsal")
   function endRehearsal() {
     // See ADR-0132 (docs/adr/0132-explicit-mirrors-endserviceteardown-s-defense-in-depth.md)
     loopTimer.disarm()
@@ -1025,17 +953,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   /** The current slide's position WITHIN the active item (RunFilmstrip currentIndex). */
   const filmstripCurrentIndex = computed(() => index.value)
 
-  // ── Per-item loop timer (R306/R308, Phase 106) ──────────────────────────────
-  // The SINGLE loop timer lives HERE — never in an output window
-  // (AudienceOutputView/ConfidenceOutputView stay receive-only, ARCHITECTURE
-  // anti-patterns). Every advance routes through postIndex() above (the single
-  // writer), so the loop and manual nav can never fight or double-drive the
-  // output windows (T-106-04). reconcileLoop() is the ONE place that decides
-  // arm vs. disarm, called from postIndex (after posting — manual nav AND
-  // every loop tick itself), postBlackout ("Go to black" pauses/resumes the
-  // loop per 106-CONTEXT.md), and — below — watch(currentSlotIndex) (item
-  // change) and watch(live) (go-live/rehearse arms, End Service/End Rehearsal
-  // disarms).
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useRunControl.ts, "Per-item loop timer")
   const loopTimer = useLoopTimer()
 
   /** Clamp a (possibly hand-edited/persisted) interval to 1–3600s (T-106-05). */
@@ -1137,16 +1055,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     slideCount.value === 0 ? 0 : (((index.value ?? 0) + 1) / slideCount.value) * 100,
   )
 
-  /**
-   * Open the monitor-setup screen in a NEW TAB so the running control (index/seq/
-   * channel + any open outputs) survives — mirrors the reassign banner's new-tab
-   * rule. Owner fix #5: NO 'noopener'. noopener severs the opener relationship, and
-   * the HTML spec only copies the opener's sessionStorage — which carries a
-   * multi-church user's picked active org — to the child when that relationship is
-   * preserved. With noopener the fresh tab had no active-org, so the router guard
-   * bounced it to /select-church. A plain window.open (like the run/output windows
-   * already use) lets the new tab inherit sessionStorage and load monitor-setup.
-   */
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useRunControl.ts, "openManage")
   function openManage() {
     window.open('/monitor-setup', '_blank')
   }

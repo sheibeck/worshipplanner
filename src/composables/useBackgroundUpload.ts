@@ -2,16 +2,7 @@ import { ref, type Ref } from 'vue'
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/firebase'
 
-/**
- * Background-image-cap constant (R055/R057, Phase 33 Plan 03) — a
- * client-side pre-validation figure that sits well under the authoritative
- * server-side cap for this prefix. `orgs/{orgId}/backgrounds/**` does NOT
- * match `storage.rules`' dedicated `orgs/{orgId}/media/{allPaths=**}` block
- * (that block's 50MB cap is `useMediaUpload`'s, not this one's) — it falls
- * through to the generic `orgs/{orgId}/{allPaths=**}` catch-all, which caps
- * at 25MB. 10MB is well under that, so no `storage.rules` change is needed
- * or in scope for this phase (33-RESEARCH.md § Research Question 1).
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useBackgroundUpload.ts)
 export const BACKGROUND_MAX_BYTES = 10485760
 
 export interface UseBackgroundUploadReturn {
@@ -45,28 +36,7 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_')
 }
 
-/**
- * Firebase Storage upload composable for background images (R055/R057,
- * Phase 33 Plan 03). Mirrors `useMediaUpload.ts`'s resumable-upload +
- * createdAt-custom-metadata pattern, reactively, diverging on exactly three
- * points: MIME check (`image/*` only), size cap (10MB, not 50MB), and the
- * Storage path prefix (`backgrounds/`, not `media/`).
- *
- * The `backgrounds/` prefix matters beyond naming: the deployed
- * `cleanupExpiredMedia` Cloud Function's path guard
- * (`functions/src/index.ts:241`, `MEDIA_PATH_GUARD = /^orgs\/[^/]+\/media\//`)
- * matches only the `media/` prefix, so an object written under
- * `backgrounds/` is structurally exempt from the 14-day sweep — a background
- * written to `media/` instead would silently vanish two weeks after being
- * set. The `backgrounds/` prefix falls into `storage.rules`' existing
- * generic `orgs/{orgId}/{allPaths=**}` catch-all (25MB cap, same
- * org-membership auth check as `media/`), so no `storage.rules` change is in
- * scope for this phase.
- *
- * Validates MIME type (`image/*`) and size (<= BACKGROUND_MAX_BYTES) BEFORE
- * any upload begins — an invalid file rejects immediately without calling
- * into Storage at all.
- */
+// See .planning/codebase/INTEGRATIONS.md (§ Component & Composable Integration Notes (R318) -> src/composables/useBackgroundUpload.ts)
 export function useBackgroundUpload(): UseBackgroundUploadReturn {
   const progress = ref(0)
   const error = ref<string | null>(null)

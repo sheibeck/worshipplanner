@@ -17,23 +17,7 @@ export interface UseAutoSaveReturn {
 }
 
 /**
- * Reusable auto-save composable extracted from ServiceEditorView's pattern.
- *
- * Watches a reactive source with a deep watcher, debounces changes, and calls
- * `saveFn` after the debounce period elapses.  An inflight guard prevents
- * concurrent saves — if a save is already running when the timer fires, the
- * save is rescheduled.
- *
- * The first trigger from the watcher is suppressed (initialized guard) so that
- * the initial load of data does not trigger a save.
- *
- * Status is one of five values: 'idle' | 'pending' | 'saving' | 'saved' |
- * 'error'. A rejected `saveFn` is contained on both the debounced path and
- * `flush()` and surfaces as the 'error' status rather than an unhandled
- * rejection — it is never left stranded at 'saving'. The handling is
- * generic: it only sets the status, it does not inspect or discriminate
- * the failure. The 'saved' state is terminal — it persists until the next
- * pending transition, it does not fade back to 'idle' on its own.
+ * See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useAutoSave.ts).
  *
  * @param watchSource - Reactive source to watch (deep).
  * @param saveFn      - Async function that performs the actual save.

@@ -16,17 +16,7 @@ export interface UseOutputWindowOptions {
    * Production passes nothing and `openRunChannel` uses native BroadcastChannel.
    */
   channelFactory?: BroadcastChannelFactory
-  /**
-   * Each output view passes its OWN static role ('audience' | 'confidence') — the
-   * routes /present/audience|confidence make the role statically known. Retained as
-   * a harmless identity option; fullscreen is no longer resolved from it. The
-   * control creates + positions each window on its assigned monitor via window.open
-   * features, so auto-fullscreen has two independent, best-effort paths: (1) the
-   * PRIMARY zero-click path — Chrome's "Automatic Fullscreen" content setting, via
-   * attemptAutoFullscreen() on mount when the origin is granted; and (2) the
-   * fallback — Fullscreen Capability Delegation from the opener (see
-   * handleDelegationMessage) plus the one-tap overlay in each view.
-   */
+  /** See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/composables/useOutputWindow.ts, "role option") */
   role?: MonitorRole
 }
 
@@ -101,18 +91,7 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     })
   }
 
-  // ── Fullscreen Capability Delegation (best-effort zero-tap) ─────────────────
-  // A popup opened via window.open loses its OWN transient user-activation the
-  // moment its SPA/auth bootstrap runs, so a mount-time requestFullscreen() here
-  // always rejected ("API can only be initiated by a user gesture") — the console
-  // error the owner saw. The correct mechanism is Fullscreen Capability
-  // Delegation: the OPENER (control window), which still HAS activation from the
-  // Go-live click, delegates its fullscreen capability to us. We (a) announce
-  // readiness so the opener knows to delegate, and (b) on receiving the delegation
-  // message call requestFullscreen() — now permitted WITHOUT our own gesture. A
-  // browser that does not implement capability delegation simply never enables us,
-  // and the one-tap-anywhere affordance (rendered while !isFullscreen) guarantees
-  // a usable result. All best-effort: never throws, never surfaces an error.
+  // See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/composables/useOutputWindow.ts, "Fullscreen Capability Delegation (best-effort zero-tap)")
   function handleDelegationMessage(event: MessageEvent) {
     // Trust ONLY same-origin messages (the opener is our own app on our origin).
     if (event.origin !== window.location.origin) return
@@ -128,34 +107,7 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     }
   }
 
-  // ── Automatic Fullscreen content setting (Chrome 126+ — the ZERO-CLICK primary) ─
-  // Chrome's "Automatic Fullscreen" content setting (a one-time per-computer allow,
-  // or the AutomaticFullscreenAllowedForUrls enterprise policy) lets an allowed
-  // origin call Element.requestFullscreen() WITHOUT a user gesture. This is the
-  // correct fix for the multi-display problem: gesture-based fullscreen (capability
-  // delegation, the control button, a per-window tap) can only fullscreen ONE window
-  // per gesture — the browser consumes the transient activation on the first
-  // requestFullscreen, so the second display never gets it. With the content setting
-  // granted, each output window self-fullscreens on load INDEPENDENTLY (no shared
-  // gesture), so BOTH displays go fullscreen with zero clicks.
-  //
-  // The control already OPENED and POSITIONED each window on its assigned monitor
-  // (window.open left/top/width/height), so a PLAIN requestFullscreen() fullscreens
-  // on the monitor the window is already on = the correct screen. No getScreenDetails()
-  // is needed or wanted here — the window is already placed.
-  //
-  // When the setting is NOT granted (or the permission descriptor is unsupported /
-  // query() throws), this does NOTHING: the existing fallbacks remain — the
-  // wp-fullscreen-delegate capability-delegation listener above, the opener-side
-  // delegation + control "Fullscreen displays" button (useRunControl, untouched),
-  // and the one-tap-anywhere overlay in each output view.
-  // Best-effort: where the browser honors the setting, each output self-fullscreens
-  // on mount with no gesture. Where it does NOT — proven on the owner's Chrome 151
-  // AND Edge even with a correct machine-wide policy (chrome://policy showed OK): the
-  // permission query reports 'granted' but requestFullscreen still rejects
-  // "not granted" — this is a silent no-op, and the per-display "Go fullscreen"
-  // buttons on the control's Displays panel (gesture-delegated, one click per display,
-  // all in one place at the booth) are the reliable path. Never throws.
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useOutputWindow.ts, "Automatic Fullscreen content setting")
   async function attemptAutoFullscreen() {
     try {
       // The { name:'fullscreen', allowWithoutGesture:true } descriptor is not in the
@@ -244,9 +196,7 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
       fontReady.value = true
     }
 
-    // NOTE: the deferred first-play (audience old onMounted 256-259) is NOT here —
-    // it references the view's canvas ref and is re-homed to a view-local
-    // watch(fontReady) in each consuming view.
+    // See .planning/codebase/CONCERNS.md (§ Component & Composable Concern Notes (R318) -> src/composables/useOutputWindow.ts)
   })
 
   onUnmounted(async () => {

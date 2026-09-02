@@ -1,22 +1,6 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-/**
- * useRunTimers — the Run screen's wall clock + elapsed-since-go-live timer (R281).
- *
- * A SINGLE ~1s setInterval, created in onMounted and cleared in onUnmounted
- * (mirroring RunControlView's stopRecoveryWatchers clearInterval + null-the-id
- * discipline), drives both a short wall-time `clock` string and an `elapsed`
- * (M:SS / H:MM:SS) string measured from the go-live origin.
- *
- * `startElapsed()` is idempotent: only the FIRST call (the first go-live OR the
- * first rehearse) records the origin; later calls are no-ops. `resetElapsed()`
- * clears the origin so `elapsed` reads '00:00' again.
- *
- * All formatting is padStart-based — NO Array.prototype.at (absent from the TS
- * lib target; see CLAUDE.md). Fake-timer friendly: advanceTimersByTime drives
- * both the clock and the elapsed count, so a mount/unmount harness can prove
- * the interval self-clears.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useRunTimers.ts)
 export function useRunTimers() {
   // Reactive display surface consumed by RunHeader.
   const clock = ref('')

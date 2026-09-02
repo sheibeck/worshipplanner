@@ -2,13 +2,7 @@ import { ref, type Ref } from 'vue'
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/firebase'
 
-/**
- * Media-cap constant for the Phase 22 org media path (R014). Kept in sync
- * conceptually with storage.rules' `orgs/{orgId}/media/{allPaths=**}` write
- * cap (52428800 bytes / 50MB) — client-side pre-validation here rejects
- * oversize files before any bytes leave the browser; storage.rules is the
- * authoritative server-side enforcement.
- */
+/** Media-cap constant for the Phase 22 org media path (R014); see .planning/codebase/INTEGRATIONS.md (§ Component & Composable Integration Notes (R318) -> src/composables/useMediaUpload.ts). */
 export const MEDIA_MAX_BYTES = 52428800
 
 export interface UseMediaUploadReturn {
@@ -38,16 +32,7 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_')
 }
 
-/**
- * Firebase Storage upload composable for audio/video media attachments
- * (Phase 22, R013/R014). Mirrors `src/utils/pptxUpload.ts`'s resumable-upload
- * + createdAt-custom-metadata pattern, reactively, for the media-attachment
- * upload UI.
- *
- * Validates MIME type (`audio/*` or `video/*`) and size (<= MEDIA_MAX_BYTES)
- * BEFORE any upload begins — an invalid file rejects immediately without
- * calling into Storage at all.
- */
+// See .planning/codebase/INTEGRATIONS.md (§ Component & Composable Integration Notes (R318) -> src/composables/useMediaUpload.ts)
 export function useMediaUpload(): UseMediaUploadReturn {
   const progress = ref(0)
   const error = ref<string | null>(null)

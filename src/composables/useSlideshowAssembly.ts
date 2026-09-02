@@ -1,17 +1,4 @@
-/**
- * Reactive wrapper over the pure `assembleSlideshow` engine (20-02), delivering
- * R006: reorder/add/remove a service element and the assembled slideshow follows
- * with no manual re-sync.
- *
- * Builds the content maps `assembleSlideshow` needs from live Pinia
- * stores — `scriptureReadingsById` from the scriptureSlides store — and
- * maintains its own `songLyricsById` map by loading the current (newest)
- * lyrics doc for every distinct songId referenced by a SONG slot in the
- * service (the songLyrics store itself only ever subscribes to a single song
- * at a time, so it cannot be reused directly here). A song's slide order is
- * read from that lyrics document's `performanceOrder` field alone (R035/D-03)
- * — there is no second order source and no precedence chain.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts). See also .planning/codebase/STACK.md (same section) for the R006 reactivity contract.
 import { ref, reactive, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
 import { db } from '@/firebase'
@@ -31,16 +18,7 @@ import type { SlideGroup, SlideGroupInput, GroupSlideEntry } from '@/types/slide
 /** Tears down a lyrics subscription opened by a {@link LyricsSubscriber}. */
 export type LyricsUnsubscribe = () => void
 
-/**
- * Opens a LIVE subscription to a song's current (newest) lyrics document.
- * `onUpdate` fires with the newest doc (or `null` when none exists) on the
- * initial snapshot AND on every subsequent edit, so a reworded lyric or a
- * verse added/removed/reordered propagates to the assembled slideshow with no
- * composable remount — and independently of `canWrite`, so a locked/viewer
- * session sees content edits live. Injectable for tests. Returns an
- * unsubscribe the composable calls when the song leaves the service or on
- * teardown.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "LyricsSubscriber")
 export type LyricsSubscriber = (
   orgId: string,
   songId: string,
@@ -117,49 +95,11 @@ export interface UseSlideshowAssemblyReturn {
   isLoading: Ref<boolean>
   /** Re-exposed from the `slideGroups` store so consumers (24-06's delete warning) don't subscribe a second time. */
   groupsBySlotId: ComputedRef<Map<string, SlideGroup>>
-  /**
-   * On-demand group materializer (25-05 Task 1): resolves to `{ entries,
-   * sourceSignature }` for `slotId`'s group, creating it first if it does not
-   * exist yet — including when the derived input has ZERO slides, unlike the
-   * automatic `materializeCandidates` watcher below (that skip implements
-   * Phase 24 D-02's "groups are always populated" rule for AUTOMATIC
-   * materialization; this function only ever runs because a user just asked
-   * to put something into this plan item, R032). Resolves `undefined` when it
-   * cannot act (no service, no org, no such slot, the caller cannot write, or
-   * the slot's delete is in flight). Every write path in 25-05/25-06/25-07
-   * (add slide, drag-reorder, import, drop) resolves the group through this
-   * first rather than calling the store directly.
-   */
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "ensureGroupMaterialized")
   ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
-  /**
-   * ME-04 (R045 membership). Marks `slotId` as having a delete in flight and
-   * returns the release; call it in a `finally`.
-   *
-   * `confirmSlotDelete` awaits the group cascade BEFORE splicing the slot, so
-   * that a failed delete never leaves the slot removed locally while its group
-   * lingers. But Firestore applies a delete to its LOCAL cache and raises
-   * `onSnapshot` immediately, whereas `deleteDoc` resolves only on server ack.
-   * For the length of that ack the slot is still in `service.slots` with no
-   * group — exactly the shape `materializationCandidates` treats as
-   * "materialize me" — so the watcher re-created the document the cascade had
-   * just deleted, and the slot was then spliced out with no second cascade,
-   * orphaning the group document indefinitely.
-   *
-   * A held slot is skipped by BOTH the automatic candidate watcher and
-   * `ensureGroupMaterialized`.
-   */
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "suppressMaterialization")
   suppressMaterialization: (slotId: string) => () => void
-  /**
-   * HI-01. Resolves once no group write issued by this composable is still in
-   * flight. Both apply loops run fire-and-forget from `{ immediate: true }`
-   * watchers, so without this there is no way for a caller to know a write is
-   * outstanding — and `onMarkAsPlanned` flipped the service's status straight
-   * through that window, leaving the write to be denied on arrival by the new
-   * `/slideGroups` rule while the user saw a normal transition.
-   *
-   * Never rejects: individual failures are already contained and logged at the
-   * point of the write. This is a barrier, not an error channel.
-   */
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "drainGroupWrites")
   drainGroupWrites: () => Promise<void>
 }
 
@@ -243,16 +183,7 @@ export function useSlideshowAssembly(
         const deck = importedDecksById.value.get(slot.importId)
         if (deck?.renderImportId) ids.add(deck.renderImportId)
       }
-      // 2. `imported` ENTRIES living inside ANY slot's slide group. A PPTX deck's
-      //    rendered slides can be added straight into a non-IMPORTED slot's group
-      //    (e.g. a Prayer or Scripture group), where the render linkage lives on the
-      //    entry's deck (`sourceRef.importId` → `ImportedDeck.id` → `renderImportId`),
-      //    NOT on an IMPORTED slot and NOT on the group's own `renderImportId` (which
-      //    stays null for a non-imported slot). Without collecting these, the render
-      //    doc is never subscribed, its `ready` status is never seen, and every such
-      //    entry hangs on the "Rendering" spinner permanently even after the render
-      //    has completed — a real production defect (a deck imported into a Prayer
-      //    group's slides). Same identifier hop as the IMPORTED-slot branch above.
+      // 2. See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "distinctRenderImportIds's imported-entry collection"). Same identifier hop as the IMPORTED-slot branch above.
       const group = slideGroupsStore.groupsBySlotId.get(slot.id)
       if (group) {
         for (const entry of group.slides) {
@@ -462,18 +393,7 @@ export function useSlideshowAssembly(
     return freshOrder.some((sectionId, index) => sectionId !== storedOrder[index])
   }
 
-  // The group map the assembler renders from. For an EDITABLE session
-  // (`canWrite`) this is the store's map UNCHANGED — the rebuild loop persists
-  // any regenerated group, so the stored group is authoritative and behavior is
-  // identical to before. For a LOCKED / viewer session (`!canWrite`), a SONG
-  // group gone stale against its song's current verse structure is OMITTED, so
-  // the assembler falls through to its live no-group derivation path
-  // (`performanceOrder`), reflowing an added / removed / reordered verse IN
-  // MEMORY. Nothing is persisted here: this override only feeds
-  // `assembledSlideshow` (read/render), never the write paths
-  // (`materializationCandidates` / `rebuildOutcomes` / `ensureGroupMaterialized`
-  // all read the store map directly and stay gated on `canWrite`), so a locked
-  // session still writes nothing to `/slideGroups`.
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "assemblyGroupsBySlotId")
   const assemblyGroupsBySlotId = computed<Map<string, SlideGroup>>(() => {
     const stored = slideGroupsStore.groupsBySlotId
     if (canWrite.value) return stored
@@ -509,16 +429,7 @@ export function useSlideshowAssembly(
   // of the Map captured at setup time.
   const groupsBySlotId = computed<Map<string, SlideGroup>>(() => slideGroupsStore.groupsBySlotId)
 
-  // --- Task 2: lazy materialization, zero writes on reorder ---
-  //
-  // `materializationCandidates` is a fully SYNCHRONOUS computed that decides
-  // WHAT needs materializing. This matters: an async function body passed to
-  // `watch`/`watchEffect` only tracks reactive reads made before its first
-  // `await` — reads made after resuming from an await happen outside the
-  // effect's tracking window, silently dropping dependencies. Keeping the
-  // decision synchronous (mirroring `distinctSongIds`'s shape) and only
-  // performing the actual (async) writes in the watch callback avoids that
-  // pitfall entirely.
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "materializationCandidates")
   interface MaterializationCandidate {
     slotId: string
     orgId: string
@@ -639,16 +550,7 @@ export function useSlideshowAssembly(
     { immediate: true },
   )
 
-  // --- 25-05 Task 1: on-demand materialization for an explicit user write ---
-  //
-  // Concurrent calls for the SAME slot are deduped through `ensureInFlight` so
-  // at most one create is issued and every caller resolves the same result.
-  // Also participates in the shared `materializingSlotIds` guard so the
-  // automatic watcher above cannot fire a second create for a slot this
-  // function is already materializing — belt and braces on top of the
-  // store's deterministic doc id, which already makes the worst case of the
-  // reverse race (the automatic watcher already in flight when this function
-  // is called) a harmless overwrite rather than two divergent documents.
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "ensureGroupMaterialized")
   const ensureInFlight = new Map<string, Promise<EnsureGroupMaterializedResult | undefined>>()
 
   async function ensureGroupMaterialized(slotId: string): Promise<EnsureGroupMaterializedResult | undefined> {
