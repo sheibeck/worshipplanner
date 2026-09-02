@@ -715,10 +715,19 @@ share-token/public-page exposure and PII handling, and cost/abuse controls.
   3. Critical/High findings are clearly distinguished from Medium/Low, giving Phase 113 an unambiguous remediation scope (R322).
 
 **Plans**: 4 plans
+**Wave 1**
+
 - [ ] 112-01-PLAN.md — Firestore & Storage rules + multi-tenant isolation review (runs the live rules suite) → 112-FINDINGS-rules-isolation.md
 - [ ] 112-02-PLAN.md — auth/custom-claims + route guards + Cloud Functions authorization review (incl. ARCH-005, ARCH-018) → 112-FINDINGS-auth-functions.md
 - [ ] 112-03-PLAN.md — share-token/public-page exposure + PII + cost/abuse controls review → 112-FINDINGS-sharetoken-pii-abuse.md
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 112-04-PLAN.md — consolidate all findings into the ranked 112-SECURITY-REVIEW.md (C/High → Phase 113, M/Low → backlog)
+
+**Cross-cutting constraints:**
+
+- No files under src/, functions/, firestore.rules, or storage.rules were modified; no deploy occurred.
 
 ### Phase 113: Security Remediation
 
