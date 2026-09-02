@@ -492,16 +492,9 @@ export const useServiceStore = defineStore('services', () => {
   }
 
   // D-15: deliberately NOT guarded (delete stays available at every status).
+  // R234 (80-02): revoke public share artifacts FIRST, delete the service doc LAST.
   // See .planning/codebase/INTEGRATIONS.md (Store Integration Notes (R318) ->
-  // src/stores/services.ts). R234 (80-02): revoke every public share artifact
-  // FIRST, then delete the service doc LAST, mirroring `deleteQuarter`'s precedent
-  // (`quarters.ts`). Unlike a quarter's single denormalized `shareToken`
-  // field, a service can accumulate MULTIPLE `shareTokens` docs (adoption/
-  // re-share via `ensureShareLink`), so that step is a QUERY, not a
-  // single-doc lookup — and unlike `deleteQuarter`'s one outer
-  // `if (quarter.shareToken)` gate, each of the three artifact types here is
-  // independently possibly-present, so each is checked/queried on its own
-  // rather than behind one shared flag.
+  // src/stores/services.ts).
   async function deleteService(id: string) {
     if (!orgId.value) return
     // Looked up BEFORE any delete — the serviceShares key below needs
