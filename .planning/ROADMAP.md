@@ -582,7 +582,7 @@ inside Phase 108's own plan.
 - [x] **Phase 109: Behavioral/Architectural Extraction & Comment Convention** - Relocate "how this works" comments into `.planning/codebase/` map docs and document the go-forward comment convention (completed 2026-09-02)
 - [x] **Phase 110: Architectural Review** - Severity-ranked report on module boundaries, store/Firestore-listener lifecycle, multi-tenant isolation architecture, data flow, and coupling (completed 2026-09-02)
 - [x] **Phase 111: Architectural Remediation** - Fix or explicitly defer every Critical/High architectural finding; triage Medium/Low to backlog (completed 2026-09-02)
-- [ ] **Phase 112: Security Review** - Severity-ranked report on Firestore/Storage rules, auth/claims + route guards, tenant isolation, Cloud Functions authorization, share-token/PII exposure, and cost/abuse controls
+- [x] **Phase 112: Security Review** - Severity-ranked report on Firestore/Storage rules, auth/claims + route guards, tenant isolation, Cloud Functions authorization, share-token/PII exposure, and cost/abuse controls (completed 2026-09-02)
 - [ ] **Phase 113: Security Remediation** - Fix or explicitly defer every Critical/High security finding; triage Medium/Low to backlog
 
 ### Phase 108: Comment Audit & Decision-Rationale Extraction
