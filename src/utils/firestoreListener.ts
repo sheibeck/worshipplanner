@@ -1,13 +1,5 @@
 // Bug 2b (quick 260830-l9c) — shared onSnapshot error-handling helper.
-//
-// A handful of Firestore snapshot listeners only unsubscribe on view
-// unmount, which happens AFTER the router redirects to /login on sign-out.
-// In that window the auth token has already been revoked (Bug 2a tears down
-// the ORG-SCOPED store listeners first, but these component-owned listeners
-// are separate), so Firestore rejects the read with `permission-denied`.
-// With no `onError` handler, that surfaces as "Uncaught Error in snapshot
-// listener" — benign, but noisy. `ignorePermissionDenied` swallows exactly
-// that one error code and still logs anything else.
+// See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/firestoreListener.ts)
 export function isPermissionDenied(err: unknown): boolean {
   return (err as { code?: string } | null)?.code === 'permission-denied'
 }

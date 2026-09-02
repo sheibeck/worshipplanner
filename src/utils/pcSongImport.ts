@@ -250,13 +250,10 @@ export async function fetchAndMapPcSongs(
 }
 
 /**
- * Split mapped PC songs into "new" (not yet in the library) and "already-imported"
- * (matches an existing song) based on the shared triple-key matching rule:
- * pcSongId (exact) OR ccliNumber (exact, non-empty) OR title (case-insensitive).
- *
- * This is a pure function — no side effects, no store access. It centralizes the
- * matching logic previously duplicated in PcImportModal's classifySongs and in
- * importFromPc's inline counting.
+ * Split mapped PC songs into "new" and "already-imported" based on the shared
+ * triple-key matching rule: pcSongId (exact) OR ccliNumber (exact, non-empty)
+ * OR title (case-insensitive). Pure function — no side effects, no store access.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/pcSongImport.ts)
  *
  * @param mapped - Mapped PC songs (from fetchAndMapPcSongs) to classify
  * @param existing - Existing library songs to match against

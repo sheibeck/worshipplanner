@@ -166,6 +166,76 @@ lockstep with the canonical progression preset. Fresh `crypto.randomUUID()` ids 
 fresh ids are harmless on the createService path). Carries no `body` — the suggested entries are
 bodyless; a church adds recurring MISC body text itself.
 
+### src/utils/messaging.ts
+
+**`isMessagingEnabled` (R130):** single shared choke point for the org-level volunteer-email
+messaging kill switch (`authStore.settings.messaging.enabled`). Every later messaging UI surface
+gates on this ONE function — no scattered `settings.messaging.enabled` reads — mirroring
+`claudeApi.ts::isAiEnabled`'s rationale. Unlike `isAiEnabled`, this function makes no network call
+and has no "never throw" contract (yet), so it stays a thin, honest boolean read: `useAuthStore()`
+throws if called with no active Pinia instance, and that throw is intentionally NOT swallowed here.
+Callers that need a never-throw guarantee wrap their own call site.
+
+### src/utils/runChannel.ts
+
+**Module overview (Phase 91, consumed by Phases 92-96's multi-window Run mode):** run-mode
+control->output message protocol — a typed, injectable wrapper around `BroadcastChannel`. The
+control window is the SINGLE writer of `state` messages; an output window posts only `hello` on
+(re)mount so control can re-send current state to a freshly-opened or reloaded output. Deliberately
+free of Vue/Firebase/Pinia imports — its only runtime dependency is the `BroadcastChannel`
+primitive, supplied through an injectable factory so tests can drive it deterministically without
+relying on jsdom/Node to provide a native `BroadcastChannel` (they do not reliably do so). `seq` is
+a monotonically increasing counter OWNED BY THE CALLER (control), not by this module — `postState`
+posts `state` verbatim, never generating its own seq. `onState` is where the load-bearing stale-drop
+lives: an incoming state message is delivered to the caller's callback ONLY when its seq is
+STRICTLY greater than the highest seq already delivered on that handle — this guards the
+window-open race and the reload-loses-place hazard, so a reopened/reloaded output window can never
+be driven backward by a stale or out-of-order message. No echo-suppression is implemented on
+purpose: the platform never delivers a context's own broadcast back to itself, so a self-filter
+would be dead, misleading code.
+
+### src/utils/serviceSlots.ts
+
+**Module overview (Phase 91, consumed by the Run rail in Phases 92-96):** the `slotIndex` <->
+first-assembled-slide-index lookup — the SINGLE shared derivation any consumer uses for "which slide
+does clicking this order-of-service item jump to," extracted so the position-sort is never
+re-implemented and allowed to disagree with `slideshowAssembler.ts` (CLAUDE.md's
+two-orderings-disagree warning). `sortedSlotsWithIndex` reproduces `slideshowAssembler.ts`'s own
+map-then-sort BYTE-FOR-BYTE: pair each slot with its ORIGINAL `service.slots` array index first,
+THEN sort a copy by ascending `slot.position`. Every emitted `AssembledSlide.slotIndex` IS that
+original array index (never a position-sorted index), so this module's `index` and the assembler's
+`slotIndex` are the same number by construction. Pure derivation over in-memory
+`Service`/`AssembledSlide[]` already resident in the window — no external trust boundary crossed, no
+Firestore/Pinia/Vue import.
+
+### src/utils/shareTokens.ts
+
+**Module overview (R078):** share-token minting and adoption selection, extracted into a pure
+module so both decisions ("what does a freshly-minted token look like" and "which of several
+already-circulated tokens is the one to adopt") can be proven exhaustively without a Firestore mock.
+The adoption branch this module exists for is built on an equality-only query
+(`where('serviceId','==',id)`, no server-side sort clause) followed by a client-side sort here — an
+equality filter combined with a server-side sort on a different field requires a composite
+Firestore index this project's `firestore.indexes.json` has none of, and the Firestore emulator does
+not enforce that requirement, so a version that added the server-side sort would pass every local
+test and then throw in production. The caller must never add that sort clause to the query that
+produces the candidates passed into `pickAdoptableToken` — do the ordering here instead.
+Deliberately free of Firestore and Pinia imports.
+
+### src/utils/stageLayout.ts
+
+**Module overview (R313/R314, Phase 107 — redesigned to the single-room "Nocturne" diagram):** pure
+geometry + kind-registry helpers for the visual stage layout. Dependency-free (no Vue/Pinia/
+Firebase) so it is safe from BOTH the editor's drag canvas and the read-only renderer
+(`StageLayoutView`), which keeps that view import-free enough for the public, unauthenticated
+`ShareView`. The diagram is ONE continuous room; positions are a single percentage space ([0,100] of
+the room rect) — never snapped, always resize-stable (R314). A marker's stored `zone` is derived
+from where it lands (`zoneFromPosition`). A marker's TYPE is either a fixed `kind` (Vocals / Mics &
+DI / Gear, plus the Orchestra & Instrument extras) OR a band ROLE (`roleId`/`roleName`): the
+Instruments palette mirrors the org's Band roles so a marker's instrument lines up with the role a
+person is assigned to. The read-only surfaces need only the denormalized `roleName` to render
+(icon/label/skin), never the id.
+
 ---
 
 *Stack analysis: 2026-07-16*

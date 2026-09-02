@@ -2,16 +2,9 @@ import { getAppAuthHeaders } from '@/utils/appAuth'
 
 /**
  * Fetches an NLT passage and returns it reformatted into the exact `[N] text`
- * bracketed-verse-number convention `scriptureSplitter.ts::parseVerses` (and,
- * transitively, `scriptureBoundaries.ts::computeBoundaries`'s VERSE_MARKER_PATTERN)
- * depend on. Mirrors `src/utils/esvApi.ts::fetchPassageText`'s shape: same
- * `/api/<service>/...` proxy route, same `getAppAuthHeaders()` auth, same
- * `Error('Failed to fetch passage')` failure contract — so both clients present
- * a uniform failure mode to their shared callers (ScriptureInput.vue,
- * CongregationalEditor.vue).
- *
- * The `ref` string needs NO translation between ESV and NLT — both accept the
- * same `Book Chapter:VerseStart-VerseEnd` format the app already builds.
+ * bracketed-verse-number convention `scriptureSplitter.ts::parseVerses` depends
+ * on. Mirrors `src/utils/esvApi.ts::fetchPassageText`'s shape and failure contract.
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/nltApi.ts)
  */
 export async function fetchNltPassageText(query: string): Promise<string> {
   const params = new URLSearchParams({ ref: query, version: 'NLT' })
@@ -63,32 +56,10 @@ export async function fetchNltPassageText(query: string): Promise<string> {
 
 /**
  * Parses NLT's HTML response with native `DOMParser` and reduces it to plain
- * `[N] text` verse strings joined with a single space. Exported (in addition
- * to `fetchNltPassageText`) so tests can exercise the stripping logic
- * directly against fixture HTML strings, without a network mock.
- *
- * Strip/keep table (45-RESEARCH.md § Element inventory — strip vs. keep):
- * - `.tn` / `.a-tn` (footnote body + marker) — STRIP. Nested INSIDE the
- *   verse's own paragraph, immediately after the annotated word — must strip
- *   both together or footnote prose leaks into the middle of verse text.
- * - `.bk_ch_vs_header` / `.chapter-number` / `.subhead` — STRIP. Not
- *   scripture text; matches ESV's `include-headings: false` parity.
- * - `.psa-title` (Psalm superscription, e.g. "A psalm of David.") — STRIP
- *   alongside headings (Assumption A1). Lives INSIDE verse 1's
- *   `<verse_export>`, ahead of the actual verse text — if kept it would
- *   silently prepend onto verse 1's own words.
- * - `.red` (red-letter) / `.sc` (small-caps) — KEEP contents; these are pure
- *   styling wrappers, `.textContent` already includes their text naturally.
- * - `verse_export`'s own `vn` ATTRIBUTE (not the rendered `.vn` span text) —
- *   the single most reliable per-verse boundary and verse-number source, per
- *   research: more reliable than the `.vn` span, which sits directly abutted
- *   to the next text node with no separating space in the raw HTML.
- * - `.vn` (rendered verse-number glyph span) — STRIP. Research labels this
- *   "ignore" for numbering purposes (read the attribute instead), but its
- *   digit text still sits in the DOM; left unstripped it leaks as a
- *   duplicate, unspaced digit directly before the verse text (e.g.
- *   "[16] 16For..." instead of "[16] For...") — removing it is required to
- *   avoid that concatenation, not merely to avoid using it as the source.
+ * `[N] text` verse strings joined with a single space. Exported so tests can
+ * exercise the stripping logic directly against fixture HTML, without a
+ * network mock.
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/nltApi.ts)
  */
 export function stripNltHtml(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html')

@@ -1,14 +1,9 @@
 import type { LyricSection } from '@/types/songLyrics'
 
 /**
- * PURE module — imports only types from `@/types/songLyrics`. No Vue, no
- * store, no Firestore. Mirrors the purity contract of `slideshowAssembler.ts`.
- *
- * Establishes the section-order model Phase 28's editor is built on:
- * `sections` is an unordered POOL (each id unique), and `performanceOrder`
- * is THE ordered list of section-id references that IS the slide order
- * (D-01/D-03). A repeated id in the order is a REFERENCE to the same
- * pooled section, not a copy (D-02).
+ * PURE module — imports only types from `@/types/songLyrics`. Mirrors the
+ * purity contract of `slideshowAssembler.ts`.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/songSectionOrder.ts)
  */
 
 /** The six quick-add kinds the option 2a mockup draws, in mockup order (R119 adds 'Pre-Chorus'). */
@@ -137,16 +132,8 @@ export function buildSectionRows(
 
 /**
  * Slices a section's `lines` into consecutive slide line-groups at its
- * `slideBreaks` (R117). This is the SINGLE definition of what a split means —
- * both assembler paths (Plan 02) and the editor split affordance (Plan 03)
- * consume this one helper.
- *
- * Read-tolerant: keeps only integer break indices `k` with
- * `1 <= k < lines.length`, sorts ascending and de-duplicates. An absent, empty
- * or fully-invalid break set yields exactly one group equal to `section.lines`
- * (today's behavior — backward compatible). Never throws, never mutates its
- * argument (builds new arrays only). Pure — imports only the `LyricSection`
- * type, no Vue/store/Firestore.
+ * `slideBreaks` (R117) — the SINGLE definition of what a split means.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/songSectionOrder.ts)
  */
 export function sliceSectionIntoSlides(section: LyricSection): string[][] {
   const n = section.lines.length
@@ -168,20 +155,9 @@ export function sliceSectionIntoSlides(section: LyricSection): string[][] {
 }
 
 /**
- * Enforces the pool/order invariants over a (sections, order) pair:
- * - the pool is de-duplicated by id, keeping the first occurrence;
- * - order ids with no pooled section are dropped;
- * - if the surviving order is empty while the pool is not, the order is
- *   seeded from the pool's stored sequence;
- * - pooled sections referenced zero times are dropped.
- *
- * This runs on the WRITE path — the editor normalises what it holds and
- * lets its existing dirty-check decide whether to persist. It is
- * deliberately not a read-time fallback (D-19 forbids that).
- *
- * Returns a value-equal result for input that already satisfies the
- * invariants, so a caller can detect "nothing needed changing" via a deep
- * comparison. Never mutates its arguments.
+ * Enforces the pool/order invariants over a (sections, order) pair. Runs on
+ * the WRITE path — deliberately not a read-time fallback (D-19 forbids that).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/songSectionOrder.ts)
  */
 export function normalizeLyricOrder(
   sections: LyricSection[],
@@ -383,28 +359,9 @@ function linesAreEquivalent(pooledLines: string[], incomingLines: string[]): boo
 }
 
 /**
- * Normalises freshly-parsed CCLI sections into the pool/order model.
- *
- * This is the ONLY collision guard over `ccliParser.ts`'s unguarded
- * `slugify(label)` ids — that parser mints ids with no uniqueness check
- * across four mint sites, so two `Chorus` markers in one paste arrive as
- * two `LyricSection` objects both carrying id `chorus`. This function
- * resolves that collision:
- *
- * - Id not yet pooled: pool the section, append its id to the order.
- * - Id already pooled and the incoming lines are empty or value-equal
- *   (after trimming) to the pooled section's lines: a REPEAT MARKER —
- *   append the pooled id again, add nothing to the pool (D-02).
- * - Id already pooled and the incoming lines differ and are non-empty:
- *   two sections that merely share a label — mint a fresh id, pool the
- *   incoming section under it (keeping its original label), append the
- *   new id to the order.
- *
- * Accepts anything carrying a `sections` array (a bare array wrapper, or
- * a full `ParsedCCLI`) so this module never needs to import from
- * `ccliParser.ts` itself. The returned pair already satisfies the
- * pool/order invariants — feeding it to `normalizeLyricOrder` changes
- * nothing. Never mutates its argument.
+ * Normalises freshly-parsed CCLI sections into the pool/order model — the
+ * ONLY collision guard over `ccliParser.ts`'s unguarded `slugify(label)` ids.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/songSectionOrder.ts)
  */
 export function normalizeParsedSections(parsed: { sections: LyricSection[] }): {
   sections: LyricSection[]

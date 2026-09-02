@@ -1,20 +1,7 @@
 // The slotIndex <-> first-assembled-slide-index lookup (Phase 91, consumed by
-// the Run rail in Phases 92-96). This is the SINGLE shared derivation any
-// consumer uses for "which slide does clicking this order-of-service item
-// jump to" — extracted so the position-sort is never re-implemented and
-// allowed to disagree with `slideshowAssembler.ts` (CLAUDE.md's
-// two-orderings-disagree warning).
-//
-// `sortedSlotsWithIndex` reproduces `slideshowAssembler.ts`'s own map-then-sort
-// (lines ~376-377 there) BYTE-FOR-BYTE: pair each slot with its ORIGINAL
-// `service.slots` array index first, THEN sort a copy by ascending
-// `slot.position`. Every emitted `AssembledSlide.slotIndex` IS that original
-// array index (never a position-sorted index), so this module's `index` and
-// the assembler's `slotIndex` are the same number by construction.
-//
-// Pure derivation over in-memory `Service`/`AssembledSlide[]` already resident
-// in the window — no external trust boundary crossed, no Firestore/Pinia/Vue
-// import.
+// the Run rail in Phases 92-96) — the SINGLE shared derivation for "which
+// slide does clicking this order-of-service item jump to."
+// See .planning/codebase/STACK.md (Utils Stack Notes — src/utils/serviceSlots.ts)
 import type { Service, ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 

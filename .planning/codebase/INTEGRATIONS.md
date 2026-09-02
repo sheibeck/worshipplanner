@@ -547,6 +547,44 @@ deterministic, order-sensitive and field-explicit, NOT `JSON.stringify` on the s
 signature that flips on key order would rebuild groups at random). Separators are ASCII control
 characters (`\x1e`/`\x1f`) that cannot occur in typed or ESV-sourced scripture text.
 
+### src/utils/claudeApi.ts
+
+**`logAiProxyError`:** classifies and logs a failed proxied AI call. Phase 65's cost controls
+(R161/R162) mean the proxy can now legitimately reject a request with HTTP 429 (per-uid rate/cost
+limit exceeded) or HTTP 400 (disallowed model / server-side policy rejection) — these are
+DELIBERATE cost-control rejections, not an outage, so they are logged distinctly (`console.warn`,
+quiet) from every other failure (`console.error`). This helper only classifies and logs; it never
+throws and never changes control flow — each of this module's three network-calling exports still
+does its own unconditional `return null` in the catch block that calls this. The Anthropic SDK's
+`APIError` carries a numeric `.status`; classification reads that field only (never message text,
+which is not a stable contract).
+
+### src/utils/nltApi.ts
+
+**`fetchNltPassageText`:** fetches an NLT passage and returns it reformatted into the exact `[N]
+text` bracketed-verse-number convention `scriptureSplitter.ts::parseVerses` (and, transitively,
+`scriptureBoundaries.ts::computeBoundaries`'s `VERSE_MARKER_PATTERN`) depend on. Mirrors
+`src/utils/esvApi.ts::fetchPassageText`'s shape: same `/api/<service>/...` proxy route, same
+`getAppAuthHeaders()` auth, same `Error('Failed to fetch passage')` failure contract, so both
+clients present a uniform failure mode to their shared callers. The `ref` string needs NO
+translation between ESV and NLT — both accept the same `Book Chapter:VerseStart-VerseEnd` format.
+Routed through the `/api/nlt` proxy (Cloud Function) so `NLT_API_KEY` stays server-side. NLT returns
+HTTP 200 with an EMPTY body for a bad ref/version — verified live against the real API — so
+`response.ok` alone is NOT sufficient; an empty/whitespace body must be treated as a fetch failure
+too, and so must a structurally-empty-but-non-empty-HTML response.
+
+**`stripNltHtml`:** parses NLT's HTML response with native `DOMParser` and reduces it to plain `[N]
+text` verse strings joined with a single space. Exported so tests can exercise the stripping logic
+directly against fixture HTML strings, without a network mock. Strip/keep rules: `.tn`/`.a-tn`
+(footnote body + marker) STRIP together (nested inside the verse's own paragraph, immediately after
+the annotated word); `.bk_ch_vs_header`/`.chapter-number`/`.subhead` STRIP (not scripture text,
+matches ESV's `include-headings: false` parity); `.psa-title` (Psalm superscription) STRIPs
+alongside headings (lives inside verse 1's own `<verse_export>`, would otherwise silently prepend
+onto verse 1's words); `.red`/`.sc` KEEP contents (pure styling wrappers); `verse_export`'s own `vn`
+ATTRIBUTE (not the rendered `.vn` span text) is the single most reliable per-verse boundary and
+verse-number source; the rendered `.vn` glyph span itself STRIPs — left unstripped its digit text
+leaks as a duplicate, unspaced digit directly before the verse text.
+
 ---
 
 *Integration audit: 2026-07-16*

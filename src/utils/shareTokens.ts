@@ -1,19 +1,6 @@
-// R078 — share-token minting and adoption selection, extracted into a pure module so both
-// decisions ("what does a freshly-minted token look like" and "which of several already-
-// circulated tokens is the one to adopt") can be proven exhaustively without a Firestore mock.
-//
-// The adoption branch this module exists for is built on an equality-only query
-// (`where('serviceId','==',id)`, no server-side sort clause) followed by a client-side sort here.
-// An equality filter combined with a server-side sort on a different field requires a composite
-// Firestore index; this project's firestore.indexes.json has none; and the Firestore emulator does
-// not enforce that requirement, so a version that added the server-side sort would pass every
-// local test and then throw in production on exactly the services this logic exists to rescue.
-// The caller must never add that sort clause to the query that produces the candidates passed
-// into pickAdoptableToken — do the ordering here instead.
-//
-// Deliberately free of Firestore and Pinia imports: no `firebase/firestore`, no `@/firebase`, no
-// store. Every candidate is described by the minimal structural shape below, not a Firestore
-// snapshot type, so these functions are testable with plain literal fixtures.
+// R078 — share-token minting and adoption selection, extracted into a pure
+// module so both decisions can be proven exhaustively without a Firestore mock.
+// See .planning/codebase/STACK.md (Utils Stack Notes — src/utils/shareTokens.ts)
 
 /**
  * The minimal shape this module needs from a `shareTokens` document. `orgId` and `createdAt`
@@ -40,20 +27,10 @@ export function mintShareToken(): string {
 }
 
 /**
- * Coerces any timestamp shape a `shareTokens` document can actually carry in this codebase into
- * milliseconds, without ever throwing and without ever returning `NaN` (a `NaN` leaking into a
- * comparator would silently destroy sort order rather than failing loudly, so every branch here
- * returns `0` instead).
- *
- * Recognised shapes, in the order checked:
- * - an object exposing a callable `toMillis` — a server-resolved Firestore `Timestamp`.
- * - an object with a numeric `seconds` (and optionally numeric `nanoseconds`) — the shape
- *   `services.test.ts`'s `serverTimestamp` mock produces, and the shape a raw REST read gives.
- * - a `Date` — its epoch milliseconds.
- * - a finite number — itself.
- * - anything else, including `null`, `undefined`, a non-finite number, and a locally-pending
- *   `serverTimestamp()` that has not yet round-tripped from the server (which reads back as
- *   `null`) — `0`.
+ * Coerces any timestamp shape a `shareTokens` document can carry into
+ * milliseconds — never throws, never returns `NaN` (every unrecognized shape
+ * returns `0` instead, so a leaking `NaN` never silently destroys sort order).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/shareTokens.ts)
  */
 export function shareTokenCreatedAtMillis(value: unknown): number {
   if (value == null) return 0
@@ -87,23 +64,11 @@ export function shareTokenCreatedAtMillis(value: unknown): number {
 }
 
 /**
- * Selects which already-circulated `shareTokens` document to adopt for a service, or `null` when
- * there is nothing adoptable (the caller mints instead).
- *
- * Three steps, in this order — the order matters:
- * 1. Filter to candidates whose `orgId` is a string strictly equal to `orgId` (T-41-07). The
- *    Firestore query that produces these candidates filters on `serviceId` only, so its result
- *    set is NOT org-scoped; without this filter, run BEFORE the sort, an adoption could latch
- *    onto a document belonging to another organisation even when that document happens to be the
- *    newest match.
- * 2. Sort a COPY of the filtered array (the input is never mutated) over a total order:
- *    newest `createdAt` first, and when two candidates' `createdAt` coerce to the identical
- *    millisecond value, the lexicographically greatest document id wins. The tiebreak exists
- *    because Firestore query iteration order is not a guarantee — relying on "whichever came back
- *    first" would make adoption nondeterministic. A locally-pending `serverTimestamp()` reads as
- *    `null`, coerces to `0` via shareTokenCreatedAtMillis, and therefore sorts last
- *    deterministically (via the same id tiebreak) instead of throwing.
- * 3. Return the first element's `id`, or `null` when the filtered list is empty.
+ * Selects which already-circulated `shareTokens` document to adopt for a
+ * service, or `null` when there is nothing adoptable (the caller mints
+ * instead). Order matters: org-scope filter (T-41-07) BEFORE the newest-first
+ * sort with an id tiebreak.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/shareTokens.ts)
  */
 export function pickAdoptableToken(candidates: ShareTokenCandidate[], orgId: string): string | null {
   const scoped = candidates.filter((candidate) => candidate.orgId === orgId)

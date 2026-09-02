@@ -1,22 +1,5 @@
-// Pure service-lock diff + slide-group fingerprint (Phase 62, R146/R147). No
-// Firestore/Pinia/store imports (types only), so both functions are testable
-// with plain fixtures and zero app/store setup — the same "pure function in
-// utils/" convention as src/utils/serviceRoles.ts and
-// src/utils/messagingRecipients.ts. Every ServiceSnapshot/SlideGroup value is
-// passed IN; nothing here reads a store, a Firestore doc, or resolved slide
-// text.
-//
-// LIMITATION A1 (v1.7, deliberate): fingerprintSlideGroups hashes each group's
-// ordered sourceRef IDENTITIES (kind + the ids/authored fields that live on the
-// group doc) — NEVER the resolved slide TEXT. Slide text is not stored on the
-// group document; it resolves LIVE from the canonical song/scripture/imported
-// record via sourceRef (slideGroup.ts invariant 3). Consequence: editing a
-// song's LYRICS in place, with no change to which song/section the group points
-// at, does NOT change the hash and is therefore NOT flagged as a SLIDES change.
-// This is accepted scope for v1.7's coarse SLIDES change-notice — broadening it
-// would re-couple the lock hook to live text resolution, which is deliberately
-// avoided. Add/remove/reorder of slides and any authored text/scripture/video
-// field edit ARE caught, because those change a sourceRef identity.
+// Pure service-lock diff + slide-group fingerprint (Phase 62, R146/R147).
+// See .planning/codebase/CONCERNS.md (Utils Concern Notes — src/utils/serviceLockDiff.ts)
 
 import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
 import type { RoleGroup } from '@/types/roster'
@@ -140,16 +123,9 @@ function fingerprintsDiffer(prev: SlideFingerprint | null, curr: SlideFingerprin
 
 /**
  * PURE diff of two locked ServiceSnapshots plus their two slide fingerprint
- * maps. Returns the typed ChangeEntry[] (SONG/ORDER/ROLE/NOTES/SLIDES) with
- * R147 affected-teams tagging: ROLE narrow (exactly the changed role's group),
- * SONG/ORDER/NOTES/SLIDES broad (every current group with an assigned person).
- * Two identical snapshots with identical fingerprints return [] — the empty-diff
- * branch 62-04's lock hook uses to overwrite lockSnapshots/current silently.
- *
- * Both `slots` arrays are ALREADY section-major (buildServiceSnapshot calls
- * orderSlotsBySection) — this function must NOT re-sort them; ORDER is detected
- * on the shipped ordering as-is. Matching is by stable `slot.id`, never by array
- * index or `position`, both of which a drag-reorder rewrites.
+ * maps (R147 affected-teams tagging). Both `slots` arrays are ALREADY
+ * section-major — this function must NOT re-sort them.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/serviceLockDiff.ts)
  */
 export function diffServiceSnapshots(
   previous: ServiceSnapshot,

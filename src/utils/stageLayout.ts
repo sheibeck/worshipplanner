@@ -2,20 +2,8 @@ import type { StageMarker, StageMarkerKind } from '@/types/service'
 
 /**
  * Pure geometry + kind-registry helpers for the visual stage layout (R313/R314,
- * Phase 107; redesigned to the single-room "Nocturne" diagram). Dependency-free
- * (no Vue/Pinia/Firebase) so it is safe from BOTH the editor's drag canvas and
- * the read-only renderer (`StageLayoutView`), which keeps that view import-free
- * enough for the public, unauthenticated ShareView.
- *
- * The diagram is ONE continuous room; positions are a single percentage space
- * ([0,100] of the room rect) — never snapped, always resize-stable (R314). A
- * marker's stored `zone` is derived from where it lands (`zoneFromPosition`).
- *
- * A marker's TYPE is either a fixed `kind` (Vocals / Mics & DI / Gear, plus the
- * Orchestra & Instrument extras) OR a band ROLE (`roleId`/`roleName`): the
- * Instruments palette mirrors the org's Band roles so a marker's instrument
- * lines up with the role a person is assigned to. The read-only surfaces need
- * only the denormalized `roleName` to render (icon/label/skin), never the id.
+ * Phase 107). Dependency-free (no Vue/Pinia/Firebase).
+ * See .planning/codebase/STACK.md (Utils Stack Notes — src/utils/stageLayout.ts)
  */
 
 interface Rect {

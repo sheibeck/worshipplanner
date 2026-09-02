@@ -1,20 +1,8 @@
 /**
  * Client-side rendered-page Storage-path convention (Phase 42, R079/R080).
- *
- * Copied verbatim from the two server-side originals — there is no importable package
- * boundary between `functions/`/`render-service/` and `src/`, so this is a hand-synced
- * third copy. Keep in sync with:
- *   - `functions/src/index.ts:274-283` (`renderedPrefixFor`, `RENDERED_OBJECT_NAME`)
- *   - `render-service/src/render.ts:69-79` (`RENDERED_PAGE_PAD`, `renderedPrefix`,
- *     `renderedObjectName`)
- *
- * Page numbering is 1-based — there is no page 0. This matches the contiguity check
- * `functions/src/index.ts:408` runs against the server's own recount
- * (`pageNumbers.every((n, i) => n === i + 1)`), which is only sound if page numbers
- * start at 1.
- *
- * Do NOT re-implement `getDownloadURL` here — `src/utils/pptxUpload.ts::resolveImageUrl`
- * is the one canonical wrapper; this module only builds the PATH that wrapper resolves.
+ * Hand-synced third copy — keep in sync with `functions/src/index.ts` and
+ * `render-service/src/render.ts`. Page numbering is 1-based; there is no page 0.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/renderedPagePaths.ts)
  */
 
 // ★ Load-bearing, not cosmetic — see render-service/src/render.ts:62-68 for the full

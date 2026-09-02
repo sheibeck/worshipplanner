@@ -3,14 +3,7 @@ import { storage } from '@/firebase'
 
 /**
  * Client-side upload helpers for the PPTX/image import flow (Phase 21, R010/R011).
- * Uploads always land under orgs/{orgId}/pptx-imports/{importId}/... so
- * storage.rules' org-membership gate governs every read/write, and every
- * uploaded object carries a createdAt custom metadata field so Phase 22's
- * future retention sweep can consume it without a follow-up migration.
- *
- * These helpers only ever write to Storage. They never delete anything —
- * deletion (even on parse failure) is explicitly out of scope per CONTEXT's
- * error-handling contract; Phase 22 owns cleanup.
+ * See .planning/codebase/CONCERNS.md (Utils Concern Notes — src/utils/pptxUpload.ts)
  */
 
 /** Generates a fresh client-side unique id for a single import "session",
@@ -24,35 +17,18 @@ export function generateImportId(): string {
 
 /**
  * 25MB — the SAME ceiling `storage.rules` enforces on the generic
- * `orgs/{orgId}/{allPaths=**}` match (`request.resource.size < 26214400`),
- * which is the match `pptx-imports/` falls into.
- *
- * ★ These two numbers must stay in lockstep. If you raise one, raise the other,
- * or you reintroduce the failure below.
- *
- * Why this exists (2026-08-06): the PPTX path had NO client-side size check at
- * all, while `useBackgroundUpload` (10MB) and `useMediaUpload` (50MB) both had
- * one. An over-cap deck therefore failed at the Storage rule with
- * `storage/unauthorized` — a *permission* error, verbatim identical to the one
- * a genuine auth failure produces. During a real production incident that
- * ambiguity cost hours: an actual cross-service permission bug and "your file is
- * too big" were indistinguishable from the console, and neither could be ruled
- * out without deploying changes to find out.
- *
- * The rule still enforces the cap server-side — this is UX, not security. Its
- * whole job is making the client-side failure say what actually happened.
+ * `orgs/{orgId}/{allPaths=**}` match (`request.resource.size < 26214400`).
+ * ★ These two numbers must stay in lockstep — if you raise one, raise the
+ * other, or an over-cap upload fails with a permission-shaped Storage error
+ * indistinguishable from a real auth failure.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/pptxUpload.ts)
  */
 export const PPTX_MAX_BYTES = 26214400
 
 /**
- * Thrown when a file exceeds PPTX_MAX_BYTES.
- *
- * A distinct class rather than a bare Error because `PptxImportModal.vue`'s
- * catch block replaces every failure with one generic "we couldn't read this
- * file" message. Without something to branch on, the specific size message
- * would be swallowed and the user would be told to re-export from PowerPoint —
- * useless advice for a file that is simply too big, and the same dead end the
- * raw `storage/unauthorized` produced.
+ * Thrown when a file exceeds PPTX_MAX_BYTES — a distinct class so
+ * `PptxImportModal.vue`'s catch block can branch on it.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/pptxUpload.ts)
  */
 export class PptxFileTooLargeError extends Error {
   readonly fileSize: number
@@ -68,14 +44,9 @@ export class PptxFileTooLargeError extends Error {
 
 /**
  * Narrows an unknown caught value to a too-large error, by NAME rather than
- * `instanceof`.
- *
- * Callers live in components whose tests `vi.mock` this module with a
- * full-replacement factory. Under such a mock the exported class binding is
- * `undefined`, and `err instanceof undefined` throws a TypeError — so an
- * `instanceof` check would convert every unrelated upload failure into a crash
- * inside the very catch block meant to handle it. Name matching also survives
- * the class being duplicated across bundle chunks or JS realms.
+ * `instanceof` — an `instanceof` check would throw under a `vi.mock`
+ * full-replacement factory (the exported class binding is `undefined` there).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/pptxUpload.ts)
  */
 export function isPptxFileTooLarge(err: unknown): err is PptxFileTooLargeError {
   return err instanceof Error && err.name === 'PptxFileTooLargeError'

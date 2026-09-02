@@ -23,22 +23,10 @@ export function generateSundaysInQuarter(year: number, quarter: 1 | 2 | 3 | 4): 
 }
 
 /**
- * R038 / D-12 / D-13: the nearest FUTURE Sunday that does not already have a plan.
- *
- * Walks FORWARD only from `from` (D-12 — a new-service dialog defaulting to a past
- * date is surprising), skipping every Sunday present in `takenDates`, bounded at
- * `maxWeeks` (D-13 ~52). On exhaustion it returns the plain next Sunday so the field
- * is never blank and the degenerate case degrades to exactly the pre-R038 behaviour.
- *
- * ★ Sunday convention — deliberately STRICTLY FORWARD, and deliberately NOT the same
- * as `generateSundaysInQuarter`'s `(7 - d.getDay()) % 7` advance above. That one yields
- * TODAY when today is a Sunday; this one yields the FOLLOWING Sunday, matching the
- * `nextSunday()` that `NewServiceDialog.vue` used before R038. The two differ by seven
- * days on a Sunday, and D-13 requires the fallback to "degrade to exactly the behaviour
- * that exists now" — so the strictly-forward rule wins here. Do not "unify" these
- * without re-reading D-13; `quarterDates.test.ts` pins this with a Sunday `from`.
- *
- * Pure: no `Date.now()` — the caller passes `from`, which is what makes it testable.
+ * R038 / D-12 / D-13: the nearest FUTURE Sunday that does not already have a
+ * plan. ★ Deliberately STRICTLY FORWARD — NOT the same convention as
+ * `generateSundaysInQuarter`'s advance above (do not "unify" these).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/quarterDates.ts)
  */
 export function nextFreeSunday(
   from: Date,

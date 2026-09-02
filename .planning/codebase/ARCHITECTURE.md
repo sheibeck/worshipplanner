@@ -1273,6 +1273,287 @@ this function is NEVER a vehicle for reinstating `buildSlots()` as a fallback; u
 (pinned by `slotTypes.test.ts:798`). An entry's optional `body` (R116) is threaded through to
 `createSlot` for body-bearing kinds; a bodyless entry leaves the created slot's `body` key absent.
 
+### src/utils/claudeApi.ts
+
+**`SPLIT_SCHEMA`:** the structural contract the model is allowed to speak — nothing else. This
+schema's field set is itself part of R064's guarantee: there is no field here the model could
+populate with scripture words, not even an optional one the code never reads. Adding any
+string-typed property beyond `speaker`'s closed enum would mean the model *could* emit text,
+defeating the structural guarantee no matter how good the prompt. Structured outputs' JSON Schema
+subset has no `minimum`, `maximum`, or `multipleOf` — this schema proves SHAPE only; every bounds,
+ordering, adjacency and coverage check lives in `validateSplitResult` in plain TypeScript, because
+the schema is structurally incapable of expressing them. Do not reach for `strict: true` here —
+that field belongs to tool definitions, not to `OutputConfig`, and would not add range enforcement
+even if it applied.
+
+### src/utils/firestoreListener.ts
+
+**Module overview (Bug 2b, quick 260830-l9c):** shared onSnapshot error-handling helper. A handful
+of Firestore snapshot listeners only unsubscribe on view unmount, which happens AFTER the router
+redirects to `/login` on sign-out. In that window the auth token has already been revoked (Bug 2a
+tears down the ORG-SCOPED store listeners first, but these component-owned listeners are separate),
+so Firestore rejects the read with `permission-denied`. With no `onError` handler, that surfaces as
+"Uncaught Error in snapshot listener" — benign, but noisy. `ignorePermissionDenied` swallows exactly
+that one error code and still logs anything else.
+
+### src/utils/lastUsed.ts
+
+**Module overview (R247/R248, Phase 84):** canonical last-used-date derivation. Pure and
+framework-free — NO firebase, NO vue imports — so this module can be copied verbatim into
+`functions/src/backfillLastUsed.ts`; the functions package cannot import from `src/` (separate
+tsconfig/build, a different `Timestamp` class), so `computeLastUsedDate` and `serviceDateToMillis`
+are MIRRORED there rather than shared by import, and both sides carry their own unit tests so drift
+breaks a test instead of silently diverging. Semantics: a service counts toward a song's
+`lastUsedAt` ONLY when it is LOCKED (`status !== 'draft'`) — draft services never contribute. The
+value is `MAX(service.date)` over every locked service that contains the song in a SONG slot.
+`null` means "no locked service contains this song" — a valid, intentional result, never an error;
+it must not be conflated with "song is in no service at all."
+
+### src/utils/messagingRecipients.ts
+
+**`resolveRecipients`:** resolves a `{ teams, individualPersonIds, includeEveryone }` selection into
+deduped (by person id), reachability-split recipient lists. Wraps the already-pure
+`resolveServiceRoleAssignments` — the only recipient-resolution algorithm any later messaging phase
+consumes. `includeEveryone` resolves every assigned role regardless of group; a person assigned to
+two matching roles/teams is deduped and appears once; a matched person with `email === ''` is
+excluded from `reachable` and increments `unreachableCount`; an unfilled role contributes 0
+recipients and does NOT change `unreachableCount`; a matched personId absent from `people`
+(stale/deleted) is silently skipped and does NOT increment `unreachableCount`.
+
+### src/utils/monitorConfig.ts
+
+**`matchMapping` (R268):** decides whether a saved mapping can be silently reused against the
+CURRENT live screens, or whether a genuine layout change requires re-prompting. The contract is
+BIDIRECTIONAL set-equality between saved and live fingerprints, not a one-way subset check: matched
+only when EVERY saved fingerprint is found among the live screens' fingerprints, AND EVERY live
+screen's fingerprint is found among the saved fingerprints. A screen unplugged since the mapping was
+saved and a screen newly plugged in since are both genuine layout changes and both force
+`needs-reprompt`. Does not open windows or prompt itself — the caller owns that.
+
+### src/utils/orgName.ts
+
+**`normalizeOrgName`:** normalize an organization display name into a stable, Firestore-doc-id-safe
+uniqueness KEY (for the `orgNames/{key}` registry). Case- and whitespace-insensitive so "Grace
+Church", "grace  church" and " Grace Church " collide as the same name. Firestore doc IDs may not
+be empty, `.`, `..`, or contain `/`. `/` is folded to a space; a name with no usable characters
+falls back to its slug (always `[a-z0-9-]`), and `''` only if even that is empty — callers treat
+`''` as "nothing to claim".
+
+**`claimOrgName`:** claim a unique org name via a create-only write against `orgNames/{nameKey}`,
+mirroring `claimSlug`'s `orgSlugs` pattern (the rule denies any overwrite, so a create against an
+existing doc fails permission-denied). Returns `true` when the name is now this org's (freshly
+claimed, OR already claimed by this same org — idempotent). Returns `false` when another org holds
+it. Unlike `claimSlug`, this does NOT auto-suffix — a NAME collision is surfaced to the caller
+(reject), per owner decision.
+
+### src/utils/pcSongImport.ts
+
+**`partitionPcSongs`:** splits mapped PC songs into "new" (not yet in the library) and
+"already-imported" (matches an existing song) based on the shared triple-key matching rule:
+`pcSongId` (exact) OR `ccliNumber` (exact, non-empty) OR `title` (case-insensitive). Pure — no side
+effects, no store access. Centralizes matching logic previously duplicated in `PcImportModal`'s
+`classifySongs` and in `importFromPc`'s inline counting.
+
+### src/utils/planningCenterApi.ts
+
+**`addSlotAsItem`'s exhaustiveness backstop (R085):** binds on `slot.kind` rather than `slot`
+itself: PRAYER/ANNOUNCEMENTS/MISC/MESSAGE all share the single `NonAssignableSlot` interface (one
+object type, a 4-literal `kind` union), and TypeScript's control-flow narrowing does not collapse a
+shared object type to `never` from sequential `if`-return checks on one of its properties — only the
+discriminant's own literal-union type narrows to `never` that way. If a future `SlotKind` member is
+ever added without a branch above, `slot.kind` stops being assignable to `never` and
+`npm run type-check` fails AT THAT LINE — a compile error, not a silent relabel of the new kind as
+"Message." This is the one dispatch site in the codebase where that protection has to be written by
+hand.
+
+### src/utils/pptxUpload.ts
+
+**`PPTX_MAX_BYTES`:** 25MB — the SAME ceiling `storage.rules` enforces on the generic
+`orgs/{orgId}/{allPaths=**}` match (`request.resource.size < 26214400`), which is the match
+`pptx-imports/` falls into. ★ These two numbers must stay in lockstep — if you raise one, raise the
+other. Why this exists (2026-08-06): the PPTX path had NO client-side size check at all, while
+`useBackgroundUpload` (10MB) and `useMediaUpload` (50MB) both had one. An over-cap deck therefore
+failed at the Storage rule with `storage/unauthorized` — a *permission* error, verbatim identical to
+the one a genuine auth failure produces. During a real production incident that ambiguity cost
+hours. The rule still enforces the cap server-side — this constant is UX, not security; its whole
+job is making the client-side failure say what actually happened.
+
+**`PptxFileTooLargeError`:** thrown when a file exceeds `PPTX_MAX_BYTES`. A distinct class rather
+than a bare `Error` because `PptxImportModal.vue`'s catch block replaces every failure with one
+generic "we couldn't read this file" message — without something to branch on, the specific size
+message would be swallowed and the user would be told to re-export from PowerPoint.
+
+**`isPptxFileTooLarge`:** narrows an unknown caught value to a too-large error, by NAME rather than
+`instanceof`. Callers live in components whose tests `vi.mock` this module with a full-replacement
+factory — under such a mock the exported class binding is `undefined`, and `err instanceof
+undefined` throws a TypeError, so an `instanceof` check would convert every unrelated upload
+failure into a crash inside the very catch block meant to handle it. Name matching also survives
+the class being duplicated across bundle chunks or JS realms.
+
+### src/utils/quarterDates.ts
+
+**`nextFreeSunday` (R038/D-12/D-13):** the nearest FUTURE Sunday that does not already have a plan.
+Walks FORWARD only from `from` (D-12), skipping every Sunday present in `takenDates`, bounded at
+`maxWeeks` (D-13 ~52). On exhaustion it returns the plain next Sunday so the field is never blank.
+★ Sunday convention — deliberately STRICTLY FORWARD, and deliberately NOT the same as
+`generateSundaysInQuarter`'s advance rule: that one yields TODAY when today is a Sunday; this one
+yields the FOLLOWING Sunday, matching the `nextSunday()` `NewServiceDialog.vue` used before R038. Do
+not "unify" these without re-reading D-13; `quarterDates.test.ts` pins this with a Sunday `from`.
+
+### src/utils/renderedPagePaths.ts
+
+**Module overview (Phase 42, R079/R080):** client-side rendered-page Storage-path convention.
+Copied verbatim from the two server-side originals — there is no importable package boundary
+between `functions/`/`render-service/` and `src/`, so this is a hand-synced third copy. Keep in
+sync with `functions/src/index.ts` (`renderedPrefixFor`, `RENDERED_OBJECT_NAME`) and
+`render-service/src/render.ts` (`RENDERED_PAGE_PAD`, `renderedPrefix`, `renderedObjectName`). Page
+numbering is 1-based — there is no page 0, matching the contiguity check
+`functions/src/index.ts` runs against the server's own recount. Do NOT re-implement
+`getDownloadURL` here — `src/utils/pptxUpload.ts::resolveImageUrl` is the one canonical wrapper;
+this module only builds the PATH that wrapper resolves.
+
+### src/utils/rotationTable.ts
+
+**`computeRotationTable`:** computes a rotation table from an array of services. For each song that
+appears in at least one service, returns an entry with the song's ID, title, and the ISO date
+strings of services where it appears. A song appearing in multiple slots within the same service is
+counted once per service (not once per slot). Pure function — no Firestore reads, operates entirely
+on in-memory data.
+
+### src/utils/scheduler.ts
+
+**`evaluateGroupCombo` (D-10):** pure group co-occurrence rule, derived purely from group + the
+multi-role flag, NOT configurable. Rewritten for R259 — the flag generalizes from vocals-only to any
+role in any group: filter the person's roleIds down to the NON-multi-role ones first, then apply the
+existing rule to just that remainder — Band and Tech are mutually exclusive on the non-multi
+remainder; Other combines freely with either; at most one non-multi Band-group role (the
+one-instrument cap) per person per date. A multi-role role NEVER causes a conflict — it may co-occur
+with anything, crossing Band/Tech/Other (R259), a deliberate behavior change from the Phase-85 rule.
+Exported so `QuarterGrid.vue` (D-11) can reuse the exact same evaluation for its manual-grid warning
+badge.
+
+**Auto-scheduling candidate filter:** only 'regular'-tier people are auto-scheduled. 'fillin'-tier is
+manual-only — the coordinator fills those gaps by hand (there is intentionally NO last-resort fillin
+auto-fill), and 'out'-tier is excluded for the whole quarter. A regular candidate stays eligible only
+while still BEHIND their even-spread cadence pace (withinCadence): "1-in-N" means once every N
+dates, so a monthly (n=4) person is only eligible on ~every 4th date and lands evenly across the
+whole quarter instead of being front-loaded into the first few weeks and then dropped. When nobody
+is behind their pace, the slot is left BLANK (pushed to `unfilled`) rather than over-serving
+someone: hard caps win over full coverage.
+
+### src/utils/serviceLockDiff.ts
+
+**`diffServiceSnapshots`:** PURE diff of two locked `ServiceSnapshot`s plus their two slide
+fingerprint maps. Returns the typed `ChangeEntry[]` (SONG/ORDER/ROLE/NOTES/SLIDES) with R147
+affected-teams tagging: ROLE narrow (exactly the changed role's group), SONG/ORDER/NOTES/SLIDES
+broad (every current group with an assigned person). Two identical snapshots with identical
+fingerprints return `[]` — the empty-diff branch 62-04's lock hook uses to overwrite
+`lockSnapshots/current` silently. Both `slots` arrays are ALREADY section-major (`buildServiceSnapshot`
+calls `orderSlotsBySection`) — this function must NOT re-sort them; ORDER is detected on the shipped
+ordering as-is. Matching is by stable `slot.id`, never by array index or `position`, both of which
+a drag-reorder rewrites.
+
+### src/utils/shareTokens.ts
+
+**`shareTokenCreatedAtMillis`:** coerces any timestamp shape a `shareTokens` document can actually
+carry in this codebase into milliseconds, without ever throwing and without ever returning `NaN` (a
+`NaN` leaking into a comparator would silently destroy sort order, so every branch returns `0`
+instead). Recognised shapes, in the order checked: an object exposing a callable `toMillis` (a
+server-resolved Firestore `Timestamp`); an object with a numeric `seconds` (the shape
+`services.test.ts`'s `serverTimestamp` mock produces, and the shape a raw REST read gives); a
+`Date`; a finite number; anything else (including a locally-pending `serverTimestamp()` that has
+not yet round-tripped from the server, which reads back as `null`) — `0`.
+
+**`pickAdoptableToken`:** selects which already-circulated `shareTokens` document to adopt for a
+service, or `null` when there is nothing adoptable (the caller mints instead). Three steps, in
+order: (1) filter to candidates whose `orgId` is a string strictly equal to `orgId` (T-41-07) — the
+producing Firestore query filters on `serviceId` only, so its result set is NOT org-scoped; (2) sort
+a COPY of the filtered array over a total order — newest `createdAt` first, tiebroken by the
+lexicographically greatest document id (Firestore query iteration order is not a guarantee, so
+relying on "whichever came back first" would make adoption nondeterministic); (3) return the first
+element's `id`, or `null` when the filtered list is empty.
+
+### src/utils/songSearch.ts
+
+**`songMatchesQuery`:** multi-term AND search over a song's metadata. Supports field-scoped prefixes
+(`type:`, `key:`, `tag:`, `theme:`, `team:`, with optional space after the colon) whose value may
+contain multiple words (e.g. `tag:christmas eve`), natural two-word phrases (`Type 1`, `Key A`), and
+the original bare full-field substring match for any remaining text. Every extracted term (field-
+scoped span or bare word) must match (AND). `team:` is aliased to a plain tag match (D-06).
+`vwModeEnabled` (default `true`) gates the `type:` prefix — when `false`, `type:` matches nothing,
+hiding VW-type search app-wide when VW mode is off (D-16); only the `type:` prefix is gated.
+
+**`filterSongsByTags` (D-08/D-09/D-10, R240):** filters a song list by the shared per-tag Show/Hide
+include/exclude sets. Both sets empty returns `songs` unchanged. Exclude always wins: a song
+carrying any excluded theme or tag is removed, even if it also carries an included one. When
+include is non-empty, only songs carrying an included theme OR tag (across both fields) survive.
+`themes`/`tags` are treated as empty arrays when undefined (legacy docs) — this never throws. Lifted
+byte-for-byte from the two prior duplicated call sites (`stores/songs.ts`'s `filteredSongs`,
+`SongSlotPicker.vue`'s `tagFilteredSongs`).
+
+### src/utils/songSectionOrder.ts
+
+**Module overview:** PURE module — imports only types from `@/types/songLyrics`. No Vue, no store,
+no Firestore. Mirrors the purity contract of `slideshowAssembler.ts`. Establishes the section-order
+model Phase 28's editor is built on: `sections` is an unordered POOL (each id unique), and
+`performanceOrder` is THE ordered list of section-id references that IS the slide order (D-01/D-03).
+A repeated id in the order is a REFERENCE to the same pooled section, not a copy (D-02).
+
+**`sliceSectionIntoSlides` (R117):** slices a section's `lines` into consecutive slide line-groups at
+its `slideBreaks`. This is the SINGLE definition of what a split means — both assembler paths and
+the editor split affordance consume this one helper. Read-tolerant: keeps only integer break indices
+`k` with `1 <= k < lines.length`, sorts ascending and de-duplicates. An absent, empty or
+fully-invalid break set yields exactly one group equal to `section.lines`. Never throws, never
+mutates its argument.
+
+**`normalizeLyricOrder`:** enforces the pool/order invariants over a (sections, order) pair — the
+pool is de-duplicated by id keeping the first occurrence; order ids with no pooled section are
+dropped; if the surviving order is empty while the pool is not, the order is seeded from the pool's
+stored sequence; pooled sections referenced zero times are dropped. This runs on the WRITE path —
+the editor normalises what it holds and lets its existing dirty-check decide whether to persist. It
+is deliberately not a read-time fallback (D-19 forbids that). Returns a value-equal result for
+input that already satisfies the invariants. Never mutates its arguments.
+
+**`normalizeParsedSections`:** normalises freshly-parsed CCLI sections into the pool/order model —
+the ONLY collision guard over `ccliParser.ts`'s unguarded `slugify(label)` ids (that parser mints
+ids with no uniqueness check across four mint sites, so two `Chorus` markers in one paste arrive as
+two `LyricSection` objects both carrying id `chorus`). Resolution: an id not yet pooled is pooled
+and appended to the order; an id already pooled whose incoming lines are empty or value-equal
+(after trimming) is a REPEAT MARKER — append the pooled id again, add nothing to the pool (D-02); an
+id already pooled whose incoming lines differ and are non-empty gets a freshly minted id. The
+returned pair already satisfies the pool/order invariants — feeding it to `normalizeLyricOrder`
+changes nothing. Never mutates its argument.
+
+### src/utils/stripUndefined.ts
+
+**`stripUndefined`:** recursively removes properties whose value is `undefined` so the result is
+safe to write to Firestore, which rejects any `undefined` field value at any depth with
+"Unsupported field value: undefined (found in document ...)". Arrays are mapped element-wise. Only
+PLAIN objects are recursed into; `Date` instances, class instances, and Firestore `FieldValue`
+sentinels (e.g. `serverTimestamp()`) are returned untouched — callers should add FieldValue
+sentinels AFTER stripping the plain payload. `null`, `0`, `''`, and `false` are preserved — only
+`undefined` is dropped.
+
+### src/utils/suggestions.ts
+
+**`rankSongsForSlot`:** returns songs ranked for a given slot. Every song is always eligible — there
+is no hard team filter (D-03). Service team scheduling is a soft nudge only: for each scheduled team
+whose name matches (case-insensitively) one of the song's `tags`, the song's score gets an additive
+bonus (D-04) — data-driven, no hardcoded team list. The VW type is accepted for API compatibility
+(caller passes slot type) but no longer influences the score (D-10) — songs are ranked purely by
+rotation/recency plus the team-tag bonus. Pure function — no side effects, easily testable.
+
+### src/utils/teamRecurrence.ts
+
+**Module overview (R254/R255, Phase 86):** Nth-Sunday-of-month recurrence matching. Pure and
+framework-free — NO firebase, NO vue imports. Date parsing mirrors the UTC-stable convention
+established in `src/utils/lastUsed.ts` (`serviceDateToMillis`): split the "YYYY-MM-DD" string on
+'-' and treat the parts as a UTC calendar date, rather than constructing a `Date` that resolves
+"local midnight" against whichever timezone the running process defaults to — without this, the
+same date string could compute a different ordinal depending on the host's timezone. Scope note:
+only the Nth-occurrence-of-the-month pattern is supported; "every N weeks" was considered and
+dropped for this phase.
+
 ---
 
 *Architecture analysis: 2026-07-16*

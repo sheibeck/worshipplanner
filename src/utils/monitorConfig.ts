@@ -119,14 +119,8 @@ export function loadMapping(storageOverride?: Storage): MonitorMapping | null {
 /**
  * Decides whether a saved mapping can be silently reused against the CURRENT
  * live screens, or whether a genuine layout change requires re-prompting
- * (R268). The contract is BIDIRECTIONAL set-equality between saved and live
- * fingerprints, not a one-way subset check: matched only when EVERY saved
- * fingerprint is found among the live screens' fingerprints, AND EVERY live
- * screen's fingerprint is found among the saved fingerprints. A screen
- * unplugged since the mapping was saved (saved fingerprint missing from
- * live) and a screen newly plugged in since (live fingerprint absent from
- * saved) are both genuine layout changes and both force `needs-reprompt`.
- * Does not open windows or prompt itself — the caller owns that.
+ * (R268). BIDIRECTIONAL set-equality, not a one-way subset check.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/monitorConfig.ts)
  */
 export function matchMapping(savedMapping: MonitorMapping, liveScreens: ScreenLike[]): MatchResult {
   const liveFingerprints = new Set(liveScreens.map((screen) => computeFingerprint(screen)))

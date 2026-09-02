@@ -149,18 +149,9 @@ export function safeParseJsonArray(text: string): unknown[] | null {
 }
 
 /**
- * Classifies and logs a failed proxied AI call. Phase 65's cost controls
- * (R161/R162) mean the proxy can now legitimately reject a request with HTTP
- * 429 (per-uid rate/cost limit exceeded) or HTTP 400 (disallowed model /
- * server-side policy rejection) — these are DELIBERATE cost-control
- * rejections, not an outage, so they are logged distinctly (console.warn,
- * quiet) from every other failure (console.error). This helper only
- * classifies and logs; it never throws and never changes control flow — each
- * of this module's three network-calling exports still does its own
- * unconditional `return null` in the catch block that calls this.
- *
- * The Anthropic SDK's `APIError` carries a numeric `.status`; classification
- * reads that field only (never message text, which is not a stable contract).
+ * Classifies and logs a failed proxied AI call (R161/R162). Reads only the
+ * numeric `.status` field (never message text, which is not a stable contract).
+ * See .planning/codebase/INTEGRATIONS.md (Utils Integration Notes — src/utils/claudeApi.ts)
  */
 export function logAiProxyError(context: string, err: unknown): void {
   const status =
@@ -424,23 +415,10 @@ export interface SplitSection {
 }
 
 /**
- * The structural contract the model is allowed to speak — nothing else.
- *
- * This schema's field set is itself part of R064's guarantee: there is no
- * field here the model could populate with scripture words, not even an
- * optional one the code never reads. Adding any string-typed property beyond
- * `speaker`'s closed enum would mean the model *could* emit text, defeating
- * the structural guarantee no matter how good the prompt (see P-02).
- *
- * Structured outputs' JSON Schema subset has no `minimum`, `maximum`, or
- * `multipleOf` — this schema proves SHAPE only (an integer where an integer
- * is expected, one of three enum strings — 'ALL' added Phase 47, R095/R096/
- * R097, additively alongside LEADER/CONGREGATION). Every bounds, ordering, adjacency
- * and coverage check lives in `validateSplitResult` below, in plain
- * TypeScript, because the schema is structurally incapable of expressing
- * them. Do not reach for `strict: true` here — that field belongs to tool
- * definitions, not to `OutputConfig`, and would not add range enforcement
- * even if it applied.
+ * The structural contract the model is allowed to speak — nothing else (R064).
+ * Do not reach for `strict: true` here — it belongs to tool definitions, not
+ * `OutputConfig`, and would not add range enforcement even if it applied.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/claudeApi.ts)
  */
 export const SPLIT_SCHEMA = {
   type: 'object',

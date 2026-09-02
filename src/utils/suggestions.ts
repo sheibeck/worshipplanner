@@ -12,13 +12,9 @@ export interface SuggestionResult {
 }
 
 /**
- * Returns songs ranked for a given slot. Every song is always eligible — there is no hard
- * team filter (D-03). Service team scheduling is a soft nudge only: for each scheduled team
- * whose name matches (case-insensitively) one of the song's `tags`, the song's score gets an
- * additive bonus (D-04) — data-driven, no hardcoded team list.
- * The VW type is accepted for API compatibility (caller passes slot type) but no longer
- * influences the score — songs are ranked purely by rotation/recency plus the team-tag bonus.
- * Pure function — no side effects, easily testable.
+ * Returns songs ranked for a given slot. Every song is always eligible — there
+ * is no hard team filter (D-03); team scheduling is a soft score nudge only.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/suggestions.ts)
  *
  * @param songs - All songs from the song store
  * @param requiredVwType - Accepted for API compatibility; no longer contributes to scoring (D-10)

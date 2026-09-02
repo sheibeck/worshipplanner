@@ -1079,17 +1079,10 @@ export async function addSlotAsItem(
     return ''
   }
 
-  // Exhaustiveness backstop (R085). Binds on `slot.kind` rather than `slot`
-  // itself: PRAYER/ANNOUNCEMENTS/MISC/MESSAGE all share the single
-  // `NonAssignableSlot` interface (one object type, a 4-literal `kind`
-  // union), and TypeScript's control-flow narrowing does not collapse a
-  // shared object type to `never` from sequential `if`-return checks on one
-  // of its properties — only the discriminant's own literal-union type
-  // narrows to `never` that way. If a future `SlotKind` member is ever added
-  // without a branch above, `slot.kind` stops being assignable to `never`
-  // and `npm run type-check` fails AT THIS LINE — a compile error here, not
-  // a silent relabel of the new kind as "Message". This is the one dispatch
-  // site in the codebase where that protection has to be written by hand.
+  // Exhaustiveness backstop (R085): a future SlotKind added without a branch
+  // above makes `npm run type-check` fail AT THIS LINE, not silently relabel.
+  // See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes —
+  // src/utils/planningCenterApi.ts)
   const unhandledKind: never = slot.kind
   throw new Error(`addSlotAsItem: unhandled SlotKind "${unhandledKind}"`)
 }

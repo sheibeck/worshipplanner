@@ -81,15 +81,10 @@ const FIELD_SPAN_RE = new RegExp(
 
 /**
  * Multi-term AND search over a song's metadata. Supports field-scoped
- * prefixes (`type:`, `key:`, `tag:`, `theme:`, `team:`, with optional space
- * after the colon) whose value may contain multiple words (e.g.
- * `tag:christmas eve`), natural two-word phrases (`Type 1`, `Key A`), and the
- * original bare full-field substring match for any remaining text. Every
- * extracted term (field-scoped span or bare word) must match (AND).
- * `team:` is aliased to a plain tag match (D-06). `vwModeEnabled` (default
- * `true`) gates the `type:` prefix — when `false`, `type:` matches nothing,
- * hiding VW-type search app-wide when VW mode is off (D-16). Only the `type:`
- * prefix is gated; all other prefixes and bare terms are unaffected.
+ * prefixes (`type:`, `key:`, `tag:`, `theme:`, `team:`) plus bare substring
+ * terms; `team:` aliases to a plain tag match (D-06); `vwModeEnabled` gates
+ * only the `type:` prefix (D-16).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/songSearch.ts)
  */
 export function songMatchesQuery(song: Song, query: string, vwModeEnabled = true): boolean {
   const trimmed = query.trim()
@@ -130,14 +125,8 @@ export function songMatchesQuery(song: Song, query: string, vwModeEnabled = true
 
 /**
  * Filters a song list by the shared per-tag Show/Hide include/exclude sets
- * (D-08/D-09/D-10, R240 extraction). Both sets empty returns `songs` unchanged.
- * Exclude always wins: a song carrying any excluded theme or tag is removed,
- * even if it also carries an included one. When include is non-empty, only
- * songs carrying an included theme OR tag (across both fields) survive.
- * `themes`/`tags` are treated as empty arrays when undefined (legacy docs) —
- * this never throws. This is a pure function — no Vue, no store imports —
- * lifted byte-for-byte from the two prior duplicated call sites
- * (`stores/songs.ts`'s `filteredSongs`, `SongSlotPicker.vue`'s `tagFilteredSongs`).
+ * (D-08/D-09/D-10, R240). Exclude always wins over include.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/songSearch.ts)
  */
 export function filterSongsByTags(
   songs: Song[],

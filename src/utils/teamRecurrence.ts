@@ -1,21 +1,8 @@
 /**
- * Nth-Sunday-of-month recurrence matching (R254/R255, Phase 86).
- *
- * Pure and framework-free — NO firebase, NO vue imports — so it stays a
- * small, independently-testable module that NewServiceDialog.vue (and any
- * future consumer) can import without pulling in store/component wiring.
- *
- * Date parsing mirrors the UTC-stable convention established in
- * `src/utils/lastUsed.ts` (`serviceDateToMillis`): split the "YYYY-MM-DD"
- * string on '-' and treat the parts as a UTC calendar date, rather than
- * constructing a `Date` that resolves "local midnight" against whichever
- * timezone the running process defaults to. Without this, the same date
- * string could compute a different ordinal depending on the host's
- * timezone — an off-by-one-day slip near a month boundary.
- *
- * Scope note: only the Nth-occurrence-of-the-month pattern is supported.
- * "Every N weeks" was considered and dropped for this phase (see the
- * phase CONTEXT's Deferred Ideas) — do not reintroduce it here.
+ * Nth-Sunday-of-month recurrence matching (R254/R255, Phase 86). Pure and
+ * framework-free — NO firebase, NO vue imports. Only the Nth-occurrence-of-
+ * the-month pattern is supported — do not reintroduce "every N weeks" here.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/teamRecurrence.ts)
  */
 
 import type { Team } from '@/types/team'

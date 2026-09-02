@@ -1,27 +1,8 @@
 /**
- * Canonical last-used-date derivation (R247/R248, Phase 84).
- *
- * Pure and framework-free — NO firebase, NO vue imports — so this module can
- * be copied verbatim into `functions/src/backfillLastUsed.ts` (84-02). The
- * functions package cannot import from `src/` (separate tsconfig/build, a
- * different `Timestamp` class), so `computeLastUsedDate` and
- * `serviceDateToMillis` are MIRRORED there rather than shared by import.
- * Both sides carry their own unit tests, so drift between the copies breaks
- * a test instead of silently diverging.
- *
- * Semantics (84-CONTEXT.md Area 1, owner-refined):
- * - A service counts toward a song's `lastUsedAt` ONLY when it is LOCKED —
- *   `status !== 'draft'` (i.e. `'planned'` or `'exported'`). Draft services
- *   never contribute; assigning a song to a draft plan must not stamp a date
- *   (this is the fix for the root-cause bug — see `services.ts`).
- * - The value is `MAX(service.date)` over every locked service that contains
- *   the song in a SONG slot. Adding the song to a later-dated locked service
- *   advances the date; an earlier locked service never regresses it.
- * - `null` means "no locked service contains this song" — a valid,
- *   intentional result, never an error. It must not be conflated with "song
- *   is in no service at all" — that case is handled by the caller (the live
- *   store only recomputes songs it knows are affected; the 84-02 backfill's
- *   conservative skip rule leaves untouched songs alone).
+ * Canonical last-used-date derivation (R247/R248, Phase 84). Pure and
+ * framework-free — NO firebase, NO vue imports — so this module can be
+ * copied verbatim into `functions/src/backfillLastUsed.ts` (84-02).
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/lastUsed.ts)
  */
 
 /** Timestamp-agnostic shape a `Service` is reduced to before derivation. */

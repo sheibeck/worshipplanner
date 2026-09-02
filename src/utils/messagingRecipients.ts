@@ -34,19 +34,8 @@ export interface RecipientSelection {
 
 /**
  * Resolves a { teams, individualPersonIds, includeEveryone } selection into
- * deduped (by person id), reachability-split recipient lists. Wraps the
- * already-pure resolveServiceRoleAssignments — the only recipient-resolution
- * algorithm any later messaging phase (composer, auto-sends, re-lock notice)
- * consumes.
- *
- * - includeEveryone resolves every assigned role regardless of group.
- * - A person assigned to two matching roles/teams is deduped and appears once.
- * - A matched person with email === '' is excluded from `reachable` and
- *   increments `unreachableCount`.
- * - An unfilled role (effectivePersonIds === []) contributes 0 recipients and
- *   does NOT change unreachableCount — distinct from an unreachable person.
- * - A matched personId absent from `people` (stale/deleted) is silently
- *   skipped and does NOT increment unreachableCount.
+ * deduped (by person id), reachability-split recipient lists.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/messagingRecipients.ts)
  */
 export function resolveRecipients(
   service: Service,

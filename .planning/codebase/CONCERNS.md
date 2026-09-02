@@ -261,6 +261,31 @@ limitation: if a concurrent editor inserts or removes a slot in the same window,
 alignment can shift and one slot may take a fresh id — the window closes permanently on the first
 real save, which persists the ids to Firestore.
 
+### src/utils/pptxUpload.ts
+
+**Module overview (Phase 21, R010/R011):** client-side upload helpers for the PPTX/image import
+flow. Uploads always land under `orgs/{orgId}/pptx-imports/{importId}/...` so `storage.rules`'
+org-membership gate governs every read/write, and every uploaded object carries a `createdAt`
+custom metadata field so Phase 22's future retention sweep can consume it without a follow-up
+migration. These helpers only ever write to Storage. They never delete anything — deletion (even
+on parse failure) is explicitly out of scope per CONTEXT's error-handling contract; Phase 22 owns
+cleanup.
+
+### src/utils/serviceLockDiff.ts
+
+**Module overview (Phase 62, R146/R147):** pure service-lock diff + slide-group fingerprint. No
+Firestore/Pinia/store imports (types only), so both functions are testable with plain fixtures and
+zero app/store setup. Every `ServiceSnapshot`/`SlideGroup` value is passed IN; nothing here reads a
+store, a Firestore doc, or resolved slide text. LIMITATION A1 (v1.7, deliberate):
+`fingerprintSlideGroups` hashes each group's ordered `sourceRef` IDENTITIES (kind + the ids/authored
+fields that live on the group doc) — NEVER the resolved slide TEXT, which is not stored on the
+group document and resolves LIVE from the canonical song/scripture/imported record via `sourceRef`.
+Consequence: editing a song's LYRICS in place, with no change to which song/section the group
+points at, does NOT change the hash and is therefore NOT flagged as a SLIDES change. This is
+accepted scope for v1.7's coarse SLIDES change-notice — broadening it would re-couple the lock hook
+to live text resolution, which is deliberately avoided. Add/remove/reorder of slides and any
+authored text/scripture/video field edit ARE caught, because those change a `sourceRef` identity.
+
 ---
 
 *Concerns audit: 2026-07-16*

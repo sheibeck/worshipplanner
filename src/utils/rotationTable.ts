@@ -7,15 +7,9 @@ export interface RotationEntry {
 }
 
 /**
- * Computes a rotation table from an array of services.
- *
- * For each song that appears in at least one service, returns an entry with
- * the song's ID, title, and the ISO date strings of services where it appears.
- *
- * A song appearing in multiple slots within the same service is counted once
- * per service (not once per slot).
- *
- * Pure function — no Firestore reads, operates entirely on in-memory data.
+ * Computes a rotation table from an array of services. A song appearing in
+ * multiple slots within the same service is counted once per service.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/rotationTable.ts)
  *
  * @param services - Array of service documents from the service store
  * @returns Array of RotationEntry sorted alphabetically by songTitle

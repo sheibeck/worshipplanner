@@ -1,26 +1,6 @@
 // Run-mode control->output message protocol (Phase 91, consumed by Phases 92-96's
-// multi-window Run mode). A typed, injectable wrapper around BroadcastChannel:
-// the control window is the SINGLE writer of `state` messages; an output window
-// posts only `hello` on (re)mount so control can re-send current state to a
-// freshly-opened or reloaded output (ARCHITECTURE.md Pattern 4).
-//
-// Deliberately free of Vue/Firebase/Pinia imports — its only runtime dependency
-// is the BroadcastChannel primitive, supplied through an injectable factory so
-// tests can drive it deterministically without relying on jsdom/Node to provide
-// a native BroadcastChannel (they do not reliably do so).
-//
-// `seq` is a monotonically increasing counter OWNED BY THE CALLER (control),
-// not by this module — postState posts `state` verbatim, never generating its
-// own seq. onState is where the load-bearing stale-drop lives: an incoming
-// state message is delivered to the caller's callback ONLY when its seq is
-// STRICTLY greater than the highest seq already delivered on that handle. This
-// guards the window-open race and the reload-loses-place hazard (PITFALLS
-// 10-11) — a reopened/reloaded output window can never be driven backward by a
-// stale or out-of-order message.
-//
-// No echo-suppression is implemented on purpose: the platform never delivers a
-// context's own broadcast back to itself, so a self-filter would be dead,
-// misleading code (91-CONTEXT.md + ARCHITECTURE.md Pattern 4).
+// multi-window Run mode). A typed, injectable wrapper around BroadcastChannel.
+// See .planning/codebase/STACK.md (Utils Stack Notes — src/utils/runChannel.ts)
 
 /** The state the control window broadcasts to every output window. */
 export interface RunState {

@@ -10,22 +10,9 @@ import type {
 } from '@/types/roster'
 
 /**
- * Pure group co-occurrence rule (D-10, derived purely from group + the multi-role flag, NOT
- * configurable). Rewritten for R259 — the flag generalizes from vocals-only to any role in any
- * group: filter the person's roleIds down to the NON-multi-role ones first, then apply the
- * existing rule to just that remainder:
- * - Band and Tech are mutually exclusive on the non-multi remainder: holding a non-multi
- *   'band'-group role that date rules out a non-multi 'tech'-group role that date, and vice
- *   versa.
- * - Other combines freely with either Band or Tech (relaxes the old TECH-exclusive-of-all rule).
- * - Cardinality: at most one non-multi Band-group role (the one-instrument cap) per person per
- *   date.
- * A multi-role role NEVER causes a conflict — it may co-occur with anything, crossing
- * Band/Tech/Other (R259). This is a deliberate behavior change from the Phase-85 rule: a
- * multi-role vocalist can now also run a Tech role the same date (filtered out of the
- * remainder), where previously vocals folded into Band and blocked it.
- * Exported so QuarterGrid.vue (D-11) can reuse the exact same evaluation for its manual-grid
- * warning badge, since it cannot import scheduler.ts's internal closures.
+ * Pure group co-occurrence rule (D-10, NOT configurable). Rewritten for R259 —
+ * a multi-role role NEVER causes a conflict, crossing Band/Tech/Other.
+ * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/scheduler.ts)
  */
 export function evaluateGroupCombo(
   roleIds: string[],
@@ -230,17 +217,10 @@ export function proposeQuarterSchedule(
       calendar[date]![roleId] ??= []
       while (calendar[date]![roleId]!.length < count) {
         const alreadyInRole = new Set(calendar[date]![roleId])
-        // Only 'regular'-tier people are auto-scheduled. 'fillin'-tier is manual-only — the
-        // coordinator fills those gaps by hand (there is intentionally NO last-resort fillin
-        // auto-fill), and 'out'-tier is excluded for the whole quarter. A regular candidate
-        // stays eligible only while still BEHIND their even-spread cadence pace
-        // (withinCadence): "1-in-N" means once every N dates, so a monthly (n=4) person is only
-        // eligible on ~every 4th date and lands evenly across the whole quarter instead of being
-        // front-loaded into the first few weeks and then dropped. When nobody is behind their
-        // pace, the slot is left BLANK (pushed to `unfilled`) rather than over-serving someone:
-        // hard caps win over full coverage, and blank spots are acceptable/expected (they get
-        // filled in by hand). This is what stops the "only guitarist gets booked every single
-        // week" and "once-a-month person lands twice a month" over-scheduling.
+        // Only 'regular'-tier people are auto-scheduled (no last-resort fillin
+        // auto-fill); a regular candidate stays eligible only while BEHIND
+        // their even-spread cadence pace. See .planning/codebase/
+        // ARCHITECTURE.md (Utils Behavioral Notes — src/utils/scheduler.ts)
         const candidates = people.filter(
           (p) =>
             p.active &&
