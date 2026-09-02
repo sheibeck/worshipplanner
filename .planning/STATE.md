@@ -5,15 +5,15 @@ milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Securit
 current_phase: 109
 current_phase_name: Behavioral/Architectural Extraction & Comment Convention
 status: executing
-stopped_at: Completed 108-02-PLAN.md (Decision-Rationale ADR Extraction)
-last_updated: "2026-09-02T03:00:17.888Z"
+stopped_at: Completed 109-01-PLAN.md (Comment Convention)
+last_updated: "2026-09-02T03:04:35.284Z"
 last_activity: 2026-09-01
-last_activity_desc: Phase 108 complete, transitioned to Phase 109
+last_activity_desc: Phase 109 execution started
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 7
+  completed_plans: 3
   percent: 17
 ---
 
@@ -1171,7 +1171,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 108 — Comment Audit & Decision-Rationale Extraction
+**Current focus:** Phase 109 — Behavioral/Architectural Extraction & Comment Convention
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1181,10 +1181,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 109 — Behavioral/Architectural Extraction & Comment Convention
-Plan: Not started
-Status: 108-01 (comment audit + triage inventory, R316) complete — 108-COMMENT-INVENTORY.md created (382 Decision-Rationale / 309 Behavioral-Architectural / 5 Genuinely-Local entries). Next: 108-02 (R317, ADR extraction from Bucket A).
-Last activity: 2026-09-01 — Phase 108 complete, transitioned to Phase 109
+Phase: 109 (Behavioral/Architectural Extraction & Comment Convention) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-09-01 — Phase 109 execution started
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
 
@@ -3060,6 +3060,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 107-visual-stage-layout P03 | 35min | 2 tasks | 6 files |
 | Phase 108 P01 | 13min | 3 tasks | 1 files |
 | Phase 108 P02 | 150min | 3 tasks | 339 files |
+| Phase 109 P01 | 10min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3546,6 +3547,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 108-01: comment audit tag ids (WR-01/CR-01/etc.) are per-file/per-review scoped, not globally unique — plan 108-02 must group ADR candidates by (tag + qualifying doc), never by bare tag id alone
 - [Phase ?]: Phase 108-02: Grouped 382 Bucket A decision-rationale comments into 244 MADR-lite ADRs under docs/adr/, keyed by (tag+qualifier) or (file+tag), with the generic Pitfall tag additionally keyed by its extracted sub-number to avoid merging unrelated decisions; shrank 381 source comments across 93 files to ADR pointers with zero behavior change (type-check clean, app/render-service/rules suites unchanged).
 - [Phase ?]: Phase 108-02: Discovered a pre-existing, unrelated test-baseline failure (src/stores/appConfig.test.ts) not caused by this phase; documented in deferred-items.md rather than fixed (out of scope).
+- [Phase 109]: Comment Convention section co-located in CONVENTIONS.md (per 109-CONTEXT); CLAUDE.md pointer kept to one line, no restated rationale.
 
 ### Roadmap Evolution
 
@@ -3873,8 +3875,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-01T22:20:37.448Z
-Stopped at: Completed 108-02-PLAN.md (Decision-Rationale ADR Extraction)
+Last session: 2026-09-02T03:04:16.505Z
+Stopped at: Completed 109-01-PLAN.md (Comment Convention)
 Resume file: None
 
 ## Operator Next Steps

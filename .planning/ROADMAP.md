@@ -622,12 +622,12 @@ future comments short.
   3. A spot-check across the affected files shows no paragraph-length inline "how it works" narration remaining where a map doc now covers it (R318).
   4. `npm run type-check` and the full test suite pass unchanged — comment-only changes (R318).
 
-**Plans**: 5 plans
+**Plans**: 1/5 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 109-01-PLAN.md — Comment convention (R319): "## Comment Convention" section in `.planning/codebase/CONVENTIONS.md` + one-line CLAUDE.md pointer [wave 1]
+- [x] 109-01-PLAN.md — Comment convention (R319): "## Comment Convention" section in `.planning/codebase/CONVENTIONS.md` + one-line CLAUDE.md pointer [wave 1]
 - [ ] 109-02-PLAN.md — R318 backend sweep: relocate + shrink `functions/src/**` + `firestore.rules` + `storage.rules` Bucket B comments into the map docs [wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*

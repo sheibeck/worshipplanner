@@ -31,7 +31,7 @@ remediating the Critical/High findings.
   `.planning/codebase/` map docs, and the affected code comment is reduced to what the code alone cannot
   convey.
 
-- [ ] **R319**: A written comment convention (comments are short; specifications/ADRs bear the load of how
+- [x] **R319**: A written comment convention (comments are short; specifications/ADRs bear the load of how
   features work) is documented so the standard holds for future work.
 
 ### Architectural Review
@@ -77,7 +77,7 @@ remediating the Critical/High findings.
 | R316 | Phase 108 | Complete |
 | R317 | Phase 108 | Complete |
 | R318 | Phase 109 | Pending |
-| R319 | Phase 109 | Pending |
+| R319 | Phase 109 | Complete |
 | R320 | Phase 110 | Pending |
 | R321 | Phase 111 | Pending |
 | R322 | Phase 112 | Pending |
