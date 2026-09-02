@@ -4,9 +4,9 @@ milestone: v2.8
 milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)"
 current_phase: 113
 current_phase_name: Security Remediation
-status: planning
+status: executing
 stopped_at: Completed 112-04-PLAN.md
-last_updated: "2026-09-02T16:33:48.620Z"
+last_updated: "2026-09-02T19:31:56.814Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 112 complete, transitioned to Phase 113
 progress:
@@ -45,7 +45,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 `/gsd-plan-phase 108`.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
@@ -1183,7 +1183,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 113 — Security Remediation
 Plan: Not started
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Last activity: 2026-09-02 — Phase 112 complete, transitioned to Phase 113
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
