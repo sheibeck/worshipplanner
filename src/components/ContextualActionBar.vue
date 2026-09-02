@@ -133,29 +133,7 @@
 </template>
 
 <script setup lang="ts">
-/**
- * ContextualActionBar.vue — the one shared action bar (36-02, R068). Owns no
- * state, no store access and no emits: `items` is a fully-computed
- * declarative list (produced by `buildActionBarItems`,
- * `src/views/serviceEditorActionBar.ts`) and every `onClick` is the caller's
- * own handler reference, dispatched verbatim. Matches `SlideActionMenu.vue`'s
- * own "renders a list, does not decide what's in it" precedent (33-UI-SPEC
- * §2) — this component goes one step further and owns no open/closed state
- * either, since a button row has none to own.
- *
- * The empty-list case (`items: []`, e.g. the Roles tab) needs no `v-if` gate:
- * the container carries no border/background/padding/margin — unlike the
- * save-status bar (`SaveStatusIndicator.vue`), which DOES need a gate because
- * its own chrome renders even at idle. An empty `<div class="flex items-center
- * gap-3">` with zero children contributes no visible box.
- *
- * `Save`'s padding normalises here from its old `px-4 py-2` to this bar's
- * declared `px-3 py-2` (36-UI-SPEC § Spacing Scale) — the one relocated
- * control this phase restyles. `＋ Add slide` (`SlideGrid.vue`) is explicitly
- * NOT restyled to match; it stays grid-local with its own pre-existing
- * `px-2.5 py-1.5`, per 36-UI-SPEC § Finding 2 / § Spacing Scale's exceptions
- * note.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/ContextualActionBar.vue)
 import type { ActionBarItem, ActionBarTone } from './actionBarItems'
 
 defineProps<{ items: ActionBarItem[] }>()

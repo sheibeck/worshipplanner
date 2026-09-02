@@ -585,6 +585,69 @@ ATTRIBUTE (not the rendered `.vn` span text) is the single most reliable per-ver
 verse-number source; the rendered `.vn` glyph span itself STRIPs — left unstripped its digit text
 leaks as a duplicate, unspaced digit directly before the verse text.
 
+## Component & Composable Integration Notes (R318)
+
+Behavioral/architectural "how it works" narration relocated out of `src/components/**` and
+`src/composables/**` source comments per the Phase 109 comment convention (CONVENTIONS.md §
+Comment Convention). Each entry cites the file:line range at the time of relocation (109-04).
+
+### src/components/slides/slideDisplay.ts
+
+**`slideBodyText`'s scripture case (R047):** a Reference-state slide (no congregational section)
+defaults to reference-only (empty text) — return just the reference, with no trailing blank line. A
+Congregational-state section slide (Phase 38-01/38-02) carries that section's own words in `text`,
+so the joined form applies for that slide only. R124 (Phase 55): the slideshow preview no longer
+auto-appends the Bible version (ESV/NLT) to scripture slides — the owner wants clean scripture when
+presenting. This is a RENDER-ONLY change: the provenance helpers
+(`scriptureAttribution`/`resolveTranslationSource`) and the per-slide `translationSource` field are
+UNTOUCHED (R092 capture-once immutability preserved), and the version can still be added by typing it
+into the slide's own editable text — nothing to attribute is rendered here anymore. R105 (Phase 49):
+the reference now lives on its OWN dedicated slide (the assembler emits it as a synthetic leading
+slide), so NO section slide prefixes the reference — the gate is simply `!slide.section`. A
+Reference-state slide always shows its reference; every congregational section slide returns just
+its own words. This gate applies ONLY to this prefix — `slideContentLabel`'s eyebrow and
+`slideFooterLabel`'s footer are NOT reference-gated; they name the speaker per-slide regardless of
+position.
+
+### src/composables/useBackgroundUpload.ts
+
+**`useBackgroundUpload` (R055/R057, Phase 33 Plan 03):** mirrors `useMediaUpload.ts`'s
+resumable-upload plus `createdAt`-custom-metadata pattern, reactively, diverging on exactly three
+points: MIME check (`image/*` only), size cap (10MB, not 50MB), and the Storage path prefix
+(`backgrounds/`, not `media/`). The `backgrounds/` prefix matters beyond naming: the deployed
+`cleanupExpiredMedia` Cloud Function's path guard (`functions/src/index.ts`,
+`MEDIA_PATH_GUARD = /^orgs\/[^/]+\/media\//`) matches only the `media/` prefix, so an object written
+under `backgrounds/` is structurally exempt from the 14-day sweep — a background written to `media/`
+instead would silently vanish two weeks after being set. The `backgrounds/` prefix falls into
+`storage.rules`' existing generic `orgs/{orgId}/{allPaths=**}` catch-all (25MB cap, same
+org-membership auth check as `media/`), so no `storage.rules` change is in scope for this phase.
+Validates MIME type (`image/*`) and size (<= `BACKGROUND_MAX_BYTES`) BEFORE any upload begins — an
+invalid file rejects immediately without calling into Storage at all.
+
+### src/composables/useMediaUpload.ts
+
+**`useMediaUpload` (Phase 22, R013/R014):** Firebase Storage upload composable for audio/video media
+attachments. Mirrors `src/utils/pptxUpload.ts`'s resumable-upload plus `createdAt`-custom-metadata
+pattern, reactively, for the media-attachment upload UI. Validates MIME type (`audio/*` or `video/*`)
+and size (<= `MEDIA_MAX_BYTES`) BEFORE any upload begins — an invalid file rejects immediately
+without calling into Storage at all. Uploads always land under
+`orgs/{orgId}/media/{mediaId}/{sanitizedFileName}`, resolving to the download URL. Rejects (and sets
+`error`) without ever writing to Firestore or touching slide/slot metadata — upload is fully decoupled
+from autosave (mirrors `useAutoSave`'s separation), so a failed upload can never lose or corrupt
+slide/slot data.
+
+### src/composables/useRunControl.ts
+
+**`endRehearsal` (owner UAT):** returns to the pre-flight "Ready when you are" screen (State A)
+WITHOUT tearing down or navigating away. A rehearsal opened NO output windows and holds no
+`getScreenDetails` (`liveScreenDetails === null`), so there is nothing on the congregation screens to
+close: it simply drops `live` + `rehearsing` (→ State A renders via `v-if="!live"`), resets the
+elapsed timer, and clears blackout so a later Go live starts clean. The run channel handle stays open
+(the operator is still in the console); when they click Go live the existing `openOutputs` path
+re-drives everything and the freshly-opened outputs sync via the hello→resend handshake. Deliberately
+NEVER `window.open`, `router.push`, or the `confirmExit` teardown — ending a rehearsal is low-stakes
+and needs no confirm.
+
 ---
 
 *Integration audit: 2026-07-16*

@@ -236,6 +236,123 @@ Instruments palette mirrors the org's Band roles so a marker's instrument lines 
 person is assigned to. The read-only surfaces need only the denormalized `roleName` to render
 (icon/label/skin), never the id.
 
+## Component & Composable Stack Notes (R318)
+
+Behavioral/architectural "how it works" narration relocated out of `src/components/**` and
+`src/composables/**` source comments per the Phase 109 comment convention (CONVENTIONS.md §
+Comment Convention). Each entry cites the file:line range at the time of relocation (109-04).
+
+### src/components/SongLyricEditor.vue
+
+**Drag reorder (D-01):** the list is always draggable by handle, no mode to enter first. Reproduces
+the exact SortableJS configuration/DOM-revert pattern established for the service slot list
+(`ServiceEditorView.vue`) and reused by the slide grid (`SlideGrid.vue`) — handle-scoped, same
+animation duration and ghost class, so drag means the same thing app-wide (D-01's stated reason 2a
+was chosen over 2b). Reorder moves a POSITION in `performanceOrder`, not a section — `moveRow` only
+ever splices the order array. Which occurrence of a repeated section is "the followed row" vs. "the
+repeat" is derived fresh on every render by `buildSectionRows` (earliest occurrence in order wins),
+so a drag that reorders occurrences needs no extra bookkeeping here.
+
+### src/components/slides/SlideCanvas.vue
+
+**Font-size scoped-style rule (R093, 46-04):** per-element font-weight/font-size overrides reading
+the `--slide-font-*` custom properties `PresentationViewer`'s `typographyStyle` sets on its viewer
+root, which these elements inherit into (moved here unchanged, Phase 90).
+
+### src/components/slides/SlideDropTarget.vue
+
+**Module overview (D-13):** the drop tile itself — always the LAST item the grid renders, including
+at zero slides (D-08), and NEVER inside SortableJS's draggable set: `.slide-card` is deliberately
+absent from this component's root class, so a tile mounted inside the cards container never shifts a
+reorder's old/new index arithmetic by one. Performs no upload and no routing decision of its own — it
+only emits the dropped file list upward; `SlideGrid.vue` routes BOTH this tile's drop and the
+whole-grid container's drop through the exact same handler (`dropRouting.ts`'s `resolveDrop`), so the
+two entry points can never diverge. Phase 36 (R053): this tile now doubles as the click-to-import
+affordance the deleted "⇪ Import into this group" button used to be — a `clickable` prop adds
+`role="button"`/keyboard parity and a `browse` emit; the gate is entirely the PARENT's job, this
+component never decides who may click it, it only offers the emit when `clickable` says the parent
+has already decided yes. R054: on a SONG group the tile stays mounted — group-level music is still
+allowed — but every slide-appending route (deck, image, video) is refused by
+`SlideGrid.onFilesDropped`; the `audioOnly` prop makes the COPY tell the same story the handler
+enforces, since advertising "PPTX, image, and video appends a slide" on a locked group reads as a
+bug (exactly how it was reported during Phase 30 verification).
+
+### src/components/slides/SlideGrid.vue
+
+**Task 3: drag-reorder within the selected group (D-11):** reuses the exact SortableJS pattern
+already established in `ServiceEditorView.vue`'s slot list — `handle`/`draggable` scoping and
+splice-and-reindex. R036 second lock over the instance itself: it is destroyed when `canReorder` goes
+false, so `onEnd` only catches a drag already in flight when the service locks mid-gesture.
+Draggable-scoped indices only (T-29-11) — `oldIndex`/`newIndex` count every element child of the
+container, including 25-07's drop tile (a non-`.slide-card` sibling, always last today); only
+`oldDraggableIndex`/`newDraggableIndex` respect the `draggable: '.slide-card'` selector. The tile
+happens to sit last, which makes the un-prefixed pair latent rather than live here — fixed anyway for
+symmetry with `ServiceEditorView.vue` and to guard the one divergence case (dragging past the tile's
+own DOM position). Reads the current group and slot id from PROPS at call time — never from values
+captured when the instance was created — since the same container instance serves whichever group is
+selected.
+
+### src/components/stage/StageLayoutView.vue
+
+**Module overview (R313/R314/R315, Phase 107; redesigned to the single-room diagram):** shared
+READ-ONLY stage-plot renderer. Pure presentational — props only, NO Pinia store import and NO
+Firebase import — so it is safe to mount on the public, unauthenticated ShareView as well as the
+locked-service editor and the print layout. This is the ONE component all three surfaces reuse; do
+not fork a second read-only rendering path. Positions render directly from the stored
+`xPct`/`yPct` percentages as inline `left`/`top` over the shared `StageRoom` rect — never computed
+from a measured container — so placement is resize-stable and reload-exact (R314) by construction.
+Labels/notes are Vue text interpolation only (XSS-safe).
+
+### src/composables/useOutputWindow.ts
+
+**`role` option:** each output view passes its OWN static role (`'audience' | 'confidence'`) — the
+routes `/present/audience|confidence` make the role statically known. Retained as a harmless identity
+option; fullscreen is no longer resolved from it. The control creates and positions each window on
+its assigned monitor via `window.open` features, so auto-fullscreen has two independent, best-effort
+paths: (1) the PRIMARY zero-click path — Chrome's "Automatic Fullscreen" content setting, via
+`attemptAutoFullscreen()` on mount when the origin is granted; and (2) the fallback — Fullscreen
+Capability Delegation from the opener (`handleDelegationMessage`) plus the one-tap overlay in each
+view.
+
+**Fullscreen Capability Delegation (best-effort zero-tap):** a popup opened via `window.open` loses
+its OWN transient user-activation the moment its SPA/auth bootstrap runs, so a mount-time
+`requestFullscreen()` here always rejected ("API can only be initiated by a user gesture") — the
+console error the owner saw. The correct mechanism is Fullscreen Capability Delegation: the OPENER
+(control window), which still HAS activation from the Go-live click, delegates its fullscreen
+capability to us. The output window (a) announces readiness so the opener knows to delegate, and (b)
+on receiving the delegation message calls `requestFullscreen()` — now permitted WITHOUT its own
+gesture. A browser that does not implement capability delegation simply never enables this, and the
+one-tap-anywhere affordance (rendered while `!isFullscreen`) guarantees a usable result. All
+best-effort: never throws, never surfaces an error. `handleDelegationMessage` trusts ONLY
+same-origin messages (the opener is the app's own origin).
+
+### src/composables/useRunControl.ts
+
+**`openWindow` auto-fullscreen (owner UAT):** Chrome's Window Management API supports opening a
+popup DIRECTLY in fullscreen via the `fullscreen` window feature (with the window-management
+permission — already granted in monitor setup — and this Go-live user gesture). `left`/`top` pick
+the target monitor; `fullscreen` fills it with no chrome — harmless best-effort positioning.
+Deliberately does NOT call `win.document.documentElement.requestFullscreen()` — that cross-document
+call targets the child's still-loading/blank document from the OPENER and never worked. Reliable
+auto-fullscreen is Fullscreen Capability Delegation instead: the child announces
+`{ type:'wp-output-ready' }` and the control delegates its fullscreen capability back to it (see
+`installFullscreenDelegation`/`handleOutputReady`) while the Go-live click's transient activation is
+still valid — plus the child's one-tap-anywhere affordance as the guaranteed fallback.
+
+**Fullscreen Capability Delegation (opener side):** a popup cannot self-fullscreen (it loses its own
+activation to its bootstrap), but the control window still holds transient activation from the
+Go-live click. When an opened output posts `{ type:'wp-output-ready' }` back to the control, it
+delegates its fullscreen capability to that exact window via `postMessage` with the non-standard
+`{ delegate:'fullscreen' }` option, so the child may then `requestFullscreen()` using the control's
+delegated capability.
+
+### src/composables/useSlideshowAssembly.ts
+
+**Module overview:** reactive wrapper over the pure `assembleSlideshow` engine (20-02), delivering
+R006: reorder/add/remove a service element and the assembled slideshow follows with no manual
+re-sync. See the fuller module overview relocated to ARCHITECTURE.md § "src/composables/useSlideshowAssembly.ts"
+for the content-map construction and `performanceOrder` ordering contract this wrapper builds on.
+
 ---
 
 *Stack analysis: 2026-07-16*

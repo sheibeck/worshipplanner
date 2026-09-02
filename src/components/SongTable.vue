@@ -435,11 +435,7 @@ function clearSelection() {
 
 defineExpose({ selectedIds, clearSelection })
 
-// Note: Tags/Themes on this listing are display-only + click-to-filter
-// (filterByPill above). All add/edit/remove of tags and themes happens on the
-// edit screen (SongSlideOver.vue) — including the removedThemes tracking
-// (D-14) recorded there on save, which lets a removed theme survive PC
-// re-import without resurfacing.
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/SongTable.vue)
 
 // ── Progressive rendering ──────────────────────────────────────────────────────
 

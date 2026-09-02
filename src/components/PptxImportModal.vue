@@ -446,19 +446,7 @@ function onCancel() {
   emit('cancel')
 }
 
-// ── External drop-zone entry point (25-07 Task 1, D-15) ─────────────────────
-//
-// Lets an external drop zone (the Slides tab's grid-wide/tile drop handling,
-// 25-07) hand this modal an already-picked File without touching its own
-// <input> elements or synthesizing a DataTransfer + fake change event. Both
-// exposed functions call straight into the EXISTING importPptx/importImages
-// functions above — no new upload/parse/preview/confirm logic is added here,
-// so this remains the app's single PPTX/image import implementation with a
-// second caller (D-15), not a second implementation.
-//
-// Guarded against re-entry: this modal is a single-batch state machine, and a
-// second concurrent import while one is already uploading/parsing/confirming
-// would corrupt its preview state — the guard silently no-ops instead.
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/PptxImportModal.vue)
 function isImportInFlight(): boolean {
   return step.value === 'uploading' || step.value === 'parsing' || step.value === 'confirming'
 }

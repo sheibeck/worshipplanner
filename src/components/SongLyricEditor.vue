@@ -757,18 +757,7 @@ function onAddSection(kind: string) {
   if (newRow) expandRowKey(newRow.stableKey)
 }
 
-// ── Drag reorder (D-01): the list is always draggable by handle, no mode to
-// enter first. Reproduces the exact SortableJS configuration/DOM-revert
-// pattern established for the service slot list (ServiceEditorView.vue) and
-// reused by the slide grid (SlideGrid.vue) — handle-scoped, same animation
-// duration and ghost class, so drag means the same thing app-wide (D-01's
-// stated reason 2a was chosen over 2b).
-//
-// Reorder moves a POSITION in performanceOrder, not a section — moveRow only
-// ever splices the order array. Which occurrence of a repeated section is
-// "the followed row" vs. "the repeat" is derived fresh on every render by
-// buildSectionRows (earliest occurrence in order wins), so a drag that
-// reorders occurrences needs no extra bookkeeping here.
+// See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/components/SongLyricEditor.vue)
 const rowsContainerRef = ref<HTMLElement | null>(null)
 let sortableInstance: Sortable | null = null
 

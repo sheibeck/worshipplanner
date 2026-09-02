@@ -1554,6 +1554,694 @@ same date string could compute a different ordinal depending on the host's timez
 only the Nth-occurrence-of-the-month pattern is supported; "every N weeks" was considered and
 dropped for this phase.
 
+## Component & Composable Behavioral Notes (R318)
+
+Behavioral/architectural "how it works" narration relocated out of `src/components/**` and
+`src/composables/**` source comments per the Phase 109 comment convention (CONVENTIONS.md §
+Comment Convention). Each entry cites the file:line range at the time of relocation (109-04).
+
+### src/components/ContextualActionBar.vue
+
+**Module overview (36-02, R068):** the one shared action bar. Owns no state, no store access, and
+no emits — `items` is a fully-computed declarative list produced by `buildActionBarItems`
+(`src/views/serviceEditorActionBar.ts`) and every `onClick` is the caller's own handler reference,
+dispatched verbatim. Matches `SlideActionMenu.vue`'s "renders a list, does not decide what's in it"
+precedent, going one step further by owning no open/closed state either — a button row has none to
+own. The empty-list case (`items: []`, e.g. the Roles tab) needs no `v-if` gate: the container
+carries no border/background/padding/margin, so an empty row contributes no visible box (unlike
+`SaveStatusIndicator.vue`, whose own chrome renders even at idle). `Save`'s padding normalizes here
+from its old `px-4 py-2` to this bar's declared `px-3 py-2` (36-UI-SPEC § Spacing Scale) — the one
+relocated control this phase restyles; `＋ Add slide` (`SlideGrid.vue`) stays grid-local with its
+own pre-existing `px-2.5 py-1.5` per that spec's exceptions note.
+
+### src/components/MiscLabelBadge.vue
+
+**Module overview (2026-08-12 owner request):** inline-editable MISC label pill, replacing the
+separate MISC "label" input added in Phase 56 (R127) — the colored badge pill IS the editable
+surface; click it (or its pencil) to rename a Miscellaneous item directly. Shared by both the live
+service editor (`ServiceEditorView.vue`) and the Edit-Template editor (`ServiceTemplateEditor.vue`)
+so the two can never drift (the Phase-57 `kindBadgeClass` lesson). Display shows `modelValue`
+(trimmed) or the placeholder ("Miscellaneous"), uppercased by the badge's own CSS — the STORED
+value keeps its real casing. Plain text only: `:value`/`v-model` bindings plus interpolation
+auto-escape; never `v-html`.
+
+### src/components/PptxImportModal.vue
+
+**External drop-zone entry point (25-07 Task 1, D-15):** lets an external drop zone (the Slides
+tab's grid-wide/tile drop handling) hand this modal an already-picked File without touching its own
+`<input>` elements or synthesizing a DataTransfer + fake change event. Both exposed functions call
+straight into the existing `importPptx`/`importImages` functions — no new upload/parse/preview/
+confirm logic is added, so this remains the app's single PPTX/image import implementation with a
+second caller (D-15), not a second implementation. Guarded against re-entry: this modal is a
+single-batch state machine, and a second concurrent import while one is already uploading/parsing/
+confirming would corrupt its preview state — the guard silently no-ops instead.
+
+### src/components/SongSlotPicker.vue
+
+**`tagFilteredSongs`:** visible songs filtered by the shared store tag-filter state (D-09/D-10:
+independent per-tag Show/Hide sets — exclusion always wins; include set OR-combines when
+non-empty). R240: delegates to the same shared `filterSongsByTags()` used by `SongBrowser`'s own
+`filteredSongs` computed (with the same `visibleSongs`/`tagFilterInclude`/`tagFilterExclude`
+inputs), so this is provably identical to the shared shell's slot value. Kept as a script-level
+computed (rather than read from the slot scope) because `suggestions`/`searchResults` feed the
+IntersectionObserver load-more machinery (`visibleCount`, `hasMore`, `loadMore`), which runs
+outside the template's render/slot context and needs synchronous script access.
+
+### src/components/SongTable.vue
+
+**Tags/Themes display note:** on this listing, Tags/Themes are display-only plus click-to-filter
+(`filterByPill`). All add/edit/remove of tags and themes happens on the edit screen
+(`SongSlideOver.vue`) — including the removedThemes tracking (D-14) recorded there on save, which
+lets a removed theme survive a Planning Center re-import without resurfacing.
+
+### src/components/actionBarItems.ts
+
+**Module overview (36-02, R068):** the `ActionBarItem` contract — the declarative shape
+`ContextualActionBar.vue` renders and `buildActionBarItems` (`src/views/serviceEditorActionBar.ts`)
+produces. Kept in its own module, separate from the component file, so a pure per-tab builder can
+import just the types without pulling in any Vue runtime code. `ActionBarIcon` originally gained a
+`copy` member over 36-UI-SPEC §2's illustrative union for the `copy-pc` button's clipboard glyph
+(flagged spec extension) — removed along with the `Copy for PC` button itself per direct owner
+feedback ("let's get rid of the Copy for PC button all together, it's not useful at all"); an
+organization with no Planning Center credentials now has no export affordance in the action bar at
+all, only the credentials-missing note pointing at Settings — the owner's explicit, accepted
+consequence; do not add a replacement affordance. `ActionBarTone` originally gained a fourth
+`present` member per 36-UI-SPEC §2's prose (outlined indigo), distinct from `primary` (filled
+indigo), so Present and Save would never collapse into one visual treatment — removed per direct
+owner feedback ("Update the Present Button so that it matches the other buttons... it's so visually
+different"); `buildPresentItem` now omits `tone` entirely, falling back to `default` like every
+other non-Save button. Present and Save stay visually distinguishable anyway (`primary` filled
+indigo vs `default` gray) — just not via the spec's dedicated outlined-indigo treatment. Do not
+re-add this member to "restore" the spec; the owner asked for the opposite of what §2 specified.
+
+### src/components/admin/CleanupEnableConfirmDialog.vue
+
+**Module overview (Phase 71-02, R189/R190):** confirm-to-flip modal for the Owner Console's Cleanup
+card. Structural shell (Teleport + backdrop/panel Transition) is copied from
+`src/components/NewServiceDialog.vue`; the hand-rolled focus trap is new to this codebase (no prior
+precedent), per 71-UI-SPEC.md. R190 hard block: when `referencesComplete === false` (only ever
+passed for the backgrounds type — the other three types never send this prop), the Confirm button
+is not rendered as a clickable element at all — a separate, permanently-disabled `<button disabled>`
+with no `@click` handler is rendered in its place. There is no code path that can wire a click
+handler to that element; this is what makes the hard block structural rather than just visually
+disabled.
+
+### src/components/admin/DeactivateOrgConfirmDialog.vue
+
+**Module overview (quick task 260824):** reversible-lifecycle confirm dialog for deactivating a
+church. Structural shell (Teleport + backdrop/panel Transition, hand-rolled focus trap,
+focus-on-open/close, `confirming` guard on every dismissal path) is copied verbatim from
+`DeleteOrgConfirmDialog.vue` (Phase 77-02), which establishes this shell for the admin org-list
+dialogs. Deliberate divergence: no type-to-confirm text input. Deleting an org is irreversible, so
+`DeleteOrgConfirmDialog` gates its Delete button on an exact name match as a slip-proof safeguard;
+deactivating is reversible (a super-admin can reactivate at any time), so a single Confirm/Cancel
+pair with plain consequence copy is proportionate.
+
+### src/components/run/RunFilmstrip.vue
+
+**Module overview (R282, 97-05):** the in-item "Slides in this item" click-to-jump filmstrip,
+extracted as a PURE presentational child. It does NOT compute which slides belong to the active
+item — the parent (97-08) supplies the already-filtered `slides` and a PARALLEL `indices` array
+(`indices[i]` is `slides[i]`'s array index in `assembledSlideshow`). The click contract is the whole
+point: `@jump` emits `indices[i]`, the GLOBAL array index, so the parent maps it straight to
+`postIndex`; emitting the local loop index `i` would jump to the wrong slide (T-97-05-01). Renders
+each thumb as a scaled non-interactive `SlideCanvas`; the current slide gets the green live frame.
+Owner UAT: each thumb renders a true mini-slide by laying `SlideCanvas` out at the 1280×720
+reference stage (where fonts are proportionally correct) and scaling the WHOLE stage down to the
+thumb, so text and layout shrink together (same technique as `RunPreviewPair`) — rendering directly
+at the tiny thumb width wrapped every word into a stacked mess.
+
+### src/components/run/RunHeader.vue
+
+**Module overview (R277):** the State-B live header. PURE presentation: props-in / emits-out, no
+channel, no store, no timer logic — the parent (`RunControlView`, wired in 97-09) owns all state and
+passes the `live` flag plus the clock/elapsed strings from `useRunTimers`. Owner fix #4: the live
+status is GREEN only when truly live, and a muted/amber "Not open" otherwise — never a pre-live red.
+Owner fix #7: a REHEARSAL is a distinct third state — YELLOW "Rehearsing" (never green) with an "End
+Rehearsal" exit label — so green unambiguously means the outputs are really live. All three states
+are driven by the `live`/`rehearsing` props the parent sets, never derived from any output-status
+machine here: green "Live" when `live && !rehearsing`, amber "Rehearsing" when `rehearsing`, muted
+"Not open" otherwise. The Nocturne Run-scoped palette (97-UI-SPEC) is applied via local CSS custom
+properties on the root only — this does not retheme the app.
+
+### src/components/run/RunPreviewPair.vue
+
+**Module overview (R276 owner fix #2/#4, 97-05):** the program + next-up preview pair, extracted as
+a PURE display child. Both panes render the real `SlideCanvas` with `:interactive="false"`; the
+previews own no navigation (the transport/rail posts index changes), so there is deliberately no
+emit and no run-take / run-push-live control here — that keeps the single-selection contract intact.
+The live frame is GREEN when `live` is true. Owner UAT fix (Next-up font too big): `SlideCanvas` has
+no font-size prop — its text is sized in fixed projector px, scaled only by `--slide-font-scale`, so
+scaling a box-sized canvas by 0.8 still left the font enormous in the small preview box. Instead each
+canvas renders at a fixed `REFERENCE_WIDTH × REFERENCE_HEIGHT` (1280×720, 16:9) stage — where the
+projector-sized fonts are proportionally correct — and the whole stage is CSS `transform: scale(f)`-ed
+down to fit its pane, with `f = paneWidth / REFERENCE_WIDTH`, `transform-origin: top left`, and the
+pane `overflow-hidden`. Font and layout shrink together and each preview reads as a true mini-slide.
+A ResizeObserver per pane keeps `f` correct across layout/resize; both panes and the stage are 16:9,
+so the scaled stage fills its pane exactly (no letterboxing).
+
+### src/components/run/RunRail.vue
+
+**Module overview (R276, R262/R263):** the order-of-service rail, extracted as PURE presentation
+from `RunControlView.vue` (its markup plus the Phase 95 `captureActiveRow`/`watch(index)`
+auto-scroll in `useRunControl.ts`). The parent (97-09) owns all state and navigation: it supplies
+`rows` (`RailRow[]` from `useRunControl`), the current `activeIndex` (a slotIndex, or null pre-live),
+and — for the active item only — its `expandedSlides`. Every interaction is emitted as intent
+(`@jump` / `@jump-slide`); the parent maps those to `jumpToSlot` / `postIndex`. No store, channel, or
+side-effects here. The rail testids (`rail-item`, `rail-item-empty`, `run-rail-empty`) and the
+has-slides-vs-empty branching are reproduced exactly so the wired-view control suite
+(`RunControlView.test.ts` rail tests) stays green.
+
+### src/components/run/RunTransportBar.vue
+
+**Module overview (R276):** the State-B bottom transport bar. PURE presentation: props-in /
+emits-out, no channel, no store. Previous/Next emit intent; the parent (97-09) posts the actual
+navigation immediately — single-selection: nav posts on click, there is no take/stage step, so this
+bar introduces no run-take / run-push-live testid, which the control's single-selection test asserts
+are absent. The Nocturne Run-scoped palette (97-UI-SPEC) is applied via local CSS custom properties
+only.
+
+### src/components/settings/ServiceTemplateEditor.vue
+
+**The six creatable kinds:** a closed set, never derived from the `SlotKind` union (which also
+contains HYMN, palette-retired in Phase 43/R084, and IMPORTED, which has no pre-creation meaning).
+Kept only as the palette's click targets in the template; this array is not iterated to build the
+markup, matching the "verbatim, not derived" requirement for this list.
+
+### src/components/slides/BackgroundControl.vue
+
+**Module overview (R055/R057, Phase 33 Plan 03):** shared, presentational background-image control,
+mounted at both the group level (`SlideGrid.vue`, 33-08) and the song level (`SongLyricEditor.vue`,
+33-06) — a mechanical sibling of `SlideGroupMusicControl.vue`: emit-only, no Firestore write of its
+own, `isEditor`-gated add/remove, and a failed upload emits NOTHING so it can never clear or
+overwrite an existing attachment. `addLabel` is threaded as its own prop (additive divergence from
+33-UI-SPEC §6's stated prop list) because the Copywriting Contract gives the two call sites
+different add-affordance text ("+ Add background for this group" vs "+ Add background for this
+song"). `inheritedFrom` is populated ONLY by the group-level call site, and only for a SONG group
+whose own background is empty while the song's is set — every non-SONG group and the song-level call
+site pass `undefined` (the song is the least specific level; nothing below it to inherit from);
+renders the inherited thumbnail and the "inherited from the song" copywriting line. The add/override
+affordance is not offered while inherited (owner request): a song-sourced background is managed at
+the song level, so a group-level override is suppressed to avoid confusion. There is no confirmation
+dialog for Remove at any level — a plain, unconfirmed clear, matching `SlideGroupMusicControl.vue`'s
+own contract verbatim. Owner follow-up (side-by-side group media panel): `hideCaption` drops this
+control's own caption line so `SlideGrid.vue` can place the group caption on its own full-width line
+below both add-buttons rather than stacked above only this one — it deliberately does NOT suppress
+the `inheritedFrom` block, a different affordance that belongs with the control it describes.
+
+### src/components/slides/EditSlideDrawer.vue
+
+**Lifecycle lock prop (R036):** kept DISTINCT from `isEditor` because this drawer is the one surface
+that must tell the two apart — a viewer and a locked editor need different read-only copy
+(31-UI-SPEC § 6). Composed into `canMutate`, which is why the entire Phase 30 read-only rendering
+comes for free rather than needing a parallel mechanism. The drawer still OPENS when locked: it is
+the only surface showing a slide at size, plus its context line and what audio covers it; blocking
+it would remove a VIEW affordance in the name of a WRITE lock.
+
+**`scripturePassageText`:** for `scripture`-kind entries the UI-SPEC calls for the passage text
+alone, not `slideBodyText`'s reference-prefixed form (the reference is already shown in the context
+line above). R047 ripple (30-03-PLAN.md): a Reference-state scripture slide always resolves with
+empty `text` — falling back to the slide's own `reference` keeps this block from going blank. A
+Congregational-state section slide (Phase 38) carries text and shows it unchanged; this computed is
+also read by the section entry's own read-only fallback further down.
+
+**`canMutateBackground`:** deliberately NOT `canMutate` — omits the song-group exclusion.
+`canMutate` (`isEditor && !serviceLocked && !isSongGroup && !isPendingRender`) governs
+label/notes/audio/duplicate/delete, all of which R054 keeps song-slide-canonical. A per-slide
+background is a genuinely new, independent property R054's "canonical, edited only from Song
+Lyrics" rule was never written to cover — 33-CONTEXT.md explicitly states a song group's reduced
+menu still offers background-setting. This is the ONE mutation gate in this drawer that omits
+`isSongGroup` — do not "fix" it to match the surrounding pattern. It does still compose
+`!isPendingRender` (R236): a background attached to a not-yet-rendered slide is exactly the kind of
+customization the locked pending-render copy warns would be lost.
+
+**`lowerLevelBackgroundLabel` (Phase 33 UI-audit fix, previously a known, scoped gap documented in
+33-07-SUMMARY.md):** this drawer still receives no `song` document, so the GROUP branch keeps
+reading `props.group.backgroundImageUrl` directly (a raw field read, not a re-derivation of
+resolution precedence). The SONG branch is provable WITHOUT threading a song document or a second
+resolver: `groupAssembledSlides` (populated by `SlidesTab.vue` from the SAME `assembledSlideshow`
+prop it already filters for position/total) is this slide's own group, already resolved — a sibling
+entry with `backgroundSource === 'song'` proves the song has one, mirroring how `SlideGrid.vue`'s
+`songBackgroundForInheritedDisplay` scans its own group's assembled cards for the same signal. Known
+limitation, shared with that precedent: if EVERY slide in the group has its own override, a
+song-level background one level further down stays invisible to this caption — narrower than a
+silent wrong-level claim (the caption simply doesn't render), and accepted because the group-level
+control already surfaces this exact case via its own `inheritedFrom` prop.
+
+**`onDuplicate` (Phase 26-09 Task 2):** mints a FRESH id for the copy (D-04) — never the original's,
+and never derived from label/source/position: `PresentationViewer.vue` keys its per-slide
+`AudioPlayer`/`VideoPlayer` on this id (invariant 2, `src/types/slideGroup.ts`), so two entries
+sharing one id would collide there. `base` is read FRESH from `props.group.slides` at the moment
+this runs (never a snapshot from mount), matching every other write this drawer makes. The copy is
+inserted directly after the original and every entry's `order` is renumbered contiguous, following
+the same discipline `SlideGrid.vue`'s own append (`onAddSlide`) uses. The selection moves to the
+copy only AFTER the write succeeds (T-26-09-04) — emitting `duplicate` eagerly, before the write
+lands, would leave the panel pointed at an entry that was never actually created if the write is
+rejected.
+
+**Delete path (Phase 26-09 Task 3):** filters the entry out and renumbers the rest contiguous,
+writing through the same fresh-base helper every other write in this drawer uses. The group's
+shared bed music (`setGroupBedMedia`) is never called here — a slide delete touches only `slides`,
+never the group's own `bedAudioUrl`.
+
+**Menu-dispatched delete (P-01):** the delete key sets the EXISTING `showDeleteConfirm` state and
+never calls the delete action directly — a menu puts destruction one click closer than the drawer
+did, and it must not also make it quieter. The existing inline confirm (which names whether attached
+audio and operator notes go with the slide, `deleteConfirmBody`, unchanged) stays byte-unchanged and
+remains unavoidable. T-33-15: re-checks `canMutate` before acting on either key, so a dispatched
+action cannot bypass the editor / not-locked / not-a-song-group composition even if the menu that
+sent it were wrong. `pending-action-consumed` is emitted once per handled nonce regardless of
+whether `canMutate` permitted the action, so the parent never gets stuck holding a request this
+drawer correctly refused, while the actual mutation only ever happens when permitted.
+
+### src/components/slides/SlideCanvas.vue
+
+**`currentBackgroundUrl` (R070, UAT F3):** the slide → group → song background cascade was already
+resolved upstream, once, by the assembler; this reads only the single winning value already sitting
+on the current slide. It takes no map of groups by slot id, performs no song-document lookup, and
+never branches on which tier supplied the value. Phase 105 (R303): a blackout slide is checked FIRST
+of all — it never paints a background image or scrim no matter what (stale/crafted)
+`backgroundImageUrl` it happens to carry (T-105-03). Phase 90/94: `suppressBackground` forces this
+null regardless of the slide's own resolved value — checked next, ahead of the R070
+video-suppresses-background rule, since a confidence monitor wants black-only no matter what the
+slide carries.
+
+### src/components/slides/SlideGrid.vue
+
+**`canMutateGroup`/`canWriteGroupMedia`:** the two composed gates (★ R036) this component uses
+everywhere, both folding the lifecycle lock into the existing R054 seam rather than running beside
+it. `canMutateGroup` governs create/import/reorder of the group's SLIDES and deliberately omits
+`isSongGroup` for `canWriteGroupMedia` — the drop tile and the group-bed music control stay
+available on a SONG group (audio-only there, exactly what 30-03 shipped: "lock the slide grid for
+song groups without blocking group media"). Every corresponding HANDLER re-checks the same
+computed — 30-VERIFICATION I-01 found six of seven mutation entry points guarded by a template
+`v-if` alone, and a lifecycle lock layered over that alone inherits its fragility.
+
+**`appendToGroup` append contract (R050):** the one append contract every write path routes
+through — sorts a copy of `entries` by `order`, concatenates `additions` in the order given, then
+renumbers every element to its array index, so array order and `order` can never disagree.
+
+**Reorder failure handling (T-29-13):** surfaces the failure inline and forces the card list to
+rebuild from props (via `gridRenderNonce`) — the DOM revert this used to lean on is gone, and
+`props.assembledSlideshow` changes no prop on a rejected write, so nothing re-renders on its own.
+
+### src/components/slides/SlideGroupMusicControl.vue
+
+**Module overview (Phase 25 Task 1, R032):** group-level audio bed control, scoped to the SELECTED
+GROUP rather than a service slot, and audio-only per D-14 (group music is never a slide; dropped
+video is a slide, that path is 25-07's). This is the sole surviving attach/remove surface for
+group-bed audio — the Service Order tab's per-slot equivalent was removed in Phase 27-04. Emit-only:
+uploads through `useMediaUpload` and emits the resulting URL via `attach`, or emits `remove` for a
+plain, unconfirmed clear; performs NO Firestore write itself — `SlideGrid.vue` (Task 2) intercepts
+both events and calls the slideGroups store's scoped bed write. A failed upload sets the composable's
+reactive `error` and emits NOTHING — it can never clear an existing group bed attachment
+(T-25-06-03).
+
+### src/components/slides/SlidesTab.vue
+
+**`canPresent`:** whether there is anything assembled to present — the same condition
+`SlideshowPreview`'s own `canPresent` (aliased to `hasAnySlides`, Phase 23-04) used, restated
+directly against `assembledSlideshow` rather than reintroducing the `AssembledSection[]` grouping
+that only existed to render the removed preview list. Phase 36-03 (design 1a): the `▶ Present`
+button this gates now renders in `ServiceEditorView`'s page header, immediately left of Save,
+instead of inside this tab — this component still owns the condition and the `present` emit;
+exposed (with `onPresentClick`) so the header can drive both from a `slidesTabRef`.
+
+**`pendingDrawerAction` (Phase 33-09):** a menu-dispatched Duplicate/Delete request, relayed
+verbatim into the drawer's own `pendingAction` prop (33-07's seam). Keyed on a monotonically
+incrementing nonce (never the `key` alone) so the same key dispatched twice in a row still fires the
+drawer's watcher the second time. P-01: this component never calls a delete/duplicate store action
+itself — it only ever sets this pending request, which the drawer turns into its own existing write
+paths (the inline delete confirm, the duplicate write). No longer set true on every selection
+(Phase 33-09, R051) — that was the coupling this plan exists to break; `drawerOpen` is set true only
+by `onMenuAction`'s edit key and the post-duplicate follow-selection handler, and cleared only by the
+drawer's own `close` emit or by the selection itself disappearing.
+
+**`onEditCongregational`:** the group-level "Make this / Modify congregational reading" button
+(`SlideGrid`'s `edit-congregational` emit) — a more discoverable route to the SAME editor the 3-dot
+menu's `edit-in-scripture` opens, taking the exact same path: honour the open drawer's unsaved-edit
+guard, close the drawer (two editing surfaces must not stack on one entry), then relay via
+`requestEditInScripture`, which uses the selected plan item's array index — the group this button
+belongs to.
+
+**`presentStartIndex` (R061):** the (group, slide) → flat-deck-index mapping `present` hands to
+`PresentationViewer`. Ladder: a selected SLIDE resolves to its own flat index; failing that, the
+selected GROUP's first slide; failing that, 0. Each rung falls through to the next on a miss — this
+is what makes a stale selection degrade quietly instead of throwing or landing on an unrelated
+slide. Resolved via `findIndex` only: `selectedSlideId` is an assembled slide's string `id`, never a
+position (35-RESEARCH.md Anti-Patterns).
+
+### src/components/slides/SlotLoopControl.vue
+
+**Module overview (R306/R307, Phase 106):** per-item Run auto-advance/loop authoring control.
+Relocated (owner 2026-09-01) out of the Service Order slot rows into the Slide editor: loop is a
+presentation concern, never a plan concern, and it must never apply to Song items — so it is only
+ever rendered in `SlideGrid` for a MISC or ANNOUNCEMENTS plan item (that gate lives in `SlideGrid`,
+not here). This component owns the whole checkbox/preset/custom-seconds UI and its logic, and emits
+ONE `change` with the resulting loop object; the parent chain (`SlideGrid` → `SlidesTab` →
+`ServiceEditorView`) persists it onto `slot.loop` through the existing autosave path — no new save
+call, no rules surface. `enabled: false` (not an absent object) is the "off" state, exactly as the
+field's own contract defines.
+
+### src/components/slides/dropRouting.ts
+
+**Module overview (25-07 Task 2, R018/R032):** pure module partitioning a native drop's raw
+`File[]` into the four accepted kinds (PPTX deck, image, video, audio) plus a rejected bucket. A
+native HTML5 drop delivers raw `File` objects with NO filtering whatsoever — the file input's
+`accept` attribute never runs on this path — so this module IS the filter: every drop (the tile's
+and the whole-grid container's) must route through `resolveDrop` before any upload begins. A PPTX is
+classified by its file-NAME extension rather than its MIME type, since an OS drag often supplies an
+empty or generic MIME type for `.pptx` (verified: `application/octet-stream`, or `''`) — MIME-sniffing
+alone would misclassify it as rejected. Images/video/audio are classified by MIME prefix, using the
+SAME prefixes `useMediaUpload` validates against (`audio/*`, `video/*`) so this module and that
+composable's own server-mirroring validation can never disagree.
+
+**`resolveDrop`'s multi-kind resolution order (25-07 Task 2, D-14 discretion):** the first audio
+file becomes the group's music; every video file appends a slide, in drop order; for the two
+modal-backed kinds, a PPTX takes precedence and the first one is imported, otherwise every image is
+imported as one deck. Anything left over — extra audio files, images skipped because a PPTX won, and
+anything unsupported — is collected into `skipped` so the caller can report it rather than silently
+drop it.
+
+### src/components/slides/slideDisplay.ts
+
+**`KIND_BADGE_CLASSES`/`RENDER_FAILURE_SENTENCES`:** static, fully-spelled-out literal maps (per
+25-UI-SPEC.md's Color § "Kind badge color map" and 42-UI-SPEC.md's copywriting-contract table).
+Tailwind v4 silently purges any class name built by string interpolation (e.g. `` `bg-${kind}-900` ``)
+from the production bundle — this codebase has shipped that exact bug twice already (`SongBadge.vue`,
+`TeamTagPill.vue`) — so every badge-class value is a complete, literal string. The backend's
+`failureReason` slug space is open (`functions/src/index.ts` can add a new reason without a client
+deploy), so `RENDER_FAILURE_SENTENCES` is deliberately NOT exhaustive; `renderFailureSentence` is the
+ONE sanctioned route from a render document's raw `failureReason` slug to the DOM
+(`SlideBase.renderFailureReason`'s own doc comment names this function as its only legal consumer) —
+never render `failureReason` any other way. Its fallback arm is written out explicitly rather than
+left to exhaustiveness (the same defensive posture `slideActionMenuItems`'s `default` arm takes),
+closing off T-42-04 structurally: whatever string a tampered render document carries, including
+markup, the return value is always one of exactly three authored sentences, and the input string
+itself never appears in the output.
+
+**`speakerDisplayName` (Phase 38-03, widened Phase 47 R095):** readable, natural-case speaker name
+for a congregational section's `speaker` enum value (`'LEADER'` → `'Leader'`, `'CONGREGATION'` →
+`'Congregation'`, `'ALL'` → `'All'`). This module already exists so the rail and the grid never fork
+the kind-badge vocabulary; the three speaker words are exactly that kind of vocabulary, so this is
+the ONE producer of them — `slideContentLabel`'s eyebrow, `slideFooterLabel`'s footer, and
+`EditSlideDrawer.vue`'s speaker control all read through this rather than re-deriving the spelling.
+
+**`deleteSlideConfirmBody` (26-UI-SPEC.md § "Duplicate and Delete Slide", Phase 24 D-03
+precedent):** the four wordings, reproduced verbatim, branching on whether THIS entry (never the
+group) has its own attached audio and/or operator notes. `entry.audioUrl` is the entry's OWN
+per-slide audio, distinct from the group's shared bed music (`SlideGroup.bedAudioUrl`) — deleting a
+slide never touches the bed, and this wording must never imply otherwise by naming media that
+belongs to the group instead of the slide.
+
+**`MENU_ITEM_LABELS['edit-in-scripture']` relabeling history:** 34-07 (owner UAT F1) changed this key
+to open the congregational-reading editor in place (a modal over the Slides tab), not a navigation
+away from it — `'edit-in-song'` stays `'nav'` in `menuItemToneFor` because IT still routes to the
+song editor. Relabelled again 2026-08-05 (owner): "Edit scripture text" promised something the
+destination does not offer — what opens is the modal titled "Congregational Reading" (enter a
+reference, Fetch, AI-split, toggle each section's speaker); there is deliberately NO free-text
+scripture override anywhere in it (34-07: the owner was shown the D-13/D-15 shadow-copy tension and
+declined it), so a label promising text editing described a feature that does not and will not exist
+here. Kept as an action phrase because every sibling label here is one ('Edit details', 'Duplicate',
+'Delete Slide') — accepted as slightly odd on a reading that already exists, because the modal's own
+heading names the state correctly once open and the previous label was actively wrong on every
+visit.
+
+**`slideActionMenuItems` (R063):** pure per-kind 3-dot slide action menu item list. Synchronous, no
+store/composable reads — item order is fixed and identical across kinds for shared items:
+edit-details, then the navigation item (where one exists), then duplicate, then delete. Deliberate
+divergence from 33-UI-SPEC.md §3's stated 4-parameter signature: the fourth parameter
+`canMutateBackground` is NOT threaded through, since nothing in §3's table branches on it and per §11
+"Edit details" is unconditional (the drawer it opens is a view affordance too) — background-mutation
+gating lives entirely inside `EditSlideDrawer.vue`'s own `canMutateBackground` computed. D2
+(260805-bvo, owner authority, superseding 33-UI-SPEC.md §3 row 3a/§4): the Hymn carve-out that used
+to withhold a second edit affordance from a HYMN group's auto-derived pristine text slide is REVERSED
+— owner verbatim: "This only non-editable thing should be Song. Everything else can be editable.
+Hymns are a special thing for now only." Every `text` entry now returns the same menu regardless of
+whether its body is defined or which plan item kind it belongs to, including a HYMN group's
+auto-derived slide, which can now diverge from its Service Order Hymn fields when edited here — the
+owner accepts that divergence as temporary (T-bvo-03); R054/P-03 is NOT dropped by this reversal.
+`planItemKind` is UNCONSULTED by every branch (kept in R063's signature rather than removed, since
+this repo's ESLint `args: 'after-used'` rule does not flag it followed by a used parameter). The
+`default` arm returns the single most conservative item (`edit-details` only) for an unrecognized
+`sourceRef.kind`, never the most permissive. Prohibition P-03 is structural: `lyric`/`copyright`
+entries are always inside a SONG group (R054) and their rows never include `duplicate`/`delete`
+under any argument combination, not even when `canMutate` is true — both branches return immediately
+after pushing their two fixed items, so `canMutate` is never consulted for them; D2 does not touch
+this.
+
+### src/components/stage/StageKindIcon.vue
+
+**Module overview (Phase 107 redesign):** inline-SVG glyph for a stage-marker kind. The app has no
+icon-font dependency and renders icons as inline SVGs by convention, so the imported design's
+Phosphor web font is intentionally NOT used — each `icon` name from `STAGE_KIND_META` maps to a
+hand-authored 24×24 stroke glyph here. One component, reused by the palette chip, the marker tile
+(editor + read-only view), and the inspector drawer, so there is exactly one place a kind's glyph is
+defined. Pure/presentational (no store, no Firebase) so it is safe on the public ShareView via
+`StageLayoutView`. Colour comes from `currentColor`.
+
+### src/components/stage/StageLayoutEditor.vue
+
+**Module overview (R313/R314, Phase 107), redesigned to the single-room "Nocturne" diagram:** the
+AUTHORING half of the visual stage layout — a left PALETTE of typed chips, one continuous room
+CANVAS (`StageRoom`), and — for editing a marker — the app's existing right-hand slide-over pattern
+(matching `RoleSlideOver`/`TeamSlideOver`: a Teleport modal with a backdrop and a buffered
+Save/Cancel form). Click a chip to drop a marker, drag it where it stands, click it to edit its
+label/assigned person/type/note. Placement is FREE (never snapped to a grid): pointerup resolves the
+exact clamped `xPct`/`yPct` within the single room rect and derives the stored `zone` from that
+position. Still native Pointer Events (never Konva/interactjs/HTML5-DnD, which is mouse-only and
+dead on touch). The parent owns `elements`; this component NEVER mutates the prop array — every
+change round-trips through an emit (add/update/remove/move) so the parent's single autosave path
+stays the one source of truth. A marker can be named by picking a PERSON already serving this
+service (via `assignablePeople`, resolved from the service's role assignments) OR by a free-text
+LABEL — the label stays editable for a spot with no matching assigned person (a guest, a spare,
+gear). The kind's TYPE is always shown on the tile alongside the label, so a tile reads as both a
+name and a type. When `editable` is false (locked service) this renders the SAME shared read-only
+`StageLayoutView` used by share/print — no third rendering path.
+
+### src/components/stage/StageLayoutPrintDocument.vue
+
+**Module overview (quick task 2026-09-01):** the tech team's printable STAGE LAYOUT sheet — hidden
+on screen, shown only when printing, and printed LANDSCAPE + BLACK AND WHITE (see
+`ServiceEditorView.printStageLayout`, which injects the `@page { size: landscape }` rule and toggles
+this doc in over the normal service print). It pairs the high-contrast outline diagram with a large,
+legible list of every marker grouped by placement, so a tech setting up the stage can read it at a
+glance. Available whether the service is a draft or locked/planned — printing is read-only.
+Pure/presentational (props only) — safe to render from the read-only, possibly-locked editor.
+
+### src/components/stage/StageMarkerChip.vue
+
+**Module overview (Phase 107 redesign):** a single stage-marker tile — a rounded icon tile with the
+kind glyph, the label beneath it, plus the type, an assigned person, and a tech note. Purely
+PRESENTATIONAL and single-root, so both callers drive it by fallthrough: `StageLayoutEditor`
+positions it (`:style`), marks it interactive, and attaches the native pointer handlers for drag plus
+the click-to-select; `StageLayoutView` (read-only: locked editor/share/print) just positions it — no
+handlers, not interactive. No store/Firebase import — safe on the public ShareView. `print` mode
+renders a larger, high-contrast BLACK-AND-WHITE tile for the tech team's printed sheet (bigger
+legible type, black text, a white tile with a black outline). The label is bound via Vue text
+interpolation ONLY, so a label containing markup renders as literal text (XSS-safe, R315).
+
+### src/components/stage/StageRoom.vue
+
+**Module overview (Phase 107 redesign):** the stage-room BACKDROP — one continuous room drawn the
+way it reads when you stand in it: the platform is a shape at the top, the audience sits below, and
+"off stage" is the floor in the side wings. Shared verbatim by the read-only `StageLayoutView`
+(locked editor/share/print) and the live `StageLayoutEditor`, so the diagram is defined in exactly
+ONE place and can never drift between authoring and the printed/shared plot. Pure/presentational: no
+store, no Firebase — safe on the public ShareView. Markers are projected in through the default
+slot, absolutely positioned by the caller over this same rect. The root element is exposed as
+`roomEl` so the editor can read its bounding rect for drop math (drag never measures a marker, only
+this room, keeping placement resize-stable — R314). `print` mode renders a high-contrast
+BLACK-AND-WHITE plot for the tech team's printed sheet: the stage platform is an OUTLINE (a line, not
+a filled shape) so it costs no ink and reads clearly, labels are larger and black, and the audience
+seats become hollow outlines.
+
+### src/composables/useAutoSave.ts
+
+**Module overview:** reusable auto-save composable extracted from `ServiceEditorView`'s pattern.
+Watches a reactive source with a deep watcher, debounces changes, and calls `saveFn` after the
+debounce period elapses. An inflight guard prevents concurrent saves — if a save is already running
+when the timer fires, the save is rescheduled. The first trigger from the watcher is suppressed
+(initialized guard) so the initial load of data does not trigger a save. Status is one of five
+values: `'idle' | 'pending' | 'saving' | 'saved' | 'error'`. A rejected `saveFn` is contained on both
+the debounced path and `flush()` and surfaces as the `'error'` status rather than an unhandled
+rejection — it is never left stranded at `'saving'`; the handling is generic, it only sets the
+status, it does not inspect or discriminate the failure. The `'saved'` state is terminal — it
+persists until the next pending transition, it does not fade back to `'idle'` on its own.
+
+### src/composables/useBackgroundUpload.ts
+
+**`BACKGROUND_MAX_BYTES` (R055/R057, Phase 33 Plan 03):** a client-side pre-validation figure that
+sits well under the authoritative server-side cap for this prefix. `orgs/{orgId}/backgrounds/**`
+does NOT match `storage.rules`' dedicated `orgs/{orgId}/media/{allPaths=**}` block (that block's
+50MB cap belongs to `useMediaUpload`, not this one) — it falls through to the generic
+`orgs/{orgId}/{allPaths=**}` catch-all, which caps at 25MB. 10MB is well under that, so no
+`storage.rules` change is needed or in scope for this phase (33-RESEARCH.md § Research Question 1).
+
+### src/composables/useLoopTimer.ts
+
+**Module overview (Phase 106, R306/R308):** the single-active-timer primitive behind per-item Run
+loop playback. Owns EXACTLY ONE interval id. `arm()` ALWAYS `disarm()`s first, so there is never
+more than one live timer no matter how many times `arm()` is called in a row (the T-106-03
+leak/duplicate-timer mitigation) — this also means arming resets the clock, which is exactly what
+makes a manual nav mid-interval (`useRunControl`'s `postIndex` → `reconcileLoop` → `arm`) restart the
+interval from the new position instead of fighting a stale tick. `disarm()` clears and nulls the id
+and is idempotent (safe to call when already disarmed). `onUnmounted(disarm)` is registered on the
+calling instance so a plain route-away/unmount can never leak a ticking interval even if the caller
+(`useRunControl.ts`) forgets to disarm explicitly on every exit path — defense-in-depth alongside its
+own `confirmExit`/`endServiceTeardown` disarms. Must be called from inside a component `setup()` (it
+calls `onUnmounted`).
+
+### src/composables/useOutputWindow.ts
+
+**Automatic Fullscreen content setting (Chrome 126+ — the zero-click primary):** Chrome's
+"Automatic Fullscreen" content setting (a one-time per-computer allow, or the
+`AutomaticFullscreenAllowedForUrls` enterprise policy) lets an allowed origin call
+`Element.requestFullscreen()` without a user gesture. This is the correct fix for the multi-display
+problem: gesture-based fullscreen (capability delegation, the control button, a per-window tap) can
+only fullscreen ONE window per gesture — the browser consumes the transient activation on the first
+`requestFullscreen`, so the second display never gets it. With the content setting granted, each
+output window self-fullscreens on load INDEPENDENTLY (no shared gesture), so both displays go
+fullscreen with zero clicks. The control already opened and positioned each window on its assigned
+monitor (`window.open` left/top/width/height), so a plain `requestFullscreen()` fullscreens on the
+monitor the window is already on — no `getScreenDetails()` needed. When the setting is not granted
+(or the permission descriptor is unsupported / `query()` throws), `attemptAutoFullscreen()` does
+nothing — the existing fallbacks remain: the `wp-fullscreen-delegate` capability-delegation listener,
+the opener-side delegation + control "Fullscreen displays" button, and the one-tap-anywhere overlay
+in each output view. Best-effort: where the browser honors the setting, each output self-fullscreens
+on mount with no gesture; where it does NOT — proven on the owner's Chrome 151 and Edge even with a
+correct machine-wide policy (`chrome://policy` showed OK) — the permission query reports `'granted'`
+but `requestFullscreen` still rejects "not granted"; this is a silent no-op, and the per-display "Go
+fullscreen" buttons on the control's Displays panel (gesture-delegated, one click per display) are
+the reliable path. Never throws.
+
+### src/composables/useRunControl.ts
+
+**Output-window orchestration (R261/R266):** the Go live gesture opens BOTH standalone output
+windows and (when the live monitors match a saved mapping) places each on its assigned screen. This
+runs ONLY from the run-go-live-btn click — NEVER `onMounted`. `window.open` (pop-up blocker) and
+`requestFullscreen({ screen })` require a live transient activation traceable to a gesture task;
+after the Run click's `router.push` + the lazy route-chunk `import()` + the async auth/org
+`beforeEach` guard + the mount tick, Chrome/Edge no longer honor that activation on mount, so an
+`onMounted` open would silently open ZERO windows on a cold first Run while claiming success. The
+operator clicks Go live on the control screen to supply a FRESH, live activation for both
+`window.open` and `requestFullscreen`. HANDSHAKE (95-03): the channel is the single writer from
+mount and `postIndex` drives state whether or not a display is open; when Go live opens a window it
+posts hello and the control's `onHello` (`resendCurrent`) resends the current index — so the operator
+may click Go live at ANY time (even after navigating several slides) and the freshly-opened output
+syncs to the live slide.
+
+**Per-display fullscreen (owner UAT):** bound to a "Go fullscreen" button on each card in the
+control's Displays panel. The automatic no-gesture path is unreliable across browsers (proven on
+Chrome 151 + Edge with a correct machine-wide policy), so fullscreen is driven by an explicit
+operator click — one per display, all in one place at the booth, so nobody chases the mouse across
+monitors that may not even be visible. Runs synchronously in the button's click handler, so the
+click's transient activation is delegated to the already-open, already-loaded output window, which
+then `requestFullscreen()`s reliably (no load-race to eat the gesture). No-op if the window is
+closed. Generalizes to any future output role (e.g. Live Stream).
+
+**Per-item loop timer (R306/R308, Phase 106):** the SINGLE loop timer lives HERE — never in an
+output window (`AudienceOutputView`/`ConfidenceOutputView` stay receive-only, see the Anti-Patterns
+section above). Every advance routes through `postIndex()` (the single writer), so the loop and
+manual nav can never fight or double-drive the output windows (T-106-04). `reconcileLoop()` is the
+ONE place that decides arm vs. disarm, called from `postIndex` (after posting — manual nav AND every
+loop tick itself), `postBlackout` ("Go to black" pauses/resumes the loop per 106-CONTEXT.md), and
+`watch(currentSlotIndex)` (item change) / `watch(live)` (go-live/rehearse arms, End Service/End
+Rehearsal disarms).
+
+**`openManage` (owner fix #5):** opens the monitor-setup screen in a NEW TAB so the running control
+(index/seq/channel plus any open outputs) survives — mirrors the reassign banner's new-tab rule.
+Deliberately NO `'noopener'`: `noopener` severs the opener relationship, and the HTML spec only
+copies the opener's `sessionStorage` — which carries a multi-church user's picked active org — to the
+child when that relationship is preserved. With `noopener` the fresh tab had no active-org, so the
+router guard bounced it to `/select-church`; a plain `window.open` (like the run/output windows
+already use) lets the new tab inherit `sessionStorage` and load monitor-setup.
+
+### src/composables/useRunTimers.ts
+
+**Module overview (R281):** the Run screen's wall clock plus elapsed-since-go-live timer. A SINGLE
+~1s `setInterval`, created in `onMounted` and cleared in `onUnmounted` (mirroring
+`RunControlView`'s `stopRecoveryWatchers` clearInterval + null-the-id discipline), drives both a
+short wall-time `clock` string and an `elapsed` (M:SS / H:MM:SS) string measured from the go-live
+origin. `startElapsed()` is idempotent: only the FIRST call (the first go-live OR the first rehearse)
+records the origin; later calls are no-ops. `resetElapsed()` clears the origin so `elapsed` reads
+'00:00' again. All formatting is padStart-based — no `Array.prototype.at` (absent from the TS lib
+target; see CLAUDE.md). Fake-timer friendly: `advanceTimersByTime` drives both the clock and the
+elapsed count, so a mount/unmount harness can prove the interval self-clears.
+
+### src/composables/useSlideshowAssembly.ts
+
+**Module overview:** reactive wrapper over the pure `assembleSlideshow` engine (20-02), delivering
+R006 — reorder/add/remove a service element and the assembled slideshow follows with no manual
+re-sync. Builds the content maps `assembleSlideshow` needs from live Pinia stores
+(`scriptureReadingsById` from the scriptureSlides store) and maintains its own `songLyricsById` map
+by loading the current (newest) lyrics doc for every distinct songId referenced by a SONG slot (the
+songLyrics store itself only ever subscribes to a single song at a time, so it cannot be reused
+directly here). A song's slide order is read from that lyrics document's `performanceOrder` field
+alone (R035/D-03) — there is no second order source and no precedence chain.
+
+**`LyricsSubscriber`:** opens a LIVE subscription to a song's current (newest) lyrics document.
+`onUpdate` fires with the newest doc (or `null` when none exists) on the initial snapshot AND on
+every subsequent edit, so a reworded lyric or a verse added/removed/reordered propagates to the
+assembled slideshow with no composable remount — independently of `canWrite`, so a locked/viewer
+session sees content edits live. Injectable for tests.
+
+**`ensureGroupMaterialized` (25-05 Task 1):** resolves to `{ entries, sourceSignature }` for
+`slotId`'s group, creating it first if it does not exist yet — including when the derived input has
+ZERO slides, unlike the automatic `materializeCandidates` watcher (that skip implements Phase 24
+D-02's "groups are always populated" rule for AUTOMATIC materialization; this function only ever
+runs because a user just asked to put something into this plan item, R032). Resolves `undefined`
+when it cannot act (no service, no org, no such slot, the caller cannot write, or the slot's delete
+is in flight). Concurrent calls for the SAME slot are deduped through `ensureInFlight` so at most one
+create is issued and every caller resolves the same result — also participates in the shared
+`materializingSlotIds` guard so the automatic watcher cannot fire a second create for a slot this
+function is already materializing (belt and braces on top of the store's deterministic doc id, which
+already makes the worst case of the reverse race a harmless overwrite rather than two divergent
+documents).
+
+**`suppressMaterialization` (ME-04, R045 membership):** marks `slotId` as having a delete in flight
+and returns the release; call it in a `finally`. `confirmSlotDelete` awaits the group cascade BEFORE
+splicing the slot, so a failed delete never leaves the slot removed locally while its group lingers —
+but Firestore applies a delete to its LOCAL cache and raises `onSnapshot` immediately, whereas
+`deleteDoc` resolves only on server ack, so for the length of that ack the slot is still in
+`service.slots` with no group, exactly the shape `materializationCandidates` treats as "materialize
+me": the watcher re-created the document the cascade had just deleted, and the slot was then spliced
+out with no second cascade, orphaning the group document indefinitely. A held slot is skipped by
+BOTH the automatic candidate watcher and `ensureGroupMaterialized`.
+
+**`drainGroupWrites` (HI-01):** resolves once no group write issued by this composable is still in
+flight. Both apply loops run fire-and-forget from `{ immediate: true }` watchers, so without this
+there is no way for a caller to know a write is outstanding — and `onMarkAsPlanned` flipped the
+service's status straight through that window, leaving the write to be denied on arrival by the
+`/slideGroups` rule while the user saw a normal transition. Never rejects: individual failures are
+already contained and logged at the point of the write — this is a barrier, not an error channel.
+
+**`distinctRenderImportIds`'s imported-entry collection (part 2):** `imported` ENTRIES living inside
+ANY slot's slide group. A PPTX deck's rendered slides can be added straight into a non-IMPORTED
+slot's group (e.g. a Prayer or Scripture group), where the render linkage lives on the entry's deck
+(`sourceRef.importId` → `ImportedDeck.id` → `renderImportId`), NOT on an IMPORTED slot and NOT on the
+group's own `renderImportId` (which stays null for a non-imported slot). Without collecting these,
+the render doc is never subscribed, its `ready` status is never seen, and every such entry hangs on
+the "Rendering" spinner permanently even after the render has completed — a real production defect
+(a deck imported into a Prayer group's slides).
+
+**`assemblyGroupsBySlotId`:** the group map the assembler renders from. For an EDITABLE session
+(`canWrite`) this is the store's map UNCHANGED — the rebuild loop persists any regenerated group, so
+the stored group is authoritative and behavior is identical to before. For a LOCKED/viewer session
+(`!canWrite`), a SONG group gone stale against its song's current verse structure (`songGroupIsStale`)
+is OMITTED, so the assembler falls through to its live no-group derivation path (`performanceOrder`),
+reflowing an added/removed/reordered verse IN MEMORY. Nothing is persisted here: this override only
+feeds `assembledSlideshow` (read/render), never the write paths (`materializationCandidates` /
+`rebuildOutcomes` / `ensureGroupMaterialized` all read the store map directly and stay gated on
+`canWrite`), so a locked session still writes nothing to `/slideGroups`.
+
+**`materializationCandidates` (Task 2: lazy materialization, zero writes on reorder):** a fully
+SYNCHRONOUS computed that decides WHAT needs materializing. This matters: an async function body
+passed to `watch`/`watchEffect` only tracks reactive reads made before its first `await` — reads made
+after resuming from an await happen outside the effect's tracking window, silently dropping
+dependencies. Keeping the decision synchronous (mirroring `distinctSongIds`'s shape) and only
+performing the actual (async) writes in the watch callback avoids that pitfall entirely.
+
 ---
 
 *Architecture analysis: 2026-07-16*

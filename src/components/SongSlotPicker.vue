@@ -262,17 +262,7 @@ const availableTags = computed<string[]>(() => {
   return Array.from(tagSet).sort()
 })
 
-/**
- * Visible songs filtered by the shared store tag-filter state (D-09/D-10: independent
- * per-tag Show/Hide sets — exclusion always wins; include set OR-combines when non-empty).
- * R240: delegates to the same shared filterSongsByTags() used by SongBrowser's own
- * filteredSongs computed (with the same visibleSongs/tagFilterInclude/tagFilterExclude
- * inputs SongBrowser is bound to below), so this is provably identical to the shared
- * shell's slot value. Kept as a script-level computed (rather than read from the slot
- * scope) because suggestions/searchResults below feed the IntersectionObserver
- * load-more machinery (visibleCount, hasMore, loadMore), which runs outside the
- * template's render/slot context and needs synchronous script access.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/SongSlotPicker.vue)
 const tagFilteredSongs = computed<Song[]>(() =>
   filterSongsByTags(visibleSongs.value, songStore.tagFilterInclude, songStore.tagFilterExclude),
 )

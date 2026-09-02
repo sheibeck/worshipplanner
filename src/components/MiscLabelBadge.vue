@@ -1,17 +1,5 @@
 <script setup lang="ts">
-/**
- * Inline-editable MISC label pill (2026-08-12 owner request). Replaces the
- * separate MISC "label" input added in Phase 56 (R127): the colored badge pill
- * IS the editable surface — click it (or its pencil) to rename a Miscellaneous
- * item directly. Shared by BOTH the live service editor (ServiceEditorView.vue)
- * and the Edit-Template editor (ServiceTemplateEditor.vue) so the two can never
- * drift (the Phase-57 kindBadgeClass lesson).
- *
- * Display shows `modelValue` (trimmed) or the placeholder ("Miscellaneous"),
- * uppercased by the badge's own CSS — the STORED value keeps its real casing.
- * Plain text only: :value/v-model bindings + interpolation auto-escape; never
- * v-html.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/MiscLabelBadge.vue)
 import { ref, nextTick } from 'vue'
 
 const props = withDefaults(

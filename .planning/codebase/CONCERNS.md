@@ -286,6 +286,65 @@ accepted scope for v1.7's coarse SLIDES change-notice — broadening it would re
 to live text resolution, which is deliberately avoided. Add/remove/reorder of slides and any
 authored text/scripture/video field edit ARE caught, because those change a `sourceRef` identity.
 
+## Component & Composable Concern Notes (R318)
+
+Behavioral/architectural "how it works" narration relocated out of `src/components/**` and
+`src/composables/**` source comments per the Phase 109 comment convention (CONVENTIONS.md §
+Comment Convention). Each entry cites the file:line range at the time of relocation (109-04).
+
+### src/components/run/RunDisplaysPanel.vue
+
+**Module overview (R276), now relocated to the right column beside/under the next-up preview (owner
+fix #4):** carries the closed-window RECOVERY (R274) that the removed top status band used to
+surface (owner fix #3). Each real output (Audience/Confidence) renders ONE of four honest states,
+colorblind-safe (dot + word): `open` GREEN — live AND the output is open (already gated on
+`!closed` by the parent's `audienceOpen`/`confidenceOpen` computed); `closed` AMBER "… display
+closed" plus a Reopen button (`run-display-reopen-{role}`) and a "won't lose your place"
+reassurance — the R274 one-click reopen; `closed-muted` AMBER muted "Reassign displays to reopen",
+NO reopen button — shown when a monitor-unplug (reassigning) banner is up, since the reassign banner
+is the senior action and the per-role chip is SUPPRESSED (precedence, 96-UI-SPEC §B) — a closed
+window is NEVER rendered green; `not-open` AMBER "Not open" — pre-real-live (e.g. rehearse) or
+otherwise not open. Stage stays a DISABLED "Off" placeholder only (no 3rd-output build — out of
+scope). Pure props-in/emits-out: no store, channel, `getScreenDetails`, or `monitorConfig`
+side-effect — the parent supplies each card's open/label, the live flag, the per-output closed
+latches, and the reassigning flag, and maps `@reopen(role)`/`@manage` back onto its own
+reopen/manage handlers. The closed-detection poll plus position-preserved reopen BEHAVIOR
+(`useRunControl`) is unchanged — only the SURFACE moved here from the deleted header band.
+
+### src/components/slides/EditSlideDrawer.vue
+
+**`groupAssembledSlides` prop (Phase 33 UI-audit fix):** the selected slide's GROUP siblings,
+already resolved — the same array `SlidesTab.vue`'s `selectedGroupAssembledSlides` computes for the
+position/total props above, at the same altitude, no new resolver. Lets `lowerLevelBackgroundLabel`
+tell a song-level inherited background apart from "nothing resolves beneath this slide's own
+override" without re-deriving the cascade itself — mirrors how `SlideGrid.vue`'s
+`songBackgroundForInheritedDisplay` finds the same song-sourced value by scanning its own group's
+assembled cards. Defaults `[]` so every pre-existing fixture/mount is unaffected; shares the known
+limitation documented on `lowerLevelBackgroundLabel` in ARCHITECTURE.md.
+
+### src/components/slides/SlideCard.vue
+
+**Module overview (Phase 25 Task 1, drag grip added 25-05 Task 3):** presentational, prop-driven
+slide card. Renders one assembled slide inside `SlideGrid.vue` — text body plus metadata only; real
+formatted-slide rendering remains deferred (D-10).
+
+### src/composables/useOutputWindow.ts
+
+**Deferred first-play note:** the deferred first-play (audience old `onMounted`) is NOT implemented
+here — it references the view's canvas ref and is re-homed to a view-local `watch(fontReady)` in
+each consuming view.
+
+### src/composables/useRunControl.ts
+
+**`reassertControlFullscreen` (owner UAT):** keeps the CONTROL screen fullscreen while running.
+`openOutputs` requests control fullscreen SYNCHRONOUSLY in the click path (so a non-policy machine
+still gets its one gesture-authorized attempt), but opening the two output popups immediately after
+makes Chrome DROP the opener's fullscreen — so the control flashed to fullscreen and fell back out.
+Re-asserts AFTER both outputs are open, deferred a tick so the popup-driven fullscreen-exit has
+settled. With the Automatic Fullscreen policy granted (the multi-monitor target) this re-entry needs
+NO gesture; without it it is a silently-rejected no-op. Idempotent (skips when already fullscreen)
+and guarded against a fast exit. Exited again in `endServiceTeardown`.
+
 ---
 
 *Concerns audit: 2026-07-16*
