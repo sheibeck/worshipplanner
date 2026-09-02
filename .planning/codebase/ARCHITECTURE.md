@@ -1839,7 +1839,13 @@ computed — 30-VERIFICATION I-01 found six of seven mutation entry points guard
 
 **`appendToGroup` append contract (R050):** the one append contract every write path routes
 through — sorts a copy of `entries` by `order`, concatenates `additions` in the order given, then
-renumbers every element to its array index, so array order and `order` can never disagree.
+renumbers every element to its array index, so array order and `order` are the same statement
+afterward. This is the exact normalization the reorder handler's `onEnd` already performs; this
+helper makes it the component's one contract instead of a behavior only the reorder path had —
+closing the divergence where `entries`' array order and `order`-field values disagree (e.g. after a
+prior reorder or reconciliation), which is the mechanism behind "a new slide lands second-to-last"
+for a group with no copyright entries (see 29-04-SUMMARY.md for the investigation of the second,
+unrelated candidate mechanism).
 
 **Reorder failure handling (T-29-13):** surfaces the failure inline and forces the card list to
 rebuild from props (via `gridRenderNonce`) — the DOM revert this used to lean on is gone, and

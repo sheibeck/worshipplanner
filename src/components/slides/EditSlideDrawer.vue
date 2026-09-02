@@ -508,20 +508,7 @@ const props = withDefaults(defineProps<{
   serviceId: string
   /** Gates the label/notes write controls (T-26-05-02) — a viewer still reads the slide's information. */
   isEditor: boolean
-  /**
-   * R036 — the service's lifecycle lock, kept DISTINCT from `isEditor` because
-   * this drawer is the one surface that must tell the two apart: a viewer and a
-   * locked editor need different read-only copy (31-UI-SPEC § 6). Composed into
-   * `canMutate` below, which is why the entire Phase 30 read-only rendering comes
-   * for free rather than needing a parallel mechanism.
-   *
-   * ★ The drawer still OPENS when locked. It is the only surface showing a slide
-   * at size, plus its context line and what audio covers it; blocking it would
-   * remove a VIEW affordance in the name of a WRITE lock.
-   *
-   * Defaults `false` — `mountDrawer`'s fixture omits it, so no fixture rewrite is
-   * needed.
-   */
+  /** See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/EditSlideDrawer.vue). Defaults `false` — `mountDrawer`'s fixture omits it, so no fixture rewrite is needed. */
   serviceLocked?: boolean
   /**
    * Phase 33-07 — a menu-dispatched Duplicate/Delete request, keyed on a
@@ -531,19 +518,7 @@ const props = withDefaults(defineProps<{
    * every pre-33-07 fixture is unaffected.
    */
   pendingAction?: { key: 'duplicate' | 'delete'; nonce: number } | null
-  /**
-   * Phase 33 UI-audit fix — the selected slide's GROUP siblings, already
-   * resolved (same array `SlidesTab.vue`'s `selectedGroupAssembledSlides`
-   * computes for the position/total props above, at the same altitude, no
-   * new resolver). Lets `lowerLevelBackgroundLabel` below tell a song-level
-   * inherited background apart from "nothing resolves beneath this slide's
-   * own override" without re-deriving the cascade itself — mirrors how
-   * `SlideGrid.vue`'s `songBackgroundForInheritedDisplay` finds the same
-   * song-sourced value by scanning its own group's assembled cards. Defaults
-   * `[]` so every pre-existing fixture/mount is unaffected. See
-   * `lowerLevelBackgroundLabel`'s own comment for the known limitation this
-   * shares with that precedent.
-   */
+  /** See .planning/codebase/CONCERNS.md (§ Component & Composable Concern Notes (R318) -> src/components/slides/EditSlideDrawer.vue). Defaults `[]` so every pre-existing fixture/mount is unaffected. */
   groupAssembledSlides?: AssembledSlide[]
 }>(), { serviceLocked: false, pendingAction: null, groupAssembledSlides: () => [] })
 
@@ -771,16 +746,7 @@ const copyrightSlide = computed(() =>
   sourceKind.value === 'copyright' ? (props.assembledSlide?.slide as CopyrightSlide | undefined) : undefined,
 )
 
-/**
- * `scripture`-kind entries: the UI-SPEC calls for the passage text alone, not
- * `slideBodyText`'s reference-prefixed form (the reference is already shown
- * in the context line above). R047 ripple (30-03-PLAN.md): a Reference-state
- * scripture slide always resolves with empty `text` — falling back to the
- * slide's own `reference` keeps this block from going blank. A
- * Congregational-state section slide (Phase 38) DOES carry text and shows it
- * unchanged; this computed is also read by the section entry's own read-only
- * fallback (mutation disallowed) further down.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/EditSlideDrawer.vue, "scripturePassageText")
 const scripturePassageText = computed(() => {
   if (sourceKind.value !== 'scripture' || !props.assembledSlide) return ''
   const slide = props.assembledSlide.slide as ScriptureSlide
@@ -967,43 +933,10 @@ const ownBackgroundUrl = computed(() => props.entry?.backgroundImageUrl)
 
 const backgroundFileName = computed(() => (ownBackgroundUrl.value ? backgroundImageLabel(ownBackgroundUrl.value) : ''))
 
-/**
- * ★ Deliberately NOT `canMutate` — omits the song-group exclusion.
- * `canMutate` (`isEditor && !serviceLocked && !isSongGroup && !isPendingRender`,
- * above) governs label/notes/audio/duplicate/delete, all of which R054 keeps
- * song-slide-canonical. A per-slide background is a genuinely new,
- * independent property R054's "canonical, edited only from Song Lyrics" rule
- * was never written to cover — 33-CONTEXT.md explicitly states a song
- * group's reduced menu still offers background-setting. This is the ONE
- * mutation gate in this drawer that omits `isSongGroup` — do not "fix" it to
- * match the surrounding pattern. It DOES still compose `!isPendingRender`
- * (R236): a background attached to a not-yet-rendered slide is exactly the
- * kind of customization the locked pending-render copy warns would be lost.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/EditSlideDrawer.vue, "canMutateBackground")
 const canMutateBackground = computed(() => props.isEditor && !props.serviceLocked && !isPendingRender.value)
 
-/**
- * ★ Phase 33 UI-audit fix (previously a known, scoped gap documented in
- * 33-07-SUMMARY.md): this drawer still receives no `song` document, so the
- * GROUP branch keeps reading `props.group.backgroundImageUrl` directly (a
- * raw field read, not a re-derivation of resolution precedence). The SONG
- * branch is now provable WITHOUT threading a song document or a second
- * resolver: `groupAssembledSlides` (populated by `SlidesTab.vue` from the
- * SAME `assembledSlideshow` prop it already filters for position/total) is
- * this slide's own group, already resolved — a sibling entry with
- * `backgroundSource === 'song'` proves the song has one, exactly mirroring
- * how `SlideGrid.vue`'s `songBackgroundForInheritedDisplay` scans its own
- * group's assembled cards for the same signal.
- *
- * ★ Known limitation, shared with that precedent, not introduced by this
- * fix: if EVERY slide in the group has its own override (so no sibling ever
- * resolves to 'song'), a song-level background one level further down stays
- * invisible to this caption. This is narrower than a silent wrong-level
- * claim — the caption simply doesn't render rather than naming the wrong
- * level (the same "absent is safer than wrong" reasoning the original gap
- * used) — and is considered acceptable because the group-level control
- * already surfaces this exact case via its own `inheritedFrom` prop.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/EditSlideDrawer.vue, "lowerLevelBackgroundLabel")
 const lowerLevelBackgroundLabel = computed<'group' | 'song' | null>(() => {
   if (!ownBackgroundUrl.value) return null
   if (props.group?.backgroundImageUrl) return 'group'
@@ -1316,25 +1249,7 @@ onUnmounted(() => {
   void flushAll()
 })
 
-// ── Phase 26-09 Task 2: Duplicate — insert a copy directly after the original ──
-
-/**
- * Mints a FRESH id for the copy (D-04, this plan's key_links) — never the
- * original's, and never derived from label/source/position:
- * `PresentationViewer.vue` keys its per-slide `AudioPlayer`/`VideoPlayer` on
- * this id (invariant 2, `src/types/slideGroup.ts`), so two entries sharing
- * one id would collide there. `base` is read FRESH from `props.group.slides`
- * at the moment this runs (never a snapshot from mount), matching every
- * other write this drawer makes. The copy is inserted directly after the
- * original and every entry's `order` is renumbered contiguous, following the
- * same discipline `SlideGrid.vue`'s own append (`onAddSlide`) uses.
- *
- * The selection moves to the copy only AFTER the write succeeds (T-26-09-04)
- * — emitting `duplicate` eagerly, before the write lands, would leave the
- * panel pointed at an entry that was never actually created if the write is
- * rejected. Task 1's reconciliation fix is what makes this copy survivable
- * once it lands; this function is what actually creates it.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/EditSlideDrawer.vue, "onDuplicate")
 async function onDuplicate(): Promise<void> {
   if (!canMutate.value) return
   if (!props.group || !props.entry) return
@@ -1375,10 +1290,7 @@ function onCancelDelete(): void {
 }
 
 /**
- * Filters the entry out and renumbers the rest contiguous, writing through
- * the same fresh-base helper every other write in this drawer uses. The
- * group's shared bed music (`setGroupBedMedia`) is never called here — a
- * slide delete touches only `slides`, never the group's own `bedAudioUrl`.
+ * See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/EditSlideDrawer.vue, "Delete path").
  * No close-handling is added for the post-delete case: `SlidesTab.vue`'s
  * existing `selectedGroupSlideIds` watch already clears `selectedSlideId`
  * (and with it, `drawerOpen`) the moment it stops resolving against the
@@ -1411,24 +1323,7 @@ async function onConfirmDelete(): Promise<void> {
  */
 const lastHandledPendingActionNonce = ref<number | null>(null)
 
-/**
- * ★ P-01: the delete key sets the EXISTING `showDeleteConfirm` state and
- * never calls the delete action directly. A menu puts destruction one click
- * closer than the drawer did; it must not also make it quieter. The existing
- * inline confirm — which names whether attached audio and operator notes go
- * with the slide (`deleteConfirmBody`, unchanged) — stays byte-unchanged and
- * remains unavoidable.
- *
- * ★ T-33-15: re-checks `canMutate` before acting on either key, so a
- * dispatched action cannot bypass the editor / not-locked / not-a-song-group
- * composition even if the menu that sent it were wrong.
- *
- * `pending-action-consumed` is emitted once per handled nonce regardless of
- * whether `canMutate` permitted the action — so the parent (which owns the
- * pending state) never gets stuck holding a request this drawer correctly
- * refused, while the ACTUAL mutation (confirm-state flip / duplicate write)
- * only ever happens when permitted.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/EditSlideDrawer.vue, "Menu-dispatched delete")
 watch(
   () => props.pendingAction,
   (action) => {

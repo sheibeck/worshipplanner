@@ -141,19 +141,7 @@ const selectedSlideId = ref<string | null>(null)
 /** See ADR-0119 (docs/adr/0119-the-drawer-has-one-body-so-there-is-no-mode-to-set-duplicate.md) */
 const editSlideDrawerRef = ref<InstanceType<typeof EditSlideDrawer> | null>(null)
 
-/**
- * Whether there is anything assembled to present — the same condition
- * SlideshowPreview's own `canPresent` (aliased to `hasAnySlides`, Phase
- * 23-04) used, restated directly against `assembledSlideshow` rather than
- * reintroducing the `AssembledSection[]` grouping that only existed to
- * render the removed preview list.
- *
- * Phase 36-03 (design 1a): the `▶ Present` button this gates now renders in
- * `ServiceEditorView`'s page header, immediately left of Save, instead of
- * inside this tab. This component still owns the condition and the `present`
- * emit below — only the rendered button moved. Exposed (with
- * `onPresentClick`) so the header can read/drive both from a `slidesTabRef`.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlidesTab.vue, "canPresent")
 const canPresent = computed(() => props.assembledSlideshow.length > 0)
 
 /** Plan (position) order — must match the rail's own ordering exactly. */
@@ -219,25 +207,9 @@ function onSelectSlot(slotId: string): void {
   selectedSlotId.value = slotId
 }
 
-// Phase 33-09 (R051): no longer set true on every selection — that was the
-// coupling this plan exists to break. Set true only by `onMenuAction`'s
-// edit key and by the post-duplicate follow-selection handler
-// (`selectSlideById`) below, and cleared only by the drawer's own `close`
-// emit or by the selection itself disappearing (below) — never by a
-// selection CHANGE to a still-valid slide, so once open the drawer still
-// follows the selection instead of closing and reopening (D-03).
 const drawerOpen = ref(false)
 
-/**
- * Phase 33-09 — a menu-dispatched Duplicate/Delete request, relayed
- * verbatim into the drawer's own `pendingAction` prop (33-07's seam). Keyed
- * on a monotonically incrementing nonce (never the `key` alone) so the same
- * key dispatched twice in a row still fires the drawer's watcher the second
- * time. ★ P-01: this component never calls a delete/duplicate store action
- * itself — it only ever sets this pending request, which the drawer turns
- * into its OWN existing write paths (the inline delete confirm, the
- * duplicate write).
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlidesTab.vue, "pendingDrawerAction")
 const pendingDrawerAction = ref<{ key: 'duplicate' | 'delete'; nonce: number } | null>(null)
 let pendingActionNonce = 0
 
@@ -320,16 +292,7 @@ const selectedAssembledSlide = computed<AssembledSlide | null>(() => {
   return selectedGroupAssembledSlides.value.find((a) => a.slide.id === selectedSlideId.value) ?? null
 })
 
-/**
- * R061 — the (group, slide) → flat-deck-index mapping `present` hands to
- * `PresentationViewer`. Ladder: a selected SLIDE resolves to its own flat
- * index; failing that (not found, or only a group selected), the selected
- * GROUP's first slide; failing that (no group selected, or the group is
- * gone too), 0. Each rung falls through to the next on a miss — this is what
- * makes a stale selection degrade quietly instead of throwing or landing on
- * an unrelated slide. Resolved via `findIndex` only: `selectedSlideId` is an
- * assembled slide's string `id`, never a position (35-RESEARCH.md Anti-Patterns).
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlidesTab.vue, "presentStartIndex")
 const presentStartIndex = computed<number>(() => {
   if (selectedSlideId.value !== null) {
     const bySlide = props.assembledSlideshow.findIndex((a) => a.slide.id === selectedSlideId.value)
@@ -373,15 +336,7 @@ function confirmLeavingOpenDrawer(): boolean {
   return editSlideDrawerRef.value?.confirmDiscard() ?? true
 }
 
-/**
- * The group-level "Make this / Modify congregational reading" button
- * (SlideGrid's `edit-congregational` emit). A more discoverable route to the
- * SAME editor the 3-dot menu's `edit-in-scripture` opens, so it takes the exact
- * same path: honour the open drawer's unsaved-edit guard, close the drawer (two
- * editing surfaces must not stack on one entry), then relay via
- * `requestEditInScripture` — which uses the selected plan item's array index,
- * the group this button belongs to.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlidesTab.vue, "onEditCongregational")
 function onEditCongregational(): void {
   if (!confirmLeavingOpenDrawer()) return
   drawerOpen.value = false

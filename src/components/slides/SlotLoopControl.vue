@@ -1,18 +1,5 @@
 <script setup lang="ts">
-/**
- * Per-item Run auto-advance / LOOP authoring control (R306/R307, Phase 106).
- *
- * Relocated (owner 2026-09-01) out of the Service Order slot rows into the
- * Slide editor: loop is a presentation concern, never a plan concern, and it
- * must NEVER apply to Song items — so it is only ever rendered in `SlideGrid`
- * for a MISC or ANNOUNCEMENTS plan item (that gate lives in SlideGrid, not
- * here). This component owns the whole checkbox / preset / custom-seconds UI
- * and its logic, and emits ONE `change` with the resulting loop object; the
- * parent chain (SlideGrid → SlidesTab → ServiceEditorView) persists it onto
- * `slot.loop` through the existing autosave path — no new save call, no rules
- * surface. `enabled: false` (not an absent object) is the "off" state, exactly
- * as the field's own contract defines.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlotLoopControl.vue)
 import { ref, computed, watch } from 'vue'
 import type { ServiceSlot } from '@/types/service'
 

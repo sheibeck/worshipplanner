@@ -73,22 +73,7 @@
 </template>
 
 <script setup lang="ts">
-/**
- * Group-level audio bed control (Phase 25 Task 1, R032) — scoped to the
- * SELECTED GROUP rather than a service slot, and audio-only per D-14 (group
- * music is never a slide; dropped video is a slide, that path is 25-07's).
- * This is the sole surviving attach/remove surface for group-bed audio — the
- * Service Order tab's per-slot equivalent was removed in Phase 27-04.
- *
- * Emit-only: uploads through `useMediaUpload` and emits the resulting URL via
- * `attach`, or emits `remove` for a plain, unconfirmed clear. This component
- * performs NO Firestore write itself — `SlideGrid.vue` (Task 2) intercepts
- * both events and calls the slideGroups store's scoped bed write.
- *
- * A failed upload sets the composable's reactive `error` and emits NOTHING —
- * a failed upload can never clear an existing group bed attachment
- * (T-25-06-03).
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlideGroupMusicControl.vue)
 import { ref, computed } from 'vue'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import AudioPlayer from '../AudioPlayer.vue'

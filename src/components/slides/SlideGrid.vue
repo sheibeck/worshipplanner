@@ -527,14 +527,7 @@ const songGroupSongId = computed<string | null>(() =>
  * `canMutateGroup` — create/import/reorder the group's SLIDES. Excludes song
  * groups (R054: a song's slides are canonical and edited in Song Lyrics).
  *
- * `canWriteGroupMedia` — the drop tile and the group-bed music control. These
- * stay available on a SONG group (audio-only there, which is exactly what 30-03
- * shipped: "lock the slide grid for song groups without blocking group media"),
- * so this gate deliberately omits `isSongGroup`.
- *
- * Every corresponding HANDLER re-checks the same computed. 30-VERIFICATION I-01
- * found six of seven mutation entry points here guarded by template `v-if`
- * ALONE; a lifecycle lock layered over that inherits its fragility.
+ * See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlideGrid.vue, "canMutateGroup/canWriteGroupMedia")
  */
 const canMutateGroup = computed(() => props.isEditor && !props.serviceLocked && !isSongGroup.value)
 const canWriteGroupMedia = computed(() => props.isEditor && !props.serviceLocked)
@@ -753,18 +746,7 @@ async function onRemoveImportedSlides(): Promise<void> {
   }
 }
 
-// --- R050: the one append contract every write path below routes through ---
-//
-// Sorts a copy of `entries` by `order`, concatenates `additions` (in the
-// order given), then renumbers every element to its array index — so array
-// order and `order` are the same statement afterward. This is the exact
-// normalization the reorder handler's `onEnd` already performs; this helper
-// makes it the component's one contract instead of a behaviour only the
-// reorder path had. Closes the divergence where `entries`' array order and
-// `order`-field values disagree (e.g. after a prior reorder or
-// reconciliation) — the mechanism behind "a new slide lands second-to-last"
-// for a group with no copyright entries (see 29-04-SUMMARY.md for the
-// investigation of the second, unrelated candidate mechanism).
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlideGrid.vue, "appendToGroup")
 function appendToGroup(entries: GroupSlideEntry[], additions: GroupSlideEntry[]): GroupSlideEntry[] {
   const sorted = [...entries].sort((a, b) => a.order - b.order)
   return [...sorted, ...additions].map((entry, i) => ({ ...entry, order: i }))
@@ -1046,16 +1028,7 @@ function onGridDrop(event: DragEvent): void {
   if (files.length > 0) void onFilesDropped(files)
 }
 
-// --- Task 3: drag-reorder within the selected group (D-11) ---
-//
-// Reuses the exact SortableJS pattern already established in
-// `ServiceEditorView.vue`'s slot list: `handle`/`draggable` scoping and
-// splice-and-reindex. Renders from state alone (Phase 29 removed the D-16
-// single-step DOM revert) — `SlideCard` is keyed on a stable entry id, so
-// the card list re-renders correctly from props once a write lands. The
-// instance exists only while there is a stored group to write to AND the
-// caller can write — a group with no stored document has no `slides` array
-// to reorder, and would reject at the store.
+// See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/components/slides/SlideGrid.vue, "Task 3: drag-reorder"). The instance exists only while there is a stored group to write to AND the caller can write — a group with no stored document has no `slides` array to reorder, and would reject at the store.
 const cardsContainerRef = ref<HTMLElement | null>(null)
 let sortableInstance: Sortable | null = null
 
@@ -1066,13 +1039,7 @@ let sortableInstance: Sortable | null = null
 // page reload, a new defect introduced by the fix.
 const canReorder = computed(() => canMutateGroup.value && props.group !== null)
 
-// T-29-13 / UI-SPEC §5: a rejected reorder write is no longer silent. The
-// DOM revert this component used to lean on is gone (CONTEXT.md's explicit
-// D-16 removal) — the card list re-renders from `props.assembledSlideshow`,
-// so a rejection changes no prop and nothing re-renders on its own.
-// `gridRenderNonce` forces a rebuild of the keyed card list from props on
-// rejection, which is what puts the dragged card back where the data says
-// it belongs.
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlideGrid.vue, "Reorder failure handling")
 const reorderError = ref<string | null>(null)
 const gridRenderNonce = ref(0)
 
@@ -1094,18 +1061,8 @@ watch(
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
         async onEnd(evt) {
-          // R036: second lock over the instance itself. It is destroyed when
-          // `canReorder` goes false, so this only catches a drag already in
-          // flight when the service locks mid-gesture.
+          // See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/components/slides/SlideGrid.vue, "Task 3: drag-reorder")
           if (!canReorder.value) return
-          // Draggable-scoped indices only (T-29-11) — `oldIndex`/`newIndex`
-          // count every element child of the container, including 25-07's
-          // drop tile (a non-`.slide-card` sibling, always last today). Only
-          // `oldDraggableIndex`/`newDraggableIndex` respect the `draggable:
-          // '.slide-card'` selector. The tile happens to sit last, which
-          // makes the un-prefixed pair latent rather than live here — fixed
-          // anyway for symmetry with `ServiceEditorView.vue` and to guard the
-          // one divergence case (dragging past the tile's own DOM position).
           if (evt.oldDraggableIndex == null || evt.newDraggableIndex == null) return
           if (evt.oldDraggableIndex === evt.newDraggableIndex) return
 
@@ -1134,16 +1091,7 @@ watch(
               currentGroup.slides,
             )
           } catch (err) {
-            // T-29-13: surface the failure inline and force the card list to
-            // rebuild from props (via `gridRenderNonce`) — the DOM revert this
-            // used to lean on is gone, and `props.assembledSlideshow` changes
-            // no prop on a rejected write, so nothing re-renders on its own.
-            // `destroySortable()` releases the instance bound to the
-            // container element the `:key` bump is about to discard; the
-            // watcher below creates a fresh instance on the replacement
-            // container once it lands, so a rejected reorder can never leave
-            // real drag-and-drop silently unresponsive for the rest of the
-            // session.
+            // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlideGrid.vue, "Reorder failure handling"). `destroySortable()` releases the instance bound to the container element the `:key` bump is about to discard; the watcher below creates a fresh instance on the replacement container once it lands, so a rejected reorder can never leave real drag-and-drop silently unresponsive for the rest of the session.
             reorderError.value = "Couldn't save this change — reverted. Try again."
             destroySortable()
             gridRenderNonce.value += 1

@@ -255,9 +255,16 @@ so a drag that reorders occurrences needs no extra bookkeeping here.
 
 ### src/components/slides/SlideCanvas.vue
 
-**Font-size scoped-style rule (R093, 46-04):** per-element font-weight/font-size overrides reading
+**Font-size scoped-style rules (R093, 46-04):** per-element font-weight/font-size overrides reading
 the `--slide-font-*` custom properties `PresentationViewer`'s `typographyStyle` sets on its viewer
-root, which these elements inherit into (moved here unchanged, Phase 90).
+root, which these elements inherit into (moved here unchanged, Phase 90). Unlayered scoped styles
+win over Tailwind's `@layer utilities` regardless of selector specificity, so these override the
+template's fixed Tailwind size/weight classes without touching them. Each element's base rem/px
+value is its EXISTING Tailwind size class, read directly (46-UI-SPEC.md § Typography (B)):
+`text-6xl`=3.75rem, `text-5xl`=3rem, `text-2xl`=1.5rem, `text-xs`=0.75rem. `presentation-body`
+carries two distinct base sizes depending on slide kind (`text-5xl` for lyric/scripture/text,
+`text-6xl` for the copyright title) — targeted by combining the testid with the existing size class
+rather than a single ambiguous rule.
 
 ### src/components/slides/SlideDropTarget.vue
 

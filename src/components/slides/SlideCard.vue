@@ -143,10 +143,8 @@
 
 <script setup lang="ts">
 /**
- * Presentational, prop-driven slide card (Phase 25 Task 1, drag grip added
- * 25-05 Task 3). Renders one assembled slide inside `SlideGrid.vue` — text
- * body plus metadata only; real formatted-slide rendering remains deferred
- * (D-10). Holds no selection state of its own: clicking emits `select` with
+ * See .planning/codebase/CONCERNS.md (§ Component & Composable Concern Notes (R318) -> src/components/slides/SlideCard.vue).
+ * Holds no selection state of its own: clicking emits `select` with
  * the slide's id, and the PARENT (`SlideGrid`/`SlidesTab`) owns which card is
  * currently selected — this is the whole of the D-12 seam Phase 26's Edit
  * Slide drawer will open against.

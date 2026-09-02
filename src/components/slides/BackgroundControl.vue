@@ -70,35 +70,7 @@
 </template>
 
 <script setup lang="ts">
-/**
- * Shared, presentational background-image control (R055/R057, Phase 33 Plan
- * 03) — mounted at BOTH the group level (`SlideGrid.vue`, 33-08) and the song
- * level (`SongLyricEditor.vue`, 33-06), a mechanical sibling of
- * `SlideGroupMusicControl.vue`: emit-only, no Firestore write of its own,
- * `isEditor`-gated add/remove, and a failed upload emits NOTHING so it can
- * never clear or overwrite an existing attachment.
- *
- * ★ Additive divergence from 33-UI-SPEC.md §6's stated prop list: `addLabel`
- * is threaded as its own prop because the Copywriting Contract gives the two
- * call sites different add-affordance text ("+ Add background for this
- * group" vs "+ Add background for this song") — without it this shared
- * component would have to hardcode one level's string. `caption` is
- * likewise level-specific and was already a prop in §6's list.
- *
- * `inheritedFrom` is populated ONLY by the group-level call site, and only
- * for a SONG group whose own background is empty while the song's is set —
- * every non-SONG group and the song-level call site pass `undefined` (the
- * song is the least specific level; there is nothing below it to inherit
- * from). Renders the inherited thumbnail and the
- * "inherited from the song — {label}" line from the Copywriting Contract. The
- * add/override affordance is NOT offered while inherited (owner request): a
- * song-sourced background is managed at the song level, so a group-level
- * override here is suppressed to avoid confusion.
- *
- * There is no confirmation dialog for Remove at any level — a plain,
- * unconfirmed clear, matching `SlideGroupMusicControl.vue`'s own documented
- * contract verbatim.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/BackgroundControl.vue)
 import { computed } from 'vue'
 import { useBackgroundUpload } from '@/composables/useBackgroundUpload'
 import { backgroundImageLabel } from './slideDisplay'
@@ -136,19 +108,7 @@ const props = withDefaults(defineProps<{
    * are visually unchanged.
    */
   flush?: boolean
-  /**
-   * Owner follow-up (side-by-side group media panel): when true, this control
-   * renders NO caption line of its own in either state — the caller is taking
-   * responsibility for placing `caption`'s copy itself. `SlideGrid.vue` sets
-   * this so the group caption can sit on its own full-width line BELOW both
-   * add-buttons rather than stacked above only this one, which is what forced
-   * the two buttons out of horizontal alignment.
-   *
-   * Deliberately does NOT suppress the `inheritedFrom` block — that is a
-   * different affordance (a thumbnail plus provenance line for a song-sourced
-   * background) and belongs with the control it describes. Defaults false so
-   * `SongLyricEditor.vue`'s call site keeps its caption exactly where it is.
-   */
+  /** See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/BackgroundControl.vue) */
   hideCaption?: boolean
 }>(), { removeLabel: 'Remove background', flush: false, hideCaption: false })
 

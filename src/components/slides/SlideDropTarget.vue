@@ -30,34 +30,7 @@
 </template>
 
 <script setup lang="ts">
-/**
- * The drop tile itself (D-13) — always the LAST item the grid renders,
- * including at zero slides (D-08), and NEVER inside SortableJS's draggable
- * set: `.slide-card` is deliberately absent from this component's root
- * class, so a tile mounted inside the cards container never shifts a
- * reorder's old/new index arithmetic by one.
- *
- * Performs no upload and no routing decision of its own — it only emits the
- * dropped file list upward. `SlideGrid.vue` routes BOTH this tile's drop and
- * the whole-grid container's drop through the exact same handler
- * (`dropRouting.ts`'s `resolveDrop`), so the two entry points can never
- * diverge.
- *
- * Phase 36 (R053): this tile now doubles as the click-to-import affordance
- * the deleted `⇪ Import into this group` button used to be — a `clickable`
- * prop adds `role="button"`/keyboard parity and a `browse` emit. The gate is
- * entirely the PARENT's job: this component never decides who may click it,
- * it only offers the emit when `clickable` says the parent has already
- * decided yes.
- */
-/**
- * R054: on a SONG group the tile stays mounted — group-level music is still
- * allowed — but every slide-appending route (deck, image, video) is refused
- * by `SlideGrid.onFilesDropped`. `audioOnly` makes the COPY tell the same
- * story the handler enforces; advertising "PPTX, image, and video appends a
- * slide" on a locked group reads as a bug, which is exactly how it was
- * reported during Phase 30 verification.
- */
+// See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/components/slides/SlideDropTarget.vue)
 withDefaults(defineProps<{ audioOnly?: boolean; clickable?: boolean }>(), {
   audioOnly: false,
   clickable: false,

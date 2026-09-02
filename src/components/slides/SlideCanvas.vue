@@ -352,17 +352,7 @@ const currentVideoUrl = computed<string | null>(() => {
 })
 
 /**
- * R070 (UAT F3) — the slide → group → song background cascade was already
- * resolved upstream, once, by the assembler; this reads only the single
- * winning value already sitting on the current slide. It takes no map of
- * groups by slot id, performs no song-document lookup, and never branches on
- * which tier supplied the value. Phase 105 (R303): a blackout slide is
- * checked FIRST of all — it never paints a background image or scrim no
- * matter what (stale/crafted) `backgroundImageUrl` it happens to carry
- * (T-105-03). Phase 90/94: `suppressBackground` forces this null regardless
- * of the slide's own resolved value — checked next, ahead of the R070
- * video-suppresses-background rule, since a confidence monitor wants
- * black-only no matter what the slide carries.
+ * See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlideCanvas.vue)
  */
 const currentBackgroundUrl = computed<string | null>(() => {
   if (props.slide?.slide.contentKind === 'blackout') return null
@@ -521,20 +511,7 @@ function onUnmuteClick() {
 </script>
 
 <style scoped>
-/*
- * R093 (46-04) — per-element font-weight/font-size overrides reading the
- * `--slide-font-*` custom properties `PresentationViewer`'s `typographyStyle`
- * sets on its viewer root, which these elements inherit into (moved here
- * unchanged, Phase 90). Unlayered scoped styles win over Tailwind's
- * `@layer utilities` regardless of selector specificity, so these override
- * the template's fixed Tailwind size/weight classes without touching them.
- * Each element's base rem/px value is its EXISTING Tailwind size class, read
- * directly (46-UI-SPEC.md § Typography (B)): text-6xl=3.75rem, text-5xl=3rem,
- * text-2xl=1.5rem, text-xs=0.75rem. `presentation-body` carries two distinct
- * base sizes depending on slide kind (text-5xl for lyric/scripture/text,
- * text-6xl for the copyright title) — targeted by combining the testid with
- * the existing size class rather than a single ambiguous rule.
- */
+/* See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/components/slides/SlideCanvas.vue) */
 [data-testid='presentation-body'].text-5xl {
   font-weight: var(--slide-font-weight);
   font-size: calc(3rem * var(--slide-font-scale));

@@ -1,22 +1,4 @@
-/**
- * Pure module partitioning a native drop's raw `File[]` into the four
- * accepted kinds (PPTX deck, image, video, audio) plus a rejected bucket
- * (25-07 Task 2, R018/R032).
- *
- * A native HTML5 drop delivers raw `File` objects with NO filtering
- * whatsoever — the file input's `accept` attribute never runs on this path.
- * This module IS the filter, not a convenience: every drop (the tile's and
- * the whole-grid container's) must route through `resolveDrop` before any
- * upload begins.
- *
- * A PPTX is classified by its file-NAME extension rather than its MIME type
- * — an OS drag often supplies an empty or generic MIME type for `.pptx`
- * (verified: `application/octet-stream`, or `''`), so MIME-sniffing alone
- * would misclassify it as rejected. Images/video/audio are classified by
- * MIME prefix, using the SAME prefixes `useMediaUpload` validates against
- * (`audio/*`, `video/*`) so this module and that composable's own
- * server-mirroring validation can never disagree.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/dropRouting.ts)
 
 const PPTX_EXTENSION_RE = /\.pptx$/i
 
@@ -94,16 +76,7 @@ export interface ResolvedDrop {
 /** The UI-SPEC's rejected-file copy, verbatim (Copywriting Contract). */
 export const UNSUPPORTED_FILE_MESSAGE = 'Unsupported file — drop a PPTX, image, video, or audio file.'
 
-/**
- * Applies the documented resolution order for a multi-kind drop (25-07 Task
- * 2, D-14 discretion): the first audio file becomes the group's music; every
- * video file appends a slide, in drop order; for the two modal-backed kinds,
- * a PPTX takes precedence and the first one is imported, otherwise every
- * image is imported as one deck. Anything left over — extra audio files,
- * images skipped because a PPTX won, and anything unsupported — is
- * collected into `skipped` so the caller can report it rather than silently
- * drop it.
- */
+// See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/dropRouting.ts, "resolveDrop")
 export function resolveDrop(files: File[]): ResolvedDrop {
   const classified = classifyFiles(files)
 
