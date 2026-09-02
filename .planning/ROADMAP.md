@@ -662,9 +662,18 @@ architecture, data flow, and coupling.
 **Plans**: 3 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 110-01-PLAN.md — Review pass: store/Firestore-listener lifecycle (incl. org-scoped teardown/re-subscription) + multi-tenant isolation architecture → 110-FINDINGS-lifecycle-isolation.md
 - [ ] 110-02-PLAN.md — Review pass: module boundaries + coupling + data flow → 110-FINDINGS-boundaries-coupling-dataflow.md
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 110-03-PLAN.md — Consolidate & severity-rank all findings → 110-ARCHITECTURE-REVIEW.md (Critical/High → Phase 111; Medium/Low → backlog)
+
+**Cross-cutting constraints:**
+
+- No files under src/, functions/, firestore.rules, or storage.rules are modified by this plan
 
 ### Phase 111: Architectural Remediation
 

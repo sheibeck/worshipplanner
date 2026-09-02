@@ -4,9 +4,9 @@ milestone: v2.8
 milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)"
 current_phase: 110
 current_phase_name: Architectural Review
-status: planning
+status: executing
 stopped_at: Completed 109-05-PLAN.md (final R318 plan; phase 109 all 5 plans done, ready for verification)
-last_updated: "2026-09-02T06:44:16.656Z"
+last_updated: "2026-09-02T11:56:28.783Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 109 complete, transitioned to Phase 110
 progress:
@@ -45,7 +45,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 `/gsd-plan-phase 108`.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
@@ -1183,7 +1183,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 110 — Architectural Review
 Plan: Not started
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Last activity: 2026-09-02 — Phase 109 complete, transitioned to Phase 110
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
