@@ -2169,5 +2169,74 @@ describe('useAuthStore', () => {
       expect(onSnapshot).not.toHaveBeenCalled()
       expect(store.orgId).toBeNull()
     })
+
+    // IN-03 (111-REVIEW-2.md) — WR-02's enterOrgAsSuperAdmin epoch integration
+    // had no dedicated overlapping-call regression test. Mirrors the WR-01
+    // test above's shape: drive a loadOrgContext call (the initial post-login
+    // load) that suspends on its very FIRST await (the users/{uid} read), run
+    // enterOrgAsSuperAdmin to completion while it's still suspended, then let
+    // the stale call resume and assert it never overwrites orgId/
+    // viewingAsSuperAdmin/orgName and never attaches a memberUnsub listener.
+    it('a loadOrgContext call still in flight when enterOrgAsSuperAdmin runs never overwrites its result (WR-02 fix)', async () => {
+      let resolveUserDoc!: (value: unknown) => void
+      const userDocPromise = new Promise((resolve) => {
+        resolveUserDoc = resolve
+      })
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return userDocPromise as never
+        }
+        if (path === 'organizations/church-x') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ name: 'Church X', slug: 'church-x' }),
+          }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      vi.mocked(getIdTokenResult).mockResolvedValue({
+        claims: { superAdmin: true },
+      } as never)
+
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+
+      // Fire the initial sign-in (and its loadOrgContext) WITHOUT awaiting —
+      // it suspends on the deferred users/test-uid read, loadOrgContext's
+      // very first await.
+      const signInCall = triggerAuthStateChange(mockUser)
+      await flushPromises()
+      store.isSuperAdmin = true
+
+      // enterOrgAsSuperAdmin runs to completion while the initial sign-in's
+      // loadOrgContext call is still suspended on its first await.
+      const entered = await store.enterOrgAsSuperAdmin('church-x')
+      expect(entered).toBe(true)
+      expect(store.orgId).toBe('church-x')
+      expect(store.viewingAsSuperAdmin).toBe('church-x')
+      expect(store.orgName).toBe('Church X')
+
+      // Now let the stale sign-in's userDoc read resolve, well after
+      // enterOrgAsSuperAdmin completed.
+      resolveUserDoc({ exists: () => true, data: () => ({ orgIds: [] }) })
+      await signInCall
+      await flushPromises()
+
+      // Pre-WR-02-fix: enterOrgAsSuperAdmin never bumped/checked the epoch,
+      // so the stale sign-in's loadOrgContext call (resolving to zero
+      // memberships, activeId===null) would reach its unconditional
+      // resetOrgContext() branch and clobber the super-admin's just-entered
+      // context back to null. Post-fix: enterOrgAsSuperAdmin's epoch bump
+      // supersedes it, so that branch's own isStale() check catches it
+      // first and it never touches shared state.
+      expect(store.orgId).toBe('church-x')
+      expect(store.viewingAsSuperAdmin).toBe('church-x')
+      expect(store.orgName).toBe('Church X')
+      expect(onSnapshot).not.toHaveBeenCalled()
+    })
   })
 })
