@@ -1865,6 +1865,14 @@ reactive `error` and emits NOTHING — it can never clear an existing group bed 
 
 ### src/components/slides/SlidesTab.vue
 
+**`serviceLocked` prop (★ R036):** the lifecycle lock, threaded DISTINCT from `isEditor` rather than
+folded into it upstream. Passing `canEditService` as `is-editor` would lock everything in one line,
+but it would also make it impossible for `EditSlideDrawer` to tell "you are a viewer" from "the
+service is locked" — and 31-UI-SPEC § 6 requires different read-only copy for each. Every downstream
+gate composes the two (`isEditor && !serviceLocked`); the drawer additionally branches on
+`serviceLocked` alone for its notice. Defaulted `false` so existing fixtures that mount this
+component without the prop keep behaving exactly as they did.
+
 **`canPresent`:** whether there is anything assembled to present — the same condition
 `SlideshowPreview`'s own `canPresent` (aliased to `hasAnySlides`, Phase 23-04) used, restated
 directly against `assembledSlideshow` rather than reintroducing the `AssembledSection[]` grouping

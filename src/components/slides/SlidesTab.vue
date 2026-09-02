@@ -99,18 +99,7 @@ const props = withDefaults(defineProps<{
   assembledSlideshow: AssembledSlide[]
   groupsBySlotId: Map<string, SlideGroup>
   isEditor: boolean
-  /**
-   * ★ R036 — the lifecycle lock, threaded DISTINCT from `isEditor` rather than
-   * folded into it upstream. Passing `canEditService` as `is-editor` would lock
-   * everything in one line, but it would also make it impossible for
-   * `EditSlideDrawer` to tell "you are a viewer" from "the service is locked" —
-   * and 31-UI-SPEC § 6 requires different read-only copy for each. Every
-   * downstream gate composes the two (`isEditor && !serviceLocked`); the drawer
-   * additionally branches on `serviceLocked` alone for its notice.
-   *
-   * Defaulted `false` so existing fixtures that mount this component without the
-   * prop keep behaving exactly as they did.
-   */
+  /** See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/slides/SlidesTab.vue, "serviceLocked prop"). Defaulted `false` so existing fixtures that mount this component without the prop keep behaving exactly as they did. */
   serviceLocked?: boolean
   groupsLoading: boolean
   /** True while the Slides tab is the visible one in `ServiceEditorView`. */
