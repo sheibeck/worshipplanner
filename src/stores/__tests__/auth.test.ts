@@ -39,6 +39,11 @@ vi.mock('firebase/auth', () => {
 // batch.update() was called with. Previously writeBatch() returned a FRESH
 // object with a fresh vi.fn() per call, so nothing was assertable.
 const mockBatchUpdate = vi.fn()
+// ARCH-001 (Phase 111) — every onSnapshot() call gets its OWN trackable
+// vi.fn() unsubscribe spy (pushed to mockOnSnapshotUnsubs in call order), so
+// a test can assert exactly which listeners were created and whether each
+// one was ever torn down — the epoch-guard regression test below needs both.
+const mockOnSnapshotUnsubs: ReturnType<typeof vi.fn>[] = []
 vi.mock('firebase/firestore', () => ({
   getFirestore: vi.fn(() => ({})),
   doc: vi.fn(() => ({ id: 'mock-doc' })),
@@ -49,7 +54,11 @@ vi.mock('firebase/firestore', () => ({
       data: () => null,
     }),
   ),
-  onSnapshot: vi.fn(() => () => {}),
+  onSnapshot: vi.fn(() => {
+    const unsub = vi.fn()
+    mockOnSnapshotUnsubs.push(unsub)
+    return unsub
+  }),
   updateDoc: vi.fn(() => Promise.resolve()),
   collection: vi.fn(),
   addDoc: vi.fn(() => Promise.resolve({ id: 'new-org-id' })),
@@ -100,7 +109,7 @@ import {
   signOut,
   getIdTokenResult,
 } from 'firebase/auth'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore'
 import { DEFAULT_ORG_SETTINGS } from '@/types/organization'
 import { loadFontCss } from '@/utils/slideTypography'
 
@@ -230,6 +239,9 @@ describe('useAuthStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    // ARCH-001 — vi.clearAllMocks() resets each spy's own call history but
+    // does not shrink this plain array; clear it directly per test.
+    mockOnSnapshotUnsubs.length = 0
     // Reset auth callbacks
     ;(globalThis as Record<string, unknown>).__authCallbacks = []
     // v2.0 — the church choice is remembered in sessionStorage; clear between
@@ -1938,6 +1950,82 @@ describe('useAuthStore', () => {
 
       mockTargetOrgDoc('church-missing', null)
       await expect(store.enterOrgAsSuperAdmin('church-missing')).resolves.toBe(false)
+    })
+  })
+
+  // ── ARCH-001 (Phase 111, T-111-01/T-111-02) ─────────────────────────────
+  // Store-layer epoch guard around loadOrgContext's shared memberUnsub
+  // onSnapshot assignment. Drives two OVERLAPPING loadOrgContext calls
+  // through the store's real onAuthStateChanged callback (never exports
+  // loadOrgContext) by re-firing triggerAuthStateChange without awaiting the
+  // first — the exact "re-fired onAuthStateChanged callback" shape
+  // 111-01-PLAN.md calls out, and a faithful stand-in for exitSuperAdminView
+  // being invoked twice in quick succession with no UI guard.
+  describe('loadOrgContext memberUnsub epoch guard (ARCH-001, Phase 111)', () => {
+    it('an interleaved second loadOrgContext call leaves exactly one live members listener — no orphan', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+
+      // Fire two overlapping auth-state-change events WITHOUT awaiting the
+      // first — both race through ensureUserDocument + loadOrgContext
+      // concurrently, exactly like a superseded loadOrgContext call would in
+      // production (e.g. two rapid exitSuperAdminView invocations before
+      // Task 2's UI guard existed).
+      const first = triggerAuthStateChange(mockUser)
+      const second = triggerAuthStateChange(mockUser)
+      await Promise.all([first, second])
+      await flushPromises()
+
+      // The superseded call must never reach the onSnapshot() call at all
+      // (the epoch check returns before it) — so exactly ONE members
+      // listener was created for this pair of overlapping loads, not two.
+      // (Pre-fix behavior: onSnapshot would be called twice, and whichever
+      // call's assignment ran LAST would win regardless of which was
+      // actually the newer/intended call.)
+      expect(onSnapshot).toHaveBeenCalledTimes(1)
+
+      // And that one listener is still live — nothing tore it down, so no
+      // orphan and no accidental self-unsubscribe either.
+      expect(mockOnSnapshotUnsubs).toHaveLength(1)
+      expect(mockOnSnapshotUnsubs[0]).not.toHaveBeenCalled()
+
+      // Sanity: normal org-context state still resolved correctly despite
+      // the race (userRole set from the one surviving listener's callback
+      // requires the onSnapshot callback to actually fire, which this mock
+      // doesn't invoke — orgId/orgName are enough to prove the call
+      // completed normally).
+      expect(store.orgId).toBe('org-1')
+      expect(store.orgName).toBe('Test Org')
+    })
+
+    it('a normal, non-overlapping church switch still opens a fresh members listener (re-subscribe path unregressed)', async () => {
+      // quick 260901-lua's church-switch re-subscribe path: two FULLY
+      // AWAITED, non-overlapping selectOrg calls (no race) must keep
+      // unsubscribing the prior listener and opening a fresh one every
+      // time — the epoch guard must never block a legitimate re-subscribe.
+      mockMultiOrg()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      // Multi-org with no remembered/single-org choice yet resolves
+      // activeId===null (needs selection) — resetOrgContext() returns
+      // before ever reaching the onSnapshot assignment.
+      expect(onSnapshot).not.toHaveBeenCalled()
+
+      await store.selectOrg('org-1')
+      expect(onSnapshot).toHaveBeenCalledTimes(1)
+      expect(store.orgId).toBe('org-1')
+
+      await store.selectOrg('org-2')
+      expect(onSnapshot).toHaveBeenCalledTimes(2)
+      expect(mockOnSnapshotUnsubs).toHaveLength(2)
+      // The FIRST (org-1) listener was torn down by the second call's
+      // `memberUnsub?.()` before it assigned its own.
+      expect(mockOnSnapshotUnsubs[0]).toHaveBeenCalled()
+      // The second (org-2) listener is the live one.
+      expect(mockOnSnapshotUnsubs[1]).not.toHaveBeenCalled()
+      expect(store.orgId).toBe('org-2')
     })
   })
 })

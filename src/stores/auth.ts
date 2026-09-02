@@ -30,6 +30,21 @@ import { loadFontCss, snapWeight } from '@/utils/slideTypography'
 
 let memberUnsub: Unsubscribe | null = null
 
+// ARCH-001 (Phase 111, T-111-01/T-111-02, D-ARCH-001) — a generation/epoch
+// token guarding the shared `memberUnsub` onSnapshot race in loadOrgContext
+// below. Every loadOrgContext call captures the post-increment value into a
+// local `myEpoch` at its very top; immediately before it would touch
+// memberUnsub (right after its LAST await), it re-checks that captured value
+// against this counter. A superseded/interleaved call (one whose awaits
+// settle after a newer loadOrgContext call has already started) will always
+// find a mismatch and returns WITHOUT creating an onSnapshot or touching
+// memberUnsub — so it can never win the race and never orphans a listener.
+// Store-layer defense-in-depth: protects ALL callers (selectOrg,
+// enterOrgAsSuperAdmin's sibling loadOrgContext calls via exitSuperAdminView,
+// logout's re-entry, and the initial onAuthStateChanged load), not just the
+// two with UI-level in-flight guards (switchingId / enteringOrgId).
+let loadOrgContextEpoch = 0
+
 // R075 / P-01 (Phase 40 Plan 03) — bounds on the just-joined-membership claim
 // retry in refreshOrgClaim below. Four attempts spaced 1.5s apart gives a
 // worst case of roughly 4.5s, comfortably inside the few-hundred-ms-to-a-few-
@@ -394,6 +409,10 @@ export const useAuthStore = defineStore('auth', () => {
     // load BEFORE any branch below, so it never lingers across an org switch.
     deactivatedOrgMessage.value = null
 
+    // ARCH-001 — capture this call's generation. See loadOrgContextEpoch's
+    // header comment (module scope, above) for the full race this guards.
+    const myEpoch = ++loadOrgContextEpoch
+
     const userRef = doc(db, 'users', uid)
     const userSnap = await getDoc(userRef)
     const userData = userSnap.exists() ? userSnap.data() : null
@@ -501,6 +520,18 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       applyOrgSnapshot(orgData)
+    }
+
+    // ARCH-001 — the epoch re-check. This sits AFTER loadOrgContext's last
+    // await (the getDoc immediately above) and BEFORE the memberUnsub
+    // onSnapshot assignment below, so check-then-assign runs synchronously
+    // with no await between them (T-111-01). If a newer loadOrgContext call
+    // has started since this one began, myEpoch no longer matches the
+    // current counter: this call has been superseded and must NOT touch
+    // memberUnsub (the newer call owns it) — return here, before creating
+    // an onSnapshot of our own, so nothing is left to leak/orphan.
+    if (myEpoch !== loadOrgContextEpoch) {
+      return
     }
 
     // Unsubscribe from previous listener if any
