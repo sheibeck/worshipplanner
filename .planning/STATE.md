@@ -5,15 +5,15 @@ milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Securit
 current_phase: 113
 current_phase_name: Security Remediation
 status: executing
-stopped_at: Completed 113-01-PLAN.md
-last_updated: "2026-09-02T19:50:39.615Z"
+stopped_at: Completed 113-02-PLAN.md
+last_updated: "2026-09-02T20:18:14.249Z"
 last_activity: 2026-09-02
 last_activity_desc: Phase 113 execution started
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 19
-  completed_plans: 17
+  completed_plans: 18
   percent: 83
 ---
 
@@ -1182,7 +1182,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 113 (Security Remediation) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-02 — Phase 113 execution started
 
@@ -3075,6 +3075,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 112 P03 | 50min | 2 tasks | 1 files |
 | Phase 112 P04 | 25min | 1 tasks | 1 files |
 | Phase 113 P01 | 15min | 3 tasks | 2 files |
+| Phase 113 P02 | 27min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -3580,6 +3581,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 112-03: SEC-S-01 (Critical) — shareTokens/quarterShares/serviceShares are publicly listable via allow read: if true, live-proved via emulator probe; cross-tenant PII leak, needs a get/list rules split in Phase 113
 - [Phase ?]: 112-03: live gcloud run evidence confirms R173 render-service instance/concurrency ceilings and no-public-invoker IAM policy are deployed in production
 - [Phase ?]: 112-04: Deduped SEC-ISO-04 into ARCH-018 and SEC-ISO-06 into SEC-S-01/residual when consolidating the security review report; no severities re-classified from source findings.
+- [Phase ?]: SEC-ISO-02: revokeRefreshTokens(uid) added only to the clear branch, strictly after the claim write lands, logged-and-swallowed on failure (mirrors orgProvisioning.ts:461/ADR-0049)
+- [Phase ?]: SEC-ISO-02 Storage ALLOW-case authored but not executed this session (Storage emulator 127.0.0.1:9199 unreachable, ECONNREFUSED) -- committed run-when-available; functions unit test is the primary emulator-independent proof
 
 ### Roadmap Evolution
 
@@ -3907,8 +3910,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-02T19:50:39.549Z
-Stopped at: Completed 113-01-PLAN.md
+Last session: 2026-09-02T20:18:14.179Z
+Stopped at: Completed 113-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
