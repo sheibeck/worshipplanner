@@ -446,6 +446,59 @@ anchoring slot's stable id (D-01) — a deterministic doc id — so that lazy ma
 simultaneously-open tabs can never create two divergent documents for the same slot (RESEARCH.md
 Pattern 1).
 
+## Type & View Stack Notes (R318)
+
+### src/types/importedDeck.ts
+
+**`ImportedDeck.renderImportId` (Phase 37, R062):** the Storage-side import id — the same
+`crypto.randomUUID()` value `pptxUpload.ts`'s `generateImportId()` produces, which scopes
+`orgs/{orgId}/pptx-imports/{importId}/` and `organizations/{orgId}/pptxRenders/{importId}`.
+Deliberately distinct from this interface's own `id`, which Firestore assigns via `addDoc()` when
+`importedSlidesStore.createDeck()` confirms the deck. Without this field nothing can join a
+confirmed deck to its render record — the two identifiers were structurally unlinked before this
+field existed. Optional because decks confirmed before this phase have no render record, and
+because image-only imports (no `source.pptx`, nothing to render) never produce one.
+
+### src/types/service.ts
+
+**`Service.stageLayout` (R313/R314/R315, Phase 107):** visual stage plot for tech/sound. Additive,
+optional, no-migration — mirrors `messaging`/`notes`/`loop`'s lifecycle exactly: absent on every
+service written before this field existed (old behavior, no backfill needed), and an emptied layout
+is set back to `undefined` and dropped by the existing `stripUndefined` save path before the
+Firestore write, so a raw `undefined` never reaches the document. Deliberately NOT a new top-level
+collection or subcollection (an earlier milestone ARCHITECTURE.md draft proposed a
+`stageLayouts/{serviceId}` collection + store — 107-CONTEXT.md supersedes that draft). Storing it
+here means the layout rides the service doc's existing read/write `firestore.rules`, its existing
+`onSnapshot`, and the existing autosave path — no new rules surface, no new Pinia store. This is
+also what RESOLVES the Phase-104 `STAGELAYOUTS-RESET-OBLIGATION` marker in
+`src/stores/orgScopedStores.ts`: because the layout lives on the service doc (owned by the
+already-reset services store), a church switch cannot leak a prior org's layout — there is no
+separate store to register.
+
+### src/views/ServiceEditorView.vue
+
+**Sortable — one instance per section (29-03/R044):** one Sortable instance PER SECTION list
+container — this codebase's first multi-instance Sortable and first use of SortableJS `group`
+(cross-section drag). Generalizes `SlideGrid.vue`'s single-instance `canReorder` computed +
+`destroySortable()` guard to a keyed `Map<ServiceSection | 'ungrouped', Sortable>` (PATTERNS.md
+"Multi-instance Sortable lifecycle"). R036: this computed carried NO lock term until 31-04, so
+drag-reorder worked on an exported service — a live defect, not a theoretical one. Composing
+`canEditService` in also gives the Sortable teardown for free: the watcher keys on `canReorder`, so
+the five per-section instances are `destroy()`ed the moment the service locks and re-created the
+moment it unlocks.
+
+**Cross-section drag orphan reclaim (R110):** reclaims any node SortableJS physically relocated
+across containers. On a cross-section drag, Sortable moves the dragged `.slot-item` into the target
+`<ul>` before the reorder handler runs; the reactive slot-array reassignment is correct, but Vue
+does not reconcile that stray node — when the source section empties it removes the container
+subtree without reclaiming the moved child, orphaning a handler-less "No Section" phantom. The
+handler tears the section Sortables down FIRST, then bumps a render nonce so every keyed container
+`<div>` is discarded and rebuilt from state (reclaiming the orphan). The teardown is load-bearing,
+not belt-and-braces: the lifecycle watcher only creates a Sortable when
+`!sectionSortables.has(key)`, so without clearing the map it would leave stale instances bound to
+discarded elements and the rebuilt containers with no Sortable at all (dead drag) — the same
+destroy-then-nonce pairing `SlideGrid.vue` uses.
+
 ---
 
 *Stack analysis: 2026-07-16*

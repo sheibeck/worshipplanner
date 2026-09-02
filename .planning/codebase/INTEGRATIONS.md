@@ -648,6 +648,93 @@ re-drives everything and the freshly-opened outputs sync via the hello→resend 
 NEVER `window.open`, `router.push`, or the `confirmExit` teardown — ending a rehearsal is low-stakes
 and needs no confirm.
 
+## Type & View Integration Notes (R318)
+
+### src/types/organization.ts
+
+**`Organization.bibleApiEnabled` (Phase 101, R295):** the super-admin MASTER gate for the Bible
+**API** (paid ESV/NLT proxy), NOT scripture features in general — an OFF org still does scripture
+manually (Phases 102/103). Absent or `false` => OFF (default), mirroring `aiMasterEnabled`'s
+inverted-default posture: a fresh/legacy org has the Bible API off until a super-admin explicitly
+enables it. Written ONLY by the `setOrgBibleEnabled` Cloud Function (Admin SDK,
+`functions/src/orgProvisioning.ts`, Plan 01); `firestore.rules`'s `lifecycleFields()` guard denies
+every client write path, including a super-admin's own client SDK. Deliberately a distinct
+top-level name (never a bare settings leaf) — there is no church-editable Bible-API leaf this
+milestone.
+
+### src/types/service.ts
+
+**`NonAssignableSlot.label` (R127, Phase 56):** optional custom display name for a MISC item. Only
+MISC uses it — a planner can name a Miscellaneous item ("Communion", "Offering") instead of the
+generic "Miscellaneous", and that name is exported as the Planning Center item title. OPTIONAL and
+non-destructive: absent on every slot written before this field existed (no migration), and an
+emptied value is stored as `undefined` and dropped by `stripUndefined` before the Firestore write —
+same lifecycle as `notes`. Read through the shared `miscLabel()` helper (`src/utils/slotTypes.ts`),
+which coerces any absent/whitespace value back to "Miscellaneous".
+
+### src/types/slide.ts
+
+**`CongregationalSection.translationSource` (R092, Phase 45):** which Bible translation this
+section's text was fetched from, stamped ONCE by `CongregationalEditor.vue` at fetch time from the
+church's CURRENT `bibleVersion` setting. OPTIONAL — a section created before this phase has no such
+field and resolves to `'ESV'` at read time via `resolveTranslationSource()` (the only source before
+this phase). Never re-derived from the org's setting after stamping — that is the whole point of
+the field (see `resolveTranslationSource` in `src/utils/scripture.ts`).
+
+### src/views/ServiceEditorView.vue
+
+**`deleteServiceConfirmBody` (D-15):** delete stays available at every status, but must not stay
+un-warned — reopening is reversible, deleting is not. Delete is the only irreversible action in
+this view, and for a service carrying export evidence it silently orphans a live Planning Center
+plan and destroys the audit trail D-11 exists to preserve. Warning is the mitigation; locking is
+not. Uses the same `hasPcExportEvidence` computed as the reopen dialog.
+
+**`hasPcExportEvidence` (D-04):** the Planning Center warning gates on EVIDENCE, never on the status
+string. Live data holds services sitting at `exported` that were hand-set through the deleted
+three-way cycle and were never exported; telling those users "Planning Center already has this
+plan" would be false, and a warning users learn is sometimes false is one they learn to click
+through. ONE computed, deliberately — it drives the lock banner's body, the reopen confirm dialog
+AND the delete-confirm's Planning Center sentence (D-15). A second copy of this predicate is how
+those three drift apart.
+
+**`onConfirmExport` pre-flight (ME-01):** checks against the STORED status, before any Planning
+Center work. The Export button's own `:disabled` reads `localService.status`, which is this
+editor's copy and can disagree with what is stored: two editors open the same `planned` service, A
+exports, and B's button is still enabled. Without this check B's export runs the ENTIRE PC
+conversation — creating or mutating a real plan — and only then hits the store guard on the
+terminal write. The plan is left orphaned in Planning Center with `pcPlanId` unrecorded and no audit
+trail, which is the loss D-11 exists to prevent. Refusing here costs one array lookup and makes that
+outcome unreachable. Reads the same source the guard does (`services.ts`), including its
+`?? 'draft'` default for a legacy document with no status field.
+
+### src/views/serviceEditorActionBar.ts
+
+**Module overview — `buildActionBarItems` (R068, 36-02 Task 2):** the pure per-tab item builder.
+Turns `ServiceEditorView.vue`'s header state into the declarative list `ContextualActionBar.vue`
+renders. Imports nothing from Vue, Pinia or the router — that is what makes "which actions does tab
+X expose?" answerable as a plain function call against data, instead of as a DOM-mount assertion
+repeated in three places. Every builder reproduces an EXISTING control's EXACT gate, label, title
+and disabled expression, verified against `ServiceEditorView.vue`'s header buttons/computeds and
+`SlidesTab.vue`'s Present button. FLAGGED SPEC DIVERGENCE (36-02-PLAN.md, T-36-02-01):
+36-UI-SPEC.md §3 asserts every Service Order item is `canEditService`-gated; live source disagrees
+— the export affordance's gate is `authStore.hasPcCredentials` ALONE. This module preserves that:
+`buildServiceOrderItems` pushes the export item unconditionally (when one exists at all), only
+suggest-all-songs and save are gated on `canEditService` — preserving the phase invariant ("moving a
+control must not change who can press it") outranks the spec's illustrative code. Owner follow-up
+(post-36-02): the `copy-pc` fallback item no longer exists — `buildExportOrCopyItem` now returns
+`undefined` when `hasPcCredentials` is false, per direct owner feedback ("let's get rid of the Copy
+for PC button all together"). 39-05 (R089): `buildExportOrCopyItem`'s single early return also
+composes the org's Planning Center integration toggle (`ctx.pcEnabled`) alongside the pre-existing
+credentials check — both conditions govern the SAME return, so the item disappears when the
+integration is off even if credentials are present.
+
+**`buildExportOrCopyItem`:** returns `undefined` — no item at all — when there are no Planning
+Center credentials, instead of the `copy-pc` fallback button this used to build. Do NOT ungate
+`export-pc` to fill the gap this leaves for an uncredentialed org — that consequence is intentional.
+39-05 (R089): also returns `undefined` when the org has turned Planning Center off, independently
+of credentials — composed onto this SAME return, not a second check, so the two conditions can
+never drift apart.
+
 ## Store Integration Notes (R318)
 
 ### src/stores/services.ts

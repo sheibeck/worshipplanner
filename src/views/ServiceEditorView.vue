@@ -2012,18 +2012,9 @@ const deleteConfirmBody = computed(() => {
 })
 
 /**
- * D-15 — Delete stays available at every status, but must not stay un-warned.
- *
- * The reasoning that justifies NO friction on Reopen runs the opposite way
- * here: reopening is reversible, deleting is not. Delete is the only
- * irreversible action in this view, and for a service carrying export evidence
- * it silently orphans a live Planning Center plan and destroys the audit trail
- * D-11 exists to preserve. Warning is the mitigation; locking is not — forcing
- * a Reopen just to delete adds friction with no safety gain and strands the
- * "created by mistake" case behind two extra steps.
- *
- * Same `hasPcExportEvidence` computed as the reopen dialog. No new dialog, no
- * rules change (the rule's `allow delete` is deliberately unconditional).
+ * D-15 — delete stays available at every status, but must not stay un-warned. See
+ * .planning/codebase/INTEGRATIONS.md (Type & View Integration Notes (R318) ->
+ * src/views/ServiceEditorView.vue).
  */
 const deleteServiceConfirmBody = computed(() => {
   const base = `This will permanently delete the service for ${formattedDate.value}. This cannot be undone.`
@@ -2055,20 +2046,9 @@ const congregationalSlot = computed<ScriptureSlot | null>(() => {
 })
 
 /**
- * Handles the "Set up congregational reading" request (relabelled from "Edit
- * scripture text" on 2026-08-05 — see slideDisplay.ts) relayed up
- * through SlidesTab's `navigate-to-scripture-editor` event (T-26-03-01: the
- * index is validated against the current plan item list and its kind before
- * touching any state, so an unhonourable request — out of range, or naming a
- * non-scripture plan item — is a no-op).
- *
- * ★ REVISED 34-07 (owner UAT F1) — the relay is REUSED, the handler body is
- * REPLACED. R047 had deleted the panel this relay used to reveal, which is
- * why it degraded to a tab-switch-plus-scroll. The owner's finding restored
- * a real destination: the scripture slide's edit route now opens the
- * congregational-reading editor as a modal over the Slides tab where the
- * request originated — dragging the user off to the Service Order tab to
- * reach it was the disorientation that made the feature read as absent.
+ * Handles the "Set up congregational reading" request (T-26-03-01: index validated
+ * before touching state). See .planning/codebase/ARCHITECTURE.md
+ * (Type & View Behavioral Notes (R318) -> src/views/ServiceEditorView.vue).
  */
 function handleNavigateToScriptureEditor(index: number): void {
   const slot = localService.value?.slots[index]
@@ -2143,13 +2123,9 @@ const selectedPcTeamIds = ref<string[]>([])
 // ── Computed: editing guard ─────────────────────────────────────────────────────
 
 // ── R036 / R037 — the lifecycle lock seams ────────────────────────────────────
-//
-// `isLocked` widened the retired `isExportedLocked` (`=== 'exported'`) to
-// `!== 'draft'`. ★ `isExportedLocked` is DELETED as of 31-04: it fired only at
-// `exported` and never at `planned`, which is half of R036, and leaving a
-// similarly-named computed alongside this one invites a future edit to reach for
-// the wrong one. The per-line migration off it was a five-class job (31-UI-SPEC
-// § gate migration) — a blind find-and-replace inverts three of the classes.
+// `isLocked` widened the retired `isExportedLocked` to `!== 'draft'` (31-04 deleted
+// isExportedLocked). See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral
+// Notes (R318) -> src/views/ServiceEditorView.vue).
 
 const isLocked = computed(() => localService.value !== null && localService.value.status !== 'draft')
 
@@ -2193,15 +2169,9 @@ const statusLabel = computed(() =>
 )
 
 /**
- * ★ D-04 — the Planning Center warning gates on EVIDENCE, never on the status
- * string. Live data holds services sitting at `exported` that were hand-set
- * through the deleted three-way cycle and were never exported; telling those
- * users "Planning Center already has this plan" would be false, and a warning
- * users learn is sometimes false is one they learn to click through.
- *
- * ★ ONE computed, deliberately. It drives the lock banner's body, the reopen
- * confirm dialog AND the delete-confirm's Planning Center sentence (D-15). A
- * second copy of this predicate is how those three drift apart.
+ * D-04 — the Planning Center warning gates on EVIDENCE, never on the status string.
+ * See .planning/codebase/INTEGRATIONS.md (Type & View Integration Notes (R318) ->
+ * src/views/ServiceEditorView.vue).
  */
 const hasPcExportEvidence = computed(
   () => !!(localService.value?.pcExportedAt || localService.value?.pcPlanId),
@@ -2241,13 +2211,9 @@ const reopenPcWarning = computed(() => {
 // ── Sections (D005/R007/R043/R044) + live slideshow assembly (R005/R006 visible) ─
 
 /**
- * `{ slot, index }` pairs (index = the slot's ABSOLUTE position in
- * `localService.slots`) grouped into `SERVICE_SECTIONS`-ordered buckets plus
- * a trailing `legacy`/ungrouped bucket, per `groupBySection` (29-02). The
- * ABSOLUTE index is what every existing per-slot handler in the template
- * (onClearSong, removeSlot, onSectionChange, aiDraftSongs, the scripture
- * panel, slotLabel, data-testid="slot-{index}") already keys on — grouping
- * for render never renumbers it to a per-section ordinal.
+ * `{ slot, index }` pairs with ABSOLUTE index (never per-section ordinal), per
+ * `groupBySection` (29-02). See .planning/codebase/ARCHITECTURE.md
+ * (Type & View Behavioral Notes (R318) -> src/views/ServiceEditorView.vue).
  */
 const slotsBySection = computed(() => {
   const slots = localService.value?.slots ?? []
@@ -2399,23 +2365,10 @@ function toggleRowMenu(id: string, event?: MouseEvent): void {
 
 const orgIdRef = computed(() => authStore.orgId)
 /**
- * R036 — whether this session may write slide-group documents at all.
- *
- * ★ This is NOT only a UI concern, and narrowing it is not optional. The
- * `/slideGroups` Firestore rule rejects every write whose parent service is not
- * draft. `useSlideshowAssembly`'s materialization watcher runs with
- * `{ immediate: true }` — it writes on service LOAD, with no user action — as
- * does `rebuildOutcomes`. Leaving this as bare `isEditor` would therefore make
- * every locked service throw permission-denied the moment it opens, which is a
- * worse failure than the one the lock fixes.
- *
- * Suppressing the write is the right shape rather than carving an exception into
- * the rule: the rules layer cannot distinguish a load-time materialization from
- * a user edit, so the exception would have to be "allow any write", i.e. no lock.
- *
- * A service still loading has no status yet; `?? 'draft'` matches the rule's own
- * `resource.data.get('status','draft')` default so the two layers agree, and it
- * avoids wedging materialization behind a transient null.
+ * R036 — whether this session may write slide-group documents at all. NOT only a UI
+ * concern (the /slideGroups rule rejects every write whose parent isn't draft). See
+ * .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/views/ServiceEditorView.vue).
  */
 const canWriteSlideGroups = computed(
   () => authStore.isEditor && (localService.value?.status ?? 'draft') === 'draft',
@@ -2463,16 +2416,12 @@ const aiPerSlotResults = ref(new Map<number, AiSongSuggestion[]>())
 const aiPerSlotError = ref(new Map<number, boolean>())
 
 // ── Sortable ───────────────────────────────────────────────────────────────────
-// One Sortable instance PER SECTION list container (29-03/R044) — this codebase's
-// first multi-instance Sortable and first use of SortableJS `group` (cross-section
-// drag). Generalizes SlideGrid.vue's single-instance `canReorder` computed +
-// `destroySortable()` guard (SlideGrid.vue:650-655,712-714) to a keyed
-// `Map<ServiceSection | 'ungrouped', Sortable>` (PATTERNS.md "Multi-instance
-// Sortable lifecycle").
+// One Sortable instance PER SECTION list container (29-03/R044) — first multi-instance
+// Sortable in this codebase. See .planning/codebase/STACK.md (Type & View Stack
+// Notes (R318) -> src/views/ServiceEditorView.vue).
 
-// ★ R036: this computed carried NO lock term until 31-04, so drag-reorder worked
-// on an exported service — a live defect, not a theoretical one. Composing
-// `canEditService` in also gives the Sortable teardown for free: the watcher
+// R036: this computed carried NO lock term until 31-04 — composing `canEditService`
+// in also gives the Sortable teardown for free: the watcher
 // below already keys on `canReorder`, so the five per-section instances are
 // `destroy()`ed the moment the service locks and re-created the moment it
 // reopens. Without that pairing, hiding the handles would leave a reopened
@@ -2539,18 +2488,9 @@ async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
   localService.value.slots = reindexed
 
   // R110: reclaim any node SortableJS physically relocated across containers.
-  // On a cross-section drag Sortable moves the dragged `.slot-item` into the
-  // target `<ul>` before this handler runs; the reactive reassignment above is
-  // correct, but Vue does not reconcile that stray node — when the source
-  // section empties it removes the container subtree without reclaiming the
-  // moved child, orphaning a handler-less "No Section" phantom. Tear the section
-  // Sortables down FIRST, then bump the nonce so every keyed container `<div>`
-  // is discarded and rebuilt from state (reclaiming the orphan). The teardown is
-  // load-bearing, not belt-and-braces: the lifecycle watcher only creates a
-  // Sortable when `!sectionSortables.has(key)`, so without clearing the map it
-  // would leave the stale instances bound to the discarded elements and the
-  // rebuilt containers with no Sortable at all (dead drag). This is exactly the
-  // destroy-then-nonce pairing SlideGrid.vue uses (destroySortable + gridRenderNonce).
+  // Teardown-then-nonce is load-bearing, not belt-and-braces. See
+  // .planning/codebase/STACK.md (Type & View Stack Notes (R318) ->
+  // src/views/ServiceEditorView.vue).
   destroySectionSortables()
   slotRenderNonce.value += 1
 
@@ -2665,17 +2605,9 @@ const hasSermonContext = computed(
 )
 
 /**
- * 36-03 (R068) — the page-header's per-tab action list, replacing the four
- * unconditional buttons that used to render regardless of `activeTab`.
- * Threads the view's OWN existing state into `buildActionBarItems` (36-02);
- * `handlers` passes EXISTING functions by reference, except `onPresent`,
- * which contains no logic of its own — it only calls the exposed
- * `SlidesTab.onPresentClick()`, which still does the actual emitting.
- * `@present="onPresent"` on the `<SlidesTab>` element below still receives
- * that emit and still owns opening `PresentationViewer` at the computed
- * start index. Routing through the emit (not calling the view's own
- * `onPresent` directly from here) keeps the start-index computation in the
- * one place that owns it.
+ * 36-03 (R068) — the page-header's per-tab action list. See
+ * .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/views/ServiceEditorView.vue).
  */
 const activeActionItems = computed(() =>
   buildActionBarItems(activeTab.value, {
@@ -2925,13 +2857,9 @@ watch(
 // ── Autosave failure handling ────────────────────────────────────────────────
 
 /**
- * BL-02 — a rejected autosave must leave the view USABLE, never stranded at
- * 'saving'. useAutoSave's own catch is generic; this writes the definitive
- * useSaveStatus entry itself: ServiceLockedError can never succeed while
- * locked, so revert to originalService and report 'idle' (nothing to retry);
- * anything else may land on retry, so the edit is KEPT and the entry reports
- * 'error'. lifecycleError (not the shared status bar) is the surface —
- * 31-04's bar/banner slots are gone/present at exactly the right statuses.
+ * BL-02 — a rejected autosave must leave the view USABLE, never stranded at 'saving'.
+ * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/views/ServiceEditorView.vue).
  */
 function handleAutosaveFailure(err: unknown): void {
   console.error('[ServiceEditorView] autosave failed:', err)
@@ -3379,17 +3307,9 @@ function toggleTeam(team: string) {
 
 // ── Dynamic slot add/remove ────────────────────────────────────────────────────
 
-/** Per-band assembled-slide count for a section-band header's "{n} slides" caption
- *  (36-04, UI-SPEC §9). Deliberately mirrors `SlidePlanRail.vue`'s own per-row
- *  derivation — filtering `assembledSlideshow` by `AssembledSlide.slotIndex` — rather
- *  than reading `group.slides.length` off a `SlideGroup` document, because an
- *  unmaterialized group reads zero slides there while the grid (and this count)
- *  show the full fallback-path group. Takes the band's own `entries` (the same
- *  `{ slot, index }[]` shape `slotSectionGroups` already produces) rather than a bare
- *  `ServiceSection` key — same output as UI-SPEC §9's illustrative
- *  `sectionSlideCount(group.key)`, without re-deriving the section-to-slots mapping
- *  `slotSectionGroups` already computed. Builds one `Set` of the band's indices and
- *  filters once, rather than calling `.filter` per entry. */
+/** Per-band assembled-slide count for a section-band header caption (36-04, UI-SPEC §9).
+ *  See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ *  src/views/ServiceEditorView.vue). */
 function sectionSlideCount(entries: { slot: ServiceSlot; index: number }[]): number {
   const indices = new Set(entries.map((entry) => entry.index))
   return assembledSlideshow.value.filter((s) => indices.has(s.slotIndex)).length
@@ -3795,15 +3715,9 @@ function rejectAiSong(index: number) {
 // ── Scripture ──────────────────────────────────────────────────────────────────
 
 /**
- * ME-02: the canonical primitive, not a private four-field variant.
- *
- * This used to require book + chapter + verseStart + verseEnd, while
- * `scriptureRefFromSlot` — the rule R047 derives the SLIDE from — requires only
- * book + chapter. A whole-chapter reading ("Psalms 103") or a single verse
- * ("Romans 8:28", where `parseScriptureInput` leaves verseEnd null) therefore
- * projected a correct slide while this row handed `null` to ScriptureInput: the
- * input rendered empty, the read-only lines rendered "Scripture — Empty", and
- * "Edit in scripture" scrolled to a blank field.
+ * ME-02: the canonical primitive, not a private four-field variant. See
+ * .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/views/ServiceEditorView.vue).
  */
 function slotToScriptureRef(slot: ScriptureSlot): ScriptureRef | null {
   return scriptureRefFromSlot(slot)
@@ -3991,19 +3905,9 @@ async function onConfirmExport() {
   if (!localService.value) return
   if (!authStore.pcCredentials || !exportSelectedServiceTypeId.value) return
 
-  // ME-01 — pre-flight against the STORED status, before any Planning Center
-  // work. The Export button's own `:disabled` reads `localService.status`
-  // (:196), which is this editor's copy and can disagree with what is stored:
-  // two editors open the same `planned` service, A exports, and B's button is
-  // still enabled. Without this check B's export runs the ENTIRE PC
-  // conversation — creating or mutating a real plan — and only then hits the
-  // store guard on the terminal write. The plan is left orphaned in Planning
-  // Center with `pcPlanId` unrecorded and no audit trail, which is the loss
-  // D-11 exists to prevent. Refusing here costs one array lookup and makes that
-  // outcome unreachable.
-  //
-  // Reads the same source the guard does (`services.ts:134-136`), including its
-  // `?? 'draft'` default for a legacy document with no status field.
+  // ME-01 — pre-flight against the STORED status, before any Planning Center work.
+  // See .planning/codebase/INTEGRATIONS.md (Type & View Integration Notes (R318) ->
+  // src/views/ServiceEditorView.vue).
   const storedStatus =
     serviceStore.services.find((s) => s.id === localService.value!.id)?.status ?? 'draft'
   if (storedStatus !== 'planned') {
@@ -4633,16 +4537,9 @@ async function onDelete() {
 // ── Save ───────────────────────────────────────────────────────────────────────
 
 async function onSave() {
-  // ★ 31-PATTERNS § 4a row 24 (BL-02). 31-04-SUMMARY recorded the decision to
-  // leave this ungated because "the store guard already refuses it" — but this
-  // phase made that refusal a THROW, so an ungated `onSave` is not a harmless
-  // no-op, it is a rejected promise. Refusing here, like every other mutation
-  // entry point in this file, is what makes the rejection unreachable rather
-  // than merely caught.
-  //
-  // `canEditService`, not `isLocked`: a viewer is refused by the same line.
-  // Note this cannot break `onMarkAsPlanned`'s flush — that awaits `onSave()`
-  // while the service is still locally draft, before `applyTransitionLocally`.
+  // 31-PATTERNS § 4a row 24 (BL-02) — an ungated onSave is a rejected promise, not a
+  // no-op. See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+  // src/views/ServiceEditorView.vue).
   if (!canEditService.value) return
   if (!localService.value || !isDirty.value) return
   isSaving.value = true

@@ -2469,6 +2469,272 @@ store, not inside `ToastHost.vue` — a toast raised by a surface that unmounts 
 still self-dismiss; if the timer lived in the component it would die with it and the toast would be
 stranded on screen forever.
 
+## Type & View Behavioral Notes (R318)
+
+### src/types/organization.ts
+
+**`ServiceTemplateEntry` (R086/R087):** a single entry in a church's default service template.
+Carries the item's type, its section, and — for body-bearing kinds (MISC and the other
+NonAssignable kinds the live editor treats the same way) — an optional recurring `body` text
+(R116, e.g. "canned music", "more announcement slides"). It never carries chosen content (no
+`songId` or scripture reference) and never a computed Vertical Worship type — VW typing is derived
+fresh at service-creation time by `buildSlotsFromTemplate` (`src/utils/slotTypes.ts`) and is never
+stored here. Array order in `OrgSettings.defaultServiceTemplate` IS the creation/display order —
+there is no `position` field (Assumption A3).
+
+**`OrgSettings` (R073):** church-level settings stored on `organizations/{orgId}.settings`. This
+shape is nested rather than flat because eight settings arrive across five v1.5 phases (this
+phase's `aiEnabled`/`pcEnabled`, plus one field each from Phase 44's default service template,
+Phase 45's Bible version, and Phase 46's slide typography) — nesting isolates all of them from the
+org document's identity fields (`name`, `slug`, `pcAppId`, `pcSecret`) instead of polluting the
+document's top level one field at a time. Every member is REQUIRED, not optional. Optionality lives
+at the one Firestore-read boundary — `auth.ts::loadOrgContext`, which narrows the document's
+(possibly absent, possibly partial) `settings` field through `Partial<OrgSettings>` and merges it
+under `DEFAULT_ORG_SETTINGS`. Because that merge happens exactly once, every consumer downstream of
+the auth store reads `authStore.settings.<field>` as a plain boolean — no consumer anywhere writes
+its own `?? default` fallback. Phases 44, 45 and 46 each extend this contract by adding one field
+here plus one default in `DEFAULT_ORG_SETTINGS` — nothing else; they must never introduce a second
+defaults-merge point.
+
+**`OrgSettings.defaultServiceTemplate` (R086/R087):** entries carry `{ id, kind, section, body? }` —
+never a chosen song/scripture and never a computed VW type, which is derived fresh at
+service-creation time; `body?` carries recurring MISC text for body-bearing kinds (R116). An
+empty/unset array does NOT produce an empty service: per R115 (which supersedes the owner's
+2026-08-07 EMPTY override), `createService` seeds a new service from the Suggested Template
+(`buildSuggestedTemplateEntries()`, the 1-2-2-3-derived preset) when this array is empty. The
+fallback is resolved at the `createService` call site — `buildSlotsFromTemplate` stays pure
+(`[]` → `[]`).
+
+### src/types/pptxRender.ts
+
+**Module overview (Phase 42, R079/R080):** client-side render-status type for
+`organizations/{orgId}/pptxRenders/{importId}`. This is a CONSUMED-FIELDS PROJECTION of the server
+document defined in `functions/src/index.ts`, not a wire mirror. It deliberately OMITS the server
+document's `storagePath` field: a render document is server-written today but was writable by any
+org editor until 42-01's rules fix landed (T-42-01), and display code has no legitimate reason to
+build an image source from a render-document field at all — the sole sanctioned producer of a
+rendered-page Storage path is `renderedPagePath` (`src/utils/renderedPagePaths.ts`), built only
+from ids the client already trusts (orgId, renderImportId, pageNumber). Omitting the member here
+turns "read a path off this document" into a compile error instead of a code-review question
+(T-42-05). Keep this in sync by hand with `functions/src/index.ts` (`PptxRenderStatus`/
+`PptxRenderDoc`) — there is no importable package boundary between `functions/` and `src/`.
+
+### src/types/service.ts
+
+**`MediaAttachableSlot.notes` (R122, Phase 54):** slot-level free-text notes — plain text only, a
+planner jots who leads / who sings which parts beside the item's selector. Lives on the shared base
+so `slot.notes` is reachable cast-free on all five slot kinds. OPTIONAL and schemaless: absent on
+every slot written before this field existed, so no migration is required; an emptied value is set
+back to `undefined` and dropped by `stripUndefined` before the Firestore write (Phase 51), so a raw
+`undefined` never reaches the document. NOT to be confused with the SEPARATE required top-level
+`Service.notes` — that is a service-level field on a different object.
+
+**`MediaAttachableSlot.loop` (R306/R307, Phase 106):** per-item Run auto-advance/loop
+configuration. Lives on the shared base so `slot.loop` is reachable cast-free on all five slot
+kinds, exactly like `notes`. OPTIONAL and non-destructive: absent on every slot written before this
+field existed (no migration); absent OR `enabled: false` both mean "current (non-looping) behavior"
+— there is no third state. When the whole `loop` object is set back to `undefined` it is dropped by
+`stripUndefined` before the Firestore write, same lifecycle as `notes`. `intervalSeconds` is
+SECONDS, not milliseconds (default 10) — this is the approved 106-UI-SPEC.md contract and matches
+the v2.7 ARCHITECTURE research (`intervalSeconds: number // default 10`). An earlier
+106-CONTEXT.md draft phrase ("intervalMs") is superseded by this approved field name/unit.
+
+**`StageMarker` (R313/R314/R315, Phase 107):** `label` is free text and the source of truth (an
+owner may label a marker for a one-off speaker's mic); `kind` is an OPTIONAL light visual accent
+only — never a required constrained picker (107-CONTEXT.md). `zone` places the marker in exactly
+one of the two stage regions. `xPct`/`yPct` are percentages (0-100) of that zone's box, NOT pixels
+— this is what makes a saved position resize-stable and reload-exact (R314): a viewport resize
+simply recomputes pixel placement from the same stored percentage, with no refetch or recalculation
+step.
+
+### src/types/slide.ts
+
+**Module overview:** unified `Slide` type with `contentKind` discriminator. S01 defines `'lyric'`
+only; later slices add `'scripture'`, `'imported'`, `'text'`, `'image'`, and `'video'`. Phase 105
+(R302/R303) adds `'blackout'` — additive, no other kind's shape changes — a first-class slide kind
+that renders solid black with no text/background on every render surface
+(Audience/Confidence/preview/print), backing an authored inline black slide inside a song's slide
+sequence (105-CONTEXT.md).
+
+**`SlideBase.audioUrl` (Phase 22 R013/R014, refactored Phase 24 D-04):** render carrier for
+attached audio. For a slide resolved from a stored `SlideGroup` entry, `audioUrl` is filled by
+two-level precedence — the entry's OWN audio first, falling back to the group's `bedAudioUrl`. The
+bed is audio-only (D-18) — video is slide-only and never has a bed carrier. For a slot with no
+materialized group yet, this is simply unset — there is no legacy slot-level media fallback (D-19:
+the slide area has never shipped). Never persisted standalone on the (ephemeral, regenerated)
+assembled slide.
+
+**`SlideBase.renderState` (Phase 42, R079/R080):** render-state discriminator for a slide sourced
+from a PPTX deck whose server-side render (`organizations/{orgId}/pptxRenders/{importId}`) has not
+yet produced a usable page for it. This field's PRESENCE is the discriminator every consumer must
+branch on FIRST, ahead of `contentKind` — a slide carrying `renderState` never carries drawable
+content (`SlideCard.vue`/`PresentationViewer.vue` render pending/failed chrome instead of the
+normal `contentKind: 'image'` `<img>` path). Set only by
+`src/utils/importedRenderReconciler.ts`'s `importedEntryContent`; absent on every slide from every
+other content path (lyric, scripture, text, video, or a rendered-ready image with a resolved URL).
+
+**`SlideBase.renderFailureReason`:** the raw machine slug copied unchanged off the render
+document's own `failureReason` (e.g. `'incomplete-render'`, `'render-service-error'`). Present only
+alongside `renderState: 'failed'`. Never rendered directly — it MUST route through the
+failure-sentence lookup 42-06 introduces (`slideDisplay.ts`), whose fallback arm exists precisely so
+an unmapped slug never surfaces to a congregation as raw text (T-42-04). This field carries the
+untranslated slug on purpose, named so that displaying it verbatim looks obviously wrong at the
+call site.
+
+**`BlackoutSlide` (R302/R303, 105-CONTEXT.md):** an authored inline black interlude. Carries NO
+fields of its own beyond `SlideBase` — no text, no label, no background — because it renders as a
+full solid-black screen on every surface (Audience/Confidence/preview/print) with nothing to draw.
+Resolved from a `LyricSection` whose `kind` is `'blackout'` (`src/utils/songSectionOrder.ts`,
+`src/utils/slideshowAssembler.ts`) — a blackout slide still carries `audioUrl`/`audioLoop`/
+`backgroundImageUrl` inherited fields structurally (`SlideBase`), but the assembler never populates
+`backgroundImageUrl`/`backgroundSource` for one (rendering is a 105-02 concern; this type only
+shapes the data).
+
+### src/types/slideGroup.ts
+
+**`SlideGroup.sourceSignature`:** opaque signature of the source content this group was last
+rebuilt against. Phase 30 deleted the confirm-gated reconciler that used to compare against it, but
+Phase 38 (D1) gives it a new reader: `rebuildScriptureGroup` consults it as the ONE durable marker
+distinguishing "this group was already materialized from the slot's CURRENT reading" (detached,
+freely editable) from "not yet" (still slot-derived). Every other rebuild path still treats it as a
+stored change-detector only, written for storage parity and not read back.
+
+**`SourceRef` discriminated union:** the `copyright` member is a planner addition to research's
+four-member shape: `assembleSlideshow` emits a copyright slide BEFORE and AFTER a song's lyric
+sections, so a song group needs two entries that carry no `sectionId`. Encoding them as
+`kind: 'copyright'` keeps song reconciliation's diff-by-`sectionId` from ever seeing a section-less
+entry. The `video` member (D-17) is unlike every other member: it references no canonical record —
+a dropped video has no document behind it, the storage URL itself IS the reference, carried on
+`videoSrc` (same field name as `VideoSlide`'s own-source field); video is slide-only (D-18), so
+there is nothing for this field to collide with. The `text` member is widened with optional
+authored `title`/`body` (D-17 ripple) so a user-added blank slide (`＋ Add slide` on a
+SONG/SCRIPTURE/IMPORTED group) has somewhere to store its own words. `scripture` (Phase 38, D1/D2)
+is either of TWO shapes — a scripture group has exactly two states, never a mix: REFERENCE
+(default, Phase 30's hard lock, unchanged) carries NO payload at all (R047) — content comes from
+the owning SCRIPTURE slot's own reference fields, resolved live at render time; CONGREGATIONAL
+(opt-in, D1) carries `speaker` — its PRESENCE is the discriminator — plus that section's own `text`
+and, when the section has one, `verseRange`; this entry's words are the GROUP's, not the slot's
+(D2), since converting to congregational deliberately detaches the group from slot-driven
+re-derivation. Both `scriptureReadingId` and `innerSlideId` stay in the union as OPTIONAL legacy
+fields — every entry written before Phase 38 stays readable (both fields are ignored on read).
+Phase 42 (R079/R080): the `imported` member's `innerSlideId` carries EITHER a parsed
+`deck.slides[i].id` OR the synthetic `rendered-page-N` identity `src/utils/importedRenderReconciler.ts`
+mints for a ready-state rendered page. R108 (Phase 50, part 1 of 2): the `imported` member also
+carries an optional `renderedPage` — the render-stable 1-based page this entry maps to, recorded at
+add-time (`SlideGrid.vue::onImportConfirmed`) from the deck slide's own `sourcePage`. It supersedes
+the interim positional resolver (`src/utils/importedRenderReconciler.ts`, commit ec217aa) that fails
+whenever parsed-slide count != rendered-page count (a multi-image deck). `renderedPage` deliberately
+does NOT participate in `derivedIdentityKey` — it is provenance, not identity.
+
+### src/types/songLyrics.ts
+
+**`LyricSection` (module overview):** a single section of song lyrics (e.g. Verse 1, Chorus). A
+member of the canonical POOL (`SongLyrics.sections` / `ParsedCCLI.sections`) — each `id` appears at
+most once across a document's pool. A section shown more than once in the slide order is a
+REFERENCE to this same pooled entry, not a copy (D-02): edit its `lines` once and every occurrence
+in `SongLyrics.performanceOrder` reflects the edit. See `src/utils/songSectionOrder.ts` for the pure
+helpers that derive rows from and safely mutate the pool/order pair.
+
+**`LyricSection.kind` (Phase 105, R302/R303/R304):** absent means `'lyric'` — every section
+persisted before this phase, and every section minted by the normal `addSection` path, carries no
+`kind` field at all (additive, no migration). `'blackout'` marks an inline black interlude slide
+with no lyric text — minted only via `addSection(..., 'BLACKOUT')`
+(`src/utils/songSectionOrder.ts`), always with empty `lines`. `buildSectionRows` excludes a blackout
+section from per-kind position numbering (R304), and `slideshowAssembler.ts` resolves it to a
+`BlackoutSlide` (`src/types/slide.ts`) instead of lyric content.
+
+### src/views/ServiceEditorView.vue
+
+**`deleteServiceConfirmBody` (D-15):** delete stays available at every status, but must not stay
+un-warned. The reasoning that justifies NO friction on Reopen runs the opposite way here: reopening
+is reversible, deleting is not. Delete is the only irreversible action in this view, and for a
+service carrying export evidence it silently orphans a live Planning Center plan and destroys the
+audit trail D-11 exists to preserve. Warning is the mitigation; locking is not — forcing a Reopen
+just to delete adds friction with no safety gain and strands the "created by mistake" case behind
+two extra steps. Uses the same `hasPcExportEvidence` computed as the reopen dialog; no new dialog,
+no rules change (the rule's `allow delete` is deliberately unconditional).
+
+**`handleNavigateToScriptureEditor`:** handles the "Set up congregational reading" request
+(relabelled from "Edit scripture text" on 2026-08-05 — see `slideDisplay.ts`) relayed up through
+SlidesTab's `navigate-to-scripture-editor` event (T-26-03-01: the index is validated against the
+current plan item list and its kind before touching any state, so an unhonourable request — out of
+range, or naming a non-scripture plan item — is a no-op). REVISED 34-07 (owner UAT F1): the relay is
+REUSED, the handler body is REPLACED. R047 had deleted the panel this relay used to reveal, which is
+why it degraded to a tab-switch-plus-scroll. The owner's finding restored a real destination: the
+scripture slide's edit route now opens the congregational-reading editor as a modal over the Slides
+tab where the request originated — dragging the user off to the Service Order tab to reach it was
+the disorientation that made the feature read as absent.
+
+**`isLocked` (R036/R037 lifecycle lock seams):** widened the retired `isExportedLocked`
+(`=== 'exported'`) to `!== 'draft'`. `isExportedLocked` is DELETED as of 31-04: it fired only at
+`exported` and never at `planned`, which is half of R036, and leaving a similarly-named computed
+alongside this one invites a future edit to reach for the wrong one. The per-line migration off it
+was a five-class job (31-UI-SPEC § gate migration) — a blind find-and-replace inverts three of the
+classes.
+
+**`slotsBySection` (D005/R007/R043/R044, R005/R006 live slideshow assembly):** `{ slot, index }`
+pairs (index = the slot's ABSOLUTE position in `localService.slots`) grouped into
+`SERVICE_SECTIONS`-ordered buckets plus a trailing `legacy`/ungrouped bucket, per `groupBySection`
+(29-02). The ABSOLUTE index is what every existing per-slot handler in the template (onClearSong,
+removeSlot, onSectionChange, aiDraftSongs, the scripture panel, slotLabel,
+`data-testid="slot-{index}"`) already keys on — grouping for render never renumbers it to a
+per-section ordinal.
+
+**`canWriteSlideGroups` (R036):** whether this session may write slide-group documents at all. This
+is NOT only a UI concern, and narrowing it is not optional. The `/slideGroups` Firestore rule
+rejects every write whose parent service is not draft. `useSlideshowAssembly`'s materialization
+watcher runs with `{ immediate: true }` — it writes on service LOAD, with no user action — as does
+`rebuildOutcomes`. Leaving this as bare `isEditor` would therefore make every locked service throw
+permission-denied the moment it opens, which is a worse failure than the one the lock fixes.
+Suppressing the write is the right shape rather than carving an exception into the rule: the rules
+layer cannot distinguish a load-time materialization from a user edit, so the exception would have
+to be "allow any write", i.e. no lock. A service still loading has no status yet; `?? 'draft'`
+matches the rule's own `resource.data.get('status','draft')` default so the two layers agree, and it
+avoids wedging materialization behind a transient null.
+
+**`buildActionBarItems` wiring (36-03, R068):** the page-header's per-tab action list, replacing the
+four unconditional buttons that used to render regardless of `activeTab`. Threads the view's OWN
+existing state into `buildActionBarItems` (36-02); `handlers` passes EXISTING functions by
+reference, except `onPresent`, which contains no logic of its own — it only calls the exposed
+`SlidesTab.onPresentClick()`, which still does the actual emitting. `@present="onPresent"` on the
+`<SlidesTab>` element still receives that emit and still owns opening `PresentationViewer` at the
+computed start index. Routing through the emit (not calling the view's own `onPresent` directly)
+keeps the start-index computation in the one place that owns it.
+
+**`handleAutosaveFailure` (BL-02):** a rejected autosave must leave the view USABLE, never stranded
+at 'saving'. `useAutoSave`'s own catch is generic; this writes the definitive `useSaveStatus` entry
+itself: `ServiceLockedError` can never succeed while locked, so revert to `originalService` and
+report 'idle' (nothing to retry); anything else may land on retry, so the edit is KEPT and the entry
+reports 'error'. `lifecycleError` (not the shared status bar) is the surface — 31-04's bar/banner
+slots are gone/present at exactly the right statuses.
+
+**`sectionSlideCount` (36-04, UI-SPEC §9):** per-band assembled-slide count for a section-band
+header's "{n} slides" caption. Deliberately mirrors `SlidePlanRail.vue`'s own per-row derivation —
+filtering `assembledSlideshow` by `AssembledSlide.slotIndex` — rather than reading
+`group.slides.length` off a `SlideGroup` document, because an unmaterialized group reads zero
+slides there while the grid (and this count) show the full fallback-path group. Takes the band's
+own `entries` (the same `{ slot, index }[]` shape `slotSectionGroups` already produces) rather than
+a bare `ServiceSection` key — same output as UI-SPEC §9's illustrative
+`sectionSlideCount(group.key)`, without re-deriving the section-to-slots mapping
+`slotSectionGroups` already computed. Builds one `Set` of the band's indices and filters once,
+rather than calling `.filter` per entry.
+
+**`slotToScriptureRef` (ME-02):** the canonical primitive, not a private four-field variant. This
+used to require book + chapter + verseStart + verseEnd, while `scriptureRefFromSlot` — the rule
+R047 derives the SLIDE from — requires only book + chapter. A whole-chapter reading ("Psalms 103")
+or a single verse ("Romans 8:28", where `parseScriptureInput` leaves `verseEnd` null) therefore
+projected a correct slide while this row handed `null` to `ScriptureInput`: the input rendered
+empty, the read-only lines rendered "Scripture — Empty", and "Edit in scripture" scrolled to a
+blank field.
+
+**`onSave` (31-PATTERNS § 4a row 24, BL-02):** 31-04-SUMMARY recorded the decision to leave this
+ungated because "the store guard already refuses it" — but this phase made that refusal a THROW, so
+an ungated `onSave` is not a harmless no-op, it is a rejected promise. Refusing here, like every
+other mutation entry point in this file, is what makes the rejection unreachable rather than merely
+caught. `canEditService`, not `isLocked`: a viewer is refused by the same line. This cannot break
+`onMarkAsPlanned`'s flush — that awaits `onSave()` while the service is still locally draft, before
+`applyTransitionLocally`.
+
 ---
 
 *Architecture analysis: 2026-07-16*

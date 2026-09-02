@@ -1,54 +1,7 @@
 /**
- * serviceEditorActionBar.ts — the pure per-tab item builder behind R068
- * (36-02 Task 2). `buildActionBarItems(tab, ctx)` turns
- * `ServiceEditorView.vue`'s header state into the declarative list
- * `ContextualActionBar.vue` renders. Imports nothing from Vue, Pinia or the
- * router — that is what makes "which actions does tab X expose?" answerable
- * as a plain function call against data, instead of as a DOM-mount
- * assertion repeated in three places (36-CONTEXT.md § Specific Ideas — that
- * repetition is the exact shape that let `Suggest All Songs` leak onto Roles
- * in the first place).
- *
- * Every builder here reproduces an EXISTING control's EXACT gate, label,
- * title and disabled expression — verified against:
- *   - ServiceEditorView.vue:96-246 (the four header buttons)
- *   - ServiceEditorView.vue:1697-1700 (isLocked, canEditService)
- *   - ServiceEditorView.vue:2074-2082 (isDirty, hasSermonContext)
- *   - SlidesTab.vue:12-23, 200-210, 405-426 (canPresent, presentStartIndex,
- *     onPresentClick, the Present button)
- *
- * ★ FLAGGED SPEC DIVERGENCE (36-02-PLAN.md frontmatter `assumptions`,
- * threat T-36-02-01): 36-UI-SPEC.md §3's illustrative code and its E3 row
- * both assert every Service Order item is `canEditService`-gated. Live
- * source disagrees — the export affordance's gate is
- * `authStore.hasPcCredentials` ALONE, with no `canEditService` involved, nor
- * does the enclosing div. This module preserves that: `buildServiceOrderItems`
- * pushes the export item unconditionally (when one exists at all), only
- * suggest-all-songs and save are gated on `canEditService`. Preserving the
- * phase invariant ("moving a control must not change who can press it")
- * outranks the spec's illustrative code, per this plan's own stated central
- * invariant.
- *
- * ★ Owner follow-up (post-36-02): the `copy-pc` fallback item described
- * below no longer exists. `buildExportOrCopyItem` now returns `undefined`
- * when `hasPcCredentials` is false — direct owner feedback on the running
- * app: "let's get rid of the Copy for PC button all together, it's not
- * useful at all." An organization with no Planning Center credentials now
- * has NO export affordance in the action bar; only the credentials-missing
- * note (`ServiceEditorView.vue`, rendered below the bar and gated to the
- * Service Order tab) points them at Settings. That is the owner's explicit,
- * accepted consequence — do not add a replacement affordance and do not
- * ungate `export-pc`.
- *
- * ★ 39-05 (R089): `buildExportOrCopyItem`'s single early return now also
- * composes the org's Planning Center integration toggle (`ctx.pcEnabled`)
- * alongside the pre-existing credentials check. Both conditions govern the
- * SAME return — not two competing checks — so the item disappears when the
- * integration is off even if credentials happen to be present, and the
- * credentials-only gate is unchanged when the integration is on. This is
- * the last of five entry points 39-05 gates; Planning Center has no single
- * choke point the way `claudeApi.ts` does for AI, so each surface carries
- * its own composed condition.
+ * serviceEditorActionBar.ts — the pure per-tab item builder behind R068 (36-02 Task 2).
+ * See .planning/codebase/INTEGRATIONS.md (Type & View Integration Notes (R318) ->
+ * src/views/serviceEditorActionBar.ts).
  */
 import type { ActionBarItem } from '@/components/actionBarItems'
 
@@ -121,16 +74,9 @@ function buildSuggestItem(ctx: ActionBarContext): ActionBarItem {
 }
 
 /**
- * Owner follow-up (post-36-02): returns `undefined` — no item at all — when
- * there are no Planning Center credentials, instead of the `copy-pc`
- * fallback button this used to build. Direct owner instruction: "let's get
- * rid of the Copy for PC button all together, it's not useful at all." Do
- * NOT ungate `export-pc` to fill the gap this leaves for an uncredentialed
- * org — that consequence is intentional (see this file's head comment).
- *
- * 39-05 (R089): also returns `undefined` when the org has turned Planning
- * Center off, independently of credentials — composed onto this SAME
- * return, not a second check, so the two conditions can never drift apart.
+ * Do NOT ungate `export-pc` for an uncredentialed org — intentional (owner follow-up).
+ * See .planning/codebase/INTEGRATIONS.md (Type & View Integration Notes (R318) ->
+ * src/views/serviceEditorActionBar.ts).
  */
 function buildExportOrCopyItem(ctx: ActionBarContext): ActionBarItem | undefined {
   if (!ctx.hasPcCredentials || !ctx.pcEnabled) return undefined

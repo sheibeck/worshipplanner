@@ -1,15 +1,8 @@
 import type { Timestamp } from 'firebase/firestore'
 
 /**
- * A single section of song lyrics (e.g. Verse 1, Chorus).
- *
- * A member of the canonical POOL (`SongLyrics.sections` / `ParsedCCLI.sections`) —
- * each `id` appears at most once across a document's pool. A section shown more
- * than once in the slide order is a REFERENCE to this same pooled entry, not a
- * copy (D-02): edit its `lines` once and every occurrence in
- * `SongLyrics.performanceOrder` reflects the edit. See `src/utils/songSectionOrder.ts`
- * for the pure helpers that derive rows from and safely mutate the
- * pool/order pair.
+ * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/types/songLyrics.ts).
  */
 export interface LyricSection {
   /** Slugified label — e.g. 'verse-1', 'chorus'. */
@@ -29,15 +22,9 @@ export interface LyricSection {
    */
   slideBreaks?: number[]
   /**
-   * Optional content kind (Phase 105, R302/R303/R304). Absent means
-   * 'lyric' - every section persisted before this phase, and every section
-   * minted by the normal `addSection` path, carries no `kind` field at all
-   * (additive, no migration). 'blackout' marks an inline black interlude
-   * slide with no lyric text - minted only via
-   * `addSection(..., 'BLACKOUT')` (`src/utils/songSectionOrder.ts`), always
-   * with empty `lines`. `buildSectionRows` excludes a blackout section from
-   * per-kind position numbering (R304), and `slideshowAssembler.ts` resolves
-   * it to a `BlackoutSlide` (`src/types/slide.ts`) instead of lyric content.
+   * Additive, no migration (Phase 105, R302/R303/R304). See
+   * .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+   * src/types/songLyrics.ts).
    */
   kind?: 'lyric' | 'blackout'
 }

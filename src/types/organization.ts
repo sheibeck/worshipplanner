@@ -1,16 +1,8 @@
 import type { SlotKind, ServiceSection } from '@/types/service'
 
 /**
- * A single entry in a church's default service template (R086/R087). Carries
- * the item's type, its section, and — for body-bearing kinds (MISC and the
- * other NonAssignable kinds the live editor treats the same way) — an optional
- * recurring `body` text (R116, e.g. "canned music", "more announcement
- * slides"). It never carries chosen content (no `songId` or scripture
- * reference) and never a computed Vertical Worship type. VW typing is derived
- * fresh at service-creation time by `buildSlotsFromTemplate`
- * (`src/utils/slotTypes.ts`) and is never stored here. Array order in
- * `OrgSettings.defaultServiceTemplate` IS the creation/display order — there
- * is no `position` field (Assumption A3).
+ * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/types/organization.ts).
  */
 export interface ServiceTemplateEntry {
   id: string
@@ -28,26 +20,8 @@ export interface ServiceTemplateEntry {
 }
 
 /**
- * Church-level settings stored on `organizations/{orgId}.settings` (R073).
- *
- * This shape is nested rather than flat because eight settings arrive across
- * five v1.5 phases (this phase's `aiEnabled`/`pcEnabled`, plus one field each
- * from Phase 44's default service template, Phase 45's Bible version, and
- * Phase 46's slide typography) — nesting isolates all of them from the org
- * document's identity fields (`name`, `slug`, `pcAppId`, `pcSecret`) instead
- * of polluting the document's top level one field at a time.
- *
- * Every member is REQUIRED, not optional. Optionality lives at the one
- * Firestore-read boundary — `auth.ts::loadOrgContext`, which narrows the
- * document's (possibly absent, possibly partial) `settings` field through
- * `Partial<OrgSettings>` and merges it under `DEFAULT_ORG_SETTINGS`. Because
- * that merge happens exactly once, every consumer downstream of the auth
- * store reads `authStore.settings.<field>` as a plain boolean — no consumer
- * anywhere writes its own `?? default` fallback.
- *
- * Phases 44, 45 and 46 each extend this contract by adding one field here
- * plus one default in `DEFAULT_ORG_SETTINGS` below — nothing else. They must
- * never introduce a second defaults-merge point.
+ * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/types/organization.ts).
  */
 export interface OrgSettings {
   /** Church-level toggle for AI-assisted features (song suggestions,
@@ -70,16 +44,8 @@ export interface OrgSettings {
    */
   vwModeEnabled: boolean
   /**
-   * Church-defined default set/order of items for a new service (R086/R087).
-   * Entries carry `{ id, kind, section, body? }` — never a chosen song/scripture
-   * and never a computed VW type, which is derived fresh at service-creation
-   * time; `body?` carries recurring MISC text for body-bearing kinds (R116).
-   * An empty/unset array does NOT produce an empty service: per R115 (which
-   * supersedes the owner's 2026-08-07 EMPTY override), `createService` seeds a
-   * new service from the Suggested Template (`buildSuggestedTemplateEntries()`,
-   * the 1-2-2-3-derived preset) when this array is empty. The fallback is
-   * resolved at the `createService` call site — `buildSlotsFromTemplate` stays
-   * pure (`[]` → `[]`).
+   * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+   * src/types/organization.ts).
    */
   defaultServiceTemplate: ServiceTemplateEntry[]
   /**
@@ -91,20 +57,8 @@ export interface OrgSettings {
    */
   bibleVersion: 'ESV' | 'NLT'
   /**
-   * Church's one house font, applied to every slide surface — the Slides
-   * grid, the Edit Slide drawer preview, and the presenter
-   * (`PresentationViewer.vue`) — via CSS custom properties (R093).
-   * `ServicePrintLayout.vue` is deliberately excluded; the printed Order of
-   * Service is out of scope for this setting.
-   *
-   * `fontFamily` must be one of `SLIDE_FONTS`'s keys (`src/config/
-   * slideFonts.ts`); `fontWeight` must be one of that family's `weights`;
-   * both are defensively re-validated at render time by
-   * `src/utils/slideTypography.ts::cssVarsFor`/`snapWeight`, never trusted
-   * as free text (ASVS V5). `fontScale` is a **multiplier** applied via
-   * `--slide-font-scale`, not an absolute pixel size — `'md'` is the
-   * identity scale (1.0), so a church that never opens this setting sees
-   * zero size change.
+   * See .planning/codebase/CONCERNS.md (Type Concern Notes (R318) ->
+   * src/types/organization.ts).
    */
   slideTypography: {
     fontFamily: string
@@ -168,31 +122,16 @@ export interface Organization {
    */
   settings?: Partial<OrgSettings>
   /**
-   * LEGACY flat storage location for the Vertical Worship toggle, in use
-   * before this phase (Phase 16.1, D-15/D-16). This phase migrates the
-   * canonical value into `settings.vwModeEnabled`, but this field stays
-   * present and readable — `loadOrgContext` dual-reads
-   * `settings?.vwModeEnabled ?? vwModeEnabled ?? true` — until every org
-   * document has been lazily backfilled by a Settings save (never a bulk
-   * migration script). Removing this field is explicitly deferred to a
-   * later cleanup phase, not this one. Do not delete, deprecate, or stop
-   * reading it here.
+   * LEGACY (Phase 16.1, D-15/D-16) — do not delete, deprecate, or stop reading. See
+   * .planning/codebase/CONCERNS.md (Type Concern Notes (R318) -> src/types/organization.ts).
    */
   vwModeEnabled?: boolean
   /** See ADR-0001 (docs/adr/0001-super-admin-explicitly-enables-it-written-only-by-the.md) */
   aiMasterEnabled?: boolean
   /**
-   * Phase 101 (R295) — the super-admin MASTER gate for the Bible **API**
-   * (paid ESV/NLT proxy), NOT scripture features in general — an OFF org
-   * still does scripture manually (Phases 102/103). Absent or `false` =>
-   * OFF (default), mirroring `aiMasterEnabled`'s inverted-default posture: a
-   * fresh/legacy org has the Bible API off until a super-admin explicitly
-   * enables it. Written ONLY by the `setOrgBibleEnabled` Cloud Function
-   * (Admin SDK, `functions/src/orgProvisioning.ts`, Plan 01);
-   * `firestore.rules`'s `lifecycleFields()` guard denies every client write
-   * path, including a super-admin's own client SDK. Deliberately a distinct
-   * top-level name (never a bare settings leaf) — there is no
-   * church-editable Bible-API leaf this milestone.
+   * Phase 101 (R295) — super-admin MASTER gate, written ONLY server-side. See
+   * .planning/codebase/INTEGRATIONS.md (Type & View Integration Notes (R318) ->
+   * src/types/organization.ts).
    */
   bibleApiEnabled?: boolean
 }

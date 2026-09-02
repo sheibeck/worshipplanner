@@ -374,6 +374,27 @@ refresh), not a genuine supply-chain signal: all six resolve to the canonical
 v1.5/v1.6 standing autonomy grant, since RESEARCH.md already performed direct tarball + registry
 verification.
 
+## Type Concern Notes (R318)
+
+### src/types/organization.ts
+
+**`OrgSettings.slideTypography` (R093):** church's one house font, applied to every slide surface —
+the Slides grid, the Edit Slide drawer preview, and the presenter (`PresentationViewer.vue`) — via
+CSS custom properties. `ServicePrintLayout.vue` is deliberately excluded; the printed Order of
+Service is out of scope for this setting. `fontFamily` must be one of `SLIDE_FONTS`'s keys
+(`src/config/slideFonts.ts`); `fontWeight` must be one of that family's `weights`; both are
+defensively re-validated at render time by `src/utils/slideTypography.ts::cssVarsFor`/`snapWeight`,
+never trusted as free text (ASVS V5). `fontScale` is a **multiplier** applied via
+`--slide-font-scale`, not an absolute pixel size — `'md'` is the identity scale (1.0), so a church
+that never opens this setting sees zero size change.
+
+**`Organization.vwModeEnabled` (LEGACY, Phase 16.1, D-15/D-16):** flat storage location for the
+Vertical Worship toggle, in use before this phase. This phase migrates the canonical value into
+`settings.vwModeEnabled`, but this field stays present and readable — `loadOrgContext` dual-reads
+`settings?.vwModeEnabled ?? vwModeEnabled ?? true` — until every org document has been lazily
+backfilled by a Settings save (never a bulk migration script). Removing this field is explicitly
+deferred to a later cleanup phase, not this one. Do not delete, deprecate, or stop reading it here.
+
 ---
 
 *Concerns audit: 2026-07-16*

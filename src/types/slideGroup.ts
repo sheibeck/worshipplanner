@@ -38,14 +38,8 @@ export interface SlideGroup {
   /** Group-level background image (R055) — the middle tier of the slide/group/song cascade `resolveEntryMedia` resolves; greenfield, no migration (D-19). */
   backgroundImageUrl?: string
   /**
-   * Opaque signature of the source content this group was last rebuilt
-   * against. Phase 30 deleted the confirm-gated reconciler that used to
-   * compare against it, but Phase 38 (D1) gives it a new reader:
-   * `rebuildScriptureGroup` consults it as the ONE durable marker
-   * distinguishing "this group was already materialized from the slot's
-   * CURRENT reading" (detached, freely editable) from "not yet" (still
-   * slot-derived). Every other rebuild path still treats it as a stored
-   * change-detector only, written for storage parity and not read back.
+   * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+   * src/types/slideGroup.ts).
    */
   sourceSignature?: string
   slides: GroupSlideEntry[]
@@ -81,72 +75,11 @@ export interface GroupSlideEntry {
 }
 
 /**
- * Discriminated union of every kind of content a `GroupSlideEntry` can point
- * at, narrowed on `kind`. The `copyright` member is a planner addition to
- * research's four-member shape: `assembleSlideshow` emits a copyright slide
- * BEFORE and AFTER a song's lyric sections, so a song group needs two entries
- * that carry no `sectionId`. Encoding them as `kind: 'copyright'` keeps song
- * reconciliation's diff-by-`sectionId` from ever seeing a section-less entry.
- *
- * The `video` member (D-17) is unlike every other member here: it references
- * no canonical record. A dropped video has no document behind it — the
- * storage URL itself IS the reference, carried on `videoSrc` (same field name
- * as `VideoSlide`'s own-source field). Video is slide-only (D-18) — there is
- * no group bed video, so there is nothing for this field to collide with.
- *
- * The `text` member is widened with optional authored `title`/`body` (D-17
- * ripple) so a user-added blank slide (`＋ Add slide` on a SONG/SCRIPTURE/
- * IMPORTED group) has somewhere to store its own words — today a `text` entry
- * carries nothing and its content derives entirely from the owning slot,
- * which stays correct for the auto-derived PRAYER/MESSAGE/HYMN entry. Both
- * fields are optional so every entry written before this change stays valid.
- *
- * `scripture` (Phase 38, D1/D2) is either of TWO shapes — a scripture group
- * has exactly two states, never a mix:
- *
- * - REFERENCE (default, Phase 30's hard lock, unchanged): the ref carries NO
- *   payload at all (R047). Content comes from the owning SCRIPTURE slot's own
- *   reference fields, resolved live at render time — exactly like the
- *   auto-derived `text` entry, and for the same reason: the slot IS the
- *   canonical record. A `scriptureReadingId` pointing at a separately-fetched
- *   reading document was the previous source, and it never worked — nothing
- *   wrote the id back onto the slot, so a scripture item produced no slide.
- * - CONGREGATIONAL (opt-in, D1): the ref carries `speaker` — its PRESENCE is
- *   the discriminator, the same present-or-absent test the `text` member's
- *   `body` already uses above — plus that section's own `text` and, when the
- *   section has one, `verseRange`. This entry's words are the GROUP's, not
- *   the slot's (D2): converting to congregational deliberately detaches the
- *   group from slot-driven re-derivation, so there is no live source left to
- *   resolve against. `derivedIdentityKey` still keys every scripture ref —
- *   Reference or Congregational — on the ref KIND alone, so this widening
- *   changes nothing about how a stored entry is matched during a rebuild.
- *
- * Both `scriptureReadingId` and `innerSlideId` stay in the union as OPTIONAL
- * legacy fields rather than being removed: every entry written before Phase
- * 38 stays readable (both fields are ignored on read).
- *
- * Phase 42 (R079/R080): the `imported` member's `innerSlideId` carries EITHER
- * a parsed `deck.slides[i].id` OR the synthetic `rendered-page-N` identity
- * `src/utils/importedRenderReconciler.ts` mints for a ready-state rendered
- * page (no reliable positional pairing exists between the two — see that
- * module's doc comment). `derivedIdentityKey`'s existing
- * `imported:{importId}:{innerSlideId}` scheme needs no widening for this —
- * a synthetic id is just another string value for that key to carry.
- *
- * R108 (Phase 50, part 1 of 2): the `imported` member also carries an optional
- * `renderedPage` — the render-stable 1-based page this entry maps to, recorded
- * at add-time (`SlideGrid.vue::onImportConfirmed`) from the deck slide's own
- * `sourcePage` (`src/types/slide.ts`). It supersedes the interim positional
- * resolver (`src/utils/importedRenderReconciler.ts`, commit ec217aa) that
- * fails whenever parsed-slide count != rendered-page count (a multi-image
- * deck). A legacy imported entry (added before this phase) omits
- * `renderedPage` and falls back to that positional resolution — plan 50-05
- * is what actually consumes this field to resolve a slide.
- *
- * `renderedPage` deliberately does NOT participate in `derivedIdentityKey` —
- * it is provenance (which page this entry renders as), not identity (which
- * canonical thing this entry points at). Keying on it would break the
- * existing carry/survival matching this field has no bearing on.
+ * Discriminated union of every kind of content a `GroupSlideEntry` can point at,
+ * narrowed on `kind`. See .planning/codebase/ARCHITECTURE.md (Type & View
+ * Behavioral Notes (R318) -> src/types/slideGroup.ts) for the per-member rationale
+ * (copyright, video, text, scripture's two-shape contract, imported's innerSlideId/
+ * renderedPage provenance).
  */
 export type SourceRef =
   | { kind: 'lyric'; songId: string; sectionId: string }

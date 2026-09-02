@@ -46,33 +46,13 @@ export interface MediaAttachableSlot {
    */
   id: string
   /**
-   * Slot-level free-text notes (R122, Phase 54). Plain text only — a planner
-   * jots who leads / who sings which parts beside the item's selector. Lives
-   * on the shared base so `slot.notes` is reachable cast-free on all five slot
-   * kinds. OPTIONAL and schemaless: absent on every slot written before this
-   * field existed, so no migration is required; an emptied value is set back to
-   * `undefined` and dropped by `stripUndefined` before the Firestore write
-   * (Phase 51), so a raw `undefined` never reaches the document.
-   *
-   * NOT to be confused with the SEPARATE required top-level `Service.notes`
-   * below — that is a service-level field on a different object.
+   * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+   * src/types/service.ts). NOT the SEPARATE required top-level `Service.notes` below.
    */
   notes?: string
   /**
-   * Per-item Run auto-advance/loop configuration (R306/R307, Phase 106).
-   * Lives on the shared base so `slot.loop` is reachable cast-free on all
-   * five slot kinds, exactly like `notes` above. OPTIONAL and non-destructive:
-   * absent on every slot written before this field existed (no migration);
-   * absent OR `enabled: false` both mean "current (non-looping) behavior" —
-   * there is no third state. When the whole `loop` object is set back to
-   * `undefined` it is dropped by `stripUndefined` before the Firestore write,
-   * same lifecycle as `notes`.
-   *
-   * `intervalSeconds` is SECONDS, not milliseconds (default 10) — this is the
-   * approved 106-UI-SPEC.md contract and matches the v2.7 ARCHITECTURE
-   * research (`intervalSeconds: number // default 10`). An earlier
-   * 106-CONTEXT.md draft phrase ("intervalMs") is superseded by this
-   * approved field name/unit.
+   * intervalSeconds is SECONDS not ms. See .planning/codebase/ARCHITECTURE.md
+   * (Type & View Behavioral Notes (R318) -> src/types/service.ts).
    */
   loop?: {
     enabled: boolean
@@ -128,15 +108,9 @@ export interface NonAssignableSlot extends MediaAttachableSlot {
   linkUrl?: string
   linkLabel?: string
   /**
-   * Optional custom display name for a MISC item (R127, Phase 56). Only MISC
-   * uses it — a planner can name a Miscellaneous item ("Communion", "Offering")
-   * instead of the generic "Miscellaneous", and that name is exported as the
-   * Planning Center item title. OPTIONAL and non-destructive: absent on every
-   * slot written before this field existed (no migration), and an emptied value
-   * is stored as `undefined` and dropped by `stripUndefined` before the
-   * Firestore write — same lifecycle as `notes` (:48-60). Read through the
-   * shared `miscLabel()` helper (`src/utils/slotTypes.ts`), which coerces any
-   * absent/whitespace value back to "Miscellaneous".
+   * MISC-only custom display name (R127, Phase 56). See
+   * .planning/codebase/INTEGRATIONS.md (Type & View Integration Notes (R318) ->
+   * src/types/service.ts).
    */
   label?: string
   section?: ServiceSection
@@ -173,15 +147,8 @@ export interface ScriptureRef {
 }
 
 /**
- * A single stage-plot marker (R313/R314/R315, Phase 107). `label` is free
- * text and the source of truth (an owner may label a marker for a one-off
- * speaker's mic); `kind` is an OPTIONAL light visual accent only — never a
- * required constrained picker (107-CONTEXT.md). `zone` places the marker in
- * exactly one of the two stage regions. `xPct`/`yPct` are percentages
- * (0-100) of that zone's box, NOT pixels — this is what makes a saved
- * position resize-stable and reload-exact (R314): a viewport resize simply
- * recomputes pixel placement from the same stored percentage, with no
- * refetch or recalculation step.
+ * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/types/service.ts).
  */
 /**
  * A marker's optional kind. Drives the palette grouping, the tile icon, and
@@ -278,23 +245,8 @@ export interface Service {
     reminderSentAt: Timestamp | null
   }
   /**
-   * Visual stage plot for tech/sound (R313/R314/R315, Phase 107). Additive,
-   * optional, no-migration — mirrors `messaging`/`notes`/`loop`'s lifecycle
-   * exactly: absent on every service written before this field existed (old
-   * behavior, no backfill needed), and an emptied layout is set back to
-   * `undefined` and dropped by the existing `stripUndefined` save path before
-   * the Firestore write, so a raw `undefined` never reaches the document.
-   *
-   * Deliberately NOT a new top-level collection or subcollection (an earlier
-   * milestone ARCHITECTURE.md draft proposed a `stageLayouts/{serviceId}`
-   * collection + store — 107-CONTEXT.md supersedes that draft). Storing it
-   * here means the layout rides the service doc's existing read/write
-   * `firestore.rules`, its existing `onSnapshot`, and the existing autosave
-   * path — no new rules surface, no new Pinia store. This is also what
-   * RESOLVES the Phase-104 `STAGELAYOUTS-RESET-OBLIGATION` marker in
-   * `src/stores/orgScopedStores.ts`: because the layout lives on the service
-   * doc (owned by the already-reset services store), a church switch cannot
-   * leak a prior org's layout — there is no separate store to register.
+   * Additive, no-migration (R313/R314/R315, Phase 107). See
+   * .planning/codebase/STACK.md (Type & View Stack Notes (R318) -> src/types/service.ts).
    */
   stageLayout?: {
     elements: StageMarker[]

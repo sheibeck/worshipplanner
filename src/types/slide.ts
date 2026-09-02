@@ -1,12 +1,6 @@
 /**
- * Unified Slide type with contentKind discriminator.
- *
- * S01 defines 'lyric' only; later slices add 'scripture', 'imported',
- * 'text', 'image', and 'video'. Phase 105 (R302/R303) adds 'blackout' —
- * additive, no other kind's shape changes — a first-class slide kind that
- * renders solid black with no text/background on every render surface
- * (Audience/Confidence/preview/print), backing an authored inline black
- * slide inside a song's slide sequence (105-CONTEXT.md).
+ * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/types/slide.ts).
  */
 
 /** All slide content kinds the system will eventually support. */
@@ -18,14 +12,8 @@ export interface SlideBase {
   position: number
   contentKind: SlideContentKind
   /**
-   * Render carrier for attached audio (Phase 22 R013/R014, refactored Phase 24
-   * D-04). For a slide resolved from a stored `SlideGroup` entry, `audioUrl`
-   * is filled by two-level precedence — the entry's OWN audio first, falling
-   * back to the group's `bedAudioUrl`. The bed is audio-only (D-18) — video is
-   * slide-only and never has a bed carrier. For a slot with no materialized
-   * group yet, this is simply unset — there is no legacy slot-level media
-   * fallback (D-19: the slide area has never shipped). Never persisted
-   * standalone on the (ephemeral, regenerated) assembled slide.
+   * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+   * src/types/slide.ts).
    */
   audioUrl?: string
   /**
@@ -52,27 +40,15 @@ export interface SlideBase {
    */
   backgroundSource?: 'slide' | 'group' | 'song'
   /**
-   * Phase 42 (R079/R080) render-state discriminator for a slide sourced from
-   * a PPTX deck whose server-side render (`organizations/{orgId}/pptxRenders/
-   * {importId}`) has not yet produced a usable page for it. This field's
-   * PRESENCE is the discriminator every consumer must branch on FIRST, ahead
-   * of `contentKind` — a slide carrying `renderState` never carries drawable
-   * content (`SlideCard.vue`/`PresentationViewer.vue` render pending/failed
-   * chrome instead of the normal `contentKind: 'image'` `<img>` path). Set
-   * only by `src/utils/importedRenderReconciler.ts`'s `importedEntryContent`;
-   * absent on every slide from every other content path (lyric, scripture,
-   * text, video, or a rendered-ready image with a resolved URL).
+   * PRESENCE is the discriminator, checked before contentKind. See
+   * .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+   * src/types/slide.ts).
    */
   renderState?: 'pending' | 'failed'
   /**
-   * The raw machine slug copied unchanged off the render document's own
-   * `failureReason` (e.g. `'incomplete-render'`, `'render-service-error'`).
-   * Present only alongside `renderState: 'failed'`. Never rendered directly —
-   * it MUST route through the failure-sentence lookup 42-06 introduces
-   * (`slideDisplay.ts`), whose fallback arm exists precisely so an unmapped
-   * slug never surfaces to a congregation as raw text (T-42-04). This field
-   * carries the untranslated slug on purpose, named so that displaying it
-   * verbatim looks obviously wrong at the call site.
+   * Untranslated slug — MUST route through slideDisplay.ts's failure-sentence lookup,
+   * never rendered directly (T-42-04). See .planning/codebase/ARCHITECTURE.md
+   * (Type & View Behavioral Notes (R318) -> src/types/slide.ts).
    */
   renderFailureReason?: string
 }
@@ -107,14 +83,9 @@ export interface CongregationalSection {
   text: string
   verseRange?: string
   /**
-   * R092 (Phase 45): which Bible translation this section's text was fetched
-   * from, stamped ONCE by `CongregationalEditor.vue` at fetch time from the
-   * church's CURRENT `bibleVersion` setting. OPTIONAL — a section created
-   * before this phase has no such field and resolves to `'ESV'` at read time
-   * via `resolveTranslationSource()` (the only source before this phase).
-   * Never re-derived from the org's setting after stamping — that is the
-   * whole point of the field (see `resolveTranslationSource` in
-   * `src/utils/scripture.ts`).
+   * Stamped ONCE at fetch time, never re-derived (R092, Phase 45). See
+   * .planning/codebase/INTEGRATIONS.md (Type & View Integration Notes (R318) ->
+   * src/types/slide.ts).
    */
   translationSource?: 'ESV' | 'NLT'
 }
@@ -201,16 +172,8 @@ export interface VideoSlide extends SlideBase {
 }
 
 /**
- * A blackout slide — an authored inline black interlude (R302/R303,
- * 105-CONTEXT.md). Carries NO fields of its own beyond `SlideBase` — no
- * text, no label, no background — because it renders as a full solid-black
- * screen on every surface (Audience/Confidence/preview/print) with nothing
- * to draw. Resolved from a `LyricSection` whose `kind` is `'blackout'`
- * (`src/utils/songSectionOrder.ts`, `src/utils/slideshowAssembler.ts`) — a
- * blackout slide still carries `audioUrl`/`audioLoop`/`backgroundImageUrl`
- * inherited fields structurally (SlideBase), but the assembler never
- * populates `backgroundImageUrl`/`backgroundSource` for one (rendering is a
- * 105-02 concern; this type only shapes the data).
+ * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
+ * src/types/slide.ts).
  */
 export interface BlackoutSlide extends SlideBase {
   contentKind: 'blackout'
