@@ -697,6 +697,12 @@ export const useAuthStore = defineStore('auth', () => {
   // its pre-visit (no-org) state.
   async function exitSuperAdminView(): Promise<void> {
     if (viewingAsSuperAdmin.value === null) return
+    // WR-03 (111-REVIEW-2.md) — bump the shared epoch BEFORE this function's
+    // own resetOrgContext() call, matching enterOrgAsSuperAdmin's pattern, so
+    // a loadOrgContext call already in flight (and possibly already holding
+    // a live memberUnsub listener) is superseded and its own isStale() check
+    // catches it instead of this call's resetOrgContext() racing it.
+    loadOrgContextEpoch++
     // IN-01 (78-REVIEW.md): resetOrgContext() below already sets
     // viewingAsSuperAdmin.value = null -- no separate clear needed here.
     resetOrgContext()
