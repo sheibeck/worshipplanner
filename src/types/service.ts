@@ -147,14 +147,9 @@ export interface ScriptureRef {
 }
 
 /**
- * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) ->
- * src/types/service.ts).
- */
-/**
- * A marker's optional kind. Drives the palette grouping, the tile icon, and
- * the accent/neutral skin (see STAGE_KIND_META in src/utils/stageLayout.ts).
- * Additive: absent on markers that never set one (older/neutral markers still
- * typecheck and render with a neutral dot glyph).
+ * A marker's optional kind — drives palette grouping, tile icon, and accent/neutral skin
+ * (STAGE_KIND_META in src/utils/stageLayout.ts). Additive: absent on older/neutral markers.
+ * See .planning/codebase/ARCHITECTURE.md (Type & View Behavioral Notes (R318) -> src/types/service.ts).
  */
 export type StageMarkerKind =
   | 'lead'

@@ -368,17 +368,9 @@ export function useSlideshowAssembly(
   )
 
   // --- Part 2: live structure for a stale SONG group, in-memory only ---
-  //
-  // True when a SONG slot's PERSISTED slide group no longer matches the verse
-  // structure the song's CURRENT lyrics would produce — a verse added, removed,
-  // or reordered in `performanceOrder` since the group was materialized.
-  // Compares the group's stored lyric-entry section sequence against
-  // `performanceOrder` filtered to sections that still exist — EXACTLY what the
-  // assembler's no-group fallback path derives — so the two never disagree on
-  // ordering (CLAUDE.md: don't create a second ordering that disagrees with the
-  // assembler). Returns false when there is nothing to compare (non-SONG slot,
-  // no songId, or lyrics not loaded yet): never force a live derivation when the
-  // current structure is unknown.
+  // True when a SONG slot's persisted group no longer matches the verse structure its current lyrics
+  // would produce; compares against `performanceOrder` exactly as the assembler's no-group fallback does.
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "assemblyGroupsBySlotId")
   function songGroupIsStale(group: SlideGroup, slot: Service['slots'][number]): boolean {
     if (slot.kind !== 'SONG' || !slot.songId) return false
     const lyrics = songLyricsById.get(slot.songId)
@@ -491,17 +483,9 @@ export function useSlideshowAssembly(
   // `materializationCandidates`.
   const materializingSlotIds = new Set<string>()
 
-  // HI-01. Both apply loops below are invoked fire-and-forget (`void …`) from
-  // `{ immediate: true }` watchers, so nothing awaits them and nothing can
-  // observe when their writes settle. Two consequences this set addresses:
-  //
-  //  - `onMarkAsPlanned` used to flip the service's status straight through the
-  //    window where a group write was still in flight, so the write arrived at
-  //    a service that had just become locked and was denied by the new
-  //    `/slideGroups` rule. `drainGroupWrites` gives the view something to await
-  //    before the status write.
-  //  - a caller that wants to know the batch has quiesced (tests included) had
-  //    no handle on it at all.
+  // HI-01. Tracks fire-and-forget group writes from `{ immediate: true }` watchers so a caller can
+  // await them (drainGroupWrites) before flipping service status past an in-flight write.
+  // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts, "drainGroupWrites")
   const inFlightGroupWrites = new Set<Promise<unknown>>()
 
   function trackGroupWrite<T>(promise: Promise<T>): Promise<T> {
