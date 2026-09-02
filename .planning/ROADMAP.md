@@ -733,6 +733,39 @@ with recorded rationale.
 
 ## Backlog
 
+### Phase 999.4: v2.8 Architectural Review — Medium/Low findings (ARCH-002..023) (BACKLOG)
+
+**Goal:** [Captured for future planning] Consolidates all 22 Medium/Low architectural findings
+(ARCH-002 through ARCH-023) deferred from Phase 111 remediation, per 111-CONTEXT.md's locked triage
+decision ("ONE consolidated backlog entry", not 22 near-empty stubs).
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Source: `.planning/phases/110-architectural-review/110-ARCHITECTURE-REVIEW.md`'s `## Medium/Low (→
+backlog)` section (lines 114-714) carries the full per-finding detail — location, problem, impact, and
+recommendation for each. This entry does not duplicate that detail; it is the durable backlog pointer to
+it, so nothing found by the Phase 110 review is silently dropped.
+
+- **13 Medium** (ARCH-002 through ARCH-014): org-switch teardown drift (ARCH-002), static-prop
+  subscriptions that don't re-subscribe on org change (ARCH-003), a single-driver listener pool flagged
+  fragile for a future second caller (ARCH-004), `ServiceEditorView.vue`'s continued monolith growth
+  (ARCH-006), a component bypassing the store-as-source-of-truth write pattern (ARCH-007), two
+  view-owned `onSnapshot` calls with no owning store (ARCH-008), a duplicated/drifted Firestore query
+  between a composable and its store (ARCH-009), `functions/src/index.ts`'s god-module shape (ARCH-010),
+  a per-item update loop with no per-item error isolation (ARCH-011), unreachable dead code from a
+  deep-clone Timestamp strip (ARCH-012), an autosave/reorder-save coordination gap (ARCH-013), and an
+  unbatched sequential PCO song-import write path (ARCH-014).
+- **9 Low** (ARCH-015 through ARCH-023): mostly confirmed-correct/no-new-finding verification notes plus
+  one utility-layer dependency-direction nit (ARCH-020).
+- **Phase 112 security handoffs (already carried forward there, listed here only for traceability):**
+  **ARCH-005** — org-provisioning Cloud Functions are built/tested but UNDEPLOYED, so isolation cannot be
+  verified against live production state until deployed; and **ARCH-018** — super-admin's `isOrgEditor`
+  grant is universal by rule design, so the no-membership-doc guarantee on super-admin org entry (R226)
+  holds only as a client-code contract, not a Firestore-rules invariant (already reviewed/accepted at
+  Phase 78, T-78-03). Both are Phase 112's scoping decision, not this backlog entry's.
+
+Promote with `/gsd-review-backlog` when ready.
+
 ### Phase 999.3: Monitor Setup — route one signal to multiple monitors; no signal mandatory (BACKLOG)
 
 **Goal:** [Captured for future planning] In Monitor Setup (Run the Service, v2.4), let a user send the
