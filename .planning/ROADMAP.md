@@ -722,6 +722,28 @@ with recorded rationale.
 
 ## Backlog
 
+### Phase 999.3: Monitor Setup — route one signal to multiple monitors; no signal mandatory (BACKLOG)
+
+**Goal:** [Captured for future planning] In Monitor Setup (Run the Service, v2.4), let a user send the
+**same signal to multiple monitors** and never force assigning every signal.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Reported by owner 2026-09-02. Current behavior (defect): signal→monitor assignment is treated as
+1:1/exclusive — with 2 monitors, assigning **Audience** to Monitor A and then to Monitor B
+*un-assigns* it from Monitor A. Desired behavior:
+
+- [ ] One signal (Audience / Confidence / Livestream / etc.) can be routed to **multiple monitors**
+  simultaneously (e.g. Audience mirrored to both Monitor A and Monitor B).
+- [ ] Assigning a signal to a monitor must **not** steal it from another monitor.
+- [ ] **No signal is mandatory** — if the user only wants Audience, they should not be required to
+  assign Confidence, Livestream, or any other output.
+- [ ] Verify the audience/confidence output windows + `useRunControl` channel routing handle a
+  one-signal→many-monitors fan-out (BroadcastChannel/window management) without desync.
+
+Area: `src/views/MonitorSetupView.vue` + monitor config/channel utilities (Phase 91 config+channel
+utilities, Phase 92 Monitor Configuration screen). Promote with `/gsd-review-backlog` when ready.
+
 ### Phase 999.2: Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG)
 
 **Goal:** [Captured for future planning] Rename the app from "Worship Planner" (name taken) to **WorshipBuilder**, and cut hosting over to a single deploy on `worshipbuilder.web.app`, then point other/custom domains at it.
