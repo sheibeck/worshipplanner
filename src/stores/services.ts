@@ -804,14 +804,23 @@ export const useServiceStore = defineStore('services', () => {
     }
 
     // 2. No link doc yet — adopt an already-circulated token if one exists
-    //    for this service, else mint a fresh one. Equality filter ONLY: no
+    //    for this service, else mint a fresh one. Equality filters ONLY: no
     //    orderBy, no limit. Ordering is pickAdoptableToken's job (client-side)
     //    and a server-side sort here would need a composite index this
     //    project's firestore.indexes.json does not declare, and the emulator
     //    would not catch the gap — it would only surface in production, on
     //    exactly the multi-token services this adoption path exists to
     //    rescue.
-    const adoptionQuery = query(collection(db, 'shareTokens'), where('serviceId', '==', service.id))
+    // CR-02 (113-REVIEW-2): also filtered by orgId, mirroring deleteService's
+    // fix above for the same shareTokens `allow list` rule -- without it this
+    // bare where('serviceId','==',...) was rejected outright, silently
+    // breaking every first share. pickAdoptableToken already scopes
+    // candidates to orgIdValue in JS, so this changes nothing adopted.
+    const adoptionQuery = query(
+      collection(db, 'shareTokens'),
+      where('serviceId', '==', service.id),
+      where('orgId', '==', orgIdValue),
+    )
     const candidatesSnap = await getDocs(adoptionQuery)
     const candidates: ShareTokenCandidate[] = candidatesSnap.docs.map((d) => ({
       id: d.id,

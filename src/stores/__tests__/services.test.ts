@@ -1589,6 +1589,11 @@ describe('useServiceStore', () => {
       await store.ensureShareLink(service, 'org-1')
 
       expect(where).toHaveBeenCalledWith('serviceId', '==', 'service-1')
+      // CR-02 (113-REVIEW-2): the query must also carry an orgId equality
+      // filter -- firestore.rules' org-gated shareTokens list rule rejects
+      // this query outright without it (see src/rules.test.ts for the
+      // rules-level proof).
+      expect(where).toHaveBeenCalledWith('orgId', '==', 'org-1')
       expect(orderBy).not.toHaveBeenCalled()
       expect(limit).not.toHaveBeenCalled()
     })

@@ -1282,9 +1282,10 @@ describe('shareTokens — public read, editor-scoped create, editor-scoped in-pl
     await assertFails(getDocs(collection(db, 'shareTokens')))
   })
 
-  // CR-01 (113-REVIEW): `allow list: if false;` also denied the ONE legitimate
-  // list this collection needs -- deleteService()'s org-scoped
-  // where('serviceId','==',id) + where('orgId','==',orgId) cleanup query.
+  // CR-01 (113-REVIEW): `allow list: if false;` also denied the legitimate
+  // lists this collection needs -- deleteService()'s org-scoped
+  // where('serviceId','==',id) + where('orgId','==',orgId) cleanup query
+  // (and, per CR-02 below, ensureShareLink()'s adoption query, same shape).
   // Org-gating (isOrgEditor(resource.data.orgId)) instead of a flat deny lets
   // an org editor list their OWN org's tokens while keeping the SEC-S-01
   // enumeration leak closed for everyone else. This mirrors the exact query
@@ -1299,6 +1300,38 @@ describe('shareTokens — public read, editor-scoped create, editor-scoped in-pl
       getDocs(query(collection(db, 'shareTokens'), where('serviceId', '==', 'service-1'), where('orgId', '==', 'orgA'))),
     )
     expect(snap.docs.map((d) => d.id).sort()).toEqual(['tok-1', 'tok-2'])
+  })
+
+  // CR-02 (113-REVIEW-2): ensureShareLink()'s adoption query
+  // (src/stores/services.ts) issued a bare where('serviceId','==',id) with
+  // no orgId filter, so it was rejected outright under the CR-01 list rule
+  // -- Firestore denies a `list` against a resource.data.orgId-reading rule
+  // unless the query itself carries a matching equality filter, regardless
+  // of whether any candidate exists. This is the exact unscoped shape that
+  // broke every first share (auto-link on createService + the manual Share
+  // button) until the store's query was fixed to add
+  // where('orgId','==',orgIdValue).
+  it('DENIES (CR-02) the old unscoped shareTokens list shape ensureShareLink used to issue (serviceId only, no orgId filter)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('shareTokens/tok-1', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(getDocs(query(collection(db, 'shareTokens'), where('serviceId', '==', 'service-1'))))
+  })
+
+  // CR-02 (113-REVIEW-2): the FIXED shape -- ensureShareLink()'s adoption
+  // query now mirrors deleteService's, adding where('orgId','==',orgIdValue)
+  // alongside where('serviceId','==',id). Proves an org editor's own-org
+  // adopt-or-mint lookup succeeds under the org-gated rule post-fix.
+  it('ALLOWS (CR-02) the fixed ensureShareLink adoption query shape (serviceId + own-org orgId filter)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('shareTokens/tok-1', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    const snap = await assertSucceeds(
+      getDocs(query(collection(db, 'shareTokens'), where('serviceId', '==', 'service-1'), where('orgId', '==', 'orgA'))),
+    )
+    expect(snap.docs.map((d) => d.id)).toEqual(['tok-1'])
   })
 
   // CR-01 regression proof: an authenticated editor of a DIFFERENT org (or
