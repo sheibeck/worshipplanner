@@ -30,15 +30,21 @@ import { loadFontCss, snapWeight } from '@/utils/slideTypography'
 
 let memberUnsub: Unsubscribe | null = null
 
-// ARCH-001 (Phase 111, T-111-01/T-111-02, D-ARCH-001) — a generation/epoch
-// token guarding the shared `memberUnsub` onSnapshot race in loadOrgContext
-// below. Every loadOrgContext call captures the post-increment value into a
-// local `myEpoch` at its very top; immediately before it would touch
-// memberUnsub (right after its LAST await), it re-checks that captured value
-// against this counter. A superseded/interleaved call (one whose awaits
-// settle after a newer loadOrgContext call has already started) will always
-// find a mismatch and returns WITHOUT creating an onSnapshot or touching
-// memberUnsub — so it can never win the race and never orphans a listener.
+// ARCH-001 (Phase 111, T-111-01/T-111-02, D-ARCH-001; hardened post-111-REVIEW
+// CR-01) — a generation/epoch token guarding EVERY shared-state mutation
+// point in loadOrgContext below (not just the final memberUnsub onSnapshot
+// assignment). Every loadOrgContext call captures the post-increment value
+// into a local `myEpoch` at its very top, then re-checks that captured value
+// against this counter (via the local `isStale()` helper) immediately after
+// EVERY await and before EVERY subsequent write to a shared ref
+// (memberships/orgId/settings/etc. via applyOrgSnapshot) or call to
+// resetOrgContext() — including each of its three early-return branches, not
+// only the tail onSnapshot assignment. A superseded/interleaved call (one
+// whose awaits settle after a newer loadOrgContext call has already started)
+// will always find a mismatch at its very next checkpoint and returns
+// WITHOUT mutating any shared state or touching memberUnsub — so it can
+// never win the race, clobber a newer call's context, or orphan/tear down a
+// newer call's listener.
 // Store-layer defense-in-depth: protects ALL callers (selectOrg,
 // enterOrgAsSuperAdmin's sibling loadOrgContext calls via exitSuperAdminView,
 // logout's re-entry, and the initial onAuthStateChanged load), not just the
@@ -411,10 +417,17 @@ export const useAuthStore = defineStore('auth', () => {
 
     // ARCH-001 — capture this call's generation. See loadOrgContextEpoch's
     // header comment (module scope, above) for the full race this guards.
+    // 111-REVIEW CR-01: `isStale()` is re-checked after EVERY await below,
+    // immediately before the next shared-state mutation (memberships/orgId/
+    // applyOrgSnapshot's writes) or resetOrgContext() call/early-return — not
+    // only once at the tail. A superseded call must bail at its very next
+    // checkpoint, never reaching a later mutation via an earlier branch.
     const myEpoch = ++loadOrgContextEpoch
+    const isStale = (): boolean => myEpoch !== loadOrgContextEpoch
 
     const userRef = doc(db, 'users', uid)
     const userSnap = await getDoc(userRef)
+    if (isStale()) return
     const userData = userSnap.exists() ? userSnap.data() : null
     const orgIds: string[] = userData?.orgIds ?? []
 
@@ -426,6 +439,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (currentUser) {
       try {
         const tokenResult = await getIdTokenResult(currentUser, false)
+        if (isStale()) return
         claimOrgs = (tokenResult.claims.orgs ?? {}) as Record<string, unknown>
       } catch (err) {
         console.error('[auth] loadOrgContext claim read:', err)
@@ -450,7 +464,7 @@ export const useAuthStore = defineStore('auth', () => {
     const roleFor = (id: string): 'editor' | 'viewer' =>
       claimOrgs[id] === 'editor' ? 'editor' : 'viewer'
 
-    memberships.value = await Promise.all(
+    const resolvedMemberships = await Promise.all(
       ids.map(async (id) => {
         try {
           const snap = await getDoc(doc(db, 'organizations', id))
@@ -464,6 +478,12 @@ export const useAuthStore = defineStore('auth', () => {
         }
       }),
     )
+    // 111-REVIEW CR-01: check-then-assign — resolve the Promise.all into a
+    // local first, THEN gate the write to the shared `memberships` ref on
+    // isStale(), so a superseded call never overwrites a newer call's
+    // church-picker list.
+    if (isStale()) return
+    memberships.value = resolvedMemberships
 
     // Resolve the active org for this session:
     //  - a remembered choice for THIS user (survives refresh, cleared on logout),
@@ -476,10 +496,16 @@ export const useAuthStore = defineStore('auth', () => {
       remembered && ids.includes(remembered) ? remembered : ids.length === 1 ? ids[0]! : null
 
     if (activeId === null) {
+      // 111-REVIEW CR-01: no await happened since the last isStale() check
+      // above, but resetOrgContext() tears down memberUnsub — re-check
+      // immediately before it anyway, matching the guard-every-mutation-site
+      // rule so this branch never depends on reasoning about upstream state.
+      if (isStale()) return
       resetOrgContext()
       return
     }
 
+    if (isStale()) return
     orgId.value = activeId
 
     // R075/P-01 — force the claim onto the token now that we know which org
@@ -488,6 +514,7 @@ export const useAuthStore = defineStore('auth', () => {
     // site for why). Also the source of isSuperAdmin.value used by the
     // deactivation exemption check just below.
     await refreshOrgClaim(activeId, membershipJustCreated)
+    if (isStale()) return
 
     // R213 (Phase 76) — once 76-01-PLAN.md's firestore.rules ship, this read
     // is DENIED (rejects) for a deactivated org's ordinary (non-super-admin)
@@ -500,10 +527,15 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       orgSnap = await getDoc(orgRef)
     } catch {
+      // 111-REVIEW CR-01: this resetOrgContext()/memberUnsub-teardown branch
+      // was previously completely unguarded — a stale call reaching here
+      // could tear down a newer call's live listener. Gate it.
+      if (isStale()) return
       resetOrgContext()
       deactivatedOrgMessage.value = DEACTIVATED_ORG_MESSAGE
       return
     }
+    if (isStale()) return
     if (orgSnap.exists()) {
       const orgData = orgSnap.data()
 
@@ -514,6 +546,10 @@ export const useAuthStore = defineStore('auth', () => {
       // exemption for a super-admin with a genuine membership doc).
       const isActive = (orgData.active as boolean | undefined) ?? true
       if (isActive === false && !isSuperAdmin.value) {
+        // 111-REVIEW CR-01: same reasoning as the catch block above — this
+        // resetOrgContext() branch is a memberUnsub-teardown site and must
+        // never run for a superseded call.
+        if (isStale()) return
         resetOrgContext()
         deactivatedOrgMessage.value = DEACTIVATED_ORG_MESSAGE
         return
@@ -522,15 +558,13 @@ export const useAuthStore = defineStore('auth', () => {
       applyOrgSnapshot(orgData)
     }
 
-    // ARCH-001 — the epoch re-check. This sits AFTER loadOrgContext's last
-    // await (the getDoc immediately above) and BEFORE the memberUnsub
-    // onSnapshot assignment below, so check-then-assign runs synchronously
-    // with no await between them (T-111-01). If a newer loadOrgContext call
-    // has started since this one began, myEpoch no longer matches the
-    // current counter: this call has been superseded and must NOT touch
-    // memberUnsub (the newer call owns it) — return here, before creating
-    // an onSnapshot of our own, so nothing is left to leak/orphan.
-    if (myEpoch !== loadOrgContextEpoch) {
+    // ARCH-001 — the final epoch re-check, immediately before the
+    // memberUnsub onSnapshot assignment below, so check-then-assign runs
+    // synchronously with no await between them (T-111-01). Kept in addition
+    // to (not instead of) the isStale() checkpoints above — this is the last
+    // line of defense right before the one write every earlier checkpoint
+    // exists to protect.
+    if (isStale()) {
       return
     }
 
