@@ -643,10 +643,17 @@ export const useAuthStore = defineStore('auth', () => {
     if (!currentUser) return
     if (!memberships.value.some((m) => m.id === targetOrgId)) return
     rememberOrg(currentUser.uid, targetOrgId)
+    // WR-04 (111-REVIEW-2.md) — capture this call's epoch BEFORE the dynamic
+    // import's await, matching enterOrgAsSuperAdmin/exitSuperAdminView/
+    // logout, and re-check it immediately after: a superseded selectOrg
+    // (superseded by e.g. a faster overlapping selectOrg/enterOrgAsSuperAdmin/
+    // logout) must not wipe a newer call's org-scoped store data.
+    const myEpoch = ++loadOrgContextEpoch
     // Quick 260823-switch-church-cache: clear stale org-scoped store data before
     // loading the newly-selected church so nothing from the previous church
     // flashes during the switch.
     const { resetOrgScopedStores } = await import('./orgScopedStores')
+    if (myEpoch !== loadOrgContextEpoch) return
     resetOrgScopedStores()
     await loadOrgContext(currentUser.uid, false)
   }
@@ -676,6 +683,10 @@ export const useAuthStore = defineStore('auth', () => {
     // church being entered never briefly shows the previous church's services/
     // songs/roster while their listeners re-point.
     const { resetOrgScopedStores } = await import('./orgScopedStores')
+    // WR-04 (111-REVIEW-2.md) — re-check after the dynamic import's await: a
+    // newer org-context call may already be repopulating the org-scoped
+    // stores; a superseded enterOrgAsSuperAdmin must not wipe them.
+    if (myEpoch !== loadOrgContextEpoch) return false
     resetOrgScopedStores()
     let orgSnap
     try {
@@ -701,8 +712,9 @@ export const useAuthStore = defineStore('auth', () => {
     // own resetOrgContext() call, matching enterOrgAsSuperAdmin's pattern, so
     // a loadOrgContext call already in flight (and possibly already holding
     // a live memberUnsub listener) is superseded and its own isStale() check
-    // catches it instead of this call's resetOrgContext() racing it.
-    loadOrgContextEpoch++
+    // catches it instead of this call's resetOrgContext() racing it. Captured
+    // into myEpoch so WR-04 below can also re-check after its own await.
+    const myEpoch = ++loadOrgContextEpoch
     // IN-01 (78-REVIEW.md): resetOrgContext() below already sets
     // viewingAsSuperAdmin.value = null -- no separate clear needed here.
     resetOrgContext()
@@ -710,6 +722,13 @@ export const useAuthStore = defineStore('auth', () => {
     // before restoring the super-admin's own church so its services/songs/etc.
     // don't linger during the switch back.
     const { resetOrgScopedStores } = await import('./orgScopedStores')
+    // WR-04 (111-REVIEW-2.md) — re-check after the dynamic import's await: a
+    // newer org-context call may already be repopulating the org-scoped
+    // stores. Bail entirely (not just skip the wipe) so this superseded call
+    // also doesn't proceed to the loadOrgContext() call below, which would
+    // otherwise re-bump the epoch and incorrectly reclaim "newest" status
+    // out from under whichever call actually superseded this one.
+    if (myEpoch !== loadOrgContextEpoch) return
     resetOrgScopedStores()
     // Quick 260823: restore the super-admin's OWN church context so exiting a
     // visited church returns them to their normal nav (own church + Owner
@@ -837,7 +856,9 @@ export const useAuthStore = defineStore('auth', () => {
     // WR-01 (111-REVIEW.md) — see the matching comment in onAuthStateChanged's
     // sign-out branch: invalidate any loadOrgContext call still in flight so
     // it cannot attach a fresh memberUnsub listener after this signs out.
-    loadOrgContextEpoch++
+    // Captured into myEpoch so WR-04 (111-REVIEW-2.md) below can re-check
+    // after its own await.
+    const myEpoch = ++loadOrgContextEpoch
     clearRememberedOrg()
     memberships.value = []
     orgId.value = null
@@ -860,7 +881,14 @@ export const useAuthStore = defineStore('auth', () => {
     // mid-signOut. Same dynamic-import pattern selectOrg/enterOrgAsSuperAdmin/
     // exitSuperAdminView already use (avoids an auth<->store import cycle).
     const { resetOrgScopedStores } = await import('./orgScopedStores')
-    resetOrgScopedStores()
+    // WR-04 (111-REVIEW-2.md) — re-check after the dynamic import's await: if
+    // a newer org-context call started while logout awaited, skip wiping its
+    // freshly-loading org-scoped stores. Sign-out itself always still
+    // completes below — logging out must remain reliable even in this
+    // narrow race.
+    if (myEpoch === loadOrgContextEpoch) {
+      resetOrgScopedStores()
+    }
     await signOut(auth)
   }
 
