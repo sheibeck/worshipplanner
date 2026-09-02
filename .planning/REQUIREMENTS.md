@@ -76,7 +76,7 @@ remediating the Critical/High findings.
 |-------------|-------|--------|
 | R316 | Phase 108 | Complete |
 | R317 | Phase 108 | Complete |
-| R318 | Phase 109 | In Progress (109-02 backend subset done; 109-03/04/05 pending) |
+| R318 | Phase 109 | In Progress (109-02 backend + 109-03 utils subsets done; 109-04/05 pending) |
 | R319 | Phase 109 | Complete |
 | R320 | Phase 110 | Pending |
 | R321 | Phase 111 | Pending |

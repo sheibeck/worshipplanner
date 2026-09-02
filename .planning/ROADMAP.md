@@ -622,7 +622,7 @@ future comments short.
   3. A spot-check across the affected files shows no paragraph-length inline "how it works" narration remaining where a map doc now covers it (R318).
   4. `npm run type-check` and the full test suite pass unchanged — comment-only changes (R318).
 
-**Plans**: 2/5 plans executed
+**Plans**: 3/5 plans executed
 
 Plans:
 **Wave 1**
@@ -632,7 +632,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 109-03-PLAN.md — R318 utils sweep: relocate + shrink `src/utils/**` Bucket B comments into the map docs [wave 2]
+- [x] 109-03-PLAN.md — R318 utils sweep: relocate + shrink `src/utils/**` Bucket B comments into the map docs [wave 2]
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
