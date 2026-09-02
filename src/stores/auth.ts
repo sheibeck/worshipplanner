@@ -611,6 +611,12 @@ export const useAuthStore = defineStore('auth', () => {
       const { membershipCreated } = await ensureUserDocument(firebaseUser)
       await loadOrgContext(firebaseUser.uid, membershipCreated)
     } else {
+      // WR-01 (111-REVIEW.md) — invalidate any loadOrgContext call still in
+      // flight (e.g. suspended in refreshOrgClaim's retry window) BEFORE
+      // tearing down memberUnsub below, so that call's own isStale() check
+      // (whichever checkpoint it resumes at) finds a mismatch and can never
+      // attach a fresh listener for an already-signed-out session.
+      loadOrgContextEpoch++
       orgId.value = null
       orgName.value = null
       orgSlug.value = null
@@ -812,6 +818,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
+    // WR-01 (111-REVIEW.md) — see the matching comment in onAuthStateChanged's
+    // sign-out branch: invalidate any loadOrgContext call still in flight so
+    // it cannot attach a fresh memberUnsub listener after this signs out.
+    loadOrgContextEpoch++
     clearRememberedOrg()
     memberships.value = []
     orgId.value = null
