@@ -39,7 +39,7 @@ church-projector run, so a projectionist can set up and read the live output wit
   where roles would not hold once a third monitor was present is fixed (the single-select model that
   collapsed is replaced).
 
-- [ ] **R327**: When the operator launches the outputs, each output window opens on **its assigned
+- [x] **R327**: When the operator launches the outputs, each output window opens on **its assigned
   display on macOS/Chrome**, not just on the developer's laptop — the Mac tab/window-placement failure is
   fixed rather than worked around with manual dragging.
 
@@ -117,7 +117,7 @@ church-projector run, so a projectionist can set up and read the live output wit
 | R324 | Phase 114 | Complete |
 | R325 | Phase 114 | Complete |
 | R326 | Phase 114 | Complete |
-| R327 | Phase 114 | Pending |
+| R327 | Phase 114 | Complete |
 | R328 | Phase 114 | Complete |
 | R338 | Phase 114 | Complete |
 | R329 | Phase 115 | Pending |
