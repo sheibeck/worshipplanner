@@ -1,6 +1,7 @@
 // R329 — replaces the manual `--slide-font-scale` sm/md/lg multiplier with a
 // measure-and-fit engine. See .planning/codebase/ARCHITECTURE.md (§ Component &
 // Composable Behavioral Notes) and docs/adr/ for the auto-fit rationale.
+import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
 
 /** Identity default — the scale used whenever layout is unavailable (jsdom/SSR)
  *  or nothing fits, so no consumer ever renders zero-size or NaN-scaled text. */
@@ -74,4 +75,109 @@ export function computeContainScale(
     return DEFAULT_FIT_SCALE
   }
   return Math.min(containerW / refW, containerH / refH)
+}
+
+export interface UseSlideAutoFitResult {
+  frameRef: Ref<HTMLElement | null>
+  contentRef: Ref<HTMLElement | null>
+  scale: Ref<number>
+  /** Re-runs the fit measurement — call on slide change / after fontReady. */
+  retrigger: () => void
+}
+
+/**
+ * Per-slide text fit: measures `contentRef` against `frameRef` and exposes a
+ * reactive `scale` (the largest fitting scale, capped at `options.max`).
+ * Re-measured on mount, on `retrigger()`, and via a feature-detected
+ * ResizeObserver on the frame. Never throws; degrades to DEFAULT_FIT_SCALE
+ * wherever layout is unavailable (mirrors RunPreviewPair's useScaleToFit).
+ */
+export function useSlideAutoFit(options?: { max?: number }): UseSlideAutoFitResult {
+  const frameRef = ref<HTMLElement | null>(null)
+  const contentRef = ref<HTMLElement | null>(null)
+  const scale = ref(DEFAULT_FIT_SCALE)
+  let observer: ResizeObserver | null = null
+
+  function measure() {
+    const frame = frameRef.value
+    const content = contentRef.value
+    if (!frame || !content) return
+
+    const frameW = frame.clientWidth
+    const frameH = frame.clientHeight
+    if (frameW <= 0 || frameH <= 0) {
+      scale.value = DEFAULT_FIT_SCALE
+      return
+    }
+
+    const fits = (trial: number) => {
+      content.style.setProperty('--slide-fit-scale', String(trial))
+      const w = content.scrollWidth
+      const h = content.scrollHeight
+      return w <= frameW && h <= frameH
+    }
+
+    const result = computeFitScale(fits, { max: options?.max ?? MAX_FIT_SCALE })
+    content.style.setProperty('--slide-fit-scale', String(result))
+    scale.value = result
+  }
+
+  function retrigger() {
+    measure()
+  }
+
+  onMounted(() => {
+    measure()
+    if (typeof ResizeObserver !== 'undefined' && frameRef.value) {
+      observer = new ResizeObserver(() => measure())
+      observer.observe(frameRef.value)
+    }
+  })
+
+  onBeforeUnmount(() => {
+    observer?.disconnect()
+    observer = null
+  })
+
+  return { frameRef, contentRef, scale, retrigger }
+}
+
+export interface UseContainScaleResult {
+  containerRef: Ref<HTMLElement | null>
+  scale: Ref<number>
+}
+
+/**
+ * Geometric scale-to-contain of a fixed reference stage (default
+ * REFERENCE_WIDTH x REFERENCE_HEIGHT) inside `containerRef`. Re-measured on
+ * mount and via a feature-detected ResizeObserver; degrades to
+ * DEFAULT_FIT_SCALE (1) wherever layout is unavailable.
+ */
+export function useContainScale(options?: { refW?: number; refH?: number }): UseContainScaleResult {
+  const containerRef = ref<HTMLElement | null>(null)
+  const scale = ref(DEFAULT_FIT_SCALE)
+  const refW = options?.refW ?? REFERENCE_WIDTH
+  const refH = options?.refH ?? REFERENCE_HEIGHT
+  let observer: ResizeObserver | null = null
+
+  function measure() {
+    const el = containerRef.value
+    if (!el) return
+    scale.value = computeContainScale(el.clientWidth, el.clientHeight, refW, refH)
+  }
+
+  onMounted(() => {
+    measure()
+    if (typeof ResizeObserver !== 'undefined' && containerRef.value) {
+      observer = new ResizeObserver(() => measure())
+      observer.observe(containerRef.value)
+    }
+  })
+
+  onBeforeUnmount(() => {
+    observer?.disconnect()
+    observer = null
+  })
+
+  return { containerRef, scale }
 }

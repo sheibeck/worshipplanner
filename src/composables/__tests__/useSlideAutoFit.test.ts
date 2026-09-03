@@ -4,16 +4,32 @@
  *
  * Task 1 — pure fit math (computeFitScale, computeContainScale, constants):
  * driven by injected numeric oracles, no DOM/mounting.
+ *
+ * Task 2 — the ResizeObserver composable shells (useSlideAutoFit,
+ * useContainScale): mounted through a trivial host component (same harness
+ * idiom as useOutputWindow.test.ts) so onMounted/onBeforeUnmount actually run.
+ * jsdom has no layout engine, so these only assert the documented no-layout
+ * fallback (scale stays DEFAULT_FIT_SCALE) and that mount/retrigger/unmount
+ * never throw — real measured scales are covered by Plan 03's integration and
+ * the batched hardware UAT.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
+import { mount, enableAutoUnmount } from '@vue/test-utils'
+import { defineComponent, h } from 'vue'
 import {
   computeFitScale,
   computeContainScale,
+  useSlideAutoFit,
+  useContainScale,
   DEFAULT_FIT_SCALE,
   MAX_FIT_SCALE,
   REFERENCE_WIDTH,
   REFERENCE_HEIGHT,
+  type UseSlideAutoFitResult,
+  type UseContainScaleResult,
 } from '../useSlideAutoFit'
+
+enableAutoUnmount(afterEach)
 
 describe('constants', () => {
   it('REFERENCE_WIDTH/HEIGHT are the canonical 1280x720 stage', () => {
@@ -76,5 +92,60 @@ describe('computeContainScale', () => {
 
   it('returns DEFAULT_FIT_SCALE for negative input', () => {
     expect(computeContainScale(-100, 1080, 1280, 720)).toBe(DEFAULT_FIT_SCALE)
+  })
+})
+
+// ── Composable shells ────────────────────────────────────────────────────────
+
+let capturedFit: UseSlideAutoFitResult | null = null
+const FitHost = defineComponent({
+  name: 'UseSlideAutoFitHost',
+  setup() {
+    capturedFit = useSlideAutoFit()
+    return () =>
+      h('div', { ref: capturedFit!.frameRef }, [h('div', { ref: capturedFit!.contentRef })])
+  },
+})
+
+let capturedContain: UseContainScaleResult | null = null
+const ContainHost = defineComponent({
+  name: 'UseContainScaleHost',
+  setup() {
+    capturedContain = useContainScale()
+    return () => h('div', { ref: capturedContain!.containerRef })
+  },
+})
+
+describe('useSlideAutoFit — no-layout fallback (jsdom/SSR)', () => {
+  it('exposes frameRef, contentRef, scale, and retrigger; scale is DEFAULT_FIT_SCALE with no real layout', () => {
+    const wrapper = mount(FitHost)
+    expect(capturedFit).not.toBeNull()
+    expect(capturedFit!.scale.value).toBe(DEFAULT_FIT_SCALE)
+    wrapper.unmount()
+  })
+
+  it('retrigger() is a safe no-op that leaves scale at the default', () => {
+    mount(FitHost)
+    expect(() => capturedFit!.retrigger()).not.toThrow()
+    expect(capturedFit!.scale.value).toBe(DEFAULT_FIT_SCALE)
+  })
+
+  it('unmounts without throwing (ResizeObserver disconnect guard)', () => {
+    const wrapper = mount(FitHost)
+    expect(() => wrapper.unmount()).not.toThrow()
+  })
+})
+
+describe('useContainScale — no-layout fallback (jsdom/SSR)', () => {
+  it('exposes containerRef and scale; scale is DEFAULT_FIT_SCALE (1) with a 0-size container', () => {
+    const wrapper = mount(ContainHost)
+    expect(capturedContain).not.toBeNull()
+    expect(capturedContain!.scale.value).toBe(DEFAULT_FIT_SCALE)
+    wrapper.unmount()
+  })
+
+  it('unmounts without throwing (ResizeObserver disconnect guard)', () => {
+    const wrapper = mount(ContainHost)
+    expect(() => wrapper.unmount()).not.toThrow()
   })
 })
