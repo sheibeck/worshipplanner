@@ -28,10 +28,10 @@ church-projector run, so a projectionist can set up and read the live output wit
 
 ### Multi-Monitor Assignment (Run the Service)
 
-- [ ] **R324**: The monitor-configuration screen detects and lists **every** connected display for role
+- [x] **R324**: The monitor-configuration screen detects and lists **every** connected display for role
   assignment, with no cap at two monitors (verified against a real 3-monitor setup).
 
-- [ ] **R325**: A user can assign any output role (Audience / Confidence) to any detected monitor,
+- [x] **R325**: A user can assign any output role (Audience / Confidence) to any detected monitor,
   including assigning **Audience to more than one monitor at the same time** — selecting a role on one
   monitor no longer clears it on another.
 
@@ -114,8 +114,8 @@ church-projector run, so a projectionist can set up and read the live output wit
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R324 | Phase 114 | Pending |
-| R325 | Phase 114 | Pending |
+| R324 | Phase 114 | Complete |
+| R325 | Phase 114 | Complete |
 | R326 | Phase 114 | Complete |
 | R327 | Phase 114 | Pending |
 | R328 | Phase 114 | Complete |

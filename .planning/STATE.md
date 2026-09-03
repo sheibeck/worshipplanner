@@ -5,15 +5,15 @@ milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
 current_phase: 114
 current_phase_name: Multi-Monitor Assignment Rework
 status: executing
-stopped_at: Completed 114-01-PLAN.md
-last_updated: "2026-09-03T12:05:03.960Z"
+stopped_at: Completed 114-03-PLAN.md
+last_updated: "2026-09-03T13:50:56.669Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 114 execution started
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 3
   percent: 0
 ---
 
@@ -1221,7 +1221,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 114 (Multi-Monitor Assignment Rework) — EXECUTING
-Plan: 2 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 114 execution started
 
@@ -3147,6 +3147,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 113 P02 | 27min | 2 tasks | 3 files |
 | Phase 113 P03 | 8min | 1 tasks | 1 files |
 | Phase 114 P01 | 27min | 3 tasks | 4 files |
+| Phase 114 P03 | 40min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -3657,6 +3658,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Consolidated all 11 Medium/Low Phase 112 security findings into ONE Phase 999.5 backlog entry (999.5 via phase.next-decimal 999), pointing to 112-SECURITY-REVIEW.md rather than duplicating detail.
 - [Phase ?]: Monitor identity fingerprint drops left/top/isPrimary entirely (macOS-volatile) — never re-add for 'accuracy'
 - [Phase ?]: computeFingerprint kept as backward-compatible single-arg overload; Wave 2 plans migrate call sites to pass allScreens
+- [Phase ?]: R327 (macOS output placement) deliberately NOT marked complete by 114-03 — only the URL/fingerprint plumbing it depends on; Plan 04 + real-hardware UAT complete it.
+- [Phase ?]: A refused Confidence window no longer blocks go-live (>=1-Audience gate replaces the old both-must-open rule, per CONTEXT.md); RunHeader's role-keyed dots kept reopenOutput/fullscreenDisplay accepting either a role or a fingerprint id permanently.
 
 ### Roadmap Evolution
 
@@ -3984,8 +3987,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-03T12:05:03.891Z
-Stopped at: Completed 114-01-PLAN.md
+Last session: 2026-09-03T13:50:56.557Z
+Stopped at: Completed 114-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
