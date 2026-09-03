@@ -46,6 +46,11 @@ church-projector run, so a projectionist can set up and read the live output wit
 - [ ] **R328**: The monitor auto-detect no longer falsely reports "your monitors changed" when the
   physical display layout is unchanged; a saved mapping re-loads without a spurious re-configure prompt.
 
+- [ ] **R338**: A user can assign a **nickname** to each detected monitor (many report as a number or
+  "Unknown" on macOS), persisted with that monitor's identity and shown on the setup + assignment UI so
+  roles can be assigned to the right physical screen with confidence. *(Added 2026-09-02 during Phase 114
+  discuss.)*
+
 ### Live-Output Readability & Layout
 
 - [ ] **R329**: Slide text **auto-scales to fill the output display** (Audience and Confidence) so it is
@@ -110,6 +115,7 @@ church-projector run, so a projectionist can set up and read the live output wit
 | R326 | Phase 114 | Pending |
 | R327 | Phase 114 | Pending |
 | R328 | Phase 114 | Pending |
+| R338 | Phase 114 | Pending |
 | R329 | Phase 115 | Pending |
 | R330 | Phase 115 | Pending |
 | R331 | Phase 115 | Pending |
@@ -122,4 +128,5 @@ church-projector run, so a projectionist can set up and read the live output wit
 
 *Filled by the roadmapper — each requirement maps to exactly one phase.*
 
-**Coverage: 14/14 v2.9 requirements mapped, 100%. No orphans, no duplicates.**
+**Coverage: 15/15 v2.9 requirements mapped, 100%. No orphans, no duplicates.** *(R338 added 2026-09-02
+during Phase 114 discuss — monitor nicknames.)*
