@@ -659,6 +659,23 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
+*Last updated: 2026-09-02 — archived milestone v2.8 Production Hardening: Comments-as-Specs, Architecture
+& Security Review (Phases 108–113, R316–R323), shipped & deployed to production 2026-09-02. Comments-as-specs:
+696 load-bearing comments inventoried → 244 MADR-lite ADRs under `docs/adr/` (decision-rationale) + 309
+behavioral comments relocated into `.planning/codebase/` map docs, source comments shrunk to pointers, plus
+a written comment convention. Architectural review → the one High (ARCH-001, a `loadOrgContext` re-entrancy/
+listener-leak race) fixed; 22 Medium/Low → backlog 999.4. Security review found a **proven, live, production
+cross-tenant data leak** — SEC-S-01: `shareTokens`/`quarterShares`/`serviceShares` were publicly *listable*
+(unauthenticated enumeration of every church's shared plans + volunteer names) — fixed (get/list split +
+org-gated list + org-scoped client queries), together with SEC-ISO-01 (legacy client org self-provisioning
+removed) and SEC-ISO-02 (`revokeRefreshTokens` on member removal); 11 Medium/Low → backlog 999.5. Coordinated
+owner-authorized prod deploy (hosting + firestore:rules + functions:syncOrgMembershipClaim). Audit PASSED
+(8/8 reqs, 6/6 phases, 6/6 integration WIRED); the adversarial code-review chain caught 3 blockers pre-ship.
+Run via `/gsd-autonomous`. Also captured backlog 999.3 (multi-monitor signal routing) mid-run. Archived:
+`milestones/v2.8-ROADMAP.md` · `milestones/v2.8-REQUIREMENTS.md` · `milestones/v2.8-MILESTONE-AUDIT.md` ·
+`milestones/v2.8-phases/`. Previous footer below.*
+
+---
 *Last updated: 2026-08-31 — started milestone v2.7 Rehearsal, Stage Plans & Presentation Polish (8 features:
 inline black lyric slide, Audience-only "Go to black", system-wide dismissible messages, per-item loop,
 user-menu church switcher, song rehearsal attachments PDF/MP3/YouTube, Rehearse mode on the shared link, and

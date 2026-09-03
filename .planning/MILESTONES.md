@@ -1,5 +1,33 @@
 # Milestones
 
+## v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (Shipped: 2026-09-02)
+
+**Phases completed:** 6 phases, 19 plans, 38 tasks
+
+**Key accomplishments:**
+
+- Grep-first triage inventory of all 696 load-bearing comments across the runtime codebase, classified into Decision-Rationale (382, ready for ADR extraction in 108-02), Behavioral/Architectural (309, handed off to Phase 109), and Genuinely-Local (5) buckets, with a Tag Collision Index warning that this codebase's WR-/CR- tags are per-file labels, not a global namespace.
+- Extracted 382 tagged decision-rationale comments into 244 MADR-lite ADRs under `docs/adr/`, then shrank 381 of them across 93 source files to `// See ADR-NNNN (...)` pointers — comment-only, zero behavior change, verified by a clean type-check plus unchanged app/render-service/rules test baselines.
+- Wrote the durable "Comment Convention" section in CONVENTIONS.md (short inline comments; rationale in ADRs; behavior/architecture in `.planning/codebase/` map docs; two documented pointer forms) plus a one-line CLAUDE.md pointer, satisfying R319.
+- Relocated 76 backend "how it works" comments from functions/src/
+- Relocated all 80 Bucket-B "how it works" comment entries from the 34 src/utils/
+- Relocated all 85 in-scope Bucket B "how it works" comments from `src/components/
+- 1. [Rule 1 - Bug] Two ServiceEditorView.vue handoff entries missed on first content-search pass
+- Traced every org-scoped Pinia store's `onSnapshot`
+- Spot-checked `.planning/codebase/ARCHITECTURE.md`'s documented
+- Merged 24 named findings from the two Phase 110 review passes into one 23-ID, severity-ranked report (`110-ARCHITECTURE-REVIEW.md`) with exactly one High finding scoped to Phase 111 and 22 Medium/Low findings triaged to backlog.
+- Closed the sole High architectural finding (ARCH-001) with a store-layer epoch guard in auth.ts's `loadOrgContext` plus a matching UI in-flight guard on AppShell.vue's exit button, both proven by a regression test and a full no-regression gate (type-check + app-suite baseline + render-service 39/39).
+- Consolidated all 22 Medium/Low architectural findings (ARCH-002..023) into one Phase 999.4 backlog entry in ROADMAP.md, pointing at the Phase 110 report for full detail instead of creating 22 near-empty stubs.
+- Reviewed firestore.rules/storage.rules and multi-tenant isolation grounded in a live 200/200-passing Firestore rules-emulator run; found a legacy client-side org self-provisioning bypass (High) and a member-removal Storage-claim revocation gap (High), plus one Medium provenance-forgery gap and three Low/informational notes.
+- Static security review of auth.ts custom-claims, router guards, and every Cloud Functions handler's server-side authz — surfaced an unauthenticated `/api/planningcenter` proxy route, and used live `firebase functions:list` evidence to overturn Phase 110's stale "undeployed provisioning functions" premise while independently re-scoring the super-admin universal-grant residual (ARCH-018) as a genuine Medium finding.
+- Live Firestore-emulator probe proves `shareTokens`/`quarterShares`/`serviceShares` are fully LISTABLE (not just gettable) via `allow read: if true`, exposing every organization's shared service plans and volunteer names cross-tenant with no token needed — the review's single Critical finding, plus 4 Medium/Low share/PII findings and 6 cost/abuse findings (2 Medium, 4 confirmed-sound-or-Low), all written to `112-FINDINGS-sharetoken-pii-abuse.md`.
+- Consolidated three per-dimension findings files (rules-isolation, auth-functions, sharetoken-pii-abuse) into the single 112-SECURITY-REVIEW.md, surfacing 1 Critical + 2 High findings as Phase 113's exact remediation scope, with 11 Medium/Low findings routed to backlog.
+- 3/3 (Task 3 verification + this summary finished by the orchestrator after the executor
+- Added `getAuth().revokeRefreshTokens(uid)` to `syncOrgMembershipClaimHandler`'s clear branch, closing the ~55-minute stale-token Storage authz window on member removal, with a functions unit test proving it fires and a Storage ALLOW-case proving scoped blast radius.
+- Consolidated all 11 Medium/Low Phase 112 security findings into one new ### Phase 999.5 ROADMAP.md backlog entry, pointing to 112-SECURITY-REVIEW.md for full detail — no code changed, nothing deployed.
+
+---
+
 ## v2.7 Rehearsal, Stage Plans & Presentation Polish (Shipped: 2026-09-01)
 
 **Phases completed:** 4 phases (104–107), 10 plans
@@ -20,24 +48,30 @@ on 2026-09-01 and all three phases PASSED — a verified closeout.
   configured" warning made state-driven, and a user-menu church switcher (`selectOrg` +
   `resetOrgScopedStores`, distinct from super-admin enter-any-church). Code review caught a Critical R312
   org-scoped listener leak in `TeamView`/`GettingStarted` — fixed with reactive re-subscription.
+
 - **Phase 105 — Blackout & Inline Black Slide (R302–R305):** an additive `LyricSection.kind` blackout
   slide (excluded from numbering), solid-black render on every surface, and "Go to black" scoped to the
   Audience output only.
+
 - **Phase 106 — Per-Item Loop (R306–R308):** `slot.loop {enabled,intervalSeconds}` (default 10s,
   preset+custom) driven from `useRunControl.postIndex`'s single writer; go-to-black pauses the loop.
+
 - **Phase 107 — Visual Stage Layout (R313–R315):** an additive `Service.stageLayout` field (no new
   collection/rules/store) with a native-Pointer-Events drag canvas + draft-locked Stage Layout tab, and a
   read-only render on the public share snapshot + print.
+
 - **Post-audit interactive polish (same milestone/tag):** the Stage Layout was redesigned to the owner's
   imported "Nocturne" design (single-room diagram, palette, icon-tile markers, inspector slide-over);
   Instruments mirror the org's Band roles with person "Name - Role" assignment + notes + "+ Vocal";
   stage share/print split out (landscape `?view=stage` + landscape B&W "Print for tech"); loop authoring
   relocated to the Slide editor (MISC/Announcement-only); and button-area consistency (Run primary in the
   cluster, Present→"Review Slides", Save rightmost + dropped from Slides, save-status into the header).
+
 - **A WYSIWYG stage bug was diagnosed in the running app** (via browser inspection): Tailwind v4's
   `-translate-x/y-1/2` emits the CSS `translate` property, which stacked with the editor's inline
   `transform` translate and drew markers half a tile too far left only while editing — fixed with a single
   inline-transform centering + a hard-coded room size so editing/locked/share/print render identically.
+
 - Full suite = only the two documented baselines fail (`storage.rules.test.ts`, stale `appConfig.test.ts`);
   type-check clean.
 
@@ -59,11 +93,13 @@ hosting; tag `v2.6`). Closed on owner acceptance; human/visual UAT was deferred 
   client-write-denied in `firestore.rules`, defaulting every org (including Berean) to OFF with no data
   migration; an `authStore` mirror plus an `OrgConfigDrawer` checkbox and an at-a-glance Organizations-list
   badge surface the state.
+
 - **Phase 102 — Gated Scripture Fetch Dispatcher:** a new `src/utils/scriptureApi.ts` choke point (the
   `isAiEnabled()` analog) replaced the previously split direct calls to `esvApi.ts`/`nltApi.ts` from
   `ScriptureInput.vue` and `CongregationalEditor.vue`, with an independent server-side
   `checkOrgBibleEnablement` gate added to the `api` proxy's `esv`/`nlt` branches as defense-in-depth — zero
   regression for an enabled org.
+
 - **Phase 103 — Manual Fallback When Off:** an "Open in BibleGateway" deep-link (any version, reusing the
   existing `scripture.ts` link builder) and Settings' "Bible Translation" card hidden when the API is off,
   mirroring the AI Features card. **Owner refinement post-Phase-103 (2026-08-31):** the originally-built
@@ -71,11 +107,13 @@ hosting; tag `v2.6`). Closed on owner acceptance; human/visual UAT was deferred 
   reference-only (deep-link only) when off, and a congregational reading is composed directly in the
   existing bottom reading/format textarea, with the LLM split still operating on that text under the
   independent AI gate.
+
 - **Two code-review rounds caught and fixed real defects before ship:** Phase 102's review caught a live
   gate bypass in `planningCenterApi.ts`'s scripture-push branch (a Planning-Center-export path reaching
   ESV/NLT without the new per-org gate); Phase 103's review caught two fallback data-loss bugs — pasted
   text silently erased by a reference edit or the still-visible Preview button, and paste-box keystrokes
   clobbering an AI split or a manual edit.
+
 - Milestone audit independently re-ran all three test/type gates (type-check clean; app suite 175/177
   files with only the two pre-existing baseline failures; functions suite 636/636) and traced the full
   toggle → dispatcher gate → fallback UI path end to end against live source — PASSED 7/7 requirements,

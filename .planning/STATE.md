@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)"
-current_phase: 999.5
-current_phase_name: 11
-status: planning
+status: completed
 stopped_at: Completed 113-03-PLAN.md
-last_updated: "2026-09-03T00:17:59.918Z"
+last_updated: "2026-09-03T00:30:31.810Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 113 complete, transitioned to Phase 999.5
+last_activity_desc: Milestone v2.8 completed and archived
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 19
   completed_plans: 19
   percent: 100
+current_phase: 999.5
+current_phase_name: 11
 ---
 
 ## Human UAT — completed & PASSED
@@ -45,7 +45,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
 
-**Status:** Ready to plan
+**Status:** v2.8 milestone complete
 `/gsd-plan-phase 108`.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
@@ -1181,10 +1181,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 999.5 — v2.8 Security Review — Medium/Low findings (11) (BACKLOG)
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-09-02 — Phase 113 complete, transitioned to Phase 999.5
+Phase: Milestone v2.8 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-02 — Milestone v2.8 completed and archived
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
 
