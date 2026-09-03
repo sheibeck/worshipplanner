@@ -6,8 +6,9 @@ import {
   loadMapping,
   matchMapping,
   MONITOR_CONFIG_STORAGE_KEY,
+  SCREEN_QUERY_PARAM,
 } from '@/utils/monitorConfig'
-import type { ScreenLike, MonitorMapping } from '@/utils/monitorConfig'
+import type { ScreenLike, MonitorMapping, MonitorAssignment } from '@/utils/monitorConfig'
 
 /** A minimal in-memory Storage-like stub, clearable between tests. */
 function makeMemoryStorage(): Storage {
@@ -190,10 +191,19 @@ describe('saveMapping / loadMapping', () => {
   })
 
   it('persists under a fixed device-scoped key with no uid/org interpolation', () => {
-    expect(MONITOR_CONFIG_STORAGE_KEY).toBe('wp:runMonitorConfig:v1')
+    expect(MONITOR_CONFIG_STORAGE_KEY).toBe('wp:runMonitorConfig:v2')
     const mapping: MonitorMapping = { assignments: [], savedAt: 1 }
     saveMapping(mapping, storage)
     expect(storage.getItem(MONITOR_CONFIG_STORAGE_KEY)).not.toBeNull()
+  })
+
+  it('a v1-key payload is invisible to v2 loadMapping (no migration, clean one-time reconfigure)', () => {
+    const v1Mapping: MonitorMapping = {
+      assignments: [{ fingerprint: 'fp-audience', role: 'audience' }],
+      savedAt: 1,
+    }
+    storage.setItem('wp:runMonitorConfig:v1', JSON.stringify(v1Mapping))
+    expect(loadMapping(storage)).toBeNull()
   })
 
   it('saveMapping/loadMapping never throw (and degrade to no-op/null) when merely REFERENCING the global localStorage getter throws — no storageOverride, so resolveStorage\'s global-access branch is genuinely exercised', () => {
@@ -220,11 +230,13 @@ describe('saveMapping / loadMapping', () => {
 })
 
 describe('matchMapping', () => {
-  it('returns matched when every saved fingerprint is present among live screens', () => {
+  it('returns matched when the exact saved layout is still live (silent reuse, R328)', () => {
+    const screenA = makeScreen({ label: 'A' })
+    const screenB = makeScreen({ label: 'B', left: 1920 })
     const saved: MonitorMapping = {
       assignments: [
-        { fingerprint: computeFingerprint(makeScreen({ label: 'A' })), role: 'audience' },
-        { fingerprint: computeFingerprint(makeScreen({ label: 'B', left: 1920 })), role: 'confidence' },
+        { fingerprint: computeFingerprint(screenA, [screenA, screenB]), role: 'audience' },
+        { fingerprint: computeFingerprint(screenB, [screenA, screenB]), role: 'confidence' },
       ],
       savedAt: 1,
     }
@@ -233,32 +245,54 @@ describe('matchMapping', () => {
     expect(result.status).toBe('matched')
   })
 
-  it('returns needs-reprompt when a saved fingerprint is absent from the live set', () => {
-    const saved: MonitorMapping = {
-      assignments: [{ fingerprint: computeFingerprint(makeScreen({ label: 'A' })), role: 'audience' }],
-      savedAt: 1,
-    }
-    const liveScreens = [makeScreen({ label: 'Totally Different', width: 800, height: 600, left: 500, top: 500, isPrimary: false })]
-    const result = matchMapping(saved, liveScreens)
-    expect(result.status).toBe('needs-reprompt')
+  it('returns no-mapping when saved.assignments is empty', () => {
+    const saved: MonitorMapping = { assignments: [], savedAt: 1 }
+    const result = matchMapping(saved, [makeScreen()])
+    expect(result.status).toBe('no-mapping')
   })
 
-  it('returns needs-reprompt when a NEW live screen not present in the saved mapping is plugged in (a genuinely added monitor)', () => {
-    const saved: MonitorMapping = {
-      assignments: [
-        { fingerprint: computeFingerprint(makeScreen({ label: 'A' })), role: 'audience' },
-        { fingerprint: computeFingerprint(makeScreen({ label: 'B', left: 1920 })), role: 'confidence' },
-      ],
-      savedAt: 1,
-    }
-    // Both previously-saved screens are still live (subset check alone would say
-    // "matched"), PLUS a genuinely new third screen the mapping knows nothing about.
+  it('returns partial with kept=all saved + newScreens=[the added one] when a third monitor is added (R326)', () => {
+    const screenA = makeScreen({ label: 'A' })
+    const screenB = makeScreen({ label: 'B', left: 1920 })
+    const assignmentA: MonitorAssignment = { fingerprint: computeFingerprint(screenA, [screenA, screenB]), role: 'audience' }
+    const assignmentB: MonitorAssignment = { fingerprint: computeFingerprint(screenB, [screenA, screenB]), role: 'confidence' }
+    const saved: MonitorMapping = { assignments: [assignmentA, assignmentB], savedAt: 1 }
+    // Both previously-saved screens are still live, PLUS a genuinely new third
+    // screen the mapping knows nothing about.
     const liveScreens = [
       makeScreen({ label: 'A' }),
       makeScreen({ label: 'B', left: 1920 }),
       makeScreen({ label: 'C', left: 3840, isPrimary: false }),
     ]
     const result = matchMapping(saved, liveScreens)
-    expect(result.status).toBe('needs-reprompt')
+    expect(result.status).toBe('partial')
+    if (result.status === 'partial') {
+      expect(result.kept).toHaveLength(2)
+      expect(result.kept).toEqual(expect.arrayContaining([assignmentA, assignmentB]))
+      expect(result.newScreens).toHaveLength(1)
+      expect(result.newScreens[0]).toEqual(liveScreens[2])
+    }
+  })
+
+  it('returns partial with a shrunk kept (missing monitor simply dropped, no error) when a monitor is removed', () => {
+    const screenA = makeScreen({ label: 'A' })
+    const screenB = makeScreen({ label: 'B', left: 1920 })
+    const assignmentA: MonitorAssignment = { fingerprint: computeFingerprint(screenA, [screenA, screenB]), role: 'audience' }
+    const assignmentB: MonitorAssignment = { fingerprint: computeFingerprint(screenB, [screenA, screenB]), role: 'confidence' }
+    const saved: MonitorMapping = { assignments: [assignmentA, assignmentB], savedAt: 1 }
+    // Only screen A is still live; screen B has been unplugged.
+    const liveScreens = [makeScreen({ label: 'A' })]
+    const result = matchMapping(saved, liveScreens)
+    expect(result.status).toBe('partial')
+    if (result.status === 'partial') {
+      expect(result.kept).toEqual([assignmentA])
+      expect(result.newScreens).toHaveLength(0)
+    }
+  })
+})
+
+describe('SCREEN_QUERY_PARAM', () => {
+  it('is the opener->popup fingerprint hand-off contract constant', () => {
+    expect(SCREEN_QUERY_PARAM).toBe('screen')
   })
 })

@@ -31,14 +31,26 @@ export interface MonitorMapping {
   savedAt: number
 }
 
-/** The outcome of comparing a saved mapping against the CURRENT live screens. */
-export type MatchResult = { status: 'matched' } | { status: 'needs-reprompt' }
+/**
+ * The outcome of comparing a saved mapping against the CURRENT live screens —
+ * delta-aware (R326/R328): a partial change keeps the still-live assignments
+ * and reports only the delta, instead of invalidating the whole mapping.
+ */
+export type MatchResultV2 =
+  | { status: 'matched' }
+  | { status: 'partial'; kept: MonitorAssignment[]; newScreens: ScreenLike[] }
+  | { status: 'no-mapping' }
 
 /**
  * The ONE fixed localStorage key this module ever reads or writes.
  * Deliberately carries no uid/org interpolation — see module doc comment.
+ * Bumped v1 -> v2 for the fingerprint/delta-match rework; a v1 value is
+ * simply invisible to v2 code (no migration — one-time reconfigure).
  */
-export const MONITOR_CONFIG_STORAGE_KEY = 'wp:runMonitorConfig:v1'
+export const MONITOR_CONFIG_STORAGE_KEY = 'wp:runMonitorConfig:v2'
+
+/** Opener->popup fingerprint hand-off contract (URL query param name). */
+export const SCREEN_QUERY_PARAM = 'screen'
 
 /** A screen with no label at all degrades to this placeholder rather than throwing. */
 const UNLABELED_PLACEHOLDER = 'unlabeled'
@@ -146,14 +158,18 @@ export function loadMapping(storageOverride?: Storage): MonitorMapping | null {
 
 /**
  * Decides whether a saved mapping can be silently reused against the CURRENT
- * live screens, or whether a genuine layout change requires re-prompting
- * (R268). BIDIRECTIONAL set-equality, not a one-way subset check.
- * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/monitorConfig.ts)
+ * live screens (R328), or whether a partial layout change should keep the
+ * still-live assignments and surface only the delta (R326). Delta-aware —
+ * NOT bidirectional set-equality; see .planning/codebase/ARCHITECTURE.md
+ * (Utils Behavioral Notes — src/utils/monitorConfig.ts).
  */
-export function matchMapping(savedMapping: MonitorMapping, liveScreens: ScreenLike[]): MatchResult {
-  const liveFingerprints = new Set(liveScreens.map((screen) => computeFingerprint(screen)))
+export function matchMapping(savedMapping: MonitorMapping, liveScreens: ScreenLike[]): MatchResultV2 {
+  if (savedMapping.assignments.length === 0) return { status: 'no-mapping' }
+  const fingerprintByScreen = computeFingerprints(liveScreens)
+  const liveFingerprints = new Set(fingerprintByScreen.values())
   const savedFingerprints = new Set(savedMapping.assignments.map((assignment) => assignment.fingerprint))
-  const allSavedFound = savedMapping.assignments.every((assignment) => liveFingerprints.has(assignment.fingerprint))
-  const allLiveKnown = liveScreens.every((screen) => savedFingerprints.has(computeFingerprint(screen)))
-  return allSavedFound && allLiveKnown ? { status: 'matched' } : { status: 'needs-reprompt' }
+  const kept = savedMapping.assignments.filter((assignment) => liveFingerprints.has(assignment.fingerprint))
+  const newScreens = liveScreens.filter((screen) => !savedFingerprints.has(fingerprintByScreen.get(screen)!))
+  if (kept.length === savedMapping.assignments.length && newScreens.length === 0) return { status: 'matched' }
+  return { status: 'partial', kept, newScreens }
 }
