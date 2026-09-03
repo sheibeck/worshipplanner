@@ -332,7 +332,7 @@ function resolveGrantedBranch() {
 
 // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
 function screenSetKey(screens: ScreenLike[]): string {
-  return screens.map(computeFingerprint).sort().join('|')
+  return screens.map((s) => computeFingerprint(s)).sort().join('|')
 }
 
 /** See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md) */

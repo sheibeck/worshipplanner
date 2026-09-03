@@ -43,14 +43,42 @@ export const MONITOR_CONFIG_STORAGE_KEY = 'wp:runMonitorConfig:v1'
 /** A screen with no label at all degrades to this placeholder rather than throwing. */
 const UNLABELED_PLACEHOLDER = 'unlabeled'
 
-/**
- * Synthesizes a stable fingerprint from label + resolution + position +
- * isPrimary (STACK.md/ARCHITECTURE.md). A missing label degrades to a fixed
- * placeholder token instead of throwing or producing `undefined` in the string.
- */
-export function computeFingerprint(screen: ScreenLike): string {
+/** Identity ignores left/top/isPrimary (see ARCHITECTURE.md — those are macOS-volatile). */
+function identityKey(screen: ScreenLike): string {
   const label = screen.label && screen.label.length > 0 ? screen.label : UNLABELED_PLACEHOLDER
-  return `${label}:${screen.width}x${screen.height}:${screen.left},${screen.top}:${screen.isPrimary}`
+  return `${label}:${screen.width}x${screen.height}`
+}
+
+/**
+ * Groups `screens` by identity key, sorts each group by ascending (left, top),
+ * and assigns each screen a fingerprint of `identityKey#index` — the 0-based
+ * position of that screen within its group. See ARCHITECTURE.md.
+ */
+export function computeFingerprints(screens: ScreenLike[]): Map<ScreenLike, string> {
+  const byIdentity = new Map<string, ScreenLike[]>()
+  for (const screen of screens) {
+    const key = identityKey(screen)
+    const group = byIdentity.get(key) ?? []
+    group.push(screen)
+    byIdentity.set(key, group)
+  }
+  const result = new Map<ScreenLike, string>()
+  for (const [key, group] of byIdentity) {
+    const sorted = [...group].sort((a, b) => a.left - b.left || a.top - b.top)
+    sorted.forEach((screen, index) => result.set(screen, `${key}#${index}`))
+  }
+  return result
+}
+
+/**
+ * Computes one screen's v2 fingerprint. When `allScreens` is provided, the
+ * disambiguation index reflects that screen's sorted-position rank within its
+ * identity group; when absent, the screen is treated as a lone group (`#0`) —
+ * kept for call sites that only have one screen in hand. See ARCHITECTURE.md.
+ */
+export function computeFingerprint(screen: ScreenLike, allScreens?: ScreenLike[]): string {
+  if (allScreens) return computeFingerprints(allScreens).get(screen) ?? `${identityKey(screen)}#0`
+  return `${identityKey(screen)}#0`
 }
 
 /**

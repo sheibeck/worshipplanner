@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   computeFingerprint,
+  computeFingerprints,
   saveMapping,
   loadMapping,
   matchMapping,
@@ -62,7 +63,7 @@ function makeScreen(overrides: Partial<ScreenLike> = {}): ScreenLike {
 }
 
 describe('computeFingerprint', () => {
-  it('returns an identical string for two screens sharing label + resolution + position + isPrimary', () => {
+  it('returns an identical string for two screens sharing label + resolution, single-arg form', () => {
     const a = makeScreen()
     const b = makeScreen()
     expect(computeFingerprint(a)).toBe(computeFingerprint(b))
@@ -86,28 +87,59 @@ describe('computeFingerprint', () => {
     expect(computeFingerprint(a)).not.toBe(computeFingerprint(b))
   })
 
-  it('differs when left differs', () => {
-    const a = makeScreen({ left: 0 })
-    const b = makeScreen({ left: 1920 })
-    expect(computeFingerprint(a)).not.toBe(computeFingerprint(b))
-  })
-
-  it('differs when top differs', () => {
-    const a = makeScreen({ top: 0 })
-    const b = makeScreen({ top: 100 })
-    expect(computeFingerprint(a)).not.toBe(computeFingerprint(b))
-  })
-
-  it('differs when isPrimary differs', () => {
-    const a = makeScreen({ isPrimary: true })
-    const b = makeScreen({ isPrimary: false })
-    expect(computeFingerprint(a)).not.toBe(computeFingerprint(b))
+  it('is UNCHANGED when left, top, or isPrimary differ (identity drops the volatile fields)', () => {
+    const a = makeScreen({ left: 0, top: 0, isPrimary: true })
+    const b = makeScreen({ left: 1920, top: 100, isPrimary: false })
+    expect(computeFingerprint(a)).toBe(computeFingerprint(b))
   })
 
   it('degrades a missing label to a fixed placeholder rather than throwing', () => {
     const a = makeScreen({ label: undefined })
     expect(() => computeFingerprint(a)).not.toThrow()
     expect(typeof computeFingerprint(a)).toBe('string')
+  })
+
+  it('computeFingerprint(screen) with no array still returns a valid identity#0 string', () => {
+    const a = makeScreen()
+    expect(computeFingerprint(a)).toBe(computeFingerprint(a, [a]))
+  })
+})
+
+describe('computeFingerprints', () => {
+  it('assigns a single monitor of a given identity the suffix #0', () => {
+    const a = makeScreen()
+    const result = computeFingerprints([a])
+    expect(result.get(a)).toMatch(/#0$/)
+  })
+
+  it('assigns two same-identity screens distinct indices ordered by ascending (left, top)', () => {
+    const a = makeScreen({ left: 0, top: 0 })
+    const b = makeScreen({ left: 1920, top: 0 })
+    const result = computeFingerprints([a, b])
+    expect(result.get(a)).not.toBe(result.get(b))
+    expect(result.get(a)).toMatch(/#0$/)
+    expect(result.get(b)).toMatch(/#1$/)
+  })
+
+  it('two same-identity screens keep the same index when position/isPrimary drift but relative order is preserved', () => {
+    const a = makeScreen({ left: 0, top: 0, isPrimary: true })
+    const b = makeScreen({ left: 1920, top: 0, isPrimary: false })
+    const before = computeFingerprints([a, b])
+    const fpA = before.get(a)
+    const fpB = before.get(b)
+
+    // Drift a's position/primary slightly but preserve relative left-to-right order.
+    const aDrifted = { ...a, left: 10, top: 5, isPrimary: false }
+    const bDrifted = { ...b, left: 1930, top: 15, isPrimary: true }
+    const after = computeFingerprints([aDrifted, bDrifted])
+    expect(after.get(aDrifted)).toBe(fpA)
+    expect(after.get(bDrifted)).toBe(fpB)
+  })
+
+  it('a missing/empty label still degrades to the placeholder token without throwing', () => {
+    const a = makeScreen({ label: undefined })
+    expect(() => computeFingerprints([a])).not.toThrow()
+    expect(computeFingerprints([a]).get(a)).toMatch(/^unlabeled:/)
   })
 })
 
