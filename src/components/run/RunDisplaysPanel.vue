@@ -1,68 +1,78 @@
 <script setup lang="ts">
 // See .planning/codebase/CONCERNS.md (§ Component & Composable Concern Notes (R318) -> src/components/run/RunDisplaysPanel.vue)
+// 114-03: replaced the fixed audience/confidence prop pair with a `displays`
+// v-for (one row per SAVED assignment, any count/role mix) so multiple
+// Audience monitors each get their own row; reopen/fullscreen now emit the
+// display id (fingerprint), not a role.
 import { computed } from 'vue'
 
-type Role = 'audience' | 'confidence'
-type CardState = 'open' | 'closed' | 'closed-muted' | 'not-open'
-
-interface OutputCard {
-  open: boolean
+interface DisplayItem {
+  id: string
+  role: 'audience' | 'confidence'
   label: string
+  open: boolean
+  closed: boolean
+  fullscreen: boolean
 }
 
+type CardState = 'open' | 'closed' | 'closed-muted' | 'not-open'
+
 const props = defineProps<{
-  audience: OutputCard
-  confidence: OutputCard
+  displays: DisplayItem[]
   live: boolean
-  audienceClosed: boolean
-  confidenceClosed: boolean
   reassigning: boolean
-  // REAL fullscreen state per output (reported by each output window). Drives the
-  // per-display button: "Go fullscreen" vs a done ✓, flipping back on an Escape.
-  audienceFullscreen: boolean
-  confidenceFullscreen: boolean
 }>()
 
 const emit = defineEmits<{
-  reopen: [role: Role]
-  fullscreen: [role: Role]
+  reopen: [id: string]
+  fullscreen: [id: string]
   manage: []
 }>()
 
-function cardState(card: OutputCard, closed: boolean): CardState {
+function roleTitle(role: 'audience' | 'confidence'): string {
+  return role === 'audience' ? 'Audience' : 'Confidence'
+}
+
+function cardState(display: DisplayItem): CardState {
   // A monitor unplug (reassigning) takes precedence over the per-role reopen chip:
   // a closed output falls to the muted "reassign" indicator, never a reopen button.
-  if (closed && props.reassigning) return 'closed-muted'
-  if (closed) return 'closed'
+  if (display.closed && props.reassigning) return 'closed-muted'
+  if (display.closed) return 'closed'
   // GREEN only once truly live AND the output is open (owner fix #4 honesty).
-  if (props.live && card.open) return 'open'
+  if (props.live && display.open) return 'open'
   return 'not-open'
 }
 
 interface Row {
-  role: Role
+  id: string
   title: string
-  card: OutputCard
+  testidSuffix: string
+  label: string
   state: CardState
   fullscreen: boolean
 }
 
-const rows = computed<Row[]>(() => [
-  {
-    role: 'audience',
-    title: 'Audience',
-    card: props.audience,
-    state: cardState(props.audience, props.audienceClosed),
-    fullscreen: props.audienceFullscreen,
-  },
-  {
-    role: 'confidence',
-    title: 'Confidence',
-    card: props.confidence,
-    state: cardState(props.confidence, props.confidenceClosed),
-    fullscreen: props.confidenceFullscreen,
-  },
-])
+/**
+ * The FIRST assignment of a role keeps the plain role testid/title
+ * (`run-display-audience`, "Audience") so the common single-Audience/
+ * single-Confidence setup is unchanged; a second (or later) assignment
+ * sharing a role gets a numbered suffix ("Audience 2", `run-display-audience-2`)
+ * so multiple Audience monitors never collide.
+ */
+const rows = computed<Row[]>(() => {
+  const seen: Record<string, number> = {}
+  return props.displays.map((d) => {
+    const n = (seen[d.role] = (seen[d.role] ?? 0) + 1)
+    return {
+      id: d.id,
+      title: n === 1 ? roleTitle(d.role) : `${roleTitle(d.role)} ${n}`,
+      testidSuffix: n === 1 ? d.role : `${d.role}-${n}`,
+      label: d.label,
+      state: cardState(d),
+      fullscreen: d.fullscreen,
+    }
+  })
+})
 </script>
 
 <template>
@@ -83,11 +93,11 @@ const rows = computed<Row[]>(() => [
     </header>
 
     <div class="space-y-2">
-      <!-- AUDIENCE / CONFIDENCE cards -->
+      <!-- One row per saved assignment (114-03) — any count/role mix. -->
       <div
         v-for="row in rows"
-        :key="row.role"
-        :data-testid="`run-display-${row.role}`"
+        :key="row.id"
+        :data-testid="`run-display-${row.testidSuffix}`"
         class="flex items-start gap-3 rounded-md bg-white/5 border border-white/10 px-3 py-2.5"
       >
         <span
@@ -100,7 +110,7 @@ const rows = computed<Row[]>(() => [
 
           <!-- CLOSED (recovery): amber "… display closed" + a reassurance note. -->
           <template v-if="row.state === 'closed'">
-            <p :data-testid="`run-display-closed-${row.role}`" class="text-xs text-amber-200">
+            <p :data-testid="`run-display-closed-${row.testidSuffix}`" class="text-xs text-amber-200">
               {{ row.title }} display closed
             </p>
             <p class="text-xs text-amber-200/80">
@@ -111,19 +121,19 @@ const rows = computed<Row[]>(() => [
           <!-- CLOSED but a reassign is up: muted indicator, NO reopen chip (precedence). -->
           <p
             v-else-if="row.state === 'closed-muted'"
-            :data-testid="`run-display-closed-${row.role}-muted`"
+            :data-testid="`run-display-closed-${row.testidSuffix}-muted`"
             class="text-xs text-amber-200/80"
           >
             Reassign displays to reopen
           </p>
 
-          <!-- OPEN (green): the assigned display label. -->
+          <!-- OPEN (green): the assigned display label (nickname-or-fallback, R338). -->
           <p
             v-else-if="row.state === 'open'"
-            :data-testid="`run-display-ready-${row.role}`"
+            :data-testid="`run-display-ready-${row.testidSuffix}`"
             class="text-xs text-gray-400 truncate"
           >
-            {{ row.card.label }}
+            {{ row.label }}
           </p>
 
           <!-- NOT OPEN: honest amber, never an alarming red. -->
@@ -135,10 +145,10 @@ const rows = computed<Row[]>(() => [
         <button
           v-if="row.state === 'closed'"
           type="button"
-          :data-testid="`run-display-reopen-${row.role}`"
-          :aria-label="`Reopen the ${row.role} display on its screen`"
+          :data-testid="`run-display-reopen-${row.testidSuffix}`"
+          :aria-label="`Reopen the ${row.title} display on its screen`"
           class="min-h-9 flex-none rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          @click="emit('reopen', row.role)"
+          @click="emit('reopen', row.id)"
         >
           Reopen
         </button>
@@ -148,23 +158,23 @@ const rows = computed<Row[]>(() => [
              never chases the mouse across monitors that may not even be visible.
              Shown only while the output is open (you can't fullscreen a closed
              window). Reliable: the click's gesture is delegated to the already-open
-             window. Scales to any number of outputs (e.g. a future Live Stream).
-             The button reflects REAL fullscreen state (reported by the output): once
-             the display is fullscreen it shows a done ✓, and it flips BACK to the
-             action the instant someone presses Escape out of fullscreen. -->
+             window. Scales to any number of outputs. The button reflects REAL
+             fullscreen state (reported by the output): once the display is
+             fullscreen it shows a done ✓, and it flips BACK to the action the
+             instant someone presses Escape out of fullscreen. -->
         <button
           v-if="row.state === 'open' && !row.fullscreen"
           type="button"
-          :data-testid="`run-display-fullscreen-${row.role}`"
-          :aria-label="`Make the ${row.role} display fullscreen`"
+          :data-testid="`run-display-fullscreen-${row.testidSuffix}`"
+          :aria-label="`Make the ${row.title} display fullscreen`"
           class="min-h-9 flex-none rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          @click="emit('fullscreen', row.role)"
+          @click="emit('fullscreen', row.id)"
         >
           Go fullscreen
         </button>
         <span
           v-else-if="row.state === 'open' && row.fullscreen"
-          :data-testid="`run-display-fullscreen-done-${row.role}`"
+          :data-testid="`run-display-fullscreen-done-${row.testidSuffix}`"
           class="inline-flex items-center gap-1 min-h-9 flex-none rounded-md bg-green-500/15 px-3 py-1.5 text-xs font-medium text-green-300"
         >
           <span class="h-1.5 w-1.5 rounded-full bg-green-400" aria-hidden="true"></span>

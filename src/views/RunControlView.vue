@@ -178,12 +178,11 @@
           :itemCount="itemCount"
           :renderedCount="renderedCount"
           :allRendered="allRendered"
-          :audienceLabel="audienceLabel"
-          :confidenceLabel="confidenceLabel"
+          :displays="displays"
+          :canGoLive="canGoLive"
           @go-live="openOutputs"
           @rehearse="rehearse"
-          @change-audience="openManage"
-          @change-confidence="openManage"
+          @change="openManage"
         />
         <p class="flex-none px-6 pb-6 text-center text-xs text-gray-500">
           Nothing is on the screens yet. Slides advance only after you go live.
@@ -218,14 +217,9 @@
           </template>
           <template #under-next>
             <RunDisplaysPanel
-              :audience="audience"
-              :confidence="confidence"
+              :displays="displays"
               :live="live"
-              :audienceClosed="audienceClosed"
-              :confidenceClosed="confidenceClosed"
               :reassigning="monitorChanged"
-              :audienceFullscreen="audienceFullscreen"
-              :confidenceFullscreen="confidenceFullscreen"
               @reopen="reopenOutput"
               @fullscreen="fullscreenDisplay"
               @manage="openManage"
@@ -327,11 +321,10 @@ const {
   itemCount,
   renderedCount,
   allRendered,
-  audienceLabel,
-  confidenceLabel,
-  // displays panel + blackout (State B)
-  audience,
-  confidence,
+  // N-assignment display list + go-live gate (114-03)
+  displays,
+  canGoLive,
+  // blackout (State B)
   blackout,
   postBlackout,
   // in-item filmstrip + rail expansion (R282)
@@ -348,13 +341,9 @@ const {
   // output state machine + recovery (banners inline; closed-recovery on the panel)
   outputStatus,
   blockedRole,
-  audienceClosed,
-  confidenceClosed,
   monitorChanged,
   reopenOutput,
   fullscreenDisplay,
-  audienceFullscreen,
-  confidenceFullscreen,
   openOutputs,
   // actions
   rehearse,

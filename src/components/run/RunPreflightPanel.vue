@@ -6,7 +6,13 @@
        (useRunControl, 97-08/09) supplies every prop and owns @go-live/@rehearse.
        The Go-live button REUSES data-testid=run-go-live-btn so the output test
        suite keeps driving go-live through the same identifier after 97-09 wires
-       this in. -->
+       this in.
+
+       114-03: the fixed Audience/Confidence pair is replaced by a `displays`
+       v-for (one card per SAVED assignment — any count, any role mix), and
+       go-live is gated on `canGoLive` (>=1 Audience, CONTEXT.md decision). The
+       common single-Audience/single-Confidence setup keeps its original
+       run-preflight-audience/-confidence testids (see cardTestidSuffix). -->
   <div
     data-testid="run-preflight"
     class="flex h-full w-full items-center justify-center px-6 py-10"
@@ -16,21 +22,24 @@
       <div class="flex flex-col gap-2">
         <h2 class="text-3xl font-semibold text-gray-100">Ready when you are</h2>
         <p class="text-sm leading-relaxed text-gray-400">
-          Going live opens the audience and confidence windows and puts slide 1 on the screens.
+          Going live opens a window for every assigned display and puts slide 1 on the screens.
         </p>
       </div>
 
-      <!-- Display cards: Audience + Confidence. Each shows the SAVED assigned
-           monitor label (from loadMapping(), passed as a prop) + a "Not open"
-           amber badge (pre-live) + a Change link. No live screen name here —
-           getScreenDetails only runs inside the go-live gesture (parent). -->
-      <div class="flex flex-col gap-3 sm:flex-row">
+      <!-- Display cards: one per saved assignment (114-03). Each shows the SAVED
+           assigned monitor's nickname-or-label (from useRunControl's `displays`,
+           which reads loadMapping() and prefers the R338 nickname) + a "Not
+           open" amber badge (pre-live) + a Change link. No live screen name
+           here — getScreenDetails only runs inside the go-live gesture (parent). -->
+      <div v-if="cards.length > 0" class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <div
-          data-testid="run-preflight-audience"
-          class="flex flex-1 flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/70 p-4 text-left"
+          v-for="card in cards"
+          :key="card.id"
+          :data-testid="`run-preflight-${card.testidSuffix}`"
+          class="flex flex-1 min-w-[180px] flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/70 p-4 text-left"
         >
           <div class="flex items-center justify-between gap-2">
-            <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Audience</span>
+            <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ card.title }}</span>
             <span
               class="inline-flex items-center gap-1.5 rounded-full bg-amber-900/40 px-2.5 py-1 text-xs font-medium text-amber-300"
             >
@@ -38,38 +47,13 @@
               Not open
             </span>
           </div>
-          <span class="truncate text-sm font-medium text-gray-100">{{ audienceLabel }}</span>
+          <span class="truncate text-sm font-medium text-gray-100">{{ card.label }}</span>
           <span class="text-xs text-gray-500">will open on this screen</span>
           <button
             type="button"
-            data-testid="run-preflight-audience-change"
+            :data-testid="`run-preflight-${card.testidSuffix}-change`"
             class="self-start text-xs font-medium text-indigo-400 hover:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            @click="emit('change-audience')"
-          >
-            Change
-          </button>
-        </div>
-
-        <div
-          data-testid="run-preflight-confidence"
-          class="flex flex-1 flex-col gap-2 rounded-lg border border-gray-800 bg-gray-900/70 p-4 text-left"
-        >
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">Confidence</span>
-            <span
-              class="inline-flex items-center gap-1.5 rounded-full bg-amber-900/40 px-2.5 py-1 text-xs font-medium text-amber-300"
-            >
-              <span class="h-1.5 w-1.5 flex-none rounded-full bg-amber-400" aria-hidden="true"></span>
-              Not open
-            </span>
-          </div>
-          <span class="truncate text-sm font-medium text-gray-100">{{ confidenceLabel }}</span>
-          <span class="text-xs text-gray-500">will open on this screen</span>
-          <button
-            type="button"
-            data-testid="run-preflight-confidence-change"
-            class="self-start text-xs font-medium text-indigo-400 hover:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            @click="emit('change-confidence')"
+            @click="emit('change', card.id)"
           >
             Change
           </button>
@@ -117,6 +101,16 @@
         <span v-else>{{ renderedCount }} of {{ slideCount }} slides rendered</span>
       </div>
 
+      <!-- ≥1-Audience Go-live gate (CONTEXT.md decision, 114-03): mirrors the
+           existing MonitorSetupView canSave-disables-Save precedent — disable
+           Go-live with an inline explanation and a route to Monitor Setup,
+           rather than letting a Run with zero Audience displays silently do
+           nothing useful. -->
+      <p v-if="!canGoLive" data-testid="run-go-live-gate-note" class="text-xs text-amber-300">
+        Assign at least one Audience monitor to go live.
+        <router-link to="/monitor-setup" class="underline hover:text-amber-200">Open monitor setup</router-link>
+      </p>
+
       <!-- Actions: primary Go live (run-go-live-btn — the SAME identifier the
            output suite drives) + secondary Rehearse without screens + an Enter
            key hint. This component only EMITS; the open+place path stays in the
@@ -125,8 +119,13 @@
         <button
           type="button"
           data-testid="run-go-live-btn"
-          aria-label="Go live — open the audience and confidence displays"
-          class="inline-flex min-h-11 items-center gap-2 rounded-md bg-indigo-600 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-indigo-900/40 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          :disabled="!canGoLive"
+          :aria-label="
+            canGoLive
+              ? 'Go live — open every assigned display'
+              : 'Go live disabled — assign an Audience monitor first'
+          "
+          class="inline-flex min-h-11 items-center gap-2 rounded-md bg-indigo-600 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-indigo-900/40 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-indigo-600"
           @click="emit('go-live')"
         >
           <svg
@@ -161,12 +160,25 @@
  * R276 State A — the pre-flight "Ready when you are" surface, extracted as a
  * PURE presentational child (97-05). Every value is a prop and every action is
  * an emit; the readiness derivation (allRendered/renderedCount from each
- * AssembledSlide.renderState), the monitor-label resolution (loadMapping()),
- * and the actual open+place/rehearse orchestration all live in the parent
- * (useRunControl / RunControlView, 97-08/09). No channel, no store, no
- * getScreenDetails here.
+ * AssembledSlide.renderState), the monitor-label resolution, and the actual
+ * open+place/rehearse orchestration all live in the parent (useRunControl /
+ * RunControlView, 97-08/09). No channel, no store, no getScreenDetails here.
+ *
+ * 114-03: replaced the fixed audienceLabel/confidenceLabel props with a
+ * `displays` v-for (any count/role mix) and added the `canGoLive` gate prop.
  */
-defineProps<{
+import { computed } from 'vue'
+
+interface DisplayItem {
+  id: string
+  role: 'audience' | 'confidence'
+  label: string
+  open: boolean
+  closed: boolean
+  fullscreen: boolean
+}
+
+const props = defineProps<{
   /** Service display name (header context; kept for parity with the wired view). */
   serviceName: string
   /** Total assembled slide count — the "N" in the readiness line. */
@@ -177,16 +189,46 @@ defineProps<{
   renderedCount: number
   /** True iff every assembled slide's renderState is undefined (honest check). */
   allRendered: boolean
-  /** Saved audience monitor label from loadMapping() (pre-live; no live name). */
-  audienceLabel: string
-  /** Saved confidence monitor label from loadMapping(). */
-  confidenceLabel: string
+  /** One entry per SAVED assignment (useRunControl's `displays`) — any count/role mix. */
+  displays: DisplayItem[]
+  /** >=1-Audience Go-live gate (useRunControl's `canGoLive`, CONTEXT.md decision). */
+  canGoLive: boolean
 }>()
 
 const emit = defineEmits<{
   'go-live': []
   rehearse: []
-  'change-audience': []
-  'change-confidence': []
+  change: [id: string]
 }>()
+
+function roleTitle(role: 'audience' | 'confidence'): string {
+  return role === 'audience' ? 'Audience' : 'Confidence'
+}
+
+interface Card {
+  id: string
+  title: string
+  testidSuffix: string
+  label: string
+}
+
+/**
+ * The FIRST assignment of a role keeps the plain role testid/title
+ * (`run-preflight-audience`, "Audience") so the common single-Audience/
+ * single-Confidence setup is unchanged; a second (or later) assignment
+ * sharing a role gets a numbered suffix ("Audience 2", `run-preflight-audience-2`)
+ * so multiple Audience monitors never collide (114-03).
+ */
+const cards = computed<Card[]>(() => {
+  const seen: Record<string, number> = {}
+  return props.displays.map((d) => {
+    const n = (seen[d.role] = (seen[d.role] ?? 0) + 1)
+    return {
+      id: d.id,
+      title: n === 1 ? roleTitle(d.role) : `${roleTitle(d.role)} ${n}`,
+      testidSuffix: n === 1 ? d.role : `${d.role}-${n}`,
+      label: d.label,
+    }
+  })
+})
 </script>
