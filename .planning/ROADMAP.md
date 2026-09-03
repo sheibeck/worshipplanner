@@ -570,6 +570,99 @@ Full details: [milestones/v2.8-ROADMAP.md](milestones/v2.8-ROADMAP.md) · requir
 > **Deployed to production 2026-09-02** (hosting + firestore:rules + functions:syncOrgMembershipClaim). Audit PASSED (8/8 requirements, 6/6 phases, 6/6 integration seams WIRED). Comments-as-specs: 696 load-bearing comments inventoried → 244 MADR-lite ADRs (docs/adr/) for decision-rationale + 309 behavioral comments relocated into .planning/codebase/ maps, source comments shrunk to pointers, comment convention written (R316–R319). Architectural review (R320) → the sole High (ARCH-001 loadOrgContext epoch/listener-leak race) fixed (R321); 22 Medium/Low → backlog 999.4. Security review (R322) found a **proven, live, production cross-tenant data leak** — SEC-S-01: shareTokens/quarterShares/serviceShares were publicly *listable* (unauthenticated enumeration of every church's shared plans + volunteer names) — fixed (get/list split + org-gated list + org-scoped client queries) along with SEC-ISO-01 (legacy client org self-provisioning) and SEC-ISO-02 (revokeRefreshTokens on member removal); 11 Medium/Low → backlog 999.5 (R323). The adversarial code-review chain caught 3 blockers before ship (an incomplete epoch guard in 111; and in 113 the rules fix's two regressions — broken share-token cleanup and broken share-link creation). Owner-authorized coordinated prod deploy.
 </details>
 
+### 🚧 v2.9 Live Presentation Field Fixes (Phases 114-116, in planning)
+
+**Milestone Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the
+first real church-projector run, so a projectionist can set up and read the live output without fighting
+the tool.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R324–R337 (14 mapped, 100% coverage)
+
+**Key context:** All field feedback from the first real church-projector run (church Mac + projector).
+Fixes/polish on the existing v2.4 "Run the Service" + v2.7 presentation/lyric-editor features — no new
+feature areas. Multi-monitor is a rework, not a tweak — the v2.4 single-select Audience/Confidence model
+collapses on a real 3-monitor setup, so it is replaced with any-number-of-monitors detection, any-role-to-
+any-monitor assignment (incl. multiple Audience outputs) that sticks, macOS auto-placement treated as a
+bug to fix rather than routed around with manual dragging, and no false "monitors changed" re-prompt. Font
+sizing is auto-fit only — no manual size control; the font family stays configurable exactly as today
+(v1.5 slide typography). **Out of scope / deferred:** all audio — vamps (mp3 upload + slide assignment)
+and canned pre/post-service music — punted to the backlog 999.13 storage cluster (SEED-003), since they
+open the Firebase Storage + external-media cost/security surface; the unsupported-browser warning is
+**dropped** (Safari ran the app fine on retest). No research pass (internal fixes to existing features).
+
+- [ ] **Phase 114: Multi-Monitor Assignment Rework** - Rework the single-select Audience/Confidence
+  monitor model into any-role-to-any-monitor assignment that holds on 3+ displays and auto-places
+  correctly on macOS
+- [ ] **Phase 115: Live-Output Readability & Layout** - Auto-fit slide text, a smaller live main view with
+  larger readable thumbnails, an end-of-item marker, and a reliable Mac scrollbar
+- [ ] **Phase 116: Lyric Editor & Song UX** - Relabeled edit-lyrics link opening in a new tab, a
+  SongSelect link, Cancel→Close, manual Credits/CCLI editing, and a hidden History tab
+
+### Phase 114: Multi-Monitor Assignment Rework
+
+**Goal**: A projectionist can assign any output role to any of three or more connected monitors —
+including multiple Audience monitors at once — have that assignment persist, have the output windows
+actually land on their assigned macOS displays, and never see a false "monitors changed" re-configure
+prompt on an unchanged setup.
+**Depends on**: Nothing (first phase of v2.9)
+**Requirements**: R324, R325, R326, R327, R328
+**Success Criteria** (what must be TRUE):
+
+  1. The monitor-configuration screen detects and lists every currently connected display for role
+     assignment, with no cap at two monitors — verified against a real 3-monitor setup (R324).
+  2. A user can assign Audience or Confidence to any monitor, including selecting Audience on more than
+     one monitor at the same time, without a role selection on one monitor clearing it on another (R325).
+  3. Saved role assignments persist and remain correct across a 3+ monitor setup after reload/relaunch —
+     the bug where a third monitor caused roles to stop holding no longer reproduces (R326).
+  4. Launching the outputs opens each output window on its own assigned physical display on macOS/Chrome,
+     not just on the primary/laptop screen (R327).
+  5. Reopening monitor setup with an unchanged physical display layout loads the saved mapping directly,
+     with no spurious "your monitors changed" re-configure prompt (R328).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 115: Live-Output Readability & Layout
+
+**Goal**: A projectionist and the audience/band can read the live output clearly — slide text fills the
+screen automatically, the Run screen's thumbnails are actually legible, and the operator can see when a
+song is ending.
+**Depends on**: Phase 114 (shares the Run screen / output-window rendering surface Phase 114 reworks)
+**Requirements**: R329, R330, R331, R332
+**Success Criteria** (what must be TRUE):
+
+  1. Slide text auto-scales to fill the Audience and Confidence output displays with no manual font-size
+     control, staying readable at projection distance, while the configured slide font family still
+     renders as selected (R329).
+  2. On the Run/control screen, the live main-slide view is smaller and the preview thumbnails are larger,
+     so a thumbnail's slide content is legible at a glance (R330).
+  3. An "end" marker appears after the last thumbnail of the current item, so the operator can see the
+     item is ending and the next service item is coming up (R331).
+  4. The preview-thumbnail strip's scroll affordance is reliably visible and usable on macOS, with the
+     intermittently-missing scrollbar fixed (R332).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 116: Lyric Editor & Song UX
+
+**Goal**: A user can open, navigate, and correct a song's lyrics and credits without confusion, from both
+the read-only lyric viewer and the editor itself.
+**Depends on**: Nothing (independent of the live-presentation output work in Phases 114-115)
+**Requirements**: R333, R334, R335, R336, R337
+**Success Criteria** (what must be TRUE):
+
+  1. The read-only lyric viewer's edit link reads "Edit song lyrics for {song name}" and opens that
+     song's lyric editor in a new browser tab (R333).
+  2. The lyric editor's title bar shows a link to the song's SongSelect page next to the song name (R334).
+  3. The lyric editor's former "Cancel" button now reads "Close" (R335).
+  4. A user can manually add, correct, or remove a song's Credits/CCLI/copyright text, independent of
+     pasting lyrics (R336).
+  5. The lyric editor no longer shows a History tab (R337).
+
+**Plans**: TBD
+**UI hint**: yes
+
 ## Backlog
 
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (BACKLOG)

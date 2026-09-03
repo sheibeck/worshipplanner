@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Live Presentation Field Fixes
 status: planning
-last_updated: "2026-09-03T01:09:04.485Z"
+last_updated: "2026-09-02T18:00:00.000Z"
 last_activity: 2026-09-02
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -39,23 +39,62 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
+# ▶ ACTIVE MILESTONE — v2.9 Live Presentation Field Fixes (roadmap created 2026-09-02)
 
-**Status:** v2.8 milestone complete
-`/gsd-plan-phase 108`.
+**Status:** Roadmap created — ready for `/gsd-plan-phase 114`.
+
+**Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the first real
+church-projector run, so a projectionist can set up and read the live output without fighting the tool.
+
+(v2.8 ended at Phase 113); this milestone is **Phases 114–116**.
+
+**Key context:** All field feedback from the first real church-projector run (church Mac + projector).
+Fixes/polish on the existing v2.4 "Run the Service" + v2.7 presentation/lyric-editor features — no new
+feature areas. Multi-monitor is a rework, not a tweak: the v2.4 single-select Audience/Confidence model
+collapses on a real 3-monitor setup, so it's replaced with any-number-of-monitors detection, any-role-to-
+any-monitor assignment (incl. multiple Audience outputs) that sticks, macOS auto-placement treated as a
+bug to fix (not routed around with manual dragging), and no false "monitors changed" re-prompt. Font
+sizing is auto-fit only — no manual size control; the font family stays configurable exactly as today.
+Out of scope/deferred: all audio (vamps + canned music, both open the Storage/external-media cost-security
+surface → backlog 999.13); the unsupported-browser warning is dropped (Safari ran the app fine on
+retest). No research pass (internal fixes to existing features). Requirements R324–R337; phases
+continue from 114.
+
+See the `## ★ v2.9 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
+phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (shipped & deployed to production 2026-09-02, archived 2026-09-02)
+
+**Status:** v2.8 milestone complete.
+
+> ✅ **Deployed to production 2026-09-02** (hosting + firestore:rules + functions:syncOrgMembershipClaim).
+> Audit PASSED (8/8 requirements, 6/6 phases, 6/6 integration seams WIRED). Closed on owner acceptance.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
 load-bearing comments into GSD's durable stores, then running architectural and security reviews and
-remediating the Critical/High findings.
+remediating the Critical/High findings. Requirements R316–R323, archived to
+`milestones/v2.8-REQUIREMENTS.md`.
 
-(v2.7 ended at Phase 107); this milestone is **Phases 108–113**.
+(v2.7 ended at Phase 107); this milestone was **Phases 108–113**.
 
-**Key context:** Reviews produce reports AND fix Critical/High in-milestone; Medium/Low triaged to
-backlog. No research pass (internal hardening). Build/commit only — any production deploy of remediation
-(esp. rules/functions) is a separate, explicitly owner-confirmed step per standing deploy policy.
+**Delivered (6 phases):** Comments-as-Specs sweep (244 ADRs under `docs/adr/` from 382 tagged rationale
+comments + 309 behavioral comments relocated to `.planning/codebase/` map docs, comment convention
+documented — R316–R319); an architectural review (23-finding report, sole High ARCH-001 store-layer
+epoch guard fixed, 22 Medium/Low → backlog 999.4 — R320–R321); and a security review that found and
+fixed a **proven LIVE Critical cross-tenant leak** (SEC-S-01: `shareTokens`/`quarterShares`/
+`serviceShares` fully listable via `allow read: if true`) plus a member-removal Storage-claim revocation
+gap (High), with 11 Medium/Low → backlog 999.5 (R322–R323). All remediation deployed to production.
 
-See the `## ★ v2.8 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
-phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
+**Coverage:** 8/8 v2.8 requirements mapped and validated, each to exactly one phase; no orphans, no
+duplicates.
+
+Full record: [milestones/v2.8-ROADMAP.md](milestones/v2.8-ROADMAP.md) ·
+[milestones/v2.8-REQUIREMENTS.md](milestones/v2.8-REQUIREMENTS.md) ·
+[milestones/v2.8-MILESTONE-AUDIT.md](milestones/v2.8-MILESTONE-AUDIT.md).
+
+**Next step:** `/gsd-new-milestone` was already run to scope v2.9 — see the ACTIVE MILESTONE section above.
 
 ---
 
@@ -1167,7 +1206,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 113 — Security Remediation
+**Current focus:** Phase 114 — Multi-Monitor Assignment Rework (v2.9 roadmap created; not yet planned)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1177,10 +1216,40 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 114 (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-02 — Milestone v2.9 started
+Status: Roadmap created — ready to plan Phase 114
+Last activity: 2026-09-02 — ROADMAP.md created for v2.9 (Phases 114-116, R324-R337, 100% coverage)
+
+## ★ v2.9 ROADMAP.md phase breakdown (created 2026-09-02)
+
+3 phases (114-116), derived directly from R324-R337 (14 requirements) with this project's `coarse`
+granularity setting applied. The requirements cluster into three tight, independently-verifiable groups
+and each becomes exactly one phase — no further splitting, since none of the three groups decomposes into
+a genuinely separate delivery boundary at `coarse` compression. Multi-Monitor Assignment (R324-R328) keeps
+the Mac auto-placement fix (R327) in the SAME phase as the data-model rework (R324, R325, R326, R328)
+rather than splitting it into its own phase: R327 is a single requirement, and placement correctness is
+only meaningful once the new any-role/any-monitor/N-monitor assignment model exists to place FROM — a
+standalone "fix the bug" phase would be thin and task-shaped, not an independently observable delivery
+boundary. Live-Output Readability & Layout (R329-R332) and Lyric Editor & Song UX (R333-R337) are each
+already-coherent, self-contained UI clusters with no cross-dependency on the monitor rework, so they stay
+as their own phases. Numbering continues from v2.8, which ended at Phase 113 — v2.9 starts at Phase 114,
+not reset.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 114 Multi-Monitor Assignment Rework | Rework the v2.4 single-select Audience/Confidence monitor model into an any-role-to-any-monitor assignment that holds on 3+ displays, auto-places correctly on macOS, and never falsely re-prompts on an unchanged layout | R324-R328 | Nothing (first) | yes |
+| 115 Live-Output Readability & Layout | Auto-fit slide text to the output screen (font family stays configurable), shrink the Run screen's main view and enlarge its thumbnails, add an end-of-item marker, and fix the intermittent Mac thumbnail scrollbar | R329-R332 | Phase 114 (shares the Run screen / output-window rendering surface Phase 114 touches) | yes |
+| 116 Lyric Editor & Song UX | Relabel and retarget the edit-lyrics link, add a SongSelect link to the editor title bar, rename Cancel to Close, allow manual Credits/CCLI/copyright editing, and hide the History tab | R333-R337 | Nothing (independent of the live-presentation output work in 114-115) | yes |
+
+**Out of scope this milestone (owner decision, locked at requirements time):** all audio — vamps
+(mp3 upload + slide assignment) and canned pre/post-service music — deferred to the backlog 999.13 storage
+cluster (SEED-003); the unsupported-browser warning is dropped (Safari ran the app fine on retest); manual
+per-slide font-size control is deliberately not built (auto-fit only).
+
+See `.planning/ROADMAP.md` § v2.9 Live Presentation Field Fixes for the full phase detail table (goals,
+dependencies, success criteria). Next step: `/gsd-plan-phase 114` (optionally preceded by
+`/gsd-discuss-phase 114`).
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
 

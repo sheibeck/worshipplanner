@@ -105,19 +105,21 @@ church-projector run, so a projectionist can set up and read the live output wit
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R324 | TBD | Pending |
-| R325 | TBD | Pending |
-| R326 | TBD | Pending |
-| R327 | TBD | Pending |
-| R328 | TBD | Pending |
-| R329 | TBD | Pending |
-| R330 | TBD | Pending |
-| R331 | TBD | Pending |
-| R332 | TBD | Pending |
-| R333 | TBD | Pending |
-| R334 | TBD | Pending |
-| R335 | TBD | Pending |
-| R336 | TBD | Pending |
-| R337 | TBD | Pending |
+| R324 | Phase 114 | Pending |
+| R325 | Phase 114 | Pending |
+| R326 | Phase 114 | Pending |
+| R327 | Phase 114 | Pending |
+| R328 | Phase 114 | Pending |
+| R329 | Phase 115 | Pending |
+| R330 | Phase 115 | Pending |
+| R331 | Phase 115 | Pending |
+| R332 | Phase 115 | Pending |
+| R333 | Phase 116 | Pending |
+| R334 | Phase 116 | Pending |
+| R335 | Phase 116 | Pending |
+| R336 | Phase 116 | Pending |
+| R337 | Phase 116 | Pending |
 
 *Filled by the roadmapper — each requirement maps to exactly one phase.*
+
+**Coverage: 14/14 v2.9 requirements mapped, 100%. No orphans, no duplicates.**
