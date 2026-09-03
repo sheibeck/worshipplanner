@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
-current_phase: 114
-current_phase_name: Multi-Monitor Assignment Rework
-status: verifying
-stopped_at: Completed 114-04-PLAN.md (final plan of phase 114)
+current_phase: 115
+current_phase_name: Live-Output Readability & Layout
+status: planning
+stopped_at: Phase 114 executed + auto-verified (human_needed — hardware UAT batched to v2.9-DEFERRED-VERIFICATION.md); starting Phase 115
 last_updated: "2026-09-03T14:13:49.609Z"
 last_activity: 2026-09-03
-last_activity_desc: Phase 114 execution started
+last_activity_desc: "Phase 114 executed + code-reviewed + auto-verified green; real-3-monitor/macOS UAT deferred (batched, owner instruction); advancing to Phase 115"
 progress:
   total_phases: 3
   completed_phases: 1
@@ -16,6 +16,17 @@ progress:
   completed_plans: 4
   percent: 33
 ---
+
+## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
+
+Per the owner's 2026-09-03 instruction ("run v2.9 autonomously, defer UAT to the end"), phases are built +
+auto-verified green, with real-hardware/human UAT batched into `.planning/v2.9-DEFERRED-VERIFICATION.md`
+for one owner pass at milestone end. These phases are executed, not fully closed — do NOT re-run them; close
+them via the batched UAT.
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 114 | verification_deferred_human (auto-verified green; real-3-monitor/macOS placement UAT pending) | /gsd-verify-work 114 |
 
 ## Human UAT — completed & PASSED
 

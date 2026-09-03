@@ -590,9 +590,10 @@ and canned pre/post-service music — punted to the backlog 999.13 storage clust
 open the Firebase Storage + external-media cost/security surface; the unsupported-browser warning is
 **dropped** (Safari ran the app fine on retest). No research pass (internal fixes to existing features).
 
-- [ ] **Phase 114: Multi-Monitor Assignment Rework** - Rework the single-select Audience/Confidence
+- [x] **Phase 114: Multi-Monitor Assignment Rework** - Rework the single-select Audience/Confidence
   monitor model into any-role-to-any-monitor assignment that holds on 3+ displays and auto-places
-  correctly on macOS
+  correctly on macOS *(executed + code-reviewed + auto-verified green 2026-09-03; real-3-monitor/macOS
+  placement is batched hardware UAT → v2.9-DEFERRED-VERIFICATION.md)*
 
 - [ ] **Phase 115: Live-Output Readability & Layout** - Auto-fit slide text, a smaller live main view with
   larger readable thumbnails, an end-of-item marker, and a reliable Mac scrollbar
