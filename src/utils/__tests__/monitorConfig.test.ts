@@ -7,6 +7,7 @@ import {
   matchMapping,
   MONITOR_CONFIG_STORAGE_KEY,
   SCREEN_QUERY_PARAM,
+  NICKNAME_MAX_LENGTH,
 } from '@/utils/monitorConfig'
 import type { ScreenLike, MonitorMapping, MonitorAssignment } from '@/utils/monitorConfig'
 
@@ -175,6 +176,39 @@ describe('saveMapping / loadMapping', () => {
 
   it('returns null when the stored value is valid JSON but the wrong shape', () => {
     storage.setItem(MONITOR_CONFIG_STORAGE_KEY, JSON.stringify({ unrelated: true }))
+    expect(loadMapping(storage)).toBeNull()
+  })
+
+  it('round-trips a nickname unchanged through saveMapping/loadMapping', () => {
+    const mapping: MonitorMapping = {
+      assignments: [{ fingerprint: 'fp-audience', role: 'audience', nickname: 'Stage Left' }],
+      savedAt: 1,
+    }
+    saveMapping(mapping, storage)
+    expect(loadMapping(storage)).toEqual(mapping)
+  })
+
+  it('a mapping with no nickname field still validates and round-trips (backward-compatible)', () => {
+    const mapping: MonitorMapping = { assignments: [{ fingerprint: 'fp-audience', role: 'audience' }], savedAt: 1 }
+    saveMapping(mapping, storage)
+    expect(loadMapping(storage)).toEqual(mapping)
+  })
+
+  it('returns null when an assignment nickname is present but not a string', () => {
+    const raw = {
+      assignments: [{ fingerprint: 'fp-audience', role: 'audience', nickname: 42 }],
+      savedAt: 1,
+    }
+    storage.setItem(MONITOR_CONFIG_STORAGE_KEY, JSON.stringify(raw))
+    expect(loadMapping(storage)).toBeNull()
+  })
+
+  it('returns null when a nickname string exceeds NICKNAME_MAX_LENGTH', () => {
+    const raw = {
+      assignments: [{ fingerprint: 'fp-audience', role: 'audience', nickname: 'x'.repeat(NICKNAME_MAX_LENGTH + 1) }],
+      savedAt: 1,
+    }
+    storage.setItem(MONITOR_CONFIG_STORAGE_KEY, JSON.stringify(raw))
     expect(loadMapping(storage)).toBeNull()
   })
 

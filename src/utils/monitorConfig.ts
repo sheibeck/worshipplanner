@@ -23,6 +23,8 @@ export type MonitorRole = 'audience' | 'confidence'
 export interface MonitorAssignment {
   fingerprint: string
   role: MonitorRole
+  /** User-entered (R338); blank/absent falls back to the OS label at render time. */
+  nickname?: string
 }
 
 /** The full persisted mapping — every assignment plus a save timestamp. */
@@ -51,6 +53,9 @@ export const MONITOR_CONFIG_STORAGE_KEY = 'wp:runMonitorConfig:v2'
 
 /** Opener->popup fingerprint hand-off contract (URL query param name). */
 export const SCREEN_QUERY_PARAM = 'screen'
+
+/** Max length accepted for a nickname (T-114-01 — untrusted-localStorage-read guard). */
+export const NICKNAME_MAX_LENGTH = 60
 
 /** A screen with no label at all degrades to this placeholder rather than throwing. */
 const UNLABELED_PLACEHOLDER = 'unlabeled'
@@ -117,8 +122,11 @@ function isValidMapping(value: unknown): value is MonitorMapping {
   if (typeof v.savedAt !== 'number') return false
   return v.assignments.every((a) => {
     if (typeof a !== 'object' || a === null) return false
-    const assignment = a as { fingerprint?: unknown; role?: unknown }
-    return typeof assignment.fingerprint === 'string' && (assignment.role === 'audience' || assignment.role === 'confidence')
+    const assignment = a as { fingerprint?: unknown; role?: unknown; nickname?: unknown }
+    if (typeof assignment.fingerprint !== 'string') return false
+    if (assignment.role !== 'audience' && assignment.role !== 'confidence') return false
+    if (assignment.nickname === undefined) return true
+    return typeof assignment.nickname === 'string' && assignment.nickname.length <= NICKNAME_MAX_LENGTH
   })
 }
 

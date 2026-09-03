@@ -1322,13 +1322,28 @@ recipients and does NOT change `unreachableCount`; a matched personId absent fro
 
 ### src/utils/monitorConfig.ts
 
-**`matchMapping` (R268):** decides whether a saved mapping can be silently reused against the
-CURRENT live screens, or whether a genuine layout change requires re-prompting. The contract is
-BIDIRECTIONAL set-equality between saved and live fingerprints, not a one-way subset check: matched
-only when EVERY saved fingerprint is found among the live screens' fingerprints, AND EVERY live
-screen's fingerprint is found among the saved fingerprints. A screen unplugged since the mapping was
-saved and a screen newly plugged in since are both genuine layout changes and both force
-`needs-reprompt`. Does not open windows or prompt itself — the caller owns that.
+**Fingerprint v2 (R326/R328):** identity is `label:WxH` only — `left`, `top`, and `isPrimary` are
+deliberately excluded because macOS re-detects report them with drift/reordering, which was the
+root cause of both "roles don't stick on 3 monitors" and the false "monitors changed" reprompt.
+`computeFingerprints(screens)` groups by that identity, sorts each group by ascending `(left, top)`,
+and appends a stable 0-based disambiguation index (`identity#0`, `identity#1`, ...) so two
+identical-model monitors still get distinct fingerprints. `computeFingerprint(screen, allScreens?)`
+is a single-screen convenience wrapper; without `allScreens` it treats the screen as a lone group
+(`#0`).
+
+**`matchMapping` (R326/R328):** delta-aware, NOT bidirectional set-equality. Returns `'no-mapping'`
+when the saved mapping has no assignments; `'matched'` when every saved fingerprint is still live
+AND no live screen is unknown to the mapping (unchanged layout — silent reuse, no reprompt);
+otherwise `'partial'` with `kept` (the saved assignments whose fingerprints are still live) and
+`newScreens` (the live screens whose fingerprints are new to the mapping). A monitor being
+added/removed keeps the still-matching assignments and surfaces only the delta, instead of
+invalidating the whole mapping on any single change. Does not open windows or prompt itself — the
+caller owns that.
+
+**Nicknames (R338):** `MonitorAssignment.nickname` is an optional user-entered string that travels
+with its assignment through save/load/match (same record, no separate lookup). `isValidMapping`
+rejects a non-string or over-`NICKNAME_MAX_LENGTH` nickname on read (T-114-01 — untrusted-
+localStorage-read guard, mirroring the existing fingerprint/role validation).
 
 ### src/utils/orgName.ts
 
