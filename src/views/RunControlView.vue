@@ -46,42 +46,16 @@
          source of truth that gates the (unchanged) reopen-chip precedence on
          RunDisplaysPanel below. -->
 
-    <!-- FALLBACK: windows DID open, just un-positioned. Amber, never red. -->
-    <div
-      v-if="outputStatus === 'fallback'"
-      data-testid="run-fallback-banner"
-      class="flex-none m-4 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3 text-amber-200"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        class="mt-0.5 h-5 w-5 flex-none text-amber-400"
-        aria-hidden="true"
-      >
-        <path
-          fill-rule="evenodd"
-          d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
-          clip-rule="evenodd"
-        />
-      </svg>
-      <div class="min-w-0 flex-1">
-        <p class="font-medium">Finish setting up your displays</p>
-        <ol class="mt-2 list-decimal list-inside text-sm space-y-1">
-          <li>Two windows opened — one Audience, one Confidence.</li>
-          <li>Drag each window onto the correct screen.</li>
-          <li>Click Enter fullscreen in each window.</li>
-        </ol>
-        <router-link to="/monitor-setup" class="mt-2 inline-block text-amber-200 underline">
-          Open monitor setup
-        </router-link>
-      </div>
-    </div>
+    <!-- FALLBACK (v2.9): windows DID open, just un-positioned. The "finish
+         setting up your displays" help RELOCATED off this top band into
+         RunDisplaysPanel (:fallback below), where it is dismissible. Blocked and
+         partial stay here (they fire in State A, where the Displays panel is not
+         rendered) but are now dismissible via dismissedStatus. -->
 
     <!-- BLOCKED: ZERO windows open (pop-up blocker). Amber (recoverable), NOT
-         red, and NEVER any "opened / displays ready" claim. -->
+         red, and NEVER any "opened / displays ready" claim. Dismissible (v2.9). -->
     <div
-      v-if="outputStatus === 'blocked'"
+      v-if="outputStatus === 'blocked' && dismissedStatus !== 'blocked'"
       data-testid="run-blocked-banner"
       class="flex-none m-4 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3 text-amber-200"
     >
@@ -114,11 +88,23 @@
           Go live
         </button>
       </div>
+      <button
+        type="button"
+        data-testid="run-blocked-dismiss"
+        aria-label="Dismiss this message"
+        class="-mr-1 -mt-1 flex-none rounded p-1 text-amber-300 hover:text-amber-100 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-amber-500"
+        @click="dismissedStatus = 'blocked'"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
     </div>
 
-    <!-- See ADR-0221 (docs/adr/0221-partial-wr-02-exactly-one-output-window-opened-the-other-was.md) -->
+    <!-- See ADR-0221 (docs/adr/0221-partial-wr-02-exactly-one-output-window-opened-the-other-was.md).
+         Dismissible (v2.9). -->
     <div
-      v-if="outputStatus === 'partial'"
+      v-if="outputStatus === 'partial' && dismissedStatus !== 'partial'"
       data-testid="run-partial-banner"
       class="flex-none m-4 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3 text-amber-200"
     >
@@ -153,6 +139,17 @@
           Go live
         </button>
       </div>
+      <button
+        type="button"
+        data-testid="run-partial-dismiss"
+        aria-label="Dismiss this message"
+        class="-mr-1 -mt-1 flex-none rounded p-1 text-amber-300 hover:text-amber-100 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-amber-500"
+        @click="dismissedStatus = 'partial'"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
     </div>
 
     <!-- 2. MAIN REGION — the order-of-service rail (both states) + State A
@@ -220,6 +217,7 @@
               :displays="displays"
               :live="live"
               :reassigning="monitorChanged"
+              :fallback="outputStatus === 'fallback'"
               @reopen="reopenOutput"
               @fullscreen="fullscreenDisplay"
               @manage="openManage"
@@ -280,6 +278,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import type { BroadcastChannelFactory } from '@/utils/runChannel'
 import { useRunControl } from '@/composables/useRunControl'
 import RunHeader from '@/components/run/RunHeader.vue'
@@ -355,6 +354,14 @@ const {
   confirmExit,
   cancelBtnRef,
 } = useRunControl({ channelFactory: props.channelFactory })
+
+// Dismiss state for the State-A blocked/partial output banners (v2.9). Resets
+// whenever outputStatus changes so a fresh occurrence always reappears; the
+// fallback help relocated into RunDisplaysPanel owns its own in-panel dismissal.
+const dismissedStatus = ref<string | null>(null)
+watch(outputStatus, () => {
+  dismissedStatus.value = null
+})
 </script>
 
 <style scoped>

@@ -4,7 +4,7 @@
 // v-for (one row per SAVED assignment, any count/role mix) so multiple
 // Audience monitors each get their own row; reopen/fullscreen now emit the
 // display id (fingerprint), not a role.
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 interface DisplayItem {
   id: string
@@ -21,6 +21,10 @@ const props = defineProps<{
   displays: DisplayItem[]
   live: boolean
   reassigning: boolean
+  // Outputs opened un-positioned (outputStatus === 'fallback'): the "finish
+  // setting up your displays" help now renders in-panel here (v2.9), not as a
+  // stuck top banner.
+  fallback: boolean
 }>()
 
 const emit = defineEmits<{
@@ -28,6 +32,17 @@ const emit = defineEmits<{
   fullscreen: [id: string]
   manage: []
 }>()
+
+// Dismissible in-panel setup help (v2.9). Dismissal auto-resets on leaving the
+// fallback state so it returns if outputs open un-positioned again.
+const setupHelpDismissed = ref(false)
+watch(
+  () => props.fallback,
+  (isFallback) => {
+    if (!isFallback) setupHelpDismissed.value = false
+  },
+)
+const showSetupHelp = computed(() => props.fallback && !setupHelpDismissed.value)
 
 function roleTitle(role: 'audience' | 'confidence'): string {
   return role === 'audience' ? 'Audience' : 'Confidence'
@@ -91,6 +106,51 @@ const rows = computed<Row[]>(() => {
         Manage
       </button>
     </header>
+
+    <!-- Relocated + dismissible (v2.9): the "finish setting up your displays"
+         help used to be a stuck top banner on RunControlView; it now lives here
+         in the Displays panel with a dismiss control. -->
+    <div
+      v-if="showSetupHelp"
+      data-testid="run-fallback-banner"
+      class="mb-3 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950/60 px-3 py-2.5 text-amber-200"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        class="mt-0.5 h-5 w-5 flex-none text-amber-400"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-medium">Finish setting up your displays</p>
+        <ol class="mt-2 list-decimal list-inside text-xs space-y-1">
+          <li>Two windows opened — one Audience, one Confidence.</li>
+          <li>Drag each window onto the correct screen.</li>
+          <li>Click Enter fullscreen in each window.</li>
+        </ol>
+        <router-link to="/monitor-setup" class="mt-2 inline-block text-xs text-amber-200 underline">
+          Open monitor setup
+        </router-link>
+      </div>
+      <button
+        type="button"
+        data-testid="run-fallback-dismiss"
+        aria-label="Dismiss the display setup instructions"
+        class="-mr-1 -mt-1 flex-none rounded p-1 text-amber-300 hover:text-amber-100 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-amber-500"
+        @click="setupHelpDismissed = true"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+          <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+        </svg>
+      </button>
+    </div>
 
     <div class="space-y-2">
       <!-- One row per saved assignment (114-03) — any count/role mix. -->

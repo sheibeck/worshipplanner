@@ -649,6 +649,70 @@ describe('RunControlView output — ≥1-Audience gate replaces the old both-mus
   })
 })
 
+// ── 5d. DISMISSIBLE MONITOR WARNINGS + FALLBACK RELOCATED INTO THE DISPLAYS
+//    PANEL (v2.9) — the "finish setting up your displays" help no longer sits
+//    stuck in the top band; it renders inside RunDisplaysPanel (State B) and is
+//    dismissible, and the State-A blocked/partial banners gain a dismiss X. ────
+describe('RunControlView output — dismissible monitor warnings (v2.9)', () => {
+  it('the "finish setting up your displays" fallback help renders INSIDE the Displays panel (off the top band), with the monitor-setup link', async () => {
+    // No saved mapping (localStorage cleared in beforeEach) → fallback path, live.
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+
+    const panel = wrapper.find('[data-testid="run-displays-panel"]')
+    expect(panel.exists()).toBe(true)
+    // The relocated help is a DESCENDANT of the Displays panel now, not a sibling
+    // top banner, and keeps the monitor-setup link.
+    const notice = panel.find('[data-testid="run-fallback-banner"]')
+    expect(notice.exists()).toBe(true)
+    expect(notice.find('a[data-to="/monitor-setup"]').exists()).toBe(true)
+  })
+
+  it('the fallback help is dismissible — run-fallback-dismiss hides it while the session stays live', async () => {
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+    expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="run-fallback-dismiss"]').trigger('click')
+
+    // Dismiss only hides the help — the outputs / Displays panel stay live.
+    expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-displays-panel"]').exists()).toBe(true)
+  })
+
+  it('the blocked banner is dismissible — run-blocked-dismiss hides it', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    openSpy.mockReturnValue(null) // BOTH windows refused → blocked (State A)
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+    expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="run-blocked-dismiss"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(false)
+  })
+
+  it('the partial banner is dismissible — run-partial-dismiss hides it', async () => {
+    // No saved mapping → fallback path; audience refused (null) → honest partial.
+    installGetScreenDetails([screenA, screenB])
+    openSpy.mockImplementationOnce(() => null).mockImplementationOnce(() => makeFakeWin())
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+    expect(wrapper.find('[data-testid="run-partial-banner"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="run-partial-dismiss"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="run-partial-banner"]').exists()).toBe(false)
+  })
+})
+
 // ── 5c. STALE RESOLUTION — a late getScreenDetails resolve after exit/unmount ─────
 //        must open NO orphaned output windows (WR-01 / Pitfall 6).
 describe('RunControlView output — stale-resolution guard (WR-01)', () => {
