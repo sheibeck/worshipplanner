@@ -621,7 +621,13 @@ prompt on an unchanged setup.
   6. A user can assign a nickname to each detected monitor; it persists with that monitor's identity and
      is shown on the setup/assignment UI so roles map to the right physical screen (R338).
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 114-01-PLAN.md — monitorConfig v2: stable fingerprint (drops position/primary), delta-aware matchMapping, nickname field, storage key bump [R326, R328, R338]
+- [ ] 114-02-PLAN.md — Monitor Setup UI: per-monitor independent role selector, None option, ≥1-Audience Save gate, nicknames, delta reprompt [R324, R325, R328, R338]
+- [ ] 114-03-PLAN.md — Run-mode N-window orchestration + dynamic Displays/Preflight panels + ≥1-Audience go-live gate [R324, R325, R327, R338]
+- [ ] 114-04-PLAN.md — Popup self-placement on assigned display via requestFullscreen({screen}) [R327]
 **UI hint**: yes
 
 ### Phase 115: Live-Output Readability & Layout
