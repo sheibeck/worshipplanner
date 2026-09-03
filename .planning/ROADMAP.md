@@ -662,7 +662,16 @@ song is ending.
   4. The preview-thumbnail strip's scroll affordance is reliably visible and usable on macOS, with the
      intermittently-missing scrollbar fixed (R332).
 
-**Plans**: TBD
+**Plans**: 5 plans across 3 waves
+
+Plans:
+
+- [ ] 115-01-PLAN.md — auto-fit engine: pure fit math + useSlideAutoFit/useContainScale composables [R329]
+- [ ] 115-02-PLAN.md — Run-screen layout: smaller live pane, larger thumbnails, next-item end cap, macOS scrollbar [R330, R331, R332]
+- [ ] 115-03-PLAN.md — SlideCanvas per-slide auto-fit + Audience/Confidence canonical-stage rendering (WYSIWYG) [R329]
+- [ ] 115-04-PLAN.md — migrate editor readers (SlideCard/EditSlideDrawer) off the --slide-font-scale multiplier [R329]
+- [ ] 115-05-PLAN.md — retire the fontScale typography model + remove the Settings Size control [R329]
+
 **UI hint**: yes
 
 ### Phase 116: Lyric Editor & Song UX
