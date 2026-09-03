@@ -1,6 +1,6 @@
 /**
- * Phase 92 Plan 02 (R267/R268/R269). Behavioral coverage for MonitorSetupView.vue's
- * detect/assign/persist state machine.
+ * Phase 92 Plan 02 (R267/R268/R269); reworked Phase 114 Plan 02 (R324/R325/
+ * R328/R338) for the per-fingerprint role map + delta-aware match consumption.
  *
  * Unlike SettingsView.test.ts's harness, MonitorSetupView.vue imports NO store
  * (`@/stores/auth` is never referenced) — only AppShell (stubbed here to a plain
@@ -66,6 +66,12 @@ function mountView() {
   })
 }
 
+async function detect(wrapper: ReturnType<typeof mountView>) {
+  await flushPromises()
+  await wrapper.get('[data-testid="detect-button"]').trigger('click')
+  await flushPromises()
+}
+
 beforeEach(() => {
   localStorage.clear()
   setActivePinia(createPinia())
@@ -105,18 +111,108 @@ describe('MonitorSetupView — granted, fresh (State B, R267)', () => {
     const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
     installGetScreenDetails(screens)
     const wrapper = mountView()
-    await flushPromises()
-
-    await wrapper.get('[data-testid="detect-button"]').trigger('click')
-    await flushPromises()
+    await detect(wrapper)
 
     const fpA = computeFingerprint(screens[0]!)
     const fpB = computeFingerprint(screens[1]!)
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-none"]`).attributes('aria-checked')).toBe('true')
     expect(wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).attributes('aria-checked')).toBe('false')
     expect(wrapper.get(`[data-testid="monitor-role-${fpA}-confidence"]`).attributes('aria-checked')).toBe('false')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpB}-none"]`).attributes('aria-checked')).toBe('true')
     expect(wrapper.get(`[data-testid="monitor-role-${fpB}-audience"]`).attributes('aria-checked')).toBe('false')
     expect(wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).attributes('aria-checked')).toBe('false')
     expect(wrapper.get('[data-testid="save-button"]').attributes('disabled')).toBeDefined()
+  })
+})
+
+describe('MonitorSetupView — 3+ monitors, no cap at two (R324)', () => {
+  it('renders three MonitorCards when three displays are detected', async () => {
+    const screens = [
+      makeScreen({ label: 'Front Wall' }),
+      makeScreen({ label: 'Stage Monitor', left: 1920 }),
+      makeScreen({ label: 'Lobby Screen', left: 3840 }),
+    ]
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    const fps = screens.map((s) => computeFingerprint(s))
+    for (const fp of fps) {
+      expect(wrapper.find(`[data-testid="monitor-role-${fp}-none"]`).exists()).toBe(true)
+    }
+  })
+})
+
+describe('MonitorSetupView — independent per-monitor role selection, incl. repeated Audience (R325)', () => {
+  it('leaves both cards Audience when Audience is selected on two of three cards, and a third stays None', async () => {
+    const screens = [
+      makeScreen({ label: 'Front Wall' }),
+      makeScreen({ label: 'Stage Monitor', left: 1920 }),
+      makeScreen({ label: 'Lobby Screen', left: 3840 }),
+    ]
+    const [fpA, fpB, fpC] = screens.map((s) => computeFingerprint(s))
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-audience"]`).trigger('click')
+
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpB}-audience"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpC}-none"]`).attributes('aria-checked')).toBe('true')
+  })
+
+  it('never mutates another card when a role is selected on one card', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const [fpA, fpB] = screens.map((s) => computeFingerprint(s))
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).trigger('click')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).attributes('aria-checked')).toBe('true')
+
+    // Changing card A's role must not clear or alter card B's role.
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-confidence"]`).trigger('click')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-confidence"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).attributes('aria-checked')).toBe('true')
+  })
+
+  it('removes only that card\'s role when None is selected on a previously-assigned card', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const [fpA, fpB] = screens.map((s) => computeFingerprint(s))
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-audience"]`).trigger('click')
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-none"]`).trigger('click')
+
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-none"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpB}-audience"]`).attributes('aria-checked')).toBe('true')
+  })
+})
+
+describe('MonitorSetupView — Save gate: at least one Audience required (CONTEXT decision)', () => {
+  it('disables Save with zero Audience assigned and enables it once one Audience exists', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const [fpA, fpB] = screens.map((s) => computeFingerprint(s))
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    expect(wrapper.get('[data-testid="save-button"]').attributes('disabled')).toBeDefined()
+
+    // Confidence alone is not enough.
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).trigger('click')
+    expect(wrapper.get('[data-testid="save-button"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
+    expect(wrapper.get('[data-testid="save-button"]').attributes('disabled')).toBeUndefined()
   })
 })
 
@@ -148,9 +244,7 @@ describe('MonitorSetupView — persistence round-trip + matched reload (State B2
 
     installGetScreenDetails(screens)
     const wrapper = mountView()
-    await flushPromises()
-    await wrapper.get('[data-testid="detect-button"]').trigger('click')
-    await flushPromises()
+    await detect(wrapper)
 
     await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
     await wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).trigger('click')
@@ -171,19 +265,82 @@ describe('MonitorSetupView — persistence round-trip + matched reload (State B2
     // Same fake screens on a fresh mount — the saved mapping must be reused
     // silently (State B2), not re-prompted.
     const secondWrapper = mountView()
-    await flushPromises()
-    await secondWrapper.get('[data-testid="detect-button"]').trigger('click')
-    await flushPromises()
+    await detect(secondWrapper)
 
     expect(secondWrapper.text()).toContain('Your displays are set up')
     expect(secondWrapper.find('[data-testid="save-button"]').exists()).toBe(false)
   })
 })
 
-describe('MonitorSetupView — layout-changed reprompt (State B3, R268)', () => {
-  it('renders the amber layout-changed banner above a blank editable grid when the saved fingerprints no longer match', async () => {
-    // Seed a saved mapping (via the real saveMapping) for screens that will
-    // NOT match the live screens detected below.
+describe('MonitorSetupView — nickname save + reload round-trip (R338)', () => {
+  it('persists a nickname with its assignment and shows it nickname-first on the matched summary after reload', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const fpA = computeFingerprint(screens[0]!)
+    const fpB = computeFingerprint(screens[1]!)
+
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    await wrapper.get(`[data-testid="monitor-nickname-${fpA}"]`).setValue('Sanctuary Screen')
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).trigger('click')
+
+    await wrapper.get('[data-testid="save-button"]').trigger('click')
+    await flushPromises()
+
+    const raw = localStorage.getItem(MONITOR_CONFIG_STORAGE_KEY)
+    const persisted = JSON.parse(raw!) as MonitorMapping
+    const audienceAssignment = persisted.assignments.find((a) => a.fingerprint === fpA)
+    expect(audienceAssignment?.nickname).toBe('Sanctuary Screen')
+
+    wrapper.unmount()
+
+    const secondWrapper = mountView()
+    await detect(secondWrapper)
+
+    expect(secondWrapper.text()).toContain('Your displays are set up')
+    expect(secondWrapper.text()).toContain('Sanctuary Screen')
+  })
+})
+
+describe('MonitorSetupView — partial delta reprompt (State B3, R326/R328)', () => {
+  it('pre-selects the two kept cards and leaves only the new display unselected, with no full-reconfigure wipe banner', async () => {
+    const keptA = makeScreen({ label: 'Front Wall' })
+    const keptB = makeScreen({ label: 'Stage Monitor', left: 1920 })
+    const fpA = computeFingerprint(keptA)
+    const fpB = computeFingerprint(keptB)
+
+    saveMapping({
+      assignments: [
+        { fingerprint: fpA, role: 'audience' },
+        { fingerprint: fpB, role: 'confidence' },
+      ],
+      savedAt: Date.now(),
+    })
+
+    const newScreen = makeScreen({ label: 'Lobby Screen', left: 3840 })
+    const fpC = computeFingerprint(newScreen, [keptA, keptB, newScreen])
+    const liveScreens = [keptA, keptB, newScreen]
+    installGetScreenDetails(liveScreens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    // Delta notice, not the old full-reconfigure wipe banner.
+    expect(wrapper.find('[data-testid="partial-delta-notice"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('We found 1 new display')
+    expect(wrapper.text()).not.toContain('Your monitor setup changed')
+    expect(wrapper.text()).not.toContain('Choose two different displays')
+
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpC}-none"]`).attributes('aria-checked')).toBe('true')
+
+    // At least one Audience is already kept, so Save is enabled.
+    expect(wrapper.get('[data-testid="save-button"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('shows the delta notice with no kept cards when every saved fingerprint is gone (fully different layout)', async () => {
     const staleScreens = [makeScreen({ label: 'Old Front' }), makeScreen({ label: 'Old Stage', left: 1920 })]
     saveMapping({
       assignments: [
@@ -196,55 +353,17 @@ describe('MonitorSetupView — layout-changed reprompt (State B3, R268)', () => 
     const liveScreens = [makeScreen({ label: 'New Front' }), makeScreen({ label: 'New Stage', left: 1920 })]
     installGetScreenDetails(liveScreens)
     const wrapper = mountView()
-    await flushPromises()
-    await wrapper.get('[data-testid="detect-button"]').trigger('click')
-    await flushPromises()
+    await detect(wrapper)
 
-    expect(wrapper.text()).toContain('Your monitor setup changed')
+    expect(wrapper.find('[data-testid="partial-delta-notice"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('We found 2 new displays')
+    expect(wrapper.text()).not.toContain('Your monitor setup changed')
 
     const fpA = computeFingerprint(liveScreens[0]!)
     const fpB = computeFingerprint(liveScreens[1]!)
-    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).attributes('aria-checked')).toBe('false')
-    expect(wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).attributes('aria-checked')).toBe('false')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-none"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpB}-none"]`).attributes('aria-checked')).toBe('true')
     expect(wrapper.get('[data-testid="save-button"]').attributes('disabled')).toBeDefined()
-  })
-})
-
-describe('MonitorSetupView — same-monitor validation blocks Save', () => {
-  // NOTE: `onSelectRole`'s own cross-card exclusivity guard (parent view —
-  // see 92-01-SUMMARY.md's "key-decisions") makes it IMPOSSIBLE to drive
-  // audienceFingerprint === confidenceFingerprint through two card clicks —
-  // selecting a role on a card always clears the other role if it currently
-  // points at that same fingerprint. The one reachable path to this state is
-  // `resolveGrantedBranch()`'s matched-branch pre-fill, which copies a saved
-  // mapping's fingerprints directly WITHOUT that guard. Seeding a corrupted
-  // single-fingerprint mapping and reassigning from the matched summary
-  // reaches the same `sameMonitorSelected`/`canSave` guard this test proves.
-  it('disables Save and shows the inline validation copy when a saved mapping pre-fills both roles to the same monitor', async () => {
-    const screen = makeScreen({ label: 'Only Display' })
-    const fp = computeFingerprint(screen)
-    saveMapping({
-      assignments: [
-        { fingerprint: fp, role: 'audience' },
-        { fingerprint: fp, role: 'confidence' },
-      ],
-      savedAt: Date.now(),
-    })
-
-    installGetScreenDetails([screen])
-    const wrapper = mountView()
-    await flushPromises()
-    await wrapper.get('[data-testid="detect-button"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('Your displays are set up')
-    const reassignButton = wrapper.findAll('button').find((b) => b.text() === 'Reassign roles')
-    expect(reassignButton).toBeTruthy()
-    await reassignButton!.trigger('click')
-
-    const saveButton = wrapper.get('[data-testid="save-button"]')
-    expect(saveButton.attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('Choose two different displays for Audience and Confidence.')
   })
 })
 
@@ -266,9 +385,7 @@ describe('MonitorSetupView — WR-02: a same-layout re-detect must not discard u
 
     installGetScreenDetails(screens)
     const wrapper = mountView()
-    await flushPromises()
-    await wrapper.get('[data-testid="detect-button"]').trigger('click')
-    await flushPromises()
+    await detect(wrapper)
     expect(wrapper.text()).toContain('Your displays are set up')
 
     // Expand into the editable grid and make an unsaved change: put Confidence
@@ -302,9 +419,7 @@ describe('MonitorSetupView — save round-trip "not persisted" warning (Phase 10
 
     installGetScreenDetails(screens)
     const wrapper = mountView()
-    await flushPromises()
-    await wrapper.get('[data-testid="detect-button"]').trigger('click')
-    await flushPromises()
+    await detect(wrapper)
 
     await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
     await wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).trigger('click')
@@ -336,9 +451,7 @@ describe('MonitorSetupView — save round-trip "not persisted" warning (Phase 10
 
     installGetScreenDetails(screens)
     const wrapper = mountView()
-    await flushPromises()
-    await wrapper.get('[data-testid="detect-button"]').trigger('click')
-    await flushPromises()
+    await detect(wrapper)
 
     await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
     await wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).trigger('click')

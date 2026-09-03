@@ -5,7 +5,7 @@
       <div class="mb-6 pb-4 border-b border-gray-800">
         <h1 class="text-xl font-semibold text-gray-100">Monitor Setup</h1>
         <p class="text-sm text-gray-400 mt-1">
-          Set up which screen shows your congregation and which shows your team. You only need to
+          Set up which screens show your congregation and which show your team. You only need to
           do this once per computer.
         </p>
       </div>
@@ -46,8 +46,9 @@
           </div>
           <p class="text-sm text-gray-400 mt-1">This computer's setup still matches what you saved — nothing to do.</p>
           <div class="text-sm text-gray-300 mt-3 space-y-1">
-            <p>Audience &rarr; {{ screenLabelFor(audienceFingerprint) }}</p>
-            <p>Confidence &rarr; {{ screenLabelFor(confidenceFingerprint) }}</p>
+            <p v-for="a in matchedSummaryList" :key="a.fingerprint">
+              {{ roleLabel(a.role) }} &rarr; {{ screenLabelFor(a.fingerprint) }}
+            </p>
           </div>
           <button
             type="button"
@@ -60,14 +61,18 @@
 
         <!-- State B / B3: editable grid -->
         <div v-else>
-          <div v-if="grantedView === 'reprompt'" class="bg-amber-900/20 border border-amber-800/60 rounded-lg p-4 mb-4">
+          <div v-if="grantedView === 'partial'" data-testid="partial-delta-notice" class="bg-amber-900/20 border border-amber-800/60 rounded-lg p-4 mb-4">
             <div class="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
-              <h3 class="text-sm font-semibold text-amber-200">Your monitor setup changed</h3>
+              <h3 class="text-sm font-semibold text-amber-200">
+                We found {{ newDisplayCount }} new display{{ newDisplayCount === 1 ? '' : 's' }}
+              </h3>
             </div>
-            <p class="text-xs text-amber-200/80 mt-1">We found different displays than last time. Please assign roles again below.</p>
+            <!-- See ADR-0215 (docs/adr/0215-layout-changed-since-the-mapping-was-saved-never-guess-the-n.md) —
+                 kept assignments stay pre-selected below; only the new display(s) are left unassigned. -->
+            <p class="text-xs text-amber-200/80 mt-1">Your other assignments are still set up. Assign a role to the new display below, or leave it as None.</p>
           </div>
 
           <div class="flex items-center justify-between">
@@ -97,7 +102,9 @@
               :screen="item.screen"
               :fingerprint="item.fingerprint"
               :selected-role="selectedRoleFor(item.fingerprint)"
+              :nickname="nicknameByFingerprint[item.fingerprint] ?? ''"
               @select-role="onSelectRole(item.fingerprint, $event)"
+              @update-nickname="onUpdateNickname(item.fingerprint, $event)"
             />
           </div>
 
@@ -111,7 +118,6 @@
             >
               Save monitor setup
             </button>
-            <p v-if="sameMonitorSelected" class="text-red-400 text-sm">Choose two different displays for Audience and Confidence.</p>
           </div>
           <div v-else class="mt-6 flex items-center gap-3">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -133,13 +139,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import AppShell from '@/components/AppShell.vue'
 import MonitorCard from '@/components/MonitorCard.vue'
 import MonitorFallbackPanel from '@/components/MonitorFallbackPanel.vue'
 import { useToasts } from '@/stores/toasts'
 import {
   computeFingerprint,
+  computeFingerprints,
   saveMapping,
   loadMapping,
   matchMapping,
@@ -147,10 +154,11 @@ import {
   type MonitorAssignment,
   type MonitorRole,
   type ScreenLike,
+  type MatchResultV2,
 } from '@/utils/monitorConfig'
 
 type Phase = 'prompt' | 'detecting' | 'denied' | 'unavailable' | 'granted'
-type GrantedView = 'fresh' | 'matched' | 'reprompt'
+type GrantedView = 'fresh' | 'matched' | 'partial'
 
 /**
  * Precise structural shape of the live `ScreenDetails` object (REVIEW-FIX
@@ -178,8 +186,15 @@ const grantedView = ref<GrantedView>('fresh')
 const editingFromMatched = ref(false)
 
 const liveScreens = ref<ScreenLike[]>([])
-const audienceFingerprint = ref<string | null>(null)
-const confidenceFingerprint = ref<string | null>(null)
+// Per-monitor role/nickname state (R325 fix): a fingerprint present in
+// roleByFingerprint holds that role; absent means None. This is the exact
+// replacement for the old audienceFingerprint/confidenceFingerprint singleton
+// refs — mutating one fingerprint's entry never touches any other.
+const roleByFingerprint = reactive<Record<string, MonitorRole>>({})
+const nicknameByFingerprint = reactive<Record<string, string>>({})
+// Count of currently-undetected-before displays surfaced by a 'partial' match
+// (R326/R328) — drives the "we found N new displays" copy.
+const newDisplayCount = ref(0)
 const saveOutcome = ref<'idle' | 'saved' | 'not-persisted-warning'>('idle')
 
 // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
@@ -193,31 +208,57 @@ let screenDetailsRef: ScreenDetailsLike | null = null
 // See ADR-0214 (docs/adr/0214-monotonic-token-guarding-against-a-stale-getscreendetails.md)
 let detectRequestId = 0
 
-const screensWithFingerprint = computed(() =>
-  liveScreens.value.map((screen) => ({ screen, fingerprint: computeFingerprint(screen) })),
-)
+// Fingerprints for the WHOLE live array via computeFingerprints (Plan 01) so
+// identical-monitor indices match what was saved, not a per-screen lone-group
+// fingerprint that would collide/misalign when two monitors share an identity.
+const screensWithFingerprint = computed(() => {
+  const fingerprintByScreen = computeFingerprints(liveScreens.value)
+  return liveScreens.value.map((screen) => ({
+    screen,
+    fingerprint: fingerprintByScreen.get(screen)!,
+  }))
+})
 
 function selectedRoleFor(fingerprint: string): MonitorRole | null {
-  if (audienceFingerprint.value === fingerprint) return 'audience'
-  if (confidenceFingerprint.value === fingerprint) return 'confidence'
-  return null
+  return roleByFingerprint[fingerprint] ?? null
 }
 
-function screenLabelFor(fingerprint: string | null): string {
-  if (!fingerprint) return '—'
+function roleLabel(role: MonitorRole): string {
+  return role === 'audience' ? 'Audience' : 'Confidence'
+}
+
+function screenLabelFor(fingerprint: string): string {
+  const nickname = nicknameByFingerprint[fingerprint]
+  if (nickname) return nickname
   const item = screensWithFingerprint.value.find((s) => s.fingerprint === fingerprint)
-  if (!item) return '—'
-  return `${item.screen.label || 'Unlabeled display'} (${item.screen.width} x ${item.screen.height})`
+  if (!item) return 'Unknown'
+  return `${item.screen.label || 'Unknown'} (${item.screen.width} x ${item.screen.height})`
 }
 
-function onSelectRole(fingerprint: string, role: MonitorRole) {
-  if (role === 'audience') {
-    audienceFingerprint.value = fingerprint
-    if (confidenceFingerprint.value === fingerprint) confidenceFingerprint.value = null
+// A summary list for the B2 "already configured" view — lists EVERY assigned
+// monitor (any count, incl. multiple Audience), not two fixed slots.
+const matchedSummaryList = computed(() =>
+  Object.entries(roleByFingerprint)
+    .map(([fingerprint, role]) => ({ fingerprint, role }))
+    .sort((a, b) => (a.role === b.role ? a.fingerprint.localeCompare(b.fingerprint) : a.role === 'audience' ? -1 : 1)),
+)
+
+function onSelectRole(fingerprint: string, role: MonitorRole | null) {
+  // This is the R325 fix: a non-null role sets ONLY this fingerprint's entry;
+  // None deletes ONLY this fingerprint's entry. Never touches another card.
+  if (role === null) {
+    delete roleByFingerprint[fingerprint]
   } else {
-    confidenceFingerprint.value = fingerprint
-    if (audienceFingerprint.value === fingerprint) audienceFingerprint.value = null
+    roleByFingerprint[fingerprint] = role
   }
+  saveOutcome.value = 'idle'
+  // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
+  dirtyEdits.value = true
+  refreshNoticeVisible.value = false
+}
+
+function onUpdateNickname(fingerprint: string, value: string) {
+  nicknameByFingerprint[fingerprint] = value
   saveOutcome.value = 'idle'
   // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
   dirtyEdits.value = true
@@ -231,23 +272,12 @@ function onReassignRoles() {
   refreshNoticeVisible.value = false
 }
 
-const sameMonitorSelected = computed(
-  () =>
-    audienceFingerprint.value !== null &&
-    confidenceFingerprint.value !== null &&
-    audienceFingerprint.value === confidenceFingerprint.value,
-)
-
-const canSave = computed(
-  () =>
-    audienceFingerprint.value !== null &&
-    confidenceFingerprint.value !== null &&
-    audienceFingerprint.value !== confidenceFingerprint.value,
-)
+// ≥1 Audience required to Save; Confidence optional (CONTEXT.md decision).
+const canSave = computed(() => Object.values(roleByFingerprint).includes('audience'))
 
 function assignmentSetsEqual(a: MonitorAssignment[], b: MonitorAssignment[]): boolean {
   if (a.length !== b.length) return false
-  const key = (x: MonitorAssignment) => `${x.fingerprint}::${x.role}`
+  const key = (x: MonitorAssignment) => `${x.fingerprint}::${x.role}::${x.nickname ?? ''}`
   const setA = new Set(a.map(key))
   const setB = new Set(b.map(key))
   if (setA.size !== setB.size) return false
@@ -258,11 +288,13 @@ function assignmentSetsEqual(a: MonitorAssignment[], b: MonitorAssignment[]): bo
 }
 
 function onSave() {
-  if (!canSave.value || !audienceFingerprint.value || !confidenceFingerprint.value) return
-  const assignments: MonitorAssignment[] = [
-    { fingerprint: audienceFingerprint.value, role: 'audience' },
-    { fingerprint: confidenceFingerprint.value, role: 'confidence' },
-  ]
+  if (!canSave.value) return
+  const assignments: MonitorAssignment[] = Object.entries(roleByFingerprint).map(([fingerprint, role]) => {
+    const nickname = nicknameByFingerprint[fingerprint]
+    const assignment: MonitorAssignment = { fingerprint, role }
+    if (nickname) assignment.nickname = nickname
+    return assignment
+  })
   const mapping: MonitorMapping = { assignments, savedAt: Date.now() }
   saveMapping(mapping)
   // Round-trip check — saveMapping() never throws and silently no-ops on
@@ -275,7 +307,7 @@ function onSave() {
     // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
     dirtyEdits.value = false
     refreshNoticeVisible.value = false
-    if (grantedView.value === 'reprompt') {
+    if (grantedView.value === 'partial') {
       grantedView.value = 'fresh'
     }
   } else {
@@ -301,31 +333,44 @@ watch(saveOutcome, (value) => {
   }
 })
 
+function resetAssignmentMaps() {
+  for (const key of Object.keys(roleByFingerprint)) delete roleByFingerprint[key]
+  for (const key of Object.keys(nicknameByFingerprint)) delete nicknameByFingerprint[key]
+}
+
+function applyAssignmentsToMaps(assignments: MonitorAssignment[]) {
+  for (const assignment of assignments) {
+    roleByFingerprint[assignment.fingerprint] = assignment.role
+    if (assignment.nickname) nicknameByFingerprint[assignment.fingerprint] = assignment.nickname
+  }
+}
+
 function resolveGrantedBranch() {
   // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
   dirtyEdits.value = false
   refreshNoticeVisible.value = false
+  resetAssignmentMaps()
+  newDisplayCount.value = 0
   const saved = loadMapping()
   if (!saved) {
     grantedView.value = 'fresh'
-    audienceFingerprint.value = null
-    confidenceFingerprint.value = null
     saveOutcome.value = 'idle'
     return
   }
-  const result = matchMapping(saved, liveScreens.value)
+  const result: MatchResultV2 = matchMapping(saved, liveScreens.value)
   if (result.status === 'matched') {
     grantedView.value = 'matched'
     editingFromMatched.value = false
-    const audience = saved.assignments.find((a) => a.role === 'audience')
-    const confidence = saved.assignments.find((a) => a.role === 'confidence')
-    audienceFingerprint.value = audience ? audience.fingerprint : null
-    confidenceFingerprint.value = confidence ? confidence.fingerprint : null
+    applyAssignmentsToMaps(saved.assignments)
+  } else if (result.status === 'partial') {
+    // See ADR-0215 (docs/adr/0215-layout-changed-since-the-mapping-was-saved-never-guess-the-n.md) —
+    // only the kept assignments are pre-filled; the delta is left for the
+    // operator to assign, never guessed.
+    grantedView.value = 'partial'
+    applyAssignmentsToMaps(result.kept)
+    newDisplayCount.value = result.newScreens.length
   } else {
-    // See ADR-0215 (docs/adr/0215-layout-changed-since-the-mapping-was-saved-never-guess-the-n.md)
-    grantedView.value = 'reprompt'
-    audienceFingerprint.value = null
-    confidenceFingerprint.value = null
+    grantedView.value = 'fresh'
   }
   saveOutcome.value = 'idle'
 }
