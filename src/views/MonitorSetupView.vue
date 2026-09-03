@@ -248,6 +248,10 @@ function onSelectRole(fingerprint: string, role: MonitorRole | null) {
   // None deletes ONLY this fingerprint's entry. Never touches another card.
   if (role === null) {
     delete roleByFingerprint[fingerprint]
+    // IN-02: onSave only persists nicknames for role-bearing monitors, so a
+    // nickname left on a None card would be silently dropped on Save. Clear it
+    // here instead, so the loss is VISIBLE at the moment the card becomes None.
+    delete nicknameByFingerprint[fingerprint]
   } else {
     roleByFingerprint[fingerprint] = role
   }
