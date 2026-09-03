@@ -164,3 +164,7 @@ None - no external service configuration required. This is a pure, framework-fre
 ---
 *Phase: 114-multi-monitor-assignment-rework*
 *Completed: 2026-09-03*
+
+## Self-Check: PASSED
+
+All created/modified files confirmed present on disk; all four commit hashes (`db249fd3`, `3317773c`, `b3f65b66`, `6e013b3a`) confirmed present in `git log`.

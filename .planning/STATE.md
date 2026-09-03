@@ -1,15 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.9
-milestone_name: Live Presentation Field Fixes
-status: planning
-last_updated: "2026-09-02T18:00:00.000Z"
-last_activity: 2026-09-02
+milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
+current_phase: 114
+current_phase_name: Multi-Monitor Assignment Rework
+status: executing
+stopped_at: Completed 114-01-PLAN.md
+last_updated: "2026-09-03T12:05:03.960Z"
+last_activity: 2026-09-03
+last_activity_desc: Phase 114 execution started
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 1
   percent: 0
 ---
 
@@ -41,7 +45,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.9 Live Presentation Field Fixes (roadmap created 2026-09-02)
 
-**Status:** Roadmap created — ready for `/gsd-plan-phase 114`.
+**Status:** Ready to execute
 
 **Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the first real
 church-projector run, so a projectionist can set up and read the live output without fighting the tool.
@@ -1206,7 +1210,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 114 — Multi-Monitor Assignment Rework (v2.9 roadmap created; not yet planned)
+**Current focus:** Phase 114 — Multi-Monitor Assignment Rework
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1216,10 +1220,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 114 (not started)
-Plan: —
-Status: Roadmap created — ready to plan Phase 114
-Last activity: 2026-09-02 — ROADMAP.md created for v2.9 (Phases 114-116, R324-R337, 100% coverage)
+Phase: 114 (Multi-Monitor Assignment Rework) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-09-03 — Phase 114 execution started
 
 ## ★ v2.9 ROADMAP.md phase breakdown (created 2026-09-02)
 
@@ -3142,6 +3146,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 113 P01 | 15min | 3 tasks | 2 files |
 | Phase 113 P02 | 27min | 2 tasks | 3 files |
 | Phase 113 P03 | 8min | 1 tasks | 1 files |
+| Phase 114 P01 | 27min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3650,6 +3655,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: SEC-ISO-02: revokeRefreshTokens(uid) added only to the clear branch, strictly after the claim write lands, logged-and-swallowed on failure (mirrors orgProvisioning.ts:461/ADR-0049)
 - [Phase ?]: SEC-ISO-02 Storage ALLOW-case authored but not executed this session (Storage emulator 127.0.0.1:9199 unreachable, ECONNREFUSED) -- committed run-when-available; functions unit test is the primary emulator-independent proof
 - [Phase ?]: Consolidated all 11 Medium/Low Phase 112 security findings into ONE Phase 999.5 backlog entry (999.5 via phase.next-decimal 999), pointing to 112-SECURITY-REVIEW.md rather than duplicating detail.
+- [Phase ?]: Monitor identity fingerprint drops left/top/isPrimary entirely (macOS-volatile) — never re-add for 'accuracy'
+- [Phase ?]: computeFingerprint kept as backward-compatible single-arg overload; Wave 2 plans migrate call sites to pass allScreens
 
 ### Roadmap Evolution
 
@@ -3977,8 +3984,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-02T20:20:36.815Z
-Stopped at: Completed 113-03-PLAN.md
+Last session: 2026-09-03T12:05:03.891Z
+Stopped at: Completed 114-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -35,7 +35,7 @@ church-projector run, so a projectionist can set up and read the live output wit
   including assigning **Audience to more than one monitor at the same time** — selecting a role on one
   monitor no longer clears it on another.
 
-- [ ] **R326**: Monitor role assignments **persist and stay stuck** across a 3+ monitor setup — the bug
+- [x] **R326**: Monitor role assignments **persist and stay stuck** across a 3+ monitor setup — the bug
   where roles would not hold once a third monitor was present is fixed (the single-select model that
   collapsed is replaced).
 
@@ -43,10 +43,10 @@ church-projector run, so a projectionist can set up and read the live output wit
   display on macOS/Chrome**, not just on the developer's laptop — the Mac tab/window-placement failure is
   fixed rather than worked around with manual dragging.
 
-- [ ] **R328**: The monitor auto-detect no longer falsely reports "your monitors changed" when the
+- [x] **R328**: The monitor auto-detect no longer falsely reports "your monitors changed" when the
   physical display layout is unchanged; a saved mapping re-loads without a spurious re-configure prompt.
 
-- [ ] **R338**: A user can assign a **nickname** to each detected monitor (many report as a number or
+- [x] **R338**: A user can assign a **nickname** to each detected monitor (many report as a number or
   "Unknown" on macOS), persisted with that monitor's identity and shown on the setup + assignment UI so
   roles can be assigned to the right physical screen with confidence. *(Added 2026-09-02 during Phase 114
   discuss.)*
@@ -90,8 +90,10 @@ church-projector run, so a projectionist can set up and read the live output wit
 - **Vamps** — upload a library of vamp mp3 files (single-key/chord backing tracks) and assign one to a
   non-song slide group (mutually exclusive with a regular mp3 attachment; applies to the whole group).
   Deferred to the backlog 999.13 storage cluster.
+
 - **Canned pre/post-service music** — a copyright-safe way to play music before/after the service (local
   mp3 folder vs. external Spotify/YouTube/Amazon playlist links). Needs its own research pass. Deferred.
+
 - **Lyric-editor version History** — a genuinely useful, correctly-timestamped version history (the
   feature hidden by R337), if it earns its place later.
 
@@ -99,8 +101,10 @@ church-projector run, so a projectionist can set up and read the live output wit
 
 - **All audio/media upload this milestone** — vamps and canned music both open the Firebase Storage +
   external-media cost/security surface (SEED-003 / backlog 999.13) and are held for their own milestone.
+
 - **Unsupported-browser warning** — dropped; Safari ran the app correctly on retest, so there is no
   compatibility gate to build.
+
 - **Manual per-slide font-size control** — deliberately not built; sizing is auto-fit only, by owner
   decision (manual sizing is "more fiddly than just auto scaling").
 
@@ -112,10 +116,10 @@ church-projector run, so a projectionist can set up and read the live output wit
 |-------------|-------|--------|
 | R324 | Phase 114 | Pending |
 | R325 | Phase 114 | Pending |
-| R326 | Phase 114 | Pending |
+| R326 | Phase 114 | Complete |
 | R327 | Phase 114 | Pending |
-| R328 | Phase 114 | Pending |
-| R338 | Phase 114 | Pending |
+| R328 | Phase 114 | Complete |
+| R338 | Phase 114 | Complete |
 | R329 | Phase 115 | Pending |
 | R330 | Phase 115 | Pending |
 | R331 | Phase 115 | Pending |

@@ -593,8 +593,10 @@ open the Firebase Storage + external-media cost/security surface; the unsupporte
 - [ ] **Phase 114: Multi-Monitor Assignment Rework** - Rework the single-select Audience/Confidence
   monitor model into any-role-to-any-monitor assignment that holds on 3+ displays and auto-places
   correctly on macOS
+
 - [ ] **Phase 115: Live-Output Readability & Layout** - Auto-fit slide text, a smaller live main view with
   larger readable thumbnails, an end-of-item marker, and a reliable Mac scrollbar
+
 - [ ] **Phase 116: Lyric Editor & Song UX** - Relabeled edit-lyrics link opening in a new tab, a
   SongSelect link, Cancel→Close, manual Credits/CCLI editing, and a hidden History tab
 
@@ -610,24 +612,31 @@ prompt on an unchanged setup.
 
   1. The monitor-configuration screen detects and lists every currently connected display for role
      assignment, with no cap at two monitors — verified against a real 3-monitor setup (R324).
+
   2. A user can assign Audience or Confidence to any monitor, including selecting Audience on more than
      one monitor at the same time, without a role selection on one monitor clearing it on another (R325).
+
   3. Saved role assignments persist and remain correct across a 3+ monitor setup after reload/relaunch —
      the bug where a third monitor caused roles to stop holding no longer reproduces (R326).
+
   4. Launching the outputs opens each output window on its own assigned physical display on macOS/Chrome,
      not just on the primary/laptop screen (R327).
+
   5. Reopening monitor setup with an unchanged physical display layout loads the saved mapping directly,
      with no spurious "your monitors changed" re-configure prompt (R328).
+
   6. A user can assign a nickname to each detected monitor; it persists with that monitor's identity and
      is shown on the setup/assignment UI so roles map to the right physical screen (R338).
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
 Plans:
-- [ ] 114-01-PLAN.md — monitorConfig v2: stable fingerprint (drops position/primary), delta-aware matchMapping, nickname field, storage key bump [R326, R328, R338]
+
+- [x] 114-01-PLAN.md — monitorConfig v2: stable fingerprint (drops position/primary), delta-aware matchMapping, nickname field, storage key bump [R326, R328, R338]
 - [ ] 114-02-PLAN.md — Monitor Setup UI: per-monitor independent role selector, None option, ≥1-Audience Save gate, nicknames, delta reprompt [R324, R325, R328, R338]
 - [ ] 114-03-PLAN.md — Run-mode N-window orchestration + dynamic Displays/Preflight panels + ≥1-Audience go-live gate [R324, R325, R327, R338]
 - [ ] 114-04-PLAN.md — Popup self-placement on assigned display via requestFullscreen({screen}) [R327]
+
 **UI hint**: yes
 
 ### Phase 115: Live-Output Readability & Layout
@@ -642,10 +651,13 @@ song is ending.
   1. Slide text auto-scales to fill the Audience and Confidence output displays with no manual font-size
      control, staying readable at projection distance, while the configured slide font family still
      renders as selected (R329).
+
   2. On the Run/control screen, the live main-slide view is smaller and the preview thumbnails are larger,
      so a thumbnail's slide content is legible at a glance (R330).
+
   3. An "end" marker appears after the last thumbnail of the current item, so the operator can see the
      item is ending and the next service item is coming up (R331).
+
   4. The preview-thumbnail strip's scroll affordance is reliably visible and usable on macOS, with the
      intermittently-missing scrollbar fixed (R332).
 
@@ -662,10 +674,12 @@ the read-only lyric viewer and the editor itself.
 
   1. The read-only lyric viewer's edit link reads "Edit song lyrics for {song name}" and opens that
      song's lyric editor in a new browser tab (R333).
+
   2. The lyric editor's title bar shows a link to the song's SongSelect page next to the song name (R334).
   3. The lyric editor's former "Cancel" button now reads "Close" (R335).
   4. A user can manually add, correct, or remove a song's Credits/CCLI/copyright text, independent of
      pasting lyrics (R336).
+
   5. The lyric editor no longer shows a History tab (R337).
 
 **Plans**: TBD
