@@ -27,6 +27,7 @@ import {
   loadMapping,
   matchMapping,
   computeFingerprints,
+  MONITOR_CONFIG_STORAGE_KEY,
   SCREEN_QUERY_PARAM,
   type MonitorAssignment,
   type MonitorMapping,
@@ -38,13 +39,34 @@ import { SERVICE_SECTION_LABELS, type ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 
 /**
+ * A deterministic 32-bit FNV-1a hash of a string, base-36 encoded. Used to make
+ * windowNameFor collision-resistant (IN-03) — see below.
+ */
+function hashFingerprint(input: string): string {
+  let h = 2166136261
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return (h >>> 0).toString(36)
+}
+
+/**
  * Stable per-assignment window name, keyed by the assignment's FINGERPRINT (not
  * array position) so a reopen of the SAME assignment targets the SAME browser
  * window while two assignments sharing a role (two Audience monitors) get
  * distinct names. See 114-RESEARCH.md Pitfall 3.
+ *
+ * IN-03: the readable segment lossily maps every non-alphanumeric char to `_`,
+ * so two distinct fingerprints differing only in punctuation ("Dell 1" vs
+ * "Dell-1") would collapse to the same window name and share one physical
+ * monitor. A hash of the RAW fingerprint is appended so distinct fingerprints
+ * always resolve to distinct window names.
  */
 export function windowNameFor(assignment: MonitorAssignment): string {
-  return `wp-output-${assignment.fingerprint.replace(/[^a-zA-Z0-9]/g, '_')}`
+  const raw = assignment.fingerprint
+  const readable = raw.replace(/[^a-zA-Z0-9]/g, '_')
+  return `wp-output-${readable}-${hashFingerprint(raw)}`
 }
 
 /** The present-mode URL for one assignment, carrying its target fingerprint (Plan 04 popup self-placement). */
@@ -402,8 +424,17 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   }
 
   // ── Saved-assignment derived state (114-03: N assignments, not 2 fixed roles) ──
-  /** The current saved assignments (same read-on-access caching as the pre-existing mappingLabel). */
-  const savedAssignments = computed<MonitorAssignment[]>(() => loadMapping()?.assignments ?? [])
+  // WR-02: hold the mapping in a REACTIVE ref (was a computed over the
+  // non-reactive loadMapping(), which memoized the assignment set forever). It is
+  // refreshed on mount, on cross-tab `storage` writes, on window focus, and after
+  // the reassign reopen — so canGoLive/displays reflect a mid-service reconfigure
+  // (e.g. the "Open monitor setup in a new tab" recovery flow) instead of a stale
+  // first-read cache.
+  const savedMapping = ref<MonitorMapping | null>(loadMapping())
+  function refreshSavedMapping() {
+    savedMapping.value = loadMapping()
+  }
+  const savedAssignments = computed<MonitorAssignment[]>(() => savedMapping.value?.assignments ?? [])
 
   /** Nickname-first label (R338), falling back to the fingerprint's identity segment. */
   function labelForAssignment(assignment: MonitorAssignment): string {
@@ -412,46 +443,25 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     return seg && seg.length > 0 ? seg : 'Assigned display'
   }
 
-  function firstAssignment(role: MonitorRole): MonitorAssignment | undefined {
-    return savedAssignments.value.find((a) => a.role === role)
-  }
-
-  /** The saved-mapping display label for a role, or an honest 'no monitor' note. */
-  function mappingLabel(role: MonitorRole): string {
-    const a = firstAssignment(role)
-    return a ? labelForAssignment(a) : 'No monitor assigned'
-  }
-  const audienceLabel = computed(() => mappingLabel('audience'))
-  const confidenceLabel = computed(() => mappingLabel('confidence'))
-
   /** True iff an assignment's window opened AND has not since latched closed. */
   function isAssignmentOpen(assignment: MonitorAssignment | undefined): boolean {
     if (!assignment) return false
     const name = windowNameFor(assignment)
     return !!openedByWindowName.value[name] && !closedByWindowName.value[name]
   }
-  /** open = the output is live/placed AND not closed (per-assignment, not aggregate outputStatus). */
-  const audienceOpen = computed(() => isAssignmentOpen(firstAssignment('audience')))
-  const confidenceOpen = computed(() => isAssignmentOpen(firstAssignment('confidence')))
-  const audienceClosed = computed(() => {
-    const a = firstAssignment('audience')
-    return !!a && !!closedByWindowName.value[windowNameFor(a)]
-  })
-  const confidenceClosed = computed(() => {
-    const a = firstAssignment('confidence')
-    return !!a && !!closedByWindowName.value[windowNameFor(a)]
-  })
-  const audienceFullscreen = computed(() => {
-    const a = firstAssignment('audience')
-    return !!a && !!fullscreenByWindowName.value[windowNameFor(a)]
-  })
-  const confidenceFullscreen = computed(() => {
-    const a = firstAssignment('confidence')
-    return !!a && !!fullscreenByWindowName.value[windowNameFor(a)]
-  })
-  /** Objects for RunDisplaysPanel's `{ open, label }` per-output prop contract. */
-  const audience = computed(() => ({ open: audienceOpen.value, label: audienceLabel.value }))
-  const confidence = computed(() => ({ open: confidenceOpen.value, label: confidenceLabel.value }))
+
+  /**
+   * WR-01: the RunHeader renders ONE dot per role, so its open state must
+   * AGGREGATE every same-role monitor — "healthy" only when the role has at least
+   * one assignment AND all of them are open. A first-of-role read would show GREEN
+   * while a second Audience display is still dark.
+   */
+  function roleOpen(role: MonitorRole): boolean {
+    const roleAssignments = savedAssignments.value.filter((a) => a.role === role)
+    return roleAssignments.length > 0 && roleAssignments.every((a) => isAssignmentOpen(a))
+  }
+  const audienceOpen = computed(() => roleOpen('audience'))
+  const confidenceOpen = computed(() => roleOpen('confidence'))
 
   /**
    * The N-assignment display list for RunDisplaysPanel/RunPreflightPanel
@@ -513,6 +523,21 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     )
   }
 
+  /** Reopen ONE assignment's window on its resolved screen. Assumes liveScreenDetails is set. */
+  function reopenAssignmentWindow(assignment: MonitorAssignment) {
+    if (liveScreenDetails === null) return
+    const name = windowNameFor(assignment)
+    const screen = resolveScreenForAssignment(assignment, liveScreenDetails.screens)
+    const win = openWindow(urlFor(assignment), name, screen)
+    if (!win) return
+    closedByWindowName.value[name] = false
+    openedByWindowName.value[name] = true
+    // IN-04: the prior (now-closed) window may have left fullscreenByWindowName[name]
+    // true, so the panel would briefly render a false "Fullscreen ✓" until the fresh
+    // child posts its real state. Clear it alongside the closed/opened resets.
+    fullscreenByWindowName.value[name] = false
+  }
+
   /** See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md) */
   function reopenOutput(idOrRole: string) {
     // IN-03: defense-in-parity with openOutputs' async guard — never open a window
@@ -523,18 +548,27 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
     if (!live.value || liveScreenDetails === null) return
     const assignments = fallbackAssignments(loadMapping())
+    // WR-01: a role keyword from the AGGREGATED RunHeader dot must reopen EVERY
+    // not-open monitor of that role (the dot goes amber when any same-role display
+    // is dark), not just the first-of-role. A fingerprint id (RunDisplaysPanel's
+    // per-row reopen) still targets exactly that one window.
+    if (idOrRole === 'audience' || idOrRole === 'confidence') {
+      for (const a of assignments.filter((a) => a.role === idOrRole && !isAssignmentOpen(a))) {
+        reopenAssignmentWindow(a)
+      }
+      return
+    }
     const assignment = resolveTargetAssignment(idOrRole, assignments)
     if (!assignment) return
-    const name = windowNameFor(assignment)
-    const screen = resolveScreenForAssignment(assignment, liveScreenDetails.screens)
-    const win = openWindow(urlFor(assignment), name, screen)
-    if (!win) return
-    closedByWindowName.value[name] = false
-    openedByWindowName.value[name] = true
+    reopenAssignmentWindow(assignment)
   }
 
   /** See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md) */
   function reopenReassignedOutputs() {
+    // WR-02: a reconfigure in the monitor-setup tab may have changed the saved
+    // mapping — re-read it so displays/canGoLive reflect the live set, and so the
+    // reopen below targets the current assignments.
+    refreshSavedMapping()
     for (const a of missingAssignments.value) reopenOutput(a.fingerprint)
     monitorChanged.value = false
     missingAssignments.value = []
@@ -776,6 +810,25 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     finishOpen(results, true)
   }
 
+  /**
+   * IN-01 PARTIAL path — a single display change no longer strips R327 placement
+   * from the monitors that did not move. The still-matched `kept` assignments open
+   * PLACED on their resolved screens; only the `changed` delta opens un-positioned
+   * for the operator to drag. Reported as fallback (amber) because SOME output
+   * still needs manual placement.
+   */
+  function openMixed(kept: MonitorAssignment[], changed: MonitorAssignment[], screens: ScreenLike[]) {
+    const placed: OpenResult[] = kept.map((assignment) => {
+      const screen = resolveScreenForAssignment(assignment, screens)
+      return { assignment, win: openWindow(urlFor(assignment), windowNameFor(assignment), screen) }
+    })
+    const unplaced: OpenResult[] = changed.map((assignment) => ({
+      assignment,
+      win: openWindow(urlFor(assignment), windowNameFor(assignment), null),
+    }))
+    finishOpen([...placed, ...unplaced], true)
+  }
+
   // URL computed at open time so it reads the CURRENT serviceId/org.
   function urlFor(assignment: MonitorAssignment): string {
     return urlForAssignment(assignment, serviceId.value, orgIdRef.value)
@@ -825,13 +878,23 @@ export function useRunControl(options: UseRunControlOptions = {}) {
         if (typeof details.addEventListener === 'function') {
           details.addEventListener('screenschange', onScreensChange)
         }
+        // WR-02: openOutputs re-reads the mapping fresh; sync the reactive ref so
+        // the display list/gate track this go-live's mapping.
+        refreshSavedMapping()
         const saved = loadMapping()
         if (!saved) {
           openAllUnplaced(fallbackAssignments(null))
           return
         }
         const result = matchMapping(saved, details.screens)
-        if (result.status !== 'matched') {
+        if (result.status === 'partial') {
+          // IN-01: place the unchanged monitors, open only the delta un-positioned.
+          const keptFingerprints = new Set(result.kept.map((a) => a.fingerprint))
+          const changed = saved.assignments.filter((a) => !keptFingerprints.has(a.fingerprint))
+          openMixed(result.kept, changed, details.screens)
+          return
+        }
+        if (result.status === 'no-mapping') {
           openAllUnplaced(fallbackAssignments(saved))
           return
         }
@@ -1053,9 +1116,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   /** Honest 'all N slides rendered' — every slide drawable, and at least one exists. */
   const allRendered = computed(() => slideCount.value > 0 && renderedCount.value === slideCount.value)
 
-  // Monitor labels + open/closed/fullscreen flags (audienceLabel, audienceOpen,
-  // audience/confidence, displays, canGoLive) are all defined earlier in this
-  // file (114-03 N-assignment rework) — see "Saved-assignment derived state".
+  // Per-role open flags (audienceOpen/confidenceOpen), the N-assignment display
+  // list, and canGoLive are all defined earlier in this file (114-03 N-assignment
+  // rework, WR-01/WR-02) — see "Saved-assignment derived state".
 
   // ── In-item filmstrip (R282) — the active item's slides + GLOBAL indices ────
   const filmstrip = computed(() => {
@@ -1181,11 +1244,26 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     window.open('/monitor-setup', '_blank')
   }
 
+  // WR-02: keep savedMapping fresh against a mid-service reconfigure. The
+  // recovery flow opens monitor-setup in a NEW tab, so a save there reaches THIS
+  // tab as a `storage` event (same-document writes never fire it); returning focus
+  // is a belt-and-braces refresh for any same-tab edge.
+  function handleMonitorConfigStorage(e: StorageEvent) {
+    if (e.key === null || e.key === MONITOR_CONFIG_STORAGE_KEY) refreshSavedMapping()
+  }
+  function handleWindowFocus() {
+    refreshSavedMapping()
+  }
+
   // ── Channel lifecycle + initial go-live ────────────────────────────────────
   onMounted(() => {
     handle = openRunChannel(serviceId.value, options.channelFactory)
     handle.onHello(resendCurrent)
     document.addEventListener('keydown', handleKeydown)
+    // WR-02: pick up the current mapping at mount + track later changes.
+    refreshSavedMapping()
+    window.addEventListener('storage', handleMonitorConfigStorage)
+    window.addEventListener('focus', handleWindowFocus)
     if (index.value == null && assembledSlideshow.value.length > 0) postIndex(0)
   })
 
@@ -1207,6 +1285,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     removeFullscreenDelegation()
     handle?.close()
     document.removeEventListener('keydown', handleKeydown)
+    // WR-02: never leak the mapping-refresh listeners past teardown.
+    window.removeEventListener('storage', handleMonitorConfigStorage)
+    window.removeEventListener('focus', handleWindowFocus)
     // Owner fix #6: never leak the live-only beforeunload listener past teardown.
     window.removeEventListener('beforeunload', handleBeforeUnload)
     // R309 — defense-in-depth mirror of endServiceTeardown's clear, for any
@@ -1239,13 +1320,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     itemCount,
     renderedCount,
     allRendered,
-    // monitor labels + open flags
-    audienceLabel,
-    confidenceLabel,
+    // Aggregate per-role open flags for RunHeader's role dots (WR-01).
     audienceOpen,
     confidenceOpen,
-    audience,
-    confidence,
     // N-assignment display list + go-live gate (114-03)
     displays,
     canGoLive,
@@ -1274,15 +1351,11 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     readyAudienceLabel,
     readyConfidenceLabel,
     blockedRole,
-    audienceClosed,
-    confidenceClosed,
     monitorChanged,
     reassignRole,
     reopenOutput,
     reopenReassignedOutputs,
     fullscreenDisplay,
-    audienceFullscreen,
-    confidenceFullscreen,
     openOutputs,
     // exit confirm + mode-branched exit affordance (owner UAT)
     confirmOpen,
