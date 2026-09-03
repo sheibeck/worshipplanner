@@ -323,6 +323,45 @@ describe('matchMapping', () => {
       expect(result.newScreens).toHaveLength(0)
     }
   })
+
+  it('returns partial with the removed assignment excluded from kept AND the added screen in newScreens when one monitor is swapped for another simultaneously (IN-05)', () => {
+    const screenA = makeScreen({ label: 'A' })
+    const screenB = makeScreen({ label: 'B', left: 1920 })
+    const assignmentA: MonitorAssignment = { fingerprint: computeFingerprint(screenA, [screenA, screenB]), role: 'audience' }
+    const assignmentB: MonitorAssignment = { fingerprint: computeFingerprint(screenB, [screenA, screenB]), role: 'confidence' }
+    const saved: MonitorMapping = { assignments: [assignmentA, assignmentB], savedAt: 1 }
+    // Screen B is unplugged AND a brand-new screen C is added in the same change:
+    // A stays, B is gone, C is new — the simultaneous add+remove case.
+    const screenC = makeScreen({ label: 'C', left: 3840, isPrimary: false })
+    const liveScreens = [makeScreen({ label: 'A' }), screenC]
+    const result = matchMapping(saved, liveScreens)
+    expect(result.status).toBe('partial')
+    if (result.status === 'partial') {
+      // kept keeps A, excludes the removed B.
+      expect(result.kept).toEqual([assignmentA])
+      expect(result.kept).not.toContainEqual(assignmentB)
+      // newScreens carries only the genuinely-new C.
+      expect(result.newScreens).toHaveLength(1)
+      expect(result.newScreens[0]).toEqual(screenC)
+    }
+  })
+
+  it('returns partial with kept=[] when EVERY saved monitor has been removed (IN-05)', () => {
+    const screenA = makeScreen({ label: 'A' })
+    const screenB = makeScreen({ label: 'B', left: 1920 })
+    const assignmentA: MonitorAssignment = { fingerprint: computeFingerprint(screenA, [screenA, screenB]), role: 'audience' }
+    const assignmentB: MonitorAssignment = { fingerprint: computeFingerprint(screenB, [screenA, screenB]), role: 'confidence' }
+    const saved: MonitorMapping = { assignments: [assignmentA, assignmentB], savedAt: 1 }
+    // Both saved monitors are gone, replaced by a single unrelated new display.
+    const screenD = makeScreen({ label: 'D', left: 5000, isPrimary: false })
+    const liveScreens = [screenD]
+    const result = matchMapping(saved, liveScreens)
+    expect(result.status).toBe('partial')
+    if (result.status === 'partial') {
+      expect(result.kept).toEqual([])
+      expect(result.newScreens).toEqual([screenD])
+    }
+  })
 })
 
 describe('SCREEN_QUERY_PARAM', () => {
