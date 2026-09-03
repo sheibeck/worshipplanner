@@ -576,7 +576,7 @@ Full details: [milestones/v2.8-ROADMAP.md](milestones/v2.8-ROADMAP.md) · requir
 first real church-projector run, so a projectionist can set up and read the live output without fighting
 the tool.
 
-**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R324–R337 (14 mapped, 100% coverage)
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R324–R338 (15 mapped, 100% coverage; R338 monitor nicknames added 2026-09-02 during Phase 114 discuss)
 
 **Key context:** All field feedback from the first real church-projector run (church Mac + projector).
 Fixes/polish on the existing v2.4 "Run the Service" + v2.7 presentation/lyric-editor features — no new
@@ -605,7 +605,7 @@ including multiple Audience monitors at once — have that assignment persist, h
 actually land on their assigned macOS displays, and never see a false "monitors changed" re-configure
 prompt on an unchanged setup.
 **Depends on**: Nothing (first phase of v2.9)
-**Requirements**: R324, R325, R326, R327, R328
+**Requirements**: R324, R325, R326, R327, R328, R338
 **Success Criteria** (what must be TRUE):
 
   1. The monitor-configuration screen detects and lists every currently connected display for role
@@ -618,6 +618,8 @@ prompt on an unchanged setup.
      not just on the primary/laptop screen (R327).
   5. Reopening monitor setup with an unchanged physical display layout loads the saved mapping directly,
      with no spurious "your monitors changed" re-configure prompt (R328).
+  6. A user can assign a nickname to each detected monitor; it persists with that monitor's identity and
+     is shown on the setup/assignment UI so roles map to the right physical screen (R338).
 
 **Plans**: TBD
 **UI hint**: yes
