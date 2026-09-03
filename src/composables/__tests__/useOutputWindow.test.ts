@@ -26,6 +26,7 @@ import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { reactive, defineComponent, h, type PropType } from 'vue'
 import type { AssembledSlide } from '@/types/slide'
 import type { BroadcastChannelLike, BroadcastChannelFactory } from '@/utils/runChannel'
+import { computeFingerprints, SCREEN_QUERY_PARAM, type ScreenLike } from '@/utils/monitorConfig'
 import { useOutputWindow } from '../useOutputWindow'
 
 // onUnmounted must run so the channel-close, wake-lock-release, and
@@ -34,7 +35,10 @@ enableAutoUnmount(afterEach)
 
 // ── Mocks (mirrored from AudienceOutputView.test.ts) ────────────────────────────
 
-const mockRoute = reactive({ params: { serviceId: 'service-1' }, query: { org: 'org-1' } })
+const mockRoute = reactive({
+  params: { serviceId: 'service-1' },
+  query: { org: 'org-1' } as Record<string, string | undefined>,
+})
 vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
   useRouter: () => ({ push: vi.fn() }),
@@ -167,6 +171,7 @@ beforeEach(() => {
   serviceStoreMock.orgId = null
   mockRoute.params.serviceId = 'service-1'
   mockRoute.query.org = 'org-1'
+  delete mockRoute.query[SCREEN_QUERY_PARAM]
   capturedApi = null
 })
 
@@ -601,5 +606,108 @@ describe('useOutputWindow — Automatic Fullscreen content setting (permission-g
     }
     expect(error).toBeNull()
     expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalled()
+  })
+})
+
+// ── Screen-Targeted Fullscreen Placement (R327 macOS fix) ───────────────────────
+// The macOS field-report fix: once the popup independently confirms Window
+// Management permission, it re-resolves ITS OWN live screens (never trusting
+// coordinates from the opener — CONTEXT.md), matches the target fingerprint
+// carried on the route's SCREEN_QUERY_PARAM query, and requests fullscreen ON
+// that ScreenDetailed. Additive to the plain attemptAutoFullscreen path above;
+// fails closed to it (and the manual Go-fullscreen button) on any
+// absence/denial/mismatch. See ADR-0214/0216/0125.
+describe('useOutputWindow — Screen-Targeted Fullscreen Placement (R327 macOS fix)', () => {
+  /** Resolves permissions.query per-descriptor-name, so this suite can grant
+   *  'window-management' without also tripping the unrelated 'fullscreen'
+   *  Automatic-Fullscreen descriptor (and vice versa). */
+  function installPermissionsByName(states: Record<string, string>) {
+    const query = vi.fn((descriptor: unknown) => {
+      const name = (descriptor as { name?: string } | null)?.name ?? ''
+      return Promise.resolve({ state: states[name] ?? 'prompt' })
+    })
+    Object.defineProperty(navigator, 'permissions', {
+      value: { query },
+      configurable: true,
+      writable: true,
+    })
+    return query
+  }
+
+  function installGetScreenDetailsWithScreens(screens: ScreenLike[]) {
+    const fn = vi.fn(() =>
+      Promise.resolve({ screens, addEventListener: vi.fn(), removeEventListener: vi.fn() }),
+    )
+    ;(window as unknown as { getScreenDetails: unknown }).getScreenDetails = fn
+    return fn
+  }
+
+  it('requests fullscreen ON the matching screen when window-management is granted and a matching target fingerprint is on the route', async () => {
+    setFullscreenElement(null)
+    const screenA: ScreenLike = { label: 'Display A', width: 1920, height: 1080, left: 0, top: 0, isPrimary: true }
+    const screenB: ScreenLike = { label: 'Display B', width: 1280, height: 720, left: 1920, top: 0, isPrimary: false }
+    const targetFingerprint = computeFingerprints([screenA, screenB]).get(screenB)!
+    mockRoute.query[SCREEN_QUERY_PARAM] = targetFingerprint
+    installPermissionsByName({ 'window-management': 'granted' })
+    const getScreenDetails = installGetScreenDetailsWithScreens([screenA, screenB])
+
+    const fake = createFakeChannel()
+    mountHost(fake.factory)
+    await flushPromises()
+
+    expect(getScreenDetails).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(Element.prototype.requestFullscreen)).toHaveBeenCalledWith(
+      expect.objectContaining({ screen: screenB }),
+    )
+  })
+
+  it('does NOT call the screen-targeted fullscreen when window-management is not granted', async () => {
+    setFullscreenElement(null)
+    const screenA: ScreenLike = { label: 'Display A', width: 1920, height: 1080, left: 0, top: 0, isPrimary: true }
+    mockRoute.query[SCREEN_QUERY_PARAM] = computeFingerprints([screenA]).get(screenA)!
+    installPermissionsByName({ 'window-management': 'denied' })
+    const getScreenDetails = installGetScreenDetailsWithScreens([screenA])
+
+    const fake = createFakeChannel()
+    mountHost(fake.factory)
+    await flushPromises()
+
+    expect(getScreenDetails).not.toHaveBeenCalled()
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalledWith(
+      expect.objectContaining({ screen: expect.anything() }),
+    )
+  })
+
+  it('resolves false without calling getScreenDetails when no target fingerprint is on the route', async () => {
+    setFullscreenElement(null)
+    // mockRoute.query has no SCREEN_QUERY_PARAM by default (reset in beforeEach).
+    installPermissionsByName({ 'window-management': 'granted' })
+    const getScreenDetails = installGetScreenDetailsWithScreens([])
+
+    const fake = createFakeChannel()
+    mountHost(fake.factory)
+    await flushPromises()
+
+    expect(getScreenDetails).not.toHaveBeenCalled()
+  })
+
+  it('does not throw when getScreenDetails is absent, even with a target fingerprint on the route', async () => {
+    setFullscreenElement(null)
+    expect('getScreenDetails' in window).toBe(false)
+    mockRoute.query[SCREEN_QUERY_PARAM] = 'Display A:1920x1080#0'
+    installPermissionsByName({ 'window-management': 'granted' })
+
+    const fake = createFakeChannel()
+    let error: unknown = null
+    try {
+      mountHost(fake.factory)
+      await flushPromises()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeNull()
+    expect(vi.mocked(Element.prototype.requestFullscreen)).not.toHaveBeenCalledWith(
+      expect.objectContaining({ screen: expect.anything() }),
+    )
   })
 })

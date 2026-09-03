@@ -1,10 +1,11 @@
 /** See ADR-0123 (docs/adr/0123-lifecycle.md) */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
 import { useServiceAssembly } from '@/composables/useServiceAssembly'
 import { openRunChannel, type BroadcastChannelFactory, type RunChannelHandle } from '@/utils/runChannel'
-import { type MonitorRole } from '@/utils/monitorConfig'
+import { computeFingerprints, SCREEN_QUERY_PARAM, type MonitorRole, type ScreenLike } from '@/utils/monitorConfig'
 import { SLIDE_FONTS } from '@/config/slideFonts'
 import { cssVarsFor, snapWeight, waitForSlideFont, loadFontCss, FONT_LOAD_TIMEOUT_MS } from '@/utils/slideTypography'
 
@@ -23,6 +24,7 @@ export interface UseOutputWindowOptions {
 export function useOutputWindow(options: UseOutputWindowOptions = {}) {
   const authStore = useAuthStore()
   const serviceStore = useServiceStore()
+  const route = useRoute()
 
   // See ADR-0123 (docs/adr/0123-lifecycle.md)
   const { serviceId, assembledSlideshow } = useServiceAssembly()
@@ -124,6 +126,28 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     }
   }
 
+  // Screen-targeted placement (R327 macOS fix) — a SECOND, additive gesture-sensitive
+  // call site, in the popup's own context. See ADR-0214/0216/0125 (docs/adr/) for the
+  // gesture/monotonic-token fragility class this belongs to. Fails closed on any
+  // absence/denial/mismatch to the plain path above + the manual Go-fullscreen button.
+  async function attemptScreenTargetedFullscreen(targetFingerprint: string | null): Promise<boolean> {
+    if (!targetFingerprint || !('getScreenDetails' in window)) return false
+    try {
+      const status = await navigator.permissions.query({ name: 'window-management' } as unknown as PermissionDescriptor)
+      if (status.state !== 'granted') return false
+      const details = await (
+        window as unknown as { getScreenDetails: () => Promise<{ screens: ScreenLike[] }> }
+      ).getScreenDetails()
+      const fingerprints = computeFingerprints(details.screens)
+      const matched = details.screens.find((screen) => fingerprints.get(screen) === targetFingerprint)
+      if (!matched) return false
+      await document.documentElement.requestFullscreen({ screen: matched } as unknown as FullscreenOptions)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   // ── Screen Wake Lock (R271; no in-repo analog) ─────────────────────────────
   const wakeLock = ref<WakeLockSentinel | null>(null)
 
@@ -157,6 +181,11 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     // Best-effort automatic fullscreen where the browser honors the content setting
     // (fire-and-forget; a silent no-op where it does not — see attemptAutoFullscreen).
     void attemptAutoFullscreen()
+
+    // Additive: self-place on the assigned physical display (R327 macOS fix) — a
+    // silent no-op fallback to the plain attempt above. See attemptScreenTargetedFullscreen.
+    const targetFingerprint = route.query[SCREEN_QUERY_PARAM]
+    void attemptScreenTargetedFullscreen(typeof targetFingerprint === 'string' ? targetFingerprint : null)
 
     // Fullscreen Capability Delegation — ALWAYS listen, so each per-display
     // "Go fullscreen" button on the control's Displays panel works: that button click
