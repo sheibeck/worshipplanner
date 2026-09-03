@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: "Production Hardening: Comments-as-Specs, Architecture & Security Review (Phases 108-113, in planning)"
-current_phase: 113
-current_phase_name: Security Remediation
-status: verifying
+current_phase: 999.5
+current_phase_name: 11
+status: planning
 stopped_at: Completed 113-03-PLAN.md
-last_updated: "2026-09-02T20:20:36.882Z"
+last_updated: "2026-09-03T00:17:59.918Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 113 execution started
+last_activity_desc: Phase 113 complete, transitioned to Phase 999.5
 progress:
   total_phases: 6
   completed_phases: 6
@@ -45,7 +45,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (roadmap created 2026-09-01)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to plan
 `/gsd-plan-phase 108`.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
@@ -1181,10 +1181,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 113 (Security Remediation) — EXECUTING
-Plan: 3 of 3
+Phase: 999.5 — v2.8 Security Review — Medium/Low findings (11) (BACKLOG)
+Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-09-02 — Phase 113 execution started
+Last activity: 2026-09-02 — Phase 113 complete, transitioned to Phase 999.5
 
 ## ★ v2.8 ROADMAP.md phase breakdown (created 2026-09-01)
 
