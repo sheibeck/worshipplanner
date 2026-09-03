@@ -26,7 +26,9 @@ import { sortedSlotsWithIndex, firstAssembledIndexBySlot } from '@/utils/service
 import {
   loadMapping,
   matchMapping,
-  computeFingerprint,
+  computeFingerprints,
+  SCREEN_QUERY_PARAM,
+  type MonitorAssignment,
   type MonitorMapping,
   type MonitorRole,
   type ScreenLike,
@@ -34,6 +36,26 @@ import {
 import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { SERVICE_SECTION_LABELS, type ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
+
+/**
+ * Stable per-assignment window name, keyed by the assignment's FINGERPRINT (not
+ * array position) so a reopen of the SAME assignment targets the SAME browser
+ * window while two assignments sharing a role (two Audience monitors) get
+ * distinct names. See 114-RESEARCH.md Pitfall 3.
+ */
+export function windowNameFor(assignment: MonitorAssignment): string {
+  return `wp-output-${assignment.fingerprint.replace(/[^a-zA-Z0-9]/g, '_')}`
+}
+
+/** The present-mode URL for one assignment, carrying its target fingerprint (Plan 04 popup self-placement). */
+export function urlForAssignment(assignment: MonitorAssignment, serviceId: string, orgId: string | null): string {
+  return `/present/${assignment.role}/${serviceId}?org=${orgId ?? ''}&${SCREEN_QUERY_PARAM}=${encodeURIComponent(assignment.fingerprint)}`
+}
+
+// CONTEXT.md dev/nothing-assigned fallback: Run still works with two virtual,
+// un-fingerprinted assignments when nothing has been configured yet.
+const DEFAULT_AUDIENCE_ASSIGNMENT: MonitorAssignment = { fingerprint: 'default-audience', role: 'audience' }
+const DEFAULT_CONFIDENCE_ASSIGNMENT: MonitorAssignment = { fingerprint: 'default-confidence', role: 'confidence' }
 
 /**
  * The enriched rail row shape the rail derivation produces (RunControlView's old
@@ -313,16 +335,18 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   const outputStatus = ref<OutputStatus>('idle')
   const readyAudienceLabel = ref<string | null>(null)
   const readyConfidenceLabel = ref<string | null>(null)
-  // Owner UAT: REAL fullscreen state per output, reported by each output window on
-  // fullscreenchange (see useOutputWindow.reportFullscreenState). Drives the
-  // Displays-panel per-display button: done ✓ vs "Go fullscreen", and flips back the
-  // instant the projectionist presses Escape out of fullscreen on that display.
-  const audienceFullscreen = ref(false)
-  const confidenceFullscreen = ref(false)
+  // Per-assignment runtime state, keyed by windowNameFor(assignment) — replaces
+  // the old fixed audienceFullscreen/confidenceFullscreen boolean pair (114-03,
+  // N-assignment window orchestration). Owner UAT: REAL fullscreen state per
+  // output, reported by each output window on fullscreenchange.
+  const fullscreenByWindowName = ref<Record<string, boolean>>({})
+  const openedByWindowName = ref<Record<string, boolean>>({})
   // See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md)
-  const blockedRole = ref<MonitorRole | null>(null)
+  // Generalized to a display/role LABEL (was a single MonitorRole) — N windows
+  // may need to report more than one failed name.
+  const blockedRole = ref<string | null>(null)
 
-  // Raw window handles (NOT reactive), keyed by stable window name.
+  // Raw window handles (NOT reactive), keyed by windowNameFor(assignment).
   const outputWindows: Record<string, Window | null> = {}
 
   // ── Live-Ops recovery (96-01) ──────────────────────────────────────────────
@@ -335,15 +359,16 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     removeEventListener: (type: 'screenschange', listener: () => void) => void
   }
 
-  // Per-output CLOSED flags. These do NOT extend OutputStatus (96-UI-SPEC §A): the
-  // cluster stays 'placed'; only the affected subordinate line turns amber. LATCH-
-  // ONLY — the poll sets them true and NEVER false, so only a successful reopen
-  // clears them (a refused reopen can never silently clear the amber row).
-  const audienceClosed = ref(false)
-  const confidenceClosed = ref(false)
+  // Per-output CLOSED flags, keyed by windowNameFor(assignment) — replaces the
+  // fixed audienceClosed/confidenceClosed pair (114-03). LATCH-ONLY (96-01): the
+  // poll sets an entry true and NEVER false, so only a successful reopen clears it.
+  const closedByWindowName = ref<Record<string, boolean>>({})
   // A mid-service monitor change (unplug/rearrange) → the reassign banner.
   const monitorChanged = ref(false)
-  // The body names the specific missing role when resolvable, else this default.
+  // The saved assignment(s) that lost their live screen (Plan 01 delta match) —
+  // drives both the sticky's in-place reopen action and its display label.
+  const missingAssignments = ref<MonitorAssignment[]>([])
+  // The body/action-label display name for the current reassign.
   const reassignRole = ref('audience or confidence')
 
   // The SINGLE shared closed-poll interval id (null when not running).
@@ -363,20 +388,133 @@ export function useRunControl(options: UseRunControlOptions = {}) {
 
   /**
    * The SINGLE shared ~1s closed-output poll (one interval, not one-per-window).
-   * LATCH-ONLY: it only ever sets a closed ref true, never false, so a null handle
-   * after a refused reopen cannot silently clear the amber row — only a successful
-   * reopen does. The pollId != null guard makes a second Go-live / reopen idempotent.
+   * Iterates every window this session has opened — generalized from the fixed
+   * wp-audience/wp-confidence pair (114-03). LATCH-ONLY: see
+   * closedByWindowName's doc comment above.
    */
   function startClosedPoll() {
     if (pollId != null) return
     pollId = setInterval(() => {
-      if (readClosed('wp-audience')) audienceClosed.value = true
-      if (readClosed('wp-confidence')) confidenceClosed.value = true
+      for (const name of Object.keys(outputWindows)) {
+        if (readClosed(name)) closedByWindowName.value[name] = true
+      }
     }, 1000)
   }
 
+  // ── Saved-assignment derived state (114-03: N assignments, not 2 fixed roles) ──
+  /** The current saved assignments (same read-on-access caching as the pre-existing mappingLabel). */
+  const savedAssignments = computed<MonitorAssignment[]>(() => loadMapping()?.assignments ?? [])
+
+  /** Nickname-first label (R338), falling back to the fingerprint's identity segment. */
+  function labelForAssignment(assignment: MonitorAssignment): string {
+    if (assignment.nickname && assignment.nickname.trim().length > 0) return assignment.nickname
+    const seg = assignment.fingerprint.split(':')[0]
+    return seg && seg.length > 0 ? seg : 'Assigned display'
+  }
+
+  function firstAssignment(role: MonitorRole): MonitorAssignment | undefined {
+    return savedAssignments.value.find((a) => a.role === role)
+  }
+
+  /** The saved-mapping display label for a role, or an honest 'no monitor' note. */
+  function mappingLabel(role: MonitorRole): string {
+    const a = firstAssignment(role)
+    return a ? labelForAssignment(a) : 'No monitor assigned'
+  }
+  const audienceLabel = computed(() => mappingLabel('audience'))
+  const confidenceLabel = computed(() => mappingLabel('confidence'))
+
+  /** True iff an assignment's window opened AND has not since latched closed. */
+  function isAssignmentOpen(assignment: MonitorAssignment | undefined): boolean {
+    if (!assignment) return false
+    const name = windowNameFor(assignment)
+    return !!openedByWindowName.value[name] && !closedByWindowName.value[name]
+  }
+  /** open = the output is live/placed AND not closed (per-assignment, not aggregate outputStatus). */
+  const audienceOpen = computed(() => isAssignmentOpen(firstAssignment('audience')))
+  const confidenceOpen = computed(() => isAssignmentOpen(firstAssignment('confidence')))
+  const audienceClosed = computed(() => {
+    const a = firstAssignment('audience')
+    return !!a && !!closedByWindowName.value[windowNameFor(a)]
+  })
+  const confidenceClosed = computed(() => {
+    const a = firstAssignment('confidence')
+    return !!a && !!closedByWindowName.value[windowNameFor(a)]
+  })
+  const audienceFullscreen = computed(() => {
+    const a = firstAssignment('audience')
+    return !!a && !!fullscreenByWindowName.value[windowNameFor(a)]
+  })
+  const confidenceFullscreen = computed(() => {
+    const a = firstAssignment('confidence')
+    return !!a && !!fullscreenByWindowName.value[windowNameFor(a)]
+  })
+  /** Objects for RunDisplaysPanel's `{ open, label }` per-output prop contract. */
+  const audience = computed(() => ({ open: audienceOpen.value, label: audienceLabel.value }))
+  const confidence = computed(() => ({ open: confidenceOpen.value, label: confidenceLabel.value }))
+
+  /**
+   * The N-assignment display list for RunDisplaysPanel/RunPreflightPanel
+   * (114-03) — one entry per SAVED assignment, id=fingerprint so two Audience
+   * rows never collide.
+   */
+  const displays = computed(() =>
+    savedAssignments.value.map((a) => {
+      const name = windowNameFor(a)
+      return {
+        id: a.fingerprint,
+        role: a.role,
+        label: labelForAssignment(a),
+        open: isAssignmentOpen(a),
+        closed: !!closedByWindowName.value[name],
+        fullscreen: !!fullscreenByWindowName.value[name],
+      }
+    }),
+  )
+
+  /**
+   * ≥1-Audience Go-live gate (CONTEXT.md decision). A genuinely EMPTY saved
+   * mapping (nothing configured yet) is exempt — the dev/single-screen fallback
+   * path (fallbackAssignments) still runs; the gate only blocks an explicit
+   * mapping that assigned zero Audience monitors.
+   */
+  const canGoLive = computed(() => {
+    const assignments = savedAssignments.value
+    return assignments.length === 0 || assignments.some((a) => a.role === 'audience')
+  })
+
+  /** The assignments to actually open: the real saved ones, or the dev-fallback pair when nothing is configured. */
+  function fallbackAssignments(saved: MonitorMapping | null): MonitorAssignment[] {
+    if (saved && saved.assignments.length > 0) return saved.assignments
+    return [DEFAULT_AUDIENCE_ASSIGNMENT, DEFAULT_CONFIDENCE_ASSIGNMENT]
+  }
+
+  /** Resolve an assignment's saved fingerprint against the LIVE screens (whole-array v2 fingerprint — Plan 01). */
+  function resolveScreenForAssignment(assignment: MonitorAssignment, screens: ScreenLike[]): ScreenLike | null {
+    const fingerprintByScreen = computeFingerprints(screens)
+    for (const [screen, fingerprint] of fingerprintByScreen) {
+      if (fingerprint === assignment.fingerprint) return screen
+    }
+    return null
+  }
+
+  /**
+   * A bare id/role string from a child emit resolves to a real assignment — an
+   * id (fingerprint) wins over a role name, so RunHeader's role-keyed dots
+   * (unchanged by this phase) and RunDisplaysPanel's fingerprint-keyed rows
+   * both work through the same entry point.
+   */
+  function resolveTargetAssignment(idOrRole: string, assignments: MonitorAssignment[]): MonitorAssignment | undefined {
+    return (
+      assignments.find((a) => a.fingerprint === idOrRole) ??
+      (idOrRole === 'audience' || idOrRole === 'confidence'
+        ? assignments.find((a) => a.role === idOrRole)
+        : undefined)
+    )
+  }
+
   /** See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md) */
-  function reopenOutput(role: MonitorRole) {
+  function reopenOutput(idOrRole: string) {
     // IN-03: defense-in-parity with openOutputs' async guard — never open a window
     // outside a live session. reopenOutput is synchronous and today only reachable
     // from a button rendered while placed+mounted, so this cannot fire post-exit in
@@ -384,75 +522,74 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     if (isUnmounted) return
     // See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
     if (!live.value || liveScreenDetails === null) return
-    const name = role === 'audience' ? 'wp-audience' : 'wp-confidence'
-    const url = role === 'audience' ? audienceUrl() : confidenceUrl()
-    const saved = loadMapping()
-    const screen = saved && liveScreenDetails ? resolveScreen(saved, role, liveScreenDetails.screens) : null
-    const win = openWindow(url, name, screen)
+    const assignments = fallbackAssignments(loadMapping())
+    const assignment = resolveTargetAssignment(idOrRole, assignments)
+    if (!assignment) return
+    const name = windowNameFor(assignment)
+    const screen = resolveScreenForAssignment(assignment, liveScreenDetails.screens)
+    const win = openWindow(urlFor(assignment), name, screen)
     if (!win) return
-    if (role === 'audience') audienceClosed.value = false
-    else confidenceClosed.value = false
+    closedByWindowName.value[name] = false
+    openedByWindowName.value[name] = true
   }
 
   /** See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md) */
   function reopenReassignedOutputs() {
-    if (reassignRole.value === 'audience') {
-      reopenOutput('audience')
-    } else if (reassignRole.value === 'confidence') {
-      reopenOutput('confidence')
-    } else {
-      reopenOutput('audience')
-      reopenOutput('confidence')
-    }
+    for (const a of missingAssignments.value) reopenOutput(a.fingerprint)
     monitorChanged.value = false
+    missingAssignments.value = []
     // 104-REVIEW IN-03: reset alongside monitorChanged so a future consumer
     // reading reassignRole without also gating on monitorChanged never sees a
-    // stale role name left over from the last reassign.
+    // stale label left over from the last reassign.
     reassignRole.value = 'audience or confidence'
     notifications.clearSticky('monitor-reassign')
   }
 
   /**
-   * MONITOR-UNPLUG handler (R274) — re-runs matchMapping against the held live
-   * screens. needs-reprompt (or any non-matched) → monitorChanged=true + name the
-   * missing role; a still-matching change (benign refresh) → monitorChanged=false,
-   * raising NO false alarm. Never guesses a new mapping from the stale one.
+   * MONITOR-UNPLUG handler (R274) — re-runs the delta-aware matchMapping (Plan
+   * 01) against the held live screens. 'matched' → monitorChanged=false, no
+   * false alarm (R328); anything else names ONLY the missing assignment(s) and
+   * offers an in-place reopen — never a whole-mapping wipe (R326).
    */
   function onScreensChange() {
     if (!liveScreenDetails) return
     const saved = loadMapping()
     if (!saved) {
       monitorChanged.value = false
+      missingAssignments.value = []
       // 104-REVIEW IN-03: see reopenReassignedOutputs()'s matching comment.
       reassignRole.value = 'audience or confidence'
       notifications.clearSticky('monitor-reassign')
       return
     }
     const result = matchMapping(saved, liveScreenDetails.screens)
-    if (result.status !== 'matched') {
-      monitorChanged.value = true
-      const audMissing = resolveScreen(saved, 'audience', liveScreenDetails.screens) == null
-      const confMissing = resolveScreen(saved, 'confidence', liveScreenDetails.screens) == null
-      reassignRole.value =
-        audMissing && !confMissing ? 'audience' : confMissing && !audMissing ? 'confidence' : 'audience or confidence'
-      // Phase 104 (R310 proof case) — the sticky replaces the old ad-hoc
-      // v-if banner. Copy is verbatim from the removed RunControlView.vue
-      // markup; setSticky de-dupes on the 'monitor-reassign' key so a
-      // second screenschange while the card is still up updates it in
-      // place rather than stacking a duplicate.
-      notifications.setSticky('monitor-reassign', {
-        variant: 'warning',
-        heading: 'Your monitor setup changed',
-        body: `A display was unplugged or rearranged, so we can't place the ${reassignRole.value} output on its old screen. Your service is still live — reopen the ${reassignRole.value} display below to keep going without losing your place.`,
-        action: { label: `Reopen & replace ${reassignRole.value}`, onClick: reopenReassignedOutputs },
-        link: { label: 'Open monitor setup in a new tab', href: '/monitor-setup' },
-      })
-    } else {
+    if (result.status === 'matched') {
       monitorChanged.value = false
+      missingAssignments.value = []
       // 104-REVIEW IN-03: see reopenReassignedOutputs()'s matching comment.
       reassignRole.value = 'audience or confidence'
       notifications.clearSticky('monitor-reassign')
+      return
     }
+    monitorChanged.value = true
+    const keptFingerprints = new Set(result.status === 'partial' ? result.kept.map((a) => a.fingerprint) : [])
+    missingAssignments.value = saved.assignments.filter((a) => !keptFingerprints.has(a.fingerprint))
+    const label =
+      missingAssignments.value.length > 0
+        ? missingAssignments.value.map((a) => a.nickname || a.role).join(', ')
+        : 'audience or confidence'
+    reassignRole.value = label
+    // Phase 104 (R310 proof case) — the sticky replaces the old ad-hoc
+    // v-if banner; setSticky de-dupes on the 'monitor-reassign' key so a
+    // second screenschange while the card is still up updates it in
+    // place rather than stacking a duplicate.
+    notifications.setSticky('monitor-reassign', {
+      variant: 'warning',
+      heading: 'Your monitor setup changed',
+      body: `A display was unplugged or rearranged, so we can't place the ${label} output on its old screen. Your service is still live — reopen the affected display below to keep going without losing your place.`,
+      action: { label: `Reopen & replace ${label}`, onClick: reopenReassignedOutputs },
+      link: { label: 'Open monitor setup in a new tab', href: '/monitor-setup' },
+    })
   }
 
   /**
@@ -531,21 +668,22 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   }
 
   // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useRunControl.ts, "Per-display fullscreen")
-  function fullscreenDisplay(role: MonitorRole) {
-    const name = role === 'audience' ? 'wp-audience' : 'wp-confidence'
-    const win = outputWindows[name]
+  function fullscreenDisplay(idOrRole: string) {
+    const assignment = resolveTargetAssignment(idOrRole, fallbackAssignments(loadMapping()))
+    if (!assignment) return
+    const win = outputWindows[windowNameFor(assignment)]
     if (win && !win.closed) delegateFullscreenTo(win)
   }
 
   function handleOutputReady(event: MessageEvent) {
     if (event.origin !== window.location.origin) return
-    const data = event.data as { type?: string; role?: string; fullscreen?: boolean } | null
-    // Owner UAT: an output window reporting its REAL fullscreen state → update the
-    // per-display button. Origin-gated (same-origin only); it is UI state, not a
-    // capability grant, so no source-window check is needed.
+    const data = event.data as { type?: string; fullscreen?: boolean } | null
+    // Owner UAT: an output window reporting its REAL fullscreen state → update
+    // the per-display button. Matched by SOURCE window identity (not role) so
+    // two same-role windows (two Audience monitors) never collide (114-03).
     if (data && data.type === 'wp-fullscreen-state') {
-      if (data.role === 'audience') audienceFullscreen.value = !!data.fullscreen
-      else if (data.role === 'confidence') confidenceFullscreen.value = !!data.fullscreen
+      const name = Object.keys(outputWindows).find((n) => outputWindows[n] === event.source)
+      if (name) fullscreenByWindowName.value[name] = !!data.fullscreen
       return
     }
     if (!data || data.type !== 'wp-output-ready') return
@@ -569,42 +707,44 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     fullscreenDelegationInstalled = false
   }
 
-  /** Resolve a role → its saved fingerprint → the live screen with that fingerprint. */
-  function resolveScreen(saved: MonitorMapping, role: MonitorRole, screens: ScreenLike[]): ScreenLike | null {
-    const fingerprint = saved.assignments.find((a) => a.role === role)?.fingerprint
-    if (!fingerprint) return null
-    return screens.find((s) => computeFingerprint(s) === fingerprint) ?? null
+  interface OpenResult {
+    assignment: MonitorAssignment
+    win: Window | null
   }
 
-  function screenLabel(screen: ScreenLike | null): string {
-    return screen?.label && screen.label.length > 0 ? screen.label : 'display'
+  /**
+   * Decides success from N opened windows: succeeds iff at least one Audience
+   * window opened (CONTEXT.md — Confidence is optional). `failedLabel` names
+   * whichever assignment(s) did NOT open, whether or not the overall attempt
+   * succeeded (a refused Confidence is reported but does not block go-live).
+   */
+  function evaluateOpenResults(results: OpenResult[]): { ok: boolean; failedLabel: string | null } {
+    const anyOpened = results.some((r) => r.win !== null)
+    const audienceOpened = results.some((r) => r.assignment.role === 'audience' && r.win !== null)
+    const failed = results.filter((r) => r.win === null)
+    const failedLabel =
+      failed.length > 0 ? failed.map((r) => r.assignment.nickname || r.assignment.role).join(', ') : null
+    if (!anyOpened) return { ok: false, failedLabel: null }
+    if (!audienceOpened) return { ok: false, failedLabel: failedLabel ?? 'audience' }
+    return { ok: true, failedLabel }
   }
 
-  /** See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md) */
-  function bothOpened(aWin: Window | null, cWin: Window | null): boolean {
-    if (aWin && cWin) return true
-    if (!aWin && !cWin) {
-      outputStatus.value = 'blocked'
-      return false
+  /** Common tail for openAllPlaced/openAllUnplaced. See ADR-0127 for the partial-naming precedent this generalizes. */
+  function finishOpen(results: OpenResult[], fallback: boolean) {
+    const { ok, failedLabel } = evaluateOpenResults(results)
+    if (!ok) {
+      outputStatus.value = results.some((r) => r.win !== null) ? 'partial' : 'blocked'
+      blockedRole.value = failedLabel
+      return
     }
-    // Exactly one opened: name the display that was refused (the null handle).
-    blockedRole.value = aWin ? 'confidence' : 'audience'
-    outputStatus.value = 'partial'
-    return false
-  }
-
-  /** MATCHED path — open + place each output on its assigned monitor. */
-  function openPlaced(saved: MonitorMapping, screens: ScreenLike[]) {
-    const audienceScreen = resolveScreen(saved, 'audience', screens)
-    const confidenceScreen = resolveScreen(saved, 'confidence', screens)
-    const aWin = openWindow(audienceUrl(), 'wp-audience', audienceScreen)
-    const cWin = openWindow(confidenceUrl(), 'wp-confidence', confidenceScreen)
-    // See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md)
-    if (!bothOpened(aWin, cWin)) return
-    readyAudienceLabel.value = screenLabel(audienceScreen)
-    readyConfidenceLabel.value = screenLabel(confidenceScreen)
-    outputStatus.value = 'placed'
-    // Honest live flag (R277): both outputs opened — this is a genuine go-live.
+    for (const r of results) {
+      if (r.win) openedByWindowName.value[windowNameFor(r.assignment)] = true
+    }
+    // A non-audience-critical failure (e.g. one refused Confidence window) is
+    // still reported so the operator can retry it, without blocking go-live.
+    blockedRole.value = failedLabel
+    outputStatus.value = fallback ? 'fallback' : 'placed'
+    // Honest live flag (R277): at least one Audience output opened.
     live.value = true
     // Owner fix #7: a real go-live is NOT a rehearsal — turn the yellow tile green.
     rehearsing.value = false
@@ -612,42 +752,41 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     // Start the closed-output poll once the outputs have actually opened
     // (idempotent via the pollId != null guard).
     startClosedPoll()
-    // Re-enter control-screen fullscreen now that both popups are open (they made
+    // Re-enter control-screen fullscreen now that the popups are open (they made
     // Chrome drop the opener's fullscreen entered synchronously at go-live).
     reassertControlFullscreen()
   }
 
-  /** FALLBACK path — open both outputs un-positioned (operator drags + fullscreens). */
-  function openUnplaced() {
-    const aWin = openWindow(audienceUrl(), 'wp-audience', null)
-    const cWin = openWindow(confidenceUrl(), 'wp-confidence', null)
-    // See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md)
-    if (!bothOpened(aWin, cWin)) return
-    outputStatus.value = 'fallback'
-    // Honest live flag (R277): both outputs opened (un-positioned) — a genuine
-    // go-live, so enter the live state and start the elapsed timer.
-    live.value = true
-    // Owner fix #7: a real go-live is NOT a rehearsal — turn the yellow tile green.
-    rehearsing.value = false
-    startElapsed()
-    // Start the closed-output poll once the outputs have actually opened
-    // (idempotent via the pollId != null guard).
-    startClosedPoll()
-    // Re-enter control-screen fullscreen now that both popups are open (they made
-    // Chrome drop the opener's fullscreen entered synchronously at go-live).
-    reassertControlFullscreen()
+  /** MATCHED path — open + place each assignment's output on its assigned monitor (114-03: N assignments, not 2 fixed roles). */
+  function openAllPlaced(assignments: MonitorAssignment[], screens: ScreenLike[]) {
+    const results: OpenResult[] = assignments.map((assignment) => {
+      const screen = resolveScreenForAssignment(assignment, screens)
+      const win = openWindow(urlFor(assignment), windowNameFor(assignment), screen)
+      return { assignment, win }
+    })
+    finishOpen(results, false)
   }
 
-  // URLs computed at open time so they read the CURRENT serviceId/org.
-  function audienceUrl(): string {
-    return `/present/audience/${serviceId.value}?org=${orgIdRef.value ?? ''}`
+  /** FALLBACK path — open every assignment's output un-positioned (operator drags + fullscreens). */
+  function openAllUnplaced(assignments: MonitorAssignment[]) {
+    const results: OpenResult[] = assignments.map((assignment) => ({
+      assignment,
+      win: openWindow(urlFor(assignment), windowNameFor(assignment), null),
+    }))
+    finishOpen(results, true)
   }
-  function confidenceUrl(): string {
-    return `/present/confidence/${serviceId.value}?org=${orgIdRef.value ?? ''}`
+
+  // URL computed at open time so it reads the CURRENT serviceId/org.
+  function urlFor(assignment: MonitorAssignment): string {
+    return urlForAssignment(assignment, serviceId.value, orgIdRef.value)
   }
 
   /** See ADR-0129 (docs/adr/0129-the-go-live-gesture-entry-bound-to-the-run-go-live-btn-click.md) */
   function openOutputs() {
+    // ≥1-Audience gate (CONTEXT.md decision) — an explicit saved mapping with
+    // zero Audience assignments never opens anything. A genuinely empty mapping
+    // (nothing configured) is exempt — see fallbackAssignments/canGoLive.
+    if (!canGoLive.value) return
     // See ADR-0126 (docs/adr/0126-monotonic-go-live-token-unmount-flag-guarding-a-late.md)
     const requestId = ++goLiveRequestId
     outputStatus.value = 'opening'
@@ -666,7 +805,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
       // Activation lost / unsupported — silent; running continues windowed.
     })
     if (!('getScreenDetails' in window)) {
-      openUnplaced()
+      openAllUnplaced(fallbackAssignments(loadMapping()))
       return
     }
     ;(window as unknown as { getScreenDetails: () => Promise<ScreenDetailsLike> })
@@ -688,19 +827,19 @@ export function useRunControl(options: UseRunControlOptions = {}) {
         }
         const saved = loadMapping()
         if (!saved) {
-          openUnplaced()
+          openAllUnplaced(fallbackAssignments(null))
           return
         }
         const result = matchMapping(saved, details.screens)
         if (result.status !== 'matched') {
-          openUnplaced()
+          openAllUnplaced(fallbackAssignments(saved))
           return
         }
-        openPlaced(saved, details.screens)
+        openAllPlaced(saved.assignments, details.screens)
       })
       .catch(() => {
         if (isUnmounted || requestId !== goLiveRequestId) return
-        openUnplaced()
+        openAllUnplaced(fallbackAssignments(loadMapping()))
       })
   }
 
@@ -770,8 +909,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     live.value = false
     rehearsing.value = false
     blackout.value = false
-    audienceFullscreen.value = false
-    confidenceFullscreen.value = false
+    fullscreenByWindowName.value = {}
     resetElapsed()
     // Blank the projector FIRST — close the output windows before the channel
     // close + navigation, so ending run mode tears down the real displays (R266).
@@ -784,6 +922,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     notifications.clearSticky('monitor-reassign')
     // See ADR-0131 (docs/adr/0131-monitorchanged-is-rundisplayspanel-s-own-source-of-truth-for.md)
     monitorChanged.value = false
+    missingAssignments.value = []
     // Leave the control-screen fullscreen entered on go-live (only when we are
     // actually fullscreen — a rehearse exit never entered it). Feature-detected +
     // .catch-swallowed so a reject/absence never blocks teardown or navigation.
@@ -914,27 +1053,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   /** Honest 'all N slides rendered' — every slide drawable, and at least one exists. */
   const allRendered = computed(() => slideCount.value > 0 && renderedCount.value === slideCount.value)
 
-  // ── Monitor labels (from the saved mapping fingerprints) + open flags ───────
-  /** The saved-mapping display label for a role, or an honest 'no monitor' note. */
-  function mappingLabel(role: MonitorRole): string {
-    const saved = loadMapping()
-    const fp = saved?.assignments.find((a) => a.role === role)?.fingerprint
-    if (!fp) return 'No monitor assigned'
-    // The fingerprint's first colon-segment is the display label (monitorConfig :69-72).
-    return fp.split(':')[0] || 'Assigned display'
-  }
-  const audienceLabel = computed(() => mappingLabel('audience'))
-  const confidenceLabel = computed(() => mappingLabel('confidence'))
-  /** open = the output is live/placed (placed|fallback) AND not closed. */
-  const audienceOpen = computed(
-    () => (outputStatus.value === 'placed' || outputStatus.value === 'fallback') && !audienceClosed.value,
-  )
-  const confidenceOpen = computed(
-    () => (outputStatus.value === 'placed' || outputStatus.value === 'fallback') && !confidenceClosed.value,
-  )
-  /** Objects for RunDisplaysPanel's `{ open, label }` per-output prop contract. */
-  const audience = computed(() => ({ open: audienceOpen.value, label: audienceLabel.value }))
-  const confidence = computed(() => ({ open: confidenceOpen.value, label: confidenceLabel.value }))
+  // Monitor labels + open/closed/fullscreen flags (audienceLabel, audienceOpen,
+  // audience/confidence, displays, canGoLive) are all defined earlier in this
+  // file (114-03 N-assignment rework) — see "Saved-assignment derived state".
 
   // ── In-item filmstrip (R282) — the active item's slides + GLOBAL indices ────
   const filmstrip = computed(() => {
@@ -1094,6 +1215,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     notifications.clearSticky('monitor-reassign')
     // See ADR-0131 (docs/adr/0131-monitorchanged-is-rundisplayspanel-s-own-source-of-truth-for.md)
     monitorChanged.value = false
+    missingAssignments.value = []
   })
 
   return {
@@ -1124,6 +1246,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     confidenceOpen,
     audience,
     confidence,
+    // N-assignment display list + go-live gate (114-03)
+    displays,
+    canGoLive,
     // in-item filmstrip (R282) + rail expansion
     filmstrip,
     filmstripSlides,

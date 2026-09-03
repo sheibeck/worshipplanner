@@ -36,6 +36,7 @@ import {
   type ScreenLike,
 } from '@/utils/monitorConfig'
 import { useToasts } from '@/stores/toasts'
+import { windowNameFor } from '@/composables/useRunControl'
 import RunControlView from '../RunControlView.vue'
 
 // onUnmounted must run so the document keydown listener + channel close this
@@ -265,21 +266,47 @@ function seedMatchingMapping() {
   })
 }
 
+// Fingerprints for screens that are NOT among the live screens → needs-reprompt.
+const OTHER_A = makeScreen({ label: 'Old Front', left: 100, top: 100 })
+const OTHER_B = makeScreen({ label: 'Old Stage', left: 3000, top: 0, isPrimary: false })
+
 function seedNonMatchingMapping() {
-  // Fingerprints for screens that are NOT among the live screens → needs-reprompt.
-  const otherA = makeScreen({ label: 'Old Front', left: 100, top: 100 })
-  const otherB = makeScreen({ label: 'Old Stage', left: 3000, top: 0, isPrimary: false })
   saveMapping({
     assignments: [
-      { fingerprint: computeFingerprint(otherA), role: 'audience' },
-      { fingerprint: computeFingerprint(otherB), role: 'confidence' },
+      { fingerprint: computeFingerprint(OTHER_A), role: 'audience' },
+      { fingerprint: computeFingerprint(OTHER_B), role: 'confidence' },
     ],
     savedAt: Date.now(),
   })
 }
 
-const AUDIENCE_URL = '/present/audience/service-1?org=org-1'
-const CONFIDENCE_URL = '/present/confidence/service-1?org=org-1'
+// ── Window-name/URL expectations, 114-03: fingerprint-keyed (wp-output-<fp>),
+//    not the old fixed 'wp-audience'/'wp-confidence'. Each opened URL now also
+//    carries the assignment's fingerprint as the SCREEN_QUERY_PARAM (?screen=).
+const AUDIENCE_ASSIGNMENT = { fingerprint: computeFingerprint(screenA), role: 'audience' as const }
+const CONFIDENCE_ASSIGNMENT = { fingerprint: computeFingerprint(screenB), role: 'confidence' as const }
+const AUDIENCE_WIN_NAME = windowNameFor(AUDIENCE_ASSIGNMENT)
+const CONFIDENCE_WIN_NAME = windowNameFor(CONFIDENCE_ASSIGNMENT)
+const AUDIENCE_URL = `/present/audience/service-1?org=org-1&screen=${encodeURIComponent(AUDIENCE_ASSIGNMENT.fingerprint)}`
+const CONFIDENCE_URL = `/present/confidence/service-1?org=org-1&screen=${encodeURIComponent(CONFIDENCE_ASSIGNMENT.fingerprint)}`
+
+// The stale/non-matching saved mapping (seedNonMatchingMapping) opens un-positioned
+// with ITS OWN (stale) fingerprints — never the live screenA/screenB ones.
+const OTHER_AUDIENCE_ASSIGNMENT = { fingerprint: computeFingerprint(OTHER_A), role: 'audience' as const }
+const OTHER_CONFIDENCE_ASSIGNMENT = { fingerprint: computeFingerprint(OTHER_B), role: 'confidence' as const }
+const OTHER_AUDIENCE_WIN_NAME = windowNameFor(OTHER_AUDIENCE_ASSIGNMENT)
+const OTHER_CONFIDENCE_WIN_NAME = windowNameFor(OTHER_CONFIDENCE_ASSIGNMENT)
+const OTHER_AUDIENCE_URL = `/present/audience/service-1?org=org-1&screen=${encodeURIComponent(OTHER_AUDIENCE_ASSIGNMENT.fingerprint)}`
+const OTHER_CONFIDENCE_URL = `/present/confidence/service-1?org=org-1&screen=${encodeURIComponent(OTHER_CONFIDENCE_ASSIGNMENT.fingerprint)}`
+
+// CONTEXT.md dev/nothing-assigned fallback (no saved mapping at all) — the two
+// virtual default assignments useRunControl.ts opens when nothing is configured.
+const DEFAULT_AUDIENCE_ASSIGNMENT = { fingerprint: 'default-audience', role: 'audience' as const }
+const DEFAULT_CONFIDENCE_ASSIGNMENT = { fingerprint: 'default-confidence', role: 'confidence' as const }
+const DEFAULT_AUDIENCE_WIN_NAME = windowNameFor(DEFAULT_AUDIENCE_ASSIGNMENT)
+const DEFAULT_CONFIDENCE_WIN_NAME = windowNameFor(DEFAULT_CONFIDENCE_ASSIGNMENT)
+const DEFAULT_AUDIENCE_URL = `/present/audience/service-1?org=org-1&screen=${encodeURIComponent('default-audience')}`
+const DEFAULT_CONFIDENCE_URL = `/present/confidence/service-1?org=org-1&screen=${encodeURIComponent('default-confidence')}`
 
 let openSpy: ReturnType<typeof vi.spyOn>
 
@@ -360,6 +387,57 @@ describe('RunControlView output — pre-open idle state (R261; T-95-19)', () => 
   })
 })
 
+// ── N-ASSIGNMENT ORCHESTRATION (114-03) — multiple Audience monitors + the
+//    ≥1-Audience go-live gate ───────────────────────────────────────────────
+const screenC = makeScreen({ label: 'Second Wall', left: 3840, top: 0, isPrimary: false })
+
+function seedTwoAudienceMapping() {
+  saveMapping({
+    assignments: [
+      { fingerprint: computeFingerprint(screenA), role: 'audience' },
+      { fingerprint: computeFingerprint(screenC), role: 'audience' },
+      { fingerprint: computeFingerprint(screenB), role: 'confidence' },
+    ],
+    savedAt: Date.now(),
+  })
+}
+
+describe('RunControlView output — N-assignment orchestration (114-03)', () => {
+  it('two Audience assignments + one Confidence: opens THREE windows, each with a distinct fingerprint-derived name and its own screen param', async () => {
+    seedTwoAudienceMapping()
+    installGetScreenDetails([screenA, screenB, screenC])
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+
+    expect(openSpy).toHaveBeenCalledTimes(3)
+    const names = openSpy.mock.calls.map((c: unknown[]) => c[1])
+    expect(new Set(names).size).toBe(3) // three DISTINCT window names — no collision
+    const urls = openSpy.mock.calls.map((c: unknown[]) => c[0])
+    expect(urls.every((u: unknown) => typeof u === 'string' && u.includes('&screen='))).toBe(true)
+    expect(wrapper.find('[data-testid="run-live-status"]').classes()).toContain('run-status--live')
+  })
+
+  it('canGoLive is false when the saved mapping has no Audience assignment — Go-live is a no-op', async () => {
+    saveMapping({
+      assignments: [{ fingerprint: computeFingerprint(screenB), role: 'confidence' }],
+      savedAt: Date.now(),
+    })
+    installGetScreenDetails([screenA, screenB])
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="run-go-live-btn"]').trigger('click')
+    await flushPromises()
+
+    // The ≥1-Audience gate (CONTEXT.md) blocked go-live entirely — nothing
+    // opened, and the session never becomes live (still honest pre-flight).
+    expect(openSpy).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="run-live-status"]').classes()).not.toContain('run-status--live')
+    expect(wrapper.find('[data-testid="run-displays-panel"]').exists()).toBe(false)
+  })
+})
+
 // ── 1. MATCHED — open + place both windows on their assigned screens ────────────
 describe('RunControlView output — matched placement (R261/R266)', () => {
   it('opens the audience + confidence windows with stable names + placement features, and shows both outputs green/ready in the Displays panel', async () => {
@@ -371,8 +449,8 @@ describe('RunControlView output — matched placement (R261/R266)', () => {
 
     // Both windows opened with the exact URLs (incl. ?org=) + stable names, and
     // WITH placement features (a non-empty third arg).
-    expect(openSpy).toHaveBeenCalledWith(AUDIENCE_URL, 'wp-audience', expect.stringMatching(/width=/))
-    expect(openSpy).toHaveBeenCalledWith(CONFIDENCE_URL, 'wp-confidence', expect.stringMatching(/width=/))
+    expect(openSpy).toHaveBeenCalledWith(AUDIENCE_URL, AUDIENCE_WIN_NAME, expect.stringMatching(/width=/))
+    expect(openSpy).toHaveBeenCalledWith(CONFIDENCE_URL, CONFIDENCE_WIN_NAME, expect.stringMatching(/width=/))
 
     // Both handles came back (the placement features position each window).
     expect(openedWins).toHaveLength(2)
@@ -404,9 +482,10 @@ describe('RunControlView output — fallback pop-outs (R261)', () => {
 
     await goLive(wrapper)
 
-    // Both windows opened, but with NO placement features (un-positioned).
-    expect(openSpy).toHaveBeenCalledWith(AUDIENCE_URL, 'wp-audience', '')
-    expect(openSpy).toHaveBeenCalledWith(CONFIDENCE_URL, 'wp-confidence', '')
+    // Both windows opened, but with NO placement features (un-positioned) — and
+    // with the STALE saved fingerprints (never the live screenA/screenB ones).
+    expect(openSpy).toHaveBeenCalledWith(OTHER_AUDIENCE_URL, OTHER_AUDIENCE_WIN_NAME, '')
+    expect(openSpy).toHaveBeenCalledWith(OTHER_CONFIDENCE_URL, OTHER_CONFIDENCE_WIN_NAME, '')
     for (const win of openedWins) {
       expect(win.document.documentElement.requestFullscreen).not.toHaveBeenCalled()
     }
@@ -424,8 +503,9 @@ describe('RunControlView output — fallback pop-outs (R261)', () => {
 
     await goLive(wrapper)
 
-    expect(openSpy).toHaveBeenCalledWith(AUDIENCE_URL, 'wp-audience', '')
-    expect(openSpy).toHaveBeenCalledWith(CONFIDENCE_URL, 'wp-confidence', '')
+    // Nothing configured (CONTEXT.md dev fallback) — the default virtual pair opens.
+    expect(openSpy).toHaveBeenCalledWith(DEFAULT_AUDIENCE_URL, DEFAULT_AUDIENCE_WIN_NAME, '')
+    expect(openSpy).toHaveBeenCalledWith(DEFAULT_CONFIDENCE_URL, DEFAULT_CONFIDENCE_WIN_NAME, '')
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(true)
   })
 
@@ -442,8 +522,8 @@ describe('RunControlView output — fallback pop-outs (R261)', () => {
     }
     expect(error).toBeNull()
 
-    expect(openSpy).toHaveBeenCalledWith(AUDIENCE_URL, 'wp-audience', '')
-    expect(openSpy).toHaveBeenCalledWith(CONFIDENCE_URL, 'wp-confidence', '')
+    expect(openSpy).toHaveBeenCalledWith(DEFAULT_AUDIENCE_URL, DEFAULT_AUDIENCE_WIN_NAME, '')
+    expect(openSpy).toHaveBeenCalledWith(DEFAULT_CONFIDENCE_URL, DEFAULT_CONFIDENCE_WIN_NAME, '')
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(true)
     for (const win of openedWins) {
       expect(win.document.documentElement.requestFullscreen).not.toHaveBeenCalled()
@@ -462,8 +542,8 @@ describe('RunControlView output — fallback pop-outs (R261)', () => {
     }
     expect(error).toBeNull()
 
-    expect(openSpy).toHaveBeenCalledWith(AUDIENCE_URL, 'wp-audience', '')
-    expect(openSpy).toHaveBeenCalledWith(CONFIDENCE_URL, 'wp-confidence', '')
+    expect(openSpy).toHaveBeenCalledWith(DEFAULT_AUDIENCE_URL, DEFAULT_AUDIENCE_WIN_NAME, '')
+    expect(openSpy).toHaveBeenCalledWith(DEFAULT_CONFIDENCE_URL, DEFAULT_CONFIDENCE_WIN_NAME, '')
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(true)
   })
 })
@@ -485,8 +565,8 @@ describe('RunControlView output — blocked (pop-up refused) (R261; T-95-16/T-95
     expect(error).toBeNull()
 
     // window.open WAS attempted, but zero handles came back.
-    expect(openSpy).toHaveBeenCalledWith(AUDIENCE_URL, 'wp-audience', expect.any(String))
-    expect(openSpy).toHaveBeenCalledWith(CONFIDENCE_URL, 'wp-confidence', expect.any(String))
+    expect(openSpy).toHaveBeenCalledWith(AUDIENCE_URL, AUDIENCE_WIN_NAME, expect.any(String))
+    expect(openSpy).toHaveBeenCalledWith(CONFIDENCE_URL, CONFIDENCE_WIN_NAME, expect.any(String))
     expect(openedWins).toHaveLength(0)
 
     // The HONEST blocked state — never a success/opened claim while zero opened.
@@ -497,9 +577,12 @@ describe('RunControlView output — blocked (pop-up refused) (R261; T-95-16/T-95
   })
 })
 
-// ── 5b. PARTIAL — exactly ONE window.open null must NOT claim success (WR-02) ────
-describe('RunControlView output — partial open is not full success (WR-02)', () => {
-  it('matched but the CONFIDENCE window.open returns null: NOT a live success — honest partial banner naming the dark confidence display', async () => {
+// ── 5b. ≥1-AUDIENCE GATE (CONTEXT.md; 114-03) ────────────────────────────────
+//    A refused CONFIDENCE window no longer blocks go-live (Confidence is
+//    optional) — only a refused AUDIENCE window does. This is a deliberate
+//    114-03 behavior change from the pre-multi-monitor "both must open" rule.
+describe('RunControlView output — ≥1-Audience gate replaces the old both-must-open rule (114-03)', () => {
+  it('matched but the CONFIDENCE window.open returns null: STILL a live success (Audience opened) — Confidence simply shows not-open', async () => {
     seedMatchingMapping()
     installGetScreenDetails([screenA, screenB])
     // First open (audience) succeeds; second (confidence) is refused → null.
@@ -510,17 +593,37 @@ describe('RunControlView output — partial open is not full success (WR-02)', (
 
     await goLive(wrapper)
 
-    // No green "Displays ready" (live stayed false → no Displays panel) and no
-    // both-opened fallback claim.
+    // Live succeeded on the strength of the Audience window alone.
+    expect(wrapper.find('[data-testid="run-display-ready-audience"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-partial-banner"]').exists()).toBe(false)
+
+    // Confidence never opened — it reads "Not open", never a false "ready" claim.
+    expect(wrapper.find('[data-testid="run-display-ready-confidence"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-display-closed-confidence"]').exists()).toBe(false)
+  })
+
+  it('matched but the AUDIENCE window.open returns null (Confidence opens): NOT a live success — the ≥1-Audience gate blocks it', async () => {
+    seedMatchingMapping()
+    installGetScreenDetails([screenA, screenB])
+    // First open (audience) refused → null; second (confidence) succeeds.
+    openSpy
+      .mockImplementationOnce(() => null)
+      .mockImplementationOnce(() => makeFakeWin())
+    const { wrapper } = mountView()
+
+    await goLive(wrapper)
+
+    // No green "Displays ready" (live stayed false → no Displays panel).
     expect(wrapper.find('[data-testid="run-displays-panel"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-fallback-banner"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-blocked-banner"]').exists()).toBe(false)
 
-    // The honest partial banner renders and names the display that stayed dark.
+    // The honest partial banner renders and names the missing Audience display.
     const banner = wrapper.find('[data-testid="run-partial-banner"]')
     expect(banner.exists()).toBe(true)
-    expect(banner.text().toLowerCase()).toContain('confidence')
-    // Retry affordance is present.
+    expect(banner.text().toLowerCase()).toContain('audience')
     expect(wrapper.find('[data-testid="run-partial-retry"]').exists()).toBe(true)
   })
 
@@ -705,7 +808,7 @@ describe('RunControlView output — closed detection, per-role reopen, position 
 
     // Exactly ONE more window.open — the audience name, placed (matched → features).
     expect(openSpy.mock.calls.length).toBe(callsBefore + 1)
-    expect(openSpy).toHaveBeenLastCalledWith(AUDIENCE_URL, 'wp-audience', expect.stringMatching(/width=/))
+    expect(openSpy).toHaveBeenLastCalledWith(AUDIENCE_URL, AUDIENCE_WIN_NAME, expect.stringMatching(/width=/))
     // The reopen never touched the confidence window in this click.
     const reopenCall = openSpy.mock.calls[openSpy.mock.calls.length - 1]!
     expect(reopenCall[0]).not.toBe(CONFIDENCE_URL)
@@ -850,7 +953,7 @@ describe('RunControlView output — monitor-unplug reassign sticky (R274/R310)',
     // Exactly one reopen for the affected (confidence) role, un-positioned since
     // its saved monitor is gone — NOT a control-destroying navigation.
     expect(openSpy.mock.calls.length).toBe(callsBefore + 1)
-    expect(openSpy).toHaveBeenLastCalledWith(CONFIDENCE_URL, 'wp-confidence', '')
+    expect(openSpy).toHaveBeenLastCalledWith(CONFIDENCE_URL, CONFIDENCE_WIN_NAME, '')
 
     // The control is STILL mounted (its top-bar heading still renders) and the
     // channel was NOT closed — the running session survived the recovery.
