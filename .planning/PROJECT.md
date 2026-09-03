@@ -8,28 +8,55 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.8 Production Hardening — Comments-as-Specs, Architecture & Security Review
+## Current Milestone: v2.9 Live Presentation Field Fixes
+
+**Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the first real
+church-projector run, so a projectionist can set up and read the live output without fighting the tool.
+
+**Target work (three groups):**
+
+- **Multi-monitor rework** (reworks the v2.4 monitor config) — support *any number* of connected monitors
+  (verified against a real **3-monitor** setup, not just 2); assign *any role to any monitor*, including
+  **multiple Audience** monitors, and **make the assignment stick** — the core bug is that with 3 monitors
+  the roles wouldn't hold (the single-select Audience/Confidence model collapses); auto-placement to the
+  assigned displays must work on **Mac too** (treat the Mac tab-placement failure as a bug to fix, not a
+  limitation to route around with manual dragging); and stop the false "your monitors changed" re-detect
+  prompt on an unchanged setup.
+- **Live-output readability & layout** — **auto-scale slide text** to fill the screen (no manual size
+  control; the font *family* stays pickable in config as it is today via v1.5 slide typography); shrink the
+  live main screen and enlarge the preview thumbnails so they're readable; add an **"end" marker** after
+  the last thumbnail (song's over, next item coming); investigate the flaky Mac thumbnail scrollbar (may be
+  nothing).
+- **Lyric editor / song UX** — relabel the edit-lyrics link to **"Edit song lyrics for {song name}"** and
+  open the song in a **new tab**; add a **SongSelect link** next to the song name in the editor title bar;
+  rename **"Cancel" → "Close"**; allow **manually editing Credits / CCLI / copyright** text (fixes stale
+  credits after a wrong-then-right paste); and **hide the History tab** (defer — the "Just now"-everywhere
+  version list is confusing and adds no value yet).
+
+**Key context:** All field feedback from the first real church-projector run (church Mac + projector, the
+external-link hardware). **Out of scope / deferred:** all audio — vamps (mp3 upload + slide assignment)
+and canned pre/post-service music — punted to a future milestone / the backlog 999.13 storage cluster
+(SEED-003), since they open the Firebase Storage + external-media cost/security surface; and the
+unsupported-browser warning is **dropped** (Safari ran the app fine on retest). No research pass (internal
+fixes to existing features). Requirements continue from R324; phases continue from 114.
+
+## Shipped Milestone: v2.8 Production Hardening — Comments-as-Specs, Architecture & Security Review — ✅ SHIPPED & DEPLOYED 2026-09-02
+
+**Status:** Shipped, deployed to production, archived, and tagged `v2.8` (2026-09-02). Full record:
+[milestones/v2.8-ROADMAP.md](milestones/v2.8-ROADMAP.md) · MILESTONES.md.
 
 **Goal:** Prepare the app for real-world use (it can impact real people if it has issues) by extracting
 load-bearing comments into GSD's durable stores, then running architectural and security reviews and
 remediating the Critical/High findings.
 
-**Target work:**
-- **Comments-as-Specs sweep** — comments must never bear the load of how features work. Audit the codebase,
-  relocate decision *rationale* (the `R-`/`WR-`/`CR-`/`Pitfall` "why" notes) into **ADRs** (`docs/adr/`) and
-  *behavioral/architectural* "how it works" into **`.planning/codebase/`** map docs, shrinking comments to
-  short pointers, and document the go-forward comment convention (R316–R319).
-- **Architectural review** — module boundaries, store/Firestore-listener lifecycle (incl. org-scoped
-  teardown/re-subscription), multi-tenant isolation, data flow, coupling — report + remediate Critical/High
-  (R320–R321).
-- **Security review** — Firestore/Storage rules, auth/claims & route guards, tenant isolation, Cloud
-  Functions authorization, share-token/PII exposure, cost/abuse — report + remediate Critical/High
-  (R322–R323).
-
-**Key context:** Reviews produce reports AND fix Critical/High in-milestone; Medium/Low triaged to backlog.
-No research pass (internal hardening). Build/commit only — any production deploy of remediation (esp.
-rules/functions) is a separate, explicitly owner-confirmed step. Requirements R316–R323; phases continue
-from 108.
+**Delivered:** Comments-as-Specs sweep (244 ADRs under `docs/adr/` from 382 tagged rationale comments +
+309 behavioral comments relocated to `.planning/codebase/` map docs, comments shrunk to pointers, go-forward
+convention documented — R316–R319); an architectural review (23-finding report, sole High ARCH-001 store-layer
+epoch guard fixed, 22 Medium/Low → backlog 999.4 — R320–R321); and a security review that found and fixed a
+**proven LIVE Critical cross-tenant leak** (SEC-S-01: `shareTokens`/`quarterShares`/`serviceShares` fully
+listable via `allow read: if true`, exposing every org's shared plans + volunteer names) plus a member-removal
+Storage-claim revocation gap (High), with 11 Medium/Low → backlog 999.5 (R322–R323). All remediation deployed
+to production.
 
 ## Shipped Milestone: v2.7 Rehearsal, Stage Plans & Presentation Polish — ✅ SHIPPED & DEPLOYED 2026-09-01
 
@@ -466,6 +493,17 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
+**v2.9 Live Presentation Field Fixes** — 🚧 in planning (started 2026-09-02). Field feedback from the first
+real church-projector run (church Mac + projector). Three groups: **multi-monitor rework** (N monitors,
+any-role-to-any-monitor incl. multiple Audience, assignments that stick on a 3-monitor setup, Mac
+auto-placement treated as a bug, no false "monitors changed" prompt); **live-output readability** (auto-scale
+slide text to the screen with the font *family* still config-pickable, smaller live main screen + larger
+readable thumbnails, an "end" marker after the last thumbnail, flaky Mac scrollbar investigation); and
+**lyric-editor UX** ("Edit song lyrics for {song}" opening a new tab, a SongSelect link in the editor title
+bar, "Cancel"→"Close", manual Credits/CCLI/copyright editing, and hiding the confusing History tab). Audio
+(vamps + canned music) deferred; browser-support warning dropped (Safari runs fine). Requirements continue
+from R324; phases from 114. See `.planning/REQUIREMENTS.md`.
+
 **v2.7 Rehearsal, Stage Plans & Presentation Polish** — 🚧 in planning (started 2026-08-31). Eight features:
 inline black slide in the lyric editor; "Go to black" limited to the Audience output; system-wide dismissible
 messages (stuck monitor-warning auto-clears once configured); per-item loop with interval; user-menu church
@@ -657,6 +695,21 @@ This document evolves at phase transitions and milestone boundaries.
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
+
+---
+*Last updated: 2026-09-02 — started milestone v2.9 Live Presentation Field Fixes. Field feedback from the
+first real church-projector run (church Mac + projector, the external-link hardware). Three groups:
+multi-monitor rework (support any number of monitors verified on a real 3-monitor setup, assign any role to
+any monitor incl. multiple Audience, make role assignments STICK — the core bug where 3 monitors collapse
+the single-select model, fix Mac auto-placement as a bug not a manual-drag workaround, and kill the false
+"monitors changed" re-detect prompt); live-output readability (auto-scale slide text to fill the screen with
+the font family still config-pickable, shrink the live main screen + enlarge readable preview thumbnails,
+add an "end" marker after the last thumbnail, investigate the flaky Mac thumbnail scrollbar); and
+lyric-editor UX ("Edit song lyrics for {song}" opening a new tab, a SongSelect link in the editor title bar,
+"Cancel"→"Close", manual Credits/CCLI/copyright editing, hide the confusing History tab). Out of scope: all
+audio — vamps (mp3 upload + slide assignment) and canned pre/post-service music — deferred to the backlog
+999.13 storage cluster (SEED-003); the unsupported-browser warning dropped (Safari retested fine). No
+research pass. Requirements continue from R324; phases from 114. Previous footer below.*
 
 ---
 *Last updated: 2026-09-02 — archived milestone v2.8 Production Hardening: Comments-as-Specs, Architecture
