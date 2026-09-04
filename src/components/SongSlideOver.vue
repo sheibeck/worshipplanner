@@ -34,11 +34,28 @@
           <!-- Owner UAT: show the song title in the header so it's visible on every
                tab (the title input only lives on the Details tab). Live from
                form.title, truncated so a long title can't push the actions off. -->
-          <div class="min-w-0">
-            <p v-if="!isCreateMode" class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Edit Song</p>
-            <h2 class="truncate text-base font-semibold text-gray-100">
-              {{ isCreateMode ? 'New Song' : (form.title.trim() || 'Untitled song') }}
-            </h2>
+          <div class="min-w-0 flex items-center gap-2">
+            <div class="min-w-0">
+              <p v-if="!isCreateMode" class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Edit Song</p>
+              <h2 class="truncate text-base font-semibold text-gray-100">
+                {{ isCreateMode ? 'New Song' : (form.title.trim() || 'Untitled song') }}
+              </h2>
+            </div>
+            <!-- R334 (owner: "Use CCLI just like we have on the song table. We
+                 already link out to it."): reuses SongTable.vue's exact CCLI
+                 link-out pattern verbatim. Gated on the PERSISTED
+                 `Song.ccliNumber` (the Details-tab field the table itself
+                 links on) — never `form.ccliNumber` or the paste-derived
+                 `copyright.ccliSongNumber`. Lives in the shared header so it
+                 stays visible on both the Details and Lyrics tabs. -->
+            <a
+              v-if="props.song?.ccliNumber"
+              :href="`https://songselect.ccli.com/songs/${props.song.ccliNumber}`"
+              target="_blank"
+              rel="noopener"
+              class="shrink-0 text-xs font-medium text-indigo-400 hover:text-indigo-300 hover:underline"
+              data-testid="song-songselect-link"
+            >SongSelect</a>
           </div>
           <div class="flex items-center gap-2">
             <button
@@ -46,7 +63,7 @@
               class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 transition-colors"
               @click="onCancel"
             >
-              Cancel
+              Close
             </button>
             <button
               type="button"
