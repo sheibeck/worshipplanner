@@ -6,14 +6,6 @@ import { SLIDE_FONTS } from '@/config/slideFonts'
  * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideTypography.ts)
  */
 
-/** Locked scale multipliers (46-CONTEXT.md): Medium is the identity scale —
- *  a church that never opens this setting sees zero size change. */
-export const SCALE_MAP: Record<'sm' | 'md' | 'lg', number> = {
-  sm: 0.85,
-  md: 1.0,
-  lg: 1.25,
-}
-
 /** Bounded font-load gate timeout (R094 / RESEARCH Open Question 1). A named
  *  constant, not a magic number, so it is a one-line change if human-verify
  *  on real projector hardware says otherwise. A stalled/missing font asset
@@ -27,18 +19,15 @@ const SERIF_STACK = 'ui-serif, Georgia, serif'
 /** Matches `DEFAULT_ORG_SETTINGS.slideTypography` (src/types/organization.ts). */
 const DEFAULT_FAMILY = 'Inter'
 const DEFAULT_WEIGHT = 400
-const DEFAULT_SCALE: keyof typeof SCALE_MAP = 'md'
 
 export interface SlideTypographySettings {
   fontFamily: string
   fontWeight: number
-  fontScale: 'sm' | 'md' | 'lg'
 }
 
 export interface SlideTypographyCssVars {
   '--slide-font-family': string
   '--slide-font-weight': number
-  '--slide-font-scale': number
 }
 
 /**
@@ -60,13 +49,12 @@ function defaultCssVars(): SlideTypographyCssVars {
   return {
     '--slide-font-family': `"${DEFAULT_FAMILY}", ${stack}`,
     '--slide-font-weight': DEFAULT_WEIGHT,
-    '--slide-font-scale': SCALE_MAP[DEFAULT_SCALE],
   }
 }
 
 /**
- * Computes the three `--slide-font-*` CSS custom properties. DEFENSIVELY
- * falls back to Inter/400/md — never partially — on any invalid input
+ * Computes the two `--slide-font-*` CSS custom properties. DEFENSIVELY
+ * falls back to Inter/400 — never partially — on any invalid input
  * (T-46-03, ASVS V5): the value fed downstream into `document.fonts.load()`
  * is therefore always drawn from the curated `SLIDE_FONTS` set, never free text.
  * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideTypography.ts)
@@ -74,17 +62,15 @@ function defaultCssVars(): SlideTypographyCssVars {
 export function cssVarsFor(
   typography: Partial<SlideTypographySettings> | undefined,
 ): SlideTypographyCssVars {
-  const { fontFamily, fontWeight, fontScale } = typography ?? {}
+  const { fontFamily, fontWeight } = typography ?? {}
 
   const entry = fontFamily !== undefined ? SLIDE_FONTS[fontFamily] : undefined
   const weightValid =
     entry !== undefined &&
     fontWeight !== undefined &&
     snapWeight(fontFamily as string, fontWeight) === fontWeight
-  const scaleValid =
-    fontScale !== undefined && Object.prototype.hasOwnProperty.call(SCALE_MAP, fontScale)
 
-  if (!entry || !weightValid || !scaleValid) {
+  if (!entry || !weightValid) {
     return defaultCssVars()
   }
 
@@ -92,7 +78,6 @@ export function cssVarsFor(
   return {
     '--slide-font-family': `"${fontFamily}", ${stack}`,
     '--slide-font-weight': fontWeight as number,
-    '--slide-font-scale': SCALE_MAP[fontScale as 'sm' | 'md' | 'lg'],
   }
 }
 

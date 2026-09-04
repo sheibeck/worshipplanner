@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  SCALE_MAP,
   FONT_LOAD_TIMEOUT_MS,
   FONT_CSS_LOADERS,
   cssVarsFor,
@@ -9,56 +8,45 @@ import {
 } from '@/utils/slideTypography'
 
 describe('slideTypography', () => {
-  describe('SCALE_MAP / FONT_LOAD_TIMEOUT_MS', () => {
-    it('maps sm/md/lg to the locked scale multipliers', () => {
-      expect(SCALE_MAP.sm).toBe(0.85)
-      expect(SCALE_MAP.md).toBe(1.0)
-      expect(SCALE_MAP.lg).toBe(1.25)
-    })
-
+  describe('FONT_LOAD_TIMEOUT_MS', () => {
     it('bounds the font-load gate at 3000ms', () => {
       expect(FONT_LOAD_TIMEOUT_MS).toBe(3000)
     })
   })
 
   describe('cssVarsFor', () => {
-    it('returns the serif stack + scaled values for a serif family', () => {
-      const vars = cssVarsFor({ fontFamily: 'Lora', fontWeight: 600, fontScale: 'lg' })
+    it('returns the serif stack for a serif family', () => {
+      const vars = cssVarsFor({ fontFamily: 'Lora', fontWeight: 600 })
       expect(vars).toEqual({
         '--slide-font-family': '"Lora", ui-serif, Georgia, serif',
         '--slide-font-weight': 600,
-        '--slide-font-scale': 1.25,
       })
     })
 
     it('returns the sans stack for a sans-category family', () => {
-      const vars = cssVarsFor({ fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' })
+      const vars = cssVarsFor({ fontFamily: 'Inter', fontWeight: 400 })
       expect(vars).toEqual({
         '--slide-font-family': '"Inter", ui-sans-serif, system-ui, sans-serif',
         '--slide-font-weight': 400,
-        '--slide-font-scale': 1.0,
       })
     })
 
-    it('falls back to Inter/400/md for undefined input', () => {
+    it('falls back to Inter/400 for undefined input', () => {
       const vars = cssVarsFor(undefined)
       expect(vars).toEqual({
         '--slide-font-family': '"Inter", ui-sans-serif, system-ui, sans-serif',
         '--slide-font-weight': 400,
-        '--slide-font-scale': 1.0,
       })
     })
 
-    it('falls back to Inter/400/md for a tampered value (unknown family, unreachable weight, invalid scale)', () => {
+    it('falls back to Inter/400 for a tampered value (unknown family, unreachable weight)', () => {
       const vars = cssVarsFor({
         fontFamily: 'Comic Sans MS',
         fontWeight: 250,
-        fontScale: 'xl' as never,
       })
       expect(vars).toEqual({
         '--slide-font-family': '"Inter", ui-sans-serif, system-ui, sans-serif',
         '--slide-font-weight': 400,
-        '--slide-font-scale': 1.0,
       })
     })
   })

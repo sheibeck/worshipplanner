@@ -1221,12 +1221,14 @@ grid, the Edit Slide drawer preview), the Settings "Slide Typography" card previ
 app-init font-load gate (R094) share; no consumer computes CSS variables or re-derives the
 font-load gate on its own.
 
-**`cssVarsFor`:** computes the three `--slide-font-*` CSS custom properties from a stored (or
-possibly undefined/tampered) `slideTypography` value. DEFENSIVELY falls back to Inter/400/md —
-never partially — when the family key is unknown, the weight is not reachable for that family (via
-`snapWeight`), or the scale is not one of `sm`/`md`/`lg` (T-46-03, ASVS V5): the value written into
-`--slide-font-family` and, downstream, into a `document.fonts.load()` template string is therefore
-always drawn from the curated `SLIDE_FONTS` set, never free text.
+**`cssVarsFor`:** computes the two `--slide-font-*` CSS custom properties from a stored (or
+possibly undefined/tampered) `slideTypography` value. DEFENSIVELY falls back to Inter/400 —
+never partially — when the family key is unknown or the weight is not reachable for that family
+(via `snapWeight`) (T-46-03, ASVS V5): the value written into `--slide-font-family` and,
+downstream, into a `document.fonts.load()` template string is therefore always drawn from the
+curated `SLIDE_FONTS` set, never free text. R329 (Phase 115 Plan 05): the old discrete
+`--slide-font-scale` sm/md/lg multiplier (`SCALE_MAP`) is removed — text size is now owned
+entirely by SlideCanvas's per-slide auto-fit (`--slide-fit-scale`, Plan 03).
 
 ### src/utils/slotTypes.ts
 
