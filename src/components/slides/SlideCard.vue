@@ -199,7 +199,7 @@ const props = withDefaults(
      * `cssVarsFor(authStore.settings.slideTypography)` and passed down
      * rather than read from the store here: this component still "reads no
      * store and calls no composable" (see the header comment above).
-     * Defaults to `cssVarsFor`'s own Inter/400/md fallback so every
+     * Defaults to `cssVarsFor`'s own Inter/400 fallback so every
      * standalone mount (this component's own test suite) still carries the
      * correct default custom properties.
      */
