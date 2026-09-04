@@ -1,6 +1,8 @@
 <template>
-  <!-- R276 owner fix #2/#4 — the program ("On screen", dominant, LEFT) + next-up
-       (subordinate, RIGHT) preview split. Display-only: both panes are
+  <!-- R276 owner fix #2/#4 — the program ("On screen", LEFT) + next-up (RIGHT)
+       preview split (R330, Phase 115: an even split, no longer a dominant
+       2/3-share program pane — see the grid classes below). Display-only:
+       both panes are
        <SlideCanvas :interactive="false">; navigation is the transport/rail's job,
        so there is NO push-to-live control here (no run-take / run-push-live testid
        — that preserves the single-selection contract the control suite asserts).
@@ -19,9 +21,11 @@
        the real slide. A ResizeObserver keeps the scale correct as the pane resizes.
        Both panes are aspect-video (16:9) and the stage is 16:9, so the scaled stage
        exactly fills its pane with no letterboxing. -->
-  <div class="grid grid-cols-1 gap-8 lg:grid-cols-3 items-start">
-    <!-- CURRENT (dominant, LEFT) — the program / "On screen" preview. -->
-    <div class="lg:col-span-2">
+  <div class="grid grid-cols-1 gap-8 lg:grid-cols-2 items-start">
+    <!-- CURRENT (LEFT) — the program / "On screen" preview. R330: reduced from
+         the old dominant lg:col-span-2-of-3 (2/3) share to an even split with
+         Next-up so it no longer crowds out the filmstrip beneath it. -->
+    <div data-testid="run-current-pane">
       <div class="mb-2 flex items-center gap-2">
         <span class="text-xs font-semibold text-gray-400">On screen</span>
         <!-- Owner UAT: in rehearse mode the tag/ring is YELLOW "Rehearsing" (green
@@ -79,9 +83,10 @@
       <div class="mt-6"><slot name="under-current" /></div>
     </div>
 
-    <!-- NEXT (subordinate, RIGHT) — the same scale-to-fit thumbnail as the program
-         pane, sized to its own (smaller) box. "End of service" when next is null. -->
-    <div class="lg:col-span-1">
+    <!-- NEXT (RIGHT) — the same scale-to-fit thumbnail as the program pane,
+         now sized to a matching (even-split) box. "End of service" when next
+         is null. -->
+    <div data-testid="run-next-pane">
       <div class="mb-2 flex items-center">
         <span class="text-xs font-semibold text-gray-400">Next up</span>
       </div>

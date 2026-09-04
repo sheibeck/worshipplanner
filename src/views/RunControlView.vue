@@ -199,9 +199,9 @@
              item" filmstrip (bottom, its #under-current slot), and the RIGHT column
              is the Next-up preview (top) over the Displays panel (bottom, its
              #under-next slot). RunPreviewPair already lays the two panes out
-             (On-screen lg:col-span-2 left, Next-up lg:col-span-1 right) and exposes
-             a slot under each; the filmstrip keeps its own overflow-x-auto so it
-             stays usable in the narrower left column. `rehearsing` makes the
+             (R330: an even split, On-screen left / Next-up right) and exposes
+             a slot under each; the filmstrip keeps its own horizontal scroll so
+             it stays usable in the left column. `rehearsing` makes the
              On-screen tag/ring read yellow "Rehearsing" in rehearse mode. -->
         <RunPreviewPair :current="current" :next="next" :live="live" :rehearsing="rehearsing" :blackout="blackout">
           <template #under-current>

@@ -15,6 +15,17 @@ vi.mock('@/components/slides/SlideCanvas.vue', async () => {
   return { default: defineComponent({ name: 'SlideCanvas', setup: () => () => h('div') }) }
 })
 
+describe('RunPreviewPair — On-screen pane share (R330)', () => {
+  it('no longer gives the On-screen pane the dominant lg:col-span-2 share', () => {
+    const w = mount(RunPreviewPair, {
+      props: { current: null, next: null, live: false },
+    })
+    const onScreenPane = w.find('[data-testid="run-current-pane"]')
+    expect(onScreenPane.exists()).toBe(true)
+    expect(onScreenPane.classes()).not.toContain('lg:col-span-2')
+  })
+})
+
 describe('RunPreviewPair — blackout mirror on the On-screen preview (owner UAT)', () => {
   it('shows a BLACK overlay on the program preview when blackout is true', () => {
     const w = mount(RunPreviewPair, {
