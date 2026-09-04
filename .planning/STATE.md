@@ -4,17 +4,17 @@ milestone: v2.9
 milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
 current_phase: 115
 current_phase_name: Live-Output Readability & Layout
-status: planning
-stopped_at: Phase 114 executed + auto-verified (human_needed — hardware UAT batched to v2.9-DEFERRED-VERIFICATION.md); starting Phase 115
-last_updated: "2026-09-03T14:13:49.609Z"
+status: executing
+stopped_at: Phase 115 Plan 01 (auto-fit engine) closed out via safe_resume_gate; Wave 1 continues with plans 02, 04
+last_updated: "2026-09-03T20:42:06.209Z"
 last_activity: 2026-09-03
-last_activity_desc: "Phase 114 executed + code-reviewed + auto-verified green; real-3-monitor/macOS UAT deferred (batched, owner instruction); advancing to Phase 115"
+last_activity_desc: "Phase 115 Plan 01 (auto-fit engine) closed out — 17/17 tests + type-check green; SUMMARY reconstructed via safe_resume_gate"
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
-  percent: 33
+  total_plans: 9
+  completed_plans: 5
+  percent: 56
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -56,7 +56,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.9 Live Presentation Field Fixes (roadmap created 2026-09-02)
 
-**Status:** Phase complete — ready for verification
+**Status:** Executing Phase 115
 
 **Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the first real
 church-projector run, so a projectionist can set up and read the live output without fighting the tool.
@@ -1221,7 +1221,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 114 — Multi-Monitor Assignment Rework
+**Current focus:** Phase 115 — Live-Output Readability & Layout
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1231,10 +1231,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 114 (Multi-Monitor Assignment Rework) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-09-03 — Phase 114 execution started
+Phase: 115 (Live-Output Readability & Layout) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 115
+Last activity: 2026-09-03 — Phase 115 execution started
 
 ## ★ v2.9 ROADMAP.md phase breakdown (created 2026-09-02)
 
