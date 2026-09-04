@@ -1151,6 +1151,15 @@ describe('SongLyricEditor', () => {
   })
 
   // ── 28-06: restore the CCLI copyright display dropped in 28-04 ─────────────
+  // ── 116-02 (R336): inline manual credits editing over the same block ───────
+
+  const EMPTY_COPYRIGHT: CopyrightInfo = {
+    title: '',
+    authors: [],
+    ccliSongNumber: '',
+    copyrightLines: [],
+    ccliLicenseNumber: '',
+  }
 
   it('shows the copyright display, inside the single scroll region, when ccliSongNumber is present', async () => {
     mockIsLoading.value = false
@@ -1168,15 +1177,114 @@ describe('SongLyricEditor', () => {
     expect(copyright.text()).toContain('CCLI License # 99999')
   })
 
-  it('hides the copyright display when ccliSongNumber is absent', async () => {
+  it('hides the copyright display when all credit fields are blank, and offers the edit toggle instead (R336)', async () => {
     mockIsLoading.value = false
-    mockCurrentLyrics.value = makeLyrics({
-      copyright: { ...SAMPLE_COPYRIGHT, ccliSongNumber: '' },
-    })
+    mockCurrentLyrics.value = makeLyrics({ copyright: { ...EMPTY_COPYRIGHT } })
     const wrapper = await mountEditor()
     await flushPromises()
 
     expect(wrapper.find('[data-testid="copyright-display"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="copyright-edit-toggle"]').exists()).toBe(true)
+  })
+
+  it('a copyright with only copyrightLines populated still shows the read-only display — the ccliSongNumber-only gate no longer suppresses it (R336)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({
+      copyright: { ...EMPTY_COPYRIGHT, copyrightLines: ['© 2024 X'] },
+    })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const copyright = wrapper.find('[data-testid="copyright-display"]')
+    expect(copyright.exists()).toBe(true)
+    expect(copyright.text()).toContain('© 2024 X')
+  })
+
+  it('opening "Edit credits" shows a form pre-filled with all 5 fields from the current copyright (R336)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="copyright-edit-toggle"]').trigger('click')
+    await flushPromises()
+
+    const form = wrapper.find('[data-testid="copyright-edit-form"]')
+    expect(form.exists()).toBe(true)
+    expect((wrapper.find('[data-testid="copyright-edit-title"]').element as HTMLInputElement).value).toBe('Amazing Grace')
+    expect((wrapper.find('[data-testid="copyright-edit-authors"]').element as HTMLTextAreaElement).value).toContain('John Newton')
+    expect((wrapper.find('[data-testid="copyright-edit-ccli-song"]').element as HTMLInputElement).value).toBe('12345')
+    expect((wrapper.find('[data-testid="copyright-edit-copyright-lines"]').element as HTMLTextAreaElement).value).toContain('© 2023 Test Publisher')
+    expect((wrapper.find('[data-testid="copyright-edit-license"]').element as HTMLInputElement).value).toBe('99999')
+  })
+
+  it('editing the title and authors then saving calls saveLyrics with the edited copyright and unchanged sections/order, then closes the form (R336)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="copyright-edit-toggle"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.find('[data-testid="copyright-edit-title"]').setValue('Amazing Grace (My Chains Are Gone)')
+    await wrapper.find('[data-testid="copyright-edit-authors"]').setValue('John Newton\nChris Tomlin')
+    mockSaveLyrics.mockClear()
+    await wrapper.find('[data-testid="copyright-edit-save"]').trigger('click')
+    await flushPromises()
+
+    expect(mockSaveLyrics).toHaveBeenCalledTimes(1)
+    expect(mockSaveLyrics).toHaveBeenCalledWith('org-1', 'song-1', expect.objectContaining({
+      copyright: expect.objectContaining({
+        title: 'Amazing Grace (My Chains Are Gone)',
+        authors: ['John Newton', 'Chris Tomlin'],
+      }),
+      sections: expect.arrayContaining([
+        expect.objectContaining({ id: 'verse-1' }),
+        expect.objectContaining({ id: 'chorus' }),
+      ]),
+      performanceOrder: ['verse-1', 'chorus'],
+    }))
+    expect(wrapper.find('[data-testid="copyright-edit-form"]').exists()).toBe(false)
+  })
+
+  it('starting from empty credits, entering a ccliSongNumber and saving calls saveLyrics with that number and empty-derived arrays (R336)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({ copyright: { ...EMPTY_COPYRIGHT } })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="copyright-edit-toggle"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-testid="copyright-edit-ccli-song"]').setValue('55555')
+    mockSaveLyrics.mockClear()
+    await wrapper.find('[data-testid="copyright-edit-save"]').trigger('click')
+    await flushPromises()
+
+    expect(mockSaveLyrics).toHaveBeenCalledWith('org-1', 'song-1', expect.objectContaining({
+      copyright: expect.objectContaining({
+        ccliSongNumber: '55555',
+        authors: [],
+        copyrightLines: [],
+      }),
+    }))
+  })
+
+  it('canceling the credits edit closes the form and does not call saveLyrics (R336)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="copyright-edit-toggle"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-testid="copyright-edit-title"]').setValue('Should Not Save')
+    mockSaveLyrics.mockClear()
+    await wrapper.find('[data-testid="copyright-edit-cancel"]').trigger('click')
+    await flushPromises()
+
+    expect(mockSaveLyrics).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="copyright-edit-form"]').exists()).toBe(false)
   })
 
   it('Add section saves once with both fields', async () => {
