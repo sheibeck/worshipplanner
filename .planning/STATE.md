@@ -5,16 +5,16 @@ milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
 current_phase: 115
 current_phase_name: Live-Output Readability & Layout
 status: executing
-stopped_at: Completed 115-03-PLAN.md
-last_updated: "2026-09-04T05:56:50.640Z"
+stopped_at: Completed 115-05-PLAN.md (Phase 115 complete, all 5 plans done)
+last_updated: "2026-09-04T06:17:29.909Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 115 execution started
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 8
-  percent: 33
+  completed_plans: 9
+  percent: 67
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1232,7 +1232,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 115 (Live-Output Readability & Layout) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 115 execution started
 
@@ -3163,6 +3163,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 115 P02 | 45 min | 3 tasks | 7 files |
 | Phase 115 P04 | 20min | 2 tasks | 3 files |
 | Phase 115 P03 | 10min | 3 tasks | 7 files |
+| Phase 115 P05 | 25min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -3680,6 +3681,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: deriveNextItemLabel (R331) kept as a module-level exported pure function in useRunControl.ts, mirroring the existing windowNameFor/urlForAssignment pattern, so it is unit-testable with plain RailRow[] arrays without mounting the composable.
 - [Phase ?]: SlideCard.test.ts: dropped the --slide-font-scale-specific assertions (jsdom does not reliably apply Vue SFC scoped CSS through getComputedStyle) rather than asserting computed style; kept the family/weight coverage
 - [Phase ?]: SlideCanvas per-slide auto-fit (useSlideAutoFit) replaces --slide-font-scale reads; AudienceOutputView/ConfidenceOutputView render on a canonical 1280x720 stage via useContainScale so output stays WYSIWYG with Run previews; Confidence next-pane scale(0.8) hack removed
+- [Phase ?]: R329 complete: slideTypography model carries only fontFamily/fontWeight; SCALE_MAP, fontScale, and --slide-font-scale removed everywhere; Settings Size control removed
+- [Phase ?]: Deleting a settings leaf field: pure-function model first, then type/defaults, then UI reader, then test-mock sweep — each step's own tests prove the prior step correct before the type change ripples into unrelated fixtures
 
 ### Roadmap Evolution
 
@@ -4008,8 +4011,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-04T05:56:50.499Z
-Stopped at: Completed 115-03-PLAN.md
+Last session: 2026-09-04T06:17:29.849Z
+Stopped at: Completed 115-05-PLAN.md (Phase 115 complete, all 5 plans done)
 Resume file: None
 
 ## Operator Next Steps
