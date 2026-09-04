@@ -1841,6 +1841,19 @@ null regardless of the slide's own resolved value — checked next, ahead of the
 video-suppresses-background rule, since a confidence monitor wants black-only no matter what the
 slide carries.
 
+**Text size (R329, Phase 115 Plan 03) — per-slide auto-fit, not a discrete multiplier:** the
+scoped font-size rules read `var(--slide-fit-scale)`, a value measured per slide by
+`useSlideAutoFit` (grow-to-fill, shrink-to-avoid-overflow, capped at `MAX_FIT_SCALE`) against
+SlideCanvas's own canonical 1280×720 frame — not the old discrete `--slide-font-scale` sm/md/lg
+multiplier (SlideCanvas no longer reads that variable at all; its emission survives only for the
+editor surfaces until Plan 05). Because every consumer — the Audience/Confidence outputs
+(via `useContainScale`'s canonical stage) and the Run-screen previews/thumbnails
+(`RunPreviewPair`'s existing 1280×720 reference stage) — renders SlideCanvas at that same
+reference size, the fit computed once is identical everywhere: the previews stay a true WYSIWYG
+mirror of the projector. In jsdom/no-layout environments the fit degrades to
+`DEFAULT_FIT_SCALE` (1), matching the old `md` identity default, so no existing render test
+depends on real measured pixels.
+
 ### src/components/slides/SlideGrid.vue
 
 **`canMutateGroup`/`canWriteGroupMedia`:** the two composed gates (★ R036) this component uses

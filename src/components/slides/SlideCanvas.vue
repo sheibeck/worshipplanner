@@ -27,10 +27,12 @@
   <!-- Slide content — PresentationViewer keeps the v-else-if="currentSlide"
        guard around the <SlideCanvas> element itself; here the block renders
        whenever props.slide is non-null. -->
+  <div v-if="props.slide" ref="frameRef" class="w-full h-full">
   <div
-    v-if="props.slide"
+    ref="contentRef"
     data-testid="presentation-slide"
     class="w-full h-full flex flex-col items-center justify-center px-16 py-12 text-center"
+    :style="{ '--slide-fit-scale': fitScale }"
   >
     <!-- Render-pending — the FIRST branch of this chain (R080/D-15).
          Occupies the slide's normal position; never filters it out of
@@ -278,6 +280,7 @@
       Playing muted — tap to unmute
     </button>
   </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -294,6 +297,7 @@ import type {
   VideoSlide,
 } from '@/types/slide'
 import { renderFailureSentence } from './slideDisplay'
+import { useSlideAutoFit } from '@/composables/useSlideAutoFit'
 import AudioPlayer from '../AudioPlayer.vue'
 import VideoPlayer from '../VideoPlayer.vue'
 
@@ -313,6 +317,11 @@ const props = defineProps<{
 
 const audioRef = ref<InstanceType<typeof AudioPlayer> | null>(null)
 const videoRef = ref<InstanceType<typeof VideoPlayer> | null>(null)
+
+/** R329 — per-slide measure-and-fit, replacing the discrete --slide-font-scale
+ *  multiplier. frameRef is the consumer's canonical stage box; contentRef is
+ *  the text wrapper measured against it. See useSlideAutoFit.ts / ARCHITECTURE.md. */
+const { frameRef, contentRef, scale: fitScale, retrigger: retriggerFit } = useSlideAutoFit()
 
 // Per-slide degraded-state flags. All reset on every slide change (the
 // `watch` below, equivalent to the pre-extraction resetMediaState() call
@@ -466,7 +475,10 @@ function resetMediaState() {
 // resetMediaState() call inside goToIndex/the slides-length watcher).
 watch(
   () => props.slide?.slide.id,
-  () => resetMediaState(),
+  () => {
+    resetMediaState()
+    retriggerFit()
+  },
 )
 
 defineExpose({
@@ -511,33 +523,35 @@ function onUnmuteClick() {
 </script>
 
 <style scoped>
-/* See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/components/slides/SlideCanvas.vue) */
+/* See .planning/codebase/STACK.md (§ Component & Composable Stack Notes (R318) -> src/components/slides/SlideCanvas.vue).
+   R329 — sized from the measured per-slide --slide-fit-scale (useSlideAutoFit),
+   not the old discrete --slide-font-scale multiplier. */
 [data-testid='presentation-body'].text-5xl {
   font-weight: var(--slide-font-weight);
-  font-size: calc(3rem * var(--slide-font-scale));
+  font-size: calc(3rem * var(--slide-fit-scale));
 }
 [data-testid='presentation-body'].text-6xl {
-  font-size: calc(3.75rem * var(--slide-font-scale));
+  font-size: calc(3.75rem * var(--slide-fit-scale));
 }
 [data-testid='presentation-scripture-reference'] {
   font-weight: var(--slide-font-weight);
-  font-size: calc(3rem * var(--slide-font-scale));
+  font-size: calc(3rem * var(--slide-fit-scale));
 }
 [data-testid='presentation-speaker'] {
   font-weight: var(--slide-font-weight);
-  font-size: calc(3rem * var(--slide-font-scale));
+  font-size: calc(3rem * var(--slide-fit-scale));
 }
 [data-testid='presentation-congregational-section'] {
   font-weight: var(--slide-font-weight);
-  font-size: calc(3rem * var(--slide-font-scale));
+  font-size: calc(3rem * var(--slide-fit-scale));
 }
 /* Deliberately NO font-weight override here — the copyright title/authors
    keep their existing font-semibold hierarchy (only the primary font-normal
    body/scripture/speaker/congregational elements above get the weight var). */
 [data-testid='presentation-copyright-fine-print'] {
-  font-size: calc(0.75rem * var(--slide-font-scale));
+  font-size: calc(0.75rem * var(--slide-fit-scale));
 }
 .presentation-copyright-authors {
-  font-size: calc(1.5rem * var(--slide-font-scale));
+  font-size: calc(1.5rem * var(--slide-fit-scale));
 }
 </style>

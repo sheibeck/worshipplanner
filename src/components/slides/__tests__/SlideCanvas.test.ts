@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import SlideCanvas from '../SlideCanvas.vue'
+import { DEFAULT_FIT_SCALE } from '@/composables/useSlideAutoFit'
 import type { AssembledSlide } from '@/types/slide'
 
 // Phase 90 — SlideCanvas is NOT teleported (unlike PresentationViewer), so
@@ -286,6 +287,19 @@ describe('SlideCanvas', () => {
       await flushPromises()
 
       expect(wrapper.find('[data-testid="presentation-audio"]').exists()).toBe(true)
+    })
+  })
+
+  // ── auto-fit (R329, Phase 115 Plan 03) ─────────────────────────────────────
+
+  describe('auto-fit --slide-fit-scale', () => {
+    it('exposes a --slide-fit-scale inline custom property on the content wrapper, identity default under jsdom (no layout)', async () => {
+      const wrapper = mount(SlideCanvas, { props: { slide: lyricSlide('a') } })
+      await flushPromises()
+
+      const content = wrapper.find('[data-testid="presentation-slide"]')
+      expect(content.exists()).toBe(true)
+      expect(content.attributes('style')).toContain(`--slide-fit-scale: ${DEFAULT_FIT_SCALE};`)
     })
   })
 
