@@ -319,24 +319,99 @@
         &middot; used as the slide order for this song in every service. A repeat reuses the original words &mdash; edit once, both update.
       </p>
 
-      <!-- Copyright (read-only) — restored (28-06); dropped without a decision
-           in 28-04. Lives inside the single scroll region so R035's
-           one-scroll-surface property still holds. -->
-      <div
-        v-if="currentLyrics.copyright.ccliSongNumber"
-        data-testid="copyright-display"
-        class="mt-4 space-y-1 border-t border-gray-800 pt-4"
-      >
-        <div class="text-sm font-medium text-gray-200">{{ currentLyrics.copyright.title }}</div>
-        <div class="text-xs text-gray-500">{{ currentLyrics.copyright.authors.join(', ') }}</div>
+      <!-- Copyright — restored read-only (28-06); R336 adds inline manual
+           editing over the same block (Edit/Add credits toggle -> form ->
+           saveLyrics, sections/order untouched). Lives inside the single
+           scroll region so R035's one-scroll-surface property still holds. -->
+      <div class="mt-4 border-t border-gray-800 pt-4">
         <div
-          v-for="(line, i) in currentLyrics.copyright.copyrightLines"
-          :key="i"
-          class="text-xs text-gray-500"
-        >{{ line }}</div>
-        <div class="text-xs text-gray-500">CCLI Song # {{ currentLyrics.copyright.ccliSongNumber }}</div>
-        <div v-if="currentLyrics.copyright.ccliLicenseNumber" class="text-xs text-gray-500">
-          CCLI License # {{ currentLyrics.copyright.ccliLicenseNumber }}
+          v-if="hasCredits && !editingCredits"
+          data-testid="copyright-display"
+          class="space-y-1"
+        >
+          <div class="text-sm font-medium text-gray-200">{{ currentLyrics.copyright.title }}</div>
+          <div class="text-xs text-gray-500">{{ currentLyrics.copyright.authors.join(', ') }}</div>
+          <div
+            v-for="(line, i) in currentLyrics.copyright.copyrightLines"
+            :key="i"
+            class="text-xs text-gray-500"
+          >{{ line }}</div>
+          <div v-if="currentLyrics.copyright.ccliSongNumber" class="text-xs text-gray-500">CCLI Song # {{ currentLyrics.copyright.ccliSongNumber }}</div>
+          <div v-if="currentLyrics.copyright.ccliLicenseNumber" class="text-xs text-gray-500">
+            CCLI License # {{ currentLyrics.copyright.ccliLicenseNumber }}
+          </div>
+        </div>
+
+        <button
+          v-if="!editingCredits"
+          type="button"
+          data-testid="copyright-edit-toggle"
+          class="mt-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
+          @click="openCreditsEdit"
+        >{{ hasCredits ? 'Edit credits' : 'Add credits' }}</button>
+
+        <!-- R336: all 5 CopyrightInfo fields; authors/copyrightLines edited
+             one entry per line, joined/split on save. -->
+        <div v-else data-testid="copyright-edit-form" class="mt-2 space-y-2">
+          <div>
+            <label class="block text-[11px] text-gray-500">Title</label>
+            <input
+              data-testid="copyright-edit-title"
+              v-model="creditsForm.title"
+              type="text"
+              class="mt-1 w-full rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label class="block text-[11px] text-gray-500">Authors (one per line)</label>
+            <textarea
+              data-testid="copyright-edit-authors"
+              v-model="creditsForm.authorsText"
+              rows="2"
+              class="mt-1 w-full resize-none rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            ></textarea>
+          </div>
+          <div>
+            <label class="block text-[11px] text-gray-500">CCLI Song #</label>
+            <input
+              data-testid="copyright-edit-ccli-song"
+              v-model="creditsForm.ccliSongNumber"
+              type="text"
+              class="mt-1 w-full rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label class="block text-[11px] text-gray-500">Copyright lines (one per line)</label>
+            <textarea
+              data-testid="copyright-edit-copyright-lines"
+              v-model="creditsForm.copyrightLinesText"
+              rows="2"
+              class="mt-1 w-full resize-none rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            ></textarea>
+          </div>
+          <div>
+            <label class="block text-[11px] text-gray-500">CCLI License #</label>
+            <input
+              data-testid="copyright-edit-license"
+              v-model="creditsForm.ccliLicenseNumber"
+              type="text"
+              class="mt-1 w-full rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-xs text-gray-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div class="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              data-testid="copyright-edit-cancel"
+              class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
+              @click="cancelCreditsEdit"
+            >Cancel</button>
+            <button
+              type="button"
+              data-testid="copyright-edit-save"
+              class="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-500"
+              @click="saveCreditsEdit"
+            >Save</button>
+          </div>
         </div>
       </div>
     </div>
@@ -414,7 +489,7 @@ import {
 } from '@/utils/songSectionOrder'
 import LyricPasteRegion from './LyricPasteRegion.vue'
 import LyricVersionHistory from './LyricVersionHistory.vue'
-import type { LyricSection, SongLyrics } from '@/types/songLyrics'
+import type { CopyrightInfo, LyricSection, SongLyrics } from '@/types/songLyrics'
 
 const props = defineProps<{
   songId: string
@@ -825,6 +900,62 @@ function previewText(section: LyricSection): string {
 function lineCountLabel(section: LyricSection): string {
   const count = section.lines.length
   return `${count} line${count === 1 ? '' : 's'}`
+}
+
+// R336: inline manual editing over the copyright block. hasCredits is
+// deliberately wider than the old ccliSongNumber-only gate so a manual entry
+// of e.g. only copyrightLines still shows the read-only display.
+const editingCredits = ref(false)
+const hasCredits = computed(() => {
+  const c = currentLyrics.value?.copyright
+  if (!c) return false
+  return !!(c.title || c.authors.length || c.ccliSongNumber || c.copyrightLines.length || c.ccliLicenseNumber)
+})
+
+const creditsForm = reactive({
+  title: '',
+  authorsText: '',
+  ccliSongNumber: '',
+  copyrightLinesText: '',
+  ccliLicenseNumber: '',
+})
+
+function openCreditsEdit() {
+  const c = currentLyrics.value?.copyright
+  creditsForm.title = c?.title ?? ''
+  creditsForm.authorsText = (c?.authors ?? []).join('\n')
+  creditsForm.ccliSongNumber = c?.ccliSongNumber ?? ''
+  creditsForm.copyrightLinesText = (c?.copyrightLines ?? []).join('\n')
+  creditsForm.ccliLicenseNumber = c?.ccliLicenseNumber ?? ''
+  editingCredits.value = true
+}
+
+function cancelCreditsEdit() {
+  editingCredits.value = false
+}
+
+function parseCreditLines(text: string): string[] {
+  return text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
+}
+
+// Mirrors onSaveVersion's saveLyrics shape below — sections/performanceOrder
+// pass through unchanged, so a credits save never re-parses the lyrics.
+async function saveCreditsEdit() {
+  const cur = currentLyrics.value
+  if (!cur) return
+  const edited: CopyrightInfo = {
+    title: creditsForm.title.trim(),
+    authors: parseCreditLines(creditsForm.authorsText),
+    ccliSongNumber: creditsForm.ccliSongNumber.trim(),
+    copyrightLines: parseCreditLines(creditsForm.copyrightLinesText),
+    ccliLicenseNumber: creditsForm.ccliLicenseNumber.trim(),
+  }
+  await songLyricsStore.saveLyrics(props.orgId, props.songId, {
+    sections: editableState.sections,
+    copyright: edited,
+    performanceOrder: editableState.performanceOrder,
+  })
+  editingCredits.value = false
 }
 
 async function onSaveVersion() {
