@@ -325,9 +325,17 @@ const audioRef = ref<InstanceType<typeof AudioPlayer> | null>(null)
 const videoRef = ref<InstanceType<typeof VideoPlayer> | null>(null)
 
 /** R329 — per-slide measure-and-fit, replacing the discrete --slide-font-scale
- *  multiplier. frameRef is the consumer's canonical stage box; contentRef is
- *  the text wrapper measured against it. See useSlideAutoFit.ts / ARCHITECTURE.md. */
-const { frameRef, contentRef, scale: fitScale, retrigger: retriggerFit } = useSlideAutoFit()
+ *  multiplier. frameRef is the canonical stage box (the whole output is this
+ *  1280x720 stage, then uniformly scaled to the screen); contentRef is the text
+ *  wrapper measured against it, inset by its own padding so text never reaches
+ *  the stage edge (the pseudo-viewport margin).
+ *
+ *  `max: 1` = SHRINK-TO-FIT ONLY (owner UAT). The authored base sizes ARE the
+ *  intended maximum; the fit never ENLARGES past them (which made sparse slides
+ *  hit the old 4x cap and look uniformly huge). A slide only scales DOWN when it
+ *  has more text than fits the padded viewport — so a wordy slide shows smaller
+ *  text than a sparse one, and nothing overflows. See useSlideAutoFit.ts. */
+const { frameRef, contentRef, scale: fitScale, retrigger: retriggerFit } = useSlideAutoFit({ max: 1 })
 
 // Per-slide degraded-state flags. All reset on every slide change (the
 // `watch` below, equivalent to the pre-extraction resetMediaState() call
