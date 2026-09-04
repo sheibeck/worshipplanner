@@ -8,7 +8,41 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.9 Live Presentation Field Fixes
+## Current Milestone: v2.10 Security & Architecture Hardening
+
+**Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and architectural
+reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" — starting with the
+unauthenticated `/api/planningcenter` proxy.
+
+**Target features:**
+
+- **Security hardening (from backlog 999.5)** — authenticate the `/api/planningcenter` proxy route
+  (SEC-A-01, highest priority: currently zero auth, open-relay/DoS risk); extend the per-uid rate limiter
+  to the ESV/NLT Bible-API proxy branches (SEC-C-01); restrict the `services` draft-edit branch so
+  `createdBy`/provenance fields can't be forged (SEC-R-03); harden super-admin's universal `members`
+  write from a client-code contract toward a rule-level invariant (ARCH-018/SEC-ISO-04); split
+  `get`/`list` on the publicly-readable `orgSlugs`/`orgNames` registries (SEC-ISO-06 residual); add
+  enqueue/import quotas to `queueServiceMessage` and `parsePptx` (SEC-C-05/06); PII-filter free-text
+  fields on the public share page (SEC-S-04); and address the deterministic share-id (SEC-S-02) and
+  `admin`-vs-`editor` role-semantics (SEC-ISO-05) findings.
+- **Architecture hardening (from backlog 999.4)** — add per-item failure isolation to the `lastUsedAt`
+  recompute loop (ARCH-011) and batch the unbatched Planning Center song-import writes (ARCH-014); fix the
+  drifted/duplicated lyrics subscription query (ARCH-009) and the unreachable `pcExportedAt` dead code
+  from the JSON deep-clone Timestamp strip (ARCH-012); close the org-switch teardown/re-subscribe gaps
+  (ARCH-002, ARCH-003); route direct `updateDoc`/`onSnapshot` calls back through their stores
+  (ARCH-007, ARCH-008); confirm-and-test the autosave/reorder-save coordination window (ARCH-013); and
+  begin decomposing the two god modules — `ServiceEditorView.vue` and `functions/src/index.ts`
+  (ARCH-006, ARCH-010) — plus the utility-layer dependency-direction nit (ARCH-020).
+
+**Key context:** Pure remediation of findings already fully documented in the v2.8 review reports
+(`.planning/milestones/v2.8-phases/112-security-review/112-SECURITY-REVIEW.md` and
+`110-architectural-review/110-ARCHITECTURE-REVIEW.md`) — no new user-facing features, no research pass.
+**Out of scope:** the confirmed-sound / no-finding items (SEC-C-02..04, SEC-A-02, SEC-S-05,
+ARCH-015..019, ARCH-021..023), ARCH-005 (already resolved — org-provisioning functions are deployed),
+and SEC-S-03 (share links never expiring — an intentional product-design decision, recorded but not
+changed). Requirements continue from R339; phases continue from 117.
+
+## Shipped Milestone: v2.9 Live Presentation Field Fixes — ✅ SHIPPED & DEPLOYED 2026-09-04
 
 **Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the first real
 church-projector run, so a projectionist can set up and read the live output without fighting the tool.

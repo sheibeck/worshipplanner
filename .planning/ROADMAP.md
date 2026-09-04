@@ -640,29 +640,29 @@ it, so nothing found by the Phase 110 review is silently dropped.
 
 Promote with `/gsd-review-backlog` when ready.
 
-### Phase 999.3: Monitor Setup — route one signal to multiple monitors; no signal mandatory (BACKLOG)
+### Phase 999.3: Monitor Setup — route one signal to multiple monitors; no signal mandatory (✅ COMPLETE)
 
-**Goal:** [Captured for future planning] In Monitor Setup (Run the Service, v2.4), let a user send the
+**Goal:** In Monitor Setup (Run the Service, v2.4), let a user send the
 **same signal to multiple monitors** and never force assigning every signal.
 **Requirements:** TBD
-**Plans:** 0 plans
+**Plans:** completed (owner-confirmed done 2026-09-04)
 
 Reported by owner 2026-09-02. Current behavior (defect): signal→monitor assignment is treated as
 1:1/exclusive — with 2 monitors, assigning **Audience** to Monitor A and then to Monitor B
 *un-assigns* it from Monitor A. Desired behavior:
 
-- [ ] One signal (Audience / Confidence / Livestream / etc.) can be routed to **multiple monitors**
+- [x] One signal (Audience / Confidence / Livestream / etc.) can be routed to **multiple monitors**
   simultaneously (e.g. Audience mirrored to both Monitor A and Monitor B).
 
-- [ ] Assigning a signal to a monitor must **not** steal it from another monitor.
-- [ ] **No signal is mandatory** — if the user only wants Audience, they should not be required to
+- [x] Assigning a signal to a monitor must **not** steal it from another monitor.
+- [x] **No signal is mandatory** — if the user only wants Audience, they should not be required to
   assign Confidence, Livestream, or any other output.
 
-- [ ] Verify the audience/confidence output windows + `useRunControl` channel routing handle a
+- [x] Verify the audience/confidence output windows + `useRunControl` channel routing handle a
   one-signal→many-monitors fan-out (BroadcastChannel/window management) without desync.
 
 Area: `src/views/MonitorSetupView.vue` + monitor config/channel utilities (Phase 91 config+channel
-utilities, Phase 92 Monitor Configuration screen). Promote with `/gsd-review-backlog` when ready.
+utilities, Phase 92 Monitor Configuration screen). **Completed — owner-confirmed done 2026-09-04.**
 
 ### Phase 999.2: Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG)
 
