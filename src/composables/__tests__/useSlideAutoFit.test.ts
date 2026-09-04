@@ -116,6 +116,29 @@ const ContainHost = defineComponent({
   },
 })
 
+// WR-01 (115-REVIEW.md) — hosts whose frame/container element isn't present
+// at the exact `onMounted` tick (e.g. a `v-if` that resolves after mount).
+const LateFitHost = defineComponent({
+  name: 'UseSlideAutoFitLateHost',
+  props: { visible: { type: Boolean, default: false } },
+  setup(props) {
+    capturedFit = useSlideAutoFit()
+    return () =>
+      props.visible
+        ? h('div', { ref: capturedFit!.frameRef }, [h('div', { ref: capturedFit!.contentRef })])
+        : h('div')
+  },
+})
+
+const LateContainHost = defineComponent({
+  name: 'UseContainScaleLateHost',
+  props: { visible: { type: Boolean, default: false } },
+  setup(props) {
+    capturedContain = useContainScale()
+    return () => (props.visible ? h('div', { ref: capturedContain!.containerRef }) : h('div'))
+  },
+})
+
 describe('useSlideAutoFit — no-layout fallback (jsdom/SSR)', () => {
   it('exposes frameRef, contentRef, scale, and retrigger; scale is DEFAULT_FIT_SCALE with no real layout', () => {
     const wrapper = mount(FitHost)
@@ -134,6 +157,15 @@ describe('useSlideAutoFit — no-layout fallback (jsdom/SSR)', () => {
     const wrapper = mount(FitHost)
     expect(() => wrapper.unmount()).not.toThrow()
   })
+
+  it('WR-01: still degrades to DEFAULT_FIT_SCALE and never throws when frameRef attaches after mount', async () => {
+    const wrapper = mount(LateFitHost, { props: { visible: false } })
+    expect(capturedFit!.scale.value).toBe(DEFAULT_FIT_SCALE)
+    await wrapper.setProps({ visible: true })
+    expect(() => capturedFit!.retrigger()).not.toThrow()
+    expect(capturedFit!.scale.value).toBe(DEFAULT_FIT_SCALE)
+    expect(() => wrapper.unmount()).not.toThrow()
+  })
 })
 
 describe('useContainScale — no-layout fallback (jsdom/SSR)', () => {
@@ -146,6 +178,14 @@ describe('useContainScale — no-layout fallback (jsdom/SSR)', () => {
 
   it('unmounts without throwing (ResizeObserver disconnect guard)', () => {
     const wrapper = mount(ContainHost)
+    expect(() => wrapper.unmount()).not.toThrow()
+  })
+
+  it('WR-01: still degrades to DEFAULT_FIT_SCALE and never throws when containerRef attaches after mount', async () => {
+    const wrapper = mount(LateContainHost, { props: { visible: false } })
+    expect(capturedContain!.scale.value).toBe(DEFAULT_FIT_SCALE)
+    await wrapper.setProps({ visible: true })
+    expect(capturedContain!.scale.value).toBe(DEFAULT_FIT_SCALE)
     expect(() => wrapper.unmount()).not.toThrow()
   })
 })

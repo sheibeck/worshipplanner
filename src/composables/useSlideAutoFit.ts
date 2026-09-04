@@ -1,7 +1,7 @@
 // R329 — replaces the manual `--slide-font-scale` sm/md/lg multiplier with a
 // measure-and-fit engine. See .planning/codebase/ARCHITECTURE.md (§ Component &
 // Composable Behavioral Notes) and docs/adr/ for the auto-fit rationale.
-import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, onBeforeUnmount, watch, type Ref } from 'vue'
 
 /** Identity default — the scale used whenever layout is unavailable (jsdom/SSR)
  *  or nothing fits, so no consumer ever renders zero-size or NaN-scaled text. */
@@ -88,9 +88,11 @@ export interface UseSlideAutoFitResult {
 /**
  * Per-slide text fit: measures `contentRef` against `frameRef` and exposes a
  * reactive `scale` (the largest fitting scale, capped at `options.max`).
- * Re-measured on mount, on `retrigger()`, and via a feature-detected
- * ResizeObserver on the frame. Never throws; degrades to DEFAULT_FIT_SCALE
- * wherever layout is unavailable (mirrors RunPreviewPair's useScaleToFit).
+ * Re-measured whenever `frameRef` attaches or changes (mount, or a later
+ * attach if the frame element wasn't there yet — WR-01), on `retrigger()`,
+ * and via a feature-detected ResizeObserver reinstalled on that same frame
+ * element. Never throws; degrades to DEFAULT_FIT_SCALE wherever layout is
+ * unavailable (mirrors RunPreviewPair's useScaleToFit).
  */
 export function useSlideAutoFit(options?: { max?: number }): UseSlideAutoFitResult {
   const frameRef = ref<HTMLElement | null>(null)
@@ -126,13 +128,24 @@ export function useSlideAutoFit(options?: { max?: number }): UseSlideAutoFitResu
     measure()
   }
 
-  onMounted(() => {
-    measure()
-    if (typeof ResizeObserver !== 'undefined' && frameRef.value) {
-      observer = new ResizeObserver(() => measure())
-      observer.observe(frameRef.value)
-    }
-  })
+  // WR-01: attach (or reattach) the observer whenever `frameRef` itself
+  // changes, not only inside onMounted — a consumer that mounts before its
+  // frame element exists (e.g. a later `v-if`) would otherwise never get an
+  // observer at all. `immediate: true` covers the normal mount case too;
+  // `flush: 'post'` ensures the DOM ref is already assigned when it runs.
+  watch(
+    frameRef,
+    (el) => {
+      observer?.disconnect()
+      observer = null
+      if (typeof ResizeObserver !== 'undefined' && el) {
+        observer = new ResizeObserver(() => measure())
+        observer.observe(el)
+      }
+      measure()
+    },
+    { immediate: true, flush: 'post' },
+  )
 
   onBeforeUnmount(() => {
     observer?.disconnect()
@@ -149,9 +162,10 @@ export interface UseContainScaleResult {
 
 /**
  * Geometric scale-to-contain of a fixed reference stage (default
- * REFERENCE_WIDTH x REFERENCE_HEIGHT) inside `containerRef`. Re-measured on
- * mount and via a feature-detected ResizeObserver; degrades to
- * DEFAULT_FIT_SCALE (1) wherever layout is unavailable.
+ * REFERENCE_WIDTH x REFERENCE_HEIGHT) inside `containerRef`. Re-measured
+ * whenever `containerRef` attaches or changes (mount, or a later attach —
+ * WR-01) and via a feature-detected ResizeObserver reinstalled on that same
+ * element; degrades to DEFAULT_FIT_SCALE (1) wherever layout is unavailable.
  */
 export function useContainScale(options?: { refW?: number; refH?: number }): UseContainScaleResult {
   const containerRef = ref<HTMLElement | null>(null)
@@ -166,13 +180,21 @@ export function useContainScale(options?: { refW?: number; refH?: number }): Use
     scale.value = computeContainScale(el.clientWidth, el.clientHeight, refW, refH)
   }
 
-  onMounted(() => {
-    measure()
-    if (typeof ResizeObserver !== 'undefined' && containerRef.value) {
-      observer = new ResizeObserver(() => measure())
-      observer.observe(containerRef.value)
-    }
-  })
+  // WR-01: same late-attach hardening as useSlideAutoFit — reinstall the
+  // observer whenever containerRef itself changes, not only at mount.
+  watch(
+    containerRef,
+    (el) => {
+      observer?.disconnect()
+      observer = null
+      if (typeof ResizeObserver !== 'undefined' && el) {
+        observer = new ResizeObserver(() => measure())
+        observer.observe(el)
+      }
+      measure()
+    },
+    { immediate: true, flush: 'post' },
+  )
 
   onBeforeUnmount(() => {
     observer?.disconnect()
