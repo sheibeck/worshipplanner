@@ -1005,6 +1005,57 @@ describe('SlidesTab', () => {
       expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'lyrics' } })
     })
 
+    // IN-01: the badge path (SlideGrid's `edit-in-song` emit -> onEditInSongBadge)
+    // runs the SAME confirmLeavingOpenDrawer() guard as the menu key above, but
+    // opens a new tab via window.open rather than router.push — these two cases
+    // prove the guard actually gates that call, complementing the happy-path
+    // "badge: SlideGrid's edit-in-song emit opens..." test above (which mounts
+    // with the default auto-stub, so its confirmDiscard always resolves true
+    // via the `?? true` fallback and can never observe a blocked navigation).
+    it('badge: a cancelled confirm blocks the badge\'s new-tab navigation — window.open is not called', async () => {
+      const { wrapper, confirmDiscard } = mountWithControllableGuard(
+        { kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' },
+        false,
+      )
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+      const windowOpenSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+
+      // Open the drawer first — the guard only asks `confirmDiscard` when a
+      // drawer is actually open (`drawerOpen.value` true).
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-details')
+      await wrapper.vm.$nextTick()
+
+      grid.vm.$emit('edit-in-song', 'song-1')
+      await wrapper.vm.$nextTick()
+
+      expect(confirmDiscard).toHaveBeenCalledTimes(1)
+      expect(windowOpenSpy).not.toHaveBeenCalled()
+
+      windowOpenSpy.mockRestore()
+    })
+
+    it('badge: a confirmed discard allows the badge\'s new-tab navigation to proceed — window.open is called', async () => {
+      const { wrapper, confirmDiscard } = mountWithControllableGuard(
+        { kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' },
+        true,
+      )
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+      const windowOpenSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-details')
+      await wrapper.vm.$nextTick()
+
+      grid.vm.$emit('edit-in-song', 'song-1')
+      await wrapper.vm.$nextTick()
+
+      expect(confirmDiscard).toHaveBeenCalledTimes(1)
+      expect(windowOpenSpy).toHaveBeenCalledTimes(1)
+
+      windowOpenSpy.mockRestore()
+    })
+
     it('never calls confirmDiscard for edit-in-scripture when the drawer was never opened this session', async () => {
       const { wrapper, confirmDiscard } = mountWithControllableGuard(
         { kind: 'scripture', scriptureReadingId: 'read-1', innerSlideId: 'inner-1' },
