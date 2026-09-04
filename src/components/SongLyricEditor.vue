@@ -943,11 +943,16 @@ function parseCreditLines(text: string): string[] {
   return text.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
 }
 
-// Mirrors onSaveVersion's saveLyrics shape below — sections/performanceOrder
-// pass through unchanged, so a credits save never re-parses the lyrics.
+// WR-02: an in-place update (not saveLyrics) — a credits-only edit must not
+// duplicate the full lyrics doc into a new version, especially with History
+// hidden (R337) where that growth would be invisible/unprunable.
+// sections/performanceOrder are never sent, so they can't be touched.
+// WR-01: errors are caught and surfaced the same way doAutoSave's do (through
+// saveStatus into SaveStatusIndicator), and the form stays open on failure so
+// the user's edits aren't lost and they can retry.
 async function saveCreditsEdit() {
   const cur = currentLyrics.value
-  if (!cur) return
+  if (!cur?.id) return
   const edited: CopyrightInfo = {
     title: creditsForm.title.trim(),
     authors: parseCreditLines(creditsForm.authorsText),
@@ -955,12 +960,20 @@ async function saveCreditsEdit() {
     copyrightLines: parseCreditLines(creditsForm.copyrightLinesText),
     ccliLicenseNumber: creditsForm.ccliLicenseNumber.trim(),
   }
-  await songLyricsStore.saveLyrics(props.orgId, props.songId, {
-    sections: editableState.sections,
-    copyright: edited,
-    performanceOrder: editableState.performanceOrder,
-  })
-  editingCredits.value = false
+  try {
+    await songLyricsStore.updateCurrentLyrics(props.orgId, props.songId, cur.id, {
+      copyright: edited,
+    })
+    editingCredits.value = false
+  } catch (err) {
+    console.error('Failed to save credits:', err)
+    if (surfaceId.value) {
+      saveStatus.set(surfaceId.value, {
+        status: 'error',
+        errorText: "Couldn't save your changes — they're still here. Try again.",
+      })
+    }
+  }
 }
 
 async function onSaveVersion() {

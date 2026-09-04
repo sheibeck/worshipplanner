@@ -1176,7 +1176,7 @@ describe('SongLyricEditor', () => {
     expect((wrapper.find('[data-testid="copyright-edit-license"]').element as HTMLInputElement).value).toBe('99999')
   })
 
-  it('editing the title and authors then saving calls saveLyrics with the edited copyright and unchanged sections/order, then closes the form (R336)', async () => {
+  it('editing the title and authors then saving calls updateCurrentLyrics in place with the edited copyright, never saveLyrics (a new version), then closes the form (WR-02, R336)', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     const wrapper = await mountEditor()
@@ -1187,26 +1187,29 @@ describe('SongLyricEditor', () => {
 
     await wrapper.find('[data-testid="copyright-edit-title"]').setValue('Amazing Grace (My Chains Are Gone)')
     await wrapper.find('[data-testid="copyright-edit-authors"]').setValue('John Newton\nChris Tomlin')
+    mockUpdateCurrentLyrics.mockClear()
     mockSaveLyrics.mockClear()
     await wrapper.find('[data-testid="copyright-edit-save"]').trigger('click')
     await flushPromises()
 
-    expect(mockSaveLyrics).toHaveBeenCalledTimes(1)
-    expect(mockSaveLyrics).toHaveBeenCalledWith('org-1', 'song-1', expect.objectContaining({
+    // In-place update of the CURRENT lyrics doc only — no sections/
+    // performanceOrder key is sent at all, so they cannot be dropped or
+    // rewritten (WR-02: this must never duplicate the full lyrics doc).
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledTimes(1)
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', {
       copyright: expect.objectContaining({
         title: 'Amazing Grace (My Chains Are Gone)',
         authors: ['John Newton', 'Chris Tomlin'],
       }),
-      sections: expect.arrayContaining([
-        expect.objectContaining({ id: 'verse-1' }),
-        expect.objectContaining({ id: 'chorus' }),
-      ]),
-      performanceOrder: ['verse-1', 'chorus'],
-    }))
+    })
+    // toHaveBeenCalledWith above already requires the 4th arg to be exactly
+    // `{ copyright: ... }` (no sibling keys), so sections/performanceOrder
+    // cannot have been sent.
+    expect(mockSaveLyrics).not.toHaveBeenCalled()
     expect(wrapper.find('[data-testid="copyright-edit-form"]').exists()).toBe(false)
   })
 
-  it('starting from empty credits, entering a ccliSongNumber and saving calls saveLyrics with that number and empty-derived arrays (R336)', async () => {
+  it('starting from empty credits, entering a ccliSongNumber and saving calls updateCurrentLyrics with that number and empty-derived arrays, never saveLyrics (WR-02, R336)', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics({ copyright: { ...EMPTY_COPYRIGHT } })
     const wrapper = await mountEditor()
@@ -1215,20 +1218,22 @@ describe('SongLyricEditor', () => {
     await wrapper.find('[data-testid="copyright-edit-toggle"]').trigger('click')
     await flushPromises()
     await wrapper.find('[data-testid="copyright-edit-ccli-song"]').setValue('55555')
+    mockUpdateCurrentLyrics.mockClear()
     mockSaveLyrics.mockClear()
     await wrapper.find('[data-testid="copyright-edit-save"]').trigger('click')
     await flushPromises()
 
-    expect(mockSaveLyrics).toHaveBeenCalledWith('org-1', 'song-1', expect.objectContaining({
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', {
       copyright: expect.objectContaining({
         ccliSongNumber: '55555',
         authors: [],
         copyrightLines: [],
       }),
-    }))
+    })
+    expect(mockSaveLyrics).not.toHaveBeenCalled()
   })
 
-  it('canceling the credits edit closes the form and does not call saveLyrics (R336)', async () => {
+  it('canceling the credits edit closes the form and does not call updateCurrentLyrics or saveLyrics (R336)', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     const wrapper = await mountEditor()
@@ -1237,12 +1242,38 @@ describe('SongLyricEditor', () => {
     await wrapper.find('[data-testid="copyright-edit-toggle"]').trigger('click')
     await flushPromises()
     await wrapper.find('[data-testid="copyright-edit-title"]').setValue('Should Not Save')
+    mockUpdateCurrentLyrics.mockClear()
     mockSaveLyrics.mockClear()
     await wrapper.find('[data-testid="copyright-edit-cancel"]').trigger('click')
     await flushPromises()
 
+    expect(mockUpdateCurrentLyrics).not.toHaveBeenCalled()
     expect(mockSaveLyrics).not.toHaveBeenCalled()
     expect(wrapper.find('[data-testid="copyright-edit-form"]').exists()).toBe(false)
+  })
+
+  it('a rejected credits save keeps the form open with the entered edits and surfaces the generic error (WR-01)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="copyright-edit-toggle"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-testid="copyright-edit-title"]').setValue('Should Stay Open')
+
+    mockUpdateCurrentLyrics.mockRejectedValueOnce(new Error('permission-denied'))
+    await wrapper.find('[data-testid="copyright-edit-save"]').trigger('click')
+    await flushPromises()
+
+    // Form stays open, edits are not lost.
+    expect(wrapper.find('[data-testid="copyright-edit-form"]').exists()).toBe(true)
+    expect((wrapper.find('[data-testid="copyright-edit-title"]').element as HTMLInputElement).value).toBe('Should Stay Open')
+
+    // Error surfaces through the same shared indicator autosave uses.
+    const errorEl = wrapper.find('[data-testid="save-status-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.text()).toBe(GENERIC_ERROR_TEXT)
   })
 
   it('Add section saves once with both fields', async () => {
