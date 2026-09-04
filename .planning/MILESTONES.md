@@ -1,5 +1,24 @@
 # Milestones
 
+## v2.9 Live Presentation Field Fixes (Shipped: 2026-09-04)
+
+**Phases completed:** 3 phases, 11 plans, 25 tasks
+
+**Key accomplishments:**
+
+- Reworked the pure `monitorConfig.ts` persistence module — v2 fingerprint identity that drops the macOS-volatile `left`/`top`/`isPrimary` fields, a delta-aware `matchMapping` that keeps matched assignments instead of wiping the whole mapping, per-monitor nicknames, and a v1→v2 storage-key bump.
+- Generalized Run mode's output-window launch from two hard-coded `wp-audience`/`wp-confidence` windows to an N-assignment model keyed by fingerprint, with a `>=1-Audience` go-live gate and dynamic Displays/Preflight panels.
+- Popup-side `requestFullscreen({ screen })` in `useOutputWindow.ts` — each output window re-resolves its own live screens, matches the assigned display by fingerprint, and requests fullscreen directly on it, additively layered over the existing plain fullscreen + manual fallback.
+- Built the framework-light auto-fit engine every R329 render site will share: a pure, binary-searched text-fit function (`computeFitScale`) plus its ResizeObserver composable (`useSlideAutoFit`), and a geometric "contain" scaler (`computeContainScale` / `useContainScale`) for the canonical 1280x720 stage. No consumers wired yet — this is the highest-leverage, lowest-risk piece that unblocks the SlideCanvas + output-view integration in Plan 03.
+- Made the live Run/control screen readable at a glance: the On-screen (program) preview pane no longer dominates the layout (moved from a 2/3-share 3-column grid to an even 2-column split with Next-up), the in-item filmstrip thumbnails are 1.5x larger (w-32→w-48) while staying WYSIWYG via the same reference-stage scaling, the filmstrip always ends with a cap naming the next service item (or end-of-service), and the filmstrip's horizontal scrollbar is forced always-visible with a subtle edge fade so it survives macOS's overlay auto-hide.
+- Wired 115-01's measure-and-fit engine into SlideCanvas and both output windows: per-slide text now auto-scales against a canonical 1280x720 frame (grow-to-fill, shrink-to-avoid-overflow, capped), and Audience/Confidence render on that same canonical stage via useContainScale — so the fit computed once is pixel-identical across the projector, the band monitor, and the Run-screen previews (WYSIWYG). The Confidence next-pane's fixed `scale(0.8)` hack is gone, replaced by a properly contain-scaled mini stage.
+- Migrated SlideCard.vue and EditSlideDrawer.vue off the discrete `--slide-font-scale` multiplier to a fixed 13px base, removing the last two non-SlideCanvas readers of that variable so Plan 05 can delete it cleanly.
+- Removed the discrete `--slide-font-scale` sm/md/lg multiplier end to end — `SCALE_MAP`, the `fontScale` field, the Settings Size radios, and every test mock that spelled it out — completing R329's auto-fit-owns-text-size decision now that every render site (SlideCanvas/output in Plan 03, editor surfaces in Plan 04) had already migrated off it.
+- Read-only slide-viewer badge now names the song and opens the lyric editor in a new tab (leaving the viewer in place); the song editor header gained a SongSelect deep link and its dismiss button now reads "Close" instead of "Cancel".
+- SongLyricEditor's copyright block now has an inline "Edit credits" form covering all 5 CCLI fields (works from empty), its read-only display gate widened to any non-empty field, and the History toggle/panel are hidden (not deleted) from the editor UI.
+
+---
+
 ## v2.8 Production Hardening: Comments-as-Specs, Architecture & Security Review (Shipped: 2026-09-02)
 
 **Phases completed:** 6 phases, 19 plans, 38 tasks

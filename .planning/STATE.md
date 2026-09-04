@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
-current_phase: 116
-current_phase_name: Lyric Editor & Song UX
-status: verified
-stopped_at: "All v2.9 phases (114-116) executed + code-reviewed + auto-verified green; human/hardware UAT batched. Ready for milestone lifecycle (audit → complete → cleanup)."
-last_updated: "2026-09-04T13:03:52.163Z"
+status: completed
+stopped_at: "Completed 116-02-PLAN.md (R336/R337: inline credits editing, History hidden)"
+last_updated: "2026-09-04T18:49:36.886Z"
 last_activity: 2026-09-04
-last_activity_desc: "Phase 116 verified (6/6 code truths; browser UAT batched) — all 3 v2.9 phases executed; entering milestone lifecycle"
+last_activity_desc: Milestone v2.9 completed and archived
 progress:
   total_phases: 3
   completed_phases: 3
   total_plans: 11
   completed_plans: 11
   percent: 100
+current_phase: 116
+current_phase_name: Lyric Editor & Song UX
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.9 Live Presentation Field Fixes (roadmap created 2026-09-02)
 
-**Status:** Ready to execute
+**Status:** v2.9 milestone complete
 
 **Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the first real
 church-projector run, so a projectionist can set up and read the live output without fighting the tool.
@@ -1233,10 +1233,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 116 (Lyric Editor & Song UX) — EXECUTED (both plans complete; verification deferred to milestone end)
-Plan: 2 of 2 complete
-Status: 116-01 executed (R333/R334/R335: badge label + new-tab open, SongSelect header link, Close relabel); 116-02 executed (R336/R337: inline credits editing, History hidden). All of v2.9 (Phases 114-116) is now executed — resume at milestone-end deferred verification.
-Last activity: 2026-09-04 — 116-02-PLAN.md executed and committed
+Phase: Milestone v2.9 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-04 — Milestone v2.9 completed and archived
 
 ## ★ v2.9 ROADMAP.md phase breakdown (created 2026-09-02)
 
