@@ -458,7 +458,7 @@ describe('SlideCard', () => {
   })
 
   describe('slide-font CSS variables (46-04, R093)', () => {
-    it('carries the --slide-font-* custom properties on its own root, defaulting to scale 1 (Inter/400/md identity)', () => {
+    it('carries the --slide-font-* custom properties on its own root, defaulting to Inter/400/md identity', () => {
       const assembled = makeAssembled({
         slide: { id: 'font-1', position: 0, contentKind: 'text', body: 'body' },
       })
@@ -466,7 +466,6 @@ describe('SlideCard', () => {
       const style = wrapper.attributes('style') ?? ''
       expect(style).toContain('--slide-font-family')
       expect(style).toContain('--slide-font-weight: 400')
-      expect(style).toContain('--slide-font-scale: 1')
     })
 
     it('reflects a non-default typographyStyle prop passed down by the parent grid', () => {
@@ -481,14 +480,12 @@ describe('SlideCard', () => {
           typographyStyle: {
             '--slide-font-family': '"Lora", ui-serif, Georgia, serif',
             '--slide-font-weight': 600,
-            '--slide-font-scale': 1.25,
             fontFamily: 'var(--slide-font-family)',
           },
         },
       })
       const style = wrapper.attributes('style') ?? ''
       expect(style).toContain('--slide-font-weight: 600')
-      expect(style).toContain('--slide-font-scale: 1.25')
     })
   })
 
