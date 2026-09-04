@@ -63,7 +63,6 @@ export interface OrgSettings {
   slideTypography: {
     fontFamily: string
     fontWeight: number
-    fontScale: 'sm' | 'md' | 'lg'
   }
   /**
    * Church-level volunteer-email messaging settings (R130/R132, Phase 58).
@@ -157,13 +156,12 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
   // the slide types, R092) — this default only governs scripture fetched
   // going forward.
   bibleVersion: 'NLT',
-  // Medium (1.0) = identity scale: a church that never opens the Slide
-  // Typography setting sees zero size change. Family default anchors on the
-  // ROADMAP's designated Helvetica-Neue stand-in (Inter, weight 400).
+  // Family default anchors on the ROADMAP's designated Helvetica-Neue
+  // stand-in (Inter, weight 400). Size is no longer a manual setting (R329,
+  // Phase 115 Plan 05) — text size is owned by SlideCanvas's per-slide auto-fit.
   slideTypography: {
     fontFamily: 'Inter',
     fontWeight: 400,
-    fontScale: 'md',
   },
   // R130 — DELIBERATE deviation from aiEnabled/pcEnabled: `enabled` defaults
   // false (kill-switch fails closed for a fresh org with no email provider

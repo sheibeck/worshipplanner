@@ -372,9 +372,9 @@
         <h2 class="text-sm font-semibold text-gray-300 mb-3">Slide Typography</h2>
 
         <p class="text-xs text-gray-400 mb-3">
-          Choose one font, weight, and size for every slide across your services — the Slides
-          grid, the Edit Slide drawer preview, and the presenter all match. The printed Order of
-          Service is unaffected.
+          Choose one font and weight for every slide across your services — the Slides grid, the
+          Edit Slide drawer preview, and the presenter all match. Text size fits each slide
+          automatically. The printed Order of Service is unaffected.
         </p>
 
         <div class="space-y-3">
@@ -402,60 +402,6 @@
             >
               <option v-for="weight in slideFontWeightOptions" :key="weight" :value="weight">{{ weight }}</option>
             </select>
-          </div>
-
-          <div>
-            <label class="block text-xs text-gray-400 mb-1">Size</label>
-            <div class="flex items-center gap-4">
-              <label
-                class="flex items-center gap-2"
-                :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
-              >
-                <input
-                  v-model="slideFontScaleInput"
-                  type="radio"
-                  value="sm"
-                  name="slideFontScale"
-                  :disabled="!authStore.isEditor"
-                  @change="saveSlideTypography"
-                  data-testid="slide-font-scale-sm"
-                  class="h-4 w-4 border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
-                />
-                <span class="text-sm text-gray-200">Small</span>
-              </label>
-              <label
-                class="flex items-center gap-2"
-                :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
-              >
-                <input
-                  v-model="slideFontScaleInput"
-                  type="radio"
-                  value="md"
-                  name="slideFontScale"
-                  :disabled="!authStore.isEditor"
-                  @change="saveSlideTypography"
-                  data-testid="slide-font-scale-md"
-                  class="h-4 w-4 border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
-                />
-                <span class="text-sm text-gray-200">Medium</span>
-              </label>
-              <label
-                class="flex items-center gap-2"
-                :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
-              >
-                <input
-                  v-model="slideFontScaleInput"
-                  type="radio"
-                  value="lg"
-                  name="slideFontScale"
-                  :disabled="!authStore.isEditor"
-                  @change="saveSlideTypography"
-                  data-testid="slide-font-scale-lg"
-                  class="h-4 w-4 border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
-                />
-                <span class="text-sm text-gray-200">Large</span>
-              </label>
-            </div>
           </div>
         </div>
 
@@ -666,7 +612,6 @@ const bibleVersionSaveError = ref<string | null>(null)
 
 const slideFontFamilyInput = ref(authStore.settings.slideTypography.fontFamily)
 const slideFontWeightInput = ref(authStore.settings.slideTypography.fontWeight)
-const slideFontScaleInput = ref(authStore.settings.slideTypography.fontScale)
 const slideTypographySavedFeedback = ref(false)
 const slideTypographySaveError = ref<string | null>(null)
 
@@ -733,13 +678,11 @@ const slideTypographyPreviewStyle = computed(() => {
   const vars = cssVarsFor({
     fontFamily: slideFontFamilyInput.value,
     fontWeight: slideFontWeightInput.value,
-    fontScale: slideFontScaleInput.value,
   })
   return {
     ...vars,
     fontFamily: 'var(--slide-font-family)',
     fontWeight: 'var(--slide-font-weight)',
-    fontSize: 'calc(1rem * var(--slide-font-scale))',
   }
 })
 
@@ -838,7 +781,6 @@ watch(
   (val) => {
     slideFontFamilyInput.value = val.fontFamily
     slideFontWeightInput.value = val.fontWeight
-    slideFontScaleInput.value = val.fontScale
   },
   { deep: true },
 )
@@ -1127,11 +1069,11 @@ async function onChangeBibleVersion() {
 }
 
 // ── Slide Typography save action (R093) ─────────────────────────────────────────
-// Writes all three leaf dot-paths in a single updateDoc call (never a whole-map
+// Writes both leaf dot-paths in a single updateDoc call (never a whole-map
 // write), then mirrors the whole object into authStore.settings.slideTypography
-// (matching onSave's Services-template whole-object mirror, since family/weight/
-// scale are always saved together as one selection, unlike the independent
-// toggles above).
+// (matching onSave's Services-template whole-object mirror, since family/weight
+// are always saved together as one selection, unlike the independent toggles
+// above). Size is no longer a manual leaf (R329) — auto-fit owns text size.
 
 async function saveSlideTypography() {
   if (!authStore.orgId || !authStore.isEditor) return
@@ -1140,7 +1082,6 @@ async function saveSlideTypography() {
   const newValue = {
     fontFamily: slideFontFamilyInput.value,
     fontWeight: slideFontWeightInput.value,
-    fontScale: slideFontScaleInput.value,
   }
   slideTypographySaveError.value = null
 
@@ -1148,7 +1089,6 @@ async function saveSlideTypography() {
     await updateDoc(doc(db, 'organizations', authStore.orgId), {
       'settings.slideTypography.fontFamily': newValue.fontFamily,
       'settings.slideTypography.fontWeight': newValue.fontWeight,
-      'settings.slideTypography.fontScale': newValue.fontScale,
     })
     authStore.settings.slideTypography = newValue
 
@@ -1162,7 +1102,6 @@ async function saveSlideTypography() {
     // Revert the local selection to reflect the unsaved state
     slideFontFamilyInput.value = previous.fontFamily
     slideFontWeightInput.value = previous.fontWeight
-    slideFontScaleInput.value = previous.fontScale
   }
 }
 

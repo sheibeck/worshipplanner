@@ -123,10 +123,9 @@ let mockDefaultServiceTemplate: ServiceTemplateEntry[] = []
 // 45-02: R090 Bible Translation card.
 let mockBibleVersion: 'ESV' | 'NLT' = 'NLT'
 // 46-03: R093 Slide Typography card.
-let mockSlideTypography: { fontFamily: string; fontWeight: number; fontScale: 'sm' | 'md' | 'lg' } = {
+let mockSlideTypography: { fontFamily: string; fontWeight: number } = {
   fontFamily: 'Inter',
   fontWeight: 400,
-  fontScale: 'md',
 }
 // 58-04: R130/R132/R133 Messaging card. Kill-switch defaults FALSE (fail-closed,
 // mirrors DEFAULT_ORG_SETTINGS.messaging.enabled — the deliberate divergence
@@ -232,7 +231,7 @@ vi.mock('@/stores/auth', () => ({
       get slideTypography() {
         return mockSlideTypography
       },
-      set slideTypography(v: { fontFamily: string; fontWeight: number; fontScale: 'sm' | 'md' | 'lg' }) {
+      set slideTypography(v: { fontFamily: string; fontWeight: number }) {
         mockSlideTypography = v
       },
       // 58-04: setters required for onToggleMessagingEnabled/onToggleLockNotifyDefault/
@@ -309,7 +308,7 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
@@ -360,7 +359,7 @@ describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
@@ -469,7 +468,7 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
@@ -550,7 +549,7 @@ describe('SettingsView — no Services template card (R113)', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
@@ -585,7 +584,7 @@ describe('SettingsView Bible Translation card (R090) — 45-02', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
@@ -690,7 +689,7 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
@@ -702,40 +701,42 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
     mockLoadFontCss.mockClear()
   })
 
-  it('renders the Slide Typography heading, controls, and Preview panel', () => {
+  it('renders the Slide Typography heading, family/weight controls, and Preview panel — no Size control', () => {
     const wrapper = mountSettingsView()
     expect(wrapper.text()).toContain('Slide Typography')
     expect(wrapper.find('[data-testid="slide-font-family-select"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="slide-font-weight-select"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="slide-font-scale-sm"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="slide-font-scale-md"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="slide-font-scale-lg"]').exists()).toBe(true)
+    // R329: the manual Size control is gone — text size is now auto-fit.
+    expect(wrapper.find('[data-testid="slide-font-scale-sm"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slide-font-scale-md"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slide-font-scale-lg"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="slide-typography-preview-label"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Amazing grace, how sweet the sound')
   })
 
-  it('saves family/weight/size as three leaf dot-paths and mirrors into the store', async () => {
+  it('saves family/weight as two leaf dot-paths and mirrors into the store', async () => {
     const wrapper = mountSettingsView()
 
-    await wrapper.get('[data-testid="slide-font-scale-lg"]').setValue(true)
+    await wrapper.get('[data-testid="slide-font-weight-select"]').setValue('600')
     await flushPromises()
 
     expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
     const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
     // Assert on the KEY SET, not merely that the expected keys are present —
-    // rules out a whole-map { 'settings.slideTypography': {...} } write.
-    expect(Object.keys(payload)).toHaveLength(3)
+    // rules out a whole-map { 'settings.slideTypography': {...} } write and
+    // proves no fontScale leaf survives (R329).
+    expect(Object.keys(payload)).toHaveLength(2)
     expect(payload).toHaveProperty('settings.slideTypography.fontFamily', 'Inter')
-    expect(payload).toHaveProperty('settings.slideTypography.fontWeight', 400)
-    expect(payload).toHaveProperty('settings.slideTypography.fontScale', 'lg')
+    expect(payload).toHaveProperty('settings.slideTypography.fontWeight', 600)
+    expect(payload).not.toHaveProperty('settings.slideTypography.fontScale')
     expect(payload).not.toHaveProperty('settings')
 
-    expect(mockSlideTypography).toEqual({ fontFamily: 'Inter', fontWeight: 400, fontScale: 'lg' })
+    expect(mockSlideTypography).toEqual({ fontFamily: 'Inter', fontWeight: 600 })
     expect(wrapper.text()).toContain('Saved!')
   })
 
   it('snaps the weight to 400 when switching family to Lora while weight 300 is selected', async () => {
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 300, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 300 }
     const wrapper = mountSettingsView()
 
     const weightSelectBefore = wrapper.get('[data-testid="slide-font-weight-select"]')
@@ -778,32 +779,30 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
     mockUpdateDoc.mockRejectedValueOnce(new Error('network error'))
     const wrapper = mountSettingsView()
 
-    await wrapper.get('[data-testid="slide-font-scale-lg"]').setValue(true)
+    await wrapper.get('[data-testid="slide-font-weight-select"]').setValue('600')
     await flushPromises()
 
     expect(wrapper.text()).toContain("Couldn't save your slide typography settings. Try again.")
-    const scaleMd = wrapper.get('[data-testid="slide-font-scale-md"]').element as HTMLInputElement
-    expect(scaleMd.checked).toBe(true)
-    expect(mockSlideTypography).toEqual({ fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' })
+    const weightSelect = wrapper.get('[data-testid="slide-font-weight-select"]')
+      .element as HTMLSelectElement
+    expect(weightSelect.value).toBe('400')
+    expect(mockSlideTypography).toEqual({ fontFamily: 'Inter', fontWeight: 400 })
   })
 
-  it('disables all three controls and blocks saving for a non-editor (viewer)', async () => {
+  it('disables both controls and blocks saving for a non-editor (viewer)', async () => {
     mockIsEditor = false
     const wrapper = mountSettingsView()
 
     expect(wrapper.get('[data-testid="slide-font-family-select"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('[data-testid="slide-font-weight-select"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('[data-testid="slide-font-scale-sm"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('[data-testid="slide-font-scale-md"]').attributes('disabled')).toBeDefined()
-    expect(wrapper.get('[data-testid="slide-font-scale-lg"]').attributes('disabled')).toBeDefined()
 
     // Force-select despite disabled, exercising the handler guard directly
     // rather than relying on jsdom to block interaction with a disabled input.
-    await wrapper.get('[data-testid="slide-font-scale-lg"]').setValue(true)
+    await wrapper.get('[data-testid="slide-font-weight-select"]').setValue('600')
     await flushPromises()
 
     expect(mockUpdateDoc).not.toHaveBeenCalled()
-    expect(mockSlideTypography).toEqual({ fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' })
+    expect(mockSlideTypography).toEqual({ fontFamily: 'Inter', fontWeight: 400 })
   })
 
   it('offers weight 300 (Inter Light) when Inter is the selected family', () => {
@@ -848,7 +847,7 @@ describe('SettingsView Messaging card — kill-switch + automatic email defaults
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
@@ -1017,7 +1016,7 @@ describe('SettingsView organization timezone select (R133) — 58-04', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
@@ -1091,7 +1090,7 @@ describe('SettingsView AI Features card visibility (Phase 82, R242/R243)', () =>
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
@@ -1139,7 +1138,7 @@ describe('SettingsView Bible Translation card visibility (R300)', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     mockMessagingEnabled = false
     mockLockNotifyDefault = false
     mockReminderEnabled = false
