@@ -34,28 +34,33 @@
           <!-- Owner UAT: show the song title in the header so it's visible on every
                tab (the title input only lives on the Details tab). Live from
                form.title, truncated so a long title can't push the actions off. -->
-          <div class="min-w-0 flex items-center gap-2">
-            <div class="min-w-0">
-              <p v-if="!isCreateMode" class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Edit Song</p>
-              <h2 class="truncate text-base font-semibold text-gray-100">
-                {{ isCreateMode ? 'New Song' : (form.title.trim() || 'Untitled song') }}
-              </h2>
-            </div>
-            <!-- R334 (owner: "Use CCLI just like we have on the song table. We
-                 already link out to it."): reuses SongTable.vue's exact CCLI
-                 link-out pattern verbatim. Gated on the PERSISTED
-                 `Song.ccliNumber` (the Details-tab field the table itself
-                 links on) — never `form.ccliNumber` or the paste-derived
-                 `copyright.ccliSongNumber`. Lives in the shared header so it
-                 stays visible on both the Details and Lyrics tabs. -->
+          <div class="min-w-0">
+            <p v-if="!isCreateMode" class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Edit Song</p>
+            <!-- R334 (owner 2026-09-04): the song TITLE itself is the SongSelect
+                 link. When the PERSISTED `Song.ccliNumber` exists the title opens
+                 https://songselect.ccli.com/songs/{ccliNumber} in a new tab (same
+                 target as the song table) with a boxed-arrow external-link glyph;
+                 otherwise the title is plain text. Gated on `Song.ccliNumber` —
+                 never `form.ccliNumber` or the paste-derived
+                 `copyright.ccliSongNumber`. In the shared header so it shows on
+                 both the Details and Lyrics tabs. -->
             <a
-              v-if="props.song?.ccliNumber"
+              v-if="!isCreateMode && props.song?.ccliNumber"
               :href="`https://songselect.ccli.com/songs/${props.song.ccliNumber}`"
               target="_blank"
               rel="noopener"
-              class="shrink-0 text-xs font-medium text-indigo-400 hover:text-indigo-300 hover:underline"
+              class="group flex items-center gap-1 min-w-0 text-base font-semibold text-gray-100 hover:text-indigo-300"
               data-testid="song-songselect-link"
-            >SongSelect</a>
+            >
+              <span class="truncate">{{ form.title.trim() || 'Untitled song' }}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0 text-gray-500 group-hover:text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+              </svg>
+              <span class="sr-only">(opens SongSelect in a new tab)</span>
+            </a>
+            <h2 v-else class="truncate text-base font-semibold text-gray-100">
+              {{ isCreateMode ? 'New Song' : (form.title.trim() || 'Untitled song') }}
+            </h2>
           </div>
           <div class="flex items-center gap-2">
             <button

@@ -414,10 +414,11 @@ describe('SongSlideOver — opening tab (initialTab prop)', () => {
   })
 })
 
-// R334: a SongSelect deep link next to the song name, reusing SongTable.vue's
-// exact CCLI link-out pattern; gated on the persisted `Song.ccliNumber`.
+// R334: the song TITLE itself is the SongSelect deep link (with a boxed-arrow
+// external-link glyph), reusing SongTable.vue's exact CCLI link-out target;
+// gated on the persisted `Song.ccliNumber`.
 describe('SongSlideOver — SongSelect link (R334)', () => {
-  it('shows a SongSelect link to the persisted ccliNumber, opening in a new noopener tab', async () => {
+  it('makes the song title itself the SongSelect link (persisted ccliNumber, new noopener tab, with an external-link icon)', async () => {
     const song = makeSong({ ccliNumber: '12345' })
     const wrapper = await mountDrawer(song)
 
@@ -426,13 +427,22 @@ describe('SongSlideOver — SongSelect link (R334)', () => {
     expect(link.attributes('href')).toBe('https://songselect.ccli.com/songs/12345')
     expect(link.attributes('target')).toBe('_blank')
     expect(link.attributes('rel')).toContain('noopener')
+    // The title text is the clickable link (not a separate "SongSelect" label).
+    expect(link.text()).toContain('Amazing Grace')
+    // A boxed-arrow external-link glyph accompanies it.
+    expect(link.find('svg').exists()).toBe(true)
+    // No separate plain <h2> title is rendered while the title-link is shown.
+    expect(wrapper.find('h2.truncate').exists()).toBe(false)
   })
 
-  it('hides the SongSelect link when ccliNumber is empty', async () => {
+  it('renders the title as plain text (no link) when ccliNumber is empty, title still visible', async () => {
     const song = makeSong({ ccliNumber: '' })
     const wrapper = await mountDrawer(song)
 
     expect(wrapper.find('[data-testid="song-songselect-link"]').exists()).toBe(false)
+    const heading = wrapper.find('h2.truncate')
+    expect(heading.exists()).toBe(true)
+    expect(heading.text()).toContain('Amazing Grace')
   })
 
   it('hides the SongSelect link in create mode (no song)', async () => {
