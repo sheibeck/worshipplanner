@@ -119,6 +119,7 @@
 // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/run/RunPreviewPair.vue)
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import SlideCanvas from '@/components/slides/SlideCanvas.vue'
+import { REFERENCE_WIDTH, REFERENCE_HEIGHT } from '@/composables/useSlideAutoFit'
 import type { AssembledSlide } from '@/types/slide'
 
 defineProps<{
@@ -136,16 +137,6 @@ defineProps<{
    *  preview shows a BLACK overlay so the projectionist sees the audience is black. */
   blackout?: boolean
 }>()
-
-/**
- * The fixed reference "stage" the SlideCanvas is laid out at before it is scaled
- * down to the pane. 1280×720 is a plain 16:9 box at which SlideCanvas's
- * projector-sized fonts render in their intended proportion; the exact pixel
- * value is immaterial to the result — only the ratio paneWidth/REFERENCE_WIDTH
- * matters — but a real 720p-class stage keeps sub-pixel rounding negligible.
- */
-const REFERENCE_WIDTH = 1280
-const REFERENCE_HEIGHT = 720
 
 /** The inline style for a scale-to-fit stage: fixed reference size, scaled down
  *  from its top-left corner so it fills the (16:9) pane from the same origin. */
@@ -165,6 +156,12 @@ function stageStyle(scale: number) {
  * the pane changes size (window resize, the lg: breakpoint reflowing the split).
  * Falls back to scale 1 where layout is unavailable (SSR / jsdom clientWidth 0),
  * which still renders a valid `transform: scale(...)`.
+ *
+ * WR-02 (115-REVIEW.md): deliberately width-only, NOT useContainScale's
+ * min-of-both-ratios contain. Only equivalent here because both panes are
+ * `aspect-video` (exactly matching the 1280x720 reference ratio) — swapping to
+ * useContainScale would be a behavior change, not a pure DRY refactor, so it
+ * was left as-is.
  */
 function useScaleToFit() {
   const boxRef = ref<HTMLElement | null>(null)

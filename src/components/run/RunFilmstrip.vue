@@ -54,6 +54,7 @@
 // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/run/RunFilmstrip.vue)
 import { computed, onMounted, watch } from 'vue'
 import SlideCanvas from '@/components/slides/SlideCanvas.vue'
+import { REFERENCE_WIDTH, REFERENCE_HEIGHT } from '@/composables/useSlideAutoFit'
 import type { AssembledSlide } from '@/types/slide'
 
 const props = defineProps<{
@@ -89,10 +90,10 @@ const thumbs = computed(() =>
  * 16:9), so font AND layout shrink together into a faithful mini-slide. Static
  * factor because the thumb width is fixed; mirrors RunPreviewPair's approach.
  * THUMB_WIDTH MUST stay in sync with the template's `w-48` class (R330) — both
- * are the same physical thumb width.
+ * are the same physical thumb width. REFERENCE_WIDTH/HEIGHT are imported from
+ * useSlideAutoFit so this thumbnail's reference stage can never desync from
+ * the real output views (IN-02).
  */
-const REFERENCE_WIDTH = 1280
-const REFERENCE_HEIGHT = 720
 const THUMB_WIDTH = 192
 const thumbStageStyle = {
   width: `${REFERENCE_WIDTH}px`,
