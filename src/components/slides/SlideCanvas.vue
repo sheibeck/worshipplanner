@@ -497,8 +497,18 @@ watch(
   () => props.slide?.slide.id,
   () => {
     resetMediaState()
-    retriggerFit()
   },
+)
+
+// R329 — re-fit AFTER the DOM has swapped in the new slide's text (flush:
+// 'post'). A pre-flush measure reads the OUTGOING slide's content, so the fit
+// lands one slide behind — the live output (a single canvas whose slide keeps
+// changing) then shows a stale, too-big scale, while the thumbnails (one fixed
+// slide each, measured once at mount) look correct. This is that bug's fix.
+watch(
+  () => props.slide?.slide.id,
+  () => retriggerFit(),
+  { flush: 'post' },
 )
 
 defineExpose({

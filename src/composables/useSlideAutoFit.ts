@@ -124,8 +124,19 @@ export function useSlideAutoFit(options?: { max?: number }): UseSlideAutoFitResu
     scale.value = result
   }
 
-  function retrigger() {
+  // Measure now AND once more after the next animation frame. In a freshly
+  // mounted / freshly opened output popup the frame and content width can still
+  // be settling when the first measure runs (before the browser's layout pass),
+  // which yields a stale fit; the rAF pass re-measures once layout has resolved.
+  // Both are cheap and idempotent — the fit is deterministic, so a redundant
+  // second measure just recomputes the same scale.
+  function measureSoon() {
     measure()
+    if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(() => measure())
+  }
+
+  function retrigger() {
+    measureSoon()
   }
 
   // WR-01: attach (or reattach) the observer whenever `frameRef` itself
@@ -142,7 +153,7 @@ export function useSlideAutoFit(options?: { max?: number }): UseSlideAutoFitResu
         observer = new ResizeObserver(() => measure())
         observer.observe(el)
       }
-      measure()
+      measureSoon()
     },
     { immediate: true, flush: 'post' },
   )
