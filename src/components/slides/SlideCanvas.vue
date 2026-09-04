@@ -37,11 +37,20 @@
   <!-- px-10 py-6 is the pseudo-viewport margin (owner UAT: smaller than the
        original px-16 py-12) — text fills closer to the stage edge but never
        touches it. This padding does NOT scale with --slide-fit-scale, so it
-       stays a constant safe margin at every fit scale. -->
+       stays a constant safe margin at every fit scale.
+
+       BLOCK flow (deliberately NOT flex/items-center): a `flex … items-center`
+       wrapper sizes each text block to its longest UNWRAPPED line, so long lines
+       overflow the frame sides instead of wrapping at the frame width — the
+       "funny wrapping" + non-WYSIWYG preview-vs-output difference (owner UAT). As
+       a full-width block, every text child wraps at the frame width (`text-center`
+       centers the wrapped text and inline images); the FRAME owns vertical +
+       horizontal centering. This also makes the fit's width measurement honest
+       (no centered horizontal overflow hidden from scrollWidth). -->
   <div
     ref="contentRef"
     data-testid="presentation-slide"
-    class="w-full flex flex-col items-center px-10 py-6 text-center"
+    class="w-full px-10 py-6 text-center"
     :style="{ '--slide-fit-scale': fitScale }"
   >
     <!-- Render-pending — the FIRST branch of this chain (R080/D-15).
@@ -88,11 +97,17 @@
       <p class="text-[13px] leading-normal text-gray-400">{{ currentRenderFailureSentence }}</p>
     </div>
 
-    <!-- lyric -->
+    <!-- lyric — `whitespace-pre` (NOT pre-line): a song's authored line breaks
+         are meaningful, so each lyric line must stay on ONE line. pre-line let a
+         line wrap when it sat a few px over the width, so 3 authored lines
+         rendered as 5 visual lines and near-identical lines wrapped differently
+         (owner UAT "funny wrapping"). With pre, a too-wide line overflows instead
+         of wrapping, which the auto-fit's width check then shrinks to fit — so
+         the font sizes down until the widest line fits on one line. -->
     <template v-else-if="slideKind === 'lyric'">
       <p
         data-testid="presentation-body"
-        class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4]"
+        class="text-gray-100 whitespace-pre text-5xl font-normal leading-[1.4]"
       >
         {{ (props.slide.slide as LyricSlide).lines.join('\n') }}
       </p>
