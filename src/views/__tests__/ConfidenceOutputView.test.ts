@@ -825,7 +825,7 @@ describe('ConfidenceOutputView — authored blackout SLIDE still renders black c
 })
 
 describe('ConfidenceOutputView — left/right split layout (R279) + next-scale (R276)', () => {
-  it('is a horizontal flex-row split with current-region LEFT before next-region RIGHT (border-l seam), both panes suppressed, next pane scaled smaller', async () => {
+  it('is a horizontal flex-row split with current-region LEFT before next-region RIGHT (border-l seam), both panes suppressed, each on its own canonical stage', async () => {
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
     await flushPromises()
@@ -857,12 +857,20 @@ describe('ConfidenceOutputView — left/right split layout (R279) + next-scale (
     expect(canvasRegistry).toHaveLength(2)
     expect(canvasRegistry.every((c) => c.suppressBackground === true)).toBe(true)
 
-    // R276 — the next pane is scaled SMALLER than the current: the scale(0.8)
-    // wrapper lives in the next-region only; the current pane has none.
-    const nextScale = nextRegion.find('[style*="scale"]')
-    expect(nextScale.exists()).toBe(true)
-    expect(nextScale.attributes('style')).toContain('scale(0.8)')
-    expect(currentRegion.find('[style*="scale"]').exists()).toBe(false)
+    // R329 — each pane wraps its SlideCanvas in its own canonical 1280x720 stage
+    // (useContainScale), REPLACING the old fixed transform: scale(0.8) next-pane
+    // hack — no element anywhere carries that literal value any more.
+    const currentStage = currentRegion.find('[data-testid="confidence-current-stage"]')
+    const nextStage = nextRegion.find('[data-testid="confidence-next-stage"]')
+    expect(currentStage.exists()).toBe(true)
+    expect(nextStage.exists()).toBe(true)
+    expect(currentStage.find('[data-testid="slide-canvas"]').exists()).toBe(true)
+    expect(nextStage.find('[data-testid="slide-canvas"]').exists()).toBe(true)
+    // No rendered element's inline style carries the old fixed scale(0.8) value
+    // (checked against `style` attributes only — a template comment mentioning
+    // the hack by name would otherwise false-positive a plain HTML substring scan).
+    const styledEls = wrapper.findAll('[style]')
+    expect(styledEls.some((el) => (el.attributes('style') ?? '').includes('scale(0.8)'))).toBe(false)
   })
 
   it('keeps both region wrappers present with only the inner canvas + "Next" label toggling on the last slide (no reflow)', async () => {

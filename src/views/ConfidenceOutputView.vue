@@ -20,16 +20,26 @@
          ONLY once a valid current slide exists AND the font gate has resolved;
          otherwise pure black with zero elements. No label on this pane. -->
     <div
+      ref="currentRegionRef"
       data-testid="confidence-current-region"
       class="relative flex-[3_1_0%] flex items-center justify-center overflow-hidden"
     >
-      <SlideCanvas
+      <!-- R329 canonical stage — same 1280x720 frame + useContainScale pattern as
+           AudienceOutputView, scaled to CONTAIN this region so the band sees the
+           same auto-fit text as the audience. -->
+      <div
         v-if="currentSlide && fontReady"
-        ref="currentCanvasRef"
-        :slide="currentSlide"
-        :suppressBackground="true"
-        :interactive="false"
-      />
+        data-testid="confidence-current-stage"
+        class="relative overflow-hidden"
+        :style="currentStageStyle"
+      >
+        <SlideCanvas
+          ref="currentCanvasRef"
+          :slide="currentSlide"
+          :suppressBackground="true"
+          :interactive="false"
+        />
+      </div>
     </div>
 
     <!-- NEXT region (subordinate, RIGHT ~40%). STATIC preview — NO ref, never
@@ -39,17 +49,22 @@
          pure black, "Next" tag hidden) — collapsing it would jump-resize the
          current pane in front of the band on the final advance. The
          border-l border-white/10 hairline is the seam between the left/right
-         panes. R276 — the preview is scaled DOWN (SlideCanvas has no font-size
-         prop) so the upcoming slide reads smaller than the current pane and fits
-         the narrower right column. -->
+         panes. R276 — the preview is scaled DOWN via its own canonical-stage
+         useContainScale (below) so the upcoming slide reads smaller than the
+         current pane and fits the narrower right column. -->
     <div
+      ref="nextRegionRef"
       data-testid="confidence-next-region"
       class="relative flex-[2_1_0%] flex items-center justify-center overflow-hidden border-l-[6px] border-white"
     >
+      <!-- R329 — the old fixed transform: scale(0.8) hack is replaced by the same
+           canonical-stage + useContainScale pattern as the current pane, scaled to
+           this (narrower) region: a properly-fitted mini of the real slide. -->
       <div
         v-if="nextSlide && fontReady"
-        class="flex items-center justify-center"
-        style="transform: scale(0.8); transform-origin: center"
+        data-testid="confidence-next-stage"
+        class="relative overflow-hidden"
+        :style="nextStageStyle"
       >
         <SlideCanvas
           :slide="nextSlide"
@@ -113,6 +128,7 @@
 import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import type { AssembledSlide } from '@/types/slide'
 import { useOutputWindow } from '@/composables/useOutputWindow'
+import { useContainScale, REFERENCE_WIDTH, REFERENCE_HEIGHT } from '@/composables/useSlideAutoFit'
 import type { BroadcastChannelFactory } from '@/utils/runChannel'
 import SlideCanvas from '@/components/slides/SlideCanvas.vue'
 
@@ -143,6 +159,24 @@ const currentSlide = computed<AssembledSlide | null>(() =>
 const nextSlide = computed<AssembledSlide | null>(() =>
   index.value == null ? null : (assembledSlideshow.value[index.value + 1] ?? null),
 )
+
+// R329 — each pane gets its own canonical 1280x720 stage + useContainScale
+// (same pattern as AudienceOutputView), scaled to CONTAIN its own region —
+// replaces the old fixed transform: scale(0.8) next-pane hack.
+const { containerRef: currentRegionRef, scale: currentContainScale } = useContainScale()
+const { containerRef: nextRegionRef, scale: nextContainScale } = useContainScale()
+const currentStageStyle = computed(() => ({
+  width: `${REFERENCE_WIDTH}px`,
+  height: `${REFERENCE_HEIGHT}px`,
+  transform: `scale(${currentContainScale.value})`,
+  transformOrigin: 'center',
+}))
+const nextStageStyle = computed(() => ({
+  width: `${REFERENCE_WIDTH}px`,
+  height: `${REFERENCE_HEIGHT}px`,
+  transform: `scale(${nextContainScale.value})`,
+  transformOrigin: 'center',
+}))
 
 // ── Media invariant (CURRENT pane only) ───────────────────────────────────────
 // The current pane drives its media exactly as AudienceOutputView; the next pane
