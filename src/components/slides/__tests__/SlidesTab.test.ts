@@ -14,8 +14,14 @@ import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 // EditSlideDrawer.test.ts's own identical convention for the link button
 // this key replaces.
 const mockRouterPush = vi.fn().mockResolvedValue(undefined)
+// R333: the read-only badge resolves its target href (for a new-tab
+// window.open) rather than pushing — `resolve` is mocked alongside `push` so
+// both navigation paths stay testable through the same router double.
+const mockRouterResolve = vi.fn((to: { query: { edit: string; tab: string } }) => ({
+  href: `/songs?edit=${to.query.edit}&tab=${to.query.tab}`,
+}))
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: mockRouterPush }),
+  useRouter: () => ({ push: mockRouterPush, resolve: mockRouterResolve }),
 }))
 
 function makeEntry(overrides: Partial<GroupSlideEntry> & { id: string }): GroupSlideEntry {
@@ -833,17 +839,30 @@ describe('SlidesTab', () => {
       expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'details' } })
     })
 
-    // Owner UAT: the read-only song badge (SlideGrid's `edit-in-song` emit)
-    // reuses the same song-lyrics navigation the menu's edit-in-song performs,
-    // pushing the lyrics tab for the group's own songId.
-    it('badge: SlideGrid\'s edit-in-song emit pushes the lyrics tab for the group\'s songId', async () => {
+    // R333 (owner UAT): the read-only song badge (SlideGrid's `edit-in-song`
+    // emit) opens the same song-lyrics deep link the menu's edit-in-song
+    // resolves to, but in a NEW tab (window.open, noopener) rather than
+    // navigating this tab away — the planner keeps their place in the
+    // read-only viewer.
+    it('badge: SlideGrid\'s edit-in-song emit opens the lyrics deep-link in a new noopener tab, not router.push', async () => {
       const wrapper = mountWithEntry({ kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' })
       await wrapper.vm.$nextTick()
+
+      const windowOpenSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+      mockRouterPush.mockClear()
 
       wrapper.findComponent(SlideGrid).vm.$emit('edit-in-song', 'song-42')
       await wrapper.vm.$nextTick()
 
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-42', tab: 'lyrics' } })
+      expect(mockRouterResolve).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-42', tab: 'lyrics' } })
+      expect(windowOpenSpy).toHaveBeenCalledTimes(1)
+      const [href, target, features] = windowOpenSpy.mock.calls[0]!
+      expect(href).toBe('/songs?edit=song-42&tab=lyrics')
+      expect(target).toBe('_blank')
+      expect(features).toContain('noopener')
+      expect(mockRouterPush).not.toHaveBeenCalled()
+
+      windowOpenSpy.mockRestore()
     })
 
     it('menu: the edit-in-scripture key emits navigate-to-scripture-editor and leaves the drawer closed', async () => {

@@ -1853,9 +1853,24 @@ describe('SlideGrid', () => {
       const wrapper = mountGrid({ selectedSlot: makeSongSlot() })
       const badge = wrapper.find('[data-testid="slide-grid-song-readonly-badge"]')
       expect(badge.element.tagName).toBe('BUTTON')
-      expect(badge.attributes('aria-label')).toBe('Edit lyrics in Song Lyrics')
+      expect(badge.attributes('aria-label')).toBe('Edit song lyrics for X')
       await badge.trigger('click')
       expect(wrapper.emitted('edit-in-song')).toEqual([['s1']])
+    })
+
+    // R333: the badge label interpolates the song's own title.
+    it('the actionable badge text is "Edit song lyrics for {title}" when the slot carries a songTitle', () => {
+      const wrapper = mountGrid({ selectedSlot: makeSongSlot() })
+      const badge = wrapper.find('[data-testid="slide-grid-song-readonly-badge"]')
+      expect(badge.text()).toBe('Edit song lyrics for X')
+    })
+
+    // R333: falls back to the generic label when the slot has a songId but no title.
+    it('the actionable badge text falls back to "Edit song lyrics" when songTitle is null', () => {
+      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: null, songKey: null, requiredVwType: 1 } as never)
+      const wrapper = mountGrid({ selectedSlot: slot })
+      const badge = wrapper.find('[data-testid="slide-grid-song-readonly-badge"]')
+      expect(badge.text()).toBe('Edit song lyrics')
     })
 
     // A song slot with no song assigned has nothing to link to — the badge
@@ -1866,6 +1881,7 @@ describe('SlideGrid', () => {
       const badge = wrapper.find('[data-testid="slide-grid-song-readonly-badge"]')
       expect(badge.exists()).toBe(true)
       expect(badge.element.tagName).toBe('SPAN')
+      expect(badge.text()).toBe('Edit song lyrics')
       await badge.trigger('click')
       expect(wrapper.emitted('edit-in-song')).toBeUndefined()
     })
