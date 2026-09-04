@@ -4,16 +4,16 @@ milestone: v2.9
 milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
 current_phase: 116
 current_phase_name: Lyric Editor & Song UX
-status: planning
-stopped_at: Phase 115 executed + code-reviewed + auto-verified green (human_needed — hardware UAT batched to v2.9-DEFERRED-VERIFICATION.md); starting Phase 116
-last_updated: "2026-09-04T06:17:29.909Z"
+status: executing
+stopped_at: Completed 116-01-PLAN.md (R333/R334/R335); 116-02-PLAN.md (R336/R337) remains
+last_updated: "2026-09-04T12:43:33.000Z"
 last_activity: 2026-09-04
-last_activity_desc: "Phase 115 verified (17/17 code must-haves; human/hardware UAT batched); advancing to Phase 116 (Lyric Editor & Song UX)"
+last_activity_desc: 116-01-PLAN.md executed and committed
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
   percent: 67
 ---
 
@@ -57,7 +57,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.9 Live Presentation Field Fixes (roadmap created 2026-09-02)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the first real
 church-projector run, so a projectionist can set up and read the live output without fighting the tool.
@@ -1232,10 +1232,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 116 (Lyric Editor & Song UX) — PLANNING
-Plan: 0 of 0 (not yet planned)
-Status: Phase 115 executed + auto-verified (human UAT batched); starting Phase 116
-Last activity: 2026-09-04 — Phase 115 verified (human_needed, batched); advancing to Phase 116
+Phase: 116 (Lyric Editor & Song UX) — EXECUTING
+Plan: 1 of 2 complete
+Status: 116-01 executed (R333/R334/R335: badge label + new-tab open, SongSelect header link, Close relabel); 116-02 (R336/R337) remaining
+Last activity: 2026-09-04 — 116-01-PLAN.md executed and committed
 
 ## ★ v2.9 ROADMAP.md phase breakdown (created 2026-09-02)
 
@@ -3165,6 +3165,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 115 P04 | 20min | 2 tasks | 3 files |
 | Phase 115 P03 | 10min | 3 tasks | 7 files |
 | Phase 115 P05 | 25min | 3 tasks | 14 files |
+| Phase 116 P01 | 15m | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -3684,6 +3685,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: SlideCanvas per-slide auto-fit (useSlideAutoFit) replaces --slide-font-scale reads; AudienceOutputView/ConfidenceOutputView render on a canonical 1280x720 stage via useContainScale so output stays WYSIWYG with Run previews; Confidence next-pane scale(0.8) hack removed
 - [Phase ?]: R329 complete: slideTypography model carries only fontFamily/fontWeight; SCALE_MAP, fontScale, and --slide-font-scale removed everywhere; Settings Size control removed
 - [Phase ?]: Deleting a settings leaf field: pure-function model first, then type/defaults, then UI reader, then test-mock sweep — each step's own tests prove the prior step correct before the type change ripples into unrelated fixtures
+- [Phase ?]: 116-01: songEditLabel reads songTitle only for selectedSlot.kind==='SONG', mirroring songGroupSongId — keeps T-116-01's navigation-target-from-slot-only property
+- [Phase ?]: 116-01: SongSelect link gated on persisted props.song.ccliNumber (not form.ccliNumber or paste-derived copyright.ccliSongNumber), matching SongTable.vue's own gate
 
 ### Roadmap Evolution
 
@@ -4012,8 +4015,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-04T06:17:29.849Z
-Stopped at: Completed 115-05-PLAN.md (Phase 115 complete, all 5 plans done)
+Last session: 2026-09-04T12:43:32.830Z
+Stopped at: Completed 116-01-PLAN.md (R333/R334/R335); 116-02-PLAN.md (R336/R337) remains
 Resume file: None
 
 ## Operator Next Steps

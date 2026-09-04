@@ -597,6 +597,7 @@ open the Firebase Storage + external-media cost/security surface; the unsupporte
 
 - [x] **Phase 115: Live-Output Readability & Layout** - Auto-fit slide text, a smaller live main view with
   larger readable thumbnails, an end-of-item marker, and a reliable Mac scrollbar *(executed + code-reviewed
+
   + auto-verified green 2026-09-04, 17/17 code-verifiable must-haves; real-projector WYSIWYG / macOS
   scrollbar / at-a-glance legibility batched hardware UAT → v2.9-DEFERRED-VERIFICATION.md)*
 
@@ -694,10 +695,12 @@ the read-only lyric viewer and the editor itself.
 
   5. The lyric editor no longer shows a History tab (R337).
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 Plans:
-- [ ] 116-01-PLAN.md — Read-only badge relabel + new-tab open (R333), SongSelect header link (R334), Cancel→Close (R335)
+
+- [x] 116-01-PLAN.md — Read-only badge relabel + new-tab open (R333), SongSelect header link (R334), Cancel→Close (R335)
 - [ ] 116-02-PLAN.md — Inline manual Credits/CCLI editing (R336) + hide the History toggle/panel (R337)
+
 **UI hint**: yes
 
 ## Backlog

@@ -68,13 +68,13 @@ church-projector run, so a projectionist can set up and read the live output wit
 
 ### Lyric Editor & Song UX
 
-- [ ] **R333**: The read-only lyric editor's edit link reads **"Edit song lyrics for {song name}"** and
+- [x] **R333**: The read-only lyric editor's edit link reads **"Edit song lyrics for {song name}"** and
   opens that song's lyric editor in a **new browser tab**.
 
-- [ ] **R334**: The lyric editor shows a **link to the SongSelect page** next to the song name in the
+- [x] **R334**: The lyric editor shows a **link to the SongSelect page** next to the song name in the
   editor's title bar.
 
-- [ ] **R335**: The lyric editor's **"Cancel" button is relabeled "Close"**.
+- [x] **R335**: The lyric editor's **"Cancel" button is relabeled "Close"**.
 
 - [ ] **R336**: A user can **manually edit a song's Credits / CCLI / copyright text** — add, correct, or
   remove it — independent of pasting lyrics, so stale credits left over from a wrong-then-right paste can
@@ -124,9 +124,9 @@ church-projector run, so a projectionist can set up and read the live output wit
 | R330 | Phase 115 | Complete |
 | R331 | Phase 115 | Complete |
 | R332 | Phase 115 | Complete |
-| R333 | Phase 116 | Pending |
-| R334 | Phase 116 | Pending |
-| R335 | Phase 116 | Pending |
+| R333 | Phase 116 | Complete |
+| R334 | Phase 116 | Complete |
+| R335 | Phase 116 | Complete |
 | R336 | Phase 116 | Pending |
 | R337 | Phase 116 | Pending |
 
