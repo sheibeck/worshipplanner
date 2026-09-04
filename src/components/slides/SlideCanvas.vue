@@ -34,10 +34,14 @@
        live on the measured element — `justify-center` there hides top overflow
        from scrollHeight, so the fit over-scales and clips (owner-reported). -->
   <div v-if="props.slide" ref="frameRef" class="w-full h-full flex items-center justify-center overflow-hidden">
+  <!-- px-10 py-6 is the pseudo-viewport margin (owner UAT: smaller than the
+       original px-16 py-12) — text fills closer to the stage edge but never
+       touches it. This padding does NOT scale with --slide-fit-scale, so it
+       stays a constant safe margin at every fit scale. -->
   <div
     ref="contentRef"
     data-testid="presentation-slide"
-    class="w-full flex flex-col items-center px-16 py-12 text-center"
+    class="w-full flex flex-col items-center px-10 py-6 text-center"
     :style="{ '--slide-fit-scale': fitScale }"
   >
     <!-- Render-pending — the FIRST branch of this chain (R080/D-15).
@@ -330,12 +334,14 @@ const videoRef = ref<InstanceType<typeof VideoPlayer> | null>(null)
  *  wrapper measured against it, inset by its own padding so text never reaches
  *  the stage edge (the pseudo-viewport margin).
  *
- *  `max: 1` = SHRINK-TO-FIT ONLY (owner UAT). The authored base sizes ARE the
- *  intended maximum; the fit never ENLARGES past them (which made sparse slides
- *  hit the old 4x cap and look uniformly huge). A slide only scales DOWN when it
- *  has more text than fits the padded viewport — so a wordy slide shows smaller
- *  text than a sparse one, and nothing overflows. See useSlideAutoFit.ts. */
-const { frameRef, contentRef, scale: fitScale, retrigger: retriggerFit } = useSlideAutoFit({ max: 1 })
+ *  `max: 2.5` = grow-to-fill, capped (owner UAT tuning). The fit GROWS text to
+ *  fill the padded pseudo-viewport so it isn't dwarfed by the stage on a big
+ *  screen, but is capped at 2.5x the authored base so a sparse 1-2 line slide
+ *  doesn't blow up the way the old 4x cap did. A wordy slide fills at a smaller
+ *  scale (or shrinks below 1); a sparse slide grows up to the cap — different
+ *  slides show different sizes, none overflow. Tune this cap up for bigger text
+ *  / down for smaller. See useSlideAutoFit.ts. */
+const { frameRef, contentRef, scale: fitScale, retrigger: retriggerFit } = useSlideAutoFit({ max: 2.5 })
 
 // Per-slide degraded-state flags. All reset on every slide change (the
 // `watch` below, equivalent to the pre-extraction resetMediaState() call
