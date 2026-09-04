@@ -5,16 +5,16 @@ milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
 current_phase: 115
 current_phase_name: Live-Output Readability & Layout
 status: executing
-stopped_at: Phase 115 Plan 01 (auto-fit engine) closed out via safe_resume_gate; Wave 1 continues with plans 02, 04
-last_updated: "2026-09-03T20:42:06.209Z"
+stopped_at: Completed 115-02-PLAN.md
+last_updated: "2026-09-04T04:57:53.773Z"
 last_activity: 2026-09-03
-last_activity_desc: "Phase 115 Plan 01 (auto-fit engine) closed out — 17/17 tests + type-check green; SUMMARY reconstructed via safe_resume_gate"
+last_activity_desc: Phase 115 execution started
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 9
-  completed_plans: 5
-  percent: 56
+  completed_plans: 6
+  percent: 33
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -56,7 +56,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.9 Live Presentation Field Fixes (roadmap created 2026-09-02)
 
-**Status:** Executing Phase 115
+**Status:** Ready to execute
 
 **Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the first real
 church-projector run, so a projectionist can set up and read the live output without fighting the tool.
@@ -1232,8 +1232,8 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 115 (Live-Output Readability & Layout) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 115
+Plan: 2 of 5
+Status: Ready to execute
 Last activity: 2026-09-03 — Phase 115 execution started
 
 ## ★ v2.9 ROADMAP.md phase breakdown (created 2026-09-02)
@@ -3160,6 +3160,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 114 P01 | 27min | 3 tasks | 4 files |
 | Phase 114 P03 | 40min | 3 tasks | 5 files |
 | Phase 114 P04 | 35min | 2 tasks | 2 files |
+| Phase 115 P02 | 45 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -3673,6 +3674,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R327 (macOS output placement) deliberately NOT marked complete by 114-03 — only the URL/fingerprint plumbing it depends on; Plan 04 + real-hardware UAT complete it.
 - [Phase ?]: A refused Confidence window no longer blocks go-live (>=1-Audience gate replaces the old both-must-open rule, per CONTEXT.md); RunHeader's role-keyed dots kept reopenOutput/fullscreenDisplay accepting either a role or a fingerprint id permanently.
 - [Phase ?]: R327: popup self-places via requestFullscreen({screen}), queried via window-management permission, additive to plain fullscreen path
+- [Phase ?]: RunPreviewPair moved from a dominant 2:1 (lg:col-span-2/1) On-screen/Next-up split to an even lg:grid-cols-2 split, satisfying R330's 'no longer dominant' requirement with the simplest legible ratio (exact tuning deferred to hardware UAT).
+- [Phase ?]: deriveNextItemLabel (R331) kept as a module-level exported pure function in useRunControl.ts, mirroring the existing windowNameFor/urlForAssignment pattern, so it is unit-testable with plain RailRow[] arrays without mounting the composable.
 
 ### Roadmap Evolution
 
@@ -4001,8 +4004,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-03T14:13:49.506Z
-Stopped at: Completed 114-04-PLAN.md (final plan of phase 114)
+Last session: 2026-09-04T04:57:53.712Z
+Stopped at: Completed 115-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

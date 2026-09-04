@@ -57,13 +57,13 @@ church-projector run, so a projectionist can set up and read the live output wit
   readable at projection distance, with no manual font-size control; the slide font *family* remains
   selectable in configuration as it is today.
 
-- [ ] **R330**: On the Run/control screen the live **main-slide view is smaller** and the **preview
+- [x] **R330**: On the Run/control screen the live **main-slide view is smaller** and the **preview
   thumbnails are larger**, so a thumbnail's slide content is actually legible.
 
-- [ ] **R331**: An **"end" marker** appears after the last thumbnail of the current item, so the operator
+- [x] **R331**: An **"end" marker** appears after the last thumbnail of the current item, so the operator
   can see that the item (e.g. a song) is ending and the next service item is coming up.
 
-- [ ] **R332**: The preview-thumbnail strip's **scroll affordance is reliably visible and usable**,
+- [x] **R332**: The preview-thumbnail strip's **scroll affordance is reliably visible and usable**,
   including on macOS (investigate and fix the intermittently-missing Mac scrollbar).
 
 ### Lyric Editor & Song UX
@@ -121,9 +121,9 @@ church-projector run, so a projectionist can set up and read the live output wit
 | R328 | Phase 114 | Complete |
 | R338 | Phase 114 | Complete |
 | R329 | Phase 115 | Pending |
-| R330 | Phase 115 | Pending |
-| R331 | Phase 115 | Pending |
-| R332 | Phase 115 | Pending |
+| R330 | Phase 115 | Complete |
+| R331 | Phase 115 | Complete |
+| R332 | Phase 115 | Complete |
 | R333 | Phase 116 | Pending |
 | R334 | Phase 116 | Pending |
 | R335 | Phase 116 | Pending |
