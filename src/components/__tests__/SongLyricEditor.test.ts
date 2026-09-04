@@ -210,20 +210,16 @@ describe('SongLyricEditor', () => {
     expect(wrapper.text()).toContain('Paste Lyrics from SongSelect')
   })
 
-  it('shows "Paste lyrics" and "History" as the only header actions when lyrics are loaded', async () => {
+  it('shows "Paste lyrics" as the only header action when lyrics are loaded; History is hidden (R337)', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     const wrapper = await mountEditor()
     await flushPromises()
 
     const pasteBtn = wrapper.find('[data-testid="paste-lyrics-btn"]')
-    const historyBtn = wrapper.find('[data-testid="history-toggle-btn"]')
     expect(pasteBtn.exists()).toBe(true)
     expect(pasteBtn.text()).toBe('Paste lyrics')
-    expect(historyBtn.exists()).toBe(true)
-    expect(historyBtn.text()).toBe('History')
-    // "Save Version" no longer lives directly in the header — it moved behind
-    // History, since 2a's header carries only these two buttons.
+    expect(wrapper.find('[data-testid="history-toggle-btn"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="save-version-btn"]').exists()).toBe(false)
   })
 
@@ -243,54 +239,16 @@ describe('SongLyricEditor', () => {
     expect(scrollers[0]!.find('[data-testid="closing-note"]').exists()).toBe(true)
   })
 
-  it('history list is not rendered until activated, and activating it reveals the list', async () => {
+  it('the History toggle, panel, and Save Version action are absent from the UI even with versions loaded — hidden per R337, not deleted', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     mockLyricVersions.value = [makeLyrics()]
     const wrapper = await mountEditor()
     await flushPromises()
 
+    expect(wrapper.find('[data-testid="history-toggle-btn"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="history-panel"]').exists()).toBe(false)
-    await wrapper.find('[data-testid="history-toggle-btn"]').trigger('click')
-    expect(wrapper.find('[data-testid="history-panel"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="version-entry"]').exists()).toBe(true)
-  })
-
-  it('choosing to restore a version from the history panel calls the store revert action', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-    mockIsLoading.value = false
-    mockCurrentLyrics.value = makeLyrics({ id: 'lyrics-1' })
-    mockLyricVersions.value = [
-      makeLyrics({ id: 'lyrics-1' }),
-      makeLyrics({ id: 'lyrics-0' }),
-    ]
-    const wrapper = await mountEditor()
-    await flushPromises()
-
-    await wrapper.find('[data-testid="history-toggle-btn"]').trigger('click')
-    await wrapper.find('[data-testid="revert-btn"]').trigger('click')
-
-    expect(mockRevertToVersion).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-0')
-  })
-
-  it('the "Save Version" action lives inside the history panel and calls saveLyrics', async () => {
-    mockIsLoading.value = false
-    mockCurrentLyrics.value = makeLyrics()
-    const wrapper = await mountEditor()
-    await flushPromises()
-
-    await wrapper.find('[data-testid="history-toggle-btn"]').trigger('click')
-    await wrapper.find('[data-testid="save-version-btn"]').trigger('click')
-    await flushPromises()
-
-    expect(mockSaveLyrics).toHaveBeenCalledWith('org-1', 'song-1', expect.objectContaining({
-      sections: expect.arrayContaining([
-        expect.objectContaining({ id: 'verse-1', label: 'Verse 1' }),
-        expect.objectContaining({ id: 'chorus', label: 'Chorus' }),
-      ]),
-      copyright: SAMPLE_COPYRIGHT,
-      performanceOrder: ['verse-1', 'chorus'],
-    }))
+    expect(wrapper.find('[data-testid="save-version-btn"]').exists()).toBe(false)
   })
 
   it('useAutoSave is wired with correct arguments', async () => {

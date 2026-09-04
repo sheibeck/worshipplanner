@@ -18,7 +18,9 @@
           class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
           @click="pasteMode = true"
         >Paste lyrics</button>
+        <!-- R337: History hidden (deferred, not deleted) — HISTORY_ENABLED gate. -->
         <button
+          v-if="HISTORY_ENABLED"
           type="button"
           data-testid="history-toggle-btn"
           class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
@@ -76,9 +78,9 @@
       data-testid="lyrics-scroll-region"
       class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3"
     >
-      <!-- History disclosure -->
+      <!-- History disclosure — R337: hidden (deferred, not deleted). -->
       <div
-        v-if="showHistory"
+        v-if="HISTORY_ENABLED && showHistory"
         data-testid="history-panel"
         class="space-y-3 rounded-lg border border-gray-700 bg-gray-800/40 p-3"
       >
@@ -500,6 +502,9 @@ const songLyricsStore = useSongLyricsStore()
 const authStore = useAuthStore()
 const saveStatus = useSaveStatus()
 const pasteMode = ref(false)
+// R337: History UI hidden pending a redesign of the "Just now" timestamp
+// problem — store/handlers below stay intact so it can return later.
+const HISTORY_ENABLED = false
 const showHistory = ref(false)
 const expandedRowKeys = ref<Set<string>>(new Set())
 
