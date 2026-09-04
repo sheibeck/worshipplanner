@@ -53,7 +53,7 @@ church-projector run, so a projectionist can set up and read the live output wit
 
 ### Live-Output Readability & Layout
 
-- [ ] **R329**: Slide text **auto-scales to fill the output display** (Audience and Confidence) so it is
+- [x] **R329**: Slide text **auto-scales to fill the output display** (Audience and Confidence) so it is
   readable at projection distance, with no manual font-size control; the slide font *family* remains
   selectable in configuration as it is today.
 
@@ -120,7 +120,7 @@ church-projector run, so a projectionist can set up and read the live output wit
 | R327 | Phase 114 | Complete |
 | R328 | Phase 114 | Complete |
 | R338 | Phase 114 | Complete |
-| R329 | Phase 115 | Pending |
+| R329 | Phase 115 | Complete |
 | R330 | Phase 115 | Complete |
 | R331 | Phase 115 | Complete |
 | R332 | Phase 115 | Complete |

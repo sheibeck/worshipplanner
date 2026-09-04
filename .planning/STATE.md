@@ -5,15 +5,15 @@ milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
 current_phase: 115
 current_phase_name: Live-Output Readability & Layout
 status: executing
-stopped_at: Completed 115-02-PLAN.md
-last_updated: "2026-09-04T04:57:53.773Z"
+stopped_at: Completed 115-04-PLAN.md
+last_updated: "2026-09-04T05:28:57.364Z"
 last_activity: 2026-09-03
 last_activity_desc: Phase 115 execution started
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 33
 ---
 
@@ -1232,7 +1232,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 115 (Live-Output Readability & Layout) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-03 — Phase 115 execution started
 
@@ -3161,6 +3161,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 114 P03 | 40min | 3 tasks | 5 files |
 | Phase 114 P04 | 35min | 2 tasks | 2 files |
 | Phase 115 P02 | 45 min | 3 tasks | 7 files |
+| Phase 115 P04 | 20min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -3676,6 +3677,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R327: popup self-places via requestFullscreen({screen}), queried via window-management permission, additive to plain fullscreen path
 - [Phase ?]: RunPreviewPair moved from a dominant 2:1 (lg:col-span-2/1) On-screen/Next-up split to an even lg:grid-cols-2 split, satisfying R330's 'no longer dominant' requirement with the simplest legible ratio (exact tuning deferred to hardware UAT).
 - [Phase ?]: deriveNextItemLabel (R331) kept as a module-level exported pure function in useRunControl.ts, mirroring the existing windowNameFor/urlForAssignment pattern, so it is unit-testable with plain RailRow[] arrays without mounting the composable.
+- [Phase ?]: SlideCard.test.ts: dropped the --slide-font-scale-specific assertions (jsdom does not reliably apply Vue SFC scoped CSS through getComputedStyle) rather than asserting computed style; kept the family/weight coverage
 
 ### Roadmap Evolution
 
@@ -4004,8 +4006,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-04T04:57:53.712Z
-Stopped at: Completed 115-02-PLAN.md
+Last session: 2026-09-04T05:28:57.305Z
+Stopped at: Completed 115-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
