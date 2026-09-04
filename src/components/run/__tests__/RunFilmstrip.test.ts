@@ -80,4 +80,30 @@ describe('RunFilmstrip — array-index click-to-jump contract (R282)', () => {
     expect(jumps).toBeTruthy()
     expect(jumps).toEqual([[2], [4]])
   })
+
+  it('renders thumbs at the enlarged R330 width (w-48)', () => {
+    const wrapper = mount(RunFilmstrip, {
+      props: { slides: [fakeSlide('a')], indices: [0], currentIndex: 0 },
+    })
+    expect(wrapper.find('[data-testid="run-filmstrip-slide"]').classes()).toContain('w-48')
+  })
+})
+
+describe('RunFilmstrip — end-of-item cap (R331)', () => {
+  it('names the next item when nextItemLabel is present', () => {
+    const wrapper = mount(RunFilmstrip, {
+      props: { slides: [fakeSlide('a')], indices: [0], currentIndex: 0, nextItemLabel: 'Sermon' },
+    })
+    const cap = wrapper.find('[data-testid="run-filmstrip-endcap"]')
+    expect(cap.text()).toContain('Sermon')
+  })
+
+  it('shows end-of-service copy (no next-name) when nextItemLabel is null', () => {
+    const wrapper = mount(RunFilmstrip, {
+      props: { slides: [fakeSlide('a')], indices: [0], currentIndex: 0, nextItemLabel: null },
+    })
+    const cap = wrapper.find('[data-testid="run-filmstrip-endcap"]')
+    expect(cap.text()).toContain('End of service')
+    expect(cap.text()).not.toContain('Next:')
+  })
 })
