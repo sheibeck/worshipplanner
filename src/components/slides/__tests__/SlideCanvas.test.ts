@@ -180,26 +180,34 @@ function withBackground(assembled: AssembledSlide, url: string): AssembledSlide 
   }
 }
 
-// R329 auto-fit geometry (owner-reported "words way too big / cut off"): the
-// vertical centering MUST live on the FRAME, not on the measured content
-// element. `justify-center` on the measured element hides top overflow from
-// `scrollHeight`, so the fit over-scales and clips. This guards the fix.
+// R329 auto-fit geometry (owner UAT — "words too big / cut off", then "right
+// margin runs to the edge"): centering MUST live on the frame boxes, not the
+// measured content element (`justify-center` there hides overflow from
+// scroll{Width,Height} and breaks the fit); and the text is fit to an INSET
+// safe-area frame (not the full stage) so a filled line centers symmetrically
+// with margin on every side. This guards both.
 describe('SlideCanvas — auto-fit measurement geometry (R329)', () => {
-  it('centers on the frame, not the measured content, so scrollHeight sees true overflow', () => {
+  it('fits to an inset safe-area frame that centers, not the measured content', () => {
     const wrapper = mount(SlideCanvas, { props: { slide: lyricSlide('l1') } })
     const content = wrapper.find('[data-testid="presentation-slide"]')
     expect(content.exists()).toBe(true)
 
     // The measured content element must NOT be height-locked or vertically
-    // centered — those are exactly what break the scrollHeight overflow read.
+    // centered — those are exactly what break the scroll{Width,Height} read.
     expect(content.classes()).not.toContain('justify-center')
     expect(content.classes()).not.toContain('h-full')
 
-    // The frame (content's parent) owns the centering + clips at the stage edge.
+    // The safe-area frame (content's parent) centers the content and is INSET
+    // from the stage (a calc() width/height that carves the margin).
     const frame = content.element.parentElement as HTMLElement
     expect(frame.className).toContain('items-center')
     expect(frame.className).toContain('justify-center')
-    expect(frame.className).toContain('overflow-hidden')
+    expect(frame.getAttribute('style') || '').toContain('calc(')
+
+    // The outer box (frame's parent) fills the stage and clips at the edge.
+    const outer = frame.parentElement as HTMLElement
+    expect(outer.className).toContain('overflow-hidden')
+    expect(outer.className).toContain('h-full')
   })
 })
 

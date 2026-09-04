@@ -27,30 +27,31 @@
   <!-- Slide content — PresentationViewer keeps the v-else-if="currentSlide"
        guard around the <SlideCanvas> element itself; here the block renders
        whenever props.slide is non-null. -->
-  <!-- R329 auto-fit geometry: the FRAME is the fixed fit box (fills the
-       canonical stage) and does the vertical+horizontal centering + clips at
-       the stage edge; the CONTENT shrink-wraps to its natural height so
-       `contentRef.scrollHeight` reports the TRUE text height. Centering must NOT
-       live on the measured element — `justify-center` there hides top overflow
-       from scrollHeight, so the fit over-scales and clips (owner-reported). -->
-  <div v-if="props.slide" ref="frameRef" class="w-full h-full flex items-center justify-center overflow-hidden">
-  <!-- px-10 py-6 is the pseudo-viewport margin (owner UAT: smaller than the
-       original px-16 py-12) — text fills closer to the stage edge but never
-       touches it. This padding does NOT scale with --slide-fit-scale, so it
-       stays a constant safe margin at every fit scale.
-
-       BLOCK flow (deliberately NOT flex/items-center): a `flex … items-center`
-       wrapper sizes each text block to its longest UNWRAPPED line, so long lines
-       overflow the frame sides instead of wrapping at the frame width — the
-       "funny wrapping" + non-WYSIWYG preview-vs-output difference (owner UAT). As
-       a full-width block, every text child wraps at the frame width (`text-center`
-       centers the wrapped text and inline images); the FRAME owns vertical +
-       horizontal centering. This also makes the fit's width measurement honest
-       (no centered horizontal overflow hidden from scrollWidth). -->
+  <!-- R329 auto-fit geometry — three nested boxes:
+       1. OUTER — fills the canonical 1280x720 stage, centers the safe area, and
+          clips anything at the stage edge (overflow-hidden).
+       2. frameRef — the inset SAFE AREA and the fit TARGET. Text is fit to THIS
+          box, not the full stage, so a fully-filled line keeps the inset as a
+          symmetric left/right + top/bottom margin and never touches the stage
+          edge. Inset ≈ 80px horizontal / 24px vertical each side of the 1280x720
+          stage. The fit measures content against frameRef's client box.
+       3. contentRef — full width of the safe area, text-centered, natural height.
+          Centering lives on the frame boxes, NOT the measured element:
+          `justify-center` there would hide overflow from scroll{Width,Height} and
+          break the fit. And because the fit keeps the text WITHIN the safe area,
+          a wide line never overflows its box, so `text-center` centers it
+          symmetrically instead of left-anchoring and eating the right margin
+          (owner UAT — right side ran to the edge while the left had margin). -->
+  <div v-if="props.slide" class="w-full h-full flex items-center justify-center overflow-hidden">
+  <div
+    ref="frameRef"
+    class="flex items-center justify-center"
+    style="width: calc(100% - 160px); height: calc(100% - 48px)"
+  >
   <div
     ref="contentRef"
     data-testid="presentation-slide"
-    class="w-full px-10 py-6 text-center"
+    class="w-full text-center"
     :style="{ '--slide-fit-scale': fitScale }"
   >
     <!-- Render-pending — the FIRST branch of this chain (R080/D-15).
@@ -304,6 +305,7 @@
     >
       Playing muted — tap to unmute
     </button>
+  </div>
   </div>
   </div>
 </template>
