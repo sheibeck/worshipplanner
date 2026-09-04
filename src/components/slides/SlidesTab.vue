@@ -332,10 +332,17 @@ function onEditCongregational(): void {
   requestEditInScripture()
 }
 
-/** See ADR-0119 (docs/adr/0119-the-drawer-has-one-body-so-there-is-no-mode-to-set-duplicate.md) */
+/**
+ * See ADR-0119 (docs/adr/0119-the-drawer-has-one-body-so-there-is-no-mode-to-set-duplicate.md).
+ * R333: opens the lyrics deep-link in a NEW tab (`window.open`, `noopener` —
+ * T-116-02) rather than navigating this tab away, so the planner keeps their
+ * place in the read-only viewer. The 3-dot menu's `edit-in-song`
+ * (`onMenuAction` below) is untouched — it still navigates in-app.
+ */
 function onEditInSongBadge(songId: string): void {
   if (!confirmLeavingOpenDrawer()) return
-  void router.push(buildSongEditLink(songId, 'lyrics'))
+  const href = router.resolve(buildSongEditLink(songId, 'lyrics')).href
+  window.open(href, '_blank', 'noopener')
 }
 
 function onMenuAction(slideId: string, key: MenuItemKey): void {

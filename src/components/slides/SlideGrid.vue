@@ -37,20 +37,22 @@
              be edited here. Reuses the exact `edit-in-song` navigation the
              3-dot menu already performs (SlidesTab.vue), via an emit carrying
              this group's `songId`. Falls back to a plain, inert span when the
-             song slot has no song assigned yet (nothing to link to). -->
+             song slot has no song assigned yet (nothing to link to).
+             R333: relabeled to name the song and opens in a new tab
+             (SlidesTab's `onEditInSongBadge`) — see `songEditLabel`. -->
         <button
           v-if="isSongGroup && songGroupSongId"
           type="button"
           class="ml-auto inline-flex items-center gap-1 rounded border border-gray-700 bg-gray-800/50 px-2 py-0.5 text-[11px] text-gray-400 transition-colors hover:border-indigo-600 hover:text-indigo-300"
           data-testid="slide-grid-song-readonly-badge"
-          aria-label="Edit lyrics in Song Lyrics"
+          :aria-label="songEditLabel"
           @click="emit('edit-in-song', songGroupSongId)"
-        >Read-only — edit in Song Lyrics</button>
+        >{{ songEditLabel }}</button>
         <span
           v-else-if="isSongGroup"
           class="ml-auto inline-flex items-center rounded border border-gray-700 bg-gray-800/50 px-2 py-0.5 text-[11px] text-gray-400"
           data-testid="slide-grid-song-readonly-badge"
-        >Read-only — edit in Song Lyrics</span>
+        >{{ songEditLabel }}</span>
       </div>
 
       <!-- The grid's OWN import-modal instance (25-07 Task 3, D-15/D-16) —
@@ -519,6 +521,17 @@ const canLoopSlot = computed(() => isLoopableSlot.value && props.isEditor && !pr
 const songGroupSongId = computed<string | null>(() =>
   props.selectedSlot?.kind === 'SONG' ? props.selectedSlot.songId : null,
 )
+
+/**
+ * R333: names the song in the read-only badge — "Edit song lyrics for {title}"
+ * when the selected SONG slot carries a `songTitle`, or the generic "Edit song
+ * lyrics" when it doesn't (no title yet, or a non-song group). Drives both the
+ * button's visible text and its `aria-label`, and the inert span's fallback.
+ */
+const songEditLabel = computed<string>(() => {
+  const title = props.selectedSlot?.kind === 'SONG' ? props.selectedSlot.songTitle : null
+  return title ? `Edit song lyrics for ${title}` : 'Edit song lyrics'
+})
 
 /**
  * ★ R036 — the two composed gates this component uses everywhere. Both fold the
