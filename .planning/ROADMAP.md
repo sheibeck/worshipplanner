@@ -694,7 +694,10 @@ the read-only lyric viewer and the editor itself.
 
   5. The lyric editor no longer shows a History tab (R337).
 
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 116-01-PLAN.md — Read-only badge relabel + new-tab open (R333), SongSelect header link (R334), Cancel→Close (R335)
+- [ ] 116-02-PLAN.md — Inline manual Credits/CCLI editing (R336) + hide the History toggle/panel (R337)
 **UI hint**: yes
 
 ## Backlog
