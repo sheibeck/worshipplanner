@@ -1351,9 +1351,11 @@ defineExpose({ confirmDiscard: unsavedGuard.confirmDiscard })
  * styles win over Tailwind's `@layer utilities` regardless of selector
  * specificity, so this overrides the template's fixed `text-[13px]` class
  * without touching it.
+ * Size is fixed (R329) — the manual scale multiplier is retired; only
+ * family/weight still vary.
  */
 [data-testid='drawer-preview-text'] {
   font-weight: var(--slide-font-weight);
-  font-size: calc(13px * var(--slide-font-scale));
+  font-size: 13px;
 }
 </style>
