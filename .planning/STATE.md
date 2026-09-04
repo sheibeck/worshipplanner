@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-09-04T23:28:09.921Z"
 last_activity: 2026-09-04
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -52,7 +52,33 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.9 Live Presentation Field Fixes (roadmap created 2026-09-02)
+# ▶ ACTIVE MILESTONE — v2.10 Security & Architecture Hardening (roadmap created 2026-09-04)
+
+**Status:** Roadmap created, not yet planned. Next: `/gsd-plan-phase 117`.
+
+**Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and architectural
+reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" — starting with the
+unauthenticated `/api/planningcenter` proxy.
+
+(v2.9 ended at Phase 116); this milestone is **Phases 117–120**.
+
+**Key context:** Pure remediation of findings already fully documented in the v2.8 review reports
+(`.planning/milestones/v2.8-phases/112-security-review/112-SECURITY-REVIEW.md` and
+`110-architectural-review/110-ARCHITECTURE-REVIEW.md`) — no new user-facing features, no research pass,
+no new requirements beyond R339–R360. SEC-A-01 (the unauthenticated `/api/planningcenter` proxy) is the
+highest-priority finding and is front-loaded into Phase 117. **Out of scope:** the confirmed-sound /
+no-finding items (SEC-C-02..04, SEC-A-02, SEC-S-05, ARCH-015..019, ARCH-021..023), ARCH-005 (already
+resolved — org-provisioning functions are deployed), and SEC-S-03 (share links never expiring — an
+intentional product-design decision, recorded but not changed).
+
+See the `## ★ v2.10 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
+phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.9 Live Presentation Field Fixes (shipped & deployed to production 2026-09-04, archived 2026-09-04)
+
+> ✅ **Deployed to production 2026-09-04** (hosting only — client-side changes; tag `v2.9`). Owner-verified live on audience+confidence outputs.
 
 **Status:** v2.9 milestone complete
 
@@ -1219,7 +1245,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 115 — Live-Output Readability & Layout
+**Current focus:** Phase 117 — Security — Proxy Authentication, Rate Limits & Quotas
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1229,10 +1255,41 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 117 — Security — Proxy Authentication, Rate Limits & Quotas (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-04 — Milestone v2.10 started
+Status: Roadmap created; awaiting /gsd-plan-phase 117
+Last activity: 2026-09-04 — v2.10 ROADMAP.md created (Phases 117-120, R339-R360, 22/22 mapped)
+
+## ★ v2.10 ROADMAP.md phase breakdown (created 2026-09-04)
+
+4 phases (117-120), derived directly from R339-R360 (22 requirements) with this project's `coarse`
+granularity setting applied. Every requirement traces to a specific, already-documented finding in the
+v2.8 security (112-SECURITY-REVIEW.md) and architectural (110-ARCHITECTURE-REVIEW.md) reports, so phase
+boundaries follow the natural fault lines those reports already drew rather than an imposed structure:
+Cloud-Functions-only security fixes (auth + rate limits + quotas, no rules touch) cluster into Phase 117
+and are sequenced first since SEC-A-01 is the milestone's highest priority; every `firestore.rules`- and
+public-share-page-touching security requirement clusters into Phase 118 since they share one emulator
+test harness; the nine self-contained architecture correctness/lifecycle/store-ownership fixes (no
+module-boundary changes) cluster into Phase 119; and the two "begin decomposing" god-module
+requirements (ARCH-006 `ServiceEditorView.vue`, ARCH-010 `functions/src/index.ts`) plus the related
+dependency-direction nit get their own Phase 120, sequenced last and dependent on 117+119 since all
+three phases touch the same two large files. Numbering continues from v2.9, which ended at Phase 116 —
+v2.10 starts at Phase 117, not reset.
+
+| Phase | Goal | Requirements | Depends on |
+|-------|------|--------------|------------|
+| 117 Security — Proxy Authentication, Rate Limits & Quotas | Close the Cloud-Functions-only gaps: the unauthenticated `/api/planningcenter` proxy, the ESV/NLT rate-limit gap, and missing enqueue/import quotas on messaging and PPTX import | R339, R340, R344, R345 | Nothing (first; SEC-A-01 highest priority) |
+| 118 Security — Firestore Rules & Public Share Hardening | Close every remaining `firestore.rules`/public-share-page gap: draft provenance forgery, the super-admin universal members-write grant, orgSlugs/orgNames enumeration, share-page PII, guessable share ids, and admin/editor role semantics | R341, R342, R343, R346, R347, R348 | Nothing (independent of 117; shares the rules-test harness) |
+| 119 Architecture — Correctness, Batching & Store-Ownership Fixes | Nine self-contained architecture fixes: per-item failure isolation, batched PC song-import writes, a de-duplicated lyrics subscription, dead-code removal, org-switch teardown/re-subscribe hardening, store-mediated writes/reads, and a tested autosave/reorder-save coordination window | R349, R350, R351, R352, R353, R354, R355, R356, R357 | Nothing (independent of 117-118) |
+| 120 Architecture — God-Module Decomposition | Begin decomposing `ServiceEditorView.vue` and `functions/src/index.ts`, and correct the utility-layer dependency-direction inversion | R358, R359, R360 | Phases 117 and 119 (both touch the same two files this phase decomposes) |
+
+**Out of scope this milestone (locked at requirements time):** the confirmed-sound / no-finding review
+items (SEC-C-02..04, SEC-A-02, SEC-S-05, ARCH-015..019, ARCH-021..023), ARCH-005 (already resolved), and
+SEC-S-03 (share links never expiring — intentional product design, not changed).
+
+See `.planning/ROADMAP.md` § v2.10 Security & Architecture Hardening for the full phase detail table
+(goals, dependencies, success criteria). Next step: `/gsd-plan-phase 117` (optionally preceded by
+`/gsd-discuss-phase 117`).
 
 ## ★ v2.9 ROADMAP.md phase breakdown (created 2026-09-02)
 

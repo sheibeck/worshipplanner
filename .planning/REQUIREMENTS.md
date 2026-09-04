@@ -145,28 +145,28 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R339 | TBD | Pending |
-| R340 | TBD | Pending |
-| R341 | TBD | Pending |
-| R342 | TBD | Pending |
-| R343 | TBD | Pending |
-| R344 | TBD | Pending |
-| R345 | TBD | Pending |
-| R346 | TBD | Pending |
-| R347 | TBD | Pending |
-| R348 | TBD | Pending |
-| R349 | TBD | Pending |
-| R350 | TBD | Pending |
-| R351 | TBD | Pending |
-| R352 | TBD | Pending |
-| R353 | TBD | Pending |
-| R354 | TBD | Pending |
-| R355 | TBD | Pending |
-| R356 | TBD | Pending |
-| R357 | TBD | Pending |
-| R358 | TBD | Pending |
-| R359 | TBD | Pending |
-| R360 | TBD | Pending |
+| R339 | Phase 117 | Pending |
+| R340 | Phase 117 | Pending |
+| R341 | Phase 118 | Pending |
+| R342 | Phase 118 | Pending |
+| R343 | Phase 118 | Pending |
+| R344 | Phase 117 | Pending |
+| R345 | Phase 117 | Pending |
+| R346 | Phase 118 | Pending |
+| R347 | Phase 118 | Pending |
+| R348 | Phase 118 | Pending |
+| R349 | Phase 119 | Pending |
+| R350 | Phase 119 | Pending |
+| R351 | Phase 119 | Pending |
+| R352 | Phase 119 | Pending |
+| R353 | Phase 119 | Pending |
+| R354 | Phase 119 | Pending |
+| R355 | Phase 119 | Pending |
+| R356 | Phase 119 | Pending |
+| R357 | Phase 119 | Pending |
+| R358 | Phase 120 | Pending |
+| R359 | Phase 120 | Pending |
+| R360 | Phase 120 | Pending |
 
 *Filled by the roadmapper — each requirement maps to exactly one phase.*
 

@@ -22,6 +22,7 @@
 - ✅ **v2.7 — Rehearsal, Stage Plans & Presentation Polish** — Phases 104-107 (shipped & deployed to production 2026-09-01; inline black slide + audience-only "Go to black", system-wide dismissible notification store, per-item loop (relocated to the Slide editor, MISC/Announcement-only), user-menu church switcher, and a freeform visual **stage-layout** canvas redesigned to the owner's imported design — band-role instruments + person "Name - Role" + notes + "+ Vocal", stage-only landscape share `?view=stage` + dedicated landscape B&W "Print for tech", plus a live-diagnosed WYSIWYG fix (Tailwind v4 `translate`-vs-`transform` double-shift) and button-area polish (Run primary in the cluster, Present→"Review Slides", Save rightmost on Service Order + dropped from Slides, save-status into the header) — R302–R315; rehearsal attachments/Rehearse mode deferred to backlog 999.13; tag `v2.7`; audit PASSED 14/14 reqs + 6/6 seams; human/visual UAT owner-verified PASSED 2026-09-01 — see [milestones/v2.7-ROADMAP.md](milestones/v2.7-ROADMAP.md))
 - ✅ **v2.8 — Production Hardening (Comments-as-Specs, Architecture & Security Review)** — Phases 108-113 (shipped & deployed to production 2026-09-02; 244 ADRs (docs/adr/) + 309 behavioral comments relocated to .planning/codebase/ + a written comment convention; architectural review + remediation (ARCH-001 loadOrgContext re-entrancy/listener-leak race); security review + remediation — fixed a proven LIVE cross-tenant data leak (SEC-S-01: shareTokens/quarterShares/serviceShares were publicly listable) + legacy client-side org self-provisioning (SEC-ISO-01) + member-removal refresh-token revocation (SEC-ISO-02); Medium/Low triaged to backlog 999.4/999.5; the code-review chain caught 3 blockers pre-ship; audit PASSED 8/8 reqs + 6/6 integration WIRED — see [milestones/v2.8-ROADMAP.md](milestones/v2.8-ROADMAP.md))
 - ✅ **v2.9 — Live Presentation Field Fixes** — Phases 114-116 (shipped & deployed to production 2026-09-04; field fixes from the first real church-projector run — multi-monitor assignment rework (any-role-to-any-monitor, v2 fingerprint, nicknames — R324-R328/R338), live-output readability (measure-and-fit auto-fit engine: per-slide shrink-to-fit within an inset safe-area, lyric lines never wrap mid-line, symmetric margins; Run-screen readability — bigger filmstrip thumbs + next-item end cap + left-most auto-scroll + macOS scrollbar — R329-R332), and lyric-editor/song UX (new-tab edit link, clickable title→SongSelect, Cancel→Close, inline credits editing, hidden History — R333-R337); client-side only; audit PASSED 15/15 reqs + integration WIRED; owner-verified live on audience+confidence; tag v2.9 — see [milestones/v2.9-ROADMAP.md](milestones/v2.9-ROADMAP.md))
+- 🔲 **v2.10 — Security & Architecture Hardening** — Phases 117-120 (in planning; pure remediation of the 22 Medium/Low findings deferred from v2.8's security (backlog 999.5) and architectural (backlog 999.4) reviews — no new user-facing features, no research pass; SEC-A-01 (the unauthenticated `/api/planningcenter` proxy) front-loaded as highest priority — R339-R360)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -571,9 +572,108 @@ Full details: [milestones/v2.8-ROADMAP.md](milestones/v2.8-ROADMAP.md) · requir
 > **Deployed to production 2026-09-02** (hosting + firestore:rules + functions:syncOrgMembershipClaim). Audit PASSED (8/8 requirements, 6/6 phases, 6/6 integration seams WIRED). Comments-as-specs: 696 load-bearing comments inventoried → 244 MADR-lite ADRs (docs/adr/) for decision-rationale + 309 behavioral comments relocated into .planning/codebase/ maps, source comments shrunk to pointers, comment convention written (R316–R319). Architectural review (R320) → the sole High (ARCH-001 loadOrgContext epoch/listener-leak race) fixed (R321); 22 Medium/Low → backlog 999.4. Security review (R322) found a **proven, live, production cross-tenant data leak** — SEC-S-01: shareTokens/quarterShares/serviceShares were publicly *listable* (unauthenticated enumeration of every church's shared plans + volunteer names) — fixed (get/list split + org-gated list + org-scoped client queries) along with SEC-ISO-01 (legacy client org self-provisioning) and SEC-ISO-02 (revokeRefreshTokens on member removal); 11 Medium/Low → backlog 999.5 (R323). The adversarial code-review chain caught 3 blockers before ship (an incomplete epoch guard in 111; and in 113 the rules fix's two regressions — broken share-token cleanup and broken share-link creation). Owner-authorized coordinated prod deploy.
 </details>
 
+### 🚧 v2.10 Security & Architecture Hardening (Phases 117-120, in planning)
+
+**Milestone Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and
+architectural reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" —
+starting with the unauthenticated `/api/planningcenter` proxy.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R339–R360 (22 mapped, 100% coverage)
+
+**Key context:** Pure remediation of findings already fully documented in the v2.8 review reports
+(`milestones/v2.8-phases/112-security-review/112-SECURITY-REVIEW.md` and
+`milestones/v2.8-phases/110-architectural-review/110-ARCHITECTURE-REVIEW.md`) — no new user-facing
+features, no research pass. Phase numbering continues from v2.9, which ended at Phase 116 — v2.10
+starts at Phase 117, not reset. **Out of scope:** the confirmed-sound/no-finding items (SEC-C-02..04,
+SEC-A-02, SEC-S-05, ARCH-015..019, ARCH-021..023), ARCH-005 (already resolved — provisioning functions
+are deployed), and SEC-S-03 (share links never expiring — an intentional product-design decision).
+
+- [ ] **Phase 117: Security — Proxy Authentication, Rate Limits & Quotas** - Close the four Cloud-Functions-only gaps: the unauthenticated `/api/planningcenter` proxy, the ESV/NLT rate-limit gap, and missing enqueue/import quotas on messaging and PPTX import
+- [ ] **Phase 118: Security — Firestore Rules & Public Share Hardening** - Close every remaining `firestore.rules`/public-share-page gap: draft provenance forgery, the super-admin universal members-write grant, orgSlugs/orgNames enumeration, share-page PII, guessable share ids, and admin/editor role semantics
+- [ ] **Phase 119: Architecture — Correctness, Batching & Store-Ownership Fixes** - Nine self-contained architecture fixes: per-item failure isolation, batched PC song-import writes, a de-duplicated lyrics subscription, dead-code removal, org-switch teardown/re-subscribe hardening, store-mediated writes/reads, and a tested autosave/reorder-save coordination window
+- [ ] **Phase 120: Architecture — God-Module Decomposition** - Begin decomposing `ServiceEditorView.vue` and `functions/src/index.ts`, and correct the utility-layer dependency-direction inversion
+
+### Phase 117: Security — Proxy Authentication, Rate Limits & Quotas
+
+**Goal**: Every Cloud Functions entry point that currently has no authentication or no rate/quota
+ceiling gets one — closing the open-relay and unthrottled-fan-out gaps the v2.8 security review found,
+starting with the highest-priority finding (SEC-A-01).
+**Depends on**: Nothing (first v2.10 phase; SEC-A-01 is the milestone's highest priority)
+**Requirements**: R339, R340, R344, R345
+**Success Criteria** (what must be TRUE):
+
+  1. An unauthenticated request to `/api/planningcenter` is rejected (401) instead of being relayed to `api.planningcenteronline.com`; a request carrying a valid `X-App-Auth` Firebase ID token still works exactly as before (R339).
+  2. An authenticated caller who exceeds the same per-uid rate limit that already guards `anthropic` is rejected the same way when calling `/api/esv/...` or `/api/nlt/...` (R340).
+  3. `queueServiceMessage` rejects a caller who exceeds a per-uid/per-org enqueue-rate ceiling, independent of the existing downstream per-message/per-org-daily send caps (R344).
+  4. `parsePptx` rejects a caller who exceeds a per-uid/per-org daily import quota, independent of the render service's own concurrency ceiling (R345).
+  5. The functions test suite passes with new tests proving each of the four gates/limits actually fires, and that ordinary within-limit usage and the sibling `anthropic` behavior are unaffected.
+
+**Plans**: TBD
+
+### Phase 118: Security — Firestore Rules & Public Share Hardening
+
+**Goal**: Every remaining rules-level and public-share-page security gap is closed — provenance-field
+forgery, the super-admin universal members-write grant, registry enumeration, PII on the share page,
+guessable share ids, and the admin/editor role-semantics ambiguity — each proven by a passing rules
+test.
+**Depends on**: Nothing (independent of Phase 117; grouped because every requirement here touches `firestore.rules` and shares its emulator test harness)
+**Requirements**: R341, R342, R343, R346, R347, R348
+**Success Criteria** (what must be TRUE):
+
+  1. An org editor can no longer overwrite `createdBy` (or other provenance fields) on a draft `services/{docId}` update — a new DENY-case proves this while an ALLOW-case proves ordinary draft edits still work (R341).
+  2. Super-admin's ability to write any org's `members/{uid}` is either constrained to an explicit, auditable "acting as editor of org X" signal (with ALLOW/DENY rules tests), or the current universal-grant boundary is documented and pinned by a rules test that proves the accepted invariant (R342).
+  3. An unauthenticated collection-level query against `orgSlugs` or `orgNames` fails (`assertFails(getDocs(...))`) while `getDoc` by known slug/name still succeeds — mirroring the SEC-S-01 get/list split pattern (R343).
+  4. Free-text `notes`/slot-body fields are filtered or explicitly gated before rendering on the public `ShareView`/`QuarterShareView` pages, consistent with the `roleAssignments` names-only allowlist (R346).
+  5. Memorable-URL share ids gain an added unguessable token component (proven by a test that the old deterministic id alone is no longer sufficient), or the guessability risk is explicitly re-accepted in writing with reasoning (R347).
+  6. The `role: 'admin'` vs `'editor'` distinction either gates at least one real, tested capability difference, or is documented as intentionally synonymous today with an explicit warning that a future `'admin'`-specific check must not silently inherit the editor self-escalation path (R348).
+  7. `npm run test:rules` (or `npx vitest run --config vitest.rules.config.ts` against a running emulator) passes with every new ALLOW/DENY case green.
+
+**Plans**: TBD
+
+### Phase 119: Architecture — Correctness, Batching & Store-Ownership Fixes
+
+**Goal**: The nine self-contained architecture findings that don't require touching module boundaries
+are fixed — failure isolation, batched writes, a de-duplicated subscription, dead-code removal,
+defense-in-depth store teardown, reactive re-subscription, store-mediated writes/reads, and a tested
+autosave/reorder-save coordination window.
+**Depends on**: Nothing (independent of Phases 117-118; no rules/functions-proxy overlap)
+**Requirements**: R349, R350, R351, R352, R353, R354, R355, R356, R357
+**Success Criteria** (what must be TRUE):
+
+  1. `recomputeLastUsedFor`'s per-song loop isolates failures — one song's update failing no longer prevents the rest of the same service's songs from getting their correct `lastUsedAt`, and the specific failed song id(s) are logged (R349).
+  2. The Planning Center song-import path (`upsertSongs`) writes in `writeBatch` chunks like the sibling CSV `importSongs`, and the import UI surfaces per-song success/failure instead of one bad write silently stopping the rest (R350).
+  3. `useSlideshowAssembly`'s default lyrics subscriber routes through (or shares a function with) `songLyricsStore.subscribeLyrics`, eliminating the existing `limit(1)` drift between the two queries (R351).
+  4. `reopenPcWarning` either correctly renders `pcExportedAt`'s actual date after fixing the deep-clone Timestamp strip, or the unreachable branch is removed so no dead code remains (R352).
+  5. `ServicesView.vue`'s org-switch watcher explicitly tears down `teamsStore` locally, matching the pattern already used by `RosterView.vue`/`DashboardView.vue`/`TeamView.vue` (R353).
+  6. `SongLyricEditor.vue` and `ScriptureSlideEditor.vue` reactively re-subscribe/teardown when their org prop changes while mounted, instead of only subscribing once at mount (R354).
+  7. `ServiceTemplateEditor.vue` no longer calls `updateDoc()` directly on the org document — it goes through a new auth-store mutation method that performs the write and syncs local state together (R355).
+  8. `GettingStarted.vue`'s member-count listener and `ConfigurationTab.vue`'s super-admins listener are each owned by a store instead of a one-off local `onSnapshot` (R356).
+  9. A new regression test proves a remote snapshot arriving during an in-flight reorder save is handled safely — no stale overwrite and no lost edit — closing the previously-untested coordination window (R357).
+
+**Plans**: TBD
+
+### Phase 120: Architecture — God-Module Decomposition
+
+**Goal**: Begin decomposing the two largest, riskiest modules the architecture review flagged —
+`ServiceEditorView.vue` and `functions/src/index.ts` — following the extraction pattern already
+established elsewhere in the codebase, and correct the small utility-layer dependency-direction
+inversion sharing the same module-boundaries theme.
+**Depends on**: Phases 117 and 119 (both touch the same two files — `functions/src/index.ts` and `ServiceEditorView.vue` — that this phase decomposes; sequencing last avoids compounding edits in the same files)
+**Requirements**: R358, R359, R360
+**Success Criteria** (what must be TRUE):
+
+  1. At least one more distinct feature responsibility (e.g. Planning Center export or AI song-suggestions) is extracted out of `ServiceEditorView.vue` into its own composable/component, continuing the `useAutoSave`/`useSlideshowAssembly` pattern, with the view file measurably smaller (R358).
+  2. The extracted responsibility's existing behavior is unchanged after the extraction — proven by `ServiceEditorView.test.ts` passing with only import/wiring changes, not behavior changes (R358).
+  3. At least one of `functions/src/index.ts`'s five inline concerns (API proxy, PPTX pipeline, cleanup sweeps, reminder/scheduled-message cron, messaging pipeline) is extracted into its own module file and re-exported from `index.ts`, matching the `orgProvisioning.ts`/`orgMembershipClaims.ts` pattern (R359).
+  4. The extracted module's existing tests continue to pass unmodified in behavior, and every function it contains is still re-exported from `index.ts` so `firebase deploy` finds it (R359).
+  5. The three `src/utils/*.ts` files (`claudeApi.ts`, `messaging.ts`, `scriptureApi.ts`) that import `useAuthStore()` for read-only settings gating either no longer do so (settings passed in instead), or the exception is documented in `ARCHITECTURE.md` as sanctioned (R360).
+  6. `npm run type-check`, `npx vitest run` (app suite, 1-file baseline unchanged), and the functions test suite all pass after both extractions.
+
+**Plans**: TBD
+
 ## Backlog
 
-### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (BACKLOG)
+### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
 
 **Goal:** [Captured for future planning] Consolidates all 11 Medium/Low security findings
 (5 Medium, 6 Low) deferred from Phase 113 remediation, per 113-CONTEXT.md's locked triage decision
@@ -605,7 +705,9 @@ it, so nothing found by the Phase 112 review is silently dropped.
 
 Promote with `/gsd-review-backlog` when ready.
 
-### Phase 999.4: v2.8 Architectural Review — Medium/Low findings (ARCH-002..023) (BACKLOG)
+> **Promoted 2026-09-04:** every finding above maps to a v2.10 requirement (R339-R348). See milestone v2.10 Phases 117-118.
+
+### Phase 999.4: v2.8 Architectural Review — Medium/Low findings (ARCH-002..023) (PROMOTED to v2.10)
 
 **Goal:** [Captured for future planning] Consolidates all 22 Medium/Low architectural findings
 (ARCH-002 through ARCH-023) deferred from Phase 111 remediation, per 111-CONTEXT.md's locked triage
@@ -639,6 +741,8 @@ it, so nothing found by the Phase 110 review is silently dropped.
   Phase 78, T-78-03). Both are Phase 112's scoping decision, not this backlog entry's.
 
 Promote with `/gsd-review-backlog` when ready.
+
+> **Promoted 2026-09-04:** every finding above maps to a v2.10 requirement (R349-R360). See milestone v2.10 Phases 119-120.
 
 ### Phase 999.3: Monitor Setup — route one signal to multiple monitors; no signal mandatory (✅ COMPLETE)
 
