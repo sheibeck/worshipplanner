@@ -5,16 +5,16 @@ milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
 current_phase: 116
 current_phase_name: Lyric Editor & Song UX
 status: executing
-stopped_at: Completed 116-01-PLAN.md (R333/R334/R335); 116-02-PLAN.md (R336/R337) remains
-last_updated: "2026-09-04T12:43:33.000Z"
+stopped_at: "Completed 116-02-PLAN.md (R336/R337: inline credits editing, History hidden)"
+last_updated: "2026-09-04T13:03:52.163Z"
 last_activity: 2026-09-04
-last_activity_desc: 116-01-PLAN.md executed and committed
+last_activity_desc: 116-02-PLAN.md executed and committed
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 11
-  completed_plans: 10
-  percent: 67
+  completed_plans: 11
+  percent: 100
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -57,7 +57,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.9 Live Presentation Field Fixes (roadmap created 2026-09-02)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Fix the readability, multi-monitor, and lyric-editing rough edges surfaced by the first real
 church-projector run, so a projectionist can set up and read the live output without fighting the tool.
@@ -1232,10 +1232,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 116 (Lyric Editor & Song UX) — EXECUTING
-Plan: 1 of 2 complete
-Status: 116-01 executed (R333/R334/R335: badge label + new-tab open, SongSelect header link, Close relabel); 116-02 (R336/R337) remaining
-Last activity: 2026-09-04 — 116-01-PLAN.md executed and committed
+Phase: 116 (Lyric Editor & Song UX) — EXECUTED (both plans complete; verification deferred to milestone end)
+Plan: 2 of 2 complete
+Status: 116-01 executed (R333/R334/R335: badge label + new-tab open, SongSelect header link, Close relabel); 116-02 executed (R336/R337: inline credits editing, History hidden). All of v2.9 (Phases 114-116) is now executed — resume at milestone-end deferred verification.
+Last activity: 2026-09-04 — 116-02-PLAN.md executed and committed
 
 ## ★ v2.9 ROADMAP.md phase breakdown (created 2026-09-02)
 
@@ -3166,6 +3166,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 115 P03 | 10min | 3 tasks | 7 files |
 | Phase 115 P05 | 25min | 3 tasks | 14 files |
 | Phase 116 P01 | 15m | 2 tasks | 5 files |
+| Phase 116 P02 | 35min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3687,6 +3688,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Deleting a settings leaf field: pure-function model first, then type/defaults, then UI reader, then test-mock sweep — each step's own tests prove the prior step correct before the type change ripples into unrelated fixtures
 - [Phase ?]: 116-01: songEditLabel reads songTitle only for selectedSlot.kind==='SONG', mirroring songGroupSongId — keeps T-116-01's navigation-target-from-slot-only property
 - [Phase ?]: 116-01: SongSelect link gated on persisted props.song.ccliNumber (not form.ccliNumber or paste-derived copyright.ccliSongNumber), matching SongTable.vue's own gate
+- [Phase ?]: hasCredits computed reads all 5 CopyrightInfo fields (not just ccliSongNumber) so a manual-only entry (e.g. copyrightLines alone) still shows the read-only display (R336).
+- [Phase ?]: saveCreditsEdit mirrors onSaveVersion's exact saveLyrics shape — editableState.sections/performanceOrder pass through unchanged, so a credits save never re-parses the lyrics (R336, threat T-116-04).
+- [Phase ?]: History toggle/panel hidden via a HISTORY_ENABLED=false template gate rather than deletion — LyricVersionHistory.vue and the store's version state/handlers stay referenced and unchanged for a later re-enable (R337).
 
 ### Roadmap Evolution
 
@@ -4015,8 +4019,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-04T12:43:32.830Z
-Stopped at: Completed 116-01-PLAN.md (R333/R334/R335); 116-02-PLAN.md (R336/R337) remains
+Last session: 2026-09-04T13:03:52.092Z
+Stopped at: Completed 116-02-PLAN.md (R336/R337: inline credits editing, History hidden)
 Resume file: None
 
 ## Operator Next Steps

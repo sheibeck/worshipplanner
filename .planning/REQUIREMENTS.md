@@ -76,11 +76,11 @@ church-projector run, so a projectionist can set up and read the live output wit
 
 - [x] **R335**: The lyric editor's **"Cancel" button is relabeled "Close"**.
 
-- [ ] **R336**: A user can **manually edit a song's Credits / CCLI / copyright text** — add, correct, or
+- [x] **R336**: A user can **manually edit a song's Credits / CCLI / copyright text** — add, correct, or
   remove it — independent of pasting lyrics, so stale credits left over from a wrong-then-right paste can
   be fixed.
 
-- [ ] **R337**: The lyric editor's **History tab is hidden** (deferred), removing the confusing version
+- [x] **R337**: The lyric editor's **History tab is hidden** (deferred), removing the confusing version
   list where every saved version reads "Just now".
 
 ---
@@ -127,8 +127,8 @@ church-projector run, so a projectionist can set up and read the live output wit
 | R333 | Phase 116 | Complete |
 | R334 | Phase 116 | Complete |
 | R335 | Phase 116 | Complete |
-| R336 | Phase 116 | Pending |
-| R337 | Phase 116 | Pending |
+| R336 | Phase 116 | Complete |
+| R337 | Phase 116 | Complete |
 
 *Filled by the roadmapper — each requirement maps to exactly one phase.*
 
