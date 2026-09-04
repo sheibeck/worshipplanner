@@ -413,3 +413,56 @@ describe('SongSlideOver — opening tab (initialTab prop)', () => {
     expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
   })
 })
+
+// R334: a SongSelect deep link next to the song name, reusing SongTable.vue's
+// exact CCLI link-out pattern; gated on the persisted `Song.ccliNumber`.
+describe('SongSlideOver — SongSelect link (R334)', () => {
+  it('shows a SongSelect link to the persisted ccliNumber, opening in a new noopener tab', async () => {
+    const song = makeSong({ ccliNumber: '12345' })
+    const wrapper = await mountDrawer(song)
+
+    const link = wrapper.find('[data-testid="song-songselect-link"]')
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('href')).toBe('https://songselect.ccli.com/songs/12345')
+    expect(link.attributes('target')).toBe('_blank')
+    expect(link.attributes('rel')).toContain('noopener')
+  })
+
+  it('hides the SongSelect link when ccliNumber is empty', async () => {
+    const song = makeSong({ ccliNumber: '' })
+    const wrapper = await mountDrawer(song)
+
+    expect(wrapper.find('[data-testid="song-songselect-link"]').exists()).toBe(false)
+  })
+
+  it('hides the SongSelect link in create mode (no song)', async () => {
+    const wrapper = await mountDrawer(null)
+
+    expect(wrapper.find('[data-testid="song-songselect-link"]').exists()).toBe(false)
+  })
+
+  it('keeps the SongSelect link visible on the Lyrics tab too — it lives in the shared header', async () => {
+    const song = makeSong({ ccliNumber: '12345' })
+    const wrapper = await mountDrawer(song)
+    await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="song-songselect-link"]').exists()).toBe(true)
+  })
+})
+
+// R335: the header dismiss button reads "Close" (was "Cancel"); behavior
+// (the unsaved-changes guard + emit('close')) is unchanged.
+describe('SongSlideOver — header dismiss button reads "Close" (R335)', () => {
+  it('the header no longer shows a "Cancel" button, and "Close" emits close', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+
+    const buttons = wrapper.findAll('button')
+    expect(buttons.some((b) => b.text() === 'Cancel')).toBe(false)
+    const closeButton = buttons.find((b) => b.text() === 'Close')
+    expect(closeButton).toBeTruthy()
+
+    await closeButton!.trigger('click')
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+})
