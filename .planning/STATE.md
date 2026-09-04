@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
-current_phase: 115
-current_phase_name: Live-Output Readability & Layout
-status: executing
-stopped_at: Completed 115-05-PLAN.md (Phase 115 complete, all 5 plans done)
+current_phase: 116
+current_phase_name: Lyric Editor & Song UX
+status: planning
+stopped_at: Phase 115 executed + code-reviewed + auto-verified green (human_needed — hardware UAT batched to v2.9-DEFERRED-VERIFICATION.md); starting Phase 116
 last_updated: "2026-09-04T06:17:29.909Z"
-last_activity: 2026-09-03
-last_activity_desc: Phase 115 execution started
+last_activity: 2026-09-04
+last_activity_desc: "Phase 115 verified (17/17 code must-haves; human/hardware UAT batched); advancing to Phase 116 (Lyric Editor & Song UX)"
 progress:
   total_phases: 3
   completed_phases: 2
@@ -27,6 +27,7 @@ them via the batched UAT.
 | Phase | State | Resume |
 |-------|-------|--------|
 | 114 | verification_deferred_human (auto-verified green; real-3-monitor/macOS placement UAT pending) | /gsd-verify-work 114 |
+| 115 | verification_deferred_human (auto-verified green, 17/17 code must-haves; real-projector WYSIWYG / macOS scrollbar / at-a-glance legibility UAT pending) | /gsd-verify-work 115 |
 
 ## Human UAT — completed & PASSED
 
@@ -1231,10 +1232,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 115 (Live-Output Readability & Layout) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
-Last activity: 2026-09-03 — Phase 115 execution started
+Phase: 116 (Lyric Editor & Song UX) — PLANNING
+Plan: 0 of 0 (not yet planned)
+Status: Phase 115 executed + auto-verified (human UAT batched); starting Phase 116
+Last activity: 2026-09-04 — Phase 115 verified (human_needed, batched); advancing to Phase 116
 
 ## ★ v2.9 ROADMAP.md phase breakdown (created 2026-09-02)
 

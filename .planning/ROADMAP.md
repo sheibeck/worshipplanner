@@ -595,8 +595,10 @@ open the Firebase Storage + external-media cost/security surface; the unsupporte
   correctly on macOS *(executed + code-reviewed + auto-verified green 2026-09-03; real-3-monitor/macOS
   placement is batched hardware UAT → v2.9-DEFERRED-VERIFICATION.md)*
 
-- [ ] **Phase 115: Live-Output Readability & Layout** - Auto-fit slide text, a smaller live main view with
-  larger readable thumbnails, an end-of-item marker, and a reliable Mac scrollbar
+- [x] **Phase 115: Live-Output Readability & Layout** - Auto-fit slide text, a smaller live main view with
+  larger readable thumbnails, an end-of-item marker, and a reliable Mac scrollbar *(executed + code-reviewed
+  + auto-verified green 2026-09-04, 17/17 code-verifiable must-haves; real-projector WYSIWYG / macOS
+  scrollbar / at-a-glance legibility batched hardware UAT → v2.9-DEFERRED-VERIFICATION.md)*
 
 - [ ] **Phase 116: Lyric Editor & Song UX** - Relabeled edit-lyrics link opening in a new tab, a
   SongSelect link, Cancel→Close, manual Credits/CCLI editing, and a hidden History tab
