@@ -78,7 +78,7 @@ vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     orgId: 'org-1',
     settings: {
-      slideTypography: { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' },
+      slideTypography: { fontFamily: 'Inter', fontWeight: 400 },
     },
   }),
 }))

@@ -1147,8 +1147,8 @@ describe('useAuthStore', () => {
 
     // WR-01 (46-REVIEW.md): `slideTypography` must be deep-merged, not
     // shallow-replaced — a partial stored value (hand-edited Firestore
-    // document, or any future write path that persists fewer than all
-    // three leaf keys) must still resolve its missing sibling fields to
+    // document, or any future write path that persists fewer than both
+    // leaf keys) must still resolve its missing sibling fields to
     // their per-field defaults, never `undefined`.
     it('deep-merges a partial stored slideTypography — missing leaf fields fall back to their own defaults', async () => {
       mockOrgDocPath({
@@ -1161,7 +1161,6 @@ describe('useAuthStore', () => {
       expect(store.settings.slideTypography).toEqual({
         fontFamily: 'Poppins',
         fontWeight: DEFAULT_ORG_SETTINGS.slideTypography.fontWeight,
-        fontScale: DEFAULT_ORG_SETTINGS.slideTypography.fontScale,
       })
     })
   })
@@ -1256,7 +1255,7 @@ describe('useAuthStore', () => {
     it('calls loadFontCss with the resolved family/weight for a non-default stored family', async () => {
       mockOrgDocPath({
         name: 'Test Org',
-        settings: { slideTypography: { fontFamily: 'Lora', fontWeight: 600, fontScale: 'md' } },
+        settings: { slideTypography: { fontFamily: 'Lora', fontWeight: 600 } },
       })
       const { useAuthStore } = await import('../auth')
       useAuthStore()
@@ -1268,7 +1267,7 @@ describe('useAuthStore', () => {
       mockOrgDocPath({
         name: 'Test Org',
         // Lora does not ship 300 (46-01-SUMMARY.md's corrected ramp).
-        settings: { slideTypography: { fontFamily: 'Lora', fontWeight: 300, fontScale: 'md' } },
+        settings: { slideTypography: { fontFamily: 'Lora', fontWeight: 300 } },
       })
       const { useAuthStore } = await import('../auth')
       useAuthStore()

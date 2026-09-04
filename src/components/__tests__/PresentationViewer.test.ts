@@ -7,12 +7,11 @@ import { FONT_LOAD_TIMEOUT_MS, loadFontCss } from '@/utils/slideTypography'
 // --- 46-04: PresentationViewer reads authStore.settings.slideTypography for
 // its CSS-variable wrapper (R093) and the R094 font-load gate. Mutable so the
 // non-default-family test (below) can override it per-test; every other test
-// in this file gets the Inter/400/md default, matching
+// in this file gets the Inter/400 default, matching
 // DEFAULT_ORG_SETTINGS.slideTypography. ---
-let mockSlideTypography: { fontFamily: string; fontWeight: number; fontScale: 'sm' | 'md' | 'lg' } = {
+let mockSlideTypography: { fontFamily: string; fontWeight: number } = {
   fontFamily: 'Inter',
   fontWeight: 400,
-  fontScale: 'md',
 }
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
@@ -324,7 +323,7 @@ describe('PresentationViewer', () => {
       writable: true,
     })
     stubResolvedFonts()
-    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400 }
     vi.mocked(loadFontCss).mockClear()
   })
 
@@ -1964,7 +1963,7 @@ describe('PresentationViewer', () => {
     })
 
     it('font gate: a non-default chosen family triggers loadFontCss for that family/weight before rendering', async () => {
-      mockSlideTypography = { fontFamily: 'Lora', fontWeight: 600, fontScale: 'md' }
+      mockSlideTypography = { fontFamily: 'Lora', fontWeight: 600 }
       mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
       await flushPromises()
 
@@ -1995,7 +1994,7 @@ describe('PresentationViewer', () => {
     // Distinct from the timeout test above: this promise REJECTS, it
     // never merely stalls.
     it('font gate: releases fontReady when loadFontCss REJECTS — never permanently hangs "Loading slideshow…"', async () => {
-      mockSlideTypography = { fontFamily: 'Lora', fontWeight: 600, fontScale: 'md' }
+      mockSlideTypography = { fontFamily: 'Lora', fontWeight: 600 }
       vi.mocked(loadFontCss).mockRejectedValueOnce(new Error('chunk load failed'))
       mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
       await flushPromises()
