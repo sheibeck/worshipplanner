@@ -209,6 +209,7 @@
               :slides="filmstripSlides"
               :indices="filmstripIndices"
               :currentIndex="index"
+              :nextItemLabel="nextItemLabel"
               @jump="postIndex"
             />
           </template>
@@ -334,6 +335,7 @@ const {
   progress,
   // rail + navigation actions
   railRows,
+  nextItemLabel,
   jumpToSlot,
   goBySlide,
   postIndex,

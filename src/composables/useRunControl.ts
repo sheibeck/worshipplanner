@@ -100,6 +100,20 @@ export interface RailRow {
   loop?: boolean
 }
 
+/**
+ * R331: the title of the rail row immediately after the active item, for the
+ * filmstrip's end-of-item cap. Pure over the same RailRow[] the order-of-service
+ * list renders, so the cap always names the very next item the operator advances
+ * into. Null at end of service, pre-live (currentSlotIndex null), or if the
+ * active row is not found in rows.
+ */
+export function deriveNextItemLabel(rows: RailRow[], currentSlotIndex: number | null): string | null {
+  if (currentSlotIndex == null) return null
+  const pos = rows.findIndex((r) => r.index === currentSlotIndex)
+  if (pos === -1 || pos === rows.length - 1) return null
+  return rows[pos + 1]!.title
+}
+
 export interface UseRunControlOptions {
   /**
    * Testability seam (93/95-PATTERNS): the run-channel factory is injectable so
@@ -254,6 +268,9 @@ export function useRunControl(options: UseRunControlOptions = {}) {
       }
     }),
   )
+
+  /** R331: the next service item's title, for RunFilmstrip's end-of-item cap. */
+  const nextItemLabel = computed(() => deriveNextItemLabel(railRows.value, currentSlotIndex.value))
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   function goBySlide(delta: number) {
@@ -1338,6 +1355,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     openManage,
     // rail
     railRows,
+    nextItemLabel,
     firstIndexBySlot,
     countLabel,
     jumpToSlot,
