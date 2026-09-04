@@ -271,6 +271,24 @@ describe('AudienceOutputView — channel-driven slide (R270/R271)', () => {
   })
 })
 
+describe('AudienceOutputView — R329 canonical stage', () => {
+  it('wraps SlideCanvas in the canonical audience-stage around the live slide', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    // No stage before any state (pure black, no slide yet).
+    expect(wrapper.find('[data-testid="audience-stage"]').exists()).toBe(false)
+
+    fake.emitState(0, 1)
+    await flushPromises()
+
+    const stage = wrapper.find('[data-testid="audience-stage"]')
+    expect(stage.exists()).toBe(true)
+    expect(stage.find('[data-testid="slide-canvas"]').text()).toBe('a')
+  })
+})
+
 describe('AudienceOutputView — media pause→nextTick→play invariant (T-23-08)', () => {
   it('pauses the outgoing slide before playing the incoming on a slide change (pause → tick → play)', async () => {
     const fake = createFakeChannel()
@@ -553,13 +571,14 @@ describe('AudienceOutputView — blackout overlay obeys the channel field (R280)
     expect(wrapper.find('[data-testid="audience-blackout"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(true)
 
-    // The overlay is a LATER sibling of the SlideCanvas → it paints ABOVE it
-    // (non-vacuous DOM-order proof, not merely "both exist").
+    // The overlay is a LATER sibling of the R329 canonical stage (which wraps the
+    // SlideCanvas) → it paints ABOVE it (non-vacuous DOM-order proof, not merely
+    // "both exist").
     const children = Array.from(wrapper.get('[data-testid="audience-output"]').element.children)
-    const canvasPos = children.findIndex((el) => el.getAttribute('data-testid') === 'slide-canvas')
+    const stagePos = children.findIndex((el) => el.getAttribute('data-testid') === 'audience-stage')
     const blackoutPos = children.findIndex((el) => el.getAttribute('data-testid') === 'audience-blackout')
-    expect(canvasPos).toBeGreaterThanOrEqual(0)
-    expect(blackoutPos).toBeGreaterThan(canvasPos)
+    expect(stagePos).toBeGreaterThanOrEqual(0)
+    expect(blackoutPos).toBeGreaterThan(stagePos)
 
     // blackout:false → overlay removed, the slide is visible again.
     fake.emitState(0, 3, false)

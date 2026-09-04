@@ -5,23 +5,32 @@
        hidden ONLY while fullscreen (restored windowed so the re-enter
        affordance stays clickable). No operator chrome of any kind. -->
   <div
-    ref="rootRef"
+    :ref="setRootRefs"
     data-testid="audience-output"
     class="fixed inset-0 bg-black flex items-center justify-center"
     :style="rootStyle"
   >
-    <!-- Live slide — background ON (no suppressBackground; that is Phase 94's
-         confidence job). Rendered ONLY once a valid current slide exists AND
-         the bounded font gate has resolved; otherwise the surface is pure
-         black with zero elements (deliberate divergence from
-         PresentationViewer's spinner + "Loading slideshow…" heading — a
-         projector must never flash a spinner or copy at a congregation). -->
-    <SlideCanvas
+    <!-- R329 canonical stage — a fixed 1280x720 box (REFERENCE_WIDTH/HEIGHT) that
+         SlideCanvas always fills, so its per-slide auto-fit measures against the
+         SAME frame the Run-screen previews/thumbnails use (WYSIWYG). The stage is
+         transform-scaled to CONTAIN this fixed root (useContainScale — letterboxed,
+         never stretched). Rendered ONLY once a valid current slide exists AND the
+         bounded font gate has resolved; otherwise the surface is pure black with
+         zero elements (deliberate divergence from PresentationViewer's spinner +
+         "Loading slideshow…" heading — a projector must never flash a spinner or
+         copy at a congregation). -->
+    <div
       v-if="currentSlide && fontReady"
-      ref="slideCanvasRef"
-      :slide="currentSlide"
-      :interactive="false"
-    />
+      data-testid="audience-stage"
+      class="relative overflow-hidden"
+      :style="stageStyle"
+    >
+      <SlideCanvas
+        ref="slideCanvasRef"
+        :slide="currentSlide"
+        :interactive="false"
+      />
+    </div>
 
     <!-- R280 — full-bleed blackout overlay. When the control posts blackout:true
          the projector shows pure black, painting OVER the live slide (sibling of
@@ -70,9 +79,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, nextTick, type ComponentPublicInstance } from 'vue'
 import type { AssembledSlide } from '@/types/slide'
 import { useOutputWindow } from '@/composables/useOutputWindow'
+import { useContainScale, REFERENCE_WIDTH, REFERENCE_HEIGHT } from '@/composables/useSlideAutoFit'
 import type { BroadcastChannelFactory } from '@/utils/runChannel'
 import SlideCanvas from '@/components/slides/SlideCanvas.vue'
 
@@ -89,6 +99,21 @@ const props = defineProps<{
 // See ADR-0210 (docs/adr/0210-the-shared-output-window-lifecycle-core-r272-reuse-not-fork.md)
 const { assembledSlideshow, index, blackout, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
   useOutputWindow({ channelFactory: props.channelFactory, role: 'audience' })
+
+// R329 — the canonical 1280x720 stage scaled to CONTAIN this fixed root
+// (letterboxed, never stretched); containerRef shares the same DOM node as
+// useOutputWindow's rootRef (fullscreen target), merged via setRootRefs below.
+const { containerRef, scale: containScale } = useContainScale()
+function setRootRefs(el: Element | ComponentPublicInstance | null) {
+  rootRef.value = el as HTMLElement | null
+  containerRef.value = el as HTMLElement | null
+}
+const stageStyle = computed(() => ({
+  width: `${REFERENCE_WIDTH}px`,
+  height: `${REFERENCE_HEIGHT}px`,
+  transform: `scale(${containScale.value})`,
+  transformOrigin: 'center',
+}))
 
 // ── Current slide + media invariant (view-local per-canvas plumbing) ──────────
 // A null index (before the first RunState) and an out-of-range index both
