@@ -4,11 +4,11 @@ milestone: v2.9
 milestone_name: Live Presentation Field Fixes (Phases 114-116, in planning)
 current_phase: 116
 current_phase_name: Lyric Editor & Song UX
-status: executing
-stopped_at: "Completed 116-02-PLAN.md (R336/R337: inline credits editing, History hidden)"
+status: verified
+stopped_at: "All v2.9 phases (114-116) executed + code-reviewed + auto-verified green; human/hardware UAT batched. Ready for milestone lifecycle (audit → complete → cleanup)."
 last_updated: "2026-09-04T13:03:52.163Z"
 last_activity: 2026-09-04
-last_activity_desc: 116-02-PLAN.md executed and committed
+last_activity_desc: "Phase 116 verified (6/6 code truths; browser UAT batched) — all 3 v2.9 phases executed; entering milestone lifecycle"
 progress:
   total_phases: 3
   completed_phases: 3
@@ -28,6 +28,7 @@ them via the batched UAT.
 |-------|-------|--------|
 | 114 | verification_deferred_human (auto-verified green; real-3-monitor/macOS placement UAT pending) | /gsd-verify-work 114 |
 | 115 | verification_deferred_human (auto-verified green, 17/17 code must-haves; real-projector WYSIWYG / macOS scrollbar / at-a-glance legibility UAT pending) | /gsd-verify-work 115 |
+| 116 | verification_deferred_human (auto-verified green, 6/6 code truths; new-tab edit-link / SongSelect link / credits round-trip browser UAT pending) | /gsd-verify-work 116 |
 
 ## Human UAT — completed & PASSED
 

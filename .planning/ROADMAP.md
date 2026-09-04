@@ -601,8 +601,10 @@ open the Firebase Storage + external-media cost/security surface; the unsupporte
   + auto-verified green 2026-09-04, 17/17 code-verifiable must-haves; real-projector WYSIWYG / macOS
   scrollbar / at-a-glance legibility batched hardware UAT → v2.9-DEFERRED-VERIFICATION.md)*
 
-- [ ] **Phase 116: Lyric Editor & Song UX** - Relabeled edit-lyrics link opening in a new tab, a
-  SongSelect link, Cancel→Close, manual Credits/CCLI editing, and a hidden History tab
+- [x] **Phase 116: Lyric Editor & Song UX** - Relabeled edit-lyrics link opening in a new tab, a
+  SongSelect link, Cancel→Close, manual Credits/CCLI editing, and a hidden History tab *(executed +
+  code-reviewed + auto-verified green 2026-09-04, 6/6 code truths, R333–R337; light browser UAT — new-tab
+  open / SongSelect link / credits round-trip — batched → v2.9-DEFERRED-VERIFICATION.md)*
 
 ### Phase 114: Multi-Monitor Assignment Rework
 
