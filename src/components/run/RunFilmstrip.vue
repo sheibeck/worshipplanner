@@ -103,19 +103,20 @@ const thumbStageStyle = {
 }
 
 /**
- * Owner UAT: keep the current (highlighted) thumb visible. As the operator
- * advances, the active thumb would otherwise scroll off the right edge and
- * they'd have to hand-scroll. We capture the active thumb's element via a
- * function ref and scroll it into view within the horizontal strip whenever
- * the current slide changes (and on mount). `block: 'nearest'` avoids nudging
- * the page vertically; guarded for jsdom (no real scrollIntoView).
+ * Owner UAT: on every slide change, scroll the strip so the CURRENT thumb is
+ * the LEFT-MOST thumbnail (`inline: 'start'`), not merely nudged into view.
+ * This keeps the upcoming slides — and, as you reach the last slides, the
+ * end-of-item / next-item end cap that sits after them — visible to the right,
+ * instead of leaving the current thumb pinned at the right edge with the end
+ * cap off-screen. `block: 'nearest'` avoids nudging the page vertically;
+ * guarded for jsdom (no real scrollIntoView).
  */
 let activeThumbEl: HTMLElement | null = null
 function setActiveThumb(el: unknown, thumbIndex: number) {
   if (thumbIndex === props.currentIndex && el instanceof HTMLElement) activeThumbEl = el
 }
 function scrollActiveIntoView() {
-  activeThumbEl?.scrollIntoView?.({ behavior: 'smooth', inline: 'nearest', block: 'nearest' })
+  activeThumbEl?.scrollIntoView?.({ behavior: 'smooth', inline: 'start', block: 'nearest' })
 }
 watch(() => props.currentIndex, scrollActiveIntoView, { flush: 'post' })
 onMounted(scrollActiveIntoView)

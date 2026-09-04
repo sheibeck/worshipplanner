@@ -89,6 +89,49 @@ describe('RunFilmstrip — array-index click-to-jump contract (R282)', () => {
   })
 })
 
+describe('RunFilmstrip — auto-scroll keeps the current thumb left-most (owner UAT)', () => {
+  it('scrolls the active thumb with inline:"start" on mount and on currentIndex change', async () => {
+    // jsdom does not implement scrollIntoView; define it so the component's
+    // optional-chained call is observable.
+    const proto = HTMLElement.prototype as unknown as { scrollIntoView?: unknown }
+    const original = proto.scrollIntoView
+    const scrollSpy = vi.fn()
+    proto.scrollIntoView = scrollSpy
+
+    try {
+      const wrapper = mount(RunFilmstrip, {
+        props: {
+          slides: [fakeSlide('a'), fakeSlide('b'), fakeSlide('c')],
+          indices: [0, 1, 2],
+          currentIndex: 0,
+        },
+      })
+      await wrapper.vm.$nextTick()
+
+      // On mount the current (first) thumb is aligned to the strip's start.
+      expect(scrollSpy).toHaveBeenCalled()
+      const mountCalls = scrollSpy.mock.calls
+      expect(mountCalls[mountCalls.length - 1]![0]).toMatchObject({ inline: 'start', block: 'nearest' })
+
+      scrollSpy.mockClear()
+      await wrapper.setProps({ currentIndex: 2 })
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick() // flush:'post' watcher
+
+      // Advancing re-scrolls so the new current thumb is again left-most —
+      // this is what brings the trailing end-cap into view near the end.
+      expect(scrollSpy).toHaveBeenCalled()
+      const changeCalls = scrollSpy.mock.calls
+      expect(changeCalls[changeCalls.length - 1]![0]).toMatchObject({ inline: 'start' })
+
+      wrapper.unmount()
+    } finally {
+      if (original) proto.scrollIntoView = original
+      else delete (proto as Record<string, unknown>).scrollIntoView
+    }
+  })
+})
+
 describe('RunFilmstrip — end-of-item cap (R331)', () => {
   it('names the next item when nextItemLabel is present', () => {
     const wrapper = mount(RunFilmstrip, {
