@@ -334,15 +334,22 @@ function onEditCongregational(): void {
 
 /**
  * See ADR-0119 (docs/adr/0119-the-drawer-has-one-body-so-there-is-no-mode-to-set-duplicate.md).
- * R333: opens the lyrics deep-link in a NEW tab (`window.open`, `noopener` —
- * T-116-02) rather than navigating this tab away, so the planner keeps their
- * place in the read-only viewer. The 3-dot menu's `edit-in-song`
- * (`onMenuAction` below) is untouched — it still navigates in-app.
+ * R333: opens the lyrics deep-link in a NEW tab (`window.open`) rather than
+ * navigating this tab away, so the planner keeps their place in the read-only
+ * viewer. The 3-dot menu's `edit-in-song` (`onMenuAction` below) is untouched.
+ *
+ * Deliberately NOT `noopener`: this is a SAME-ORIGIN internal route, and the
+ * active-church choice lives in per-tab `sessionStorage` (`wp.selectedOrg`).
+ * `noopener` severs the opener relationship, so the new tab starts with empty
+ * sessionStorage → the router's org-selection guard bounces it to
+ * `/select-church` (owner-reported). Keeping the opener lets the new tab
+ * inherit the opener's sessionStorage copy and land on the song's Lyrics tab.
+ * Reverse-tabnabbing is not a concern for a first-party same-origin URL.
  */
 function onEditInSongBadge(songId: string): void {
   if (!confirmLeavingOpenDrawer()) return
   const href = router.resolve(buildSongEditLink(songId, 'lyrics')).href
-  window.open(href, '_blank', 'noopener')
+  window.open(href, '_blank')
 }
 
 function onMenuAction(slideId: string, key: MenuItemKey): void {

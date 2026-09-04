@@ -841,10 +841,12 @@ describe('SlidesTab', () => {
 
     // R333 (owner UAT): the read-only song badge (SlideGrid's `edit-in-song`
     // emit) opens the same song-lyrics deep link the menu's edit-in-song
-    // resolves to, but in a NEW tab (window.open, noopener) rather than
-    // navigating this tab away — the planner keeps their place in the
-    // read-only viewer.
-    it('badge: SlideGrid\'s edit-in-song emit opens the lyrics deep-link in a new noopener tab, not router.push', async () => {
+    // resolves to, but in a NEW tab (window.open) rather than navigating this
+    // tab away — the planner keeps their place in the read-only viewer.
+    // Deliberately WITHOUT `noopener`: this is a same-origin internal route and
+    // the active-church choice lives in per-tab sessionStorage, so noopener
+    // would strand the new tab on /select-church (owner-reported regression).
+    it('badge: SlideGrid\'s edit-in-song emit opens the lyrics deep-link in a new tab (no noopener), not router.push', async () => {
       const wrapper = mountWithEntry({ kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' })
       await wrapper.vm.$nextTick()
 
@@ -859,7 +861,9 @@ describe('SlidesTab', () => {
       const [href, target, features] = windowOpenSpy.mock.calls[0]!
       expect(href).toBe('/songs?edit=song-42&tab=lyrics')
       expect(target).toBe('_blank')
-      expect(features).toContain('noopener')
+      // No noopener — the new tab must inherit the opener's sessionStorage
+      // (selected church) to reach the editor instead of /select-church.
+      expect(features == null || !String(features).includes('noopener')).toBe(true)
       expect(mockRouterPush).not.toHaveBeenCalled()
 
       windowOpenSpy.mockRestore()
