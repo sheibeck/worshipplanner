@@ -27,11 +27,17 @@
   <!-- Slide content — PresentationViewer keeps the v-else-if="currentSlide"
        guard around the <SlideCanvas> element itself; here the block renders
        whenever props.slide is non-null. -->
-  <div v-if="props.slide" ref="frameRef" class="w-full h-full">
+  <!-- R329 auto-fit geometry: the FRAME is the fixed fit box (fills the
+       canonical stage) and does the vertical+horizontal centering + clips at
+       the stage edge; the CONTENT shrink-wraps to its natural height so
+       `contentRef.scrollHeight` reports the TRUE text height. Centering must NOT
+       live on the measured element — `justify-center` there hides top overflow
+       from scrollHeight, so the fit over-scales and clips (owner-reported). -->
+  <div v-if="props.slide" ref="frameRef" class="w-full h-full flex items-center justify-center overflow-hidden">
   <div
     ref="contentRef"
     data-testid="presentation-slide"
-    class="w-full h-full flex flex-col items-center justify-center px-16 py-12 text-center"
+    class="w-full flex flex-col items-center px-16 py-12 text-center"
     :style="{ '--slide-fit-scale': fitScale }"
   >
     <!-- Render-pending — the FIRST branch of this chain (R080/D-15).

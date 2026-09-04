@@ -180,6 +180,29 @@ function withBackground(assembled: AssembledSlide, url: string): AssembledSlide 
   }
 }
 
+// R329 auto-fit geometry (owner-reported "words way too big / cut off"): the
+// vertical centering MUST live on the FRAME, not on the measured content
+// element. `justify-center` on the measured element hides top overflow from
+// `scrollHeight`, so the fit over-scales and clips. This guards the fix.
+describe('SlideCanvas — auto-fit measurement geometry (R329)', () => {
+  it('centers on the frame, not the measured content, so scrollHeight sees true overflow', () => {
+    const wrapper = mount(SlideCanvas, { props: { slide: lyricSlide('l1') } })
+    const content = wrapper.find('[data-testid="presentation-slide"]')
+    expect(content.exists()).toBe(true)
+
+    // The measured content element must NOT be height-locked or vertically
+    // centered — those are exactly what break the scrollHeight overflow read.
+    expect(content.classes()).not.toContain('justify-center')
+    expect(content.classes()).not.toContain('h-full')
+
+    // The frame (content's parent) owns the centering + clips at the stage edge.
+    const frame = content.element.parentElement as HTMLElement
+    expect(frame.className).toContain('items-center')
+    expect(frame.className).toContain('justify-center')
+    expect(frame.className).toContain('overflow-hidden')
+  })
+})
+
 describe('SlideCanvas', () => {
   // ── Content-kind coverage — same data-testid markers PresentationViewer used ──
 
