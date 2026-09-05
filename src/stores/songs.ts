@@ -55,6 +55,7 @@ export const useSongStore = defineStore('songs', () => {
     lastUsed: true,
     tags: true,
     themes: true,
+    files: true,
   }
   const columnVisibility = ref<Record<string, boolean>>({ ...DEFAULT_COLUMN_VISIBILITY })
 
