@@ -360,6 +360,10 @@ function onYearChange(event: Event) {
   selectedMonth.value = null
 }
 
+// R353/ARCH-002: hoisted so the org-switch watcher below can stop+null a
+// retained teams seed watch (mirrors RosterView's stopTeamsSeedWatch).
+let stopTeamsSeedWatch: (() => void) | null = null
+
 // Subscribe to Firestore services collection for the given (live) orgId
 function initStore(orgId: string) {
   serviceStore.subscribe(orgId)
@@ -369,11 +373,12 @@ function initStore(orgId: string) {
   // because seeding writes to Firestore and reads require isOrgEditor.
   if (authStore.isEditor && !teamsStore.orgId) {
     teamsStore.subscribe(orgId)
-    const stopTeamsSeedWatch = watch(
+    stopTeamsSeedWatch = watch(
       () => teamsStore.teams,
       () => {
         teamsStore.seedDefaultTeamsIfEmpty()
-        stopTeamsSeedWatch()
+        stopTeamsSeedWatch?.()
+        stopTeamsSeedWatch = null
       },
     )
   }
@@ -383,14 +388,23 @@ function initStore(orgId: string) {
 watch(
   () => authStore.orgId,
   (orgId) => {
+    stopTeamsSeedWatch?.()
+    stopTeamsSeedWatch = null
     serviceStore.unsubscribeAll()
+    // R353/ARCH-002: local defense-in-depth teardown, matching
+    // RosterView/DashboardView/TeamView — resetOrgScopedStores() still runs
+    // globally, this guards against a future path that changes orgId without it.
+    teamsStore.unsubscribeAll()
     if (orgId) initStore(orgId)
   },
   { immediate: true },
 )
 
 onUnmounted(() => {
+  stopTeamsSeedWatch?.()
+  stopTeamsSeedWatch = null
   serviceStore.unsubscribeAll()
+  teamsStore.unsubscribeAll()
 })
 
 async function onCreateService(data: { date: string; name: string; teams: string[] }) {

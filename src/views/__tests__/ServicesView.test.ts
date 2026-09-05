@@ -116,6 +116,7 @@ const mockTeamsState = reactive<{ teams: { id: string; name: string; order: numb
   orgId: null,
 })
 const mockTeamsSubscribe = vi.fn()
+const mockTeamsUnsubscribeAll = vi.fn()
 const mockSeedDefaultTeamsIfEmpty = vi.fn()
 
 vi.mock('@/stores/teams', () => ({
@@ -127,6 +128,7 @@ vi.mock('@/stores/teams', () => ({
       return mockTeamsState.orgId
     },
     subscribe: mockTeamsSubscribe,
+    unsubscribeAll: mockTeamsUnsubscribeAll,
     seedDefaultTeamsIfEmpty: mockSeedDefaultTeamsIfEmpty,
   }),
 }))
@@ -153,6 +155,7 @@ beforeEach(() => {
   mockCreateService.mockClear()
   mockTeamsState.orgId = null
   mockTeamsSubscribe.mockClear()
+  mockTeamsUnsubscribeAll.mockClear()
   mockSeedDefaultTeamsIfEmpty.mockClear()
 })
 
@@ -209,5 +212,21 @@ describe('church switch re-subscribe (260901-lua)', () => {
     expect(mockUnsubscribeAll).toHaveBeenCalled()
     expect(mockSubscribe).toHaveBeenCalledWith('org-2')
     expect(mockSubscribe).not.toHaveBeenCalledWith('org-1')
+  })
+})
+
+describe('teamsStore teardown on org switch (R353/ARCH-002)', () => {
+  it('tears down teamsStore locally on org switch, matching RosterView/DashboardView/TeamView', async () => {
+    mockAuthState.orgId = 'org-1'
+    mountServicesView()
+    await flushPromises()
+
+    mockTeamsUnsubscribeAll.mockClear()
+
+    // In-place church switch — no route change, no remount.
+    mockAuthState.orgId = 'org-2'
+    await flushPromises()
+
+    expect(mockTeamsUnsubscribeAll).toHaveBeenCalled()
   })
 })
