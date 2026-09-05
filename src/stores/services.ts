@@ -180,6 +180,21 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
           position: slot.position,
           ...(slot.kind === 'MISC' && slot.label ? { label: slot.label } : {}),
         }
+      // WR-02 (118-REVIEW): the switch above is exhaustive over the compile-time
+      // `ServiceSlot` union, but a runtime slot whose `kind` falls outside it
+      // (corrupt/legacy/future data crossing the Firestore boundary) must still
+      // map to a value — falling off the end returns `undefined`, which throws
+      // the whole `shareTokens` write (Firestore rejects `undefined` at any
+      // depth). Mirrors the old pre-switch pass-through and slotTypes.ts's
+      // `KNOWN_SLOT_KINDS` defensiveness: keep the slot's identity/position as a
+      // structured stand-in rather than propagate `undefined`.
+      default: {
+        // `slot` narrows to `never` here because the switch is exhaustive over
+        // the compile-time union — this branch only exists for a runtime value
+        // outside it, so read defensively through an unknown cast.
+        const unknownSlot = slot as unknown as { id: string; kind: string; position: number }
+        return { id: unknownSlot.id, kind: unknownSlot.kind, position: unknownSlot.position } as ServiceSlot
+      }
     }
   })
 
