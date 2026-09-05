@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
+import { reactive } from 'vue'
 import GettingStarted from '../GettingStarted.vue'
 
 // R103 — dismissible Getting Started panel, persisted per-device via
-// localStorage. Stores and Firestore's onSnapshot are mocked so each test can
-// independently control whether `allDone` is true or false; the dismiss key
-// itself is exercised against the REAL localStorage (matching
-// CollapsibleSection.test.ts's precedent), cleared before and after every
-// test to prevent cross-test pollution.
+// localStorage. Stores are mocked so each test can independently control
+// whether `allDone` is true or false; the dismiss key itself is exercised
+// against the REAL localStorage (matching CollapsibleSection.test.ts's
+// precedent), cleared before and after every test to prevent cross-test
+// pollution.
 
 const mockUseAuthStore = vi.fn()
 vi.mock('@/stores/auth', () => ({
@@ -25,15 +25,16 @@ vi.mock('@/stores/services', () => ({
   useServiceStore: () => mockUseServiceStore(),
 }))
 
-vi.mock('@/firebase', () => ({ db: {} }))
-
-const mockMemberSnapshotSize = vi.fn<() => number>()
-vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(),
-  onSnapshot: (_ref: unknown, cb: (snap: { size: number }) => void) => {
-    cb({ size: mockMemberSnapshotSize() })
-    return () => {}
-  },
+// R356/ARCH-008 — the member-count listener now lives in useMembersStore;
+// this component only drives subscribe()/unsubscribeAll() and reads
+// memberCount, so the mock is a reactive stand-in with spy actions.
+const mockMembersStore = reactive({
+  memberCount: 0,
+  subscribe: vi.fn(),
+  unsubscribeAll: vi.fn(),
+})
+vi.mock('@/stores/members', () => ({
+  useMembersStore: () => mockMembersStore,
 }))
 
 const globalStubs = {
@@ -52,12 +53,14 @@ function mountPanel() {
 describe('GettingStarted', () => {
   beforeEach(() => {
     localStorage.clear()
-    // Default: at least one step incomplete (songs/services empty), no org
-    // so the member-count Firestore subscription never fires — panel visible.
+    // Default: at least one step incomplete (songs/services empty), no org —
+    // panel visible.
     mockUseAuthStore.mockReturnValue({ orgId: null })
     mockUseSongStore.mockReturnValue({ songs: [] })
     mockUseServiceStore.mockReturnValue({ services: [] })
-    mockMemberSnapshotSize.mockReturnValue(0)
+    mockMembersStore.memberCount = 0
+    mockMembersStore.subscribe.mockClear()
+    mockMembersStore.unsubscribeAll.mockClear()
   })
 
   afterEach(() => {
@@ -94,14 +97,23 @@ describe('GettingStarted', () => {
     mockUseAuthStore.mockReturnValue({ orgId: 'org-1' })
     mockUseSongStore.mockReturnValue({ songs: [{ id: 'song-1' }] })
     mockUseServiceStore.mockReturnValue({ services: [{ id: 'service-1' }] })
-    mockMemberSnapshotSize.mockReturnValue(2)
+    mockMembersStore.memberCount = 2
 
     const wrapper = mountPanel()
-    // memberCount is set inside onMounted's onSnapshot callback — wait one tick
-    // for the reactive update (allDone) to flush into the rendered template.
-    await nextTick()
 
     expect(wrapper.find('[data-testid="getting-started-dismiss"]').exists()).toBe(false)
+  })
+
+  // R356/ARCH-008 — the panel drives the store's subscribe/unsubscribeAll
+  // lifecycle instead of opening its own onSnapshot.
+  it('drives membersStore.subscribe on org change and unsubscribeAll on unmount', async () => {
+    mockUseAuthStore.mockReturnValue({ orgId: 'org-1' })
+    const wrapper = mountPanel()
+
+    expect(mockMembersStore.subscribe).toHaveBeenCalledWith('org-1')
+
+    wrapper.unmount()
+    expect(mockMembersStore.unsubscribeAll).toHaveBeenCalled()
   })
 
   it('dismissed-but-not-allDone hides the panel — the two conditions are independent', () => {

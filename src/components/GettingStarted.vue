@@ -74,19 +74,15 @@
 
 <script setup lang="ts">
 import { computed, ref, onUnmounted, watch } from 'vue'
-import { collection, onSnapshot, type Unsubscribe } from 'firebase/firestore'
-import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
 import { useServiceStore } from '@/stores/services'
-import { ignorePermissionDenied } from '@/utils/firestoreListener'
+import { useMembersStore } from '@/stores/members'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
 const serviceStore = useServiceStore()
-
-const memberCount = ref(0)
-let unsub: Unsubscribe | null = null
+const membersStore = useMembersStore()
 
 // R103 — dismiss control, persisted per-device. Flat, unscoped key (matches
 // CollapsibleSection.vue's precedent) since this is UI-state chrome, not church
@@ -118,26 +114,17 @@ function onDismiss() {
 }
 
 // See ADR-0066 (docs/adr/0066-260901-lua-the-sidebar-s-in-place-church-switcher-appsidebar.md)
+// R356/ARCH-008 — the member-count listener lifecycle now lives in
+// useMembersStore (src/stores/members.ts); this just drives subscribe() on
+// org change and reads store.memberCount below.
 watch(
   () => authStore.orgId,
-  (orgId) => {
-    unsub?.()
-    unsub = null
-    memberCount.value = 0
-    if (!orgId) return
-    unsub = onSnapshot(
-      collection(db, 'organizations', orgId, 'members'),
-      (snap) => {
-        memberCount.value = snap.size
-      },
-      ignorePermissionDenied('GettingStarted memberCount'),
-    )
-  },
+  (orgId) => membersStore.subscribe(orgId),
   { immediate: true },
 )
 
 onUnmounted(() => {
-  unsub?.()
+  membersStore.unsubscribeAll()
 })
 
 const steps = computed(() => [
@@ -162,7 +149,7 @@ const steps = computed(() => [
   {
     title: 'Share with your team',
     description: 'Invite team members to collaborate.',
-    done: memberCount.value > 1,
+    done: membersStore.memberCount > 1,
     to: '/admins',
   },
 ])

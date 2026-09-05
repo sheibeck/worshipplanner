@@ -9,6 +9,7 @@ import { useImportedSlides } from './importedSlides'
 import { usePptxRenders } from './pptxRenders'
 import { useServiceMessagesStore } from './serviceMessages'
 import { useSongLyricsStore } from './songLyrics'
+import { useMembersStore } from './members'
 
 /**
  * See .planning/codebase/STACK.md (Store & Entry-Point Stack Notes (R318) ->
@@ -31,4 +32,8 @@ export function resetOrgScopedStores(): void {
   usePptxRenders().unsubscribeAll()
   useServiceMessagesStore().unsubscribeServiceMessages()
   useSongLyricsStore().unsubscribeLyrics()
+  // R356/ARCH-008 — the member-count listener (src/stores/members.ts), moved
+  // out of GettingStarted.vue's own onSnapshot; registered here for org-switch
+  // teardown parity with the other 10 org-scoped stores above.
+  useMembersStore().unsubscribeAll()
 }
