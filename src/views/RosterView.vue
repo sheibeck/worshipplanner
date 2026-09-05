@@ -779,13 +779,16 @@ watch(() => route?.query?.edit, () => applyEditQuery())
 watch(() => rosterStore.people.length, () => applyEditQuery())
 
 onUnmounted(() => {
+  // Stop only the LOCAL seed watchers (component-owned). Do NOT unsubscribe the
+  // shared org-scoped rosterStore/teamsStore here: onUnmounted is a deferred
+  // post-render effect, so it runs AFTER the next route view's synchronous
+  // watch(orgId,{immediate:true}) re-subscribe and would wipe the listener that
+  // view just attached (orgId is unchanged, so its watch never re-fires ->
+  // empty until reload). Shared org-scoped stores are torn down solely by
+  // resetOrgScopedStores() on church switch / logout (v2.10 hotfix).
   stopSeedWatch?.()
   stopSeedWatch = null
   stopTeamsSeedWatch?.()
   stopTeamsSeedWatch = null
-  rosterStore.unsubscribeAll()
-  // Mirrors rosterStore's teardown above — teams are RosterView-owned config,
-  // same as roles.
-  teamsStore.unsubscribeAll()
 })
 </script>

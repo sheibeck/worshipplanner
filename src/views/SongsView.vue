@@ -412,7 +412,15 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  songStore.unsubscribeAll()
+  // Stop only the LOCAL song-edit deep-link watcher. Do NOT unsubscribe the
+  // shared org-scoped songStore here: onUnmounted is a deferred post-render
+  // effect that runs AFTER the next route view's synchronous
+  // watch(orgId,{immediate:true}) re-subscribe (e.g. Dashboard's), so tearing
+  // songStore down here wipes the listener that view just attached (orgId
+  // unchanged -> its watch never re-fires -> empty until reload; this is what
+  // flipped GettingStarted's "Import your song library" step back on). Shared
+  // org-scoped stores are torn down solely by resetOrgScopedStores() on church
+  // switch / logout (v2.10 hotfix).
   stopSongEditWatch?.()
   stopSongEditWatch = null
 })

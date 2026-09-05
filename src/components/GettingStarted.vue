@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onUnmounted, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
 import { useServiceStore } from '@/stores/services'
@@ -123,9 +123,13 @@ watch(
   { immediate: true },
 )
 
-onUnmounted(() => {
-  membersStore.unsubscribeAll()
-})
+// No onUnmounted teardown of the shared org-scoped membersStore: onUnmounted is
+// a deferred post-render effect that runs AFTER the next view's synchronous
+// watch(orgId,{immediate:true}) re-subscribe, so tearing the shared listener
+// down here would wipe a listener another consumer just attached (and stub the
+// member count to 0, flipping the "Share with your team" step back on). The
+// member-count listener is torn down solely by resetOrgScopedStores() on church
+// switch / logout (v2.10 hotfix).
 
 const steps = computed(() => [
   {

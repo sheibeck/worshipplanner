@@ -401,10 +401,16 @@ watch(
 )
 
 onUnmounted(() => {
+  // Stop only the LOCAL teams seed watcher. Do NOT unsubscribe the shared
+  // org-scoped serviceStore/teamsStore here: onUnmounted is a deferred
+  // post-render effect that runs AFTER the next route view's synchronous
+  // watch(orgId,{immediate:true}) re-subscribe, so it would wipe the listener
+  // that view just attached (orgId unchanged -> its watch never re-fires ->
+  // empty until reload). This is exactly what R353's added teamsStore teardown
+  // did to RosterView's Teams tab. Shared org-scoped stores are torn down
+  // solely by resetOrgScopedStores() on church switch / logout (v2.10 hotfix).
   stopTeamsSeedWatch?.()
   stopTeamsSeedWatch = null
-  serviceStore.unsubscribeAll()
-  teamsStore.unsubscribeAll()
 })
 
 async function onCreateService(data: { date: string; name: string; teams: string[] }) {

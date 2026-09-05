@@ -493,7 +493,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useQuartersStore } from '@/stores/quarters'
 import { useRosterStore } from '@/stores/roster'
@@ -850,8 +850,11 @@ watch(
   { immediate: true },
 )
 
-onUnmounted(() => {
-  quartersStore.unsubscribeAll()
-  rosterStore.unsubscribeAll()
-})
+// No onUnmounted teardown of the shared org-scoped quartersStore/rosterStore:
+// onUnmounted is a deferred post-render effect that runs AFTER the next route
+// view's synchronous watch(orgId,{immediate:true}) re-subscribe, so tearing the
+// shared listener down here wipes the one that view just attached (orgId
+// unchanged -> its watch never re-fires -> empty until reload). Shared
+// org-scoped stores are torn down solely by resetOrgScopedStores() on church
+// switch / logout (v2.10 hotfix).
 </script>

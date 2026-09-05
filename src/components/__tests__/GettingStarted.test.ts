@@ -104,16 +104,21 @@ describe('GettingStarted', () => {
     expect(wrapper.find('[data-testid="getting-started-dismiss"]').exists()).toBe(false)
   })
 
-  // R356/ARCH-008 — the panel drives the store's subscribe/unsubscribeAll
-  // lifecycle instead of opening its own onSnapshot.
-  it('drives membersStore.subscribe on org change and unsubscribeAll on unmount', async () => {
+  // R356/ARCH-008 — the panel drives the shared members store's subscribe on
+  // org change. v2.10 hotfix: it must NOT tear the shared org-scoped store down
+  // on its own unmount. onUnmounted runs as a deferred post-render effect, so a
+  // teardown here fires AFTER the next route view's synchronous
+  // watch(orgId,{immediate:true}) re-subscribe and wipes the just-attached
+  // listener (this is the shared-store navigation teardown race). Teardown is
+  // owned solely by resetOrgScopedStores() on church switch / logout.
+  it('drives membersStore.subscribe on org change and does NOT unsubscribe the shared store on unmount', async () => {
     mockUseAuthStore.mockReturnValue({ orgId: 'org-1' })
     const wrapper = mountPanel()
 
     expect(mockMembersStore.subscribe).toHaveBeenCalledWith('org-1')
 
     wrapper.unmount()
-    expect(mockMembersStore.unsubscribeAll).toHaveBeenCalled()
+    expect(mockMembersStore.unsubscribeAll).not.toHaveBeenCalled()
   })
 
   it('dismissed-but-not-allDone hides the panel — the two conditions are independent', () => {
