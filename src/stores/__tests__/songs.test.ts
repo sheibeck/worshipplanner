@@ -40,6 +40,11 @@ vi.mock('firebase/firestore', () => {
     query: vi.fn((ref) => ref),
     orderBy: vi.fn(),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
+    // Phase 123 code-review CR-01: addSongAttachment's atomic append. Mirrors
+    // auth.test.ts's arrayUnion mock convention — wraps the value so
+    // assertions can distinguish "this field is an arrayUnion of X" from a
+    // plain array write.
+    arrayUnion: vi.fn((v: unknown) => ({ __arrayUnion: v })),
   }
 })
 
@@ -777,6 +782,66 @@ describe('useSongStore', () => {
       expect(data.title).toBe('Updated Title')
       expect(data.updatedAt).toBeDefined()
       expect(serverTimestamp).toHaveBeenCalled()
+    })
+  })
+
+  describe('addSongAttachment', () => {
+    it('Phase 123 code-review CR-01: writes attachments via arrayUnion, not a plain array, alongside serverTimestamp updatedAt', async () => {
+      const { updateDoc, serverTimestamp, arrayUnion } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+
+      const attachment = {
+        id: 'att-1',
+        kind: 'document' as const,
+        name: 'chart.pdf',
+        storagePath: 'orgs/org-1/song-files/att-1/chart.pdf',
+        downloadUrl: 'https://cdn.example.com/chart.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 1024,
+        createdAt: {} as never,
+        createdBy: 'user-1',
+      }
+
+      await store.addSongAttachment('song-1', attachment)
+
+      expect(arrayUnion).toHaveBeenCalledWith(attachment)
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      // The mocked arrayUnion wraps its argument so this assertion actually
+      // proves the field is an arrayUnion sentinel, not a plain array literal
+      // that happens to contain the same attachment (which would silently
+      // reintroduce the CR-01 read-modify-write race).
+      expect(data.attachments).toEqual({ __arrayUnion: attachment })
+      expect(data.updatedAt).toBeDefined()
+      expect(serverTimestamp).toHaveBeenCalled()
+    })
+
+    it('CR-01: two overlapping addSongAttachment calls each land as their own independent arrayUnion write — neither is dropped', async () => {
+      const { updateDoc, arrayUnion } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+
+      const attachmentA = { id: 'att-a', kind: 'document' as const, name: 'a.pdf', createdAt: {} as never, createdBy: 'user-1' }
+      const attachmentB = { id: 'att-b', kind: 'link' as const, name: 'b link', href: 'https://youtu.be/x', createdAt: {} as never, createdBy: 'user-1' }
+
+      // Simulates the scenario from CR-01: a second attachment-adding
+      // operation (link submit) resolves while a first (upload completion)
+      // is still in flight. With the old read-modify-write, the later write
+      // would silently drop whichever wasn't in ITS captured snapshot. With
+      // arrayUnion, both calls are independent server-side merges — the
+      // order they resolve in never causes one to overwrite the other.
+      await Promise.all([
+        store.addSongAttachment('song-1', attachmentA),
+        store.addSongAttachment('song-1', attachmentB),
+      ])
+
+      expect(updateDoc).toHaveBeenCalledTimes(2)
+      expect(arrayUnion).toHaveBeenCalledWith(attachmentA)
+      expect(arrayUnion).toHaveBeenCalledWith(attachmentB)
     })
   })
 

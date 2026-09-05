@@ -158,7 +158,6 @@ const uploadCtx = computed(() => ({
   songId: props.songId,
   orgId: props.orgId,
   createdBy: props.createdBy,
-  existingAttachments: props.attachments,
 }))
 
 function openFilePicker() {
@@ -187,7 +186,9 @@ function submitLink() {
   }
   linkError.value = false
   const attachment = buildLinkAttachment({ href: linkInput.value.trim(), createdBy: props.createdBy })
-  void songStore.updateSong(props.songId, { attachments: [...props.attachments, attachment] })
+  // CR-01: atomic arrayUnion append (not a read-modify-write of props.attachments)
+  // so this can't clobber/be clobbered by an overlapping upload completion.
+  void songStore.addSongAttachment(props.songId, attachment)
   linkInput.value = ''
 }
 

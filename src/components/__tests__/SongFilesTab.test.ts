@@ -7,10 +7,10 @@ import { useSongStore } from '@/stores/songs'
 import type { SongAttachment } from '@/types/song'
 import type { UploadRow } from '@/composables/useSongFileUpload'
 
-// SongFilesTab persists link-attach via useSongStore().updateSong — the store
-// itself is spied at the method level, so its own firebase/firestore imports
-// never execute; only @/firebase needs a stub for the module graph (mirrors
-// useSongFileUpload.test.ts's convention).
+// SongFilesTab persists link-attach via useSongStore().addSongAttachment —
+// the store itself is spied at the method level, so its own
+// firebase/firestore imports never execute; only @/firebase needs a stub for
+// the module graph (mirrors useSongFileUpload.test.ts's convention).
 vi.mock('@/firebase', () => ({
   auth: {},
   db: {},
@@ -98,11 +98,13 @@ describe('SongFilesTab', () => {
     expect(mockAddFiles).toHaveBeenCalledTimes(1)
     const [files, ctx] = mockAddFiles.mock.calls[0]!
     expect(Array.from(files as FileList | File[])).toEqual([file])
+    // CR-01: the upload context no longer carries existingAttachments — the
+    // composable persists via the store's atomic addSongAttachment append,
+    // not a read-modify-write of a captured snapshot.
     expect(ctx).toEqual({
       songId: 'song-1',
       orgId: 'org-1',
       createdBy: 'user-1',
-      existingAttachments: [makeAttachment({ id: 'existing-1' })],
     })
   })
 
@@ -128,7 +130,7 @@ describe('SongFilesTab', () => {
   })
 
   it('submitting an invalid link shows the exact error and persists nothing', async () => {
-    const updateSongSpy = vi.spyOn(useSongStore(), 'updateSong').mockResolvedValue(undefined)
+    const addAttachmentSpy = vi.spyOn(useSongStore(), 'addSongAttachment').mockResolvedValue(undefined)
     const wrapper = mountTab()
     const input = wrapper.find('[data-testid="song-files-link-input"]')
     await input.setValue('not-a-url')
@@ -137,24 +139,29 @@ describe('SongFilesTab', () => {
     expect(wrapper.find('[data-testid="song-files-link-error"]').text()).toBe(
       'Enter a valid link (starting with https://).',
     )
-    expect(updateSongSpy).not.toHaveBeenCalled()
+    expect(addAttachmentSpy).not.toHaveBeenCalled()
   })
 
-  it('submitting a valid https link appends a kind:link attachment via updateSong and clears the field', async () => {
-    const updateSongSpy = vi.spyOn(useSongStore(), 'updateSong').mockResolvedValue(undefined)
+  it('submitting a valid https link appends a kind:link attachment via the atomic addSongAttachment and clears the field', async () => {
+    // CR-01: submitLink() now calls the atomic arrayUnion-based
+    // addSongAttachment(songId, attachment) — a single new attachment, not a
+    // read-modify-write of props.attachments — so an overlapping upload
+    // completion can't be clobbered by this write (or vice versa).
+    const addAttachmentSpy = vi.spyOn(useSongStore(), 'addSongAttachment').mockResolvedValue(undefined)
     const existing = [makeAttachment({ id: 'existing-1' })]
     const wrapper = mountTab(existing)
     const input = wrapper.find('[data-testid="song-files-link-input"]')
     await input.setValue('https://youtu.be/abc123')
     await input.trigger('keydown.enter')
 
-    expect(updateSongSpy).toHaveBeenCalledTimes(1)
-    const [songId, data] = updateSongSpy.mock.calls[0]!
+    expect(addAttachmentSpy).toHaveBeenCalledTimes(1)
+    const [songId, attachment] = addAttachmentSpy.mock.calls[0]!
     expect(songId).toBe('song-1')
-    const attachments = (data as { attachments: SongAttachment[] }).attachments
-    expect(attachments).toHaveLength(2)
-    expect(attachments[0]).toEqual(existing[0])
-    expect(attachments[1]).toMatchObject({ kind: 'link', href: 'https://youtu.be/abc123', linkSource: 'youtube' })
+    expect(attachment as SongAttachment).toMatchObject({
+      kind: 'link',
+      href: 'https://youtu.be/abc123',
+      linkSource: 'youtube',
+    })
 
     expect((input.element as HTMLInputElement).value).toBe('')
     expect(wrapper.find('[data-testid="song-files-link-error"]').exists()).toBe(false)

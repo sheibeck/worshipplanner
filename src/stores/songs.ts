@@ -8,6 +8,7 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  arrayUnion,
   writeBatch,
   query,
   orderBy,
@@ -16,7 +17,7 @@ import {
 } from 'firebase/firestore'
 import { ref as storageRef, deleteObject } from 'firebase/storage'
 import { db, storage } from '@/firebase'
-import type { Song, UpsertSongInput, VWType } from '@/types/song'
+import type { Song, SongAttachment, UpsertSongInput, VWType } from '@/types/song'
 import { songMatchesQuery, filterSongsByTags } from '@/utils/songSearch'
 import { useAuthStore } from '@/stores/auth'
 
@@ -303,6 +304,20 @@ export const useSongStore = defineStore('songs', () => {
     })
   }
 
+  // Phase 123 code-review CR-01: atomic array append for song-file/link
+  // attachments. Two attachment-adding operations (a second upload batch
+  // dropped while the first is still in flight, or a link submitted mid-
+  // upload) each call this independently rather than reading+writing the
+  // whole attachments array from a snapshot — arrayUnion merges server-side,
+  // so neither write can silently clobber the other's addition.
+  async function addSongAttachment(id: string, attachment: SongAttachment) {
+    if (!orgId.value) return
+    await updateDoc(doc(db, 'organizations', orgId.value, 'songs', id), {
+      attachments: arrayUnion(attachment),
+      updatedAt: serverTimestamp(),
+    })
+  }
+
   async function deleteSong(id: string) {
     if (!orgId.value) return
     await updateDoc(doc(db, 'organizations', orgId.value, 'songs', id), {
@@ -515,6 +530,7 @@ export const useSongStore = defineStore('songs', () => {
     unsubscribeAll,
     addSong,
     updateSong,
+    addSongAttachment,
     deleteSong,
     hardDeleteSong,
     restoreSong,

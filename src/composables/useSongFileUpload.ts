@@ -25,7 +25,6 @@ export interface AddFilesContext {
   songId: string
   orgId: string
   createdBy: string
-  existingAttachments: SongAttachment[]
 }
 
 export interface UseSongFileUploadReturn {
@@ -37,7 +36,9 @@ export interface UseSongFileUploadReturn {
    * upload. A file failing client validation (wrong type / >50MB) gets a
    * 'rejected' row and never starts an upload — it does not block the other
    * files in the batch. Each completed upload persists a SongAttachment via
-   * `songStore.updateSong(songId, { attachments })`.
+   * the atomic `songStore.addSongAttachment(songId, attachment)` (CR-01 —
+   * an arrayUnion append, not a read-modify-write of the whole array, so
+   * overlapping addFiles()/link-submit calls can't clobber each other).
    */
   addFiles: (files: FileList | File[], ctx: AddFilesContext) => void
   /** Clears the uploads list. */
@@ -75,11 +76,6 @@ export function useSongFileUpload(): UseSongFileUploadReturn {
 
   function addFiles(files: FileList | File[], ctx: AddFilesContext): void {
     const fileArray = Array.from(files)
-    // Batch-local accumulator: every completion writes existingAttachments +
-    // everything completed so far in THIS batch, so the final persisted array
-    // is complete regardless of which file finishes first (Firestore is
-    // last-write-wins).
-    const completed: SongAttachment[] = []
 
     for (const file of fileArray) {
       const validationError = validateSongFile(file)
@@ -145,10 +141,8 @@ export function useSongFileUpload(): UseSongFileUploadReturn {
                 createdAt: Timestamp.now(),
                 createdBy: ctx.createdBy,
               }
-              completed.push(attachment)
-              await useSongStore().updateSong(ctx.songId, {
-                attachments: [...ctx.existingAttachments, ...completed],
-              })
+              // CR-01: arrayUnion append — see addSongAttachment doc comment.
+              await useSongStore().addSongAttachment(ctx.songId, attachment)
               const current = uploads.value[rowIndex]
               if (!current) return
               uploads.value[rowIndex] = { ...current, status: 'done', progress: 100 }
