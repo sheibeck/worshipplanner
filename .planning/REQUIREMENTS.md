@@ -46,7 +46,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 - [ ] **R363**: An editor can upload **several files at once** to a song by drag-and-drop onto a drop zone
   or by click-to-browse, with **per-file upload progress** shown while each transfers.
 
-- [ ] **R364**: Uploads are restricted to **PDF (documents)** and **MP3 (audio)**, **≤ 50 MB per file**.
+- [x] **R364**: Uploads are restricted to **PDF (documents)** and **MP3 (audio)**, **≤ 50 MB per file**.
   The type and size limits are enforced **both client-side** (clear rejection message before/at upload)
   **and in `storage.rules`** (server-authoritative), so an oversized or disallowed file cannot be written
   even by bypassing the UI.
@@ -86,7 +86,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 
 ### Access Control & Design Fidelity
 
-- [ ] **R372**: Only **editors** can upload, link, or remove song attachments; **viewers** can see the
+- [x] **R372**: Only **editors** can upload, link, or remove song attachments; **viewers** can see the
   Files tab/column as read-only and cannot mutate attachments — enforced in the UI **and** in
   `storage.rules`/Firestore rules.
 
@@ -135,7 +135,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 | R361 | Phase 123 | Pending |
 | R362 | Phase 123 | Pending |
 | R363 | Phase 123 | Pending |
-| R364 | Phase 122 | Pending |
+| R364 | Phase 122 | Complete |
 | R365 | Phase 123 | Pending |
 | R366 | Phase 124 | Pending |
 | R367 | Phase 124 | Pending |
@@ -143,7 +143,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 | R369 | Phase 122 | Pending |
 | R370 | Phase 122 | Pending |
 | R371 | Phase 122 | Pending |
-| R372 | Phase 122 | Pending |
+| R372 | Phase 122 | Complete |
 | R373 | Phase 121 | Complete |
 
 **Coverage: 13 v2.11 requirements (R361–R373) — 100% mapped, 0 orphaned.**

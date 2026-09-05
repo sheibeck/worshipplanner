@@ -5,15 +5,15 @@ milestone_name: Song File Attachments (Phases 121-124, in planning)
 current_phase: 122
 current_phase_name: Durable Storage, Rules & Retention-Exempt Foundation
 status: planning
-stopped_at: Phase 121 UI-SPEC approved
-last_updated: "2026-09-05T15:42:59.262Z"
+stopped_at: Completed 122-01-PLAN.md
+last_updated: "2026-09-05T16:16:12.038Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 121 complete, transitioned to Phase 122
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 3
+  completed_plans: 2
   percent: 25
 ---
 
@@ -3298,6 +3298,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 119 P04 | 35min | 2 tasks | 2 files |
 | Phase 120 P01 | 20min | 2 tasks | 3 files |
 | Phase 120 P02 | 12min | 2 tasks | 3 files |
+| Phase 122 P01 | 25min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3841,6 +3842,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R358: moved AI sermon-context cache-clear watcher into useAiSongSuggestions composable (not explicitly named in plan) to keep the composable fully self-contained
 - [Phase ?]: R360: documented sanctioned utils->useAuthStore exception in ARCHITECTURE.md per accepted low-risk branch; no src/utils refactor performed
 - [Phase ?]: R359: extracted the four cleanup sweeps into functions/src/cleanupSweeps.ts (import-top/export-bottom pattern); moved shared helper renderedPrefixFor into the new module rather than importing it back from index.ts, to keep the dependency direction one-way and avoid a require() cycle.
+- [Phase ?]: isOrgEditorByClaim mirrors isOrgMemberByClaim structure but requires role in ['editor','admin']; song-files/ is immutable (update:false); delete gets its own unconditioned verb; catch-all amended to exclude song-files/ per OR-combination fix
 
 ### Roadmap Evolution
 
@@ -4169,9 +4171,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T15:36:26.485Z
-Stopped at: Phase 121 UI-SPEC approved
-Resume file: .planning/phases/121-song-files-ui-design-spec/121-UI-SPEC.md
+Last session: 2026-09-05T16:16:11.976Z
+Stopped at: Completed 122-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 
