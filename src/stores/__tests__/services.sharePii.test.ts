@@ -156,4 +156,44 @@ describe('buildServiceSnapshot / toPublicServiceSnapshot PII projection (R346/SE
     expect(publicSnapshot.status).toBe('planned')
     expect(publicSnapshot.roleAssignments).toEqual([])
   })
+
+  // WR-01 (118-REVIEW) — the stage-marker free-text `note` rode the public
+  // projection unstripped even after R346 closed service/slot free-text.
+  it('toPublicServiceSnapshot drops the stage-marker free-text note for the public write path, but buildServiceSnapshot itself keeps it', async () => {
+    const { buildServiceSnapshot, toPublicServiceSnapshot } = await import('../services')
+    const service = makeService({
+      stageLayout: {
+        elements: [
+          { id: 'm1', label: 'Guest', kind: 'mic', zone: 'onstage', xPct: 40, yPct: 40, note: PII_MARKER },
+          { id: 'm2', label: 'Drums', kind: 'instrument', zone: 'offstage', xPct: 10, yPct: 20 },
+        ],
+      },
+    }) as unknown as Service
+
+    const snapshot = buildServiceSnapshot(service)
+    // buildServiceSnapshot itself still carries the marker note — the
+    // org-internal lockSnapshots/current consumer (ServiceEditorView.vue) is
+    // untouched by this change, exactly like service-level `notes`.
+    expect(snapshot.stageLayout?.elements[0]?.note).toBe(PII_MARKER)
+
+    const publicSnapshot = toPublicServiceSnapshot(snapshot)
+    for (const marker of publicSnapshot.stageLayout?.elements ?? []) {
+      expect('note' in (marker as object)).toBe(false)
+    }
+    expect(JSON.stringify(publicSnapshot)).not.toContain(PII_MARKER)
+    // Structured stage-layout fields survive — only the free-text note is stripped.
+    const marker0 = publicSnapshot.stageLayout?.elements[0] as unknown as Record<string, unknown>
+    expect(marker0.label).toBe('Guest')
+    expect(marker0.kind).toBe('mic')
+    expect(marker0.zone).toBe('onstage')
+  })
+
+  it('toPublicServiceSnapshot is a no-op for stageLayout when the service has no markers', async () => {
+    const { buildServiceSnapshot, toPublicServiceSnapshot } = await import('../services')
+    const service = makeService() as unknown as Service
+
+    const publicSnapshot = toPublicServiceSnapshot(buildServiceSnapshot(service))
+
+    expect('stageLayout' in publicSnapshot).toBe(false)
+  })
 })

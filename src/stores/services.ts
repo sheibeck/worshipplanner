@@ -79,6 +79,10 @@ export class ServiceLockedError extends Error {
  * (`writeSharePayload` is the sole choke point for both). Per-slot free-text
  * (`notes`/`body`) is dropped unconditionally in `buildServiceSnapshot` itself
  * — no internal consumer reads it, so there is no such split for slots.
+ * Stage-marker free-text `note` (WR-01, 118-REVIEW) uses the SAME split as
+ * service-level `notes`: it stays on this type's `stageLayout.elements` (the
+ * lockSnapshots/current consumer is unaffected), and `toPublicServiceSnapshot()`
+ * strips it per-marker before either public write.
  */
 export interface ServiceSnapshot {
   date: string
@@ -223,9 +227,13 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     zone: marker.zone,
     xPct: clampPct(marker.xPct),
     yPct: clampPct(marker.yPct),
-    // `note` is planner-authored tech instruction (non-PII); conditional spread keeps
-    // it ABSENT (never undefined). See .planning/codebase/ARCHITECTURE.md
-    // (Store & Config Behavioral Notes (R318) -> src/stores/services.ts).
+    // `note` is free-text (WR-01, 118-REVIEW walked back the earlier
+    // "non-PII" assumption — a planner can type anything, including PII, into
+    // this field). It stays on `buildServiceSnapshot`'s own return because the
+    // org-internal lockSnapshots/current consumer is untouched by this
+    // change, but `toPublicServiceSnapshot()` strips it before either public
+    // write — the same split R346 already uses for service-level `notes`.
+    // Conditional spread keeps it ABSENT (never undefined) either way.
     ...(marker.note ? { note: marker.note } : {}),
     // Band-role instrument: project the display role NAME (needed for the tile's
     // type/icon/skin on the read-only page), never the internal roleId.
@@ -259,8 +267,15 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
   }
 }
 
+/** A stage-layout marker as it may reach a PUBLIC share doc — same 6-ish
+ *  display fields as `StageMarker`, minus the free-text `note` (WR-01,
+ *  118-REVIEW). */
+export type PublicStageMarker = Omit<StageMarker, 'note'>
+
 /** The subset of `ServiceSnapshot` actually written to a PUBLIC share doc. */
-export type PublicServiceSnapshot = Omit<ServiceSnapshot, 'notes'>
+export type PublicServiceSnapshot = Omit<ServiceSnapshot, 'notes' | 'stageLayout'> & {
+  stageLayout?: { elements: PublicStageMarker[] }
+}
 
 /**
  * The one function every public write (`writeSharePayload`, shared by
@@ -269,10 +284,31 @@ export type PublicServiceSnapshot = Omit<ServiceSnapshot, 'notes'>
  * service-level free-text `notes` — see the `ServiceSnapshot` type doc for why
  * `notes` stays on `buildServiceSnapshot`'s own return instead of being cut at
  * the source.
+ *
+ * WR-01 (118-REVIEW): also drops the stage-marker free-text `note` here, at
+ * this same choke point — mirroring the `notes` strip above — rather than at
+ * `buildServiceSnapshot`'s stageLayout projection. `buildServiceSnapshot`'s own
+ * return (used by the org-internal lockSnapshots/current re-lock diff,
+ * ServiceEditorView.vue) keeps `note`; nothing there reads it today
+ * (serviceLockDiff.ts never inspects stageLayout), but stripping only here —
+ * not at the source — keeps the internal/editing path (which reads
+ * `service.stageLayout` directly, never this projection) untouched, exactly
+ * like `notes`.
  */
 export function toPublicServiceSnapshot(snapshot: ServiceSnapshot): PublicServiceSnapshot {
   const { notes: _notes, ...publicSnapshot } = snapshot
-  return publicSnapshot
+  if (!publicSnapshot.stageLayout) {
+    return publicSnapshot as PublicServiceSnapshot
+  }
+  return {
+    ...publicSnapshot,
+    stageLayout: {
+      elements: publicSnapshot.stageLayout.elements.map((marker) => {
+        const { note: _note, ...publicMarker } = marker
+        return publicMarker
+      }),
+    },
+  }
 }
 
 export const useServiceStore = defineStore('services', () => {
