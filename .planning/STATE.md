@@ -5,15 +5,15 @@ milestone_name: Song File Attachments (Phases 121-124, in planning)
 current_phase: 124
 current_phase_name: Grouped File List, In-App Preview/Play, Download & Remove
 status: planning
-stopped_at: Completed 123-03-PLAN.md
-last_updated: "2026-09-05T19:35:11.188Z"
+stopped_at: Completed 124-01-PLAN.md
+last_updated: "2026-09-05T21:05:00.000Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 123 complete, transitioned to Phase 124
+last_activity_desc: 124-01 complete (removeSongAttachment + grouped Documents/Audio rows + Download + Remove); 124-02 (in-app preview/play) remains
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
   percent: 75
 ---
 
@@ -1290,9 +1290,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 124 — Grouped File List, In-App Preview/Play, Download & Remove
-Plan: Not started
-Status: 123-02-PLAN.md (Songs-list Files column, R362) complete
-Last activity: 2026-09-05 — Phase 123 complete, transitioned to Phase 124
+Plan: 124-02 not started
+Status: 124-01-PLAN.md (removeSongAttachment store method, Documents/Audio grouped rows, per-row Download, per-row Remove inline-confirm — R366+R368) complete. 124-02 (in-app PDF preview + MP3 player, R367) remains.
+Last activity: 2026-09-05 — 124-01 complete
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 
@@ -3303,6 +3303,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 123 P01 | 25min | 3 tasks | 6 files |
 | Phase 123 P02 | 20min | 2 tasks | 4 files |
 | Phase 123 P03 | 55min | 3 tasks | 7 files |
+| Phase 124 P01 | 55min | 3 tasks | 4 files |
 
 ## Accumulated Context
 

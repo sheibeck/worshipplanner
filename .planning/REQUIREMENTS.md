@@ -57,14 +57,14 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 
 ### File List, Preview & Management
 
-- [ ] **R366**: Attachments are shown grouped into **Documents** and **Audio** sections, each row showing
+- [x] **R366**: Attachments are shown grouped into **Documents** and **Audio** sections, each row showing
   the file's icon, name, and metadata (type · pages-or-duration · size · date), with a per-group empty
   state when a group has no files.
 
 - [ ] **R367**: An editor can **preview a PDF** and **play an MP3 in-app** from its row (an inline reader /
   audio player), without leaving the Files tab. Externally-linked media instead opens in a new tab (R365).
 
-- [ ] **R368**: An editor can **download** any attachment and **remove** any attachment from its row.
+- [x] **R368**: An editor can **download** any attachment and **remove** any attachment from its row.
   Removal deletes the file from the song **everywhere it appears** — including past services that used the
   song — and the UI makes that consequence clear before/at removal.
 
@@ -137,9 +137,9 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 | R363 | Phase 123 | Complete |
 | R364 | Phase 122 | Complete |
 | R365 | Phase 123 | Complete |
-| R366 | Phase 124 | Pending |
+| R366 | Phase 124 | Complete |
 | R367 | Phase 124 | Pending |
-| R368 | Phase 124 | Pending |
+| R368 | Phase 124 | Complete |
 | R369 | Phase 122 | Complete |
 | R370 | Phase 122 | Complete |
 | R371 | Phase 122 | Complete |
