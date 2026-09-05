@@ -57,6 +57,8 @@ export function buildLinkAttachment(params: { href: string; name?: string; creat
     name: trimmedName || fallbackName,
     linkSource: inferLinkSource(params.href),
     href: params.href,
+    // Timestamp.now(), not serverTimestamp() — this value lives inside the
+    // attachments ARRAY, and serverTimestamp() resolves to null inside arrays.
     createdAt: Timestamp.now(),
     createdBy: params.createdBy,
   }

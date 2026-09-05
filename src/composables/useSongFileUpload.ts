@@ -147,6 +147,9 @@ export function useSongFileUpload(): UseSongFileUploadReturn {
                 downloadUrl,
                 mimeType: file.type || (kind === 'document' ? 'application/pdf' : 'audio/mpeg'),
                 sizeBytes: file.size,
+                // Timestamp.now(), not serverTimestamp() — this value lives
+                // inside the attachments ARRAY, and serverTimestamp() resolves
+                // to null inside arrays.
                 createdAt: Timestamp.now(),
                 createdBy: ctx.createdBy,
               }
