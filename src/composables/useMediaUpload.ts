@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/firebase'
+import { sanitizeFileName } from '@/utils/songFiles'
 
 /** Media-cap constant for the Phase 22 org media path (R014); see .planning/codebase/INTEGRATIONS.md (§ Component & Composable Integration Notes (R318) -> src/composables/useMediaUpload.ts). */
 export const MEDIA_MAX_BYTES = 52428800
@@ -23,13 +24,6 @@ export interface UseMediaUploadReturn {
   uploadMedia: (file: File, orgId: string) => Promise<string>
   /** Clears progress/error/isUploading back to their initial state. */
   reset: () => void
-}
-
-/** Best-effort filename sanitization for the Storage object path — strips
- * characters Cloud Storage object paths don't like, keeping the upload path
- * predictable and collision-free alongside the mediaId path segment. */
-function sanitizeFileName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, '_')
 }
 
 // See .planning/codebase/INTEGRATIONS.md (§ Component & Composable Integration Notes (R318) -> src/composables/useMediaUpload.ts)
