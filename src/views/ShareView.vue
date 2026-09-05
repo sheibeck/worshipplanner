@@ -146,6 +146,7 @@ import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 import StageLayoutView from '@/components/stage/StageLayoutView.vue'
 import type { ScriptureRef } from '@/types/service'
+import type { PublicServiceSnapshot } from '@/stores/services'
 
 // Static VW type label lookup (Tailwind v4 purge safety)
 const vwTypeLabels: Record<number, string> = {
@@ -161,7 +162,10 @@ void vwTypeLabels
 const route = useRoute()
 const isLoading = ref(true)
 const notFound = ref(false)
-const serviceSnapshot = ref<any>(null)
+// WR-03 (118-REVIEW): typed (not `any`) so the render-side R346 security gate
+// is compiler-enforced — a future `{{ slot.notes }}` or `{{ marker.note }}`
+// re-add fails `npm run type-check` instead of silently rendering PII.
+const serviceSnapshot = ref<PublicServiceSnapshot | null>(null)
 
 // `?view=stage` renders a LANDSCAPE, stage-only public page (the "Share stage
 // layout" link) instead of the portrait service plan — the two are separated,
@@ -169,14 +173,18 @@ const serviceSnapshot = ref<any>(null)
 // Optional-chained: a real route always has a `query` object, but some test
 // route mocks omit it — never crash the whole share page over a missing query.
 const isStageView = computed(() => route.query?.view === 'stage')
-const stageElements = computed<any[]>(() => serviceSnapshot.value?.stageLayout?.elements ?? [])
+const stageElements = computed(() => serviceSnapshot.value?.stageLayout?.elements ?? [])
 
 // ── Computed ────────────────────────────────────────────────────────────────
 
 const formattedDate = computed(() => {
   if (!serviceSnapshot.value?.date) return ''
+  // WR-03 (118-REVIEW): now that `serviceSnapshot` is typed (not `any`),
+  // `noUncheckedIndexedAccess` sees `date.split('-')` as a variable-length
+  // array — the `!`s below assert what was always true at runtime (the app
+  // only ever writes a `YYYY-MM-DD` date string here).
   const [year, month, day] = serviceSnapshot.value.date.split('-').map(Number)
-  return new Date(year, month - 1, day).toLocaleDateString('en-US', {
+  return new Date(year!, month! - 1, day!).toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
