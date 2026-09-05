@@ -38,7 +38,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 - [ ] **R361**: The Edit Song slideout gains a third tab, **Files**, beside Details and Lyrics, showing a
   live count badge of the number of attachments on the song.
 
-- [ ] **R362**: The Songs list gains a **Files** column showing a paperclip icon and the attachment count
+- [x] **R362**: The Songs list gains a **Files** column showing a paperclip icon and the attachment count
   ("N files", or "none" when empty) for each song.
 
 ### Upload & Attach
@@ -133,7 +133,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R361 | Phase 123 | Pending |
-| R362 | Phase 123 | Pending |
+| R362 | Phase 123 | Complete |
 | R363 | Phase 123 | Complete |
 | R364 | Phase 122 | Complete |
 | R365 | Phase 123 | Complete |
