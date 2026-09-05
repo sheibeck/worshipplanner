@@ -20,6 +20,30 @@ export interface Arrangement {
   teamTags: string[]
 }
 
+export type SongAttachmentKind = 'document' | 'audio' | 'link'
+export type SongAttachmentLinkSource = 'youtube' | 'drive' | 'dropbox' | 'other'
+
+/** R369: a song's uploaded file or external link. See src/utils/songFiles.ts for the
+ * storage path/constants helper. Uploads carry storagePath+downloadUrl; links carry
+ * linkSource+href instead. */
+export interface SongAttachment {
+  id: string
+  kind: SongAttachmentKind
+  /** Display filename (uploads) or user-entered label (links). */
+  name: string
+  /** Storage object path, uploads only: orgs/{orgId}/song-files/{id}/{sanitizedName}. */
+  storagePath?: string
+  /** Denormalized Storage download-token URL — reads never need a rules round-trip. */
+  downloadUrl?: string
+  mimeType?: string
+  sizeBytes?: number
+  /** Links only. */
+  linkSource?: SongAttachmentLinkSource
+  href?: string
+  createdAt: Timestamp
+  createdBy: string
+}
+
 export interface Song {
   id: string
   title: string
@@ -39,6 +63,8 @@ export interface Song {
   tags: string[] // D-01 user-defined tags (e.g. "Christmas") — folded team tags + user tags (Song.teamTags removed)
   /** Themes the user removed locally; subtracted from PC theme union on re-import (D-14). */
   removedThemes: string[]
+  /** R369: additive, optional — every existing song loads/saves unchanged. */
+  attachments?: SongAttachment[]
 }
 
 /**
