@@ -335,4 +335,83 @@ describe('SongFilesTab', () => {
     const rows = wrapper.find('[data-testid="song-files-upload-rows"]')
     expect(rows.text()).toContain("'cover.png' can't be uploaded — PDF and MP3 only, up to 50 MB.")
   })
+
+  describe('R368: per-row Remove inline-confirm', () => {
+    it('clicking Remove opens the inline confirm with the exact removes-everywhere copy and the bolded filename', async () => {
+      const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf' })
+      const wrapper = mountTab([doc])
+      const row = wrapper.find('[data-testid="song-file-row-doc-1"]')
+      expect(wrapper.find('[data-testid="song-file-remove-confirm"]').exists()).toBe(false)
+
+      await row.find('[data-testid="song-file-remove"]').trigger('click')
+
+      const confirm = wrapper.find('[data-testid="song-file-remove-confirm"]')
+      expect(confirm.exists()).toBe(true)
+      expect(confirm.text()).toContain(
+        'Remove "chart.pdf"? This file appears on every service that uses this song. Removing it here removes it everywhere — including past services. This can\'t be undone.',
+      )
+      expect(confirm.find('strong').text()).toBe('"chart.pdf"')
+    })
+
+    it('opening a second row\'s confirm collapses the first — only one open at a time', async () => {
+      const docA = makeAttachment({ id: 'doc-a', kind: 'document', name: 'a.pdf' })
+      const docB = makeAttachment({ id: 'doc-b', kind: 'document', name: 'b.pdf' })
+      const wrapper = mountTab([docA, docB])
+
+      await wrapper.find('[data-testid="song-file-row-doc-a"] [data-testid="song-file-remove"]').trigger('click')
+      expect(wrapper.find('[data-testid="song-file-row-doc-a"] + [data-testid="song-file-remove-confirm"]').exists()).toBe(true)
+
+      await wrapper.find('[data-testid="song-file-row-doc-b"] [data-testid="song-file-remove"]').trigger('click')
+      expect(wrapper.findAll('[data-testid="song-file-remove-confirm"]')).toHaveLength(1)
+      expect(wrapper.find('[data-testid="song-file-row-doc-b"] + [data-testid="song-file-remove-confirm"]').exists()).toBe(true)
+    })
+
+    it('Cancel closes the confirm without calling the store', async () => {
+      const removeSpy = vi.spyOn(useSongStore(), 'removeSongAttachment').mockResolvedValue(undefined)
+      const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf' })
+      const wrapper = mountTab([doc])
+
+      await wrapper.find('[data-testid="song-file-remove"]').trigger('click')
+      await wrapper.find('[data-testid="song-file-remove-cancel"]').trigger('click')
+
+      expect(wrapper.find('[data-testid="song-file-remove-confirm"]').exists()).toBe(false)
+      expect(removeSpy).not.toHaveBeenCalled()
+    })
+
+    it('confirming calls removeSongAttachment(songId, attachment) exactly once', async () => {
+      const removeSpy = vi.spyOn(useSongStore(), 'removeSongAttachment').mockResolvedValue(undefined)
+      const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf' })
+      const wrapper = mountTab([doc])
+
+      await wrapper.find('[data-testid="song-file-remove"]').trigger('click')
+      await wrapper.find('[data-testid="song-file-remove-confirm-button"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(removeSpy).toHaveBeenCalledTimes(1)
+      expect(removeSpy).toHaveBeenCalledWith('song-1', doc)
+    })
+
+    it('a link row\'s Remove also calls removeSongAttachment', async () => {
+      const removeSpy = vi.spyOn(useSongStore(), 'removeSongAttachment').mockResolvedValue(undefined)
+      const link = makeAttachment({
+        id: 'link-1',
+        kind: 'link',
+        name: 'Reference track',
+        href: 'https://youtu.be/xyz',
+        linkSource: 'youtube',
+        storagePath: undefined,
+        downloadUrl: undefined,
+        mimeType: undefined,
+        sizeBytes: undefined,
+      })
+      const wrapper = mountTab([link])
+
+      await wrapper.find('[data-testid="song-file-remove"]').trigger('click')
+      await wrapper.find('[data-testid="song-file-remove-confirm-button"]').trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(removeSpy).toHaveBeenCalledTimes(1)
+      expect(removeSpy).toHaveBeenCalledWith('song-1', link)
+    })
+  })
 })

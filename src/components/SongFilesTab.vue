@@ -98,47 +98,88 @@
         No documents attached yet.
       </p>
       <div v-else class="space-y-2">
-        <div
-          v-for="a in documents"
-          :key="a.id"
-          class="flex items-center gap-3 px-3 py-3 rounded-md bg-gray-800/60 border border-gray-800"
-          :data-testid="`song-file-row-${a.id}`"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-          </svg>
-          <div class="min-w-0 flex-1">
-            <p class="text-sm text-gray-100 truncate" :title="a.name">{{ a.name }}</p>
-            <p class="text-xs text-gray-500" data-testid="song-file-meta">{{ metaLine(a) }}</p>
+        <template v-for="a in documents" :key="a.id">
+          <div
+            class="flex items-center gap-3 px-3 py-3 rounded-md bg-gray-800/60 border border-gray-800"
+            :data-testid="`song-file-row-${a.id}`"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm text-gray-100 truncate" :title="a.name">{{ a.name }}</p>
+              <p class="text-xs text-gray-500" data-testid="song-file-meta">{{ metaLine(a) }}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <a
+                v-if="a.kind !== 'link'"
+                :href="a.downloadUrl"
+                download
+                :aria-label="`Download ${a.name}`"
+                data-testid="song-file-download"
+                class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+              </a>
+              <a
+                v-else
+                :href="a.href"
+                target="_blank"
+                rel="noopener noreferrer"
+                :aria-label="`Open ${a.name} in a new tab`"
+                data-testid="song-file-open-link"
+                class="p-1 rounded hover:bg-gray-700 text-gray-500"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                </svg>
+              </a>
+              <button
+                type="button"
+                :aria-label="`Remove ${a.name}`"
+                data-testid="song-file-remove"
+                class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-red-400"
+                @click="confirmingId = confirmingId === a.id ? null : a.id"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+              </button>
+            </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <a
-              v-if="a.kind !== 'link'"
-              :href="a.downloadUrl"
-              download
-              :aria-label="`Download ${a.name}`"
-              data-testid="song-file-download"
-              class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-            </a>
-            <a
-              v-else
-              :href="a.href"
-              target="_blank"
-              rel="noopener noreferrer"
-              :aria-label="`Open ${a.name} in a new tab`"
-              data-testid="song-file-open-link"
-              class="p-1 rounded hover:bg-gray-700 text-gray-500"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-              </svg>
-            </a>
+          <div
+            v-if="confirmingId === a.id"
+            class="mt-2 rounded-lg bg-red-900/20 border border-red-800 p-3"
+            data-testid="song-file-remove-confirm"
+          >
+            <p class="text-sm text-gray-200 mb-2">
+              Remove <strong class="text-white">"{{ a.name }}"</strong>? This file appears on every service
+              that uses this song. Removing it here removes it everywhere — including past services. This
+              can't be undone.
+            </p>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                data-testid="song-file-remove-cancel"
+                @click="confirmingId = null"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
+                data-testid="song-file-remove-confirm-button"
+                :disabled="removingId === a.id"
+                @click="confirmRemove(a)"
+              >
+                {{ removingId === a.id ? 'Removing…' : 'Remove' }}
+              </button>
+            </div>
           </div>
-        </div>
+        </template>
       </div>
     </div>
 
@@ -153,33 +194,74 @@
         No audio files attached yet.
       </p>
       <div v-else class="space-y-2">
-        <div
-          v-for="a in audio"
-          :key="a.id"
-          class="flex items-center gap-3 px-3 py-3 rounded-md bg-gray-800/60 border border-gray-800"
-          :data-testid="`song-file-row-${a.id}`"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
-          </svg>
-          <div class="min-w-0 flex-1">
-            <p class="text-sm text-gray-100 truncate" :title="a.name">{{ a.name }}</p>
-            <p class="text-xs text-gray-500" data-testid="song-file-meta">{{ metaLine(a) }}</p>
+        <template v-for="a in audio" :key="a.id">
+          <div
+            class="flex items-center gap-3 px-3 py-3 rounded-md bg-gray-800/60 border border-gray-800"
+            :data-testid="`song-file-row-${a.id}`"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
+            </svg>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm text-gray-100 truncate" :title="a.name">{{ a.name }}</p>
+              <p class="text-xs text-gray-500" data-testid="song-file-meta">{{ metaLine(a) }}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <a
+                :href="a.downloadUrl"
+                download
+                :aria-label="`Download ${a.name}`"
+                data-testid="song-file-download"
+                class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+              </a>
+              <button
+                type="button"
+                :aria-label="`Remove ${a.name}`"
+                data-testid="song-file-remove"
+                class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-red-400"
+                @click="confirmingId = confirmingId === a.id ? null : a.id"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+              </button>
+            </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <a
-              :href="a.downloadUrl"
-              download
-              :aria-label="`Download ${a.name}`"
-              data-testid="song-file-download"
-              class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-            </a>
+          <div
+            v-if="confirmingId === a.id"
+            class="mt-2 rounded-lg bg-red-900/20 border border-red-800 p-3"
+            data-testid="song-file-remove-confirm"
+          >
+            <p class="text-sm text-gray-200 mb-2">
+              Remove <strong class="text-white">"{{ a.name }}"</strong>? This file appears on every service
+              that uses this song. Removing it here removes it everywhere — including past services. This
+              can't be undone.
+            </p>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                data-testid="song-file-remove-cancel"
+                @click="confirmingId = null"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
+                data-testid="song-file-remove-confirm-button"
+                :disabled="removingId === a.id"
+                @click="confirmRemove(a)"
+              >
+                {{ removingId === a.id ? 'Removing…' : 'Remove' }}
+              </button>
+            </div>
           </div>
-        </div>
+        </template>
       </div>
     </div>
   </div>
@@ -240,6 +322,25 @@ function onFileInputChange(e: Event) {
     addFiles(input.files, uploadCtx.value)
   }
   input.value = ''
+}
+
+// R368 — per-row Remove inline-confirm, reusing the Delete-Song pattern
+// (SongSlideOver.vue:299-331). Only one row's confirm card is open at a
+// time — clicking a different row's trash collapses the first.
+const confirmingId = ref<string | null>(null)
+const removingId = ref<string | null>(null)
+
+async function confirmRemove(a: SongAttachment) {
+  removingId.value = a.id
+  try {
+    // Do NOT mutate props.attachments — the row and the Files count
+    // disappear live because SongSlideOver's liveAttachments/filesCount
+    // recompute off songStore.songs once this write lands via onSnapshot.
+    await songStore.removeSongAttachment(props.songId, a)
+  } finally {
+    removingId.value = null
+    confirmingId.value = null
+  }
 }
 
 function submitLink() {
