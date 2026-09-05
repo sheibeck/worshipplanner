@@ -16,6 +16,7 @@ let mockColumnVisibility: Record<string, boolean> = {
   lastUsed: true,
   tags: true,
   themes: true,
+  files: true,
 }
 
 // Singleton store object so a test can observe searchQuery mutations made by
@@ -88,6 +89,7 @@ describe('SongTable', () => {
       lastUsed: true,
       tags: true,
       themes: true,
+      files: true,
     }
     mockVwModeEnabled = true
     mockPcEnabled = true
@@ -279,6 +281,73 @@ describe('SongTable', () => {
         .find((s) => s.text() === 'Christmas Eve' && s.attributes('title') === 'Filter by this tag')
       await tagPill!.trigger('click')
       expect(mockSongStore.searchQuery).toBe('tag:Christmas tag:Christmas Eve')
+    })
+  })
+
+  describe('Files column (R362)', () => {
+    it('renders the Files header when columnVisibility.files is true', () => {
+      const wrapper = mountTable()
+      const headers = wrapper.findAll('th').map((th) => th.text())
+      expect(headers.some((h) => h.includes('Files'))).toBe(true)
+    })
+
+    it('does not render the Files header or cells when columnVisibility.files is false', () => {
+      mockColumnVisibility = { ...mockColumnVisibility, files: false }
+      const wrapper = mountTable([makeSong({ attachments: [] })])
+      const headers = wrapper.findAll('th').map((th) => th.text())
+      expect(headers.some((h) => h.includes('Files'))).toBe(false)
+      expect(wrapper.text()).not.toContain('none')
+    })
+
+    it("renders 'none' for a song with an empty attachments array", () => {
+      const wrapper = mountTable([makeSong({ attachments: [] })])
+      expect(wrapper.text()).toContain('none')
+    })
+
+    it("renders 'none' without throwing for a legacy song with no attachments field", () => {
+      const song = makeSong()
+      delete (song as { attachments?: unknown }).attachments
+      expect(() => mountTable([song])).not.toThrow()
+      const wrapper = mountTable([song])
+      expect(wrapper.text()).toContain('none')
+    })
+
+    it("renders '1 file' for a song with exactly one attachment", () => {
+      const wrapper = mountTable([
+        makeSong({
+          attachments: [
+            { id: 'a1', kind: 'document', name: 'chart.pdf', createdAt: {} as never, createdBy: 'u1' },
+          ],
+        }),
+      ])
+      expect(wrapper.text()).toContain('1 file')
+      // Guard against a naive substring match also matching "N files".
+      expect(wrapper.text()).not.toMatch(/\d+ files/)
+    })
+
+    it("renders 'N files' for a song with two or more attachments", () => {
+      const wrapper = mountTable([
+        makeSong({
+          attachments: [
+            { id: 'a1', kind: 'document', name: 'chart.pdf', createdAt: {} as never, createdBy: 'u1' },
+            { id: 'a2', kind: 'audio', name: 'track.mp3', createdAt: {} as never, createdBy: 'u1' },
+          ],
+        }),
+      ])
+      expect(wrapper.text()).toContain('2 files')
+    })
+
+    it('includes a Files checkbox in the cog menu that calls toggleColumn on change', async () => {
+      const wrapper = mountTable()
+      const cogButton = wrapper.find('button[aria-label="Column settings"]')
+      await cogButton.trigger('click')
+      const filesLabel = wrapper
+        .findAll('label')
+        .find((l) => l.text().includes('Files'))
+      expect(filesLabel).toBeTruthy()
+      const checkbox = filesLabel!.find('input[type="checkbox"]')
+      await checkbox.trigger('change')
+      expect(mockToggleColumn).toHaveBeenCalledWith('files')
     })
   })
 })

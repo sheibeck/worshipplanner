@@ -154,6 +154,14 @@
           >
             Themes
           </th>
+          <!-- Files (paperclip + none/1 file/N files, plain text not a pill; R362) -->
+          <th
+            v-if="songStore.columnVisibility.files"
+            scope="col"
+            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
+          >
+            Files
+          </th>
           <!-- Column-visibility cog + trailing chevron slot (opens edit drawer per-row) -->
           <th scope="col" class="px-4 py-3 w-10 text-right relative">
             <button
@@ -280,6 +288,16 @@
             </div>
           </td>
 
+          <!-- Files: paperclip + none/1 file/N files, plain text not a pill (R362) -->
+          <td v-if="songStore.columnVisibility.files" class="px-4 py-3 text-gray-300">
+            <span class="flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+              </svg>
+              <span class="text-sm">{{ filesLabel(song) }}</span>
+            </span>
+          </td>
+
           <!-- Trailing chevron (opens edit drawer) -->
           <td class="px-4 py-3 text-right">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -334,6 +352,7 @@ const toggleableColumns = [
   { key: 'lastUsed', label: 'Last Used' },
   { key: 'tags', label: 'Tags' },
   { key: 'themes', label: 'Themes' },
+  { key: 'files', label: 'Files' },
 ] as const
 
 // ── Sort ───────────────────────────────────────────────────────────────────────
@@ -484,6 +503,16 @@ onMounted(() => {
 onUnmounted(() => {
   observer?.disconnect()
 })
+
+// R362: Songs-list Files column copy — count derives from the already-subscribed
+// Song doc (song.attachments), no fetch. Legacy songs predating the attachments
+// field render 'none' via the optional-chain fallback.
+function filesLabel(song: Song): string {
+  const count = song.attachments?.length ?? 0
+  if (count === 0) return 'none'
+  if (count === 1) return '1 file'
+  return `${count} files`
+}
 
 function formatDate(ts: Timestamp | null): string {
   if (!ts) return '—'

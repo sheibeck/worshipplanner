@@ -2009,7 +2009,7 @@ describe('useSongStore', () => {
   })
 
   describe('column visibility (D-08/D-09/D-10)', () => {
-    it('defaults all six toggleable columns to visible, with no title key', async () => {
+    it('defaults all seven toggleable columns to visible, with no title key', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       expect(store.columnVisibility).toEqual({
@@ -2019,6 +2019,7 @@ describe('useSongStore', () => {
         lastUsed: true,
         tags: true,
         themes: true,
+        files: true,
       })
       expect('title' in store.columnVisibility).toBe(false)
     })
@@ -2048,6 +2049,7 @@ describe('useSongStore', () => {
         lastUsed: true,
         tags: true,
         themes: true,
+        files: true,
       })
     })
   })
@@ -2119,6 +2121,7 @@ describe('useSongStore', () => {
         lastUsed: true,
         tags: true,
         themes: true,
+        files: true,
       })
     })
 
@@ -2135,6 +2138,7 @@ describe('useSongStore', () => {
         lastUsed: true,
         tags: true,
         themes: true,
+        files: true,
       })
     })
 
