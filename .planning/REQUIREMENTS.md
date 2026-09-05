@@ -84,10 +84,10 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
   idiom that strips the `pcExportedAt` Firestore `Timestamp` is corrected so the guard **works**, or the
   dead code is removed.
 
-- [ ] **R353** (ARCH-002): `ServicesView.vue`'s org-switch watcher **tears down `teamsStore` locally**
+- [x] **R353** (ARCH-002): `ServicesView.vue`'s org-switch watcher **tears down `teamsStore` locally**
   (defense-in-depth), not relying solely on the global org reset for correctness.
 
-- [ ] **R354** (ARCH-003): `SongLyricEditor.vue` and `ScriptureSlideEditor.vue` **reactively
+- [x] **R354** (ARCH-003): `SongLyricEditor.vue` and `ScriptureSlideEditor.vue` **reactively
   re-subscribe/teardown on an in-flight org switch** instead of subscribing once on mount via a static
   prop.
 
@@ -159,8 +159,8 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 | R350 | Phase 119 | Complete |
 | R351 | Phase 119 | Complete |
 | R352 | Phase 119 | Pending |
-| R353 | Phase 119 | Pending |
-| R354 | Phase 119 | Pending |
+| R353 | Phase 119 | Complete |
+| R354 | Phase 119 | Complete |
 | R355 | Phase 119 | Complete |
 | R356 | Phase 119 | Complete |
 | R357 | Phase 119 | Pending |
