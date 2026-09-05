@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.11
 milestone_name: Song File Attachments (Phases 121-124, in planning)
-current_phase: 124
-current_phase_name: Grouped File List, In-App Preview/Play, Download & Remove
+current_phase: 999.5
+current_phase_name: 11
 status: planning
-stopped_at: Completed 124-02-PLAN.md
-last_updated: "2026-09-05T20:40:27.213Z"
+stopped_at: Completed 123-03-PLAN.md
+last_updated: "2026-09-05T22:03:54.402Z"
 last_activity: 2026-09-05
-last_activity_desc: 124-02 complete (last plan of v2.11)
+last_activity_desc: Phase 124 complete, transitioned to Phase 999.5
 progress:
   total_phases: 4
   completed_phases: 4
@@ -1289,10 +1289,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 124 — Grouped File List, In-App Preview/Play, Download & Remove
-Plan: 124-02 complete — phase fully executed (2/2 plans)
+Phase: 999.5 — v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
+Plan: Not started
 Status: 124-01-PLAN.md (removeSongAttachment store method, Documents/Audio grouped rows, per-row Download, per-row Remove inline-confirm — R366+R368) complete. 124-02-PLAN.md (SongFilePreviewModal in-app PDF viewer + inline MP3 player wired into Preview/Play row actions — R367) complete. All 4 phases of v2.11 (121-124) are now built; milestone-level UAT and closeout (audit-milestone/complete-milestone) have not run yet.
-Last activity: 2026-09-05 — 124-02 complete (last plan of v2.11)
+Last activity: 2026-09-05 — Phase 124 complete, transitioned to Phase 999.5
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 
