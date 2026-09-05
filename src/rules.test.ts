@@ -1945,6 +1945,28 @@ describe('Service draft lock (R036/R037)', () => {
       const db = await editorDb()
       await assertSucceeds(updateDoc(svcRef(db), { notes: 'still editable', updatedAt: new Date() }))
     })
+
+    // R341/SEC-R-03: branch 1 used to permit ANY field change while draft,
+    // including forging createdBy/createdAt. These three pin the fix.
+    it('an editor cannot change createdBy on a draft service (R341)', async () => {
+      await seedService('draft', { createdBy: 'userA' })
+      const db = await editorDb()
+      await assertFails(
+        updateDoc(svcRef(db), { createdBy: 'someoneElse', updatedAt: new Date() }),
+      )
+    })
+
+    it('an editor cannot forge createdBy onto a draft service that has none (R341)', async () => {
+      await seedService('draft')
+      const db = await editorDb()
+      await assertFails(updateDoc(svcRef(db), { createdBy: 'forged', updatedAt: new Date() }))
+    })
+
+    it('an ordinary draft edit that leaves createdBy untouched still succeeds (R341)', async () => {
+      await seedService('draft', { createdBy: 'userA' })
+      const db = await editorDb()
+      await assertSucceeds(updateDoc(svcRef(db), { notes: 'edited', updatedAt: new Date() }))
+    })
   })
 
   describe('reopen (R037)', () => {

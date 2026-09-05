@@ -201,7 +201,9 @@ service cloud.firestore {
         allow update: if isOrgEditor(orgId) && (
           // 1. Ordinary editing — allowed only while the STORED status is draft.
           //    This also covers the draft -> planned transition (D-02).
-          storedStatus() == 'draft'
+          //    R341/SEC-R-03: mirrors preservesCreatedBy() (:104-106) — createdBy/
+          //    createdAt are provenance, not editable draft fields.
+          (storedStatus() == 'draft' && !keys().hasAny(['createdBy', 'createdAt']))
 
           // 2. D-09 — the Planning Center export write. planned -> exported,
           //    carrying real export evidence. `hasAll(['pcExportedAt'])` (not
