@@ -695,7 +695,14 @@ rules)
   4. An editor can attach an external YouTube/Google Drive/Dropbox link as metadata with no file
      transfer; clicking it opens the link in a new tab rather than an in-app viewer (R365).
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+
+- [ ] 123-01-PLAN.md — useSongFileUpload composable (multi-file resumable upload + per-file progress/validation, persist) + songLinks (https validate + source infer) + IN-03 sanitizer de-dup (R363, R365)
+- [ ] 123-02-PLAN.md — Songs-list Files column (paperclip + none/1 file/N files, toggleable) + store column-visibility key (R362)
+- [ ] 123-03-PLAN.md — Files tab + live count badge + SongFilesTab panel (drop zone, link field, attachment list) in SongSlideOver + 'files' SongEditTab (R361, R363, R365)
+
 **UI hint**: yes
 
 ### Phase 124: Grouped File List, In-App Preview/Play, Download & Remove
