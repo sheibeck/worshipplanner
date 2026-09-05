@@ -59,13 +59,13 @@
     <!-- IN-01/121-UI-SPEC §5 A11y: non-visual batch-completion announcement,
          updated as each file finishes (not per progress tick). -->
     <p class="sr-only" role="status" aria-live="polite" data-testid="song-files-upload-status">
-      {{ uploadStatusAnnouncement }}
+      {{ announcement }}
     </p>
 
     <!-- Per-file upload progress rows (R363) -->
     <div v-if="uploads.length > 0" class="space-y-2" data-testid="song-files-upload-rows">
       <div v-for="row in uploads" :key="row.id" class="px-3 py-2 rounded-md bg-gray-800/60 border border-gray-800">
-        <template v-if="row.status === 'uploading' || row.status === 'done'">
+        <template v-if="row.status === 'uploading'">
           <p class="text-xs text-gray-400 truncate" :title="row.name">{{ row.name }}</p>
           <div class="mt-1 h-1.5 rounded-full bg-gray-800">
             <div class="h-1.5 rounded-full bg-indigo-500" :style="{ width: row.progress + '%' }"></div>
@@ -77,7 +77,18 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
-            <span class="text-xs text-red-400">{{ row.message }}</span>
+            <span class="flex-1 text-xs text-red-400">{{ row.message }}</span>
+            <button
+              type="button"
+              :aria-label="`Dismiss ${row.name}`"
+              data-testid="song-file-upload-dismiss"
+              class="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300 shrink-0"
+              @click="dismiss(row.id)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </template>
       </div>
@@ -168,9 +179,7 @@
             data-testid="song-file-remove-confirm"
           >
             <p class="text-sm text-gray-200 mb-2">
-              Remove <strong class="text-white">"{{ a.name }}"</strong>? This file appears on every service
-              that uses this song. Removing it here removes it everywhere — including past services. This
-              can't be undone.
+              Remove <strong class="text-white">"{{ a.name }}"</strong>? This can't be undone.
             </p>
             <div class="flex gap-2">
               <button
@@ -299,9 +308,7 @@
             data-testid="song-file-remove-confirm"
           >
             <p class="text-sm text-gray-200 mb-2">
-              Remove <strong class="text-white">"{{ a.name }}"</strong>? This file appears on every service
-              that uses this song. Removing it here removes it everywhere — including past services. This
-              can't be undone.
+              Remove <strong class="text-white">"{{ a.name }}"</strong>? This can't be undone.
             </p>
             <div class="flex gap-2">
               <button
@@ -352,7 +359,7 @@ const props = defineProps<{
 }>()
 
 const songStore = useSongStore()
-const { uploads, addFiles } = useSongFileUpload()
+const { uploads, announcement, addFiles, dismiss } = useSongFileUpload()
 
 const dragOver = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -364,16 +371,6 @@ const uploadCtx = computed(() => ({
   orgId: props.orgId,
   createdBy: props.createdBy,
 }))
-
-// IN-01: screen-reader-only batch-completion count, e.g. "2 of 3 files
-// uploaded." — counts only files that started uploading (excludes rejected
-// rows, which already get their own visible/read error message).
-const uploadStatusAnnouncement = computed(() => {
-  const relevant = uploads.value.filter((u) => u.status === 'uploading' || u.status === 'done')
-  const doneCount = relevant.filter((u) => u.status === 'done').length
-  if (relevant.length === 0 || doneCount === 0) return ''
-  return `${doneCount} of ${relevant.length} file${relevant.length === 1 ? '' : 's'} uploaded.`
-})
 
 function openFilePicker() {
   fileInputRef.value?.click()

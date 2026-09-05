@@ -17,7 +17,10 @@ export interface UploadRow {
   name: string
   kind: SongAttachmentKind
   progress: number
-  status: 'uploading' | 'done' | 'error' | 'rejected'
+  // No 'done': a completed upload's row is removed immediately (the file now
+  // shows in the Documents/Audio list, which is the confirmation) — a lingering
+  // 100% bar was a reported bug. 'error'/'rejected' rows stay until dismissed.
+  status: 'uploading' | 'error' | 'rejected'
   message?: string
 }
 
@@ -28,19 +31,28 @@ export interface AddFilesContext {
 }
 
 export interface UseSongFileUploadReturn {
-  /** Reactive per-file upload rows, in the order files were added. */
+  /** Reactive per-file upload rows, in the order files were added. Rows are
+   * addressed by their stable `id` (never a positional index), so removing a
+   * finished row can't corrupt an in-flight row's progress updates. */
   uploads: Ref<UploadRow[]>
+  /** Screen-reader-only announcement, set on each successful completion (the
+   * 'done' rows it used to derive from are now removed on success). */
+  announcement: Ref<string>
   /**
    * Validates and uploads every file in the batch to
    * `orgs/{orgId}/song-files/{attachmentId}/{sanitizedName}` via a resumable
-   * upload. A file failing client validation (wrong type / >=50MB) gets a
-   * 'rejected' row and never starts an upload — it does not block the other
-   * files in the batch. Each completed upload persists a SongAttachment via
-   * the atomic `songStore.addSongAttachment(songId, attachment)` (CR-01 —
-   * an arrayUnion append, not a read-modify-write of the whole array, so
-   * overlapping addFiles()/link-submit calls can't clobber each other).
+   * upload. A file failing client validation (wrong type / >=50MB) or that
+   * duplicates a name already attached (or already uploading) gets a 'rejected'
+   * row and never starts an upload — it does not block the other files in the
+   * batch. Each completed upload persists a SongAttachment via the atomic
+   * `songStore.addSongAttachment(songId, attachment)` (CR-01 — an arrayUnion
+   * append, not a read-modify-write of the whole array, so overlapping
+   * addFiles()/link-submit calls can't clobber each other) and then removes its
+   * own progress row.
    */
   addFiles: (files: FileList | File[], ctx: AddFilesContext) => void
+  /** Manually remove an upload row by id (used to dismiss an error/rejected message). */
+  dismiss: (id: string) => void
   /** Clears the uploads list. */
   reset: () => void
 }
@@ -78,15 +90,59 @@ function validateSongFile(file: File): string | null {
 
 export function useSongFileUpload(): UseSongFileUploadReturn {
   const uploads = ref<UploadRow[]>([])
+  const announcement = ref('')
+
+  function patchRow(id: string, patch: Partial<UploadRow>): void {
+    const i = uploads.value.findIndex((r) => r.id === id)
+    if (i === -1) return
+    uploads.value[i] = { ...uploads.value[i]!, ...patch }
+  }
+
+  function removeRow(id: string): void {
+    uploads.value = uploads.value.filter((r) => r.id !== id)
+  }
+
+  function dismiss(id: string): void {
+    removeRow(id)
+  }
 
   function reset(): void {
     uploads.value = []
+    announcement.value = ''
   }
 
   function addFiles(files: FileList | File[], ctx: AddFilesContext): void {
     const fileArray = Array.from(files)
 
+    // Duplicate guard: a name already attached to this song (uploaded kinds) or
+    // already uploading must not be added again as a separate file. Denying with
+    // a clear per-file message is friendlier than a silent duplicate or a
+    // mid-batch overwrite prompt — to replace a file, remove it then re-upload.
+    const song = useSongStore().songs.find((s) => s.id === ctx.songId)
+    const takenNames = new Set<string>([
+      ...(song?.attachments ?? [])
+        .filter((a) => a.kind !== 'link')
+        .map((a) => a.name.toLowerCase()),
+      ...uploads.value
+        .filter((u) => u.status === 'uploading')
+        .map((u) => u.name.toLowerCase()),
+    ])
+
     for (const file of fileArray) {
+      const lowerName = file.name.toLowerCase()
+
+      if (takenNames.has(lowerName)) {
+        uploads.value.push({
+          id: crypto.randomUUID(),
+          name: file.name,
+          kind: kindForFile(file),
+          progress: 0,
+          status: 'rejected',
+          message: `'${file.name}' is already attached — remove it first to replace.`,
+        })
+        continue
+      }
+
       const validationError = validateSongFile(file)
       if (validationError) {
         uploads.value.push({
@@ -100,6 +156,9 @@ export function useSongFileUpload(): UseSongFileUploadReturn {
         continue
       }
 
+      // Claim the name so a second identical file in the same batch is rejected.
+      takenNames.add(lowerName)
+
       const attachmentId = crypto.randomUUID()
       const kind = kindForFile(file)
       uploads.value.push({
@@ -109,7 +168,6 @@ export function useSongFileUpload(): UseSongFileUploadReturn {
         progress: 0,
         status: 'uploading',
       })
-      const rowIndex = uploads.value.length - 1
 
       const path = songFileStoragePath(ctx.orgId, attachmentId, file.name)
       const fileRef = storageRef(storage, path)
@@ -120,21 +178,15 @@ export function useSongFileUpload(): UseSongFileUploadReturn {
       task.on(
         'state_changed',
         (snapshot) => {
-          const current = uploads.value[rowIndex]
-          if (!current) return
-          uploads.value[rowIndex] = {
-            ...current,
+          patchRow(attachmentId, {
             progress: snapshot.totalBytes > 0 ? (snapshot.bytesTransferred / snapshot.totalBytes) * 100 : 0,
-          }
+          })
         },
         () => {
-          const current = uploads.value[rowIndex]
-          if (!current) return
-          uploads.value[rowIndex] = {
-            ...current,
+          patchRow(attachmentId, {
             status: 'error',
             message: 'Upload failed. Check your connection and try again.',
-          }
+          })
         },
         () => {
           getDownloadURL(task.snapshot.ref)
@@ -155,23 +207,20 @@ export function useSongFileUpload(): UseSongFileUploadReturn {
               }
               // CR-01: arrayUnion append — see addSongAttachment doc comment.
               await useSongStore().addSongAttachment(ctx.songId, attachment)
-              const current = uploads.value[rowIndex]
-              if (!current) return
-              uploads.value[rowIndex] = { ...current, status: 'done', progress: 100 }
+              // Auto-clear the finished row — the file now appears in the list.
+              removeRow(attachmentId)
+              announcement.value = `Uploaded ${file.name}.`
             })
             .catch(() => {
-              const current = uploads.value[rowIndex]
-              if (!current) return
-              uploads.value[rowIndex] = {
-                ...current,
+              patchRow(attachmentId, {
                 status: 'error',
                 message: 'Upload failed. Check your connection and try again.',
-              }
+              })
             })
         },
       )
     }
   }
 
-  return { uploads, addFiles, reset }
+  return { uploads, announcement, addFiles, dismiss, reset }
 }

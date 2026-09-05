@@ -379,9 +379,9 @@ group with an inline confirm card directly beneath the row:
 ```html
 <div class="mt-2 rounded-lg bg-red-900/20 border border-red-800 p-3">
   <p class="text-sm text-gray-200 mb-2">
-    Remove <strong class="text-white">"{filename}"</strong>? This file appears on every service
-    that uses this song. Removing it here removes it everywhere — including past services. This
-    can't be undone.
+    Remove <strong class="text-white">"{filename}"</strong>? This can't be undone.
+    <!-- Owner 2026-09-05: files ride with the SONG, not with services — so the old
+         "appears on every service / past services included" framing was misleading and was dropped. -->
   </p>
   <div class="flex gap-2">
     <button>Cancel</button>  <!-- text-gray-300 bg-gray-800 hover:bg-gray-700 border-gray-700 -->
@@ -403,7 +403,7 @@ Only one row's confirm card is open at a time (opening a second collapses the fi
 | Empty state heading | (none — see per-group empty bodies below; no single top-level "no files" banner, R366 is satisfied per-group) |
 | Empty state body | Documents: **"No documents attached yet."** · Audio: **"No audio files attached yet."** |
 | Error state | Rejection (wrong type): **"'{filename}' can't be uploaded — PDF and MP3 only, up to 50 MB."** · Rejection (too large): **"'{filename}' is too large — max 50 MB."** · Upload failure: **"Upload failed. Check your connection and try again."** (+ Retry) |
-| Destructive confirmation | Remove: **"Remove '{filename}'? This file appears on every service that uses this song. Removing it here removes it everywhere — including past services. This can't be undone."** |
+| Destructive confirmation | Remove: **"Remove '{filename}'? This can't be undone."** (owner 2026-09-05: files ride with the song, not with services, so the removes-everywhere framing was dropped) |
 
 **Additional copy elements** (Files-specific, beyond the template's 5 required rows):
 

@@ -19,13 +19,17 @@ vi.mock('@/firebase', () => ({
 }))
 
 const mockUploads = ref<UploadRow[]>([])
+const mockAnnouncement = ref('')
 const mockAddFiles = vi.fn()
+const mockDismiss = vi.fn()
 const mockReset = vi.fn()
 
 vi.mock('@/composables/useSongFileUpload', () => ({
   useSongFileUpload: () => ({
     uploads: mockUploads,
+    announcement: mockAnnouncement,
     addFiles: mockAddFiles,
+    dismiss: mockDismiss,
     reset: mockReset,
   }),
 }))
@@ -69,7 +73,9 @@ describe('SongFilesTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockUploads.value = []
+    mockAnnouncement.value = ''
     mockAddFiles.mockClear()
+    mockDismiss.mockClear()
     mockReset.mockClear()
   })
 
@@ -303,25 +309,50 @@ describe('SongFilesTab', () => {
     expect((fill.element as HTMLElement).style.width).toBe('42%')
   })
 
-  it('IN-01: announces batch-completion count via a visually-hidden aria-live region', () => {
+  it('surfaces the composable per-file completion announcement in a visually-hidden aria-live region', () => {
+    // A completed upload's row is REMOVED (no lingering 'done' bar); the
+    // composable sets a per-file announcement instead.
     mockUploads.value = [
-      { id: 'u1', name: 'a.pdf', kind: 'document', progress: 100, status: 'done' },
       { id: 'u2', name: 'b.pdf', kind: 'document', progress: 40, status: 'uploading' },
     ]
+    mockAnnouncement.value = 'Uploaded a.pdf.'
     const wrapper = mountTab()
     const status = wrapper.find('[data-testid="song-files-upload-status"]')
     expect(status.attributes('aria-live')).toBe('polite')
     expect(status.classes()).toContain('sr-only')
-    expect(status.text()).toBe('1 of 2 files uploaded.')
+    expect(status.text()).toBe('Uploaded a.pdf.')
   })
 
-  it('IN-01: the aria-live region is empty before any file has completed', () => {
+  it('the aria-live region is empty before any file has completed', () => {
     mockUploads.value = [
       { id: 'u1', name: 'a.pdf', kind: 'document', progress: 10, status: 'uploading' },
     ]
     const wrapper = mountTab()
     const status = wrapper.find('[data-testid="song-files-upload-status"]')
     expect(status.text()).toBe('')
+  })
+
+  it('an in-flight upload row has no dismiss button; an error/rejected row does', () => {
+    mockUploads.value = [
+      { id: 'u1', name: 'a.pdf', kind: 'document', progress: 30, status: 'uploading' },
+    ]
+    let wrapper = mountTab()
+    expect(wrapper.find('[data-testid="song-file-upload-dismiss"]').exists()).toBe(false)
+
+    mockUploads.value = [
+      { id: 'u2', name: 'bad.png', kind: 'document', progress: 0, status: 'rejected', message: "'bad.png' can't be uploaded — PDF and MP3 only, up to 50 MB." },
+    ]
+    wrapper = mountTab()
+    expect(wrapper.find('[data-testid="song-file-upload-dismiss"]').exists()).toBe(true)
+  })
+
+  it('clicking the dismiss button on an error/rejected row calls dismiss(id)', async () => {
+    mockUploads.value = [
+      { id: 'u9', name: 'oops.mp3', kind: 'audio', progress: 0, status: 'error', message: 'Upload failed. Check your connection and try again.' },
+    ]
+    const wrapper = mountTab()
+    await wrapper.find('[data-testid="song-file-upload-dismiss"]').trigger('click')
+    expect(mockDismiss).toHaveBeenCalledWith('u9')
   })
 
   it('renders a rejected upload row with its red rejection message', () => {
@@ -351,9 +382,7 @@ describe('SongFilesTab', () => {
 
       const confirm = wrapper.find('[data-testid="song-file-remove-confirm"]')
       expect(confirm.exists()).toBe(true)
-      expect(confirm.text()).toContain(
-        'Remove "chart.pdf"? This file appears on every service that uses this song. Removing it here removes it everywhere — including past services. This can\'t be undone.',
-      )
+      expect(confirm.text()).toContain('Remove "chart.pdf"? This can\'t be undone.')
       expect(confirm.find('strong').text()).toBe('"chart.pdf"')
     })
 

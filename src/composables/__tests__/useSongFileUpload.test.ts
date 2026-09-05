@@ -84,7 +84,7 @@ describe('useSongFileUpload', () => {
     expect(uploads.value[1]).toMatchObject({ name: 'track.mp3', kind: 'audio', status: 'uploading', progress: 0 })
   })
 
-  it('state_changed updates each row\'s progress independently, and completion marks it done', async () => {
+  it('updates each row\'s progress independently, and removes the row + announces on completion', async () => {
     const pdfTask = makeTask('orgs/org1/song-files/id1/song.pdf')
     const mp3Task = makeTask('orgs/org1/song-files/id2/track.mp3')
     mockUploadBytesResumable
@@ -95,7 +95,7 @@ describe('useSongFileUpload', () => {
       .mockResolvedValueOnce('https://cdn.example.com/track.mp3')
     const addAttachmentSpy = vi.spyOn(useSongStore(), 'addSongAttachment').mockResolvedValue(undefined)
 
-    const { uploads, addFiles } = useSongFileUpload()
+    const { uploads, announcement, addFiles } = useSongFileUpload()
     const pdfFile = makeFile('song.pdf', 'application/pdf', 1024)
     const mp3File = makeFile('track.mp3', 'audio/mpeg', 2048)
 
@@ -104,24 +104,35 @@ describe('useSongFileUpload', () => {
       orgId: 'org1',
       createdBy: 'user1',
     })
+    expect(uploads.value).toHaveLength(2)
+
+    // Rows are addressed by id, so look them up by name (index-safe) — a
+    // completed row is removed, which would otherwise shift indices.
+    const findRow = (name: string) => uploads.value.find((r) => r.name === name)
 
     pdfTask._triggerProgress(50, 100)
-    expect(uploads.value[0]!.progress).toBe(50)
-    expect(uploads.value[1]!.progress).toBe(0)
+    expect(findRow('song.pdf')!.progress).toBe(50)
+    expect(findRow('track.mp3')!.progress).toBe(0)
 
     pdfTask._triggerComplete()
     await flushPromises()
 
-    expect(uploads.value[0]!.status).toBe('done')
-    expect(uploads.value[1]!.status).toBe('uploading')
+    // The finished PDF row is auto-removed (the file now shows in the list);
+    // the MP3 row keeps uploading, its progress unaffected by the removal.
+    expect(findRow('song.pdf')).toBeUndefined()
+    expect(uploads.value).toHaveLength(1)
+    expect(findRow('track.mp3')!.status).toBe('uploading')
+    expect(announcement.value).toBe('Uploaded song.pdf.')
 
     mp3Task._triggerProgress(100, 100)
-    expect(uploads.value[1]!.progress).toBe(100)
+    expect(findRow('track.mp3')!.progress).toBe(100)
 
     mp3Task._triggerComplete()
     await flushPromises()
 
-    expect(uploads.value[1]!.status).toBe('done')
+    // All finished rows cleared — no lingering progress bars.
+    expect(uploads.value).toHaveLength(0)
+    expect(announcement.value).toBe('Uploaded track.mp3.')
 
     // Phase 123 code-review CR-01 fix: each completed file persists via its
     // OWN atomic addSongAttachment call (an arrayUnion append), not a shared
@@ -299,6 +310,47 @@ describe('useSongFileUpload', () => {
     expect(uploads.value).toHaveLength(1)
 
     reset()
+    expect(uploads.value).toHaveLength(0)
+  })
+
+  it('denies a file whose name already matches an attached (non-link) file — case-insensitive; other files continue', () => {
+    const store = useSongStore()
+    // Only name + kind are read by the duplicate guard — cast the rest.
+    store.songs = [{ id: 'song1', attachments: [{ kind: 'document', name: 'Chart.pdf' }] } as any]
+    mockUploadBytesResumable.mockReturnValue(makeTask('orgs/org1/song-files/x/new.pdf'))
+
+    const { uploads, addFiles } = useSongFileUpload()
+    const dup = makeFile('chart.pdf', 'application/pdf', 1024) // different case → still a dup
+    const fresh = makeFile('new.pdf', 'application/pdf', 2048)
+    addFiles([dup, fresh], { songId: 'song1', orgId: 'org1', createdBy: 'user1' })
+
+    const dupRow = uploads.value.find((r) => r.name === 'chart.pdf')!
+    expect(dupRow.status).toBe('rejected')
+    expect(dupRow.message).toContain('already attached')
+    // the non-duplicate file is unaffected and starts uploading
+    expect(uploads.value.find((r) => r.name === 'new.pdf')!.status).toBe('uploading')
+  })
+
+  it('denies a second identical file within the same batch (only one uploads)', () => {
+    mockUploadBytesResumable.mockReturnValue(makeTask('orgs/org1/song-files/x/dup.pdf'))
+    const { uploads, addFiles } = useSongFileUpload()
+    const a = makeFile('dup.pdf', 'application/pdf', 1024)
+    const b = makeFile('dup.pdf', 'application/pdf', 1024)
+    addFiles([a, b], { songId: 'song1', orgId: 'org1', createdBy: 'user1' })
+
+    const rows = uploads.value.filter((r) => r.name === 'dup.pdf')
+    expect(rows).toHaveLength(2)
+    expect(rows.filter((r) => r.status === 'uploading')).toHaveLength(1)
+    expect(rows.filter((r) => r.status === 'rejected')).toHaveLength(1)
+  })
+
+  it('dismiss(id) removes a rejected/error row', () => {
+    const { uploads, addFiles, dismiss } = useSongFileUpload()
+    addFiles([makeFile('cover.png', 'image/png', 1024)], { songId: 'song1', orgId: 'org1', createdBy: 'user1' })
+    expect(uploads.value).toHaveLength(1)
+    expect(uploads.value[0]!.status).toBe('rejected')
+
+    dismiss(uploads.value[0]!.id)
     expect(uploads.value).toHaveLength(0)
   })
 })
