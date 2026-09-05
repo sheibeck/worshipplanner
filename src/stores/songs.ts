@@ -13,6 +13,7 @@ import {
   query,
   orderBy,
   getDocs,
+  runTransaction,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { ref as storageRef, deleteObject } from 'firebase/storage'
@@ -324,21 +325,35 @@ export const useSongStore = defineStore('songs', () => {
   // identically after onSnapshot normalization, so arrayRemove(liveObject)
   // can silently no-op and leave the "removed" file to reappear on the next
   // snapshot. `id` is a guaranteed-unique stable field, so filter-by-id is
-  // deterministic and immune to the Timestamp round-trip. Reads songs.value
-  // (already the latest onSnapshot array) immediately before writing, so the
-  // concurrent-add lost-update window is negligible — removal is a
-  // user-initiated, one-at-a-time action. Storage cleanup mirrors
-  // hardDeleteSong's best-effort loop (~L348-355): a failed deleteObject is
-  // logged and NEVER reverts the record removal (a rare orphaned blob is
-  // acceptable per the CONTEXT remove-atomicity decision).
+  // deterministic and immune to the Timestamp round-trip.
+  //
+  // 124-REVIEW WR-01: reads+writes inside a `runTransaction` against the
+  // LIVE server doc (not the local onSnapshot cache) so two concurrent
+  // removes on different rows — or a remove racing an in-flight
+  // addSongAttachment arrayUnion — can never last-write-wins clobber each
+  // other. Firestore retries the transaction if the doc changes between
+  // read and commit, which also serializes two removes racing on the same
+  // attachment instead of one silently resurrecting it.
+  //
+  // Storage cleanup mirrors hardDeleteSong's best-effort loop (~L348-355): a
+  // failed deleteObject is logged and NEVER reverts the record removal (a
+  // rare orphaned blob is acceptable per the CONTEXT remove-atomicity
+  // decision). 124-REVIEW WR-03: unlike the Storage half, a transaction
+  // failure is deliberately NOT caught here — it propagates so the caller
+  // can surface a "removal did not happen" error (Remove is framed as
+  // unrecoverable, so failing silently is worse than most other sites).
   async function removeSongAttachment(id: string, attachment: SongAttachment) {
     if (!orgId.value) return
-    const song = songs.value.find((s) => s.id === id)
-    if (!song) return
-    const filtered = (song.attachments ?? []).filter((a) => a.id !== attachment.id)
-    await updateDoc(doc(db, 'organizations', orgId.value, 'songs', id), {
-      attachments: filtered,
-      updatedAt: serverTimestamp(),
+    const ref = doc(db, 'organizations', orgId.value, 'songs', id)
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref)
+      if (!snap.exists()) return
+      const data = snap.data() as { attachments?: SongAttachment[] }
+      const filtered = (data.attachments ?? []).filter((a) => a.id !== attachment.id)
+      tx.update(ref, {
+        attachments: filtered,
+        updatedAt: serverTimestamp(),
+      })
     })
     if (attachment.storagePath) {
       try {

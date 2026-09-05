@@ -15,6 +15,12 @@ let mockLyricsDocs: { ref: { path: string } }[] = [
   { ref: { path: 'lyrics/lyric-2' } },
 ]
 
+// 124-REVIEW WR-01: simulated "live server doc" backing the mocked
+// runTransaction below — deliberately separate from `songs.value` (the
+// local onSnapshot cache the store no longer reads for removeSongAttachment)
+// so tests exercise the same read-live-doc/commit path production code does.
+let mockServerSongDoc: { attachments?: unknown[] } | null = null
+
 // Mock firebase/firestore module
 vi.mock('firebase/firestore', () => {
   const mockBatch = {
@@ -23,6 +29,7 @@ vi.mock('firebase/firestore', () => {
     delete: vi.fn((ref) => { mockBatchOps.push({ type: 'delete', ref }) }),
     commit: vi.fn(() => Promise.resolve()),
   }
+  const updateDocMock = vi.fn((_ref?: unknown, _data?: unknown) => Promise.resolve())
 
   return {
     getFirestore: vi.fn(() => ({})),
@@ -33,7 +40,7 @@ vi.mock('firebase/firestore', () => {
       return mockUnsubscribe
     }),
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-song-id' })),
-    updateDoc: vi.fn(() => Promise.resolve()),
+    updateDoc: updateDocMock,
     deleteDoc: vi.fn(() => Promise.resolve()),
     getDocs: vi.fn(() => Promise.resolve({ docs: mockLyricsDocs })),
     writeBatch: vi.fn(() => ({ ...mockBatch })),
@@ -45,6 +52,27 @@ vi.mock('firebase/firestore', () => {
     // assertions can distinguish "this field is an arrayUnion of X" from a
     // plain array write.
     arrayUnion: vi.fn((v: unknown) => ({ __arrayUnion: v })),
+    // 124-REVIEW WR-01: `tx.get`/`tx.update` read/write mockServerSongDoc
+    // (not songs.value) and `tx.update` delegates to the SAME updateDocMock
+    // instance returned above, so existing assertions against `updateDoc`
+    // keep working unmodified for the transaction path. `data()` is a live
+    // closure over mockServerSongDoc (not a frozen snapshot captured at
+    // `get()` time) so two overlapping transactions in the same test tick
+    // observe each other's commits, mirroring Firestore's actual
+    // read-conflict/retry behavior closely enough to prove no resurrection.
+    runTransaction: vi.fn(async (_db: unknown, updateFunction: (tx: unknown) => Promise<void>) => {
+      const tx = {
+        get: (_ref: unknown) => Promise.resolve({
+          exists: () => mockServerSongDoc !== null,
+          data: () => mockServerSongDoc,
+        }),
+        update: (ref: unknown, data: Record<string, unknown>) => {
+          mockServerSongDoc = { ...(mockServerSongDoc ?? {}), ...data }
+          return updateDocMock(ref, data)
+        },
+      }
+      return updateFunction(tx)
+    }),
   }
 })
 
@@ -156,6 +184,7 @@ describe('useSongStore', () => {
     mockAuthUser = null
     mockAuthOrgId = null
     mockAuthVwModeEnabled = true
+    mockServerSongDoc = null
     localStorage.clear()
   })
 
@@ -872,16 +901,15 @@ describe('useSongStore', () => {
     }
 
     it('writes a filtered attachments array (excludes the removed id, keeps the rest) plus serverTimestamp updatedAt', async () => {
-      const { updateDoc, serverTimestamp } = await import('firebase/firestore')
+      const { updateDoc, runTransaction, serverTimestamp } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
-      triggerSnapshot([
-        makeSong({ id: 'song-1', attachments: [uploadAttachment, audioAttachment, linkAttachment] }),
-      ])
+      mockServerSongDoc = { attachments: [uploadAttachment, audioAttachment, linkAttachment] }
 
       await store.removeSongAttachment('song-1', uploadAttachment)
 
+      expect(runTransaction).toHaveBeenCalledOnce()
       expect(updateDoc).toHaveBeenCalledOnce()
       const callArgs = vi.mocked(updateDoc).mock.calls[0]!
       const data = callArgs[1] as unknown as { attachments: Array<{ id: string }>; updatedAt: unknown }
@@ -896,9 +924,7 @@ describe('useSongStore', () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
-      triggerSnapshot([
-        makeSong({ id: 'song-1', attachments: [uploadAttachment, audioAttachment] }),
-      ])
+      mockServerSongDoc = { attachments: [uploadAttachment, audioAttachment] }
 
       await store.removeSongAttachment('song-1', uploadAttachment)
 
@@ -912,9 +938,7 @@ describe('useSongStore', () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
-      triggerSnapshot([
-        makeSong({ id: 'song-1', attachments: [uploadAttachment, linkAttachment] }),
-      ])
+      mockServerSongDoc = { attachments: [uploadAttachment, linkAttachment] }
 
       await store.removeSongAttachment('song-1', linkAttachment)
 
@@ -927,9 +951,7 @@ describe('useSongStore', () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
-      triggerSnapshot([
-        makeSong({ id: 'song-1', attachments: [uploadAttachment] }),
-      ])
+      mockServerSongDoc = { attachments: [uploadAttachment] }
 
       vi.mocked(deleteObject).mockRejectedValueOnce(new Error('object not found'))
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -945,7 +967,7 @@ describe('useSongStore', () => {
     })
 
     it('is a no-op when orgId is unset', async () => {
-      const { updateDoc } = await import('firebase/firestore')
+      const { updateDoc, runTransaction } = await import('firebase/firestore')
       const { deleteObject } = await import('firebase/storage')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
@@ -953,8 +975,32 @@ describe('useSongStore', () => {
 
       await store.removeSongAttachment('song-1', uploadAttachment)
 
+      expect(runTransaction).not.toHaveBeenCalled()
       expect(updateDoc).not.toHaveBeenCalled()
       expect(deleteObject).not.toHaveBeenCalled()
+    })
+
+    // 124-REVIEW WR-01 regression: two Remove operations on DIFFERENT
+    // attachments of the SAME song overlap (e.g. a user opens a second
+    // row's trash while the first row's removal is still in flight). The
+    // pre-fix plain read-songs.value/filter/updateDoc last-write-wins on
+    // the whole field, so whichever write lands second silently resurrects
+    // the attachment the other call had just removed. With the
+    // runTransaction fix, each call reads the LIVE doc at commit time, so
+    // both removals stick regardless of interleaving.
+    it('WR-01: two concurrent removes on different attachments both stick — neither is resurrected', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      mockServerSongDoc = { attachments: [uploadAttachment, audioAttachment, linkAttachment] }
+
+      await Promise.all([
+        store.removeSongAttachment('song-1', uploadAttachment),
+        store.removeSongAttachment('song-1', audioAttachment),
+      ])
+
+      const remainingIds = (mockServerSongDoc?.attachments as Array<{ id: string }> ?? []).map((a) => a.id)
+      expect(remainingIds).toEqual(['a3'])
     })
   })
 
