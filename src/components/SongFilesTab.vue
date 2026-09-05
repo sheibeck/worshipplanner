@@ -111,6 +111,19 @@
               <p class="text-xs text-gray-500" data-testid="song-file-meta">{{ metaLine(a) }}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
+              <button
+                v-if="a.kind === 'document'"
+                type="button"
+                :aria-label="`Preview ${a.name}`"
+                data-testid="song-file-preview"
+                class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-indigo-300"
+                @click="previewAttachment = a"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
               <a
                 v-if="a.kind !== 'link'"
                 :href="a.downloadUrl"
@@ -183,6 +196,12 @@
       </div>
     </div>
 
+    <SongFilePreviewModal
+      :open="previewAttachment !== null"
+      :attachment="previewAttachment"
+      @close="previewAttachment = null"
+    />
+
     <div class="space-y-2" data-testid="song-files-group-audio">
       <div class="flex items-center gap-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -207,6 +226,21 @@
               <p class="text-xs text-gray-500" data-testid="song-file-meta">{{ metaLine(a) }}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                :aria-label="`Play ${a.name}`"
+                data-testid="song-file-play"
+                class="p-1 rounded hover:bg-gray-700"
+                :class="playingId === a.id ? 'text-indigo-400' : 'text-gray-400'"
+                @click="togglePlay(a)"
+              >
+                <svg v-if="playingId !== a.id" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+              </button>
               <a
                 :href="a.downloadUrl"
                 download
@@ -231,6 +265,27 @@
               </button>
             </div>
           </div>
+          <audio
+            v-if="playingId === a.id"
+            controls
+            :src="a.downloadUrl"
+            class="mt-2 w-full"
+            data-testid="song-file-audio-player"
+            @error="onAudioError"
+          ></audio>
+          <p
+            v-if="playingId === a.id && audioErrored"
+            class="text-xs text-red-400 mt-1"
+            data-testid="song-file-audio-error"
+          >
+            Couldn't play this file.
+            <a
+              :href="a.downloadUrl"
+              download
+              class="underline"
+              data-testid="song-file-audio-error-download"
+            >Download</a>
+          </p>
           <div
             v-if="confirmingId === a.id"
             class="mt-2 rounded-lg bg-red-900/20 border border-red-800 p-3"
@@ -272,6 +327,7 @@ import { ref, computed } from 'vue'
 import { useSongFileUpload } from '@/composables/useSongFileUpload'
 import { useSongStore } from '@/stores/songs'
 import { isValidExternalLink, buildLinkAttachment } from '@/utils/songLinks'
+import SongFilePreviewModal from '@/components/SongFilePreviewModal.vue'
 import type { SongAttachment } from '@/types/song'
 
 const props = defineProps<{
@@ -341,6 +397,29 @@ async function confirmRemove(a: SongAttachment) {
     removingId.value = null
     confirmingId.value = null
   }
+}
+
+// R367 — Preview (PDF modal). Setting a different attachment while the
+// modal is already open just swaps which one it shows (the modal resets its
+// own loading/error state on the attachment change).
+const previewAttachment = ref<SongAttachment | null>(null)
+
+// R367 — Play (inline MP3 player). Only one track's <audio> is ever mounted
+// at a time; toggling a different row's Play collapses the previous one.
+const playingId = ref<string | null>(null)
+const audioErrored = ref(false)
+
+function togglePlay(a: SongAttachment) {
+  if (playingId.value === a.id) {
+    playingId.value = null
+    return
+  }
+  playingId.value = a.id
+  audioErrored.value = false
+}
+
+function onAudioError() {
+  audioErrored.value = true
 }
 
 function submitLink() {
