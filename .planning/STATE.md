@@ -1,16 +1,20 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.11
-milestone_name: Song File Attachments
+milestone_name: Song File Attachments (Phases 121-124, in planning)
+current_phase: 122
+current_phase_name: Durable Storage, Rules & Retention-Exempt Foundation
 status: planning
-last_updated: "2026-09-05T15:06:15.461Z"
+stopped_at: Phase 121 UI-SPEC approved
+last_updated: "2026-09-05T15:42:59.262Z"
 last_activity: 2026-09-05
+last_activity_desc: Phase 121 complete, transitioned to Phase 122
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 25
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -54,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.11 Song File Attachments (roadmap created 2026-09-05)
 
-**Status:** v2.11 roadmap created — ready to plan Phase 121
+**Status:** Ready to plan
 
 **Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external media
 links (YouTube/Drive/Dropbox) — on a Song in the stable, via a new Files tab in the Edit Song slideout,
@@ -1285,10 +1289,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (roadmap created; Phase 121 not yet planned)
-Plan: —
+Phase: 122 — Durable Storage, Rules & Retention-Exempt Foundation
+Plan: Not started
 Status: Roadmap created — ready for /gsd-plan-phase 121
-Last activity: 2026-09-05 — v2.11 ROADMAP.md created (Phases 121-124, R361-R373, 100% coverage)
+Last activity: 2026-09-05 — Phase 121 complete, transitioned to Phase 122
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 
@@ -1323,7 +1327,6 @@ backlog 999.13).
 See `.planning/ROADMAP.md` § v2.11 Song File Attachments for the full phase detail table (goals,
 dependencies, success criteria). Next step: `/gsd-plan-phase 121` (optionally preceded by
 `/gsd-discuss-phase 121`).
-
 
 ## ★ v2.10 ROADMAP.md phase breakdown (created 2026-09-04)
 
@@ -4166,9 +4169,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T05:30:35.550Z
-Stopped at: Completed 120-02-PLAN.md
-Resume file: None
+Last session: 2026-09-05T15:36:26.485Z
+Stopped at: Phase 121 UI-SPEC approved
+Resume file: .planning/phases/121-song-files-ui-design-spec/121-UI-SPEC.md
 
 ## Operator Next Steps
 
