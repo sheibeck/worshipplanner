@@ -2387,5 +2387,48 @@ describe('useServiceStore', () => {
 
       consoleErrorSpy.mockRestore()
     })
+
+    // R349/ARCH-011: recomputeLastUsedFor must isolate a single song's
+    // updateSong rejection so every OTHER affected song still gets written,
+    // and the failed id(s) must be logged rather than silently dropped.
+    it('R349: a mid-loop updateSong rejection for one song does not prevent the others from being written; the failed id is logged', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeService({
+          id: 'service-1',
+          date: '2026-09-06',
+          status: 'draft',
+          slots: [
+            { kind: 'SONG', position: 0, requiredVwType: 1, songId: 'song-a', songTitle: 'A', songKey: 'G' },
+            { kind: 'SONG', position: 1, requiredVwType: 1, songId: 'song-b', songTitle: 'B', songKey: 'G' },
+            { kind: 'SONG', position: 2, requiredVwType: 1, songId: 'song-c', songTitle: 'C', songKey: 'G' },
+          ],
+        }),
+      ])
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockUpdateSong.mockImplementation((songId: unknown) =>
+        songId === 'song-b' ? Promise.reject(new Error('write failed')) : Promise.resolve(),
+      )
+
+      await store.markAsPlanned('service-1')
+
+      // Every song still got its updateSong call — song-b's rejection didn't
+      // abort the loop for song-c (which comes after it).
+      expect(mockUpdateSong).toHaveBeenCalledWith('song-a', { lastUsedAt: expect.anything() })
+      expect(mockUpdateSong).toHaveBeenCalledWith('song-b', { lastUsedAt: expect.anything() })
+      expect(mockUpdateSong).toHaveBeenCalledWith('song-c', { lastUsedAt: expect.anything() })
+
+      // The failed id is logged.
+      const loggedFailedId = consoleErrorSpy.mock.calls.some((call) =>
+        call.some((arg) => typeof arg === 'string' && arg.includes('song-b')),
+      )
+      expect(loggedFailedId).toBe(true)
+
+      consoleErrorSpy.mockRestore()
+      mockUpdateSong.mockImplementation(() => Promise.resolve())
+    })
   })
 })

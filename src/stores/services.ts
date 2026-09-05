@@ -484,10 +484,20 @@ export const useServiceStore = defineStore('services', () => {
     servicesSnapshot: LastUsedServiceInput[],
   ): Promise<void> {
     const songStore = useSongStore()
+    // R349/ARCH-011 — per-song try/catch: one song's updateSong rejection must
+    // not abort the write for every OTHER song still in this loop.
+    const failedSongIds: string[] = []
     for (const songId of affectedSongIds) {
       const maxDate = computeLastUsedDate(songId, servicesSnapshot)
       const lastUsedAt = maxDate === null ? null : Timestamp.fromMillis(serviceDateToMillis(maxDate))
-      await songStore.updateSong(songId, { lastUsedAt })
+      try {
+        await songStore.updateSong(songId, { lastUsedAt })
+      } catch {
+        failedSongIds.push(songId)
+      }
+    }
+    if (failedSongIds.length > 0) {
+      console.error(`recomputeLastUsedFor: lastUsedAt write failed for song id(s): ${failedSongIds.join(', ')}`)
     }
   }
 
