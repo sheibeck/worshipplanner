@@ -1436,6 +1436,24 @@ describe("PPTX_SOURCE_GUARD", () => {
   });
 });
 
+describe("Song-files retention exemption (R370, Phase 122)", () => {
+  // Song attachments are permanent by owner mandate -- no new sweep/guard is
+  // added. This locks the structural fact that song-files/ matches none of
+  // the four existing sweep guards, so a future guard-widening edit fails here.
+  const SONG_FILE_PDF_PATH = "orgs/orgA/song-files/attach1/chart.pdf";
+  const SONG_FILE_MP3_PATH = "orgs/orgA/song-files/attach2/track.mp3";
+
+  it.each([SONG_FILE_PDF_PATH, SONG_FILE_MP3_PATH])(
+    "%s is matched by NONE of the four retention-sweep guards",
+    (songFilePath) => {
+      expect(MEDIA_PATH_GUARD.test(songFilePath)).toBe(false);
+      expect(RENDERED_OBJECT_GUARD.test(songFilePath)).toBe(false);
+      expect(BACKGROUND_PATH_GUARD.test(songFilePath)).toBe(false);
+      expect(PPTX_SOURCE_GUARD.test(songFilePath)).toBe(false);
+    },
+  );
+});
+
 describe("cleanupOrphanBackgroundsHandler", () => {
   const ORG_ID = "orgA";
   const STALE_DAYS = BACKGROUND_RETENTION_DAYS + 60; // comfortably past the retention window

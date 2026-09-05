@@ -52,6 +52,7 @@ export function readMediaRetentionDays(config: AppConfig): number {
  * the delete decision, regardless of age.
  */
 export const MEDIA_PATH_GUARD = /^orgs\/[^/]+\/media\//;
+// R370: orgs/{orgId}/song-files/ is intentionally out of scope -- retention-exempt (permanent).
 
 export interface CleanupSummary {
   scannedCount: number;
@@ -184,6 +185,7 @@ export function readOrphanRenderStaleHours(config: AppConfig): number {
  * not by a runtime check on their names.
  */
 export const RENDERED_OBJECT_GUARD = /^orgs\/[^/]+\/pptx-imports\/[^/]+\/rendered\//;
+// R370: orgs/{orgId}/song-files/ is intentionally out of scope -- retention-exempt (permanent).
 
 export interface OrphanCleanupSummary {
   scannedCount: number;
@@ -359,6 +361,7 @@ export function readBackgroundRetentionDays(config: AppConfig): number {
  * reference state.
  */
 export const BACKGROUND_PATH_GUARD = /^orgs\/[^/]+\/backgrounds\//;
+// R370: orgs/{orgId}/song-files/ is intentionally out of scope -- retention-exempt (permanent).
 
 export interface OrphanBackgroundSummary {
   scannedCount: number;
@@ -571,6 +574,7 @@ export function readPptxSourceRetentionDays(config: AppConfig): number {
  * construction, never by a runtime name check.
  */
 export const PPTX_SOURCE_GUARD = /^orgs\/[^/]+\/pptx-imports\/[^/]+\/(source\.pptx$|images\/)/;
+// R370: orgs/{orgId}/song-files/ is intentionally out of scope -- retention-exempt (permanent).
 
 /** Builds the per-import Storage prefix a pptx import's source lives under. */
 export function sourcePrefixFor(orgId: string, importId: string): string {
