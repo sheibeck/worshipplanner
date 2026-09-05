@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Song Files — UX Mock (v2.11)</title>
+<style>
+  /* App-fidelity palette — Tailwind v4 stock tokens the real app uses */
+  :root{
+    --gray-950:#030712; --gray-900:#111827; --gray-850:#161e2e; --gray-800:#1f2937;
+    --gray-700:#374151; --gray-600:#4b5563; --gray-500:#6b7280; --gray-400:#9ca3af;
+    --gray-300:#d1d5db; --gray-200:#e5e7eb; --gray-100:#f3f4f6;
+    --indigo-600:#4f46e5; --indigo-500:#6366f1; --indigo-400:#818cf8; --indigo-300:#a5b4fc;
+    --indigo-900:#312e81; --indigo-800:#3730a3;
+    --red-900:#7f1d1d; --red-800:#991b1b; --red-700:#b91c1c; --red-600:#dc2626;
+    --red-400:#f87171; --red-300:#fca5a5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--gray-950);color:var(--gray-200);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;line-height:1.5}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+  h1{font-size:20px;font-weight:600;margin:0 0 4px;color:#fff}
+  .sub{color:var(--gray-500);font-size:13px;margin:0 0 24px}
+  .kicker{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--gray-500);margin:34px 0 10px}
+  .note{font-size:12px;color:var(--gray-500);margin:6px 0 0}
+  svg{display:block}
+  .icon{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .icon-lg{width:32px;height:32px}
+  .icon-sm{width:14px;height:14px}
+  .icon-md{width:20px;height:20px}
+
+  /* ---- Songs table ---- */
+  .panel{background:var(--gray-900);border:1px solid var(--gray-800);border-radius:12px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{text-align:left;padding:12px 16px;font-size:11px;font-weight:500;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--gray-400);border-bottom:1px solid var(--gray-800)}
+  tbody td{padding:12px 16px;border-bottom:1px solid var(--gray-800);color:var(--gray-300)}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr.sel{background:rgba(79,70,229,.10)}
+  .title{color:#fff;font-size:13px}
+  .byline{color:var(--gray-500);font-size:11px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .cat{display:inline-flex;align-items:center;padding:2px 9px;border-radius:6px;font-size:11px;
+    background:rgba(49,46,129,.5);color:var(--indigo-300);border:1px solid var(--indigo-800)}
+  .files-cell{display:inline-flex;align-items:center;gap:6px;color:var(--gray-300);font-size:13px}
+  .files-cell.none{color:var(--gray-500)}
+  .files-cell .icon{color:var(--gray-500)}
+
+  /* ---- Slideout ---- */
+  .stage{display:flex;justify-content:flex-end;background:
+    linear-gradient(90deg,rgba(3,7,18,0) 0%, rgba(3,7,18,.5) 40%, var(--gray-950) 40%);
+    border-radius:12px;border:1px solid var(--gray-800);overflow:hidden}
+  .slide{width:520px;background:var(--gray-900);border-left:1px solid var(--gray-800);
+    display:flex;flex-direction:column;min-height:760px}
+  .slide-head{padding:16px 20px 0;display:flex;align-items:flex-start;gap:12px}
+  .eyebrow{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gray-500)}
+  .song-title{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:600;color:#fff;margin-top:3px}
+  .song-title .icon{color:var(--gray-500)}
+  .head-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .btn{height:32px;padding:0 13px;border-radius:8px;font-size:12.5px;font-family:inherit;cursor:pointer;border:1px solid transparent;background:transparent}
+  .btn-close{border-color:var(--gray-700);color:var(--gray-300)}
+  .btn-save{background:var(--indigo-600);border-color:var(--indigo-500);color:#fff;font-weight:500}
+  .btn-x{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;color:var(--gray-500);border:none}
+
+  /* tabs */
+  .tabs{display:flex;gap:2px;padding:14px 20px 0;border-bottom:1px solid var(--gray-800);margin-top:14px}
+  .tab{padding:8px 16px 10px;font-size:14px;font-weight:500;color:var(--gray-400);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;background:none;font-family:inherit}
+  .tab:hover{color:var(--gray-300)}
+  .tab.active{color:var(--indigo-400);border-bottom-color:var(--indigo-500)}
+  .badge{display:inline-flex;align-items:center;padding:1px 8px;margin-left:7px;border-radius:999px;font-size:11px;font-weight:500;
+    background:rgba(49,46,129,.5);color:var(--indigo-300);border:1px solid var(--indigo-800)}
+
+  .body{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:20px}
+
+  /* drop zone */
+  .drop{border:2px dashed var(--gray-700);background:rgba(31,41,55,.4);border-radius:10px;
+    padding:26px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer}
+  .drop .icon-lg{color:var(--gray-500)}
+  .drop .primary{font-size:14px;font-weight:500;color:var(--gray-200)}
+  .drop .helper{font-size:12px;color:var(--gray-500)}
+  .drop.drag{border-color:var(--indigo-500);background:rgba(49,46,129,.12)}
+  .drop.drag .icon-lg,.drop.drag .primary{color:var(--indigo-400)}
+
+  /* link field */
+  .field label{display:block;font-size:12px;font-weight:500;color:var(--gray-400);margin-bottom:5px}
+  .input{width:100%;height:38px;padding:0 12px;border-radius:8px;background:var(--gray-800);
+    border:1px solid var(--gray-700);color:var(--gray-100);font:inherit;font-size:13px}
+  .input::placeholder{color:var(--gray-500)}
+  .field .fhelp{font-size:12px;color:var(--gray-500);margin-top:6px}
+
+  /* groups */
+  .group-head{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:500;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--gray-500);margin-bottom:8px}
+  .group-head .icon{color:var(--gray-400)}
+  .stack{display:flex;flex-direction:column;gap:8px}
+  .row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:8px;
+    background:rgba(31,41,55,.6);border:1px solid var(--gray-800)}
+  .row .ficon{color:var(--gray-400);flex:none}
+  .row .meta{flex:1;min-width:0}
+  .row .fname{font-size:13px;color:var(--gray-100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .fmeta{font-size:11px;color:var(--gray-500);margin-top:2px}
+  .row .actions{display:flex;gap:4px;flex:none}
+  .act{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;
+    color:var(--gray-400);background:transparent;border:none;cursor:pointer}
+  .act:hover{background:var(--gray-700)}
+  .act.rm:hover{color:var(--red-400)}
+  .act.prev:hover{color:var(--indigo-300)}
+  .act.playing{color:var(--indigo-400)}
+  .empty{font-size:12px;color:var(--gray-500);padding:8px 2px}
+
+  /* uploading row */
+  .up-row{padding:11px 12px}
+  .up-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .up-name{flex:1;font-size:13px;color:var(--gray-200);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .up-pct{font-size:11px;color:var(--gray-400)}
+  .track{height:6px;border-radius:999px;background:var(--gray-800);overflow:hidden}
+  .fill{height:100%;background:var(--indigo-500);border-radius:999px}
+
+  /* mp3 player expanded */
+  audio{width:100%;margin-top:8px;height:36px}
+
+  /* inline states row */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}.slide{width:100%}.stage{background:var(--gray-950)}}
+  .card{background:var(--gray-900);border:1px solid var(--gray-800);border-radius:12px;padding:16px}
+  .card h3{font-size:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--gray-400);margin:0 0 12px}
+
+  /* remove confirm */
+  .confirm{margin-top:8px;border:1px solid var(--red-800);background:rgba(127,29,29,.2);border-radius:10px;padding:12px}
+  .confirm p{margin:0 0 10px;font-size:13px;color:var(--gray-200)}
+  .confirm strong{color:#fff}
+  .confirm .row-btns{display:flex;gap:8px}
+  .btn-cancel{background:var(--gray-800);border:1px solid var(--gray-700);color:var(--gray-300)}
+  .btn-remove{background:var(--red-700);border:1px solid var(--red-600);color:#fff}
+
+  /* pdf modal */
+  .modal{background:var(--gray-900);border:1px solid var(--gray-800);border-radius:12px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+  .modal-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--gray-800)}
+  .modal-head .mtitle{font-size:13px;font-weight:500;color:var(--gray-100);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .modal-body{height:220px;display:flex;align-items:center;justify-content:center;color:var(--gray-600);
+    background:repeating-linear-gradient(45deg,#0b1220,#0b1220 12px,#0d1526 12px,#0d1526 24px);font-size:12px}
+  .reject{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--red-400);padding:4px 2px}
+  .err-link{color:var(--red-300);font-size:12px;text-decoration:underline;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow" style="color:var(--indigo-400);font-size:11px;letter-spacing:.14em">v2.11 · Phase 121 · UX mock</div>
+  <h1>Song Files</h1>
+  <p class="sub">Attach PDFs and MP3s (plus external links) to a song, in the app's real dark theme. A throwaway
+    reference for the owner — not shipping code. Remapped from the Nocturne mock to gray-950 / indigo.</p>
+
+  <!-- ============ SONGS LIST ============ -->
+  <div class="kicker">1 · Songs list — new "Files" column</div>
+  <div class="panel">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:32%">Title</th><th>Category</th><th>Key</th><th>CCLI</th>
+          <th>Files</th><th>Last used</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="sel">
+          <td><div class="title">Great Things</div><div class="byline">Phil Wickham</div></td>
+          <td><span class="cat">Type 1</span></td>
+          <td class="mono">Bb</td><td class="mono" style="color:var(--indigo-300)">7111321</td>
+          <td><span class="files-cell"><svg class="icon" viewBox="0 0 24 24"><path d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94a3 3 0 014.243 4.243l-10.94 10.94a1.5 1.5 0 01-2.122-2.121l9.16-9.16"/></svg>6 files</span></td>
+          <td style="color:var(--gray-500)">Sep 5, 2026</td>
+        </tr>
+        <tr>
+          <td><div class="title">Yay Jesus</div><div class="byline">—</div></td>
+          <td>—</td><td class="mono">—</td><td class="mono">—</td>
+          <td><span class="files-cell none">none</span></td>
+          <td style="color:var(--gray-500)">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Toggleable column (cog menu), positioned last before the trailing chevron. Plain text — the pill
+    badge is reserved for the Files-tab count only.</p>
+
+  <!-- ============ SLIDEOUT — FILES TAB ============ -->
+  <div class="kicker">2 · Edit Song slideout — new "Files" tab (populated)</div>
+  <div class="stage">
+    <div class="slide">
+      <div class="slide-head">
+        <div>
+          <div class="eyebrow">Edit song</div>
+          <div class="song-title">Great Things
+            <svg class="icon-sm icon" viewBox="0 0 24 24"><path d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+          </div>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-close">Close</button>
+          <button class="btn btn-save">Save</button>
+          <button class="btn btn-x"><svg class="icon" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab">Details</button>
+        <button class="tab">Lyrics</button>
+        <button class="tab active">Files <span class="badge">6</span></button>
+      </div>
+
+      <div class="body">
+        <!-- drop zone -->
+        <div class="drop">
+          <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 7.5L12 3m0 0L7.5 7.5M12 3v13.5"/></svg>
+          <div class="primary">Drop files here, or click to browse</div>
+          <div class="helper">PDF, MP3 · up to 50 MB each · several at once</div>
+        </div>
+
+        <!-- link field -->
+        <div class="field">
+          <label>Or link instead of uploading</label>
+          <input class="input" placeholder="Paste a YouTube, Google Drive, or Dropbox link">
+          <div class="fhelp">Opens in a new tab when clicked — not previewed in-app.</div>
+        </div>
+
+        <!-- uploading -->
+        <div>
+          <div class="group-head" style="letter-spacing:.12em">Uploading</div>
+          <div class="row up-row" style="flex-direction:column;align-items:stretch">
+            <div class="up-top">
+              <svg class="icon-md icon" style="color:var(--indigo-300)" viewBox="0 0 24 24"><path d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303"/></svg>
+              <span class="up-name">GreatThings — click track 72bpm.mp3</span>
+              <span class="up-pct">64%</span>
+              <button class="act"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="track"><div class="fill" style="width:64%"></div></div>
+          </div>
+        </div>
+
+        <!-- documents -->
+        <div>
+          <div class="group-head">
+            <svg class="icon-md icon" viewBox="0 0 24 24"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+            Documents
+          </div>
+          <div class="stack">
+            <div class="row">
+              <svg class="icon-md icon ficon" viewBox="0 0 24 24"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+              <div class="meta"><div class="fname">GreatThings — chord chart (Bb).pdf</div><div class="fmeta">PDF · 1 page · 148 KB · Sep 2, 2026</div></div>
+              <div class="actions">
+                <button class="act prev" title="Preview"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                <button class="act" title="Download"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 10.5L12 15m0 0l4.5-4.5M12 15V3"/></svg></button>
+                <button class="act rm" title="Remove"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M18.16 5.79L17.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M4.772 5.79A48.11 48.11 0 018.25 5.393m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916"/></svg></button>
+              </div>
+            </div>
+            <div class="row">
+              <svg class="icon-md icon ficon" viewBox="0 0 24 24"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+              <div class="meta"><div class="fname">GreatThings — piano vocal.pdf</div><div class="fmeta">PDF · 4 pages · 612 KB · Aug 24, 2026</div></div>
+              <div class="actions">
+                <button class="act prev"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                <button class="act"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 10.5L12 15m0 0l4.5-4.5M12 15V3"/></svg></button>
+                <button class="act rm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M18.16 5.79L17.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M4.772 5.79A48.11 48.11 0 018.25 5.393m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916"/></svg></button>
+              </div>
+            </div>
+            <!-- linked doc row -->
+            <div class="row">
+              <svg class="icon-md icon ficon" viewBox="0 0 24 24"><path d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+              <div class="meta"><div class="fname">Lead sheet (Google Drive)</div><div class="fmeta">Drive link · Aug 24, 2026</div></div>
+              <div class="actions">
+                <button class="act prev" title="Open in new tab"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg></button>
+                <button class="act rm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M18.16 5.79L17.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M4.772 5.79A48.11 48.11 0 018.25 5.393m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- audio -->
+        <div>
+          <div class="group-head">
+            <svg class="icon-md icon" viewBox="0 0 24 24"><path d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303"/></svg>
+            Audio
+          </div>
+          <div class="stack">
+            <div class="row">
+              <svg class="icon-md icon ficon" viewBox="0 0 24 24"><path d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303"/></svg>
+              <div class="meta"><div class="fname">GreatThings — band reference.mp3</div><div class="fmeta">MP3 · 4:38 · 6.4 MB · Sep 2, 2026</div></div>
+              <div class="actions">
+                <button class="act playing" title="Play"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg></button>
+                <button class="act"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 10.5L12 15m0 0l4.5-4.5M12 15V3"/></svg></button>
+                <button class="act rm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M18.16 5.79L17.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M4.772 5.79A48.11 48.11 0 018.25 5.393m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916"/></svg></button>
+              </div>
+            </div>
+            <!-- expanded player under the playing row -->
+            <audio controls style="filter:invert(.9) hue-rotate(180deg)"><source></audio>
+            <div class="row">
+              <svg class="icon-md icon ficon" viewBox="0 0 24 24"><path d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303"/></svg>
+              <div class="meta"><div class="fname">GreatThings — piano guide.mp3</div><div class="fmeta">MP3 · 4:41 · 6.6 MB · Aug 28, 2026</div></div>
+              <div class="actions">
+                <button class="act"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg></button>
+                <button class="act"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 10.5L12 15m0 0l4.5-4.5M12 15V3"/></svg></button>
+                <button class="act rm"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166M18.16 5.79L17.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397M4.772 5.79A48.11 48.11 0 018.25 5.393m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="note" style="border-top:1px solid var(--gray-800);padding-top:12px">Files attached here appear
+          for every service that uses this song. Removing a file removes it everywhere — past services included.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ STATE INSETS ============ -->
+  <div class="kicker">3 · Key states</div>
+  <div class="grid2">
+
+    <div class="card">
+      <h3>Empty state (editor)</h3>
+      <div class="drop" style="padding:18px">
+        <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 7.5L12 3m0 0L7.5 7.5M12 3v13.5"/></svg>
+        <div class="primary">Drop files here, or click to browse</div>
+        <div class="helper">PDF, MP3 · up to 50 MB each · several at once</div>
+      </div>
+      <div class="group-head" style="margin-top:14px">Documents</div>
+      <div class="empty">No documents attached yet.</div>
+      <div class="group-head" style="margin-top:10px">Audio</div>
+      <div class="empty">No audio files attached yet.</div>
+    </div>
+
+    <div class="card">
+      <h3>Remove confirmation (inline)</h3>
+      <div class="row">
+        <svg class="icon-md icon ficon" viewBox="0 0 24 24"><path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+        <div class="meta"><div class="fname">GreatThings — chord chart (Bb).pdf</div><div class="fmeta">PDF · 1 page · 148 KB · Sep 2, 2026</div></div>
+      </div>
+      <div class="confirm">
+        <p>Remove <strong>"GreatThings — chord chart (Bb).pdf"</strong>? This file appears on every service that
+          uses this song. Removing it here removes it everywhere — including past services. This can't be undone.</p>
+        <div class="row-btns"><button class="btn btn-cancel">Cancel</button><button class="btn btn-remove">Remove</button></div>
+      </div>
+
+      <h3 style="margin-top:18px">Rejected file (client-side)</h3>
+      <div class="reject">
+        <svg class="icon icon-sm" viewBox="0 0 24 24" style="stroke:var(--red-400)"><path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        "rehearsal-video.mp4" can't be uploaded — PDF and MP3 only, up to 50 MB.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>In-app PDF preview (modal)</h3>
+      <div class="modal">
+        <div class="modal-head">
+          <span class="mtitle">GreatThings — piano vocal.pdf</span>
+          <button class="act"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 10.5L12 15m0 0l4.5-4.5M12 15V3"/></svg></button>
+          <button class="act"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <div class="modal-body">rendered PDF (iframe)</div>
+      </div>
+      <p class="note">Escape / backdrop / Close dismisses — never leaves the Files tab.</p>
+    </div>
+
+    <div class="card">
+      <h3>Viewer (read-only)</h3>
+      <p class="note" style="margin-top:0">No drop zone, no link field, no Remove — Preview / Play / Download remain.</p>
+      <div class="row">
+        <svg class="icon-md icon ficon" viewBox="0 0 24 24"><path d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303"/></svg>
+        <div class="meta"><div class="fname">GreatThings — band reference.mp3</div><div class="fmeta">MP3 · 4:38 · 6.4 MB · Sep 2, 2026</div></div>
+        <div class="actions">
+          <button class="act"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg></button>
+          <button class="act"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 10.5L12 15m0 0l4.5-4.5M12 15V3"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="note" style="margin-top:28px;border-top:1px solid var(--gray-800);padding-top:14px">
+    Mock reflects UI-SPEC 121. Icons are Heroicons-outline (hand-inlined SVG, matching the app). Palette is
+    Tailwind v4 stock gray-950/900/800 + indigo — no custom theme. Uploads are PDF + MP3 only (≤ 50 MB);
+    video/images come in only as external links.</p>
+</div>
+</body>
+</html>
