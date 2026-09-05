@@ -116,4 +116,44 @@ describe('SongFilePreviewModal', () => {
     expect(wrapper.emitted('close')).toBeUndefined()
     wrapper.unmount()
   })
+
+  describe('WR-02: Tab/Shift+Tab focus trap', () => {
+    it('Tab from the last focusable element (Close) wraps focus to the first (header Download)', async () => {
+      const wrapper = mountModal(true, makeAttachment())
+      const download = wrapper.find('[data-testid="song-file-preview-download"]').element as HTMLElement
+      const close = wrapper.find('[data-testid="song-file-preview-close"]').element as HTMLElement
+
+      close.focus()
+      expect(document.activeElement).toBe(close)
+
+      await wrapper.find('[role="dialog"]').trigger('keydown', { key: 'Tab' })
+
+      expect(document.activeElement).toBe(download)
+      wrapper.unmount()
+    })
+
+    it('Shift+Tab from the first focusable element (header Download) wraps focus to the last (Close)', async () => {
+      const wrapper = mountModal(true, makeAttachment())
+      const download = wrapper.find('[data-testid="song-file-preview-download"]').element as HTMLElement
+      const close = wrapper.find('[data-testid="song-file-preview-close"]').element as HTMLElement
+
+      download.focus()
+      expect(document.activeElement).toBe(download)
+
+      await wrapper.find('[role="dialog"]').trigger('keydown', { key: 'Tab', shiftKey: true })
+
+      expect(document.activeElement).toBe(close)
+      wrapper.unmount()
+    })
+
+    it('focus lands on the Close button when the modal transitions to open', async () => {
+      const wrapper = mountModal(false, makeAttachment())
+      await wrapper.setProps({ open: true })
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      const close = wrapper.find('[data-testid="song-file-preview-close"]').element as HTMLElement
+      expect(document.activeElement).toBe(close)
+      wrapper.unmount()
+    })
+  })
 })

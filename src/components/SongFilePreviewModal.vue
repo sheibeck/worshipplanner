@@ -98,6 +98,7 @@
               :src="attachment.downloadUrl"
               class="w-full h-full border-0"
               data-testid="song-file-preview-iframe"
+              tabindex="-1"
               @load="onLoad"
               @error="onError"
             ></iframe>
@@ -122,10 +123,16 @@
 
 <script setup lang="ts">
 // See src/components/admin/CleanupEnableConfirmDialog.vue — this reuses that dialog shell
-// (backdrop, role="dialog" aria-modal, DOM-scoped @keydown) for a transient PDF viewer. Unlike
-// SongSlideOver's deliberately non-dismissing editing panel, this overlay DOES dismiss on
-// Escape/backdrop/Close — the Escape handler is bound on the dialog root element (not window),
-// so it can never bubble up and close the editing slideout underneath (T-124-06).
+// (backdrop, role="dialog" aria-modal, DOM-scoped @keydown, Tab/Shift+Tab focus trap) for a
+// transient PDF viewer. Unlike SongSlideOver's deliberately non-dismissing editing panel, this
+// overlay DOES dismiss on Escape/backdrop/Close — the Escape handler is bound on the dialog root
+// element (not window), so it can never bubble up and close the editing slideout underneath
+// (T-124-06). 124-REVIEW WR-02: unlike CleanupEnableConfirmDialog's fixed Cancel/Confirm button
+// pair, this dialog's focusable set changes shape (header Download + Close, plus an error-state
+// Download link when the iframe errors) — so the trap queries the dialog root for focusable
+// elements at keydown time instead of a static ref list. The PDF <iframe> itself is deliberately
+// excluded (tabindex="-1"): it's a separate (often cross-origin) browsing context our keydown
+// handler cannot see inside, so scripting it into a Tab cycle would be unreliable at best.
 import { nextTick, ref, useId, watch } from 'vue'
 import type { SongAttachment } from '@/types/song'
 
@@ -190,13 +197,50 @@ function onError(): void {
   errored.value = true
 }
 
-// DOM-scoped Escape handler (bound on the dialog root via @keydown in the
-// template) — never a window/document listener, so it cannot bubble to or
-// affect SongSlideOver's non-dismissing editing slideout (T-124-06).
+// 124-REVIEW WR-02: the dialog's focusable descendants at any given moment
+// (header Download + Close, plus the error-state Download when errored).
+// The iframe is intentionally not part of this set — see the top-of-file
+// comment.
+function getFocusableElements(): HTMLElement[] {
+  const root = dialogRootRef.value
+  if (!root) return []
+  return Array.from(
+    root.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+  )
+}
+
+// DOM-scoped Escape + Tab/Shift+Tab focus trap (bound on the dialog root via
+// @keydown in the template) — never a window/document listener, so it
+// cannot bubble to or affect SongSlideOver's non-dismissing editing
+// slideout (T-124-06). The Tab-cycling logic mirrors
+// CleanupEnableConfirmDialog.vue's onKeydown (~L191-210), generalized to a
+// dynamic focusable-element query since this dialog's focusable set changes
+// shape across loading/errored states.
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
     event.preventDefault()
     onClose()
+    return
+  }
+  if (event.key !== 'Tab') return
+
+  const elements = getFocusableElements()
+  if (elements.length === 0) return
+
+  const first = elements[0]!
+  const last = elements[elements.length - 1]!
+  const active = document.activeElement
+
+  if (event.shiftKey) {
+    if (active === first || !elements.includes(active as HTMLElement)) {
+      event.preventDefault()
+      last.focus()
+    }
+  } else {
+    if (active === last || !elements.includes(active as HTMLElement)) {
+      event.preventDefault()
+      first.focus()
+    }
   }
 }
 </script>
