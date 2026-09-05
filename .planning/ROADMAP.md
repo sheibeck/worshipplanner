@@ -665,12 +665,12 @@ it.
      deleted; no other service-side operation — including deleting a service that used the song — removes
      or orphans it (R371).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 Plans:
 
 - [x] 122-01-PLAN.md — storage.rules song-files block (isOrgEditor helper, type/size gate, catch-all exclusion) + rules-emulator allow/deny tests (R364, R372)
-- [ ] 122-02-PLAN.md — additive SongAttachment schema + path helper (R369), retention-sweep guard-exclusion lock (R370), hardDeleteSong best-effort Storage cascade (R371)
+- [x] 122-02-PLAN.md — additive SongAttachment schema + path helper (R369), retention-sweep guard-exclusion lock (R370), hardDeleteSong best-effort Storage cascade (R371)
 
 ### Phase 123: Files Tab, Songs List Column, Upload & External Link Attach
 

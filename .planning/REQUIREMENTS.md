@@ -70,17 +70,17 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 
 ### Durable, Retention-Exempt Storage (Invariant)
 
-- [ ] **R369**: Attachment records live on the **Song document** (additive schema, **no migration** of
+- [x] **R369**: Attachment records live on the **Song document** (additive schema, **no migration** of
   existing songs), and uploaded bytes live under a **dedicated org-scoped Storage prefix outside `media/`**
   (e.g. `orgs/{orgId}/song-files/…`). Org members' read/write access to that prefix is granted in
   `storage.rules` mirroring the existing `orgs/{orgId}/…` member rule, with the R364 size cap applied.
 
-- [ ] **R370**: Song attachments are **exempt from every automated retention/cleanup sweep**. Each existing
+- [x] **R370**: Song attachments are **exempt from every automated retention/cleanup sweep**. Each existing
   cleanup Cloud Function — `cleanupExpiredMedia`, `cleanupOrphanBackgrounds`, and `cleanupPptxSources` — is
   verified to **exclude** the song-files prefix, and a check/test proves none of them can reach or delete a
   song attachment. (A future edit to any sweep must not be able to silently start deleting song files.)
 
-- [ ] **R371**: A song attachment is deleted **only** by an explicit editor removal (R368) or by the song
+- [x] **R371**: A song attachment is deleted **only** by an explicit editor removal (R368) or by the song
   itself being deleted; no service operation (including deleting a service that used the song) removes or
   orphans a song's attachments, and the attachment survives indefinitely otherwise.
 
@@ -140,9 +140,9 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 | R366 | Phase 124 | Pending |
 | R367 | Phase 124 | Pending |
 | R368 | Phase 124 | Pending |
-| R369 | Phase 122 | Pending |
-| R370 | Phase 122 | Pending |
-| R371 | Phase 122 | Pending |
+| R369 | Phase 122 | Complete |
+| R370 | Phase 122 | Complete |
+| R371 | Phase 122 | Complete |
 | R372 | Phase 122 | Complete |
 | R373 | Phase 121 | Complete |
 

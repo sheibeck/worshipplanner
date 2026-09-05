@@ -5,16 +5,16 @@ milestone_name: Song File Attachments (Phases 121-124, in planning)
 current_phase: 122
 current_phase_name: Durable Storage, Rules & Retention-Exempt Foundation
 status: planning
-stopped_at: Completed 122-01-PLAN.md
-last_updated: "2026-09-05T16:16:12.038Z"
+stopped_at: Completed 122-02-PLAN.md
+last_updated: "2026-09-05T16:30:23.159Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 121 complete, transitioned to Phase 122
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
-  percent: 25
+  completed_plans: 3
+  percent: 50
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1290,9 +1290,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 122 — Durable Storage, Rules & Retention-Exempt Foundation
-Plan: Not started
-Status: Roadmap created — ready for /gsd-plan-phase 121
-Last activity: 2026-09-05 — Phase 121 complete, transitioned to Phase 122
+Plan: 2 of 2 complete (122-01, 122-02)
+Status: Phase 122 plans complete — ready for /gsd-verify-work 122
+Last activity: 2026-09-05 — Phase 122 Plan 02 complete (SongAttachment schema, R370 retention lock, hardDeleteSong Storage cascade)
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 
@@ -3299,6 +3299,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 120 P01 | 20min | 2 tasks | 3 files |
 | Phase 120 P02 | 12min | 2 tasks | 3 files |
 | Phase 122 P01 | 25min | 2 tasks | 2 files |
+| Phase 122 P02 | 13min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -3843,6 +3844,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R360: documented sanctioned utils->useAuthStore exception in ARCHITECTURE.md per accepted low-risk branch; no src/utils refactor performed
 - [Phase ?]: R359: extracted the four cleanup sweeps into functions/src/cleanupSweeps.ts (import-top/export-bottom pattern); moved shared helper renderedPrefixFor into the new module rather than importing it back from index.ts, to keep the dependency direction one-way and avoid a require() cycle.
 - [Phase ?]: isOrgEditorByClaim mirrors isOrgMemberByClaim structure but requires role in ['editor','admin']; song-files/ is immutable (update:false); delete gets its own unconditioned verb; catch-all amended to exclude song-files/ per OR-combination fix
+- [Phase ?]: Song attachments (R369-R371): additive SongAttachment schema, hardDeleteSong-only Storage cascade, and a locking test proving song-files/ is structurally exempt from all retention sweeps
 
 ### Roadmap Evolution
 
@@ -4171,8 +4173,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T16:16:11.976Z
-Stopped at: Completed 122-01-PLAN.md
+Last session: 2026-09-05T16:30:23.094Z
+Stopped at: Completed 122-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
