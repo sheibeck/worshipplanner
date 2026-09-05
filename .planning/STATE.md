@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.11
 milestone_name: Song File Attachments (Phases 121-124, in planning)
-current_phase: 999.5
-current_phase_name: 11
-status: planning
+status: completed
 stopped_at: Completed 123-03-PLAN.md
-last_updated: "2026-09-05T22:03:54.402Z"
+last_updated: "2026-09-05T22:14:40.116Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 124 complete, transitioned to Phase 999.5
+last_activity_desc: Milestone v2.11 completed and archived
 progress:
   total_phases: 4
   completed_phases: 4
   total_plans: 8
   completed_plans: 8
   percent: 100
+current_phase: 999.5
+current_phase_name: 11
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.11 Song File Attachments (roadmap created 2026-09-05)
 
-**Status:** Ready to plan
+**Status:** v2.11 milestone complete
 
 **Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external media
 links (YouTube/Drive/Dropbox) — on a Song in the stable, via a new Files tab in the Edit Song slideout,
@@ -1289,10 +1289,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 999.5 — v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
-Plan: Not started
-Status: 124-01-PLAN.md (removeSongAttachment store method, Documents/Audio grouped rows, per-row Download, per-row Remove inline-confirm — R366+R368) complete. 124-02-PLAN.md (SongFilePreviewModal in-app PDF viewer + inline MP3 player wired into Preview/Play row actions — R367) complete. All 4 phases of v2.11 (121-124) are now built; milestone-level UAT and closeout (audit-milestone/complete-milestone) have not run yet.
-Last activity: 2026-09-05 — Phase 124 complete, transitioned to Phase 999.5
+Phase: Milestone v2.11 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-05 — Milestone v2.11 completed and archived
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 

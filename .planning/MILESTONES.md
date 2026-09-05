@@ -1,5 +1,22 @@
 # Milestones
 
+## v2.11 — Song File Attachments (Shipped & deployed to production: 2026-09-05)
+
+**Phases completed:** 4 phases, 8 plans, 18 tasks
+
+**Key accomplishments:**
+
+- 121-UI-SPEC.md
+- Amended storage.rules with a claim-only isOrgEditor helper, a dedicated editor-gated song-files/ block (PDF/MP3, <50MB, immutable, editor-only create/delete), and a catch-all exclusion closing the Storage OR-combination bypass — proven by 8 new rules-emulator allow/deny cases.
+- Additive SongAttachment schema + songFiles.ts path helper, a locking test proving song-files/ is structurally exempt from all four retention sweeps, and a best-effort Storage cascade confined to hardDeleteSong.
+- Multi-file resumable upload composable (`useSongFileUpload`) with per-file progress and UI-SPEC-exact client validation, plus `songLinks` https-link validation/source-inference/attachment-builder helpers — both persisting via `songStore.updateSong`, with the Phase 122 IN-03 sanitizer duplication closed.
+- Toggleable Files column in `SongTable.vue` — paperclip glyph + plain-text `none`/`1 file`/`N files` derived from `song.attachments?.length`, positioned last before the row chevron and wired into the existing column-visibility cog/store preference.
+- Third Files tab in SongSlideOver with a live count badge, wired to a new SongFilesTab.vue panel that hosts the drag-drop/click multi-file upload zone (per-file progress + rejection), an external-link attach field, and a simple functional attachment list — attachments resolve live from the Pinia store by id so uploads appear without reopening the panel.
+- Restructured SongFilesTab's flat attachment list into always-rendered Documents/Audio groups with graceful `{TYPE} · {size} · {date}` metadata, per-row Download, and a per-row Remove inline-confirm backed by a new filter-by-id `removeSongAttachment` store method.
+- New `SongFilePreviewModal.vue` (PDF iframe overlay reusing the CleanupEnableConfirmDialog shell) wired onto document rows via a Preview eye icon, plus an inline one-at-a-time native `<audio controls>` player wired onto audio rows via a Play icon — completes R367 and the Files tab's read-side UX for v2.11.
+
+---
+
 ## v2.10 v2.10 (Shipped: 2026-09-05)
 
 **Phases completed:** 4 phases, 9 plans, 23 tasks

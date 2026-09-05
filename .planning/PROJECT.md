@@ -8,7 +8,18 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.11 Song File Attachments
+## Shipped Milestone: v2.11 Song File Attachments — ✅ SHIPPED & DEPLOYED 2026-09-05
+
+**Status:** Shipped, deployed to production (`firebase deploy --only storage,hosting` — the `song-files/`
+editor+PDF/MP3+50MB rules gate is live; hosting released), and archived + tagged `v2.11` (2026-09-05).
+Audit PASSED (13/13 reqs, 4/4 phases, 6/6 integration seams); owner-verified local UAT drove three
+post-UAT fixes (download Save-dialog, upload auto-clear/dismiss, duplicate-file denial, remove-confirm
+copy). Full record: [milestones/v2.11-ROADMAP.md](milestones/v2.11-ROADMAP.md) ·
+[milestones/v2.11-REQUIREMENTS.md](milestones/v2.11-REQUIREMENTS.md) · [v2.11-MILESTONE-AUDIT.md](v2.11-MILESTONE-AUDIT.md).
+**No active milestone follows — run `/gsd-new-milestone` to start one.** **Standing follow-up:** confirm
+the Firebase Storage bucket sends permissive CORS for the app origin so the download button prompts a Save
+dialog in prod (else it falls back to opening the file in a new tab). Rehearse-mode (public/authenticated
+playback) is the next step of backlog 999.13.
 
 **Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external media
 links (YouTube/Drive/Dropbox) — on a **Song** in the stable, via a new **Files** tab in the Edit Song
@@ -520,6 +531,8 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Validated
 
+- ✓ Song file attachments — editors attach/manage PDF + MP3 files (≤ 50 MB, editor+type+size gated in `storage.rules` via a new `isOrgEditor` helper + a `song-files/` block + a catch-all OR-exclusion) and external YouTube/Drive/Dropbox links on a **Song**, via a new **Files** tab (Songs-list Files column, multi-file upload w/ per-file progress + duplicate denial + dismissable messages, Documents/Audio grouped rows, in-app PDF preview modal + inline MP3 player, download (blob Save-dialog + new-tab fallback), remove via an atomic `runTransaction`); attachments are additive on the Song doc under an org-scoped Storage prefix **outside `media/`**, proven exempt from every retention sweep by a locking test, with a `hardDeleteSong` cascade (R361–R373) — **v2.11** (shipped & deployed to production 2026-09-05; `storage.rules`+hosting; audit PASSED 13/13 reqs + 6/6 integration seams; owner-verified local UAT; step 1 of backlog 999.13/SEED-003 — Rehearse-mode is next; archived: `milestones/v2.11-REQUIREMENTS.md`).
+
 - ✓ Per-org Bible API toggle & manual fallback — a super-admin enables/disables the paid ESV/NLT Bible API per church from the Owner Console (`setOrgBibleEnabled`, default OFF, client-write-denied); a single `scriptureApi.ts` dispatcher + server `checkOrgBibleEnablement` gate on the `api` proxy's esv/nlt branches enforce it with no regression when enabled; when disabled, scripture/congregational editors offer an "Open in BibleGateway" deep-link (owner removed the paste box + off-state message before ship — plain scripture is reference-only, congregational composed in the existing reading textarea, AI split still runs on that text under the independent AI gate); Settings hides the Bible Translation card when off (R295–R301) — **v2.6** (shipped & deployed to production 2026-08-31; tag `v2.6`; audit PASSED 7/7 reqs + 5/5 integration seams; two code-review rounds caught a Planning-Center-export gate bypass + two fallback data-loss bugs; human/visual UAT deferred; each production org incl. Berean must be enabled by hand via the Owner Console since default is OFF; archived: `milestones/v2.6-REQUIREMENTS.md`).
 - ✓ Invite email & non-Google onboarding — every TeamView invite now sends a real email: Gmail/Google invitees get a "sign in with Google" notice, non-Google invitees get a Cloud-Function-provisioned Auth account + `generatePasswordResetLink()` set-password link (an editor-only, invite-existence-gated `sendInviteOnboardingEmail` callable, reusing the Resend pattern); LoginView gains a discoverable set/reset-password path + a real `auth/operation-not-allowed` message; the Owner Console gets an `appConfig`-backed onboarding-email on/off toggle (R288–R294) — **v2.5** (shipped 2026-08-31; built autonomously via `/gsd-autonomous` + a local-UAT fix round; audit PASSED 7/7 reqs + 4/4 integration seams; code review caught & fixed an editor-can-email-arbitrary-addresses hole; `functions:sendInviteOnboardingEmail` deployed to prod; **hosting deploy + Resend DNS domain verification are standing owner follow-ups** — until the domain is verified the test sender only reaches the owner's own inbox; archived: `milestones/v2.5-REQUIREMENTS.md`).
 - ✓ Scheduling accuracy & song/team refinements + multi-role scheduling — last-used lock-gated derivation + prod backfill (R247–R248), Vocals folded into Band with a Band↔Tech one-team-per-date rule + sing-and-play exception (R250–R252), Nth-Sunday recurring team auto-select via a Volunteer→Teams `>` slideout (R254–R255), editable song Key + sermon-free Scripture rotation + corrected schedulable-roles copy (R249, R253, R256), Roles/Teams read-only-row slideouts + song Key type-ahead (R257–R258), and a generalized per-role multi-role flag + same-date scheduler bundling anchored on a person's rarest role (R259–R260) — **v2.3** (shipped & deployed to production 2026-08-27; hosting + all Cloud Functions incl. the Phase-85 messaging fix; no rules changes; R248 backfill applied to Berean prod; audit PASSED 14/14; owner-approved UAT; archived: `milestones/v2.3-REQUIREMENTS.md`).
@@ -569,14 +582,9 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-**v2.11 Song File Attachments** — 🚧 in planning (started 2026-09-05). Step 1 of the file-storage backlog
-(999.13 / SEED-003). Editors attach/manage PDF + MP3 files (≤ 50 MB each) and external media links
-(YouTube/Drive/Dropbox) on a **Song**, via a new **Files** tab in the Edit Song slideout (Songs list
-gains a Files column). Multi-file upload with progress, Documents/Audio grouping, in-app PDF preview +
-MP3 player, download, remove. **Load-bearing invariant:** song attachments are permanent and exempt from
-**every** retention sweep — dedicated org-scoped Storage prefix outside `media/`; all cleanup crons
-exclude it. Per-file caps only (per-org quota + egress deferred to Rehearse). No research pass — built on
-SEED-003. Requirements continue from R361; phases from 121. See `.planning/REQUIREMENTS.md`.
+**v2.11 Song File Attachments** — ✅ SHIPPED & DEPLOYED to production 2026-09-05 (moved to Validated
+above). Step 1 of the file-storage backlog (999.13 / SEED-003); Rehearse-mode (public/authenticated
+playback) is the next step. Standing follow-up: confirm Storage-bucket CORS for the download Save-dialog.
 
 **v2.9 Live Presentation Field Fixes** — 🚧 in planning (started 2026-09-02). Field feedback from the first
 real church-projector run (church Mac + projector). Three groups: **multi-monitor rework** (N monitors,
@@ -780,6 +788,20 @@ This document evolves at phase transitions and milestone boundaries.
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
+
+---
+*Last updated: 2026-09-05 — archived milestone v2.11 Song File Attachments (Phases 121-124, R361-R373),
+shipped & deployed to production 2026-09-05 (`firebase deploy --only storage,hosting`). Editors attach/
+manage PDF + MP3 files (≤50MB) + external YouTube/Drive/Dropbox links on a Song via a new Files tab
+(Songs-list column, multi-file upload w/ progress + duplicate denial + dismissable messages, Documents/
+Audio grouped rows, in-app PDF preview modal + inline MP3 player, download w/ blob Save-dialog+new-tab
+fallback, remove via atomic runTransaction). Permanent org-scoped Storage prefix outside media/ proven
+exempt from every retention sweep (locking test); editor-only rules gate (isOrgEditor + PDF/MP3/50MB +
+catch-all OR-exclusion); hardDeleteSong cascade. Built via /gsd-new-milestone → /gsd-autonomous; three
+owner-UAT fixes shipped (download-in-window bug, upload-progress lingering + dismiss, duplicate handling)
+plus a mid-run quick task (song slideout no longer closes on outside-click/Escape). Audit PASSED 13/13 +
+6/6 seams WIRED. Standing follow-up: confirm Storage-bucket CORS for the download Save-dialog (else new-tab
+fallback). Rehearse-mode = next step of 999.13. Previous footer below.*
 
 ---
 *Last updated: 2026-09-05 — started milestone v2.11 Song File Attachments (step 1 of file-storage backlog
