@@ -102,7 +102,7 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
 - [x] **R357** (ARCH-013): The autosave/reorder-save coordination window is **confirmed safe by a test**
   — a remote snapshot arriving during an in-flight reorder save no longer has an unguarded path.
 
-- [ ] **R358** (ARCH-006): `ServiceEditorView.vue` is **decomposed** — at least one more distinct feature
+- [x] **R358** (ARCH-006): `ServiceEditorView.vue` is **decomposed** — at least one more distinct feature
   responsibility is extracted from the monolith into a composable/component (continuing the
   `useAutoSave`/`useSlideshowAssembly` pattern).
 
@@ -111,7 +111,7 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
   is extracted to its own module, matching the sibling `orgProvisioning.ts`/`orgMembershipClaims.ts`
   extraction pattern.
 
-- [ ] **R360** (ARCH-020): The three `src/utils/*.ts` files that import `useAuthStore()` for read-only
+- [x] **R360** (ARCH-020): The three `src/utils/*.ts` files that import `useAuthStore()` for read-only
   settings gating have that **dependency-direction inversion corrected** (settings passed in rather than
   the store imported), or the exception is documented as sanctioned.
 
@@ -164,9 +164,9 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 | R355 | Phase 119 | Complete |
 | R356 | Phase 119 | Complete |
 | R357 | Phase 119 | Complete |
-| R358 | Phase 120 | Pending |
+| R358 | Phase 120 | Complete |
 | R359 | Phase 120 | Pending |
-| R360 | Phase 120 | Pending |
+| R360 | Phase 120 | Complete |
 
 *Filled by the roadmapper — each requirement maps to exactly one phase.*
 

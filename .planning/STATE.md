@@ -4,16 +4,16 @@ milestone: v2.10
 milestone_name: Security & Architecture Hardening (Phases 117-120, in planning)
 current_phase: 120
 current_phase_name: Architecture — God-Module Decomposition
-status: planning
-stopped_at: Completed 119-04-PLAN.md
-last_updated: "2026-09-05T04:49:36.954Z"
+status: executing
+stopped_at: Completed 120-01-PLAN.md
+last_updated: "2026-09-05T05:19:38.130Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 119 complete, transitioned to Phase 120
+last_activity_desc: Phase 120 execution started
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 9
+  completed_plans: 8
   percent: 75
 ---
 
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.10 Security & Architecture Hardening (roadmap created 2026-09-04)
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 
 **Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and architectural
 reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" — starting with the
@@ -1249,7 +1249,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 119 — Architecture — Correctness, Batching & Store-Ownership Fixes
+**Current focus:** Phase 120 — Architecture — God-Module Decomposition
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1259,10 +1259,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 120 — Architecture — God-Module Decomposition
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-09-05 — Phase 119 complete, transitioned to Phase 120
+Phase: 120 (Architecture — God-Module Decomposition) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-09-05 — Phase 120 execution started
 
 ## ★ v2.10 ROADMAP.md phase breakdown (created 2026-09-04)
 
@@ -3232,6 +3232,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 119 P02 | ~25min | 3 tasks | 12 files |
 | Phase 119 P03 | ~20min | 2 tasks | 6 files |
 | Phase 119 P04 | 35min | 2 tasks | 2 files |
+| Phase 120 P01 | 20min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -3772,6 +3773,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 119-03: SongLyricEditor and ScriptureSlideEditor reactively re-subscribe/teardown on props.orgId change while mounted instead of subscribing once at mount, closing an org-switch lifecycle gap (R354); ScriptureSlideEditor's subscription became unconditional (previously readingId-gated) to express it as a single reactive watch
 - [Phase ?]: R352: removed reopenPcWarning's unreachable date branch (JSON deep-clone strips pcExportedAt's Timestamp) rather than fixing the clone — lower risk, clone idiom is load-bearing elsewhere.
 - [Phase ?]: R357: wrote the proving regression test for the reorder-save/remote-merge coordination window; it passed on first run against current code, confirming ARCH-023's finding that the window is already safe — no production guard added.
+- [Phase ?]: R358: moved AI sermon-context cache-clear watcher into useAiSongSuggestions composable (not explicitly named in plan) to keep the composable fully self-contained
+- [Phase ?]: R360: documented sanctioned utils->useAuthStore exception in ARCHITECTURE.md per accepted low-risk branch; no src/utils refactor performed
 
 ### Roadmap Evolution
 
@@ -4100,8 +4103,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T04:17:24.957Z
-Stopped at: Completed 119-04-PLAN.md
+Last session: 2026-09-05T05:19:38.067Z
+Stopped at: Completed 120-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -685,10 +685,11 @@ inversion sharing the same module-boundaries theme.
   5. The three `src/utils/*.ts` files (`claudeApi.ts`, `messaging.ts`, `scriptureApi.ts`) that import `useAuthStore()` for read-only settings gating either no longer do so (settings passed in instead), or the exception is documented in `ARCHITECTURE.md` as sanctioned (R360).
   6. `npm run type-check`, `npx vitest run` (app suite, 1-file baseline unchanged), and the functions test suite all pass after both extractions.
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
-- [ ] 120-01-PLAN.md — Extract AI song-suggestions into a `useAiSongSuggestions` composable (R358) + document the sanctioned utils→useAuthStore exception in ARCHITECTURE.md (R360) [wave 1]
+
+- [x] 120-01-PLAN.md — Extract AI song-suggestions into a `useAiSongSuggestions` composable (R358) + document the sanctioned utils→useAuthStore exception in ARCHITECTURE.md (R360) [wave 1]
 - [ ] 120-02-PLAN.md — Extract the four cleanup sweeps into `functions/src/cleanupSweeps.ts` + re-export from index.ts, with a dedicated re-export-trap verification task (R359) [wave 1]
 
 ## Backlog
