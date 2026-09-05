@@ -86,6 +86,13 @@ export const PROXY_TARGETS: Record<string, string> = {
 // a signed-in app user (verified Firebase ID token in X-App-Auth).
 export const SECRET_INJECTED = new Set(["anthropic", "esv", "nlt"]);
 
+// Services requiring a signed-in app caller (X-App-Auth) but injecting NO
+// server secret -- distinct from SECRET_INJECTED. planningcenter forwards the
+// caller's OWN Planning Center OAuth token untouched; the gate exists only to
+// close the unauthenticated open relay (R339 / SEC-A-01), not to protect a
+// key we pay for.
+export const AUTH_REQUIRED = new Set(["planningcenter"]);
+
 /** See ADR-0019 (docs/adr/0019-nlt-auth-travels-as-a-key-query-parameter-not-a-header-unlik.md) */
 export function buildUpstreamUrl(
   service: string,
@@ -494,7 +501,7 @@ export const api = onRequest(
     // anthropic-only controls below (R161 rate limit, R163 ledger) can read
     // `decoded.uid` / resolveOrgId(decoded) without re-verifying the token.
     let decodedCaller: DecodedIdToken | null = null;
-    if (SECRET_INJECTED.has(service)) {
+    if (SECRET_INJECTED.has(service) || AUTH_REQUIRED.has(service)) {
       const appToken = req.headers["x-app-auth"];
       const token = typeof appToken === "string" ? appToken : undefined;
       decodedCaller = await verifyAppCaller(token);
@@ -620,6 +627,40 @@ export const api = onRequest(
       if (!bibleVerdict.ok) {
         res.status(bibleVerdict.status).json(bibleVerdict.error);
         return;
+      }
+
+      // R340: layer the SAME per-uid proxy budget that already guards
+      // anthropic onto esv/nlt -- one shared aiRateLimits counter across all
+      // three upstreams, not a separate esv/nlt budget. Fail-OPEN on a
+      // Firestore hiccup (locked decision, 65-CONTEXT.md -- cost guardrail,
+      // not a security control); the enablement gate above stays fail-CLOSED.
+      let config: AppConfig = DEFAULT_APP_CONFIG;
+      try {
+        config = await getAppConfig(getFirestore());
+      } catch (configErr) {
+        console.warn("[api] appConfig read failed; failing open to defaults:", {
+          message: configErr instanceof Error ? configErr.message : String(configErr),
+        });
+      }
+      const aiLimits = readAiProxyLimits(config);
+      try {
+        const rateResult = await checkAndConsumeRateLimit(
+          getFirestore(),
+          decodedCaller!.uid,
+          aiLimits,
+        );
+        if (!rateResult.allowed) {
+          res.status(429).json({
+            error: "Rate limit exceeded. Please slow down and try again shortly.",
+            scope: rateResult.scope,
+            retryAfterSec: rateResult.scope === "minute" ? 60 : 86_400,
+          });
+          return;
+        }
+      } catch (limiterErr) {
+        console.warn("[api] rate limiter Firestore op failed; failing open:", {
+          message: limiterErr instanceof Error ? limiterErr.message : String(limiterErr),
+        });
       }
     }
 

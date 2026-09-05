@@ -31,6 +31,7 @@ import {
   RETENTION_DAYS,
   readMediaRetentionDays,
   SECRET_INJECTED,
+  AUTH_REQUIRED,
   parsePptxHandler,
   requestPptxRenderHandler,
   sendQueuedMessageHandler,
@@ -3604,6 +3605,20 @@ describe("PROXY_TARGETS / SECRET_INJECTED (nlt membership)", () => {
     expect(SECRET_INJECTED.has("esv")).toBe(true);
     expect(SECRET_INJECTED.has("anthropic")).toBe(true);
   });
+
+  // R339 (117-01 / SEC-A-01): planningcenter is authenticated via a SEPARATE
+  // AUTH_REQUIRED set, not folded into SECRET_INJECTED -- it forwards the
+  // caller's own PCO OAuth token rather than injecting a server secret.
+  it("adds planningcenter to AUTH_REQUIRED, NOT SECRET_INJECTED -- authenticated, no server secret injected (R339)", () => {
+    expect(AUTH_REQUIRED.has("planningcenter")).toBe(true);
+    expect(SECRET_INJECTED.has("planningcenter")).toBe(false);
+  });
+
+  it("leaves SECRET_INJECTED's anthropic/esv/nlt membership untouched by AUTH_REQUIRED (R339)", () => {
+    expect(AUTH_REQUIRED.has("anthropic")).toBe(false);
+    expect(AUTH_REQUIRED.has("esv")).toBe(false);
+    expect(AUTH_REQUIRED.has("nlt")).toBe(false);
+  });
 });
 
 describe("buildUpstreamUrl", () => {
@@ -4464,19 +4479,13 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
     expect(getFirestore).not.toHaveBeenCalled();
   });
 
-  it("WR-01 (69-REVIEW.md): a non-anthropic service (esv) never calls getAppConfig, and succeeds even if getAppConfig would reject", async () => {
-    // Proves the fix: getAppConfig() is now scoped inside the `service ===
-    // "anthropic"` branch, so esv/nlt/planningcenter stay independent of the
-    // AI appConfig/rate-limit/ledger controls exactly as they were before
-    // this phase. Rejecting the mock (rather than merely asserting "not
-    // called") would surface a regression even if some other code path
-    // started awaiting it.
-    //
-    // getFirestore IS now called for esv/nlt (R297, Plan 102-02's
-    // checkOrgBibleEnablement defense-in-depth gate) -- that assertion was
-    // updated when this test's era of "esv is fully Firestore-independent"
-    // ended; the org doc below is set up as enabled so the request still
-    // succeeds end to end.
+  it("R340: a non-anthropic service (esv) now DOES call getAppConfig for its own per-uid rate limit, and still succeeds if getAppConfig rejects (fails open)", async () => {
+    // Superseded WR-01 (69-REVIEW.md)'s "esv never calls getAppConfig"
+    // assertion: R340 (117-01) deliberately layers the shared per-uid
+    // aiRateLimits budget onto esv/nlt too, which means reading live limits
+    // via getAppConfig(getFirestore()) same as the anthropic branch. Proves
+    // the fail-open contract survives that change -- a getAppConfig rejection
+    // degrades to DEFAULT_APP_CONFIG's limits rather than failing the request.
     vi.mocked(getAppConfig).mockRejectedValue(new Error("appConfig Firestore read boom"));
     const { db } = mockCombinedDb({ bibleApiEnabled: true });
     vi.mocked(getFirestore).mockReturnValue(db);
@@ -4496,7 +4505,7 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
 
     await api(req as never, res as never);
 
-    expect(getAppConfig).not.toHaveBeenCalled();
+    expect(getAppConfig).toHaveBeenCalled();
     expect(getFirestore).toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(200);
@@ -4592,6 +4601,143 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
 
     // Degrades to DEFAULT_APP_CONFIG's allowed-model list rather than
     // erroring -- the model is still allowed, and the request completes.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  // R339 (SEC-A-01): planningcenter is in AUTH_REQUIRED, NOT SECRET_INJECTED
+  // -- authenticate the caller, but inject no server secret and forward the
+  // client's own PCO OAuth token byte-identically.
+  function fakePlanningCenterReq(
+    headers: Record<string, string> = { "x-app-auth": "valid-token" },
+    body: unknown = undefined,
+  ) {
+    return {
+      path: "/api/planningcenter/v2/me",
+      originalUrl: "/api/planningcenter/v2/me",
+      method: "GET",
+      headers,
+      body,
+    };
+  }
+
+  it("R339: an unauthenticated /api/planningcenter request (no X-App-Auth) is rejected 401 and never relayed", async () => {
+    const req = fakePlanningCenterReq({}); // no x-app-auth header at all
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Authentication required" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("R339: an /api/planningcenter request with an INVALID X-App-Auth token is rejected 401 and never relayed", async () => {
+    vi.mocked(getAuth).mockReturnValue({
+      verifyIdToken: vi.fn(async () => {
+        throw new Error("invalid token");
+      }),
+      getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+    } as never);
+    const req = fakePlanningCenterReq({ "x-app-auth": "bogus-token" });
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Authentication required" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("R339: a valid X-App-Auth /api/planningcenter request forwards the client's PCO authorization header byte-identically, strips x-app-auth, and touches no aiRateLimits/organizations reads", async () => {
+    fetchMock.mockResolvedValue({
+      status: 200,
+      headers: { get: () => "application/json" },
+      text: async () => JSON.stringify({ data: { id: "person1" } }),
+    });
+    const req = fakePlanningCenterReq({
+      "x-app-auth": "valid-token",
+      authorization: "Bearer pco-oauth-token",
+    });
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [calledUrl, fetchOpts] = fetchMock.mock.calls[0] as [string, { headers: Record<string, string> }];
+    expect(calledUrl).toBe("https://api.planningcenteronline.com/v2/me");
+    expect(fetchOpts.headers.authorization).toBe("Bearer pco-oauth-token");
+    expect(fetchOpts.headers["x-app-auth"]).toBeUndefined();
+    // No server secret is injected on this branch -- outboundBody is req.body
+    // untouched (GET here, so no body is even sent), and no cost-control
+    // Firestore reads (aiRateLimits/organizations) fire for planningcenter.
+    expect(getFirestore).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  // R340: layers the SAME per-uid aiRateLimits budget that guards anthropic
+  // onto esv/nlt.
+  it("R340: an authenticated /api/esv caller already at the per-uid MINUTE ceiling gets 429 with the anthropic body shape, and fetch is never called", async () => {
+    const NOW = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const minuteWindow = Math.floor(NOW / 60_000);
+    const seededDoc = { id: `uid1__min__${minuteWindow}`, count: DEFAULT_APP_CONFIG.aiProxy.rateLimitPerMin };
+    const orgGetSpy = vi.fn(async () => ({ exists: true, data: () => ({ bibleApiEnabled: true }) }));
+    const doc = vi.fn((id: string) => ({ id, _docId: id }));
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        get: vi.fn(async (ref: { _docId: string }) =>
+          ref._docId === seededDoc.id
+            ? { exists: true, data: () => ({ count: seededDoc.count }) }
+            : { exists: false, data: () => undefined },
+        ),
+        set: vi.fn(),
+      };
+      return fn(tx);
+    });
+    const collection = vi.fn((name: string) => {
+      if (name === "aiRateLimits") return { doc };
+      if (name === "organizations") return { doc: vi.fn(() => ({ get: orgGetSpy })) };
+      throw new Error(`unexpected collection "${name}"`);
+    });
+    vi.mocked(getFirestore).mockReturnValue({ collection, runTransaction } as never);
+
+    const req = fakeEsvReq();
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "minute", retryAfterSec: 60 }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("R340: the esv per-uid rate limiter fails OPEN (request still succeeds) when the Firestore transaction throws", async () => {
+    const orgGetSpy = vi.fn(async () => ({ exists: true, data: () => ({ bibleApiEnabled: true }) }));
+    const collection = vi.fn((name: string) => {
+      if (name === "aiRateLimits") return { doc: vi.fn((id: string) => ({ id })) };
+      if (name === "organizations") return { doc: vi.fn(() => ({ get: orgGetSpy })) };
+      throw new Error(`unexpected collection "${name}"`);
+    });
+    const runTransaction = vi.fn(async () => {
+      throw new Error("Firestore unavailable");
+    });
+    vi.mocked(getFirestore).mockReturnValue({ collection, runTransaction } as never);
+    fetchMock.mockResolvedValue({
+      status: 200,
+      headers: { get: () => "application/json" },
+      text: async () => JSON.stringify({ passages: ["In the beginning..."] }),
+    });
+
+    const req = fakeEsvReq();
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(200);
   });
