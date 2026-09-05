@@ -4,17 +4,17 @@ milestone: v2.10
 milestone_name: Security & Architecture Hardening (Phases 117-120, in planning)
 current_phase: 119
 current_phase_name: Architecture — Correctness, Batching & Store-Ownership Fixes
-status: executing
-stopped_at: Completed 119-03-PLAN.md
-last_updated: "2026-09-05T04:00:55.241Z"
+status: verifying
+stopped_at: Completed 119-04-PLAN.md
+last_updated: "2026-09-05T04:17:25.021Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 119 execution started
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 7
-  completed_plans: 6
-  percent: 50
+  completed_plans: 7
+  percent: 75
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.10 Security & Architecture Hardening (roadmap created 2026-09-04)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and architectural
 reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" — starting with the
@@ -1261,7 +1261,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 119 (Architecture — Correctness, Batching & Store-Ownership Fixes) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-04 — Phase 119 execution started
 
 ## ★ v2.10 ROADMAP.md phase breakdown (created 2026-09-04)
@@ -3231,6 +3231,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 119 P01 | 40min | 3 tasks | 10 files |
 | Phase 119 P02 | ~25min | 3 tasks | 12 files |
 | Phase 119 P03 | ~20min | 2 tasks | 6 files |
+| Phase 119 P04 | 35min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3769,6 +3770,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 119-02: useMembersStore is org-scoped (registered in resetOrgScopedStores); useSuperAdminsStore is deliberately global and NOT registered there, matching appConfig.ts
 - [Phase ?]: 119-03: ServicesView's org-switch watcher now tears down teamsStore locally (parity with RosterView/DashboardView/TeamView) as defense-in-depth alongside resetOrgScopedStores() (R353)
 - [Phase ?]: 119-03: SongLyricEditor and ScriptureSlideEditor reactively re-subscribe/teardown on props.orgId change while mounted instead of subscribing once at mount, closing an org-switch lifecycle gap (R354); ScriptureSlideEditor's subscription became unconditional (previously readingId-gated) to express it as a single reactive watch
+- [Phase ?]: R352: removed reopenPcWarning's unreachable date branch (JSON deep-clone strips pcExportedAt's Timestamp) rather than fixing the clone — lower risk, clone idiom is load-bearing elsewhere.
+- [Phase ?]: R357: wrote the proving regression test for the reorder-save/remote-merge coordination window; it passed on first run against current code, confirming ARCH-023's finding that the window is already safe — no production guard added.
 
 ### Roadmap Evolution
 
@@ -4097,8 +4100,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T04:00:45.912Z
-Stopped at: Completed 119-03-PLAN.md
+Last session: 2026-09-05T04:17:24.957Z
+Stopped at: Completed 119-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

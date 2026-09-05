@@ -659,14 +659,14 @@ autosave/reorder-save coordination window.
   8. `GettingStarted.vue`'s member-count listener and `ConfigurationTab.vue`'s super-admins listener are each owned by a store instead of a one-off local `onSnapshot` (R356).
   9. A new regression test proves a remote snapshot arriving during an in-flight reorder save is handled safely — no stale overwrite and no lost edit — closing the previously-untested coordination window (R357).
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans executed
 
 Plans:
 
 - [x] 119-01-PLAN.md — Data-layer correctness: per-item failure isolation in recomputeLastUsedFor (R349), batched + per-song-reported PC song import (R350), single shared lyrics query with no limit(1) drift (R351) [wave 1]
 - [x] 119-02-PLAN.md — Store ownership: auth-store updateOrgSettings mutation for ServiceTemplateEditor (R355), member-count + super-admins listeners moved into owning stores (R356) [wave 1]
 - [x] 119-03-PLAN.md — Org-switch lifecycle hardening: ServicesView local teamsStore teardown (R353), reactive re-subscribe on org-prop change in SongLyricEditor/ScriptureSlideEditor (R354) [wave 1]
-- [ ] 119-04-PLAN.md — ServiceEditorView correctness: remove the unreachable reopenPcWarning date branch (R352), regression test for the reorder-save/remote-snapshot coordination window (R357) [wave 1]
+- [x] 119-04-PLAN.md — ServiceEditorView correctness: remove the unreachable reopenPcWarning date branch (R352), regression test for the reorder-save/remote-snapshot coordination window (R357) [wave 1]
 
 ### Phase 120: Architecture — God-Module Decomposition
 

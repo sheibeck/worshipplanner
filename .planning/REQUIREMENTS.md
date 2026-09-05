@@ -80,7 +80,7 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
   `songLyricsStore.subscribeLyrics`** rather than a duplicated direct `onSnapshot` query, eliminating the
   existing `limit(1)` drift between the two.
 
-- [ ] **R352** (ARCH-012): The unreachable `reopenPcWarning` date branch is fixed — the JSON deep-clone
+- [x] **R352** (ARCH-012): The unreachable `reopenPcWarning` date branch is fixed — the JSON deep-clone
   idiom that strips the `pcExportedAt` Firestore `Timestamp` is corrected so the guard **works**, or the
   dead code is removed.
 
@@ -99,7 +99,7 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
   `onSnapshot` subscriptions are **owned by a store** instead of each duplicating subscribe/unsubscribe
   lifecycle machinery inline.
 
-- [ ] **R357** (ARCH-013): The autosave/reorder-save coordination window is **confirmed safe by a test**
+- [x] **R357** (ARCH-013): The autosave/reorder-save coordination window is **confirmed safe by a test**
   — a remote snapshot arriving during an in-flight reorder save no longer has an unguarded path.
 
 - [ ] **R358** (ARCH-006): `ServiceEditorView.vue` is **decomposed** — at least one more distinct feature
@@ -158,12 +158,12 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 | R349 | Phase 119 | Complete |
 | R350 | Phase 119 | Complete |
 | R351 | Phase 119 | Complete |
-| R352 | Phase 119 | Pending |
+| R352 | Phase 119 | Complete |
 | R353 | Phase 119 | Complete |
 | R354 | Phase 119 | Complete |
 | R355 | Phase 119 | Complete |
 | R356 | Phase 119 | Complete |
-| R357 | Phase 119 | Pending |
+| R357 | Phase 119 | Complete |
 | R358 | Phase 120 | Pending |
 | R359 | Phase 120 | Pending |
 | R360 | Phase 120 | Pending |
