@@ -101,16 +101,13 @@
             <p v-else class="text-gray-400 italic text-sm">[not assigned]</p>
           </template>
 
-          <!-- Per-item free-text notes (notes ?? legacy body), for every slot kind -->
-          <p v-if="(slot.notes ?? slot.body)?.trim()" class="whitespace-pre-wrap text-sm text-gray-700 mt-1">{{ slot.notes ?? slot.body }}</p>
+          <!-- R346/SEC-S-04: no per-item free-text (notes/body) render — an
+               already-deployed legacy share doc can still carry it, so this is
+               a render-side gate, not just a projection fix. -->
         </div>
       </div>
 
-      <!-- Notes section -->
-      <div v-if="serviceSnapshot.notes" class="mt-6 rounded-lg bg-gray-50 p-4">
-        <h2 class="text-sm font-semibold text-gray-700 mb-2">Notes</h2>
-        <p class="whitespace-pre-wrap text-sm text-gray-700">{{ serviceSnapshot.notes }}</p>
-      </div>
+      <!-- R346/SEC-S-04: no service-level Notes section — same legacy-doc gate as above. -->
 
       <!-- Who's Serving section (names-only role snapshot; omitted for legacy shares with no roleAssignments) -->
       <div v-if="serviceSnapshot.roleAssignments?.length" class="mt-6 rounded-lg bg-gray-50 p-4">

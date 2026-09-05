@@ -145,8 +145,8 @@ describe('ShareView', () => {
     // Scripture reference text
     expect(wrapper.text()).toContain('Psalm')
     expect(wrapper.text()).toContain('100')
-    // Notes
-    expect(wrapper.text()).toContain('Remember to mic the choir')
+    // R346/SEC-S-04 — service-level free-text notes are gated, never rendered.
+    expect(wrapper.text()).not.toContain('Remember to mic the choir')
   })
 
   it('renders not-found when getDoc throws an error', async () => {
@@ -237,7 +237,7 @@ describe('ShareView', () => {
   // T-43-12 — before this plan, the v-else-if chain had no trailing arm, so
   // these two kinds rendered as nothing at all.
 
-  it('renders an ANNOUNCEMENTS slot as its own labelled line, with its body (43-04)', async () => {
+  it('renders an ANNOUNCEMENTS slot as its own labelled line, without its free-text body (R346)', async () => {
     mockGetDoc.mockResolvedValue({
       exists: () => true,
       data: () => ({
@@ -252,10 +252,10 @@ describe('ShareView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Announcements')
-    expect(wrapper.text()).toContain('Potluck this Sunday after service')
+    expect(wrapper.text()).not.toContain('Potluck this Sunday after service')
   })
 
-  it('renders a MISC slot as its own labelled line, with its body (43-04)', async () => {
+  it('renders a MISC slot as its own labelled line, without its free-text body (R346)', async () => {
     mockGetDoc.mockResolvedValue({
       exists: () => true,
       data: () => ({
@@ -270,10 +270,10 @@ describe('ShareView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Miscellaneous')
-    expect(wrapper.text()).toContain('Building closes early Monday')
+    expect(wrapper.text()).not.toContain('Building closes early Monday')
   })
 
-  it('preserves an embedded newline in a MESSAGE body (43-04)', async () => {
+  it('never renders a MESSAGE body, even one carrying an embedded newline (R346)', async () => {
     mockGetDoc.mockResolvedValue({
       exists: () => true,
       data: () => ({
@@ -287,12 +287,10 @@ describe('ShareView', () => {
     const wrapper = await mountShareView()
     await flushPromises()
 
-    // notes is blanked above so this is the only whitespace-pre-wrap paragraph
-    // in the DOM — .text() collapses the embedded newline, so read textContent
-    // directly to prove the line break survives.
-    const bodyEl = wrapper.find('p.whitespace-pre-wrap')
-    expect(bodyEl.exists()).toBe(true)
-    expect(bodyEl.element.textContent).toBe('Line one\nLine two')
+    // R346/SEC-S-04 — no free-text render path remains at all; there is no
+    // whitespace-pre-wrap element left in the DOM for any slot body.
+    expect(wrapper.find('p.whitespace-pre-wrap').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Line one')
   })
 
   it('renders a MISC slot with no body as a label-only line, with no not-assigned placeholder (43-04)', async () => {
@@ -316,7 +314,7 @@ describe('ShareView', () => {
 
   // ── 260812-izz: notes render for every slot kind on the share link ─────────
 
-  it('renders a SONG slot\'s notes on the share view (260812-izz)', async () => {
+  it('never renders a SONG slot\'s notes on the share view, even on a legacy doc that still carries them (R346)', async () => {
     mockGetDoc.mockResolvedValue({
       exists: () => true,
       data: () => ({
@@ -340,10 +338,10 @@ describe('ShareView', () => {
     const wrapper = await mountShareView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Sarah leads')
+    expect(wrapper.text()).not.toContain('Sarah leads')
   })
 
-  it('renders a MESSAGE slot\'s notes on the share view, not just legacy body (260812-izz)', async () => {
+  it('never renders a MESSAGE slot\'s notes (nor legacy body) on the share view (R346)', async () => {
     mockGetDoc.mockResolvedValue({
       exists: () => true,
       data: () => ({
@@ -357,7 +355,47 @@ describe('ShareView', () => {
     const wrapper = await mountShareView()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Guest speaker this week')
+    expect(wrapper.text()).not.toContain('Guest speaker this week')
+  })
+
+  // ── 118-02 R346/SEC-S-04 — legacy-doc render gate ────────────────────────
+  // A doc written BEFORE this fix shipped can still carry free-text notes/
+  // body baked into its stored snapshot; the projection fix alone cannot
+  // touch data already in Firestore, so ShareView itself must never render
+  // these fields, no matter what the fetched snapshot contains.
+
+  it('renders no free-text notes/body anywhere, for a legacy snapshot that still carries them at every level', async () => {
+    const PII_MARKER = 'call the office at 555-0100'
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          notes: PII_MARKER,
+          slots: [
+            {
+              kind: 'SONG',
+              position: 0,
+              requiredVwType: 1,
+              songId: 'song-abc',
+              songTitle: 'Amazing Grace',
+              songKey: 'G',
+              notes: PII_MARKER,
+            },
+            { kind: 'MISC', position: 1, label: 'Notice', body: PII_MARKER },
+          ],
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    // Structured content still renders...
+    expect(wrapper.text()).toContain('Amazing Grace')
+    expect(wrapper.text()).toContain('Notice')
+    // ...but the PII marker never reaches the DOM, from any of the three
+    // free-text sites (service-level notes, slot notes, slot body).
+    expect(wrapper.text()).not.toContain(PII_MARKER)
   })
 
   // ── Stage layout: portrait PLAN share excludes it; ?view=stage shows it ─────
