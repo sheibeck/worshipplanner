@@ -90,7 +90,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
   Files tab/column as read-only and cannot mutate attachments — enforced in the UI **and** in
   `storage.rules`/Firestore rules.
 
-- [ ] **R373**: The Files tab and Songs-list Files column are implemented to the owner's approved "Song
+- [x] **R373**: The Files tab and Songs-list Files column are implemented to the owner's approved "Song
   Files" mock, **mapped to the app's existing dark gray-950 design language** (not the raw Nocturne
   palette), consistent with the current Edit Song slideout, Details, and Lyrics tabs. An app-fidelity
   design/UI spec is produced before implementation.
@@ -102,14 +102,19 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 - **Rehearse mode** — volunteers play the attached MP3 / view the PDF / open the linked media for the
   service they are serving, inside the shared (public or authenticated) service link. This is the read/
   streaming side and the driver for the whole cluster; deferred to its own milestone (backlog 999.13).
+
 - **Per-org storage quota** (~10 GB) enforced at upload time, and **egress monitoring / budget alerting** —
   deferred with the Rehearse (streaming) milestone, where egress cost actually accrues.
+
 - **Download-token URL / signed-URL read path** for anonymous playback on the public share page — a
   Rehearse-mode concern (this milestone's readers are authenticated org members).
+
 - **Image and uploaded-video attachment types** (JPG/PNG/MP4) — trimmed from this milestone to hold down
   the storage/egress surface; revisit only with quotas + egress controls in place.
+
 - **Per-file "share with volunteers" toggle** — the mock's underlying `shared` flag; a Rehearse-mode
   affordance (control which attachments volunteers see), deferred with Rehearse.
+
 - **Additional document/audio formats** (e.g. m4a, wav, docx) — hold to PDF + MP3 until there is demand.
 
 ## Out of Scope (this milestone)
@@ -117,6 +122,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 - Any playback/preview on the **public share page** — the share page is not touched this milestone.
 - Server-side audio processing (transposition, tempo/pitch shift, loop-a-section) — an explicit
   anti-feature from SEED-003 / FEATURES.md; never in this cluster's v1.
+
 - Cross-service or per-arrangement attachment scoping — attachments are on the Song, full stop.
 - Migrating or backfilling any existing data — the schema addition is additive and lazy.
 
@@ -138,7 +144,6 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 | R370 | Phase 122 | Pending |
 | R371 | Phase 122 | Pending |
 | R372 | Phase 122 | Pending |
-| R373 | Phase 121 | Pending |
+| R373 | Phase 121 | Complete |
 
 **Coverage: 13 v2.11 requirements (R361–R373) — 100% mapped, 0 orphaned.**
-
