@@ -931,6 +931,18 @@ describe('orgSlugs — public read, org-editor-scoped create-once claim (WR-01)'
     const db = context.firestore()
     await assertFails(setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgB' }))
   })
+
+  // R343/SEC-ISO-06 DENY-case regression proof: the unsplit `allow read: if
+  // true` granted list as well as get, letting an unauthenticated caller
+  // enumerate every org's slugs via getDocs(collection(...)). After the
+  // get/list split this must fail-closed while the get-by-id test above
+  // keeps succeeding.
+  it('denies unauthenticated collection listing of orgSlugs (R343)', async () => {
+    await seedDoc('orgSlugs/grace-church', { orgId: 'orgA' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDocs(collection(db, 'orgSlugs')))
+  })
 })
 
 describe('orgNames — public read, org-editor-scoped create-once claim (name uniqueness)', () => {
@@ -973,6 +985,14 @@ describe('orgNames — public read, org-editor-scoped create-once claim (name un
     const context = testEnv.authenticatedContext('userB')
     const db = context.firestore()
     await assertFails(setDoc(doc(db, 'orgNames', 'grace church'), { orgId: 'orgB' }))
+  })
+
+  // R343/SEC-ISO-06 DENY-case regression proof: same rationale as orgSlugs above.
+  it('denies unauthenticated collection listing of orgNames (R343)', async () => {
+    await seedDoc('orgNames/grace church', { orgId: 'orgA' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDocs(collection(db, 'orgNames')))
   })
 })
 

@@ -397,7 +397,11 @@ service cloud.firestore {
 
     // See ADR-0007 (docs/adr/0007-org-slug-claims-public-read-org-editor-scoped-create-only.md)
     match /orgSlugs/{slug} {
-      allow read: if true;
+      // R343/SEC-ISO-06: get/list split (SEC-S-01 mirror) -- claimSlug only ever
+      // getDoc()s by known id, so a flat list deny closes enumeration with no
+      // legitimate-path risk.
+      allow get: if true;
+      allow list: if false;
       allow create: if isOrgEditor(request.resource.data.orgId);
       allow update, delete: if false;
     }
@@ -409,7 +413,11 @@ service cloud.firestore {
     // requires the caller to be an editor of the orgId in the payload (no
     // name-squatting for an arbitrary/victim org).
     match /orgNames/{nameKey} {
-      allow read: if true;
+      // R343/SEC-ISO-06: get/list split (SEC-S-01 mirror) -- claimOrgName only
+      // ever getDoc()s by known id, so a flat list deny closes enumeration with
+      // no legitimate-path risk.
+      allow get: if true;
+      allow list: if false;
       allow create: if isOrgEditor(request.resource.data.orgId);
       allow update, delete: if false;
     }
