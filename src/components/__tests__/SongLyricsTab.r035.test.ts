@@ -48,8 +48,15 @@ vi.mock('sortablejs', () => ({
 const mockAddSong = vi.fn((_data: Record<string, unknown>) => Promise.resolve())
 const mockUpdateSong = vi.fn((_id: string, _data: Record<string, unknown>) => Promise.resolve())
 const mockDeleteSong = vi.fn((_id: string) => Promise.resolve())
+// 123-03: SongSlideOver resolves attachments LIVE from songStore.songs by id
+// (liveAttachments) — seed it with the mounted song in mountDrawer() below so
+// that computed never dereferences undefined.
+let mockSongs: Song[] = []
 const mockSongStore = {
   allUserTags: [] as string[],
+  get songs() {
+    return mockSongs
+  },
   addSong: mockAddSong,
   updateSong: mockUpdateSong,
   deleteSong: mockDeleteSong,
@@ -160,6 +167,7 @@ function makeLyrics(overrides?: Partial<SongLyrics>): SongLyrics {
 }
 
 async function mountDrawer(song: Song, initialTab?: SongEditTab) {
+  mockSongs = [song]
   const wrapper = mount(SongSlideOver, {
     props: { open: false, song, initialTab },
   })

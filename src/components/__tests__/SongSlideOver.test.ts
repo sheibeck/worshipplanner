@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import SongSlideOver from '../SongSlideOver.vue'
 import { MAJOR_KEYS } from '@/constants/keys'
 import type { Song } from '@/types/song'
@@ -11,8 +12,18 @@ const mockAddSong = vi.fn((_data: Record<string, unknown>) => Promise.resolve())
 const mockUpdateSong = vi.fn((_id: string, _data: Record<string, unknown>) => Promise.resolve())
 const mockDeleteSong = vi.fn((_id: string) => Promise.resolve())
 
+// 123-03: SongSlideOver resolves attachments LIVE from songStore.songs by id
+// (liveAttachments) rather than the stale props.song reference. A real `ref`
+// (not a plain array behind a getter) so reassigning `mockSongsRef.value`
+// actually invalidates SongSlideOver's computed — proving the live-resolution
+// contract, not just its initial render.
+const mockSongsRef = ref<Song[]>([])
+
 const mockSongStore = {
   allUserTags: [] as string[],
+  get songs() {
+    return mockSongsRef.value
+  },
   addSong: mockAddSong,
   updateSong: mockUpdateSong,
   deleteSong: mockDeleteSong,
@@ -32,6 +43,14 @@ vi.mock('@/stores/auth', () => ({
 
 vi.mock('../SongLyricEditor.vue', () => ({
   default: { name: 'SongLyricEditor', template: '<div data-testid="song-lyric-editor" />', props: ['songId', 'orgId'] },
+}))
+
+vi.mock('../SongFilesTab.vue', () => ({
+  default: {
+    name: 'SongFilesTab',
+    template: '<div data-testid="song-files-tab" />',
+    props: ['songId', 'orgId', 'createdBy', 'attachments'],
+  },
 }))
 
 function makeSong(overrides: Partial<Song> = {}): Song {
@@ -73,7 +92,8 @@ function makeArrangement(overrides: Partial<Song['arrangements'][number]> = {}):
 // The drawer's watch(() => props.open, ...) seeds form state from a false->true
 // transition (mirrors real usage — SongsView mounts it once with open=false and
 // flips it true on edit-click). Mount closed, then open it so that seeding runs.
-async function mountDrawer(song: Song | null, initialTab?: 'details' | 'lyrics') {
+async function mountDrawer(song: Song | null, initialTab?: 'details' | 'lyrics' | 'files') {
+  mockSongsRef.value = song ? [song] : []
   const wrapper = mount(SongSlideOver, {
     props: { open: false, song, initialTab },
     global: {
@@ -457,6 +477,81 @@ describe('SongSlideOver — SongSelect link (R334)', () => {
     await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
 
     expect(wrapper.find('[data-testid="song-songselect-link"]').exists()).toBe(true)
+  })
+})
+
+// 123-03 (R361): the third Files tab, its live count badge, and the panel it mounts.
+describe('SongSlideOver — Files tab (R361)', () => {
+  beforeEach(() => {
+    mockVwModeEnabled = true
+    mockAddSong.mockClear()
+    mockUpdateSong.mockClear()
+    mockDeleteSong.mockClear()
+  })
+
+  it('shows a Files tab beside Details/Lyrics in edit mode, with no badge when there are no attachments', async () => {
+    const song = makeSong({ attachments: [] })
+    const wrapper = await mountDrawer(song)
+    const filesTab = wrapper.find('[data-testid="tab-files"]')
+    expect(filesTab.exists()).toBe(true)
+    expect(filesTab.text()).toContain('Files')
+    // No count badge (a <span>) when the song has zero attachments.
+    expect(filesTab.find('span').exists()).toBe(false)
+  })
+
+  it('does not show the Files tab in create mode', async () => {
+    const wrapper = await mountDrawer(null)
+    expect(wrapper.find('[data-testid="tab-files"]').exists()).toBe(false)
+  })
+
+  it('shows a live count badge reflecting the current attachment count', async () => {
+    const song = makeSong({
+      attachments: [
+        { id: 'a1', kind: 'document', name: 'chart.pdf', createdAt: {} as never, createdBy: 'user-1' },
+        { id: 'a2', kind: 'link', name: 'Ref', href: 'https://youtu.be/x', createdAt: {} as never, createdBy: 'user-1' },
+      ],
+    })
+    const wrapper = await mountDrawer(song)
+    const badge = wrapper.find('[data-testid="tab-files"] span')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('2')
+  })
+
+  it('switching to the Files tab mounts SongFilesTab with the live attachments and hides the Details/Lyrics content', async () => {
+    const song = makeSong({
+      attachments: [{ id: 'a1', kind: 'document', name: 'chart.pdf', createdAt: {} as never, createdBy: 'user-1' }],
+    })
+    const wrapper = await mountDrawer(song)
+    await wrapper.find('[data-testid="tab-files"]').trigger('click')
+
+    const filesContent = wrapper.find('[data-testid="files-tab-content"]')
+    expect(filesContent.exists()).toBe(true)
+    const filesTabComponent = wrapper.findComponent({ name: 'SongFilesTab' })
+    expect(filesTabComponent.exists()).toBe(true)
+    expect(filesTabComponent.props('songId')).toBe('song-1')
+    expect(filesTabComponent.props('attachments')).toEqual(song.attachments)
+
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('resolves attachments LIVE from songStore.songs by id rather than the stale props.song reference', async () => {
+    const song = makeSong({ id: 'song-1', attachments: [] })
+    const wrapper = await mountDrawer(song)
+
+    // Mutate the store's live copy (simulating an onSnapshot update after an
+    // upload) WITHOUT touching props.song — mirrors SongsView's stale
+    // selectedSong reference never updating on its own.
+    mockSongsRef.value = [
+      { ...song, attachments: [{ id: 'new-1', kind: 'document', name: 'new.pdf', createdAt: {} as never, createdBy: 'user-1' }] },
+    ]
+    await wrapper.find('[data-testid="tab-files"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const badge = wrapper.find('[data-testid="tab-files"] span')
+    expect(badge.text()).toBe('1')
+    const filesTabComponent = wrapper.findComponent({ name: 'SongFilesTab' })
+    expect(filesTabComponent.props('attachments')).toEqual(mockSongsRef.value[0]!.attachments)
   })
 })
 

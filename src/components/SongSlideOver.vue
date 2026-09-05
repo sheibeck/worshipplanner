@@ -118,6 +118,21 @@
           >
             Lyrics
           </button>
+          <button
+            type="button"
+            data-testid="tab-files"
+            class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+            :class="activeTab === 'files'
+              ? 'text-indigo-400 border-indigo-500'
+              : 'text-gray-400 border-transparent hover:text-gray-300'"
+            @click="activeTab = 'files'"
+          >
+            Files
+            <span
+              v-if="filesCount > 0"
+              class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-indigo-900/50 text-indigo-300 border-indigo-800"
+            >{{ filesCount }}</span>
+          </button>
         </div>
 
         <!-- Details tab (also shown always in create mode) -->
@@ -327,6 +342,19 @@
           />
         </div>
 
+        <!-- Files tab (R361): container matches the Details tab (px-5 py-5
+             space-y-5) for zero layout jump. Attachments resolve LIVE from
+             songStore.songs by id (liveAttachments below) rather than the
+             stale props.song reference SongsView passes as selectedSong. -->
+        <div v-if="activeTab === 'files' && !isCreateMode" class="flex-1 overflow-y-auto px-5 py-5 space-y-5" data-testid="files-tab-content">
+          <SongFilesTab
+            :song-id="props.song!.id"
+            :org-id="orgId"
+            :created-by="authStore.user?.uid ?? ''"
+            :attachments="liveAttachments"
+          />
+        </div>
+
       </div>
     </Transition>
   </Teleport>
@@ -339,7 +367,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { MAJOR_KEYS } from '@/constants/keys'
 import SongLyricEditor from './SongLyricEditor.vue'
-import type { Song, Arrangement, VWType } from '@/types/song'
+import SongFilesTab from './SongFilesTab.vue'
+import type { Song, Arrangement, VWType, SongAttachment } from '@/types/song'
 import type { SongEditTab } from '@/utils/songEditLink'
 
 const props = defineProps<{
@@ -358,8 +387,19 @@ const emit = defineEmits<{
 const songStore = useSongStore()
 const authStore = useAuthStore()
 
-const activeTab = ref<'details' | 'lyrics'>('details')
+const activeTab = ref<'details' | 'lyrics' | 'files'>('details')
 const orgId = computed(() => authStore.orgId ?? '')
+
+// R361 — the load-bearing key-link: reads the CURRENT store snapshot by id
+// rather than the `props.song` reference SongsView captured (which does not
+// update on Firestore onSnapshot), so the badge and the Files panel reflect a
+// just-uploaded file immediately without reopening the panel.
+const liveAttachments = computed<SongAttachment[]>(() => {
+  const id = props.song?.id
+  if (!id) return []
+  return songStore.songs.find((s) => s.id === id)?.attachments ?? props.song?.attachments ?? []
+})
+const filesCount = computed(() => liveAttachments.value.length)
 
 // ── Form state ────────────────────────────────────────────────────────────────
 
