@@ -26,6 +26,11 @@ export const useSuperAdminsStore = defineStore('superAdmins', () => {
   let unsub: Unsubscribe | null = null
 
   function subscribe(): void {
+    // LW-02 (119-REVIEW) — mirror members.ts's unsubscribe-first guard: a
+    // second subscribe() call (double mount, or a future second consumer)
+    // must tear down the prior listener instead of leaking it.
+    unsub?.()
+    unsub = null
     unsub = onSnapshot(
       collection(db, 'superAdmins'),
       (snap) => {
@@ -51,6 +56,10 @@ export const useSuperAdminsStore = defineStore('superAdmins', () => {
   function unsubscribe(): void {
     unsub?.()
     unsub = null
+    // LW-02 (119-REVIEW) — mirror members.ts: reset state on teardown so a
+    // remount shows "Loading roster..." instead of the previous roster.
+    superAdmins.value = []
+    loaded.value = false
   }
 
   return {

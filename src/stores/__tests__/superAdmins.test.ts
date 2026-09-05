@@ -84,6 +84,18 @@ describe('useSuperAdminsStore', () => {
       expect(store.loaded).toBe(true)
       consoleSpy.mockRestore()
     })
+
+    // LW-02 (119-REVIEW) — mirrors members.ts's unsubscribe-first guard: a
+    // second subscribe() call must tear down the prior listener, not leak it.
+    it('a second subscribe() call tears down the prior listener before opening a new one', async () => {
+      const { useSuperAdminsStore } = await import('../superAdmins')
+      const store = useSuperAdminsStore()
+
+      store.subscribe()
+      store.subscribe()
+
+      expect(unsubscribeSpies[0]).toHaveBeenCalledOnce()
+    })
   })
 
   describe('unsubscribe', () => {
@@ -101,6 +113,23 @@ describe('useSuperAdminsStore', () => {
       const { useSuperAdminsStore } = await import('../superAdmins')
       const store = useSuperAdminsStore()
       expect(() => store.unsubscribe()).not.toThrow()
+    })
+
+    // LW-02 (119-REVIEW) — mirrors members.ts: resets state so a remount
+    // shows "Loading roster..." instead of the previous roster.
+    it('resets superAdmins and loaded so a remount does not show the previous roster', async () => {
+      const { useSuperAdminsStore } = await import('../superAdmins')
+      const store = useSuperAdminsStore()
+
+      store.subscribe()
+      triggerSnapshot([docOf('uid-1', { email: 'a@example.com' })])
+      expect(store.superAdmins).toHaveLength(1)
+      expect(store.loaded).toBe(true)
+
+      store.unsubscribe()
+
+      expect(store.superAdmins).toEqual([])
+      expect(store.loaded).toBe(false)
     })
   })
 
