@@ -788,9 +788,11 @@ export async function parsePptxHandler(
     throw new HttpsError("permission-denied", "Invalid storage path for this organization.");
   }
 
+  const db = getFirestore();
+
   // Independent org-membership check -- never trust the client-declared orgId
   // alone, even though storage.rules also enforces this at the Storage layer.
-  const memberDoc = await getFirestore()
+  const memberDoc = await db
     .collection("organizations")
     .doc(orgId)
     .collection("members")
@@ -798,6 +800,62 @@ export async function parsePptxHandler(
     .get();
   if (!memberDoc.exists) {
     throw new HttpsError("permission-denied", "You are not a member of this organization.");
+  }
+
+  // R345 (117-01 / SEC-C-06): a per-uid + per-org daily import quota, on
+  // DEDICATED counters, independent of the render service's own
+  // --concurrency=1/--max-instances=3 ceiling. Reuses the existing
+  // aiProxy.rateLimitPerDay / messaging.orgDailyEmailQuota knobs -- a new
+  // appConfig field would need the out-of-scope frontend appConfig
+  // duplicate (117-CONTEXT.md). Fails OPEN on a Firestore hiccup, same
+  // posture as the sibling limits.
+  let pptxConfig: AppConfig = DEFAULT_APP_CONFIG;
+  try {
+    pptxConfig = await getAppConfig(db);
+  } catch (configErr) {
+    console.warn("[parsePptx] appConfig read failed; failing open to defaults:", {
+      message: configErr instanceof Error ? configErr.message : String(configErr),
+    });
+  }
+  try {
+    const uidQuota = await checkAndConsumeOrgEmailQuota(
+      db,
+      request.auth.uid,
+      1,
+      pptxConfig.aiProxy.rateLimitPerDay,
+      Date.now(),
+      "pptxImportUidCounters",
+    );
+    if (!uidQuota.allowed) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "You have reached your daily PowerPoint import limit. Try again tomorrow.",
+      );
+    }
+    const orgQuota = await checkAndConsumeOrgEmailQuota(
+      db,
+      orgId,
+      1,
+      pptxConfig.messaging.orgDailyEmailQuota,
+      Date.now(),
+      "pptxImportOrgCounters",
+    );
+    if (!orgQuota.allowed) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "This organization has reached its daily PowerPoint import limit.",
+      );
+    }
+  } catch (limiterErr) {
+    if (limiterErr instanceof HttpsError) {
+      throw limiterErr;
+    }
+    // Fail OPEN: the quota is a cost guardrail, not a security control
+    // (locked decision, 65-CONTEXT.md) -- a Firestore hiccup must never block
+    // a legitimate import.
+    console.warn("[parsePptx] import quota Firestore op failed; failing open:", {
+      message: limiterErr instanceof Error ? limiterErr.message : String(limiterErr),
+    });
   }
 
   try {

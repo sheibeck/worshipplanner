@@ -489,6 +489,13 @@ describe("parsePptxHandler", () => {
   interface FakeDbOptions {
     memberExists?: boolean;
     setSpy?: ReturnType<typeof vi.fn>;
+    // R345 (117-01): seeds for the two DEDICATED daily-import-quota counter
+    // collections, keyed exactly as checkAndConsumeOrgEmailQuota keys them.
+    // Absent = under every ceiling.
+    uidQuotaSeed?: Record<string, number>;
+    orgQuotaSeed?: Record<string, number>;
+    // When true, BOTH import-quota transactions throw -- proves fail-open.
+    quotaThrows?: boolean;
   }
 
   /**
@@ -496,6 +503,7 @@ describe("parsePptxHandler", () => {
    * parsePptxHandler / pptxRenderDocRef use:
    *   organizations/{orgId}/members/{uid}       -> .get()
    *   organizations/{orgId}/pptxRenders/{importId} -> .set()
+   *   pptxImportUidCounters / pptxImportOrgCounters -> .doc()/.runTransaction() (R345)
    */
   function fakeDb(opts: FakeDbOptions = {}) {
     const memberDoc = {
@@ -511,11 +519,51 @@ describe("parsePptxHandler", () => {
       }),
     };
 
+    // R345: a tiny generic per-collection counter store shared by both
+    // checkAndConsumeOrgEmailQuota calls (per-uid, per-org), tagging each
+    // doc ref with the collection it came from -- mirrors the Task 2
+    // queueServiceMessageHandler fakeDb harness.
+    const counterStates: Record<string, Record<string, { count: number }>> = {
+      pptxImportUidCounters: {},
+      pptxImportOrgCounters: {},
+    };
+    for (const [id, count] of Object.entries(opts.uidQuotaSeed ?? {})) {
+      counterStates.pptxImportUidCounters[id] = { count };
+    }
+    for (const [id, count] of Object.entries(opts.orgQuotaSeed ?? {})) {
+      counterStates.pptxImportOrgCounters[id] = { count };
+    }
+    const makeCounterDoc = (collectionName: string) =>
+      vi.fn((id: string) => ({ id, _docId: id, _collection: collectionName }));
+    const uidQuotaCollection = { doc: makeCounterDoc("pptxImportUidCounters") };
+    const orgQuotaCollection = { doc: makeCounterDoc("pptxImportOrgCounters") };
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      if (opts.quotaThrows) {
+        throw new Error("Firestore unavailable");
+      }
+      const tx = {
+        get: vi.fn(async (ref: { _docId: string; _collection: string }) => {
+          const entry = counterStates[ref._collection]?.[ref._docId];
+          return {
+            exists: entry !== undefined,
+            data: () => (entry ? { ...entry } : undefined),
+          };
+        }),
+        set: vi.fn((ref: { _docId: string; _collection: string }, patch: { count: number }) => {
+          counterStates[ref._collection][ref._docId] = { count: patch.count };
+        }),
+      };
+      return fn(tx);
+    });
+
     return {
       collection: vi.fn((name: string) => {
         if (name === "organizations") return { doc: vi.fn(() => orgDoc) };
+        if (name === "pptxImportUidCounters") return uidQuotaCollection;
+        if (name === "pptxImportOrgCounters") return orgQuotaCollection;
         throw new Error(`fakeDb: unexpected collection "${name}"`);
       }),
+      runTransaction,
       __memberDoc: memberDoc,
       __pptxRendersDoc: pptxRendersDoc,
     };
@@ -661,6 +709,72 @@ describe("parsePptxHandler", () => {
     expect(onCallStart).toBeGreaterThan(start);
     const handlerBody = source.slice(start, onCallStart);
     expect(handlerBody).not.toMatch(/invokeRenderService/);
+  });
+
+  // R345 (117-01 / SEC-C-06): per-uid + per-org daily import quota,
+  // independent of the render service's own concurrency/max-instances ceiling.
+  it("R345: a caller over the per-uid daily import quota is rejected resource-exhausted, and neither bucket.download nor parsePptxBuffer run", async () => {
+    const NOW = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const dayWindow = Math.floor(NOW / 86_400_000);
+    const db = fakeDb({
+      uidQuotaSeed: { [`${UID}__day__${dayWindow}`]: DEFAULT_APP_CONFIG.aiProxy.rateLimitPerDay },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    const { file } = mockBucketForDownload();
+
+    await expect(parsePptxHandler(fakeRequest())).rejects.toMatchObject({
+      code: "resource-exhausted",
+    });
+    expect(file).not.toHaveBeenCalled();
+    expect(parsePptxBuffer).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("R345: an org over its per-org daily import quota is rejected resource-exhausted, and neither bucket.download nor parsePptxBuffer run", async () => {
+    const NOW = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const dayWindow = Math.floor(NOW / 86_400_000);
+    const db = fakeDb({
+      orgQuotaSeed: {
+        [`${ORG_ID}__day__${dayWindow}`]: DEFAULT_APP_CONFIG.messaging.orgDailyEmailQuota,
+      },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    const { file } = mockBucketForDownload();
+
+    await expect(parsePptxHandler(fakeRequest())).rejects.toMatchObject({
+      code: "resource-exhausted",
+    });
+    expect(file).not.toHaveBeenCalled();
+    expect(parsePptxBuffer).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("R345: a within-quota caller still returns { slides } (case-1 happy path unaffected)", async () => {
+    const slides = [{ type: "text", text: "Hello" }];
+    vi.mocked(parsePptxBuffer).mockResolvedValue(slides as never);
+    const db = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    mockBucketForDownload();
+
+    const result = await parsePptxHandler(fakeRequest());
+
+    expect(result).toEqual({ slides });
+  });
+
+  it("R345: a Firestore error inside either import-quota check fails OPEN -- the parse still runs and returns", async () => {
+    const slides = [{ type: "text", text: "Still works" }];
+    vi.mocked(parsePptxBuffer).mockResolvedValue(slides as never);
+    const db = fakeDb({ quotaThrows: true });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    mockBucketForDownload();
+
+    const result = await parsePptxHandler(fakeRequest());
+
+    expect(result).toEqual({ slides });
   });
 });
 
