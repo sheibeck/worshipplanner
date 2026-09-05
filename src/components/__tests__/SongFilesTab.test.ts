@@ -1,0 +1,224 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
+import SongFilesTab from '../SongFilesTab.vue'
+import { useSongStore } from '@/stores/songs'
+import type { SongAttachment } from '@/types/song'
+import type { UploadRow } from '@/composables/useSongFileUpload'
+
+// SongFilesTab persists link-attach via useSongStore().updateSong — the store
+// itself is spied at the method level, so its own firebase/firestore imports
+// never execute; only @/firebase needs a stub for the module graph (mirrors
+// useSongFileUpload.test.ts's convention).
+vi.mock('@/firebase', () => ({
+  auth: {},
+  db: {},
+  storage: {},
+}))
+
+const mockUploads = ref<UploadRow[]>([])
+const mockAddFiles = vi.fn()
+const mockReset = vi.fn()
+
+vi.mock('@/composables/useSongFileUpload', () => ({
+  useSongFileUpload: () => ({
+    uploads: mockUploads,
+    addFiles: mockAddFiles,
+    reset: mockReset,
+  }),
+}))
+
+function makeAttachment(overrides: Partial<SongAttachment> = {}): SongAttachment {
+  return {
+    id: 'att-1',
+    kind: 'document',
+    name: 'chart.pdf',
+    storagePath: 'orgs/org-1/song-files/att-1/chart.pdf',
+    downloadUrl: 'https://cdn.example.com/chart.pdf',
+    mimeType: 'application/pdf',
+    sizeBytes: 2516582, // 2.4 MB
+    createdAt: {} as SongAttachment['createdAt'],
+    createdBy: 'user-1',
+    ...overrides,
+  }
+}
+
+function mountTab(attachments: SongAttachment[] = []) {
+  return mount(SongFilesTab, {
+    props: {
+      songId: 'song-1',
+      orgId: 'org-1',
+      createdBy: 'user-1',
+      attachments,
+    },
+  })
+}
+
+describe('SongFilesTab', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    mockUploads.value = []
+    mockAddFiles.mockClear()
+    mockReset.mockClear()
+  })
+
+  it('renders the drop zone with exact primary and helper copy', () => {
+    const wrapper = mountTab()
+    const dropzone = wrapper.find('[data-testid="song-files-dropzone"]')
+    expect(dropzone.exists()).toBe(true)
+    expect(dropzone.text()).toContain('Drop files here, or click to browse')
+    expect(dropzone.text()).toContain('PDF, MP3 · up to 50 MB each · several at once')
+  })
+
+  it('renders a hidden multi-file input accepting PDF and MP3', () => {
+    const wrapper = mountTab()
+    const input = wrapper.find('[data-testid="song-files-input"]')
+    expect(input.exists()).toBe(true)
+    expect(input.attributes('type')).toBe('file')
+    expect(input.attributes('multiple')).toBeDefined()
+    expect(input.attributes('accept')).toBe('.pdf,audio/mpeg')
+  })
+
+  it('clicking the drop zone triggers the hidden file input', async () => {
+    const wrapper = mountTab()
+    const input = wrapper.find('[data-testid="song-files-input"]').element as HTMLInputElement
+    const clickSpy = vi.spyOn(input, 'click')
+    await wrapper.find('[data-testid="song-files-dropzone"]').trigger('click')
+    expect(clickSpy).toHaveBeenCalled()
+  })
+
+  it('picking files via the input calls addFiles with the upload context', async () => {
+    const wrapper = mountTab([makeAttachment({ id: 'existing-1' })])
+    const input = wrapper.find('[data-testid="song-files-input"]')
+    const file = new File(['x'], 'song.pdf', { type: 'application/pdf' })
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+
+    expect(mockAddFiles).toHaveBeenCalledTimes(1)
+    const [files, ctx] = mockAddFiles.mock.calls[0]!
+    expect(Array.from(files as FileList | File[])).toEqual([file])
+    expect(ctx).toEqual({
+      songId: 'song-1',
+      orgId: 'org-1',
+      createdBy: 'user-1',
+      existingAttachments: [makeAttachment({ id: 'existing-1' })],
+    })
+  })
+
+  it('dropping files calls addFiles and clears the drag-over state', async () => {
+    const wrapper = mountTab()
+    const file = new File(['x'], 'track.mp3', { type: 'audio/mpeg' })
+    const dropzone = wrapper.find('[data-testid="song-files-dropzone"]')
+
+    await dropzone.trigger('dragover')
+    expect(dropzone.classes().join(' ')).toContain('border-indigo-500')
+
+    await dropzone.trigger('drop', { dataTransfer: { files: [file] } })
+    expect(mockAddFiles).toHaveBeenCalledTimes(1)
+    expect(dropzone.classes().join(' ')).not.toContain('border-indigo-500')
+  })
+
+  it('renders the link field with exact label, placeholder, and helper copy', () => {
+    const wrapper = mountTab()
+    const input = wrapper.find('[data-testid="song-files-link-input"]')
+    expect(wrapper.text()).toContain('Or link instead of uploading')
+    expect(input.attributes('placeholder')).toBe('Paste a YouTube, Google Drive, or Dropbox link')
+    expect(wrapper.text()).toContain('Opens in a new tab when clicked — not previewed in-app.')
+  })
+
+  it('submitting an invalid link shows the exact error and persists nothing', async () => {
+    const updateSongSpy = vi.spyOn(useSongStore(), 'updateSong').mockResolvedValue(undefined)
+    const wrapper = mountTab()
+    const input = wrapper.find('[data-testid="song-files-link-input"]')
+    await input.setValue('not-a-url')
+    await input.trigger('keydown.enter')
+
+    expect(wrapper.find('[data-testid="song-files-link-error"]').text()).toBe(
+      'Enter a valid link (starting with https://).',
+    )
+    expect(updateSongSpy).not.toHaveBeenCalled()
+  })
+
+  it('submitting a valid https link appends a kind:link attachment via updateSong and clears the field', async () => {
+    const updateSongSpy = vi.spyOn(useSongStore(), 'updateSong').mockResolvedValue(undefined)
+    const existing = [makeAttachment({ id: 'existing-1' })]
+    const wrapper = mountTab(existing)
+    const input = wrapper.find('[data-testid="song-files-link-input"]')
+    await input.setValue('https://youtu.be/abc123')
+    await input.trigger('keydown.enter')
+
+    expect(updateSongSpy).toHaveBeenCalledTimes(1)
+    const [songId, data] = updateSongSpy.mock.calls[0]!
+    expect(songId).toBe('song-1')
+    const attachments = (data as { attachments: SongAttachment[] }).attachments
+    expect(attachments).toHaveLength(2)
+    expect(attachments[0]).toEqual(existing[0])
+    expect(attachments[1]).toMatchObject({ kind: 'link', href: 'https://youtu.be/abc123', linkSource: 'youtube' })
+
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(wrapper.find('[data-testid="song-files-link-error"]').exists()).toBe(false)
+  })
+
+  it('renders a document row with name and no download/preview/remove action button', () => {
+    const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf', sizeBytes: 2516582 })
+    const wrapper = mountTab([doc])
+    const row = wrapper.find('[data-testid="song-file-row-doc-1"]')
+    expect(row.exists()).toBe(true)
+    expect(row.text()).toContain('chart.pdf')
+    expect(row.text()).toContain('PDF')
+    expect(row.text()).toContain('2.4 MB')
+    expect(row.findAll('button')).toHaveLength(0)
+  })
+
+  it('renders a link row as an anchor opening in a new tab with rel noopener', () => {
+    const link = makeAttachment({
+      id: 'link-1',
+      kind: 'link',
+      name: 'Reference track',
+      href: 'https://youtu.be/xyz',
+      linkSource: 'youtube',
+      storagePath: undefined,
+      downloadUrl: undefined,
+      mimeType: undefined,
+      sizeBytes: undefined,
+    })
+    const wrapper = mountTab([link])
+    const row = wrapper.find('[data-testid="song-file-row-link-1"]')
+    expect(row.exists()).toBe(true)
+    expect(row.element.tagName).toBe('A')
+    expect(row.attributes('href')).toBe('https://youtu.be/xyz')
+    expect(row.attributes('target')).toBe('_blank')
+    expect(row.attributes('rel')).toContain('noopener')
+    expect(row.findAll('button')).toHaveLength(0)
+  })
+
+  it('renders an in-flight upload row with a progress bar and percent', () => {
+    mockUploads.value = [
+      { id: 'u1', name: 'uploading.pdf', kind: 'document', progress: 42, status: 'uploading' },
+    ]
+    const wrapper = mountTab()
+    const rows = wrapper.find('[data-testid="song-files-upload-rows"]')
+    expect(rows.text()).toContain('uploading.pdf')
+    expect(rows.text()).toContain('42%')
+    const fill = rows.find('.bg-indigo-500')
+    expect(fill.exists()).toBe(true)
+    expect((fill.element as HTMLElement).style.width).toBe('42%')
+  })
+
+  it('renders a rejected upload row with its red rejection message', () => {
+    mockUploads.value = [
+      {
+        id: 'u2',
+        name: 'cover.png',
+        kind: 'document',
+        progress: 0,
+        status: 'rejected',
+        message: "'cover.png' can't be uploaded — PDF and MP3 only, up to 50 MB.",
+      },
+    ]
+    const wrapper = mountTab()
+    const rows = wrapper.find('[data-testid="song-files-upload-rows"]')
+    expect(rows.text()).toContain("'cover.png' can't be uploaded — PDF and MP3 only, up to 50 MB.")
+  })
+})
