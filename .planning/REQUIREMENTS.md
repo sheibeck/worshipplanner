@@ -35,7 +35,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 
 ### Files Tab & Song-List Surface
 
-- [ ] **R361**: The Edit Song slideout gains a third tab, **Files**, beside Details and Lyrics, showing a
+- [x] **R361**: The Edit Song slideout gains a third tab, **Files**, beside Details and Lyrics, showing a
   live count badge of the number of attachments on the song.
 
 - [x] **R362**: The Songs list gains a **Files** column showing a paperclip icon and the attachment count
@@ -132,7 +132,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R361 | Phase 123 | Pending |
+| R361 | Phase 123 | Complete |
 | R362 | Phase 123 | Complete |
 | R363 | Phase 123 | Complete |
 | R364 | Phase 122 | Complete |

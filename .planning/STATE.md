@@ -4,17 +4,17 @@ milestone: v2.11
 milestone_name: Song File Attachments (Phases 121-124, in planning)
 current_phase: 123
 current_phase_name: Files Tab, Songs List Column, Upload & External Link Attach
-status: planning
-stopped_at: Completed 123-02-PLAN.md
-last_updated: "2026-09-05T17:49:21.485Z"
+status: executing
+stopped_at: Completed 123-03-PLAN.md
+last_updated: "2026-09-05T18:13:23.377Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 123 Plan 02 complete (Songs-list Files column)
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 50
+  completed_plans: 6
+  percent: 75
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.11 Song File Attachments (roadmap created 2026-09-05)
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 
 **Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external media
 links (YouTube/Drive/Dropbox) — on a Song in the stable, via a new Files tab in the Edit Song slideout,
@@ -1290,7 +1290,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 123 — Files Tab, Songs List Column, Upload & External Link Attach
-Plan: 02 of 03 complete (123-03-PLAN.md remaining)
+Plan: 3 of 03 complete (123-03-PLAN.md remaining)
 Status: 123-02-PLAN.md (Songs-list Files column, R362) complete
 Last activity: 2026-09-05 — Phase 123 Plan 02 complete (Songs-list Files column)
 
@@ -3302,6 +3302,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 122 P02 | 13min | 3 tasks | 7 files |
 | Phase 123 P01 | 25min | 3 tasks | 6 files |
 | Phase 123 P02 | 20min | 2 tasks | 4 files |
+| Phase 123 P03 | 55min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -3849,6 +3850,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Song attachments (R369-R371): additive SongAttachment schema, hardDeleteSong-only Storage cascade, and a locking test proving song-files/ is structurally exempt from all retention sweeps
 - [Phase ?]: Phase 123 Plan 01: promoted sanitizeFileName to shared export (IN-03 closed); built songLinks (R365) and useSongFileUpload (R363) composables per plan
 - [Phase ?]: Songs-list Files column: filesLabel(song) helper computes none/1 file/N files from song.attachments?.length ?? 0; files:true added to DEFAULT_COLUMN_VISIBILITY (R362).
+- [Phase ?]: Files tab attachments resolve LIVE from songStore.songs by id (not stale props.song), so a just-uploaded file appears without reopening the panel
+- [Phase ?]: Attachments persist outside the edit form/unsavedGuard — uploads/link-attach mutate via direct updateSong calls, never via onSave's data object
 
 ### Roadmap Evolution
 
@@ -4177,8 +4180,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T17:49:21.423Z
-Stopped at: Completed 123-02-PLAN.md
+Last session: 2026-09-05T18:13:23.314Z
+Stopped at: Completed 123-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
