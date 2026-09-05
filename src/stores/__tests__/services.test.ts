@@ -1289,7 +1289,9 @@ describe('useServiceStore', () => {
       expect(writeData.serviceSnapshot).toBeDefined()
       const snapshot = writeData.serviceSnapshot as Record<string, unknown>
       expect(snapshot.date).toBe(service.date)
-      expect(snapshot.notes).toBe(service.notes)
+      // R346/SEC-S-04 — the public shareTokens payload carries no free-text
+      // service-level notes (118-02).
+      expect('notes' in snapshot).toBe(false)
     })
 
     it('createShareToken embeds BPM from song store into song slots', async () => {
@@ -1683,16 +1685,18 @@ describe('useServiceStore', () => {
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
       store.subscribe('org-1')
-      triggerSnapshot([makeService({ notes: 'original notes' })])
+      triggerSnapshot([makeService({ name: 'Original Name' })])
 
       vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
 
-      await store.updateService('service-1', { notes: 'a different value' })
+      await store.updateService('service-1', { name: 'A Different Name' })
 
       const [docRef, data] = vi.mocked(setDoc).mock.calls[0]!
       expect((docRef as { id: string }).id).toBe('tok-existing')
       const snapshot = (data as Record<string, unknown>).serviceSnapshot as Record<string, unknown>
-      expect(snapshot.notes).toBe('a different value')
+      expect(snapshot.name).toBe('A Different Name')
+      // R346/SEC-S-04 — the refreshed public payload still carries no notes.
+      expect('notes' in snapshot).toBe(false)
     })
 
     it("setRoleOverride refreshes the payload with the new override (R077)", async () => {
@@ -1941,7 +1945,7 @@ describe('useServiceStore', () => {
       vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
       vi.mocked(setDoc).mockImplementationOnce(() => Promise.reject(new Error('network blip')))
 
-      await store.updateService('service-1', { notes: 'first edit' })
+      await store.updateService('service-1', { name: 'first edit' })
       expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
 
       // Second attempt: the write succeeds this time. If the transient
@@ -1950,11 +1954,11 @@ describe('useServiceStore', () => {
       // successful write here proves the cache was NOT poisoned.
       vi.mocked(setDoc).mockClear()
 
-      await store.updateService('service-1', { notes: 'second edit' })
+      await store.updateService('service-1', { name: 'second edit' })
       expect(setDoc).toHaveBeenCalled()
       const [, data] = vi.mocked(setDoc).mock.calls[0]!
       const snapshot = (data as Record<string, unknown>).serviceSnapshot as Record<string, unknown>
-      expect(snapshot.notes).toBe('second edit')
+      expect(snapshot.name).toBe('second edit')
 
       consoleErrorSpy.mockRestore()
     })

@@ -68,10 +68,17 @@ export class ServiceLockedError extends Error {
 }
 
 /**
- * The public payload shape `shareTokens/{token}` and `serviceShares/{slug}...`
- * both carry as their `serviceSnapshot` field. Everything in here is published
- * to anyone holding the URL — see the D-04/D-24 PII guard on `roleAssignments`
- * below.
+ * The base shape `shareTokens/{token}` and `serviceShares/{slug}...` carry as
+ * their `serviceSnapshot` field, AND the shape `lockSnapshots/current` carries
+ * as its `snapshot` field for the org-internal re-lock diff (serviceLockDiff.ts,
+ * R146/R147). Everything except `notes` is published to anyone holding a public
+ * URL — see the D-04/D-24 PII guard on `roleAssignments` below. `notes` (R346/
+ * SEC-S-04) is free-text and stays on this type ONLY because
+ * diffServiceSnapshots needs it to detect a "Service notes changed" re-lock
+ * notice; `toPublicServiceSnapshot()` strips it before EITHER public write
+ * (`writeSharePayload` is the sole choke point for both). Per-slot free-text
+ * (`notes`/`body`) is dropped unconditionally in `buildServiceSnapshot` itself
+ * — no internal consumer reads it, so there is no such split for slots.
  */
 export interface ServiceSnapshot {
   date: string
@@ -80,6 +87,7 @@ export interface ServiceSnapshot {
   teams: string[]
   slots: ServiceSlot[]
   sermonPassage: ScriptureRef | null
+  /** Service-level free-text. Internal-only past `toPublicServiceSnapshot()` — see the type doc above. */
   notes: string
   status: ServiceStatus
   roleAssignments: {
@@ -114,21 +122,63 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
   // cadence is untouched. orderSlotsBySection is identity-preserving.
   const orderedSlots = orderSlotsBySection(service.slots)
 
-  // Resolve BPM for each song slot from song store
+  // Per-slot field-allowlist (R346/SEC-S-04): only the structured display
+  // fields ShareView.vue/diffServiceSnapshots actually read survive — free-text
+  // `notes`/`body` are dropped for every kind, unconditionally (no raw spread).
+  // Mirrors the roleAssignments/stageLayout allowlists below.
   const songStore = useSongStore()
-  const slotsWithBpm = orderedSlots.map((slot) => {
-    if (slot.kind === 'SONG' && (slot as SongSlot).songId) {
-      const songSlot = slot as SongSlot
-      const song = songStore.songs.find((s) => s.id === songSlot.songId)
-      let bpm: number | null = null
-      if (song) {
-        const matchingArr = song.arrangements.find((a) => a.key === songSlot.songKey)
-        bpm = matchingArr?.bpm ?? song.arrangements[0]?.bpm ?? null
+  const slotsWithBpm = orderedSlots.map((slot): ServiceSlot => {
+    switch (slot.kind) {
+      case 'SONG': {
+        const base = {
+          id: slot.id,
+          kind: 'SONG' as const,
+          position: slot.position,
+          requiredVwType: slot.requiredVwType,
+          songId: slot.songId,
+          songTitle: slot.songTitle,
+          songKey: slot.songKey,
+        }
+        if (!slot.songId) return base
+        const song = songStore.songs.find((s) => s.id === slot.songId)
+        const bpm = song
+          ? (song.arrangements.find((a) => a.key === slot.songKey)?.bpm ?? song.arrangements[0]?.bpm ?? null)
+          : null
+        return { ...base, bpm }
       }
-      return { ...slot, bpm }
+      case 'SCRIPTURE':
+        return {
+          id: slot.id,
+          kind: 'SCRIPTURE',
+          position: slot.position,
+          book: slot.book,
+          chapter: slot.chapter,
+          verseStart: slot.verseStart,
+          verseEnd: slot.verseEnd,
+        }
+      case 'HYMN':
+        return {
+          id: slot.id,
+          kind: 'HYMN',
+          position: slot.position,
+          hymnName: slot.hymnName,
+          hymnNumber: slot.hymnNumber,
+          verses: slot.verses,
+        }
+      case 'IMPORTED':
+        return { id: slot.id, kind: 'IMPORTED', position: slot.position, importId: slot.importId }
+      case 'PRAYER':
+      case 'MESSAGE':
+      case 'ANNOUNCEMENTS':
+      case 'MISC':
+        return {
+          id: slot.id,
+          kind: slot.kind,
+          position: slot.position,
+          ...(slot.kind === 'MISC' && slot.label ? { label: slot.label } : {}),
+        }
     }
-    return slot
-  }) as ServiceSlot[]
+  })
 
   // Who's-serving snapshot (D-04/D-24 PII guard): resolve personId -> name via a
   // Map ONLY — never embed the raw Person object (no email/phone/pcPersonId).
@@ -189,6 +239,22 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     // already reads for its own optional sections.
     ...(stageLayoutElements.length > 0 ? { stageLayout: { elements: stageLayoutElements } } : {}),
   }
+}
+
+/** The subset of `ServiceSnapshot` actually written to a PUBLIC share doc. */
+export type PublicServiceSnapshot = Omit<ServiceSnapshot, 'notes'>
+
+/**
+ * The one function every public write (`writeSharePayload`, shared by
+ * `shareTokens/{token}` and `serviceShares/{slug}...`) must route its
+ * `buildServiceSnapshot()` result through (R346/SEC-S-04). Drops the
+ * service-level free-text `notes` — see the `ServiceSnapshot` type doc for why
+ * `notes` stays on `buildServiceSnapshot`'s own return instead of being cut at
+ * the source.
+ */
+export function toPublicServiceSnapshot(snapshot: ServiceSnapshot): PublicServiceSnapshot {
+  const { notes: _notes, ...publicSnapshot } = snapshot
+  return publicSnapshot
 }
 
 export const useServiceStore = defineStore('services', () => {
@@ -744,7 +810,9 @@ export const useServiceStore = defineStore('services', () => {
    * (Store & Config Behavioral Notes (R318) -> src/stores/services.ts).
    */
   async function writeSharePayload(service: Service, orgIdValue: string, token: string): Promise<void> {
-    const serviceSnapshot = buildServiceSnapshot(service)
+    // R346/SEC-S-04 — route through toPublicServiceSnapshot so free-text
+    // `notes` never reaches either public write below.
+    const serviceSnapshot = toPublicServiceSnapshot(buildServiceSnapshot(service))
 
     await setDoc(doc(db, 'shareTokens', token), {
       serviceId: service.id,
