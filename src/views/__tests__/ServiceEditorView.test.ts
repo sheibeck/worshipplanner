@@ -8110,6 +8110,66 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
     expect(mockUpdateService).not.toHaveBeenCalled()
   })
 
+  // ── R357/ARCH-013: a remote snapshot during an in-flight reorder-save ───────
+  //
+  // The D-15 reorder-save path (onSlotSortEnd) writes immediately: it mutates
+  // `localService.value.slots`, then `await`s `serviceStore.updateService`
+  // before it ever resolves. While that write is in flight, this test pushes
+  // a GENUINELY different remote snapshot (never marked as this client's own
+  // write echo — `mockOwnWriteEchoIds` stays empty) into `serviceStore.services`,
+  // firing the remote-merge watcher mid-save. ARCH-023 found the round-trip
+  // substantially hardened already: the reorder mutation itself also fires the
+  // `useAutoSave` composable's own deep watch on `localService` (independent
+  // of the reorder-save's own direct write), which arms `autoSave.status` to
+  // 'pending' — and the remote-merge watcher only ever merges when status is
+  // idle/saved/(error && !dirty), so a 'pending' status should already block
+  // the merge. This test proves that empirically rather than by inspection.
+  it('a differing remote snapshot arriving during an in-flight reorder-save does not clobber it — no stale overwrite, no lost edit (R357/ARCH-013)', async () => {
+    const reactiveServices = reactive([makeSectionedService()])
+    mockServicesList = reactiveServices as unknown as Service[]
+
+    let resolveUpdate!: () => void
+    const pendingUpdate = new Promise<void>((resolve) => {
+      resolveUpdate = resolve
+    })
+    mockUpdateService.mockImplementationOnce(() => pendingUpdate)
+
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const worshipCapture = captureForSection('worship')
+    if (!worshipCapture) throw new Error('R357 repro: no worship Sortable capture resolved')
+
+    // Worship is [s2, s3, s4] — drag s2 (position 0) to the last position
+    // (same move as the pre-existing "moves an item within its own section"
+    // D-15 test). Fire-and-forget: SortableJS's onEnd is never awaited in
+    // production, and the write is held pending by the mock above.
+    void worshipCapture.options.onEnd!({
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      item: worshipCapture.el.children[0] as HTMLElement,
+      from: worshipCapture.el,
+      to: worshipCapture.el,
+    } as never)
+    await wrapper.vm.$nextTick()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+
+    // While that write is still in flight, a genuinely different remote
+    // snapshot lands — a different editor's change, never our own echo.
+    mockOwnWriteEchoIds = []
+    reactiveServices[0] = { ...makeSectionedService(), sermonTopic: 'a different editor changed this' }
+    await wrapper.vm.$nextTick()
+
+    // Now let the in-flight reorder-save resolve.
+    resolveUpdate()
+    await flushPromises()
+
+    const vm = wrapper.vm as unknown as { localService: { slots: Array<{ id: string }> } }
+    // The user's in-flight reorder must survive — the remote snapshot's
+    // (unreordered) slots must not have clobbered it.
+    expect(vm.localService.slots.map((s) => s.id)).toEqual(['s1', 's3', 's4', 's2', 's5', 's6', 's7', 's8'])
+  })
+
   it('a locked-service rejection reverts local state and returns the entry to idle, not error', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
