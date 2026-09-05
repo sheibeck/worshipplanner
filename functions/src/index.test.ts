@@ -8,28 +8,10 @@ import { getAuth } from "firebase-admin/auth";
 import type { CallableRequest } from "firebase-functions/v2/https";
 import {
   buildUpstreamUrl,
-  cleanupExpiredMediaHandler,
-  cleanupOrphanRendersHandler,
-  cleanupOrphanBackgroundsHandler,
-  cleanupPptxSourcesHandler,
-  BACKGROUND_PATH_GUARD,
-  BACKGROUND_RETENTION_DAYS,
-  readBackgroundRetentionDays,
-  extractBackgroundObjectPath,
-  PPTX_SOURCE_GUARD,
-  PPTX_SOURCE_RETENTION_DAYS,
-  readPptxSourceRetentionDays,
-  sourcePrefixFor,
   createQueuedMessage,
-  MEDIA_PATH_GUARD,
-  ORPHAN_RENDER_STALE_HOURS,
-  readOrphanRenderStaleHours,
   PROXY_TARGETS,
   queueServiceMessageHandler,
   redactUrl,
-  RENDERED_OBJECT_GUARD,
-  RETENTION_DAYS,
-  readMediaRetentionDays,
   SECRET_INJECTED,
   AUTH_REQUIRED,
   parsePptxHandler,
@@ -59,6 +41,26 @@ import {
   previewCleanupDryRunHandler,
 } from "./index";
 import type { QueueMessageRequest, PreviewCleanupDryRunRequest } from "./index";
+import {
+  cleanupExpiredMediaHandler,
+  cleanupOrphanRendersHandler,
+  cleanupOrphanBackgroundsHandler,
+  cleanupPptxSourcesHandler,
+  BACKGROUND_PATH_GUARD,
+  BACKGROUND_RETENTION_DAYS,
+  readBackgroundRetentionDays,
+  extractBackgroundObjectPath,
+  PPTX_SOURCE_GUARD,
+  PPTX_SOURCE_RETENTION_DAYS,
+  readPptxSourceRetentionDays,
+  sourcePrefixFor,
+  MEDIA_PATH_GUARD,
+  ORPHAN_RENDER_STALE_HOURS,
+  readOrphanRenderStaleHours,
+  RENDERED_OBJECT_GUARD,
+  RETENTION_DAYS,
+  readMediaRetentionDays,
+} from "./cleanupSweeps";
 import { parsePptxBuffer } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
 import { getAppConfig, DEFAULT_APP_CONFIG, type AppConfig } from "./appConfig";
@@ -1349,7 +1351,7 @@ describe("cleanupOrphanRendersHandler", () => {
   });
 
   it('★ SOURCE INSPECTION: the dry-run gate direction is pinned against the 2026-07-28 inverted-gate incident (9f1b881)', () => {
-    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const source = readFileSync(path.join(__dirname, "cleanupSweeps.ts"), "utf-8");
     const start = source.indexOf("export async function cleanupOrphanRendersHandler(");
     const wrapperStart = source.indexOf("export const cleanupOrphanRenders = onSchedule(");
     expect(start).toBeGreaterThan(-1);
@@ -1772,7 +1774,7 @@ describe("cleanupOrphanBackgroundsHandler", () => {
   });
 
   it('★ SOURCE INSPECTION: the dry-run gate direction is pinned (cleanup.backgroundEnabled)', () => {
-    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const source = readFileSync(path.join(__dirname, "cleanupSweeps.ts"), "utf-8");
     const start = source.indexOf("export async function cleanupOrphanBackgroundsHandler(");
     const wrapperStart = source.indexOf("export const cleanupOrphanBackgrounds = onSchedule(");
     expect(start).toBeGreaterThan(-1);
@@ -2074,7 +2076,7 @@ describe("cleanupPptxSourcesHandler", () => {
   });
 
   it('★ SOURCE INSPECTION: the dry-run gate direction is pinned (cleanup.pptxSourceEnabled)', () => {
-    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const source = readFileSync(path.join(__dirname, "cleanupSweeps.ts"), "utf-8");
     const start = source.indexOf("export async function cleanupPptxSourcesHandler(");
     const wrapperStart = source.indexOf("export const cleanupPptxSources = onSchedule(");
     expect(start).toBeGreaterThan(-1);
