@@ -4,17 +4,17 @@ milestone: v2.10
 milestone_name: Security & Architecture Hardening (Phases 117-120, in planning)
 current_phase: 120
 current_phase_name: Architecture — God-Module Decomposition
-status: executing
-stopped_at: Completed 120-01-PLAN.md
-last_updated: "2026-09-05T05:19:38.130Z"
+status: verifying
+stopped_at: Completed 120-02-PLAN.md
+last_updated: "2026-09-05T05:30:35.613Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 120 execution started
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 8
-  percent: 75
+  completed_plans: 9
+  percent: 100
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.10 Security & Architecture Hardening (roadmap created 2026-09-04)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and architectural
 reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" — starting with the
@@ -1261,7 +1261,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 120 (Architecture — God-Module Decomposition) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-05 — Phase 120 execution started
 
 ## ★ v2.10 ROADMAP.md phase breakdown (created 2026-09-04)
@@ -3233,6 +3233,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 119 P03 | ~20min | 2 tasks | 6 files |
 | Phase 119 P04 | 35min | 2 tasks | 2 files |
 | Phase 120 P01 | 20min | 2 tasks | 3 files |
+| Phase 120 P02 | 12min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -3775,6 +3776,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R357: wrote the proving regression test for the reorder-save/remote-merge coordination window; it passed on first run against current code, confirming ARCH-023's finding that the window is already safe — no production guard added.
 - [Phase ?]: R358: moved AI sermon-context cache-clear watcher into useAiSongSuggestions composable (not explicitly named in plan) to keep the composable fully self-contained
 - [Phase ?]: R360: documented sanctioned utils->useAuthStore exception in ARCHITECTURE.md per accepted low-risk branch; no src/utils refactor performed
+- [Phase ?]: R359: extracted the four cleanup sweeps into functions/src/cleanupSweeps.ts (import-top/export-bottom pattern); moved shared helper renderedPrefixFor into the new module rather than importing it back from index.ts, to keep the dependency direction one-way and avoid a require() cycle.
 
 ### Roadmap Evolution
 
@@ -4103,8 +4105,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T05:19:38.067Z
-Stopped at: Completed 120-01-PLAN.md
+Last session: 2026-09-05T05:30:35.550Z
+Stopped at: Completed 120-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

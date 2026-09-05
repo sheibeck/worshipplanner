@@ -106,7 +106,7 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
   responsibility is extracted from the monolith into a composable/component (continuing the
   `useAutoSave`/`useSlideshowAssembly` pattern).
 
-- [ ] **R359** (ARCH-010): `functions/src/index.ts` is **decomposed** — at least one of its five inline
+- [x] **R359** (ARCH-010): `functions/src/index.ts` is **decomposed** — at least one of its five inline
   concerns (API proxy, PPTX pipeline, cleanup sweeps, reminder/scheduled-message cron, messaging pipeline)
   is extracted to its own module, matching the sibling `orgProvisioning.ts`/`orgMembershipClaims.ts`
   extraction pattern.
@@ -165,7 +165,7 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 | R356 | Phase 119 | Complete |
 | R357 | Phase 119 | Complete |
 | R358 | Phase 120 | Complete |
-| R359 | Phase 120 | Pending |
+| R359 | Phase 120 | Complete |
 | R360 | Phase 120 | Complete |
 
 *Filled by the roadmapper — each requirement maps to exactly one phase.*
