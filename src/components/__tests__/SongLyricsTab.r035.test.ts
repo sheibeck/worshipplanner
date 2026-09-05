@@ -20,6 +20,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
 import SongSlideOver from '../SongSlideOver.vue'
 import { buildSongEditLink, parseSongEditRequest } from '@/utils/songEditLink'
+import type { SongEditTab } from '@/utils/songEditLink'
 import { parseCCLIPaste } from '@/utils/ccliParser'
 import { normalizeParsedSections } from '@/utils/songSectionOrder'
 import { assembleSlideshow } from '@/utils/slideshowAssembler'
@@ -158,7 +159,7 @@ function makeLyrics(overrides?: Partial<SongLyrics>): SongLyrics {
   }
 }
 
-async function mountDrawer(song: Song, initialTab?: 'details' | 'lyrics') {
+async function mountDrawer(song: Song, initialTab?: SongEditTab) {
   const wrapper = mount(SongSlideOver, {
     props: { open: false, song, initialTab },
   })

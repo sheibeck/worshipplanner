@@ -1,9 +1,9 @@
 /** See ADR-0204 (docs/adr/0204-this-application-has-no-per-song-address-today-songs-is-a-fl.md) */
 
 /** The only tabs `SongSlideOver.vue` actually has. */
-export type SongEditTab = 'details' | 'lyrics'
+export type SongEditTab = 'details' | 'lyrics' | 'files'
 
-const VALID_TABS: readonly SongEditTab[] = ['details', 'lyrics']
+const VALID_TABS: readonly SongEditTab[] = ['details', 'lyrics', 'files']
 
 const SONG_QUERY_KEY = 'edit'
 const TAB_QUERY_KEY = 'tab'

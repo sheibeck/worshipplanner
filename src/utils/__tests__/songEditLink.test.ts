@@ -51,6 +51,12 @@ describe('songEditLink — parseSongEditRequest', () => {
     expect(request).toEqual({ songId: 'song-1' })
     expect(request?.tab).toBeUndefined()
   })
+
+  // 123-03 (R361): the Files tab is a valid arriving-link target too.
+  it('accepts the files tab', () => {
+    const request = parseSongEditRequest({ edit: 'song-1', tab: 'files' })
+    expect(request).toEqual({ songId: 'song-1', tab: 'files' })
+  })
 })
 
 describe('songEditLink — clearSongEditRequest', () => {
