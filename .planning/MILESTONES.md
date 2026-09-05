@@ -1,5 +1,23 @@
 # Milestones
 
+## v2.10 v2.10 (Shipped: 2026-09-05)
+
+**Phases completed:** 4 phases, 9 plans, 23 tasks
+
+**Key accomplishments:**
+
+- Closed the v2.8 security review's four Cloud-Functions-only gaps: authenticated the planningcenter open relay, shared the anthropic per-uid budget with esv/nlt, and added dedicated enqueue/import quotas to queueServiceMessage and parsePptx — all on existing appConfig knobs, no schema or frontend changes.
+- Two real firestore.rules fixes (draft-provenance forgery, orgSlugs/orgNames enumeration) plus two documented-and-pinned accepted residuals (super-admin members-write, admin/editor synonymity), all four regression-proven in the emulator rules suite.
+- Allowlist-shaped public service snapshot (drops free-text notes/slot-body) with a ShareView render-side gate for legacy docs, plus a written re-acceptance of the guessable memorable-share-id residual — no id format change.
+- Per-item failure isolation in the lastUsedAt recompute, writeBatch-chunked + per-song-reported Planning Center import, and a single shared lyrics query eliminating a limit(1) drift.
+- Adds authStore.updateOrgSettings (write+sync in one call) and two new owning stores — useMembersStore (org-scoped) and useSuperAdminsStore (global) — replacing three component-local Firestore write/listener sites with store-owned equivalents.
+- ServicesView now tears down teamsStore locally on org switch; SongLyricEditor and ScriptureSlideEditor reactively re-subscribe/teardown on an org-prop change instead of subscribing once at mount — closing the two lifecycle defense-in-depth gaps ARCH-002/ARCH-003 flagged.
+- Removed reopenPcWarning's unreachable date branch (R352) and proved by regression test that the reorder-save/remote-merge coordination window is already safe with no production change needed (R357).
+- Extracted the AI song-suggestion cluster out of ServiceEditorView.vue into `useAiSongSuggestions.ts` (4606 -> 4409 lines) and documented the sanctioned utils->useAuthStore read as an accepted exception in ARCHITECTURE.md.
+- Moved the four scheduled Storage-retention sweeps (cleanupExpiredMedia, cleanupOrphanRenders, cleanupOrphanBackgrounds, cleanupPptxSources) out of functions/src/index.ts into a new functions/src/cleanupSweeps.ts, wired via the same import-top/export-bottom pattern as orgProvisioning.ts, and closed the re-export trap with a dedicated grep + build + test verification.
+
+---
+
 ## v2.9 Live Presentation Field Fixes (Shipped: 2026-09-04)
 
 **Phases completed:** 3 phases, 11 plans, 25 tasks
