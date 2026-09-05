@@ -4799,6 +4799,21 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
     };
   }
 
+  // IN-02 (117-REVIEW): the esv and nlt branches share one `service === "esv"
+  // || service === "nlt"` code path, but the existing 429/fail-open tests
+  // below only drive /api/esv. Mirror the request shape for nlt so the
+  // reject path is proven directly on that branch too, not just inferred
+  // from identical code.
+  function fakeNltReq() {
+    return {
+      path: "/api/nlt/api/passages",
+      originalUrl: "/api/nlt/api/passages?ref=John+1&version=NLT",
+      method: "GET",
+      headers: { "x-app-auth": "valid-token" },
+      body: undefined,
+    };
+  }
+
   it("WR-03 (102-REVIEW): a disabled org (bibleApiEnabled:false) is denied 403 on esv before fetch", async () => {
     const { db } = mockCombinedDb({ bibleApiEnabled: false });
     vi.mocked(getFirestore).mockReturnValue(db);
@@ -5009,6 +5024,49 @@ describe("api (WR-04: anthropic branch end-to-end wiring)", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  // IN-02 (117-REVIEW): an explicit /api/nlt 429 test, mirroring the esv
+  // MINUTE-ceiling test above, so the nlt branch of the shared
+  // `service === "esv" || service === "nlt"` reject path is proven directly
+  // rather than only inferred from identical esv coverage.
+  it("R340/IN-02: an authenticated /api/nlt caller already at the per-uid MINUTE ceiling gets 429 with the anthropic body shape, and fetch is never called", async () => {
+    const NOW = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const minuteWindow = Math.floor(NOW / 60_000);
+    const seededDoc = { id: `uid1__min__${minuteWindow}`, count: DEFAULT_APP_CONFIG.aiProxy.rateLimitPerMin };
+    const orgGetSpy = vi.fn(async () => ({ exists: true, data: () => ({ bibleApiEnabled: true }) }));
+    const doc = vi.fn((id: string) => ({ id, _docId: id }));
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        get: vi.fn(async (ref: { _docId: string }) =>
+          ref._docId === seededDoc.id
+            ? { exists: true, data: () => ({ count: seededDoc.count }) }
+            : { exists: false, data: () => undefined },
+        ),
+        set: vi.fn(),
+      };
+      return fn(tx);
+    });
+    const collection = vi.fn((name: string) => {
+      if (name === "aiRateLimits") return { doc };
+      if (name === "organizations") return { doc: vi.fn(() => ({ get: orgGetSpy })) };
+      throw new Error(`unexpected collection "${name}"`);
+    });
+    vi.mocked(getFirestore).mockReturnValue({ collection, runTransaction } as never);
+
+    const req = fakeNltReq();
+    const res = fakeRes();
+
+    await api(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "minute", retryAfterSec: 60 }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });
 
