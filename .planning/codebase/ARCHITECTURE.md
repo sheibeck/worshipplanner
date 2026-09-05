@@ -113,6 +113,12 @@
 - Contains: `planningCenterApi.ts`, `claudeApi.ts`, `pcSongImport.ts`, `scheduler.ts`, etc.
 - Depends on: Types, Firebase (via stores)
 - Used by: Views, components, stores
+- **Sanctioned exception (ARCH-020/R360):** `claudeApi.ts` (`isAiEnabled`), `messaging.ts`
+  (`isMessagingEnabled`), and `scriptureApi.ts` each call `useAuthStore()` directly to read a
+  read-only boolean settings gate, inverting the utils-called-by-stores direction above. This is
+  accepted as-is rather than refactored to a pass-in parameter: the reads are read-only (never a
+  mutation), carry no correctness or data-integrity risk, and cannot cause a circular-import
+  failure — Pinia stores are legitimately callable from anywhere once `createPinia()` is installed.
 
 **Type Layer:**
 - Purpose: Shared TypeScript domain models (Song, Service, Arrangement, etc.)
