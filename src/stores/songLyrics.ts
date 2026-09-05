@@ -16,6 +16,20 @@ import {
 import { db } from '@/firebase'
 import type { SongLyrics } from '@/types/songLyrics'
 
+/**
+ * R351/ARCH-009 — the ONE query both callers must share: the org-scoped
+ * lyrics subcollection for `songId`, newest-createdAt-first, no `limit`.
+ * `subscribeLyrics` below and `useSlideshowAssembly`'s `defaultLyricsSubscriber`
+ * both build their listener from this function so neither can drift from the
+ * other (the drift this fixes: the composable used to add its own `limit(1)`).
+ */
+export function lyricsQuery(orgId: string, songId: string) {
+  return query(
+    collection(db, 'organizations', orgId, 'songs', songId, 'lyrics'),
+    orderBy('createdAt', 'desc'),
+  )
+}
+
 export const useSongLyricsStore = defineStore('songLyrics', () => {
   const lyrics = ref<SongLyrics[]>([])
   const isLoading = ref(true)
@@ -39,10 +53,7 @@ export const useSongLyricsStore = defineStore('songLyrics', () => {
       unsubscribeFn()
     }
     isLoading.value = true
-    const q = query(
-      collection(db, 'organizations', orgId, 'songs', songId, 'lyrics'),
-      orderBy('createdAt', 'desc'),
-    )
+    const q = lyricsQuery(orgId, songId)
     unsubscribeFn = onSnapshot(q, (snap) => {
       lyrics.value = snap.docs.map((d) => {
         const data = d.data() as Record<string, unknown>

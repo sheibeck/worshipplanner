@@ -117,6 +117,44 @@ describe('useSongLyricsStore', () => {
     })
   })
 
+  // R351/ARCH-009 — lyricsQuery is the ONE shared query builder subscribeLyrics
+  // AND useSlideshowAssembly's defaultLyricsSubscriber must both route through,
+  // so neither can drift from the other (the drift this fixes: the composable
+  // used to add its own `limit(1)`, unlike this store).
+  describe('lyricsQuery (shared query builder)', () => {
+    it('builds the org-scoped lyrics subcollection query, ordered createdAt desc, with no limit', async () => {
+      const { collection, orderBy } = await import('firebase/firestore')
+      const { lyricsQuery } = await import('../songLyrics')
+
+      lyricsQuery('org-1', 'song-1')
+
+      expect(collection).toHaveBeenCalledWith(
+        expect.anything(),
+        'organizations',
+        'org-1',
+        'songs',
+        'song-1',
+        'lyrics',
+      )
+      expect(orderBy).toHaveBeenCalledWith('createdAt', 'desc')
+      // This file's firebase/firestore mock has no `limit` export at all — a
+      // stray `limit(...)` call inside lyricsQuery would throw "limit is not
+      // a function" and fail this test before reaching this line, which is
+      // what pins down "no limit(1) drift" for this module.
+    })
+
+    it('subscribeLyrics builds its query via the shared lyricsQuery, not a bespoke inline one', async () => {
+      const { query, orderBy } = await import('firebase/firestore')
+      const { useSongLyricsStore } = await import('../songLyrics')
+      const store = useSongLyricsStore()
+
+      store.subscribeLyrics('org-1', 'song-1')
+
+      expect(query).toHaveBeenCalled()
+      expect(orderBy).toHaveBeenCalledWith('createdAt', 'desc')
+    })
+  })
+
   describe('subscribeLyrics', () => {
     it('calls onSnapshot on the lyrics subcollection', async () => {
       const { onSnapshot } = await import('firebase/firestore')

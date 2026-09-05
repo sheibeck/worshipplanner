@@ -1,11 +1,11 @@
 // See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/composables/useSlideshowAssembly.ts). See also .planning/codebase/STACK.md (same section) for the R006 reactivity contract.
 import { ref, reactive, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
-import { db } from '@/firebase'
+import { onSnapshot } from 'firebase/firestore'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
 import { useImportedSlides } from '@/stores/importedSlides'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { usePptxRenders } from '@/stores/pptxRenders'
+import { lyricsQuery } from '@/stores/songLyrics'
 import { resolveImageUrl } from '@/utils/pptxUpload'
 import { renderedPagePath } from '@/utils/renderedPagePaths'
 import { assembleSlideshow, type AssemblyInputs } from '@/utils/slideshowAssembler'
@@ -29,21 +29,20 @@ export type LyricsSubscriber = (
  * Default lyrics subscriber — a LIVE `onSnapshot` listener (replacing the
  * pre-existing one-shot `getDocs` cache, which only re-fetched when a new
  * distinct songId appeared and so left content/structure edits stale until a
- * full remount) against organizations/{orgId}/songs/{songId}/lyrics ordered
- * createdAt desc, limit 1 — newest-doc-wins, mirroring `songLyrics` store's
- * `subscribeLyrics`. Missing `performanceOrder` defaults to `[]`, same as the
- * store and the old loader.
+ * full remount) against organizations/{orgId}/songs/{songId}/lyrics.
+ * R351/ARCH-009 — routes through the SAME `lyricsQuery()` the `songLyrics`
+ * store's `subscribeLyrics` uses (no `limit`, unlike this file's old inline
+ * `limit(1)`); newest-doc-wins is derived client-side via `snap.docs[0]`
+ * instead, which is byte-identical to what `limit(1)` used to return since
+ * both queries share the same `orderBy('createdAt','desc')`. Missing
+ * `performanceOrder` defaults to `[]`, same as the store and the old loader.
  */
 function defaultLyricsSubscriber(
   orgId: string,
   songId: string,
   onUpdate: (lyrics: SongLyrics | null) => void,
 ): LyricsUnsubscribe {
-  const q = query(
-    collection(db, 'organizations', orgId, 'songs', songId, 'lyrics'),
-    orderBy('createdAt', 'desc'),
-    limit(1),
-  )
+  const q = lyricsQuery(orgId, songId)
   return onSnapshot(q, (snap) => {
     if (snap.empty) {
       onUpdate(null)

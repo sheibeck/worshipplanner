@@ -156,6 +156,31 @@ vi.mock('@/utils/pptxUpload', async (importActual) => {
   }
 })
 
+// --- R351/ARCH-009: proves defaultLyricsSubscriber shares songLyrics store's
+// lyricsQuery (no bespoke inline query, no limit(1) drift) ---
+//
+// Every OTHER test in this file always injects `lyricsSubscriber:
+// fakeLyricsSubscriber`, so the real `defaultLyricsSubscriber` (and hence
+// `onSnapshot`/`lyricsQuery`) is never exercised elsewhere — mocking these two
+// seams here is scoped to exactly the describe block below that omits the
+// injection option.
+const mockOnSnapshot = vi.hoisted(() => vi.fn())
+const mockLyricsQuery = vi.hoisted(() =>
+  vi.fn((orgId: string, songId: string) => ({ __sentinel: 'lyricsQuery', orgId, songId })),
+)
+
+vi.mock('firebase/firestore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('firebase/firestore')>()
+  return {
+    ...actual,
+    onSnapshot: mockOnSnapshot,
+  }
+})
+
+vi.mock('@/stores/songLyrics', () => ({
+  lyricsQuery: mockLyricsQuery,
+}))
+
 // Every call site below invokes the composable directly (not through a
 // mounted component), so a lifecycle hook that only registers against a live
 // component instance (`onUnmounted`) would be a silent no-op here (Vue warns
@@ -1939,6 +1964,86 @@ describe('useSlideshowAssembly', () => {
       // group (it does NOT silently derive-in-memory like the locked path).
       expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
       expect(mockReplaceGroupSlides.mock.calls[0]![1]).toBe('slot-song-editable')
+    })
+  })
+
+  // R351/ARCH-009: the DEFAULT lyrics subscriber (no lyricsSubscriber option
+  // injected) must build its query via the SAME lyricsQuery() the songLyrics
+  // store's subscribeLyrics uses, with no bespoke limit(1) of its own.
+  describe('defaultLyricsSubscriber shares songLyricsStore.lyricsQuery (R351/ARCH-009)', () => {
+    function lyricsDocData(overrides: Partial<{ sections: unknown[]; performanceOrder: string[] }> = {}) {
+      return {
+        sections: [{ id: 'v1', label: 'Verse 1', lines: ['default line'] }],
+        copyright: { title: 'T', authors: [], ccliSongNumber: '', copyrightLines: [], ccliLicenseNumber: '' },
+        performanceOrder: ['v1'],
+        createdAt: {} as never,
+        updatedAt: {} as never,
+        ...overrides,
+      }
+    }
+
+    beforeEach(() => {
+      mockOnSnapshot.mockReset()
+      mockLyricsQuery.mockClear()
+    })
+
+    it('builds its query via the shared lyricsQuery (not a bespoke inline query), and resolves the newest doc client-side via docs[0] with no limit', async () => {
+      songsState.songs = [{ id: 'song-x' } as Song]
+
+      let capturedCallback:
+        | ((snap: { empty: boolean; docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => void)
+        | undefined
+      mockOnSnapshot.mockImplementation((_q: unknown, callback: typeof capturedCallback) => {
+        capturedCallback = callback
+        return () => {}
+      })
+
+      const service = ref<Service | null>(makeService([songSlot({ position: 0, songId: 'song-x' })]))
+      const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      // The default subscriber must call through the SHARED lyricsQuery —
+      // never build its own inline query() / orderBy() / limit(1).
+      expect(mockLyricsQuery).toHaveBeenCalledWith('org-1', 'song-x')
+      expect(mockOnSnapshot).toHaveBeenCalledOnce()
+      const queryArgPassedToOnSnapshot = mockOnSnapshot.mock.calls[0]![0]
+      expect(queryArgPassedToOnSnapshot).toEqual({ __sentinel: 'lyricsQuery', orgId: 'org-1', songId: 'song-x' })
+
+      // Newest-createdAt-wins is preserved: a multi-doc snapshot (already
+      // ordered createdAt desc, since that's lyricsQuery's contract) resolves
+      // to docs[0] client-side — the query itself carries no `limit`.
+      capturedCallback!({
+        empty: false,
+        docs: [
+          { id: 'lyrics-newest', data: () => lyricsDocData({ sections: [{ id: 'v1', label: 'Verse 1', lines: ['newest line'] }] }) },
+          { id: 'lyrics-older', data: () => lyricsDocData({ sections: [{ id: 'v1', label: 'Verse 1', lines: ['older line'] }] }) },
+        ],
+      })
+      await nextTick()
+
+      const lyricLines = assembledSlideshow.value
+        .filter((s) => 'lines' in s.slide)
+        .flatMap((s) => (s.slide as { lines: string[] }).lines)
+      expect(lyricLines).toContain('newest line')
+      expect(lyricLines).not.toContain('older line')
+    })
+
+    it('an empty snapshot resolves to null (no lyrics for this song)', async () => {
+      songsState.songs = [{ id: 'song-y' } as Song]
+
+      let capturedCallback:
+        | ((snap: { empty: boolean; docs: Array<{ id: string; data: () => Record<string, unknown> }> }) => void)
+        | undefined
+      mockOnSnapshot.mockImplementation((_q: unknown, callback: typeof capturedCallback) => {
+        capturedCallback = callback
+        return () => {}
+      })
+
+      const service = ref<Service | null>(makeService([songSlot({ position: 0, songId: 'song-y' })]))
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      expect(() => capturedCallback!({ empty: true, docs: [] })).not.toThrow()
     })
   })
 })

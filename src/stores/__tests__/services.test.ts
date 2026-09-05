@@ -2409,7 +2409,7 @@ describe('useServiceStore', () => {
       ])
 
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      mockUpdateSong.mockImplementation((songId: unknown) =>
+      mockUpdateSong.mockImplementation((songId?: unknown) =>
         songId === 'song-b' ? Promise.reject(new Error('write failed')) : Promise.resolve(),
       )
 
