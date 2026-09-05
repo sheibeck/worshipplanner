@@ -5930,6 +5930,26 @@ describe('ServiceEditorView - service lifecycle transitions (R036, R037)', () =>
     expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Exported')
   })
 
+  // R352/ARCH-012: `reopenPcWarning` used to carry an unreachable dated
+  // branch — every `localService` assignment site round-trips through
+  // JSON.parse(JSON.stringify(...)), which strips the Firestore Timestamp
+  // to a plain object with no `.toDate()`, so the guard was always false.
+  // `PC_EVIDENCE.pcExportedAt` here is a live `Timestamp`-shaped stub (has a
+  // real `.toDate()`) precisely so this test would have failed loudly had
+  // the branch still been reachable and rendering a date.
+  it('the PC warning is the accurate no-date sentence, exact match — no unreachable date branch (R352/ARCH-012)', async () => {
+    mockServicesList = [{ ...mockService, status: 'exported', ...PC_EVIDENCE }]
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(body().find('[data-testid="reopen-confirm-pc-warning"]').text()).toBe(
+      'This service was exported to Planning Center. That plan is still there — reopening here does not change or remove it.',
+    )
+  })
+
   it('the reopen confirm transitions only once its confirm button is pressed', async () => {
     mockServicesList = [{ ...mockService, status: 'exported', ...PC_EVIDENCE }]
     const wrapper = await mountView()

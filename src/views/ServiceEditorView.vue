@@ -2191,22 +2191,16 @@ const lockBannerBody = computed(() =>
     : 'Reopen it for editing to change the order, slides or roles.',
 )
 
-/** Same locale/option shape as `formattedDate`, minus `weekday`. */
-const reopenPcWarning = computed(() => {
-  const exportedAt = localService.value?.pcExportedAt
-  const toDate = (exportedAt as { toDate?: () => Date } | null | undefined)?.toDate
-  const when = typeof toDate === 'function' ? toDate.call(exportedAt) : null
-  if (when) {
-    const formatted = when.toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    return `This service was exported to Planning Center on ${formatted}. That plan is still there — reopening here does not change or remove it.`
-  }
-  // pcPlanId present but no usable pcExportedAt — same sentence, no date clause.
-  return 'This service was exported to Planning Center. That plan is still there — reopening here does not change or remove it.'
-})
+// R352/ARCH-012: the dated branch this computed used to have was unreachable
+// — every `localService` assignment site round-trips through
+// `JSON.parse(JSON.stringify(...))`, which strips `pcExportedAt`'s Firestore
+// `Timestamp` to a plain object with no `.toDate()`. Removed rather than
+// fixing the clone: that idiom is load-bearing across seven sites and gates
+// the autosave dirty-check (ARCH-023), so leave it untouched.
+const reopenPcWarning = computed(
+  () =>
+    'This service was exported to Planning Center. That plan is still there — reopening here does not change or remove it.',
+)
 
 // ── Sections (D005/R007/R043/R044) + live slideshow assembly (R005/R006 visible) ─
 
