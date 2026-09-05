@@ -124,18 +124,18 @@
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </button>
-              <a
+              <button
                 v-if="a.kind !== 'link'"
-                :href="a.downloadUrl"
-                download
+                type="button"
                 :aria-label="`Download ${a.name}`"
                 data-testid="song-file-download"
                 class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+                @click="downloadAttachment(a)"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
-              </a>
+              </button>
               <a
                 v-else
                 :href="a.href"
@@ -154,7 +154,7 @@
                 :aria-label="`Remove ${a.name}`"
                 data-testid="song-file-remove"
                 class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-red-400"
-                @click="confirmingId = confirmingId === a.id ? null : a.id"
+                @click="openConfirm(a)"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -177,7 +177,7 @@
                 type="button"
                 class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
                 data-testid="song-file-remove-cancel"
-                @click="confirmingId = null"
+                @click="cancelRemove"
               >
                 Cancel
               </button>
@@ -191,6 +191,13 @@
                 {{ removingId === a.id ? 'Removing…' : 'Remove' }}
               </button>
             </div>
+            <p
+              v-if="removeError && removeError.id === a.id"
+              class="text-xs text-red-400 mt-2"
+              data-testid="song-file-remove-error"
+            >
+              {{ removeError.message }}
+            </p>
           </div>
         </template>
       </div>
@@ -241,23 +248,23 @@
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
                 </svg>
               </button>
-              <a
-                :href="a.downloadUrl"
-                download
+              <button
+                type="button"
                 :aria-label="`Download ${a.name}`"
                 data-testid="song-file-download"
                 class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+                @click="downloadAttachment(a)"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
-              </a>
+              </button>
               <button
                 type="button"
                 :aria-label="`Remove ${a.name}`"
                 data-testid="song-file-remove"
                 class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-red-400"
-                @click="confirmingId = confirmingId === a.id ? null : a.id"
+                @click="openConfirm(a)"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -279,12 +286,12 @@
             data-testid="song-file-audio-error"
           >
             Couldn't play this file.
-            <a
-              :href="a.downloadUrl"
-              download
+            <button
+              type="button"
               class="underline"
               data-testid="song-file-audio-error-download"
-            >Download</a>
+              @click="downloadAttachment(a)"
+            >Download</button>
           </p>
           <div
             v-if="confirmingId === a.id"
@@ -301,7 +308,7 @@
                 type="button"
                 class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
                 data-testid="song-file-remove-cancel"
-                @click="confirmingId = null"
+                @click="cancelRemove"
               >
                 Cancel
               </button>
@@ -315,6 +322,13 @@
                 {{ removingId === a.id ? 'Removing…' : 'Remove' }}
               </button>
             </div>
+            <p
+              v-if="removeError && removeError.id === a.id"
+              class="text-xs text-red-400 mt-2"
+              data-testid="song-file-remove-error"
+            >
+              {{ removeError.message }}
+            </p>
           </div>
         </template>
       </div>
@@ -385,17 +399,65 @@ function onFileInputChange(e: Event) {
 // time — clicking a different row's trash collapses the first.
 const confirmingId = ref<string | null>(null)
 const removingId = ref<string | null>(null)
+// 124-REVIEW WR-03: the Firestore half of removeSongAttachment now throws on
+// failure (songs.ts) instead of the rejection silently reaching nowhere —
+// surface it inline near the confirm card so a failed Remove doesn't look
+// identical to a successful one (Remove is framed as "can't be undone").
+const removeError = ref<{ id: string; message: string } | null>(null)
+
+function openConfirm(a: SongAttachment) {
+  confirmingId.value = confirmingId.value === a.id ? null : a.id
+  removeError.value = null
+}
+
+function cancelRemove() {
+  confirmingId.value = null
+  removeError.value = null
+}
 
 async function confirmRemove(a: SongAttachment) {
   removingId.value = a.id
+  removeError.value = null
   try {
     // Do NOT mutate props.attachments — the row and the Files count
     // disappear live because SongSlideOver's liveAttachments/filesCount
     // recompute off songStore.songs once this write lands via onSnapshot.
     await songStore.removeSongAttachment(props.songId, a)
+    confirmingId.value = null
+  } catch (err) {
+    console.error('confirmRemove: removeSongAttachment failed', err)
+    // Keep the confirm card open (do NOT reset confirmingId) so the error
+    // has somewhere to render and the user can retry without reopening it.
+    removeError.value = { id: a.id, message: "Couldn't remove this file. Try again." }
   } finally {
     removingId.value = null
-    confirmingId.value = null
+  }
+}
+
+// 124-REVIEW FIX A (user-reported bug): Firebase Storage download URLs are
+// cross-origin, so a plain `<a :href download>`'s `download` attribute is
+// IGNORED and, with no `target`, the browser navigates the whole SPA away to
+// render/play the file inline instead of prompting a Save dialog. Fetching
+// the bytes and pointing `download` at a same-origin blob: URL makes the
+// attribute honored. A reliable cross-origin Save dialog still depends on
+// the Storage bucket's CORS config allowing this app's origin — if fetch
+// fails (CORS/network), fall back to opening in a new tab rather than ever
+// navigating the SPA away.
+async function downloadAttachment(a: SongAttachment) {
+  try {
+    const res = await fetch(a.downloadUrl!)
+    if (!res.ok) throw new Error(String(res.status))
+    const blob = await res.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = a.name
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(objectUrl)
+  } catch {
+    window.open(a.downloadUrl, '_blank', 'noopener,noreferrer')
   }
 }
 
@@ -451,7 +513,10 @@ const LINK_SOURCE_LABELS: Record<NonNullable<SongAttachment['linkSource']>, stri
 }
 
 function formatSize(bytes?: number): string {
-  if (!bytes) return ''
+  // IN-02: `bytes == null` (not a truthiness check) so a genuine 0-byte file
+  // still renders "0.0 MB" instead of being treated as unknown size — `0` is
+  // falsy but is a real, known size.
+  if (bytes == null) return ''
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
@@ -475,7 +540,9 @@ function metaLine(a: SongAttachment): string {
     const source = LINK_SOURCE_LABELS[a.linkSource ?? 'other']
     return [source, date].filter(Boolean).join(' · ')
   }
-  const typeLabel = a.kind === 'document' || a.kind === 'audio' ? TYPE_LABELS[a.kind] : ''
+  // IN-03: the 'link' branch already returned above, so `a.kind` here is
+  // narrowed to 'document' | 'audio' — no ternary/defensive `: ''` branch needed.
+  const typeLabel = TYPE_LABELS[a.kind]
   const size = formatSize(a.sizeBytes)
   return [typeLabel, size, date].filter(Boolean).join(' · ')
 }

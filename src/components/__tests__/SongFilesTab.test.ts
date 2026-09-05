@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import SongFilesTab from '../SongFilesTab.vue'
@@ -177,7 +177,7 @@ describe('SongFilesTab', () => {
     expect(wrapper.find('[data-testid="song-files-link-error"]').exists()).toBe(false)
   })
 
-  it('renders a document row grouped under Documents with graceful metadata and a Download action targeting downloadUrl', () => {
+  it('renders a document row grouped under Documents with graceful metadata and a Download action', () => {
     const doc = makeAttachment({
       id: 'doc-1',
       kind: 'document',
@@ -194,7 +194,10 @@ describe('SongFilesTab', () => {
     expect(row.find('[data-testid="song-file-meta"]').text()).toBe('PDF · 2.4 MB · Sep 5, 2026')
     const download = row.find('[data-testid="song-file-download"]')
     expect(download.exists()).toBe(true)
-    expect(download.attributes('href')).toBe('https://cdn.example.com/chart.pdf')
+    // FIX A: a <button>, not an <a href download> — see the dedicated
+    // "Download action" describe block below for why (cross-origin Storage
+    // URLs make the HTML download attribute a no-op).
+    expect(download.element.tagName).toBe('BUTTON')
     expect(download.attributes('aria-label')).toBe('Download chart.pdf')
     expect(row.find('[data-testid="song-file-open-link"]').exists()).toBe(false)
   })
@@ -244,7 +247,7 @@ describe('SongFilesTab', () => {
     expect(row.find('[data-testid="song-file-meta"]').text()).toBe('MP3 · 5.1 MB · Sep 5, 2026')
     const download = row.find('[data-testid="song-file-download"]')
     expect(download.exists()).toBe(true)
-    expect(download.attributes('href')).toBe('https://cdn.example.com/demo.mp3')
+    expect(download.element.tagName).toBe('BUTTON')
     expect(download.attributes('aria-label')).toBe('Download demo.mp3')
   })
 
@@ -392,6 +395,24 @@ describe('SongFilesTab', () => {
       expect(removeSpy).toHaveBeenCalledWith('song-1', doc)
     })
 
+    it('WR-03: a rejected removeSongAttachment shows an inline error and keeps the confirm card open (no silent failure)', async () => {
+      const removeSpy = vi.spyOn(useSongStore(), 'removeSongAttachment').mockRejectedValue(new Error('permission-denied'))
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf' })
+      const wrapper = mountTab([doc])
+
+      await wrapper.find('[data-testid="song-file-remove"]').trigger('click')
+      await wrapper.find('[data-testid="song-file-remove-confirm-button"]').trigger('click')
+      await flushPromises()
+
+      expect(removeSpy).toHaveBeenCalledTimes(1)
+      expect(wrapper.find('[data-testid="song-file-remove-confirm"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="song-file-remove-error"]').text()).toContain("Couldn't remove")
+      expect(consoleErrorSpy).toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
+
     it('a link row\'s Remove also calls removeSongAttachment', async () => {
       const removeSpy = vi.spyOn(useSongStore(), 'removeSongAttachment').mockResolvedValue(undefined)
       const link = makeAttachment({
@@ -498,7 +519,7 @@ describe('SongFilesTab', () => {
       expect(wrapper.find('[data-testid="song-file-audio-error"]').text()).toContain("Couldn't play this file.")
       const fallback = wrapper.find('[data-testid="song-file-audio-error-download"]')
       expect(fallback.exists()).toBe(true)
-      expect(fallback.attributes('href')).toBe('https://cdn.example.com/demo.mp3')
+      expect(fallback.element.tagName).toBe('BUTTON')
     })
 
     it('a link row exposes neither Preview nor Play', () => {
@@ -533,6 +554,54 @@ describe('SongFilesTab', () => {
       const row = wrapper.find('[data-testid="song-file-row-track-1"]')
       expect(row.find('[data-testid="song-file-play"]').exists()).toBe(true)
       expect(row.find('[data-testid="song-file-preview"]').exists()).toBe(false)
+    })
+  })
+
+  describe('FIX A: Download uses fetch+blob, never a same-window navigation', () => {
+    // Firebase Storage download URLs are cross-origin, so a plain
+    // <a :href download> silently ignores `download` and, with no target,
+    // navigates the whole SPA away to render/play the file inline — the
+    // reported bug. downloadAttachment() fetches the bytes and clicks a
+    // same-origin blob: <a download>, which the browser DOES honor.
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('clicking Download fetches the file and clicks a same-origin blob download link', async () => {
+      const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf', downloadUrl: 'https://cdn.example.com/chart.pdf' })
+      const fetchMock = vi.fn(() =>
+        Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob(['x'])) } as Response),
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      const createObjectURLSpy = vi.fn(() => 'blob:mock-url')
+      const revokeObjectURLSpy = vi.fn()
+      vi.stubGlobal('URL', { ...URL, createObjectURL: createObjectURLSpy, revokeObjectURL: revokeObjectURLSpy })
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+      const wrapper = mountTab([doc])
+      await wrapper.find('[data-testid="song-file-download"]').trigger('click')
+      await flushPromises()
+
+      expect(fetchMock).toHaveBeenCalledWith('https://cdn.example.com/chart.pdf')
+      expect(createObjectURLSpy).toHaveBeenCalled()
+      expect(clickSpy).toHaveBeenCalled()
+      expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:mock-url')
+
+      clickSpy.mockRestore()
+    })
+
+    it('falls back to opening a new tab (never navigating the SPA away) when fetch fails', async () => {
+      const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf', downloadUrl: 'https://cdn.example.com/chart.pdf' })
+      vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('CORS'))))
+      const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+
+      const wrapper = mountTab([doc])
+      await wrapper.find('[data-testid="song-file-download"]').trigger('click')
+      await flushPromises()
+
+      expect(openSpy).toHaveBeenCalledWith('https://cdn.example.com/chart.pdf', '_blank', 'noopener,noreferrer')
+
+      openSpy.mockRestore()
     })
   })
 })
