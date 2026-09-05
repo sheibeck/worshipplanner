@@ -32,7 +32,7 @@
     <p v-if="grantedFeedback" class="text-green-400 text-sm mt-2">Granted super-admin to {{ grantedFeedback }}!</p>
 
     <!-- Loading state -->
-    <div v-if="!loaded" class="text-sm text-gray-400 py-8 text-center">
+    <div v-if="!superAdminsStore.loaded" class="text-sm text-gray-400 py-8 text-center">
       Loading roster...
     </div>
 
@@ -48,7 +48,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-800">
-            <tr v-for="admin in superAdmins" :key="admin.uid" class="hover:bg-gray-800/20 transition-colors">
+            <tr v-for="admin in superAdminsStore.superAdmins" :key="admin.uid" class="hover:bg-gray-800/20 transition-colors">
               <td class="px-4 py-3 text-gray-200">{{ admin.email }}</td>
               <td class="px-4 py-3 text-gray-400 text-sm">{{ formatDate(admin.grantedAt) }}</td>
               <td class="px-4 py-3">
@@ -83,7 +83,7 @@
             </tr>
 
             <!-- Empty state -->
-            <tr v-if="superAdmins.length === 0">
+            <tr v-if="superAdminsStore.superAdmins.length === 0">
               <td colspan="3" class="px-4 py-8 text-center text-sm text-gray-500">
                 No super-admins yet. Grant one above.
               </td>
@@ -133,24 +133,17 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { collection, onSnapshot, type Unsubscribe } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
-import { db, functions } from '@/firebase'
+import { functions } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useAppConfigStore } from '@/stores/appConfig'
-import { isPermissionDenied } from '@/utils/firestoreListener'
+import { useSuperAdminsStore } from '@/stores/superAdmins'
+import type { SuperAdminEntry } from '@/stores/superAdmins'
 import CleanupConfigCard from '@/components/admin/CleanupConfigCard.vue'
 import AiProxyConfigCard from '@/components/admin/AiProxyConfigCard.vue'
 import MessagingConfigCard from '@/components/admin/MessagingConfigCard.vue'
 import OnboardingConfigCard from '@/components/admin/OnboardingConfigCard.vue'
 import SenderConfigCard from '@/components/admin/SenderConfigCard.vue'
-
-interface SuperAdminEntry {
-  uid: string
-  email: string
-  grantedBy?: string
-  grantedAt: { toDate?: () => Date } | null
-}
 
 interface SetSuperAdminClaimRequest {
   targetEmail: string
@@ -163,12 +156,7 @@ interface SetSuperAdminClaimResponse {
 
 const authStore = useAuthStore()
 const appConfigStore = useAppConfigStore()
-
-// ── Data state ─────────────────────────────────────────────────────────────────
-
-const superAdmins = ref<SuperAdminEntry[]>([])
-const loaded = ref(false)
-let superAdminsUnsub: Unsubscribe | null = null
+const superAdminsStore = useSuperAdminsStore()
 
 // ── Grant form state ───────────────────────────────────────────────────────────
 
@@ -290,28 +278,10 @@ async function onConfirmRevoke(admin: SuperAdminEntry) {
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 
 onMounted(() => {
+  // R356/ARCH-008 — the roster listener now lives in useSuperAdminsStore.
   // Rules-gated (Plan 03's isSuperAdmin() rule) — a non-super-admin session
   // cannot subscribe successfully even if it somehow reached this view.
-  superAdminsUnsub = onSnapshot(
-    collection(db, 'superAdmins'),
-    (snap) => {
-      superAdmins.value = snap.docs.map((d) => ({
-        uid: d.id,
-        ...(d.data() as Omit<SuperAdminEntry, 'uid'>),
-      }))
-      loaded.value = true
-    },
-    (err) => {
-      // Bug 2b (quick 260830-l9c) — a super-admin's own logout can hit this
-      // handler with a benign permission-denied once the token is revoked;
-      // suppress ONLY the console.error for that code, state-setting below
-      // stays unchanged for a genuine error.
-      if (!isPermissionDenied(err)) {
-        console.error('[ConfigurationTab] roster subscription error:', err)
-      }
-      loaded.value = true
-    },
-  )
+  superAdminsStore.subscribe()
 
   // Platform configuration (Phase 70) — separate subscription, does not
   // disturb the roster subscription above.
@@ -319,7 +289,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  superAdminsUnsub?.()
+  superAdminsStore.unsubscribe()
   appConfigStore.unsubscribe()
 })
 </script>
