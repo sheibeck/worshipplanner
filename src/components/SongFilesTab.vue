@@ -83,57 +83,104 @@
       </div>
     </div>
 
-    <!-- Functional attachment list — simple rows, no preview/play/download/remove (Phase 124). -->
-    <div v-if="attachments.length > 0" class="space-y-2" data-testid="song-files-attachment-list">
-      <template v-for="a in attachments" :key="a.id">
-        <a
-          v-if="a.kind === 'link'"
-          :href="a.href"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="flex items-center gap-2 px-3 py-3 rounded-md bg-gray-800/60 border border-gray-800 hover:bg-gray-800"
-          :data-testid="`song-file-row-${a.id}`"
-        >
-          <span class="text-sm text-gray-100 truncate" :title="a.name">{{ a.name }}</span>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-          </svg>
-        </a>
+    <!-- Documents / Audio grouped rows (R366) — two ALWAYS-rendered groups per
+         121-UI-SPEC §6/7. Documents folds in link-kind rows by default (§4:
+         a generic link's type can't be inferred, so it defaults into
+         Documents rather than a third "Links" sub-group). -->
+    <div class="space-y-2" data-testid="song-files-group-documents">
+      <div class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+        </svg>
+        <h3 class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Documents</h3>
+      </div>
+      <p v-if="documents.length === 0" class="text-xs text-gray-500 py-2" data-testid="song-files-documents-empty">
+        No documents attached yet.
+      </p>
+      <div v-else class="space-y-2">
         <div
-          v-else
+          v-for="a in documents"
+          :key="a.id"
           class="flex items-center gap-3 px-3 py-3 rounded-md bg-gray-800/60 border border-gray-800"
           :data-testid="`song-file-row-${a.id}`"
         >
-          <svg
-            v-if="a.kind === 'document'"
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-gray-400 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-            aria-hidden="true"
-          >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
           </svg>
-          <svg
-            v-else
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 text-gray-400 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="2"
-            aria-hidden="true"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
-          </svg>
-          <div class="min-w-0">
+          <div class="min-w-0 flex-1">
             <p class="text-sm text-gray-100 truncate" :title="a.name">{{ a.name }}</p>
-            <p class="text-xs text-gray-500">{{ metaLine(a) }}</p>
+            <p class="text-xs text-gray-500" data-testid="song-file-meta">{{ metaLine(a) }}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <a
+              v-if="a.kind !== 'link'"
+              :href="a.downloadUrl"
+              download
+              :aria-label="`Download ${a.name}`"
+              data-testid="song-file-download"
+              class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            </a>
+            <a
+              v-else
+              :href="a.href"
+              target="_blank"
+              rel="noopener noreferrer"
+              :aria-label="`Open ${a.name} in a new tab`"
+              data-testid="song-file-open-link"
+              class="p-1 rounded hover:bg-gray-700 text-gray-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+              </svg>
+            </a>
           </div>
         </div>
-      </template>
+      </div>
+    </div>
+
+    <div class="space-y-2" data-testid="song-files-group-audio">
+      <div class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
+        </svg>
+        <h3 class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Audio</h3>
+      </div>
+      <p v-if="audio.length === 0" class="text-xs text-gray-500 py-2" data-testid="song-files-audio-empty">
+        No audio files attached yet.
+      </p>
+      <div v-else class="space-y-2">
+        <div
+          v-for="a in audio"
+          :key="a.id"
+          class="flex items-center gap-3 px-3 py-3 rounded-md bg-gray-800/60 border border-gray-800"
+          :data-testid="`song-file-row-${a.id}`"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
+          </svg>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm text-gray-100 truncate" :title="a.name">{{ a.name }}</p>
+            <p class="text-xs text-gray-500" data-testid="song-file-meta">{{ metaLine(a) }}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <a
+              :href="a.downloadUrl"
+              download
+              :aria-label="`Download ${a.name}`"
+              data-testid="song-file-download"
+              class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -213,16 +260,51 @@ const TYPE_LABELS: Record<'document' | 'audio', string> = {
   audio: 'MP3',
 }
 
+/** Full label already includes the trailing " link" word (e.g. "YouTube
+ * link") so metaLine() doesn't have to special-case appending it — 'other'
+ * degrades to a bare "Link" rather than the awkward "Link link". */
+const LINK_SOURCE_LABELS: Record<NonNullable<SongAttachment['linkSource']>, string> = {
+  youtube: 'YouTube link',
+  drive: 'Google Drive link',
+  dropbox: 'Dropbox link',
+  other: 'Link',
+}
+
 function formatSize(bytes?: number): string {
   if (!bytes) return ''
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-/** Meta line built only from fields this phase actually persists — type +
- * size. Pages/duration are deferred (SongAttachment carries neither field). */
+/** Guarded Timestamp → short date string, mirrors TeamView.vue's formatDate
+ * convention (~L265-269): return '' — never "Invalid Date" — unless
+ * createdAt has a callable toDate() (guards against the `{}` fixture and a
+ * still-serializing serverTimestamp() sentinel). */
+function formatAttachmentDate(createdAt: SongAttachment['createdAt'] | undefined): string {
+  if (!createdAt || typeof (createdAt as { toDate?: unknown }).toDate !== 'function') return ''
+  return (createdAt as { toDate: () => Date })
+    .toDate()
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+/** Metadata line, graceful-omission (R366): never renders undefined/NaN/
+ * "Invalid Date", and never a pages/duration field — SongAttachment carries
+ * neither (SEED-003 no-new-deps; no PDF page-count library). */
 function metaLine(a: SongAttachment): string {
+  const date = formatAttachmentDate(a.createdAt)
+  if (a.kind === 'link') {
+    const source = LINK_SOURCE_LABELS[a.linkSource ?? 'other']
+    return [source, date].filter(Boolean).join(' · ')
+  }
   const typeLabel = a.kind === 'document' || a.kind === 'audio' ? TYPE_LABELS[a.kind] : ''
   const size = formatSize(a.sizeBytes)
-  return [typeLabel, size].filter(Boolean).join(' · ')
+  return [typeLabel, size, date].filter(Boolean).join(' · ')
 }
+
+// R366 — Documents group folds in link-kind rows by default (121-UI-SPEC §4:
+// a generic link's type can't be inferred, so it lands in Documents rather
+// than a third "Links" sub-group). Audio is exclusively kind==='audio'.
+const documents = computed(() =>
+  props.attachments.filter((a) => a.kind === 'document' || a.kind === 'link'),
+)
+const audio = computed(() => props.attachments.filter((a) => a.kind === 'audio'))
 </script>

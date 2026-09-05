@@ -44,6 +44,15 @@ function makeAttachment(overrides: Partial<SongAttachment> = {}): SongAttachment
   }
 }
 
+/** A createdAt fixture with a callable toDate() — mirrors the real Firestore
+ * Timestamp shape closely enough for formatAttachmentDate()'s guard. Uses
+ * local noon (not a bare date-only ISO string, which parses as UTC midnight
+ * and can render as the previous day once toLocaleDateString applies a
+ * negative-offset timezone) so the assertion date is stable everywhere. */
+function makeTimestamp(isoDate: string): SongAttachment['createdAt'] {
+  return { toDate: () => new Date(`${isoDate}T12:00:00`) } as SongAttachment['createdAt']
+}
+
 function mountTab(attachments: SongAttachment[] = []) {
   return mount(SongFilesTab, {
     props: {
@@ -167,18 +176,29 @@ describe('SongFilesTab', () => {
     expect(wrapper.find('[data-testid="song-files-link-error"]').exists()).toBe(false)
   })
 
-  it('renders a document row with name and no download/preview/remove action button', () => {
-    const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf', sizeBytes: 2516582 })
+  it('renders a document row grouped under Documents with graceful metadata and a Download action targeting downloadUrl', () => {
+    const doc = makeAttachment({
+      id: 'doc-1',
+      kind: 'document',
+      name: 'chart.pdf',
+      sizeBytes: 2516582, // 2.4 MB
+      downloadUrl: 'https://cdn.example.com/chart.pdf',
+      createdAt: makeTimestamp('2026-09-05'),
+    })
     const wrapper = mountTab([doc])
-    const row = wrapper.find('[data-testid="song-file-row-doc-1"]')
+    const group = wrapper.find('[data-testid="song-files-group-documents"]')
+    const row = group.find('[data-testid="song-file-row-doc-1"]')
     expect(row.exists()).toBe(true)
     expect(row.text()).toContain('chart.pdf')
-    expect(row.text()).toContain('PDF')
-    expect(row.text()).toContain('2.4 MB')
-    expect(row.findAll('button')).toHaveLength(0)
+    expect(row.find('[data-testid="song-file-meta"]').text()).toBe('PDF · 2.4 MB · Sep 5, 2026')
+    const download = row.find('[data-testid="song-file-download"]')
+    expect(download.exists()).toBe(true)
+    expect(download.attributes('href')).toBe('https://cdn.example.com/chart.pdf')
+    expect(download.attributes('aria-label')).toBe('Download chart.pdf')
+    expect(row.find('[data-testid="song-file-open-link"]').exists()).toBe(false)
   })
 
-  it('renders a link row as an anchor opening in a new tab with rel noopener', () => {
+  it('renders a link row folded into Documents with an Open-in-new-tab action and no Download', () => {
     const link = makeAttachment({
       id: 'link-1',
       kind: 'link',
@@ -189,15 +209,81 @@ describe('SongFilesTab', () => {
       downloadUrl: undefined,
       mimeType: undefined,
       sizeBytes: undefined,
+      createdAt: makeTimestamp('2026-09-05'),
     })
     const wrapper = mountTab([link])
-    const row = wrapper.find('[data-testid="song-file-row-link-1"]')
+    const group = wrapper.find('[data-testid="song-files-group-documents"]')
+    const row = group.find('[data-testid="song-file-row-link-1"]')
     expect(row.exists()).toBe(true)
-    expect(row.element.tagName).toBe('A')
-    expect(row.attributes('href')).toBe('https://youtu.be/xyz')
-    expect(row.attributes('target')).toBe('_blank')
-    expect(row.attributes('rel')).toContain('noopener')
-    expect(row.findAll('button')).toHaveLength(0)
+    expect(row.text()).toContain('Reference track')
+    expect(row.find('[data-testid="song-file-meta"]').text()).toBe('YouTube link · Sep 5, 2026')
+    expect(row.find('[data-testid="song-file-download"]').exists()).toBe(false)
+    const openLink = row.find('[data-testid="song-file-open-link"]')
+    expect(openLink.exists()).toBe(true)
+    expect(openLink.attributes('href')).toBe('https://youtu.be/xyz')
+    expect(openLink.attributes('target')).toBe('_blank')
+    expect(openLink.attributes('rel')).toContain('noopener')
+  })
+
+  it('renders an audio row with MP3 metadata and a Download action', () => {
+    const track = makeAttachment({
+      id: 'track-1',
+      kind: 'audio',
+      name: 'demo.mp3',
+      mimeType: 'audio/mpeg',
+      sizeBytes: 5348147, // ~5.1 MB
+      storagePath: 'orgs/org-1/song-files/track-1/demo.mp3',
+      downloadUrl: 'https://cdn.example.com/demo.mp3',
+      createdAt: makeTimestamp('2026-09-05'),
+    })
+    const wrapper = mountTab([track])
+    const group = wrapper.find('[data-testid="song-files-group-audio"]')
+    const row = group.find('[data-testid="song-file-row-track-1"]')
+    expect(row.exists()).toBe(true)
+    expect(row.find('[data-testid="song-file-meta"]').text()).toBe('MP3 · 5.1 MB · Sep 5, 2026')
+    const download = row.find('[data-testid="song-file-download"]')
+    expect(download.exists()).toBe(true)
+    expect(download.attributes('href')).toBe('https://cdn.example.com/demo.mp3')
+    expect(download.attributes('aria-label')).toBe('Download demo.mp3')
+  })
+
+  it('R366: splits attachments into a Documents group (document + link) and an Audio group (audio)', () => {
+    const doc = makeAttachment({ id: 'doc-1', kind: 'document' })
+    const track = makeAttachment({ id: 'track-1', kind: 'audio', name: 'demo.mp3', mimeType: 'audio/mpeg' })
+    const link = makeAttachment({ id: 'link-1', kind: 'link', name: 'Ref', href: 'https://youtu.be/x', linkSource: 'youtube' })
+    const wrapper = mountTab([doc, track, link])
+
+    const documentsGroup = wrapper.find('[data-testid="song-files-group-documents"]')
+    expect(documentsGroup.find('[data-testid="song-file-row-doc-1"]').exists()).toBe(true)
+    expect(documentsGroup.find('[data-testid="song-file-row-link-1"]').exists()).toBe(true)
+    expect(documentsGroup.find('[data-testid="song-file-row-track-1"]').exists()).toBe(false)
+
+    const audioGroup = wrapper.find('[data-testid="song-files-group-audio"]')
+    expect(audioGroup.find('[data-testid="song-file-row-track-1"]').exists()).toBe(true)
+    expect(audioGroup.find('[data-testid="song-file-row-doc-1"]').exists()).toBe(false)
+  })
+
+  it('R366: both groups always render, with the exact per-group empty copy when attachments is empty', () => {
+    const wrapper = mountTab([])
+    expect(wrapper.find('[data-testid="song-files-group-documents"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="song-files-documents-empty"]').text()).toBe('No documents attached yet.')
+    expect(wrapper.find('[data-testid="song-files-group-audio"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="song-files-audio-empty"]').text()).toBe('No audio files attached yet.')
+  })
+
+  it('gracefully omits the date when createdAt has no callable toDate() — no "Invalid Date", no "undefined", no dangling separator', () => {
+    const doc = makeAttachment({
+      id: 'doc-1',
+      kind: 'document',
+      sizeBytes: 2516582,
+      createdAt: {} as SongAttachment['createdAt'],
+    })
+    const wrapper = mountTab([doc])
+    const meta = wrapper.find('[data-testid="song-file-meta"]')
+    expect(meta.text()).toBe('PDF · 2.4 MB')
+    expect(meta.text()).not.toContain('Invalid Date')
+    expect(meta.text()).not.toContain('undefined')
+    expect(meta.text()).not.toContain('NaN')
   })
 
   it('renders an in-flight upload row with a progress bar and percent', () => {
