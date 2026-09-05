@@ -3842,6 +3842,19 @@ describe("PROXY_TARGETS / SECRET_INJECTED (nlt membership)", () => {
     expect(AUTH_REQUIRED.has("esv")).toBe(false);
     expect(AUTH_REQUIRED.has("nlt")).toBe(false);
   });
+
+  // IN-01 (117-REVIEW): a regression guard for the whole SEC-A-01 finding
+  // class -- safety depends on EVERY PROXY_TARGETS key appearing in
+  // SECRET_INJECTED or AUTH_REQUIRED. Without this, a future contributor
+  // adding a fifth proxy target with no gate-set entry would silently
+  // reopen an unauthenticated open relay and no existing test would fail.
+  it("IN-01: every PROXY_TARGETS key is covered by SECRET_INJECTED or AUTH_REQUIRED, so a future target can never be added unauthenticated", () => {
+    const ungated = Object.keys(PROXY_TARGETS).filter(
+      (service) => !SECRET_INJECTED.has(service) && !AUTH_REQUIRED.has(service),
+    );
+    expect(ungated).toEqual([]);
+    expect(Object.keys(PROXY_TARGETS).length).toBeGreaterThan(0);
+  });
 });
 
 describe("buildUpstreamUrl", () => {
