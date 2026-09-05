@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.11
 milestone_name: Song File Attachments (Phases 121-124, in planning)
-current_phase: 122
-current_phase_name: Durable Storage, Rules & Retention-Exempt Foundation
+current_phase: 123
+current_phase_name: Files Tab, Songs List Column, Upload & External Link Attach
 status: planning
 stopped_at: Completed 122-02-PLAN.md
-last_updated: "2026-09-05T16:30:23.159Z"
+last_updated: "2026-09-05T16:48:30.663Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 121 complete, transitioned to Phase 122
+last_activity_desc: Phase 122 complete, transitioned to Phase 123
 progress:
   total_phases: 4
   completed_phases: 2
@@ -1289,10 +1289,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 122 — Durable Storage, Rules & Retention-Exempt Foundation
-Plan: 2 of 2 complete (122-01, 122-02)
+Phase: 123 — Files Tab, Songs List Column, Upload & External Link Attach
+Plan: Not started
 Status: Phase 122 plans complete — ready for /gsd-verify-work 122
-Last activity: 2026-09-05 — Phase 122 Plan 02 complete (SongAttachment schema, R370 retention lock, hardDeleteSong Storage cascade)
+Last activity: 2026-09-05 — Phase 122 complete, transitioned to Phase 123
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 
