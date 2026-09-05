@@ -48,6 +48,36 @@ service firebase.storage {
       return isOrgMemberByClaim(orgId);
     }
 
+    // Phase 122 (R372): mirrors isOrgMemberByClaim's exact structure (same
+    // superAdmin outer arm, same multi-org/legacy-arm OR, same
+    // isOrgDeactivatedForCaller wrap) but requires the resolved role to be
+    // editor/admin rather than merely non-null. 'admin' is intentionally
+    // synonymous with 'editor' (mirrors firestore.rules' isOrgEditor,
+    // R348/SEC-ISO-05). CLAIM-ONLY — see isOrgMemberByClaim's comment above
+    // for why a cross-service firestore.exists() must never be added here.
+    function isOrgEditorByClaim(orgId) {
+      return request.auth != null
+        && (
+          request.auth.token.superAdmin == true
+          ||
+          (
+            (
+              (request.auth.token.orgs != null
+                && request.auth.token.orgs[orgId] != null
+                && request.auth.token.orgs[orgId] in ['editor', 'admin'])
+              || (request.auth.token.orgId == orgId
+                && request.auth.token.role in ['editor', 'admin'])
+            )
+            && !isOrgDeactivatedForCaller(orgId)
+          )
+        );
+    }
+
+    // Phase 122 (R372): editor-tier gate for song-files create/delete.
+    function isOrgEditor(orgId) {
+      return isOrgEditorByClaim(orgId);
+    }
+
     // Cloud Storage rules do NOT cascade between sibling `match` blocks — this
     // more-specific `orgs/{orgId}/media/**` match is evaluated independently of
     // the generic `orgs/{orgId}/{allPaths=**}` block below (proven by the media
@@ -66,14 +96,45 @@ service firebase.storage {
                       && request.resource.size < 52428800;
     }
 
-    match /orgs/{orgId}/{allPaths=**} {
+    // Phase 122 (R364, R372): permanent, org-scoped home for Song attachments
+    // (chord charts / lead sheets / audio), deliberately OUTSIDE media/ so the
+    // retention sweeps in functions/src/cleanupSweeps.ts structurally never
+    // match it (see 122-RESEARCH.md Must-Resolve #3). Explicit create/update/
+    // delete verbs, NOT bundled `write` — `write` would bundle delete, and
+    // request.resource is null on delete (referencing request.resource.size/
+    // .name on a delete errors -> denies that clause), so delete needs its own
+    // unconditioned grant.
+    match /orgs/{orgId}/song-files/{allPaths=**} {
       allow read: if isOrgMember(orgId);
+
+      allow create: if isOrgEditor(orgId)
+                       && request.resource.size < 52428800
+                       && request.resource.contentType in ['application/pdf', 'audio/mpeg'];
+
+      // Attachments are immutable once uploaded — every re-upload uses a new
+      // attachmentId/path (122-CONTEXT.md's path scheme), so denying update
+      // closes an in-place-overwrite bypass of the create-time type check.
+      allow update: if false;
+
+      allow delete: if isOrgEditor(orgId);
+    }
+
+    match /orgs/{orgId}/{allPaths=**} {
+      // Song-files is excluded here — it has its own, MORE RESTRICTIVE block
+      // above. Storage rule blocks are OR-combined, so without this exclusion
+      // this catch-all's permissive isOrgMember/<25MB grant would still allow
+      // an oversized-for-song-files-but-under-25MB, or non-PDF/MP3, write to
+      // song-files/ regardless of the dedicated block's deny (122-RESEARCH.md
+      // Pitfall 1). This exclusion is MANDATORY, not optional.
+      allow read: if isOrgMember(orgId)
+                     && !resource.name.matches('^orgs/[^/]+/song-files/.*');
 
       // Same membership condition for write, plus a per-upload size ceiling. 25MB
       // (26214400 bytes) is the researched starting cap for this milestone's PPTX
       // imports (21-RESEARCH.md Open Question 3) — tunable, not a hard product limit.
       allow write: if isOrgMember(orgId)
-                      && request.resource.size < 26214400;
+                      && request.resource.size < 26214400
+                      && !request.resource.name.matches('^orgs/[^/]+/song-files/.*');
     }
   }
 }
