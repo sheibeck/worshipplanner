@@ -8,7 +8,49 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.10 Security & Architecture Hardening
+## Current Milestone: v2.11 Song File Attachments
+
+**Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external media
+links (YouTube/Drive/Dropbox) — on a **Song** in the stable, via a new **Files** tab in the Edit Song
+slideout, laying the durable storage foundation for the future team-rehearsal experience. This is
+**step 1** of the file-storage backlog (999.13 / SEED-003); Rehearse mode (playback inside the
+shared/public service) is the *next* milestone.
+
+**Target features:**
+
+- **Files tab in the Edit Song slideout** — a third tab beside Details and Lyrics with a live count
+  badge; the Songs list gains a **Files** column (paperclip + "N files" / "none"). Files attach to the
+  **Song** (not a service), so they follow the song into every service that uses it.
+- **Multi-file upload** — drag-and-drop or click-to-browse, several files at once, with per-file upload
+  progress. Uploads limited to **PDF (documents) + MP3 (audio)**, **≤ 50 MB per file**. No image or
+  uploaded-video types (video comes in only as an external link).
+- **Attach external media links** — paste a YouTube / Google Drive / Dropbox link; linked media opens
+  in a new tab rather than the built-in reader/player (zero upload, zero storage/egress cost).
+- **Grouped file list with in-app preview/play** — results grouped into **Documents** and **Audio**;
+  each row previews (PDF) or plays (MP3) in-app, downloads, or removes, with empty states and a "removing
+  removes it everywhere — past services included" note.
+- **Permanent, retention-exempt storage (load-bearing invariant)** — song attachments are a **permanent
+  part of a church's collection** and must **never** be deleted by any automated retention/cleanup sweep.
+  They live on the **Song** document plus a dedicated **org-scoped Storage prefix outside `media/`**
+  (e.g. `orgs/{orgId}/song-files/…`); **every** existing cleanup cron (`cleanupExpiredMedia`,
+  `cleanupOrphanBackgrounds`, `cleanupPptxSources`) must exclude that prefix — those sweeps exist for
+  *transient, service-specific* media only. The only thing that ever deletes a song attachment is an
+  editor removing it (or the song being deleted). Per-file size caps are enforced client-side **and** in
+  `storage.rules`.
+
+**Key context:** Scope confirmed with the owner (2026-09-05). Uploads = PDF + MP3 only (≤ 50 MB/file);
+video via external link only; in-app PDF preview + MP3 player included. **Per-file caps only** this
+milestone — the per-org storage **quota** + egress alerting are deferred to the Rehearse milestone.
+Design reference is the owner's "Song Files" Claude Design mock (Nocturne palette → mapped to the app's
+dark gray-950 language), so the milestone includes a UI/design phase producing app-fidelity mocks.
+**No research pass** — built on SEED-003's architecture + cost research (download-token URLs, org-scoped
+non-`media/` path, the `firestore.exists()`-in-Storage-emulator blind spot to avoid, reuse of the
+`useMediaUpload`/`useBackgroundUpload` `uploadBytesResumable` + `MEDIA_MAX_BYTES`/`BACKGROUND_MAX_BYTES`
+cap patterns). **Out of scope:** per-org storage quota + egress monitoring, image/uploaded-video types,
+per-file "share with volunteers" toggles, and the Rehearse/playback experience (all → future milestone).
+Requirements continue from R361; phases continue from 121.
+
+## Shipped Milestone: v2.10 Security & Architecture Hardening — ✅ SHIPPED & DEPLOYED 2026-09-05
 
 **Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and architectural
 reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" — starting with the
@@ -527,6 +569,15 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
+**v2.11 Song File Attachments** — 🚧 in planning (started 2026-09-05). Step 1 of the file-storage backlog
+(999.13 / SEED-003). Editors attach/manage PDF + MP3 files (≤ 50 MB each) and external media links
+(YouTube/Drive/Dropbox) on a **Song**, via a new **Files** tab in the Edit Song slideout (Songs list
+gains a Files column). Multi-file upload with progress, Documents/Audio grouping, in-app PDF preview +
+MP3 player, download, remove. **Load-bearing invariant:** song attachments are permanent and exempt from
+**every** retention sweep — dedicated org-scoped Storage prefix outside `media/`; all cleanup crons
+exclude it. Per-file caps only (per-org quota + egress deferred to Rehearse). No research pass — built on
+SEED-003. Requirements continue from R361; phases from 121. See `.planning/REQUIREMENTS.md`.
+
 **v2.9 Live Presentation Field Fixes** — 🚧 in planning (started 2026-09-02). Field feedback from the first
 real church-projector run (church Mac + projector). Three groups: **multi-monitor rework** (N monitors,
 any-role-to-any-monitor incl. multiple Audience, assignments that stick on a 3-monitor setup, Mac
@@ -729,6 +780,21 @@ This document evolves at phase transitions and milestone boundaries.
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
+
+---
+*Last updated: 2026-09-05 — started milestone v2.11 Song File Attachments (step 1 of file-storage backlog
+999.13 / SEED-003). Editors attach/manage PDF (documents) + MP3 (audio) files, ≤ 50 MB each, plus external
+media links (YouTube/Drive/Dropbox), on a Song via a new Files tab in the Edit Song slideout (Songs list
+gains a Files column); multi-file upload with per-file progress, Documents/Audio grouping, in-app PDF
+preview + MP3 player, download, remove. Load-bearing invariant per owner: song attachments are a permanent
+part of a church's collection and must never be deleted by any retention sweep — dedicated org-scoped
+Storage prefix outside media/, every cleanup cron (cleanupExpiredMedia/cleanupOrphanBackgrounds/
+cleanupPptxSources) excludes it; only an editor removal or song deletion removes an attachment. Decisions:
+uploads = PDF + MP3 only (no images/uploaded video; video via external link only); per-file caps only this
+milestone (per-org quota + egress alerting deferred to the Rehearse milestone); in-app preview/play
+included. Design reference = owner's "Song Files" Claude Design mock (Nocturne → app dark gray-950); UI
+phase produces app-fidelity mocks. No research pass — built on SEED-003. Requirements continue from R361;
+phases from 121. Previous footer below.*
 
 ---
 *Last updated: 2026-09-02 — started milestone v2.9 Live Presentation Field Fixes. Field feedback from the
