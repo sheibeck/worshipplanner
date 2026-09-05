@@ -91,11 +91,11 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
   re-subscribe/teardown on an in-flight org switch** instead of subscribing once on mount via a static
   prop.
 
-- [ ] **R355** (ARCH-007): `ServiceTemplateEditor.vue` writes org settings **through the auth store's
+- [x] **R355** (ARCH-007): `ServiceTemplateEditor.vue` writes org settings **through the auth store's
   mutation surface** rather than calling `updateDoc()` on the org document directly and hand-syncing
   `authStore.settings`.
 
-- [ ] **R356** (ARCH-008): `GettingStarted.vue` and `ConfigurationTab.vue`'s direct Firestore
+- [x] **R356** (ARCH-008): `GettingStarted.vue` and `ConfigurationTab.vue`'s direct Firestore
   `onSnapshot` subscriptions are **owned by a store** instead of each duplicating subscribe/unsubscribe
   lifecycle machinery inline.
 
@@ -161,8 +161,8 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 | R352 | Phase 119 | Pending |
 | R353 | Phase 119 | Pending |
 | R354 | Phase 119 | Pending |
-| R355 | Phase 119 | Pending |
-| R356 | Phase 119 | Pending |
+| R355 | Phase 119 | Complete |
+| R356 | Phase 119 | Complete |
 | R357 | Phase 119 | Pending |
 | R358 | Phase 120 | Pending |
 | R359 | Phase 120 | Pending |

@@ -5,15 +5,15 @@ milestone_name: Security & Architecture Hardening (Phases 117-120, in planning)
 current_phase: 119
 current_phase_name: Architecture — Correctness, Batching & Store-Ownership Fixes
 status: executing
-stopped_at: Completed 119-01-PLAN.md
-last_updated: "2026-09-05T03:20:54.438Z"
+stopped_at: Completed 119-02-PLAN.md
+last_updated: "2026-09-05T03:48:03.881Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 119 execution started
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 5
   percent: 50
 ---
 
@@ -1260,7 +1260,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 119 (Architecture — Correctness, Batching & Store-Ownership Fixes) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-09-04 — Phase 119 execution started
 
@@ -3229,6 +3229,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 118 P01 | 25min | 3 tasks | 2 files |
 | Phase 118 P02 | 40min | 3 tasks | 5 files |
 | Phase 119 P01 | 40min | 3 tasks | 10 files |
+| Phase 119 P02 | ~25min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -3763,6 +3764,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R347: took the default low-risk branch — written re-acceptance + code comments, no id-format change
 - [Phase ?]: upsertSongs returns UpsertSongsSummary (added/updated/failed) instead of void; PcImportModal's imported count/done-step now reflects the real post-import summary, not pre-import preview counts
 - [Phase ?]: defaultLyricsSubscriber keeps snap.docs[0] newest-wins client-side instead of re-adding limit(1), since the shared lyricsQuery carries no limit and both queries share the same orderBy
+- [Phase ?]: 119-02: updateOrgSettings walks an arbitrary dot-path (not a single-leaf hardcode) so it stays correct for future multi-segment settings keys
+- [Phase ?]: 119-02: useMembersStore is org-scoped (registered in resetOrgScopedStores); useSuperAdminsStore is deliberately global and NOT registered there, matching appConfig.ts
 
 ### Roadmap Evolution
 
@@ -4091,8 +4094,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T03:20:54.339Z
-Stopped at: Completed 119-01-PLAN.md
+Last session: 2026-09-05T03:48:03.816Z
+Stopped at: Completed 119-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
