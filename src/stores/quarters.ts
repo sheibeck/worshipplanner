@@ -413,6 +413,12 @@ export const useQuartersStore = defineStore('quarters', () => {
         await updateDoc(orgRef, { slug })
       }
 
+      // R347/SEC-S-02 re-acceptance: this id is deterministic/guessable by
+      // slug+quarter+year, but the format is FROZEN — it's embedded in every
+      // already-deployed memorable link, and SEC-S-01's get/list split already
+      // denies enumeration, leaving only exact-slug+exact-quarter guessing
+      // (residual Low, accepted in writing — see 118-02-SUMMARY.md). Do NOT
+      // change this id shape.
       await setDoc(doc(db, 'quarterShares', `${slug}__q${quarter.quarter}-${quarter.year}`), {
         // See ADR-0155 (docs/adr/0155-the-owning-orgid-is-stored-on-the-doc-so-firestore-rules-can.md)
         orgId: orgId.value,

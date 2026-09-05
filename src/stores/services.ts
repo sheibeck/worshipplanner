@@ -144,7 +144,10 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
         const bpm = song
           ? (song.arrangements.find((a) => a.key === slot.songKey)?.bpm ?? song.arrangements[0]?.bpm ?? null)
           : null
-        return { ...base, bpm }
+        // `bpm` is a display-only field not declared on `SongSlot` itself
+        // (mirrors the pre-existing cast this replaces) — the resolved
+        // arrangement tempo the share page's song line reads.
+        return { ...base, bpm } as ServiceSlot
       }
       case 'SCRIPTURE':
         return {
@@ -835,6 +838,12 @@ export const useServiceStore = defineStore('services', () => {
         await updateDoc(orgRef, { slug })
       }
 
+      // R347/SEC-S-02 re-acceptance: this id is deterministic/guessable by
+      // slug+date, but the format is FROZEN — it's embedded in every already-
+      // deployed memorable link, and SEC-S-01's get/list split already denies
+      // enumeration, leaving only exact-slug+exact-date guessing (residual
+      // Low, accepted in writing — see 118-02-SUMMARY.md). Do NOT change this
+      // id shape.
       await setDoc(doc(db, 'serviceShares', `${slug}__service-${service.date}`), {
         // See ADR-0163 (docs/adr/0163-this-doc-is-keyed-purely-by-slug-date-and-the-app-enforces-n.md)
         serviceId: service.id,
