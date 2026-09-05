@@ -53,12 +53,17 @@ function kindForFile(file: File): SongAttachmentKind {
 
 /** UX-only client validation — Phase 122's storage.rules are the server
  * authority (editor + application/pdf|audio/mpeg + <=50MB). Returns the exact
- * UI-SPEC rejection copy, or null when the file is acceptable. */
+ * UI-SPEC rejection copy, or null when the file is acceptable.
+ * Phase 123 code-review WR-01: both the MIME AND the extension must agree —
+ * an OR check let an extension/MIME mismatch (e.g. a renamed file) pass
+ * client-side only to be denied by storage.rules' strict contentType check,
+ * surfacing the misleading generic "check your connection" error instead of
+ * this rejection copy. */
 function validateSongFile(file: File): string | null {
   const lowerName = file.name.toLowerCase()
   const hasAllowedExt = lowerName.endsWith('.pdf') || lowerName.endsWith('.mp3')
   const hasAllowedMime = (SONG_FILE_ALLOWED_MIME as readonly string[]).includes(file.type)
-  if (!hasAllowedMime && !hasAllowedExt) {
+  if (!hasAllowedMime || !hasAllowedExt) {
     return `'${file.name}' can't be uploaded — PDF and MP3 only, up to 50 MB.`
   }
   if (file.size > SONG_FILE_MAX_BYTES) {

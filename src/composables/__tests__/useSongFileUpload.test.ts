@@ -224,6 +224,26 @@ describe('useSongFileUpload', () => {
     expect(mockUploadBytesResumable).not.toHaveBeenCalled()
   })
 
+  it('WR-01: rejects a file whose extension is allowed but MIME type disagrees (extension/MIME mismatch)', () => {
+    mockUploadBytesResumable.mockReturnValue(makeTask('unused'))
+    vi.spyOn(useSongStore(), 'addSongAttachment').mockResolvedValue(undefined)
+
+    const { uploads, addFiles } = useSongFileUpload()
+    // .pdf extension but browser-inferred MIME is wrong (e.g. a renamed file)
+    const mismatchedFile = makeFile('renamed.pdf', 'text/plain', 1024)
+
+    addFiles([mismatchedFile], {
+      songId: 'song1',
+      orgId: 'org1',
+      createdBy: 'user1',
+    })
+
+    expect(uploads.value).toHaveLength(1)
+    expect(uploads.value[0]!.status).toBe('rejected')
+    expect(uploads.value[0]!.message).toBe("'renamed.pdf' can't be uploaded — PDF and MP3 only, up to 50 MB.")
+    expect(mockUploadBytesResumable).not.toHaveBeenCalled()
+  })
+
   it('sets an error row and message when the upload task itself errors', async () => {
     const task = makeTask('orgs/org1/song-files/id1/song.pdf')
     mockUploadBytesResumable.mockReturnValue(task)
