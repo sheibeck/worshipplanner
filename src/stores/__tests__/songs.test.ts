@@ -883,14 +883,23 @@ describe('useSongStore', () => {
   })
 
   describe('upsertSongs', () => {
-    it('creates new doc via addDoc when no match found', async () => {
-      const { addDoc } = await import('firebase/firestore')
+    // R350/ARCH-014: upsertSongs now stages writes via writeBatch (batch.set/
+    // batch.update) instead of a per-song addDoc/updateDoc — these helpers
+    // read from mockBatchOps, mirroring hardDeleteSong's existing precedent
+    // above.
+    function lastBatchOp(type: 'set' | 'update') {
+      const ops = mockBatchOps.filter((op) => op.type === type)
+      return ops[ops.length - 1]
+    }
+
+    it('stages a batch.set when no match found', async () => {
+      const { writeBatch } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
       triggerSnapshot([])
 
-      await store.upsertSongs([
+      const summary = await store.upsertSongs([
         {
           title: 'Brand New Song',
           ccliNumber: '99999',
@@ -908,17 +917,17 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(addDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(addDoc).mock.calls[0]!
-      const data = callArgs[1] as Record<string, unknown>
+      expect(writeBatch).toHaveBeenCalledOnce()
+      const op = lastBatchOp('set')!
+      const data = op.data as Record<string, unknown>
       expect(data.title).toBe('Brand New Song')
       expect(data.hidden).toBe(false)
       expect(data.createdAt).toBeDefined()
       expect(data.updatedAt).toBeDefined()
+      expect(summary).toEqual({ added: 1, updated: 0, failed: [] })
     })
 
-    it('updates existing doc via updateDoc when pcSongId matches', async () => {
-      const { updateDoc } = await import('firebase/firestore')
+    it('stages a batch.update when pcSongId matches', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -926,7 +935,7 @@ describe('useSongStore', () => {
         makeSong({ id: 'existing-song', title: 'Old Title', pcSongId: 'pc-123', ccliNumber: '11111', hidden: false }),
       ])
 
-      await store.upsertSongs([
+      const summary = await store.upsertSongs([
         {
           title: 'Updated Title',
           ccliNumber: '11111',
@@ -944,14 +953,13 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const op = lastBatchOp('update')!
+      const data = op.data as Record<string, unknown>
       expect(data.title).toBe('Updated Title')
+      expect(summary).toEqual({ added: 0, updated: 1, failed: [] })
     })
 
-    it('updates existing doc when ccliNumber matches (no pcSongId)', async () => {
-      const { updateDoc } = await import('firebase/firestore')
+    it('stages a batch.update when ccliNumber matches (no pcSongId)', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -977,14 +985,12 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const op = lastBatchOp('update')!
+      const data = op.data as Record<string, unknown>
       expect(data.title).toBe('Updated Via CCLI')
     })
 
     it('preserves hidden:true when updating existing song', async () => {
-      const { updateDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1010,14 +1016,12 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const op = lastBatchOp('update')!
+      const data = op.data as Record<string, unknown>
       expect(data.hidden).toBe(true) // preserved from existing song
     })
 
     it('only sets vwTypes when incoming vwTypes is non-empty', async () => {
-      const { updateDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1043,15 +1047,13 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const op = lastBatchOp('update')!
+      const data = op.data as Record<string, unknown>
       // vwTypes should NOT be in the update data (preserving the existing value)
       expect(data.vwTypes).toBeUndefined()
     })
 
     it('includes vwTypes in update when incoming is non-empty', async () => {
-      const { updateDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1077,16 +1079,135 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const op = lastBatchOp('update')!
+      const data = op.data as Record<string, unknown>
       expect(data.vwTypes).toEqual([1, 3])
+    })
+  })
+
+  describe('upsertSongs — batch chunking + per-chunk failure isolation (R350)', () => {
+    function makeUpsertInput(overrides: Partial<{
+      title: string
+      ccliNumber: string
+      pcSongId: string | null
+    }> = {}) {
+      return {
+        title: overrides.title ?? 'Song',
+        ccliNumber: overrides.ccliNumber ?? '',
+        author: 'Author',
+        themes: [] as string[],
+        notes: '',
+        vwTypes: [] as VWType[],
+        tags: [] as string[],
+        removedThemes: [] as string[],
+        arrangements: [] as Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>,
+        primaryArrangementId: null as string | null,
+        lastUsedAt: null,
+        pcSongId: overrides.pcSongId ?? null,
+        hidden: false,
+      }
+    }
+
+    it('chunks 600 new songs into 2 writeBatch batches of 499 max', async () => {
+      const { writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([])
+
+      const songsData = Array.from({ length: 600 }, (_, i) =>
+        makeUpsertInput({ title: `Song ${i}`, pcSongId: `pc-${i}` }),
+      )
+
+      const summary = await store.upsertSongs(songsData)
+
+      expect(writeBatch).toHaveBeenCalledTimes(2)
+      expect(summary.added).toBe(600)
+      expect(summary.failed).toEqual([])
+    })
+
+    it('creates a single batch for 499 or fewer songs', async () => {
+      const { writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([])
+
+      const songsData = Array.from({ length: 499 }, (_, i) =>
+        makeUpsertInput({ title: `Song ${i}`, pcSongId: `pc-${i}` }),
+      )
+
+      await store.upsertSongs(songsData)
+
+      expect(writeBatch).toHaveBeenCalledTimes(1)
+    })
+
+    it('a rejected chunk commit does not stop a later chunk from committing, and reports the failed songs', async () => {
+      const { writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([])
+
+      // First writeBatch() call (chunk 1) commits with a rejection; every
+      // subsequent call (chunk 2+) commits normally — proving chunk 2 still
+      // lands even though chunk 1 failed.
+      let callCount = 0
+      vi.mocked(writeBatch).mockImplementation(() => {
+        callCount += 1
+        const shouldFail = callCount === 1
+        return {
+          set: vi.fn((ref: unknown, data: Record<string, unknown>) => {
+            mockBatchOps.push({ type: 'set', ref, data })
+          }),
+          update: vi.fn((ref: unknown, data: Record<string, unknown>) => {
+            mockBatchOps.push({ type: 'update', ref, data })
+          }),
+          delete: vi.fn((ref: unknown) => {
+            mockBatchOps.push({ type: 'delete', ref })
+          }),
+          commit: vi.fn(() => (shouldFail ? Promise.reject(new Error('commit failed')) : Promise.resolve())),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any
+      })
+
+      const songsData = Array.from({ length: 600 }, (_, i) =>
+        makeUpsertInput({ title: `Song ${i}`, pcSongId: `pc-${i}` }),
+      )
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const summary = await store.upsertSongs(songsData)
+
+      expect(writeBatch).toHaveBeenCalledTimes(2)
+      // Chunk 1 (499 songs) failed — none counted as added; chunk 2 (101 songs)
+      // still committed successfully.
+      expect(summary.added).toBe(101)
+      expect(summary.updated).toBe(0)
+      expect(summary.failed).toHaveLength(499)
+      expect(summary.failed[0]).toEqual({ title: 'Song 0', error: 'commit failed' })
+      expect(consoleErrorSpy).toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+      // Restore the module's default writeBatch implementation — this test's
+      // override must not leak into later tests in this file.
+      vi.mocked(writeBatch).mockImplementation(() => ({
+        set: vi.fn((ref: unknown, data: Record<string, unknown>) => {
+          mockBatchOps.push({ type: 'set', ref, data })
+        }),
+        update: vi.fn((ref: unknown, data: Record<string, unknown>) => {
+          mockBatchOps.push({ type: 'update', ref, data })
+        }),
+        delete: vi.fn((ref: unknown) => {
+          mockBatchOps.push({ type: 'delete', ref })
+        }),
+        commit: vi.fn(() => Promise.resolve()),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any)
     })
   })
 
   describe('upsertSongs — tag preservation and theme merge (D-02, D-08)', () => {
     it('preserves existing user tags when re-importing (tags from import are ignored)', async () => {
-      const { updateDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1112,14 +1233,13 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const updateOps = mockBatchOps.filter((op) => op.type === 'update')
+      expect(updateOps).toHaveLength(1)
+      const data = updateOps[0]!.data as Record<string, unknown>
       expect(data.tags).toEqual(['Christmas']) // preserved from existing song
     })
 
     it('unions themes on re-import (existing themes not lost)', async () => {
-      const { updateDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1145,9 +1265,9 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const updateOps = mockBatchOps.filter((op) => op.type === 'update')
+      expect(updateOps).toHaveLength(1)
+      const data = updateOps[0]!.data as Record<string, unknown>
       const themes = data.themes as string[]
       expect(themes).toContain('grace')     // existing theme preserved
       expect(themes).toContain('salvation') // overlap deduplicated
@@ -1156,7 +1276,6 @@ describe('useSongStore', () => {
     })
 
     it('new song gets tags: [] when import has tags: []', async () => {
-      const { addDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1180,16 +1299,15 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(addDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(addDoc).mock.calls[0]!
-      const data = callArgs[1] as Record<string, unknown>
+      const setOps = mockBatchOps.filter((op) => op.type === 'set')
+      expect(setOps).toHaveLength(1)
+      const data = setOps[0]!.data as Record<string, unknown>
       expect(data.tags).toEqual([])
     })
   })
 
   describe('upsertSongs — tag union + theme-removal-aware merge (D-05, D-14)', () => {
     it('unions incoming team tags into existing tags without dropping the user tag', async () => {
-      const { updateDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1215,14 +1333,13 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const updateOps = mockBatchOps.filter((op) => op.type === 'update')
+      expect(updateOps).toHaveLength(1)
+      const data = updateOps[0]!.data as Record<string, unknown>
       expect(new Set(data.tags as string[])).toEqual(new Set(['Christmas', 'Orchestra']))
     })
 
     it('a theme listed in existing.removedThemes is NOT present in the written themes after re-import', async () => {
-      const { updateDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1256,9 +1373,9 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const updateOps = mockBatchOps.filter((op) => op.type === 'update')
+      expect(updateOps).toHaveLength(1)
+      const data = updateOps[0]!.data as Record<string, unknown>
       const themes = data.themes as string[]
       expect(themes).toContain('grace')
       expect(themes).toContain('worship')
@@ -1266,7 +1383,6 @@ describe('useSongStore', () => {
     })
 
     it('removedThemes survives an upsert unchanged', async () => {
-      const { updateDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1299,9 +1415,9 @@ describe('useSongStore', () => {
         },
       ])
 
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
+      const updateOps = mockBatchOps.filter((op) => op.type === 'update')
+      expect(updateOps).toHaveLength(1)
+      const data = updateOps[0]!.data as Record<string, unknown>
       expect(data.removedThemes).toEqual(['salvation'])
     })
   })

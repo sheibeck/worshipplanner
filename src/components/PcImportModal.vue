@@ -52,7 +52,7 @@
           <div class="flex-1 overflow-y-auto">
 
             <!-- Idle state -->
-            <div v-if="step === 'idle'" class="px-6 py-8">
+            <div v-if="step === 'idle'" class="px-6 py-8" data-testid="step-idle">
               <!-- No credentials banner -->
               <div
                 v-if="!authStore.hasPcCredentials"
@@ -93,7 +93,7 @@
             </div>
 
             <!-- Fetching state -->
-            <div v-else-if="step === 'fetching'" class="px-6 py-12 text-center">
+            <div v-else-if="step === 'fetching'" class="px-6 py-12 text-center" data-testid="step-fetching">
               <div class="flex flex-col items-center gap-4">
                 <div class="h-8 w-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                 <p class="text-sm text-gray-300">Fetching songs from Planning Center...</p>
@@ -102,7 +102,7 @@
             </div>
 
             <!-- Preview state -->
-            <div v-else-if="step === 'preview'" class="px-6 py-8">
+            <div v-else-if="step === 'preview'" class="px-6 py-8" data-testid="step-preview">
               <div class="rounded-lg bg-gray-800/60 border border-gray-700 p-5">
                 <h3 class="text-sm font-semibold text-gray-200 mb-4">Import Preview</h3>
                 <div class="grid grid-cols-2 gap-4">
@@ -122,7 +122,7 @@
             </div>
 
             <!-- Importing state -->
-            <div v-else-if="step === 'importing'" class="px-6 py-12 text-center">
+            <div v-else-if="step === 'importing'" class="px-6 py-12 text-center" data-testid="step-importing">
               <div class="flex flex-col items-center gap-4">
                 <div class="h-8 w-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                 <p class="text-sm text-gray-300">Importing songs...</p>
@@ -130,7 +130,7 @@
             </div>
 
             <!-- Done state -->
-            <div v-else-if="step === 'done'" class="px-6 py-10 text-center">
+            <div v-else-if="step === 'done'" class="px-6 py-10 text-center" data-testid="step-done">
               <div class="flex flex-col items-center gap-4">
                 <div class="p-3 rounded-full bg-green-900/30 border border-green-700">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -139,17 +139,21 @@
                 </div>
                 <div>
                   <p class="text-base font-semibold text-gray-100">Import complete!</p>
-                  <p class="text-sm text-gray-400 mt-1">
-                    {{ preview.toAdd }} song{{ preview.toAdd !== 1 ? 's' : '' }} added,
-                    {{ preview.toUpdate }} song{{ preview.toUpdate !== 1 ? 's' : '' }}
-                    {{ newOnly ? 'skipped' : 'updated' }}.
+                  <p class="text-sm text-gray-400 mt-1" data-testid="done-summary">
+                    {{ importSummary.added }} song{{ importSummary.added !== 1 ? 's' : '' }} added,
+                    {{ newOnly ? preview.toUpdate : importSummary.updated }}
+                    song{{ (newOnly ? preview.toUpdate : importSummary.updated) !== 1 ? 's' : '' }}
+                    {{ newOnly ? 'skipped' : 'updated' }}<template v-if="importSummary.failed.length > 0">, {{ importSummary.failed.length }} song{{ importSummary.failed.length !== 1 ? 's' : '' }} failed</template>.
+                  </p>
+                  <p v-if="importSummary.failed.length > 0" class="text-xs text-red-400 mt-2" data-testid="done-failed">
+                    Failed: {{ importSummary.failed.map((f) => f.title).join(', ') }}
                   </p>
                 </div>
               </div>
             </div>
 
             <!-- Error state -->
-            <div v-else-if="step === 'error'" class="px-6 py-8">
+            <div v-else-if="step === 'error'" class="px-6 py-8" data-testid="step-error">
               <div class="rounded-lg bg-red-900/20 border border-red-800 p-4">
                 <div class="flex items-start gap-3">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -157,7 +161,7 @@
                   </svg>
                   <div>
                     <p class="text-sm font-medium text-red-300">Import failed</p>
-                    <p class="text-xs text-red-400/80 mt-1">{{ errorMessage }}</p>
+                    <p class="text-xs text-red-400/80 mt-1" data-testid="error-message">{{ errorMessage }}</p>
                   </div>
                 </div>
               </div>
@@ -172,6 +176,7 @@
               v-if="step !== 'done' && step !== 'importing'"
               type="button"
               class="px-4 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+              data-testid="cancel-btn"
               @click="onClose"
             >
               Cancel
@@ -183,6 +188,7 @@
               type="button"
               class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="!authStore.hasPcCredentials"
+              data-testid="import-btn"
               @click="onStartFetch"
             >
               Import
@@ -193,6 +199,7 @@
               v-if="step === 'error'"
               type="button"
               class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              data-testid="retry-btn"
               @click="onStartFetch"
             >
               Retry
@@ -203,6 +210,7 @@
               v-if="step === 'preview'"
               type="button"
               class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              data-testid="confirm-btn"
               @click="onConfirmImport"
             >
               Confirm Import
@@ -213,6 +221,7 @@
               v-if="step === 'done'"
               type="button"
               class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              data-testid="done-btn"
               @click="onDoneClose"
             >
               Done
@@ -229,6 +238,7 @@
 import { ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
+import type { UpsertSongsSummary } from '@/stores/songs'
 import { fetchAndMapPcSongs, partitionPcSongs } from '@/utils/pcSongImport'
 import type { UpsertSongInput } from '@/types/song'
 
@@ -260,6 +270,10 @@ const existingSongs = ref<UpsertSongInput[]>([])
 // Preview counts
 const preview = ref({ toAdd: 0, toUpdate: 0 })
 
+// R350/ARCH-014 — the real per-song outcome of upsertSongs(), surfaced on the
+// 'done' step instead of assuming the pre-import preview counts always land.
+const importSummary = ref<UpsertSongsSummary>({ added: 0, updated: 0, failed: [] })
+
 // ── Reset on open ──────────────────────────────────────────────────────────────
 
 watch(
@@ -275,6 +289,7 @@ function resetToIdle() {
   newSongs.value = []
   existingSongs.value = []
   preview.value = { toAdd: 0, toUpdate: 0 }
+  importSummary.value = { added: 0, updated: 0, failed: [] }
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -304,7 +319,7 @@ async function onConfirmImport() {
   step.value = 'importing'
   try {
     const songsToImport = newOnly.value ? newSongs.value : [...newSongs.value, ...existingSongs.value]
-    await songStore.upsertSongs(songsToImport)
+    importSummary.value = await songStore.upsertSongs(songsToImport)
     step.value = 'done'
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred'
@@ -321,7 +336,9 @@ function onClose() {
 }
 
 function onDoneClose() {
-  const importedCount = newOnly.value ? preview.value.toAdd : preview.value.toAdd + preview.value.toUpdate
+  // R350/ARCH-014 — reflects what was ACTUALLY written (excludes failed songs),
+  // not the pre-import preview counts.
+  const importedCount = importSummary.value.added + importSummary.value.updated
   emit('imported', importedCount)
   emit('close')
 }

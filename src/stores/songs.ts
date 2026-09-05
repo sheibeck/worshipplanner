@@ -21,6 +21,14 @@ import { useAuthStore } from '@/stores/auth'
 
 type SongInput = Omit<Song, 'id' | 'createdAt' | 'updatedAt'>
 
+/** R350/ARCH-014 — per-song outcome of a batched upsertSongs() call, surfaced
+ *  to PcImportModal.vue instead of one bad write silently stopping the rest. */
+export interface UpsertSongsSummary {
+  added: number
+  updated: number
+  failed: Array<{ title: string; error: string }>
+}
+
 export const useSongStore = defineStore('songs', () => {
   const songs = ref<Song[]>([])
   const isLoading = ref(true)
@@ -339,8 +347,9 @@ export const useSongStore = defineStore('songs', () => {
     })
   }
 
-  async function upsertSongs(songsData: UpsertSongInput[]) {
-    if (!orgId.value) return
+  async function upsertSongs(songsData: UpsertSongInput[]): Promise<UpsertSongsSummary> {
+    const summary: UpsertSongsSummary = { added: 0, updated: 0, failed: [] }
+    if (!orgId.value) return summary
 
     // Build lookup maps for O(1) matching
     const byPcSongId = new Map<string, Song>()
@@ -353,73 +362,106 @@ export const useSongStore = defineStore('songs', () => {
       byTitle.set(song.title.toLowerCase(), song)
     }
 
-    for (const incoming of songsData) {
-      // Find existing match: pcSongId → ccliNumber → title (case-insensitive)
-      let existing: Song | undefined
-      if (incoming.pcSongId) {
-        existing = byPcSongId.get(incoming.pcSongId)
-      }
-      if (!existing && incoming.ccliNumber) {
-        existing = byCcliNumber.get(incoming.ccliNumber)
-      }
-      if (!existing) {
-        existing = byTitle.get(incoming.title.toLowerCase())
+    // R350/ARCH-014 — chunk into <=499-op writeBatch batches, mirroring the
+    // sibling importSongs below, so one bad write no longer silently stops
+    // the rest of a large Planning Center import.
+    const CHUNK = 499
+    for (let i = 0; i < songsData.length; i += CHUNK) {
+      const chunk = songsData.slice(i, i + CHUNK)
+      const batch = writeBatch(db)
+      const chunkAdds: string[] = []
+      const chunkUpdates: string[] = []
+
+      for (const incoming of chunk) {
+        // Find existing match: pcSongId → ccliNumber → title (case-insensitive)
+        let existing: Song | undefined
+        if (incoming.pcSongId) {
+          existing = byPcSongId.get(incoming.pcSongId)
+        }
+        if (!existing && incoming.ccliNumber) {
+          existing = byCcliNumber.get(incoming.ccliNumber)
+        }
+        if (!existing) {
+          existing = byTitle.get(incoming.title.toLowerCase())
+        }
+
+        if (existing) {
+          // Update existing: preserve hidden status, grow-only union tags/themes, only set vwTypes when incoming is non-empty
+          const {
+            vwTypes: incomingVwTypes,
+            hidden: _hidden,
+            primaryArrangementId: incomingPrimary,
+            tags: _tags,
+            themes: _themes,
+            removedThemes: _removedThemes,
+            ...restIncoming
+          } = incoming
+          const existingRemovedThemes = existing.removedThemes ?? []
+          const updateData: Record<string, unknown> = {
+            ...restIncoming,
+            hidden: existing.hidden ?? false,
+            // D-05: grow-only de-duplicated union of existing user tags + incoming
+            // (imported) team-style tags — a re-import never drops a user tag.
+            // Tradeoff: a user-removed *tag* (as opposed to a theme) can reappear on
+            // reimport since only themes track explicit removals this phase (D-14).
+            tags: Array.from(new Set([...(existing.tags ?? []), ...(_tags ?? [])])),
+            // D-08/D-14: union themes with incoming, then subtract any theme the user
+            // explicitly removed locally so a removed theme doesn't resurrect on re-import.
+            themes: Array.from(new Set([...(existing.themes ?? []), ...(_themes ?? [])])).filter(
+              (t) => !existingRemovedThemes.includes(t),
+            ),
+            // D-14: removedThemes tracking is preserved verbatim across re-import.
+            removedThemes: existingRemovedThemes,
+            updatedAt: serverTimestamp(),
+          }
+          // Only include vwTypes if incoming array is non-empty (preserve user-set types if incoming is empty)
+          if (incomingVwTypes.length > 0) {
+            updateData.vwTypes = incomingVwTypes
+          }
+          // Preserve a user-chosen primary key when it still maps to an arrangement;
+          // otherwise fall back to the import's auto-picked key.
+          const existingPrimaryStillValid =
+            existing.primaryArrangementId != null &&
+            incoming.arrangements.some((a) => a.id === existing.primaryArrangementId)
+          updateData.primaryArrangementId = existingPrimaryStillValid
+            ? existing.primaryArrangementId
+            : (incomingPrimary ?? null)
+          batch.update(doc(db, 'organizations', orgId.value!, 'songs', existing.id), updateData)
+          chunkUpdates.push(incoming.title)
+        } else {
+          // Create new doc
+          const ref = doc(collection(db, 'organizations', orgId.value!, 'songs'))
+          batch.set(ref, {
+            ...incoming,
+            hidden: false,
+            tags: incoming.tags ?? [],
+            removedThemes: incoming.removedThemes ?? [],
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          })
+          chunkAdds.push(incoming.title)
+        }
       }
 
-      if (existing) {
-        // Update existing: preserve hidden status, grow-only union tags/themes, only set vwTypes when incoming is non-empty
-        const {
-          vwTypes: incomingVwTypes,
-          hidden: _hidden,
-          primaryArrangementId: incomingPrimary,
-          tags: _tags,
-          themes: _themes,
-          removedThemes: _removedThemes,
-          ...restIncoming
-        } = incoming
-        const existingRemovedThemes = existing.removedThemes ?? []
-        const updateData: Record<string, unknown> = {
-          ...restIncoming,
-          hidden: existing.hidden ?? false,
-          // D-05: grow-only de-duplicated union of existing user tags + incoming
-          // (imported) team-style tags — a re-import never drops a user tag.
-          // Tradeoff: a user-removed *tag* (as opposed to a theme) can reappear on
-          // reimport since only themes track explicit removals this phase (D-14).
-          tags: Array.from(new Set([...(existing.tags ?? []), ...(_tags ?? [])])),
-          // D-08/D-14: union themes with incoming, then subtract any theme the user
-          // explicitly removed locally so a removed theme doesn't resurrect on re-import.
-          themes: Array.from(new Set([...(existing.themes ?? []), ...(_themes ?? [])])).filter(
-            (t) => !existingRemovedThemes.includes(t),
-          ),
-          // D-14: removedThemes tracking is preserved verbatim across re-import.
-          removedThemes: existingRemovedThemes,
-          updatedAt: serverTimestamp(),
+      try {
+        await batch.commit()
+        summary.added += chunkAdds.length
+        summary.updated += chunkUpdates.length
+      } catch (err) {
+        // R350/ARCH-014 — isolate this chunk's failure: report every song
+        // staged in it as failed, but let later chunks still commit.
+        const message = err instanceof Error ? err.message : String(err)
+        for (const title of [...chunkAdds, ...chunkUpdates]) {
+          summary.failed.push({ title, error: message })
         }
-        // Only include vwTypes if incoming array is non-empty (preserve user-set types if incoming is empty)
-        if (incomingVwTypes.length > 0) {
-          updateData.vwTypes = incomingVwTypes
-        }
-        // Preserve a user-chosen primary key when it still maps to an arrangement;
-        // otherwise fall back to the import's auto-picked key.
-        const existingPrimaryStillValid =
-          existing.primaryArrangementId != null &&
-          incoming.arrangements.some((a) => a.id === existing.primaryArrangementId)
-        updateData.primaryArrangementId = existingPrimaryStillValid
-          ? existing.primaryArrangementId
-          : (incomingPrimary ?? null)
-        await updateDoc(doc(db, 'organizations', orgId.value!, 'songs', existing.id), updateData)
-      } else {
-        // Create new doc
-        await addDoc(collection(db, 'organizations', orgId.value!, 'songs'), {
-          ...incoming,
-          hidden: false,
-          tags: incoming.tags ?? [],
-          removedThemes: incoming.removedThemes ?? [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        })
+        console.error(
+          `upsertSongs: batch commit failed for chunk starting at index ${i} — ${chunk.length} song(s) not written`,
+          err,
+        )
       }
     }
+
+    return summary
   }
 
   async function importSongs(songsData: SongInput[]) {
