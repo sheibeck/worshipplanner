@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import SongFilesTab from '../SongFilesTab.vue'
+import SongFilePreviewModal from '../SongFilePreviewModal.vue'
 import { useSongStore } from '@/stores/songs'
 import type { SongAttachment } from '@/types/song'
 import type { UploadRow } from '@/composables/useSongFileUpload'
@@ -412,6 +413,126 @@ describe('SongFilesTab', () => {
 
       expect(removeSpy).toHaveBeenCalledTimes(1)
       expect(removeSpy).toHaveBeenCalledWith('song-1', link)
+    })
+  })
+
+  describe('R367: Preview (PDF modal) + Play (inline MP3 player)', () => {
+    it('clicking Preview on a PDF row opens SongFilePreviewModal with that attachment', async () => {
+      const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf' })
+      const wrapper = mountTab([doc])
+
+      const modalBefore = wrapper.findComponent(SongFilePreviewModal)
+      expect(modalBefore.props('open')).toBe(false)
+
+      await wrapper
+        .find('[data-testid="song-file-row-doc-1"] [data-testid="song-file-preview"]')
+        .trigger('click')
+
+      const modal = wrapper.findComponent(SongFilePreviewModal)
+      expect(modal.props('open')).toBe(true)
+      expect(modal.props('attachment')).toEqual(doc)
+    })
+
+    it('closing the modal (emitting close) clears the previewed attachment', async () => {
+      const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf' })
+      const wrapper = mountTab([doc])
+
+      await wrapper
+        .find('[data-testid="song-file-row-doc-1"] [data-testid="song-file-preview"]')
+        .trigger('click')
+      expect(wrapper.findComponent(SongFilePreviewModal).props('open')).toBe(true)
+
+      wrapper.findComponent(SongFilePreviewModal).vm.$emit('close')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.findComponent(SongFilePreviewModal).props('open')).toBe(false)
+    })
+
+    it('clicking Play on an MP3 row reveals a native audio player with src=downloadUrl', async () => {
+      const track = makeAttachment({
+        id: 'track-1',
+        kind: 'audio',
+        name: 'demo.mp3',
+        mimeType: 'audio/mpeg',
+        downloadUrl: 'https://cdn.example.com/demo.mp3',
+      })
+      const wrapper = mountTab([track])
+      expect(wrapper.find('[data-testid="song-file-row-track-1"] audio').exists()).toBe(false)
+
+      await wrapper
+        .find('[data-testid="song-file-row-track-1"] [data-testid="song-file-play"]')
+        .trigger('click')
+
+      const audio = wrapper.find('[data-testid="song-file-row-track-1"] + audio')
+      expect(audio.exists()).toBe(true)
+      expect(audio.attributes('src')).toBe('https://cdn.example.com/demo.mp3')
+    })
+
+    it('starting a second Play collapses the first — only one audio element present at a time', async () => {
+      const trackA = makeAttachment({ id: 'track-a', kind: 'audio', name: 'a.mp3', mimeType: 'audio/mpeg', downloadUrl: 'https://cdn.example.com/a.mp3' })
+      const trackB = makeAttachment({ id: 'track-b', kind: 'audio', name: 'b.mp3', mimeType: 'audio/mpeg', downloadUrl: 'https://cdn.example.com/b.mp3' })
+      const wrapper = mountTab([trackA, trackB])
+
+      await wrapper.find('[data-testid="song-file-row-track-a"] [data-testid="song-file-play"]').trigger('click')
+      expect(wrapper.findAll('audio')).toHaveLength(1)
+
+      await wrapper.find('[data-testid="song-file-row-track-b"] [data-testid="song-file-play"]').trigger('click')
+      expect(wrapper.findAll('audio')).toHaveLength(1)
+      const audio = wrapper.find('[data-testid="song-file-row-track-b"] + audio')
+      expect(audio.exists()).toBe(true)
+    })
+
+    it('an audio native error renders the exact fallback copy and a Download link beneath the controls', async () => {
+      const track = makeAttachment({
+        id: 'track-1',
+        kind: 'audio',
+        name: 'demo.mp3',
+        mimeType: 'audio/mpeg',
+        downloadUrl: 'https://cdn.example.com/demo.mp3',
+      })
+      const wrapper = mountTab([track])
+      await wrapper.find('[data-testid="song-file-row-track-1"] [data-testid="song-file-play"]').trigger('click')
+
+      await wrapper.find('[data-testid="song-file-audio-player"]').trigger('error')
+
+      expect(wrapper.find('[data-testid="song-file-audio-error"]').text()).toContain("Couldn't play this file.")
+      const fallback = wrapper.find('[data-testid="song-file-audio-error-download"]')
+      expect(fallback.exists()).toBe(true)
+      expect(fallback.attributes('href')).toBe('https://cdn.example.com/demo.mp3')
+    })
+
+    it('a link row exposes neither Preview nor Play', () => {
+      const link = makeAttachment({
+        id: 'link-1',
+        kind: 'link',
+        name: 'Reference track',
+        href: 'https://youtu.be/xyz',
+        linkSource: 'youtube',
+        storagePath: undefined,
+        downloadUrl: undefined,
+        mimeType: undefined,
+        sizeBytes: undefined,
+      })
+      const wrapper = mountTab([link])
+      const row = wrapper.find('[data-testid="song-file-row-link-1"]')
+      expect(row.find('[data-testid="song-file-preview"]').exists()).toBe(false)
+      expect(row.find('[data-testid="song-file-play"]').exists()).toBe(false)
+    })
+
+    it('a document row exposes Preview but not Play', () => {
+      const doc = makeAttachment({ id: 'doc-1', kind: 'document', name: 'chart.pdf' })
+      const wrapper = mountTab([doc])
+      const row = wrapper.find('[data-testid="song-file-row-doc-1"]')
+      expect(row.find('[data-testid="song-file-preview"]').exists()).toBe(true)
+      expect(row.find('[data-testid="song-file-play"]').exists()).toBe(false)
+    })
+
+    it('an audio row exposes Play but not Preview', () => {
+      const track = makeAttachment({ id: 'track-1', kind: 'audio', name: 'demo.mp3', mimeType: 'audio/mpeg' })
+      const wrapper = mountTab([track])
+      const row = wrapper.find('[data-testid="song-file-row-track-1"]')
+      expect(row.find('[data-testid="song-file-play"]').exists()).toBe(true)
+      expect(row.find('[data-testid="song-file-preview"]').exists()).toBe(false)
     })
   })
 })
