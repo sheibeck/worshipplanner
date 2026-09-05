@@ -591,7 +591,7 @@ are deployed), and SEC-S-03 (share links never expiring — an intentional produ
 - [x] **Phase 117: Security — Proxy Authentication, Rate Limits & Quotas** - Close the four Cloud-Functions-only gaps: the unauthenticated `/api/planningcenter` proxy, the ESV/NLT rate-limit gap, and missing enqueue/import quotas on messaging and PPTX import (completed 2026-09-04)
 - [x] **Phase 118: Security — Firestore Rules & Public Share Hardening** - Close every remaining `firestore.rules`/public-share-page gap: draft provenance forgery, the super-admin universal members-write grant, orgSlugs/orgNames enumeration, share-page PII, guessable share ids, and admin/editor role semantics (completed 2026-09-04)
 - [x] **Phase 119: Architecture — Correctness, Batching & Store-Ownership Fixes** - Nine self-contained architecture fixes: per-item failure isolation, batched PC song-import writes, a de-duplicated lyrics subscription, dead-code removal, org-switch teardown/re-subscribe hardening, store-mediated writes/reads, and a tested autosave/reorder-save coordination window (completed 2026-09-05)
-- [ ] **Phase 120: Architecture — God-Module Decomposition** - Begin decomposing `ServiceEditorView.vue` and `functions/src/index.ts`, and correct the utility-layer dependency-direction inversion
+- [x] **Phase 120: Architecture — God-Module Decomposition** - Begin decomposing `ServiceEditorView.vue` and `functions/src/index.ts`, and correct the utility-layer dependency-direction inversion (completed 2026-09-05)
 
 ### Phase 117: Security — Proxy Authentication, Rate Limits & Quotas
 
