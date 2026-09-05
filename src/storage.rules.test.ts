@@ -7,7 +7,7 @@ import {
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
 import { doc, setDoc, deleteDoc } from 'firebase/firestore'
-import { ref, uploadBytes, getBytes } from 'firebase/storage'
+import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage'
 
 let testEnv: RulesTestEnvironment
 
@@ -57,6 +57,10 @@ const OVER_CAP_BYTES = new Uint8Array(26214401)
 const MEDIA_UNDER_CAP_BYTES = new Uint8Array(40 * 1024 * 1024)
 // One byte over the media path's 50MB (52428800 byte) cap.
 const MEDIA_OVER_CAP_BYTES = new Uint8Array(52428801)
+// ~40MB — under the song-files 50MB cap.
+const SONG_FILE_UNDER_CAP_BYTES = new Uint8Array(40 * 1024 * 1024)
+// One byte over the song-files 50MB (52428800 byte) cap.
+const SONG_FILE_OVER_CAP_BYTES = new Uint8Array(52428801)
 
 describe('storage.rules — org membership', () => {
   // Phase 40 (v1.5 claim migration, Deploy 2 complete 2026-08-12): membership is now the
@@ -390,6 +394,113 @@ describe('storage.rules — media path', () => {
     const fileRef = ref(storage, 'orgs/orgA/media/m4/clip.mp4')
 
     await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
+})
+
+// Phase 122 (R364, R372): song-files/ is a dedicated, permanent Storage
+// prefix for Song attachments (chord charts / lead sheets / audio),
+// deliberately OUTSIDE media/ so it is excluded from every retention sweep
+// (see functions/src/cleanupSweeps.ts). Claim-arm-only convention, same as
+// the 'storage.rules — media path' block above -- no members document is
+// seeded for the allow cases.
+describe('storage.rules — song-files path (R364, R372, Phase 122)', () => {
+  it('allows an editor to upload a PDF under the 50MB cap', async () => {
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/song-files/f1/chart.pdf')
+
+    await assertSucceeds(
+      uploadBytes(fileRef, SONG_FILE_UNDER_CAP_BYTES, { contentType: 'application/pdf' }),
+    )
+  })
+
+  it('allows an editor to upload an MP3 under the 50MB cap (proves the audio branch, not just PDF)', async () => {
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/song-files/f1b/track.mp3')
+
+    await assertSucceeds(
+      uploadBytes(fileRef, SONG_FILE_UNDER_CAP_BYTES, { contentType: 'audio/mpeg' }),
+    )
+  })
+
+  it('allows a viewer to READ a song-files object (R372: read is member-gated, not editor-gated)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const storage = context.storage()
+      await uploadBytes(ref(storage, 'orgs/orgA/song-files/f2/chart.pdf'), SMALL_BYTES, {
+        contentType: 'application/pdf',
+      })
+    })
+
+    const context = testEnv.authenticatedContext('userB', { orgId: 'orgA', role: 'viewer' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/song-files/f2/chart.pdf')
+
+    await assertSucceeds(getBytes(fileRef))
+  })
+
+  it('DENIES a viewer from uploading (R372: write is editor-gated)', async () => {
+    const context = testEnv.authenticatedContext('userC', { orgId: 'orgA', role: 'viewer' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/song-files/f3/chart.pdf')
+
+    await assertFails(
+      uploadBytes(fileRef, SMALL_BYTES, { contentType: 'application/pdf' }),
+    )
+  })
+
+  it('DENIES an oversize upload even from an editor', async () => {
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/song-files/f4/chart.pdf')
+
+    await assertFails(
+      uploadBytes(fileRef, SONG_FILE_OVER_CAP_BYTES, { contentType: 'application/pdf' }),
+    )
+  })
+
+  // THE pitfall-1 regression test: a SMALL wrong-type file, well under even
+  // the catch-all's 25MB cap, so the ONLY thing that can deny it is the type
+  // check reached through the catch-all's song-files/ exclusion -- proves the
+  // OR-combination fix, not merely the size cap (122-RESEARCH.md Pitfall 1).
+  it('DENIES a small non-PDF/MP3 upload from an editor (proves the catch-all cannot OR-override the type gate)', async () => {
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/song-files/f5/malware.exe')
+
+    await assertFails(
+      uploadBytes(fileRef, SMALL_BYTES, { contentType: 'application/x-msdownload' }),
+    )
+  })
+
+  it('allows an editor to delete a song-files object', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const storage = context.storage()
+      await uploadBytes(ref(storage, 'orgs/orgA/song-files/f6/chart.pdf'), SMALL_BYTES, {
+        contentType: 'application/pdf',
+      })
+    })
+
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/song-files/f6/chart.pdf')
+
+    await assertSucceeds(deleteObject(fileRef))
+  })
+
+  it('DENIES a viewer from deleting a song-files object', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const storage = context.storage()
+      await uploadBytes(ref(storage, 'orgs/orgA/song-files/f7/chart.pdf'), SMALL_BYTES, {
+        contentType: 'application/pdf',
+      })
+    })
+
+    const context = testEnv.authenticatedContext('userB', { orgId: 'orgA', role: 'viewer' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/song-files/f7/chart.pdf')
+
+    await assertFails(deleteObject(fileRef))
   })
 })
 
