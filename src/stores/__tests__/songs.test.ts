@@ -845,6 +845,119 @@ describe('useSongStore', () => {
     })
   })
 
+  describe('removeSongAttachment', () => {
+    const uploadAttachment = {
+      id: 'a1',
+      kind: 'document' as const,
+      name: 'chart.pdf',
+      storagePath: 'orgs/org-1/song-files/a1/chart.pdf',
+      createdAt: {} as never,
+      createdBy: 'u1',
+    }
+    const audioAttachment = {
+      id: 'a2',
+      kind: 'audio' as const,
+      name: 'track.mp3',
+      storagePath: 'orgs/org-1/song-files/a2/track.mp3',
+      createdAt: {} as never,
+      createdBy: 'u1',
+    }
+    const linkAttachment = {
+      id: 'a3',
+      kind: 'link' as const,
+      name: 'YouTube video',
+      href: 'https://youtu.be/x',
+      createdAt: {} as never,
+      createdBy: 'u1',
+    }
+
+    it('writes a filtered attachments array (excludes the removed id, keeps the rest) plus serverTimestamp updatedAt', async () => {
+      const { updateDoc, serverTimestamp } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', attachments: [uploadAttachment, audioAttachment, linkAttachment] }),
+      ])
+
+      await store.removeSongAttachment('song-1', uploadAttachment)
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as { attachments: Array<{ id: string }>; updatedAt: unknown }
+      expect(Array.isArray(data.attachments)).toBe(true)
+      expect(data.attachments.map((a) => a.id)).toEqual(['a2', 'a3'])
+      expect(data.updatedAt).toBeDefined()
+      expect(serverTimestamp).toHaveBeenCalled()
+    })
+
+    it('calls deleteObject exactly once with the removed upload storagePath', async () => {
+      const { deleteObject } = await import('firebase/storage')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', attachments: [uploadAttachment, audioAttachment] }),
+      ])
+
+      await store.removeSongAttachment('song-1', uploadAttachment)
+
+      expect(deleteObject).toHaveBeenCalledTimes(1)
+      const calledPath = (vi.mocked(deleteObject).mock.calls[0]![0] as unknown as { path: string }).path
+      expect(calledPath).toBe('orgs/org-1/song-files/a1/chart.pdf')
+    })
+
+    it('does not call deleteObject for a link-kind attachment (no storagePath)', async () => {
+      const { deleteObject } = await import('firebase/storage')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', attachments: [uploadAttachment, linkAttachment] }),
+      ])
+
+      await store.removeSongAttachment('song-1', linkAttachment)
+
+      expect(deleteObject).not.toHaveBeenCalled()
+    })
+
+    it('a rejected deleteObject does not reject removeSongAttachment, and the updateDoc record removal still committed', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { deleteObject } = await import('firebase/storage')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', attachments: [uploadAttachment] }),
+      ])
+
+      vi.mocked(deleteObject).mockRejectedValueOnce(new Error('object not found'))
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      await expect(store.removeSongAttachment('song-1', uploadAttachment)).resolves.not.toThrow()
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      expect(consoleErrorSpy).toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+      vi.mocked(deleteObject).mockReset()
+      vi.mocked(deleteObject).mockImplementation(() => Promise.resolve())
+    })
+
+    it('is a no-op when orgId is unset', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { deleteObject } = await import('firebase/storage')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      // Deliberately do not call store.subscribe() — orgId stays null.
+
+      await store.removeSongAttachment('song-1', uploadAttachment)
+
+      expect(updateDoc).not.toHaveBeenCalled()
+      expect(deleteObject).not.toHaveBeenCalled()
+    })
+  })
+
   describe('deleteSong', () => {
     it('calls updateDoc with hidden:true, not deleteDoc', async () => {
       const { updateDoc, deleteDoc } = await import('firebase/firestore')

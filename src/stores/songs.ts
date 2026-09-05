@@ -318,6 +318,37 @@ export const useSongStore = defineStore('songs', () => {
     })
   }
 
+  // R368/R371 (editor-removal half) — filter-by-id write, NOT Firestore
+  // arrayRemove: arrayRemove matches array elements by deep equality, and
+  // every attachment carries a `createdAt` Timestamp that may not round-trip
+  // identically after onSnapshot normalization, so arrayRemove(liveObject)
+  // can silently no-op and leave the "removed" file to reappear on the next
+  // snapshot. `id` is a guaranteed-unique stable field, so filter-by-id is
+  // deterministic and immune to the Timestamp round-trip. Reads songs.value
+  // (already the latest onSnapshot array) immediately before writing, so the
+  // concurrent-add lost-update window is negligible — removal is a
+  // user-initiated, one-at-a-time action. Storage cleanup mirrors
+  // hardDeleteSong's best-effort loop (~L348-355): a failed deleteObject is
+  // logged and NEVER reverts the record removal (a rare orphaned blob is
+  // acceptable per the CONTEXT remove-atomicity decision).
+  async function removeSongAttachment(id: string, attachment: SongAttachment) {
+    if (!orgId.value) return
+    const song = songs.value.find((s) => s.id === id)
+    if (!song) return
+    const filtered = (song.attachments ?? []).filter((a) => a.id !== attachment.id)
+    await updateDoc(doc(db, 'organizations', orgId.value, 'songs', id), {
+      attachments: filtered,
+      updatedAt: serverTimestamp(),
+    })
+    if (attachment.storagePath) {
+      try {
+        await deleteObject(storageRef(storage, attachment.storagePath))
+      } catch (err) {
+        console.error(`removeSongAttachment: failed to delete Storage object ${attachment.storagePath}:`, err)
+      }
+    }
+  }
+
   async function deleteSong(id: string) {
     if (!orgId.value) return
     await updateDoc(doc(db, 'organizations', orgId.value, 'songs', id), {
@@ -531,6 +562,7 @@ export const useSongStore = defineStore('songs', () => {
     addSong,
     updateSong,
     addSongAttachment,
+    removeSongAttachment,
     deleteSong,
     hardDeleteSong,
     restoreSong,
