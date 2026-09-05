@@ -724,7 +724,9 @@ song's existing attachments, with clear grouping and an unambiguous removal cons
      clear before/at removal that removal deletes the file everywhere the song is used, including past
      services (R368).
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 124-01-PLAN.md — Grouped Documents/Audio rows + metadata + Download + Remove inline-confirm; store removeSongAttachment (R366, R368)
+- [ ] 124-02-PLAN.md — In-app PDF preview modal + inline MP3 player wired into the rows (R367)
 **UI hint**: yes
 
 ## Backlog
