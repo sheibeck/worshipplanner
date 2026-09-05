@@ -56,6 +56,12 @@
       </p>
     </div>
 
+    <!-- IN-01/121-UI-SPEC §5 A11y: non-visual batch-completion announcement,
+         updated as each file finishes (not per progress tick). -->
+    <p class="sr-only" role="status" aria-live="polite" data-testid="song-files-upload-status">
+      {{ uploadStatusAnnouncement }}
+    </p>
+
     <!-- Per-file upload progress rows (R363) -->
     <div v-if="uploads.length > 0" class="space-y-2" data-testid="song-files-upload-rows">
       <div v-for="row in uploads" :key="row.id" class="px-3 py-2 rounded-md bg-gray-800/60 border border-gray-800">
@@ -159,6 +165,16 @@ const uploadCtx = computed(() => ({
   orgId: props.orgId,
   createdBy: props.createdBy,
 }))
+
+// IN-01: screen-reader-only batch-completion count, e.g. "2 of 3 files
+// uploaded." — counts only files that started uploading (excludes rejected
+// rows, which already get their own visible/read error message).
+const uploadStatusAnnouncement = computed(() => {
+  const relevant = uploads.value.filter((u) => u.status === 'uploading' || u.status === 'done')
+  const doneCount = relevant.filter((u) => u.status === 'done').length
+  if (relevant.length === 0 || doneCount === 0) return ''
+  return `${doneCount} of ${relevant.length} file${relevant.length === 1 ? '' : 's'} uploaded.`
+})
 
 function openFilePicker() {
   fileInputRef.value?.click()

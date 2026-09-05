@@ -213,6 +213,27 @@ describe('SongFilesTab', () => {
     expect((fill.element as HTMLElement).style.width).toBe('42%')
   })
 
+  it('IN-01: announces batch-completion count via a visually-hidden aria-live region', () => {
+    mockUploads.value = [
+      { id: 'u1', name: 'a.pdf', kind: 'document', progress: 100, status: 'done' },
+      { id: 'u2', name: 'b.pdf', kind: 'document', progress: 40, status: 'uploading' },
+    ]
+    const wrapper = mountTab()
+    const status = wrapper.find('[data-testid="song-files-upload-status"]')
+    expect(status.attributes('aria-live')).toBe('polite')
+    expect(status.classes()).toContain('sr-only')
+    expect(status.text()).toBe('1 of 2 files uploaded.')
+  })
+
+  it('IN-01: the aria-live region is empty before any file has completed', () => {
+    mockUploads.value = [
+      { id: 'u1', name: 'a.pdf', kind: 'document', progress: 10, status: 'uploading' },
+    ]
+    const wrapper = mountTab()
+    const status = wrapper.find('[data-testid="song-files-upload-status"]')
+    expect(status.text()).toBe('')
+  })
+
   it('renders a rejected upload row with its red rejection message', () => {
     mockUploads.value = [
       {
