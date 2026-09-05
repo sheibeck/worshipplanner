@@ -227,9 +227,22 @@ watch(
   },
 )
 
-onMounted(async () => {
-  if (props.readingId) {
+// R354/ARCH-003: reactive re-subscribe on org change while mounted, instead of
+// subscribing once at mount — mirrors the church-switch re-subscribe idiom
+// (ADR-0066) so a stale org's readings subscription cannot survive a switch.
+watch(
+  () => props.orgId,
+  () => {
+    store.unsubscribeReadings()
     store.subscribeReadings(props.orgId)
+  },
+  { immediate: true },
+)
+
+onMounted(async () => {
+  // One-time fetch of the reading being edited — stays gated on readingId
+  // and mount-only; only the subscription above became reactive.
+  if (props.readingId) {
     const reading = await store.getReading(props.orgId, props.readingId)
     if (reading) {
       const scriptureRef = reading.reference
@@ -243,9 +256,7 @@ onMounted(async () => {
 onUnmounted(() => {
   cleanupAutoSave()
   if (surfaceId.value) saveStatus.clear(surfaceId.value)
-  if (props.readingId) {
-    store.unsubscribeReadings()
-  }
+  store.unsubscribeReadings()
 })
 
 // See ADR-0077 (docs/adr/0077-test-only-seam-matches-pptximportmodal-vue-s-existing-define.md)

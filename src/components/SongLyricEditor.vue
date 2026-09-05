@@ -471,7 +471,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import Sortable from 'sortablejs'
 import { useSongLyricsStore } from '@/stores/songLyrics'
 import { useAuthStore } from '@/stores/auth'
@@ -994,9 +994,17 @@ function onPasteSaved() {
   pasteMode.value = false
 }
 
-onMounted(() => {
-  songLyricsStore.subscribeLyrics(props.orgId, props.songId)
-})
+// R354/ARCH-003: reactive re-subscribe on org (or song) change while mounted,
+// not just once at mount — mirrors the church-switch re-subscribe idiom
+// (ADR-0066) so a stale org's lyrics subscription cannot survive a switch.
+watch(
+  [() => props.orgId, () => props.songId],
+  () => {
+    songLyricsStore.unsubscribeLyrics()
+    songLyricsStore.subscribeLyrics(props.orgId, props.songId)
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   cleanupAutoSave()

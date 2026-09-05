@@ -392,4 +392,21 @@ describe('ScriptureSlideEditor', () => {
     expect(mockGetReading).toHaveBeenCalledWith('org-1', 'existing-reading')
     expect(wrapper.find('[data-testid="slide-textarea-0"]').exists()).toBe(true)
   })
+
+  // R354/ARCH-003: an org change while mounted must tear down the old
+  // readings subscription and re-subscribe with the new orgId.
+  it('re-subscribes when props.orgId changes while mounted (R354/ARCH-003)', async () => {
+    const wrapper = mountEditor()
+    await flushPromises()
+    expect(mockSubscribeReadings).toHaveBeenCalledWith('org-1')
+
+    mockUnsubscribeReadings.mockClear()
+    mockSubscribeReadings.mockClear()
+
+    await wrapper.setProps({ orgId: 'org-2' })
+    await flushPromises()
+
+    expect(mockUnsubscribeReadings).toHaveBeenCalled()
+    expect(mockSubscribeReadings).toHaveBeenCalledWith('org-2')
+  })
 })

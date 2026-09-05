@@ -196,6 +196,22 @@ describe('SongLyricEditor', () => {
     expect(mockSubscribeLyrics).toHaveBeenCalledWith('org-1', 'song-1')
   })
 
+  // R354/ARCH-003: an org (or song) change while mounted must tear down the
+  // old subscription and re-subscribe with the new ids, not sit stale.
+  it('re-subscribes when props.orgId changes while mounted (R354/ARCH-003)', async () => {
+    const wrapper = await mountEditor()
+    expect(mockSubscribeLyrics).toHaveBeenCalledWith('org-1', 'song-1')
+
+    mockUnsubscribeLyrics.mockClear()
+    mockSubscribeLyrics.mockClear()
+
+    await wrapper.setProps({ orgId: 'org-2' })
+    await flushPromises()
+
+    expect(mockUnsubscribeLyrics).toHaveBeenCalled()
+    expect(mockSubscribeLyrics).toHaveBeenCalledWith('org-2', 'song-1')
+  })
+
   it('shows loading state', async () => {
     const wrapper = await mountEditor()
     expect(wrapper.text()).toContain('Loading lyrics')
