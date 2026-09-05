@@ -54,11 +54,11 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
 - [x] **R345** (SEC-C-06): `parsePptx` enforces a **per-uid/per-org daily import quota** (matching the
   R161/R171 pattern), independent of the render service's concurrency ceiling.
 
-- [ ] **R346** (SEC-S-04): Free-text `notes`/slot-body fields are **PII-filtered or explicitly gated**
+- [x] **R346** (SEC-S-04): Free-text `notes`/slot-body fields are **PII-filtered or explicitly gated**
   before they render verbatim on the public share page, consistent with the deliberately-guarded
   `roleAssignments` names-only field.
 
-- [ ] **R347** (SEC-S-02): Memorable-URL share ids are **hardened against enumeration** (e.g. an
+- [x] **R347** (SEC-S-02): Memorable-URL share ids are **hardened against enumeration** (e.g. an
   unguessable token component alongside the memorable slug), or — if the memorable-URL product value wins
   — the residual guessability risk is explicitly re-accepted in writing with reasoning.
 
@@ -152,8 +152,8 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 | R343 | Phase 118 | Complete |
 | R344 | Phase 117 | Complete |
 | R345 | Phase 117 | Complete |
-| R346 | Phase 118 | Pending |
-| R347 | Phase 118 | Pending |
+| R346 | Phase 118 | Complete |
+| R347 | Phase 118 | Complete |
 | R348 | Phase 118 | Complete |
 | R349 | Phase 119 | Pending |
 | R350 | Phase 119 | Pending |

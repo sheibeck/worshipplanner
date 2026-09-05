@@ -4,17 +4,17 @@ milestone: v2.10
 milestone_name: Security & Architecture Hardening (Phases 117-120, in planning)
 current_phase: 118
 current_phase_name: Security — Firestore Rules & Public Share Hardening
-status: executing
-stopped_at: Completed 118-01-PLAN.md
-last_updated: "2026-09-05T01:05:30.878Z"
+status: verifying
+stopped_at: Completed 118-02-PLAN.md
+last_updated: "2026-09-05T01:39:46.679Z"
 last_activity: 2026-09-04
 last_activity_desc: Phase 118 execution started
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
-  percent: 25
+  completed_plans: 3
+  percent: 50
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.10 Security & Architecture Hardening (roadmap created 2026-09-04)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and architectural
 reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" — starting with the
@@ -1261,7 +1261,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 118 (Security — Firestore Rules & Public Share Hardening) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-04 — Phase 118 execution started
 
 ## ★ v2.10 ROADMAP.md phase breakdown (created 2026-09-04)
@@ -3227,6 +3227,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 116 P02 | 35min | 2 tasks | 2 files |
 | Phase 117 P01 | 25min | 3 tasks | 2 files |
 | Phase 118 P01 | 25min | 3 tasks | 2 files |
+| Phase 118 P02 | 40min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -3757,6 +3758,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R341 protects exactly createdBy/createdAt on draft services (not pcExportedAt/pcPlanId, which have their own export branch)
 - [Phase ?]: R343 uses a flat list:if false (not scoped) on orgSlugs/orgNames — confirmed zero legitimate list/query usage on these collections
 - [Phase ?]: R342/R348 took the locked low-risk CONTEXT branch (document + pin the accepted residual) rather than narrowing isOrgEditor
+- [Phase ?]: R346: kept ServiceSnapshot.notes for the internal re-lock diff; added toPublicServiceSnapshot() to strip it at the public-write boundary only
+- [Phase ?]: R347: took the default low-risk branch — written re-acceptance + code comments, no id-format change
 
 ### Roadmap Evolution
 
@@ -4085,8 +4088,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T01:05:30.800Z
-Stopped at: Completed 118-01-PLAN.md
+Last session: 2026-09-05T01:39:46.606Z
+Stopped at: Completed 118-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

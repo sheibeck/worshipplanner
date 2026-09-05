@@ -632,12 +632,12 @@ test.
   6. The `role: 'admin'` vs `'editor'` distinction either gates at least one real, tested capability difference, or is documented as intentionally synonymous today with an explicit warning that a future `'admin'`-specific check must not silently inherit the editor self-escalation path (R348).
   7. `npm run test:rules` (or `npx vitest run --config vitest.rules.config.ts` against a running emulator) passes with every new ALLOW/DENY case green.
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 Plans:
 
 - [x] 118-01-PLAN.md — firestore.rules hardening + rules tests: draft-provenance guard (R341), orgSlugs/orgNames get/list split (R343), super-admin members-write document+pin (R342), admin/editor synonymity document+pin (R348) [wave 1]
-- [ ] 118-02-PLAN.md — public share PII gate: allowlist-shape the service snapshot + ShareView render gate (R346), and re-accept guessable memorable share ids in writing (R347) [wave 1]
+- [x] 118-02-PLAN.md — public share PII gate: allowlist-shape the service snapshot + ShareView render gate (R346), and re-accept guessable memorable share ids in writing (R347) [wave 1]
 
 ### Phase 119: Architecture — Correctness, Batching & Store-Ownership Fixes
 
