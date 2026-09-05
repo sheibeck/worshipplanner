@@ -28,11 +28,11 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
 
 ### Security Hardening (backlog 999.5)
 
-- [ ] **R339** (SEC-A-01): The `/api/planningcenter` proxy route **requires an authenticated app caller**
+- [x] **R339** (SEC-A-01): The `/api/planningcenter` proxy route **requires an authenticated app caller**
   — the same auth gate that guards the `anthropic`/`esv`/`nlt` routes — and rejects unauthenticated
   requests with 401 instead of relaying them upstream. *(Highest priority.)*
 
-- [ ] **R340** (SEC-C-01): The ESV/NLT Bible-API proxy branches are covered by the **same per-uid rate
+- [x] **R340** (SEC-C-01): The ESV/NLT Bible-API proxy branches are covered by the **same per-uid rate
   limiter** that guards the `anthropic` proxy, so an enabled org cannot make unlimited-frequency Bible-API
   calls.
 
@@ -48,10 +48,10 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
   `get` from `list`** (the same fix pattern as v2.8's SEC-S-01) so the full registry can no longer be
   enumerated by an unauthenticated collection query.
 
-- [ ] **R344** (SEC-C-05): `queueServiceMessage` enforces its **own per-uid/per-org enqueue-rate limit**,
+- [x] **R344** (SEC-C-05): `queueServiceMessage` enforces its **own per-uid/per-org enqueue-rate limit**,
   independent of the downstream per-message and shared-instance ceilings.
 
-- [ ] **R345** (SEC-C-06): `parsePptx` enforces a **per-uid/per-org daily import quota** (matching the
+- [x] **R345** (SEC-C-06): `parsePptx` enforces a **per-uid/per-org daily import quota** (matching the
   R161/R171 pattern), independent of the render service's concurrency ceiling.
 
 - [ ] **R346** (SEC-S-04): Free-text `notes`/slot-body fields are **PII-filtered or explicitly gated**
@@ -145,13 +145,13 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R339 | Phase 117 | Pending |
-| R340 | Phase 117 | Pending |
+| R339 | Phase 117 | Complete |
+| R340 | Phase 117 | Complete |
 | R341 | Phase 118 | Pending |
 | R342 | Phase 118 | Pending |
 | R343 | Phase 118 | Pending |
-| R344 | Phase 117 | Pending |
-| R345 | Phase 117 | Pending |
+| R344 | Phase 117 | Complete |
+| R345 | Phase 117 | Complete |
 | R346 | Phase 118 | Pending |
 | R347 | Phase 118 | Pending |
 | R348 | Phase 118 | Pending |

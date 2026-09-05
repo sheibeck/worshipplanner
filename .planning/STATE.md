@@ -1,16 +1,20 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.10
-milestone_name: Security & Architecture Hardening
-status: planning
-last_updated: "2026-09-04T23:28:09.921Z"
+milestone_name: Security & Architecture Hardening (Phases 117-120, in planning)
+current_phase: 117
+current_phase_name: Security — Proxy Authentication, Rate Limits & Quotas
+status: verifying
+stopped_at: Completed 117-01-PLAN.md
+last_updated: "2026-09-05T00:18:45.546Z"
 last_activity: 2026-09-04
+last_activity_desc: Phase 117 execution started
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 25
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -54,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.10 Security & Architecture Hardening (roadmap created 2026-09-04)
 
-**Status:** Roadmap created, not yet planned. Next: `/gsd-plan-phase 117`.
+**Status:** Phase complete — ready for verification
 
 **Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and architectural
 reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" — starting with the
@@ -1255,10 +1259,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 117 — Security — Proxy Authentication, Rate Limits & Quotas (not started)
-Plan: —
-Status: Roadmap created; awaiting /gsd-plan-phase 117
-Last activity: 2026-09-04 — v2.10 ROADMAP.md created (Phases 117-120, R339-R360, 22/22 mapped)
+Phase: 117 (Security — Proxy Authentication, Rate Limits & Quotas) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-09-04 — Phase 117 execution started
 
 ## ★ v2.10 ROADMAP.md phase breakdown (created 2026-09-04)
 
@@ -3221,6 +3225,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 115 P05 | 25min | 3 tasks | 14 files |
 | Phase 116 P01 | 15m | 2 tasks | 5 files |
 | Phase 116 P02 | 35min | 2 tasks | 2 files |
+| Phase 117 P01 | 25min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3745,6 +3750,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: hasCredits computed reads all 5 CopyrightInfo fields (not just ccliSongNumber) so a manual-only entry (e.g. copyrightLines alone) still shows the read-only display (R336).
 - [Phase ?]: saveCreditsEdit mirrors onSaveVersion's exact saveLyrics shape — editableState.sections/performanceOrder pass through unchanged, so a credits save never re-parses the lyrics (R336, threat T-116-04).
 - [Phase ?]: History toggle/panel hidden via a HISTORY_ENABLED=false template gate rather than deletion — LyricVersionHistory.vue and the store's version state/handlers stay referenced and unchanged for a later re-enable (R337).
+- [Phase ?]: AUTH_REQUIRED kept as a separate set from SECRET_INJECTED (R339) -- planningcenter is authenticated but injects no server secret
+- [Phase ?]: esv/nlt share the SAME per-uid aiRateLimits counter as anthropic (R340), not a separate budget
+- [Phase ?]: R344/R345 quotas reuse existing appConfig knobs on dedicated counter collections -- no new appConfig field, keeping frontend appConfigDefaults.ts duplicate out of scope
 
 ### Roadmap Evolution
 
@@ -4073,8 +4081,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-04T13:03:52.092Z
-Stopped at: Completed 116-02-PLAN.md (R336/R337: inline credits editing, History hidden)
+Last session: 2026-09-05T00:18:45.486Z
+Stopped at: Completed 117-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
