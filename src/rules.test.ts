@@ -806,6 +806,39 @@ describe('Super-admin content access without a membership doc (R225, Phase 78)',
   // (src/rules.test.ts:496-501) -- cited here, not duplicated. That test
   // requires no changes for Phase 78: `allow delete: if false;` was never
   // touched by this widening.
+
+  // R342/ARCH-018/SEC-ISO-04 (accepted, Phase 118): pins the accepted residual
+  // -- a super-admin CAN write members/{uid} for ANY org by rule (via the
+  // isOrgEditor super-admin disjunct at :38). The "no member doc" guarantee
+  // is a client-code contract (enterOrgAsSuperAdmin), not a rules invariant.
+  it('ALLOWS a super-admin to write an org member doc directly (R342 accepted residual)', async () => {
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church" })
+    const context = testEnv.authenticatedContext('superAdminUid', { superAdmin: true })
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'members', 'someUid'), {
+        role: 'editor',
+        joinedAt: new Date(),
+      }),
+    )
+  })
+})
+
+// R348/SEC-ISO-05 (accepted, Phase 118): role:'admin' is intentionally
+// synonymous with role:'editor' today -- isOrgEditor's role check accepts
+// both, so an 'admin' member is treated identically to an 'editor' member
+// on every editor-gated write. This test pins that synonymity; a future
+// admin-specific gate that diverges from 'editor' should break this test
+// deliberately, not silently.
+describe('admin/editor role synonymity (R348)', () => {
+  it('an admin-role member is treated exactly as an editor on an editor-gated write', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'admin')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'songs', 's1'), { title: 'X' }),
+    )
+  })
 })
 
 describe('Catch-all deny', () => {

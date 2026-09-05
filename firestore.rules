@@ -37,6 +37,10 @@ service cloud.firestore {
         // NOTE: this makes isOrgEditor(orgId) true for every super-admin on every org.
         isSuperAdmin() ||
         (exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+          // R348/SEC-ISO-05 (accepted, Phase 118): 'admin' is intentionally
+          // synonymous with 'editor' today (an editor can self-escalate to
+          // 'admin', gaining nothing extra). A future 'admin'-specific gate
+          // MUST NOT silently inherit this editor self-escalation path.
           get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('role', '') in ['editor', 'admin'] &&
           isOrgActive(orgId))
       );
@@ -147,6 +151,10 @@ service cloud.firestore {
       // Members subcollection
       // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
       // IN-02 accepted residual: do NOT "fix" by narrowing isOrgEditor here.
+      // R342/ARCH-018/SEC-ISO-04 (accepted, Phase 118): a super-admin CAN write
+      // any org's members/{uid} by rule, via isOrgEditor's super-admin disjunct
+      // (:38). "Entering as super-admin creates no member doc" is a CLIENT-CODE
+      // contract (enterOrgAsSuperAdmin, auth.ts), NOT a rules invariant.
       match /members/{uid} {
         allow read: if isOrgMember(orgId);
         allow write: if isOrgEditor(orgId);
