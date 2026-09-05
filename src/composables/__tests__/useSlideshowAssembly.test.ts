@@ -2003,8 +2003,10 @@ describe('useSlideshowAssembly', () => {
       await nextTick()
 
       // The default subscriber must call through the SHARED lyricsQuery —
-      // never build its own inline query() / orderBy() / limit(1).
-      expect(mockLyricsQuery).toHaveBeenCalledWith('org-1', 'song-x')
+      // never build its own inline query() / orderBy() / limit(1). LW-01
+      // (119-REVIEW): it passes limitCount 1 since it only ever reads
+      // docs[0], unlike the songLyrics store's own (unbounded) call.
+      expect(mockLyricsQuery).toHaveBeenCalledWith('org-1', 'song-x', 1)
       expect(mockOnSnapshot).toHaveBeenCalledOnce()
       const queryArgPassedToOnSnapshot = mockOnSnapshot.mock.calls[0]![0]
       expect(queryArgPassedToOnSnapshot).toEqual({ __sentinel: 'lyricsQuery', orgId: 'org-1', songId: 'song-x' })

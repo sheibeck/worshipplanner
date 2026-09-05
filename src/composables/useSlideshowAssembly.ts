@@ -31,18 +31,22 @@ export type LyricsSubscriber = (
  * distinct songId appeared and so left content/structure edits stale until a
  * full remount) against organizations/{orgId}/songs/{songId}/lyrics.
  * R351/ARCH-009 — routes through the SAME `lyricsQuery()` the `songLyrics`
- * store's `subscribeLyrics` uses (no `limit`, unlike this file's old inline
- * `limit(1)`); newest-doc-wins is derived client-side via `snap.docs[0]`
- * instead, which is byte-identical to what `limit(1)` used to return since
- * both queries share the same `orderBy('createdAt','desc')`. Missing
- * `performanceOrder` defaults to `[]`, same as the store and the old loader.
+ * store's `subscribeLyrics` uses, so neither can drift from the other on the
+ * ordering. LW-01 (119-REVIEW) — this consumer only ever reads `docs[0]`
+ * (newest-wins), so it passes `limitCount: 1` to avoid the live listener
+ * downloading every historical lyrics doc per song on each snapshot; the
+ * `songLyrics` store's own call omits the limit since its `lyricVersions`
+ * needs the full ordered set. Same `orderBy('createdAt','desc')` on both
+ * calls means this `docs[0]` is byte-identical to the unbounded query's.
+ * Missing `performanceOrder` defaults to `[]`, same as the store and the old
+ * loader.
  */
 function defaultLyricsSubscriber(
   orgId: string,
   songId: string,
   onUpdate: (lyrics: SongLyrics | null) => void,
 ): LyricsUnsubscribe {
-  const q = lyricsQuery(orgId, songId)
+  const q = lyricsQuery(orgId, songId, 1)
   return onSnapshot(q, (snap) => {
     if (snap.empty) {
       onUpdate(null)

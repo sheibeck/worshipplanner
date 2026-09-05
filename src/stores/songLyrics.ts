@@ -11,6 +11,8 @@ import {
   deleteField,
   query,
   orderBy,
+  limit,
+  type QueryConstraint,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
@@ -18,15 +20,25 @@ import type { SongLyrics } from '@/types/songLyrics'
 
 /**
  * R351/ARCH-009 — the ONE query both callers must share: the org-scoped
- * lyrics subcollection for `songId`, newest-createdAt-first, no `limit`.
+ * lyrics subcollection for `songId`, newest-createdAt-first.
  * `subscribeLyrics` below and `useSlideshowAssembly`'s `defaultLyricsSubscriber`
  * both build their listener from this function so neither can drift from the
- * other (the drift this fixes: the composable used to add its own `limit(1)`).
+ * other.
+ *
+ * LW-01 (119-REVIEW) — `limitCount` is deliberately optional and OMITTED by
+ * this store's own call below: `lyricVersions` (version-history display)
+ * needs every doc, not just the newest, so the shared query must default to
+ * unbounded. `useSlideshowAssembly`'s listener only ever consumes
+ * `docs[0]` (newest-wins) and passes `limitCount: 1` to avoid downloading
+ * every historical lyrics doc on each snapshot — same `orderBy` means its
+ * `docs[0]` is byte-identical to the unbounded query's either way.
  */
-export function lyricsQuery(orgId: string, songId: string) {
+export function lyricsQuery(orgId: string, songId: string, limitCount?: number) {
+  const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc')]
+  if (limitCount !== undefined) constraints.push(limit(limitCount))
   return query(
     collection(db, 'organizations', orgId, 'songs', songId, 'lyrics'),
-    orderBy('createdAt', 'desc'),
+    ...constraints,
   )
 }
 
