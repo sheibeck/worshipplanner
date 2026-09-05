@@ -9,10 +9,12 @@
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
+      <!-- Backdrop is non-dismissing: this panel closes only via the Close button or the X (an
+           accidental outside-click loses in-progress edits, incl. the Files tab). Escape is not wired
+           here either. -->
       <div
         v-if="open"
         class="fixed inset-0 z-40 bg-black/30"
-        @click="onCancel"
       ></div>
     </Transition>
 

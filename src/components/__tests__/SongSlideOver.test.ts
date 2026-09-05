@@ -571,3 +571,30 @@ describe('SongSlideOver — header dismiss button reads "Close" (R335)', () => {
     expect(wrapper.emitted('close')).toBeTruthy()
   })
 })
+
+// The panel closes ONLY via the Close button or the X — an accidental outside-click must not dismiss it
+// (the slideout now hosts multi-step work incl. the Files tab). Escape is not wired here at all.
+describe('SongSlideOver — closes only via Close/X, not an outside click', () => {
+  it('clicking the backdrop does NOT emit close', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+
+    const backdrop = wrapper.find('[class~="bg-black/30"]')
+    expect(backdrop.exists()).toBe(true)
+
+    await backdrop.trigger('click')
+    expect(wrapper.emitted('close')).toBeFalsy()
+  })
+
+  it('the X (header dismiss icon) still emits close', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+
+    // The X is the icon-only button carrying aria-label "Close".
+    const xButton = wrapper.findAll('button').find((b) => b.attributes('aria-label') === 'Close')
+    expect(xButton).toBeTruthy()
+
+    await xButton!.trigger('click')
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+})
