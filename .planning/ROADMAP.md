@@ -585,6 +585,125 @@ Full details: [milestones/v2.10-ROADMAP.md](milestones/v2.10-ROADMAP.md) · requ
 > **Deployed to production 2026-09-05** (coordinated firestore:rules + functions + hosting). Remediated all 22 actionable Medium/Low findings deferred from v2.8's security (backlog 999.5) + architectural (backlog 999.4) reviews — SEC-A-01 unauthenticated `/api/planningcenter` proxy closed (fail-closed 401), esv/nlt rate-limited, queue/pptx quotas (117); firestore.rules draft-provenance + orgSlugs/orgNames enumeration fixes + public-share PII allowlist incl. a stray anonymous stage-note leak caught in review (118); 9 correctness/store-ownership fixes (119); god-module decomposition — useAiSongSuggestions + cleanupSweeps, re-export trap guarded (120). R342/R347/R348/SEC-S-03 documented as accepted residuals. Audit PASSED (22/22 reqs, 4/4 phases, integration WIRED). **Post-deploy hotfix (same day, owner-verified live):** a subscription-teardown race — per-view onUnmounted tearing down shared org-scoped singleton stores, wiping data on navigation/church-switch — root-caused + fixed (commits c336c306/b38bc933; teardown of org-scoped stores belongs solely to resetOrgScopedStores()).
 </details>
 
+### 🚧 v2.11 Song File Attachments (Phases 121-124, in planning)
+
+**Milestone Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external
+media links (YouTube/Drive/Dropbox) — on a Song in the stable, via a new Files tab in the Edit Song
+slideout, laying the durable storage foundation for the future team-rehearsal experience. This is step 1
+of the file-storage backlog (999.13 / SEED-003); Rehearse mode (playback inside the shared/public
+service) is the next milestone.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R361–R373 (13 mapped, 100% coverage)
+
+**Key context:** No research pass — built on SEED-003's architecture + cost research (download-token
+URLs, an org-scoped non-`media/` Storage path, the `firestore.exists()`-in-Storage-emulator blind spot to
+avoid, and reuse of the existing `useMediaUpload`/`useBackgroundUpload` `uploadBytesResumable` +
+`MEDIA_MAX_BYTES`/`BACKGROUND_MAX_BYTES` cap patterns — no new npm dependencies). Uploads are PDF + MP3
+only, ≤ 50 MB/file; video is external-link-only. Per-file caps only this milestone — the per-org storage
+quota and egress monitoring/alerting SEED-003 recommends are deferred to the Rehearse milestone. Design
+reference: the owner's "Song Files" mock (Nocturne palette) in the *Worship Planner Slideshow Design*
+Claude Design project, mapped to the app's own dark gray-950 design language — the milestone opens with a
+dedicated UI/design phase producing that mapping before any Files-tab code is written. **Out of scope:**
+per-org storage quota + egress monitoring, image/uploaded-video attachment types, per-file "share with
+volunteers" toggles, and the Rehearse/playback experience (all → future milestone).
+
+- [ ] **Phase 121: Song Files UI/Design Spec** - Produce an app-fidelity design contract mapping the owner's Song Files mock to the app's dark gray-950 language, before any Files-tab code is written
+- [ ] **Phase 122: Durable Storage, Rules & Retention-Exempt Foundation** - Song attachments get a permanent, org-scoped, access-controlled Storage/Firestore home that every existing cleanup sweep is proven to exclude
+- [ ] **Phase 123: Files Tab, Songs List Column, Upload & External Link Attach** - An editor can see, grow, and link a song's attachment collection via the Files tab, Songs-list column, multi-file upload, and external media links
+- [ ] **Phase 124: Grouped File List, In-App Preview/Play, Download & Remove** - An editor (or read-only viewer) can browse, preview, play, download, and safely remove a song's attachments
+
+### Phase 121: Song Files UI/Design Spec
+
+**Goal**: Before any Files-tab code is written, there is an approved, app-fidelity design contract that
+maps the owner's "Song Files" Nocturne mock onto the app's existing dark gray-950 design language, so
+every later implementation phase builds against one settled visual reference instead of improvising.
+**Depends on**: Nothing (first phase of v2.11)
+**Requirements**: R373
+**Success Criteria** (what must be TRUE):
+
+  1. A reviewable design spec (UI-SPEC.md) exists covering every Song Files surface — the Files tab
+     (empty, populated, and upload-in-progress states), the Songs list Files column, the Documents/Audio
+     grouped file rows, the PDF preview / MP3 player panels, and the external-link attach affordance
+     (R373).
+  2. Every spec element is expressed in the app's existing dark gray-950 palette, typography, and
+     spacing — not the raw Nocturne mock colors — and reads as visually consistent with the current Edit
+     Song slideout's Details and Lyrics tabs (R373).
+  3. The spec is reviewed/approved (owner sign-off, or produced via `/gsd-ui-phase`) before Phase 123
+     implementation begins (R373).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 122: Durable Storage, Rules & Retention-Exempt Foundation
+
+**Goal**: Song attachments have a permanent, org-scoped, permission-correct home in Firestore and
+Storage — proven exempt from every automated cleanup sweep — before any upload UI exists to write into
+it.
+**Depends on**: Nothing (independent of Phase 121 — backend/rules track, parallelizable)
+**Requirements**: R364, R369, R370, R371, R372
+**Success Criteria** (what must be TRUE):
+
+  1. Attachment records live on the Song document via an additive field — existing songs load and save
+     unchanged, with no migration required (R369).
+  2. Uploaded bytes live under a dedicated org-scoped Storage prefix outside `media/` (e.g.
+     `orgs/{orgId}/song-files/…`), with `storage.rules` granting org-member read/write mirroring the
+     existing member rule, and denying a write that exceeds 50 MB or is not PDF/MP3 content-type —
+     proven by rules-emulator tests covering both the allow and each deny case (R364, R369).
+  3. `storage.rules`/`firestore.rules` restrict attachment upload, link, and removal to editor-tier org
+     members; a viewer-role mutation attempt is denied at the rules layer, not just hidden in the UI
+     (R372).
+  4. Every existing cleanup Cloud Function — `cleanupExpiredMedia`, `cleanupOrphanBackgrounds`, and
+     `cleanupPptxSources` — is verified, by code inspection and a passing test, to exclude the
+     song-files prefix, proving none of them can reach or delete a song attachment (R370).
+  5. A song attachment is removable only by an explicit editor action or by its parent song being
+     deleted; no other service-side operation — including deleting a service that used the song — removes
+     or orphans it (R371).
+
+**Plans**: TBD
+
+### Phase 123: Files Tab, Songs List Column, Upload & External Link Attach
+
+**Goal**: An editor can see and grow a song's attachment collection — a Files tab with a live count, an
+at-a-glance Songs-list column, drag-and-drop/click multi-file upload with progress, and external media
+links — built to the Phase 121 spec and writing into the Phase 122 foundation.
+**Depends on**: Phase 121 (implements to its design spec), Phase 122 (writes into its Storage prefix and
+rules)
+**Requirements**: R361, R362, R363, R365
+**Success Criteria** (what must be TRUE):
+
+  1. The Edit Song slideout shows a third **Files** tab beside Details and Lyrics, with a live badge
+     showing the song's current attachment count (R361).
+  2. The Songs list shows a **Files** column with a paperclip icon and "N files" / "none" for every song
+     (R362).
+  3. An editor can drag-and-drop or click-to-browse to upload several PDF/MP3 files at once, each showing
+     its own upload progress, with a clear rejection message for a disallowed type or oversized file
+     before/at upload — the client-side half of the Phase 122 storage.rules cap (R363).
+  4. An editor can attach an external YouTube/Google Drive/Dropbox link as metadata with no file
+     transfer; clicking it opens the link in a new tab rather than an in-app viewer (R365).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 124: Grouped File List, In-App Preview/Play, Download & Remove
+
+**Goal**: An editor — or a read-only viewer — can browse, preview, play, download, and safely remove a
+song's existing attachments, with clear grouping and an unambiguous removal consequence.
+**Depends on**: Phase 123 (nothing to browse, preview, or remove until attachments exist)
+**Requirements**: R366, R367, R368
+**Success Criteria** (what must be TRUE):
+
+  1. Attachments render grouped into **Documents** and **Audio** sections, each row showing the file's
+     icon, name, and metadata (type · pages-or-duration · size · date), with a per-group empty state when
+     a group has no files (R366).
+  2. Clicking a PDF row previews it in-app and clicking an MP3 row plays it in-app via an inline
+     player — both without leaving the Files tab (R367).
+  3. An editor can download any attachment and remove any attachment from its row, with the UI making
+     clear before/at removal that removal deletes the file everywhere the song is used, including past
+     services (R368).
+
+**Plans**: TBD
+**UI hint**: yes
+
 ## Backlog
 
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)

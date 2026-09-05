@@ -124,4 +124,21 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 
 ## Traceability
 
-*(Filled by the roadmapper — maps each requirement to the phase that delivers it.)*
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| R361 | Phase 123 | Pending |
+| R362 | Phase 123 | Pending |
+| R363 | Phase 123 | Pending |
+| R364 | Phase 122 | Pending |
+| R365 | Phase 123 | Pending |
+| R366 | Phase 124 | Pending |
+| R367 | Phase 124 | Pending |
+| R368 | Phase 124 | Pending |
+| R369 | Phase 122 | Pending |
+| R370 | Phase 122 | Pending |
+| R371 | Phase 122 | Pending |
+| R372 | Phase 122 | Pending |
+| R373 | Phase 121 | Pending |
+
+**Coverage: 13 v2.11 requirements (R361–R373) — 100% mapped, 0 orphaned.**
+

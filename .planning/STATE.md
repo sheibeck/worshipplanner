@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-09-05T15:06:15.461Z"
 last_activity: 2026-09-05
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -52,7 +52,37 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.10 Security & Architecture Hardening (roadmap created 2026-09-04)
+# ▶ ACTIVE MILESTONE — v2.11 Song File Attachments (roadmap created 2026-09-05)
+
+**Status:** v2.11 roadmap created — ready to plan Phase 121
+
+**Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external media
+links (YouTube/Drive/Dropbox) — on a Song in the stable, via a new Files tab in the Edit Song slideout,
+laying the durable storage foundation for the future team-rehearsal experience. This is step 1 of the
+file-storage backlog (999.13 / SEED-003); Rehearse mode (playback inside the shared/public service) is
+the next milestone.
+
+(v2.10 ended at Phase 120); this milestone is **Phases 121–124**.
+
+**Key context:** No research pass — built on SEED-003's architecture + cost research (download-token
+URLs, an org-scoped non-`media/` Storage path, the `firestore.exists()`-in-Storage-emulator blind spot,
+and reuse of the existing `useMediaUpload`/`useBackgroundUpload` `uploadBytesResumable` +
+`MEDIA_MAX_BYTES`/`BACKGROUND_MAX_BYTES` cap patterns). Uploads are PDF + MP3 only, ≤ 50 MB/file; video
+is external-link-only. Per-file caps only this milestone — per-org storage quota + egress
+monitoring/alerting are deferred to the Rehearse milestone. Design reference: the owner's "Song Files"
+mock (Nocturne palette), mapped to the app's dark gray-950 design language — the milestone opens with a
+dedicated UI/design phase producing that mapping before any Files-tab code is written. **Out of scope:**
+per-org storage quota + egress monitoring, image/uploaded-video attachment types, per-file "share with
+volunteers" toggles, and the Rehearse/playback experience (all → future milestone).
+
+See the `## ★ v2.11 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
+phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.10 Security & Architecture Hardening (shipped & deployed to production 2026-09-05, archived 2026-09-05)
+
+> ✅ **Deployed to production 2026-09-05** (coordinated firestore:rules + functions + hosting).
 
 **Status:** v2.10 milestone complete
 
@@ -1255,10 +1285,45 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap created; Phase 121 not yet planned)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-05 — Milestone v2.11 started
+Status: Roadmap created — ready for /gsd-plan-phase 121
+Last activity: 2026-09-05 — v2.11 ROADMAP.md created (Phases 121-124, R361-R373, 100% coverage)
+
+## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
+
+4 phases (121-124), derived directly from R361-R373 (13 requirements) with this project's `coarse`
+granularity setting applied. The milestone's own framing already draws the natural fault lines: a
+design-first UI/design-contract phase (matching the orchestrator's explicit ask for a `/gsd-ui-phase`
+design contract before the Files-tab build) is kept as its own thin-but-load-bearing Phase 121, since
+R373 gates every later UI phase and produces a genuinely separate artifact (a reviewable UI-SPEC.md), not
+a task-shaped stub. The permanence invariant (R370/R371) is security-adjacent, Cloud-Functions-touching
+work distinct from frontend work, and pairs naturally with the Storage/Firestore rules work it shares a
+file with (R364/R369/R372, per the milestone's own guidance) — all five bundle into one Foundation phase
+(122) so the storage.rules edit for the song-files prefix (access + type + size + editor-only mutation)
+happens once, not split across two phases. The remaining eight requirements split along the natural
+add-vs-manage boundary: growing the attachment collection (Files tab, Songs-list column, multi-file
+upload, external-link attach — R361-R363, R365) is Phase 123, and browsing/consuming existing attachments
+(grouped list, in-app PDF/MP3 preview, download, remove — R366-R368) is Phase 124, since Phase 124's UI
+has nothing to preview or manage until Phase 123 exists. Numbering continues from v2.10, which ended at
+Phase 120 — v2.11 starts at Phase 121, not reset.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 121 Song Files UI/Design Spec | Produce an app-fidelity design contract mapping the owner's Song Files mock to the app's dark gray-950 language, before any Files-tab code is written | R373 | Nothing (first) | yes |
+| 122 Durable Storage, Rules & Retention-Exempt Foundation | Song attachments get a permanent, org-scoped, access-controlled Storage/Firestore home that every existing cleanup sweep is proven to exclude | R364, R369, R370, R371, R372 | Nothing (independent of 121 — backend/rules track, parallelizable) | no |
+| 123 Files Tab, Songs List Column, Upload & External Link Attach | An editor can see, grow, and link a song's attachment collection via the Files tab, Songs-list column, multi-file upload, and external media links | R361, R362, R363, R365 | Phase 121 (implements to its spec), Phase 122 (writes into its Storage prefix/rules) | yes |
+| 124 Grouped File List, In-App Preview/Play, Download & Remove | An editor (or read-only viewer) can browse, preview, play, download, and safely remove a song's attachments | R366, R367, R368 | Phase 123 (nothing to browse/manage until attachments exist) | yes |
+
+**Out of scope this milestone (locked at requirements time):** the Rehearse/playback experience, per-org
+storage quota + egress monitoring/alerting, image/uploaded-video attachment types, per-file "share with
+volunteers" toggles, and any playback/preview on the public share page (all → future Rehearse milestone,
+backlog 999.13).
+
+See `.planning/ROADMAP.md` § v2.11 Song File Attachments for the full phase detail table (goals,
+dependencies, success criteria). Next step: `/gsd-plan-phase 121` (optionally preceded by
+`/gsd-discuss-phase 121`).
+
 
 ## ★ v2.10 ROADMAP.md phase breakdown (created 2026-09-04)
 
