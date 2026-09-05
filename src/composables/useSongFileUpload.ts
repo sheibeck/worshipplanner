@@ -33,7 +33,7 @@ export interface UseSongFileUploadReturn {
   /**
    * Validates and uploads every file in the batch to
    * `orgs/{orgId}/song-files/{attachmentId}/{sanitizedName}` via a resumable
-   * upload. A file failing client validation (wrong type / >50MB) gets a
+   * upload. A file failing client validation (wrong type / >=50MB) gets a
    * 'rejected' row and never starts an upload — it does not block the other
    * files in the batch. Each completed upload persists a SongAttachment via
    * the atomic `songStore.addSongAttachment(songId, attachment)` (CR-01 —
@@ -66,7 +66,11 @@ function validateSongFile(file: File): string | null {
   if (!hasAllowedMime || !hasAllowedExt) {
     return `'${file.name}' can't be uploaded — PDF and MP3 only, up to 50 MB.`
   }
-  if (file.size > SONG_FILE_MAX_BYTES) {
+  // Phase 123 code-review WR-02: storage.rules requires strict
+  // `size < 52428800` — reject `>=` here too, so a file of exactly 50MB fails
+  // with this copy client-side instead of passing here and being denied
+  // server-side.
+  if (file.size >= SONG_FILE_MAX_BYTES) {
     return `'${file.name}' is too large — max 50 MB.`
   }
   return null

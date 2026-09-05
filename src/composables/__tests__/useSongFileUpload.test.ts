@@ -224,6 +224,25 @@ describe('useSongFileUpload', () => {
     expect(mockUploadBytesResumable).not.toHaveBeenCalled()
   })
 
+  it('WR-02: rejects a file of exactly 50MB (storage.rules requires strict <50MB)', () => {
+    mockUploadBytesResumable.mockReturnValue(makeTask('unused'))
+    vi.spyOn(useSongStore(), 'addSongAttachment').mockResolvedValue(undefined)
+
+    const { uploads, addFiles } = useSongFileUpload()
+    const exactFile = makeFile('exact.mp3', 'audio/mpeg', SONG_FILE_MAX_BYTES)
+
+    addFiles([exactFile], {
+      songId: 'song1',
+      orgId: 'org1',
+      createdBy: 'user1',
+    })
+
+    expect(uploads.value).toHaveLength(1)
+    expect(uploads.value[0]!.status).toBe('rejected')
+    expect(uploads.value[0]!.message).toBe("'exact.mp3' is too large — max 50 MB.")
+    expect(mockUploadBytesResumable).not.toHaveBeenCalled()
+  })
+
   it('WR-01: rejects a file whose extension is allowed but MIME type disagrees (extension/MIME mismatch)', () => {
     mockUploadBytesResumable.mockReturnValue(makeTask('unused'))
     vi.spyOn(useSongStore(), 'addSongAttachment').mockResolvedValue(undefined)
