@@ -141,9 +141,8 @@
                   <p class="text-base font-semibold text-gray-100">Import complete!</p>
                   <p class="text-sm text-gray-400 mt-1" data-testid="done-summary">
                     {{ importSummary.added }} song{{ importSummary.added !== 1 ? 's' : '' }} added,
-                    {{ newOnly ? preview.toUpdate : importSummary.updated }}
-                    song{{ (newOnly ? preview.toUpdate : importSummary.updated) !== 1 ? 's' : '' }}
-                    {{ newOnly ? 'skipped' : 'updated' }}<template v-if="importSummary.failed.length > 0">, {{ importSummary.failed.length }} song{{ importSummary.failed.length !== 1 ? 's' : '' }} failed</template>.
+                    <template v-if="newOnly">{{ preview.toUpdate }} song{{ preview.toUpdate !== 1 ? 's' : '' }} skipped<template v-if="importSummary.updated > 0">, {{ importSummary.updated }} song{{ importSummary.updated !== 1 ? 's' : '' }} updated</template></template>
+                    <template v-else>{{ importSummary.updated }} song{{ importSummary.updated !== 1 ? 's' : '' }} updated</template><template v-if="importSummary.failed.length > 0">, {{ importSummary.failed.length }} song{{ importSummary.failed.length !== 1 ? 's' : '' }} failed</template>.
                   </p>
                   <p v-if="importSummary.failed.length > 0" class="text-xs text-red-400 mt-2" data-testid="done-failed">
                     Failed: {{ importSummary.failed.map((f) => f.title).join(', ') }}
@@ -320,6 +319,18 @@ async function onConfirmImport() {
   try {
     const songsToImport = newOnly.value ? newSongs.value : [...newSongs.value, ...existingSongs.value]
     importSummary.value = await songStore.upsertSongs(songsToImport)
+    // MD-01 (119-REVIEW) — upsertSongs no longer throws on a Firestore write
+    // failure (R350: it catches every batch.commit() rejection internally),
+    // so a TOTAL failure (nothing added/updated, at least one failed) must be
+    // routed to the red error step explicitly — otherwise it would silently
+    // land on the green "Import complete!" screen with the real outcome only
+    // visible in the fine print.
+    const wrote = importSummary.value.added + importSummary.value.updated
+    if (wrote === 0 && importSummary.value.failed.length > 0) {
+      errorMessage.value = `Import failed: ${importSummary.value.failed.map((f) => f.title).join(', ')}`
+      step.value = 'error'
+      return
+    }
     step.value = 'done'
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred'

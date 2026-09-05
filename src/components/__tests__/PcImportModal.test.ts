@@ -172,6 +172,59 @@ describe('PcImportModal', () => {
     expect(wrapper.emitted('imported')![0]).toEqual([2])
   })
 
+  // MD-01 (119-REVIEW): upsertSongs no longer throws on a write failure (R350
+  // catches every batch.commit() rejection internally), so a TOTAL failure
+  // (nothing added/updated, every song failed) must route to the red error
+  // step rather than the green "Import complete!" screen.
+  it('a total import failure (0 added/updated, all failed) routes to the error step, not the done step', async () => {
+    const songA = makeUpsertInput({ title: 'Song A' })
+    const songB = makeUpsertInput({ title: 'Song B' })
+    mockFetchAndMapPcSongs.mockResolvedValueOnce([songA, songB])
+    mockPartitionPcSongs.mockReturnValueOnce({ newSongs: [songA, songB], existingSongs: [] })
+    mockUpsertSongs.mockResolvedValueOnce({
+      added: 0,
+      updated: 0,
+      failed: [
+        { title: 'Song A', error: 'permission-denied' },
+        { title: 'Song B', error: 'permission-denied' },
+      ],
+    })
+
+    mountModal()
+    await body().find('[data-testid="import-btn"]').trigger('click')
+    await flushPromises()
+    await body().find('[data-testid="confirm-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(body().find('[data-testid="step-done"]').exists()).toBe(false)
+    expect(body().find('[data-testid="step-error"]').exists()).toBe(true)
+    expect(body().find('[data-testid="error-message"]').text()).toContain('Song A')
+    expect(body().find('[data-testid="error-message"]').text()).toContain('Song B')
+  })
+
+  // LW-04 (119-REVIEW): in newOnly mode, upsertSongs matches independently of
+  // the preview partition — a song partitioned as "new" can still resolve to
+  // an update at import time. The summary must surface that real update
+  // rather than folding it silently into "skipped".
+  it('newOnly mode surfaces a real update from upsertSongs alongside the skipped count', async () => {
+    const newSong = makeUpsertInput({ title: 'New Song' })
+    const existingSong = makeUpsertInput({ title: 'Existing Song' })
+    mockFetchAndMapPcSongs.mockResolvedValueOnce([newSong, existingSong])
+    mockPartitionPcSongs.mockReturnValueOnce({ newSongs: [newSong], existingSongs: [existingSong] })
+    // upsertSongs' own matching resolved the "new"-partitioned song to an update.
+    mockUpsertSongs.mockResolvedValueOnce({ added: 0, updated: 1, failed: [] })
+
+    mountModal()
+    await body().find('[data-testid="import-btn"]').trigger('click')
+    await flushPromises()
+    await body().find('[data-testid="confirm-btn"]').trigger('click')
+    await flushPromises()
+
+    const summaryText = body().find('[data-testid="done-summary"]').text()
+    expect(summaryText).toContain('1 song skipped')
+    expect(summaryText).toContain('1 song updated')
+  })
+
   it('a thrown (non-recoverable) upsertSongs failure still routes to the error step', async () => {
     const newSong = makeUpsertInput({ title: 'New Song' })
     mockFetchAndMapPcSongs.mockResolvedValueOnce([newSong])
