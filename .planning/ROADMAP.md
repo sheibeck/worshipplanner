@@ -610,7 +610,7 @@ volunteers" toggles, and the Rehearse/playback experience (all → future milest
 - [x] **Phase 121: Song Files UI/Design Spec** - Produce an app-fidelity design contract mapping the owner's Song Files mock to the app's dark gray-950 language, before any Files-tab code is written (completed 2026-09-05)
 - [x] **Phase 122: Durable Storage, Rules & Retention-Exempt Foundation** - Song attachments get a permanent, org-scoped, access-controlled Storage/Firestore home that every existing cleanup sweep is proven to exclude (completed 2026-09-05)
 - [x] **Phase 123: Files Tab, Songs List Column, Upload & External Link Attach** - An editor can see, grow, and link a song's attachment collection via the Files tab, Songs-list column, multi-file upload, and external media links (completed 2026-09-05)
-- [ ] **Phase 124: Grouped File List, In-App Preview/Play, Download & Remove** - An editor (or read-only viewer) can browse, preview, play, download, and safely remove a song's attachments
+- [x] **Phase 124: Grouped File List, In-App Preview/Play, Download & Remove** - An editor (or read-only viewer) can browse, preview, play, download, and safely remove a song's attachments (completed 2026-09-05)
 
 ### Phase 121: Song Files UI/Design Spec
 
@@ -724,10 +724,10 @@ song's existing attachments, with clear grouping and an unambiguous removal cons
      clear before/at removal that removal deletes the file everywhere the song is used, including past
      services (R368).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 - [x] 124-01-PLAN.md — Grouped Documents/Audio rows + metadata + Download + Remove inline-confirm; store removeSongAttachment (R366, R368)
-- [ ] 124-02-PLAN.md — In-app PDF preview modal + inline MP3 player wired into the rows (R367)
+- [x] 124-02-PLAN.md — In-app PDF preview modal + inline MP3 player wired into the rows (R367)
 
 **UI hint**: yes
 

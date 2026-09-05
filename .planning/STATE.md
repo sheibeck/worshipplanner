@@ -5,16 +5,16 @@ milestone_name: Song File Attachments (Phases 121-124, in planning)
 current_phase: 124
 current_phase_name: Grouped File List, In-App Preview/Play, Download & Remove
 status: planning
-stopped_at: Completed 124-01-PLAN.md
-last_updated: "2026-09-05T21:05:00.000Z"
+stopped_at: Completed 124-02-PLAN.md
+last_updated: "2026-09-05T20:40:27.213Z"
 last_activity: 2026-09-05
-last_activity_desc: 124-01 complete (removeSongAttachment + grouped Documents/Audio rows + Download + Remove); 124-02 (in-app preview/play) remains
+last_activity_desc: 124-02 complete (last plan of v2.11)
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 8
-  completed_plans: 7
-  percent: 75
+  completed_plans: 8
+  percent: 100
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1290,9 +1290,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 124 — Grouped File List, In-App Preview/Play, Download & Remove
-Plan: 124-02 not started
-Status: 124-01-PLAN.md (removeSongAttachment store method, Documents/Audio grouped rows, per-row Download, per-row Remove inline-confirm — R366+R368) complete. 124-02 (in-app PDF preview + MP3 player, R367) remains.
-Last activity: 2026-09-05 — 124-01 complete
+Plan: 124-02 complete — phase fully executed (2/2 plans)
+Status: 124-01-PLAN.md (removeSongAttachment store method, Documents/Audio grouped rows, per-row Download, per-row Remove inline-confirm — R366+R368) complete. 124-02-PLAN.md (SongFilePreviewModal in-app PDF viewer + inline MP3 player wired into Preview/Play row actions — R367) complete. All 4 phases of v2.11 (121-124) are now built; milestone-level UAT and closeout (audit-milestone/complete-milestone) have not run yet.
+Last activity: 2026-09-05 — 124-02 complete (last plan of v2.11)
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 
@@ -3304,6 +3304,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 123 P02 | 20min | 2 tasks | 4 files |
 | Phase 123 P03 | 55min | 3 tasks | 7 files |
 | Phase 124 P01 | 55min | 3 tasks | 4 files |
+| Phase 124 P02 | 20min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3853,6 +3854,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Songs-list Files column: filesLabel(song) helper computes none/1 file/N files from song.attachments?.length ?? 0; files:true added to DEFAULT_COLUMN_VISIBILITY (R362).
 - [Phase ?]: Files tab attachments resolve LIVE from songStore.songs by id (not stale props.song), so a just-uploaded file appears without reopening the panel
 - [Phase ?]: Attachments persist outside the edit form/unsavedGuard — uploads/link-attach mutate via direct updateSong calls, never via onSave's data object
+- [Phase ?]: 124-02: PDF preview built as a standalone SongFilePreviewModal.vue mounted once at the SongFilesTab root (per plan interface_context), with its Escape/backdrop dismiss scoped to a DOM-level @keydown on the dialog root (never window/document) so it cannot bubble to SongSlideOver's deliberately non-dismissing editing slideout.
 
 ### Roadmap Evolution
 

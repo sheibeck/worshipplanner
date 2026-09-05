@@ -61,7 +61,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
   the file's icon, name, and metadata (type · pages-or-duration · size · date), with a per-group empty
   state when a group has no files.
 
-- [ ] **R367**: An editor can **preview a PDF** and **play an MP3 in-app** from its row (an inline reader /
+- [x] **R367**: An editor can **preview a PDF** and **play an MP3 in-app** from its row (an inline reader /
   audio player), without leaving the Files tab. Externally-linked media instead opens in a new tab (R365).
 
 - [x] **R368**: An editor can **download** any attachment and **remove** any attachment from its row.
@@ -138,7 +138,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 | R364 | Phase 122 | Complete |
 | R365 | Phase 123 | Complete |
 | R366 | Phase 124 | Complete |
-| R367 | Phase 124 | Pending |
+| R367 | Phase 124 | Complete |
 | R368 | Phase 124 | Complete |
 | R369 | Phase 122 | Complete |
 | R370 | Phase 122 | Complete |
