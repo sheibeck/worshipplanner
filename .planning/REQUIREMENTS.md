@@ -68,15 +68,15 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
 
 ### Architecture Hardening (backlog 999.4)
 
-- [ ] **R349** (ARCH-011): `recomputeLastUsedFor`'s per-song update loop has **per-item failure
+- [x] **R349** (ARCH-011): `recomputeLastUsedFor`'s per-song update loop has **per-item failure
   isolation** — one song's write failing no longer leaves `lastUsedAt` silently inconsistent across the
   rest of the service's songs.
 
-- [ ] **R350** (ARCH-014): The Planning Center song-import path (`upsertSongs`) **batches its writes**
+- [x] **R350** (ARCH-014): The Planning Center song-import path (`upsertSongs`) **batches its writes**
   (like the sibling CSV `importSongs`, which chunks into `writeBatch`es) and surfaces per-song
   success/failure feedback instead of hundreds of sequential unbatched writes.
 
-- [ ] **R351** (ARCH-009): The default lyrics subscriber **routes through
+- [x] **R351** (ARCH-009): The default lyrics subscriber **routes through
   `songLyricsStore.subscribeLyrics`** rather than a duplicated direct `onSnapshot` query, eliminating the
   existing `limit(1)` drift between the two.
 
@@ -155,9 +155,9 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 | R346 | Phase 118 | Complete |
 | R347 | Phase 118 | Complete |
 | R348 | Phase 118 | Complete |
-| R349 | Phase 119 | Pending |
-| R350 | Phase 119 | Pending |
-| R351 | Phase 119 | Pending |
+| R349 | Phase 119 | Complete |
+| R350 | Phase 119 | Complete |
+| R351 | Phase 119 | Complete |
 | R352 | Phase 119 | Pending |
 | R353 | Phase 119 | Pending |
 | R354 | Phase 119 | Pending |
