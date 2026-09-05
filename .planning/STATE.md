@@ -5,15 +5,15 @@ milestone_name: Song File Attachments (Phases 121-124, in planning)
 current_phase: 123
 current_phase_name: Files Tab, Songs List Column, Upload & External Link Attach
 status: planning
-stopped_at: Completed 122-02-PLAN.md
-last_updated: "2026-09-05T16:48:30.663Z"
+stopped_at: Completed 123-01-PLAN.md
+last_updated: "2026-09-05T17:23:32.703Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 122 complete, transitioned to Phase 123
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
   percent: 50
 ---
 
@@ -3300,6 +3300,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 120 P02 | 12min | 2 tasks | 3 files |
 | Phase 122 P01 | 25min | 2 tasks | 2 files |
 | Phase 122 P02 | 13min | 3 tasks | 7 files |
+| Phase 123 P01 | 25min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3845,6 +3846,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R359: extracted the four cleanup sweeps into functions/src/cleanupSweeps.ts (import-top/export-bottom pattern); moved shared helper renderedPrefixFor into the new module rather than importing it back from index.ts, to keep the dependency direction one-way and avoid a require() cycle.
 - [Phase ?]: isOrgEditorByClaim mirrors isOrgMemberByClaim structure but requires role in ['editor','admin']; song-files/ is immutable (update:false); delete gets its own unconditioned verb; catch-all amended to exclude song-files/ per OR-combination fix
 - [Phase ?]: Song attachments (R369-R371): additive SongAttachment schema, hardDeleteSong-only Storage cascade, and a locking test proving song-files/ is structurally exempt from all retention sweeps
+- [Phase ?]: Phase 123 Plan 01: promoted sanitizeFileName to shared export (IN-03 closed); built songLinks (R365) and useSongFileUpload (R363) composables per plan
 
 ### Roadmap Evolution
 
@@ -4173,8 +4175,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T16:30:23.094Z
-Stopped at: Completed 122-02-PLAN.md
+Last session: 2026-09-05T17:23:22.926Z
+Stopped at: Completed 123-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -43,7 +43,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 
 ### Upload & Attach
 
-- [ ] **R363**: An editor can upload **several files at once** to a song by drag-and-drop onto a drop zone
+- [x] **R363**: An editor can upload **several files at once** to a song by drag-and-drop onto a drop zone
   or by click-to-browse, with **per-file upload progress** shown while each transfers.
 
 - [x] **R364**: Uploads are restricted to **PDF (documents)** and **MP3 (audio)**, **≤ 50 MB per file**.
@@ -51,7 +51,7 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
   **and in `storage.rules`** (server-authoritative), so an oversized or disallowed file cannot be written
   even by bypassing the UI.
 
-- [ ] **R365**: An editor can attach an **external media link** (YouTube / Google Drive / Dropbox) to a
+- [x] **R365**: An editor can attach an **external media link** (YouTube / Google Drive / Dropbox) to a
   song instead of uploading; the link is stored as metadata (no file transfer) and **opens in a new tab**
   rather than the built-in reader/player.
 
@@ -134,9 +134,9 @@ slideout, laying the durable storage foundation for the future team-rehearsal ex
 |-------------|-------|--------|
 | R361 | Phase 123 | Pending |
 | R362 | Phase 123 | Pending |
-| R363 | Phase 123 | Pending |
+| R363 | Phase 123 | Complete |
 | R364 | Phase 122 | Complete |
-| R365 | Phase 123 | Pending |
+| R365 | Phase 123 | Complete |
 | R366 | Phase 124 | Pending |
 | R367 | Phase 124 | Pending |
 | R368 | Phase 124 | Pending |
