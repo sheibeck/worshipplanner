@@ -608,7 +608,10 @@ starting with the highest-priority finding (SEC-A-01).
   4. `parsePptx` rejects a caller who exceeds a per-uid/per-org daily import quota, independent of the render service's own concurrency ceiling (R345).
   5. The functions test suite passes with new tests proving each of the four gates/limits actually fires, and that ordinary within-limit usage and the sibling `anthropic` behavior are unaffected.
 
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 117-01-PLAN.md — planningcenter auth gate (R339), esv/nlt per-uid rate limit (R340), queueServiceMessage enqueue ceiling (R344), and parsePptx daily import quota (R345) — all in functions/src/index.ts + index.test.ts [wave 1]
 
 ### Phase 118: Security — Firestore Rules & Public Share Hardening
 
