@@ -4,16 +4,16 @@ milestone: v2.10
 milestone_name: Security & Architecture Hardening (Phases 117-120, in planning)
 current_phase: 118
 current_phase_name: Security — Firestore Rules & Public Share Hardening
-status: planning
-stopped_at: Completed 117-01-PLAN.md
-last_updated: "2026-09-05T00:36:28.150Z"
+status: executing
+stopped_at: Completed 118-01-PLAN.md
+last_updated: "2026-09-05T01:05:30.878Z"
 last_activity: 2026-09-04
-last_activity_desc: Phase 117 complete, transitioned to Phase 118
+last_activity_desc: Phase 118 execution started
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 3
+  completed_plans: 2
   percent: 25
 ---
 
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.10 Security & Architecture Hardening (roadmap created 2026-09-04)
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 
 **Goal:** Remediate the actionable Medium/Low findings deferred from v2.8's security and architectural
 reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed" — starting with the
@@ -1249,7 +1249,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 117 — Security — Proxy Authentication, Rate Limits & Quotas
+**Current focus:** Phase 118 — Security — Firestore Rules & Public Share Hardening
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1259,10 +1259,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 118 — Security — Firestore Rules & Public Share Hardening
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-09-04 — Phase 117 complete, transitioned to Phase 118
+Phase: 118 (Security — Firestore Rules & Public Share Hardening) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-09-04 — Phase 118 execution started
 
 ## ★ v2.10 ROADMAP.md phase breakdown (created 2026-09-04)
 
@@ -3226,6 +3226,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 116 P01 | 15m | 2 tasks | 5 files |
 | Phase 116 P02 | 35min | 2 tasks | 2 files |
 | Phase 117 P01 | 25min | 3 tasks | 2 files |
+| Phase 118 P01 | 25min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -3753,6 +3754,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: AUTH_REQUIRED kept as a separate set from SECRET_INJECTED (R339) -- planningcenter is authenticated but injects no server secret
 - [Phase ?]: esv/nlt share the SAME per-uid aiRateLimits counter as anthropic (R340), not a separate budget
 - [Phase ?]: R344/R345 quotas reuse existing appConfig knobs on dedicated counter collections -- no new appConfig field, keeping frontend appConfigDefaults.ts duplicate out of scope
+- [Phase ?]: R341 protects exactly createdBy/createdAt on draft services (not pcExportedAt/pcPlanId, which have their own export branch)
+- [Phase ?]: R343 uses a flat list:if false (not scoped) on orgSlugs/orgNames — confirmed zero legitimate list/query usage on these collections
+- [Phase ?]: R342/R348 took the locked low-risk CONTEXT branch (document + pin the accepted residual) rather than narrowing isOrgEditor
 
 ### Roadmap Evolution
 
@@ -4081,8 +4085,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-05T00:18:45.486Z
-Stopped at: Completed 117-01-PLAN.md
+Last session: 2026-09-05T01:05:30.800Z
+Stopped at: Completed 118-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

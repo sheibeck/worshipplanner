@@ -36,15 +36,15 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
   limiter** that guards the `anthropic` proxy, so an enabled org cannot make unlimited-frequency Bible-API
   calls.
 
-- [ ] **R341** (SEC-R-03): The `services/{docId}` draft-edit Firestore-rules branch **restricts field
+- [x] **R341** (SEC-R-03): The `services/{docId}` draft-edit Firestore-rules branch **restricts field
   diffs** so an org editor cannot forge `createdBy` or other provenance fields while a service is in draft.
 
-- [ ] **R342** (ARCH-018 / SEC-ISO-04): Super-admin's ability to write any org's `members/{uid}` is
+- [x] **R342** (ARCH-018 / SEC-ISO-04): Super-admin's ability to write any org's `members/{uid}` is
   **constrained at the Firestore-rules level** rather than resting only on client-code discipline — or, if
   a rules-level constraint proves infeasible, the invariant is documented and covered by a rules test that
   proves the accepted boundary.
 
-- [ ] **R343** (SEC-ISO-06 residual): The publicly-readable `orgSlugs`/`orgNames` registries **split
+- [x] **R343** (SEC-ISO-06 residual): The publicly-readable `orgSlugs`/`orgNames` registries **split
   `get` from `list`** (the same fix pattern as v2.8's SEC-S-01) so the full registry can no longer be
   enumerated by an unauthenticated collection query.
 
@@ -62,7 +62,7 @@ reviews (backlog 999.5 + 999.4), closing the gap between "reviewed" and "fixed."
   unguessable token component alongside the memorable slug), or — if the memorable-URL product value wins
   — the residual guessability risk is explicitly re-accepted in writing with reasoning.
 
-- [ ] **R348** (SEC-ISO-05): The org `role: 'admin'` vs `'editor'` distinction is either **given real
+- [x] **R348** (SEC-ISO-05): The org `role: 'admin'` vs `'editor'` distinction is either **given real
   enforced meaning** or **documented** so that a future `'admin'`-specific gate cannot silently inherit the
   current self-escalation path.
 
@@ -147,14 +147,14 @@ WorshipBuilder), 999.6 (verified-domain email), and 999.13 (rehearsal attachment
 |-------------|-------|--------|
 | R339 | Phase 117 | Complete |
 | R340 | Phase 117 | Complete |
-| R341 | Phase 118 | Pending |
-| R342 | Phase 118 | Pending |
-| R343 | Phase 118 | Pending |
+| R341 | Phase 118 | Complete |
+| R342 | Phase 118 | Complete |
+| R343 | Phase 118 | Complete |
 | R344 | Phase 117 | Complete |
 | R345 | Phase 117 | Complete |
 | R346 | Phase 118 | Pending |
 | R347 | Phase 118 | Pending |
-| R348 | Phase 118 | Pending |
+| R348 | Phase 118 | Complete |
 | R349 | Phase 119 | Pending |
 | R350 | Phase 119 | Pending |
 | R351 | Phase 119 | Pending |
