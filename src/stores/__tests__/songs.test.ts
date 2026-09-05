@@ -1204,6 +1204,95 @@ describe('useSongStore', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }) as any)
     })
+
+    // LW-03 (119-REVIEW): locks in the batching tradeoff — a single failing
+    // chunk is all-or-nothing (every song staged in it is reported failed,
+    // even a perfectly valid one), while a separate chunk with BOTH an add
+    // and an update still persists in full. Mixes add+update categories on
+    // both sides of the boundary so the summary's added/updated/failed
+    // counts, and the successful chunk's staged data, are all asserted.
+    it('mixed add/update across a chunk boundary: a failed chunk reports every staged song failed while a separate succeeding chunk still persists its add and update', async () => {
+      const { writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'existing-chunk1', title: 'Existing Chunk1', pcSongId: 'pc-existing-1', ccliNumber: '60001', hidden: false }),
+        makeSong({ id: 'existing-chunk2', title: 'Existing Chunk2', pcSongId: 'pc-existing-2', ccliNumber: '60002', hidden: false }),
+      ])
+
+      let callCount = 0
+      vi.mocked(writeBatch).mockImplementation(() => {
+        callCount += 1
+        const shouldFail = callCount === 1
+        return {
+          set: vi.fn((ref: unknown, data: Record<string, unknown>) => {
+            mockBatchOps.push({ type: 'set', ref, data })
+          }),
+          update: vi.fn((ref: unknown, data: Record<string, unknown>) => {
+            mockBatchOps.push({ type: 'update', ref, data })
+          }),
+          delete: vi.fn((ref: unknown) => {
+            mockBatchOps.push({ type: 'delete', ref })
+          }),
+          commit: vi.fn(() => (shouldFail ? Promise.reject(new Error('commit failed')) : Promise.resolve())),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any
+      })
+
+      // Chunk 1 (indices 0-498, 499 songs): mostly new + one update matching
+      // 'existing-chunk1'. This whole chunk's commit rejects below.
+      const chunk1 = Array.from({ length: 498 }, (_, i) =>
+        makeUpsertInput({ title: `Chunk1 New ${i}`, pcSongId: `pc-c1-${i}` }),
+      )
+      chunk1.push(makeUpsertInput({ title: 'Chunk1 Update', ccliNumber: '60001' }))
+
+      // Chunk 2 (indices 499-500, 2 songs): one new + one update matching
+      // 'existing-chunk2'. This chunk's commit succeeds.
+      const chunk2 = [
+        makeUpsertInput({ title: 'Chunk2 New', pcSongId: 'pc-c2-new' }),
+        makeUpsertInput({ title: 'Chunk2 Update', ccliNumber: '60002' }),
+      ]
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const summary = await store.upsertSongs([...chunk1, ...chunk2])
+
+      expect(writeBatch).toHaveBeenCalledTimes(2)
+      // Chunk 1 (498 new + 1 update = 499) failed wholesale — reported as failed,
+      // not partially added/updated.
+      expect(summary.failed).toHaveLength(499)
+      expect(summary.failed.some((f) => f.title === 'Chunk1 Update')).toBe(true)
+      // Chunk 2 (1 new + 1 update) persisted despite chunk 1's failure.
+      expect(summary.added).toBe(1)
+      expect(summary.updated).toBe(1)
+
+      // The successful chunk's ops are staged correctly and not corrupted by
+      // the preceding chunk's failure — chunk 2 is staged after chunk 1, so
+      // its ops are the LAST set/update ops pushed.
+      const setOps = mockBatchOps.filter((op) => op.type === 'set')
+      const updateOps = mockBatchOps.filter((op) => op.type === 'update')
+      const lastSet = setOps[setOps.length - 1]!
+      const lastUpdate = updateOps[updateOps.length - 1]!
+      expect((lastSet.data as Record<string, unknown>).title).toBe('Chunk2 New')
+      expect((lastUpdate.data as Record<string, unknown>).title).toBe('Chunk2 Update')
+
+      consoleErrorSpy.mockRestore()
+      // Restore the module's default writeBatch implementation — this test's
+      // override must not leak into later tests in this file.
+      vi.mocked(writeBatch).mockImplementation(() => ({
+        set: vi.fn((ref: unknown, data: Record<string, unknown>) => {
+          mockBatchOps.push({ type: 'set', ref, data })
+        }),
+        update: vi.fn((ref: unknown, data: Record<string, unknown>) => {
+          mockBatchOps.push({ type: 'update', ref, data })
+        }),
+        delete: vi.fn((ref: unknown) => {
+          mockBatchOps.push({ type: 'delete', ref })
+        }),
+        commit: vi.fn(() => Promise.resolve()),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any)
+    })
   })
 
   describe('upsertSongs — tag preservation and theme merge (D-02, D-08)', () => {
