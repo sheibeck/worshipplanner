@@ -424,9 +424,17 @@ export const useAuthStore = defineStore('auth', () => {
       const segments = key.split('.')
       if (segments[0] !== 'settings' || segments.length < 2) continue
       let cursor = settings.value as unknown as Record<string, unknown>
+      // MD-02 (119-REVIEW) — a missing intermediate must NOT fall through to
+      // assigning the leaf onto `cursor` at the wrong (too-shallow) level;
+      // create the missing object so the mirror write lands at the same
+      // depth Firestore's dot-path `updateDoc` creates it at.
       for (let i = 1; i < segments.length - 1; i++) {
-        const next = cursor[segments[i]!]
-        if (typeof next !== 'object' || next === null) break
+        const key2 = segments[i]!
+        let next = cursor[key2]
+        if (typeof next !== 'object' || next === null) {
+          next = {}
+          cursor[key2] = next
+        }
         cursor = next as Record<string, unknown>
       }
       cursor[segments[segments.length - 1]!] = value

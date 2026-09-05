@@ -1259,6 +1259,33 @@ describe('useAuthStore', () => {
 
       expect(updateDoc).not.toHaveBeenCalled()
     })
+
+    // MD-02 (119-REVIEW) — a nested dot-path (3+ segments) whose intermediate
+    // object does not yet exist locally must mirror-write at the SAME nesting
+    // depth Firestore's dot-path updateDoc creates, not silently collapse the
+    // leaf onto the top-level `settings` object.
+    it('mirror-writes a nested dot-path leaf at the correct depth when its parent object is missing locally', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      store.userRole = 'editor'
+      vi.mocked(updateDoc).mockClear()
+      // `settings.slideTypography` exists on the default settings shape, but
+      // exercise a genuinely-missing intermediate by targeting a nested key
+      // one level deeper than any locally-hydrated object.
+      const settingsRecord = store.settings as unknown as Record<string, unknown>
+      delete settingsRecord.someNewFeature
+
+      await store.updateOrgSettings({ 'settings.someNewFeature.enabled': true })
+
+      expect(updateDoc).toHaveBeenCalledTimes(1)
+      const nested = settingsRecord.someNewFeature as Record<string, unknown> | undefined
+      expect(nested).toBeDefined()
+      expect(nested!.enabled).toBe(true)
+      // The broken (pre-fix) behavior wrote the leaf directly onto `settings`.
+      expect(settingsRecord.enabled).toBeUndefined()
+    })
   })
 
   describe('OrgSettings.bibleVersion (R090)', () => {
