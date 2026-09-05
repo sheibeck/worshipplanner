@@ -37,11 +37,10 @@ app's existing Tailwind v4 stock dark theme, verified against the live source of
 
 ## Spacing Scale
 
-Base scale (multiples of 4):
+Base scale (multiples of 4) — used for all NEW spacing introduced by this feature:
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| 2xs | 2px | badge vertical padding (`py-0.5`) |
 | xs | 4px | icon-gap / micro padding (`gap-1`, `p-1`) |
 | sm | 8px | badge horizontal padding, row-action gaps (`gap-2`, `px-2`) |
 | sm+ | 12px | form-row / group-header spacing (`gap-3`, `px-3`, `py-3`) |
@@ -49,13 +48,18 @@ Base scale (multiples of 4):
 | lg | 20px | tab-panel outer padding + inter-block rhythm (`px-5`, `py-5`, `space-y-5`) |
 | xl | 32px | not used at this surface size — reserved for page-level layout only |
 
-Exceptions (must be reused verbatim for continuity with the existing Details/Lyrics tabs, not
-invented fresh):
+**Inherited off-grid values (accepted exception).** These three values are NOT part of the
+4-multiple scale above — they are intentionally inherited verbatim from pre-existing app chrome in
+`SongSlideOver.vue` for pixel-parity with the existing Details/Lyrics tabs, and must be reused
+as-is (never rounded to the nearest 4-multiple):
+- `py-0.5` (2px) — badge vertical padding (Files-tab count badge, matching every other status
+  badge already in the app).
 - `py-1.5` (6px) — secondary buttons and icon-only action buttons, matching `SongSlideOver.vue:68,86`.
 - `py-2.5` (10px) — the tab-bar buttons themselves; the **Files** tab button reuses this exact
   value so all three tabs (Details/Lyrics/Files) sit flush at identical height (`SongSlideOver.vue:102,113`).
-- The Files tab body container is `px-5 py-5 space-y-5` — **identical** to the Details tab
-  container at `SongSlideOver.vue:124` — so switching tabs produces zero layout jump.
+
+The Files tab body container is `px-5 py-5 space-y-5` — **identical** to the Details tab
+container at `SongSlideOver.vue:124` — so switching tabs produces zero layout jump.
 
 ---
 
@@ -139,6 +143,12 @@ All icons: `fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="r
 ---
 
 ## Surfaces & Components
+
+**Primary visual anchor:** the drop zone (§3) is the focal point of the Files tab panel — it sits
+first in panel order, is the largest single surface in the tab, and is the primary CTA (the only
+element that opens the native file picker without a preceding click on another control).
+Documents/Audio rows and the link field are secondary, subordinate to it in both position and
+visual weight; implementers should not infer hierarchy from element ordering alone.
 
 ### 1. Files tab (`SongSlideOver.vue` tab bar + panel)
 
