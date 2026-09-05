@@ -818,20 +818,12 @@ export async function parsePptxHandler(
     });
   }
   try {
-    const uidQuota = await checkAndConsumeOrgEmailQuota(
-      db,
-      request.auth.uid,
-      1,
-      pptxConfig.aiProxy.rateLimitPerDay,
-      Date.now(),
-      "pptxImportUidCounters",
-    );
-    if (!uidQuota.allowed) {
-      throw new HttpsError(
-        "resource-exhausted",
-        "You have reached your daily PowerPoint import limit. Try again tomorrow.",
-      );
-    }
+    // WR-02 (117-REVIEW): check the coarser, more-likely-binding per-org
+    // quota BEFORE consuming the per-uid quota. Once an org sits at its
+    // daily import cap, every member's rejected attempt used to still burn
+    // their own per-uid daily budget for an import that could never
+    // proceed; checking org-first avoids wrongly consuming a member's own
+    // budget whenever the org-wide ceiling is what actually rejects the call.
     const orgQuota = await checkAndConsumeOrgEmailQuota(
       db,
       orgId,
@@ -844,6 +836,20 @@ export async function parsePptxHandler(
       throw new HttpsError(
         "resource-exhausted",
         "This organization has reached its daily PowerPoint import limit.",
+      );
+    }
+    const uidQuota = await checkAndConsumeOrgEmailQuota(
+      db,
+      request.auth.uid,
+      1,
+      pptxConfig.aiProxy.rateLimitPerDay,
+      Date.now(),
+      "pptxImportUidCounters",
+    );
+    if (!uidQuota.allowed) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "You have reached your daily PowerPoint import limit. Try again tomorrow.",
       );
     }
   } catch (limiterErr) {
@@ -2407,6 +2413,26 @@ export async function queueServiceMessageHandler(
     });
   }
   try {
+    // WR-02 (117-REVIEW): check the coarser, more-likely-binding per-org
+    // quota BEFORE consuming the per-uid rate limit. Once an org sits at its
+    // daily enqueue cap, every member's rejected attempt used to still burn
+    // their own per-minute/per-day budget for a request that could never
+    // enqueue; checking org-first avoids wrongly consuming a member's own
+    // budget whenever the org-wide ceiling is what actually rejects the call.
+    const enqueueOrgQuota = await checkAndConsumeOrgEmailQuota(
+      db,
+      orgId,
+      1,
+      queueConfig.messaging.orgDailyEmailQuota,
+      Date.now(),
+      "msgEnqueueOrgCounters",
+    );
+    if (!enqueueOrgQuota.allowed) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "This organization has reached its daily message-enqueue limit.",
+      );
+    }
     const enqueueRate = await checkAndConsumeRateLimit(
       db,
       request.auth.uid,
@@ -2421,20 +2447,6 @@ export async function queueServiceMessageHandler(
       throw new HttpsError(
         "resource-exhausted",
         "You are enqueueing messages too quickly. Please slow down and try again shortly.",
-      );
-    }
-    const enqueueOrgQuota = await checkAndConsumeOrgEmailQuota(
-      db,
-      orgId,
-      1,
-      queueConfig.messaging.orgDailyEmailQuota,
-      Date.now(),
-      "msgEnqueueOrgCounters",
-    );
-    if (!enqueueOrgQuota.allowed) {
-      throw new HttpsError(
-        "resource-exhausted",
-        "This organization has reached its daily message-enqueue limit.",
       );
     }
   } catch (limiterErr) {
