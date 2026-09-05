@@ -367,17 +367,22 @@ export interface RateLimitResult {
  * R161: per-uid fixed-window Firestore rate limit.
  * See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts)
  * Deliberately does NOT catch its own Firestore errors -- caller decides fail-open policy.
+ * `collectionName` (R344, 117-01) defaults to the original "aiRateLimits" so
+ * every existing caller is byte-unchanged; a caller passes a DEDICATED
+ * collection name to keep its counter from cross-depleting the shared
+ * AI-proxy budget (e.g. queueServiceMessage's own enqueue-rate ceiling).
  */
 export async function checkAndConsumeRateLimit(
   db: Firestore,
   uid: string,
   limits: Pick<AiProxyLimits, "maxPerMin" | "maxPerDay">,
   now: number = Date.now(),
+  collectionName: string = "aiRateLimits",
 ): Promise<RateLimitResult> {
   const minuteWindow = Math.floor(now / 60_000);
   const dayWindow = Math.floor(now / 86_400_000);
-  const minuteRef = db.collection("aiRateLimits").doc(`${uid}__min__${minuteWindow}`);
-  const dayRef = db.collection("aiRateLimits").doc(`${uid}__day__${dayWindow}`);
+  const minuteRef = db.collection(collectionName).doc(`${uid}__min__${minuteWindow}`);
+  const dayRef = db.collection(collectionName).doc(`${uid}__day__${dayWindow}`);
 
   return db.runTransaction(async (tx) => {
     const [minuteSnap, daySnap] = await Promise.all([tx.get(minuteRef), tx.get(dayRef)]);
@@ -406,6 +411,14 @@ export async function checkAndConsumeRateLimit(
   * See ADR-0023 (docs/adr/0023-projected-check-not-a-check-against-the-pre-send-count.md)
  * (sendQueuedMessageHandler) decides the fail policy, same as
  * checkAndConsumeRateLimit above.
+ *
+ * Despite the name, this is now a GENERIC per-key daily projected-count quota
+ * (R344/R345, 117-01): the second argument is any string key (an orgId, or a
+ * uid for a per-uid daily ceiling), not necessarily an orgId, and
+ * `collectionName` defaults to the original "orgEmailCounters" so the email
+ * quota binding stays byte-unchanged. Callers pass a DEDICATED collection
+ * name to keep their counter independent of the email quota and of each
+ * other (e.g. queueServiceMessage's enqueue quota, parsePptx's import quota).
  */
 export async function checkAndConsumeOrgEmailQuota(
   db: Firestore,
@@ -413,9 +426,10 @@ export async function checkAndConsumeOrgEmailQuota(
   count: number,
   limit: number,
   now: number = Date.now(),
+  collectionName: string = "orgEmailCounters",
 ): Promise<RateLimitResult> {
   const dayWindow = Math.floor(now / 86_400_000);
-  const dayRef = db.collection("orgEmailCounters").doc(`${orgId}__day__${dayWindow}`);
+  const dayRef = db.collection(collectionName).doc(`${orgId}__day__${dayWindow}`);
 
   return db.runTransaction(async (tx) => {
     const daySnap = await tx.get(dayRef);
@@ -2292,7 +2306,8 @@ export async function queueServiceMessageHandler(
     }
   }
 
-  const orgRef = getFirestore().collection("organizations").doc(orgId);
+  const db = getFirestore();
+  const orgRef = db.collection("organizations").doc(orgId);
 
   // Independent editor-tier re-check — never trust the client-declared orgId.
   const memberDoc = await orgRef.collection("members").doc(request.auth.uid).get();
@@ -2316,6 +2331,64 @@ export async function queueServiceMessageHandler(
       "failed-precondition",
       "Messaging is turned off for this organization.",
     );
+  }
+
+  // R344 (117-01): a per-uid enqueue-rate ceiling and a per-org daily enqueue
+  // quota, on DEDICATED counters so message enqueues never cross-deplete the
+  // shared AI-proxy aiRateLimits budget or the send-side orgEmailCounters
+  // quota. Independent of, and additional to, the downstream
+  // MESSAGE_MAX_RECIPIENTS / ORG_MAX_EMAILS_PER_DAY send-side caps. Reusing
+  // the existing aiProxy/messaging appConfig knobs is deliberate -- a new
+  // knob would need the out-of-scope frontend appConfig duplicate.
+  let queueConfig: AppConfig = DEFAULT_APP_CONFIG;
+  try {
+    queueConfig = await getAppConfig(db);
+  } catch (configErr) {
+    console.warn("[queueServiceMessage] appConfig read failed; failing open to defaults:", {
+      message: configErr instanceof Error ? configErr.message : String(configErr),
+    });
+  }
+  try {
+    const enqueueRate = await checkAndConsumeRateLimit(
+      db,
+      request.auth.uid,
+      {
+        maxPerMin: queueConfig.aiProxy.rateLimitPerMin,
+        maxPerDay: queueConfig.aiProxy.rateLimitPerDay,
+      },
+      Date.now(),
+      "msgEnqueueRateLimits",
+    );
+    if (!enqueueRate.allowed) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "You are enqueueing messages too quickly. Please slow down and try again shortly.",
+      );
+    }
+    const enqueueOrgQuota = await checkAndConsumeOrgEmailQuota(
+      db,
+      orgId,
+      1,
+      queueConfig.messaging.orgDailyEmailQuota,
+      Date.now(),
+      "msgEnqueueOrgCounters",
+    );
+    if (!enqueueOrgQuota.allowed) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "This organization has reached its daily message-enqueue limit.",
+      );
+    }
+  } catch (limiterErr) {
+    if (limiterErr instanceof HttpsError) {
+      throw limiterErr;
+    }
+    // Fail OPEN: the limiter is a cost guardrail, not a security control
+    // (locked decision, 65-CONTEXT.md) -- a Firestore hiccup must never block
+    // a legitimate enqueue.
+    console.warn("[queueServiceMessage] enqueue limiter Firestore op failed; failing open:", {
+      message: limiterErr instanceof Error ? limiterErr.message : String(limiterErr),
+    });
   }
 
   // Enqueue exactly one messages/{id} doc via the shared shaper. Recipients are

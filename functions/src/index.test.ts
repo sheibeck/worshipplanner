@@ -2351,6 +2351,14 @@ describe("queueServiceMessageHandler", () => {
     orgExists?: boolean;
     messagingEnabled?: boolean;
     setSpy?: ReturnType<typeof vi.fn>;
+    // R344 (117-01): seeds for the two DEDICATED enqueue-limiter counter
+    // collections, keyed exactly as checkAndConsumeRateLimit /
+    // checkAndConsumeOrgEmailQuota key them. Absent = under every ceiling.
+    enqueueRateSeed?: Record<string, number>;
+    enqueueOrgQuotaSeed?: Record<string, number>;
+    // When true, BOTH enqueue-limiter transactions throw -- proves the
+    // fail-open contract (the message still enqueues).
+    enqueueLimiterThrows?: boolean;
   }
 
   /**
@@ -2359,6 +2367,7 @@ describe("queueServiceMessageHandler", () => {
    *   organizations/{orgId}/members/{uid}          -> .get()  (role re-check)
    *   organizations/{orgId}                        -> .get()  (kill-switch)
    *   organizations/{orgId}/services/{serviceId}/messages -> .doc().set() (enqueue)
+   *   msgEnqueueRateLimits / msgEnqueueOrgCounters  -> .doc()/.runTransaction() (R344)
    */
   function fakeDb(opts: FakeDbOptions = {}) {
     const memberExists = opts.memberExists ?? true;
@@ -2396,11 +2405,52 @@ describe("queueServiceMessageHandler", () => {
       }),
     };
 
+    // R344 (117-01): a tiny generic per-collection counter store so both
+    // checkAndConsumeRateLimit (msgEnqueueRateLimits) and
+    // checkAndConsumeOrgEmailQuota (msgEnqueueOrgCounters) can share one
+    // runTransaction implementation, tagging each doc ref with the
+    // collection it came from.
+    const counterStates: Record<string, Record<string, { count: number }>> = {
+      msgEnqueueRateLimits: {},
+      msgEnqueueOrgCounters: {},
+    };
+    for (const [id, count] of Object.entries(opts.enqueueRateSeed ?? {})) {
+      counterStates.msgEnqueueRateLimits[id] = { count };
+    }
+    for (const [id, count] of Object.entries(opts.enqueueOrgQuotaSeed ?? {})) {
+      counterStates.msgEnqueueOrgCounters[id] = { count };
+    }
+    const makeCounterDoc = (collectionName: string) =>
+      vi.fn((id: string) => ({ id, _docId: id, _collection: collectionName }));
+    const enqueueRateCollection = { doc: makeCounterDoc("msgEnqueueRateLimits") };
+    const enqueueOrgCollection = { doc: makeCounterDoc("msgEnqueueOrgCounters") };
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      if (opts.enqueueLimiterThrows) {
+        throw new Error("Firestore unavailable");
+      }
+      const tx = {
+        get: vi.fn(async (ref: { _docId: string; _collection: string }) => {
+          const entry = counterStates[ref._collection]?.[ref._docId];
+          return {
+            exists: entry !== undefined,
+            data: () => (entry ? { ...entry } : undefined),
+          };
+        }),
+        set: vi.fn((ref: { _docId: string; _collection: string }, patch: { count: number }) => {
+          counterStates[ref._collection][ref._docId] = { count: patch.count };
+        }),
+      };
+      return fn(tx);
+    });
+
     const db = {
       collection: vi.fn((name: string) => {
         if (name === "organizations") return { doc: vi.fn(() => orgDoc) };
+        if (name === "msgEnqueueRateLimits") return enqueueRateCollection;
+        if (name === "msgEnqueueOrgCounters") return enqueueOrgCollection;
         throw new Error(`fakeDb: unexpected collection "${name}"`);
       }),
+      runTransaction,
     };
 
     return { db, memberDoc, orgDoc, messageDoc, messagesCollection, setSpy };
@@ -2715,6 +2765,65 @@ describe("queueServiceMessageHandler", () => {
     const optionsObject = tail.slice(0, optionsEnd);
     expect(optionsObject).not.toMatch(/secrets/);
     expect(optionsObject).not.toMatch(/RESEND_API_KEY/);
+  });
+
+  // R344 (117-01 / SEC-C-05): the enqueue-time ceiling, independent of and
+  // additional to the downstream MESSAGE_MAX_RECIPIENTS / send-side daily
+  // quota that sendQueuedMessageHandler already enforces.
+  it("R344: a caller over the per-uid enqueue-rate MINUTE ceiling is rejected resource-exhausted, and the enqueue is suppressed", async () => {
+    const NOW = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const minuteWindow = Math.floor(NOW / 60_000);
+    const { db, setSpy } = fakeDb({
+      enqueueRateSeed: { [`${UID}__min__${minuteWindow}`]: DEFAULT_APP_CONFIG.aiProxy.rateLimitPerMin },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(queueServiceMessageHandler(fakeRequest())).rejects.toMatchObject({
+      code: "resource-exhausted",
+    });
+    expect(setSpy).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("R344: an org over its per-org daily enqueue quota is rejected resource-exhausted, and the enqueue is suppressed", async () => {
+    const NOW = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const dayWindow = Math.floor(NOW / 86_400_000);
+    const { db, setSpy } = fakeDb({
+      enqueueOrgQuotaSeed: {
+        [`${ORG_ID}__day__${dayWindow}`]: DEFAULT_APP_CONFIG.messaging.orgDailyEmailQuota,
+      },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(queueServiceMessageHandler(fakeRequest())).rejects.toMatchObject({
+      code: "resource-exhausted",
+    });
+    expect(setSpy).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("R344: a within-limit caller still enqueues exactly one doc (both dedicated counters under ceiling)", async () => {
+    const { db, setSpy } = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await queueServiceMessageHandler(fakeRequest());
+
+    expect(result).toEqual({ messageId: GENERATED_ID });
+    expect(setSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("R344: a Firestore error inside either enqueue limiter fails OPEN -- the message still enqueues", async () => {
+    const { db, setSpy } = fakeDb({ enqueueLimiterThrows: true });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await queueServiceMessageHandler(fakeRequest());
+
+    expect(result).toEqual({ messageId: GENERATED_ID });
+    expect(setSpy).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -3892,7 +4001,7 @@ describe("checkAndConsumeRateLimit", () => {
   const NOW = 1_700_000_000_000; // fixed instant
   const limits = { maxPerMin: 2, maxPerDay: 5 };
 
-  function mockRateLimitDb(counts: Record<string, number>) {
+  function mockRateLimitDb(counts: Record<string, number>, expectedCollection: string = "aiRateLimits") {
     const state: Record<string, { count: number }> = {};
     for (const [id, count] of Object.entries(counts)) {
       state[id] = { count };
@@ -3900,7 +4009,7 @@ describe("checkAndConsumeRateLimit", () => {
     const setSpy = vi.fn();
     const doc = vi.fn((id: string) => ({ id, _docId: id }));
     const collection = vi.fn((name: string) => {
-      if (name !== "aiRateLimits") throw new Error(`unexpected collection "${name}"`);
+      if (name !== expectedCollection) throw new Error(`unexpected collection "${name}"`);
       return { doc };
     });
     const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -3919,7 +4028,7 @@ describe("checkAndConsumeRateLimit", () => {
       };
       return fn(tx);
     });
-    return { db: { collection, runTransaction } as never, runTransaction, setSpy, state };
+    return { db: { collection, runTransaction } as never, runTransaction, setSpy, state, collection };
   }
 
   it("allows and increments both counters when under both ceilings", async () => {
@@ -3956,6 +4065,22 @@ describe("checkAndConsumeRateLimit", () => {
       "Firestore unavailable",
     );
   });
+
+  // R344 (117-01): the optional trailing collectionName param.
+  it("defaults to the aiRateLimits collection when no collectionName is passed (byte-unchanged for every pre-existing caller)", async () => {
+    const { db, collection } = mockRateLimitDb({});
+    await checkAndConsumeRateLimit(db, "uid1", limits, NOW);
+    expect(collection).toHaveBeenCalledWith("aiRateLimits");
+  });
+
+  it("routes to a caller-supplied collectionName instead of aiRateLimits, keeping its counter independent", async () => {
+    const { db, collection, setSpy } = mockRateLimitDb({}, "msgEnqueueRateLimits");
+    const result = await checkAndConsumeRateLimit(db, "uid1", limits, NOW, "msgEnqueueRateLimits");
+    expect(result).toEqual({ allowed: true });
+    expect(collection).toHaveBeenCalledWith("msgEnqueueRateLimits");
+    expect(collection).not.toHaveBeenCalledWith("aiRateLimits");
+    expect(setSpy).toHaveBeenCalledTimes(2);
+  });
 });
 
 // R171: per-org daily Resend email quota -- mirrors checkAndConsumeRateLimit's
@@ -3966,7 +4091,7 @@ describe("checkAndConsumeOrgEmailQuota", () => {
   const NOW = 1_700_000_000_000; // fixed instant
   const LIMIT = 5;
 
-  function mockOrgEmailCounterDb(counts: Record<string, number>) {
+  function mockOrgEmailCounterDb(counts: Record<string, number>, expectedCollection: string = "orgEmailCounters") {
     const state: Record<string, { count: number }> = {};
     for (const [id, count] of Object.entries(counts)) {
       state[id] = { count };
@@ -3974,7 +4099,7 @@ describe("checkAndConsumeOrgEmailQuota", () => {
     const setSpy = vi.fn();
     const doc = vi.fn((id: string) => ({ id, _docId: id }));
     const collection = vi.fn((name: string) => {
-      if (name !== "orgEmailCounters") throw new Error(`unexpected collection "${name}"`);
+      if (name !== expectedCollection) throw new Error(`unexpected collection "${name}"`);
       return { doc };
     });
     const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
@@ -3993,7 +4118,7 @@ describe("checkAndConsumeOrgEmailQuota", () => {
       };
       return fn(tx);
     });
-    return { db: { collection, runTransaction } as never, runTransaction, setSpy, state };
+    return { db: { collection, runTransaction } as never, runTransaction, setSpy, state, collection };
   }
 
   it("allows and increments the day counter by `count` when under the limit", async () => {
@@ -4054,6 +4179,23 @@ describe("checkAndConsumeOrgEmailQuota", () => {
     await expect(checkAndConsumeOrgEmailQuota(db, "org1", 1, LIMIT, NOW)).rejects.toThrow(
       "Firestore unavailable",
     );
+  });
+
+  // R344/R345 (117-01): the optional trailing collectionName param -- this
+  // helper is now a generic per-key daily quota, not just the email one.
+  it("defaults to the orgEmailCounters collection when no collectionName is passed (byte-unchanged for every pre-existing caller)", async () => {
+    const { db, collection } = mockOrgEmailCounterDb({});
+    await checkAndConsumeOrgEmailQuota(db, "org1", 1, LIMIT, NOW);
+    expect(collection).toHaveBeenCalledWith("orgEmailCounters");
+  });
+
+  it("routes to a caller-supplied collectionName instead of orgEmailCounters, and accepts a uid (not just an orgId) as the key", async () => {
+    const { db, collection, setSpy } = mockOrgEmailCounterDb({}, "pptxImportUidCounters");
+    const result = await checkAndConsumeOrgEmailQuota(db, "uid1", 1, LIMIT, NOW, "pptxImportUidCounters");
+    expect(result).toEqual({ allowed: true });
+    expect(collection).toHaveBeenCalledWith("pptxImportUidCounters");
+    expect(collection).not.toHaveBeenCalledWith("orgEmailCounters");
+    expect(setSpy).toHaveBeenCalledTimes(1);
   });
 });
 
