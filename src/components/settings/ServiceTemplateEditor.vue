@@ -288,9 +288,7 @@
  * chosen content, never a computed VW type).
  */
 import { ref, computed, watch, onUnmounted } from 'vue'
-import { doc, updateDoc } from 'firebase/firestore'
 import Sortable from 'sortablejs'
-import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import MiscLabelBadge from '@/components/MiscLabelBadge.vue'
 import { buildSuggestedTemplateEntries, createSlot, slotLabel, kindBadgeClass, groupBySection, flattenBySection } from '@/utils/slotTypes'
@@ -553,11 +551,11 @@ function applyReset(): void {
 }
 
 // ── Save ─────────────────────────────────────────────────────────────────────
-// Mirror-write template, matching SettingsView.vue's onToggleAiEnabled/onToggleVwMode
-// shape: a quoted dot-path leaf key (never a whole-map write), then reassign the
-// store so every other consumer of authStore.settings.defaultServiceTemplate sees
-// the saved value without a reload. An empty draft is a valid, saveable state —
-// Save Template is never disabled on an empty draft (R087 owner override).
+// R355/ARCH-007 — writes through authStore.updateOrgSettings, which does the
+// Firestore write AND the local settings.value mirror-write together, so this
+// component no longer touches updateDoc/db directly nor hand-syncs the store.
+// An empty draft is a valid, saveable state — Save Template is never disabled
+// on an empty draft (R087 owner override).
 
 async function onSave(): Promise<void> {
   if (!authStore.orgId || !authStore.isEditor) return
@@ -567,8 +565,7 @@ async function onSave(): Promise<void> {
 
   try {
     const payload = stripUndefined(draft.value)
-    await updateDoc(doc(db, 'organizations', authStore.orgId), { 'settings.defaultServiceTemplate': payload })
-    authStore.settings.defaultServiceTemplate = payload
+    await authStore.updateOrgSettings({ 'settings.defaultServiceTemplate': payload })
 
     savedFeedback.value = true
     setTimeout(() => {

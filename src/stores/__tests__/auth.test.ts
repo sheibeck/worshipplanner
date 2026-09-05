@@ -1208,6 +1208,59 @@ describe('useAuthStore', () => {
     })
   })
 
+  // R355/ARCH-007 — the ONE mutation ServiceTemplateEditor now writes through:
+  // Firestore write AND the local settings.value mirror-write happen together,
+  // so no component hand-syncs authStore.settings after its own updateDoc call.
+  describe('updateOrgSettings (R355/ARCH-007)', () => {
+    it('writes the patch to the org doc and mirror-writes the settings leaf when orgId + isEditor', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      store.userRole = 'editor'
+      vi.mocked(updateDoc).mockClear()
+
+      const payload = [{ id: '1', kind: 'SONG' }]
+      await store.updateOrgSettings({ 'settings.defaultServiceTemplate': payload })
+
+      expect(updateDoc).toHaveBeenCalledTimes(1)
+      const [ref, data] = vi.mocked(updateDoc).mock.calls[0]!
+      expect((ref as { path?: string }).path).toBe('organizations/org-1')
+      expect(data).toEqual({ 'settings.defaultServiceTemplate': payload })
+      expect(store.settings.defaultServiceTemplate).toEqual(payload)
+    })
+
+    it('does not write when the caller is not an editor', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      // userRole stays null (the member-doc onSnapshot mock never fires its
+      // callback in this file) — isEditor is false either way.
+      vi.mocked(updateDoc).mockClear()
+
+      await store.updateOrgSettings({ 'settings.defaultServiceTemplate': [] })
+
+      expect(updateDoc).not.toHaveBeenCalled()
+      expect(store.settings.defaultServiceTemplate).toEqual(
+        DEFAULT_ORG_SETTINGS.defaultServiceTemplate,
+      )
+    })
+
+    it('does not write when there is no active org', async () => {
+      mockNoOrg()
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      store.userRole = 'editor'
+      vi.mocked(updateDoc).mockClear()
+
+      await store.updateOrgSettings({ 'settings.defaultServiceTemplate': [] })
+
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+  })
+
   describe('OrgSettings.bibleVersion (R090)', () => {
     // The DEFAULT constant itself — the owner's locked override (45-CONTEXT.md
     // § Area 1) is NLT, NOT the "preserve current behavior" ESV default.

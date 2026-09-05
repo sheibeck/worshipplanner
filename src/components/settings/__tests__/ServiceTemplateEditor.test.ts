@@ -30,20 +30,6 @@ function body(): DOMWrapper<HTMLElement> {
   return new DOMWrapper(document.body)
 }
 
-// ── firebase/firestore + @/firebase mocks ───────────────────────────────────
-const { mockUpdateDoc } = vi.hoisted(() => ({
-  mockUpdateDoc: vi.fn((_ref: unknown, _data: Record<string, unknown>) => Promise.resolve()),
-}))
-
-vi.mock('firebase/firestore', () => ({
-  doc: vi.fn(() => ({ id: 'mock-doc' })),
-  updateDoc: mockUpdateDoc,
-}))
-
-vi.mock('@/firebase', () => ({
-  db: {},
-}))
-
 // ── sortablejs capture harness (ServiceEditorView.test.ts:66-107 pattern) ──
 interface SortableCapture {
   el: HTMLElement
@@ -74,6 +60,10 @@ function captureForUngrouped(): SortableCapture | undefined {
 }
 
 // ── @/stores/auth mock — reactive, mirroring ServiceEditorView.test.ts:352-377 ──
+// R355/ARCH-007 — updateOrgSettings replaces the component's own updateDoc call;
+// this mock mirrors the REAL auth-store method's write+sync behavior (mirror-write
+// the settings.defaultServiceTemplate leaf on success, leave it untouched on a
+// rejected write) so the component-level assertions below stay meaningful.
 const mockAuthState = reactive<{
   orgId: string | null
   isEditor: boolean
@@ -94,8 +84,17 @@ const mockAuthState = reactive<{
   },
 })
 
+const mockUpdateOrgSettings = vi.fn((patch: Record<string, unknown>) => {
+  if ('settings.defaultServiceTemplate' in patch) {
+    mockAuthState.settings.defaultServiceTemplate = patch[
+      'settings.defaultServiceTemplate'
+    ] as ServiceTemplateEntry[]
+  }
+  return Promise.resolve()
+})
+
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => mockAuthState,
+  useAuthStore: () => ({ ...mockAuthState, updateOrgSettings: mockUpdateOrgSettings }),
 }))
 
 function mountEditor(isOpen = true) {
@@ -141,8 +140,7 @@ beforeEach(() => {
   mockAuthState.settings.pcEnabled = true
   mockAuthState.settings.vwModeEnabled = true
   mockAuthState.settings.defaultServiceTemplate = []
-  mockUpdateDoc.mockClear()
-  mockUpdateDoc.mockImplementation((_ref: unknown, _data: Record<string, unknown>) => Promise.resolve())
+  mockUpdateOrgSettings.mockClear()
   resetSortableCaptures()
 })
 
@@ -210,7 +208,7 @@ describe('ServiceTemplateEditor — add-item palette (closed six-button set, R08
     await body().get('[data-testid="template-save"]').trigger('click')
     await flushPromises()
 
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const payload = mockUpdateOrgSettings.mock.calls[0]![0] as Record<string, unknown>
     const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
     expect(entries).toHaveLength(1)
     expect(entries[0]!.kind).toBe('SONG')
@@ -229,7 +227,7 @@ describe('ServiceTemplateEditor — add-item palette (closed six-button set, R08
     await body().get('[data-testid="template-save"]').trigger('click')
     await flushPromises()
 
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const payload = mockUpdateOrgSettings.mock.calls[0]![0] as Record<string, unknown>
     const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
     expect(entries).toHaveLength(2)
     expect(entries[0]!.id).not.toBe(entries[1]!.id)
@@ -334,7 +332,7 @@ describe('ServiceTemplateEditor — Suggested Template seed (R114)', () => {
     await body().get('[data-testid="template-save"]').trigger('click')
     await flushPromises()
 
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const payload = mockUpdateOrgSettings.mock.calls[0]![0] as Record<string, unknown>
     const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
     expect(entries).toHaveLength(9)
     expect(entries.map((e) => e.kind)).toEqual([
@@ -470,7 +468,7 @@ describe('ServiceTemplateEditor — MISC label edited inline on the badge (R127 
     await body().get('[data-testid="template-save"]').trigger('click')
     await flushPromises()
 
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const payload = mockUpdateOrgSettings.mock.calls[0]![0] as Record<string, unknown>
     const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
     expect(entries).toHaveLength(1)
     expect(entries[0]!.kind).toBe('MISC')
@@ -490,7 +488,7 @@ describe('ServiceTemplateEditor — MISC label edited inline on the badge (R127 
     await body().get('[data-testid="template-save"]').trigger('click')
     await flushPromises()
 
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const payload = mockUpdateOrgSettings.mock.calls[0]![0] as Record<string, unknown>
     const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
     expect(entries).toHaveLength(1)
     expect('label' in entries[0]!).toBe(false)
@@ -503,8 +501,8 @@ describe('ServiceTemplateEditor — Save Template', () => {
     await body().get('[data-testid="template-save"]').trigger('click')
     await flushPromises()
 
-    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(mockUpdateOrgSettings).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateOrgSettings.mock.calls[0]![0] as Record<string, unknown>
     expect(Object.keys(payload)).toEqual(['settings.defaultServiceTemplate'])
     expect(payload['settings.defaultServiceTemplate']).toEqual([])
     expect(mockAuthState.settings.defaultServiceTemplate).toEqual([])
@@ -513,7 +511,7 @@ describe('ServiceTemplateEditor — Save Template', () => {
 
   it('surfaces the shared failure copy and does not mirror-write the store on a rejected save', async () => {
     mockAuthState.settings.defaultServiceTemplate = [{ id: 'existing-1', kind: 'PRAYER' }]
-    mockUpdateDoc.mockRejectedValueOnce(new Error('network error'))
+    mockUpdateOrgSettings.mockRejectedValueOnce(new Error('network error'))
 
     mountEditor(true)
     await body().get('[data-testid="palette-add-song"]').trigger('click')
@@ -616,7 +614,7 @@ describe('ServiceTemplateEditor — drag-reorder (SortableJS, per-section instan
 
     await body().get('[data-testid="template-save"]').trigger('click')
     await flushPromises()
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const payload = mockUpdateOrgSettings.mock.calls[0]![0] as Record<string, unknown>
     const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
     const song = entries.find((e) => e.kind === 'SONG')
     expect(song?.section).toBe('message')

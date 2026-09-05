@@ -410,6 +410,29 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // R355/ARCH-007 — the ONE store-owned mutation for org-settings writes: does
+  // the Firestore write AND the local settings.value mirror-write together, so
+  // no component hand-syncs authStore.settings after its own updateDoc call.
+  // `patch` uses the same quoted dot-path leaf key shape every other
+  // settings write in this codebase already uses (e.g.
+  // { 'settings.defaultServiceTemplate': payload }) — never a whole-map
+  // write. Guarded on orgId + isEditor, matching every other org-doc mutator.
+  async function updateOrgSettings(patch: Record<string, unknown>): Promise<void> {
+    if (!orgId.value || !isEditor.value) return
+    await updateDoc(doc(db, 'organizations', orgId.value), patch)
+    for (const [key, value] of Object.entries(patch)) {
+      const segments = key.split('.')
+      if (segments[0] !== 'settings' || segments.length < 2) continue
+      let cursor = settings.value as unknown as Record<string, unknown>
+      for (let i = 1; i < segments.length - 1; i++) {
+        const next = cursor[segments[i]!]
+        if (typeof next !== 'object' || next === null) break
+        cursor = next as Record<string, unknown>
+      }
+      cursor[segments[segments.length - 1]!] = value
+    }
+  }
+
   async function loadOrgContext(uid: string, membershipJustCreated = false): Promise<void> {
     // R213 — clear any stale deactivation message from a prior org-context
     // load BEFORE any branch below, so it never lingers across an org switch.
@@ -938,6 +961,7 @@ export const useAuthStore = defineStore('auth', () => {
     setPcCredentials,
     vwModeEnabled,
     settings,
+    updateOrgSettings,
     aiMasterEnabled,
     isAiEnabled,
     bibleApiEnabled,
