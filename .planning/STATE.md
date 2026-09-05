@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.11
 milestone_name: Song File Attachments (Phases 121-124, in planning)
-current_phase: 123
-current_phase_name: Files Tab, Songs List Column, Upload & External Link Attach
-status: executing
+current_phase: 124
+current_phase_name: Grouped File List, In-App Preview/Play, Download & Remove
+status: planning
 stopped_at: Completed 123-03-PLAN.md
-last_updated: "2026-09-05T18:13:23.377Z"
+last_updated: "2026-09-05T19:35:11.188Z"
 last_activity: 2026-09-05
-last_activity_desc: Phase 123 Plan 02 complete (Songs-list Files column)
+last_activity_desc: Phase 123 complete, transitioned to Phase 124
 progress:
   total_phases: 4
   completed_phases: 3
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.11 Song File Attachments (roadmap created 2026-09-05)
 
-**Status:** Ready to execute
+**Status:** Ready to plan
 
 **Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external media
 links (YouTube/Drive/Dropbox) — on a Song in the stable, via a new Files tab in the Edit Song slideout,
@@ -1289,10 +1289,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 123 — Files Tab, Songs List Column, Upload & External Link Attach
-Plan: 3 of 03 complete (123-03-PLAN.md remaining)
+Phase: 124 — Grouped File List, In-App Preview/Play, Download & Remove
+Plan: Not started
 Status: 123-02-PLAN.md (Songs-list Files column, R362) complete
-Last activity: 2026-09-05 — Phase 123 Plan 02 complete (Songs-list Files column)
+Last activity: 2026-09-05 — Phase 123 complete, transitioned to Phase 124
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 
