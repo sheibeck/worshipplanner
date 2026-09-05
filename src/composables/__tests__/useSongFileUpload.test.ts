@@ -107,26 +107,26 @@ describe('useSongFileUpload', () => {
     })
 
     pdfTask._triggerProgress(50, 100)
-    expect(uploads.value[0].progress).toBe(50)
-    expect(uploads.value[1].progress).toBe(0)
+    expect(uploads.value[0]!.progress).toBe(50)
+    expect(uploads.value[1]!.progress).toBe(0)
 
     pdfTask._triggerComplete()
     await flushPromises()
 
-    expect(uploads.value[0].status).toBe('done')
-    expect(uploads.value[1].status).toBe('uploading')
+    expect(uploads.value[0]!.status).toBe('done')
+    expect(uploads.value[1]!.status).toBe('uploading')
 
     mp3Task._triggerProgress(100, 100)
-    expect(uploads.value[1].progress).toBe(100)
+    expect(uploads.value[1]!.progress).toBe(100)
 
     mp3Task._triggerComplete()
     await flushPromises()
 
-    expect(uploads.value[1].status).toBe('done')
+    expect(uploads.value[1]!.status).toBe('done')
 
     // Both attachments must be present in the final persisted array regardless
     // of finish order (last write carries the running batch accumulator).
-    const lastCall = updateSongSpy.mock.calls[updateSongSpy.mock.calls.length - 1]
+    const lastCall = updateSongSpy.mock.calls[updateSongSpy.mock.calls.length - 1]!
     expect(lastCall[0]).toBe('song1')
     const attachments = (lastCall[1] as { attachments: SongAttachment[] }).attachments
     expect(attachments).toHaveLength(2)
@@ -176,7 +176,7 @@ describe('useSongFileUpload', () => {
     task._triggerComplete()
     await flushPromises()
 
-    const lastCall = updateSongSpy.mock.calls[updateSongSpy.mock.calls.length - 1]
+    const lastCall = updateSongSpy.mock.calls[updateSongSpy.mock.calls.length - 1]!
     const attachments = (lastCall[1] as { attachments: SongAttachment[] }).attachments
     expect(attachments).toHaveLength(2)
     expect(attachments[0]).toBe(existing[0])
@@ -225,8 +225,8 @@ describe('useSongFileUpload', () => {
     })
 
     expect(uploads.value).toHaveLength(1)
-    expect(uploads.value[0].status).toBe('rejected')
-    expect(uploads.value[0].message).toBe("'huge.mp3' is too large — max 50 MB.")
+    expect(uploads.value[0]!.status).toBe('rejected')
+    expect(uploads.value[0]!.message).toBe("'huge.mp3' is too large — max 50 MB.")
     expect(mockUploadBytesResumable).not.toHaveBeenCalled()
   })
 
@@ -248,8 +248,8 @@ describe('useSongFileUpload', () => {
     task._triggerError(new Error('network error'))
     await flushPromises()
 
-    expect(uploads.value[0].status).toBe('error')
-    expect(uploads.value[0].message).toBe('Upload failed. Check your connection and try again.')
+    expect(uploads.value[0]!.status).toBe('error')
+    expect(uploads.value[0]!.message).toBe('Upload failed. Check your connection and try again.')
   })
 
   it('reset() empties the uploads list', () => {
