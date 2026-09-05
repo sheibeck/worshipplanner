@@ -14,7 +14,8 @@ import {
   getDocs,
   type Unsubscribe,
 } from 'firebase/firestore'
-import { db } from '@/firebase'
+import { ref as storageRef, deleteObject } from 'firebase/storage'
+import { db, storage } from '@/firebase'
 import type { Song, UpsertSongInput, VWType } from '@/types/song'
 import { songMatchesQuery, filterSongsByTags } from '@/utils/songSearch'
 import { useAuthStore } from '@/stores/auth'
@@ -322,6 +323,20 @@ export const useSongStore = defineStore('songs', () => {
     if (!orgId.value) return
     const song = songs.value.find((s) => s.id === id)
     if (!song || song.hidden !== true) return
+
+    // R371: best-effort delete of this song's Storage attachments before the
+    // Firestore doc goes away -- mirrors cleanupSweeps.ts's partial-failure-
+    // tolerant convention (one bad delete never aborts the song delete; a
+    // leftover orphaned object is an acceptable residual). Link-kind
+    // attachments have no storagePath and are skipped.
+    for (const attachment of song.attachments ?? []) {
+      if (!attachment.storagePath) continue
+      try {
+        await deleteObject(storageRef(storage, attachment.storagePath))
+      } catch (err) {
+        console.error(`hardDeleteSong: failed to delete attachment ${attachment.storagePath}:`, err)
+      }
+    }
 
     const songRef = doc(db, 'organizations', orgId.value, 'songs', id)
     const lyricsSnap = await getDocs(collection(db, 'organizations', orgId.value, 'songs', id, 'lyrics'))

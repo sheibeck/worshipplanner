@@ -47,6 +47,13 @@ vi.mock('firebase/firestore', () => {
 vi.mock('@/firebase', () => ({
   auth: {},
   db: {},
+  storage: {},
+}))
+
+// Mock firebase/storage — hardDeleteSong's R371 Storage cascade
+vi.mock('firebase/storage', () => ({
+  ref: vi.fn((_storage, path: string) => ({ path })),
+  deleteObject: vi.fn(() => Promise.resolve()),
 }))
 
 // Mock @/stores/auth — songs store reads useAuthStore().user/orgId for tag-filter persistence keying
@@ -82,6 +89,7 @@ function makeSong(overrides: Partial<{
   pcSongId: string | null
   hidden: boolean
   removedThemes: string[]
+  attachments: Array<{ id: string; kind: string; name: string; storagePath?: string; createdAt: unknown; createdBy: string }>
 }> = {}) {
   return {
     id: 'song-1',
@@ -862,6 +870,100 @@ describe('useSongStore', () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       expect('hardDeleteSong' in store).toBe(true)
+    })
+  })
+
+  describe('hardDeleteSong — Storage attachment cascade (R371)', () => {
+    it('calls deleteObject once per upload attachment storagePath, then deletes the Firestore doc', async () => {
+      const { deleteObject } = await import('firebase/storage')
+      const { writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({
+          id: 'song-1',
+          hidden: true,
+          attachments: [
+            { id: 'a1', kind: 'document', name: 'chart.pdf', storagePath: 'orgs/org-1/song-files/a1/chart.pdf', createdAt: null, createdBy: 'u1' },
+            { id: 'a2', kind: 'audio', name: 'track.mp3', storagePath: 'orgs/org-1/song-files/a2/track.mp3', createdAt: null, createdBy: 'u1' },
+          ],
+        }),
+      ])
+
+      await store.hardDeleteSong('song-1')
+
+      expect(deleteObject).toHaveBeenCalledTimes(2)
+      const calledPaths = vi.mocked(deleteObject).mock.calls.map((call) => (call[0] as unknown as { path: string }).path)
+      expect(calledPaths).toContain('orgs/org-1/song-files/a1/chart.pdf')
+      expect(calledPaths).toContain('orgs/org-1/song-files/a2/track.mp3')
+      // Firestore doc delete still happens afterward
+      expect(writeBatch).toHaveBeenCalledOnce()
+    })
+
+    it('tolerates a partial deleteObject failure: the loop continues and the Firestore delete still commits', async () => {
+      const { deleteObject } = await import('firebase/storage')
+      const { writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({
+          id: 'song-1',
+          hidden: true,
+          attachments: [
+            { id: 'a1', kind: 'document', name: 'chart.pdf', storagePath: 'orgs/org-1/song-files/a1/chart.pdf', createdAt: null, createdBy: 'u1' },
+            { id: 'a2', kind: 'audio', name: 'track.mp3', storagePath: 'orgs/org-1/song-files/a2/track.mp3', createdAt: null, createdBy: 'u1' },
+          ],
+        }),
+      ])
+
+      vi.mocked(deleteObject)
+        .mockRejectedValueOnce(new Error('object not found'))
+        .mockResolvedValueOnce(undefined)
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      await expect(store.hardDeleteSong('song-1')).resolves.not.toThrow()
+
+      expect(deleteObject).toHaveBeenCalledTimes(2)
+      expect(consoleErrorSpy).toHaveBeenCalled()
+      // The song/lyrics delete still committed despite the first attachment failing.
+      expect(writeBatch).toHaveBeenCalledOnce()
+
+      consoleErrorSpy.mockRestore()
+      vi.mocked(deleteObject).mockReset()
+      vi.mocked(deleteObject).mockImplementation(() => Promise.resolve())
+    })
+
+    it('skips a link-kind attachment (no storagePath) — deleteObject is not called for it', async () => {
+      const { deleteObject } = await import('firebase/storage')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({
+          id: 'song-1',
+          hidden: true,
+          attachments: [
+            { id: 'a1', kind: 'link', name: 'YouTube video', createdAt: null, createdBy: 'u1' },
+          ],
+        }),
+      ])
+
+      await store.hardDeleteSong('song-1')
+
+      expect(deleteObject).not.toHaveBeenCalled()
+    })
+
+    it('deleteSong (soft delete) does not call deleteObject — attachments survive a soft delete', async () => {
+      const { deleteObject } = await import('firebase/storage')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+
+      await store.deleteSong('song-1')
+
+      expect(deleteObject).not.toHaveBeenCalled()
     })
   })
 
