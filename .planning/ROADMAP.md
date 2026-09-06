@@ -884,7 +884,9 @@ church sees an unchanged, switcher-free experience.
   4. A volunteer serving at only one church sees no switcher — the single-church experience is unchanged
      (R405).
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 130-01-PLAN.md — Thread `orgName` through the rehearseAccess projection (both write paths) + add distinct-church derivation and a client-side filter to the mySchedule store (wave 1)
+- [ ] 130-02-PLAN.md — My Schedule church `<select>` filter (gated on >1 church) + AppSidebar volunteer church-name label (wave 2)
 **UI hint**: yes
 
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
