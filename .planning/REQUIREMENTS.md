@@ -23,7 +23,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Passwordless Volunteer Access
 
-- [ ] **R374**: A volunteer can sign in without a password via a Firebase email-link (`signInWithEmailLink`)
+- [x] **R374**: A volunteer can sign in without a password via a Firebase email-link (`signInWithEmailLink`)
   tied to their roster email — request/receive a link, click it, and be signed in with no password to set
   or remember.
 
@@ -31,7 +31,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   (reminder / share), so a rostered volunteer reaches My Schedule in one click from the email they already
   get. (Only the link-delivery channel is reused; no new email system.)
 
-- [ ] **R376**: A signed-in volunteer's session persists across browser refresh, they can sign out, and
+- [x] **R376**: A signed-in volunteer's session persists across browser refresh, they can sign out, and
   their playback position + their own downloads are attributed to their identity.
 
 - [x] **R377**: Magic-link volunteer access is **read-only and scoped** — it grants read access only to the
@@ -142,9 +142,9 @@ Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R374 | Phase 125 | Pending |
+| R374 | Phase 125 | Complete |
 | R375 | Phase 125 | Complete |
-| R376 | Phase 125 | Pending |
+| R376 | Phase 125 | Complete |
 | R377 | Phase 125 | Complete |
 | R378 | Phase 126 | Pending |
 | R379 | Phase 126 | Pending |
