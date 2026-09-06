@@ -17,6 +17,11 @@ function makeDoc(overrides: Partial<RehearseAccessDoc> = {}): RehearseAccessDoc 
     assignedEmailsLower: [],
     rolesByEmailLower: {},
     songs: [],
+    // Phase 127 (T-127-01): required fields on RehearseAccessDoc — empty is a
+    // valid fixture default (this suite doesn't exercise Order of
+    // Service/Who's Serving rendering).
+    orderOfService: [],
+    roleAssignments: [],
     ...overrides,
   }
 }

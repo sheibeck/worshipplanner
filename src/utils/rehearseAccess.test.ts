@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type { Timestamp } from 'firebase/firestore'
-import type { Service, SongSlot } from '@/types/service'
+import type { Service, ServiceSlot, SongSlot, StageMarker } from '@/types/service'
 import type { Quarter, Role, Person } from '@/types/roster'
-import type { Song } from '@/types/song'
+import type { Song, Arrangement } from '@/types/song'
 import { buildRehearseAccess } from '@/utils/rehearseAccess'
 
 const ts = {} as Timestamp
@@ -77,6 +77,20 @@ function makeService(overrides: Partial<Service> = {}): Service {
     notes: 'private planner notes — must never leak',
     createdAt: ts,
     updatedAt: ts,
+    ...overrides,
+  }
+}
+
+function makeArrangement(overrides: Partial<Arrangement> = {}): Arrangement {
+  return {
+    id: 'arr-1',
+    name: 'Default',
+    key: 'G',
+    bpm: 120,
+    lengthSeconds: null,
+    chordChartUrl: '',
+    notes: '',
+    teamTags: [],
     ...overrides,
   }
 }
@@ -193,6 +207,7 @@ describe('buildRehearseAccess', () => {
       id: 'song-missing',
       title: '(song removed)',
       keyOrArrangement: 'D',
+      bpm: null,
       attachments: [],
     })
   })
@@ -202,8 +217,22 @@ describe('buildRehearseAccess', () => {
 
     const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
 
+    // No slots/markers on the default fixture — orderOfService/roleAssignments
+    // are still required keys (empty arrays), stageLayout stays ABSENT (never
+    // an empty-elements object) per the conditional-spread contract.
     expect(Object.keys(result).sort()).toEqual(
-      ['serviceId', 'orgId', 'serviceDate', 'title', 'status', 'assignedEmailsLower', 'rolesByEmailLower', 'songs'].sort(),
+      [
+        'serviceId',
+        'orgId',
+        'serviceDate',
+        'title',
+        'status',
+        'assignedEmailsLower',
+        'rolesByEmailLower',
+        'songs',
+        'orderOfService',
+        'roleAssignments',
+      ].sort(),
     )
     expect(JSON.stringify(result)).not.toContain('private planner notes')
     expect(result.serviceId).toBe('service-1')
@@ -211,6 +240,9 @@ describe('buildRehearseAccess', () => {
     expect(result.serviceDate).toBe('2026-09-06')
     expect(result.title).toBe('Sunday Service')
     expect(result.status).toBe('planned')
+    expect(result.orderOfService).toEqual([])
+    expect(result.roleAssignments).toEqual([])
+    expect(result.stageLayout).toBeUndefined()
   })
 
   it('excludes song notes from the songs projection', () => {
@@ -304,5 +336,155 @@ describe('buildRehearseAccess', () => {
 
     expect(JSON.stringify(result.rolesByEmailLower)).not.toContain('Dana Smith')
     expect(JSON.stringify(result.rolesByEmailLower)).not.toContain('person-1')
+  })
+
+  // ── Phase 127 (T-127-01/02): orderOfService/roleAssignments/stageLayout/bpm ──
+
+  it('orderOfService lists every slot kind with only structured fields, stripping per-slot notes/body entirely', () => {
+    const PII_MARKER = 'THIS-MUST-NEVER-LEAK'
+    const service = makeService({
+      slots: [
+        makeSongSlot({ id: 'slot-song', position: 0, notes: PII_MARKER, section: 'worship' }),
+        {
+          id: 'slot-scripture',
+          kind: 'SCRIPTURE',
+          position: 1,
+          book: 'John',
+          chapter: 3,
+          verseStart: 16,
+          verseEnd: null,
+          notes: PII_MARKER,
+          section: 'worship',
+        },
+        {
+          id: 'slot-hymn',
+          kind: 'HYMN',
+          position: 2,
+          hymnName: 'Holy, Holy, Holy',
+          hymnNumber: '1',
+          verses: '1-3',
+          notes: PII_MARKER,
+          section: 'worship',
+        },
+        { id: 'slot-imported', kind: 'IMPORTED', position: 3, importId: 'import-1', section: 'worship' },
+        { id: 'slot-prayer', kind: 'PRAYER', position: 4, body: PII_MARKER, section: 'pre-service' },
+        { id: 'slot-message', kind: 'MESSAGE', position: 5, body: PII_MARKER, section: 'message' },
+        { id: 'slot-announcements', kind: 'ANNOUNCEMENTS', position: 6, body: PII_MARKER, section: 'pre-service' },
+        { id: 'slot-misc', kind: 'MISC', position: 7, label: 'Offering', body: PII_MARKER, section: 'sending' },
+      ] as ServiceSlot[],
+    })
+
+    const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
+
+    expect(result.orderOfService).toHaveLength(8)
+    for (const item of result.orderOfService) {
+      expect('notes' in (item as object)).toBe(false)
+      expect('body' in (item as object)).toBe(false)
+    }
+    const miscItem = result.orderOfService.find((i) => i.id === 'slot-misc')
+    expect(miscItem).toMatchObject({ kind: 'MISC', label: 'Offering' })
+    expect(JSON.stringify(result.orderOfService)).not.toContain(PII_MARKER)
+  })
+
+  it('a slot with a runtime kind outside the compile-time union still maps to a structured {id,kind,position} stand-in, never undefined', () => {
+    const service = makeService({
+      slots: [{ id: 'slot-unknown', kind: 'FUTURE_KIND', position: 0 } as unknown as ServiceSlot],
+    })
+
+    const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
+
+    expect(result.orderOfService).toEqual([{ id: 'slot-unknown', kind: 'FUTURE_KIND', position: 0 }])
+  })
+
+  it('roleAssignments carries names-only (roleId/roleName/group/personNames) — no personId, no email', () => {
+    const role = makeRole({ id: 'role-guitar', name: 'guitar', group: 'band' })
+    const quarter = makeQuarter({
+      serviceDates: ['2026-09-06'],
+      calendar: { '2026-09-06': { 'role-guitar': ['person-1'] } },
+    })
+    const person = makePerson({ id: 'person-1', name: 'Dana Smith', email: 'dana@example.com' })
+    const service = makeService({ date: '2026-09-06' })
+
+    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+
+    expect(result.roleAssignments).toEqual([
+      { roleId: 'role-guitar', roleName: 'guitar', group: 'band', personNames: ['Dana Smith'] },
+    ])
+    for (const assignment of result.roleAssignments) {
+      expect('personId' in (assignment as object)).toBe(false)
+      expect('email' in (assignment as object)).toBe(false)
+    }
+    expect(JSON.stringify(result.roleAssignments)).not.toContain('dana@example.com')
+  })
+
+  it('stageLayout is absent (key not present) for a service with zero markers', () => {
+    const service = makeService({ stageLayout: { elements: [] } })
+
+    const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
+
+    expect('stageLayout' in result).toBe(false)
+  })
+
+  it('stageLayout strips the free-text marker note but keeps every other display field, clamped', () => {
+    const PII_MARKER = 'XLR run from stage left — do not repeat to anyone'
+    const markers: StageMarker[] = [
+      {
+        id: 'm1',
+        label: 'Lead Vocal',
+        kind: 'lead',
+        zone: 'onstage',
+        xPct: 150,
+        yPct: -10,
+        note: PII_MARKER,
+        roleName: 'Vocals',
+        personName: 'Dana Smith',
+        withVocal: true,
+      },
+    ]
+    const service = makeService({ stageLayout: { elements: markers } })
+
+    const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
+
+    expect(result.stageLayout).toBeDefined()
+    const [element] = result.stageLayout!.elements
+    expect('note' in (element as object)).toBe(false)
+    expect(element).toEqual({
+      id: 'm1',
+      label: 'Lead Vocal',
+      kind: 'lead',
+      zone: 'onstage',
+      xPct: 100,
+      yPct: 0,
+      roleName: 'Vocals',
+      personName: 'Dana Smith',
+      withVocal: true,
+    })
+    expect(JSON.stringify(result.stageLayout)).not.toContain(PII_MARKER)
+  })
+
+  it('resolves bpm to the arrangement matching the slot key, falling back to the first arrangement, and null for an arrangement-less song', () => {
+    const songWithMatch = makeSong({
+      id: 'song-match',
+      arrangements: [makeArrangement({ key: 'G', bpm: 90 }), makeArrangement({ key: 'D', bpm: 140 })],
+    })
+    const songFallback = makeSong({
+      id: 'song-fallback',
+      arrangements: [makeArrangement({ key: 'C', bpm: 100 })],
+    })
+    const songNoArrangements = makeSong({ id: 'song-none', arrangements: [] })
+    const service = makeService({
+      slots: [
+        makeSongSlot({ id: 'slot-1', songId: 'song-match', songKey: 'D' }),
+        makeSongSlot({ id: 'slot-2', songId: 'song-fallback', songKey: 'NOT-FOUND' }),
+        makeSongSlot({ id: 'slot-3', songId: 'song-none', songKey: 'G' }),
+      ],
+    })
+
+    const result = buildRehearseAccess(service, 'org-1', [], [], [], [songWithMatch, songFallback, songNoArrangements])
+
+    const byId = new Map(result.songs.map((s) => [s.id, s]))
+    expect(byId.get('song-match')?.bpm).toBe(140)
+    expect(byId.get('song-fallback')?.bpm).toBe(100)
+    expect(byId.get('song-none')?.bpm).toBeNull()
   })
 })

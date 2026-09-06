@@ -79,6 +79,11 @@ function makeDoc(overrides: Partial<MyScheduleDoc> = {}): MyScheduleDoc {
         attachments: [{ id: 'att-1', name: 'chart.pdf', kind: 'document' }],
       },
     ],
+    // Phase 127 (T-127-01): required fields on RehearseAccessDoc — empty is a
+    // valid fixture default (this view's tests don't exercise Order of
+    // Service/Who's Serving rendering).
+    orderOfService: [],
+    roleAssignments: [],
     ...overrides,
   }
 }

@@ -28,7 +28,7 @@ import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { buildSlotsFromTemplate, buildSuggestedTemplateEntries, orderSlotsBySection } from '@/utils/slotTypes'
 import { stripUndefined } from '@/utils/stripUndefined'
-import { clampPct } from '@/utils/stageLayout'
+import { mapSlotAllowlist, mapStageMarkerAllowlist } from '@/utils/serviceProjection'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import { buildRehearseAccess } from '@/utils/rehearseAccess'
 import {
@@ -131,77 +131,19 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
   // fields ShareView.vue/diffServiceSnapshots actually read survive — free-text
   // `notes`/`body` are dropped for every kind, unconditionally (no raw spread).
   // Mirrors the roleAssignments/stageLayout allowlists below.
+  //
+  // T-127-01 (Phase 127): the actual switch body lives in the shared,
+  // store-free `mapSlotAllowlist` (src/utils/serviceProjection.ts) so
+  // `buildRehearseAccess` can reuse the EXACT same allowlist rather than a
+  // second hand-rolled one — this call only supplies the SONG-bpm resolver,
+  // which stays here because it needs `useSongStore()`.
   const songStore = useSongStore()
-  const slotsWithBpm = orderedSlots.map((slot): ServiceSlot => {
-    switch (slot.kind) {
-      case 'SONG': {
-        const base = {
-          id: slot.id,
-          kind: 'SONG' as const,
-          position: slot.position,
-          requiredVwType: slot.requiredVwType,
-          songId: slot.songId,
-          songTitle: slot.songTitle,
-          songKey: slot.songKey,
-        }
-        if (!slot.songId) return base
-        const song = songStore.songs.find((s) => s.id === slot.songId)
-        const bpm = song
-          ? (song.arrangements.find((a) => a.key === slot.songKey)?.bpm ?? song.arrangements[0]?.bpm ?? null)
-          : null
-        // `bpm` is a display-only field not declared on `SongSlot` itself
-        // (mirrors the pre-existing cast this replaces) — the resolved
-        // arrangement tempo the share page's song line reads.
-        return { ...base, bpm } as ServiceSlot
-      }
-      case 'SCRIPTURE':
-        return {
-          id: slot.id,
-          kind: 'SCRIPTURE',
-          position: slot.position,
-          book: slot.book,
-          chapter: slot.chapter,
-          verseStart: slot.verseStart,
-          verseEnd: slot.verseEnd,
-        }
-      case 'HYMN':
-        return {
-          id: slot.id,
-          kind: 'HYMN',
-          position: slot.position,
-          hymnName: slot.hymnName,
-          hymnNumber: slot.hymnNumber,
-          verses: slot.verses,
-        }
-      case 'IMPORTED':
-        return { id: slot.id, kind: 'IMPORTED', position: slot.position, importId: slot.importId }
-      case 'PRAYER':
-      case 'MESSAGE':
-      case 'ANNOUNCEMENTS':
-      case 'MISC':
-        return {
-          id: slot.id,
-          kind: slot.kind,
-          position: slot.position,
-          ...(slot.kind === 'MISC' && slot.label ? { label: slot.label } : {}),
-        }
-      // WR-02 (118-REVIEW): the switch above is exhaustive over the compile-time
-      // `ServiceSlot` union, but a runtime slot whose `kind` falls outside it
-      // (corrupt/legacy/future data crossing the Firestore boundary) must still
-      // map to a value — falling off the end returns `undefined`, which throws
-      // the whole `shareTokens` write (Firestore rejects `undefined` at any
-      // depth). Mirrors the old pre-switch pass-through and slotTypes.ts's
-      // `KNOWN_SLOT_KINDS` defensiveness: keep the slot's identity/position as a
-      // structured stand-in rather than propagate `undefined`.
-      default: {
-        // `slot` narrows to `never` here because the switch is exhaustive over
-        // the compile-time union — this branch only exists for a runtime value
-        // outside it, so read defensively through an unknown cast.
-        const unknownSlot = slot as unknown as { id: string; kind: string; position: number }
-        return { id: unknownSlot.id, kind: unknownSlot.kind, position: unknownSlot.position } as ServiceSlot
-      }
-    }
-  })
+  const slotsWithBpm = orderedSlots.map((slot) =>
+    mapSlotAllowlist(slot, (s) => {
+      const song = songStore.songs.find((song) => song.id === s.songId)
+      return song ? (song.arrangements.find((a) => a.key === s.songKey)?.bpm ?? song.arrangements[0]?.bpm ?? null) : null
+    }),
+  )
 
   // Who's-serving snapshot (D-04/D-24 PII guard): resolve personId -> name via a
   // Map ONLY — never embed the raw Person object (no email/phone/pcPersonId).
@@ -221,31 +163,22 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
   // defensively re-clamped (IN-03) as the last line of defense before an unauthenticated
   // public page renders these values. See .planning/codebase/ARCHITECTURE.md
   // (Store & Config Behavioral Notes (R318) -> src/stores/services.ts).
+  //
+  // T-127-01 (Phase 127): the allowlist itself (everything except `note`) is
+  // the shared, store-free `mapStageMarkerAllowlist` (src/utils/serviceProjection.ts)
+  // — `buildRehearseAccess` calls the SAME function. `note` is free-text
+  // (WR-01, 118-REVIEW walked back the earlier "non-PII" assumption — a
+  // planner can type anything, including PII, into this field). It is
+  // re-attached here, on TOP of the shared allowlist, only because
+  // `buildServiceSnapshot`'s own return is read by the org-internal
+  // `lockSnapshots/current` re-lock diff — `toPublicServiceSnapshot()` still
+  // strips it before either public write, and `buildRehearseAccess` never
+  // adds it back at all (there is no internal/public split on that path;
+  // every reader of `rehearseAccess/{serviceId}` is an external volunteer).
+  // Conditional spread keeps `note` ABSENT (never undefined) either way.
   const stageLayoutElements: StageMarker[] = (service.stageLayout?.elements ?? []).map((marker) => ({
-    id: marker.id,
-    label: marker.label,
-    ...(marker.kind ? { kind: marker.kind } : {}),
-    zone: marker.zone,
-    xPct: clampPct(marker.xPct),
-    yPct: clampPct(marker.yPct),
-    // `note` is free-text (WR-01, 118-REVIEW walked back the earlier
-    // "non-PII" assumption — a planner can type anything, including PII, into
-    // this field). It stays on `buildServiceSnapshot`'s own return because the
-    // org-internal lockSnapshots/current consumer is untouched by this
-    // change, but `toPublicServiceSnapshot()` strips it before either public
-    // write — the same split R346 already uses for service-level `notes`.
-    // Conditional spread keeps it ABSENT (never undefined) either way.
+    ...mapStageMarkerAllowlist(marker),
     ...(marker.note ? { note: marker.note } : {}),
-    // Band-role instrument: project the display role NAME (needed for the tile's
-    // type/icon/skin on the read-only page), never the internal roleId.
-    ...(marker.roleName ? { roleName: marker.roleName } : {}),
-    // Assigned person: project only the display NAME (same trust level as the
-    // "Who's Serving" roleAssignments the share page already shows), never the
-    // internal personId. The tile renders `personName` directly.
-    ...(marker.personName ? { personName: marker.personName } : {}),
-    // The "player also sings" flag is a boolean display cue (no PII); carry it
-    // so the shared/printed tile reads "Electric + Vocal" too.
-    ...(marker.withVocal ? { withVocal: true } : {}),
   }))
 
   return {

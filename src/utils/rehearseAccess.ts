@@ -4,10 +4,13 @@
 // "pure function in utils/" convention as serviceRoles.ts/messagingRecipients.ts.
 // Doc shape is authoritative per 125-01-PLAN.md and enforced by firestore.rules.
 
-import type { Service, SongSlot } from '@/types/service'
-import type { Quarter, Role, Person } from '@/types/roster'
+import type { Service, ServiceSlot, SongSlot } from '@/types/service'
+import type { Quarter, Role, Person, RoleGroup } from '@/types/roster'
 import type { Song, SongAttachmentKind } from '@/types/song'
+import type { PublicStageMarker } from '@/stores/services'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
+import { mapOrderedSlots, mapStageMarkers } from '@/utils/serviceProjection'
+import { orderSlotsBySection } from '@/utils/slotTypes'
 
 export interface RehearseAttachment {
   id: string
@@ -21,7 +24,23 @@ export interface RehearseSong {
   id: string
   title: string
   keyOrArrangement?: string
+  /** Resolved arrangement tempo (Phase 127, R385/R386) — same resolution
+   *  `buildServiceSnapshot` uses (arrangement matching `keyOrArrangement`,
+   *  else the first arrangement, else `null`). Always present (never a
+   *  bare "bpm" literal downstream) so the meta-line join can graceful-omit
+   *  a genuinely null value rather than concatenate a partial string. */
+  bpm?: number | null
   attachments: RehearseAttachment[]
+}
+
+/** "Who's Serving" projection (Phase 127, R392) — names-only via nameById,
+ *  mirrors `buildServiceSnapshot`'s own `roleAssignments` map
+ *  (services.ts:155-160): no `personId`/email, ever. */
+export interface RehearseRoleAssignment {
+  roleId: string
+  roleName: string
+  group: RoleGroup
+  personNames: string[]
 }
 
 /** organizations/{orgId}/rehearseAccess/{serviceId} — see 125-01-PLAN.md artifacts
@@ -42,6 +61,21 @@ export interface RehearseAccessDoc {
    *  skipped entirely (mirrors assignedEmailsLower's own empty-email skip). */
   rolesByEmailLower: Record<string, string[]>
   songs: RehearseSong[]
+  /** Read-only running order (Phase 127, R392) — the EXACT per-kind
+   *  allowlist `buildServiceSnapshot` enforces (shared via
+   *  `mapOrderedSlots`, src/utils/serviceProjection.ts), section-ordered
+   *  the same way (`orderSlotsBySection`). No per-slot free-text
+   *  `notes`/`body` ever reaches this array. */
+  orderOfService: ServiceSlot[]
+  /** "Who's Serving" (Phase 127, R392) — see {@link RehearseRoleAssignment}. */
+  roleAssignments: RehearseRoleAssignment[]
+  /** The v2.7 stage diagram (Phase 127, R393), note-stripped
+   *  (`PublicStageMarker`, the SAME allowlist `toPublicServiceSnapshot`
+   *  enforces for the public share-link path). ABSENT (never an empty
+   *  array, never `undefined`) when the service has zero markers —
+   *  conditional-spread at the return, mirroring
+   *  `buildServiceSnapshot`'s own `stageLayout?.length` omission pattern. */
+  stageLayout?: { elements: PublicStageMarker[] }
 }
 
 /** One SongSlot per distinct songId, first-occurrence order — mirrors
@@ -124,13 +158,22 @@ export function buildRehearseAccess(
         id: slot.songId as string,
         title: '(song removed)',
         ...(slot.songKey ? { keyOrArrangement: slot.songKey } : {}),
+        // No catalog song to resolve an arrangement bpm from — null, never
+        // a partial "bpm" literal downstream.
+        bpm: null,
         attachments: [],
       }
     }
+    // Bpm resolution (R385/R386) — mirrors buildServiceSnapshot's
+    // arrangement lookup (services.ts, via the shared songStore.songs.find
+    // idiom) exactly, but through the already-loaded `songsById`/`song`
+    // this pure builder already has — no useSongStore, no I/O.
+    const bpm = song.arrangements.find((a) => a.key === slot.songKey)?.bpm ?? song.arrangements[0]?.bpm ?? null
     return {
       id: song.id,
       title: song.title,
       ...(slot.songKey ? { keyOrArrangement: slot.songKey } : {}),
+      bpm,
       attachments: (song.attachments ?? []).map((a) => ({
         id: a.id,
         name: a.name,
@@ -141,6 +184,34 @@ export function buildRehearseAccess(
     }
   })
 
+  // orderOfService (R392) — SAME per-kind allowlist buildServiceSnapshot
+  // enforces (mapOrderedSlots, src/utils/serviceProjection.ts), in the same
+  // section-major running order (R112 parity) the editor/ShareView agree on.
+  // Bpm is resolved via the already-loaded `songsById` map — no useSongStore,
+  // keeping this builder store-free/pure.
+  const orderOfService = mapOrderedSlots(orderSlotsBySection(service.slots), (s) => {
+    const song = songsById.get(s.songId as string)
+    return song ? (song.arrangements.find((a) => a.key === s.songKey)?.bpm ?? song.arrangements[0]?.bpm ?? null) : null
+  })
+
+  // roleAssignments (R392, "Who's Serving") — names-only via nameById,
+  // mirrors buildServiceSnapshot's own roleAssignments map exactly; no
+  // personId/email ever reaches this array.
+  const nameById = new Map(people.map((p) => [p.id, p.name]))
+  const roleAssignments: RehearseRoleAssignment[] = assignments.map((a) => ({
+    roleId: a.roleId,
+    roleName: a.roleName,
+    group: a.group,
+    personNames: a.effectivePersonIds.map((id) => nameById.get(id) ?? id),
+  }))
+
+  // stageLayout (R393) — SAME PublicStageMarker allowlist (note stripped) as
+  // toPublicServiceSnapshot() enforces for the public share-link path
+  // (mapStageMarkers, src/utils/serviceProjection.ts). Conditional-spread at
+  // the return keeps the key ABSENT (never undefined) when there are zero
+  // markers, mirroring buildServiceSnapshot's own omission pattern.
+  const stageLayoutElements = mapStageMarkers(service.stageLayout?.elements ?? [])
+
   return {
     serviceId: service.id,
     orgId,
@@ -150,5 +221,8 @@ export function buildRehearseAccess(
     assignedEmailsLower: [...assignedEmailsLower].sort(),
     rolesByEmailLower,
     songs: rehearseSongs,
+    orderOfService,
+    roleAssignments,
+    ...(stageLayoutElements.length > 0 ? { stageLayout: { elements: stageLayoutElements } } : {}),
   }
 }
