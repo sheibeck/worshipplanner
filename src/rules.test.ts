@@ -2730,13 +2730,15 @@ describe('Volunteer magic-link scoped read access — R377', () => {
       assignedEmailsLower: ['dana@example.com'],
     })
 
-    // orgB/svcB: Planned in a DIFFERENT org, assigned to the SAME email — proves
-    // the grant is scoped by path (orgId), never by email alone.
+    // orgB/svcB: Planned in a DIFFERENT org, assigned to a DIFFERENT volunteer —
+    // proves cross-org isolation: an attacker who knows/guesses this path but is
+    // not assigned in THIS org's document is denied, even though they hold a
+    // valid magic-link token for the same email elsewhere (orgA/svc1 above).
     await seedDoc('organizations/orgB/services/svcB', { status: 'planned' })
     await seedDoc('organizations/orgB/rehearseAccess/svcB', {
       serviceId: 'svcB',
       orgId: 'orgB',
-      assignedEmailsLower: ['dana@example.com'],
+      assignedEmailsLower: ['other-org-volunteer@example.com'],
     })
   }
 

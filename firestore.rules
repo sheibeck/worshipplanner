@@ -259,6 +259,52 @@ service cloud.firestore {
         }
       }
 
+      // rehearseAccess — R377 (Phase 125, security core): a frozen, PII-safe
+      // per-service projection that grants a magic-link volunteer (authenticated,
+      // NO membership doc, NO custom claim) a single narrow read path. Sibling
+      // to services/{docId} (doc id == serviceId, not nested under it) so the
+      // rule can resolve BOTH orgId and serviceId from the path with no client
+      // field trusted for scoping -- cross-org access is structurally impossible.
+      //
+      // parentIsPlanned() re-checks the LIVE parent service status on every
+      // read (a same-service Firestore get() on a sibling doc -- safe, and
+      // already the exact idiom isOrgMember/isOrgEditor/slideGroups' parentDraft
+      // use above; this is NOT the forbidden cross-*service* storage.rules ->
+      // firestore.exists() pattern banned by CLAUDE.md). Without this live
+      // re-check, a service Reopened (R037, planned/exported -> draft) would
+      // leave its stale rehearseAccess doc still readable by an assigned
+      // volunteer even though the parent is no longer Planned.
+      match /rehearseAccess/{serviceId} {
+        function parentIsPlanned() {
+          return exists(/databases/$(database)/documents/organizations/$(orgId)/services/$(serviceId))
+            && get(/databases/$(database)/documents/organizations/$(orgId)/services/$(serviceId))
+                 .data.get('status', 'draft') != 'draft';
+        }
+
+        // Deliberate trust decision: an org member/editor is already fully
+        // trusted within their own org (isOrgMember short-circuits the whole
+        // volunteer arm below) -- R377's isolation boundary is cross-org /
+        // non-assigned access, not editor-vs-editor or member-vs-editor trust.
+        // The volunteer arm requires ALL of: signed in, a non-null email claim,
+        // the LIVE parent status being non-draft, and the token's LOWERCASED
+        // email present in the LOWERCASED assignedEmailsLower array (mirrors
+        // the invites/{email} email-claim idiom at :192 -- normalization on
+        // both sides is load-bearing, see Pitfall 5 in 125-RESEARCH.md).
+        allow read: if isOrgMember(orgId)
+          || (
+            isSignedIn()
+            && request.auth.token.email != null
+            && parentIsPlanned()
+            && request.auth.token.email.lower() in resource.data.get('assignedEmailsLower', [])
+          );
+
+        // Client-writable by the locking editor only -- mirrors lockSnapshots
+        // above, NOT a Cloud Function. An editor forging another volunteer's
+        // assignedEmailsLower entry is within that editor's EXISTING in-org
+        // trust boundary and is not itself an R377 violation.
+        allow write: if isOrgEditor(orgId);
+      }
+
       // Slide groups — one doc per slot (doc id IS the slot id), so the parent
       // service is reachable only via the serviceId FIELD. Two extra billed
       // reads per write (exists + get); 3 of the 10-call budget once
@@ -321,14 +367,19 @@ service cloud.firestore {
 
       // All other nested collections — editors only.
       // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § firestore.rules)
-      // ★ `collection != 'services'`, `collection != 'slideGroups'` AND `collection != 'pptxRenders'`
-      // are all LOAD-BEARING. Do not remove any of the three.
+      // ★ `collection != 'services'`, `collection != 'slideGroups'`, `collection != 'pptxRenders'`
+      // AND `collection != 'rehearseAccess'` are all LOAD-BEARING. Do not remove any of the four.
+      // `rehearseAccess` (Phase 125/R377) already grants editor write via its own explicit block
+      // above -- excluded here purely for accounting consistency (Pitfall 4, 125-RESEARCH.md): every
+      // collection with its own explicit match block is accounted for in this catch-all, not left to
+      // an unnoticed OR-composition with it.
       match /{collection}/{docId} {
         allow read: if isOrgEditor(orgId);
         allow write: if isOrgEditor(orgId)
           && collection != 'services'
           && collection != 'slideGroups'
-          && collection != 'pptxRenders';
+          && collection != 'pptxRenders'
+          && collection != 'rehearseAccess';
       }
     }
 
