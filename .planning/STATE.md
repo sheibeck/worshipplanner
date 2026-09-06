@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-09-06T02:34:08.742Z"
 last_activity: 2026-09-05
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -52,28 +52,61 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.11 Song File Attachments (roadmap created 2026-09-05)
+# ▶ ACTIVE MILESTONE — v2.12 Rehearse Mode (roadmap created 2026-09-05)
+
+**Status:** Roadmap created, ready to plan
+
+**Goal:** Give worship volunteers a low-friction, passwordless way to rehearse the services they're
+serving — view/print sheet music & chords and play/practice reference recordings — without tracking a
+new username/password and without exposing media publicly. This is step 2 (the final step) of the
+file-storage backlog (999.13 / SEED-003); step 1 (song attachments) shipped as v2.11.
+
+(v2.11 ended at Phase 124); this milestone is **Phases 125–127**.
+
+**Key context:** Access = passwordless magic link (Firebase `signInWithEmailLink`) tied to a volunteer's
+roster email, delivered through the existing v1.7 volunteer-messaging emails — not public, not full
+accounts. Landing = "My Schedule," a volunteer home listing every service the volunteer is assigned to
+(roster-email → assignment match), showing only Planned (locked, non-Draft) services. Rehearse is a
+STANDALONE screen reached only from a My Schedule card — explicitly not a tab in the planner's service
+editor; the volunteer surface is fully separate from the planner surface. Media = the v2.11 song
+attachments (PDF/MP3 + external links), reused — nothing is re-uploaded. Playback speed + whole-track
+loop are included (cheap native `<audio>`); server-side transposition and loop-a-section are not. Cost
+guardrails (per-org storage quota + egress alerting) are deferred to the backlog — v2.11's per-file caps
+remain the only cost bound this milestone. R377 (magic-link isolation) is security-critical and carries a
+threat model + Firestore/Storage rules or a denormalized rehearse-snapshot with ALLOW/DENY rules tests —
+the exact mechanism is a phase-level/plan-time decision. No project-research pass — the domain is already
+covered by SEED-003's v2.7 research and validated by v2.11. Design reference: the owner's Claude Design
+mocks `Rehearsal.dc.html` + `Volunteer Home.dc.html` (Nocturne palette → app dark gray-950); Phases 126
+and 127 are UI-bearing and will want a `/gsd-ui-phase` UI-SPEC at plan time. **Out of scope:** per-org
+storage quota + egress monitoring, server-side audio transposition, loop-a-section, image/uploaded-video
+attachment types, and public/anonymous access.
+
+See the `## ★ v2.12 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
+phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.11 Song File Attachments (shipped & deployed to production 2026-09-05, archived 2026-09-05)
+
+> ✅ **Deployed to production 2026-09-05** (`storage.rules` + hosting; a same-day Storage CORS fix makes
+> downloads prompt a Save dialog).
 
 **Status:** v2.11 milestone complete
 
 **Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external media
 links (YouTube/Drive/Dropbox) — on a Song in the stable, via a new Files tab in the Edit Song slideout,
-laying the durable storage foundation for the future team-rehearsal experience. This is step 1 of the
-file-storage backlog (999.13 / SEED-003); Rehearse mode (playback inside the shared/public service) is
-the next milestone.
+laying the durable storage foundation for the future team-rehearsal experience. This was step 1 of the
+file-storage backlog (999.13 / SEED-003); Rehearse mode (v2.12) is step 2.
 
-(v2.10 ended at Phase 120); this milestone is **Phases 121–124**.
+(v2.10 ended at Phase 120); this milestone was **Phases 121–124**.
 
 **Key context:** No research pass — built on SEED-003's architecture + cost research (download-token
 URLs, an org-scoped non-`media/` Storage path, the `firestore.exists()`-in-Storage-emulator blind spot,
 and reuse of the existing `useMediaUpload`/`useBackgroundUpload` `uploadBytesResumable` +
 `MEDIA_MAX_BYTES`/`BACKGROUND_MAX_BYTES` cap patterns). Uploads are PDF + MP3 only, ≤ 50 MB/file; video
-is external-link-only. Per-file caps only this milestone — per-org storage quota + egress
-monitoring/alerting are deferred to the Rehearse milestone. Design reference: the owner's "Song Files"
-mock (Nocturne palette), mapped to the app's dark gray-950 design language — the milestone opens with a
-dedicated UI/design phase producing that mapping before any Files-tab code is written. **Out of scope:**
-per-org storage quota + egress monitoring, image/uploaded-video attachment types, per-file "share with
-volunteers" toggles, and the Rehearse/playback experience (all → future milestone).
+is external-link-only. Audit PASSED 13/13 requirements, 4/4 phases, 6/6 integration seams WIRED;
+owner-verified local UAT drove three post-UAT fixes (download Save-dialog, upload auto-clear/dismiss,
+duplicate-file denial, remove-confirm copy).
 
 See the `## ★ v2.11 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
 phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
@@ -1275,7 +1308,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 120 — Architecture — God-Module Decomposition
+**Current focus:** Phase 125 — Passwordless Magic-Link Access & Scoped Read Isolation
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1285,10 +1318,52 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (Phase 125 next)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-05 — Milestone v2.12 started
+Status: Roadmap created, ready to plan Phase 125
+Last activity: 2026-09-05 — v2.12 roadmap created (Phases 125-127, R374-R393 mapped 100%)
+
+## ★ v2.12 ROADMAP.md phase breakdown (created 2026-09-05)
+
+3 phases (125-127), derived directly from R374-R393 (20 requirements) with this project's `coarse`
+granularity setting applied. The milestone's own framing draws three natural fault lines matching its
+dependency order: passwordless magic-link auth plus the R377 read-only/scoped-isolation guarantee is the
+foundation every volunteer read has to pass through (Phase 125, security-critical — no dedicated UI-SPEC,
+since its user-facing surface is a small sign-in-completion flow, not a design-bearing screen); "My
+Schedule," the volunteer home listing a volunteer's assigned Planned services (Phase 126, UI-bearing —
+maps to the owner's `Volunteer Home.dc.html` mock); and the standalone, read-only volunteer service view —
+Rehearse (song list, song detail, PDF reader, audio player with speed/loop), plus read-only Order of
+Service and Stage Layout tabs since tech-team members are volunteers too, reached only from a My Schedule
+card (Phase 127, UI-bearing — Rehearse maps to `Rehearsal.dc.html`; Order/Stage reuse the existing v2.7
+read-only renderers, not a new mock). R392/R393 (the Order of Service and Stage Layout tabs) fold into
+Phase 127 rather than a fourth phase — they compose the same standalone view R384 already establishes and
+are thin, reuse-only wiring against existing read-only renderers, not enough independent surface to earn
+their own phase under `coarse` granularity. Phase 127 depends on Phase 126 because the view is deliberately
+reachable only from a My Schedule service card, and both depend on Phase 125's session + scoped-read
+contract. Numbering continues from v2.11, which ended at Phase 124 — v2.12 starts at Phase 125, not reset.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 125 Passwordless Magic-Link Access & Scoped Read Isolation | A volunteer signs in via a roster-email-tied Firebase email-link with no password, and that session is provably read-only and scoped to their own org's Planned, assigned services — never planner/editor surfaces, other orgs, or Drafts | R374, R375, R376, R377 | Nothing (first phase of v2.12) | no |
+| 126 My Schedule — Volunteer Home | After sign-in, a volunteer lands on a read-and-go "My Schedule" page listing every Planned service they're assigned to, soonest first, with role/readiness/countdown info and a way into Rehearse | R378, R379, R380, R381, R382, R383 | Phase 125 (needs the session + scoped-read contract to query assignments) | yes |
+| 127 Volunteer Service View — Rehearse, Order of Service & Stage Layout | From a My Schedule card, a volunteer reaches a standalone read-only service view — Rehearse tab (song list, detail, PDF reader, audio player with speed/loop, external links) plus read-only Order of Service and Stage Layout tabs — reliably on mobile | R384, R385, R386, R387, R388, R389, R390, R391, R392, R393 | Phase 126 (reached only from a My Schedule card) | yes |
+
+**Security note (R377, Phase 125):** magic-link volunteer access must be read-only and scoped at the data
+layer, not just the UI — flag for a threat model + Firestore/Storage ALLOW/DENY rules tests at plan time.
+SEED-003 suggests either scoped rules, a `buildServiceSnapshot()`-style denormalized rehearse snapshot
+carrying attachment refs/tokenized URLs, or server-issued signed URLs; the exact mechanism is left to
+phase-research/planning.
+
+**UI note (Phases 126-127):** both map to the owner's Claude Design mocks (`Volunteer Home.dc.html`,
+`Rehearsal.dc.html`, Nocturne palette → app dark gray-950) — run `/gsd-ui-phase` at plan time for each.
+
+**Out of scope this milestone (locked at requirements time):** per-org storage quota + egress
+monitoring/alerting, server-side audio transposition, loop-a-section, image/uploaded-video attachment
+types, volunteers editing services/songs/attachments, and a Rehearse tab inside the planner's service
+editor (all → backlog / explicitly rejected).
+
+See `.planning/ROADMAP.md` § v2.12 Rehearse Mode for the full phase detail table (goals, dependencies,
+success criteria). Next step: `/gsd-plan-phase 125` (optionally preceded by `/gsd-discuss-phase 125`).
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 

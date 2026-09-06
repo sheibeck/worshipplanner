@@ -588,6 +588,128 @@ Full details: [milestones/v2.10-ROADMAP.md](milestones/v2.10-ROADMAP.md) · requ
 
 ### ✅ v2.11 Song File Attachments — SHIPPED & DEPLOYED 2026-09-05 (Phases 121-124) — R361-R373, audit PASSED 13/13. Full detail archived: [milestones/v2.11-ROADMAP.md](milestones/v2.11-ROADMAP.md)
 
+### 🚧 v2.12 Rehearse Mode (Phases 125-127, in planning)
+
+**Milestone Goal:** Give worship volunteers a low-friction, passwordless way to rehearse the services
+they're serving — view/print sheet music & chords and play/practice reference recordings — without
+tracking a new username/password and without exposing media publicly. Step 2 (the final step) of the
+file-storage backlog (999.13 / SEED-003); step 1 (song attachments) shipped as v2.11.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R374–R393 (20 mapped, 100% coverage)
+
+**Key context:** Access = passwordless magic link (Firebase `signInWithEmailLink`) tied to a volunteer's
+roster email, delivered through the existing v1.7 volunteer-messaging emails — not public, not full
+accounts. Landing = "My Schedule" (volunteer home) listing every service a volunteer is assigned to,
+showing only Planned (locked, non-Draft) services. Rehearse is a STANDALONE screen reached only from a My
+Schedule card — not a tab in the planner's service editor. Media = the v2.11 song attachments, reused —
+nothing is re-uploaded. Playback speed + whole-track loop are included; server-side transposition and
+loop-a-section are not. Cost guardrails (per-org storage quota + egress alerting) are deferred to the
+backlog. No project-research pass (SEED-003 + v2.7 research + v2.11 validation already cover the domain).
+Design reference: the owner's Claude Design mocks `Rehearsal.dc.html` + `Volunteer Home.dc.html` (Nocturne
+palette → app dark gray-950).
+
+**Flagged at roadmap time:**
+
+- Phase 125 (R377) is security-critical — magic-link volunteer access must be read-only and scoped at the
+  data layer, not just the UI. Needs a threat model + Firestore/Storage ALLOW/DENY rules tests at plan
+  time. SEED-003 suggests scoped rules, a `buildServiceSnapshot()`-style denormalized rehearse snapshot
+  carrying attachment refs/tokenized URLs, or server-issued signed URLs — the exact mechanism is left to
+  phase-research/planning, but the phase must own the isolation guarantee.
+- Phases 126 and 127 map to the owner's design mocks and are UI-bearing — run `/gsd-ui-phase` at plan time
+  for each (`Volunteer Home.dc.html` for 126, `Rehearsal.dc.html` for 127).
+
+- [ ] **Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation** - A volunteer signs in via a roster-email-tied Firebase email-link with no password, and that session is provably read-only and scoped to their own org's Planned, assigned services
+- [ ] **Phase 126: My Schedule — Volunteer Home** - A signed-in volunteer lands on a read-and-go page listing every Planned service they're assigned to, soonest first, with role/readiness/countdown info and a way into Rehearse
+- [ ] **Phase 127: Volunteer Service View — Rehearse, Order of Service & Stage Layout** - From a My Schedule card, a volunteer reaches a standalone read-only service view — Rehearse (song list, detail, PDF reader, audio player with speed/loop, external links) plus read-only Order of Service and Stage Layout tabs — reliably on mobile
+
+### Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation
+
+**Goal**: A volunteer can sign in without a password via a Firebase email-link tied to their roster email,
+delivered through the existing volunteer-messaging emails, and once signed in, their access is provably
+read-only and scoped to their own org's Planned, assigned services — never the planner/editor surfaces,
+another org's data, or Draft services.
+**Depends on**: Nothing (first phase of v2.12)
+**Requirements**: R374, R375, R376, R377
+**Security-critical**: yes — R377 requires a threat model and Firestore/Storage ALLOW/DENY rules tests
+proving the isolation guarantee, not just a UI hide.
+**Success Criteria** (what must be TRUE):
+
+  1. A volunteer clicks the sign-in link embedded in an existing v1.7 volunteer-messaging email
+     (reminder/share) and is signed in via Firebase email-link auth (`signInWithEmailLink`) with no
+     password ever set or requested (R374, R375).
+  2. A signed-in volunteer's session survives a browser refresh and they can explicitly sign out from the
+     volunteer surface (R376).
+  3. Playback position and downloads performed while signed in are attributed to that volunteer's own
+     identity, not anonymous (R376).
+  4. A signed-in volunteer's session cannot read another organization's data, any Draft (unlocked)
+     service, or a service they are not assigned to — proven by rules/isolation tests, not just a UI hide
+     (R377).
+  5. A signed-in volunteer cannot reach any planner/editor surface (Service Order, Slides, Roles, Stage
+     Layout editors) — those routes/reads are denied at the data layer for a volunteer-scoped session
+     (R377).
+
+**Plans**: TBD
+
+### Phase 126: My Schedule — Volunteer Home
+
+**Goal**: After signing in, a volunteer lands on "My Schedule," a read-and-go page listing every service
+they are actually assigned to, so they can see what's coming and jump straight into rehearsal.
+**Depends on**: Phase 125 (needs the magic-link session and scoped-read contract to query the volunteer's
+own assignments)
+**Requirements**: R378, R379, R380, R381, R382, R383
+**Success Criteria** (what must be TRUE):
+
+  1. After sign-in, a volunteer lands on My Schedule listing every service they are assigned to, matched
+     by roster email → role assignment — available to anyone assigned to a service, not gated by role
+     (R378).
+  2. Only Planned (locked, non-Draft) services appear — a service still being drafted by a planner never
+     shows to volunteers, reusing the app's existing not-Draft/lock gate (R379).
+  3. Services are ordered soonest-first and grouped This week / Later this month, with a "Next up" badge
+     on the soonest upcoming service; past services the volunteer served are shown separately and remain
+     openable (R380).
+  4. Each service card shows the date, name, time · venue, the volunteer's own role chips, song/chart/
+     track counts, a readiness indicator (all ready / N songs missing media / waiting on charts), and a
+     countdown + call time (R381).
+  5. An upcoming card's "Rehearse →" opens that service's standalone Rehearse screen; a past card offers a
+     read/open action instead; a "check a different email" affordance and a no-match empty state are
+     present; and My Schedule itself is not editable (R382, R383).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 127: Volunteer Service View — Rehearse, Order of Service & Stage Layout
+
+**Goal**: From a My Schedule service card, a volunteer reaches a standalone, read-only service view — not
+the planner's `ServiceEditorView` — carrying three tabs: Rehearse (default, browsing songs and rehearsing
+using the song's existing v2.11 attachments), Order of Service (read-only running order), and Stage Layout
+(read-only stage diagram) — because tech-team volunteers need those two as much as the rehearsal media —
+all working reliably on both desktop and mobile.
+**Depends on**: Phase 126 (this view is reached only from a My Schedule service card, never independently
+or from the planner's service editor)
+**Requirements**: R384, R385, R386, R387, R388, R389, R390, R391, R392, R393
+**Success Criteria** (what must be TRUE):
+
+  1. Opening a service from My Schedule opens a standalone, read-only view — never the planner's
+     `ServiceEditorView` or any editing UI — carrying Rehearse (default), Order of Service, and Stage
+     Layout tabs, composed from the existing read-only renderers (ShareView snapshot + the v2.7 read-only
+     order/stage renders) rather than a hidden/forked mode of the editor (R384).
+  2. The Rehearse tab lists the service's songs (key, PDF count, MP3 count, now-playing indicator), and
+     selecting one shows its detail — Sheet music & chords (PDF) with per-file Print + Download,
+     Recordings (MP3), an optional per-song note, and any external media links (opening in a new tab) —
+     all sourced from the existing v2.11 song attachments with nothing uploaded on this screen (R385,
+     R386, R390).
+  3. A PDF reader displays the selected chart with page navigation (Page X of Y, prev/next) and a Print
+     action; an audio player provides play/pause, a seekable progress bar, elapsed/total time, whole-track
+     playback speed (1x / 0.9x / 0.75x / 1.25x), and a whole-track Loop toggle (R387, R388, R389).
+  4. The Order of Service tab shows the service's running order read-only, and the Stage Layout tab shows
+     the v2.7 stage diagram (instruments/mics + person Name-Role) read-only — both usable by tech-team
+     volunteers, not just the Rehearse tab (R392, R393).
+  5. On a phone, PDFs open/download reliably (link-first with an inline `<iframe>` viewer as a desktop
+     enhancement) and audio plays via native `<audio>` — across both My Schedule and this view (R391).
+
+**Plans**: TBD
+**UI hint**: yes
+
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
 
 **Goal:** [Captured for future planning] Consolidates all 11 Medium/Low security findings

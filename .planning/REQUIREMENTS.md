@@ -125,31 +125,31 @@ Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R374 | TBD | Pending |
-| R375 | TBD | Pending |
-| R376 | TBD | Pending |
-| R377 | TBD | Pending |
-| R378 | TBD | Pending |
-| R379 | TBD | Pending |
-| R380 | TBD | Pending |
-| R381 | TBD | Pending |
-| R382 | TBD | Pending |
-| R383 | TBD | Pending |
-| R384 | TBD | Pending |
-| R385 | TBD | Pending |
-| R386 | TBD | Pending |
-| R387 | TBD | Pending |
-| R388 | TBD | Pending |
-| R389 | TBD | Pending |
-| R390 | TBD | Pending |
-| R391 | TBD | Pending |
-| R392 | TBD | Pending |
-| R393 | TBD | Pending |
+| R374 | Phase 125 | Pending |
+| R375 | Phase 125 | Pending |
+| R376 | Phase 125 | Pending |
+| R377 | Phase 125 | Pending |
+| R378 | Phase 126 | Pending |
+| R379 | Phase 126 | Pending |
+| R380 | Phase 126 | Pending |
+| R381 | Phase 126 | Pending |
+| R382 | Phase 126 | Pending |
+| R383 | Phase 126 | Pending |
+| R384 | Phase 127 | Pending |
+| R385 | Phase 127 | Pending |
+| R386 | Phase 127 | Pending |
+| R387 | Phase 127 | Pending |
+| R388 | Phase 127 | Pending |
+| R389 | Phase 127 | Pending |
+| R390 | Phase 127 | Pending |
+| R391 | Phase 127 | Pending |
+| R392 | Phase 127 | Pending |
+| R393 | Phase 127 | Pending |
 
 **Coverage:**
 - v1 requirements: 20 total (R374–R393)
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 20 ⚠️
+- Mapped to phases: 20
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-05 — milestone v2.12 Rehearse Mode*
