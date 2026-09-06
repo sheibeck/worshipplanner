@@ -2706,6 +2706,38 @@ export async function adminVolunteerLinkHandler(
   }
 
   if (mode === "email") {
+    // WR-01 (129-REVIEW.md): layer the SAME per-org daily throttle the public
+    // requestVolunteerLink path already uses (checkAndConsumeOrgEmailQuota on
+    // the volunteerLinkOrgCounters collection, Phase 128) -- this send path
+    // was previously unthrottled, so one editor account could loop this call
+    // and exhaust the org's Resend budget or spam a volunteer. Unlike the
+    // public path, this caller is authenticated and non-enumeration-sensitive,
+    // so an HONEST resource-exhausted error is correct (not a generic/padded
+    // response). Firestore errors fail OPEN (guardrail, not a security
+    // control), mirroring queueServiceMessageHandler's idiom above.
+    try {
+      const orgQuota = await checkAndConsumeOrgEmailQuota(
+        db,
+        orgId,
+        1,
+        VOLUNTEER_LINK_MAX_PER_ORG_PER_DAY,
+        Date.now(),
+        "volunteerLinkOrgCounters",
+      );
+      if (!orgQuota.allowed) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "Daily volunteer-link email limit reached for this church.",
+        );
+      }
+    } catch (quotaErr) {
+      if (quotaErr instanceof HttpsError) {
+        throw quotaErr;
+      }
+      console.warn("[adminVolunteerLink] per-org throttle Firestore op failed; failing open:", {
+        message: quotaErr instanceof Error ? quotaErr.message : String(quotaErr),
+      });
+    }
     await mintAndSendVolunteerLink({ db, to: emailLower, orgName, slug });
     return { sent: true };
   }

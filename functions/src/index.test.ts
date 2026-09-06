@@ -6579,6 +6579,62 @@ describe("requestVolunteerLinkHandler", () => {
       // Still only the one send from the email-mode call above -- copy mode never sends.
       expect(mockSend).toHaveBeenCalledTimes(1);
     });
+
+    it("WR-01 (129-REVIEW.md): over the volunteerLinkOrgCounters daily throttle -> mode:'email' throws an honest resource-exhausted error, no mint/send", async () => {
+      const NOW = 1_700_000_000_000;
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      const dayWindow = Math.floor(NOW / 86_400_000);
+      const { db } = fakeVolunteerDb({
+        orgs: { org1: orgWith() },
+        // Reuses the SAME dedicated collection + key format as requestVolunteerLinkHandler's
+        // WR-01 throttle (line ~6265) -- this is the shared mechanism, not a new one.
+        orgCounterSeed: { [`org1__day__${dayWindow}`]: VOLUNTEER_LINK_MAX_PER_ORG_PER_DAY },
+      });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      await expect(
+        adminVolunteerLinkHandler(
+          fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "email", uid: "editor-uid" }),
+        ),
+      ).rejects.toMatchObject({ code: "resource-exhausted" });
+      expect(vi.mocked(getAuth)().generateSignInWithEmailLink).not.toHaveBeenCalled();
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("WR-01: mode:'copy' is UNAFFECTED by the email quota -- mints a link even when the org's volunteerLinkOrgCounters daily throttle is exhausted", async () => {
+      const NOW = 1_700_000_000_000;
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+      const dayWindow = Math.floor(NOW / 86_400_000);
+      const { db } = fakeVolunteerDb({
+        orgs: { org1: orgWith() },
+        orgCounterSeed: { [`org1__day__${dayWindow}`]: VOLUNTEER_LINK_MAX_PER_ORG_PER_DAY },
+      });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      const result = await adminVolunteerLinkHandler(
+        fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "copy", uid: "editor-uid" }),
+      );
+      expect(result).toEqual({
+        link: `https://example.com/volunteer/verify?slug=grace-church&email=${encodeURIComponent(EMAIL)}`,
+      });
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("WR-01: the per-org throttle fails OPEN when its Firestore transaction throws -- a legitimate editor's send still succeeds", async () => {
+      const { db } = fakeVolunteerDb({
+        orgs: { org1: orgWith() },
+        rateLimiterThrows: true,
+      });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      const result = await adminVolunteerLinkHandler(
+        fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "email", uid: "editor-uid" }),
+      );
+      expect(result).toEqual({ sent: true });
+      expect(mockSend).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
