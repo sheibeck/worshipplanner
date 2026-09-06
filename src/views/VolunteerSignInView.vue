@@ -132,7 +132,10 @@ async function handleSignOut(): Promise<void> {
 }
 
 function handleRememberEmail(): void {
-  window.localStorage.setItem(EMAIL_FOR_SIGN_IN_KEY, rememberEmail.value.trim())
+  // WR-03 (125-REVIEW.md): normalize to lowercase, matching every other
+  // email-claim comparison in this feature (invites/{email},
+  // rehearseAccess's assignedEmailsLower).
+  window.localStorage.setItem(EMAIL_FOR_SIGN_IN_KEY, rememberEmail.value.trim().toLowerCase())
   rememberedConfirmation.value = 'Got it — now open the link from your email on this device.'
 }
 </script>
