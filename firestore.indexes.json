@@ -4,6 +4,7 @@
       "collectionGroup": "rehearseAccess",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "assignedEmailsLower", "arrayConfig": "CONTAINS" },
         { "fieldPath": "serviceDate", "order": "ASCENDING" }
       ]

@@ -409,6 +409,72 @@ service cloud.firestore {
       }
     }
 
+    // R378 (Phase 126, My Schedule): collection-group list capability for
+    // rehearseAccess. A magic-link volunteer holds NO orgId claim, so My
+    // Schedule's sole query is collectionGroup('rehearseAccess') spanning
+    // EVERY org -- this query is evaluated against the ENTIRE database, not
+    // just one org's subtree. The nested match /organizations/{orgId}/
+    // rehearseAccess/{serviceId} block above already proves get()-by-id and
+    // a single-org-scoped list() (R377, both green), but Firestore does NOT
+    // extend a nested (or top-level fixed-depth) match's guarantee to a
+    // collection-group query -- ONLY a rule using the {path=**} recursive
+    // wildcard is evaluated at all for a collectionGroup() request. Without
+    // this block, EVERY collectionGroup('rehearseAccess') list -- including
+    // a correctly array-contains-constrained one -- falls through to the
+    // top-level `match /{document=**} { allow read, write: if false; }`
+    // catch-all near the end of this file and is denied outright.
+    //
+    // IMPORTANT DEVIATION from the nested get/list arms' parentIsPlanned()
+    // LIVE cross-document re-check (Rule 4-class finding, empirically
+    // discovered implementing this block, documented in 126-01-SUMMARY.md):
+    // Firestore's list-rule evaluator does NOT support deriving either the
+    // candidate document's own id ($(serviceId)) or its ancestor segments
+    // ({orgPrefix=**}, indexed or otherwise) for constructing a get()/
+    // exists() path inside a {path=**} collection-group match -- every
+    // attempt throws ("Property X is undefined on object" / "Null value
+    // error" / "Variable is not bound in path template") regardless of
+    // whether the value comes from resource.data, the wildcard capture, or
+    // a `let` binding. A fully-static (zero-interpolation) exists() call
+    // DOES work in this same match block, proving cross-document reads are
+    // supported here in principle -- only DYNAMIC path construction from
+    // this document's own identity is unsupported. Only resource.data
+    // fields covered by an equality/array-contains filter in the QUERY
+    // ITSELF (assignedEmailsLower here) are reliably, dynamically resolvable
+    // for a collection-group list rule.
+    //
+    // Given that hard constraint, this list arm checks the PROJECTION'S OWN
+    // frozen `status` field instead of live-re-checking the sibling services
+    // doc -- provable ONLY because every call site is REQUIRED to add
+    // where('status','==','planned') to its query (mirrors the
+    // assignedEmailsLower array-contains requirement below). This is a
+    // narrower guarantee than the get arm's live check: markAsPlanned is the
+    // ONLY writer of rehearseAccess and always writes status:'planned', and
+    // reopenService DELETES the projection on every planned/exported->draft
+    // transition (125-02-SUMMARY.md) -- that delete is the PRIMARY defense
+    // against a stale doc surviving a reopen; the nested get arm's live
+    // re-check is genuinely "belt-and-suspenders" for a delete that somehow
+    // didn't happen, and this list arm relies on the primary defense alone
+    // for the cross-org aggregate view. A volunteer directly opening a known
+    // rehearseAccess doc's Rehearse view (a getDoc, not a list) still gets
+    // the full live re-check via the nested arm above, unaffected.
+    match /{orgPrefix=**}/rehearseAccess/{serviceId} {
+      // Deliberately volunteer-only (no isOrgMember(...) disjunct): an org
+      // member/editor already has full org-scoped access via the nested
+      // match above (get + same-org list, both R377) and has no legitimate
+      // reason to run a cross-org collectionGroup query. Adding isOrgMember
+      // here would call isSuperAdmin() -> request.auth.token.superAdmin
+      // during this match's per-document evaluation and throw "Property
+      // superAdmin is undefined on object", denying the WHOLE list --
+      // empirically confirmed while implementing this block. Keeping this
+      // arm narrowly scoped to the one capability R378 actually needs
+      // avoids that unproven-safe expansion.
+      allow list: if isSignedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email_verified == true
+        && resource.data.get('status', 'draft') == 'planned'
+        && request.auth.token.email.lower() in resource.data.get('assignedEmailsLower', []);
+    }
+
     // inviteLookup — stores pending invite records keyed by normalized email
     match /inviteLookup/{email} {
       allow read: if isSignedIn() && request.auth.token.email.lower() == email;

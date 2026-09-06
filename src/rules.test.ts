@@ -6,7 +6,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch, getDocs, collection, query, where } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch, getDocs, collection, collectionGroup, query, where, orderBy } from 'firebase/firestore'
 
 let testEnv: RulesTestEnvironment
 
@@ -2824,5 +2824,156 @@ describe('Volunteer magic-link scoped read access — R377', () => {
     await seedMembershipDoc('orgA', 'memberUid', 'member')
     const db = testEnv.authenticatedContext('memberUid').firestore()
     await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc1')))
+  })
+})
+
+// R378/R379 (Phase 126, My Schedule — KEY RISK): the R377 block above proves
+// getDoc()-by-id and proves an UNFILTERED list() is denied, but never proves
+// that a properly array-contains-CONSTRAINED collectionGroup list SUCCEEDS —
+// that is the one query shape My Schedule cannot do without (a volunteer
+// holds no orgId claim, so the query must be collectionGroup, not scoped to
+// one org's subcollection). Every seed doc here carries `serviceDate` (the
+// R377 fixtures omit it) so the orderBy('serviceDate') query returns them —
+// the emulator auto-builds the COLLECTION_GROUP composite index declared in
+// firestore.indexes.json (Plan 01 Task 1).
+describe('My Schedule — constrained collectionGroup list (R378)', () => {
+  async function seedMyScheduleFixtures() {
+    // orgA/svc1: Planned, assigned to dana@example.com, serviceDate 2026-09-13
+    // — the earlier of dana's two legitimate cross-org assignments.
+    await seedDoc('organizations/orgA/services/svc1', { status: 'planned' })
+    await seedDoc('organizations/orgA/rehearseAccess/svc1', {
+      serviceId: 'svc1',
+      orgId: 'orgA',
+      status: 'planned',
+      assignedEmailsLower: ['dana@example.com'],
+      serviceDate: '2026-09-13',
+    })
+
+    // orgB/svcOrgB: Planned in a DIFFERENT org, same email assigned —
+    // proves cross-org aggregation via a single collectionGroup query.
+    await seedDoc('organizations/orgB/services/svcOrgB', { status: 'planned' })
+    await seedDoc('organizations/orgB/rehearseAccess/svcOrgB', {
+      serviceId: 'svcOrgB',
+      orgId: 'orgB',
+      status: 'planned',
+      assignedEmailsLower: ['dana@example.com'],
+      serviceDate: '2026-09-20',
+    })
+
+    // orgA/svcDraft: still Draft, and — unlike the R377 fixtures — its
+    // projection's OWN `status` field also says 'draft' (the shape
+    // markAsPlanned's frozen write actually produces is always 'planned';
+    // this fixture instead proves the list arm's status=='planned' query
+    // filter, see firestore.rules R378 comment, correctly excludes any
+    // projection whose own status isn't 'planned' — the mechanism this list
+    // arm relies on since a live cross-document re-check is not achievable
+    // for a collectionGroup query, see the rule's inline comment). Its
+    // serviceDate (09-06) sorts BEFORE svc1's (09-13) — if the filter were
+    // ever dropped, this doc would appear FIRST in dana's results.
+    await seedDoc('organizations/orgA/services/svcDraft', { status: 'draft' })
+    await seedDoc('organizations/orgA/rehearseAccess/svcDraft', {
+      serviceId: 'svcDraft',
+      orgId: 'orgA',
+      status: 'draft',
+      assignedEmailsLower: ['dana@example.com'],
+      serviceDate: '2026-09-06',
+    })
+
+    // orgA/svcOther: Planned, assigned to a DIFFERENT email — proves a
+    // constrained list filtered on someone else's email doesn't leak this doc.
+    await seedDoc('organizations/orgA/services/svcOther', { status: 'planned' })
+    await seedDoc('organizations/orgA/rehearseAccess/svcOther', {
+      serviceId: 'svcOther',
+      orgId: 'orgA',
+      status: 'planned',
+      assignedEmailsLower: ['other@example.com'],
+      serviceDate: '2026-09-15',
+    })
+  }
+
+  it('(1) ALLOW — a verified volunteer lists exactly their assigned Planned services across two orgs, Draft excluded (R379 live re-check through the list path)', async () => {
+    await seedMyScheduleFixtures()
+    // Mixed-case token email vs. lowercase query filter/roster field — proves
+    // the required .lower() normalization holds through the list path too.
+    const db = testEnv
+      .authenticatedContext('volUid', { email: 'Dana@Example.com', email_verified: true })
+      .firestore()
+    const q = query(
+      collectionGroup(db, 'rehearseAccess'),
+      where('status', '==', 'planned'),
+      where('assignedEmailsLower', 'array-contains', 'dana@example.com'),
+      orderBy('serviceDate', 'asc'),
+    )
+    const snap = await assertSucceeds(getDocs(q))
+    const ids = snap.docs.map((d) => d.id)
+    // Ascending serviceDate order proves the composite index is exercised;
+    // svcDraft (earliest date, 09-06) would sort FIRST if it leaked through.
+    expect(ids).toEqual(['svc1', 'svcOrgB'])
+    expect(ids).not.toContain('svcDraft')
+  })
+
+  it('(2) ALLOW/EMPTY — a constrained list for an email with zero assignments returns an empty snapshot, not an error (R383 empty state)', async () => {
+    await seedMyScheduleFixtures()
+    const db = testEnv
+      .authenticatedContext('nobodyUid', { email: 'nobody@example.com', email_verified: true })
+      .firestore()
+    const q = query(
+      collectionGroup(db, 'rehearseAccess'),
+      where('status', '==', 'planned'),
+      where('assignedEmailsLower', 'array-contains', 'nobody@example.com'),
+      orderBy('serviceDate', 'asc'),
+    )
+    const snap = await assertSucceeds(getDocs(q))
+    expect(snap.docs).toHaveLength(0)
+  })
+
+  it('(3) DENY — an unfiltered collectionGroup list over rehearseAccess is denied (enumeration guard holds at collection-group scope)', async () => {
+    await seedMyScheduleFixtures()
+    const db = testEnv
+      .authenticatedContext('volUid', { email: 'Dana@Example.com', email_verified: true })
+      .firestore()
+    await assertFails(getDocs(collectionGroup(db, 'rehearseAccess')))
+  })
+
+  it('(4) DENY — a constrained list filtered on a DIFFERENT email than the signed-in token email', async () => {
+    await seedMyScheduleFixtures()
+    const db = testEnv
+      .authenticatedContext('volUid', { email: 'Dana@Example.com', email_verified: true })
+      .firestore()
+    const q = query(
+      collectionGroup(db, 'rehearseAccess'),
+      where('status', '==', 'planned'),
+      where('assignedEmailsLower', 'array-contains', 'other@example.com'),
+      orderBy('serviceDate', 'asc'),
+    )
+    await assertFails(getDocs(q))
+  })
+
+  it('(5) DENY — the constrained own-email query is denied when email_verified is false (CR-01, reachable through the list path)', async () => {
+    await seedMyScheduleFixtures()
+    const db = testEnv
+      .authenticatedContext('attackerUid', { email: 'Dana@Example.com', email_verified: false })
+      .firestore()
+    const q = query(
+      collectionGroup(db, 'rehearseAccess'),
+      where('status', '==', 'planned'),
+      where('assignedEmailsLower', 'array-contains', 'dana@example.com'),
+      orderBy('serviceDate', 'asc'),
+    )
+    await assertFails(getDocs(q))
+  })
+
+  it('(6) DENY (R379) — a constrained list filtered on status=="draft" is denied even for the assigned own-email, verified volunteer (the list arm only ever grants status=="planned")', async () => {
+    await seedMyScheduleFixtures()
+    const db = testEnv
+      .authenticatedContext('volUid', { email: 'Dana@Example.com', email_verified: true })
+      .firestore()
+    const q = query(
+      collectionGroup(db, 'rehearseAccess'),
+      where('status', '==', 'draft'),
+      where('assignedEmailsLower', 'array-contains', 'dana@example.com'),
+      orderBy('serviceDate', 'asc'),
+    )
+    await assertFails(getDocs(q))
   })
 })
