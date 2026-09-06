@@ -40,11 +40,19 @@ created: 2026-09-05
 
 ## Per-Task Verification Map
 
-*Planner fills this from the PLANs. R377 rules ALLOW/DENY cases MUST appear here as `test:rules` rows.*
+*Filled from the PLANs. The R377 rules ALLOW/DENY cases appear as `test:rules` rows (125-01-T1 / 125-01-T2).*
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | — | — | R374–R377 | T-125-xx | — | rules/unit | `npm run test:rules` | ❌ W0 | ⬜ pending |
+| 125-01-T1 | 01 | 1 | R377 | T-125-01..06 | R377 ALLOW/DENY isolation suite: cross-org DENY, Draft DENY, reopened DENY, not-assigned DENY, direct services/{id} DENY, volunteer-write DENY, enumeration DENY, assigned+Planned ALLOW, member ALLOW | rules | `npm run test:rules` | ❌ W0 (extends `src/rules.test.ts`) | ⬜ pending |
+| 125-01-T2 | 01 | 1 | R377 | T-125-01..06 | rehearseAccess rule block (email-claim + live parentIsPlanned) + catch-all exclusion | rules | `npm run test:rules` | ✅ (`firestore.rules`) | ⬜ pending |
+| 125-02-T1 | 02 | 2 | R377 | T-125-09 | buildRehearseAccess: email lowercasing/dedupe, empty-email skip, PII-safe attachment mapping | unit | `npx vitest run src/utils/rehearseAccess.test.ts` | ❌ W0 (new) | ⬜ pending |
+| 125-02-T2 | 02 | 2 | R377 | T-125-08 | lock-time projection write + reopen/delete cleanup (Reopen staleness) | type/unit | `npm run type-check` | ✅ (`src/stores/services.ts`) | ⬜ pending |
+| 125-03-T1 | 03 | 1 | R375 | T-125-12 | `{{rehearse_link}}` merge token renders the URL | unit | `cd functions && npm test -- messageTokens` | ✅ (`functions/src/messageTokens.test.ts`) | ⬜ pending |
+| 125-03-T2 | 03 | 1 | R375 | T-125-10, T-125-13 | per-recipient server-side link gen inside the send loop's try/catch | build | `cd functions && npm run build` | ✅ (`functions/src/index.ts`) | ⬜ pending |
+| 125-04-T1 | 04 | 1 | R374, R376 | T-125-14, T-125-16 | email-link completion + cross-device re-entry; email never from URL param | unit | `npx vitest run src/stores/__tests__/volunteerAuth.test.ts` | ❌ W0 (new) | ⬜ pending |
+| 125-04-T2 | 04 | 1 | R374, R376 | T-125-16 | completion + landing views; session survival + explicit sign-out | type | `npm run type-check` | ❌ W0 (new views) | ⬜ pending |
+| 125-04-T3 | 04 | 1 | R377 (defense-in-depth) | T-125-15, T-125-17 | isVolunteerRoute org-selection-gate exemption (Pitfall 1) | unit | `npx vitest run src/router/__tests__/router.test.ts` | ✅ (`src/router/__tests__/router.test.ts`) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -52,11 +60,18 @@ created: 2026-09-05
 
 ## Wave 0 Requirements
 
-- [ ] Rules-emulator ALLOW/DENY test scaffolding for the volunteer read arm (R377) — extends the existing
-      `src/rules.test.ts` harness
-- [ ] Unit-test stubs for the magic-link sign-in completion + roster-email→assignment matching
+- [ ] `src/rules.test.ts` — add the `describe('Volunteer magic-link scoped read access — R377')` block
+      (9 ALLOW/DENY cases; authored in Plan 125-01 Task 1) — extends the existing harness
+- [ ] `src/utils/rehearseAccess.test.ts` (new) — projection builder unit tests (Plan 125-02 Task 1)
+- [ ] `src/stores/__tests__/volunteerAuth.test.ts` (new) — email-link completion + cross-device unit tests
+      (Plan 125-04 Task 1)
+- [ ] `src/router/__tests__/router.test.ts` — add the isVolunteerRoute exemption cases (extends existing file,
+      Plan 125-04 Task 3)
+- [ ] `functions/src/messageTokens.test.ts` — extend for the `{{rehearse_link}}` token (existing file, Plan 125-03 Task 1)
+- [ ] Framework install: none — vitest (app), `@firebase/rules-unit-testing` (rules), and the functions test
+      runner are all already present
 
-*If none: "Existing infrastructure covers all phase requirements."*
+*Frameworks all present; the Wave 0 items above are test authoring within Plans 125-01/02/03/04, not separate scaffolding tasks.*
 
 ---
 
