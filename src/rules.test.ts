@@ -976,6 +976,42 @@ describe('orgSlugs — public read, org-editor-scoped create-once claim (WR-01)'
     const db = context.firestore()
     await assertFails(getDocs(collection(db, 'orgSlugs')))
   })
+
+  // WR-02 (Phase 128): claimSlug now denormalizes { orgId, name } onto the
+  // created orgSlugs doc so the public /:slug/volunteer request page can render
+  // the church name from this public-read registry (src/utils/slug.ts:65). The
+  // create rule (allow create: if isOrgEditor(request.resource.data.orgId)) does
+  // not restrict keys, so the `name` field is permitted today -- but nothing
+  // exercised that write shape, so a future .keys().hasOnly(...) tightening could
+  // silently break claimSlug with no red test. These cases pin the behavior.
+  it('WR-02: allows an org editor to create an orgSlugs doc that includes the denormalized name field', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgA', name: 'Grace Church' }),
+    )
+  })
+
+  it('WR-02: the denormalized name survives an unauthenticated get of the orgSlugs doc', async () => {
+    await seedDoc('orgSlugs/grace-church', { orgId: 'orgA', name: 'Grace Church' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    const snap = await getDoc(doc(db, 'orgSlugs', 'grace-church'))
+    expect(snap.exists()).toBe(true)
+    expect(snap.data()).toMatchObject({ orgId: 'orgA', name: 'Grace Church' })
+  })
+
+  // WR-02: adding a `name` field must NOT broaden who may write -- a non-member
+  // is still denied even when the payload carries the extra denormalized key.
+  it('WR-02: still denies a non-member from creating an orgSlugs doc even with a name field present', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgA', name: 'Grace Church' }),
+    )
+  })
 })
 
 describe('orgNames — public read, org-editor-scoped create-once claim (name uniqueness)', () => {
