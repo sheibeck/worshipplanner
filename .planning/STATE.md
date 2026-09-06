@@ -5,16 +5,16 @@ milestone_name: Rehearse Mode (Phases 125-127, in planning)
 current_phase: 125
 current_phase_name: Passwordless Magic-Link Access & Scoped Read Isolation
 status: planning
-stopped_at: Completed 125-04-PLAN.md
-last_updated: "2026-09-06T04:20:04.879Z"
+stopped_at: Completed 125-02-PLAN.md
+last_updated: "2026-09-06T04:40:50.310Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 125 Plan 01 executed and committed (7e0c423a test, 82f5a59b feat)
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 0
+  completed_plans: 4
+  percent: 33
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1323,7 +1323,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 125 — Passwordless Magic-Link Access & Scoped Read Isolation
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Plan 01 executed — R377 data-layer security gate GREEN (rehearseAccess firestore.rules block + 9-case emulator ALLOW/DENY suite, TDD RED-then-GREEN). Ready to plan/execute 125-02.
 Last activity: 2026-09-06 — Phase 125 Plan 01 executed and committed (7e0c423a test, 82f5a59b feat)
 
@@ -3383,6 +3383,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 125 P01 | 20min | 2 tasks | 2 files |
 | Phase 125 P03 | 12min | 2 tasks | 4 files |
 | Phase 125 P04 | 13min | 3 tasks | 6 files |
+| Phase 125 P02 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3939,6 +3940,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: actionCodeSettings computed once per message (not per recipient) since only the target email varies per generateSignInWithEmailLink call
 - [Phase ?]: Router isVolunteerRoute RouteMeta exemption (Pitfall 1): a zero-membership magic-link volunteer no longer bounces to the empty /select-church picker
 - [Phase ?]: volunteerAuth store never throws on completeSignIn failure — reactive needsEmailReentry/errorMessage state instead, so views branch without try/catch
+- [Phase ?]: rehearseAccess assignedEmailsLower reuses resolveServiceRoleAssignments + resolveRecipients' exact lowercase/empty-email-skip logic — assigned == who gets the reminder email, not a separately derived concept
+- [Phase ?]: buildRehearseAccess is a pure, store-free builder (mirrors buildServiceSnapshot); markAsPlanned is the sole caller resolving roster/quarters/song store state and passing it in
 
 ### Roadmap Evolution
 
@@ -4268,8 +4271,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T04:20:04.786Z
-Stopped at: Completed 125-04-PLAN.md
+Last session: 2026-09-06T04:40:50.178Z
+Stopped at: Completed 125-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
