@@ -34,6 +34,13 @@ export interface RehearseAccessDoc {
   title: string
   status: string
   assignedEmailsLower: string[]
+  /** R381 (Phase 126, My Schedule): per-email role names, mirrors
+   *  functions/src/serviceRoles.ts's roleNamesByPerson map, keyed by
+   *  lowercased email instead of personId. PII-safe: role-name strings
+   *  only, no person names/ids — a strictly smaller disclosure than the
+   *  already-projected songs[]/attachment URLs. Empty-email persons are
+   *  skipped entirely (mirrors assignedEmailsLower's own empty-email skip). */
+  rolesByEmailLower: Record<string, string[]>
   songs: RehearseSong[]
 }
 
@@ -83,6 +90,23 @@ export function buildRehearseAccess(
     assignedEmailsLower.add(person.email.toLowerCase())
   }
 
+  // rolesByEmailLower (R381) — mirrors functions/src/serviceRoles.ts's
+  // roleNamesByPerson map-building loop (resolveMessageRecipients:124-144),
+  // keyed by lowercased email instead of personId. Iterates assignments
+  // directly (not assignedPersonIds) so each role name is attributed to the
+  // correct person; empty-email persons are skipped, matching the
+  // assignedEmailsLower loop above; role names are deduped via `includes`.
+  const rolesByEmailLower: Record<string, string[]> = {}
+  for (const a of assignments) {
+    for (const pid of a.effectivePersonIds) {
+      const person = peopleById.get(pid)
+      if (!person || person.email === '') continue
+      const emailLower = person.email.toLowerCase()
+      const names = (rolesByEmailLower[emailLower] ??= [])
+      if (!names.includes(a.roleName)) names.push(a.roleName)
+    }
+  }
+
   const songsById = new Map(songs.map((s) => [s.id, s]))
   const rehearseSongs: RehearseSong[] = distinctSongSlots(service)
     .map((slot): RehearseSong | null => {
@@ -110,6 +134,7 @@ export function buildRehearseAccess(
     title: service.name,
     status: service.status,
     assignedEmailsLower: [...assignedEmailsLower].sort(),
+    rolesByEmailLower,
     songs: rehearseSongs,
   }
 }

@@ -184,7 +184,7 @@ describe('buildRehearseAccess', () => {
     const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
 
     expect(Object.keys(result).sort()).toEqual(
-      ['serviceId', 'orgId', 'serviceDate', 'title', 'status', 'assignedEmailsLower', 'songs'].sort(),
+      ['serviceId', 'orgId', 'serviceDate', 'title', 'status', 'assignedEmailsLower', 'rolesByEmailLower', 'songs'].sort(),
     )
     expect(JSON.stringify(result)).not.toContain('private planner notes')
     expect(result.serviceId).toBe('service-1')
