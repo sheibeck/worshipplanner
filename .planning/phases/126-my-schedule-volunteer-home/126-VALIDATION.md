@@ -39,8 +39,16 @@ created: 2026-09-06
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
 |---------|------|------|-------------|-----------|-------------------|--------|
-| TBD | — | 0 | R378/R379 | rules | `npm run test:rules` (constrained collectionGroup list ALLOW; unfiltered list DENY) | ⬜ pending |
-| TBD | — | — | R378–R383 | unit | `npx vitest run` (buildRehearseAccess rolesByEmailLower; grouping/countdown/readiness pure fns) | ⬜ pending |
+| 01-T1 | 126-01 | 1 | R378/R379 | rules | `npx vitest run --config vitest.rules.config.ts -t "R377"` (existing get arm unbroken after get/list split + index add) | ⬜ pending |
+| 01-T2 | 126-01 | 1 | R378/R379 | rules | `npm run test:rules` (constrained collectionGroup list ALLOW cross-org; empty-for-unassigned; DENY unfiltered/other-email/unverified; Draft excluded) — **KEY RISK** | ⬜ pending |
+| 01-T3 | 126-01 | 1 | R381 | unit | `npx vitest run src/utils/rehearseAccess.test.ts` (rolesByEmailLower: multi-role, empty-email skip, lowercase key) | ⬜ pending |
+| 02-T1 | 126-02 | 1 | R380/R381 | unit | `npx vitest run src/utils/myScheduleGrouping.test.ts` (grouping buckets/nextUpId; countdown boundaries at exactly 7/14 days; readiness three-state) | ⬜ pending |
+| 02-T2 | 126-02 | 1 | R381 | unit | `npx vitest run src/utils/roleChipIcon.test.ts` (keyword branches + music fallback → valid StageKindIcon glyphs) | ⬜ pending |
+| 03-T1 | 126-03 | 2 | R378 | unit | `npx vitest run src/stores/__tests__/mySchedule.test.ts` (lowercased-email filter; empty-email no-query; error path) | ⬜ pending |
+| 03-T2 | 126-03 | 2 | R382 | unit + build | `npx vitest run src/router/__tests__/router.test.ts` (placeholder route resolves) + `npm run build` | ⬜ pending |
+| 04-T1 | 126-04 | 3 | R381 | type | `npm run type-check` (ScheduleServiceCard.vue) | ⬜ pending |
+| 04-T2 | 126-04 | 3 | R378/R380/R382 | type + build | `npm run type-check` + `npm run build` (MyScheduleView + /my-schedule route + landing) | ⬜ pending |
+| 04-T3 | 126-04 | 3 | R378/R383 | unit (component + router) | `npx vitest run src/views/__tests__/MyScheduleView.test.ts src/router/__tests__/router.test.ts` (empty/populated/loading/error + Rehearse target + /my-schedule resolves) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
