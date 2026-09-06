@@ -19,6 +19,7 @@ import { syncSuperAdminClaim, setSuperAdminClaim } from "./superAdminClaims";
 import { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive, setOrgAiEnabled, setOrgBibleEnabled } from "./orgProvisioning";
 import { deleteOrganization } from "./orgDeletion";
 import { sendInviteOnboardingEmail } from "./inviteOnboarding";
+import { mintAndSendVolunteerLink } from "./volunteerLink";
 import { Resend } from "resend";
 import { renderMessageTokens } from "./messageTokens";
 import { verifySvixSignature } from "./webhookSignature";
@@ -2409,6 +2410,150 @@ export const messageWebhook = onRequest(
     );
     res.status(out.status).send(out.body);
   },
+);
+
+// requestVolunteerLink (Phase 128: R395-R397 -- self-service magic-link
+// request, PUBLIC/unauthenticated, security-critical). See threat model in
+// .planning/phases/128-self-service-magic-link-request-public-security-critical-sha/128-01-PLAN.md.
+// See .planning/codebase/INTEGRATIONS.md (Backend Integration Notes (R318) § functions/src/index.ts)
+
+export interface RequestVolunteerLinkRequest {
+  orgId: string;
+  email: string;
+  /** Optional -- the client already knows its own church's slug from the
+   * route it's on; falls back to the org doc's own `slug` field when absent
+   * (R399 continueUrl round-trip). */
+  slug?: string;
+}
+
+export interface RequestVolunteerLinkResponse {
+  message: string;
+}
+
+// Conservative, hardcoded ceilings for this PUBLIC endpoint (128-RESEARCH.md
+// Alternatives Considered: a new AppConfig group would need the out-of-scope
+// client-side appConfigDefaults.ts duplicate -- not worth it for a security
+// ceiling). Env-overridable mirroring AI_PROXY_MAX_INSTANCES's idiom.
+const VOLUNTEER_LINK_MAX_PER_MIN = readNumericKnob(process.env.VOLUNTEER_LINK_MAX_PER_MIN, 1);
+const VOLUNTEER_LINK_MAX_PER_DAY = readNumericKnob(process.env.VOLUNTEER_LINK_MAX_PER_DAY, 5);
+// Timing-pad target (128-RESEARCH Pitfall 2 / Assumption A4): the no-match
+// and rate-limited (no-send) branches are padded to this elapsed-ms floor so
+// their latency is indistinguishable from the roster-hit branch's real
+// mint+send work -- closing the enumeration-via-timing side channel that a
+// byte-identical response body alone does not close.
+const VOLUNTEER_LINK_TARGET_RESPONSE_MS = readNumericKnob(
+  process.env.VOLUNTEER_LINK_TARGET_RESPONSE_MS,
+  1200,
+);
+
+// R395: the SAME response body on every non-input branch (roster-hit,
+// roster-miss, rate-limited) -- only structurally-invalid input (missing
+// fields / malformed email) may differ, since that carries no membership
+// information. NEVER return a distinct error code (resource-exhausted,
+// permission-denied) for "not on roster" or "rate-limited" -- either is an
+// enumeration signal.
+const VOLUNTEER_LINK_GENERIC_RESPONSE: RequestVolunteerLinkResponse = {
+  message: "If you're on this church's team, a sign-in link is on its way.",
+};
+
+/** Mirrors the codebase's established shallow email-format convention (e.g. TeamView.vue). */
+function isShallowValidEmail(email: string): boolean {
+  return email.includes("@") && email.includes(".");
+}
+
+/** Awaits whatever remains of VOLUNTEER_LINK_TARGET_RESPONSE_MS since `startedAtMs`. */
+async function padVolunteerLinkResponse(startedAtMs: number): Promise<void> {
+  const remaining = VOLUNTEER_LINK_TARGET_RESPONSE_MS - (Date.now() - startedAtMs);
+  if (remaining > 0) {
+    await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+  }
+}
+
+/**
+ * The requestVolunteerLink handler body -- PUBLIC, unauthenticated (no
+ * request.auth check; contrast queueServiceMessageHandler's members-role
+ * re-check, which does not apply here). Gate is roster-membership +
+ * rate-limit ONLY. See .planning/codebase/ARCHITECTURE.md (Backend
+ * Behavioral Notes (R318) § functions/src/index.ts)
+ */
+export async function requestVolunteerLinkHandler(
+  request: CallableRequest<RequestVolunteerLinkRequest>,
+): Promise<RequestVolunteerLinkResponse> {
+  const startedAtMs = Date.now();
+  const { orgId, email, slug: requestedSlug } =
+    request.data ?? ({} as RequestVolunteerLinkRequest);
+
+  // The ONLY branch allowed to differ from the generic response -- purely
+  // structural, carries no membership information (R395).
+  if (!orgId || !email) {
+    throw new HttpsError("invalid-argument", "orgId and email are required.");
+  }
+  if (!isShallowValidEmail(email)) {
+    throw new HttpsError("invalid-argument", "email is not a valid email address.");
+  }
+
+  const db = getFirestore();
+  const emailLower = email.trim().toLowerCase();
+
+  // R397: fail-OPEN per-(orgId,email) rate limit on a DEDICATED collection so
+  // this public endpoint's counters never cross-deplete aiRateLimits /
+  // msgEnqueueRateLimits. Over limit -> generic response, no roster lookup,
+  // no send -- never resource-exhausted (an enumeration signal).
+  try {
+    const rate = await checkAndConsumeRateLimit(
+      db,
+      `${orgId}::${emailLower}`,
+      { maxPerMin: VOLUNTEER_LINK_MAX_PER_MIN, maxPerDay: VOLUNTEER_LINK_MAX_PER_DAY },
+      Date.now(),
+      "volunteerLinkRateLimits",
+    );
+    if (!rate.allowed) {
+      await padVolunteerLinkResponse(startedAtMs);
+      return VOLUNTEER_LINK_GENERIC_RESPONSE;
+    }
+  } catch (limiterErr) {
+    // Fail OPEN: the limiter is a cost guardrail, not the security control
+    // (mirrors queueServiceMessageHandler's index.ts fail-open idiom) -- a
+    // Firestore hiccup must never block a legitimate request.
+    console.warn("[requestVolunteerLink] rate limiter Firestore op failed; failing open:", {
+      message: limiterErr instanceof Error ? limiterErr.message : String(limiterErr),
+    });
+  }
+
+  // R396: roster gate -- full-fetch + in-memory case-insensitive match,
+  // scoped to THIS request's own orgId only (never a global/cross-org query,
+  // and never a `.where('email','==',...)` query -- Person.email is
+  // un-normalized free text, 128-RESEARCH Pitfall 3). A bogus/forged orgId's
+  // people fetch is naturally empty, producing the identical generic
+  // response (T-128-05).
+  const orgRef = db.collection("organizations").doc(orgId);
+  const [orgSnap, peopleSnap] = await Promise.all([orgRef.get(), orgRef.collection("people").get()]);
+  const orgData = orgSnap.data() as { name?: string | null; slug?: string | null } | undefined;
+  const orgName = fromDisplayName(orgData?.name);
+  const slug = requestedSlug ?? orgData?.slug ?? "";
+
+  const isRosterMatch = peopleSnap.docs.some((d) => {
+    const person = d.data() as { email?: string } | undefined;
+    return (person?.email ?? "").trim().toLowerCase() === emailLower;
+  });
+
+  if (!isRosterMatch) {
+    await padVolunteerLinkResponse(startedAtMs);
+    return VOLUNTEER_LINK_GENERIC_RESPONSE;
+  }
+
+  await mintAndSendVolunteerLink({ db, to: email, orgName, slug });
+  return VOLUNTEER_LINK_GENERIC_RESPONSE;
+}
+
+// The ONLY new function this phase binds RESEND_API_KEY to (R131 "smallest
+// key-holding surface") -- no other new function declares it. PUBLIC by
+// design (CONTEXT.md's locked single-callable decision): no auth check, no
+// App Check requirement -- the roster + rate-limit gate above IS the
+// security control.
+export const requestVolunteerLink = onCall(
+  { secrets: [RESEND_API_KEY] },
+  requestVolunteerLinkHandler,
 );
 
 // syncOrgMembershipClaim (R074/R075: the claim storage.rules reads)

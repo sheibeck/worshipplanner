@@ -5835,16 +5835,22 @@ describe("sendQueuedMessageHandler", () => {
     expect(mockSend).toHaveBeenCalledTimes(2);
   });
 
-  it("SOURCE INSPECTION: RESEND_API_KEY is bound to EXACTLY ONE Function, and it is sendQueuedMessage", () => {
+  it("SOURCE INSPECTION: RESEND_API_KEY is bound to EXACTLY the sendQueuedMessage and requestVolunteerLink Functions -- no other new function declares it (R131)", () => {
     const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
-    // The secret binds via `secrets: [RESEND_API_KEY]` exactly once in the file.
+    // Phase 128 (R395-R397) legitimately adds ONE new binding for the public
+    // requestVolunteerLink callable (it mints + sends via the shared core) --
+    // the smallest-key-holding-surface invariant is "no OTHER new function
+    // declares it", not "exactly one binding forever".
     const bindings = source.match(/secrets:\s*\[RESEND_API_KEY\]/g) ?? [];
-    expect(bindings).toHaveLength(1);
-    // And that single binding lives inside the sendQueuedMessage wrapper.
-    const wrapperStart = source.indexOf("export const sendQueuedMessage = onDocumentCreated(");
-    expect(wrapperStart).toBeGreaterThan(-1);
-    const wrapperRegion = source.slice(wrapperStart, wrapperStart + 600);
-    expect(wrapperRegion).toMatch(/secrets:\s*\[RESEND_API_KEY\]/);
+    expect(bindings).toHaveLength(2);
+    // sendQueuedMessage's binding.
+    const sendWrapperStart = source.indexOf("export const sendQueuedMessage = onDocumentCreated(");
+    expect(sendWrapperStart).toBeGreaterThan(-1);
+    expect(source.slice(sendWrapperStart, sendWrapperStart + 600)).toMatch(/secrets:\s*\[RESEND_API_KEY\]/);
+    // requestVolunteerLink's binding (Phase 128).
+    const volunteerWrapperStart = source.indexOf("export const requestVolunteerLink = onCall(");
+    expect(volunteerWrapperStart).toBeGreaterThan(-1);
+    expect(source.slice(volunteerWrapperStart, volunteerWrapperStart + 200)).toMatch(/secrets:\s*\[RESEND_API_KEY\]/);
   });
 });
 

@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAuth } from "firebase-admin/auth";
 import { getAppConfig, DEFAULT_APP_CONFIG } from "./appConfig";
 import { mintAndSendVolunteerLink } from "./volunteerLink";
 
@@ -8,11 +7,25 @@ import { mintAndSendVolunteerLink } from "./volunteerLink";
 
 const MINTED_LINK = "https://example.com/volunteer/verify?slug=grace-church&apiKey=fake&oobCode=abc&mode=signIn";
 
+interface FakeActionCodeSettings {
+  url: string;
+  handleCodeInApp: boolean;
+}
+interface FakeSendArgs {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+}
+
 const { mockSend } = vi.hoisted(() => ({
-  mockSend: vi.fn(async () => ({ data: { id: "email-1" } })),
+  mockSend: vi.fn(async (_args: FakeSendArgs) => ({ data: { id: "email-1" } })),
 }));
 const { mockGenerateLink } = vi.hoisted(() => ({
-  mockGenerateLink: vi.fn(async () => "https://example.com/volunteer/verify?slug=grace-church&apiKey=fake&oobCode=abc&mode=signIn"),
+  mockGenerateLink: vi.fn(
+    async (_email: string, _settings: FakeActionCodeSettings) =>
+      "https://example.com/volunteer/verify?slug=grace-church&apiKey=fake&oobCode=abc&mode=signIn",
+  ),
 }));
 
 let fakeShareBaseUrl = "https://example.com";
@@ -62,7 +75,7 @@ describe("mintAndSendVolunteerLink", () => {
     });
 
     expect(mockGenerateLink).toHaveBeenCalledTimes(1);
-    const [calledEmail, settings] = mockGenerateLink.mock.calls[0] as [string, { url: string; handleCodeInApp: boolean }];
+    const [calledEmail, settings] = mockGenerateLink.mock.calls[0];
     expect(calledEmail).toBe("vol@example.com");
     expect(settings.handleCodeInApp).toBe(true);
     expect(settings.url).toBe("https://example.com/volunteer/verify?slug=grace-church");
@@ -79,7 +92,7 @@ describe("mintAndSendVolunteerLink", () => {
       slug: "grace-church",
     });
 
-    const sendArgs = mockSend.mock.calls[0][0] as { to: string; subject: string; text: string; from: string };
+    const sendArgs = mockSend.mock.calls[0][0];
     expect(sendArgs.to).toBe("vol@example.com");
     expect(sendArgs.subject).not.toMatch(/reminder/i);
     expect(sendArgs.subject).not.toMatch(/added as an admin/i);
@@ -101,7 +114,7 @@ describe("mintAndSendVolunteerLink", () => {
       slug: "grace-church",
     });
 
-    const sendArgs = mockSend.mock.calls[0][0] as { from: string };
+    const sendArgs = mockSend.mock.calls[0][0];
     // bareEmailAddress peels the pre-existing display name off the configured
     // address so wrapping never nests angle brackets.
     expect(sendArgs.from).toContain("noreply@example.com");
@@ -121,7 +134,7 @@ describe("mintAndSendVolunteerLink", () => {
       mintAndSendVolunteerLink({ db, to: "vol@example.com", orgName: "Grace Church", slug: "grace-church" }),
     ).resolves.toBeUndefined();
 
-    const [, settings] = mockGenerateLink.mock.calls[0] as [string, { url: string }];
+    const [, settings] = mockGenerateLink.mock.calls[0];
     expect(settings.url).toBe("/volunteer/verify?slug=grace-church");
     expect(mockSend).toHaveBeenCalledTimes(1);
   });
