@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.12
 milestone_name: Rehearse Mode (Phases 125-127, in planning)
-current_phase: 126
-current_phase_name: My Schedule — Volunteer Home
-status: verifying
-stopped_at: Completed 126-04-PLAN.md
-last_updated: "2026-09-06T08:05:48.217Z"
+current_phase: 127
+current_phase_name: Volunteer Service View — Rehearse, Order of Service & Stage Layout
+status: executing
+stopped_at: Completed 127-01-PLAN.md
+last_updated: "2026-09-06T10:11:51.268Z"
 last_activity: 2026-09-06
-last_activity_desc: Phase 126 execution started
+last_activity_desc: Phase 127 execution started
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 8
-  completed_plans: 8
-  percent: 67
+  total_plans: 14
+  completed_plans: 9
+  percent: 64
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.12 Rehearse Mode (roadmap created 2026-09-05)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Give worship volunteers a low-friction, passwordless way to rehearse the services they're
 serving — view/print sheet music & chords and play/practice reference recordings — without tracking a
@@ -1312,7 +1312,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 126 — My Schedule — Volunteer Home
+**Current focus:** Phase 127 — Volunteer Service View — Rehearse, Order of Service & Stage Layout
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1322,10 +1322,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 126 (My Schedule — Volunteer Home) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-09-06 — Phase 126 execution started
+Phase: 127 (Volunteer Service View — Rehearse, Order of Service & Stage Layout) — EXECUTING
+Plan: 2 of 6
+Status: Ready to execute
+Last activity: 2026-09-06 — Phase 127 execution started
 
 ## ★ v2.12 ROADMAP.md phase breakdown (created 2026-09-05)
 
@@ -3388,6 +3388,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 126 P02 | 16min | 2 tasks | 4 files |
 | Phase 126 P03 | 25min | 2 tasks | 5 files |
 | Phase 126 P04 | 30min | 3 tasks | 6 files |
+| Phase 127 P01 | 45min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3953,6 +3954,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 126-03: /volunteer/service/:serviceId registered with a real placeholder VolunteerServicePlaceholderView.vue (never a lazy import of a nonexistent Phase-127 file), verified by a green npm run build
 - [Phase ?]: 126-04: chart/track counts corrected to use real SongAttachmentKind values ('document'/'audio'), not the plan's literal 'pdf'/'mp3' — mirrors 126-02's readinessOf fix
 - [Phase ?]: 126-04: /my-schedule replaces 'volunteer-home' as the post-sign-in landing (VolunteerLinkCompleteView redirect + router /login bounce-back); /volunteer remains registered for the check-a-different-email flow
+- [Phase ?]: 127-01: Extracted buildServiceSnapshot's per-kind slot + stage-marker PII allowlists into a shared, store-free src/utils/serviceProjection.ts so buildRehearseAccess (Phase 125) reuses the EXACT same allowlist rather than a second hand-rolled one
+- [Phase ?]: 127-01: orderOfService/roleAssignments/stageLayout/bpm requirements (R385/R386/R392/R393) were left unchecked in REQUIREMENTS.md — this plan only ships the data foundation; the UI-visible delivery lands in 127-02/127-04
 
 ### Roadmap Evolution
 
@@ -4282,8 +4285,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T08:05:48.153Z
-Stopped at: Completed 126-04-PLAN.md
+Last session: 2026-09-06T10:11:51.204Z
+Stopped at: Completed 127-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
