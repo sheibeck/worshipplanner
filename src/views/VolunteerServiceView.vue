@@ -250,7 +250,12 @@ const volunteerAuth = useVolunteerAuthStore()
 // serviceId is the ONLY thing this view reads from the route — orgId is
 // resolved entirely inside the composable from the volunteer's own
 // mySchedule store (T-127-02, never a route/query param).
-const serviceId = route.params.serviceId as string
+//
+// WR-02 (127-REVIEW): a plain string captured once here would go stale when
+// Vue Router reuses this component instance across two /volunteer/service/:id
+// URLs (e.g. back/forward between two rehearse links) — serviceId must stay a
+// computed so useVolunteerServiceDoc's internal watch re-loads on change.
+const serviceId = computed(() => route.params.serviceId as string)
 const { state, doc, retry } = useVolunteerServiceDoc(serviceId)
 
 // ── Top bar (copied verbatim from MyScheduleView.vue) ──────────────────────
@@ -357,6 +362,17 @@ const selectedSongId = ref<string | undefined>(undefined)
 const selectedAttachment = ref<RehearseAttachment | undefined>(undefined)
 const activeTrack = ref<RehearseAttachment | undefined>(undefined)
 const mobileScreen = ref<'list' | 'detail' | 'reader'>('list')
+
+// WR-02 (127-REVIEW): serviceId changing means a full context switch to a
+// different service — reset per-service selection state so it can't carry
+// over and reference the previous service's songs/tab.
+watch(serviceId, () => {
+  selectedSongId.value = undefined
+  selectedAttachment.value = undefined
+  activeTrack.value = undefined
+  mobileScreen.value = 'list'
+  activeTab.value = 'rehearse'
+})
 
 const songs = computed(() => doc.value?.songs ?? [])
 const selectedSong = computed(() => songs.value.find((s) => s.id === selectedSongId.value))

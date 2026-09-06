@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
-import { ref, reactive } from 'vue'
+import { ref, reactive, toValue } from 'vue'
 import VolunteerServiceView from '../VolunteerServiceView.vue'
 import RehearseSongList from '@/components/rehearse/RehearseSongList.vue'
 import RehearseSongDetail from '@/components/rehearse/RehearseSongDetail.vue'
@@ -33,8 +33,12 @@ const globalStubs = {
 }
 
 const mockPush = vi.fn(() => Promise.resolve())
+// WR-02 (127-REVIEW): params is reactive so tests can simulate Vue Router
+// reusing this component instance across two /volunteer/service/:id URLs
+// (only the dynamic segment changes, setup() does NOT re-run).
+const mockRouteParams = reactive<{ serviceId: string }>({ serviceId: 'svc-1' })
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { serviceId: 'svc-1' } }),
+  useRoute: () => ({ params: mockRouteParams }),
   useRouter: () => ({ push: mockPush }),
 }))
 
@@ -56,6 +60,11 @@ const mockRetry = vi.fn()
 vi.mock('@/composables/useVolunteerServiceDoc', () => ({
   useVolunteerServiceDoc: vi.fn(() => ({ state: mockState, doc: mockDoc, retry: mockRetry })),
 }))
+
+// Imported after the mock above so we can inspect what the view actually
+// passes as its serviceId argument (WR-02: must be reactive, not a plain
+// string snapshot of route.params at mount time).
+import { useVolunteerServiceDoc } from '@/composables/useVolunteerServiceDoc'
 
 function makeDoc(overrides: Partial<RehearseAccessDoc> = {}): RehearseAccessDoc {
   return {
@@ -97,6 +106,23 @@ describe('VolunteerServiceView', () => {
     mockDoc.value = null
     mockRetry.mockClear()
     mockPush.mockClear()
+    mockRouteParams.serviceId = 'svc-1'
+    vi.mocked(useVolunteerServiceDoc).mockClear()
+  })
+
+  // WR-02 (127-REVIEW): the view must hand the composable a reactive source
+  // (computed/ref), not a plain string captured once at setup() time — a
+  // plain string would go stale when Vue Router reuses this component
+  // instance across two /volunteer/service/:id URLs.
+  it('passes a reactive serviceId (not a plain string) to useVolunteerServiceDoc, and it tracks route param changes', () => {
+    mount(VolunteerServiceView, { global: { stubs: globalStubs } })
+
+    const arg = vi.mocked(useVolunteerServiceDoc).mock.calls[0]?.[0]
+    expect(typeof arg).not.toBe('string')
+    expect(toValue(arg)).toBe('svc-1')
+
+    mockRouteParams.serviceId = 'svc-2'
+    expect(toValue(arg)).toBe('svc-2')
   })
 
   it('shows the loading copy while state is loading', () => {
@@ -224,6 +250,24 @@ describe('VolunteerServiceView', () => {
       // detail panel now render on mobile too.
       expect(wrapper.find('[data-testid="vsv-mobile-back-to-list"]').exists()).toBe(true)
       expect(wrapper.findAllComponents(RehearseSongDetail).length).toBe(2)
+    })
+
+    it('WR-02: a route serviceId change resets song/tab/mobile-screen selection so it cannot leak from the previous service', async () => {
+      const wrapper = mount(VolunteerServiceView, { global: { stubs: globalStubs } })
+      const desktopList = wrapper.findAllComponents(RehearseSongList)[0]!
+      await desktopList.vm.$emit('select', 'song-2')
+      await wrapper.find('#vsv-tab-order').trigger('click')
+      expect(wrapper.find('#vsv-tab-order').attributes('aria-selected')).toBe('true')
+      expect(wrapper.find('[data-testid="vsv-mobile-back-to-list"]').exists()).toBe(true)
+
+      mockRouteParams.serviceId = 'svc-2'
+      await wrapper.vm.$nextTick()
+
+      // Back on the Rehearse tab, mobile back to the list screen, and no
+      // song selected — none of the previous service's selection survives.
+      expect(wrapper.find('#vsv-tab-rehearse').attributes('aria-selected')).toBe('true')
+      expect(wrapper.find('[data-testid="vsv-mobile-back-to-list"]').exists()).toBe(false)
+      expect(wrapper.findComponent(RehearseSongDetail).props('song')).toBeUndefined()
     })
 
     it('a Play toggle sets the shared active track on the single player', async () => {

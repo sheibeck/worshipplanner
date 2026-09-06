@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises } from '@vue/test-utils'
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import type { MyScheduleDoc } from '@/stores/mySchedule'
 
 const mockGetDoc = vi.fn()
@@ -159,5 +159,33 @@ describe('useVolunteerServiceDoc', () => {
     const call = mockDocRef.mock.calls[0] as unknown[]
     // args: (db, 'organizations', orgId, 'rehearseAccess', serviceId)
     expect(call[2]).toBe('org-xyz-only-in-store')
+  })
+
+  // WR-02 (127-REVIEW): serviceId must be a reactive source (ref/getter), not
+  // a plain string captured once — Vue Router reuses this component instance
+  // across two /volunteer/service/:id URLs, so the composable must reload
+  // when the id it's given changes underneath it.
+  it('accepts a reactive serviceId ref and reloads with the NEW id when it changes', async () => {
+    mockScheduleState.docs = [makeMatch({ serviceId: 'svc-1', orgId: 'org-1' }), makeMatch({ serviceId: 'svc-2', orgId: 'org-2' })]
+    mockGetDoc.mockImplementation((..._args: unknown[]) => {
+      const calls = mockDocRef.mock.calls
+      const id = calls[calls.length - 1]?.[4]
+      return Promise.resolve({ exists: () => true, data: () => ({ serviceId: id, title: `Title for ${id}` }) })
+    })
+
+    const serviceIdRef = ref('svc-1')
+    const { state, doc } = useVolunteerServiceDoc(serviceIdRef)
+    await flushPromises()
+
+    expect(state.value).toBe('loaded')
+    expect(doc.value?.serviceId).toBe('svc-1')
+    expect(mockDocRef).toHaveBeenCalledWith({}, 'organizations', 'org-1', 'rehearseAccess', 'svc-1')
+
+    serviceIdRef.value = 'svc-2'
+    await flushPromises()
+
+    expect(state.value).toBe('loaded')
+    expect(doc.value?.serviceId).toBe('svc-2')
+    expect(mockDocRef).toHaveBeenCalledWith({}, 'organizations', 'org-2', 'rehearseAccess', 'svc-2')
   })
 })
