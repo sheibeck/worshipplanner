@@ -44,11 +44,13 @@ import {
   VOLUNTEER_LINK_MAX_PER_DAY,
   VOLUNTEER_LINK_MAX_PER_ORG_PER_DAY,
   VOLUNTEER_LINK_TARGET_RESPONSE_MS,
+  adminVolunteerLinkHandler,
 } from "./index";
 import type {
   QueueMessageRequest,
   PreviewCleanupDryRunRequest,
   RequestVolunteerLinkRequest,
+  AdminVolunteerLinkRequest,
 } from "./index";
 import {
   cleanupExpiredMediaHandler,
@@ -5844,14 +5846,15 @@ describe("sendQueuedMessageHandler", () => {
     expect(mockSend).toHaveBeenCalledTimes(2);
   });
 
-  it("SOURCE INSPECTION: RESEND_API_KEY is bound to EXACTLY the sendQueuedMessage and requestVolunteerLink Functions -- no other new function declares it (R131)", () => {
+  it("SOURCE INSPECTION: RESEND_API_KEY is bound to EXACTLY the sendQueuedMessage, requestVolunteerLink, and adminVolunteerLink Functions -- no other new function declares it (R131)", () => {
     const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
-    // Phase 128 (R395-R397) legitimately adds ONE new binding for the public
-    // requestVolunteerLink callable (it mints + sends via the shared core) --
-    // the smallest-key-holding-surface invariant is "no OTHER new function
+    // Phase 128 (R395-R397) and Phase 129 (R400-R402) each legitimately add
+    // ONE new binding (requestVolunteerLink, then adminVolunteerLink) for
+    // callables that mint + send via the shared core -- the
+    // smallest-key-holding-surface invariant is "no OTHER new function
     // declares it", not "exactly one binding forever".
     const bindings = source.match(/secrets:\s*\[RESEND_API_KEY\]/g) ?? [];
-    expect(bindings).toHaveLength(2);
+    expect(bindings).toHaveLength(3);
     // sendQueuedMessage's binding.
     const sendWrapperStart = source.indexOf("export const sendQueuedMessage = onDocumentCreated(");
     expect(sendWrapperStart).toBeGreaterThan(-1);
@@ -5860,6 +5863,10 @@ describe("sendQueuedMessageHandler", () => {
     const volunteerWrapperStart = source.indexOf("export const requestVolunteerLink = onCall(");
     expect(volunteerWrapperStart).toBeGreaterThan(-1);
     expect(source.slice(volunteerWrapperStart, volunteerWrapperStart + 200)).toMatch(/secrets:\s*\[RESEND_API_KEY\]/);
+    // adminVolunteerLink's binding (Phase 129).
+    const adminVolunteerWrapperStart = source.indexOf("export const adminVolunteerLink = onCall(");
+    expect(adminVolunteerWrapperStart).toBeGreaterThan(-1);
+    expect(source.slice(adminVolunteerWrapperStart, adminVolunteerWrapperStart + 200)).toMatch(/secrets:\s*\[RESEND_API_KEY\]/);
   });
 });
 
@@ -5879,6 +5886,8 @@ describe("requestVolunteerLinkHandler", () => {
     name?: string;
     slug?: string;
     people?: Array<{ id: string; email: string }>;
+    /** adminVolunteerLinkHandler's members/{uid} authz re-check (Phase 129). */
+    members?: Record<string, { role: string }>;
   }
 
   /**
@@ -5941,6 +5950,17 @@ describe("requestVolunteerLinkHandler", () => {
               })),
             };
           }
+          if (name === "members") {
+            const members = org?.members ?? {};
+            return {
+              doc: vi.fn((uid: string) => ({
+                get: vi.fn(async () => {
+                  const m = members[uid];
+                  return { exists: m !== undefined, data: () => (m ? { ...m } : undefined) };
+                }),
+              })),
+            };
+          }
           throw new Error(`fakeVolunteerDb: unexpected org subcollection "${name}"`);
         }),
       };
@@ -5963,6 +5983,17 @@ describe("requestVolunteerLinkHandler", () => {
     data: Partial<RequestVolunteerLinkRequest>,
   ): CallableRequest<RequestVolunteerLinkRequest> {
     return { auth: undefined, data } as unknown as CallableRequest<RequestVolunteerLinkRequest>;
+  }
+
+  /** adminVolunteerLinkHandler is AUTHENTICATED (contrast fakeVolunteerRequest's auth: undefined above). */
+  function fakeAdminRequest(
+    args: Partial<AdminVolunteerLinkRequest> & { uid?: string },
+  ): CallableRequest<AdminVolunteerLinkRequest> {
+    const { uid, ...data } = args;
+    return {
+      auth: uid ? { uid, token: {} } : undefined,
+      data,
+    } as unknown as CallableRequest<AdminVolunteerLinkRequest>;
   }
 
   function setGenerateLink(impl: (email: string) => Promise<string> | string) {
@@ -6359,6 +6390,195 @@ describe("requestVolunteerLinkHandler", () => {
     await expect(
       requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL })),
     ).resolves.toEqual(GENERIC_RESPONSE);
+  });
+
+  // --- adminVolunteerLinkHandler (Phase 129: R400-R402) ---------------------
+  //
+  // AUTHENTICATED sibling of requestVolunteerLinkHandler above. Nested here so
+  // it can reuse fakeVolunteerDb/setGenerateLink (extended above with a
+  // members/{uid} fake) without duplicating the fixture. NO enumeration-safety
+  // machinery is exercised here (no generic response/rate-limit/timing-pad) --
+  // this path uses honest HttpsError codes throughout.
+  describe("adminVolunteerLinkHandler", () => {
+    const EMAIL = "rostered@example.com";
+
+    function orgWith(overrides: Partial<FakeOrg> = {}): FakeOrg {
+      return {
+        name: "Grace Church",
+        slug: "grace-church",
+        people: [{ id: "p1", email: EMAIL }],
+        members: { "editor-uid": { role: "editor" } },
+        ...overrides,
+      };
+    }
+
+    it("DENY-1: unauthenticated -> unauthenticated", async () => {
+      const { db } = fakeVolunteerDb({ orgs: { org1: orgWith() } });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      await expect(
+        adminVolunteerLinkHandler(fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "email" })),
+      ).rejects.toMatchObject({ code: "unauthenticated" });
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("DENY-2: authenticated but no members/{uid} doc -> permission-denied", async () => {
+      const { db } = fakeVolunteerDb({ orgs: { org1: { ...orgWith(), members: {} } } });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      await expect(
+        adminVolunteerLinkHandler(
+          fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "email", uid: "stranger-uid" }),
+        ),
+      ).rejects.toMatchObject({ code: "permission-denied" });
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("DENY-3: member with role 'viewer' (not editor/admin) -> permission-denied", async () => {
+      const { db } = fakeVolunteerDb({
+        orgs: { org1: { ...orgWith(), members: { "viewer-uid": { role: "viewer" } } } },
+      });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      await expect(
+        adminVolunteerLinkHandler(
+          fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "email", uid: "viewer-uid" }),
+        ),
+      ).rejects.toMatchObject({ code: "permission-denied" });
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("DENY-4 (cross-org): editor of org A calls with org B's orgId -> permission-denied (no member doc under org B)", async () => {
+      const { db } = fakeVolunteerDb({
+        orgs: {
+          orgA: { ...orgWith(), members: { "editor-uid": { role: "editor" } } },
+          orgB: { ...orgWith(), members: {} },
+        },
+      });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      await expect(
+        adminVolunteerLinkHandler(
+          fakeAdminRequest({ orgId: "orgB", email: EMAIL, mode: "email", uid: "editor-uid" }),
+        ),
+      ).rejects.toMatchObject({ code: "permission-denied" });
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("DENY-5: email not on organizations/{orgId}/people -> honest failed-precondition, no mint/send", async () => {
+      const { db } = fakeVolunteerDb({ orgs: { org1: orgWith() } });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      await expect(
+        adminVolunteerLinkHandler(
+          fakeAdminRequest({ orgId: "org1", email: "notonroster@example.com", mode: "email", uid: "editor-uid" }),
+        ),
+      ).rejects.toMatchObject({ code: "failed-precondition" });
+      expect(vi.mocked(getAuth)().generateSignInWithEmailLink).not.toHaveBeenCalled();
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("a roster entry present but with no email -> treated as a miss (honest error, no mint)", async () => {
+      const { db } = fakeVolunteerDb({
+        orgs: {
+          org1: {
+            ...orgWith(),
+            people: [{ id: "p1", email: "" }],
+          },
+        },
+      });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      await expect(
+        adminVolunteerLinkHandler(
+          fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "email", uid: "editor-uid" }),
+        ),
+      ).rejects.toMatchObject({ code: "failed-precondition" });
+      expect(vi.mocked(getAuth)().generateSignInWithEmailLink).not.toHaveBeenCalled();
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("DENY-6: missing/malformed orgId, email, or an unrecognized mode -> invalid-argument", async () => {
+      const { db } = fakeVolunteerDb({ orgs: { org1: orgWith() } });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      await expect(
+        adminVolunteerLinkHandler(fakeAdminRequest({ email: EMAIL, mode: "email", uid: "editor-uid" })),
+      ).rejects.toMatchObject({ code: "invalid-argument" });
+      await expect(
+        adminVolunteerLinkHandler(fakeAdminRequest({ orgId: "org1", mode: "email", uid: "editor-uid" })),
+      ).rejects.toMatchObject({ code: "invalid-argument" });
+      await expect(
+        adminVolunteerLinkHandler(
+          fakeAdminRequest({
+            orgId: "org1",
+            email: EMAIL,
+            mode: "delete" as unknown as AdminVolunteerLinkRequest["mode"],
+            uid: "editor-uid",
+          }),
+        ),
+      ).rejects.toMatchObject({ code: "invalid-argument" });
+      expect(mockSend).not.toHaveBeenCalled();
+    });
+
+    it("ALLOW-1: editor, roster hit, mode:'email' -> { sent: true }, sends via the shared core, mints emailLower exactly once", async () => {
+      const { db } = fakeVolunteerDb({ orgs: { org1: orgWith() } });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+
+      const result = await adminVolunteerLinkHandler(
+        fakeAdminRequest({ orgId: "org1", email: "  Rostered@Example.COM  ", mode: "email", uid: "editor-uid" }),
+      );
+
+      expect(result).toEqual({ sent: true });
+      expect(mockSend).toHaveBeenCalledTimes(1);
+      const mint = vi.mocked(vi.mocked(getAuth)().generateSignInWithEmailLink);
+      expect(mint).toHaveBeenCalledTimes(1);
+      expect(mint.mock.calls[0][0]).toBe(EMAIL);
+    });
+
+    it("ALLOW-2: editor, roster hit, mode:'copy' -> { link }, does NOT call Resend, mints emailLower exactly once", async () => {
+      const { db } = fakeVolunteerDb({ orgs: { org1: orgWith() } });
+      vi.mocked(getFirestore).mockReturnValue(db as never);
+      setGenerateLink(() => "https://example.com/volunteer/verify?slug=grace-church&mint=copy");
+
+      const result = await adminVolunteerLinkHandler(
+        fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "copy", uid: "editor-uid" }),
+      );
+
+      expect(result).toEqual({ link: "https://example.com/volunteer/verify?slug=grace-church&mint=copy" });
+      expect(mockSend).not.toHaveBeenCalled();
+      const mint = vi.mocked(vi.mocked(getAuth)().generateSignInWithEmailLink);
+      expect(mint).toHaveBeenCalledTimes(1);
+      expect(mint.mock.calls[0][0]).toBe(EMAIL);
+    });
+
+    it("ALLOW-3: role 'admin' succeeds identically to 'editor' for both modes", async () => {
+      const { db: emailDb } = fakeVolunteerDb({
+        orgs: { org1: { ...orgWith(), members: { "admin-uid": { role: "admin" } } } },
+      });
+      vi.mocked(getFirestore).mockReturnValue(emailDb as never);
+
+      const emailResult = await adminVolunteerLinkHandler(
+        fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "email", uid: "admin-uid" }),
+      );
+      expect(emailResult).toEqual({ sent: true });
+      expect(mockSend).toHaveBeenCalledTimes(1);
+
+      const { db: copyDb } = fakeVolunteerDb({
+        orgs: { org1: { ...orgWith(), members: { "admin-uid": { role: "admin" } } } },
+      });
+      vi.mocked(getFirestore).mockReturnValue(copyDb as never);
+
+      const copyResult = await adminVolunteerLinkHandler(
+        fakeAdminRequest({ orgId: "org1", email: EMAIL, mode: "copy", uid: "admin-uid" }),
+      );
+      // Default beforeEach mint impl keys the link by the (normalized) recipient email.
+      expect(copyResult).toEqual({
+        link: `https://example.com/volunteer/verify?slug=grace-church&email=${encodeURIComponent(EMAIL)}`,
+      });
+      // Still only the one send from the email-mode call above -- copy mode never sends.
+      expect(mockSend).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
