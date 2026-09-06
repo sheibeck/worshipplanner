@@ -619,7 +619,7 @@ palette → app dark gray-950).
 - Phases 126 and 127 map to the owner's design mocks and are UI-bearing — run `/gsd-ui-phase` at plan time
   for each (`Volunteer Home.dc.html` for 126, `Rehearsal.dc.html` for 127).
 
-- [ ] **Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation** - A volunteer signs in via a roster-email-tied Firebase email-link with no password, and that session is provably read-only and scoped to their own org's Planned, assigned services
+- [x] **Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation** - A volunteer signs in via a roster-email-tied Firebase email-link with no password, and that session is provably read-only and scoped to their own org's Planned, assigned services ✅ built + auto-verified 13/13 (human UAT batched → v2.12-DEFERRED-UAT.md)
 - [ ] **Phase 126: My Schedule — Volunteer Home** - A signed-in volunteer lands on a read-and-go page listing every Planned service they're assigned to, soonest first, with role/readiness/countdown info and a way into Rehearse
 - [ ] **Phase 127: Volunteer Service View — Rehearse, Order of Service & Stage Layout** - From a My Schedule card, a volunteer reaches a standalone read-only service view — Rehearse (song list, detail, PDF reader, audio player with speed/loop, external links) plus read-only Order of Service and Stage Layout tabs — reliably on mobile
 
