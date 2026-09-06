@@ -312,6 +312,48 @@ export function toPublicServiceSnapshot(snapshot: ServiceSnapshot): PublicServic
   }
 }
 
+/**
+ * WR-01 (126-REVIEW) — `rehearseAccess/{id}` revocation (reopenService,
+ * deleteService) is the ONLY defense the collection-group `list` rule has
+ * against a stale, frozen `status:'planned'` projection lingering in a
+ * volunteer's My Schedule aggregate after the parent service leaves Planned
+ * (see firestore.rules:445-459's own comment). A single transient failure
+ * (offline tab, dropped connection) used to be swallowed with nothing but a
+ * console.error and no second attempt. This adds one retry — enough to ride
+ * out a momentary blip — before falling back to the same best-effort log.
+ * Deliberately still non-throwing: the caller's primary action (status
+ * transition / service delete) has already committed and must not be rolled
+ * back or reported as failed over a projection-cleanup miss. A durable,
+ * client-independent reconciliation (e.g. a Cloud Function sweep keyed off
+ * the parent's status) remains the real fix and is out of scope here — see
+ * 126-REVIEW.md WR-01.
+ */
+async function revokeRehearseAccessWithRetry(refPath: {
+  orgId: string
+  serviceId: string
+}, caller: string): Promise<void> {
+  const rehearseRef = doc(db, 'organizations', refPath.orgId, 'rehearseAccess', refPath.serviceId)
+  try {
+    await deleteDoc(rehearseRef)
+    return
+  } catch (firstErr) {
+    console.error(
+      `${caller}: rehearseAccess revoke failed for service ${refPath.serviceId} — retrying once`,
+      firstErr,
+    )
+  }
+  try {
+    await deleteDoc(rehearseRef)
+  } catch (secondErr) {
+    console.error(
+      `${caller}: rehearseAccess revoke failed again for service ${refPath.serviceId} after retry — ` +
+        `giving up. The projection may keep surfacing in My Schedule until manually deleted or the ` +
+        `service transitions again. See 126-REVIEW.md WR-01.`,
+      secondErr,
+    )
+  }
+}
+
 export const useServiceStore = defineStore('services', () => {
   const services = ref<Service[]>([])
   const isLoading = ref(true)
@@ -665,11 +707,9 @@ export const useServiceStore = defineStore('services', () => {
     // R377 (Pitfall 3) — revoke the rehearseAccess projection now the service is
     // back in Draft; belt-and-suspenders alongside the rule's live
     // parentIsPlanned() re-check, which already denies this read regardless.
-    try {
-      await deleteDoc(doc(db, 'organizations', orgId.value, 'rehearseAccess', id))
-    } catch (err) {
-      console.error(`reopenService: rehearseAccess revoke failed for service ${id} — continuing`, err)
-    }
+    // WR-01 (126-REVIEW): also the list arm's PRIMARY defense against a stale
+    // frozen-status doc — retried once before being logged as a best-effort miss.
+    await revokeRehearseAccessWithRetry({ orgId: orgId.value, serviceId: id }, 'reopenService')
 
     // See ADR-0161 (docs/adr/0161-those-songs-fall-back-to-their-remaining-locked-max-or-null.md)
     if (songIds.length > 0) {
@@ -734,12 +774,18 @@ export const useServiceStore = defineStore('services', () => {
 
     // 2b. rehearseAccess/{id} (R377) — same existence-guard as serviceShareLinks
     // above, so a never-locked service's absent doc is a no-op, not a denied delete.
+    // WR-01 (126-REVIEW): the delete itself gets one retry via
+    // revokeRehearseAccessWithRetry — same rationale as reopenService's revoke;
+    // a stale projection outliving its now-deleted parent service would keep
+    // surfacing in a volunteer's My Schedule aggregate list.
     try {
       const rehearseRef = doc(db, 'organizations', orgId.value, 'rehearseAccess', id)
       const rehearseSnap = await getDoc(rehearseRef)
-      if (rehearseSnap.exists()) await deleteDoc(rehearseRef)
+      if (rehearseSnap.exists()) {
+        await revokeRehearseAccessWithRetry({ orgId: orgId.value, serviceId: id }, 'deleteService')
+      }
     } catch (err) {
-      console.error(`deleteService: failed to revoke rehearseAccess/${id} — continuing`, err)
+      console.error(`deleteService: failed to check/revoke rehearseAccess/${id} — continuing`, err)
     }
 
     // 3. serviceShares/{slug}__service-{date} — needs the org's slug plus
