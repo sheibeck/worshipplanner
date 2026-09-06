@@ -302,12 +302,13 @@ async function revokeRehearseAccessWithRetry(refPath: {
 async function writeRehearseAccessDoc(
   service: Service,
   org: string,
+  orgName: string | undefined,
   quarters: Quarter[],
   roles: Role[],
   people: Person[],
   songs: Song[],
 ): Promise<void> {
-  const rehearseAccess = buildRehearseAccess(service, org, quarters, roles, people, songs)
+  const rehearseAccess = buildRehearseAccess(service, org, orgName, quarters, roles, people, songs)
   await setDoc(doc(db, 'organizations', org, 'rehearseAccess', service.id), {
     ...rehearseAccess,
     updatedAt: serverTimestamp(),
@@ -635,9 +636,11 @@ export const useServiceStore = defineStore('services', () => {
         const rosterStore = useRosterStore()
         const quartersStore = useQuartersStore()
         const songStore = useSongStore()
+        const authStore = useAuthStore()
         await writeRehearseAccessDoc(
           { ...service, status: 'planned' },
           orgId.value,
+          authStore.orgName ?? undefined,
           quartersStore.quarters,
           rosterStore.roles,
           rosterStore.people,
@@ -678,18 +681,25 @@ export const useServiceStore = defineStore('services', () => {
         .filter((svc) => songIdsInService(svc).includes(songId))
       if (affected.length === 0) return
 
-      const [quartersSnap, rolesSnap, peopleSnap, songsSnap] = await Promise.all([
+      // firestore.rules grants an org member `getDoc` on organizations/{orgId};
+      // the editor triggering this resync is a member. `.catch(() => null)`
+      // scopes the best-effort degradation to just this read — a denied/failed
+      // org fetch resolves to no orgName without rejecting the whole
+      // Promise.all (T-130-03), so the resync still completes.
+      const [orgSnap, quartersSnap, rolesSnap, peopleSnap, songsSnap] = await Promise.all([
+        getDoc(doc(db, 'organizations', org)).catch(() => null),
         getDocs(collection(db, 'organizations', org, 'quarters')),
         getDocs(collection(db, 'organizations', org, 'roles')),
         getDocs(collection(db, 'organizations', org, 'people')),
         getDocs(collection(db, 'organizations', org, 'songs')),
       ])
+      const orgName = (orgSnap?.data()?.name as string | undefined) ?? undefined
       const quarters = quartersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Quarter)
       const roles = rolesSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Role)
       const people = peopleSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)
       const songs = songsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Song)
 
-      await Promise.all(affected.map((svc) => writeRehearseAccessDoc(svc, org, quarters, roles, people, songs)))
+      await Promise.all(affected.map((svc) => writeRehearseAccessDoc(svc, org, orgName, quarters, roles, people, songs)))
     } catch (err) {
       console.error(`resyncRehearseAccessForSong: failed for song ${songId}`, err)
     }

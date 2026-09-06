@@ -168,9 +168,15 @@ vi.mock('@/stores/quarters', () => ({
 // established `vi.mock('@/stores/auth', ...)` pattern (lines 352-377 there).
 // A `reactive()` object so a test can mutate `mockAuthState.settings...`
 // between calls without re-mocking.
+// Phase 130 (R404): markAsPlanned forwards authStore.orgName into the
+// rehearseAccess projection — orgName added alongside the existing settings
+// shape, defaulting to a non-null value so existing tests keep seeing the
+// same orgName-present behavior unless a test overrides it.
 const mockAuthState = reactive<{
+  orgName: string | null
   settings: { aiEnabled: boolean; pcEnabled: boolean; vwModeEnabled: boolean; defaultServiceTemplate: ServiceTemplateEntry[] }
 }>({
+  orgName: 'Grace Church',
   settings: { aiEnabled: true, pcEnabled: true, vwModeEnabled: true, defaultServiceTemplate: [] },
 })
 
@@ -2228,6 +2234,44 @@ describe('useServiceStore', () => {
       expect(data.status).toBe('planned')
     })
 
+    // Phase 130 (R404): the rehearseAccess projection written at lock time
+    // carries orgName sourced from authStore.orgName (already loaded, zero
+    // extra reads) so a zero-membership volunteer can label this church.
+    it('markAsPlanned writes a rehearseAccess doc whose orgName equals authStore.orgName', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('draft')
+
+      await store.markAsPlanned('service-1')
+
+      const rehearseWriteCall = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as { path?: string }).path?.includes('rehearseAccess'))
+      expect(rehearseWriteCall).toBeDefined()
+      const payload = rehearseWriteCall![1] as unknown as Record<string, unknown>
+      expect(payload.orgName).toBe('Grace Church')
+    })
+
+    // The projection write is best-effort — a null authStore.orgName (e.g. a
+    // session with no org context resolved yet) must never roll back the
+    // already-succeeded status transition; the doc simply omits orgName.
+    it('markAsPlanned still succeeds and omits orgName when authStore.orgName is null', async () => {
+      const { setDoc, updateDoc } = await import('firebase/firestore')
+      mockAuthState.orgName = null
+      const store = await storeAtStatus('draft')
+
+      await store.markAsPlanned('service-1')
+
+      expect(updateDoc).toHaveBeenCalled()
+      const rehearseWriteCall = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as { path?: string }).path?.includes('rehearseAccess'))
+      expect(rehearseWriteCall).toBeDefined()
+      const payload = rehearseWriteCall![1] as unknown as Record<string, unknown>
+      expect('orgName' in payload).toBe(false)
+
+      mockAuthState.orgName = 'Grace Church'
+    })
+
     // WR-01 (125-REVIEW.md): a cache miss (service just created, multi-tab
     // race, org re-subscribe mid-flight) must not silently skip the
     // rehearseAccess projection write — the store must fall back to a direct
@@ -2326,6 +2370,71 @@ describe('useServiceStore', () => {
       // hand-set "Exported" defect D-01 deletes.
       expect(store).not.toHaveProperty('setStatus')
       expect(store).not.toHaveProperty('toggleStatus')
+    })
+  })
+
+  // ── Phase 130 (R404): resyncRehearseAccessForSong forwards orgName sourced
+  // from a direct getDoc(organizations/{orgId}) — this path deliberately
+  // avoids the org-scoped Pinia stores (RESEARCH pitfall 4: forgetting to mock
+  // this getDoc call makes the new code path hang/throw rather than assert). ──
+  describe('resyncRehearseAccessForSong orgName (Phase 130, R404)', () => {
+    function plannedServiceSnap(songId: string) {
+      return {
+        docs: [
+          {
+            id: 'service-1',
+            data: () => ({
+              date: '2026-09-06',
+              status: 'planned',
+              slots: [
+                { kind: 'SONG', position: 0, requiredVwType: 1, songId, songTitle: 'Amazing Grace', songKey: 'G' },
+              ],
+            }),
+          },
+        ],
+      }
+    }
+
+    it('writes rehearseAccess docs whose orgName equals the org document name, fetched via a batched getDoc', async () => {
+      const { getDoc, getDocs, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ name: 'Grace Church' }),
+      } as never)
+      vi.mocked(getDocs).mockResolvedValueOnce(plannedServiceSnap('song-abc') as never)
+
+      await store.resyncRehearseAccessForSong('song-abc')
+
+      expect(vi.mocked(getDoc)).toHaveBeenCalled()
+      const rehearseWriteCall = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as { path?: string }).path?.includes('rehearseAccess'))
+      expect(rehearseWriteCall).toBeDefined()
+      const payload = rehearseWriteCall![1] as unknown as Record<string, unknown>
+      expect(payload.orgName).toBe('Grace Church')
+    })
+
+    it('degrades gracefully to no orgName when the org getDoc read fails, without blocking the resync write', async () => {
+      const { getDoc, getDocs, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      vi.mocked(getDoc).mockRejectedValueOnce(new Error('denied'))
+      vi.mocked(getDocs).mockResolvedValueOnce(plannedServiceSnap('song-abc') as never)
+
+      await store.resyncRehearseAccessForSong('song-abc')
+
+      const rehearseWriteCall = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as { path?: string }).path?.includes('rehearseAccess'))
+      expect(rehearseWriteCall).toBeDefined()
+      const payload = rehearseWriteCall![1] as unknown as Record<string, unknown>
+      expect('orgName' in payload).toBe(false)
     })
   })
 
