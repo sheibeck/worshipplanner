@@ -8,6 +8,56 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
+## Current Milestone: v2.12 Rehearse Mode
+
+**Goal:** Give worship volunteers a low-friction, *passwordless* way to rehearse the services they're
+serving — view/print sheet music & chords and play/practice reference recordings — without tracking a new
+username/password and without exposing media publicly. This is **step 2** (the final step) of the
+file-storage backlog (999.13 / SEED-003); step 1 (song attachments) shipped as v2.11.
+
+**Target features:**
+
+- **Passwordless magic-link access** — a volunteer receives an email link (delivered through the existing
+  v1.7 volunteer-messaging emails) tied to their roster email; clicking it signs them in via Firebase
+  email-link auth (`signInWithEmailLink`, no password), giving per-person identity for playback position +
+  their own downloads. **Not public** — removes the anonymous hotlinking/scraping cost+security risk that
+  the original v2.7 "public link only" framing carried.
+- **Volunteer home** — after sign-in, a read-and-go self-service page listing every service the volunteer is
+  actually assigned to (roster-email → assignment match), soonest first, grouped **This week / Later this
+  month** (plus past services). Each service card shows the date, name, time · venue, a "Next up" badge, the
+  volunteer's **role chips**, song/chart/track counts, a **readiness** indicator (all ready / N songs
+  missing media / waiting on charts), a countdown + call time, and a **Rehearse →** CTA that opens straight
+  into that service's Rehearsal tab. Includes a "check a different email" affordance for volunteers rostered
+  under another address.
+- **Rehearsal tab (per service)** — a 3-column experience (from the owner's design): songs-in-this-service
+  (key + PDF/MP3 counts + now-playing) → song detail (Sheet music & chords rows with **Print + Download**,
+  Recordings rows, an optional per-song note) → a PDF reader (page nav + Print) plus a bottom audio player
+  (play/seek/time, **speed** 0.9/0.75/1.25×, **whole-track Loop**). Media = the **v2.11 song attachments**
+  (PDF/MP3), reused — nothing is re-uploaded here.
+- **Mobile-friendly playback** — PDFs open/download reliably on phones (link-first, `<iframe>` as a desktop
+  enhancement per v2.7 research); native `<audio>` plays on mobile.
+
+**Key context / decisions (confirmed with owner 2026-09-05):**
+- **Access = passwordless magic link** (Firebase `signInWithEmailLink`; email/link auth free ≤ 50k MAU).
+  Per-person playback position + downloads. Not full accounts, not public.
+- **Landing = a volunteer home** listing all of a volunteer's assigned services (not just a single-service
+  deep link), then pick one to rehearse.
+- **Playback extras INCLUDED** — whole-track speed + loop (cheap on the native `<audio>` element; present in
+  the owner's design). Not the "loop-a-section / server-side transposition" SEED-003 warned against.
+- **Cost guardrails DEFERRED** (owner decision) — per-org storage quota + egress/budget alerting go to the
+  backlog; v2.11's per-file caps (PDF/MP3 ≤ 50 MB) remain the only cost bound this milestone.
+- **No project-research pass** — the domain/architecture is already covered by SEED-003's v2.7 research pass
+  and validated by v2.11 (download-token URLs, org-scoped non-`media/` path, the
+  `firestore.exists()`-in-Storage-emulator blind spot to avoid). The one new area — passwordless email-link
+  auth + roster-email→assignment matching + mobile PDF — is phase-level and handled at plan time.
+- **Design reference** — the owner's "Worship Planner Slideshow Design" Claude Design project
+  (`Rehearsal.dc.html` + `Volunteer Home.dc.html`, Nocturne palette) → mapped to the app's dark gray-950
+  language, as v2.11 did; the milestone includes a UI phase producing app-fidelity mocks.
+
+**Out of scope:** per-org storage quota + egress monitoring (deferred to backlog), server-side audio
+transposition, loop-a-section, image/uploaded-video attachment types, and public/anonymous access.
+Requirements continue from R374; phases continue from 125.
+
 ## Shipped Milestone: v2.11 Song File Attachments — ✅ SHIPPED & DEPLOYED 2026-09-05
 
 **Status:** Shipped, deployed to production (`firebase deploy --only storage,hosting` — the `song-files/`
@@ -584,10 +634,20 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
+**v2.12 Rehearse Mode** — 🚧 in planning (started 2026-09-05). Step 2 (final) of the file-storage backlog
+(999.13 / SEED-003). Passwordless magic-link access (Firebase `signInWithEmailLink`, roster-email-tied, not
+public) → a volunteer home listing all of a volunteer's assigned services (roster-email→assignment match,
+grouped This week / Later this month + past, role chips, readiness, Rehearse → CTA) → a per-service
+Rehearsal tab (3-column: songs-in-service → song detail with Print+Download → PDF reader + audio player
+with whole-track speed/loop) reusing v2.11 song attachments. Mobile-friendly PDF/audio. Cost guardrails
+(per-org quota + egress alerting) deferred to backlog; playback speed/loop included. No project-research
+pass. Design ref: owner's `Rehearsal.dc.html` + `Volunteer Home.dc.html`. Requirements continue from R374;
+phases from 125. See `.planning/REQUIREMENTS.md`.
+
 **v2.11 Song File Attachments** — ✅ SHIPPED & DEPLOYED to production 2026-09-05 (moved to Validated
-above). Step 1 of the file-storage backlog (999.13 / SEED-003); Rehearse-mode (public/authenticated
-playback) is the next step. Download-CORS follow-up RESOLVED 2026-09-05 (bucket CORS applied via
-`storage-cors.json`; prod download prompts a Save dialog — owner-confirmed live).
+above). Step 1 of the file-storage backlog (999.13 / SEED-003); Rehearse-mode is v2.12 (above).
+Download-CORS follow-up RESOLVED 2026-09-05 (bucket CORS applied via `storage-cors.json`; prod download
+prompts a Save dialog — owner-confirmed live).
 
 **v2.9 Live Presentation Field Fixes** — 🚧 in planning (started 2026-09-02). Field feedback from the first
 real church-projector run (church Mac + projector). Three groups: **multi-monitor rework** (N monitors,
@@ -791,6 +851,19 @@ This document evolves at phase transitions and milestone boundaries.
 2. Core Value check — still the right priority?
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
+
+---
+*Last updated: 2026-09-05 — started milestone v2.12 Rehearse Mode (step 2/final of file-storage backlog
+999.13 / SEED-003; step 1 = v2.11 song attachments). Passwordless magic-link access (Firebase
+`signInWithEmailLink`, roster-email-tied, delivered via v1.7 messaging emails, not public) → a volunteer
+home (all of a volunteer's assigned services via roster-email→assignment match, grouped This week / Later
+this month + past, role chips + readiness + Rehearse CTA) → a per-service Rehearsal tab (3-column: songs →
+song detail w/ Print+Download → PDF reader + audio player w/ whole-track speed/loop) reusing v2.11 song
+attachments; mobile-friendly PDF/audio. Owner decisions (2026-09-05): access=magic link, landing=volunteer
+home, playback speed/loop INCLUDED, cost guardrails (per-org quota + egress alerting) DEFERRED to backlog,
+no project-research pass. Design ref: owner's Claude Design project `Rehearsal.dc.html` +
+`Volunteer Home.dc.html` (Nocturne → app dark gray-950; UI phase produces app-fidelity mocks). Requirements
+continue from R374; phases from 125. Previous footer below.*
 
 ---
 *Last updated: 2026-09-05 — archived milestone v2.11 Song File Attachments (Phases 121-124, R361-R373),

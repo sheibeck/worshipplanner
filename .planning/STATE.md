@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.11
-milestone_name: Song File Attachments (Phases 121-124, in planning)
-status: completed
-stopped_at: Completed 123-03-PLAN.md
-last_updated: "2026-09-05T22:14:40.116Z"
+milestone: v2.12
+milestone_name: Rehearse Mode
+status: planning
+last_updated: "2026-09-06T02:34:08.742Z"
 last_activity: 2026-09-05
-last_activity_desc: Milestone v2.11 completed and archived
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
-current_phase: 999.5
-current_phase_name: 11
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1289,10 +1285,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v2.11 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-05 — Milestone v2.11 completed and archived
+Status: Defining requirements
+Last activity: 2026-09-05 — Milestone v2.12 started
 
 ## ★ v2.11 ROADMAP.md phase breakdown (created 2026-09-05)
 
