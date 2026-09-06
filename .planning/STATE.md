@@ -1,18 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.13
-milestone_name: Volunteer Self-Service & Multi-Church Access (Phases 128-130, Phase 128 complete)
-current_phase_name: Phase 128 complete (both plans) -- ready to plan Phase 129
+milestone_name: Volunteer Self-Service & Multi-Church Access (Phases 128-130, in planning)
+current_phase: 129
+current_phase_name: Phase 129 Plan 01 (server backend) complete -- Plan 02 (RosterView.vue client UI) remains
 status: in_progress
-stopped_at: Completed 128-02-PLAN.md
-last_updated: "2026-09-06T19:15:55.447Z"
+stopped_at: Completed 129-01-PLAN.md
+last_updated: "2026-09-06T20:19:44.701Z"
 last_activity: 2026-09-06
-last_activity_desc: 128-02-PLAN.md executed -- public /:slug/volunteer request page, login volunteer entry, verify-failure re-request affordance (R394/R395/R398/R399)
+last_activity_desc: "129-01-PLAN.md executed (mintVolunteerLink extracted from mintAndSendVolunteerLink as the sole Admin-SDK mint call site; new authenticated adminVolunteerLink callable added -- members/{uid} editor/admin re-check mirrors queueServiceMessageHandler, roster-gated on emailLower with honest HttpsError codes, mode:'email' sends via the shared core / mode:'copy' returns the raw link; R400/R401/R402 server-side complete; 10-case ALLOW/DENY + single-mint-path test matrix added)"
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 33
 ---
 
@@ -1357,9 +1358,15 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 128 Self-Service Magic-Link Request (public, security-critical) + shared mint/send core
+Phase: 129 Admin Resend — Email & Copy
+Plan: 129-01 (Wave 1 — server backend: mintVolunteerLink extraction + adminVolunteerLink callable) complete; 129-02 (client UI, RosterView.vue) remains
+Status: Phase 129 Plan 01 code-complete, autonomous build + auto-verified green (functions suite 701/701, root type-check clean); UNDEPLOYED. Ready to execute 129-02.
+Last activity: 2026-09-06 — 129-01-PLAN.md executed (mintVolunteerLink extracted from mintAndSendVolunteerLink as the sole Admin-SDK mint call site; new authenticated adminVolunteerLink callable added -- members/{uid} editor/admin re-check mirrors queueServiceMessageHandler, roster-gated on emailLower with honest HttpsError codes, mode:'email' sends via the shared core / mode:'copy' returns the raw link; R400/R401/R402 server-side complete; 10-case ALLOW/DENY + single-mint-path test matrix added)
+
+### Preceding: Phase 128 (complete)
+
 Plan: 128-02 (Wave 2 — client wiring) complete; both plans of Phase 128 done (128-01 server core, 128-02 client wiring)
-Status: Phase 128 code-complete, autonomous build + auto-verified green; UNDEPLOYED; manual-only verifications (real Resend delivery, felt rate-limit) deferred to a single batched UAT pass at milestone end per CONTEXT.md. Ready to plan Phase 129.
+Status: Phase 128 code-complete, autonomous build + auto-verified green; UNDEPLOYED; manual-only verifications (real Resend delivery, felt rate-limit) deferred to a single batched UAT pass at milestone end per CONTEXT.md.
 Last activity: 2026-09-06 — 128-02-PLAN.md executed (public /:slug/volunteer request page, login-page volunteer entry + find-your-church lookup, verify-failure "request a new link" affordance, R394/R395/R398/R399 complete; router BLOCKER fix removing meta.requiresAuth from /volunteer)
 
 ## ★ v2.13 ROADMAP.md phase breakdown (created 2026-09-06)
@@ -3481,6 +3488,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 127 P05 | 6min | 1 tasks | 2 files |
 | Phase 127 P06 | 18min | 2 tasks | 4 files |
 | Phase 128 P02 | 1h | 3 tasks | 11 files |
+| Phase 129 P01 | 35min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -4056,6 +4064,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 127-05: orgId for /volunteer/service/:serviceId resolved ONLY from mySchedule.docs (never a route param/arg); a post-fallback miss is access-denied without a getDoc call
 - [Phase ?]: 127-05: useVolunteerServiceDoc always re-fetches rehearseAccess via a fresh getDoc on load/retry rather than trusting the cached list-arm doc, collapsing permission-denied and missing-doc into the same access-denied state (distinct from retryable load-failure)
 - [Phase ?]: 127-06: RehearseAudioPlayerBar always renders fixed-bottom (no JS breakpoint tracking) — must_haves require only a single persistent instance, not a desktop-inline/mobile-pinned CSS split.
+- [Phase 129]: 129-01: mintVolunteerLink extracted as the sole mint call site; adminVolunteerLink callable reuses it for mode:'copy' and mintAndSendVolunteerLink for mode:'email', preserving R402's single-code-path/one-authz-model requirement
 
 ### Roadmap Evolution
 
@@ -4385,8 +4394,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T19:15:55.324Z
-Stopped at: Completed 128-02-PLAN.md
+Last session: 2026-09-06T20:19:44.635Z
+Stopped at: Completed 129-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

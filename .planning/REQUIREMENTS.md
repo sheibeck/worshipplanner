@@ -49,13 +49,13 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Admin Resend
 
-- [ ] **R400**: From the Volunteers page, an editor/admin can **email** a rostered volunteer their sign-in
+- [x] **R400**: From the Volunteers page, an editor/admin can **email** a rostered volunteer their sign-in
   link as a standalone message (not tied to any one service).
 
-- [ ] **R401**: From the Volunteers page, an editor/admin can **copy** a rostered volunteer's sign-in link
+- [x] **R401**: From the Volunteers page, an editor/admin can **copy** a rostered volunteer's sign-in link
   to the clipboard, to share through their own channel (works even while Resend is test-mode in prod).
 
-- [ ] **R402**: Admin resend only mints links for people who are on the church roster with an email
+- [x] **R402**: Admin resend only mints links for people who are on the church roster with an email
   address, and reuses the same server-side mint/send core as the self-service request (single code path,
   one authorization model).
 
