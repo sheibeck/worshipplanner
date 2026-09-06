@@ -209,4 +209,81 @@ describe('buildRehearseAccess', () => {
     buildRehearseAccess(service, 'org-1', [], [], [], [])
     expect(JSON.stringify(service)).toBe(before)
   })
+
+  // R381 (Phase 126, My Schedule): rolesByEmailLower — per-email role names,
+  // mirrors functions/src/serviceRoles.ts's roleNamesByPerson map-building,
+  // keyed by lowercased email instead of personId.
+  it('gives a person holding two roles on one service BOTH role names in their email key, deduped', () => {
+    const roleGuitar = makeRole({ id: 'role-guitar', name: 'guitar', order: 0 })
+    const roleVocals = makeRole({ id: 'role-vocals', name: 'vocals', order: 1 })
+    const quarter = makeQuarter({
+      serviceDates: ['2026-09-06'],
+      calendar: {
+        '2026-09-06': { 'role-guitar': ['person-1'], 'role-vocals': ['person-1'] },
+      },
+    })
+    const person = makePerson({ id: 'person-1', email: 'Dana@Example.com' })
+    const service = makeService({ date: '2026-09-06' })
+
+    const result = buildRehearseAccess(service, 'org-1', [quarter], [roleGuitar, roleVocals], [person], [])
+
+    expect(result.rolesByEmailLower).toEqual({ 'dana@example.com': ['guitar', 'vocals'] })
+  })
+
+  it('does not duplicate a role name when the same person is scheduled under the same role via override and schedule', () => {
+    const role = makeRole({ id: 'role-guitar', name: 'guitar' })
+    const quarter = makeQuarter({
+      serviceDates: ['2026-09-06'],
+      calendar: { '2026-09-06': { 'role-guitar': ['person-1'] } },
+    })
+    const person = makePerson({ id: 'person-1', email: 'dana@example.com' })
+    const service = makeService({ date: '2026-09-06' })
+
+    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+
+    expect(result.rolesByEmailLower).toEqual({ 'dana@example.com': ['guitar'] })
+  })
+
+  it('skips an assigned person with an empty-string email from rolesByEmailLower entirely', () => {
+    const role = makeRole()
+    const quarter = makeQuarter({
+      serviceDates: ['2026-09-06'],
+      calendar: { '2026-09-06': { 'role-guitar': ['person-1'] } },
+    })
+    const person = makePerson({ id: 'person-1', email: '' })
+    const service = makeService({ date: '2026-09-06' })
+
+    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+
+    expect(result.rolesByEmailLower).toEqual({})
+  })
+
+  it('lowercases the email key in rolesByEmailLower, matching assignedEmailsLower normalization', () => {
+    const role = makeRole()
+    const quarter = makeQuarter({
+      serviceDates: ['2026-09-06'],
+      calendar: { '2026-09-06': { 'role-guitar': ['person-1'] } },
+    })
+    const person = makePerson({ id: 'person-1', email: 'Dana@Example.COM' })
+    const service = makeService({ date: '2026-09-06' })
+
+    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+
+    expect(Object.keys(result.rolesByEmailLower)).toEqual(['dana@example.com'])
+  })
+
+  it('rolesByEmailLower carries no PII beyond role-name strings', () => {
+    const role = makeRole()
+    const quarter = makeQuarter({
+      serviceDates: ['2026-09-06'],
+      calendar: { '2026-09-06': { 'role-guitar': ['person-1'] } },
+    })
+    const person = makePerson({ id: 'person-1', name: 'Dana Smith', email: 'dana@example.com' })
+    const service = makeService({ date: '2026-09-06' })
+
+    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+
+    expect(JSON.stringify(result.rolesByEmailLower)).not.toContain('Dana Smith')
+    expect(JSON.stringify(result.rolesByEmailLower)).not.toContain('person-1')
+  })
 })
