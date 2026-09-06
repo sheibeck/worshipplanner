@@ -25,7 +25,9 @@ file-storage backlog (999.13 / SEED-003); step 1 (song attachments) shipped as v
 - **"My Schedule" (volunteer home)** — the volunteer-facing landing after sign-in, available to **anyone
   assigned to any service** (keyed off roster assignment, not role). A read-and-go self-service page listing
   every service the volunteer is actually assigned to (roster-email → assignment match), soonest first,
-  grouped **This week / Later this month** (plus past services). Each service card shows the date, name,
+  grouped **This week / Later this month** (plus past services). **Only Planned (locked, non-Draft) services
+  appear** — a service still being drafted by the planner is never shown to volunteers (same not-Draft gate
+  "Run the Service" uses). Each service card shows the date, name,
   time · venue, a "Next up" badge, the volunteer's **role chips**, song/chart/track counts, a **readiness**
   indicator (all ready / N songs missing media / waiting on charts), a countdown + call time, and a
   **Rehearse →** CTA that opens that service's standalone Rehearse screen. Includes a "check a different
@@ -49,6 +51,8 @@ file-storage backlog (999.13 / SEED-003); step 1 (song attachments) shipped as v
   planner's service editor (owner decision 2026-09-05). The volunteer surface (My Schedule + Rehearse) is
   fully separate from the planner surface (the service editor); a planner who also plays reaches rehearsal
   the same way, via My Schedule.
+- **My Schedule shows only Planned (locked) services** — draft/in-progress services are excluded from the
+  volunteer view (owner decision 2026-09-05), reusing the app's existing not-Draft/lock gate.
 - **Playback extras INCLUDED** — whole-track speed + loop (cheap on the native `<audio>` element; present in
   the owner's design). Not the "loop-a-section / server-side transposition" SEED-003 warned against.
 - **Cost guardrails DEFERRED** (owner decision) — per-org storage quota + egress/budget alerting go to the
