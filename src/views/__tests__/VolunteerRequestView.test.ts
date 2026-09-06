@@ -118,6 +118,31 @@ describe('VolunteerRequestView', () => {
     expect(wrapper.text()).toContain("Grace Church's team")
   })
 
+  it('"Use a different email" returns from the confirmation to the form with the typed email preserved', async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ orgId: 'org-A', name: 'Grace Church' }),
+    })
+    mockCallable.mockResolvedValueOnce({ data: { message: 'anything' } })
+    const wrapper = mount(VolunteerRequestView)
+    await flushPromises()
+
+    await wrapper.find('input#volunteer-request-email').setValue('typo@example.com')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Check your email')
+
+    await wrapper.find('[data-testid="volunteer-request-different-email"]').trigger('click')
+    await flushPromises()
+
+    // Back on the form, ready to correct the address — not stranded on the
+    // confirmation. The previously typed value is preserved for easy editing.
+    const input = wrapper.find('input#volunteer-request-email')
+    expect(input.exists()).toBe(true)
+    expect((input.element as HTMLInputElement).value).toBe('typo@example.com')
+    expect(wrapper.text()).not.toContain('Check your email')
+  })
+
   it('renders the identical confirmation regardless of the resolved message value (no branching on response, R395)', async () => {
     mockGetDoc.mockResolvedValueOnce({
       exists: () => true,

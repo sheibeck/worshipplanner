@@ -46,6 +46,18 @@
           <p class="text-xs text-gray-500">
             Didn't get it? Check your spam folder, or try again in a few minutes.
           </p>
+          <!-- Recovery: a mistyped email lands the volunteer here with no way
+               back. Returning to the form (email preserved so a typo is easy to
+               fix) leaks nothing — the confirmation above is enumeration-safe
+               regardless (R395). -->
+          <button
+            type="button"
+            data-testid="volunteer-request-different-email"
+            class="text-sm text-indigo-400 hover:text-indigo-300"
+            @click="submitted = false"
+          >
+            Use a different email
+          </button>
         </div>
 
         <!-- Email request form -->

@@ -147,6 +147,47 @@ describe('useVolunteerAuthStore', () => {
     })
   })
 
+  describe('completeSignIn — expired/invalid link clears the re-entry prompt (R399)', () => {
+    it('drops needsEmailReentry on auth/expired-action-code so the error state (Request a new link) can render', async () => {
+      vi.mocked(isSignInWithEmailLink).mockReturnValue(true)
+      const { useVolunteerAuthStore } = await import('../volunteerAuth')
+      const store = useVolunteerAuthStore()
+
+      // 1) cross-device first hit — no stored email → re-entry prompt shows.
+      await store.completeSignIn('https://example.com/volunteer/verify?apiKey=x')
+      expect(store.needsEmailReentry).toBe(true)
+
+      // 2) volunteer re-enters their email, but the link is expired. A dead
+      //    link can't be fixed by re-entry, so the prompt must drop and the
+      //    error branch (which offers "Request a new link") takes over.
+      vi.mocked(signInWithEmailLink).mockRejectedValue({ code: 'auth/expired-action-code' })
+      const result = await store.completeSignIn(
+        'https://example.com/volunteer/verify?apiKey=x',
+        'dana@example.com',
+      )
+
+      expect(result).toBe(false)
+      expect(store.needsEmailReentry).toBe(false)
+      expect(store.errorMessage).toMatch(/invalid or has expired/i)
+    })
+
+    it('KEEPS needsEmailReentry on a non-link error (operation-not-allowed) so the same link can be retried', async () => {
+      vi.mocked(isSignInWithEmailLink).mockReturnValue(true)
+      const { useVolunteerAuthStore } = await import('../volunteerAuth')
+      const store = useVolunteerAuthStore()
+
+      await store.completeSignIn('https://example.com/volunteer/verify?apiKey=x')
+      expect(store.needsEmailReentry).toBe(true)
+
+      vi.mocked(signInWithEmailLink).mockRejectedValue({ code: 'auth/operation-not-allowed' })
+      await store.completeSignIn('https://example.com/volunteer/verify?apiKey=x', 'dana@example.com')
+
+      // Not a dead link — the re-entry affordance stays so a retry is possible
+      // once the owner enables the provider.
+      expect(store.needsEmailReentry).toBe(true)
+    })
+  })
+
   describe('signOut', () => {
     it('delegates to the auth store logout() rather than forking its own sign-out', async () => {
       const { useVolunteerAuthStore } = await import('../volunteerAuth')

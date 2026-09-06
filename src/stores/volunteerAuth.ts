@@ -76,6 +76,17 @@ export const useVolunteerAuthStore = defineStore('volunteerAuth', () => {
       // The stored email is deliberately left in place on failure (e.g.
       // auth/operation-not-allowed while the owner enables the provider) so
       // the volunteer can retry the same link without re-entering anything.
+      const code = (err as { code?: string } | undefined)?.code
+      // A dead link (invalid/expired) can NEVER be fixed by re-entering the
+      // email — so drop the re-entry prompt and fall through to the error
+      // state, which offers "Request a new link" (R399). Without this, a
+      // cross-device / re-entered-email sign-in whose link is expired re-shows
+      // the re-entry FORM (whose only error slot has no recovery button),
+      // stranding the volunteer. Other errors keep the re-entry affordance so
+      // the same link can be retried once the underlying condition clears.
+      if (code === 'auth/invalid-action-code' || code === 'auth/expired-action-code') {
+        needsEmailReentry.value = false
+      }
       errorMessage.value = mapCompletionError(err)
       return false
     }
