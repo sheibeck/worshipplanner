@@ -65,7 +65,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Volunteer Service View (Standalone, read-only, per service)
 
-- [ ] **R384**: Opening a service from My Schedule opens a **standalone, read-only volunteer service view** —
+- [x] **R384**: Opening a service from My Schedule opens a **standalone, read-only volunteer service view** —
   **not** the planner's `ServiceEditorView` (a volunteer never sees the editing UI, drafts, slide editing, or
   messaging). It carries the views a serving volunteer needs as tabs — **Rehearse** (default) · **Order of
   Service** · **Stage Layout** — because tech-team members are volunteers too; it is composed from the
@@ -152,7 +152,7 @@ Populated during roadmap creation.
 | R381 | Phase 126 | Complete |
 | R382 | Phase 126 | Complete |
 | R383 | Phase 126 | Complete |
-| R384 | Phase 127 | Pending |
+| R384 | Phase 127 | Complete |
 | R385 | Phase 127 | Complete |
 | R386 | Phase 127 | Complete |
 | R387 | Phase 127 | Complete |

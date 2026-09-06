@@ -735,7 +735,7 @@ or from the planner's service editor)
   5. On a phone, PDFs open/download reliably (link-first with an inline `<iframe>` viewer as a desktop
      enhancement) and audio plays via native `<audio>` — across both My Schedule and this view (R391).
 
-**Plans**: 5/6 plans executed
+**Plans**: 6/6 plans executed
 
 Plans:
 
@@ -744,7 +744,7 @@ Plans:
 - [x] 127-03-PLAN.md — PDF reader (native iframe desktop / link-first mobile) + single persistent native audio player (speed/loop/seek) (R387/R388/R389/R391)
 - [x] 127-04-PLAN.md — Read-only Order of Service (re-themed ShareView anatomy) + Stage Layout (embedded StageLayoutView) tabs (R392/R393)
 - [x] 127-05-PLAN.md — useVolunteerServiceDoc composable: orgId-from-store resolution + live get-arm re-fetch + 4-state machine (R384)
-- [ ] 127-06-PLAN.md — VolunteerServiceView tri-tab shell (desktop 3-column + mobile drill-down) + route swap + build gate (R384/R391)
+- [x] 127-06-PLAN.md — VolunteerServiceView tri-tab shell (desktop 3-column + mobile drill-down) + route swap + build gate (R384/R391)
 
 **UI hint**: yes
 
