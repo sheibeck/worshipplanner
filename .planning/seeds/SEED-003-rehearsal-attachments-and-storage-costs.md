@@ -1,7 +1,7 @@
 ---
 id: SEED-003
 title: Song rehearsal attachments + public/authenticated Rehearse mode (with storage & user cost model)
-status: deferred
+status: partially-delivered  # Feature 1 (song attachments) SHIPPED in v2.11 (2026-09-05); Feature 2 (Rehearse mode) remains
 planted_during: v2.7 (Rehearsal, Stage Plans & Presentation Polish)
 planted_on: 2026-09-01
 trigger_when: >
@@ -11,6 +11,19 @@ trigger_when: >
 ---
 
 # SEED-003: Song Rehearsal Attachments + Rehearse Mode (deferred from v2.7)
+
+> **UPDATE 2026-09-05 — Feature 1 (Song attachments) SHIPPED as milestone v2.11** (Phases 121-124,
+> R361-R373; deployed to production). Editors now attach/manage PDF + MP3 files (≤50 MB) + external
+> YouTube/Drive/Dropbox links on a Song, with a permanent org-scoped Storage prefix outside `media/`
+> (retention-exempt), an editor-only `storage.rules` gate, in-app PDF preview + MP3 player, download, and
+> remove. See `.planning/milestones/v2.11-*`. **Feature 2 (Rehearse mode)** — volunteers play/view a
+> song's attachments inside the shared (public or authenticated) service — is what REMAINS of this seed,
+> and is the recommended NEXT milestone. The v2.11 build validated the architecture below (download-token
+> URLs, org-scoped non-`media/` path, no cross-service `firestore.exists()`); the **open guardrails still
+> owed for Rehearse** are the per-org storage quota + egress monitoring and the public-vs-authenticated
+> read decision. Also outstanding: confirm Storage-bucket CORS so the download Save-dialog works in prod
+> (v2.11 falls back to a new tab if CORS blocks the fetch).
+
 
 Two features were **researched during v2.7 then deferred by the owner** ("Let's defer the
 storage/rehearsal for now", 2026-08-31) to their own future milestone, because together they are
