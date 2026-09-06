@@ -30,6 +30,7 @@ import { buildSlotsFromTemplate, buildSuggestedTemplateEntries, orderSlotsBySect
 import { stripUndefined } from '@/utils/stripUndefined'
 import { clampPct } from '@/utils/stageLayout'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
+import { buildRehearseAccess } from '@/utils/rehearseAccess'
 import {
   computeLastUsedDate,
   serviceDateToMillis,
@@ -585,6 +586,32 @@ export const useServiceStore = defineStore('services', () => {
           )
         }
       }
+
+      // R377 — write the rehearseAccess projection now the service is Planned.
+      // A failure here must never roll back the already-succeeded status
+      // transition above; it fails closed (volunteers simply can't read yet).
+      try {
+        const rosterStore = useRosterStore()
+        const quartersStore = useQuartersStore()
+        const songStore = useSongStore()
+        const rehearseAccess = buildRehearseAccess(
+          { ...service, status: 'planned' },
+          orgId.value,
+          quartersStore.quarters,
+          rosterStore.roles,
+          rosterStore.people,
+          songStore.songs,
+        )
+        await setDoc(doc(db, 'organizations', orgId.value, 'rehearseAccess', id), {
+          ...rehearseAccess,
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.error(
+          `markAsPlanned: rehearseAccess projection write failed for service ${id} — the status transition already succeeded`,
+          err,
+        )
+      }
     }
   }
 
@@ -607,6 +634,15 @@ export const useServiceStore = defineStore('services', () => {
       status: 'draft',
       updatedAt: serverTimestamp(),
     })
+
+    // R377 (Pitfall 3) — revoke the rehearseAccess projection now the service is
+    // back in Draft; belt-and-suspenders alongside the rule's live
+    // parentIsPlanned() re-check, which already denies this read regardless.
+    try {
+      await deleteDoc(doc(db, 'organizations', orgId.value, 'rehearseAccess', id))
+    } catch (err) {
+      console.error(`reopenService: rehearseAccess revoke failed for service ${id} — continuing`, err)
+    }
 
     // See ADR-0161 (docs/adr/0161-those-songs-fall-back-to-their-remaining-locked-max-or-null.md)
     if (songIds.length > 0) {
@@ -667,6 +703,16 @@ export const useServiceStore = defineStore('services', () => {
       if (linkSnap.exists()) await deleteDoc(linkRef)
     } catch (err) {
       console.error(`deleteService: failed to revoke serviceShareLinks/${id} — continuing`, err)
+    }
+
+    // 2b. rehearseAccess/{id} (R377) — same existence-guard as serviceShareLinks
+    // above, so a never-locked service's absent doc is a no-op, not a denied delete.
+    try {
+      const rehearseRef = doc(db, 'organizations', orgId.value, 'rehearseAccess', id)
+      const rehearseSnap = await getDoc(rehearseRef)
+      if (rehearseSnap.exists()) await deleteDoc(rehearseRef)
+    } catch (err) {
+      console.error(`deleteService: failed to revoke rehearseAccess/${id} — continuing`, err)
     }
 
     // 3. serviceShares/{slug}__service-{date} — needs the org's slug plus

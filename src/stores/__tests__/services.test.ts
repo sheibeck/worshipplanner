@@ -1991,6 +1991,9 @@ describe('useServiceStore', () => {
       consoleErrorSpy.mockRestore()
     })
 
+    // R377 (Phase 125-02): markAsPlanned now legitimately calls setDoc for the
+    // rehearseAccess projection — a DIFFERENT write than the public share
+    // payload this test guards. Scope the assertion to shareTokens paths only.
     it('status-only transitions (markAsPlanned, reopenService) do NOT refresh the share payload', async () => {
       const { setDoc } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
@@ -1998,12 +2001,15 @@ describe('useServiceStore', () => {
       store.subscribe('org-1')
       triggerSnapshot([makeService({ status: 'draft' })])
 
+      const sharePayloadCalls = () =>
+        vi.mocked(setDoc).mock.calls.filter((call) => (call[0] as { path?: string }).path?.startsWith('shareTokens'))
+
       await store.markAsPlanned('service-1')
-      expect(setDoc).not.toHaveBeenCalled()
+      expect(sharePayloadCalls()).toHaveLength(0)
 
       triggerSnapshot([makeService({ status: 'planned' })])
       await store.reopenService('service-1')
-      expect(setDoc).not.toHaveBeenCalled()
+      expect(sharePayloadCalls()).toHaveLength(0)
     })
   })
 
