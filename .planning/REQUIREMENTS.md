@@ -91,11 +91,11 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [x] **R390**: External media links (YouTube / Google Drive / Dropbox) attached to a song in v2.11 are
   openable from the Rehearse tab, opening in a new tab (no in-app embedding required).
 
-- [ ] **R392**: The volunteer service view has a read-only **Order of Service** tab showing the service's
+- [x] **R392**: The volunteer service view has a read-only **Order of Service** tab showing the service's
   running order (reusing the existing read-only order-of-service render), so tech and all volunteers can see
   what happens when.
 
-- [ ] **R393**: The volunteer service view has a read-only **Stage Layout** tab showing the v2.7 stage
+- [x] **R393**: The volunteer service view has a read-only **Stage Layout** tab showing the v2.7 stage
   diagram (instruments/mics + person Name-Role assignments), which tech-team volunteers need for setup
   (reusing the existing read-only/print stage render).
 
@@ -160,8 +160,8 @@ Populated during roadmap creation.
 | R389 | Phase 127 | Complete |
 | R390 | Phase 127 | Complete |
 | R391 | Phase 127 | Complete |
-| R392 | Phase 127 | Pending |
-| R393 | Phase 127 | Pending |
+| R392 | Phase 127 | Complete |
+| R393 | Phase 127 | Complete |
 
 **Coverage:**
 

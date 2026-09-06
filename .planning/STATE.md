@@ -5,15 +5,15 @@ milestone_name: Rehearse Mode (Phases 125-127, in planning)
 current_phase: 127
 current_phase_name: Volunteer Service View — Rehearse, Order of Service & Stage Layout
 status: executing
-stopped_at: Completed 127-03-PLAN.md
-last_updated: "2026-09-06T10:47:49.136Z"
+stopped_at: Completed 127-04-PLAN.md
+last_updated: "2026-09-06T11:02:10.552Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 127 execution started
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
   percent: 67
 ---
 
@@ -1323,7 +1323,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 127 (Volunteer Service View — Rehearse, Order of Service & Stage Layout) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-09-06 — Phase 127 execution started
 
@@ -3391,6 +3391,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 127 P01 | 45min | 2 tasks | 6 files |
 | Phase 127 P02 | 16min | 2 tasks | 6 files |
 | Phase 127 P03 | 22min | 2 tasks | 4 files |
+| Phase 127 P04 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3961,6 +3962,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Extended RehearseAttachment with an optional linkSource field (non-PII) so external links in the Rehearse tab render their correct source label (R390) — Plan 01's projection alone couldn't satisfy this.
 - [Phase ?]: RehearseSongList/RehearseSongDetail are pure presentational components (props in, events out); Play emits rather than mounting <audio>, keeping playback centralized in the Plan 03 bottom bar.
 - [Phase ?]: Rehearse audio player carries speed/loop state across track changes and does not autoplay on track select — no acceptance criterion required either behavior
+- [Phase ?]: 127-04: Did not factor a shared theme-aware row-template between VolunteerOrderOfService.vue and ShareView.vue (optional per plan) — copied ShareView's branching field-for-field, leaving ShareView.vue untouched.
+- [Phase ?]: 127-04: VolunteerStageLayoutTab takes a flat elements?: PublicStageMarker[] prop rather than the wrapped stageLayout?:{elements} shape, keeping the component's contract simple and independently testable.
 
 ### Roadmap Evolution
 
@@ -4290,8 +4293,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T10:47:49.060Z
-Stopped at: Completed 127-03-PLAN.md
+Last session: 2026-09-06T11:02:10.484Z
+Stopped at: Completed 127-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
