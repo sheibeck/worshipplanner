@@ -93,6 +93,26 @@ function mountSidebar() {
   return mount(AppSidebar, { props: { sidebarOpen: true } })
 }
 
+describe('AppSidebar — My Schedule nav entry (always visible, no gating)', () => {
+  it('shows the My Schedule link pointing at /my-schedule for a non-editor viewer', () => {
+    mockIsEditor = false
+    mockOrgId = 'org-1'
+    const wrapper = mountSidebar()
+
+    const link = wrapper.find('[to="/my-schedule"]')
+    expect(link.exists()).toBe(true)
+    expect(link.text()).toContain('My Schedule')
+  })
+
+  it('still shows the My Schedule link for an editor and when orgId is null', () => {
+    mockIsEditor = true
+    mockOrgId = null
+    const wrapper = mountSidebar()
+
+    expect(wrapper.find('[to="/my-schedule"]').exists()).toBe(true)
+  })
+})
+
 describe('AppSidebar — Monitor Setup nav entry orgId gate (R267/R275, Phase 92)', () => {
   it('shows the Monitor Setup link to a non-editor org member (isEditor false, orgId set), while editor-only items stay absent', () => {
     mockIsEditor = false

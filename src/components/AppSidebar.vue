@@ -285,6 +285,19 @@ async function handleSwitch(targetOrgId: string): Promise<void> {
 const navItems = computed(() => {
   const items = []
 
+  // My Schedule — always visible to any authenticated org member (editor or
+  // viewer) who is signed in, regardless of whether they currently have any
+  // assignments; the page itself renders the empty state. Deliberately
+  // ungated (unlike every other item here) since a member who serves has no
+  // other in-app entry point to their own /my-schedule.
+  items.push({
+    label: 'My Schedule',
+    to: '/my-schedule',
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>`,
+  })
+
   if (authStore.isEditor) {
     items.push({
       label: 'Dashboard',
