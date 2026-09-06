@@ -2691,3 +2691,113 @@ describe('services/{id}/lockSnapshots nested collection (R132)', () => {
     )
   })
 })
+
+// R377 (Phase 125, security core): a magic-link volunteer is authenticated but holds
+// NO membership doc and NO custom claim — the ONLY grant is an email-claim match
+// against a frozen `rehearseAccess` projection, re-checked live against the parent
+// service's CURRENT status (not the projection's own snapshot) on every read. Until
+// firestore.rules gains the `rehearseAccess` block (Plan 01 Task 2), the ALLOW cases
+// below are expected to be RED (TDD) — only the DENY cases pass against the
+// pre-Task-2 rules file.
+describe('Volunteer magic-link scoped read access — R377', () => {
+  async function seedRehearseFixtures() {
+    // orgA/svc1: Planned (locked), assigned to dana@example.com — the volunteer's
+    // one legitimate read.
+    await seedDoc('organizations/orgA/services/svc1', { status: 'planned' })
+    await seedDoc('organizations/orgA/rehearseAccess/svc1', {
+      serviceId: 'svc1',
+      orgId: 'orgA',
+      assignedEmailsLower: ['dana@example.com'],
+    })
+
+    // orgA/svc2: still Draft — projection exists (e.g. authored speculatively) but
+    // the parent has never been locked.
+    await seedDoc('organizations/orgA/services/svc2', { status: 'draft' })
+    await seedDoc('organizations/orgA/rehearseAccess/svc2', {
+      serviceId: 'svc2',
+      orgId: 'orgA',
+      assignedEmailsLower: ['dana@example.com'],
+    })
+
+    // orgA/svc3: WAS Planned (a rehearseAccess projection was written at lock time)
+    // but has since been Reopened back to draft (firestore.rules R037 transition).
+    // The projection doc is untouched/stale — proves the rule re-checks the LIVE
+    // parent status, not the projection's own presence (Pitfall 3).
+    await seedDoc('organizations/orgA/services/svc3', { status: 'draft' })
+    await seedDoc('organizations/orgA/rehearseAccess/svc3', {
+      serviceId: 'svc3',
+      orgId: 'orgA',
+      assignedEmailsLower: ['dana@example.com'],
+    })
+
+    // orgB/svcB: Planned in a DIFFERENT org, assigned to the SAME email — proves
+    // the grant is scoped by path (orgId), never by email alone.
+    await seedDoc('organizations/orgB/services/svcB', { status: 'planned' })
+    await seedDoc('organizations/orgB/rehearseAccess/svcB', {
+      serviceId: 'svcB',
+      orgId: 'orgB',
+      assignedEmailsLower: ['dana@example.com'],
+    })
+  }
+
+  it('(1) ALLOW — an assigned volunteer reads the rehearseAccess projection of a Planned service in their own org', async () => {
+    await seedRehearseFixtures()
+    // Mixed-case token email vs. lowercased roster field — proves the required
+    // .lower() normalization on both sides (Pitfall 5).
+    const db = testEnv.authenticatedContext('volUid', { email: 'Dana@Example.com' }).firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc1')))
+  })
+
+  it('(2) DENY — the same volunteer cannot read another org\'s rehearseAccess projection (cross-org)', async () => {
+    await seedRehearseFixtures()
+    const db = testEnv.authenticatedContext('volUid', { email: 'Dana@Example.com' }).firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgB', 'rehearseAccess', 'svcB')))
+  })
+
+  it('(3) DENY — a volunteer cannot read the projection of a service still in Draft', async () => {
+    await seedRehearseFixtures()
+    const db = testEnv.authenticatedContext('volUid', { email: 'Dana@Example.com' }).firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc2')))
+  })
+
+  it('(4) DENY — a volunteer cannot read a projection whose parent service was Reopened to draft (live re-check, not projection staleness)', async () => {
+    await seedRehearseFixtures()
+    const db = testEnv.authenticatedContext('volUid', { email: 'Dana@Example.com' }).firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc3')))
+  })
+
+  it('(5) DENY — a volunteer whose email is NOT in assignedEmailsLower cannot read the projection', async () => {
+    await seedRehearseFixtures()
+    const db = testEnv.authenticatedContext('otherVolUid', { email: 'not-assigned@example.com' }).firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc1')))
+  })
+
+  it('(6) DENY — a volunteer cannot bypass the projection by reading organizations/{orgId}/services/{id} directly', async () => {
+    await seedRehearseFixtures()
+    const db = testEnv.authenticatedContext('volUid', { email: 'Dana@Example.com' }).firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1')))
+  })
+
+  it('(7) DENY — a volunteer cannot write to rehearseAccess', async () => {
+    await seedRehearseFixtures()
+    const db = testEnv.authenticatedContext('volUid', { email: 'Dana@Example.com' }).firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc1'), {
+        assignedEmailsLower: ['dana@example.com', 'attacker@example.com'],
+      }),
+    )
+  })
+
+  it('(8) DENY — a volunteer cannot run an unfiltered list() over rehearseAccess (enumeration)', async () => {
+    await seedRehearseFixtures()
+    const db = testEnv.authenticatedContext('volUid', { email: 'Dana@Example.com' }).firestore()
+    await assertFails(getDocs(collection(db, 'organizations', 'orgA', 'rehearseAccess')))
+  })
+
+  it('(9) ALLOW (positive control) — an org member reads rehearseAccess via ordinary membership, no email-claim path needed', async () => {
+    await seedRehearseFixtures()
+    await seedMembershipDoc('orgA', 'memberUid', 'member')
+    const db = testEnv.authenticatedContext('memberUid').firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc1')))
+  })
+})
