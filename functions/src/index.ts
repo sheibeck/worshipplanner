@@ -19,7 +19,7 @@ import { syncSuperAdminClaim, setSuperAdminClaim } from "./superAdminClaims";
 import { onboardOrganization, assignOrgAdmin, listOrganizations, setOrgActive, setOrgAiEnabled, setOrgBibleEnabled } from "./orgProvisioning";
 import { deleteOrganization } from "./orgDeletion";
 import { sendInviteOnboardingEmail } from "./inviteOnboarding";
-import { mintAndSendVolunteerLink } from "./volunteerLink";
+import { mintAndSendVolunteerLink, mintVolunteerLink } from "./volunteerLink";
 import { Resend } from "resend";
 import { renderMessageTokens } from "./messageTokens";
 import { verifySvixSignature } from "./webhookSignature";
@@ -2629,6 +2629,97 @@ export async function requestVolunteerLinkHandler(
 export const requestVolunteerLink = onCall(
   { secrets: [RESEND_API_KEY] },
   requestVolunteerLinkHandler,
+);
+
+// adminVolunteerLink (Phase 129: R400-R402) -- AUTHENTICATED sibling of
+// requestVolunteerLink above. An editor/admin can (re)deliver a rostered
+// volunteer's sign-in link, either emailed (mode:'email') or returned raw for
+// clipboard copy (mode:'copy'). Deliberately does NOT copy the public
+// callable's enumeration-safe generic response / rate limiters / timing pad
+// -- the caller is a trusted, already-authenticated editor who can already
+// see the full roster, so honest errors are strictly more useful here.
+// Accepted tradeoff (T-129-03, not mitigated by design): an editor minting a
+// volunteer's account-level link can effectively sign in as that (read-only)
+// volunteer -- see phase threat model.
+
+export interface AdminVolunteerLinkRequest {
+  orgId: string;
+  email: string;
+  mode: "email" | "copy";
+}
+
+export interface AdminVolunteerLinkResponse {
+  sent?: true;
+  link?: string;
+}
+
+/**
+ * The adminVolunteerLinkHandler body. See .planning/codebase/ARCHITECTURE.md
+ * (Backend Behavioral Notes (R318) § functions/src/index.ts)
+ */
+export async function adminVolunteerLinkHandler(
+  request: CallableRequest<AdminVolunteerLinkRequest>,
+): Promise<AdminVolunteerLinkResponse> {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const { orgId, email, mode } = request.data ?? ({} as AdminVolunteerLinkRequest);
+  if (typeof orgId !== "string" || typeof email !== "string" || !orgId || !email) {
+    throw new HttpsError("invalid-argument", "orgId and email are required.");
+  }
+  if (mode !== "email" && mode !== "copy") {
+    throw new HttpsError("invalid-argument", 'mode must be "email" or "copy".');
+  }
+
+  const db = getFirestore();
+  const orgRef = db.collection("organizations").doc(orgId);
+
+  // Independent editor-tier re-check — never trust the client-declared orgId
+  // (mirrors queueServiceMessageHandler above).
+  const memberDoc = await orgRef.collection("members").doc(request.auth.uid).get();
+  if (!memberDoc.exists) {
+    throw new HttpsError("permission-denied", "You are not a member of this organization.");
+  }
+  const role = (memberDoc.data() as { role?: string } | undefined)?.role;
+  if (role !== "editor" && role !== "admin") {
+    throw new HttpsError("permission-denied", "You must be an editor to send sign-in links.");
+  }
+
+  // Roster gate -- full-fetch + in-memory case-insensitive match, same as
+  // requestVolunteerLinkHandler (Person.email is un-normalized free text, so
+  // a `.where('email','==',...)` query would miss case/whitespace variants).
+  // Unlike the public path, a miss is an HONEST error, not a generic response
+  // -- the caller is a trusted editor, not an anonymous world-callable actor.
+  const emailLower = email.trim().toLowerCase();
+  const [orgSnap, peopleSnap] = await Promise.all([orgRef.get(), orgRef.collection("people").get()]);
+  const orgData = orgSnap.data() as { name?: string | null; slug?: string | null } | undefined;
+  const orgName = fromDisplayName(orgData?.name);
+  const slug = orgData?.slug ?? "";
+
+  const isRosterMatch = peopleSnap.docs.some((d) => {
+    const person = d.data() as { email?: string } | undefined;
+    return (person?.email ?? "").trim().toLowerCase() === emailLower;
+  });
+  if (!isRosterMatch) {
+    throw new HttpsError("failed-precondition", "This person is not on the roster with that email.");
+  }
+
+  if (mode === "email") {
+    await mintAndSendVolunteerLink({ db, to: emailLower, orgName, slug });
+    return { sent: true };
+  }
+  const link = await mintVolunteerLink({ to: emailLower, slug });
+  return { link };
+}
+
+// The ONLY new function this phase binds RESEND_API_KEY to (R131 "smallest
+// key-holding surface") -- no other new function declares it. AUTHENTICATED
+// by design (contrast requestVolunteerLink above): the members/{uid}
+// role-and-roster gate above IS the security control.
+export const adminVolunteerLink = onCall(
+  { secrets: [RESEND_API_KEY] },
+  adminVolunteerLinkHandler,
 );
 
 // syncOrgMembershipClaim (R074/R075: the claim storage.rules reads)
