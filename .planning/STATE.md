@@ -5,16 +5,16 @@ milestone_name: Rehearse Mode (Phases 125-127, in planning)
 current_phase: 127
 current_phase_name: Volunteer Service View — Rehearse, Order of Service & Stage Layout
 status: executing
-stopped_at: Completed 127-01-PLAN.md
-last_updated: "2026-09-06T10:11:51.268Z"
+stopped_at: Completed 127-02-PLAN.md
+last_updated: "2026-09-06T10:32:13.613Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 127 execution started
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 14
-  completed_plans: 9
-  percent: 64
+  completed_plans: 10
+  percent: 67
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1323,7 +1323,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 127 (Volunteer Service View — Rehearse, Order of Service & Stage Layout) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-09-06 — Phase 127 execution started
 
@@ -3389,6 +3389,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 126 P03 | 25min | 2 tasks | 5 files |
 | Phase 126 P04 | 30min | 3 tasks | 6 files |
 | Phase 127 P01 | 45min | 2 tasks | 6 files |
+| Phase 127 P02 | 16min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -3956,6 +3957,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 126-04: /my-schedule replaces 'volunteer-home' as the post-sign-in landing (VolunteerLinkCompleteView redirect + router /login bounce-back); /volunteer remains registered for the check-a-different-email flow
 - [Phase ?]: 127-01: Extracted buildServiceSnapshot's per-kind slot + stage-marker PII allowlists into a shared, store-free src/utils/serviceProjection.ts so buildRehearseAccess (Phase 125) reuses the EXACT same allowlist rather than a second hand-rolled one
 - [Phase ?]: 127-01: orderOfService/roleAssignments/stageLayout/bpm requirements (R385/R386/R392/R393) were left unchecked in REQUIREMENTS.md — this plan only ships the data foundation; the UI-visible delivery lands in 127-02/127-04
+- [Phase ?]: Extended RehearseAttachment with an optional linkSource field (non-PII) so external links in the Rehearse tab render their correct source label (R390) — Plan 01's projection alone couldn't satisfy this.
+- [Phase ?]: RehearseSongList/RehearseSongDetail are pure presentational components (props in, events out); Play emits rather than mounting <audio>, keeping playback centralized in the Plan 03 bottom bar.
 
 ### Roadmap Evolution
 
@@ -4285,8 +4288,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T10:11:51.204Z
-Stopped at: Completed 127-01-PLAN.md
+Last session: 2026-09-06T10:32:13.547Z
+Stopped at: Completed 127-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -72,10 +72,10 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   existing read-only renderers (ShareView snapshot + the v2.7 read-only order/stage renders), not by forking
   the editor.
 
-- [ ] **R385**: The **Rehearse** tab lists the songs in that service (with each song's key, PDF count, MP3
+- [x] **R385**: The **Rehearse** tab lists the songs in that service (with each song's key, PDF count, MP3
   count, and a now-playing indicator) and lets the volunteer select a song to see its media.
 
-- [ ] **R386**: A selected song's detail lists its **Sheet music & chords** (PDF attachments) with per-file
+- [x] **R386**: A selected song's detail lists its **Sheet music & chords** (PDF attachments) with per-file
   **Print** and **Download**, its **Recordings** (MP3 attachments), and an optional per-song note — all
   sourced from the v2.11 song attachments (nothing is uploaded on this screen).
 
@@ -88,7 +88,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [ ] **R389**: The audio player supports whole-track **playback speed** (1× / 0.9× / 0.75× / 1.25×) and a
   whole-track **Loop** toggle.
 
-- [ ] **R390**: External media links (YouTube / Google Drive / Dropbox) attached to a song in v2.11 are
+- [x] **R390**: External media links (YouTube / Google Drive / Dropbox) attached to a song in v2.11 are
   openable from the Rehearse tab, opening in a new tab (no in-app embedding required).
 
 - [ ] **R392**: The volunteer service view has a read-only **Order of Service** tab showing the service's
@@ -153,12 +153,12 @@ Populated during roadmap creation.
 | R382 | Phase 126 | Complete |
 | R383 | Phase 126 | Complete |
 | R384 | Phase 127 | Pending |
-| R385 | Phase 127 | Pending |
-| R386 | Phase 127 | Pending |
+| R385 | Phase 127 | Complete |
+| R386 | Phase 127 | Complete |
 | R387 | Phase 127 | Pending |
 | R388 | Phase 127 | Pending |
 | R389 | Phase 127 | Pending |
-| R390 | Phase 127 | Pending |
+| R390 | Phase 127 | Complete |
 | R391 | Phase 127 | Pending |
 | R392 | Phase 127 | Pending |
 | R393 | Phase 127 | Pending |
