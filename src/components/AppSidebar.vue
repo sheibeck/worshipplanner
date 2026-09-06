@@ -29,6 +29,14 @@
       <p v-else class="text-xs text-amber-400 truncate">Super Admin · not in a church</p>
     </div>
 
+    <!-- Volunteer church-name label (R404, Phase 130) — a NEW sibling branch,
+         never restructuring the admin block above. Only ever renders when
+         authStore.orgName is falsy AND authStore.superAdminOutsideOwnChurch
+         is falsy (the admin v-if above already claims both those cases). -->
+    <div v-else-if="volunteerChurchLabel" data-testid="volunteer-church-label" class="px-5 py-2 border-b border-gray-800">
+      <p class="text-xs text-gray-500 truncate">{{ volunteerChurchLabel }}</p>
+    </div>
+
     <!-- Nav -->
     <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
       <template v-for="item in navItems" :key="item.to">
@@ -199,9 +207,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useMyScheduleStore } from '@/stores/mySchedule'
 import { useToasts } from '@/stores/toasts'
 
 const props = defineProps<{
@@ -219,6 +228,40 @@ const appVersion = __APP_VERSION__
 
 const authStore = useAuthStore()
 const toasts = useToasts()
+// Pinia singleton — the same instance MyScheduleView reads/writes, so the
+// sidebar label and the My Schedule filter never disagree (Phase 130, R404).
+const mySchedule = useMyScheduleStore()
+
+// Priority order (130-UI-SPEC.md Component Spec 2): the admin path
+// (authStore.orgName) always wins and this returns null in that case — the
+// v-else-if in the template never even evaluates it while the admin/super-
+// admin block above is showing, but this guard keeps the computed correct
+// standalone too.
+const volunteerChurchLabel = computed(() => {
+  if (authStore.orgName) return null
+  const churches = mySchedule.churches
+  if (churches.length === 0) return null
+  if (churches.length === 1) return churches[0]!.orgName || 'Your church'
+  if (mySchedule.selectedChurch) {
+    const match = churches.find((c) => c.orgId === mySchedule.selectedChurch)
+    return match?.orgName || 'Unnamed church'
+  }
+  // Doc discrepancy resolved in favor of the owner's decision (CONTEXT.md,
+  // 130-VALIDATION.md AppSidebar test row) over 130-UI-SPEC.md's Copywriting
+  // Contract, which lists "All churches" for this state.
+  return 'Multiple churches'
+})
+
+// Best-effort cold-render guard: a volunteer deep-linking to a route other
+// than /my-schedule before that view ever mounts would otherwise see an
+// empty sidebar label until they visit My Schedule. Idempotent (loadMySchedule
+// no-ops cleanly with no signed-in email) and admin sessions never trigger it.
+onMounted(() => {
+  if (authStore.orgName) return
+  if (mySchedule.isLoading) return
+  if (mySchedule.docs.length > 0) return
+  mySchedule.loadMySchedule()
+})
 
 // Phase 104 (R311) — the switcher only ever renders for a genuine multi-org
 // member who is NOT currently viewing another church via

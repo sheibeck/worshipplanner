@@ -75,6 +75,36 @@ vi.mock('@/stores/auth', () => ({
 // without a failing test. Using the real Pinia-backed store below lets the
 // "surfaces a failed switch..." test assert the toast's actual lifetime, not
 // just the call arguments.
+
+// Phase 130 (R404) — the volunteer church-name label reads from mySchedule.
+// Mock mirrors mySchedule.ts's own churches derivation (distinct orgId, first
+// occurrence, orgName carried as-is) so tests only ever set docs/selectedChurch.
+const mockLoadMySchedule = vi.fn()
+let mockMyScheduleDocs: { orgId: string; orgName?: string }[] = []
+let mockMyScheduleLoading = false
+let mockSelectedChurch: string | null = null
+vi.mock('@/stores/mySchedule', () => ({
+  useMyScheduleStore: () => ({
+    get docs() {
+      return mockMyScheduleDocs
+    },
+    get isLoading() {
+      return mockMyScheduleLoading
+    },
+    get selectedChurch() {
+      return mockSelectedChurch
+    },
+    get churches() {
+      const byOrgId = new Map<string, string | undefined>()
+      for (const d of mockMyScheduleDocs) {
+        if (!byOrgId.has(d.orgId)) byOrgId.set(d.orgId, d.orgName)
+      }
+      return [...byOrgId.entries()].map(([orgId, orgName]) => ({ orgId, orgName }))
+    },
+    loadMySchedule: mockLoadMySchedule,
+  }),
+}))
+
 beforeEach(() => {
   setActivePinia(createPinia())
   mockOrgId = 'org-1'
@@ -87,6 +117,10 @@ beforeEach(() => {
   mockLogout.mockClear()
   mockSelectOrg.mockClear()
   mockSelectOrg.mockImplementation(() => Promise.resolve())
+  mockMyScheduleDocs = []
+  mockMyScheduleLoading = false
+  mockSelectedChurch = null
+  mockLoadMySchedule.mockClear()
 })
 
 function mountSidebar() {
@@ -280,5 +314,73 @@ describe('AppSidebar — church switcher (R311/R312, Phase 104)', () => {
 
     await wrapper.find('[data-testid="church-switcher-panel"]').trigger('keydown', { key: 'Escape' })
     expect(wrapper.find('[data-testid="church-switcher-panel"]').exists()).toBe(false)
+  })
+})
+
+/**
+ * Phase 130 Plan 02 (R404). The volunteer church-name label — a NEW
+ * v-else-if sibling of the admin org-name block, sourced from mySchedule.
+ * The admin path must render byte-identically; the volunteer branch only
+ * ever shows when authStore.orgName is falsy.
+ */
+describe('AppSidebar — volunteer church-name label (R404, Phase 130)', () => {
+  it('renders the admin org-name path unchanged, never the volunteer branch, when authStore.orgName is set', () => {
+    mockOrgName = 'Test Church'
+    mockMyScheduleDocs = [{ orgId: 'org-9', orgName: 'Should Not Show' }]
+    const wrapper = mountSidebar()
+
+    expect(wrapper.text()).toContain('Test Church')
+    expect(wrapper.find('[data-testid="volunteer-church-label"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Should Not Show')
+  })
+
+  it('shows the single church name for a zero-membership volunteer', () => {
+    mockOrgName = null
+    mockMyScheduleDocs = [{ orgId: 'org-1', orgName: 'Grace Fellowship' }]
+    const wrapper = mountSidebar()
+
+    expect(wrapper.get('[data-testid="volunteer-church-label"]').text()).toBe('Grace Fellowship')
+  })
+
+  it('falls back to "Your church" when the single church has no orgName', () => {
+    mockOrgName = null
+    mockMyScheduleDocs = [{ orgId: 'org-1', orgName: undefined }]
+    const wrapper = mountSidebar()
+
+    expect(wrapper.get('[data-testid="volunteer-church-label"]').text()).toBe('Your church')
+  })
+
+  it('shows "Multiple churches" for a multi-church volunteer with no church selected', () => {
+    mockOrgName = null
+    mockMyScheduleDocs = [
+      { orgId: 'org-1', orgName: 'Grace Fellowship' },
+      { orgId: 'org-2', orgName: 'Hillside Chapel' },
+    ]
+    mockSelectedChurch = null
+    const wrapper = mountSidebar()
+
+    expect(wrapper.get('[data-testid="volunteer-church-label"]').text()).toBe('Multiple churches')
+  })
+
+  it('shows the selected church name for a multi-church volunteer with a specific church selected', () => {
+    mockOrgName = null
+    mockMyScheduleDocs = [
+      { orgId: 'org-1', orgName: 'Grace Fellowship' },
+      { orgId: 'org-2', orgName: 'Hillside Chapel' },
+    ]
+    mockSelectedChurch = 'org-2'
+    const wrapper = mountSidebar()
+
+    expect(wrapper.get('[data-testid="volunteer-church-label"]').text()).toBe('Hillside Chapel')
+  })
+
+  it('renders nothing in the org-name slot for a volunteer with zero rehearseAccess docs', () => {
+    mockOrgName = null
+    mockMyScheduleDocs = []
+    const wrapper = mountSidebar()
+
+    expect(wrapper.find('[data-testid="volunteer-church-label"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Multiple churches')
+    expect(wrapper.text()).not.toContain('Your church')
   })
 })
