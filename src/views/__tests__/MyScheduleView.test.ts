@@ -191,5 +191,40 @@ describe('MyScheduleView', () => {
       expect(wrapper.text()).toContain('This list is built from the roster')
       expect(wrapper.text()).toContain('Dana@Example.com')
     })
+
+    it('WR-03 (126-REVIEW): shows an explicit "no upcoming services" line when every assignment is past, instead of a bare greeting', () => {
+      mockScheduleState.docs = [makeDoc({ serviceId: 'svc-past', title: 'Old Service', serviceDate: '2026-08-01' })]
+      const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
+      expect(wrapper.text()).toContain('No upcoming services — see your past services below.')
+      // Past stays collapsed by default (170 above) — this line is the ONLY
+      // visible content difference, not an implicit expand.
+      expect(wrapper.find('[data-testid="schedule-card"]').exists()).toBe(false)
+    })
+  })
+
+  describe('WR-04 (126-REVIEW): user-menu dismissal', () => {
+    it('closes the menu when clicking outside it', async () => {
+      mockScheduleState.docs = [makeDoc()]
+      const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs }, attachTo: document.body })
+      await wrapper.get('[data-testid="user-chip"]').trigger('click')
+      expect(wrapper.find('[data-testid="user-menu"]').exists()).toBe(true)
+
+      // The outside-click overlay is the fixed inset-0 sibling rendered
+      // alongside the panel while open.
+      await wrapper.get('.fixed.inset-0').trigger('click')
+      expect(wrapper.find('[data-testid="user-menu"]').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('closes the menu on Escape', async () => {
+      mockScheduleState.docs = [makeDoc()]
+      const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs }, attachTo: document.body })
+      await wrapper.get('[data-testid="user-chip"]').trigger('click')
+      expect(wrapper.find('[data-testid="user-menu"]').exists()).toBe(true)
+
+      await wrapper.get('[data-testid="user-menu"]').trigger('keydown', { key: 'Escape' })
+      expect(wrapper.find('[data-testid="user-menu"]').exists()).toBe(false)
+      wrapper.unmount()
+    })
   })
 })

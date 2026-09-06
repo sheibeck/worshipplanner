@@ -11,6 +11,7 @@
 
       <div class="relative">
         <button
+          ref="userChipRef"
           type="button"
           data-testid="user-chip"
           aria-haspopup="menu"
@@ -30,11 +31,18 @@
           </svg>
         </button>
 
+        <!-- WR-04 (126-REVIEW): outside-click dismissal, mirroring
+             SlideActionMenu.vue's fixed-overlay convention (ADR-0110) rather
+             than a new document-level listener or a VueUse dependency. -->
+        <div v-if="menuOpen" class="fixed inset-0 z-10" @click="menuOpen = false" />
+
         <div
           v-if="menuOpen"
+          ref="userMenuRef"
           role="menu"
           data-testid="user-menu"
-          class="absolute right-0 mt-2 w-56 rounded-md border border-gray-800 bg-gray-900 shadow-lg py-1 z-10"
+          class="absolute right-0 mt-2 w-56 rounded-md border border-gray-800 bg-gray-900 shadow-lg py-1 z-20"
+          @keydown.esc="onMenuEscape"
         >
           <button
             role="menuitem"
@@ -197,7 +205,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVolunteerAuthStore } from '@/stores/volunteerAuth'
@@ -213,6 +221,8 @@ const mySchedule = useMyScheduleStore()
 const menuOpen = ref(false)
 const isSigningOut = ref(false)
 const showPast = ref(false)
+const userChipRef = ref<HTMLButtonElement | null>(null)
+const userMenuRef = ref<HTMLElement | null>(null)
 
 onMounted(() => {
   mySchedule.loadMySchedule()
@@ -266,12 +276,37 @@ const nextUpDoc = computed(() => {
   return mySchedule.docs.find((d) => d.serviceId === id) ?? null
 })
 
+// WR-03 (126-REVIEW): a volunteer whose only assignments are past services
+// used to see a bare greeting with nothing else visible (Past services stays
+// collapsed by default) — indistinguishable from a broken page. Surfacing an
+// explicit line here (rather than defaulting `showPast` to true) keeps the
+// "collapsed by default" contract the existing toggle test asserts on intact.
 const summaryLine = computed(() => {
   const n = totalUpcoming.value
-  if (n === 0 || !nextUpDoc.value) return ''
-  const countdown = countdownLabel(nextUpDoc.value.serviceDate).toLowerCase()
-  return `You're assigned to ${n} upcoming service${n === 1 ? '' : 's'} — next one is ${countdown}.`
+  if (n > 0 && nextUpDoc.value) {
+    const countdown = countdownLabel(nextUpDoc.value.serviceDate).toLowerCase()
+    return `You're assigned to ${n} upcoming service${n === 1 ? '' : 's'} — next one is ${countdown}.`
+  }
+  if (n === 0 && groups.value.past.length > 0) {
+    return 'No upcoming services — see your past services below.'
+  }
+  return ''
 })
+
+// WR-04 (126-REVIEW): mirrors SlideActionMenu.vue's watcher — Escape only
+// bubbles up to the panel's own @keydown.esc if focus is INSIDE the panel,
+// so opening the menu must move focus onto its first item (mouse-opened
+// menus otherwise leave focus on the trigger button, a panel sibling).
+watch(menuOpen, async (isOpen) => {
+  if (!isOpen) return
+  await nextTick()
+  userMenuRef.value?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+})
+
+function onMenuEscape(): void {
+  menuOpen.value = false
+  userChipRef.value?.focus()
+}
 
 function goToDifferentEmail(): void {
   menuOpen.value = false
