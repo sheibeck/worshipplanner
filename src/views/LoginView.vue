@@ -100,6 +100,21 @@
           <p class="text-xs text-gray-500 text-center mt-4">
             Invited by email? Open the link we sent to set your password — or reset it below.
           </p>
+
+          <!-- R398 (Phase 128) — secondary entry point for a volunteer with no
+               password, leading to the (now-public, R398/R399 blocker fix)
+               generic /volunteer landing, which carries the "find your
+               church" lookup. Deliberately below the primary sign-in CTAs,
+               styled as a plain text link so it never competes with them. -->
+          <p class="text-center mt-2">
+            <button
+              type="button"
+              @click="goToVolunteerLanding"
+              class="text-xs text-indigo-400 hover:text-indigo-300 hover:underline"
+            >
+              Are you a volunteer? Get your sign-in link
+            </button>
+          </p>
         </div>
 
         <!-- Forgot Password Form -->
@@ -243,6 +258,12 @@ async function handleEmailSignIn() {
     isLoading.value = false
     loadingMethod.value = null
   }
+}
+
+// R398 (Phase 128) — named-route navigation only (never a string-built
+// path), per 128-RESEARCH Pitfall 5.
+async function goToVolunteerLanding() {
+  await router.push({ name: 'volunteer-home' })
 }
 
 async function handleForgotPassword() {

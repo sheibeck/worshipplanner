@@ -95,4 +95,17 @@ describe('LoginView', () => {
       "Password reset isn't available yet — ask your administrator to enable email sign-in for this app.",
     )
   })
+
+  // R398 (Phase 128) — the "Are you a volunteer?" secondary entry point.
+  it('renders the "Are you a volunteer?" entry and navigates to the volunteer landing route by name', async () => {
+    const wrapper = mount(LoginView)
+    expect(wrapper.text()).toContain('Are you a volunteer? Get your sign-in link')
+
+    const buttons = wrapper.findAll('button')
+    const volunteerButton = buttons.find((b) => b.text() === 'Are you a volunteer? Get your sign-in link')
+    expect(volunteerButton).toBeTruthy()
+
+    await volunteerButton!.trigger('click')
+    expect(mockPush).toHaveBeenCalledWith({ name: 'volunteer-home' })
+  })
 })
