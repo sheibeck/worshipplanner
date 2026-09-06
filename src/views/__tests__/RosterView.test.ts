@@ -1,8 +1,43 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import RosterView from '../RosterView.vue'
 import type { Person, Role } from '@/types/roster'
 import type { Team } from '@/types/team'
+
+// 129-02 (R400/R401): the drawer's Sign-in Link section calls
+// httpsCallable(functions, 'adminVolunteerLink') — mock the whole module
+// (ServiceEditorView.test.ts precedent) so per-test resolution/rejection is
+// controllable. `@/firebase` also needs a mock: RosterView.vue now imports
+// `functions` from it, and the real module requires VITE_FIREBASE_* env vars
+// at load time.
+const { mockHttpsCallable, mockAdminVolunteerLinkCallable, mockToastsPush } = vi.hoisted(() => {
+  const mockAdminVolunteerLinkCallable = vi.fn<
+    (...a: unknown[]) => Promise<{ data: { sent?: boolean; link?: string } }>
+  >(() => Promise.resolve({ data: { sent: true } }))
+  return {
+    mockAdminVolunteerLinkCallable,
+    mockHttpsCallable: vi.fn<(...a: unknown[]) => typeof mockAdminVolunteerLinkCallable>(
+      () => mockAdminVolunteerLinkCallable,
+    ),
+    mockToastsPush: vi.fn(() => 'toast-id'),
+  }
+})
+
+vi.mock('@/firebase', () => ({
+  auth: {},
+  db: {},
+  functions: {},
+}))
+
+vi.mock('firebase/functions', () => ({
+  httpsCallable: (...a: unknown[]) => mockHttpsCallable(...a),
+}))
+
+vi.mock('@/stores/toasts', () => ({
+  useToasts: () => ({
+    push: mockToastsPush,
+  }),
+}))
 
 const mockAddPerson = vi.fn(() => Promise.resolve('new-id'))
 const mockUpdatePerson = vi.fn((_id: string, _input: Record<string, unknown>) => Promise.resolve())
@@ -149,9 +184,15 @@ function mountRosterViewForWiring() {
 }
 
 // File-level reset so a mid-suite pcEnabled flip (39-05) never leaks into a
-// later describe block's tests.
+// later describe block's tests. Also resets the 129-02 callable/clipboard/
+// toast mocks so no test's expectations leak into the next.
 beforeEach(() => {
   mockPcEnabled = true
+  mockHttpsCallable.mockClear()
+  mockAdminVolunteerLinkCallable.mockClear()
+  mockAdminVolunteerLinkCallable.mockImplementation(() => Promise.resolve({ data: { sent: true } }))
+  mockToastsPush.mockClear()
+  Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
 })
 
 describe('RosterView — roles-only Volunteer form (D-07)', () => {
@@ -431,6 +472,101 @@ describe('RosterView — drawer status actions (immediate-apply, 260713-d60)', (
 
     expect(wrapper.text()).not.toContain('Deactivate')
     expect(wrapper.text()).not.toContain('Reactivate')
+  })
+})
+
+describe('RosterView — drawer Sign-in Link section (129-02, R400/R401)', () => {
+  it('renders the Email/Copy sign-in link buttons and help copy for a person WITH an email', async () => {
+    mockPeople = [makePerson({ id: 'p-1', name: 'Alice', email: 'alice@example.com', active: true, roles: [] })]
+    const wrapper = mountRosterView()
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    expect(wrapper.text()).toContain('Sign-in Link')
+    expect(wrapper.text()).toContain("Send Alice their passwordless sign-in link, or copy it to share yourself.")
+    expect(wrapper.findAll('button').find((b) => b.text() === 'Email sign-in link')).toBeTruthy()
+    expect(wrapper.findAll('button').find((b) => b.text() === 'Copy sign-in link')).toBeTruthy()
+  })
+
+  it('Email sign-in link calls adminVolunteerLink with mode:email and pushes a success toast', async () => {
+    mockPeople = [makePerson({ id: 'p-1', name: 'Alice', email: 'alice@example.com', active: true, roles: [] })]
+    const wrapper = mountRosterView()
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    const emailBtn = wrapper.findAll('button').find((b) => b.text() === 'Email sign-in link')!
+    await emailBtn.trigger('click')
+    await flushPromises()
+
+    expect(mockHttpsCallable).toHaveBeenCalledWith(expect.anything(), 'adminVolunteerLink')
+    expect(mockAdminVolunteerLinkCallable).toHaveBeenCalledWith({
+      orgId: 'org-1',
+      email: 'alice@example.com',
+      mode: 'email',
+    })
+    expect(mockToastsPush).toHaveBeenCalledWith(
+      'Sign-in link sent to Alice.',
+      expect.objectContaining({ variant: 'success' }),
+    )
+  })
+
+  it('Copy sign-in link calls adminVolunteerLink with mode:copy, writes to clipboard, and flips the label', async () => {
+    mockAdminVolunteerLinkCallable.mockImplementation(() =>
+      Promise.resolve({ data: { link: 'https://app.example/volunteer/verify?oobCode=xyz' } }),
+    )
+    mockPeople = [makePerson({ id: 'p-1', name: 'Alice', email: 'alice@example.com', active: true, roles: [] })]
+    const wrapper = mountRosterView()
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    const copyBtn = wrapper.findAll('button').find((b) => b.text() === 'Copy sign-in link')!
+    await copyBtn.trigger('click')
+    await flushPromises()
+
+    expect(mockAdminVolunteerLinkCallable).toHaveBeenCalledWith({
+      orgId: 'org-1',
+      email: 'alice@example.com',
+      mode: 'copy',
+    })
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://app.example/volunteer/verify?oobCode=xyz')
+
+    const flippedBtn = wrapper.findAll('button').find((b) => b.text() === 'Link copied!')
+    expect(flippedBtn).toBeTruthy()
+  })
+
+  it('hides the Email/Copy buttons and shows the explanatory line for a person with NO email', async () => {
+    mockPeople = [makePerson({ id: 'p-1', name: 'Bob', email: '', active: true, roles: [] })]
+    const wrapper = mountRosterView()
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    expect(wrapper.findAll('button').find((b) => b.text() === 'Email sign-in link')).toBeFalsy()
+    expect(wrapper.findAll('button').find((b) => b.text() === 'Copy sign-in link')).toBeFalsy()
+    expect(wrapper.text()).toContain('Add an email address above to email or copy a sign-in link for Bob.')
+  })
+
+  it('an email-mode callable rejection pushes an error-variant toast and does not throw', async () => {
+    mockAdminVolunteerLinkCallable.mockImplementation(() => Promise.reject(new Error('network down')))
+    mockPeople = [makePerson({ id: 'p-1', name: 'Alice', email: 'alice@example.com', active: true, roles: [] })]
+    const wrapper = mountRosterView()
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    const emailBtn = wrapper.findAll('button').find((b) => b.text() === 'Email sign-in link')!
+    await emailBtn.trigger('click')
+    await flushPromises()
+
+    // Default push() call (no opts) defaults to the 'error' variant — the
+    // app-wide ToastHost "Save failed." prefix is applied at render time, not
+    // by the caller (129-UI-SPEC.md Copywriting Contract).
+    expect(mockToastsPush).toHaveBeenCalledWith(
+      'Could not send the sign-in link to Alice. Try again, or use Copy sign-in link instead.',
+    )
   })
 })
 
