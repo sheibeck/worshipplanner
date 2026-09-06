@@ -85,7 +85,7 @@ Accent reserved for: the church-filter `<select>`'s focus ring/border (matching 
 | Church filter — missing-name fallback (per-option) | `Unnamed church` — shown ONLY for a distinct church whose `rehearseAccess` docs predate the `orgName` field (pre-backfill). Never blank, never a raw orgId. |
 | Sidebar volunteer label — single church | The church's `orgName` verbatim, in the exact same slot/classes as the admin's `authStore.orgName` |
 | Sidebar volunteer label — single church, name missing | `Your church` (singular fallback — distinct from the plural-list "Unnamed church" fallback above, since there's exactly one candidate and no ambiguity to resolve) |
-| Sidebar volunteer label — multi-church, "All churches" selected | `All churches` (matches the filter's own default-option label, so the sidebar and the filter never disagree) |
+| Sidebar volunteer label — multi-church, "All churches" selected | `Multiple churches` (130-REVIEW IN-01: the shipped `volunteerChurchLabel` computed and its `AppSidebar.test.ts`/`130-VALIDATION.md` coverage use this literal, not the filter's own `All churches` default-option label — reconciled here so spec, validation, and code agree) |
 | Sidebar volunteer label — multi-church, one church selected | That church's `orgName` (or `Unnamed church` if absent), same as the filter option |
 | Error state | Unchanged — reuses `MyScheduleView.vue`'s existing "Couldn't load your schedule. Check your connection and try again." + Retry. No new error path (the switcher is a pure client-side filter over already-loaded docs — it cannot itself fail) |
 | Empty state (after filtering) | `No upcoming services for {church name}.` when a specific church is selected and the filtered set is empty but `mySchedule.docs` as a whole is non-empty (distinguishes "nothing at this church" from the existing global empty state, which stays for the true zero-docs case) |
@@ -168,7 +168,7 @@ Not applicable — no shadcn, no component registry of any kind in this project.
 
 **Label resolution (in priority order):**
 1. Multi-church volunteer with a specific church selected in the My Schedule filter → that church's `orgName` (or "Unnamed church" fallback).
-2. Multi-church volunteer with "All churches" selected (the default) → literal `All churches`.
+2. Multi-church volunteer with "All churches" selected (the default) → literal `Multiple churches` (130-REVIEW IN-01).
 3. Single-church volunteer (exactly one distinct church across their `rehearseAccess` docs) → that church's `orgName` (or `Your church` fallback if missing).
 4. No `rehearseAccess` docs at all yet (loading, or a genuinely-zero-assignment volunteer) → render nothing in this slot (matches the admin path's own `v-if` — an empty slot is the existing pattern for "nothing to show here," not a new blank state).
 
