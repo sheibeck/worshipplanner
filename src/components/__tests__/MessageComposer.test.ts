@@ -253,6 +253,24 @@ describe('MessageComposer', () => {
       await nextTick()
       expect(q('sample-preview').text()).toContain('Hi Alice!')
     })
+
+    // R375 gap fix: the server already mints {{rehearse_link}} per-recipient
+    // (functions/src/messageTokens.ts), but nothing surfaced it to editors —
+    // it wasn't offered as a chip and no default body used it.
+    it('offers a Rehearse link token chip', () => {
+      mountComposer()
+      expect(q('token-rehearse_link').exists()).toBe(true)
+    })
+
+    it('fills {{rehearse_link}} with a bracketed placeholder in the live preview, not the raw token', async () => {
+      mountComposer()
+      const el = q('body-textarea').element as HTMLTextAreaElement
+      el.value = 'Sign in: {{rehearse_link}}'
+      el.dispatchEvent(new Event('input'))
+      await nextTick()
+      expect(q('sample-preview').text()).toContain('Sign in: [rehearse link]')
+      expect(q('sample-preview').text()).not.toContain('{{rehearse_link}}')
+    })
   })
 
   describe('message type seeding with a dirty guard', () => {
@@ -263,10 +281,13 @@ describe('MessageComposer', () => {
       await q('type-reminder').trigger('click')
       expect((q('subject-input').element as HTMLInputElement).value).not.toBe('')
       expect((q('body-textarea').element as HTMLTextAreaElement).value).toContain('{{service_link}}')
+      // R375: volunteers must also get their personal rehearse link.
+      expect((q('body-textarea').element as HTMLTextAreaElement).value).toContain('{{rehearse_link}}')
 
       // Share-link pre-inserts the {{service_link}} token.
       await q('type-share-link').trigger('click')
       expect((q('body-textarea').element as HTMLTextAreaElement).value).toContain('{{service_link}}')
+      expect((q('body-textarea').element as HTMLTextAreaElement).value).toContain('{{rehearse_link}}')
     })
 
     it('does NOT overwrite a subject the user has edited (dirty guard)', async () => {

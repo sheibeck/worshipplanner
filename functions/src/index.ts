@@ -1307,7 +1307,8 @@ export async function sendScheduledRemindersHandler(
       const subject = "Reminder: your upcoming service";
       const body =
         "This is a reminder that you're scheduled to serve at an upcoming service. " +
-        "View the service details here: {{service_link}}";
+        "View the service details here: {{service_link}} " +
+        "Rehearse your parts: {{rehearse_link}}";
       const messageRef = db
         .collection("organizations")
         .doc(orgId)

@@ -6337,6 +6337,7 @@ describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () =>
     expect(mockQueueCallable).toHaveBeenCalledTimes(1)
     const req = mockQueueCallable.mock.calls[0]![0] as {
       type: string
+      body: string
       recipientSelector: { includeEveryone: boolean }
       options: { attachServiceLink: boolean; sendCopyToSelf: boolean }
       scheduledFor: unknown
@@ -6346,6 +6347,10 @@ describe('ServiceEditorView - first-lock auto-notification (R144, 61-04)', () =>
     expect(req.options.attachServiceLink).toBe(true)
     expect(req.options.sendCopyToSelf).toBe(false)
     expect(req.scheduledFor).toBeNull()
+    // R375 gap fix: the lock email must also carry the volunteer's personal
+    // rehearse link alongside the existing service link.
+    expect(req.body).toContain('{{service_link}}')
+    expect(req.body).toContain('{{rehearse_link}}')
 
     expect(lockNotifyOf(wrapper)).toEqual({ kind: 'sent', count: 2 })
   })

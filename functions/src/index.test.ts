@@ -3207,6 +3207,11 @@ describe("sendScheduledRemindersHandler", () => {
       { merge: true },
     );
     expect(summary).toMatchObject({ enqueued: 1 });
+    // R375 gap fix: the scheduled-reminder body must carry the volunteer's
+    // personal rehearse link alongside the existing service link, so the
+    // server-side per-recipient render (messageTokens.ts) actually reaches them.
+    expect(enqueued[0]!.doc.body).toContain("{{service_link}}");
+    expect(enqueued[0]!.doc.body).toContain("{{rehearse_link}}");
   });
 
   it("does not enqueue or mark a service whose reminder is not due today (date - N !== today)", async () => {

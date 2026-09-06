@@ -371,6 +371,7 @@ const messageTypeOptions: ReadonlyArray<{ value: MessageType; label: string }> =
 const tokenChips: ReadonlyArray<{ token: string; label: string }> = [
   { token: 'service_date', label: 'Service date' },
   { token: 'service_link', label: 'Service link' },
+  { token: 'rehearse_link', label: 'Rehearse link' },
   { token: 'their_roles', label: 'Their roles' },
   { token: 'name', label: 'Name' },
 ]
@@ -381,11 +382,13 @@ const TYPE_DEFAULTS: Record<MessageType, { subject: string; body: string }> = {
   oneoff: { subject: '', body: '' },
   reminder: {
     subject: 'Reminder: {{service_date}}',
-    body: "Hi {{name}} — a reminder you're scheduled to serve on {{service_date}}. Here's the plan: {{service_link}}",
+    body:
+      "Hi {{name}} — a reminder you're scheduled to serve on {{service_date}}. Here's the plan: {{service_link}}\n" +
+      'Rehearse your parts: {{rehearse_link}}',
   },
   'share-link': {
     subject: 'Service plan for {{service_date}}',
-    body: '{{service_link}}',
+    body: '{{service_link}}\nRehearse: {{rehearse_link}}',
   },
 }
 
@@ -543,6 +546,7 @@ function fillToken(template: string, token: string, value: string): string {
 function renderSample(template: string): string {
   let out = fillToken(template, 'service_date', serviceDateLabel.value)
   out = fillToken(out, 'service_link', '[service link]')
+  out = fillToken(out, 'rehearse_link', '[rehearse link]')
   out = fillToken(out, 'their_roles', sampleRolesFor(sampleRecipient.value?.id ?? null))
   out = fillToken(out, 'name', sampleRecipient.value?.name ?? '[name]')
   out = fillToken(out, 'song_list', songList.value || '[song list]')

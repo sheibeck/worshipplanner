@@ -3014,6 +3014,7 @@ const LOCK_BODY = [
   '{{song_list}}',
   '',
   'View the full service order here: {{service_link}}',
+  'Rehearse your parts: {{rehearse_link}}',
   '',
   'Thanks for serving!',
 ].join('\n')
