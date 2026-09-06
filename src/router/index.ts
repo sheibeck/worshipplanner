@@ -7,6 +7,13 @@ declare module 'vue-router' {
     requiresAuth?: boolean
     requiresEditor?: boolean
     requiresSuperAdmin?: boolean
+    // R374/R376/Pitfall 1 (Phase 125) — a magic-link volunteer is
+    // authenticated but has zero org memberships, which the org-selection
+    // gate below would otherwise treat as "must pick/create a church." Any
+    // route marked isVolunteerRoute is exempted from that gate. UI
+    // defense-in-depth only — the enforced access boundary is
+    // firestore.rules (Plan 125-01), independent of this flag.
+    isVolunteerRoute?: boolean
   }
 }
 
@@ -145,6 +152,25 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      // R374 (Phase 125) — the email-link continue-URL target. Deliberately
+      // NO requiresAuth: this route COMPLETES auth (signInWithEmailLink),
+      // so a visitor here is by definition not yet signed in.
+      path: '/volunteer/verify',
+      name: 'volunteer-verify',
+      component: () => import('../views/VolunteerLinkCompleteView.vue'),
+      meta: { isVolunteerRoute: true },
+    },
+    {
+      // R374/R376 (Phase 125) — the volunteer landing: signed-in user chip +
+      // sign-out, or email-link guidance when not yet signed in.
+      // isVolunteerRoute exempts a zero-membership volunteer from the
+      // org-selection gate below (Pitfall 1) — see the RouteMeta comment.
+      path: '/volunteer',
+      name: 'volunteer-home',
+      component: () => import('../views/VolunteerSignInView.vue'),
+      meta: { requiresAuth: true, isVolunteerRoute: true },
+    },
+    {
       path: '/share/:token',
       name: 'share',
       component: () => import('../views/ShareView.vue'),
@@ -187,7 +213,7 @@ router.beforeEach(async (to) => {
     // than one and no active choice, must resolve which church (if any) to
     // enter before reaching an org-scoped view. The platform-level owner
     // console is org-independent, so it is exempt; the picker itself is too.
-    if (!to.meta.requiresSuperAdmin && to.name !== 'select-church') {
+    if (!to.meta.requiresSuperAdmin && !to.meta.isVolunteerRoute && to.name !== 'select-church') {
       const { useAuthStore } = await import('../stores/auth')
       const authStore = useAuthStore()
       await authStore.waitForReady()
