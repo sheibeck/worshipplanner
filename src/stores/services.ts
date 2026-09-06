@@ -1023,9 +1023,10 @@ export const useServiceStore = defineStore('services', () => {
       const orgData = orgSnap.exists() ? orgSnap.data() : {}
       let slug = orgData.slug as string | undefined
       if (!slug) {
-        const derived = deriveSlug((orgData.name as string | undefined) ?? '')
+        const orgNameValue = orgData.name as string | undefined
+        const derived = deriveSlug(orgNameValue ?? '')
         const base = derived || 'org'
-        slug = await claimSlug(base, orgIdValue)
+        slug = await claimSlug(base, orgIdValue, orgNameValue)
         await updateDoc(orgRef, { slug })
       }
 

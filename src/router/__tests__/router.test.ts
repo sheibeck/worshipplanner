@@ -89,6 +89,14 @@ function createTestRouter() {
         // No meta.requiresAuth — matches production router (D-24)
       },
       {
+        // R394/R399 (128-02) — the public self-service magic-link request
+        // page, matching production's /:slug/volunteer exactly.
+        path: '/:slug/volunteer',
+        name: 'volunteer-request',
+        component: { template: '<div>Volunteer Request</div>' },
+        // No meta.requiresAuth — matches production router
+      },
+      {
         // Mirrors production's /select-church — the org-selection gate below
         // needs a real destination to redirect a non-volunteer route to.
         path: '/select-church',
@@ -97,12 +105,14 @@ function createTestRouter() {
         meta: { requiresAuth: true },
       },
       {
-        // Pitfall 1 (125-04) — requiresAuth + isVolunteerRoute, matching
-        // production's /volunteer exactly.
+        // R398/R399 (128-02, BLOCKER fix) — meta.requiresAuth REMOVED so an
+        // unauthenticated volunteer reaches the landing instead of being
+        // bounced to /login; isVolunteerRoute is KEPT. Matches production's
+        // /volunteer exactly.
         path: '/volunteer',
         name: 'volunteer-home',
         component: { template: '<div>Volunteer Home</div>' },
-        meta: { requiresAuth: true, isVolunteerRoute: true },
+        meta: { isVolunteerRoute: true },
       },
       {
         // R382 (126-03) — the build-safe Rehearse-target placeholder route,
@@ -277,11 +287,28 @@ describe('Router guard', () => {
       expect(router.currentRoute.value.name).toBe('select-church')
     })
 
-    it('an unauthenticated visitor to /volunteer still redirects to /login (isVolunteerRoute exempts org-selection only, not auth itself)', async () => {
+    it('an UNAUTHENTICATED visitor to /volunteer reaches the landing, NOT a /login redirect (R398/R399 blocker fix: requiresAuth removed, isVolunteerRoute retained)', async () => {
       mockGetCurrentUser.mockResolvedValue(null)
       const router = createTestRouter()
       await router.push('/volunteer')
-      expect(router.currentRoute.value.name).toBe('login')
+      expect(router.currentRoute.value.name).toBe('volunteer-home')
+    })
+  })
+
+  describe('/:slug/volunteer self-service request route (R394/R399, 128-02)', () => {
+    it('resolves /:slug/volunteer to the volunteer-request route without shadowing static routes', async () => {
+      mockGetCurrentUser.mockResolvedValue(null)
+      const router = createTestRouter()
+      await router.push('/gracechurch/volunteer')
+      expect(router.currentRoute.value.name).toBe('volunteer-request')
+      expect(router.currentRoute.value.params.slug).toBe('gracechurch')
+    })
+
+    it('a static route (e.g. /schedule) still resolves to its own route, unaffected by the new dynamic route', async () => {
+      mockGetCurrentUser.mockResolvedValue(mockUser)
+      const router = createTestRouter()
+      await router.push('/schedule')
+      expect(router.currentRoute.value.name).toBe('schedule')
     })
   })
 
@@ -333,5 +360,25 @@ describe('Router guard', () => {
       await router.push('/login')
       expect(router.currentRoute.value.name).toBe('select-church')
     })
+  })
+})
+
+// Direct proof against the REAL production router config (not the hand-rolled
+// mirror above) — R398/R399 (128-02) blocker-gate acceptance criterion:
+// 'volunteer-home' must no longer carry meta.requiresAuth, and the new
+// 'volunteer-request' route must resolve /:slug/volunteer with no auth gate.
+describe('production router meta (direct import, R398/R399 blocker gate)', () => {
+  it("volunteer-home no longer carries meta.requiresAuth (isVolunteerRoute retained)", async () => {
+    const { default: productionRouter } = await import('../index')
+    const route = productionRouter.getRoutes().find((r) => r.name === 'volunteer-home')
+    expect(route?.meta.requiresAuth).toBeUndefined()
+    expect(route?.meta.isVolunteerRoute).toBe(true)
+  })
+
+  it('volunteer-request resolves /:slug/volunteer with no meta.requiresAuth', async () => {
+    const { default: productionRouter } = await import('../index')
+    const route = productionRouter.getRoutes().find((r) => r.name === 'volunteer-request')
+    expect(route?.path).toBe('/:slug/volunteer')
+    expect(route?.meta.requiresAuth).toBeUndefined()
   })
 })

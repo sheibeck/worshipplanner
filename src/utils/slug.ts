@@ -41,8 +41,19 @@ export const RESERVED_SLUGS = new Set([
  * candidate. On a permission-denied error (existing doc → the rules deny
  * the implicit "update"), retries with the next numeric suffix
  * (base-2, base-3, …) until a candidate writes successfully.
+ *
+ * `orgName`, when provided, is denormalized onto the claimed doc as `name`
+ * so the public /:slug/volunteer request page (Phase 128, R394) can render
+ * a church name from this SAME public-read registry without a second,
+ * membership-gated read of organizations/{orgId} (which an unauthenticated
+ * volunteer cannot perform). Because orgSlugs/{slug} is create-only
+ * (`allow update, delete: if false` — first-writer-wins anti-hijack
+ * invariant, ADR-0007), this is a point-in-time snapshot: a later org rename
+ * does NOT propagate here. Known, accepted limitation — cosmetic only
+ * (VolunteerRequestView falls back to generic copy when `name` is absent),
+ * never a security concern.
  */
-export async function claimSlug(baseSlug: string, orgId: string): Promise<string> {
+export async function claimSlug(baseSlug: string, orgId: string, orgName?: string): Promise<string> {
   let suffix = 1
   for (;;) {
     const candidate = suffix === 1 ? baseSlug : `${baseSlug}-${suffix}`
@@ -51,7 +62,7 @@ export async function claimSlug(baseSlug: string, orgId: string): Promise<string
       continue
     }
     try {
-      await setDoc(doc(db, 'orgSlugs', candidate), { orgId })
+      await setDoc(doc(db, 'orgSlugs', candidate), orgName ? { orgId, name: orgName } : { orgId })
       return candidate
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code

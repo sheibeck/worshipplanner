@@ -407,9 +407,10 @@ export const useQuartersStore = defineStore('quarters', () => {
         // permission-denied handling ever runs. Fall back to a generic base so claimSlug
         // always has a valid, non-empty candidate to start from (its own numeric-suffix
         // retry loop still guarantees uniqueness: org, org-2, org-3, ...).
-        const derived = deriveSlug((orgData.name as string | undefined) ?? '')
+        const orgNameValue = orgData.name as string | undefined
+        const derived = deriveSlug(orgNameValue ?? '')
         const base = derived || 'org'
-        slug = await claimSlug(base, orgId.value)
+        slug = await claimSlug(base, orgId.value, orgNameValue)
         await updateDoc(orgRef, { slug })
       }
 

@@ -165,10 +165,22 @@ const router = createRouter({
       // sign-out, or email-link guidance when not yet signed in.
       // isVolunteerRoute exempts a zero-membership volunteer from the
       // org-selection gate below (Pitfall 1) — see the RouteMeta comment.
+      // R398/R399 (Phase 128, BLOCKER fix): meta.requiresAuth REMOVED —
+      // this landing must be reachable by an UNAUTHENTICATED volunteer
+      // arriving from the login page's "Are you a volunteer?" entry or the
+      // verify-page's slug-absent "request a new link" fallback. Before this
+      // fix, the router's requiresAuth guard bounced any unauthenticated
+      // visitor straight to /login, making both entry points dead ends.
+      // isVolunteerRoute is KEPT (still meaningful for an authenticated,
+      // zero-membership volunteer reaching this route via other paths).
+      // Relaxing the gate leaks nothing: VolunteerSignInView.vue's own
+      // immediate watch already redirects an authenticated visitor to
+      // /my-schedule, and an unauthenticated visitor sees only non-sensitive
+      // guidance + the public orgSlugs "find your church" lookup.
       path: '/volunteer',
       name: 'volunteer-home',
       component: () => import('../views/VolunteerSignInView.vue'),
-      meta: { requiresAuth: true, isVolunteerRoute: true },
+      meta: { isVolunteerRoute: true },
     },
     {
       // R378/R380/R383 (Phase 126) — the volunteer's post-sign-in landing:
@@ -220,6 +232,21 @@ const router = createRouter({
       // mirrors quarter-memorable-share. Appended after all static routes: Vue Router
       // ranks static segments above dynamic ones, so this can never shadow /songs,
       // /volunteers, /schedule, etc. (D-19).
+    },
+    {
+      // R394/R399 (Phase 128) — the public self-service magic-link request
+      // page. Intentionally no meta.requiresAuth — public route for
+      // unauthenticated volunteers. Do NOT confuse with the existing
+      // 1-segment /volunteer (name 'volunteer-home', below) — different
+      // segment count, never collides (128-RESEARCH Pitfall 5). Appended
+      // after all static routes and the other dynamic slug routes: Vue
+      // Router ranks static segments above dynamic ones, so this can never
+      // shadow /songs, /volunteers, /schedule, etc. (D-19). Always targeted
+      // by name ({ name: 'volunteer-request', params: { slug } }), never a
+      // string-built path.
+      path: '/:slug/volunteer',
+      name: 'volunteer-request',
+      component: () => import('../views/VolunteerRequestView.vue'),
     },
   ],
 })

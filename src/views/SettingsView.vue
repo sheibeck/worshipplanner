@@ -849,7 +849,7 @@ async function onSaveSlug() {
 
   try {
     const candidate = deriveSlug(editSlug.value)
-    const claimed = await claimSlug(candidate, authStore.orgId)
+    const claimed = await claimSlug(candidate, authStore.orgId, authStore.orgName ?? undefined)
 
     if (claimed !== candidate) {
       // The exact slug the user asked for is already claimed by another org — claimSlug's
