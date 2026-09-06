@@ -37,6 +37,10 @@ let mockIsSuperAdmin = false
 // zero switcher UI unless a test opts in via mockMemberships.
 let mockMemberships: { id: string; name: string; active: boolean; role: 'editor' | 'viewer' }[] = []
 let mockViewingAsSuperAdmin: string | null = null
+// 130-REVIEW WR-01 — churchless super-admin state (Owner Console, no active
+// church). A getter (not a static field) so tests can flip it independently
+// of mockOrgName, matching the template's own `v-if` condition.
+let mockSuperAdminOutsideOwnChurch = false
 const mockLogout = vi.fn(() => Promise.resolve())
 const mockSelectOrg = vi.fn(() => Promise.resolve())
 
@@ -60,7 +64,9 @@ vi.mock('@/stores/auth', () => ({
     get viewingAsSuperAdmin() {
       return mockViewingAsSuperAdmin
     },
-    superAdminOutsideOwnChurch: null,
+    get superAdminOutsideOwnChurch() {
+      return mockSuperAdminOutsideOwnChurch
+    },
     user: { uid: 'test-uid', email: 'viewer@example.com', displayName: 'Viewer User' },
     logout: mockLogout,
     selectOrg: mockSelectOrg,
@@ -113,6 +119,7 @@ beforeEach(() => {
   mockIsSuperAdmin = false
   mockMemberships = []
   mockViewingAsSuperAdmin = null
+  mockSuperAdminOutsideOwnChurch = false
   mockRouterPush.mockClear()
   mockLogout.mockClear()
   mockSelectOrg.mockClear()
@@ -382,5 +389,54 @@ describe('AppSidebar — volunteer church-name label (R404, Phase 130)', () => {
     expect(wrapper.find('[data-testid="volunteer-church-label"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Multiple churches')
     expect(wrapper.text()).not.toContain('Your church')
+  })
+})
+
+/**
+ * 130-REVIEW WR-01. The cold-render `onMounted` guard fires
+ * `mySchedule.loadMySchedule()` for a signed-in volunteer that hasn't yet
+ * visited My Schedule, but must skip firing for a churchless super-admin
+ * (Owner Console) — matching the org-name block's own `v-if` condition
+ * (`authStore.orgName || authStore.superAdminOutsideOwnChurch`).
+ */
+describe('AppSidebar — cold-render loadMySchedule guard (WR-01, Phase 130 review)', () => {
+  it('fires loadMySchedule for a signed-in volunteer with no orgName and no cached docs', () => {
+    mockOrgName = null
+    mockSuperAdminOutsideOwnChurch = false
+    mockMyScheduleDocs = []
+    mockMyScheduleLoading = false
+    mountSidebar()
+
+    expect(mockLoadMySchedule).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT fire loadMySchedule for a super-admin outside their own church, even with no orgName', () => {
+    mockOrgName = null
+    mockSuperAdminOutsideOwnChurch = true
+    mockMyScheduleDocs = []
+    mockMyScheduleLoading = false
+    mountSidebar()
+
+    expect(mockLoadMySchedule).not.toHaveBeenCalled()
+  })
+
+  it('does NOT fire loadMySchedule when authStore.orgName is already set (admin session)', () => {
+    mockOrgName = 'Test Church'
+    mockSuperAdminOutsideOwnChurch = false
+    mockMyScheduleDocs = []
+    mockMyScheduleLoading = false
+    mountSidebar()
+
+    expect(mockLoadMySchedule).not.toHaveBeenCalled()
+  })
+
+  it('does NOT fire loadMySchedule when docs are already cached', () => {
+    mockOrgName = null
+    mockSuperAdminOutsideOwnChurch = false
+    mockMyScheduleDocs = [{ orgId: 'org-1', orgName: 'Grace Fellowship' }]
+    mockMyScheduleLoading = false
+    mountSidebar()
+
+    expect(mockLoadMySchedule).not.toHaveBeenCalled()
   })
 })

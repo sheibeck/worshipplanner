@@ -256,8 +256,13 @@ const volunteerChurchLabel = computed(() => {
 // than /my-schedule before that view ever mounts would otherwise see an
 // empty sidebar label until they visit My Schedule. Idempotent (loadMySchedule
 // no-ops cleanly with no signed-in email) and admin sessions never trigger it.
+//
+// 130-REVIEW WR-01: also exclude a churchless super-admin
+// (authStore.superAdminOutsideOwnChurch), matching the org-name block's own
+// v-if condition above — otherwise a super-admin at the Owner Console fires
+// a needless collectionGroup('rehearseAccess') query on every sidebar mount.
 onMounted(() => {
-  if (authStore.orgName) return
+  if (authStore.orgName || authStore.superAdminOutsideOwnChurch) return
   if (mySchedule.isLoading) return
   if (mySchedule.docs.length > 0) return
   mySchedule.loadMySchedule()
