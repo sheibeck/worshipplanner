@@ -286,14 +286,21 @@ service cloud.firestore {
         // volunteer arm below) -- R377's isolation boundary is cross-org /
         // non-assigned access, not editor-vs-editor or member-vs-editor trust.
         // The volunteer arm requires ALL of: signed in, a non-null email claim,
-        // the LIVE parent status being non-draft, and the token's LOWERCASED
-        // email present in the LOWERCASED assignedEmailsLower array (mirrors
-        // the invites/{email} email-claim idiom at :192 -- normalization on
-        // both sides is load-bearing, see Pitfall 5 in 125-RESEARCH.md).
+        // that claim VERIFIED (loginWithEmail() in src/stores/auth.ts silently
+        // auto-creates an unverified password account for any typed email --
+        // without this check that flow lets an attacker "claim" any roster
+        // email with no inbox access; signInWithEmailLink/Google sign-in both
+        // set email_verified: true, so legitimate magic-link volunteers are
+        // unaffected -- CR-01, 125-REVIEW.md), the LIVE parent status being
+        // non-draft, and the token's LOWERCASED email present in the
+        // LOWERCASED assignedEmailsLower array (mirrors the invites/{email}
+        // email-claim idiom at :192 -- normalization on both sides is
+        // load-bearing, see Pitfall 5 in 125-RESEARCH.md).
         allow read: if isOrgMember(orgId)
           || (
             isSignedIn()
             && request.auth.token.email != null
+            && request.auth.token.email_verified == true
             && parentIsPlanned()
             && request.auth.token.email.lower() in resource.data.get('assignedEmailsLower', [])
           );

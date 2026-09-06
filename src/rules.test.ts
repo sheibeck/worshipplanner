@@ -2745,9 +2745,32 @@ describe('Volunteer magic-link scoped read access — R377', () => {
   it('(1) ALLOW — an assigned volunteer reads the rehearseAccess projection of a Planned service in their own org', async () => {
     await seedRehearseFixtures()
     // Mixed-case token email vs. lowercased roster field — proves the required
-    // .lower() normalization on both sides (Pitfall 5).
-    const db = testEnv.authenticatedContext('volUid', { email: 'Dana@Example.com' }).firestore()
+    // .lower() normalization on both sides (Pitfall 5). email_verified: true
+    // mirrors real signInWithEmailLink() semantics (CR-01, 125-REVIEW.md).
+    const db = testEnv
+      .authenticatedContext('volUid', { email: 'Dana@Example.com', email_verified: true })
+      .firestore()
     await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc1')))
+  })
+
+  it('(1b) DENY — an email-claim match with email_verified: false cannot read the projection (CR-01: password auto-register forgery)', async () => {
+    await seedRehearseFixtures()
+    // loginWithEmail() in src/stores/auth.ts silently auto-creates an
+    // unverified password account for ANY typed email. Without the
+    // email_verified check, this same token would satisfy the rule with no
+    // inbox access ever required — the exact attack in CR-01 (125-REVIEW.md).
+    const db = testEnv
+      .authenticatedContext('attackerUid', { email: 'Dana@Example.com', email_verified: false })
+      .firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc1')))
+  })
+
+  it('(1c) DENY — an email-claim match with email_verified unset (undefined) cannot read the projection', async () => {
+    await seedRehearseFixtures()
+    // Some tokens/emulator paths omit email_verified entirely rather than
+    // setting it false; the rule must not treat "absent" as truthy.
+    const db = testEnv.authenticatedContext('attackerUid2', { email: 'Dana@Example.com' }).firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc1')))
   })
 
   it('(2) DENY — the same volunteer cannot read another org\'s rehearseAccess projection (cross-org)', async () => {
