@@ -138,9 +138,6 @@ import type { RehearseSong, RehearseAttachment } from '@/utils/rehearseAccess'
 
 const props = defineProps<{
   song?: RehearseSong
-  /** Present only if the projection carries it — omitted from the header
-   *  meta line entirely when absent, never invented (Data Dependencies). */
-  ccliNumber?: string
 }>()
 
 const emit = defineEmits<{
@@ -178,17 +175,18 @@ function metaFor(a: RehearseAttachment): string {
   return ''
 }
 
-// Header meta line ('{key} · {bpm} bpm · CCLI {ccli}') — build each clause
-// as a real string or null BEFORE filter(Boolean).join, mirroring
-// SongFilesTab.vue's metaLine() idiom exactly (Pitfall 4: never interpolate
-// a possibly-null value directly into a template literal).
+// Header meta line ('{key} · {bpm} bpm') — build each clause as a real
+// string or null BEFORE filter(Boolean).join, mirroring SongFilesTab.vue's
+// metaLine() idiom exactly (Pitfall 4: never interpolate a possibly-null
+// value directly into a template literal). No CCLI clause (IN-01,
+// 127-REVIEW): RehearseSong/RehearseAccessDoc carry no CCLI field, so a
+// `ccliNumber` prop here could never be populated by any real caller.
 const metaLine = computed(() => {
   const song = props.song
   if (!song) return ''
   const keyClause = song.keyOrArrangement || null
   const bpmClause = song.bpm != null ? `${song.bpm} bpm` : null
-  const ccliClause = props.ccliNumber ? `CCLI ${props.ccliNumber}` : null
-  return [keyClause, bpmClause, ccliClause].filter(Boolean).join(' · ')
+  return [keyClause, bpmClause].filter(Boolean).join(' · ')
 })
 
 // Print (T-127-04) — opens the Storage download URL in a NEW tab, letting

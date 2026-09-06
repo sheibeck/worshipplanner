@@ -101,14 +101,14 @@ describe('RehearseSongDetail', () => {
     expect(meta).not.toContain('null')
   })
 
-  it('renders the full meta line when key/bpm/ccli are all present', () => {
+  it('renders the full meta line when key/bpm are both present (IN-01: no CCLI clause — the prop was removed as permanently dead)', () => {
     const full = makeSong({ keyOrArrangement: 'Bb', bpm: 72 })
-    const wrapper = mount(RehearseSongDetail, { props: { song: full, ccliNumber: '12345' } })
+    const wrapper = mount(RehearseSongDetail, { props: { song: full } })
 
     const meta = wrapper.get('[data-testid="rehearse-detail-meta"]').text()
     expect(meta).toContain('Bb')
     expect(meta).toContain('72 bpm')
-    expect(meta).toContain('CCLI 12345')
+    expect(meta).not.toContain('CCLI')
   })
 
   it('mounts no <audio> element — Play emits instead of playing inline', async () => {
