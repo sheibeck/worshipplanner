@@ -47,6 +47,11 @@ export const useMyScheduleStore = defineStore('mySchedule', () => {
         return { ...data, orgId: d.ref.parent.parent!.id }
       })
     } catch (err: unknown) {
+      // IN-01 (126-REVIEW): pair the swallowed error with a console.error,
+      // matching services.ts's markAsPlanned/reopenService convention — a
+      // missing/misconfigured composite index throws a distinctive Firestore
+      // error that was previously invisible in the browser console.
+      console.error('loadMySchedule failed', err)
       docs.value = []
       error.value = err instanceof Error ? err.message : 'Failed to load your schedule.'
     } finally {
