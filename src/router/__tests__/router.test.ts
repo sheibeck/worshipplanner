@@ -113,6 +113,14 @@ function createTestRouter() {
         meta: { requiresAuth: true, isVolunteerRoute: true },
       },
       {
+        // R378/R380/R383 (126-04) — the volunteer's post-sign-in landing,
+        // matching production's /my-schedule exactly.
+        path: '/my-schedule',
+        name: 'my-schedule',
+        component: { template: '<div>My Schedule</div>' },
+        meta: { requiresAuth: true, isVolunteerRoute: true },
+      },
+      {
         // Mirrors production's /owner-console — the churchless-super-admin
         // destination the /login bounce-back below can redirect to.
         path: '/owner-console',
@@ -284,6 +292,15 @@ describe('Router guard', () => {
       await router.push('/volunteer/service/anything')
       expect(router.currentRoute.value.name).toBe('volunteer-service')
       expect(router.currentRoute.value.params.serviceId).toBe('anything')
+    })
+  })
+
+  describe('/my-schedule route (R378/R380/R383, 126-04)', () => {
+    it('resolves /my-schedule to the my-schedule route (no "no match")', async () => {
+      mockGetCurrentUser.mockResolvedValue(mockUser)
+      const router = createTestRouter()
+      await router.push('/my-schedule')
+      expect(router.currentRoute.value.name).toBe('my-schedule')
     })
   })
 
