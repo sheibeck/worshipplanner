@@ -135,10 +135,16 @@ const readinessCopy = computed(() => {
   return 'Waiting on charts from the leader'
 })
 
+// IN-03 (126-REVIEW): 'partial' (text-amber-400) and 'waiting' (previously
+// text-amber-300) were a one-shade-of-amber difference most users can't
+// perceive, undermining the three-state distinction color coding is meant to
+// convey. 'waiting' ("nothing uploaded yet") reads as neutral, not a warning,
+// so it gets a distinct gray treatment — distinguishable by color alone, not
+// just icon shape.
 const readinessColorClass = computed(() => {
   if (readiness.value.state === 'ready') return 'text-green-400'
   if (readiness.value.state === 'partial') return 'text-amber-400'
-  return 'text-amber-300'
+  return 'text-gray-400'
 })
 
 const cardClass = computed(() => {
