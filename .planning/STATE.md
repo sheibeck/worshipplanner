@@ -5,15 +5,15 @@ milestone_name: Rehearse Mode (Phases 125-127, in planning)
 current_phase: 126
 current_phase_name: My Schedule — Volunteer Home
 status: executing
-stopped_at: Completed 126-02-PLAN.md
-last_updated: "2026-09-06T07:28:35.041Z"
+stopped_at: Completed 126-03-PLAN.md
+last_updated: "2026-09-06T07:44:18.655Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 126 execution started
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 33
 ---
 
@@ -1323,7 +1323,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 126 (My Schedule — Volunteer Home) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-09-06 — Phase 126 execution started
 
@@ -3386,6 +3386,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 125 P02 | 25min | 2 tasks | 4 files |
 | Phase 126 P01 | 40min | 3 tasks | 5 files |
 | Phase 126 P02 | 16min | 2 tasks | 4 files |
+| Phase 126 P03 | 25min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -3947,6 +3948,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: rehearseAccess collection-group list requires a SEPARATE {path=**} match; live cross-doc re-check unachievable there, so the list arm gates on a query-filtered frozen status field instead
 - [Phase ?]: hasMedia() uses SongAttachmentKind's real values ('document'/'audio'), not the plan/UI-SPEC's literal 'pdf'/'mp3' strings which don't exist in the type
 - [Phase ?]: countdownLabel parses YYYY-MM-DD into local-midnight Date objects for day-delta math, avoiding time-of-day drift
+- [Phase ?]: 126-03: mySchedule store query includes BOTH where('status','==','planned') AND where('assignedEmailsLower','array-contains', myEmailLower) per 126-01's required-filter contract; array-contains value derived only from auth.currentUser.email (never a client argument)
+- [Phase ?]: 126-03: /volunteer/service/:serviceId registered with a real placeholder VolunteerServicePlaceholderView.vue (never a lazy import of a nonexistent Phase-127 file), verified by a green npm run build
 
 ### Roadmap Evolution
 
@@ -4276,8 +4279,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T07:28:26.092Z
-Stopped at: Completed 126-02-PLAN.md
+Last session: 2026-09-06T07:44:09.601Z
+Stopped at: Completed 126-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

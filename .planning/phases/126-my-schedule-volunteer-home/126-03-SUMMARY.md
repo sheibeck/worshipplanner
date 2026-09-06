@@ -142,3 +142,15 @@ None new this plan — the 126-01 COLLECTION_GROUP index/rules deploy requiremen
 ---
 *Phase: 126-my-schedule-volunteer-home*
 *Completed: 2026-09-06*
+
+## Self-Check: PASSED
+
+- FOUND: src/stores/mySchedule.ts
+- FOUND: src/stores/__tests__/mySchedule.test.ts
+- FOUND: src/views/VolunteerServicePlaceholderView.vue
+- FOUND: src/router/index.ts
+- FOUND: src/router/__tests__/router.test.ts
+- FOUND: .planning/phases/126-my-schedule-volunteer-home/126-03-SUMMARY.md
+- FOUND commit: 2b4230f0
+- FOUND commit: 007392a2
+- FOUND commit: 0ca5ad3d

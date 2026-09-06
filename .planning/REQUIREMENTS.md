@@ -56,7 +56,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   chips**, song / chart / track counts, a **readiness** indicator (all rehearsal files ready · N songs still
   missing media · waiting on charts), and a countdown + call time.
 
-- [ ] **R382**: Each upcoming card's **Rehearse →** action opens that service's standalone Rehearse screen;
+- [x] **R382**: Each upcoming card's **Rehearse →** action opens that service's standalone Rehearse screen;
   a past card offers a read/open action instead. My Schedule itself is not editable.
 
 - [ ] **R383**: My Schedule surfaces a "check a different email" affordance and, when a signed-in email
@@ -150,7 +150,7 @@ Populated during roadmap creation.
 | R379 | Phase 126 | Complete |
 | R380 | Phase 126 | Complete |
 | R381 | Phase 126 | Complete |
-| R382 | Phase 126 | Pending |
+| R382 | Phase 126 | Complete |
 | R383 | Phase 126 | Pending |
 | R384 | Phase 127 | Pending |
 | R385 | Phase 127 | Pending |
