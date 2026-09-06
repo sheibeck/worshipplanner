@@ -455,6 +455,40 @@
               </div>
             </template>
           </div>
+
+          <!-- Sign-in Link (Phase 129, R400/R401): email or copy a rostered
+               volunteer's passwordless sign-in link. Only for people WITH an
+               email — the no-email state explains rather than disables, per
+               129-UI-SPEC.md. Gated on editingPerson like Status above, so it
+               never renders in Add-Volunteer mode. -->
+          <div v-if="editingPerson" class="mt-6 pt-5 border-t border-gray-800">
+            <h3 class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Sign-in Link</h3>
+
+            <template v-if="editingPerson.email">
+              <p class="text-xs text-gray-500 mb-2">
+                Send {{ editingPerson.name }} their passwordless sign-in link, or copy it to share yourself.
+              </p>
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  :disabled="emailingLink"
+                  @click="onEmailSignInLink"
+                  class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >{{ emailingLink ? 'Sending…' : 'Email sign-in link' }}</button>
+
+                <button
+                  type="button"
+                  :disabled="copyingLink"
+                  @click="onCopySignInLink"
+                  class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >{{ copyingLink ? 'Copying…' : linkCopyLabel }}</button>
+              </div>
+            </template>
+
+            <p v-else class="text-xs text-gray-500">
+              Add an email address above to email or copy a sign-in link for {{ editingPerson.name }}.
+            </p>
+          </div>
         </div>
       </div>
     </Transition>
@@ -464,9 +498,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { httpsCallable } from 'firebase/functions'
+import { functions } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
 import { useTeamsStore } from '@/stores/teams'
+import { useToasts } from '@/stores/toasts'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import type { Person, Role, RoleGroup } from '@/types/roster'
 import type { Team } from '@/types/team'
@@ -484,6 +521,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 const rosterStore = useRosterStore()
 const teamsStore = useTeamsStore()
+const toasts = useToasts()
 
 // ── Tabbed layout ────────────────────────────────────────────────────────────
 const activeTab = ref<'volunteers' | 'roles' | 'teams'>('volunteers')
@@ -657,6 +695,80 @@ async function onDeleteInactive(id: string) {
     }
   } finally {
     deletingInactiveId.value = null
+  }
+}
+
+// ── Sign-in Link actions (drawer, Phase 129: R400/R401) ─────────────────────
+// Client-local — declared here (not imported) because functions/src is a
+// separate tsconfig project; must match AdminVolunteerLinkRequest/Response in
+// functions/src/index.ts exactly. The server re-validates orgId/roster/role on
+// every call — this client only shapes the request, it is never the authz gate.
+interface AdminVolunteerLinkRequest {
+  orgId: string
+  email: string
+  mode: 'email' | 'copy'
+}
+interface AdminVolunteerLinkResponse {
+  sent?: boolean
+  link?: string
+}
+
+// Separate busy refs so one in-flight action never disables the other button.
+const emailingLink = ref(false)
+const copyingLink = ref(false)
+const linkCopied = ref(false)
+const linkCopyError = ref<string | null>(null)
+
+// Mirrors ServiceEditorView's stageShareLabel idiom: the button's own label
+// flips to a transient confirmation/error, else shows the default CTA.
+const linkCopyLabel = computed(() => {
+  if (linkCopied.value) return 'Link copied!'
+  if (linkCopyError.value) return linkCopyError.value
+  return 'Copy sign-in link'
+})
+
+async function onEmailSignInLink() {
+  const person = editingPerson.value
+  if (!person?.email || !authStore.orgId) return
+  emailingLink.value = true
+  try {
+    await httpsCallable<AdminVolunteerLinkRequest, AdminVolunteerLinkResponse>(
+      functions,
+      'adminVolunteerLink',
+    )({ orgId: authStore.orgId, email: person.email, mode: 'email' })
+    toasts.push(`Sign-in link sent to ${person.name}.`, { variant: 'success', autoDismissMs: 3000 })
+  } catch (err) {
+    console.error('[RosterView] adminVolunteerLink (email) failed:', err)
+    toasts.push(`Could not send the sign-in link to ${person.name}. Try again, or use Copy sign-in link instead.`)
+  } finally {
+    emailingLink.value = false
+  }
+}
+
+async function onCopySignInLink() {
+  const person = editingPerson.value
+  if (!person?.email || !authStore.orgId) return
+  copyingLink.value = true
+  try {
+    const { data } = await httpsCallable<AdminVolunteerLinkRequest, AdminVolunteerLinkResponse>(
+      functions,
+      'adminVolunteerLink',
+    )({ orgId: authStore.orgId, email: person.email, mode: 'copy' })
+    if (data.link && navigator.clipboard) {
+      await navigator.clipboard.writeText(data.link)
+      linkCopied.value = true
+      setTimeout(() => {
+        linkCopied.value = false
+      }, 2000)
+    }
+  } catch (err) {
+    console.error('[RosterView] adminVolunteerLink (copy) failed:', err)
+    linkCopyError.value = "Couldn't copy — try again"
+    setTimeout(() => {
+      linkCopyError.value = null
+    }, 3000)
+  } finally {
+    copyingLink.value = false
   }
 }
 
