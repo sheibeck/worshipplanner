@@ -269,6 +269,14 @@ router.beforeEach(async (to) => {
       const authStore = useAuthStore()
       await authStore.waitForReady()
       if (authStore.requiresOrgSelection) {
+        // WR-02 (125-REVIEW.md): a signed-in, zero-membership, non-super-admin
+        // user revisiting /login (bookmark, browser back, typed URL) is a
+        // magic-link volunteer -- send them back to their own landing page
+        // rather than the (empty) church picker, which is a dead end for
+        // this population. Mirrors the isVolunteerRoute exemption at line 216.
+        if (!authStore.isSuperAdmin) {
+          return { name: 'volunteer-home' }
+        }
         // Quick 260823: churchless super-admin lands on the Owner Console.
         return { name: authStore.isChurchlessSuperAdmin ? 'owner-console' : 'select-church' }
       }

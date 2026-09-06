@@ -34,6 +34,10 @@ const mockAuthStore = {
   waitForReady: vi.fn().mockResolvedValue(undefined),
   requiresOrgSelection: false,
   isChurchlessSuperAdmin: false,
+  // WR-02 (125-REVIEW.md) — distinguishes a plain zero-membership
+  // super-admin (owner-console) from a zero-membership volunteer
+  // (volunteer-home) in the /login bounce-back below.
+  isSuperAdmin: false,
 }
 vi.mock('../../stores/auth', () => ({
   useAuthStore: () => mockAuthStore,
@@ -100,6 +104,14 @@ function createTestRouter() {
         component: { template: '<div>Volunteer Home</div>' },
         meta: { requiresAuth: true, isVolunteerRoute: true },
       },
+      {
+        // Mirrors production's /owner-console — the churchless-super-admin
+        // destination the /login bounce-back below can redirect to.
+        path: '/owner-console',
+        name: 'owner-console',
+        component: { template: '<div>Owner Console</div>' },
+        meta: { requiresAuth: true, requiresSuperAdmin: true },
+      },
     ],
   })
 
@@ -124,6 +136,17 @@ function createTestRouter() {
     if (to.name === 'login') {
       const user = await mockGetCurrentUser()
       if (user) {
+        // Mirrors production's widened /login bounce-back (src/router/index.ts)
+        // — the isSuperAdmin branch is the WR-02 fix under test.
+        const { useAuthStore } = await import('../../stores/auth')
+        const authStore = useAuthStore()
+        await authStore.waitForReady()
+        if (authStore.requiresOrgSelection) {
+          if (!authStore.isSuperAdmin) {
+            return { name: 'volunteer-home' }
+          }
+          return { name: authStore.isChurchlessSuperAdmin ? 'owner-console' : 'select-church' }
+        }
         return { name: 'dashboard' }
       }
     }
@@ -141,6 +164,7 @@ describe('Router guard', () => {
     mockAuthStore.waitForReady.mockResolvedValue(undefined)
     mockAuthStore.requiresOrgSelection = false
     mockAuthStore.isChurchlessSuperAdmin = false
+    mockAuthStore.isSuperAdmin = false
   })
 
   describe('protected routes (requiresAuth: true)', () => {
@@ -242,6 +266,37 @@ describe('Router guard', () => {
       const router = createTestRouter()
       await router.push('/volunteer')
       expect(router.currentRoute.value.name).toBe('login')
+    })
+  })
+
+  describe('/login bounce-back for a signed-in volunteer (WR-02)', () => {
+    it('a signed-in, zero-membership, non-super-admin user revisiting /login lands on /volunteer, not /select-church', async () => {
+      mockGetCurrentUser.mockResolvedValue(mockUser)
+      mockAuthStore.requiresOrgSelection = true
+      mockAuthStore.isSuperAdmin = false
+      const router = createTestRouter()
+      await router.push('/login')
+      expect(router.currentRoute.value.name).toBe('volunteer-home')
+    })
+
+    it('a signed-in, zero-membership SUPER-ADMIN revisiting /login still lands on /owner-console, not /volunteer', async () => {
+      mockGetCurrentUser.mockResolvedValue(mockUser)
+      mockAuthStore.requiresOrgSelection = true
+      mockAuthStore.isSuperAdmin = true
+      mockAuthStore.isChurchlessSuperAdmin = true
+      const router = createTestRouter()
+      await router.push('/login')
+      expect(router.currentRoute.value.name).toBe('owner-console')
+    })
+
+    it('a signed-in super-admin with a deactivated single org revisiting /login still lands on /select-church', async () => {
+      mockGetCurrentUser.mockResolvedValue(mockUser)
+      mockAuthStore.requiresOrgSelection = true
+      mockAuthStore.isSuperAdmin = true
+      mockAuthStore.isChurchlessSuperAdmin = false
+      const router = createTestRouter()
+      await router.push('/login')
+      expect(router.currentRoute.value.name).toBe('select-church')
     })
   })
 })
