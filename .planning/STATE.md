@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v2.13
 milestone_name: Volunteer Self-Service & Multi-Church Access (Phases 128-130, in planning)
 current_phase: 129
-current_phase_name: Phase 129 Plan 01 (server backend) complete -- Plan 02 (RosterView.vue client UI) remains
+current_phase_name: Phase 129 complete (both plans) -- backend callable (129-01) + RosterView client drawer UI (129-02)
 status: in_progress
-stopped_at: Completed 129-01-PLAN.md
-last_updated: "2026-09-06T20:19:44.701Z"
+stopped_at: Completed 129-02-PLAN.md
+last_updated: "2026-09-06T20:53:49.188Z"
 last_activity: 2026-09-06
 last_activity_desc: "129-01-PLAN.md executed (mintVolunteerLink extracted from mintAndSendVolunteerLink as the sole Admin-SDK mint call site; new authenticated adminVolunteerLink callable added -- members/{uid} editor/admin re-check mirrors queueServiceMessageHandler, roster-gated on emailLower with honest HttpsError codes, mode:'email' sends via the shared core / mode:'copy' returns the raw link; R400/R401/R402 server-side complete; 10-case ALLOW/DENY + single-mint-path test matrix added)"
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 33
+  completed_plans: 4
+  percent: 67
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.13 Volunteer Self-Service & Multi-Church Access (roadmap created 2026-09-06)
 
-**Status:** Phase 128 (both plans) complete, autonomous build + auto-verified green, UNDEPLOYED — ready to plan Phase 129
+**Status:** Phase 128 and Phase 129 (both plans each) complete, autonomous build + auto-verified green, UNDEPLOYED — ready to plan Phase 130
 
 **Goal:** Let volunteers get their own passwordless sign-in link on demand and see their schedule
 organized by church — extending v2.12's account-level email-link access with a self-service request path,
@@ -3489,6 +3489,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 127 P06 | 18min | 2 tasks | 4 files |
 | Phase 128 P02 | 1h | 3 tasks | 11 files |
 | Phase 129 P01 | 35min | 3 tasks | 3 files |
+| Phase 129 P02 | 27min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -4065,6 +4066,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 127-05: useVolunteerServiceDoc always re-fetches rehearseAccess via a fresh getDoc on load/retry rather than trusting the cached list-arm doc, collapsing permission-denied and missing-doc into the same access-denied state (distinct from retryable load-failure)
 - [Phase ?]: 127-06: RehearseAudioPlayerBar always renders fixed-bottom (no JS breakpoint tracking) — must_haves require only a single persistent instance, not a desktop-inline/mobile-pinned CSS split.
 - [Phase 129]: 129-01: mintVolunteerLink extracted as the sole mint call site; adminVolunteerLink callable reuses it for mode:'copy' and mintAndSendVolunteerLink for mode:'email', preserving R402's single-code-path/one-authz-model requirement
+- [Phase ?]: [Phase 129]: RosterView Sign-in Link section placed inside the existing Add/Edit drawer (after Status), not a new per-row action menu -- no new chrome, per UI-SPEC
+- [Phase ?]: [Phase 129]: Email feedback uses the global toast store; Copy feedback uses an inline label-flip only (no toast) -- matches the established Roster/ServiceEditor split
 
 ### Roadmap Evolution
 
@@ -4394,8 +4397,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T20:19:44.635Z
-Stopped at: Completed 129-01-PLAN.md
+Last session: 2026-09-06T20:53:49.112Z
+Stopped at: Completed 129-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
