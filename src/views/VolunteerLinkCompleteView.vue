@@ -57,6 +57,21 @@
             </svg>
           </div>
           <p class="text-sm text-gray-300">{{ volunteerAuth.errorMessage }}</p>
+          <!-- R399 (Phase 128) — one-tap recovery: the slug travels in the
+               minted link's continue-URL query (128-01's mintAndSendVolunteerLink),
+               so re-requesting returns to the SAME church with no re-selection.
+               Navigates via router.push to a NAMED route target only (never a
+               raw redirect URL) — 128-RESEARCH Pitfall 5 / threat T-128-C3.
+               A plain button + router.push (not RouterLink) mirrors this
+               codebase's established pattern for testability under a fully
+               mocked 'vue-router' module (see LoginView.vue). -->
+          <button
+            type="button"
+            @click="router.push(requestNewLinkTarget)"
+            class="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors"
+          >
+            Request a new link
+          </button>
         </div>
       </div>
     </div>
@@ -64,16 +79,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useVolunteerAuthStore } from '@/stores/volunteerAuth'
 
 const router = useRouter()
+const route = useRoute()
 const volunteerAuth = useVolunteerAuthStore()
 
 const isVerifying = ref(true)
 const isSubmittingReentry = ref(false)
 const reenteredEmail = ref('')
+
+// R399 — the slug round-trips on the continue-URL query (minted by 128-01's
+// mintAndSendVolunteerLink). Fallback is 'volunteer-home', the SAME concrete
+// route Task 2 makes public and targets from the login entry — NOT the
+// superseded 'volunteer-request-generic' placeholder name from RESEARCH.md.
+const requestNewLinkTarget = computed(() =>
+  typeof route.query.slug === 'string'
+    ? { name: 'volunteer-request', params: { slug: route.query.slug } }
+    : { name: 'volunteer-home' },
+)
 
 async function attemptCompletion(reenteredValue?: string): Promise<void> {
   const success = await volunteerAuth.completeSignIn(window.location.href, reenteredValue)
