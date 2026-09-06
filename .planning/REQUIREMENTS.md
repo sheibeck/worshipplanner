@@ -10,8 +10,9 @@ username/password and without exposing media publicly. Step 2 (final) of the fil
 
 > **Numbering:** continues the project's global `R###` scheme from v2.11 (which ended at R373).
 > **Scope decisions (owner, 2026-09-05):** access = passwordless magic link · landing = a "My Schedule"
-> volunteer home (only Planned/locked services) · Rehearse = a **standalone screen** reached only from My
-> Schedule (not a service-editor tab) · playback speed + whole-track loop **included** · per-org storage
+> volunteer home (only Planned/locked services) · the volunteer service view = a **standalone, read-only
+> view** reached only from My Schedule (NOT the planner editor) with **Rehearse + Order of Service + Stage
+> Layout** tabs, since tech-team members are volunteers too · playback speed + whole-track loop **included** · per-org storage
 > quota + egress alerting **deferred** to backlog · **no project-research pass** (SEED-003 + v2.7 research +
 > v2.11 validation already cover it). Design reference: the owner's Claude Design project —
 > `Rehearsal.dc.html` + `Volunteer Home.dc.html` (Nocturne palette → app dark gray-950).
@@ -54,12 +55,15 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   matches no assignment, an empty state explaining the list is built from roster assignments and how to be
   added.
 
-### Rehearse Screen (Standalone, per service)
+### Volunteer Service View (Standalone, read-only, per service)
 
-- [ ] **R384**: Rehearse is its **own standalone screen reached only from a My Schedule service card** — it
-  is **not** a tab inside the planner's service editor, and a volunteer never sees the Service Order /
-  Slides / Roles / Stage Layout editor.
-- [ ] **R385**: The Rehearse screen lists the songs in that service (with each song's key, PDF count, MP3
+- [ ] **R384**: Opening a service from My Schedule opens a **standalone, read-only volunteer service view** —
+  **not** the planner's `ServiceEditorView` (a volunteer never sees the editing UI, drafts, slide editing, or
+  messaging). It carries the views a serving volunteer needs as tabs — **Rehearse** (default) · **Order of
+  Service** · **Stage Layout** — because tech-team members are volunteers too; it is composed from the
+  existing read-only renderers (ShareView snapshot + the v2.7 read-only order/stage renders), not by forking
+  the editor.
+- [ ] **R385**: The **Rehearse** tab lists the songs in that service (with each song's key, PDF count, MP3
   count, and a now-playing indicator) and lets the volunteer select a song to see its media.
 - [ ] **R386**: A selected song's detail lists its **Sheet music & chords** (PDF attachments) with per-file
   **Print** and **Download**, its **Recordings** (MP3 attachments), and an optional per-song note — all
@@ -71,7 +75,13 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [ ] **R389**: The audio player supports whole-track **playback speed** (1× / 0.9× / 0.75× / 1.25×) and a
   whole-track **Loop** toggle.
 - [ ] **R390**: External media links (YouTube / Google Drive / Dropbox) attached to a song in v2.11 are
-  openable from the Rehearse screen, opening in a new tab (no in-app embedding required).
+  openable from the Rehearse tab, opening in a new tab (no in-app embedding required).
+- [ ] **R392**: The volunteer service view has a read-only **Order of Service** tab showing the service's
+  running order (reusing the existing read-only order-of-service render), so tech and all volunteers can see
+  what happens when.
+- [ ] **R393**: The volunteer service view has a read-only **Stage Layout** tab showing the v2.7 stage
+  diagram (instruments/mics + person Name-Role assignments), which tech-team volunteers need for setup
+  (reusing the existing read-only/print stage render).
 
 ### Delivery Quality
 
@@ -106,7 +116,8 @@ Explicitly excluded for this milestone.
 | Loop-a-section / A–B loop | Whole-track loop only this milestone (SEED-003 anti-feature). |
 | Image / uploaded-video attachment types | Out of the v2.11 attachment model; video enters only as an external link. |
 | Volunteers editing services, songs, or attachments | Volunteer surface is strictly read-and-rehearse. |
-| A Rehearse tab inside the planner's service editor | Rehearse is a standalone volunteer screen (owner decision) — reached only from My Schedule. |
+| Reusing the planner's `ServiceEditorView` for the volunteer view | The volunteer view is a standalone, read-only view composed from existing read-only renderers (owner decision) — not a hidden/read-only mode of the god-module editor; keeps the R377 isolation guarantee simple. |
+| Volunteer editing of order of service / stage layout | Order of Service + Stage Layout are read-only in the volunteer view (planners edit them in the editor). |
 
 ## Traceability
 
@@ -132,11 +143,13 @@ Populated during roadmap creation.
 | R389 | TBD | Pending |
 | R390 | TBD | Pending |
 | R391 | TBD | Pending |
+| R392 | TBD | Pending |
+| R393 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 18 total (R374–R391)
+- v1 requirements: 20 total (R374–R393)
 - Mapped to phases: 0 (roadmap pending)
-- Unmapped: 18 ⚠️
+- Unmapped: 20 ⚠️
 
 ---
 *Requirements defined: 2026-09-05 — milestone v2.12 Rehearse Mode*

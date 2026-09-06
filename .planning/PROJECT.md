@@ -32,13 +32,19 @@ file-storage backlog (999.13 / SEED-003); step 1 (song attachments) shipped as v
   indicator (all ready / N songs missing media / waiting on charts), a countdown + call time, and a
   **Rehearse →** CTA that opens that service's standalone Rehearse screen. Includes a "check a different
   email" affordance for volunteers rostered under another address.
-- **Rehearse (standalone screen, per service)** — its **own screen, reached only from a My Schedule service
-  card** — deliberately **not** a tab inside the planner's service-editor (a volunteer never sees the Service
-  Order / Slides / Roles / Stage Layout editor). A 3-column experience (from the owner's design):
-  songs-in-this-service (key + PDF/MP3 counts + now-playing) → song detail (Sheet music & chords rows with
-  **Print + Download**, Recordings rows, an optional per-song note) → a PDF reader (page nav + Print) plus a
-  bottom audio player (play/seek/time, **speed** 0.9/0.75/1.25×, **whole-track Loop**). Media = the **v2.11
-  song attachments** (PDF/MP3), reused — nothing is re-uploaded here.
+- **Volunteer service view (standalone, read-only, per service)** — reached **only from a My Schedule
+  service card**, a dedicated read-and-go view that is **not** the planner's `ServiceEditorView` (volunteers
+  never see the editing UI, drafts, slide editing, or messaging). Because tech-team members are volunteers
+  too, it carries the three views a serving volunteer needs, as tabs:
+  - **Rehearse** (default) — a 3-column experience (from the owner's design): songs-in-this-service (key +
+    PDF/MP3 counts + now-playing) → song detail (Sheet music & chords rows with **Print + Download**,
+    Recordings rows, an optional per-song note) → a PDF reader (page nav + Print) plus a bottom audio player
+    (play/seek/time, **speed** 0.9/0.75/1.25×, **whole-track Loop**). Media = the **v2.11 song attachments**
+    (PDF/MP3 + external links), reused — nothing is re-uploaded here.
+  - **Order of Service** (read-only) — the running order, for tech + everyone.
+  - **Stage Layout** (read-only) — the v2.7 stage diagram (instruments/mics + person Name-Role), which tech
+    especially needs. Built from the **existing read-only renderers** (ShareView snapshot + the v2.7
+    read-only stage/order renders), **not** by forking the editor.
 - **Mobile-friendly playback** — PDFs open/download reliably on phones (link-first, `<iframe>` as a desktop
   enhancement per v2.7 research); native `<audio>` plays on mobile.
 
@@ -47,10 +53,14 @@ file-storage backlog (999.13 / SEED-003); step 1 (song attachments) shipped as v
   Per-person playback position + downloads. Not full accounts, not public.
 - **Landing = "My Schedule"** (the volunteer home) listing all of a volunteer's assigned services (not just
   a single-service deep link), then pick one to rehearse. Available to anyone assigned to a service.
-- **Rehearse is a STANDALONE screen** reached only from a My Schedule service card — **not** a tab in the
-  planner's service editor (owner decision 2026-09-05). The volunteer surface (My Schedule + Rehearse) is
-  fully separate from the planner surface (the service editor); a planner who also plays reaches rehearsal
-  the same way, via My Schedule.
+- **The volunteer view is a STANDALONE, read-only service view** reached only from a My Schedule service
+  card — **not** the planner's `ServiceEditorView` (owner decision 2026-09-05). It carries **Rehearse +
+  Order of Service + Stage Layout** tabs, because **tech-team members are volunteers too** and need the order
+  of service and stage layout, not just rehearsal media. Rather than fork the god-module editor and hide
+  things (the option the owner floated), it is **composed from the existing read-only renderers** (ShareView
+  snapshot + the v2.7 read-only order/stage renders) — this keeps the volunteer surface fully separate from
+  the planner surface and keeps the R377 scoped-read isolation guarantee simple. A planner who also plays
+  reaches it the same way, via My Schedule.
 - **My Schedule shows only Planned (locked) services** — draft/in-progress services are excluded from the
   volunteer view (owner decision 2026-09-05), reusing the app's existing not-Draft/lock gate.
 - **Playback extras INCLUDED** — whole-track speed + loop (cheap on the native `<audio>` element; present in
@@ -649,9 +659,11 @@ for non-technical users — plus item-editing and preview polish.
 (999.13 / SEED-003). Passwordless magic-link access (Firebase `signInWithEmailLink`, roster-email-tied, not
 public) → "My Schedule" volunteer home (anyone assigned to a service; all of a volunteer's assigned services
 via roster-email→assignment match, grouped This week / Later this month + past, role chips, readiness,
-Rehearse → CTA) → a **standalone** per-service Rehearse screen reached only from My Schedule (NOT a
-service-editor tab; 3-column: songs-in-service → song detail with Print+Download → PDF reader + audio player
-with whole-track speed/loop) reusing v2.11 song attachments. Mobile-friendly PDF/audio. Cost guardrails
+Rehearse → CTA) → a **standalone read-only volunteer service view** reached only from My Schedule (NOT the
+planner editor; tabs = **Rehearse** [3-column: songs → detail w/ Print+Download → PDF reader + audio player
+w/ whole-track speed/loop, reusing v2.11 attachments] + **Order of Service** (read-only) + **Stage Layout**
+(read-only), since tech-team are volunteers too; composed from existing read-only renderers).
+Mobile-friendly PDF/audio. Cost guardrails
 (per-org quota + egress alerting) deferred to backlog; playback speed/loop included. No project-research
 pass. Design ref: owner's `Rehearsal.dc.html` + `Volunteer Home.dc.html`. Requirements continue from R374;
 phases from 125. See `.planning/REQUIREMENTS.md`.
@@ -870,10 +882,12 @@ This document evolves at phase transitions and milestone boundaries.
 `signInWithEmailLink`, roster-email-tied, delivered via v1.7 messaging emails, not public) → "My Schedule"
 volunteer home (anyone assigned to a service; all of a volunteer's assigned services via
 roster-email→assignment match, grouped This week / Later this month + past, role chips + readiness +
-Rehearse CTA) → a STANDALONE per-service Rehearse screen reached only from My Schedule, NOT a service-editor
-tab (3-column: songs → song detail w/ Print+Download → PDF reader + audio player w/ whole-track speed/loop)
-reusing v2.11 song attachments; mobile-friendly PDF/audio. Owner decisions (2026-09-05): access=magic link,
-landing="My Schedule" volunteer home, Rehearse=standalone screen (not an editor tab), playback speed/loop
+Rehearse CTA) → a STANDALONE read-only volunteer service view reached only from My Schedule, NOT the planner
+editor (tabs = Rehearse [3-column: songs → detail w/ Print+Download → PDF reader + audio player w/
+whole-track speed/loop, reusing v2.11 attachments] + Order of Service + Stage Layout, read-only, since
+tech-team are volunteers too; composed from existing read-only renderers); mobile-friendly PDF/audio. Owner
+decisions (2026-09-05): access=magic link, landing="My Schedule" volunteer home (Planned-only), volunteer
+service view = standalone read-only w/ Rehearse+Order+Stage tabs (NOT the editor), playback speed/loop
 INCLUDED, cost guardrails (per-org quota + egress alerting) DEFERRED to backlog,
 no project-research pass. Design ref: owner's Claude Design project `Rehearsal.dc.html` +
 `Volunteer Home.dc.html` (Nocturne → app dark gray-950; UI phase produces app-fidelity mocks). Requirements
