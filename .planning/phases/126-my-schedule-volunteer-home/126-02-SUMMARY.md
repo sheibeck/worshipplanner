@@ -157,3 +157,10 @@ None - no external service configuration required.
 ---
 *Phase: 126-my-schedule-volunteer-home*
 *Completed: 2026-09-06*
+
+## Self-Check: PASSED
+
+All created files verified present on disk (`src/utils/myScheduleGrouping.ts`,
+`src/utils/myScheduleGrouping.test.ts`, `src/utils/roleChipIcon.ts`,
+`src/utils/roleChipIcon.test.ts`) and all task/summary commit hashes
+(`a33d0fbe`, `eff1e82f`, `2a8c9beb`) confirmed present in `git log`.

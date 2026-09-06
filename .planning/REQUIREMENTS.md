@@ -48,7 +48,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [x] **R379**: My Schedule shows **only Planned (locked, non-Draft) services** — a service still being
   drafted by a planner never appears to volunteers (reuses the app's existing not-Draft / lock gate).
 
-- [ ] **R380**: Services are ordered soonest-first and grouped **This week / Later this month**, with a
+- [x] **R380**: Services are ordered soonest-first and grouped **This week / Later this month**, with a
   "Next up" badge on the soonest upcoming service; past services the volunteer served are shown separately
   and remain openable.
 
@@ -148,7 +148,7 @@ Populated during roadmap creation.
 | R377 | Phase 125 | Complete |
 | R378 | Phase 126 | Complete |
 | R379 | Phase 126 | Complete |
-| R380 | Phase 126 | Pending |
+| R380 | Phase 126 | Complete |
 | R381 | Phase 126 | Complete |
 | R382 | Phase 126 | Pending |
 | R383 | Phase 126 | Pending |
