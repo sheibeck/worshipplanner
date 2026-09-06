@@ -12,6 +12,7 @@ function ctx(overrides: Partial<MessageTokenContext> = {}): MessageTokenContext 
     theirRoles: ["guitar"],
     songTitles: ["Amazing Grace", "How Great Thou Art"],
     serviceLink: "https://app.example.com/share/tok_abc",
+    rehearseLink: "https://app.example.com/volunteer/verify?oobCode=abc123",
     recipientName: "Alex Kim",
     ...overrides,
   };
@@ -85,6 +86,29 @@ describe("renderMessageTokens", () => {
   it("replaces every occurrence of a repeated token, not just the first", () => {
     const out = renderMessageTokens("{{service_date}} / {{service_date}}", ctx({ serviceDate: "D1" }));
     expect(out).toBe("D1 / D1");
+  });
+
+  it("replaces {{rehearse_link}} with THIS recipient's personal magic sign-in link (R375)", () => {
+    const out = renderMessageTokens(
+      "Rehearse: {{rehearse_link}}",
+      ctx({ rehearseLink: "https://x.test/volunteer/verify?oobCode=xyz" }),
+    );
+    expect(out).toBe("Rehearse: https://x.test/volunteer/verify?oobCode=xyz");
+  });
+
+  it("R375: the SAME body template renders a DIFFERENT {{rehearse_link}} for recipient A vs recipient B", () => {
+    const template = "Sign in here: {{rehearse_link}}";
+    const personA = renderMessageTokens(template, ctx({ rehearseLink: "https://x.test/a" }));
+    const personB = renderMessageTokens(template, ctx({ rehearseLink: "https://x.test/b" }));
+    expect(personA).toBe("Sign in here: https://x.test/a");
+    expect(personB).toBe("Sign in here: https://x.test/b");
+    expect(personA).not.toBe(personB);
+  });
+
+  it("a template WITHOUT {{rehearse_link}} is unaffected by the new token", () => {
+    const raw = "See you on {{service_date}}, {{name}}!";
+    const out = renderMessageTokens(raw, ctx({ serviceDate: "Aug 17", recipientName: "Alex Kim" }));
+    expect(out).toBe("See you on Aug 17, Alex Kim!");
   });
 
   it("leaves unknown {{tokens}} untouched", () => {

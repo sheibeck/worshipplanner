@@ -12,6 +12,9 @@ export interface MessageTokenContext {
   songTitles: string[];
   /** The service's public share-link URL, or '' when none exists (A1). */
   serviceLink: string;
+  /** R375: THIS recipient's personal, server-minted magic sign-in link
+   * (getAuth().generateSignInWithEmailLink) — the per-recipient field. */
+  rehearseLink: string;
 }
 
 /**
@@ -49,5 +52,6 @@ export function renderMessageTokens(template: string, ctx: MessageTokenContext):
   out = replaceToken(out, "name", ctx.recipientName);
   out = replaceToken(out, "song_list", songText);
   out = replaceToken(out, "service_link", ctx.serviceLink);
+  out = replaceToken(out, "rehearse_link", ctx.rehearseLink);
   return out;
 }
