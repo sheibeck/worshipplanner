@@ -127,7 +127,7 @@ describe('buildRehearseAccess', () => {
     const person = makePerson({ email: 'Dana@Example.com' })
     const service = makeService({ date: '2026-09-06' })
 
-    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [role], [person], [])
 
     expect(result.assignedEmailsLower).toEqual(['dana@example.com'])
   })
@@ -141,7 +141,7 @@ describe('buildRehearseAccess', () => {
     const person = makePerson({ email: '' })
     const service = makeService({ date: '2026-09-06' })
 
-    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [role], [person], [])
 
     expect(result.assignedEmailsLower).toEqual([])
   })
@@ -176,7 +176,7 @@ describe('buildRehearseAccess', () => {
       ],
     })
 
-    const result = buildRehearseAccess(service, 'org-1', [], [], [], [song])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [song])
 
     expect(result.songs).toHaveLength(1)
     expect(result.songs[0]!.title).toBe('Amazing Grace')
@@ -203,7 +203,7 @@ describe('buildRehearseAccess', () => {
     })
     const song = makeSong({ id: 'song-1' })
 
-    const result = buildRehearseAccess(service, 'org-1', [], [], [], [song])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [song])
 
     // The count matches what the leader actually built (2 slots), not a
     // silently-shrunk 1.
@@ -220,7 +220,7 @@ describe('buildRehearseAccess', () => {
   it('returns only the schema fields — no notes or other private planner fields', () => {
     const service = makeService()
 
-    const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [])
 
     // No slots/markers on the default fixture — orderOfService/roleAssignments
     // are still required keys (empty arrays), stageLayout stays ABSENT (never
@@ -254,7 +254,7 @@ describe('buildRehearseAccess', () => {
     const service = makeService({ slots: [makeSongSlot({ songId: 'song-1' })] })
     const song = makeSong({ id: 'song-1', notes: 'this must never appear in rehearseAccess' })
 
-    const result = buildRehearseAccess(service, 'org-1', [], [], [], [song])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [song])
 
     expect(JSON.stringify(result.songs)).not.toContain('this must never appear')
   })
@@ -262,7 +262,7 @@ describe('buildRehearseAccess', () => {
   it('performs no I/O and is a pure function of its arguments', () => {
     const service = makeService()
     const before = JSON.stringify(service)
-    buildRehearseAccess(service, 'org-1', [], [], [], [])
+    buildRehearseAccess(service, 'org-1', undefined, [], [], [], [])
     expect(JSON.stringify(service)).toBe(before)
   })
 
@@ -281,7 +281,7 @@ describe('buildRehearseAccess', () => {
     const person = makePerson({ id: 'person-1', email: 'Dana@Example.com' })
     const service = makeService({ date: '2026-09-06' })
 
-    const result = buildRehearseAccess(service, 'org-1', [quarter], [roleGuitar, roleVocals], [person], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [roleGuitar, roleVocals], [person], [])
 
     expect(result.rolesByEmailLower).toEqual({ 'dana@example.com': ['guitar', 'vocals'] })
   })
@@ -295,7 +295,7 @@ describe('buildRehearseAccess', () => {
     const person = makePerson({ id: 'person-1', email: 'dana@example.com' })
     const service = makeService({ date: '2026-09-06' })
 
-    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [role], [person], [])
 
     expect(result.rolesByEmailLower).toEqual({ 'dana@example.com': ['guitar'] })
   })
@@ -309,7 +309,7 @@ describe('buildRehearseAccess', () => {
     const person = makePerson({ id: 'person-1', email: '' })
     const service = makeService({ date: '2026-09-06' })
 
-    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [role], [person], [])
 
     expect(result.rolesByEmailLower).toEqual({})
   })
@@ -323,7 +323,7 @@ describe('buildRehearseAccess', () => {
     const person = makePerson({ id: 'person-1', email: 'Dana@Example.COM' })
     const service = makeService({ date: '2026-09-06' })
 
-    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [role], [person], [])
 
     expect(Object.keys(result.rolesByEmailLower)).toEqual(['dana@example.com'])
   })
@@ -337,7 +337,7 @@ describe('buildRehearseAccess', () => {
     const person = makePerson({ id: 'person-1', name: 'Dana Smith', email: 'dana@example.com' })
     const service = makeService({ date: '2026-09-06' })
 
-    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [role], [person], [])
 
     expect(JSON.stringify(result.rolesByEmailLower)).not.toContain('Dana Smith')
     expect(JSON.stringify(result.rolesByEmailLower)).not.toContain('person-1')
@@ -379,7 +379,7 @@ describe('buildRehearseAccess', () => {
       ] as ServiceSlot[],
     })
 
-    const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [])
 
     expect(result.orderOfService).toHaveLength(8)
     for (const item of result.orderOfService) {
@@ -396,7 +396,7 @@ describe('buildRehearseAccess', () => {
       slots: [{ id: 'slot-unknown', kind: 'FUTURE_KIND', position: 0 } as unknown as ServiceSlot],
     })
 
-    const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [])
 
     expect(result.orderOfService).toEqual([{ id: 'slot-unknown', kind: 'FUTURE_KIND', position: 0 }])
   })
@@ -410,7 +410,7 @@ describe('buildRehearseAccess', () => {
     const person = makePerson({ id: 'person-1', name: 'Dana Smith', email: 'dana@example.com' })
     const service = makeService({ date: '2026-09-06' })
 
-    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [role], [person], [])
 
     expect(result.roleAssignments).toEqual([
       { roleId: 'role-guitar', roleName: 'guitar', group: 'band', personNames: ['Dana Smith'] },
@@ -434,7 +434,7 @@ describe('buildRehearseAccess', () => {
     const person = makePerson({ id: 'person-1', name: 'Dana Smith' })
     const service = makeService({ date: '2026-09-06' })
 
-    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [role], [person], [])
 
     expect(result.roleAssignments).toEqual([
       { roleId: 'role-guitar', roleName: 'guitar', group: 'band', personNames: ['(removed)', 'Dana Smith'] },
@@ -445,7 +445,7 @@ describe('buildRehearseAccess', () => {
   it('stageLayout is absent (key not present) for a service with zero markers', () => {
     const service = makeService({ stageLayout: { elements: [] } })
 
-    const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [])
 
     expect('stageLayout' in result).toBe(false)
   })
@@ -468,7 +468,7 @@ describe('buildRehearseAccess', () => {
     ]
     const service = makeService({ stageLayout: { elements: markers } })
 
-    const result = buildRehearseAccess(service, 'org-1', [], [], [], [])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [])
 
     expect(result.stageLayout).toBeDefined()
     const [element] = result.stageLayout!.elements
@@ -485,6 +485,26 @@ describe('buildRehearseAccess', () => {
       withVocal: true,
     })
     expect(JSON.stringify(result.stageLayout)).not.toContain(PII_MARKER)
+  })
+
+  // Phase 130 (R403/R404): orgName lets a zero-membership volunteer label
+  // churches without reading organizations/{orgId} (membership-gated).
+  it('orgName equals the passed org name when a non-empty name is given', () => {
+    const service = makeService()
+
+    const result = buildRehearseAccess(service, 'org-1', 'Grace Church', [], [], [], [])
+
+    expect(result.orgName).toBe('Grace Church')
+  })
+
+  it('orgName is absent (not undefined) when an empty string or undefined name is given', () => {
+    const service = makeService()
+
+    const resultUndefined = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [])
+    const resultEmpty = buildRehearseAccess(service, 'org-1', '', [], [], [], [])
+
+    expect('orgName' in resultUndefined).toBe(false)
+    expect('orgName' in resultEmpty).toBe(false)
   })
 
   it('resolves bpm to the arrangement matching the slot key, falling back to the first arrangement, and null for an arrangement-less song', () => {
@@ -505,7 +525,7 @@ describe('buildRehearseAccess', () => {
       ],
     })
 
-    const result = buildRehearseAccess(service, 'org-1', [], [], [], [songWithMatch, songFallback, songNoArrangements])
+    const result = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [songWithMatch, songFallback, songNoArrangements])
 
     const byId = new Map(result.songs.map((s) => [s.id, s]))
     expect(byId.get('song-match')?.bpm).toBe(140)

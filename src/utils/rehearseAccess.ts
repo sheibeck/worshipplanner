@@ -55,6 +55,11 @@ export interface RehearseRoleAssignment {
 export interface RehearseAccessDoc {
   serviceId: string
   orgId: string
+  /** Org's public display name (Phase 130, R403/R404) — PII-safe, already
+   *  public via the orgSlugs registry. Lets a zero-membership volunteer label
+   *  churches without reading organizations/{orgId} (membership-gated).
+   *  Optional: pre-Phase-130 docs lack it until re-projected. */
+  orgName?: string
   serviceDate: string
   title: string
   status: string
@@ -109,6 +114,7 @@ function distinctSongSlots(service: Service): SongSlot[] {
 export function buildRehearseAccess(
   service: Service,
   orgId: string,
+  orgName: string | undefined,
   quarters: Quarter[],
   roles: Role[],
   people: Person[],
@@ -224,6 +230,7 @@ export function buildRehearseAccess(
   return {
     serviceId: service.id,
     orgId,
+    ...(orgName ? { orgName } : {}),
     serviceDate: service.date,
     title: service.name,
     status: service.status,
