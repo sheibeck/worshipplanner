@@ -2436,6 +2436,18 @@ export interface RequestVolunteerLinkResponse {
 // ceiling). Env-overridable mirroring AI_PROXY_MAX_INSTANCES's idiom.
 export const VOLUNTEER_LINK_MAX_PER_MIN = readNumericKnob(process.env.VOLUNTEER_LINK_MAX_PER_MIN, 1);
 export const VOLUNTEER_LINK_MAX_PER_DAY = readNumericKnob(process.env.VOLUNTEER_LINK_MAX_PER_DAY, 5);
+// WR-01: aggregate per-org daily ceiling, LAYERED on top of the per-(orgId,email)
+// limiter above. The per-email limiter only throttles repeats of the SAME email;
+// it places no bound on the number of DISTINCT email guesses an attacker can try
+// against one orgId, each of which triggers an unconditional full read of
+// organizations/{orgId}/people (cost amplification + an unbounded timing-sample
+// budget). This org-scoped counter caps total request volume against a single
+// org per day so distinct-email enumeration is bounded. Generous default for
+// legitimate multi-volunteer churches; env-overridable like the others.
+export const VOLUNTEER_LINK_MAX_PER_ORG_PER_DAY = readNumericKnob(
+  process.env.VOLUNTEER_LINK_MAX_PER_ORG_PER_DAY,
+  300,
+);
 // Timing-pad target (128-RESEARCH Pitfall 2 / Assumption A4): the no-match
 // and rate-limited (no-send) branches are padded to this elapsed-ms floor so
 // their latency is indistinguishable from the roster-hit branch's real
@@ -2485,8 +2497,13 @@ export async function requestVolunteerLinkHandler(
     request.data ?? ({} as RequestVolunteerLinkRequest);
 
   // The ONLY branch allowed to differ from the generic response -- purely
-  // structural, carries no membership information (R395).
-  if (!orgId || !email) {
+  // structural, carries no membership information (R395). WR-04: this is a
+  // PUBLIC callable that can receive arbitrary JSON, so validate the TYPE, not
+  // just truthiness -- a non-string orgId/email (e.g. `orgId: 123`, `orgId: {}`)
+  // passes `!orgId` yet would throw unguarded inside the Admin SDK (`.doc()`
+  // requires a string), escaping as an `internal` HttpsError. A malformed
+  // SHAPE carries no membership information, so rejecting it here is safe.
+  if (typeof orgId !== "string" || typeof email !== "string" || !orgId || !email) {
     throw new HttpsError("invalid-argument", "orgId and email are required.");
   }
   if (!isShallowValidEmail(email)) {
@@ -2521,6 +2538,34 @@ export async function requestVolunteerLinkHandler(
     });
   }
 
+  // WR-01: aggregate per-org daily throttle on a DEDICATED collection
+  // (volunteerLinkOrgCounters) -- checked BEFORE the roster read so an attacker
+  // rotating through many DISTINCT email guesses against one orgId cannot drive
+  // unbounded full-people reads (cost amplification) or an unlimited timing
+  // sample budget. Enumeration-safe (over limit -> the SAME generic response,
+  // padded, no roster read, no send -- never resource-exhausted) and fail-OPEN,
+  // consistent with the per-(orgId,email) limiter above.
+  try {
+    const orgQuota = await checkAndConsumeOrgEmailQuota(
+      db,
+      orgId,
+      1,
+      VOLUNTEER_LINK_MAX_PER_ORG_PER_DAY,
+      Date.now(),
+      "volunteerLinkOrgCounters",
+    );
+    if (!orgQuota.allowed) {
+      await padVolunteerLinkResponse(startedAtMs);
+      return VOLUNTEER_LINK_GENERIC_RESPONSE;
+    }
+  } catch (orgQuotaErr) {
+    // Fail OPEN -- identical rationale to the per-email limiter above: the
+    // throttle is a cost/abuse guardrail, not the security control.
+    console.warn("[requestVolunteerLink] per-org throttle Firestore op failed; failing open:", {
+      message: orgQuotaErr instanceof Error ? orgQuotaErr.message : String(orgQuotaErr),
+    });
+  }
+
   // R396: roster gate -- full-fetch + in-memory case-insensitive match,
   // scoped to THIS request's own orgId only (never a global/cross-org query,
   // and never a `.where('email','==',...)` query -- Person.email is
@@ -2543,7 +2588,36 @@ export async function requestVolunteerLinkHandler(
     return VOLUNTEER_LINK_GENERIC_RESPONSE;
   }
 
-  await mintAndSendVolunteerLink({ db, to: email, orgName, slug });
+  // CR-01: the roster-HIT send path MUST NOT be observably different from any
+  // other branch. Any failure inside mintAndSendVolunteerLink (Resend outage,
+  // Admin SDK rejection, appConfig read blip) would otherwise propagate as an
+  // uncaught exception -> onCall's `internal` HttpsError -> a REJECTED promise
+  // client-side -> the request form's error banner, which a roster-miss/
+  // rate-limited request can never reach. That divergence is a full
+  // enumeration oracle. Swallow the failure (log server-side) and fall through
+  // to the SAME generic response, exactly like the no-match/throttled branches.
+  //
+  // CR-02: send to the already-normalized `emailLower` (trimmed + lowercased),
+  // NOT the raw `email`. The raw value can carry leading/trailing whitespace or
+  // odd casing that the roster COMPARE normalizes away but that Admin SDK's
+  // own email validator rejects (`auth/invalid-email`) -- which, absent CR-01's
+  // guard, is exactly the trivially-craftable trigger that turns a roster hit
+  // into the divergent failure mode above.
+  try {
+    await mintAndSendVolunteerLink({ db, to: emailLower, orgName, slug });
+  } catch (mintErr) {
+    console.error("[requestVolunteerLink] mint/send failed for a roster hit:", {
+      message: mintErr instanceof Error ? mintErr.message : String(mintErr),
+    });
+  }
+
+  // CR-03: pad the roster-HIT branch too. Real mint+send work commonly
+  // completes well under the target floor; without padding here, hits form a
+  // fast/variable latency cluster while misses/rate-limited/throttled requests
+  // sit at the ~1200ms floor -- the enumeration-via-timing channel this pad
+  // exists to close, merely inverted. Padding all resolvable branches to the
+  // same floor makes hit and non-hit time-indistinguishable.
+  await padVolunteerLinkResponse(startedAtMs);
   return VOLUNTEER_LINK_GENERIC_RESPONSE;
 }
 

@@ -42,6 +42,7 @@ import {
   requestVolunteerLinkHandler,
   VOLUNTEER_LINK_MAX_PER_MIN,
   VOLUNTEER_LINK_MAX_PER_DAY,
+  VOLUNTEER_LINK_MAX_PER_ORG_PER_DAY,
   VOLUNTEER_LINK_TARGET_RESPONSE_MS,
 } from "./index";
 import type {
@@ -5886,12 +5887,15 @@ describe("requestVolunteerLinkHandler", () => {
    *   organizations/{orgId}                  -> .get()
    *   organizations/{orgId}/people            -> .get()
    *   volunteerLinkRateLimits/{key}            -> .doc()/.runTransaction()
+   *   volunteerLinkOrgCounters/{key}           -> .doc()/.runTransaction()  (WR-01)
    * Throws on any OTHER collection name -- this is itself an assertion that
-   * the limiter never reads/writes aiRateLimits or msgEnqueueRateLimits.
+   * the limiter/throttle never reads/writes aiRateLimits, msgEnqueueRateLimits,
+   * or the shared orgEmailCounters.
    */
   function fakeVolunteerDb(opts: {
     orgs?: Record<string, FakeOrg | null>;
     rateLimitSeed?: Record<string, number>;
+    orgCounterSeed?: Record<string, number>;
     rateLimiterThrows?: boolean;
   } = {}) {
     const orgs = opts.orgs ?? {};
@@ -5899,9 +5903,12 @@ describe("requestVolunteerLinkHandler", () => {
     for (const [id, count] of Object.entries(opts.rateLimitSeed ?? {})) {
       counterState[id] = { count };
     }
-    const rateLimitsCollection = {
-      doc: vi.fn((id: string) => ({ _docId: id, _collection: "volunteerLinkRateLimits" as const })),
-    };
+    for (const [id, count] of Object.entries(opts.orgCounterSeed ?? {})) {
+      counterState[id] = { count };
+    }
+    const makeCounterCollection = (name: string) => ({
+      doc: vi.fn((id: string) => ({ _docId: id, _collection: name })),
+    });
     const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
       if (opts.rateLimiterThrows) {
         throw new Error("Firestore unavailable");
@@ -5942,7 +5949,8 @@ describe("requestVolunteerLinkHandler", () => {
     const db = {
       collection: vi.fn((name: string) => {
         if (name === "organizations") return { doc: vi.fn((orgId: string) => makeOrgRef(orgId)) };
-        if (name === "volunteerLinkRateLimits") return rateLimitsCollection;
+        if (name === "volunteerLinkRateLimits") return makeCounterCollection(name);
+        if (name === "volunteerLinkOrgCounters") return makeCounterCollection(name);
         throw new Error(`fakeVolunteerDb: unexpected collection "${name}"`);
       }),
       runTransaction,
@@ -6080,6 +6088,19 @@ describe("requestVolunteerLinkHandler", () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
+  it("WR-04: a non-STRING orgId/email (arbitrary JSON on a public callable) throws invalid-argument -- never a membership-revealing distinction", async () => {
+    // Truthy-but-non-string values pass the old `!orgId` guard yet would throw
+    // unguarded inside the Admin SDK (.doc() requires a string). The type guard
+    // rejects them up front as malformed SHAPE (carries no membership info).
+    await expect(
+      requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: 123 as unknown as string, email: "a@example.com" })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    await expect(
+      requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: { at: "x" } as unknown as string })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
   it("DENY-5: a malformed email throws invalid-argument", async () => {
     await expect(
       requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: "not-an-email" })),
@@ -6136,6 +6157,110 @@ describe("requestVolunteerLinkHandler", () => {
     expect(mockSend).toHaveBeenCalledTimes(2);
   });
 
+  it("CR-01: a mint/send FAILURE on a genuine roster hit still resolves the SAME generic response (never a rejected promise / different client state)", async () => {
+    vi.useFakeTimers();
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    // A failing Resend send -- the roster hit mints, then the delivery throws.
+    mockSend.mockRejectedValue(new Error("Resend 503: service unavailable"));
+
+    const promise = requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+
+    // Must RESOLVE the byte-identical generic response, NOT reject -- a rejected
+    // promise would surface as the request form's error banner, a state a
+    // roster-miss can never reach (the CR-01 enumeration oracle).
+    await expect(promise).resolves.toEqual(GENERIC_RESPONSE);
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("CR-01 (mint failure): an Admin SDK generateSignInWithEmailLink rejection on a roster hit also resolves the generic response", async () => {
+    vi.useFakeTimers();
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    setGenerateLink(() => {
+      throw new Error("auth/invalid-email");
+    });
+
+    const promise = requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+
+    await expect(promise).resolves.toEqual(GENERIC_RESPONSE);
+    expect(mockSend).not.toHaveBeenCalled(); // mint threw before the send
+  });
+
+  it("CR-02: a leading-space / mixed-case variant of a rostered email yields the generic response and sends to the NORMALIZED address (no divergent behavior)", async () => {
+    vi.useFakeTimers();
+    const ROSTER_EMAIL = "volunteer@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: ROSTER_EMAIL }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    // The exact CR-02 attack input: whitespace + casing that isShallowValidEmail
+    // accepts and the roster compare normalizes away, but that Admin SDK's own
+    // validator rejects when passed raw. The handler must send the NORMALIZED
+    // form so this behaves identically to the clean submission.
+    const promise = requestVolunteerLinkHandler(
+      fakeVolunteerRequest({ orgId: "org1", email: "  Volunteer@Example.COM  " }),
+    );
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+
+    await expect(promise).resolves.toEqual(GENERIC_RESPONSE);
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    const sendArgs = mockSend.mock.calls[0][0] as { to: string };
+    // Sent to the normalized address, NOT the raw "  Volunteer@Example.COM  ".
+    expect(sendArgs.to).toBe(ROSTER_EMAIL);
+    const mintTo = vi.mocked(vi.mocked(getAuth)().generateSignInWithEmailLink).mock.calls[0][0];
+    expect(mintTo).toBe(ROSTER_EMAIL);
+  });
+
+  it("WR-01: over the aggregate per-org daily throttle -> generic response, no roster send, even for a genuinely rostered email (bounds distinct-email enumeration)", async () => {
+    const NOW = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const dayWindow = Math.floor(NOW / 86_400_000);
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+      // The org's aggregate daily counter is already at the ceiling -- the NEXT
+      // request (a distinct email guess) must be throttled BEFORE the roster read.
+      orgCounterSeed: { [`org1__day__${dayWindow}`]: VOLUNTEER_LINK_MAX_PER_ORG_PER_DAY },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const promise = requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+    const result = await promise;
+
+    expect(result).toEqual(GENERIC_RESPONSE);
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(vi.mocked(getAuth)().generateSignInWithEmailLink).not.toHaveBeenCalled();
+  });
+
+  it("WR-01: the per-org throttle fails OPEN when its Firestore transaction throws -- a legitimate rostered request still sends", async () => {
+    // rateLimiterThrows makes ALL counter transactions throw (per-email AND
+    // per-org); both must fail open so a Firestore hiccup never blocks a
+    // legitimate volunteer. A send proves neither throttle became a hard gate.
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+      rateLimiterThrows: true,
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+
+    expect(result).toEqual(GENERIC_RESPONSE);
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
   it("byte-identical body: a DENY-1 response deep-equals an ALLOW-1 response", async () => {
     vi.useFakeTimers();
     const EMAIL = "rostered@example.com";
@@ -6143,7 +6268,11 @@ describe("requestVolunteerLinkHandler", () => {
       orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
     });
     vi.mocked(getFirestore).mockReturnValue(allowDb as never);
-    const allowResult = await requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+    // The roster-HIT branch is now padded too (CR-03) -- advance fake timers so
+    // it resolves rather than hanging on the pad's setTimeout.
+    const allowPromise = requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+    const allowResult = await allowPromise;
 
     const { db: denyDb } = fakeVolunteerDb({
       orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
@@ -6159,15 +6288,19 @@ describe("requestVolunteerLinkHandler", () => {
     expect(denyResult).toEqual(GENERIC_RESPONSE);
   });
 
-  it("TIMING-1: ALLOW and DENY branch elapsed times both land within a tolerance band around VOLUNTEER_LINK_TARGET_RESPONSE_MS, proving the timing pad", async () => {
+  it("TIMING-1 (CR-03): the roster-HIT branch is padded UP to the floor even when its real mint+send work is far under the target -- hit and miss are time-indistinguishable", async () => {
     vi.useFakeTimers();
     const EMAIL = "rostered@example.com";
     const TOLERANCE_MS = 150;
-    // The roster-HIT branch's real mint+send work: simulated as network
-    // latency comfortably under the target, so the branch's OWN work (not a
-    // pad) drives its elapsed time -- proving the pad masks it rather than
-    // stacking on top of it.
-    const HIT_LATENCY_MS = VOLUNTEER_LINK_TARGET_RESPONSE_MS - 100;
+    // The roster-HIT branch's real mint+send work: simulated as network latency
+    // FAR under the target floor (the realistic production case an in-region
+    // Admin SDK call + one small Resend POST). If the hit branch were NOT padded
+    // (pre-CR-03 behavior), allowElapsed would land at ~HIT_LATENCY_MS, i.e. a
+    // full ~1000ms below the miss branch's floor -- the exact observable timing
+    // gap this assertion now forbids. With the pad applied to the hit branch,
+    // allowElapsed must rise to the same VOLUNTEER_LINK_TARGET_RESPONSE_MS floor.
+    const HIT_LATENCY_MS = 200;
+    expect(HIT_LATENCY_MS).toBeLessThan(VOLUNTEER_LINK_TARGET_RESPONSE_MS - TOLERANCE_MS);
 
     const { db: allowDb } = fakeVolunteerDb({
       orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
@@ -6182,7 +6315,9 @@ describe("requestVolunteerLinkHandler", () => {
 
     const allowStart = Date.now();
     const allowPromise = requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
-    await vi.advanceTimersByTimeAsync(HIT_LATENCY_MS + 10);
+    // Advance past BOTH the mint latency AND the subsequent pad -- if the branch
+    // is correctly padded the handler is still pending until the ~1200ms floor.
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
     await allowPromise;
     const allowElapsed = Date.now() - allowStart;
 
@@ -6200,15 +6335,21 @@ describe("requestVolunteerLinkHandler", () => {
     await denyPromise;
     const denyElapsed = Date.now() - denyStart;
 
+    // The hit branch must be padded UP to the floor (this is the assertion that
+    // fails against the pre-CR-03 unpadded hit branch, where allowElapsed ~= 200).
+    expect(allowElapsed).toBeGreaterThanOrEqual(VOLUNTEER_LINK_TARGET_RESPONSE_MS - TOLERANCE_MS);
     expect(Math.abs(allowElapsed - VOLUNTEER_LINK_TARGET_RESPONSE_MS)).toBeLessThanOrEqual(TOLERANCE_MS);
     expect(Math.abs(denyElapsed - VOLUNTEER_LINK_TARGET_RESPONSE_MS)).toBeLessThanOrEqual(TOLERANCE_MS);
+    // Hit and miss latencies converge -- no externally observable cluster split.
+    expect(Math.abs(allowElapsed - denyElapsed)).toBeLessThanOrEqual(TOLERANCE_MS);
   });
 
-  it("the rate limiter is keyed on the DEDICATED volunteerLinkRateLimits collection -- never aiRateLimits/msgEnqueueRateLimits (no cross-depletion)", async () => {
+  it("the rate limiter + per-org throttle are keyed on DEDICATED collections -- never aiRateLimits/msgEnqueueRateLimits/orgEmailCounters (no cross-depletion)", async () => {
     // fakeVolunteerDb itself throws on any collection name other than
-    // "organizations"/"volunteerLinkRateLimits" -- a call against
-    // aiRateLimits or msgEnqueueRateLimits would fail this test with that
-    // thrown error rather than a clean assertion failure.
+    // "organizations"/"volunteerLinkRateLimits"/"volunteerLinkOrgCounters" -- a
+    // call against aiRateLimits, msgEnqueueRateLimits, or the shared
+    // orgEmailCounters would fail this test with that thrown error rather than a
+    // clean assertion failure.
     const EMAIL = "rostered@example.com";
     const { db } = fakeVolunteerDb({
       orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
