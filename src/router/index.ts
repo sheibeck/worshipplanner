@@ -171,6 +171,16 @@ const router = createRouter({
       meta: { requiresAuth: true, isVolunteerRoute: true },
     },
     {
+      // R378/R380/R383 (Phase 126) — the volunteer's post-sign-in landing:
+      // grouped assigned Planned services, empty/loading/error states, and
+      // the check-a-different-email affordance. isVolunteerRoute exempts a
+      // zero-membership volunteer from the org-selection gate below.
+      path: '/my-schedule',
+      name: 'my-schedule',
+      component: () => import('../views/MyScheduleView.vue'),
+      meta: { requiresAuth: true, isVolunteerRoute: true },
+    },
+    {
       // R382 (Phase 126) — the Rehearse/Open target for a My Schedule card.
       // A REAL placeholder authored this phase (never a lazy import() of a
       // Phase-127 file that doesn't exist yet, per Phase 125's build-safety
@@ -287,7 +297,7 @@ router.beforeEach(async (to) => {
         // rather than the (empty) church picker, which is a dead end for
         // this population. Mirrors the isVolunteerRoute exemption at line 216.
         if (!authStore.isSuperAdmin) {
-          return { name: 'volunteer-home' }
+          return { name: 'my-schedule' }
         }
         // Quick 260823: churchless super-admin lands on the Owner Console.
         return { name: authStore.isChurchlessSuperAdmin ? 'owner-console' : 'select-church' }

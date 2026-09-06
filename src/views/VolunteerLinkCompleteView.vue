@@ -78,7 +78,7 @@ const reenteredEmail = ref('')
 async function attemptCompletion(reenteredValue?: string): Promise<void> {
   const success = await volunteerAuth.completeSignIn(window.location.href, reenteredValue)
   if (success) {
-    await router.replace({ name: 'volunteer-home' })
+    await router.replace({ name: 'my-schedule' })
   }
 }
 
