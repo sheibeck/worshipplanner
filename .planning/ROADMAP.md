@@ -653,13 +653,13 @@ proving the isolation guarantee, not just a UI hide.
      Layout editors) — those routes/reads are denied at the data layer for a volunteer-scoped session
      (R377).
 
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 
 Plans:
 
 - [x] 125-01-PLAN.md — R377 scoped-read isolation: rehearseAccess rule + Firestore-emulator ALLOW/DENY proof (security core, Wave 1)
 - [ ] 125-02-PLAN.md — Rehearse-access projection builder + lock-time write / reopen-delete lifecycle (Wave 2)
-- [ ] 125-03-PLAN.md — Server-side magic-link generation embedded in the existing reminder/share email (R375, Wave 1)
+- [x] 125-03-PLAN.md — Server-side magic-link generation embedded in the existing reminder/share email (R375, Wave 1)
 - [ ] 125-04-PLAN.md — Volunteer passwordless sign-in, session, sign-out + isVolunteerRoute router exemption (R374/R376, Wave 1)
 
 ### Phase 126: My Schedule — Volunteer Home

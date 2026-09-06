@@ -5,16 +5,16 @@ milestone_name: Rehearse Mode (Phases 125-127, in planning)
 current_phase: 125
 current_phase_name: Passwordless Magic-Link Access & Scoped Read Isolation
 status: planning
-stopped_at: Completed 125-01-PLAN.md
-last_updated: "2026-09-06T03:52:05.305Z"
+stopped_at: Completed 125-03-PLAN.md
+last_updated: "2026-09-06T04:00:55.966Z"
 last_activity: 2026-09-06
 last_activity_desc: Phase 125 Plan 01 executed and committed (7e0c423a test, 82f5a59b feat)
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
-  percent: 25
+  completed_plans: 2
+  percent: 0
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1323,7 +1323,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 125 — Passwordless Magic-Link Access & Scoped Read Isolation
-Plan: 1 of 4
+Plan: 2 of 4
 Status: Plan 01 executed — R377 data-layer security gate GREEN (rehearseAccess firestore.rules block + 9-case emulator ALLOW/DENY suite, TDD RED-then-GREEN). Ready to plan/execute 125-02.
 Last activity: 2026-09-06 — Phase 125 Plan 01 executed and committed (7e0c423a test, 82f5a59b feat)
 
@@ -3381,6 +3381,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 124 P01 | 55min | 3 tasks | 4 files |
 | Phase 124 P02 | 20min | 2 tasks | 4 files |
 | Phase 125 P01 | 20min | 2 tasks | 2 files |
+| Phase 125 P03 | 12min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -3933,6 +3934,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 124-02: PDF preview built as a standalone SongFilePreviewModal.vue mounted once at the SongFilesTab root (per plan interface_context), with its Escape/backdrop dismiss scoped to a DOM-level @keydown on the dialog root (never window/document) so it cannot bubble to SongSlideOver's deliberately non-dismissing editing slideout.
 - [Phase ?]: rehearseAccess is a top-level sibling collection under organizations/{orgId} (doc id == serviceId), not nested under services/{docId}, so orgId+serviceId are both path-derived and no client field is trusted for scoping (R377).
 - [Phase ?]: parentIsPlanned() re-checks the LIVE parent service status via a same-service Firestore get() on every rehearseAccess read — required to close the Reopen-leaves-stale-grant gap; explicitly not the forbidden cross-service storage.rules->firestore.exists() pattern.
+- [Phase ?]: Reused existing SERVICE_SHARE_BASE_URL param for the volunteer magic-link continue-URL (+ /volunteer/verify) rather than adding a new Cloud Functions param
+- [Phase ?]: actionCodeSettings computed once per message (not per recipient) since only the target email varies per generateSignInWithEmailLink call
 
 ### Roadmap Evolution
 
@@ -4262,8 +4265,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T03:52:05.207Z
-Stopped at: Completed 125-01-PLAN.md
+Last session: 2026-09-06T04:00:55.904Z
+Stopped at: Completed 125-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

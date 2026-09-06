@@ -27,7 +27,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   tied to their roster email — request/receive a link, click it, and be signed in with no password to set
   or remember.
 
-- [ ] **R375**: The magic sign-in link is delivered through the existing v1.7 volunteer-messaging emails
+- [x] **R375**: The magic sign-in link is delivered through the existing v1.7 volunteer-messaging emails
   (reminder / share), so a rostered volunteer reaches My Schedule in one click from the email they already
   get. (Only the link-delivery channel is reused; no new email system.)
 
@@ -143,7 +143,7 @@ Populated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R374 | Phase 125 | Pending |
-| R375 | Phase 125 | Pending |
+| R375 | Phase 125 | Complete |
 | R376 | Phase 125 | Pending |
 | R377 | Phase 125 | Complete |
 | R378 | Phase 126 | Pending |

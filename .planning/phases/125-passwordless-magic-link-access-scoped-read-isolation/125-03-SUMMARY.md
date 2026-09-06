@@ -152,3 +152,7 @@ Local emulator testing and this plan's automated verification (`cd functions && 
 ---
 *Phase: 125-passwordless-magic-link-access-scoped-read-isolation*
 *Completed: 2026-09-05*
+
+## Self-Check: PASSED
+
+All created/modified files found on disk; all task and metadata commit hashes (`237808f6`, `e912321b`, `61ea6faf`) found in git log.
