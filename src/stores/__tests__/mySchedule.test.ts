@@ -108,6 +108,112 @@ describe('mySchedule store — loadMySchedule', () => {
     expect(store.isLoading).toBe(false)
   })
 
+  // ── Phase 130 (R403/R405): distinct-church derivation + client-side filter ──
+  describe('churches / selectedChurch / filteredDocs (Phase 130)', () => {
+    it('churches over docs from two distinct orgIds returns two entries, first-occurrence order', async () => {
+      mockAuth.currentUser = { email: 'dana@example.com' }
+      mockGetDocs.mockResolvedValue({
+        docs: [
+          fakeSnapDoc({ serviceId: 'svc1', serviceDate: '2026-09-10', orgName: 'Grace Church' }, 'orgA'),
+          fakeSnapDoc({ serviceId: 'svc2', serviceDate: '2026-09-17', orgName: 'Hope Chapel' }, 'orgB'),
+          fakeSnapDoc({ serviceId: 'svc3', serviceDate: '2026-09-24', orgName: 'Grace Church' }, 'orgA'),
+        ],
+      })
+
+      const store = useMyScheduleStore()
+      await store.loadMySchedule()
+
+      expect(store.churches).toEqual([
+        { orgId: 'orgA', orgName: 'Grace Church' },
+        { orgId: 'orgB', orgName: 'Hope Chapel' },
+      ])
+    })
+
+    it('churches over one orgId returns one entry; over zero docs returns []', async () => {
+      mockAuth.currentUser = { email: 'dana@example.com' }
+      mockGetDocs.mockResolvedValue({
+        docs: [fakeSnapDoc({ serviceId: 'svc1', serviceDate: '2026-09-10', orgName: 'Grace Church' }, 'orgA')],
+      })
+
+      const single = useMyScheduleStore()
+      await single.loadMySchedule()
+      expect(single.churches).toEqual([{ orgId: 'orgA', orgName: 'Grace Church' }])
+      // R405 gate: a single-church volunteer's church count is <= 1.
+      expect(single.churches.length).toBeLessThanOrEqual(1)
+
+      setActivePinia(createPinia())
+      mockGetDocs.mockResolvedValue({ docs: [] })
+      const empty = useMyScheduleStore()
+      await empty.loadMySchedule()
+      expect(empty.churches).toEqual([])
+    })
+
+    it('a doc whose orgName is absent still yields a churches entry with orgName undefined — no crash', async () => {
+      mockAuth.currentUser = { email: 'dana@example.com' }
+      mockGetDocs.mockResolvedValue({
+        docs: [fakeSnapDoc({ serviceId: 'svc1', serviceDate: '2026-09-10' }, 'orgA')],
+      })
+
+      const store = useMyScheduleStore()
+      await store.loadMySchedule()
+
+      expect(store.churches).toEqual([{ orgId: 'orgA', orgName: undefined }])
+    })
+
+    it('filteredDocs returns all docs when selectedChurch is null, else only docs matching the orgId', async () => {
+      mockAuth.currentUser = { email: 'dana@example.com' }
+      mockGetDocs.mockResolvedValue({
+        docs: [
+          fakeSnapDoc({ serviceId: 'svc1', serviceDate: '2026-09-10' }, 'orgA'),
+          fakeSnapDoc({ serviceId: 'svc2', serviceDate: '2026-09-17' }, 'orgB'),
+        ],
+      })
+
+      const store = useMyScheduleStore()
+      await store.loadMySchedule()
+
+      expect(store.filteredDocs).toHaveLength(2)
+
+      store.selectedChurch = 'orgA'
+      expect(store.filteredDocs).toHaveLength(1)
+      expect(store.filteredDocs[0]).toMatchObject({ serviceId: 'svc1', orgId: 'orgA' })
+    })
+
+    it('a stale selectedChurch that no longer appears among the new docs orgIds is reset to null on reload', async () => {
+      mockAuth.currentUser = { email: 'dana@example.com' }
+      mockGetDocs.mockResolvedValueOnce({
+        docs: [
+          fakeSnapDoc({ serviceId: 'svc1', serviceDate: '2026-09-10' }, 'orgA'),
+          fakeSnapDoc({ serviceId: 'svc2', serviceDate: '2026-09-17' }, 'orgB'),
+        ],
+      })
+
+      const store = useMyScheduleStore()
+      await store.loadMySchedule()
+      store.selectedChurch = 'orgB'
+      expect(store.filteredDocs).toHaveLength(1)
+
+      // Reload drops orgB entirely (e.g. that assignment no longer exists).
+      mockGetDocs.mockResolvedValueOnce({
+        docs: [fakeSnapDoc({ serviceId: 'svc1', serviceDate: '2026-09-10' }, 'orgA')],
+      })
+      await store.loadMySchedule()
+
+      expect(store.selectedChurch).toBeNull()
+      expect(store.filteredDocs).toHaveLength(1)
+    })
+
+    it('never imports @/stores/auth or calls selectOrg — filters already-loaded docs only', async () => {
+      const fs = await import('node:fs/promises')
+      const path = await import('node:path')
+      const source = await fs.readFile(path.resolve(process.cwd(), 'src/stores/mySchedule.ts'), 'utf-8')
+      // Match real import/call sites, not this file's own prohibition
+      // comments (which name both strings as anti-patterns to avoid).
+      expect(/from ['"]@\/stores\/auth['"]/.test(source)).toBe(false)
+      expect(/\bselectOrg\s*\(/.test(source)).toBe(false)
+    })
+  })
+
   it('isLoading is true only while the query is in flight', async () => {
     mockAuth.currentUser = { email: 'dana@example.com' }
     let resolveGetDocs!: (value: { docs: unknown[] }) => void

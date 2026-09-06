@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { collectionGroup, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { db, auth } from '@/firebase'
@@ -25,12 +25,45 @@ export const useMyScheduleStore = defineStore('mySchedule', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
+  // Phase 130 (R403): session-local filter over `docs` — null means "all
+  // churches". This is a pure client-side slice of already-loaded/authorized
+  // docs, never a re-subscribe: this store must NEVER import the auth store
+  // or invoke the admin membership-switch action, which assumes memberships
+  // a zero-membership volunteer never has.
+  const selectedChurch = ref<string | null>(null)
+
+  // Distinct churches the volunteer serves, first-occurrence order — mirrors
+  // rehearseAccess.ts's distinctSongSlots Set-dedupe idiom (ADR-0160), using a
+  // Map for key->value dedupe. orgName is left as-is (string | undefined) so
+  // each consumer (switcher UI, sidebar) applies its own fallback label.
+  const churches = computed(() => {
+    const byOrgId = new Map<string, string | undefined>()
+    for (const d of docs.value) {
+      if (!byOrgId.has(d.orgId)) byOrgId.set(d.orgId, d.orgName)
+    }
+    return [...byOrgId.entries()].map(([orgId, orgName]) => ({ orgId, orgName }))
+  })
+
+  const filteredDocs = computed(() => {
+    if (!selectedChurch.value) return docs.value
+    return docs.value.filter((d) => d.orgId === selectedChurch.value)
+  })
+
+  // A stale selectedChurch (an orgId no longer present in a freshly-loaded
+  // docs array) must never coerce filteredDocs to a permanently empty list —
+  // reset to null ("all") instead.
+  function resetStaleSelection(): void {
+    if (selectedChurch.value === null) return
+    if (!docs.value.some((d) => d.orgId === selectedChurch.value)) selectedChurch.value = null
+  }
+
   async function loadMySchedule(): Promise<void> {
     const email = auth.currentUser?.email
     if (!email) {
       docs.value = []
       isLoading.value = false
       error.value = null
+      resetStaleSelection()
       return
     }
 
@@ -50,6 +83,7 @@ export const useMyScheduleStore = defineStore('mySchedule', () => {
         const data = d.data() as RehearseAccessDoc
         return { ...data, orgId: d.ref.parent.parent!.id }
       })
+      resetStaleSelection()
     } catch (err: unknown) {
       // IN-01 (126-REVIEW): pair the swallowed error with a console.error,
       // matching services.ts's markAsPlanned/reopenService convention — a
@@ -58,6 +92,7 @@ export const useMyScheduleStore = defineStore('mySchedule', () => {
       console.error('loadMySchedule failed', err)
       docs.value = []
       error.value = err instanceof Error ? err.message : 'Failed to load your schedule.'
+      resetStaleSelection()
     } finally {
       isLoading.value = false
     }
@@ -67,6 +102,9 @@ export const useMyScheduleStore = defineStore('mySchedule', () => {
     docs,
     isLoading,
     error,
+    selectedChurch,
+    churches,
+    filteredDocs,
     loadMySchedule,
   }
 })
