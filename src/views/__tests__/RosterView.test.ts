@@ -537,6 +537,43 @@ describe('RosterView — drawer Sign-in Link section (129-02, R400/R401)', () =>
     expect(flippedBtn).toBeTruthy()
   })
 
+  it('WR-02 (129-REVIEW.md): a resolved copy-mode callable with no link surfaces the error label instead of silently no-oping', async () => {
+    mockAdminVolunteerLinkCallable.mockImplementation(() => Promise.resolve({ data: {} }))
+    mockPeople = [makePerson({ id: 'p-1', name: 'Alice', email: 'alice@example.com', active: true, roles: [] })]
+    const wrapper = mountRosterView()
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    const copyBtn = wrapper.findAll('button').find((b) => b.text() === 'Copy sign-in link')!
+    await copyBtn.trigger('click')
+    await flushPromises()
+
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled()
+    const flippedBtn = wrapper.findAll('button').find((b) => b.text() === "Couldn't copy — try again")
+    expect(flippedBtn).toBeTruthy()
+  })
+
+  it('WR-02: a resolved copy-mode callable with a link but no Clipboard API surfaces the error label', async () => {
+    mockAdminVolunteerLinkCallable.mockImplementation(() =>
+      Promise.resolve({ data: { link: 'https://app.example/volunteer/verify?oobCode=xyz' } }),
+    )
+    // Simulate a non-secure/older-browser context where Clipboard API is absent.
+    Object.assign(navigator, { clipboard: undefined })
+    mockPeople = [makePerson({ id: 'p-1', name: 'Alice', email: 'alice@example.com', active: true, roles: [] })]
+    const wrapper = mountRosterView()
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    const copyBtn = wrapper.findAll('button').find((b) => b.text() === 'Copy sign-in link')!
+    await copyBtn.trigger('click')
+    await flushPromises()
+
+    const flippedBtn = wrapper.findAll('button').find((b) => b.text() === "Couldn't copy — try again")
+    expect(flippedBtn).toBeTruthy()
+  })
+
   it('hides the Email/Copy buttons and shows the explanatory line for a person with NO email', async () => {
     mockPeople = [makePerson({ id: 'p-1', name: 'Bob', email: '', active: true, roles: [] })]
     const wrapper = mountRosterView()

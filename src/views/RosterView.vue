@@ -760,6 +760,15 @@ async function onCopySignInLink() {
       setTimeout(() => {
         linkCopied.value = false
       }, 2000)
+    } else {
+      // WR-02 (129-REVIEW.md): a resolved callable with no link (or no
+      // Clipboard API) is still a failure from the admin's point of view —
+      // surface the same error state the catch block below uses, instead of
+      // silently reverting to the default label with zero feedback.
+      linkCopyError.value = "Couldn't copy — try again"
+      setTimeout(() => {
+        linkCopyError.value = null
+      }, 3000)
     }
   } catch (err) {
     console.error('[RosterView] adminVolunteerLink (copy) failed:', err)
