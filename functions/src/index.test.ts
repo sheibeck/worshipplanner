@@ -5706,6 +5706,40 @@ describe("sendQueuedMessageHandler", () => {
     expect(outcome).toMatchObject({ status: "partial", sentCount: 1, failedCount: 1 });
   });
 
+  // WR-04 (125-REVIEW.md, T-125-13): generateSignInWithEmailLink lives inside
+  // the SAME per-recipient try/catch as the Resend send. A rejection there
+  // (not just a Resend send rejection) must isolate to the one recipient —
+  // proving the comment's claimed isolation actually holds for THIS call,
+  // not only for resend.emails.send.
+  it("WR-04: a generateSignInWithEmailLink rejection for one recipient is isolated — that recipient is 'failed', the other still sends", async () => {
+    const { db, recipientWrites, messageSetSpy } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    vi.mocked(getAuth).mockReturnValue({
+      verifyIdToken: vi.fn(),
+      getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+      generateSignInWithEmailLink: vi.fn(async (email: string) => {
+        if (email === "bob@example.com") throw new Error("auth/invalid-continue-uri");
+        return `https://example.com/volunteer/verify?email=${encodeURIComponent(email)}`;
+      }),
+    } as never);
+
+    const outcome = await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    // Bob's link generation threw BEFORE any Resend call for him -- only
+    // Alice's send ever reaches the provider.
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect((mockSend.mock.calls[0]![0] as { to: string }).to).toBe("alice@example.com");
+
+    const byId = Object.fromEntries(recipientWrites.map((w) => [w.id, w.payload.status]));
+    expect(byId.pA).toBe("sent");
+    expect(byId.pB).toBe("failed");
+    expect(messageSetSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "partial", deliveryCounts: { sent: 1, failed: 1 } }),
+      { merge: true },
+    );
+    expect(outcome).toMatchObject({ status: "partial", sentCount: 1, failedCount: 1 });
+  });
+
   it("all sends failing rolls the message up to 'failed'", async () => {
     const { db, messageSetSpy } = makeSendDb(twoRecipientConfig());
     vi.mocked(getFirestore).mockReturnValue(db as never);
