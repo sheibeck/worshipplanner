@@ -2076,6 +2076,18 @@ export async function sendQueuedMessageHandler(params: {
     .filter((t) => t.length > 0);
   const serviceLink = await resolveServiceLink(db, orgId, serviceId);
 
+  // R375: ActionCodeSettings for the per-recipient magic sign-in link, resolved
+  // ONCE per message (same base for every recipient) from the SAME
+  // SERVICE_SHARE_BASE_URL param resolveServiceLink already reads -- no new
+  // param (RESEARCH.md Open Question 2). '/volunteer/verify' is the Phase 125
+  // completion route (Plan 04). handleCodeInApp is mandatory for
+  // generateSignInWithEmailLink's continue-URL to complete sign-in in-app
+  // rather than via Firebase's own hosted action page.
+  const rehearseActionCodeSettings = {
+    url: `${SERVICE_SHARE_BASE_URL.value().trim().replace(/\/+$/, "")}/volunteer/verify`,
+    handleCodeInApp: true,
+  };
+
   // Build the send list: reachable volunteers + optional server-resolved self-copy.
   const sendList: SendTarget[] = reachable.map((r) => ({
     id: r.id,
@@ -2177,7 +2189,17 @@ export async function sendQueuedMessageHandler(params: {
       if (!RESEND_TAG_SAFE.test(target.id)) {
         throw new Error("recipient id is not Resend-tag-safe");
       }
-      const tokenCtx = { serviceDate, theirRoles: target.roleNames, recipientName: target.name, songTitles, serviceLink };
+      // R375: mint THIS recipient's personal magic sign-in link server-side.
+      // generateSignInWithEmailLink returns a URL string ONLY -- it never
+      // sends email itself, so the link rides the ONE Resend send below
+      // instead of triggering a second, Firebase-branded email. Lives inside
+      // this SAME per-recipient try/catch: a failure here marks only this
+      // recipient 'failed' and the loop continues (T-125-13).
+      const rehearseLink = await getAuth().generateSignInWithEmailLink(
+        target.email,
+        rehearseActionCodeSettings,
+      );
+      const tokenCtx = { serviceDate, theirRoles: target.roleNames, recipientName: target.name, songTitles, serviceLink, rehearseLink };
       const subject = renderMessageTokens(message.subject, tokenCtx);
       const body = renderMessageTokens(message.body, tokenCtx);
 

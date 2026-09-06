@@ -101,6 +101,10 @@ vi.mock("firebase-admin/auth", () => ({
     // sendQueuedMessage resolves the requesting editor's own email server-side
     // (never a client-supplied address) for options.sendCopyToSelf.
     getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+    // R375: sendQueuedMessage mints THIS recipient's magic sign-in link
+    // server-side per recipient -- fake returns a link keyed by the
+    // recipient's own email so per-recipient-uniqueness is observable.
+    generateSignInWithEmailLink: vi.fn(async (email: string) => `https://example.com/volunteer/verify?email=${encodeURIComponent(email)}`),
   })),
 }));
 vi.mock("firebase-admin/firestore", () => ({
@@ -5320,6 +5324,18 @@ describe("sendQueuedMessageHandler", () => {
     mockSend.mockResolvedValue({ data: { id: "re_fake_id" }, error: null });
     fakeShareBaseUrl = "";
     fakeEditorEmail = "editor@example.com";
+    // Earlier describe blocks in this file override getAuth's mockReturnValue
+    // (e.g. verifyIdToken-only fakes for the /api auth tests) and Vitest does
+    // not auto-reset mocks between tests in this config -- re-pin the full
+    // shape (incl. R375's generateSignInWithEmailLink) here so this describe
+    // never inherits a stale override missing the new method.
+    vi.mocked(getAuth).mockReturnValue({
+      verifyIdToken: vi.fn(),
+      getUser: vi.fn(async () => ({ email: fakeEditorEmail })),
+      generateSignInWithEmailLink: vi.fn(
+        async (email: string) => `https://example.com/volunteer/verify?email=${encodeURIComponent(email)}`,
+      ),
+    } as never);
   });
 
   afterEach(() => {
