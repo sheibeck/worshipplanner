@@ -6,7 +6,11 @@ import type { RehearseAccessDoc } from '@/utils/rehearseAccess'
 
 /** A RehearseAccessDoc plus the orgId resolved from the doc's own Firestore
  *  path (ref.parent.parent.id) — never trusted from the doc's own field,
- *  since this is a cross-org collectionGroup result (126-01-SUMMARY.md). */
+ *  since this is a cross-org collectionGroup result (126-01-SUMMARY.md).
+ *  IN-04 (126-REVIEW): `RehearseAccessDoc` already declares `orgId: string`,
+ *  so this intersection is a type-level no-op (same type, doesn't widen or
+ *  narrow anything) — the actual override happens at the `{ ...data, orgId:
+ *  ... }` spread call site below, not here. Kept for readability/intent. */
 export type MyScheduleDoc = RehearseAccessDoc & { orgId: string }
 
 // R378 (126-01-SUMMARY.md) — the collection-group `list` rule arm REQUIRES
