@@ -108,24 +108,38 @@ export function buildRehearseAccess(
   }
 
   const songsById = new Map(songs.map((s) => [s.id, s]))
-  const rehearseSongs: RehearseSong[] = distinctSongSlots(service)
-    .map((slot): RehearseSong | null => {
-      const song = songsById.get(slot.songId as string)
-      if (!song) return null
+  const rehearseSongs: RehearseSong[] = distinctSongSlots(service).map((slot): RehearseSong => {
+    const song = songsById.get(slot.songId as string)
+    if (!song) {
+      // IN-02 (126-REVIEW): a slot referencing a deleted/missing catalog song
+      // used to be silently filtered out, understating the song count/list a
+      // volunteer sees versus what the leader actually built, with no signal
+      // anywhere. Keep a visible stub (rather than dropping) so the count
+      // stays accurate, and log so a leader investigating a report can find
+      // the cause.
+      console.warn(
+        `buildRehearseAccess: song ${slot.songId} referenced by service ${service.id} is missing from the catalog — showing a stub entry`,
+      )
       return {
-        id: song.id,
-        title: song.title,
+        id: slot.songId as string,
+        title: '(song removed)',
         ...(slot.songKey ? { keyOrArrangement: slot.songKey } : {}),
-        attachments: (song.attachments ?? []).map((a) => ({
-          id: a.id,
-          name: a.name,
-          kind: a.kind,
-          ...(a.downloadUrl ? { downloadUrl: a.downloadUrl } : {}),
-          ...(a.href ? { href: a.href } : {}),
-        })),
+        attachments: [],
       }
-    })
-    .filter((s): s is RehearseSong => s !== null)
+    }
+    return {
+      id: song.id,
+      title: song.title,
+      ...(slot.songKey ? { keyOrArrangement: slot.songKey } : {}),
+      attachments: (song.attachments ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        kind: a.kind,
+        ...(a.downloadUrl ? { downloadUrl: a.downloadUrl } : {}),
+        ...(a.href ? { href: a.href } : {}),
+      })),
+    }
+  })
 
   return {
     serviceId: service.id,

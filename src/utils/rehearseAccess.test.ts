@@ -178,6 +178,25 @@ describe('buildRehearseAccess', () => {
     }
   })
 
+  it('IN-02 (126-REVIEW): keeps a visible stub for a slot referencing a deleted/missing catalog song, instead of silently dropping it', () => {
+    const service = makeService({
+      slots: [makeSongSlot({ songId: 'song-1', songKey: 'G' }), makeSongSlot({ id: 'slot-2', songId: 'song-missing', songKey: 'D' })],
+    })
+    const song = makeSong({ id: 'song-1' })
+
+    const result = buildRehearseAccess(service, 'org-1', [], [], [], [song])
+
+    // The count matches what the leader actually built (2 slots), not a
+    // silently-shrunk 1.
+    expect(result.songs).toHaveLength(2)
+    expect(result.songs[1]).toEqual({
+      id: 'song-missing',
+      title: '(song removed)',
+      keyOrArrangement: 'D',
+      attachments: [],
+    })
+  })
+
   it('returns only the schema fields — no notes or other private planner fields', () => {
     const service = makeService()
 
