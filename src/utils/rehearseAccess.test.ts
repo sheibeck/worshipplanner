@@ -146,7 +146,7 @@ describe('buildRehearseAccess', () => {
     expect(result.assignedEmailsLower).toEqual([])
   })
 
-  it('projects only id/name/kind/downloadUrl/href on each attachment', () => {
+  it('projects id/name/kind/downloadUrl/href/linkSource on each attachment, stripping storagePath/mimeType/sizeBytes/createdAt/createdBy', () => {
     const service = makeService({
       slots: [makeSongSlot({ songId: 'song-1', songKey: 'G' })],
     })
@@ -183,11 +183,16 @@ describe('buildRehearseAccess', () => {
     expect(result.songs[0]!.keyOrArrangement).toBe('G')
     expect(result.songs[0]!.attachments).toEqual([
       { id: 'att-1', name: 'chart.pdf', kind: 'document', downloadUrl: 'https://storage.example.com/chart.pdf?token=abc' },
-      { id: 'att-2', name: 'YouTube reference', kind: 'link', href: 'https://youtube.com/watch?v=abc' },
+      { id: 'att-2', name: 'YouTube reference', kind: 'link', href: 'https://youtube.com/watch?v=abc', linkSource: 'youtube' },
     ])
     for (const attachment of result.songs[0]!.attachments) {
+      expect('storagePath' in attachment).toBe(false)
+      expect('mimeType' in attachment).toBe(false)
+      expect('sizeBytes' in attachment).toBe(false)
+      expect('createdAt' in attachment).toBe(false)
+      expect('createdBy' in attachment).toBe(false)
       expect(Object.keys(attachment).sort()).toEqual(
-        [...new Set(['id', 'name', 'kind', 'downloadUrl', 'href'].filter((k) => k in attachment))].sort(),
+        [...new Set(['id', 'name', 'kind', 'downloadUrl', 'href', 'linkSource'].filter((k) => k in attachment))].sort(),
       )
     }
   })

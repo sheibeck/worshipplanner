@@ -6,7 +6,7 @@
 
 import type { Service, ServiceSlot, SongSlot } from '@/types/service'
 import type { Quarter, Role, Person, RoleGroup } from '@/types/roster'
-import type { Song, SongAttachmentKind } from '@/types/song'
+import type { Song, SongAttachmentKind, SongAttachmentLinkSource } from '@/types/song'
 import type { PublicStageMarker } from '@/stores/services'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { mapOrderedSlots, mapStageMarkers } from '@/utils/serviceProjection'
@@ -18,6 +18,12 @@ export interface RehearseAttachment {
   kind: SongAttachmentKind
   downloadUrl?: string
   href?: string
+  /** Link attachments only (Phase 127, R390) — selects the correct
+   *  LINK_SOURCE_LABELS entry (YouTube/Drive/Dropbox/Link) so an external
+   *  link renders its real source instead of a generic "Link" label. Not
+   *  PII: one of 4 fixed, non-personal enum values already inferred
+   *  client-side (songLinks.ts) from the link's own host. */
+  linkSource?: SongAttachmentLinkSource
 }
 
 export interface RehearseSong {
@@ -180,6 +186,7 @@ export function buildRehearseAccess(
         kind: a.kind,
         ...(a.downloadUrl ? { downloadUrl: a.downloadUrl } : {}),
         ...(a.href ? { href: a.href } : {}),
+        ...(a.linkSource ? { linkSource: a.linkSource } : {}),
       })),
     }
   })
