@@ -22,26 +22,33 @@ file-storage backlog (999.13 / SEED-003); step 1 (song attachments) shipped as v
   email-link auth (`signInWithEmailLink`, no password), giving per-person identity for playback position +
   their own downloads. **Not public** — removes the anonymous hotlinking/scraping cost+security risk that
   the original v2.7 "public link only" framing carried.
-- **Volunteer home** — after sign-in, a read-and-go self-service page listing every service the volunteer is
-  actually assigned to (roster-email → assignment match), soonest first, grouped **This week / Later this
-  month** (plus past services). Each service card shows the date, name, time · venue, a "Next up" badge, the
-  volunteer's **role chips**, song/chart/track counts, a **readiness** indicator (all ready / N songs
-  missing media / waiting on charts), a countdown + call time, and a **Rehearse →** CTA that opens straight
-  into that service's Rehearsal tab. Includes a "check a different email" affordance for volunteers rostered
-  under another address.
-- **Rehearsal tab (per service)** — a 3-column experience (from the owner's design): songs-in-this-service
-  (key + PDF/MP3 counts + now-playing) → song detail (Sheet music & chords rows with **Print + Download**,
-  Recordings rows, an optional per-song note) → a PDF reader (page nav + Print) plus a bottom audio player
-  (play/seek/time, **speed** 0.9/0.75/1.25×, **whole-track Loop**). Media = the **v2.11 song attachments**
-  (PDF/MP3), reused — nothing is re-uploaded here.
+- **"My Schedule" (volunteer home)** — the volunteer-facing landing after sign-in, available to **anyone
+  assigned to any service** (keyed off roster assignment, not role). A read-and-go self-service page listing
+  every service the volunteer is actually assigned to (roster-email → assignment match), soonest first,
+  grouped **This week / Later this month** (plus past services). Each service card shows the date, name,
+  time · venue, a "Next up" badge, the volunteer's **role chips**, song/chart/track counts, a **readiness**
+  indicator (all ready / N songs missing media / waiting on charts), a countdown + call time, and a
+  **Rehearse →** CTA that opens that service's standalone Rehearse screen. Includes a "check a different
+  email" affordance for volunteers rostered under another address.
+- **Rehearse (standalone screen, per service)** — its **own screen, reached only from a My Schedule service
+  card** — deliberately **not** a tab inside the planner's service-editor (a volunteer never sees the Service
+  Order / Slides / Roles / Stage Layout editor). A 3-column experience (from the owner's design):
+  songs-in-this-service (key + PDF/MP3 counts + now-playing) → song detail (Sheet music & chords rows with
+  **Print + Download**, Recordings rows, an optional per-song note) → a PDF reader (page nav + Print) plus a
+  bottom audio player (play/seek/time, **speed** 0.9/0.75/1.25×, **whole-track Loop**). Media = the **v2.11
+  song attachments** (PDF/MP3), reused — nothing is re-uploaded here.
 - **Mobile-friendly playback** — PDFs open/download reliably on phones (link-first, `<iframe>` as a desktop
   enhancement per v2.7 research); native `<audio>` plays on mobile.
 
 **Key context / decisions (confirmed with owner 2026-09-05):**
 - **Access = passwordless magic link** (Firebase `signInWithEmailLink`; email/link auth free ≤ 50k MAU).
   Per-person playback position + downloads. Not full accounts, not public.
-- **Landing = a volunteer home** listing all of a volunteer's assigned services (not just a single-service
-  deep link), then pick one to rehearse.
+- **Landing = "My Schedule"** (the volunteer home) listing all of a volunteer's assigned services (not just
+  a single-service deep link), then pick one to rehearse. Available to anyone assigned to a service.
+- **Rehearse is a STANDALONE screen** reached only from a My Schedule service card — **not** a tab in the
+  planner's service editor (owner decision 2026-09-05). The volunteer surface (My Schedule + Rehearse) is
+  fully separate from the planner surface (the service editor); a planner who also plays reaches rehearsal
+  the same way, via My Schedule.
 - **Playback extras INCLUDED** — whole-track speed + loop (cheap on the native `<audio>` element; present in
   the owner's design). Not the "loop-a-section / server-side transposition" SEED-003 warned against.
 - **Cost guardrails DEFERRED** (owner decision) — per-org storage quota + egress/budget alerting go to the
@@ -636,9 +643,10 @@ for non-technical users — plus item-editing and preview polish.
 
 **v2.12 Rehearse Mode** — 🚧 in planning (started 2026-09-05). Step 2 (final) of the file-storage backlog
 (999.13 / SEED-003). Passwordless magic-link access (Firebase `signInWithEmailLink`, roster-email-tied, not
-public) → a volunteer home listing all of a volunteer's assigned services (roster-email→assignment match,
-grouped This week / Later this month + past, role chips, readiness, Rehearse → CTA) → a per-service
-Rehearsal tab (3-column: songs-in-service → song detail with Print+Download → PDF reader + audio player
+public) → "My Schedule" volunteer home (anyone assigned to a service; all of a volunteer's assigned services
+via roster-email→assignment match, grouped This week / Later this month + past, role chips, readiness,
+Rehearse → CTA) → a **standalone** per-service Rehearse screen reached only from My Schedule (NOT a
+service-editor tab; 3-column: songs-in-service → song detail with Print+Download → PDF reader + audio player
 with whole-track speed/loop) reusing v2.11 song attachments. Mobile-friendly PDF/audio. Cost guardrails
 (per-org quota + egress alerting) deferred to backlog; playback speed/loop included. No project-research
 pass. Design ref: owner's `Rehearsal.dc.html` + `Volunteer Home.dc.html`. Requirements continue from R374;
@@ -855,12 +863,14 @@ This document evolves at phase transitions and milestone boundaries.
 ---
 *Last updated: 2026-09-05 — started milestone v2.12 Rehearse Mode (step 2/final of file-storage backlog
 999.13 / SEED-003; step 1 = v2.11 song attachments). Passwordless magic-link access (Firebase
-`signInWithEmailLink`, roster-email-tied, delivered via v1.7 messaging emails, not public) → a volunteer
-home (all of a volunteer's assigned services via roster-email→assignment match, grouped This week / Later
-this month + past, role chips + readiness + Rehearse CTA) → a per-service Rehearsal tab (3-column: songs →
-song detail w/ Print+Download → PDF reader + audio player w/ whole-track speed/loop) reusing v2.11 song
-attachments; mobile-friendly PDF/audio. Owner decisions (2026-09-05): access=magic link, landing=volunteer
-home, playback speed/loop INCLUDED, cost guardrails (per-org quota + egress alerting) DEFERRED to backlog,
+`signInWithEmailLink`, roster-email-tied, delivered via v1.7 messaging emails, not public) → "My Schedule"
+volunteer home (anyone assigned to a service; all of a volunteer's assigned services via
+roster-email→assignment match, grouped This week / Later this month + past, role chips + readiness +
+Rehearse CTA) → a STANDALONE per-service Rehearse screen reached only from My Schedule, NOT a service-editor
+tab (3-column: songs → song detail w/ Print+Download → PDF reader + audio player w/ whole-track speed/loop)
+reusing v2.11 song attachments; mobile-friendly PDF/audio. Owner decisions (2026-09-05): access=magic link,
+landing="My Schedule" volunteer home, Rehearse=standalone screen (not an editor tab), playback speed/loop
+INCLUDED, cost guardrails (per-org quota + egress alerting) DEFERRED to backlog,
 no project-research pass. Design ref: owner's Claude Design project `Rehearsal.dc.html` +
 `Volunteer Home.dc.html` (Nocturne → app dark gray-950; UI phase produces app-fidelity mocks). Requirements
 continue from R374; phases from 125. Previous footer below.*
