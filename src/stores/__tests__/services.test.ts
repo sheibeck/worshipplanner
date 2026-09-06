@@ -2194,6 +2194,54 @@ describe('useServiceStore', () => {
       expect(data.status).toBe('planned')
     })
 
+    // WR-01 (125-REVIEW.md): a cache miss (service just created, multi-tab
+    // race, org re-subscribe mid-flight) must not silently skip the
+    // rehearseAccess projection write — the store must fall back to a direct
+    // read rather than gating on the in-memory find.
+    it('WR-01: markAsPlanned still writes the rehearseAccess projection when the service is missing from the local cache', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      // Deliberately no triggerSnapshot() — services.value stays empty, so
+      // `services.value.find(...)` misses and the getDoc() fallback must fire.
+
+      const { id: _id, ...serviceData } = makeService({ id: 'service-1', status: 'draft' })
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'service-1',
+        data: () => serviceData,
+      } as never)
+
+      await store.markAsPlanned('service-1')
+
+      expect(vi.mocked(getDoc)).toHaveBeenCalled()
+      const rehearseWriteCall = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as { path?: string }).path?.includes('rehearseAccess'))
+      expect(rehearseWriteCall).toBeDefined()
+    })
+
+    // WR-01 (125-REVIEW.md): when even the direct Firestore read misses (the
+    // service truly doesn't exist), the gap must be LOGGED rather than
+    // silently swallowed.
+    it('WR-01: markAsPlanned logs a clear error when the service is missing from both cache and Firestore', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      await store.markAsPlanned('service-1')
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('rehearseAccess projection NOT written'))
+      expect(vi.mocked(setDoc)).not.toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
+
     for (const status of ['planned', 'exported'] as const) {
       it(`markAsPlanned refuses when the stored status is already ${status}`, async () => {
         const { updateDoc } = await import('firebase/firestore')

@@ -466,8 +466,19 @@ export const useServiceStore = defineStore('services', () => {
    * status — the override makes the recompute deterministic and
    * timing-independent instead of racing the snapshot listener.
    */
-  function buildLastUsedSnapshot(overrideServiceId: string, overrideStatus: ServiceStatus): LastUsedServiceInput[] {
-    return services.value.map((s) =>
+  // WR-01 (125-REVIEW.md): `fallbackService` covers the case where
+  // `overrideServiceId` isn't in `services.value` at all yet (the local
+  // onSnapshot cache missed) — without it the recompute would silently drop
+  // that service from the MAX(locked date) computation instead of merely
+  // reporting a stale status for it.
+  function buildLastUsedSnapshot(
+    overrideServiceId: string,
+    overrideStatus: ServiceStatus,
+    fallbackService?: Service,
+  ): LastUsedServiceInput[] {
+    const inCache = services.value.some((s) => s.id === overrideServiceId)
+    const base = inCache || !fallbackService ? services.value : [...services.value, fallbackService]
+    return base.map((s) =>
       serviceToLastUsedInput(s.id === overrideServiceId ? { ...s, status: overrideStatus } : s),
     )
   }
@@ -573,12 +584,28 @@ export const useServiceStore = defineStore('services', () => {
     })
 
     // See ADR-0161 (docs/adr/0161-those-songs-fall-back-to-their-remaining-locked-max-or-null.md)
-    const service = services.value.find((s) => s.id === id)
+    // WR-01 (125-REVIEW.md): the local onSnapshot cache can miss this id (a
+    // service just created, a multi-tab/timing race, an org re-subscribe
+    // mid-flight) even though the status write above already succeeded — a
+    // cache miss here must not silently skip the rehearseAccess projection
+    // write below. Fall back to a direct read rather than gating on the
+    // in-memory find.
+    let service = services.value.find((s) => s.id === id)
+    if (!service) {
+      const snap = await getDoc(doc(db, 'organizations', orgId.value, 'services', id))
+      if (snap.exists()) {
+        service = { id: snap.id, name: '', notes: '', ...snap.data() } as Service
+      } else {
+        console.error(
+          `markAsPlanned: service ${id} not found in local cache or Firestore — rehearseAccess projection NOT written`,
+        )
+      }
+    }
     if (service) {
       const songIds = songIdsInService(service)
       if (songIds.length > 0) {
         try {
-          await recomputeLastUsedFor(songIds, buildLastUsedSnapshot(id, 'planned'))
+          await recomputeLastUsedFor(songIds, buildLastUsedSnapshot(id, 'planned', service))
         } catch (err) {
           console.error(
             `markAsPlanned: lastUsedAt recompute failed for service ${id} — the status transition already succeeded`,
