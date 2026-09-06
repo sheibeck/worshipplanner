@@ -693,7 +693,7 @@ export const useServiceStore = defineStore('services', () => {
         getDocs(collection(db, 'organizations', org, 'people')),
         getDocs(collection(db, 'organizations', org, 'songs')),
       ])
-      const orgName = (orgSnap?.data()?.name as string | undefined) ?? undefined
+      const orgName = orgSnap?.data()?.name as string | undefined
       const quarters = quartersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Quarter)
       const roles = rolesSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Role)
       const people = peopleSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)
