@@ -23,12 +23,12 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Self-Service Magic-Link Request
 
-- [ ] **R394**: A volunteer can open a public, church-scoped page at `/{church-slug}/volunteer` that
+- [x] **R394**: A volunteer can open a public, church-scoped page at `/{church-slug}/volunteer` that
   resolves the slug to a church via the public `orgSlugs` registry, shows the church's name, and offers to
   send their sign-in link by entering their email address. An unknown/expired slug shows a clear "church
   not found" state rather than a broken page.
 
-- [ ] **R395**: Requesting a link is **enumeration-safe** — the page shows the same confirmation ("If
+- [x] **R395**: Requesting a link is **enumeration-safe** — the page shows the same confirmation ("If
   you're on this church's team, a sign-in link is on its way") whether or not the entered email is on the
   roster, never revealing whether a given email is a member.
 
@@ -40,10 +40,10 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   used to spam a volunteer's inbox or fan out email cost. (Security-critical — carries a threat model +
   rate-limit/enumeration ALLOW/DENY tests.)
 
-- [ ] **R398**: The login page offers an "Are you a volunteer? Get your sign-in link" entry point that
+- [x] **R398**: The login page offers an "Are you a volunteer? Get your sign-in link" entry point that
   leads a volunteer to the church-scoped self-service request.
 
-- [ ] **R399**: When a magic link is expired or invalid at `/volunteer/verify`, the volunteer is offered a
+- [x] **R399**: When a magic link is expired or invalid at `/volunteer/verify`, the volunteer is offered a
   one-tap "request a new link" that returns them to the self-service request for the same church (the
   church context travels with the link so no re-selection is needed).
 
@@ -76,6 +76,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 - Per-org email/egress quota + cost alerting for volunteer link sends (relates to backlog 999.x cost
   guardrails deferred from v2.12).
+
 - Resend DNS domain verification so real self-service emails reach any volunteer inbox, not just the owner
   (backlog 999.6) — an ops task, not app code.
 
@@ -83,8 +84,10 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 - **Changing the link's trust model** — a magic link remains an account-level bearer credential; we do not
   add per-church link restriction (the account-level design is intentional, see Scope decisions).
+
 - **Cross-org email lookup** — the self-service request is always church-scoped (slug → one org); we do not
   build a global "type your email, we'll find all your churches" endpoint (larger enumeration surface).
+
 - **A standalone volunteer account/profile UI** — sign-in stays link-only; no password, no profile editing.
 
 ## Traceability

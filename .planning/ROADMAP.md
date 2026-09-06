@@ -823,11 +823,12 @@ Admin-SDK mint/send core — and can recover from an expired or invalid link wit
      entry point, and from an expired/invalid link at `/volunteer/verify` via a one-tap "request a new
      link" that returns them to the same church's request with no re-selection needed (R398, R399).
 
-**Plans**: 2 plans
+**Plans**: 2/2 plans executed
 
 Plans:
-- [ ] 128-01-PLAN.md — Shared Admin-SDK mint/send core (`volunteerLink.ts`) + public `requestVolunteerLink` onCall: roster gate, dedicated rate limiter, enumeration-safe body + timing pad, ALLOW/DENY+TIMING tests (R395, R396, R397, R399) [wave 1]
-- [ ] 128-02-PLAN.md — Client wiring: public `/{slug}/volunteer` page (orgSlugs resolve, uniform confirmation), `/:slug/volunteer` route, login "Are you a volunteer?" entry + find-your-church lookup, verify-failure "request a new link" (R394, R395, R398, R399) [wave 2]
+
+- [x] 128-01-PLAN.md — Shared Admin-SDK mint/send core (`volunteerLink.ts`) + public `requestVolunteerLink` onCall: roster gate, dedicated rate limiter, enumeration-safe body + timing pad, ALLOW/DENY+TIMING tests (R395, R396, R397, R399) [wave 1]
+- [x] 128-02-PLAN.md — Client wiring: public `/{slug}/volunteer` page (orgSlugs resolve, uniform confirmation), `/:slug/volunteer` route, login "Are you a volunteer?" entry + find-your-church lookup, verify-failure "request a new link" (R394, R395, R398, R399) [wave 2]
 
 **UI hint**: yes
 

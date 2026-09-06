@@ -1,16 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.13
-milestone_name: Volunteer Self-Service & Multi-Church Access
-status: planning
-last_updated: "2026-09-06T18:30:00.000Z"
+milestone_name: Volunteer Self-Service & Multi-Church Access (Phases 128-130, Phase 128 complete)
+current_phase_name: Phase 128 complete (both plans) -- ready to plan Phase 129
+status: in_progress
+stopped_at: Completed 128-02-PLAN.md
+last_updated: "2026-09-06T19:15:55.447Z"
 last_activity: 2026-09-06
+last_activity_desc: 128-02-PLAN.md executed -- public /:slug/volunteer request page, login volunteer entry, verify-failure re-request affordance (R394/R395/R398/R399)
 progress:
   total_phases: 3
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 33
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -54,7 +57,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.13 Volunteer Self-Service & Multi-Church Access (roadmap created 2026-09-06)
 
-**Status:** Roadmap created — ready to plan Phase 128
+**Status:** Phase 128 (both plans) complete, autonomous build + auto-verified green, UNDEPLOYED — ready to plan Phase 129
 
 **Goal:** Let volunteers get their own passwordless sign-in link on demand and see their schedule
 organized by church — extending v2.12's account-level email-link access with a self-service request path,
@@ -69,7 +72,9 @@ authenticates the *person*, so one link = their whole schedule across every chur
 slug scopes only the request/branding/roster-check, not what a volunteer sees after sign-in. The client
 cannot mint links (`generateSignInWithEmailLink` is Admin-SDK-only), so both self-service and admin-copy
 route through a server callable. A natural shared server-side mint/send core (reusing the Resend send block
+
 + `config.sender.fromAddress` / `bareEmailAddress` / `fromDisplayName` in functions/src/params.ts and the
+
 messaging limiter pattern) is built in Phase 128 — where the security gate that guards the public path must
 live — and reused by Phase 129 per R402's single-code-path / one-authorization-model rule. R397 (the public
 self-service endpoint) is security-critical: a public, unauthenticated email-sending endpoint that must be
@@ -1352,10 +1357,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: v2.13 roadmap created — Phases 128–130 defined, none started
-Plan: —
-Status: Roadmap created — ready to plan Phase 128
-Last activity: 2026-09-06 — v2.13 ROADMAP.md created (Phases 128–130, R394–R405 mapped, 100% coverage)
+Phase: 128 Self-Service Magic-Link Request (public, security-critical) + shared mint/send core
+Plan: 128-02 (Wave 2 — client wiring) complete; both plans of Phase 128 done (128-01 server core, 128-02 client wiring)
+Status: Phase 128 code-complete, autonomous build + auto-verified green; UNDEPLOYED; manual-only verifications (real Resend delivery, felt rate-limit) deferred to a single batched UAT pass at milestone end per CONTEXT.md. Ready to plan Phase 129.
+Last activity: 2026-09-06 — 128-02-PLAN.md executed (public /:slug/volunteer request page, login-page volunteer entry + find-your-church lookup, verify-failure "request a new link" affordance, R394/R395/R398/R399 complete; router BLOCKER fix removing meta.requiresAuth from /volunteer)
 
 ## ★ v2.13 ROADMAP.md phase breakdown (created 2026-09-06)
 
@@ -3475,6 +3480,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 127 P04 | 25min | 2 tasks | 4 files |
 | Phase 127 P05 | 6min | 1 tasks | 2 files |
 | Phase 127 P06 | 18min | 2 tasks | 4 files |
+| Phase 128 P02 | 1h | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -4379,8 +4385,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T11:42:03.085Z
-Stopped at: Completed 127-06-PLAN.md
+Last session: 2026-09-06T19:15:55.324Z
+Stopped at: Completed 128-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
