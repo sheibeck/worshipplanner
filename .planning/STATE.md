@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.12
 milestone_name: Rehearse Mode (Phases 125-127, in planning)
-current_phase: 125
-current_phase_name: Passwordless Magic-Link Access & Scoped Read Isolation
-status: planning
-stopped_at: Completed 125-02-PLAN.md
-last_updated: "2026-09-06T04:40:50.310Z"
+current_phase: 126
+current_phase_name: My Schedule — Volunteer Home
+status: executing
+stopped_at: Completed 126-01-PLAN.md
+last_updated: "2026-09-06T07:09:37.110Z"
 last_activity: 2026-09-06
-last_activity_desc: Phase 125 Plan 01 executed and committed (7e0c423a test, 82f5a59b feat)
+last_activity_desc: Phase 126 execution started
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 8
+  completed_plans: 5
   percent: 33
 ---
 
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.12 Rehearse Mode (roadmap created 2026-09-05)
 
-**Status:** Roadmap created, ready to plan
+**Status:** Ready to execute
 
 **Goal:** Give worship volunteers a low-friction, passwordless way to rehearse the services they're
 serving — view/print sheet music & chords and play/practice reference recordings — without tracking a
@@ -1312,7 +1312,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 125 — Passwordless Magic-Link Access & Scoped Read Isolation
+**Current focus:** Phase 126 — My Schedule — Volunteer Home
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1322,10 +1322,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 125 — Passwordless Magic-Link Access & Scoped Read Isolation
-Plan: 4 of 4
-Status: Plan 01 executed — R377 data-layer security gate GREEN (rehearseAccess firestore.rules block + 9-case emulator ALLOW/DENY suite, TDD RED-then-GREEN). Ready to plan/execute 125-02.
-Last activity: 2026-09-06 — Phase 125 Plan 01 executed and committed (7e0c423a test, 82f5a59b feat)
+Phase: 126 (My Schedule — Volunteer Home) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-09-06 — Phase 126 execution started
 
 ## ★ v2.12 ROADMAP.md phase breakdown (created 2026-09-05)
 
@@ -3384,6 +3384,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 125 P03 | 12min | 2 tasks | 4 files |
 | Phase 125 P04 | 13min | 3 tasks | 6 files |
 | Phase 125 P02 | 25min | 2 tasks | 4 files |
+| Phase 126 P01 | 40min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -3942,6 +3943,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: volunteerAuth store never throws on completeSignIn failure — reactive needsEmailReentry/errorMessage state instead, so views branch without try/catch
 - [Phase ?]: rehearseAccess assignedEmailsLower reuses resolveServiceRoleAssignments + resolveRecipients' exact lowercase/empty-email-skip logic — assigned == who gets the reminder email, not a separately derived concept
 - [Phase ?]: buildRehearseAccess is a pure, store-free builder (mirrors buildServiceSnapshot); markAsPlanned is the sole caller resolving roster/quarters/song store state and passing it in
+- [Phase ?]: rehearseAccess collection-group list requires a SEPARATE {path=**} match; live cross-doc re-check unachievable there, so the list arm gates on a query-filtered frozen status field instead
 
 ### Roadmap Evolution
 
@@ -4271,8 +4273,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T04:40:50.178Z
-Stopped at: Completed 125-02-PLAN.md
+Last session: 2026-09-06T07:09:37.045Z
+Stopped at: Completed 126-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

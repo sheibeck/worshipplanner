@@ -41,18 +41,18 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### My Schedule (Volunteer Home)
 
-- [ ] **R378**: After sign-in a volunteer lands on **"My Schedule"**, a read-and-go page listing every
+- [x] **R378**: After sign-in a volunteer lands on **"My Schedule"**, a read-and-go page listing every
   service they are assigned to, matched by their roster email → role assignment. Available to anyone assigned
   to a service (keyed off assignment, not role).
 
-- [ ] **R379**: My Schedule shows **only Planned (locked, non-Draft) services** — a service still being
+- [x] **R379**: My Schedule shows **only Planned (locked, non-Draft) services** — a service still being
   drafted by a planner never appears to volunteers (reuses the app's existing not-Draft / lock gate).
 
 - [ ] **R380**: Services are ordered soonest-first and grouped **This week / Later this month**, with a
   "Next up" badge on the soonest upcoming service; past services the volunteer served are shown separately
   and remain openable.
 
-- [ ] **R381**: Each service card shows the date, service name, time · venue, the volunteer's own **role
+- [x] **R381**: Each service card shows the date, service name, time · venue, the volunteer's own **role
   chips**, song / chart / track counts, a **readiness** indicator (all rehearsal files ready · N songs still
   missing media · waiting on charts), and a countdown + call time.
 
@@ -146,10 +146,10 @@ Populated during roadmap creation.
 | R375 | Phase 125 | Complete |
 | R376 | Phase 125 | Complete |
 | R377 | Phase 125 | Complete |
-| R378 | Phase 126 | Pending |
-| R379 | Phase 126 | Pending |
+| R378 | Phase 126 | Complete |
+| R379 | Phase 126 | Complete |
 | R380 | Phase 126 | Pending |
-| R381 | Phase 126 | Pending |
+| R381 | Phase 126 | Complete |
 | R382 | Phase 126 | Pending |
 | R383 | Phase 126 | Pending |
 | R384 | Phase 127 | Pending |

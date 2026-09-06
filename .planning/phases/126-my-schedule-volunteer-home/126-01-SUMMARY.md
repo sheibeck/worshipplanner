@@ -181,3 +181,17 @@ Run from the repo root against the `worship-planner-bc515` project; verify the i
 ---
 *Phase: 126-my-schedule-volunteer-home*
 *Completed: 2026-09-06*
+
+## Self-Check: PASSED
+
+- FOUND: firestore.rules
+- FOUND: firestore.indexes.json
+- FOUND: src/rules.test.ts
+- FOUND: src/utils/rehearseAccess.ts
+- FOUND: src/utils/rehearseAccess.test.ts
+- FOUND: .planning/phases/126-my-schedule-volunteer-home/126-01-SUMMARY.md
+- FOUND commit: 31a9e074
+- FOUND commit: f3550176
+- FOUND commit: 871872c9
+- FOUND commit: caef13db
+- FOUND commit: 3f3d8ce2
