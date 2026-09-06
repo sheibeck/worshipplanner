@@ -852,7 +852,12 @@ server-side mint/send core as the self-service request, under one authorization 
      through the same server-side mint/send core as the self-service request — one code path, one
      authorization model (R402).
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 129-01-PLAN.md — Backend: extract `mintVolunteerLink` (single mint path, R402) + new authenticated editor/admin-gated, roster-gated `adminVolunteerLink` callable (`mode: 'email' | 'copy'`) + ALLOW/DENY test suite [wave 1] [R400, R401, R402]
+- [ ] 129-02-PLAN.md — Client: RosterView edit-drawer "Sign-in Link" section (Email/Copy actions, gated on email) wired to the callable + view tests [wave 2, depends 129-01] [R400, R401]
+
 **UI hint**: yes
 
 ### Phase 130: Multi-Church Volunteer Switcher
