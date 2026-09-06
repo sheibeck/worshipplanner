@@ -296,7 +296,26 @@ service cloud.firestore {
         // LOWERCASED assignedEmailsLower array (mirrors the invites/{email}
         // email-claim idiom at :192 -- normalization on both sides is
         // load-bearing, see Pitfall 5 in 125-RESEARCH.md).
-        allow read: if isOrgMember(orgId)
+        allow get: if isOrgMember(orgId)
+          || (
+            isSignedIn()
+            && request.auth.token.email != null
+            && request.auth.token.email_verified == true
+            && parentIsPlanned()
+            && request.auth.token.email.lower() in resource.data.get('assignedEmailsLower', [])
+          );
+
+        // R378 (Phase 126, My Schedule): a magic-link volunteer holds no orgId
+        // claim, so their sole data query is a cross-org
+        // collectionGroup('rehearseAccess') list -- there is no "current org"
+        // to scope a subcollection query to. Explicit `list` arm, condition
+        // IDENTICAL to `get` above (do not relax any conjunct). Every call
+        // site MUST add where('assignedEmailsLower','array-contains', <own
+        // lowercased token email>) to its query so this resource.data check is
+        // satisfiable (mirrors shareTokens' get/list split rationale below:
+        // Firestore requires an equality filter on any field a list rule
+        // reads from resource.data).
+        allow list: if isOrgMember(orgId)
           || (
             isSignedIn()
             && request.auth.token.email != null
