@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.12
-milestone_name: Rehearse Mode (Phases 125-127, in planning)
-current_phase: 127
-current_phase_name: Volunteer Service View — Rehearse, Order of Service & Stage Layout
-status: verifying
-stopped_at: Completed 127-06-PLAN.md
-last_updated: "2026-09-06T11:42:03.151Z"
+milestone: v2.13
+milestone_name: Volunteer Self-Service & Multi-Church Access
+status: planning
+last_updated: "2026-09-06T17:41:13.249Z"
 last_activity: 2026-09-06
-last_activity_desc: Phase 127 execution started
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 14
-  completed_plans: 14
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1322,10 +1318,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 127 (Volunteer Service View — Rehearse, Order of Service & Stage Layout) — EXECUTING
-Plan: 6 of 6
-Status: Phase complete — ready for verification
-Last activity: 2026-09-06 — Phase 127 execution started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-06 — Milestone v2.13 started
 
 ## ★ v2.12 ROADMAP.md phase breakdown (created 2026-09-05)
 

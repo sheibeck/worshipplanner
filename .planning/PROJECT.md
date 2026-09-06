@@ -8,7 +8,41 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.12 Rehearse Mode
+## Current Milestone: v2.13 Volunteer Self-Service & Multi-Church Access
+
+**Goal:** Let volunteers get their own passwordless sign-in link on demand and see their schedule
+organized by church — extending v2.12's account-level email-link access with a self-service request
+path, an admin resend affordance, and a multi-church switcher, so a volunteer is never stuck waiting
+on a service email to reach their rehearsal content.
+
+**Target features:**
+
+- **Self-service magic-link request** — a public, church-scoped landing page at `/{church-slug}/volunteer`
+  (slug resolved via the public `orgSlugs` registry) where a volunteer enters their email and receives their
+  sign-in link. Roster-gated (a link is only ever sent to an email already on *that* church's volunteer
+  list), enumeration-safe (identical response whether or not the email is on the roster), and rate-limited
+  per email + church. Reached from the login page ("Are you a volunteer?") and from the verify-failure
+  state ("request a new link"). **Security-critical** — a public, unauthenticated email-sending endpoint,
+  so it carries a threat model + rate-limit/enumeration tests.
+- **Admin resend (email + copy)** — from the Volunteers page, an editor can email a volunteer their sign-in
+  link or copy it to the clipboard (for their own channel). Shares the same server-side mint/send core as
+  the self-service request; roster-gated.
+- **Multi-church volunteer switcher** — a volunteer serving at more than one church can switch/filter My
+  Schedule (and the volunteer service view context) by church. Distinct from the admin membership switcher
+  (volunteers have zero org memberships). Requires adding `orgName` to the `rehearseAccess` projection so
+  churches can be labeled without an org-doc read.
+
+**Key context:** All three reuse v2.12's account-level Firebase email-link sign-in (the link authenticates
+the *person*, so one link = their whole schedule across churches; the church slug scopes only the
+request/branding/roster-check, not what they see after sign-in). Client cannot mint links
+(`generateSignInWithEmailLink` is Admin-SDK only), so both self-service and admin-copy route through a
+server callable. Reuses existing infra: the Resend send block + `config.sender.fromAddress` /
+`bareEmailAddress` / `fromDisplayName` (functions/src/params.ts), the messaging limiter pattern, the
+`orgSlugs` registry (ADR-0007), and v2.12's `rehearseAccess` / `volunteerAuth` / `useVolunteerServiceDoc`.
+Prod caveat: Resend is still test-mode (real email only reaches the owner inbox) until DNS domain
+verification (backlog 999.6); the copy path sidesteps this entirely.
+
+## Shipped Milestone: v2.12 Rehearse Mode — ✅ SHIPPED & DEPLOYED 2026-09-06
 
 **Goal:** Give worship volunteers a low-friction, *passwordless* way to rehearse the services they're
 serving — view/print sheet music & chords and play/practice reference recordings — without tracking a new
