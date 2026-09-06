@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.13
 milestone_name: Volunteer Self-Service & Multi-Church Access (Phases 128-130, in planning)
-current_phase: 129
-current_phase_name: Phase 129 complete (both plans) -- backend callable (129-01) + RosterView client drawer UI (129-02)
+current_phase: 130
 status: in_progress
-stopped_at: Completed 129-02-PLAN.md
-last_updated: "2026-09-06T20:53:49.188Z"
+stopped_at: Completed 130-01-PLAN.md
+last_updated: "2026-09-06T22:43:18.787Z"
 last_activity: 2026-09-06
-last_activity_desc: "129-01-PLAN.md executed (mintVolunteerLink extracted from mintAndSendVolunteerLink as the sole Admin-SDK mint call site; new authenticated adminVolunteerLink callable added -- members/{uid} editor/admin re-check mirrors queueServiceMessageHandler, roster-gated on emailLower with honest HttpsError codes, mode:'email' sends via the shared core / mode:'copy' returns the raw link; R400/R401/R402 server-side complete; 10-case ALLOW/DENY + single-mint-path test matrix added)"
+last_activity_desc: 130-01-PLAN.md executed (RehearseAccessDoc.orgName added via conditional-spread; markAsPlanned forwards authStore.orgName, resyncRehearseAccessForSong forwards a batched getDoc(organizations/{orgId}) name with a scoped .catch(() => null) degrade; mySchedule store gained selectedChurch/churches/filteredDocs -- pure client-side filter, never imports auth or calls selectOrg; R403/R404/R405 data-layer complete)
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
   percent: 67
+current_phase_name: Phase 130 Plan 01 complete (data/projection + mySchedule backbone) -- 130-02 (switcher UI) remains
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1358,9 +1358,15 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 129 Admin Resend — Email & Copy
-Plan: 129-01 (Wave 1 — server backend: mintVolunteerLink extraction + adminVolunteerLink callable) complete; 129-02 (client UI, RosterView.vue) remains
-Status: Phase 129 Plan 01 code-complete, autonomous build + auto-verified green (functions suite 701/701, root type-check clean); UNDEPLOYED. Ready to execute 129-02.
+Phase: 130 Multi-Church Volunteer Switcher
+Plan: 130-01 (Wave 1 — data/projection + mySchedule store backbone) complete; 130-02 (church switcher UI, sidebar church-name label, VolunteerServiceView context) remains
+Status: Phase 130 Plan 01 code-complete, autonomous build + auto-verified green (rehearseAccess.test.ts 21/21, services.test.ts 117/117, mySchedule.test.ts 12/12, root type-check clean); UNDEPLOYED. Ready to execute 130-02.
+Last activity: 2026-09-06 — 130-01-PLAN.md executed (RehearseAccessDoc.orgName added via conditional-spread; markAsPlanned forwards authStore.orgName, resyncRehearseAccessForSong forwards a batched getDoc(organizations/{orgId}) name with a scoped .catch(() => null) degrade; mySchedule store gained selectedChurch/churches/filteredDocs -- pure client-side filter, never imports auth or calls selectOrg; R403/R404/R405 data-layer complete)
+
+### Preceding: Phase 129 (complete)
+
+Plan: 129-01 (Wave 1 — server backend: mintVolunteerLink extraction + adminVolunteerLink callable) + 129-02 (client UI, RosterView.vue) both complete
+Status: Phase 129 code-complete, autonomous build + auto-verified green (functions suite 701/701, root type-check clean); UNDEPLOYED.
 Last activity: 2026-09-06 — 129-01-PLAN.md executed (mintVolunteerLink extracted from mintAndSendVolunteerLink as the sole Admin-SDK mint call site; new authenticated adminVolunteerLink callable added -- members/{uid} editor/admin re-check mirrors queueServiceMessageHandler, roster-gated on emailLower with honest HttpsError codes, mode:'email' sends via the shared core / mode:'copy' returns the raw link; R400/R401/R402 server-side complete; 10-case ALLOW/DENY + single-mint-path test matrix added)
 
 ### Preceding: Phase 128 (complete)
@@ -3490,6 +3496,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 128 P02 | 1h | 3 tasks | 11 files |
 | Phase 129 P01 | 35min | 3 tasks | 3 files |
 | Phase 129 P02 | 27min | 2 tasks | 3 files |
+| Phase 130 P01 | 30min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -4068,6 +4075,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 129]: 129-01: mintVolunteerLink extracted as the sole mint call site; adminVolunteerLink callable reuses it for mode:'copy' and mintAndSendVolunteerLink for mode:'email', preserving R402's single-code-path/one-authz-model requirement
 - [Phase ?]: [Phase 129]: RosterView Sign-in Link section placed inside the existing Add/Edit drawer (after Status), not a new per-row action menu -- no new chrome, per UI-SPEC
 - [Phase ?]: [Phase 129]: Email feedback uses the global toast store; Copy feedback uses an inline label-flip only (no toast) -- matches the established Roster/ServiceEditor split
+- [Phase 130]: 130-01: orgName threaded through buildRehearseAccess/writeRehearseAccessDoc as a required-positional (string | undefined) param, conditional-spread on the return so the key is absent (never a literal undefined) when empty
+- [Phase 130]: 130-01: resyncRehearseAccessForSong's new org getDoc uses a scoped .catch(() => null) inside its Promise.all (not a bare entry) so a denied/failed org read degrades to no orgName without aborting the sibling quarters/roles/people/songs reads -- satisfies T-130-03's literal "never blocks" requirement
+- [Phase 130]: 130-01: mySchedule.churches keeps orgName as string | undefined per entry with no fallback baked in -- Plan 02's UI consumers (switcher dropdown vs. sidebar) apply their own fallback text
 
 ### Roadmap Evolution
 
@@ -4397,8 +4407,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T20:53:49.112Z
-Stopped at: Completed 129-02-PLAN.md
+Last session: 2026-09-06T22:43:18.711Z
+Stopped at: Completed 130-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
