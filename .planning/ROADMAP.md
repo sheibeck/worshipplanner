@@ -690,14 +690,14 @@ own assignments)
      read/open action instead; a "check a different email" affordance and a no-match empty state are
      present; and My Schedule itself is not editable (R382, R383).
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans executed
 
 Plans:
 
 - [x] 126-01-PLAN.md — Data & security foundation: constrained rehearseAccess `list` rule arm + COLLECTION_GROUP index + first constrained-list rules test + rolesByEmailLower projection (KEY RISK, Wave 1)
 - [x] 126-02-PLAN.md — Pure derivation helpers: grouping/countdown/readiness + role-name→glyph mapping (Wave 1)
 - [x] 126-03-PLAN.md — My Schedule collectionGroup store + build-safe Phase-127 placeholder route/view (Wave 2)
-- [ ] 126-04-PLAN.md — My Schedule view + service card + /my-schedule route/landing + component tests (Wave 3)
+- [x] 126-04-PLAN.md — My Schedule view + service card + /my-schedule route/landing + component tests (Wave 3)
 
 **UI hint**: yes
 

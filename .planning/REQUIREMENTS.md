@@ -59,7 +59,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [x] **R382**: Each upcoming card's **Rehearse →** action opens that service's standalone Rehearse screen;
   a past card offers a read/open action instead. My Schedule itself is not editable.
 
-- [ ] **R383**: My Schedule surfaces a "check a different email" affordance and, when a signed-in email
+- [x] **R383**: My Schedule surfaces a "check a different email" affordance and, when a signed-in email
   matches no assignment, an empty state explaining the list is built from roster assignments and how to be
   added.
 
@@ -151,7 +151,7 @@ Populated during roadmap creation.
 | R380 | Phase 126 | Complete |
 | R381 | Phase 126 | Complete |
 | R382 | Phase 126 | Complete |
-| R383 | Phase 126 | Pending |
+| R383 | Phase 126 | Complete |
 | R384 | Phase 127 | Pending |
 | R385 | Phase 127 | Pending |
 | R386 | Phase 127 | Pending |
