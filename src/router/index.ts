@@ -182,14 +182,14 @@ const router = createRouter({
     },
     {
       // R382 (Phase 126) — the Rehearse/Open target for a My Schedule card.
-      // A REAL placeholder authored this phase (never a lazy import() of a
-      // Phase-127 file that doesn't exist yet, per Phase 125's build-safety
-      // lesson). Phase 127 REPLACES the component import ONLY — path/name/
-      // meta stay stable. isVolunteerRoute exempts a zero-membership
-      // volunteer session from the org-selection gate below (line 216-ish).
+      // Phase 127 (127-06) replaced the Phase 126 build-safe placeholder with
+      // the real standalone read-only shell (VolunteerServiceView.vue) —
+      // path/name/meta stay stable, only the component import changed.
+      // isVolunteerRoute exempts a zero-membership volunteer session from the
+      // org-selection gate below (line 216-ish).
       path: '/volunteer/service/:serviceId',
       name: 'volunteer-service',
-      component: () => import('../views/VolunteerServicePlaceholderView.vue'),
+      component: () => import('../views/VolunteerServiceView.vue'),
       meta: { requiresAuth: true, isVolunteerRoute: true },
     },
     {
