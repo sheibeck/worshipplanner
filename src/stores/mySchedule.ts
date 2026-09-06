@@ -36,10 +36,20 @@ export const useMyScheduleStore = defineStore('mySchedule', () => {
   // rehearseAccess.ts's distinctSongSlots Set-dedupe idiom (ADR-0160), using a
   // Map for key->value dedupe. orgName is left as-is (string | undefined) so
   // each consumer (switcher UI, sidebar) applies its own fallback label.
+  //
+  // 130-REVIEW CR-01: `docs` is ordered serviceDate asc (loadMySchedule), so a
+  // plain "first write wins" guard would permanently lock onto whichever doc
+  // for an org is encountered first — an older doc with no orgName (e.g. a
+  // pre-Phase-130 doc, deferred backfill) would out-rank a later doc that
+  // carries the real name. Instead: prefer a DEFINED name over an
+  // undefined/empty one for the same orgId regardless of doc order, and never
+  // let a later undefined overwrite a name already recorded.
   const churches = computed(() => {
     const byOrgId = new Map<string, string | undefined>()
     for (const d of docs.value) {
-      if (!byOrgId.has(d.orgId)) byOrgId.set(d.orgId, d.orgName)
+      if (!byOrgId.has(d.orgId) || (!byOrgId.get(d.orgId) && d.orgName)) {
+        byOrgId.set(d.orgId, d.orgName)
+      }
     }
     return [...byOrgId.entries()].map(([orgId, orgName]) => ({ orgId, orgName }))
   })

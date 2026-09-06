@@ -203,6 +203,41 @@ describe('mySchedule store — loadMySchedule', () => {
       expect(store.filteredDocs).toHaveLength(1)
     })
 
+    // 130-REVIEW CR-01: docs are ordered serviceDate asc, so a "first write
+    // wins" dedupe locks onto whichever doc for an org is encountered first.
+    // A defined orgName must win over an undefined one for the same orgId
+    // regardless of which doc arrives first — proven in both doc orders so
+    // this isn't accidentally passing on order alone.
+    it('CR-01: a later same-org doc with a defined orgName upgrades an earlier doc whose orgName is undefined', async () => {
+      mockAuth.currentUser = { email: 'dana@example.com' }
+      mockGetDocs.mockResolvedValue({
+        docs: [
+          fakeSnapDoc({ serviceId: 'svc1', serviceDate: '2026-09-10' }, 'orgA'),
+          fakeSnapDoc({ serviceId: 'svc2', serviceDate: '2026-09-17', orgName: 'Grace Church' }, 'orgA'),
+        ],
+      })
+
+      const store = useMyScheduleStore()
+      await store.loadMySchedule()
+
+      expect(store.churches).toEqual([{ orgId: 'orgA', orgName: 'Grace Church' }])
+    })
+
+    it('CR-01: a defined orgName is never overwritten by a later same-org doc with an undefined orgName', async () => {
+      mockAuth.currentUser = { email: 'dana@example.com' }
+      mockGetDocs.mockResolvedValue({
+        docs: [
+          fakeSnapDoc({ serviceId: 'svc1', serviceDate: '2026-09-10', orgName: 'Grace Church' }, 'orgA'),
+          fakeSnapDoc({ serviceId: 'svc2', serviceDate: '2026-09-17' }, 'orgA'),
+        ],
+      })
+
+      const store = useMyScheduleStore()
+      await store.loadMySchedule()
+
+      expect(store.churches).toEqual([{ orgId: 'orgA', orgName: 'Grace Church' }])
+    })
+
     it('never imports @/stores/auth or calls selectOrg — filters already-loaded docs only', async () => {
       const fs = await import('node:fs/promises')
       const path = await import('node:path')
