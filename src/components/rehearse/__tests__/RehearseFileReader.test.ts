@@ -43,7 +43,7 @@ describe('RehearseFileReader', () => {
     expect(wrapper.find('[data-testid="rehearse-reader-loading"]').exists()).toBe(false)
   })
 
-  it('desktop: @error shows the errored fallback with a Download link, hiding the iframe', async () => {
+  it('desktop: @error shows the errored fallback with a Download button (not a plain <a>), hiding the iframe', async () => {
     const attachment = makeAttachment()
     const wrapper = mount(RehearseFileReader, { props: { attachment } })
 
@@ -52,8 +52,45 @@ describe('RehearseFileReader', () => {
     expect(wrapper.find('iframe').exists()).toBe(false)
     const errorPanel = wrapper.get('[data-testid="rehearse-reader-error"]')
     expect(errorPanel.text()).toContain("Couldn't preview this file.")
-    const downloadLink = wrapper.get('[data-testid="rehearse-reader-error-download"]')
-    expect(downloadLink.attributes('href')).toBe(attachment.downloadUrl)
+    const downloadButton = wrapper.get('[data-testid="rehearse-reader-error-download"]')
+    // WR-01: this must be a <button> using the fetch->blob downloadAttachment()
+    // helper, NOT a plain <a :href download> — that silently ignores the
+    // `download` attribute on a cross-origin Storage URL and navigates the
+    // whole SPA away instead of prompting Save.
+    expect(downloadButton.element.tagName).toBe('BUTTON')
+    expect(downloadButton.attributes('href')).toBeUndefined()
+  })
+
+  describe('desktop error-fallback Download (WR-01: fetch->blob->objectURL pattern, not a bare <a download>)', () => {
+    beforeEach(() => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['x'])),
+        }),
+      )
+      vi.stubGlobal('URL', {
+        ...URL,
+        createObjectURL: vi.fn(() => 'blob:mock'),
+        revokeObjectURL: vi.fn(),
+      })
+    })
+
+    it('clicking the error-state Download button fetches the URL and triggers a synthetic-anchor click instead of navigating', async () => {
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+      const attachment = makeAttachment()
+      const wrapper = mount(RehearseFileReader, { props: { attachment } })
+      await wrapper.get('[data-testid="rehearse-reader-iframe"]').trigger('error')
+
+      await wrapper.get('[data-testid="rehearse-reader-error-download"]').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(fetch).toHaveBeenCalledWith(attachment.downloadUrl)
+      expect(clickSpy).toHaveBeenCalled()
+      expect(URL.createObjectURL).toHaveBeenCalled()
+    })
   })
 
   it('Pitfall 3: resets loading/errored state when the attachment prop changes, not just on open', async () => {

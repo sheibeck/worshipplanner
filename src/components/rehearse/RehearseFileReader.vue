@@ -50,14 +50,14 @@
 
           <div v-else class="absolute inset-0 flex flex-col items-center justify-center gap-3" data-testid="rehearse-reader-error">
             <p class="text-sm text-gray-400">Couldn't preview this file.</p>
-            <a
-              :href="attachment.downloadUrl"
-              download
-              class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+            <button
+              type="button"
               data-testid="rehearse-reader-error-download"
+              class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              @click="downloadAttachment"
             >
               Download
-            </a>
+            </button>
           </div>
         </div>
       </template>
@@ -169,10 +169,10 @@ function openPdf(): void {
   window.open(props.attachment.downloadUrl, '_blank', 'noopener,noreferrer')
 }
 
-// Mobile "Download" (R391) — copied UNMODIFIED from SongFilesTab.vue
-// (124-REVIEW FIX A: a plain <a download> on a cross-origin Storage URL
-// silently ignores the `download` attribute and navigates the whole SPA
-// away instead of prompting Save).
+// Download (R391 mobile + WR-01 desktop error fallback) — copied UNMODIFIED
+// from SongFilesTab.vue (124-REVIEW FIX A: a plain <a download> on a
+// cross-origin Storage URL silently ignores the `download` attribute and
+// navigates the whole SPA away instead of prompting Save).
 async function downloadAttachment(): Promise<void> {
   const a = props.attachment
   if (!a?.downloadUrl) return
