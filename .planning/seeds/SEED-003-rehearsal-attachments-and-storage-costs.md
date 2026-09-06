@@ -21,8 +21,8 @@ trigger_when: >
 > and is the recommended NEXT milestone. The v2.11 build validated the architecture below (download-token
 > URLs, org-scoped non-`media/` path, no cross-service `firestore.exists()`); the **open guardrails still
 > owed for Rehearse** are the per-org storage quota + egress monitoring and the public-vs-authenticated
-> read decision. Also outstanding: confirm Storage-bucket CORS so the download Save-dialog works in prod
-> (v2.11 falls back to a new tab if CORS blocks the fetch).
+> read decision. (The v2.11 download-CORS follow-up is RESOLVED — bucket CORS was applied 2026-09-05 via
+> `storage-cors.json`, owner-confirmed the prod download prompts a Save dialog.)
 
 
 Two features were **researched during v2.7 then deferred by the owner** ("Let's defer the

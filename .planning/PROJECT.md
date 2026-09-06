@@ -16,10 +16,12 @@ Audit PASSED (13/13 reqs, 4/4 phases, 6/6 integration seams); owner-verified loc
 post-UAT fixes (download Save-dialog, upload auto-clear/dismiss, duplicate-file denial, remove-confirm
 copy). Full record: [milestones/v2.11-ROADMAP.md](milestones/v2.11-ROADMAP.md) ·
 [milestones/v2.11-REQUIREMENTS.md](milestones/v2.11-REQUIREMENTS.md) · [v2.11-MILESTONE-AUDIT.md](v2.11-MILESTONE-AUDIT.md).
-**No active milestone follows — run `/gsd-new-milestone` to start one.** **Standing follow-up:** confirm
-the Firebase Storage bucket sends permissive CORS for the app origin so the download button prompts a Save
-dialog in prod (else it falls back to opening the file in a new tab). Rehearse-mode (public/authenticated
-playback) is the next step of backlog 999.13.
+**No active milestone follows — run `/gsd-new-milestone` to start one.** **Follow-up RESOLVED 2026-09-05:**
+the download button opened files in a new tab in prod (the blob-fetch was CORS-blocked). Fixed by applying
+a CORS config to the Storage bucket (`storage-cors.json` → `gcloud storage buckets update
+gs://worship-planner-bc515.firebasestorage.app --cors-file=storage-cors.json`) allowing the app origin
+(+ localhost dev) to GET objects — the download now prompts a Save dialog. Rehearse-mode
+(public/authenticated playback) is the next step of backlog 999.13.
 
 **Goal:** Let editors attach and manage documents (PDF) and audio (MP3) files — plus external media
 links (YouTube/Drive/Dropbox) — on a **Song** in the stable, via a new **Files** tab in the Edit Song
@@ -584,7 +586,8 @@ for non-technical users — plus item-editing and preview polish.
 
 **v2.11 Song File Attachments** — ✅ SHIPPED & DEPLOYED to production 2026-09-05 (moved to Validated
 above). Step 1 of the file-storage backlog (999.13 / SEED-003); Rehearse-mode (public/authenticated
-playback) is the next step. Standing follow-up: confirm Storage-bucket CORS for the download Save-dialog.
+playback) is the next step. Download-CORS follow-up RESOLVED 2026-09-05 (bucket CORS applied via
+`storage-cors.json`; prod download prompts a Save dialog — owner-confirmed live).
 
 **v2.9 Live Presentation Field Fixes** — 🚧 in planning (started 2026-09-02). Field feedback from the first
 real church-projector run (church Mac + projector). Three groups: **multi-monitor rework** (N monitors,
