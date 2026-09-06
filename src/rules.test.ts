@@ -2825,6 +2825,25 @@ describe('Volunteer magic-link scoped read access — R377', () => {
     const db = testEnv.authenticatedContext('memberUid').firestore()
     await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'rehearseAccess', 'svc1')))
   })
+
+  it('(9b) ALLOW (WR-02, 126-REVIEW) — an org member LISTS the nested rehearseAccess subcollection directly (isOrgMember success path, no superAdmin claim on the token)', async () => {
+    // (8) above proves a volunteer's UNFILTERED list is denied; this proves the
+    // OTHER half of the same `allow list` clause — an ordinary member (no
+    // superAdmin claim at all) succeeds via isOrgMember(orgId), which calls
+    // isSuperAdmin() -> request.auth.token.superAdmin. The top-level
+    // collection-group arm's own comment (firestore.rules ~465) documents that
+    // this exact call shape empirically THROWS ("Property superAdmin is
+    // undefined on object") when evaluated during a list/collection-group
+    // context for a token with no superAdmin claim — which is why that arm
+    // omits isOrgMember(...) entirely. This nested, single-org-scoped `list` is
+    // a different (non-collection-group) evaluation context; this test proves
+    // isOrgMember(orgId) does NOT throw here, so a future admin "who's
+    // assigned" screen listing this subcollection is not silently denied.
+    await seedRehearseFixtures()
+    await seedMembershipDoc('orgA', 'memberUid', 'member')
+    const db = testEnv.authenticatedContext('memberUid').firestore()
+    await assertSucceeds(getDocs(collection(db, 'organizations', 'orgA', 'rehearseAccess')))
+  })
 })
 
 // R378/R379 (Phase 126, My Schedule — KEY RISK): the R377 block above proves
