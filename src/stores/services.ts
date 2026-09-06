@@ -592,6 +592,18 @@ export const useServiceStore = defineStore('services', () => {
       // R377 — write the rehearseAccess projection now the service is Planned.
       // A failure here must never roll back the already-succeeded status
       // transition above; it fails closed (volunteers simply can't read yet).
+      //
+      // T-127-04 (Phase 127): the doc schema grew (orderOfService,
+      // roleAssignments, and now-optional stageLayout, plus bpm on each
+      // song) but this write is unchanged — the `...rehearseAccess` spread
+      // already carries whatever `buildRehearseAccess` returns, and
+      // `stageLayout` is conditionally absent (never a literal `undefined`)
+      // on a service with zero markers, so `setDoc` never rejects. The
+      // firestore.rules `get` arm on `rehearseAccess/{serviceId}` grants the
+      // WHOLE document to an assigned, `email_verified` volunteer (no
+      // field-level restriction) — confirmed by re-reading the rule and by
+      // the still-green R377 emulator suite — so no rules change was needed
+      // for this schema growth.
       try {
         const rosterStore = useRosterStore()
         const quartersStore = useQuartersStore()
