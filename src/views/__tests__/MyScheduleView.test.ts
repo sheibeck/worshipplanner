@@ -19,23 +19,19 @@ const globalStubs = {
     template: '<a :href="to"><slot /></a>',
     props: ['to'],
   },
+  // My Schedule now renders inside the shared AppShell (left-menu chrome) like
+  // every other authed view. AppShell pulls in AppSidebar (useRoute/auth), so
+  // stub it to a bare slot passthrough — this view's own content is under test.
+  AppShell: {
+    template: '<div><slot /></div>',
+  },
 }
-
-const mockPush = vi.fn(() => Promise.resolve())
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: mockPush }),
-}))
 
 const mockAuthState = reactive<{ user: { email: string; displayName: string } | null }>({
   user: { email: 'Dana@Example.com', displayName: 'Dana Reyes' },
 })
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => mockAuthState,
-}))
-
-const mockSignOut = vi.fn(() => Promise.resolve())
-vi.mock('@/stores/volunteerAuth', () => ({
-  useVolunteerAuthStore: () => ({ signOut: mockSignOut }),
 }))
 
 const mockLoadMySchedule = vi.fn()
@@ -99,8 +95,6 @@ describe('MyScheduleView', () => {
     mockScheduleState.isLoading = false
     mockScheduleState.error = null
     mockLoadMySchedule.mockClear()
-    mockPush.mockClear()
-    mockSignOut.mockClear()
   })
 
   afterEach(() => {
@@ -133,16 +127,15 @@ describe('MyScheduleView', () => {
   })
 
   describe('empty state', () => {
-    it('renders the empty state with the signed-in email interpolated and a Check a different email control', async () => {
+    it('renders the empty state (no multi-email affordance)', () => {
       mockScheduleState.docs = []
       const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
 
       const empty = wrapper.get('[data-testid="empty-state"]')
-      expect(empty.text()).toContain('No services on your schedule yet')
-      expect(empty.text()).toContain('Dana@Example.com')
-
-      await wrapper.get('[data-testid="check-different-email-empty"]').trigger('click')
-      expect(mockPush).toHaveBeenCalledWith({ name: 'volunteer-home' })
+      expect(empty.text()).toContain("You don't have any upcoming services.")
+      // The "check a different email" affordance was removed — volunteers use
+      // a single email, so it no longer makes sense.
+      expect(wrapper.find('[data-testid="check-different-email-empty"]').exists()).toBe(false)
     })
   })
 
@@ -190,13 +183,6 @@ describe('MyScheduleView', () => {
       expect(wrapper.get('h1').text()).toMatch(/^Good (morning|afternoon|evening), Dana$/)
     })
 
-    it('renders the roster-built footer note with the signed-in email', () => {
-      mockScheduleState.docs = [makeDoc()]
-      const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
-      expect(wrapper.text()).toContain('This list is built from the roster')
-      expect(wrapper.text()).toContain('Dana@Example.com')
-    })
-
     it('WR-03 (126-REVIEW): shows an explicit "no upcoming services" line when every assignment is past, instead of a bare greeting', () => {
       mockScheduleState.docs = [makeDoc({ serviceId: 'svc-past', title: 'Old Service', serviceDate: '2026-08-01' })]
       const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
@@ -204,32 +190,6 @@ describe('MyScheduleView', () => {
       // Past stays collapsed by default (170 above) — this line is the ONLY
       // visible content difference, not an implicit expand.
       expect(wrapper.find('[data-testid="schedule-card"]').exists()).toBe(false)
-    })
-  })
-
-  describe('WR-04 (126-REVIEW): user-menu dismissal', () => {
-    it('closes the menu when clicking outside it', async () => {
-      mockScheduleState.docs = [makeDoc()]
-      const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs }, attachTo: document.body })
-      await wrapper.get('[data-testid="user-chip"]').trigger('click')
-      expect(wrapper.find('[data-testid="user-menu"]').exists()).toBe(true)
-
-      // The outside-click overlay is the fixed inset-0 sibling rendered
-      // alongside the panel while open.
-      await wrapper.get('.fixed.inset-0').trigger('click')
-      expect(wrapper.find('[data-testid="user-menu"]').exists()).toBe(false)
-      wrapper.unmount()
-    })
-
-    it('closes the menu on Escape', async () => {
-      mockScheduleState.docs = [makeDoc()]
-      const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs }, attachTo: document.body })
-      await wrapper.get('[data-testid="user-chip"]').trigger('click')
-      expect(wrapper.find('[data-testid="user-menu"]').exists()).toBe(true)
-
-      await wrapper.get('[data-testid="user-menu"]').trigger('keydown', { key: 'Escape' })
-      expect(wrapper.find('[data-testid="user-menu"]').exists()).toBe(false)
-      wrapper.unmount()
     })
   })
 })

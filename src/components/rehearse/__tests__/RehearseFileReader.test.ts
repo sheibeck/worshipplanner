@@ -109,14 +109,14 @@ describe('RehearseFileReader', () => {
     expect(wrapper.get('[data-testid="rehearse-reader-iframe"]').attributes('src')).toBe(attachment2.downloadUrl)
   })
 
-  it('desktop: Print opens the download URL in a new tab via window.open(noopener)', async () => {
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+  it('desktop: renders the full-height iframe with no custom header/print chrome', () => {
     const attachment = makeAttachment()
     const wrapper = mount(RehearseFileReader, { props: { attachment } })
 
-    await wrapper.get('[data-testid="rehearse-reader-print"]').trigger('click')
-
-    expect(openSpy).toHaveBeenCalledWith(attachment.downloadUrl, '_blank', 'noopener,noreferrer')
+    // The bespoke name+Print header row was removed — the song name lives in
+    // the detail column and the native PDF viewer supplies print/zoom.
+    expect(wrapper.find('[data-testid="rehearse-reader-print"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="rehearse-reader-iframe"]').classes()).toContain('h-full')
   })
 
   it('mobile-link-first (R391): renders NO iframe — an Open PDF primary button and a Download secondary button instead', () => {

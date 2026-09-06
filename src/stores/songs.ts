@@ -317,6 +317,21 @@ export const useSongStore = defineStore('songs', () => {
       attachments: arrayUnion(attachment),
       updatedAt: serverTimestamp(),
     })
+    await resyncRehearseAfterAttachmentChange(id)
+  }
+
+  // A song's rehearseAccess data is frozen into any Planned service's projection
+  // at lock time, so a file added/removed afterward must re-sync those
+  // projections or volunteers never see it (My Schedule readiness + Rehearse
+  // view). Best-effort and non-blocking: the attachment write has already
+  // committed. Lazy import breaks the static services<->songs store cycle.
+  async function resyncRehearseAfterAttachmentChange(songId: string): Promise<void> {
+    try {
+      const { useServiceStore } = await import('@/stores/services')
+      await useServiceStore().resyncRehearseAccessForSong(songId)
+    } catch (err) {
+      console.error('resyncRehearseAfterAttachmentChange: failed', err)
+    }
   }
 
   // R368/R371 (editor-removal half) — filter-by-id write, NOT Firestore
@@ -362,6 +377,7 @@ export const useSongStore = defineStore('songs', () => {
         console.error(`removeSongAttachment: failed to delete Storage object ${attachment.storagePath}:`, err)
       }
     }
+    await resyncRehearseAfterAttachmentChange(id)
   }
 
   async function deleteSong(id: string) {

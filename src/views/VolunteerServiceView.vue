@@ -1,69 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-950">
-    <!-- Top bar — copied verbatim from MyScheduleView.vue (126-UI-SPEC.md §1);
-         do NOT modify MyScheduleView.vue itself, this is an intentional dup. -->
-    <header class="h-14 px-4 sm:px-6 border-b border-gray-800 bg-gray-900 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9.348 14.652a3.75 3.75 0 010-5.304m5.304 0a3.75 3.75 0 010 5.304m-7.425 2.121a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.807-3.808-9.98 0-13.788m13.788 0c3.808 3.807 3.808 9.98 0 13.788M12 12h.008v.008H12V12z" />
-        </svg>
-        <span class="text-sm font-semibold text-gray-100 tracking-tight">Worship Planner</span>
-      </div>
-
-      <div class="relative">
-        <button
-          ref="userChipRef"
-          type="button"
-          data-testid="user-chip"
-          aria-haspopup="menu"
-          :aria-expanded="menuOpen"
-          class="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-gray-800 transition-colors"
-          @click="menuOpen = !menuOpen"
-        >
-          <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-medium text-white shrink-0">
-            {{ initials }}
-          </div>
-          <div class="hidden sm:block text-left min-w-0">
-            <p class="text-sm font-medium text-gray-100 truncate">{{ displayLabel }}</p>
-            <p class="text-xs text-gray-500 truncate">{{ authStore.user?.email }}</p>
-          </div>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-
-        <div v-if="menuOpen" class="fixed inset-0 z-10" @click="menuOpen = false" />
-
-        <div
-          v-if="menuOpen"
-          ref="userMenuRef"
-          role="menu"
-          data-testid="user-menu"
-          class="absolute right-0 mt-2 w-56 rounded-md border border-gray-800 bg-gray-900 shadow-lg py-1 z-20"
-          @keydown.esc="onMenuEscape"
-        >
-          <button
-            role="menuitem"
-            type="button"
-            data-testid="check-different-email-menu"
-            class="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-800"
-            @click="goToDifferentEmail"
-          >
-            Check a different email
-          </button>
-          <button
-            role="menuitem"
-            type="button"
-            :disabled="isSigningOut"
-            class="w-full text-left px-3 py-2 text-sm text-gray-200 hover:bg-gray-800 disabled:opacity-50"
-            @click="handleSignOut"
-          >
-            {{ isSigningOut ? 'Signing out...' : 'Sign out' }}
-          </button>
-        </div>
-      </div>
-    </header>
-
+  <AppShell>
     <!-- Loading (127-UI-SPEC.md §7) -->
     <div v-if="state === 'loading'" class="flex flex-col items-center gap-3 py-16 text-center" data-testid="vsv-loading">
       <svg class="h-6 w-6 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -89,21 +25,31 @@
 
     <!-- Populated -->
     <template v-else-if="doc">
-      <!-- Service header (127-UI-SPEC.md §1) -->
-      <div class="bg-gray-900 border-b border-gray-800 px-4 sm:px-6 py-4">
-        <router-link to="/my-schedule" class="text-sm text-indigo-400 hover:text-indigo-300 mb-2 inline-block">
-          ‹ My Schedule
-        </router-link>
-        <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between">
-          <h1 class="text-xl font-semibold text-white" :title="doc.title">{{ doc.title }}</h1>
-          <p class="text-sm text-gray-400">{{ formattedDate }}</p>
-        </div>
+      <div class="px-4 sm:px-6 py-4">
+      <!-- Mobile-only back link — on desktop the left nav is the way back, so
+           it's hidden at lg+; on mobile (sidebar behind the hamburger) it's a
+           helpful shortcut. Matches ServiceEditorView.vue's back-link styling. -->
+      <router-link
+        to="/my-schedule"
+        class="lg:hidden inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-200 transition-colors mb-3"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        My Schedule
+      </router-link>
+
+      <!-- Header — the app's inline page-header convention (ServiceEditorView.vue),
+           not a full-bleed band. -->
+      <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
+        <h1 class="text-xl font-semibold text-gray-100 truncate" :title="doc.title">{{ doc.title }}</h1>
+        <p class="text-sm text-gray-400 shrink-0">{{ formattedDate }}</p>
       </div>
 
-      <!-- Tabs — reuses ServiceEditorView.vue's exact tab-button classes +
-           roving-tabindex + handleTabKeydown pattern (127-UI-SPEC.md §1).
+      <!-- Tabs — ServiceEditorView.vue's exact tablist container + tab-button
+           classes + roving-tabindex + handleTabKeydown pattern (127-UI-SPEC.md §1).
            Always 3 tabs, never reordered/hidden. -->
-      <div role="tablist" class="flex items-center gap-1 px-4 sm:px-6 border-b border-gray-800 bg-gray-900" @keydown="handleTabKeydown">
+      <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
         <button
           id="vsv-tab-rehearse"
           ref="rehearseTabButtonRef"
@@ -157,8 +103,16 @@
       <!-- Rehearse panel (R385-R390) -->
       <div v-show="activeTab === 'rehearse'" id="vsv-panel-rehearse" role="tabpanel" aria-labelledby="vsv-tab-rehearse" data-testid="vsv-panel-rehearse">
         <!-- Desktop (>=sm): all three columns mounted simultaneously
-             (127-UI-SPEC.md §2). -->
-        <div class="hidden sm:flex max-w-[1600px] mx-auto" data-testid="rehearse-desktop-layout">
+             (127-UI-SPEC.md §2). The row gets an explicit viewport-based height
+             (percentage h-full doesn't resolve through AppShell's <main>), so
+             the PDF reader fills the screen and each column scrolls internally.
+             Offsets account for the header/tabs above (larger at sm/md where the
+             AppShell mobile top bar + the back link are also present). -->
+        <div
+          class="hidden sm:flex sm:h-[calc(100dvh-13rem)] lg:h-[calc(100dvh-7.5rem)] max-w-[1600px] mx-auto w-full"
+          :class="{ 'sm:pb-20': activeTrack }"
+          data-testid="rehearse-desktop-layout"
+        >
           <RehearseSongList
             :songs="songs"
             :selected-song-id="selectedSongId"
@@ -218,8 +172,9 @@
       <div v-show="activeTab === 'stage'" id="vsv-panel-stage" role="tabpanel" aria-labelledby="vsv-tab-stage" data-testid="vsv-panel-stage">
         <VolunteerStageLayoutTab :elements="doc.stageLayout?.elements" />
       </div>
+      </div>
     </template>
-  </div>
+  </AppShell>
 </template>
 
 <script setup lang="ts">
@@ -230,10 +185,9 @@
 // useVolunteerServiceDoc (T-127-02), which trusts only the volunteer's own
 // mySchedule store, never a route/query value.
 import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { useVolunteerAuthStore } from '@/stores/volunteerAuth'
+import { useRoute } from 'vue-router'
 import { useVolunteerServiceDoc } from '@/composables/useVolunteerServiceDoc'
+import AppShell from '@/components/AppShell.vue'
 import RehearseSongList from '@/components/rehearse/RehearseSongList.vue'
 import RehearseSongDetail from '@/components/rehearse/RehearseSongDetail.vue'
 import RehearseFileReader from '@/components/rehearse/RehearseFileReader.vue'
@@ -243,9 +197,6 @@ import VolunteerStageLayoutTab from '@/components/rehearse/VolunteerStageLayoutT
 import type { RehearseAttachment } from '@/utils/rehearseAccess'
 
 const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const volunteerAuth = useVolunteerAuthStore()
 
 // serviceId is the ONLY thing this view reads from the route — orgId is
 // resolved entirely inside the composable from the volunteer's own
@@ -257,46 +208,6 @@ const volunteerAuth = useVolunteerAuthStore()
 // computed so useVolunteerServiceDoc's internal watch re-loads on change.
 const serviceId = computed(() => route.params.serviceId as string)
 const { state, doc, retry } = useVolunteerServiceDoc(serviceId)
-
-// ── Top bar (copied verbatim from MyScheduleView.vue) ──────────────────────
-const menuOpen = ref(false)
-const isSigningOut = ref(false)
-const userChipRef = ref<HTMLButtonElement | null>(null)
-const userMenuRef = ref<HTMLElement | null>(null)
-
-const displayLabel = computed(() => {
-  const name = authStore.user?.displayName?.trim()
-  if (name) {
-    const parts = name.split(/\s+/)
-    if (parts.length > 1) {
-      return `${parts[0]} ${parts[parts.length - 1]![0]}.`
-    }
-    return parts[0]!
-  }
-  return (authStore.user?.email ?? '').split('@')[0] || 'Volunteer'
-})
-
-const initials = computed(() => displayLabel.value.slice(0, 2).toUpperCase())
-
-function onMenuEscape(): void {
-  menuOpen.value = false
-  userChipRef.value?.focus()
-}
-
-function goToDifferentEmail(): void {
-  menuOpen.value = false
-  router.push({ name: 'volunteer-home' })
-}
-
-async function handleSignOut(): Promise<void> {
-  isSigningOut.value = true
-  try {
-    await volunteerAuth.signOut()
-  } finally {
-    isSigningOut.value = false
-    menuOpen.value = false
-  }
-}
 
 // ── Service header ──────────────────────────────────────────────────────────
 // Local-midnight ymd parse (mirrors ScheduleServiceCard.vue's own convention

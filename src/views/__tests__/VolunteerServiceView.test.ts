@@ -30,6 +30,13 @@ const globalStubs = {
     template: '<a :href="to"><slot /></a>',
     props: ['to'],
   },
+  // The view now renders inside the shared AppShell (left-menu chrome) like
+  // every other authed view, replacing the old bespoke top bar. AppShell pulls
+  // in AppSidebar (useRoute/auth/toasts + Pinia), so stub it to a bare slot
+  // passthrough — this view's own content is what's under test here.
+  AppShell: {
+    template: '<div><slot /></div>',
+  },
 }
 
 const mockPush = vi.fn(() => Promise.resolve())

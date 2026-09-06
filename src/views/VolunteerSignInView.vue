@@ -7,30 +7,13 @@
       </div>
 
       <div class="bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-6 space-y-5">
-        <!-- Signed in: user chip + explicit sign-out (R376). -->
-        <div v-if="authStore.isAuthenticated" class="space-y-4">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-medium text-white shrink-0">
-              {{ initials }}
-            </div>
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-gray-100 truncate">{{ displayLabel }}</p>
-              <p class="text-xs text-gray-500 truncate">{{ authStore.user?.email }}</p>
-            </div>
-          </div>
-
-          <p class="text-xs text-gray-500">
-            Signing in is only so each person's playback position and their own downloads stay theirs.
-          </p>
-
-          <button
-            @click="handleSignOut"
-            :disabled="isSigningOut"
-            class="w-full px-4 py-2 text-sm font-medium text-gray-100 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 hover:border-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {{ isSigningOut ? 'Signing out...' : 'Sign out' }}
-          </button>
-        </div>
+        <!-- Already signed in: this page has nothing useful to add — the real
+             home is My Schedule (which carries the sign-out in the sidebar and
+             the empty/populated states). Redirect there; show a brief holding
+             line in the tick before the redirect lands. -->
+        <p v-if="authStore.isAuthenticated" class="text-sm text-gray-400">
+          Taking you to your schedule&hellip;
+        </p>
 
         <!-- Not signed in: this device has no active volunteer session. -->
         <div v-else class="space-y-4">
@@ -84,9 +67,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useVolunteerAuthStore } from '@/stores/volunteerAuth'
 
 // Same key volunteerAuth.ts reads at completion time — pre-storing it here
 // (before the volunteer opens the emailed link on this device) lets the
@@ -94,42 +77,23 @@ import { useVolunteerAuthStore } from '@/stores/volunteerAuth'
 // falling into the needsEmailReentry prompt.
 const EMAIL_FOR_SIGN_IN_KEY = 'emailForSignIn'
 
+const router = useRouter()
 const authStore = useAuthStore()
-const volunteerAuth = useVolunteerAuthStore()
 
-const isSigningOut = ref(false)
 const showReentry = ref(false)
 const rememberEmail = ref('')
 const rememberedConfirmation = ref('')
 
-// "Dana R." — first name + last-initial, per the design reference in
-// 125-CONTEXT.md. Falls back to the account email's local part when no
-// display name is on file (e.g. a volunteer who has never set one).
-const displayLabel = computed(() => {
-  const name = authStore.user?.displayName?.trim()
-  if (name) {
-    const parts = name.split(/\s+/)
-    if (parts.length > 1) {
-      return `${parts[0]} ${parts[parts.length - 1]![0]}.`
-    }
-    return parts[0]!
-  }
-  return authStore.user?.email?.split('@')[0] ?? 'Volunteer'
-})
-
-const initials = computed(() => {
-  const label = displayLabel.value
-  return label.slice(0, 2).toUpperCase()
-})
-
-async function handleSignOut(): Promise<void> {
-  isSigningOut.value = true
-  try {
-    await volunteerAuth.signOut()
-  } finally {
-    isSigningOut.value = false
-  }
-}
+// A signed-in volunteer has nothing to do on this landing page — send them to
+// their schedule (its sidebar carries sign-out). immediate so a direct hit on
+// /volunteer while already signed in bounces straight through.
+watch(
+  () => authStore.isAuthenticated,
+  (signedIn) => {
+    if (signedIn) router.replace({ name: 'my-schedule' })
+  },
+  { immediate: true },
+)
 
 function handleRememberEmail(): void {
   // WR-03 (125-REVIEW.md): normalize to lowercase, matching every other

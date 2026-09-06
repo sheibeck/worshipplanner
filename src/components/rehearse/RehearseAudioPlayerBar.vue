@@ -152,7 +152,10 @@ const loop = ref(false)
 
 const containerClass = computed(() => [
   'border-t border-gray-800 bg-gray-900 px-4 py-3 flex flex-col gap-2',
-  props.fixedBottom ? 'fixed bottom-0 inset-x-0 z-30' : '',
+  // lg:left-64 clears the persistent w-64 AppShell sidebar on desktop so the
+  // fixed player aligns with the content area instead of overlapping the nav
+  // (inset-x-0 sets left-0; this overrides left at lg+).
+  props.fixedBottom ? 'fixed bottom-0 inset-x-0 lg:left-64 z-30' : '',
 ])
 
 const speedLabel = computed(() => `${SPEEDS[speedIndex.value]}×`)

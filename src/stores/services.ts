@@ -39,7 +39,8 @@ import {
 } from '@/utils/lastUsed'
 import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot, StageMarker } from '@/types/service'
 import type { SongSlot } from '@/types/service'
-import type { RoleGroup } from '@/types/roster'
+import type { RoleGroup, Quarter, Role, Person } from '@/types/roster'
+import type { Song } from '@/types/song'
 
 type CreateServiceInput = {
   date: string
@@ -288,6 +289,29 @@ async function revokeRehearseAccessWithRetry(refPath: {
       secondErr,
     )
   }
+}
+
+/**
+ * Build + persist the `rehearseAccess/{serviceId}` projection for ONE service.
+ * Shared by markAsPlanned (fed from the org-scoped stores, which are loaded in
+ * the service-editor context) and resyncRehearseAccessForSong (fed from direct
+ * getDocs reads, since a song-file edit happens on the Songs page where those
+ * stores aren't subscribed). buildRehearseAccess is a pure projection over the
+ * PII-safe allowlist, so both feeds produce byte-identical docs.
+ */
+async function writeRehearseAccessDoc(
+  service: Service,
+  org: string,
+  quarters: Quarter[],
+  roles: Role[],
+  people: Person[],
+  songs: Song[],
+): Promise<void> {
+  const rehearseAccess = buildRehearseAccess(service, org, quarters, roles, people, songs)
+  await setDoc(doc(db, 'organizations', org, 'rehearseAccess', service.id), {
+    ...rehearseAccess,
+    updatedAt: serverTimestamp(),
+  })
 }
 
 export const useServiceStore = defineStore('services', () => {
@@ -611,7 +635,7 @@ export const useServiceStore = defineStore('services', () => {
         const rosterStore = useRosterStore()
         const quartersStore = useQuartersStore()
         const songStore = useSongStore()
-        const rehearseAccess = buildRehearseAccess(
+        await writeRehearseAccessDoc(
           { ...service, status: 'planned' },
           orgId.value,
           quartersStore.quarters,
@@ -619,16 +643,55 @@ export const useServiceStore = defineStore('services', () => {
           rosterStore.people,
           songStore.songs,
         )
-        await setDoc(doc(db, 'organizations', orgId.value, 'rehearseAccess', id), {
-          ...rehearseAccess,
-          updatedAt: serverTimestamp(),
-        })
       } catch (err) {
         console.error(
           `markAsPlanned: rehearseAccess projection write failed for service ${id} — the status transition already succeeded`,
           err,
         )
       }
+    }
+  }
+
+  /**
+   * Keep planned-service `rehearseAccess` projections fresh when a song's
+   * attachments change AFTER the service was locked. The projection is a frozen
+   * snapshot written at markAsPlanned; without this, a chart/track added to (or
+   * removed from) a song already in a Planned service never reaches the
+   * volunteer's My Schedule readiness counts or Rehearse view.
+   *
+   * Reads its inputs directly via getDocs rather than the org-scoped stores:
+   * the caller (SongFilesTab, on the Songs page) only has the song store
+   * subscribed, so roster/quarters/services aren't in memory there. Scoped to
+   * Planned services only (few docs), and to just those referencing this song.
+   * Best-effort: a failure logs and never blocks the attachment write that
+   * triggered it.
+   */
+  async function resyncRehearseAccessForSong(songId: string): Promise<void> {
+    const org = orgId.value
+    if (!org) return
+    try {
+      const plannedSnap = await getDocs(
+        query(collection(db, 'organizations', org, 'services'), where('status', '==', 'planned')),
+      )
+      const affected = plannedSnap.docs
+        .map((d) => ({ id: d.id, name: '', notes: '', ...d.data() }) as Service)
+        .filter((svc) => songIdsInService(svc).includes(songId))
+      if (affected.length === 0) return
+
+      const [quartersSnap, rolesSnap, peopleSnap, songsSnap] = await Promise.all([
+        getDocs(collection(db, 'organizations', org, 'quarters')),
+        getDocs(collection(db, 'organizations', org, 'roles')),
+        getDocs(collection(db, 'organizations', org, 'people')),
+        getDocs(collection(db, 'organizations', org, 'songs')),
+      ])
+      const quarters = quartersSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Quarter)
+      const roles = rolesSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Role)
+      const people = peopleSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)
+      const songs = songsSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Song)
+
+      await Promise.all(affected.map((svc) => writeRehearseAccessDoc(svc, org, quarters, roles, people, songs)))
+    } catch (err) {
+      console.error(`resyncRehearseAccessForSong: failed for song ${songId}`, err)
     }
   }
 
@@ -1146,6 +1209,7 @@ export const useServiceStore = defineStore('services', () => {
     createService,
     updateService,
     markAsPlanned,
+    resyncRehearseAccessForSong,
     reopenService,
     deleteService,
     assignSongToSlot,

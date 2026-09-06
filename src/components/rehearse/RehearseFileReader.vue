@@ -4,24 +4,9 @@
       <!-- Desktop (R387): native <iframe> reader — the browser's own PDF
            viewer supplies zoom/page-nav, no custom paginator is built. -->
       <template v-if="!mobileLinkFirst">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800 bg-gray-900">
-          <p class="text-sm font-medium text-gray-100 truncate flex-1" :title="attachment.name">
-            {{ attachment.name }}
-          </p>
-          <button
-            type="button"
-            aria-label="Print"
-            data-testid="rehearse-reader-print"
-            class="flex items-center gap-1 p-1 rounded hover:bg-gray-700 text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-950"
-            @click="printAttachment"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a1 1 0 001-1v-4a1 1 0 00-1-1H9a1 1 0 00-1 1v4a1 1 0 001 1zm8-12V5a2 2 0 00-2-2H7a2 2 0 00-2 2v4h14z" />
-            </svg>
-            <span class="text-sm">Print</span>
-          </button>
-        </div>
-
+        <!-- No custom header row: the song name already shows in the detail
+             column, and the native PDF viewer supplies print/zoom/download —
+             so the reader is just the full-height iframe. -->
         <div class="flex-1 relative">
           <div
             v-if="loading && !errored"
@@ -153,14 +138,6 @@ function onLoad(): void {
 function onError(): void {
   loading.value = false
   errored.value = true
-}
-
-// Print (T-127-04) — NOT iframe.contentWindow.print(): Storage download URLs
-// are cross-origin and that call throws. A new tab lets the browser's own
-// PDF viewer supply printing, same pattern RehearseSongDetail.vue uses.
-function printAttachment(): void {
-  if (!props.attachment?.downloadUrl) return
-  window.open(props.attachment.downloadUrl, '_blank', 'noopener,noreferrer')
 }
 
 // Mobile "Open PDF" (R391) — hands off to the phone's native PDF viewer.
