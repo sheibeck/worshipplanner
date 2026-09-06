@@ -91,17 +91,17 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 | Requirement | Phase |
 |-------------|-------|
-| R394 | — |
-| R395 | — |
-| R396 | — |
-| R397 | — |
-| R398 | — |
-| R399 | — |
-| R400 | — |
-| R401 | — |
-| R402 | — |
-| R403 | — |
-| R404 | — |
-| R405 | — |
+| R394 | Phase 128 |
+| R395 | Phase 128 |
+| R396 | Phase 128 |
+| R397 | Phase 128 |
+| R398 | Phase 128 |
+| R399 | Phase 128 |
+| R400 | Phase 129 |
+| R401 | Phase 129 |
+| R402 | Phase 129 |
+| R403 | Phase 130 |
+| R404 | Phase 130 |
+| R405 | Phase 130 |
 
-*(Filled by the roadmapper.)*
+*Coverage: 12/12 v1 requirements mapped (R394–R405). No orphans, no duplicates. Phase 128 = Self-Service Magic-Link Request + shared mint/send core; Phase 129 = Admin Resend; Phase 130 = Multi-Church Switcher.*

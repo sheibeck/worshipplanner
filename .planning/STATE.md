@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.13
 milestone_name: Volunteer Self-Service & Multi-Church Access
 status: planning
-last_updated: "2026-09-06T17:41:13.249Z"
+last_updated: "2026-09-06T18:30:00.000Z"
 last_activity: 2026-09-06
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -52,7 +52,41 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.12 Rehearse Mode (roadmap created 2026-09-05)
+# ▶ ACTIVE MILESTONE — v2.13 Volunteer Self-Service & Multi-Church Access (roadmap created 2026-09-06)
+
+**Status:** Roadmap created — ready to plan Phase 128
+
+**Goal:** Let volunteers get their own passwordless sign-in link on demand and see their schedule
+organized by church — extending v2.12's account-level email-link access with a self-service request path,
+an admin resend affordance, and a multi-church switcher, so a volunteer is never stuck waiting on a
+service email to reach their rehearsal content.
+
+(v2.12 ended at Phase 127); this milestone is **Phases 128–130** (numbering continues, not reset). The
+999.x dirs under `.planning/phases` are backlog, not this milestone.
+
+**Key context:** All three features reuse v2.12's account-level Firebase email-link sign-in — the link
+authenticates the *person*, so one link = their whole schedule across every church they serve; the church
+slug scopes only the request/branding/roster-check, not what a volunteer sees after sign-in. The client
+cannot mint links (`generateSignInWithEmailLink` is Admin-SDK-only), so both self-service and admin-copy
+route through a server callable. A natural shared server-side mint/send core (reusing the Resend send block
++ `config.sender.fromAddress` / `bareEmailAddress` / `fromDisplayName` in functions/src/params.ts and the
+messaging limiter pattern) is built in Phase 128 — where the security gate that guards the public path must
+live — and reused by Phase 129 per R402's single-code-path / one-authorization-model rule. R397 (the public
+self-service endpoint) is security-critical: a public, unauthenticated email-sending endpoint that must be
+enumeration-safe + rate-limited + roster-gated, carrying a threat model + ALLOW/DENY tests (mirror Phase
+125's rehearseAccess discipline). R404 needs a small projection change — add `orgName` to `rehearseAccess`
+(`buildRehearseAccess` in src/utils/rehearseAccess.ts + the `resyncRehearseAccessForSong` / `markAsPlanned`
+write path). Reuse, don't rebuild: the `orgSlugs` public registry (ADR-0007) for slug→orgId, and v2.12's
+`rehearseAccess` / `volunteerAuth` / `useVolunteerServiceDoc` / `MyScheduleView`. No project-research pass.
+Prod caveat: Resend is still test-mode until DNS domain verification (backlog 999.6); the admin copy path
+sidesteps email entirely.
+
+See the `## ★ v2.13 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
+phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
+
+---
+
+# ◆ PRECEDING MILESTONE — v2.12 Rehearse Mode (roadmap created 2026-09-05)
 
 **Status:** Phase complete — ready for verification
 
@@ -1318,10 +1352,61 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: v2.13 roadmap created — Phases 128–130 defined, none started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-06 — Milestone v2.13 started
+Status: Roadmap created — ready to plan Phase 128
+Last activity: 2026-09-06 — v2.13 ROADMAP.md created (Phases 128–130, R394–R405 mapped, 100% coverage)
+
+## ★ v2.13 ROADMAP.md phase breakdown (created 2026-09-06)
+
+3 phases (128-130), derived directly from R394-R405 (12 requirements) with this project's `coarse`
+granularity setting applied. The milestone's own framing draws three natural fault lines matching the
+owner's settled architecture: a public, security-critical self-service request flow that also builds the
+shared server-side mint/send core (Phase 128); an authenticated admin resend that reuses that core (Phase
+129); and a multi-church switcher on the already-shipped v2.12 volunteer surface (Phase 130). The shared
+Admin-SDK mint/send helper is folded INTO Phase 128 rather than split into a thin standalone phase — a
+requirement-less internal-helper phase is exactly the over-fragmentation `coarse` granularity avoids, and
+folding it in keeps the security gate that guards the public path inseparable from the endpoint it protects
+(the owner's explicit "do not fold self-service into a phase that would let the security gate be skipped" is
+satisfied because the gate and the endpoint live together, while the core is still reused downstream). Admin
+resend (R400-R402) is its own Phase 129 because R402 mandates it reuse Phase 128's core under one
+authorization model — a genuine dependency, not a merge candidate. The switcher (R403-R405) is Phase 130:
+independent of the mint/send core (no email issuance), it touches a different surface (the `rehearseAccess`
+projection + My Schedule) and can run in parallel with 128/129. Numbering continues from v2.12, which ended
+at Phase 127 — v2.13 starts at Phase 128, not reset; the 999.x phase dirs are backlog.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 128 Self-Service Magic-Link Request (public, security-critical) + shared mint/send core | A volunteer requests their own passwordless sign-in link from a public, church-scoped page — enumeration-safe, roster-gated, rate-limited — through a shared server-side Admin-SDK mint/send core, and can recover from an expired link | R394, R395, R396, R397, R398, R399 | Nothing (first phase of v2.13) | yes |
+| 129 Admin Resend — Email & Copy | From the Volunteers page, an editor/admin emails or copies a rostered volunteer's sign-in link, reusing the same server-side mint/send core (one code path, one authz model) | R400, R401, R402 | Phase 128 (reuses its shared mint/send core; R402 single code path) | yes |
+| 130 Multi-Church Volunteer Switcher | A volunteer serving at >1 church switches/filters My Schedule (and the volunteer service view) by church, labeled via an `orgName` added to the rehearseAccess projection; a single-church volunteer sees no switcher | R403, R404, R405 | Nothing (independent of 128-129 — projection + volunteer-UI track on shipped v2.12 rehearseAccess/My Schedule) | yes |
+
+**Security note (R397, Phase 128):** the self-service request is a public, unauthenticated email-sending
+endpoint — it must be enumeration-safe (identical response whether or not the email is on the roster),
+rate-limited per email + church, and roster-gated (a link is only ever sent to an email already on that
+church's `organizations/{orgId}/people`). Carry a threat model + rate-limit/enumeration ALLOW/DENY tests at
+plan time, mirroring Phase 125's rehearseAccess security discipline. The shared mint/send core is built here
+so the gate is never bypassable from a separate helper phase.
+
+**Projection note (R404, Phase 130):** add `orgName` to the `rehearseAccess` projection — `buildRehearseAccess`
+in `src/utils/rehearseAccess.ts` plus the existing `services.resyncRehearseAccessForSong` / `markAsPlanned`
+write path — so churches can be labeled in the switcher without an org-document read. Volunteers have ZERO
+org memberships, so the switcher is distinct from the admin membership switcher and must NEVER call
+`selectOrg`.
+
+**Reuse, don't rebuild:** the `orgSlugs` public registry (ADR-0007) for slug→orgId; the Resend send block +
+`config.sender.*` (functions/src/params.ts) and the messaging limiter pattern for the mint/send core; and
+v2.12's `rehearseAccess` / `volunteerAuth` / `useVolunteerServiceDoc` / `MyScheduleView` for the switcher.
+
+**Out of scope this milestone (locked at requirements time):** changing the link's account-level trust
+model (no per-church link restriction), a global cross-org "type your email, we'll find all your churches"
+lookup (larger enumeration surface), a standalone volunteer account/profile UI (sign-in stays link-only),
+and per-org email/egress quota + cost alerting for link sends (backlog). Resend DNS domain verification
+(backlog 999.6) is an ops task, not app code.
+
+See `.planning/ROADMAP.md` § v2.13 Volunteer Self-Service & Multi-Church Access for the full phase detail
+table (goals, dependencies, success criteria). Next step: `/gsd-plan-phase 128` (optionally preceded by
+`/gsd-discuss-phase 128`).
 
 ## ★ v2.12 ROADMAP.md phase breakdown (created 2026-09-05)
 

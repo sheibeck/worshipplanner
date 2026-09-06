@@ -748,6 +748,133 @@ Plans:
 
 **UI hint**: yes
 
+### 🚧 v2.13 Volunteer Self-Service & Multi-Church Access (Phases 128-130, in planning)
+
+**Milestone Goal:** Let volunteers get their own passwordless sign-in link on demand and see their
+schedule organized by church — extending v2.12's account-level email-link access with a self-service
+request path, an admin resend affordance, and a multi-church switcher, so a volunteer is never stuck
+waiting on a service email to reach their rehearsal content.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R394–R405 (12 mapped, 100% coverage)
+
+**Key context:** All three features reuse v2.12's account-level Firebase email-link sign-in — the link
+authenticates the *person*, so one link = their whole schedule across every church they serve; the church
+slug scopes only the request/branding/roster-check, not what a volunteer sees after sign-in. The client
+cannot mint links (`generateSignInWithEmailLink` is Admin-SDK-only), so both self-service and admin-copy
+route through a server callable. There is a natural shared server-side mint/send core all link-issuing
+paths depend on — built in Phase 128 (the primary consumer, and where the security gate that guards the
+public path must live), reused by Phase 129 per R402's single-code-path / one-authorization-model rule.
+Reuses existing infra: the Resend send block + `config.sender.fromAddress` / `bareEmailAddress` /
+`fromDisplayName` (functions/src/params.ts), the messaging limiter pattern, the `orgSlugs` public registry
+(ADR-0007) for slug→orgId, and v2.12's `rehearseAccess` / `volunteerAuth` / `useVolunteerServiceDoc` /
+`MyScheduleView`. No project-research pass — every pattern already exists in the codebase (v2.11/v2.12 + the
+messaging/Resend infra). Prod caveat: Resend is still test-mode (real email only reaches the owner inbox)
+until DNS domain verification (backlog 999.6); the admin copy path sidesteps email entirely.
+
+**Flagged at roadmap time:**
+
+- Phase 128 (R394–R399) is **security-critical** — a public, unauthenticated email-sending endpoint. It
+  must carry a threat model + rate-limit/enumeration ALLOW/DENY tests, mirroring the security-gate
+  discipline Phase 125 used for `rehearseAccess`. The shared mint/send core is built here (folded into the
+  self-service phase) rather than as a thin standalone phase precisely so the security gate that guards the
+  public path can never be bypassed from a separate helper — do not fold this into a phase that would let
+  the gate be skipped.
+
+- Phase 130 (R403–R405) requires a small projection change: add `orgName` to the `rehearseAccess`
+  projection (`buildRehearseAccess` in `src/utils/rehearseAccess.ts` + the existing
+  `services.resyncRehearseAccessForSong` / `markAsPlanned` write path) so churches can be labeled without an
+  org-document read. Volunteers have ZERO org memberships, so the switcher is distinct from the admin
+  membership switcher and must NEVER call `selectOrg`.
+
+- Numbering continues from v2.12, which ended at Phase 127 — v2.13 starts at Phase 128, not reset. (The
+  999.x entries below are backlog, not this milestone.)
+
+- [ ] **Phase 128: Self-Service Magic-Link Request (public, security-critical) + shared mint/send core** - A volunteer requests their own passwordless sign-in link from a public, church-scoped page — enumeration-safe, roster-gated, rate-limited — through a shared server-side Admin-SDK mint/send core, with recovery from an expired link
+- [ ] **Phase 129: Admin Resend — Email & Copy** - From the Volunteers page, an editor/admin emails or copies a rostered volunteer's sign-in link, reusing the same server-side mint/send core (one code path, one authz model)
+- [ ] **Phase 130: Multi-Church Volunteer Switcher** - A volunteer serving at more than one church switches/filters My Schedule by church (labeled via an `orgName` added to the rehearseAccess projection); a single-church volunteer sees no switcher
+
+### Phase 128: Self-Service Magic-Link Request (public, security-critical) + shared mint/send core
+
+**Goal**: A volunteer can obtain their own passwordless sign-in link on demand from a public,
+church-scoped page — safely (enumeration-safe, roster-gated, rate-limited) through a shared server-side
+Admin-SDK mint/send core — and can recover from an expired or invalid link without help.
+**Depends on**: Nothing (first phase of v2.13)
+**Security-critical**: yes — R397 requires a threat model and rate-limit/enumeration ALLOW/DENY tests on a public, unauthenticated email-sending endpoint, not just a UI guard.
+**Requirements**: R394, R395, R396, R397, R398, R399
+**Success Criteria** (what must be TRUE):
+
+  1. A volunteer visits `/{church-slug}/volunteer`, sees the church's name (resolved from the public
+     `orgSlugs` registry), and can enter their email to request a sign-in link; an unknown/expired slug
+     shows a clear "church not found" state instead of a broken page (R394).
+
+  2. Submitting any email returns the identical confirmation ("If you're on this church's team, a sign-in
+     link is on its way") whether or not the email is on the roster — a request never reveals whether a
+     given email is a member (R395).
+
+  3. A sign-in link is minted server-side (Admin SDK) and sent via Resend only when the entered email is
+     already on that specific church's volunteer roster (`organizations/{orgId}/people`); a non-roster
+     email produces no email at all, but the same enumeration-safe confirmation (R396).
+
+  4. The public request endpoint is rate-limited per email + church and carries a threat model with
+     ALLOW/DENY tests proving it cannot be used to spam a volunteer's inbox, fan out email cost, or
+     enumerate roster membership (R397).
+
+  5. A volunteer reaches the request from the login page's "Are you a volunteer? Get your sign-in link"
+     entry point, and from an expired/invalid link at `/volunteer/verify` via a one-tap "request a new
+     link" that returns them to the same church's request with no re-selection needed (R398, R399).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 129: Admin Resend — Email & Copy
+
+**Goal**: From the Volunteers page, an editor/admin can get a rostered volunteer their sign-in link —
+either emailed as a standalone message or copied to the clipboard for their own channel — reusing the same
+server-side mint/send core as the self-service request, under one authorization model.
+**Depends on**: Phase 128 (reuses its shared server-side Admin-SDK mint/send core; R402 mandates a single code path)
+**Requirements**: R400, R401, R402
+**Success Criteria** (what must be TRUE):
+
+  1. From the Volunteers page, an editor/admin can email a rostered volunteer their sign-in link as a
+     standalone message, not tied to any one service (R400).
+
+  2. From the Volunteers page, an editor/admin can copy a rostered volunteer's sign-in link to the
+     clipboard, to share through their own channel — working even while Resend is in test-mode in
+     production (R401).
+
+  3. Both actions only mint links for people on the church roster who have an email address, and route
+     through the same server-side mint/send core as the self-service request — one code path, one
+     authorization model (R402).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 130: Multi-Church Volunteer Switcher
+
+**Goal**: A volunteer serving at more than one church can switch/filter My Schedule (and the volunteer
+service view context) by church, with each church labeled by name — while a volunteer serving at only one
+church sees an unchanged, switcher-free experience.
+**Depends on**: Nothing (independent of Phases 128-129 — a projection + volunteer-UI track building on shipped v2.12 `rehearseAccess`/My Schedule; can run in parallel)
+**Requirements**: R403, R404, R405
+**Success Criteria** (what must be TRUE):
+
+  1. A volunteer serving at more than one church sees a church switcher/filter on My Schedule that scopes
+     the displayed services to the selected church (R403).
+
+  2. The switcher is distinct from the admin membership switcher and never calls `selectOrg` — volunteers
+     have zero org memberships (R403).
+
+  3. Each church is labeled by name, sourced from an `orgName` field added to the `rehearseAccess`
+     projection (via `buildRehearseAccess` and the existing `resyncRehearseAccessForSong` / `markAsPlanned`
+     write path) so no org-document read is required, and the selected-church context carries into the
+     volunteer service view (R404).
+
+  4. A volunteer serving at only one church sees no switcher — the single-church experience is unchanged
+     (R405).
+
+**Plans**: TBD
+**UI hint**: yes
+
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
 
 **Goal:** [Captured for future planning] Consolidates all 11 Medium/Low security findings
