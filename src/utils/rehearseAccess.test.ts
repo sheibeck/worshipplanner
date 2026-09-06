@@ -422,6 +422,26 @@ describe('buildRehearseAccess', () => {
     expect(JSON.stringify(result.roleAssignments)).not.toContain('dana@example.com')
   })
 
+  it('WR-04: a scheduled person removed from the roster falls back to a neutral placeholder, not the raw personId', () => {
+    const role = makeRole({ id: 'role-guitar', name: 'guitar', group: 'band' })
+    const quarter = makeQuarter({
+      serviceDates: ['2026-09-06'],
+      calendar: { '2026-09-06': { 'role-guitar': ['person-deleted', 'person-1'] } },
+    })
+    // Only 'person-1' exists in the roster passed in — 'person-deleted' is
+    // still referenced by the calendar but no longer in `people` (removed
+    // from the roster after being scheduled).
+    const person = makePerson({ id: 'person-1', name: 'Dana Smith' })
+    const service = makeService({ date: '2026-09-06' })
+
+    const result = buildRehearseAccess(service, 'org-1', [quarter], [role], [person], [])
+
+    expect(result.roleAssignments).toEqual([
+      { roleId: 'role-guitar', roleName: 'guitar', group: 'band', personNames: ['(removed)', 'Dana Smith'] },
+    ])
+    expect(JSON.stringify(result.roleAssignments)).not.toContain('person-deleted')
+  })
+
   it('stageLayout is absent (key not present) for a service with zero markers', () => {
     const service = makeService({ stageLayout: { elements: [] } })
 

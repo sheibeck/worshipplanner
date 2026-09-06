@@ -28,7 +28,7 @@ import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { buildSlotsFromTemplate, buildSuggestedTemplateEntries, orderSlotsBySection } from '@/utils/slotTypes'
 import { stripUndefined } from '@/utils/stripUndefined'
-import { mapSlotAllowlist, mapStageMarkerAllowlist } from '@/utils/serviceProjection'
+import { mapSlotAllowlist, mapStageMarkerAllowlist, resolvePersonName } from '@/utils/serviceProjection'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import { buildRehearseAccess } from '@/utils/rehearseAccess'
 import {
@@ -147,7 +147,10 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
 
   // Who's-serving snapshot (D-04/D-24 PII guard): resolve personId -> name via a
   // Map ONLY — never embed the raw Person object (no email/phone/pcPersonId).
-  // Mirrors quarters.ts::finalizeAndShare's nameById pattern exactly.
+  // Mirrors quarters.ts::finalizeAndShare's nameById pattern exactly. WR-04
+  // (127-REVIEW): a person removed from the roster after being scheduled
+  // falls back to the shared REMOVED_PERSON_NAME placeholder, not their raw
+  // internal personId, on this PUBLIC share-link path too.
   const rosterStore = useRosterStore()
   const quartersStore = useQuartersStore()
   const nameById = new Map(rosterStore.people.map((p) => [p.id, p.name]))
@@ -156,7 +159,7 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     roleId: r.roleId,
     roleName: r.roleName,
     group: r.group,
-    personNames: r.effectivePersonIds.map((id) => nameById.get(id) ?? id),
+    personNames: r.effectivePersonIds.map((id) => resolvePersonName(nameById, id)),
   }))
 
   // Stage layout projection (T-107-01): field-allowlist to EXACTLY 6 display fields,

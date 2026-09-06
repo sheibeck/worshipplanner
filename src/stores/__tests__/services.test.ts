@@ -1343,6 +1343,40 @@ describe('useServiceStore', () => {
       expect(sound?.personNames).toEqual(['Bob Jones'])
     })
 
+    it('WR-04: a scheduled person removed from the roster falls back to a neutral placeholder, not the raw personId', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('@/stores/quarters')
+      const { useServiceStore } = await import('../services')
+      // 'person-missing' is still referenced by the calendar but no longer in
+      // the roster's `people` array (removed after being scheduled).
+      vi.mocked(useQuartersStore).mockReturnValueOnce({
+        quarters: [
+          {
+            id: 'quarter-1',
+            serviceDates: ['2026-03-08'],
+            calendar: {
+              '2026-03-08': {
+                'role-guitar': ['person-missing', 'person-1'],
+              },
+            },
+          },
+        ],
+      } as never)
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      const service = makeService() as unknown as Service
+      await store.createShareToken(service, 'org-1')
+
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
+      const writeData = data as Record<string, unknown>
+      const snapshot = writeData.serviceSnapshot as Record<string, unknown>
+      const roleAssignments = snapshot.roleAssignments as Array<{ roleId: string; personNames: string[] }>
+      const guitar = roleAssignments.find((r) => r.roleId === 'role-guitar')
+      expect(guitar?.personNames).toEqual(['(removed)', 'Alice Smith'])
+      expect(JSON.stringify(roleAssignments)).not.toContain('person-missing')
+    })
+
     it('written payload contains no email/phone/pcPersonId keys anywhere (PII guard)', async () => {
       const { setDoc } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')

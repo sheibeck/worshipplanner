@@ -134,3 +134,23 @@ export function mapStageMarkerAllowlist(marker: StageMarker): Omit<StageMarker, 
 export function mapStageMarkers(markers: StageMarker[]): Omit<StageMarker, 'note'>[] {
   return markers.map(mapStageMarkerAllowlist)
 }
+
+/**
+ * Neutral placeholder for a `roleAssignments.personNames` entry whose
+ * `personId` no longer resolves via `nameById` (WR-04, 127-REVIEW) — the
+ * person was removed from the roster after being scheduled/overridden.
+ * Both `buildServiceSnapshot` (src/stores/services.ts) and
+ * `buildRehearseAccess` (src/utils/rehearseAccess.ts) share this constant so
+ * they can't drift, matching the shared-allowlist precedent above.
+ */
+export const REMOVED_PERSON_NAME = '(removed)'
+
+/**
+ * Resolves a scheduled person's display name for `roleAssignments`, falling
+ * back to {@link REMOVED_PERSON_NAME} rather than the raw internal
+ * `personId` (WR-04) — a Firestore doc id has no business reaching an
+ * external volunteer's rehearse view or a public share link.
+ */
+export function resolvePersonName(nameById: Map<string, string>, personId: string): string {
+  return nameById.get(personId) ?? REMOVED_PERSON_NAME
+}

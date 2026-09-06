@@ -9,7 +9,7 @@ import type { Quarter, Role, Person, RoleGroup } from '@/types/roster'
 import type { Song, SongAttachmentKind, SongAttachmentLinkSource } from '@/types/song'
 import type { PublicStageMarker } from '@/stores/services'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
-import { mapOrderedSlots, mapStageMarkers } from '@/utils/serviceProjection'
+import { mapOrderedSlots, mapStageMarkers, resolvePersonName } from '@/utils/serviceProjection'
 import { orderSlotsBySection } from '@/utils/slotTypes'
 
 export interface RehearseAttachment {
@@ -203,13 +203,15 @@ export function buildRehearseAccess(
 
   // roleAssignments (R392, "Who's Serving") — names-only via nameById,
   // mirrors buildServiceSnapshot's own roleAssignments map exactly; no
-  // personId/email ever reaches this array.
+  // personId/email ever reaches this array. WR-04 (127-REVIEW): a person
+  // removed from the roster after being scheduled falls back to the shared
+  // REMOVED_PERSON_NAME placeholder, not their raw internal personId.
   const nameById = new Map(people.map((p) => [p.id, p.name]))
   const roleAssignments: RehearseRoleAssignment[] = assignments.map((a) => ({
     roleId: a.roleId,
     roleName: a.roleName,
     group: a.group,
-    personNames: a.effectivePersonIds.map((id) => nameById.get(id) ?? id),
+    personNames: a.effectivePersonIds.map((id) => resolvePersonName(nameById, id)),
   }))
 
   // stageLayout (R393) — SAME PublicStageMarker allowlist (note stripped) as
