@@ -2434,14 +2434,15 @@ export interface RequestVolunteerLinkResponse {
 // Alternatives Considered: a new AppConfig group would need the out-of-scope
 // client-side appConfigDefaults.ts duplicate -- not worth it for a security
 // ceiling). Env-overridable mirroring AI_PROXY_MAX_INSTANCES's idiom.
-const VOLUNTEER_LINK_MAX_PER_MIN = readNumericKnob(process.env.VOLUNTEER_LINK_MAX_PER_MIN, 1);
-const VOLUNTEER_LINK_MAX_PER_DAY = readNumericKnob(process.env.VOLUNTEER_LINK_MAX_PER_DAY, 5);
+export const VOLUNTEER_LINK_MAX_PER_MIN = readNumericKnob(process.env.VOLUNTEER_LINK_MAX_PER_MIN, 1);
+export const VOLUNTEER_LINK_MAX_PER_DAY = readNumericKnob(process.env.VOLUNTEER_LINK_MAX_PER_DAY, 5);
 // Timing-pad target (128-RESEARCH Pitfall 2 / Assumption A4): the no-match
 // and rate-limited (no-send) branches are padded to this elapsed-ms floor so
 // their latency is indistinguishable from the roster-hit branch's real
 // mint+send work -- closing the enumeration-via-timing side channel that a
-// byte-identical response body alone does not close.
-const VOLUNTEER_LINK_TARGET_RESPONSE_MS = readNumericKnob(
+// byte-identical response body alone does not close. Exported so the
+// security test matrix (index.test.ts) can assert the pad precisely.
+export const VOLUNTEER_LINK_TARGET_RESPONSE_MS = readNumericKnob(
   process.env.VOLUNTEER_LINK_TARGET_RESPONSE_MS,
   1200,
 );

@@ -39,8 +39,16 @@ import {
   writeUsageLedger,
   api,
   previewCleanupDryRunHandler,
+  requestVolunteerLinkHandler,
+  VOLUNTEER_LINK_MAX_PER_MIN,
+  VOLUNTEER_LINK_MAX_PER_DAY,
+  VOLUNTEER_LINK_TARGET_RESPONSE_MS,
 } from "./index";
-import type { QueueMessageRequest, PreviewCleanupDryRunRequest } from "./index";
+import type {
+  QueueMessageRequest,
+  PreviewCleanupDryRunRequest,
+  RequestVolunteerLinkRequest,
+} from "./index";
 import {
   cleanupExpiredMediaHandler,
   cleanupOrphanRendersHandler,
@@ -5851,6 +5859,365 @@ describe("sendQueuedMessageHandler", () => {
     const volunteerWrapperStart = source.indexOf("export const requestVolunteerLink = onCall(");
     expect(volunteerWrapperStart).toBeGreaterThan(-1);
     expect(source.slice(volunteerWrapperStart, volunteerWrapperStart + 200)).toMatch(/secrets:\s*\[RESEND_API_KEY\]/);
+  });
+});
+
+// --- requestVolunteerLinkHandler (Phase 128: R395-R397) ---------------------
+//
+// Security ALLOW/DENY + TIMING matrix (128-RESEARCH.md Security Domain / mirrors
+// Phase 125's rehearseAccess discipline). This suite is the BLOCKING evidence
+// for enumeration-safety (body + timing), roster-gating, cross-org isolation,
+// and rate-limit throttling -- see 128-VALIDATION.md.
+
+describe("requestVolunteerLinkHandler", () => {
+  const GENERIC_RESPONSE = {
+    message: "If you're on this church's team, a sign-in link is on its way.",
+  };
+
+  interface FakeOrg {
+    name?: string;
+    slug?: string;
+    people?: Array<{ id: string; email: string }>;
+  }
+
+  /**
+   * A minimal fake Firestore supporting exactly the chains
+   * requestVolunteerLinkHandler uses:
+   *   organizations/{orgId}                  -> .get()
+   *   organizations/{orgId}/people            -> .get()
+   *   volunteerLinkRateLimits/{key}            -> .doc()/.runTransaction()
+   * Throws on any OTHER collection name -- this is itself an assertion that
+   * the limiter never reads/writes aiRateLimits or msgEnqueueRateLimits.
+   */
+  function fakeVolunteerDb(opts: {
+    orgs?: Record<string, FakeOrg | null>;
+    rateLimitSeed?: Record<string, number>;
+    rateLimiterThrows?: boolean;
+  } = {}) {
+    const orgs = opts.orgs ?? {};
+    const counterState: Record<string, { count: number }> = {};
+    for (const [id, count] of Object.entries(opts.rateLimitSeed ?? {})) {
+      counterState[id] = { count };
+    }
+    const rateLimitsCollection = {
+      doc: vi.fn((id: string) => ({ _docId: id, _collection: "volunteerLinkRateLimits" as const })),
+    };
+    const runTransaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      if (opts.rateLimiterThrows) {
+        throw new Error("Firestore unavailable");
+      }
+      const tx = {
+        get: vi.fn(async (ref: { _docId: string }) => {
+          const entry = counterState[ref._docId];
+          return { exists: entry !== undefined, data: () => (entry ? { ...entry } : undefined) };
+        }),
+        set: vi.fn((ref: { _docId: string }, patch: { count: number }) => {
+          counterState[ref._docId] = { count: patch.count };
+        }),
+      };
+      return fn(tx);
+    });
+
+    function makeOrgRef(orgId: string) {
+      const org = orgs[orgId];
+      return {
+        get: vi.fn(async () => ({
+          exists: org != null,
+          data: () => (org ? { name: org.name, slug: org.slug } : undefined),
+        })),
+        collection: vi.fn((name: string) => {
+          if (name === "people") {
+            const people = org?.people ?? [];
+            return {
+              get: vi.fn(async () => ({
+                docs: people.map((p) => ({ id: p.id, data: () => ({ email: p.email }) })),
+              })),
+            };
+          }
+          throw new Error(`fakeVolunteerDb: unexpected org subcollection "${name}"`);
+        }),
+      };
+    }
+
+    const db = {
+      collection: vi.fn((name: string) => {
+        if (name === "organizations") return { doc: vi.fn((orgId: string) => makeOrgRef(orgId)) };
+        if (name === "volunteerLinkRateLimits") return rateLimitsCollection;
+        throw new Error(`fakeVolunteerDb: unexpected collection "${name}"`);
+      }),
+      runTransaction,
+    };
+
+    return { db };
+  }
+
+  function fakeVolunteerRequest(
+    data: Partial<RequestVolunteerLinkRequest>,
+  ): CallableRequest<RequestVolunteerLinkRequest> {
+    return { auth: undefined, data } as unknown as CallableRequest<RequestVolunteerLinkRequest>;
+  }
+
+  function setGenerateLink(impl: (email: string) => Promise<string> | string) {
+    vi.mocked(getAuth).mockReturnValue({
+      generateSignInWithEmailLink: vi.fn(impl),
+    } as never);
+  }
+
+  beforeEach(() => {
+    mockSend.mockReset();
+    mockSend.mockResolvedValue({ data: { id: "re_fake_id" }, error: null });
+    fakeShareBaseUrl = "https://example.com";
+    setGenerateLink(
+      (email: string) => `https://example.com/volunteer/verify?slug=grace-church&email=${encodeURIComponent(email)}`,
+    );
+  });
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+    vi.useRealTimers();
+  });
+
+  it("DENY-1: email not present in organizations/{orgId}/people -> generic response, no mint, no send", async () => {
+    vi.useFakeTimers();
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: "alice@example.com" }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const promise = requestVolunteerLinkHandler(
+      fakeVolunteerRequest({ orgId: "org1", email: "notonroster@example.com" }),
+    );
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+    const result = await promise;
+
+    expect(result).toEqual(GENERIC_RESPONSE);
+    expect(vi.mocked(getAuth)().generateSignInWithEmailLink).not.toHaveBeenCalled();
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("DENY-2 (cross-org): an email on org A's roster is requested under org B's orgId -> generic response, no send for org B", async () => {
+    vi.useFakeTimers();
+    const SHARED_EMAIL = "shared@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: {
+        orgA: { name: "Church A", slug: "church-a", people: [{ id: "pA", email: SHARED_EMAIL }] },
+        orgB: { name: "Church B", slug: "church-b", people: [{ id: "pB", email: "other@example.com" }] },
+      },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const promise = requestVolunteerLinkHandler(
+      fakeVolunteerRequest({ orgId: "orgB", email: SHARED_EMAIL }),
+    );
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+    const result = await promise;
+
+    expect(result).toEqual(GENERIC_RESPONSE);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("DENY-3a: over the per-minute rate-limit window -> generic response, no send (roster lookup skipped)", async () => {
+    const NOW = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const minuteWindow = Math.floor(NOW / 60_000);
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+      rateLimitSeed: { [`org1::${EMAIL}__min__${minuteWindow}`]: VOLUNTEER_LINK_MAX_PER_MIN },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const promise = requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+    const result = await promise;
+
+    expect(result).toEqual(GENERIC_RESPONSE);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("DENY-3b: over the per-day rate-limit window -> generic response, no send", async () => {
+    const NOW = 1_700_000_000_000;
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const dayWindow = Math.floor(NOW / 86_400_000);
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+      rateLimitSeed: { [`org1::${EMAIL}__day__${dayWindow}`]: VOLUNTEER_LINK_MAX_PER_DAY },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const promise = requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+    const result = await promise;
+
+    expect(result).toEqual(GENERIC_RESPONSE);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("R397: the rate limiter fails OPEN when the Firestore transaction throws -- a legitimate rostered request still sends", async () => {
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+      rateLimiterThrows: true,
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+
+    expect(result).toEqual(GENERIC_RESPONSE);
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("DENY-4: missing orgId or email throws invalid-argument (the one branch allowed to differ -- carries no membership info)", async () => {
+    await expect(
+      requestVolunteerLinkHandler(fakeVolunteerRequest({ email: "a@example.com" })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    await expect(
+      requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1" })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("DENY-5: a malformed email throws invalid-argument", async () => {
+    await expect(
+      requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: "not-an-email" })),
+    ).rejects.toMatchObject({ code: "invalid-argument" });
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("bogus/forged orgId (T-128-05): a nonexistent org's people fetch is naturally empty -> generic response, no send", async () => {
+    vi.useFakeTimers();
+    const { db } = fakeVolunteerDb({ orgs: {} });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const promise = requestVolunteerLinkHandler(
+      fakeVolunteerRequest({ orgId: "does-not-exist", email: "anyone@example.com" }),
+    );
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+    const result = await promise;
+
+    expect(result).toEqual(GENERIC_RESPONSE);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it("ALLOW-1: a rostered email under the rate limit -> generic response; mint + send both called with the minted link", async () => {
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL.toUpperCase() }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const result = await requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+
+    expect(result).toEqual(GENERIC_RESPONSE);
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    const sendArgs = mockSend.mock.calls[0][0] as { to: string; text: string };
+    expect(sendArgs.to).toBe(EMAIL);
+    expect(sendArgs.text).toContain("grace-church");
+  });
+
+  it("ALLOW-2: the SAME email requesting under two different orgs where it is rostered in both -> independent success per orgId (limiter + roster both per-orgId)", async () => {
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: {
+        orgA: { name: "Church A", slug: "church-a", people: [{ id: "pA", email: EMAIL }] },
+        orgB: { name: "Church B", slug: "church-b", people: [{ id: "pB", email: EMAIL }] },
+      },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    const resultA = await requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "orgA", email: EMAIL }));
+    const resultB = await requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "orgB", email: EMAIL }));
+
+    expect(resultA).toEqual(GENERIC_RESPONSE);
+    expect(resultB).toEqual(GENERIC_RESPONSE);
+    expect(mockSend).toHaveBeenCalledTimes(2);
+  });
+
+  it("byte-identical body: a DENY-1 response deep-equals an ALLOW-1 response", async () => {
+    vi.useFakeTimers();
+    const EMAIL = "rostered@example.com";
+    const { db: allowDb } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(allowDb as never);
+    const allowResult = await requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+
+    const { db: denyDb } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(denyDb as never);
+    const denyPromise = requestVolunteerLinkHandler(
+      fakeVolunteerRequest({ orgId: "org1", email: "notonroster@example.com" }),
+    );
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+    const denyResult = await denyPromise;
+
+    expect(denyResult).toEqual(allowResult);
+    expect(denyResult).toEqual(GENERIC_RESPONSE);
+  });
+
+  it("TIMING-1: ALLOW and DENY branch elapsed times both land within a tolerance band around VOLUNTEER_LINK_TARGET_RESPONSE_MS, proving the timing pad", async () => {
+    vi.useFakeTimers();
+    const EMAIL = "rostered@example.com";
+    const TOLERANCE_MS = 150;
+    // The roster-HIT branch's real mint+send work: simulated as network
+    // latency comfortably under the target, so the branch's OWN work (not a
+    // pad) drives its elapsed time -- proving the pad masks it rather than
+    // stacking on top of it.
+    const HIT_LATENCY_MS = VOLUNTEER_LINK_TARGET_RESPONSE_MS - 100;
+
+    const { db: allowDb } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(allowDb as never);
+    setGenerateLink(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve("https://example.com/volunteer/verify?slug=grace-church"), HIT_LATENCY_MS),
+        ),
+    );
+
+    const allowStart = Date.now();
+    const allowPromise = requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL }));
+    await vi.advanceTimersByTimeAsync(HIT_LATENCY_MS + 10);
+    await allowPromise;
+    const allowElapsed = Date.now() - allowStart;
+
+    const { db: denyDb } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(denyDb as never);
+    setGenerateLink(async () => "unused -- no-match branch never mints");
+
+    const denyStart = Date.now();
+    const denyPromise = requestVolunteerLinkHandler(
+      fakeVolunteerRequest({ orgId: "org1", email: "notonroster@example.com" }),
+    );
+    await vi.advanceTimersByTimeAsync(VOLUNTEER_LINK_TARGET_RESPONSE_MS + 50);
+    await denyPromise;
+    const denyElapsed = Date.now() - denyStart;
+
+    expect(Math.abs(allowElapsed - VOLUNTEER_LINK_TARGET_RESPONSE_MS)).toBeLessThanOrEqual(TOLERANCE_MS);
+    expect(Math.abs(denyElapsed - VOLUNTEER_LINK_TARGET_RESPONSE_MS)).toBeLessThanOrEqual(TOLERANCE_MS);
+  });
+
+  it("the rate limiter is keyed on the DEDICATED volunteerLinkRateLimits collection -- never aiRateLimits/msgEnqueueRateLimits (no cross-depletion)", async () => {
+    // fakeVolunteerDb itself throws on any collection name other than
+    // "organizations"/"volunteerLinkRateLimits" -- a call against
+    // aiRateLimits or msgEnqueueRateLimits would fail this test with that
+    // thrown error rather than a clean assertion failure.
+    const EMAIL = "rostered@example.com";
+    const { db } = fakeVolunteerDb({
+      orgs: { org1: { name: "Grace Church", slug: "grace-church", people: [{ id: "p1", email: EMAIL }] } },
+    });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(
+      requestVolunteerLinkHandler(fakeVolunteerRequest({ orgId: "org1", email: EMAIL })),
+    ).resolves.toEqual(GENERIC_RESPONSE);
   });
 });
 
