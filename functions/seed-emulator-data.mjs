@@ -275,15 +275,25 @@ async function seedOrg(orgId, name, uid, { aiMasterEnabled }) {
   // (orgProvisioning.ts:290-295) plus the super-admin lifecycle fields
   // active/aiMasterEnabled (src/types/organization.ts:181-196). slug is set so
   // public share links resolve without a lazy claim.
+  const slug = orgId.replace(/^emu-/, '')
   await db.collection('organizations').doc(orgId).set({
     name,
-    slug: orgId.replace(/^emu-/, ''),
+    slug,
     createdBy: uid,
     createdAt: now(),
     active: true,
     aiMasterEnabled,
     settings: orgSettings(),
   })
+
+  // orgSlugs/{slug} — the PUBLIC slug→org registry (ADR-0007). claimSlug()
+  // writes this on a real slug save; the seed must mirror it or public,
+  // unauthenticated slug lookups (memorable share links + the v2.13
+  // /:slug/volunteer self-service page, R394) 404 even though the org doc
+  // carries a slug. Denormalize `name` too, exactly like claimSlug(orgName)
+  // does, so /:slug/volunteer can render the church name without a
+  // membership-gated org-doc read.
+  await db.collection('orgSlugs').doc(slug).set({ orgId, name })
 
   // members/{uid} — role editor (orgProvisioning.ts:199-205).
   await db.collection('organizations').doc(orgId).collection('members').doc(uid).set({
