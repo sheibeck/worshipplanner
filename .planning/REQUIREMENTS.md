@@ -26,12 +26,15 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [ ] **R374**: A volunteer can sign in without a password via a Firebase email-link (`signInWithEmailLink`)
   tied to their roster email — request/receive a link, click it, and be signed in with no password to set
   or remember.
+
 - [ ] **R375**: The magic sign-in link is delivered through the existing v1.7 volunteer-messaging emails
   (reminder / share), so a rostered volunteer reaches My Schedule in one click from the email they already
   get. (Only the link-delivery channel is reused; no new email system.)
+
 - [ ] **R376**: A signed-in volunteer's session persists across browser refresh, they can sign out, and
   their playback position + their own downloads are attributed to their identity.
-- [ ] **R377**: Magic-link volunteer access is **read-only and scoped** — it grants read access only to the
+
+- [x] **R377**: Magic-link volunteer access is **read-only and scoped** — it grants read access only to the
   volunteer's own org's Planned services they are assigned to (songs + their v2.11 attachments), and never
   to the planner/editor surfaces, another org's data, or Draft services. (Security-critical — enforced at
   the data layer, not just the UI; carries a threat model + rules/isolation tests.)
@@ -41,16 +44,21 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [ ] **R378**: After sign-in a volunteer lands on **"My Schedule"**, a read-and-go page listing every
   service they are assigned to, matched by their roster email → role assignment. Available to anyone assigned
   to a service (keyed off assignment, not role).
+
 - [ ] **R379**: My Schedule shows **only Planned (locked, non-Draft) services** — a service still being
   drafted by a planner never appears to volunteers (reuses the app's existing not-Draft / lock gate).
+
 - [ ] **R380**: Services are ordered soonest-first and grouped **This week / Later this month**, with a
   "Next up" badge on the soonest upcoming service; past services the volunteer served are shown separately
   and remain openable.
+
 - [ ] **R381**: Each service card shows the date, service name, time · venue, the volunteer's own **role
   chips**, song / chart / track counts, a **readiness** indicator (all rehearsal files ready · N songs still
   missing media · waiting on charts), and a countdown + call time.
+
 - [ ] **R382**: Each upcoming card's **Rehearse →** action opens that service's standalone Rehearse screen;
   a past card offers a read/open action instead. My Schedule itself is not editable.
+
 - [ ] **R383**: My Schedule surfaces a "check a different email" affordance and, when a signed-in email
   matches no assignment, an empty state explaining the list is built from roster assignments and how to be
   added.
@@ -63,22 +71,30 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   Service** · **Stage Layout** — because tech-team members are volunteers too; it is composed from the
   existing read-only renderers (ShareView snapshot + the v2.7 read-only order/stage renders), not by forking
   the editor.
+
 - [ ] **R385**: The **Rehearse** tab lists the songs in that service (with each song's key, PDF count, MP3
   count, and a now-playing indicator) and lets the volunteer select a song to see its media.
+
 - [ ] **R386**: A selected song's detail lists its **Sheet music & chords** (PDF attachments) with per-file
   **Print** and **Download**, its **Recordings** (MP3 attachments), and an optional per-song note — all
   sourced from the v2.11 song attachments (nothing is uploaded on this screen).
+
 - [ ] **R387**: A PDF reader displays the selected chart with page navigation (Page X of Y, prev/next) and a
   **Print** action.
+
 - [ ] **R388**: An audio player plays a selected recording with play/pause, a seekable progress bar, and
   elapsed / total time.
+
 - [ ] **R389**: The audio player supports whole-track **playback speed** (1× / 0.9× / 0.75× / 1.25×) and a
   whole-track **Loop** toggle.
+
 - [ ] **R390**: External media links (YouTube / Google Drive / Dropbox) attached to a song in v2.11 are
   openable from the Rehearse tab, opening in a new tab (no in-app embedding required).
+
 - [ ] **R392**: The volunteer service view has a read-only **Order of Service** tab showing the service's
   running order (reusing the existing read-only order-of-service render), so tech and all volunteers can see
   what happens when.
+
 - [ ] **R393**: The volunteer service view has a read-only **Stage Layout** tab showing the v2.7 stage
   diagram (instruments/mics + person Name-Role assignments), which tech-team volunteers need for setup
   (reusing the existing read-only/print stage render).
@@ -96,6 +112,7 @@ Deferred to a later milestone. Tracked, not in this roadmap.
 
 - **RQ-QUOTA**: Per-org storage quota (e.g. ~10 GB) enforced at upload, the real cost lever a paid add-on
   would sell "more of." (v2.11 per-file caps remain the only bound this milestone.)
+
 - **RQ-EGRESS**: Egress / billing budget alerting so an abusive church or a runaway download pattern
   surfaces before the bill does.
 
@@ -128,7 +145,7 @@ Populated during roadmap creation.
 | R374 | Phase 125 | Pending |
 | R375 | Phase 125 | Pending |
 | R376 | Phase 125 | Pending |
-| R377 | Phase 125 | Pending |
+| R377 | Phase 125 | Complete |
 | R378 | Phase 126 | Pending |
 | R379 | Phase 126 | Pending |
 | R380 | Phase 126 | Pending |
@@ -147,6 +164,7 @@ Populated during roadmap creation.
 | R393 | Phase 127 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 20 total (R374–R393)
 - Mapped to phases: 20
 - Unmapped: 0 ✓

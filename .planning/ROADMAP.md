@@ -615,6 +615,7 @@ palette → app dark gray-950).
   time. SEED-003 suggests scoped rules, a `buildServiceSnapshot()`-style denormalized rehearse snapshot
   carrying attachment refs/tokenized URLs, or server-issued signed URLs — the exact mechanism is left to
   phase-research/planning, but the phase must own the isolation guarantee.
+
 - Phases 126 and 127 map to the owner's design mocks and are UI-bearing — run `/gsd-ui-phase` at plan time
   for each (`Volunteer Home.dc.html` for 126, `Rehearsal.dc.html` for 127).
 
@@ -637,21 +638,26 @@ proving the isolation guarantee, not just a UI hide.
   1. A volunteer clicks the sign-in link embedded in an existing v1.7 volunteer-messaging email
      (reminder/share) and is signed in via Firebase email-link auth (`signInWithEmailLink`) with no
      password ever set or requested (R374, R375).
+
   2. A signed-in volunteer's session survives a browser refresh and they can explicitly sign out from the
      volunteer surface (R376).
+
   3. Playback position and downloads performed while signed in are attributed to that volunteer's own
      identity, not anonymous (R376).
+
   4. A signed-in volunteer's session cannot read another organization's data, any Draft (unlocked)
      service, or a service they are not assigned to — proven by rules/isolation tests, not just a UI hide
      (R377).
+
   5. A signed-in volunteer cannot reach any planner/editor surface (Service Order, Slides, Roles, Stage
      Layout editors) — those routes/reads are denied at the data layer for a volunteer-scoped session
      (R377).
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
 Plans:
-- [ ] 125-01-PLAN.md — R377 scoped-read isolation: rehearseAccess rule + Firestore-emulator ALLOW/DENY proof (security core, Wave 1)
+
+- [x] 125-01-PLAN.md — R377 scoped-read isolation: rehearseAccess rule + Firestore-emulator ALLOW/DENY proof (security core, Wave 1)
 - [ ] 125-02-PLAN.md — Rehearse-access projection builder + lock-time write / reopen-delete lifecycle (Wave 2)
 - [ ] 125-03-PLAN.md — Server-side magic-link generation embedded in the existing reminder/share email (R375, Wave 1)
 - [ ] 125-04-PLAN.md — Volunteer passwordless sign-in, session, sign-out + isVolunteerRoute router exemption (R374/R376, Wave 1)
@@ -668,14 +674,18 @@ own assignments)
   1. After sign-in, a volunteer lands on My Schedule listing every service they are assigned to, matched
      by roster email → role assignment — available to anyone assigned to a service, not gated by role
      (R378).
+
   2. Only Planned (locked, non-Draft) services appear — a service still being drafted by a planner never
      shows to volunteers, reusing the app's existing not-Draft/lock gate (R379).
+
   3. Services are ordered soonest-first and grouped This week / Later this month, with a "Next up" badge
      on the soonest upcoming service; past services the volunteer served are shown separately and remain
      openable (R380).
+
   4. Each service card shows the date, name, time · venue, the volunteer's own role chips, song/chart/
      track counts, a readiness indicator (all ready / N songs missing media / waiting on charts), and a
      countdown + call time (R381).
+
   5. An upcoming card's "Rehearse →" opens that service's standalone Rehearse screen; a past card offers a
      read/open action instead; a "check a different email" affordance and a no-match empty state are
      present; and My Schedule itself is not editable (R382, R383).
@@ -699,17 +709,21 @@ or from the planner's service editor)
      `ServiceEditorView` or any editing UI — carrying Rehearse (default), Order of Service, and Stage
      Layout tabs, composed from the existing read-only renderers (ShareView snapshot + the v2.7 read-only
      order/stage renders) rather than a hidden/forked mode of the editor (R384).
+
   2. The Rehearse tab lists the service's songs (key, PDF count, MP3 count, now-playing indicator), and
      selecting one shows its detail — Sheet music & chords (PDF) with per-file Print + Download,
      Recordings (MP3), an optional per-song note, and any external media links (opening in a new tab) —
      all sourced from the existing v2.11 song attachments with nothing uploaded on this screen (R385,
      R386, R390).
+
   3. A PDF reader displays the selected chart with page navigation (Page X of Y, prev/next) and a Print
      action; an audio player provides play/pause, a seekable progress bar, elapsed/total time, whole-track
      playback speed (1x / 0.9x / 0.75x / 1.25x), and a whole-track Loop toggle (R387, R388, R389).
+
   4. The Order of Service tab shows the service's running order read-only, and the Stage Layout tab shows
      the v2.7 stage diagram (instruments/mics + person Name-Role) read-only — both usable by tech-team
      volunteers, not just the Rehearse tab (R392, R393).
+
   5. On a phone, PDFs open/download reliably (link-first with an inline `<iframe>` viewer as a desktop
      enhancement) and audio plays via native `<audio>` — across both My Schedule and this view (R391).
 
