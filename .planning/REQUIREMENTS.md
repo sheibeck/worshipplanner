@@ -79,13 +79,13 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   **Print** and **Download**, its **Recordings** (MP3 attachments), and an optional per-song note — all
   sourced from the v2.11 song attachments (nothing is uploaded on this screen).
 
-- [ ] **R387**: A PDF reader displays the selected chart with page navigation (Page X of Y, prev/next) and a
+- [x] **R387**: A PDF reader displays the selected chart with page navigation (Page X of Y, prev/next) and a
   **Print** action.
 
-- [ ] **R388**: An audio player plays a selected recording with play/pause, a seekable progress bar, and
+- [x] **R388**: An audio player plays a selected recording with play/pause, a seekable progress bar, and
   elapsed / total time.
 
-- [ ] **R389**: The audio player supports whole-track **playback speed** (1× / 0.9× / 0.75× / 1.25×) and a
+- [x] **R389**: The audio player supports whole-track **playback speed** (1× / 0.9× / 0.75× / 1.25×) and a
   whole-track **Loop** toggle.
 
 - [x] **R390**: External media links (YouTube / Google Drive / Dropbox) attached to a song in v2.11 are
@@ -101,7 +101,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Delivery Quality
 
-- [ ] **R391**: My Schedule and the Rehearse screen are mobile-friendly — PDFs open/download reliably on
+- [x] **R391**: My Schedule and the Rehearse screen are mobile-friendly — PDFs open/download reliably on
   phones (link-first, with an inline `<iframe>` viewer as a desktop enhancement) and audio plays on mobile.
 
 ## Future Requirements
@@ -155,11 +155,11 @@ Populated during roadmap creation.
 | R384 | Phase 127 | Pending |
 | R385 | Phase 127 | Complete |
 | R386 | Phase 127 | Complete |
-| R387 | Phase 127 | Pending |
-| R388 | Phase 127 | Pending |
-| R389 | Phase 127 | Pending |
+| R387 | Phase 127 | Complete |
+| R388 | Phase 127 | Complete |
+| R389 | Phase 127 | Complete |
 | R390 | Phase 127 | Complete |
-| R391 | Phase 127 | Pending |
+| R391 | Phase 127 | Complete |
 | R392 | Phase 127 | Pending |
 | R393 | Phase 127 | Pending |
 
