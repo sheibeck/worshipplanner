@@ -26,32 +26,38 @@ export interface MessageTokenContext {
  */
 export const EMPTY_ROLES_PLACEHOLDER = "your role";
 
-/** Escapes a literal string for safe use inside a RegExp. */
-function escapeRegExp(literal: string): string {
-  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** Replaces every occurrence of a literal `{{name}}` token with `value`. */
-function replaceToken(template: string, name: string, value: string): string {
-  const pattern = new RegExp(escapeRegExp(`{{${name}}}`), "g");
-  return template.replace(pattern, value);
-}
+/** Matches a literal `{{token_name}}` placeholder; the capture group is the name. */
+const TOKEN_PATTERN = /\{\{(\w+)\}\}/g;
 
 /**
  * Renders the supported merge tokens in `template` from `ctx`. PURE: no
  * side effects, no I/O. Called once per recipient by the send trigger so
  * `{{their_roles}}` and `{{name}}` are personalized. Unknown tokens are left untouched.
+ *
+ * IN-01 (125-REVIEW.md): every token is resolved in a SINGLE pass over the
+ * ORIGINAL template, rather than cascading `.replace()` calls where each pass
+ * re-scans the PREVIOUS pass's already-substituted output. Chained passes let
+ * an inserted, editor/roster-controlled value (e.g. a recipient name or song
+ * title) that happens to literally contain `{{rehearse_link}}` get
+ * re-substituted by a later pass — reinjecting a personal auth link into what
+ * was meant to be a literal string. A single pass over the original text can
+ * never re-scan a substituted value, because String.replace with a global
+ * regex only visits the input once, left to right.
  */
 export function renderMessageTokens(template: string, ctx: MessageTokenContext): string {
   const rolesText = ctx.theirRoles.length > 0 ? ctx.theirRoles.join(", ") : EMPTY_ROLES_PLACEHOLDER;
   const songText = ctx.songTitles.join(", ");
 
-  let out = template;
-  out = replaceToken(out, "service_date", ctx.serviceDate);
-  out = replaceToken(out, "their_roles", rolesText);
-  out = replaceToken(out, "name", ctx.recipientName);
-  out = replaceToken(out, "song_list", songText);
-  out = replaceToken(out, "service_link", ctx.serviceLink);
-  out = replaceToken(out, "rehearse_link", ctx.rehearseLink);
-  return out;
+  const values: Record<string, string> = {
+    service_date: ctx.serviceDate,
+    their_roles: rolesText,
+    name: ctx.recipientName,
+    song_list: songText,
+    service_link: ctx.serviceLink,
+    rehearse_link: ctx.rehearseLink,
+  };
+
+  return template.replace(TOKEN_PATTERN, (match, tokenName: string) =>
+    Object.prototype.hasOwnProperty.call(values, tokenName) ? values[tokenName]! : match,
+  );
 }

@@ -142,4 +142,26 @@ describe("renderMessageTokens", () => {
     );
     expect(out).toBe("Aug 17 | bass | A, B | https://x/share/1");
   });
+
+  // IN-01 (125-REVIEW.md): a value inserted by an EARLIER token pass must
+  // never be re-scanned for `{{...}}` markers by a LATER pass. A roster name
+  // that literally contains `{{rehearse_link}}` must render as inert text,
+  // not get expanded into the recipient's personal magic sign-in link.
+  it("IN-01: a recipient name containing a literal {{rehearse_link}} marker is NOT re-substituted with the actual link", () => {
+    const out = renderMessageTokens(
+      "Hi {{name}}! Sign in: {{rehearse_link}}",
+      ctx({ recipientName: "{{rehearse_link}}", rehearseLink: "https://x.test/secret-link" }),
+    );
+    expect(out).toBe("Hi {{rehearse_link}}! Sign in: https://x.test/secret-link");
+  });
+
+  // Same footgun, different pair: a song title containing `{{name}}` must not
+  // pick up a LATER pass's substitution either (order-independence proof).
+  it("IN-01: a song title containing a literal {{name}} marker is NOT re-substituted", () => {
+    const out = renderMessageTokens(
+      "Songs: {{song_list}}. Hi {{name}}!",
+      ctx({ songTitles: ["{{name}}"], recipientName: "Alex Kim" }),
+    );
+    expect(out).toBe("Songs: {{name}}. Hi Alex Kim!");
+  });
 });
