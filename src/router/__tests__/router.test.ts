@@ -105,6 +105,14 @@ function createTestRouter() {
         meta: { requiresAuth: true, isVolunteerRoute: true },
       },
       {
+        // R382 (126-03) — the build-safe Rehearse-target placeholder route,
+        // matching production's /volunteer/service/:serviceId exactly.
+        path: '/volunteer/service/:serviceId',
+        name: 'volunteer-service',
+        component: { template: '<div>Volunteer Service Placeholder</div>' },
+        meta: { requiresAuth: true, isVolunteerRoute: true },
+      },
+      {
         // Mirrors production's /owner-console — the churchless-super-admin
         // destination the /login bounce-back below can redirect to.
         path: '/owner-console',
@@ -266,6 +274,16 @@ describe('Router guard', () => {
       const router = createTestRouter()
       await router.push('/volunteer')
       expect(router.currentRoute.value.name).toBe('login')
+    })
+  })
+
+  describe('/volunteer/service/:serviceId placeholder route (R382, 126-03)', () => {
+    it('resolves to the volunteer-service placeholder route (no "no match")', async () => {
+      mockGetCurrentUser.mockResolvedValue(mockUser)
+      const router = createTestRouter()
+      await router.push('/volunteer/service/anything')
+      expect(router.currentRoute.value.name).toBe('volunteer-service')
+      expect(router.currentRoute.value.params.serviceId).toBe('anything')
     })
   })
 
