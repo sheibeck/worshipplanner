@@ -13,6 +13,24 @@ vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
 }))
 
+// 129-02: RosterView.vue now imports `functions` from '@/firebase' and calls
+// useToasts() (Sign-in Link section) — mock both here too, mirroring
+// RosterView.test.ts, so this deep-link-only suite (which never activates a
+// real Pinia) doesn't fail on the unmocked real useToasts() store.
+vi.mock('@/firebase', () => ({
+  auth: {},
+  db: {},
+  functions: {},
+}))
+vi.mock('firebase/functions', () => ({
+  httpsCallable: vi.fn(),
+}))
+vi.mock('@/stores/toasts', () => ({
+  useToasts: () => ({
+    push: vi.fn(),
+  }),
+}))
+
 const mockRoles: Role[] = [
   { id: 'r-guitar', name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
 ]
