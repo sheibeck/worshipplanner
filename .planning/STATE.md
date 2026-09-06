@@ -4,17 +4,17 @@ milestone: v2.13
 milestone_name: Volunteer Self-Service & Multi-Church Access (Phases 128-130, in planning)
 current_phase: 130
 status: in_progress
-stopped_at: Completed 130-01-PLAN.md
-last_updated: "2026-09-06T22:43:18.787Z"
+stopped_at: Completed 130-02-PLAN.md
+last_updated: "2026-09-06T23:07:03.514Z"
 last_activity: 2026-09-06
 last_activity_desc: 130-01-PLAN.md executed (RehearseAccessDoc.orgName added via conditional-spread; markAsPlanned forwards authStore.orgName, resyncRehearseAccessForSong forwards a batched getDoc(organizations/{orgId}) name with a scoped .catch(() => null) degrade; mySchedule store gained selectedChurch/churches/filteredDocs -- pure client-side filter, never imports auth or calls selectOrg; R403/R404/R405 data-layer complete)
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 67
-current_phase_name: Phase 130 Plan 01 complete (data/projection + mySchedule backbone) -- 130-02 (switcher UI) remains
+  completed_plans: 6
+  percent: 100
+current_phase_name: Phase 130 complete (Plans 01+02) -- v2.13 (Phases 128-130) fully built, autonomous + auto-verified green, UNDEPLOYED
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.13 Volunteer Self-Service & Multi-Church Access (roadmap created 2026-09-06)
 
-**Status:** Phase 128 and Phase 129 (both plans each) complete, autonomous build + auto-verified green, UNDEPLOYED — ready to plan Phase 130
+**Status:** Phases 128, 129, and 130 (all plans each) complete, autonomous build + auto-verified green, UNDEPLOYED — v2.13 fully built, ready for batched UAT/audit/deploy
 
 **Goal:** Let volunteers get their own passwordless sign-in link on demand and see their schedule
 organized by church — extending v2.12's account-level email-link access with a self-service request path,
@@ -3497,6 +3497,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 129 P01 | 35min | 3 tasks | 3 files |
 | Phase 129 P02 | 27min | 2 tasks | 3 files |
 | Phase 130 P01 | 30min | 3 tasks | 6 files |
+| Phase 130 P02 | 35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -4078,6 +4079,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 130]: 130-01: orgName threaded through buildRehearseAccess/writeRehearseAccessDoc as a required-positional (string | undefined) param, conditional-spread on the return so the key is absent (never a literal undefined) when empty
 - [Phase 130]: 130-01: resyncRehearseAccessForSong's new org getDoc uses a scoped .catch(() => null) inside its Promise.all (not a bare entry) so a denied/failed org read degrades to no orgName without aborting the sibling quarters/roles/people/songs reads -- satisfies T-130-03's literal "never blocks" requirement
 - [Phase 130]: 130-01: mySchedule.churches keeps orgName as string | undefined per entry with no fallback baked in -- Plan 02's UI consumers (switcher dropdown vs. sidebar) apply their own fallback text
+- [Phase ?]: 130-02: AppSidebar volunteer label uses a NEW sibling v-else-if div (not a widened admin v-if) to keep the admin authStore.orgName path byte-identical
+- [Phase ?]: 130-02: Sidebar multi+all-selected volunteer label is the literal 'Multiple churches' per the owner's settled decision, diverging from 130-UI-SPEC.md's Copywriting Contract
 
 ### Roadmap Evolution
 
@@ -4407,8 +4410,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T22:43:18.711Z
-Stopped at: Completed 130-01-PLAN.md
+Last session: 2026-09-06T23:07:03.436Z
+Stopped at: Completed 130-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

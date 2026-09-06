@@ -61,15 +61,15 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Multi-Church Volunteer Switcher
 
-- [ ] **R403**: A volunteer serving at more than one church sees a church switcher/filter on My Schedule
+- [x] **R403**: A volunteer serving at more than one church sees a church switcher/filter on My Schedule
   that scopes the displayed services to a selected church. It is distinct from the admin membership
   switcher (volunteers have zero org memberships) and never calls `selectOrg`.
 
-- [ ] **R404**: The switcher labels each church by name, sourced from an `orgName` field added to the
+- [x] **R404**: The switcher labels each church by name, sourced from an `orgName` field added to the
   `rehearseAccess` projection (so no org-document read is required), and the selected-church context
   carries into the volunteer service view.
 
-- [ ] **R405**: A volunteer serving at only one church sees no switcher — the single-church experience is
+- [x] **R405**: A volunteer serving at only one church sees no switcher — the single-church experience is
   unchanged.
 
 ## Future Requirements (deferred)
