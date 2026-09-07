@@ -45,6 +45,7 @@
 //                                            functions/src/orgMembershipClaims.ts:433-437 (shape written by syncOrgMembershipClaim)
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { createHash } from 'node:crypto'
 import { initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
@@ -97,6 +98,16 @@ function sundaysInQuarter(year, quarter) {
 }
 
 const now = () => FieldValue.serverTimestamp()
+
+/** R421 (131-02) — a DETERMINISTIC 36-lowercase-hex token, matching the
+ *  FORMAT `mintShareToken()` (src/utils/shareTokens.ts) produces at runtime,
+ *  without needing crypto randomness: the seed must write the SAME token on
+ *  every re-run (idempotency), not a fresh one each time. `seed` is a stable
+ *  per-service string (the doc id), so re-seeding overwrites the same
+ *  shareTokens/{token} doc instead of accumulating orphans. */
+function deterministicShareToken(seed) {
+  return createHash('sha256').update(seed).digest('hex').slice(0, 36)
+}
 
 // Next upcoming Sunday (or today, if today is Sunday), local time, as YYYY-MM-DD.
 // Used for the seeded service's date so it ALWAYS lands in the app's "Upcoming"
@@ -369,16 +380,55 @@ async function seedOrg(orgId, name, uid, { aiMasterEnabled }) {
   // org-unique (real services use addDoc-generated global IDs) so a volunteer
   // serving multiple seeded churches doesn't hit colliding "service-1" ids
   // across orgs in the rehearseAccess collectionGroup / volunteer service view.
-  await db.collection('organizations').doc(orgId).collection('services').doc(`svc-${slug}-1`).set({
-    date: nextSunday(),
+  const serviceId = `svc-${slug}-1`
+  const serviceDate = nextSunday()
+  const slots = serviceSlots()
+  const sermonPassage = { book: 'Psalms', chapter: 100 }
+  const sermonTopic = 'A Call to Thankful Worship'
+  await db.collection('organizations').doc(orgId).collection('services').doc(serviceId).set({
+    date: serviceDate,
     name: 'Sunday Morning Worship',
     progression: '1-2-2-3',
     teams: ['Choir'],
     status: 'draft',
-    slots: serviceSlots(),
-    sermonPassage: { book: 'Psalms', chapter: 100 },
-    sermonTopic: 'A Call to Thankful Worship',
+    slots,
+    sermonPassage,
+    sermonTopic,
     notes: '',
+    createdAt: now(),
+    updatedAt: now(),
+  })
+
+  // R421 (131-02) — mint a real share token for the seeded service, mirroring
+  // what src/stores/services.ts's ensureShareLink()/writeSharePayload() write
+  // for a UI-created service, so seeded test data carries a link like real
+  // data (createService's 2026-08-17 auto-mint + this phase's markAsPlanned
+  // self-heal). serviceShareLinks/{serviceId} is the idempotency identity doc
+  // ensureShareLink checks FIRST — writing it here means the app never mints
+  // a second token for this seeded service. shareTokens/{token} is what
+  // functions' resolveServiceLink resolves {{service_link}} from, and what
+  // ShareView.vue renders. serviceSnapshot below is PUBLIC-fields-only
+  // (name/date/progression/slots/sermonPassage/sermonTopic) — no `notes`,
+  // matching toPublicServiceSnapshot()'s notes-stripping contract.
+  const shareToken = deterministicShareToken(serviceId)
+  await db.collection('serviceShareLinks').doc(serviceId).set({
+    token: shareToken,
+    orgId,
+    serviceId,
+    createdAt: now(),
+    updatedAt: now(),
+  })
+  await db.collection('shareTokens').doc(shareToken).set({
+    serviceId,
+    orgId,
+    serviceSnapshot: {
+      name: 'Sunday Morning Worship',
+      date: serviceDate,
+      progression: '1-2-2-3',
+      slots,
+      sermonPassage,
+      sermonTopic,
+    },
     createdAt: now(),
     updatedAt: now(),
   })
