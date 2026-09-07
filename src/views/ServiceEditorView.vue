@@ -2186,7 +2186,7 @@ const lockBannerLead = computed(() =>
 
 const lockBannerBody = computed(() =>
   hasPcExportEvidence.value
-    ? 'Planning Center already has this plan. Reopen it for editing to change the order, slides or roles here.'
+    ? 'Reopen it for editing to change the order, slides or roles here.'
     : 'Reopen it for editing to change the order, slides or roles.',
 )
 
