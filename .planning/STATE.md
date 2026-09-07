@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
-current_phase: 135
-current_phase_name: Dashboard Overhaul
-status: verifying
-stopped_at: Completed 135-03-PLAN.md (Phase 135 execution complete, last plan)
-last_updated: "2026-09-07T22:11:41.749Z"
+current_phase: 136
+current_phase_name: Video Output — Fullscreen Slice
+status: executing
+stopped_at: Completed 136-01-PLAN.md
+last_updated: "2026-09-07T23:18:51.667Z"
 last_activity: 2026-09-07
-last_activity_desc: Phase 135 execution started
+last_activity_desc: Phase 136 execution started
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 18
+  completed_plans: 17
   percent: 71
 ---
 
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1383,7 +1383,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 135 — Dashboard Overhaul
+**Current focus:** Phase 136 — Video Output — Fullscreen Slice
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1393,10 +1393,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 136 (Video Output — Fullscreen Slice) — next
-Plan: —
-Status: Phase 135 EXECUTED + code-verified (R414–R419, 11/11 must-haves); review blocker+2 warnings fixed; 5 visual UAT items deferred. Advancing to Phase 136.
-Last activity: 2026-09-07 — Phase 135 complete (needs-attention dashboard: feed + worst-of readiness, unconfirmed-volunteers card, read-only presence rollup, empty state; removed Volunteer coverage)
+Phase: 136 (Video Output — Fullscreen Slice) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-09-07 — Phase 136 execution started
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
@@ -3624,6 +3624,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 135 P01 | 25min | 3 tasks | 3 files |
 | Phase 135 P02 | 25min | 3 tasks | 4 files |
 | Phase 135-dashboard-overhaul P03 | 20min | 3 tasks | 4 files |
+| Phase 136 P01 | 10min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -4226,6 +4227,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: attentionServices window is Planned-only (not the feed's draft-inclusive window) since Draft services have no rehearseAccess/confirmations docs yet
 - [Phase ?]: usePresenceRollup's window is the feed's own draft-inclusive upcomingServices window (not the Planned-only attentionServices window), since a draft service can still be actively edited (R418).
 - [Phase ?]: Unconfirmed volunteers card's lg:col-span-2 is now conditional on activeEditors.length === 0, resolving Plan 02's placeholder — it only spans the full row when the presence card is hidden.
+- [Phase ?]: R424 (role/setup half): MonitorRole widened to a strict 3-member allowlist ('audience'|'confidence'|'video'); canSave gate unchanged (Video optional); RunDisplaysPanel/RunPreflightPanel role typing widened as an in-scope fix since Video assignments already flow into Run Control today.
 
 ### Roadmap Evolution
 
@@ -4555,8 +4557,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T22:11:41.659Z
-Stopped at: Completed 135-03-PLAN.md (Phase 135 execution complete, last plan)
+Last session: 2026-09-07T23:18:51.595Z
+Stopped at: Completed 136-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

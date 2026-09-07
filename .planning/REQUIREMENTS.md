@@ -185,7 +185,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R421 | Phase 131 | Complete |
 | R422 | Phase 134 | Complete |
 | R423 | Phase 134 | Complete |
-| R424 | Phase 136 | Pending |
+| R424 | Phase 136 | In Progress (136-01 done; 136-02 pending) |
 | R425 | Phase 137 | Pending |
 | R426 | Phase 136 | Pending |
 | R427 | Phase 137 | Pending |
