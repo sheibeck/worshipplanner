@@ -837,9 +837,9 @@ assigned roles/instruments instead of an empty canvas — with zero risk of clob
   5. Revisiting Stage Layout after manual edits — or after a roster change — never regenerates, wipes, or
      duplicates existing markers; the one-time seed never re-runs against a non-empty canvas (R420).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
-- [ ] 131-01-PLAN.md — Stage Layout auto-populate: pure autoPopulateMarkers() + one-time empty-canvas seed trigger (R420)
+- [x] 131-01-PLAN.md — Stage Layout auto-populate: pure autoPopulateMarkers() + one-time empty-canvas seed trigger (R420)
 - [x] 131-02-PLAN.md — Auto share-link safety net: keep the createService mint, self-heal tokenless services via ensureShareLink in markAsPlanned, and fix the emulator seed to mint a token (R421)
 
 ### Phase 132: Services Page UX Alignment & Verbiage Cleanup

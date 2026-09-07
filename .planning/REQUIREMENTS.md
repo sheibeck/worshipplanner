@@ -89,7 +89,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Stage Layout Auto-Populate
 
-- [ ] **R420**: The per-service Stage Layout auto-populates the service's assigned roles/instruments as a
+- [x] **R420**: The per-service Stage Layout auto-populates the service's assigned roles/instruments as a
   **one-time seed of an empty canvas** (first visit with zero elements). It never regenerates, wipes, or
   duplicates markers on re-run against a canvas that already has manual placements (roster changes right up
   until lock).
@@ -181,7 +181,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R417 | Phase 135 | Pending |
 | R418 | Phase 135 | Pending |
 | R419 | Phase 135 | Pending |
-| R420 | Phase 131 | Pending |
+| R420 | Phase 131 | Complete |
 | R421 | Phase 131 | Complete |
 | R422 | Phase 134 | Pending |
 | R423 | Phase 134 | Pending |
