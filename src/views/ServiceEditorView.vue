@@ -1730,6 +1730,7 @@ import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference, scri
 import type { CongregationalSection } from '@/types/slide'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
 import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
+import { autoPopulateMarkers } from '@/utils/stageLayout'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
 import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, ScriptureRef, SlotKind, ServiceSection, StageMarker } from '@/types/service'
 import type { VWType, Song } from '@/types/song'
@@ -2336,6 +2337,34 @@ function onStageMarkerRemove(id: string) {
     localService.value.stageLayout.elements = remaining
   }
 }
+
+// One-time auto-populate seed (R420, plan 131-01). Guards, in order: editor +
+// unlocked, a localService to write to, a genuinely EMPTY canvas (the
+// load-bearing non-clobber invariant — a populated canvas, even one this
+// function seeded earlier, must never be touched again), a per-service
+// "already seeded" guard (so delete-all-then-revisit in the same session
+// doesn't re-seed), and finally a non-empty assignments list (an empty roster
+// seeds nothing and does NOT mark the service seeded, so a later visit once
+// assignments resolve can still seed). Mirrors onStageMarkerAdd: assigns
+// straight onto `localService.value.stageLayout`, riding the EXISTING
+// useAutoSave deep-watch — no new save call, no new store.
+const stageAutoPopulateSeededServiceIds = new Set<string>()
+function onAutoPopulateStageLayout() {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  const existing = localService.value.stageLayout?.elements ?? []
+  if (existing.length > 0) return
+  const id = serviceId.value
+  if (stageAutoPopulateSeededServiceIds.has(id)) return
+  const seeded = autoPopulateMarkers(stageServingAssignments.value)
+  if (seeded.length === 0) return
+  localService.value.stageLayout = { elements: seeded }
+  stageAutoPopulateSeededServiceIds.add(id)
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'stage') onAutoPopulateStageLayout()
+})
 
 /** 260811-vsr: which row's ⋯ menu is open (keyed on the stable slot.id, so exactly
  *  one is open at a time — the single-open pattern SlideGrid uses). UI state only;

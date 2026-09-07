@@ -4,6 +4,7 @@ import { reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
 import type { Service, StageMarker } from '@/types/service'
+import type { Person, Role, Quarter } from '@/types/roster'
 import type { Timestamp } from 'firebase/firestore'
 import StageLayoutEditor from '@/components/stage/StageLayoutEditor.vue'
 
@@ -232,11 +233,19 @@ vi.mock('@/utils/planningCenterApi', () => ({
   addNeededPosition: vi.fn(async () => undefined),
 }))
 
+// Mutable so the auto-populate (R420) tests can seed a real resolved role
+// assignment through resolveServiceRoleAssignments — mirrors the
+// mockRoles/mockRosterPeople/mockQuarters pattern in ServiceEditorView.test.ts.
+// Empty by default (existing Stage Layout tests need no assignments).
+let mockRoles: Role[] = []
+let mockRosterPeople: Person[] = []
+let mockQuarters: Quarter[] = []
+
 vi.mock('@/stores/roster', () => ({
   useRosterStore: () => ({
-    people: [],
-    roles: [],
-    activePeople: [],
+    people: mockRosterPeople,
+    roles: mockRoles,
+    activePeople: mockRosterPeople.filter((p) => p.active),
     orgId: null,
     subscribe: vi.fn(),
   }),
@@ -244,7 +253,7 @@ vi.mock('@/stores/roster', () => ({
 
 vi.mock('@/stores/quarters', () => ({
   useQuartersStore: () => ({
-    quarters: [],
+    quarters: mockQuarters,
     orgId: null,
     subscribe: vi.fn(),
   }),
@@ -273,6 +282,9 @@ beforeEach(() => {
   setActivePinia(createPinia())
   mockRoute.params.id = 'service-1'
   mockServiceStoreOrgId = 'org-1'
+  mockRoles = []
+  mockRosterPeople = []
+  mockQuarters = []
   mockAuthState.isEditor = true
   mockAuthState.orgId = 'org-1'
   mockUpdateService.mockClear()
@@ -505,5 +517,130 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
 
     await tablist.trigger('keydown', { key: 'ArrowLeft' })
     expect(wrapper.get('#svc-tab-stage').attributes('aria-selected')).toBe('true')
+  })
+
+  describe('auto-populate (R420)', () => {
+    // Real resolveServiceRoleAssignments data (mirrors the fixture in
+    // ServiceEditorView.test.ts's Roles-tab tests) so stageServingAssignments
+    // resolves to a genuine non-empty entry — not a mocked shortcut.
+    function seedAssignableRoster() {
+      mockRoles = [{ id: 'role-vox', name: 'Vocals', group: 'band', multiRole: true, defaultCount: 1, order: 0 }]
+      mockRosterPeople = [
+        {
+          id: 'person-1',
+          name: 'Alice',
+          email: 'alice@example.com',
+          phone: '',
+          active: true,
+          roles: ['role-vox'],
+          pcPersonId: null,
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        },
+      ]
+      mockQuarters = [
+        {
+          id: 'q1',
+          label: 'Q1 2026',
+          year: 2026,
+          quarter: 1,
+          serviceDates: ['2026-03-08'],
+          roleOverridesByDate: {},
+          personQuarterData: {},
+          calendar: { '2026-03-08': { 'role-vox': ['person-1'] } },
+          status: 'finalized',
+          shareToken: null,
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        },
+      ]
+    }
+
+    it('seeds one marker per resolved assignment on first visit to an empty canvas, and persists it through autosave', async () => {
+      seedAssignableRoster()
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+
+      const elements = wrapper.findComponent(StageLayoutEditor).props('elements') as StageMarker[]
+      expect(elements).toHaveLength(1)
+      expect(elements[0]).toMatchObject({ roleId: 'role-vox', roleName: 'Vocals', personId: 'person-1', personName: 'Alice', zone: 'onstage' })
+
+      await new Promise((resolve) => setTimeout(resolve, 900))
+      expect(mockUpdateService).toHaveBeenCalledTimes(1)
+      const [, payload] = mockUpdateService.mock.calls[0]!
+      expect((payload as { stageLayout: { elements: StageMarker[] } }).stageLayout.elements).toHaveLength(1)
+    })
+
+    it('never seeds against a canvas that already has elements — existing markers are byte-for-byte unchanged', async () => {
+      seedAssignableRoster()
+      const existing: StageMarker = { id: 'manual-1', label: 'Hand-placed', kind: 'mic', zone: 'onstage', xPct: 25, yPct: 25 }
+      const wrapper = await mountView({ stageLayout: { elements: [existing] } })
+      await goToStageTab(wrapper)
+
+      expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toEqual([existing])
+    })
+
+    it('does not re-seed on leaving and re-entering the Stage Layout tab in the same session', async () => {
+      seedAssignableRoster()
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+      const firstPass = wrapper.findComponent(StageLayoutEditor).props('elements') as StageMarker[]
+      expect(firstPass).toHaveLength(1)
+
+      await wrapper.get('#svc-tab-service-order').trigger('click')
+      await wrapper.vm.$nextTick()
+      await goToStageTab(wrapper)
+
+      const secondPass = wrapper.findComponent(StageLayoutEditor).props('elements') as StageMarker[]
+      expect(secondPass).toHaveLength(1)
+      expect(secondPass[0]!.id).toBe(firstPass[0]!.id)
+    })
+
+    it('does not re-seed after deleting all seeded markers and re-entering the tab in the same session', async () => {
+      seedAssignableRoster()
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+      const seeded = wrapper.findComponent(StageLayoutEditor).props('elements') as StageMarker[]
+      expect(seeded).toHaveLength(1)
+
+      await wrapper.findComponent(StageLayoutEditor).vm.$emit('remove', seeded[0]!.id)
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toEqual([])
+
+      await wrapper.get('#svc-tab-service-order').trigger('click')
+      await wrapper.vm.$nextTick()
+      await goToStageTab(wrapper)
+
+      expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toEqual([])
+    })
+
+    it('a viewer / locked service never seeds, even with resolvable assignments', async () => {
+      seedAssignableRoster()
+      const wrapper = await mountView({ status: 'planned' })
+      await goToStageTab(wrapper)
+
+      expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toEqual([])
+    })
+
+    it('does not seed when stageServingAssignments is empty (no roster/quarters resolved yet)', async () => {
+      // No roster/quarters fixture — mockRoles/mockRosterPeople/mockQuarters
+      // stay [] (beforeEach default), so stageServingAssignments resolves empty.
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+      expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toEqual([])
+    })
+
+    it('the guard is only set on an actual seed, so a fresh visit once assignments resolve still seeds normally', async () => {
+      // The roster/quarters store mocks return a plain (non-reactive) object
+      // captured at mount time, so this exercises "not permanently blocked"
+      // via a fresh mount with the roster now resolvable — the source-level
+      // guarantee (onAutoPopulateStageLayout only adds to the seeded-guard Set
+      // AFTER `seeded.length === 0` returns) is what makes the earlier empty
+      // visit a no-op rather than a lockout.
+      seedAssignableRoster()
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+      expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toHaveLength(1)
+    })
   })
 })
