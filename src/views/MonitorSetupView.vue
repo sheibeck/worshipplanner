@@ -224,7 +224,9 @@ function selectedRoleFor(fingerprint: string): MonitorRole | null {
 }
 
 function roleLabel(role: MonitorRole): string {
-  return role === 'audience' ? 'Audience' : 'Confidence'
+  if (role === 'audience') return 'Audience'
+  if (role === 'confidence') return 'Confidence'
+  return 'Video'
 }
 
 function screenLabelFor(fingerprint: string): string {

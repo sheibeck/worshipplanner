@@ -50,6 +50,7 @@
     <!-- Row 5: static caption -->
     <p class="text-xs text-gray-500 mt-1.5">
       Audience &mdash; what the congregation sees &middot; Confidence &mdash; what your team sees
+      &middot; Video &mdash; your live-stream/video-room feed
     </p>
   </div>
 </template>
@@ -76,6 +77,7 @@ const roles: { value: MonitorRole | null; label: string; testKey: string }[] = [
   { value: null, label: 'None', testKey: 'none' },
   { value: 'audience', label: 'Audience', testKey: 'audience' },
   { value: 'confidence', label: 'Confidence', testKey: 'confidence' },
+  { value: 'video', label: 'Video', testKey: 'video' },
 ]
 
 // Nickname-first heading; blank stays blank in storage, this fallback is render-time only.
