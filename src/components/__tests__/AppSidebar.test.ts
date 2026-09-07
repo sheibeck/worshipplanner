@@ -507,6 +507,10 @@ describe('AppSidebar — volunteer church switcher (Change B, Phase 130 rework)'
     expect(mockSelectOrg).not.toHaveBeenCalled()
     // Panel closes after a selection.
     expect(wrapper.find('[data-testid="volunteer-church-switcher-panel"]').exists()).toBe(false)
+    // Switching church returns to My Schedule (a service open from the previous
+    // church is no longer in scope) and closes the mobile sidebar.
+    expect(mockRouterPush).toHaveBeenCalledWith({ name: 'my-schedule' })
+    expect(wrapper.emitted('close')).toBeTruthy()
   })
 
   it('labels a church with no orgName as "Unnamed church" in the panel', async () => {

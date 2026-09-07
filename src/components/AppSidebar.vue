@@ -314,7 +314,7 @@ const props = defineProps<{
   sidebarOpen: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   close: []
 }>()
 
@@ -469,6 +469,11 @@ function onVolunteerSwitcherKeydown(event: KeyboardEvent): void {
 function handleVolunteerSelect(orgId: string): void {
   mySchedule.setSelectedChurch(orgId)
   volunteerSwitcherOpen.value = false
+  // Switching church changes which services are in scope — a service opened
+  // from the previous church is no longer accessible, so return to My Schedule.
+  // Also closes the mobile sidebar overlay (mirrors the nav-links' @click close).
+  emit('close')
+  router.push({ name: 'my-schedule' })
 }
 
 const navItems = computed(() => {
