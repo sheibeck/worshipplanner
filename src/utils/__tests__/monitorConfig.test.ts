@@ -240,6 +240,24 @@ describe('saveMapping / loadMapping', () => {
     expect(loadMapping(storage)).toBeNull()
   })
 
+  it('round-trips a mapping with a single video-role assignment (R424 — the third role)', () => {
+    const mapping: MonitorMapping = {
+      assignments: [{ fingerprint: 'fp-video', role: 'video' }],
+      savedAt: 1700000000000,
+    }
+    saveMapping(mapping, storage)
+    expect(loadMapping(storage)).toEqual(mapping)
+  })
+
+  it('returns null when an assignment carries an unknown role string outside the 3-member union', () => {
+    const raw = {
+      assignments: [{ fingerprint: 'fp-1', role: 'projector' }],
+      savedAt: 1,
+    }
+    storage.setItem(MONITOR_CONFIG_STORAGE_KEY, JSON.stringify(raw))
+    expect(loadMapping(storage)).toBeNull()
+  })
+
   it('saveMapping/loadMapping never throw (and degrade to no-op/null) when merely REFERENCING the global localStorage getter throws — no storageOverride, so resolveStorage\'s global-access branch is genuinely exercised', () => {
     const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
     Object.defineProperty(globalThis, 'localStorage', {
