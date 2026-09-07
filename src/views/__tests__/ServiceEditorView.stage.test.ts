@@ -569,6 +569,10 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
       expect(mockUpdateService).toHaveBeenCalledTimes(1)
       const [, payload] = mockUpdateService.mock.calls[0]!
       expect((payload as { stageLayout: { elements: StageMarker[] } }).stageLayout.elements).toHaveLength(1)
+      // WR-01 (131-REVIEW.md): the durability flag must ride the SAME
+      // autosave write as the seeded markers, or it would never reach
+      // Firestore and the delete-then-reload case below would regress.
+      expect((payload as { stageLayoutAutoSeeded: boolean }).stageLayoutAutoSeeded).toBe(true)
     })
 
     it('never seeds against a canvas that already has elements — existing markers are byte-for-byte unchanged', async () => {
@@ -614,6 +618,23 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
       expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toEqual([])
     })
 
+    it('does not re-seed after a delete-all-then-RELOAD — the persisted stageLayoutAutoSeeded flag survives a fresh mount (WR-01, 131-REVIEW.md)', async () => {
+      seedAssignableRoster()
+      // Simulates the service doc's state immediately after: (1) an earlier
+      // session seeded it (stageLayoutAutoSeeded persisted true), then (2)
+      // the user deleted every marker (stageLayout cleared to undefined —
+      // mirrors what onStageMarkerRemove/onSave's `?? null` produce), then
+      // (3) the page was reloaded — a genuinely FRESH `mountView` call, not
+      // the same wrapper, so no in-memory state survives from a prior visit.
+      const wrapper = await mountView({ stageLayout: undefined, stageLayoutAutoSeeded: true })
+      await goToStageTab(wrapper)
+
+      expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toEqual([])
+      // No re-seed means no dirty mutation, so autosave never fires.
+      await new Promise((resolve) => setTimeout(resolve, 900))
+      expect(mockUpdateService).not.toHaveBeenCalled()
+    })
+
     it('a viewer / locked service never seeds, even with resolvable assignments', async () => {
       seedAssignableRoster()
       const wrapper = await mountView({ status: 'planned' })
@@ -634,7 +655,7 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
       // The roster/quarters store mocks return a plain (non-reactive) object
       // captured at mount time, so this exercises "not permanently blocked"
       // via a fresh mount with the roster now resolvable — the source-level
-      // guarantee (onAutoPopulateStageLayout only adds to the seeded-guard Set
+      // guarantee (onAutoPopulateStageLayout only sets `stageLayoutAutoSeeded`
       // AFTER `seeded.length === 0` returns) is what makes the earlier empty
       // visit a no-op rather than a lockout.
       seedAssignableRoster()

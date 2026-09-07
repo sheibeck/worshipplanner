@@ -2338,28 +2338,32 @@ function onStageMarkerRemove(id: string) {
   }
 }
 
-// One-time auto-populate seed (R420, plan 131-01). Guards, in order: editor +
+// One-time auto-populate seed (R420, plan 131-01; made durable across
+// reload by the WR-01 fix, 131-REVIEW.md). Guards, in order: editor +
 // unlocked, a localService to write to, a genuinely EMPTY canvas (the
 // load-bearing non-clobber invariant — a populated canvas, even one this
-// function seeded earlier, must never be touched again), a per-service
-// "already seeded" guard (so delete-all-then-revisit in the same session
-// doesn't re-seed), and finally a non-empty assignments list (an empty roster
-// seeds nothing and does NOT mark the service seeded, so a later visit once
-// assignments resolve can still seed). Mirrors onStageMarkerAdd: assigns
-// straight onto `localService.value.stageLayout`, riding the EXISTING
-// useAutoSave deep-watch — no new save call, no new store.
-const stageAutoPopulateSeededServiceIds = new Set<string>()
+// function seeded earlier, must never be touched again), a PERSISTED
+// per-service "already seeded" guard (`stageLayoutAutoSeeded` on the
+// service doc, set in the same mutation as the seeded markers so it rides
+// the existing autosave — this is what stops delete-all-then-RELOAD from
+// re-seeding, not just delete-all-then-revisit in the same session), and
+// finally a non-empty assignments list (an empty roster seeds nothing and
+// does NOT mark the service seeded, so a later visit once assignments
+// resolve can still seed). Mirrors onStageMarkerAdd: assigns straight onto
+// `localService.value.stageLayout`, riding the EXISTING useAutoSave
+// deep-watch — no new save call, no new store. Setting the flag is not
+// awaited or gated on — if the eventual autosave write fails, useAutoSave's
+// existing retry/error surface handles it and the user is never blocked.
 function onAutoPopulateStageLayout() {
   if (!canEditService.value) return
   if (!localService.value) return
   const existing = localService.value.stageLayout?.elements ?? []
   if (existing.length > 0) return
-  const id = serviceId.value
-  if (stageAutoPopulateSeededServiceIds.has(id)) return
+  if (localService.value.stageLayoutAutoSeeded) return
   const seeded = autoPopulateMarkers(stageServingAssignments.value)
   if (seeded.length === 0) return
   localService.value.stageLayout = { elements: seeded }
-  stageAutoPopulateSeededServiceIds.add(id)
+  localService.value.stageLayoutAutoSeeded = true
 }
 
 watch(activeTab, (tab) => {
@@ -4389,6 +4393,13 @@ async function onSave() {
       // "nullable, not stripped" trick `sermonPassage` already uses on this exact
       // payload) correctly overwrites the remote field every time.
       stageLayout: data.stageLayout ?? null,
+      // WR-01 (131-REVIEW.md): the one-time auto-populate durability flag is
+      // a TOP-LEVEL field like stageLayout above, not one that rides a
+      // wholesale-replaced array — it must be explicitly listed here or the
+      // local mutation in onAutoPopulateStageLayout would never actually
+      // reach Firestore. Booleans are never stripped by stripUndefined, so
+      // no `?? null` substitution is needed the way stageLayout needs one.
+      stageLayoutAutoSeeded: data.stageLayoutAutoSeeded,
     }
     // See ADR-0235 (docs/adr/0235-snapshot-exactly-what-is-about-to-be-sent-so-the-mark-clean.md)
     const sentSnapshot = JSON.stringify(payload)
@@ -4414,6 +4425,9 @@ async function onSave() {
         // build `sentSnapshot` — otherwise this comparison would never match
         // once a stageLayout edit is in play, permanently stranding isDirty.
         stageLayout: localService.value.stageLayout ?? null,
+        // Must mirror the field this file's `payload` above sends, same
+        // reasoning as stageLayout immediately above (WR-01, 131-REVIEW.md).
+        stageLayoutAutoSeeded: localService.value.stageLayoutAutoSeeded,
       }) === sentSnapshot
     ) {
       originalService.value = JSON.parse(JSON.stringify(localService.value))

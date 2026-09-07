@@ -246,6 +246,17 @@ export interface Service {
   stageLayout?: {
     elements: StageMarker[]
   }
+  /**
+   * One-time auto-populate durability flag (R420, WR-01 fix, 131-REVIEW.md).
+   * Written `true` by `onAutoPopulateStageLayout` the moment it seeds
+   * `stageLayout` from resolved role assignments; never cleared afterward
+   * (including when every marker is later deleted). Persisting this on the
+   * service doc — rather than only in an in-memory session `Set` — is what
+   * stops a delete-all-then-reload from resurrecting the seeded layout.
+   * Additive, no-migration: absent on every service doc written before this
+   * field existed, which is treated as "not yet seeded."
+   */
+  stageLayoutAutoSeeded?: boolean
 }
 
 export type ServiceInput = Omit<Service, 'id' | 'createdAt' | 'updatedAt'>
