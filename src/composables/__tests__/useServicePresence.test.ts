@@ -7,10 +7,14 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, type PropType } from 'vue'
 
-const mockSetDoc = vi.fn()
-const mockDeleteDoc = vi.fn()
+// Resolved by default (real setDoc/deleteDoc return Promises) so the
+// composable's `.catch(() => {})` chains (WR-02) have a real Promise to hang
+// off; individual tests override with mockRejectedValueOnce to prove the
+// rejection is swallowed rather than surfacing as unhandled.
+const mockSetDoc = vi.fn().mockResolvedValue(undefined)
+const mockDeleteDoc = vi.fn().mockResolvedValue(undefined)
 const mockDocRef = vi.fn((...args: unknown[]) => ({ args }))
 const mockCollectionRef = vi.fn((...args: unknown[]) => ({ args }))
 const mockServerTimestamp = vi.fn(() => ({ __serverTimestamp: true }))
@@ -69,7 +73,10 @@ let capturedResult: ReturnType<typeof useServicePresence> | null = null
 const PresenceHost = defineComponent({
   name: 'UseServicePresenceHost',
   props: {
-    orgId: { type: String, default: 'org-1' },
+    // Nullable so WR-01 can mount with orgId still unresolved (mirrors a
+    // hard refresh landing on a service route before authStore.orgId
+    // populates), then set it later.
+    orgId: { type: String as PropType<string | null>, default: 'org-1' },
     serviceId: { type: String, default: 'svc-1' },
   },
   setup(props) {
@@ -166,5 +173,43 @@ describe('useServicePresence', () => {
     const [newRef] = mockDeleteDoc.mock.calls[1] as [{ args: unknown[] }]
     expect(newRef.args).toEqual([{}, 'organizations', 'org-1', 'services', 'svc-2', 'presence', 'me'])
     expect(mockUnsubs[1]).toHaveBeenCalledTimes(1)
+  })
+
+  it('WR-01 — activates once orgId resolves after mount, even though serviceId never changes', async () => {
+    // Mirrors a hard refresh landing on /services/:id before authStore.orgId
+    // has resolved: the immediate watch fires with orgId still null, start()
+    // guards out (no write, no listener), and serviceId itself never changes
+    // afterward — so re-activation must come from orgId joining the watch.
+    const wrapper = mount(PresenceHost, { props: { orgId: null, serviceId: 'svc-1' } })
+
+    expect(mockSetDoc).not.toHaveBeenCalled()
+    expect(mockOnSnapshot).not.toHaveBeenCalled()
+
+    await wrapper.setProps({ orgId: 'org-1' })
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(1)
+    const [ref] = mockSetDoc.mock.calls[0] as [{ args: unknown[] }]
+    expect(ref.args).toEqual([{}, 'organizations', 'org-1', 'services', 'svc-1', 'presence', 'me'])
+    expect(mockOnSnapshot).toHaveBeenCalledTimes(1)
+    // The guard-rejected first attempt never went live, so no stale-doc
+    // delete fires for it once orgId resolves.
+    expect(mockDeleteDoc).not.toHaveBeenCalled()
+  })
+
+  it('WR-02 — a rejected setDoc/deleteDoc is swallowed, not left as an unhandled rejection', async () => {
+    mockSetDoc.mockRejectedValueOnce(new Error('permission-denied'))
+    const wrapper = mount(PresenceHost, { props: { serviceId: 'svc-1' } })
+    // Let the rejected setDoc promise's microtask (and its .catch) settle.
+    await Promise.resolve()
+    await Promise.resolve()
+
+    mockDeleteDoc.mockRejectedValueOnce(new Error('permission-denied'))
+    await wrapper.setProps({ serviceId: 'svc-2' })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // Reaching here without vitest reporting an unhandled rejection IS the
+    // assertion; the composable's own state stays consistent regardless.
+    expect(capturedResult).not.toBeNull()
   })
 })

@@ -60,7 +60,7 @@ export function useServicePresence(
       uid: user.uid,
       displayName: user.displayName || 'Someone',
       lastSeen: serverTimestamp(),
-    })
+    }).catch(() => {})
   }
 
   function onVisibilityChange(): void {
@@ -88,7 +88,7 @@ export function useServicePresence(
   function stop(): void {
     if (activePresence) {
       const { org, svc, uid } = activePresence
-      void deleteDoc(presenceDocRef(org, svc, uid))
+      void deleteDoc(presenceDocRef(org, svc, uid)).catch(() => {})
       activePresence = null
     }
     unsubscribeSnapshot()
