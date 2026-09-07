@@ -8,7 +8,7 @@ import { computed, ref, watch } from 'vue'
 
 interface DisplayItem {
   id: string
-  role: 'audience' | 'confidence'
+  role: 'audience' | 'confidence' | 'video'
   label: string
   open: boolean
   closed: boolean
@@ -44,8 +44,10 @@ watch(
 )
 const showSetupHelp = computed(() => props.fallback && !setupHelpDismissed.value)
 
-function roleTitle(role: 'audience' | 'confidence'): string {
-  return role === 'audience' ? 'Audience' : 'Confidence'
+function roleTitle(role: 'audience' | 'confidence' | 'video'): string {
+  if (role === 'audience') return 'Audience'
+  if (role === 'confidence') return 'Confidence'
+  return 'Video'
 }
 
 function cardState(display: DisplayItem): CardState {

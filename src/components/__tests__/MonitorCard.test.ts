@@ -63,8 +63,8 @@ describe('MonitorCard — label truncation (WR-01)', () => {
   })
 })
 
-describe('MonitorCard — role selector: None/Audience/Confidence (R325)', () => {
-  it('renders exactly three role radios and marks None checked when selectedRole is null', () => {
+describe('MonitorCard — role selector: None/Audience/Confidence/Video (R325, R424)', () => {
+  it('renders exactly four role radios and marks None checked when selectedRole is null', () => {
     const screen = makeScreen()
     const fingerprint = computeFingerprint(screen)
     const wrapper = mount(MonitorCard, {
@@ -72,10 +72,22 @@ describe('MonitorCard — role selector: None/Audience/Confidence (R325)', () =>
     })
 
     const radios = wrapper.findAll('[role="radio"]')
-    expect(radios).toHaveLength(3)
+    expect(radios).toHaveLength(4)
     expect(wrapper.get(`[data-testid="monitor-role-${fingerprint}-none"]`).attributes('aria-checked')).toBe('true')
     expect(wrapper.get(`[data-testid="monitor-role-${fingerprint}-audience"]`).attributes('aria-checked')).toBe('false')
     expect(wrapper.get(`[data-testid="monitor-role-${fingerprint}-confidence"]`).attributes('aria-checked')).toBe('false')
+    expect(wrapper.get(`[data-testid="monitor-role-${fingerprint}-video"]`).attributes('aria-checked')).toBe('false')
+  })
+
+  it('marks Video checked and None unchecked when selectedRole is video (R424)', () => {
+    const screen = makeScreen()
+    const fingerprint = computeFingerprint(screen)
+    const wrapper = mount(MonitorCard, {
+      props: { screen, fingerprint, selectedRole: 'video', nickname: '' },
+    })
+
+    expect(wrapper.get(`[data-testid="monitor-role-${fingerprint}-video"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fingerprint}-none"]`).attributes('aria-checked')).toBe('false')
   })
 
   it('emits select-role with null when the None radio is clicked', async () => {
