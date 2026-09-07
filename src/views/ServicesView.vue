@@ -8,67 +8,70 @@
       </div>
 
       <!-- Tab bar -->
-      <div class="flex items-center gap-1 mb-6 border-b border-gray-800 pb-0">
-        <button
-          type="button"
-          class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
-          :class="activeTab === 'services'
-            ? 'text-indigo-300 border-indigo-500 bg-gray-900'
-            : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
-          @click="activeTab = 'services'"
-        >
-          Services
-        </button>
-        <button
-          v-if="authStore.isEditor"
-          type="button"
-          class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
-          :class="activeTab === 'rotation'
-            ? 'text-indigo-300 border-indigo-500 bg-gray-900'
-            : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
-          @click="activeTab = 'rotation'"
-        >
-          Song Rotation
-        </button>
-        <button
-          v-if="authStore.isEditor"
-          type="button"
-          class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
-          :class="activeTab === 'scripture-rotation'
-            ? 'text-indigo-300 border-indigo-500 bg-gray-900'
-            : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
-          @click="activeTab = 'scripture-rotation'"
-        >
-          Scripture Rotation
-        </button>
-        <div class="flex-1" />
-        <!-- Default service template cog: editor only (R113 — relocated from Settings) -->
-        <button
-          v-if="authStore.isEditor"
-          type="button"
-          class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors mb-1 mr-2"
-          aria-label="Edit default service template"
-          data-testid="open-template-editor"
-          @click="templateEditorOpen = true"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          Service Template
-        </button>
-        <!-- New Service button: editor only -->
-        <button
-          v-if="authStore.isEditor"
-          type="button"
-          class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors mb-1"
-          @click="dialogOpen = true"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          New Service
-        </button>
+      <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-1 mb-6 border-b border-gray-800 pb-2 sm:pb-0">
+        <div class="flex items-center gap-1 overflow-x-auto">
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2 shrink-0"
+            :class="activeTab === 'services'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'services'"
+          >
+            Services
+          </button>
+          <button
+            v-if="authStore.isEditor"
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2 shrink-0"
+            :class="activeTab === 'rotation'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'rotation'"
+          >
+            Song Rotation
+          </button>
+          <button
+            v-if="authStore.isEditor"
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2 shrink-0"
+            :class="activeTab === 'scripture-rotation'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'scripture-rotation'"
+          >
+            Scripture Rotation
+          </button>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap sm:ml-auto">
+          <!-- Default service template cog: editor only (R113 — relocated from Settings) -->
+          <button
+            v-if="authStore.isEditor"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
+            aria-label="Edit default service template"
+            data-testid="open-template-editor"
+            @click="templateEditorOpen = true"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Service Template
+          </button>
+          <!-- New Service button: editor only -->
+          <button
+            v-if="authStore.isEditor"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+            @click="dialogOpen = true"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            New Service
+          </button>
+        </div>
       </div>
 
       <!-- Services Tab -->
