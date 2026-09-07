@@ -59,8 +59,9 @@
     <div class="border-t border-gray-800 p-3 shrink-0">
       <div class="relative">
         <!-- Static user block (single-org, or super-admin viewing-as — R311
-             gate keeps zero visual change here for both cases). -->
-        <div v-if="!hasSwitcher" class="flex items-center gap-3 px-2 py-2 mb-1">
+             gate keeps zero visual change here for both cases). Also the
+             single-church / zero-church volunteer (no switcher). -->
+        <div v-if="!hasSwitcher && !hasVolunteerSwitcher" class="flex items-center gap-3 px-2 py-2 mb-1">
           <!-- Avatar with initials -->
           <div class="w-7 h-7 rounded-full bg-indigo-600/30 flex items-center justify-center shrink-0">
             <span class="text-xs font-semibold text-indigo-300 uppercase">{{ userInitials }}</span>
@@ -73,7 +74,7 @@
 
         <!-- Church switcher (R311/R312, Phase 104): multi-org member, not
              currently viewing another church as super-admin. -->
-        <template v-else>
+        <template v-else-if="hasSwitcher">
           <button
             ref="switcherTriggerRef"
             type="button"
@@ -191,6 +192,102 @@
             </div>
           </Transition>
         </template>
+
+        <!-- Volunteer church switcher (Phase 130 rework): a zero-membership
+             volunteer serving >1 church picks ONE church at a time. Mirrors the
+             admin switcher's trigger + panel / aria-menu / roving-focus /
+             outside-click pattern, but selects via mySchedule.setSelectedChurch()
+             ONLY — it NEVER touches authStore / selectOrg (a zero-membership
+             volunteer has no memberships to switch). The trigger shows the
+             selected church's name. -->
+        <template v-else-if="hasVolunteerSwitcher">
+          <button
+            ref="volunteerSwitcherTriggerRef"
+            type="button"
+            aria-haspopup="menu"
+            :aria-expanded="volunteerSwitcherOpen ? 'true' : 'false'"
+            data-testid="volunteer-church-switcher-trigger"
+            class="w-full flex items-center gap-3 px-2 py-2 mb-1 rounded-lg hover:bg-gray-800 transition-colors"
+            @click="toggleVolunteerSwitcher"
+          >
+            <div class="w-7 h-7 rounded-full bg-indigo-600/30 flex items-center justify-center shrink-0">
+              <span class="text-xs font-semibold text-indigo-300 uppercase">{{ userInitials }}</span>
+            </div>
+            <div class="flex-1 min-w-0 text-left">
+              <p class="text-xs font-medium text-gray-200 truncate">{{ selectedChurchName }}</p>
+              <p class="text-xs text-gray-500 truncate">{{ userEmail }}</p>
+            </div>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-3.5 w-3.5 text-gray-600 shrink-0 transition-transform"
+              :class="volunteerSwitcherOpen ? 'rotate-180' : ''"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+            </svg>
+          </button>
+
+          <div v-if="volunteerSwitcherOpen" class="fixed inset-0 z-10" @click="closeVolunteerSwitcher" />
+
+          <Transition
+            enter-active-class="transition duration-100 ease-out"
+            enter-from-class="opacity-0 scale-95"
+            enter-to-class="opacity-100 scale-100"
+            leave-active-class="transition duration-75 ease-in"
+            leave-from-class="opacity-100 scale-100"
+            leave-to-class="opacity-0 scale-95"
+          >
+            <div
+              v-if="volunteerSwitcherOpen"
+              ref="volunteerSwitcherPanelRef"
+              role="menu"
+              data-testid="volunteer-church-switcher-panel"
+              class="absolute inset-x-3 bottom-full mb-2 rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-20 max-h-64 overflow-y-auto"
+              @keydown="onVolunteerSwitcherKeydown"
+            >
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-500 px-3 pt-2 pb-1">
+                Switch church
+              </p>
+              <template v-for="c in mySchedule.churches" :key="c.orgId">
+                <!-- Selected church: non-interactive current row -->
+                <div
+                  v-if="c.orgId === mySchedule.selectedChurch"
+                  role="menuitem"
+                  aria-current="true"
+                  data-testid="volunteer-church-switcher-current"
+                  class="flex items-center gap-2 px-3 py-2 text-sm cursor-default bg-indigo-600/20 text-indigo-300"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-3.5 w-3.5 shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span class="truncate">{{ c.orgName || 'Unnamed church' }}</span>
+                </div>
+
+                <!-- Other church: real menu item -->
+                <button
+                  v-else
+                  type="button"
+                  role="menuitem"
+                  data-testid="volunteer-church-switcher-option"
+                  class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 transition-colors text-left"
+                  @click="handleVolunteerSelect(c.orgId)"
+                >
+                  <span class="truncate">{{ c.orgName || 'Unnamed church' }}</span>
+                </button>
+              </template>
+            </div>
+          </Transition>
+        </template>
       </div>
       <button
         @click="handleSignOut"
@@ -241,15 +338,13 @@ const volunteerChurchLabel = computed(() => {
   if (authStore.orgName) return null
   const churches = mySchedule.churches
   if (churches.length === 0) return null
-  if (churches.length === 1) return churches[0]!.orgName || 'Your church'
-  if (mySchedule.selectedChurch) {
-    const match = churches.find((c) => c.orgId === mySchedule.selectedChurch)
-    return match?.orgName || 'Unnamed church'
-  }
-  // Doc discrepancy resolved in favor of the owner's decision (CONTEXT.md,
-  // 130-VALIDATION.md AppSidebar test row) over 130-UI-SPEC.md's Copywriting
-  // Contract, which lists "All churches" for this state.
-  return 'Multiple churches'
+  // Phase 130 rework — always the SELECTED church name (one at a time), never a
+  // combined "Multiple churches" state. Single-church volunteers keep the
+  // historical "Your church" fallback; multi-church uses "Unnamed church" to
+  // match the switcher panel's labeling.
+  const match = churches.find((c) => c.orgId === mySchedule.selectedChurch) ?? churches[0]!
+  const fallback = churches.length === 1 ? 'Your church' : 'Unnamed church'
+  return match.orgName || fallback
 })
 
 // Best-effort cold-render guard: a volunteer deep-linking to a route other
@@ -265,7 +360,9 @@ onMounted(() => {
   if (authStore.orgName || authStore.superAdminOutsideOwnChurch) return
   if (mySchedule.isLoading) return
   if (mySchedule.docs.length > 0) return
-  mySchedule.loadMySchedule()
+  // Change A: establish the live subscription (idempotent) rather than a
+  // one-shot load, so the sidebar label tracks editor edits too.
+  mySchedule.subscribe()
 })
 
 // Phase 104 (R311) — the switcher only ever renders for a genuine multi-org
@@ -328,6 +425,50 @@ async function handleSwitch(targetOrgId: string): Promise<void> {
   } finally {
     switchingId.value = null
   }
+}
+
+// ── Volunteer church switcher (Phase 130 rework) ──────────────────────────
+// A zero-membership volunteer (no admin memberships at all) serving more than
+// one church. Distinct from the admin switcher above: this switches a pure
+// client-side selection via mySchedule.setSelectedChurch(), NEVER selectOrg().
+const hasVolunteerSwitcher = computed(
+  () => authStore.memberships.length === 0 && !!authStore.user && mySchedule.churches.length > 1,
+)
+
+const selectedChurchName = computed(() => {
+  const match = mySchedule.churches.find((c) => c.orgId === mySchedule.selectedChurch)
+  return match?.orgName || 'Unnamed church'
+})
+
+const volunteerSwitcherOpen = ref(false)
+const volunteerSwitcherTriggerRef = ref<HTMLButtonElement | null>(null)
+const volunteerSwitcherPanelRef = ref<HTMLElement | null>(null)
+
+// See ADR-0059 — same aria-menu roving-focus pattern as the admin switcher.
+watch(volunteerSwitcherOpen, async (isOpen) => {
+  if (!isOpen) return
+  await nextTick()
+  volunteerSwitcherPanelRef.value?.querySelector<HTMLElement>('button[role="menuitem"]')?.focus()
+})
+
+function toggleVolunteerSwitcher(): void {
+  volunteerSwitcherOpen.value = !volunteerSwitcherOpen.value
+}
+
+function closeVolunteerSwitcher(): void {
+  volunteerSwitcherOpen.value = false
+}
+
+function onVolunteerSwitcherKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Escape') return
+  volunteerSwitcherOpen.value = false
+  volunteerSwitcherTriggerRef.value?.focus()
+}
+
+// Client-side selection only — NEVER authStore.selectOrg (T-130-04 invariant).
+function handleVolunteerSelect(orgId: string): void {
+  mySchedule.setSelectedChurch(orgId)
+  volunteerSwitcherOpen.value = false
 }
 
 const navItems = computed(() => {

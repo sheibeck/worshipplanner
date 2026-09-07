@@ -86,6 +86,11 @@ vi.mock('@/stores/auth', () => ({
 // Mock mirrors mySchedule.ts's own churches derivation (distinct orgId, first
 // occurrence, orgName carried as-is) so tests only ever set docs/selectedChurch.
 const mockLoadMySchedule = vi.fn()
+const mockSubscribe = vi.fn()
+const mockUnsubscribe = vi.fn()
+const mockSetSelectedChurch = vi.fn((orgId: string) => {
+  mockSelectedChurch = orgId
+})
 let mockMyScheduleDocs: { orgId: string; orgName?: string }[] = []
 let mockMyScheduleLoading = false
 let mockSelectedChurch: string | null = null
@@ -108,6 +113,9 @@ vi.mock('@/stores/mySchedule', () => ({
       return [...byOrgId.entries()].map(([orgId, orgName]) => ({ orgId, orgName }))
     },
     loadMySchedule: mockLoadMySchedule,
+    subscribe: mockSubscribe,
+    unsubscribe: mockUnsubscribe,
+    setSelectedChurch: mockSetSelectedChurch,
   }),
 }))
 
@@ -128,6 +136,9 @@ beforeEach(() => {
   mockMyScheduleLoading = false
   mockSelectedChurch = null
   mockLoadMySchedule.mockClear()
+  mockSubscribe.mockClear()
+  mockUnsubscribe.mockClear()
+  mockSetSelectedChurch.mockClear()
 })
 
 function mountSidebar() {
@@ -357,7 +368,7 @@ describe('AppSidebar — volunteer church-name label (R404, Phase 130)', () => {
     expect(wrapper.get('[data-testid="volunteer-church-label"]').text()).toBe('Your church')
   })
 
-  it('shows "Multiple churches" for a multi-church volunteer with no church selected', () => {
+  it('falls back to the first church name for a multi-church volunteer before a selection resolves (never "Multiple churches")', () => {
     mockOrgName = null
     mockMyScheduleDocs = [
       { orgId: 'org-1', orgName: 'Grace Fellowship' },
@@ -366,7 +377,9 @@ describe('AppSidebar — volunteer church-name label (R404, Phase 130)', () => {
     mockSelectedChurch = null
     const wrapper = mountSidebar()
 
-    expect(wrapper.get('[data-testid="volunteer-church-label"]').text()).toBe('Multiple churches')
+    const label = wrapper.get('[data-testid="volunteer-church-label"]').text()
+    expect(label).toBe('Grace Fellowship')
+    expect(label).not.toBe('Multiple churches')
   })
 
   it('shows the selected church name for a multi-church volunteer with a specific church selected', () => {
@@ -393,50 +406,183 @@ describe('AppSidebar — volunteer church-name label (R404, Phase 130)', () => {
 })
 
 /**
- * 130-REVIEW WR-01. The cold-render `onMounted` guard fires
- * `mySchedule.loadMySchedule()` for a signed-in volunteer that hasn't yet
- * visited My Schedule, but must skip firing for a churchless super-admin
- * (Owner Console) — matching the org-name block's own `v-if` condition
- * (`authStore.orgName || authStore.superAdminOutsideOwnChurch`).
+ * Phase 130 rework (Change B). The volunteer church switcher — an admin-style
+ * lower-left switcher for a ZERO-membership volunteer serving >1 church. It
+ * mirrors the admin switcher's trigger/panel/aria pattern but selects via
+ * mySchedule.setSelectedChurch() ONLY, and must NEVER call authStore.selectOrg.
+ * The admin path (memberships > 1) must be completely undisturbed.
  */
-describe('AppSidebar — cold-render loadMySchedule guard (WR-01, Phase 130 review)', () => {
-  it('fires loadMySchedule for a signed-in volunteer with no orgName and no cached docs', () => {
+describe('AppSidebar — volunteer church switcher (Change B, Phase 130 rework)', () => {
+  const twoChurches = [
+    { orgId: 'org-1', orgName: 'Grace Fellowship' },
+    { orgId: 'org-2', orgName: 'Hillside Chapel' },
+  ]
+
+  it('renders the switcher trigger for a zero-membership volunteer serving more than one church', () => {
+    mockOrgName = null
+    mockMemberships = []
+    mockMyScheduleDocs = twoChurches
+    mockSelectedChurch = 'org-1'
+    const wrapper = mountSidebar()
+
+    const trigger = wrapper.find('[data-testid="volunteer-church-switcher-trigger"]')
+    expect(trigger.exists()).toBe(true)
+    // Trigger shows the SELECTED church's name.
+    expect(trigger.text()).toContain('Grace Fellowship')
+    // The admin switcher must NOT render for a zero-membership session.
+    expect(wrapper.find('[data-testid="church-switcher-trigger"]').exists()).toBe(false)
+  })
+
+  it('renders NO switcher for a single-church volunteer — static label only', () => {
+    mockOrgName = null
+    mockMemberships = []
+    mockMyScheduleDocs = [{ orgId: 'org-1', orgName: 'Grace Fellowship' }]
+    mockSelectedChurch = 'org-1'
+    const wrapper = mountSidebar()
+
+    expect(wrapper.find('[data-testid="volunteer-church-switcher-trigger"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="volunteer-church-label"]').text()).toBe('Grace Fellowship')
+  })
+
+  it('renders NO switcher for a volunteer with zero churches', () => {
+    mockOrgName = null
+    mockMemberships = []
+    mockMyScheduleDocs = []
+    const wrapper = mountSidebar()
+
+    expect(wrapper.find('[data-testid="volunteer-church-switcher-trigger"]').exists()).toBe(false)
+  })
+
+  it('renders NO volunteer switcher for a multi-org admin (memberships > 1) — the admin path is undisturbed', () => {
+    mockOrgName = 'Test Church'
+    mockMemberships = [
+      { id: 'org-1', name: 'Org One', active: true, role: 'editor' },
+      { id: 'org-2', name: 'Org Two', active: true, role: 'viewer' },
+    ]
+    // Even if the volunteer store somehow has multi-church docs, the admin
+    // switcher wins and the volunteer switcher never renders.
+    mockMyScheduleDocs = twoChurches
+    const wrapper = mountSidebar()
+
+    expect(wrapper.find('[data-testid="church-switcher-trigger"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="volunteer-church-switcher-trigger"]').exists()).toBe(false)
+  })
+
+  it('opens the panel, lists each church, and marks the selected one as the non-interactive current row', async () => {
+    mockOrgName = null
+    mockMemberships = []
+    mockMyScheduleDocs = twoChurches
+    mockSelectedChurch = 'org-1'
+    const wrapper = mountSidebar()
+
+    await wrapper.find('[data-testid="volunteer-church-switcher-trigger"]').trigger('click')
+
+    const panel = wrapper.find('[data-testid="volunteer-church-switcher-panel"]')
+    expect(panel.exists()).toBe(true)
+    expect(panel.text()).toContain('Grace Fellowship')
+    expect(panel.text()).toContain('Hillside Chapel')
+
+    const current = wrapper.find('[data-testid="volunteer-church-switcher-current"]')
+    expect(current.text()).toContain('Grace Fellowship')
+    expect(current.attributes('aria-current')).toBe('true')
+    expect(current.element.tagName).not.toBe('BUTTON')
+
+    // Only the non-selected church is an interactive option.
+    const options = wrapper.findAll('[data-testid="volunteer-church-switcher-option"]')
+    expect(options).toHaveLength(1)
+    expect(options[0]!.text()).toContain('Hillside Chapel')
+  })
+
+  it('clicking another church calls setSelectedChurch with that orgId and NEVER authStore.selectOrg', async () => {
+    mockOrgName = null
+    mockMemberships = []
+    mockMyScheduleDocs = twoChurches
+    mockSelectedChurch = 'org-1'
+    const wrapper = mountSidebar()
+
+    await wrapper.find('[data-testid="volunteer-church-switcher-trigger"]').trigger('click')
+    await wrapper.find('[data-testid="volunteer-church-switcher-option"]').trigger('click')
+
+    expect(mockSetSelectedChurch).toHaveBeenCalledWith('org-2')
+    expect(mockSelectOrg).not.toHaveBeenCalled()
+    // Panel closes after a selection.
+    expect(wrapper.find('[data-testid="volunteer-church-switcher-panel"]').exists()).toBe(false)
+  })
+
+  it('labels a church with no orgName as "Unnamed church" in the panel', async () => {
+    mockOrgName = null
+    mockMemberships = []
+    mockMyScheduleDocs = [
+      { orgId: 'org-1', orgName: 'Grace Fellowship' },
+      { orgId: 'org-2', orgName: undefined },
+    ]
+    mockSelectedChurch = 'org-1'
+    const wrapper = mountSidebar()
+
+    await wrapper.find('[data-testid="volunteer-church-switcher-trigger"]').trigger('click')
+    expect(wrapper.find('[data-testid="volunteer-church-switcher-option"]').text()).toContain('Unnamed church')
+  })
+
+  it('Escape closes the panel', async () => {
+    mockOrgName = null
+    mockMemberships = []
+    mockMyScheduleDocs = twoChurches
+    mockSelectedChurch = 'org-1'
+    const wrapper = mountSidebar()
+
+    await wrapper.find('[data-testid="volunteer-church-switcher-trigger"]').trigger('click')
+    expect(wrapper.find('[data-testid="volunteer-church-switcher-panel"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="volunteer-church-switcher-panel"]').trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('[data-testid="volunteer-church-switcher-panel"]').exists()).toBe(false)
+  })
+})
+
+/**
+ * 130-REVIEW WR-01 (adapted for Change A). The cold-render `onMounted` guard
+ * now establishes the live subscription (`mySchedule.subscribe()`) for a
+ * signed-in volunteer that hasn't yet visited My Schedule, but must skip firing
+ * for a churchless super-admin (Owner Console) — matching the org-name block's
+ * own `v-if` condition (`authStore.orgName || authStore.superAdminOutsideOwnChurch`).
+ */
+describe('AppSidebar — cold-render subscribe guard (WR-01, Phase 130 review)', () => {
+  it('fires subscribe for a signed-in volunteer with no orgName and no cached docs', () => {
     mockOrgName = null
     mockSuperAdminOutsideOwnChurch = false
     mockMyScheduleDocs = []
     mockMyScheduleLoading = false
     mountSidebar()
 
-    expect(mockLoadMySchedule).toHaveBeenCalledTimes(1)
+    expect(mockSubscribe).toHaveBeenCalledTimes(1)
   })
 
-  it('does NOT fire loadMySchedule for a super-admin outside their own church, even with no orgName', () => {
+  it('does NOT fire subscribe for a super-admin outside their own church, even with no orgName', () => {
     mockOrgName = null
     mockSuperAdminOutsideOwnChurch = true
     mockMyScheduleDocs = []
     mockMyScheduleLoading = false
     mountSidebar()
 
-    expect(mockLoadMySchedule).not.toHaveBeenCalled()
+    expect(mockSubscribe).not.toHaveBeenCalled()
   })
 
-  it('does NOT fire loadMySchedule when authStore.orgName is already set (admin session)', () => {
+  it('does NOT fire subscribe when authStore.orgName is already set (admin session)', () => {
     mockOrgName = 'Test Church'
     mockSuperAdminOutsideOwnChurch = false
     mockMyScheduleDocs = []
     mockMyScheduleLoading = false
     mountSidebar()
 
-    expect(mockLoadMySchedule).not.toHaveBeenCalled()
+    expect(mockSubscribe).not.toHaveBeenCalled()
   })
 
-  it('does NOT fire loadMySchedule when docs are already cached', () => {
+  it('does NOT fire subscribe when docs are already cached', () => {
     mockOrgName = null
     mockSuperAdminOutsideOwnChurch = false
     mockMyScheduleDocs = [{ orgId: 'org-1', orgName: 'Grace Fellowship' }]
     mockMyScheduleLoading = false
     mountSidebar()
 
-    expect(mockLoadMySchedule).not.toHaveBeenCalled()
+    expect(mockSubscribe).not.toHaveBeenCalled()
   })
 })

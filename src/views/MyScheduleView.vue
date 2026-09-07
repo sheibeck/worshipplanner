@@ -35,32 +35,19 @@
         <div class="mb-8">
           <h1 class="text-2xl font-semibold text-white">{{ greeting }}</h1>
           <p v-if="summaryLine" class="text-sm text-gray-400 mt-1">{{ summaryLine }}</p>
-
-          <!-- Church filter (R403/R404/R405, Phase 130) — a pure client-side
-               filter over mySchedule.docs. Zero DOM footprint for 0/1-church
-               volunteers (v-if, not v-show). Never touches authStore/selectOrg. -->
-          <select
-            v-if="mySchedule.churches.length > 1"
-            :value="mySchedule.selectedChurch ?? ''"
-            @change="onChurchChange(($event.target as HTMLSelectElement).value)"
-            data-testid="church-filter"
-            class="mt-3 rounded-md bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="">All churches</option>
-            <option v-for="c in sortedChurches" :key="c.orgId" :value="c.orgId">
-              {{ c.orgName || 'Unnamed church' }}
-            </option>
-          </select>
         </div>
 
-        <!-- Filtered-empty (Copywriting Contract): distinct from the whole-
-             schedule empty state above, which stays keyed on docs.length. -->
+        <!-- Church selection now lives in the AppSidebar switcher (Phase 130
+             rework) — one church at a time. Defensive fallback only: with a
+             single-church default this never renders, but a filteredDocs that
+             is somehow empty while docs is non-empty degrades gracefully rather
+             than showing a bare greeting. -->
         <div
-          v-if="filteredEmpty"
+          v-if="mySchedule.filteredDocs.length === 0"
           data-testid="filtered-empty"
           class="rounded-lg border border-dashed border-gray-700 py-12 px-6 text-center max-w-md mx-auto mt-4"
         >
-          <p class="text-sm text-gray-400">No upcoming services for {{ selectedChurchLabel }}.</p>
+          <p class="text-sm text-gray-400">No upcoming services.</p>
         </div>
 
         <section v-else-if="groups.thisWeek.length" class="mb-6">
@@ -145,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useMyScheduleStore, type MyScheduleDoc } from '@/stores/mySchedule'
 import { groupMySchedule, countdownLabel } from '@/utils/myScheduleGrouping'
@@ -157,8 +144,15 @@ const mySchedule = useMyScheduleStore()
 
 const showPast = ref(false)
 
+// Live subscription (Phase 130 rework, Change A) — editor edits reflect
+// without a reload. A volunteer isn't org-scoped, so resetOrgScopedStores
+// never tears this down; unsubscribe on unmount instead.
 onMounted(() => {
-  mySchedule.loadMySchedule()
+  mySchedule.subscribe()
+})
+
+onUnmounted(() => {
+  mySchedule.unsubscribe()
 })
 
 const signedInEmail = computed(() => authStore.user?.email ?? '')
@@ -169,36 +163,6 @@ const groups = computed(() => groupMySchedule(mySchedule.filteredDocs))
 function rolesFor(doc: MyScheduleDoc): string[] {
   return doc.rolesByEmailLower[myEmailLower.value] ?? []
 }
-
-// Church filter (R403/R404/R405, Phase 130) — alphabetical by displayed
-// label, fallback-labeled entries sort as the literal "Unnamed church"
-// string (130-UI-SPEC.md Component Spec 1).
-const sortedChurches = computed(() => {
-  return [...mySchedule.churches].sort((a, b) =>
-    (a.orgName || 'Unnamed church').localeCompare(b.orgName || 'Unnamed church'),
-  )
-})
-
-function onChurchChange(value: string): void {
-  // Empty-string option value ("All churches") clears the filter — mirrors
-  // SongFilters.vue's onVwTypeChange empty-string-to-null idiom. This is a
-  // pure client-side filter: it only ever assigns mySchedule.selectedChurch,
-  // never authStore.selectOrg or any org-context reset (T-130-04).
-  mySchedule.selectedChurch = value === '' ? null : value
-}
-
-const selectedChurchLabel = computed(() => {
-  if (!mySchedule.selectedChurch) return ''
-  const match = mySchedule.churches.find((c) => c.orgId === mySchedule.selectedChurch)
-  return match?.orgName || 'Unnamed church'
-})
-
-// Distinct from the whole-schedule empty state (docs.length === 0, §8) —
-// this is "nothing at THIS church" while other churches still have
-// services (Copywriting Contract).
-const filteredEmpty = computed(
-  () => mySchedule.selectedChurch !== null && mySchedule.filteredDocs.length === 0 && mySchedule.docs.length > 0,
-)
 
 // First-name-only extraction for the greeting — deliberately NOT
 // displayLabel's "Dana R." formula (VolunteerSignInView.vue Pitfall 5,
@@ -241,6 +205,7 @@ const summaryLine = computed(() => {
 })
 
 function retry(): void {
-  mySchedule.loadMySchedule()
+  // Re-establish the live listener (idempotent — tears down any prior one).
+  mySchedule.subscribe()
 }
 </script>

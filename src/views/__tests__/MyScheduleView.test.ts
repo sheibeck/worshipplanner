@@ -39,6 +39,11 @@ vi.mock('@/stores/auth', () => ({
 }))
 
 const mockLoadMySchedule = vi.fn()
+const mockSubscribe = vi.fn()
+const mockUnsubscribe = vi.fn()
+const mockSetSelectedChurch = vi.fn((orgId: string) => {
+  mockScheduleState.selectedChurch = orgId
+})
 const mockScheduleState = reactive<{
   docs: MyScheduleDoc[]
   isLoading: boolean
@@ -50,9 +55,11 @@ const mockScheduleState = reactive<{
   error: null,
   selectedChurch: null,
 })
-// Phase 130 (R403/R404/R405) — churches/filteredDocs mirror the real store's
-// derivation exactly (mySchedule.ts) so tests only ever need to set
-// mockScheduleState.docs/selectedChurch, never hand-maintain a parallel list.
+// Phase 130 rework — the church filter now lives in the AppSidebar; this view
+// just renders mySchedule.filteredDocs (single church at a time). The mock's
+// filteredDocs mirrors the real store: it resolves to the selected church, or
+// defaults to the first church when no explicit selection is set (as the real
+// store does once docs load).
 vi.mock('@/stores/mySchedule', () => ({
   useMyScheduleStore: () => ({
     get docs() {
@@ -78,10 +85,14 @@ vi.mock('@/stores/mySchedule', () => ({
       return [...byOrgId.entries()].map(([orgId, orgName]) => ({ orgId, orgName }))
     },
     get filteredDocs() {
-      if (!mockScheduleState.selectedChurch) return mockScheduleState.docs
-      return mockScheduleState.docs.filter((d) => d.orgId === mockScheduleState.selectedChurch)
+      const sel = mockScheduleState.selectedChurch ?? mockScheduleState.docs[0]?.orgId ?? null
+      if (!sel) return []
+      return mockScheduleState.docs.filter((d) => d.orgId === sel)
     },
     loadMySchedule: mockLoadMySchedule,
+    subscribe: mockSubscribe,
+    unsubscribe: mockUnsubscribe,
+    setSelectedChurch: mockSetSelectedChurch,
   }),
 }))
 
@@ -122,6 +133,9 @@ describe('MyScheduleView', () => {
     mockScheduleState.error = null
     mockScheduleState.selectedChurch = null
     mockLoadMySchedule.mockClear()
+    mockSubscribe.mockClear()
+    mockUnsubscribe.mockClear()
+    mockSetSelectedChurch.mockClear()
     mockSelectOrg.mockClear()
   })
 
@@ -129,9 +143,11 @@ describe('MyScheduleView', () => {
     vi.useRealTimers()
   })
 
-  it('calls loadMySchedule on mount', () => {
-    mount(MyScheduleView, { global: { stubs: globalStubs } })
-    expect(mockLoadMySchedule).toHaveBeenCalledOnce()
+  it('subscribes on mount and unsubscribes on unmount (Change A: live data)', () => {
+    const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
+    expect(mockSubscribe).toHaveBeenCalledOnce()
+    wrapper.unmount()
+    expect(mockUnsubscribe).toHaveBeenCalledOnce()
   })
 
   describe('loading state', () => {
@@ -143,14 +159,14 @@ describe('MyScheduleView', () => {
   })
 
   describe('error state', () => {
-    it('shows the load-failure copy and a Retry control that calls loadMySchedule again', async () => {
+    it('shows the load-failure copy and a Retry control that re-subscribes', async () => {
       mockScheduleState.error = 'permission-denied'
       const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
       expect(wrapper.text()).toContain("Couldn't load your schedule")
-      mockLoadMySchedule.mockClear()
+      mockSubscribe.mockClear()
 
       await wrapper.get('[data-testid="retry-load"]').trigger('click')
-      expect(mockLoadMySchedule).toHaveBeenCalledOnce()
+      expect(mockSubscribe).toHaveBeenCalledOnce()
     })
   })
 
@@ -222,82 +238,47 @@ describe('MyScheduleView', () => {
   })
 
   /**
-   * Phase 130 Plan 02 (R403/R404/R405). The church filter is a pure
-   * client-side filter over mySchedule.docs — never a data-scope switch.
+   * Phase 130 rework — the church filter moved to the AppSidebar switcher.
+   * This view renders only mySchedule.filteredDocs (one church at a time) and
+   * no longer has an inline <select>.
    */
-  describe('church filter (R403/R404/R405, Phase 130)', () => {
-    it('renders no filter for a single-church volunteer (R405)', () => {
-      mockScheduleState.docs = [makeDoc({ orgId: 'org-1', orgName: 'Grace Fellowship' })]
-      const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
-      expect(wrapper.find('[data-testid="church-filter"]').exists()).toBe(false)
-    })
-
-    it('renders no filter when there are zero docs (R405)', () => {
-      mockScheduleState.docs = []
-      const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
-      expect(wrapper.find('[data-testid="church-filter"]').exists()).toBe(false)
-    })
-
-    it('renders the filter with an "All churches" default plus one option per church, labeled by orgName (R403/R404)', () => {
+  describe('single-church rendering (Phase 130 rework)', () => {
+    it('no longer renders an inline church-filter <select>', () => {
       mockScheduleState.docs = [
         makeDoc({ serviceId: 'svc-1', orgId: 'org-1', orgName: 'Grace Fellowship' }),
-        makeDoc({ serviceId: 'svc-2', orgId: 'org-2', orgName: undefined }),
+        makeDoc({ serviceId: 'svc-2', orgId: 'org-2', orgName: 'Hillside Chapel' }),
       ]
       const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
-
-      const select = wrapper.get('[data-testid="church-filter"]')
-      const options = select.findAll('option')
-      expect(options.map((o) => o.text())).toEqual(['All churches', 'Grace Fellowship', 'Unnamed church'])
+      expect(wrapper.find('[data-testid="church-filter"]').exists()).toBe(false)
     })
 
-    it('selecting a church scopes the rendered cards to that church and never calls authStore.selectOrg (R403)', async () => {
+    it('renders only the selected church\'s cards (driven by filteredDocs), never a combined list', () => {
       mockScheduleState.docs = [
         makeDoc({ serviceId: 'svc-1', orgId: 'org-1', orgName: 'Grace Fellowship', title: 'Grace Service', serviceDate: '2026-09-06' }),
         makeDoc({ serviceId: 'svc-2', orgId: 'org-2', orgName: 'Hillside Chapel', title: 'Hillside Service', serviceDate: '2026-09-07' }),
       ]
+      mockScheduleState.selectedChurch = 'org-2'
       const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
 
-      let cards = wrapper.findAll('[data-testid="schedule-card"]')
-      expect(cards).toHaveLength(2)
-
-      await wrapper.get('[data-testid="church-filter"]').setValue('org-2')
-
-      cards = wrapper.findAll('[data-testid="schedule-card"]')
+      const cards = wrapper.findAll('[data-testid="schedule-card"]')
       expect(cards).toHaveLength(1)
       expect(cards[0]!.text()).toContain('Hillside Service')
+      // Never touches the admin org-switch path.
       expect(mockSelectOrg).not.toHaveBeenCalled()
     })
 
-    it('shows a filtered-empty message when the selection matches zero of the loaded docs while docs overall is non-empty (R404)', async () => {
-      // A church option always has >=1 matching doc when chosen through the
-      // rendered <select> (options are derived from docs). This exercises
-      // the defensive "stale selection" path per 130-UI-SPEC.md's Copywriting
-      // Contract directly, since resetStaleSelection() only re-validates on
-      // the next loadMySchedule() call, not on every docs read.
+    it('defensive fallback: shows a graceful empty message when filteredDocs is empty while docs is non-empty', () => {
+      // Shouldn't happen with single-church defaulting, but the view must not
+      // render a bare greeting. Force it by selecting an orgId with no docs.
       mockScheduleState.docs = [
         makeDoc({ serviceId: 'svc-1', orgId: 'org-1', orgName: 'Grace Fellowship', serviceDate: '2026-09-06' }),
-        makeDoc({ serviceId: 'svc-2', orgId: 'org-2', orgName: 'Hillside Chapel', serviceDate: '2026-09-07' }),
       ]
-      mockScheduleState.selectedChurch = 'org-3'
+      mockScheduleState.selectedChurch = 'org-nonexistent'
       const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
 
       const filteredEmpty = wrapper.get('[data-testid="filtered-empty"]')
-      expect(filteredEmpty.text()).toContain('No upcoming services for Unnamed church.')
+      expect(filteredEmpty.text()).toContain('No upcoming services.')
       expect(wrapper.find('[data-testid="schedule-card"]').exists()).toBe(false)
-    })
-
-    it('choosing "All churches" clears the filter and restores every card', async () => {
-      mockScheduleState.docs = [
-        makeDoc({ serviceId: 'svc-1', orgId: 'org-1', orgName: 'Grace Fellowship', serviceDate: '2026-09-06' }),
-        makeDoc({ serviceId: 'svc-2', orgId: 'org-2', orgName: 'Hillside Chapel', serviceDate: '2026-09-07' }),
-      ]
-      const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
-
-      await wrapper.get('[data-testid="church-filter"]').setValue('org-2')
-      expect(wrapper.findAll('[data-testid="schedule-card"]')).toHaveLength(1)
-
-      await wrapper.get('[data-testid="church-filter"]').setValue('')
-      expect(wrapper.findAll('[data-testid="schedule-card"]')).toHaveLength(2)
     })
   })
 })
