@@ -935,10 +935,10 @@ org-scoped read idiom, mirroring the discipline that closed v2.8's SEC-S-01 cros
      `cleanupStalePresence` cron sibling of the existing retention crons), not left to accumulate forever
      (R423).
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 Plans:
 
-- [ ] 134-01-PLAN.md — Org-scoped `presence/{uid}` subcollection schema + firestore.rules get/list-split read + own-doc-only write + cross-org ALLOW/DENY rules tests (R423)
+- [x] 134-01-PLAN.md — Org-scoped `presence/{uid}` subcollection schema + firestore.rules get/list-split read + own-doc-only write + cross-org ALLOW/DENY rules tests (R423)
 - [ ] 134-02-PLAN.md — `useServicePresence` composable (coarse heartbeat paused-when-hidden + client soft-TTL staleness + serviceId/unmount teardown) + header indicator + forced-disconnect test (R422)
 - [ ] 134-03-PLAN.md — `cleanupStalePresence` cron backstop (dry-run default, re-exported from index.ts) + handler tests (R423)
 

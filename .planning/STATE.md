@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
-current_phase: 133
-current_phase_name: Volunteer Responsibility Confirmation
-status: verifying
-stopped_at: Completed 133-05-PLAN.md
-last_updated: "2026-09-07T18:14:35.962Z"
+current_phase: 134
+current_phase_name: Editor Presence
+status: executing
+stopped_at: Completed 134-01-PLAN.md
+last_updated: "2026-09-07T19:22:24.895Z"
 last_activity: 2026-09-07
-last_activity_desc: Phase 133 execution started
+last_activity_desc: Phase 134 execution started
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 13
+  completed_plans: 11
   percent: 43
 ---
 
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1383,7 +1383,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 133 — Volunteer Responsibility Confirmation
+**Current focus:** Phase 134 — Editor Presence
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1393,10 +1393,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 134 (Editor Presence) — next
-Plan: —
-Status: Phase 133 EXECUTED + code-verified (R410–R413, 6/6 must-haves); security review caught+fixed Critical CR-01; 4 live-UAT items deferred. Advancing to Phase 134.
-Last activity: 2026-09-07 — Phase 133 complete (two-state confirmation: rules foundation + 12 rules tests, volunteer confirm bar, live planner chips, relock reconcile, unconfirmed-only nudges)
+Phase: 134 (Editor Presence) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-09-07 — Phase 134 execution started
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
@@ -3616,6 +3616,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 133 P03 | 25min | 2 tasks | 2 files |
 | Phase 133 P04 | 20min | 1 tasks | 2 files |
 | Phase 133 P05 | 15min | 3 tasks | 7 files |
+| Phase 134 P01 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -4209,6 +4210,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Confirmations subscription + resolver live directly in ServiceEditorView.vue (no new store) — narrow, single-view-scoped read
 - [Phase ?]: reconcileConfirmations flips stale confirmed->needsReconfirmation on relock (R412), keyed on stable {roleId}_{emailLower} identity; best-effort, mirrors writeRehearseAccessDoc/ensureShareLink catch discipline
 - [Phase ?]: R413: unconfirmedOnly filters per-assignment (not per-person), scoped to team-matched roleIds only; server sendQueuedMessageHandler is the sole authoritative enforcement point (Admin-SDK confirmations read), client MessageComposer toggle is preview-only.
+- [Phase ?]: 134-01: presence heartbeat 30000ms / staleness 60000ms (research-recommended range); isPresenceStale treats null/NaN lastSeen as always-stale
 
 ### Roadmap Evolution
 
@@ -4538,8 +4540,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T18:14:26.288Z
-Stopped at: Completed 133-05-PLAN.md
+Last session: 2026-09-07T19:22:24.827Z
+Stopped at: Completed 134-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

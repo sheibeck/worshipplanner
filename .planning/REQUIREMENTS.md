@@ -113,7 +113,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   staleness filter (~60s). Teardown uses `watch(serviceId, …)` (Vue Router reuses the mounted editor
   instance across service navigation, so `onUnmounted` alone is insufficient).
 
-- [ ] **R423**: Presence records are stored in an org-scoped `services/{serviceId}/presence/{uid}`
+- [x] **R423**: Presence records are stored in an org-scoped `services/{serviceId}/presence/{uid}`
   subcollection whose read rules use the `get`/`list`-split, org-membership-scoped idiom (no unscoped
   `allow read: if isSignedIn()`), verified by a cross-org rules test; a scheduled cleanup backstop
   (Firestore TTL and/or a `cleanupStalePresence` cron sibling of the existing retention crons) removes
@@ -184,7 +184,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R420 | Phase 131 | Complete |
 | R421 | Phase 131 | Complete |
 | R422 | Phase 134 | Pending |
-| R423 | Phase 134 | Pending |
+| R423 | Phase 134 | Complete |
 | R424 | Phase 136 | Pending |
 | R425 | Phase 137 | Pending |
 | R426 | Phase 136 | Pending |
