@@ -5,15 +5,15 @@ milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 13
 current_phase: 133
 current_phase_name: Volunteer Responsibility Confirmation
 status: executing
-stopped_at: Completed 133-03-PLAN.md
-last_updated: "2026-09-07T17:37:06.739Z"
+stopped_at: Completed 133-04-PLAN.md
+last_updated: "2026-09-07T17:52:43.800Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 133 execution started
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 29
 ---
 
@@ -1394,7 +1394,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 133 (Volunteer Responsibility Confirmation) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-07 — Phase 133 execution started
 
@@ -3613,6 +3613,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 133 P01 | 14min | 3 tasks | 6 files |
 | Phase 133 P02 | 22min | 2 tasks | 3 files |
 | Phase 133 P03 | 25min | 2 tasks | 2 files |
+| Phase 133 P04 | 20min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -4204,6 +4205,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Confirm bar skips its onSnapshot listener entirely when the volunteer holds no assignments (Rule 2 efficiency addition)
 - [Phase ?]: The R410 confirm control lives exclusively in VolunteerServiceView's tri-tab shell; ScheduleServiceCard.vue stays read-only (133-RESEARCH.md Open Question 1, resolved)
 - [Phase ?]: Confirmations subscription + resolver live directly in ServiceEditorView.vue (no new store) — narrow, single-view-scoped read
+- [Phase ?]: reconcileConfirmations flips stale confirmed->needsReconfirmation on relock (R412), keyed on stable {roleId}_{emailLower} identity; best-effort, mirrors writeRehearseAccessDoc/ensureShareLink catch discipline
 
 ### Roadmap Evolution
 
@@ -4533,8 +4535,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T17:37:06.650Z
-Stopped at: Completed 133-03-PLAN.md
+Last session: 2026-09-07T17:52:43.731Z
+Stopped at: Completed 133-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
