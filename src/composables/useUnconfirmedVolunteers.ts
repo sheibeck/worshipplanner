@@ -32,6 +32,12 @@ interface ServiceListenerState {
   confirmationStatuses: Map<string, ConfirmationStatus>
   hasRehearseSnapshot: boolean
   hasConfirmationsSnapshot: boolean
+  // CR-01 (135-REVIEW): per-service, not a single shared flag — a listener
+  // that recovers (a later successful snapshot) clears only its OWN
+  // contribution, so one transient error on one of the ≤12 listeners can
+  // never permanently poison the aggregate `error` for the rest of the
+  // session/every subsequently-switched-to org.
+  hasError: boolean
   unsubRehearse: Unsubscribe | null
   unsubConfirmations: Unsubscribe | null
 }
@@ -45,7 +51,6 @@ export function useUnconfirmedVolunteers(
   // the per-listener state objects can be mutated in place without surprises.
   const statesByServiceId = new Map<string, ServiceListenerState>()
   const version = ref(0)
-  const error = ref(false)
 
   function teardownState(state: ServiceListenerState): void {
     state.unsubRehearse?.()
@@ -63,6 +68,7 @@ export function useUnconfirmedVolunteers(
       confirmationStatuses: new Map(),
       hasRehearseSnapshot: false,
       hasConfirmationsSnapshot: false,
+      hasError: false,
       unsubRehearse: null,
       unsubConfirmations: null,
     }
@@ -73,13 +79,18 @@ export function useUnconfirmedVolunteers(
         const data = snap.data() as RehearseAccessDoc | undefined
         state.roleAssignmentsByEmailLower = data?.roleAssignmentsByEmailLower
         state.hasRehearseSnapshot = true
+        // CR-01: a successful delivery on this listener clears ONLY this
+        // service's error contribution — the other listener below can still
+        // be independently erroring.
+        state.hasError = false
         version.value++
       },
       (err: unknown) => {
         // Mirrors ServiceEditorView's confirmations-subscription convention —
         // a missing/misconfigured rule or index is otherwise invisible.
         console.error('useUnconfirmedVolunteers: rehearseAccess subscription failed', err)
-        error.value = true
+        state.hasError = true
+        version.value++
       },
     )
 
@@ -94,11 +105,13 @@ export function useUnconfirmedVolunteers(
         }
         state.confirmationStatuses = next
         state.hasConfirmationsSnapshot = true
+        state.hasError = false
         version.value++
       },
       (err: unknown) => {
         console.error('useUnconfirmedVolunteers: confirmations subscription failed', err)
-        error.value = true
+        state.hasError = true
+        version.value++
       },
     )
 
@@ -178,6 +191,21 @@ export function useUnconfirmedVolunteers(
     for (const service of windowServices) {
       const state = statesByServiceId.get(service.id)
       if (!state || !state.hasRehearseSnapshot || !state.hasConfirmationsSnapshot) return true
+    }
+    return false
+  })
+
+  // CR-01: derived (not a sticky ref) from the CURRENT set of per-service
+  // states — a service that fell out of the window is gone from
+  // `statesByServiceId` entirely (reconcile() tears it down), and any
+  // service whose listeners recovered has already flipped its own
+  // `hasError` back to false above. teardownAll() (org switch / no org)
+  // clears the map, so this naturally reads false again with no separate
+  // reset needed.
+  const error = computed(() => {
+    void version.value
+    for (const state of statesByServiceId.values()) {
+      if (state.hasError) return true
     }
     return false
   })
