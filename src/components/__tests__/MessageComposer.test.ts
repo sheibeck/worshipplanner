@@ -24,6 +24,28 @@ vi.mock('firebase/functions', () => ({
 
 vi.mock('@/firebase', () => ({
   functions: {},
+  db: {},
+}))
+
+// R413: the composer's own confirmations onSnapshot preview subscription
+// (mirrors ServiceEditorView.confirmations.test.ts's harness). `onSnapshotCalls`
+// captures every registration so a test can fire a fake snapshot directly at
+// the confirmations listener without a real Firestore connection.
+type FakeConfirmationDoc = { data: () => { roleId?: string; emailLower?: string; status?: string } }
+type FakeConfirmationSnapshot = { docs: FakeConfirmationDoc[] }
+const { mockOnSnapshot, onSnapshotCalls } = vi.hoisted(() => {
+  const onSnapshotCalls: { path: string; onNext: (snap: FakeConfirmationSnapshot) => void }[] = []
+  const mockOnSnapshot = vi.fn(
+    (ref: { __path?: string } | undefined, onNext: (snap: FakeConfirmationSnapshot) => void, _onError?: unknown) => {
+      onSnapshotCalls.push({ path: ref?.__path ?? '', onNext })
+      return () => {}
+    },
+  )
+  return { mockOnSnapshot, onSnapshotCalls }
+})
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn((_db: unknown, ...segments: string[]) => ({ __path: segments.join('/') })),
+  onSnapshot: mockOnSnapshot,
 }))
 
 // The failure-toast store (success/queued toast on send). Mocked so the
@@ -126,7 +148,14 @@ describe('MessageComposer', () => {
     vi.clearAllMocks()
     mockHttpsCallable.mockReturnValue(mockQueueServiceMessage)
     mockQueueServiceMessage.mockResolvedValue({ data: { messageId: 'msg-1' } })
+    onSnapshotCalls.length = 0
   })
+
+  function confirmationsCall() {
+    const call = onSnapshotCalls.find((c) => c.path.includes('confirmations'))
+    if (!call) throw new Error('confirmations onSnapshot listener was never registered')
+    return call
+  }
 
   it('renders the three team chips (Band/Tech/Other — vocals folded into Band, R250) + Everyone + the Individuals panel', () => {
     mountComposer()
@@ -221,6 +250,44 @@ describe('MessageComposer', () => {
       select.dispatchEvent(new Event('change'))
       await nextTick()
       expect(q('individual-pill-solo').exists()).toBe(true)
+    })
+  })
+
+  describe('unconfirmed-only toggle preview (R413)', () => {
+    it('registers a live onSnapshot listener on the confirmations subcollection (not a one-time fetch)', () => {
+      mountComposer()
+      const call = confirmationsCall()
+      expect(call.path).toBe('organizations/org-1/services/svc-1/confirmations')
+    })
+
+    it('narrows "Reaches N" to exclude a person whose only matched assignment is confirmed', async () => {
+      mountComposer()
+      confirmationsCall().onNext({
+        docs: [{ data: () => ({ roleId: 'r-band', emailLower: 'alice@example.com', status: 'confirmed' }) }],
+      })
+      await nextTick()
+
+      await q('team-chip-band').trigger('click')
+      // Sanity: without the toggle, Alice (band, reachable) still counts.
+      expect(q('reaches-count').text()).toContain('Reaches 1 person')
+
+      await q('unconfirmed-only-toggle').trigger('click')
+      // Alice's only matched (band) assignment is confirmed → dropped.
+      expect(q('reaches-count').text()).toContain('Reaches 0 people')
+      expect(q('unconfirmed-only-toggle').attributes('aria-checked')).toBe('true')
+    })
+
+    it('persists unconfirmedOnly on the queued message recipientSelector', async () => {
+      mountComposer()
+      await q('team-chip-band').trigger('click')
+      await q('unconfirmed-only-toggle').trigger('click')
+      await fillSubject('Nudge')
+
+      await q('send-btn').trigger('click')
+      await flushPromises()
+
+      const payload = mockQueueServiceMessage.mock.calls[0]![0] as { recipientSelector: { unconfirmedOnly?: boolean } }
+      expect(payload.recipientSelector.unconfirmedOnly).toBe(true)
     })
   })
 

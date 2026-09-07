@@ -87,6 +87,20 @@
                 >
                   <span>Everyone on this service · {{ everyoneCount }}</span>
                 </button>
+                <!-- R413: recipient-FILTER toggle, not a team — narrows whichever
+                     teams/individuals/everyone is already selected down to people
+                     with an unconfirmed or needs-reconfirmation assignment. -->
+                <button
+                  type="button"
+                  role="checkbox"
+                  :aria-checked="!!selection.unconfirmedOnly"
+                  data-testid="unconfirmed-only-toggle"
+                  :class="chipClass(!!selection.unconfirmedOnly)"
+                  title="Only include people with an unconfirmed or needs-reconfirmation assignment"
+                  @click="toggleUnconfirmedOnly"
+                >
+                  <span>Unconfirmed only</span>
+                </button>
               </div>
             </div>
 
@@ -270,11 +284,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onUnmounted } from 'vue'
 import { httpsCallable } from 'firebase/functions'
-import { functions } from '@/firebase'
+import { collection, onSnapshot, type Unsubscribe } from 'firebase/firestore'
+import { functions, db } from '@/firebase'
 import { resolveRecipients, MESSAGING_TEAM_LABELS, type RecipientSelection } from '@/utils/messagingRecipients'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
+import { confirmationKey } from '@/utils/confirmations'
 import type { Service, SongSlot } from '@/types/service'
 import type { Quarter, Role, Person, RoleGroup } from '@/types/roster'
 
@@ -303,6 +319,9 @@ interface RecipientSelector {
   teams: string[]
   individualPersonIds: string[]
   includeEveryone: boolean
+  /** R413: see RecipientSelection.unconfirmedOnly (messagingRecipients.ts) —
+   *  the server (sendQueuedMessageHandler) re-resolves this authoritatively. */
+  unconfirmedOnly?: boolean
 }
 interface MessageOptions {
   attachServiceLink: boolean
@@ -329,6 +348,51 @@ const selection = reactive<RecipientSelection>({
   teams: [],
   individualPersonIds: [],
   includeEveryone: false,
+  unconfirmedOnly: false,
+})
+
+// ── Live confirmations (R413 preview) ────────────────────────────────────────
+// The composer keeps its OWN confirmations subscription (rather than threading
+// one down from ServiceEditorView.vue) so this feature stays isolated to this
+// file. This is advisory only — resolveRecipients here computes the PREVIEW
+// "Reaches N" count; the server (sendQueuedMessageHandler, Plan 05 Task 2)
+// re-resolves authoritatively from its own Admin-SDK read at send time and
+// never trusts this client-computed set. Mirrors ServiceEditorView.vue's R411
+// onSnapshot discipline: subscribe live, never getDoc/getDocs.
+const confirmedKeys = ref<Set<string>>(new Set())
+let unsubscribeConfirmations: Unsubscribe | null = null
+
+function subscribeConfirmations(): void {
+  if (unsubscribeConfirmations) {
+    unsubscribeConfirmations()
+    unsubscribeConfirmations = null
+  }
+  if (!props.open || !props.orgId || !props.service.id) {
+    confirmedKeys.value = new Set()
+    return
+  }
+  unsubscribeConfirmations = onSnapshot(
+    collection(db, 'organizations', props.orgId, 'services', props.service.id, 'confirmations'),
+    (snap) => {
+      const next = new Set<string>()
+      for (const d of snap.docs) {
+        const data = d.data() as { roleId?: string; emailLower?: string; status?: string }
+        if (data.status === 'confirmed' && data.roleId && data.emailLower) {
+          next.add(confirmationKey(data.roleId, data.emailLower))
+        }
+      }
+      confirmedKeys.value = next
+    },
+    (err: unknown) => {
+      console.error('[MessageComposer] confirmations subscription failed:', err)
+    },
+  )
+}
+
+watch(() => [props.open, props.orgId, props.service.id], subscribeConfirmations, { immediate: true })
+
+onUnmounted(() => {
+  if (unsubscribeConfirmations) unsubscribeConfirmations()
 })
 
 // ── Compose state ────────────────────────────────────────────────────────────
@@ -393,7 +457,9 @@ const TYPE_DEFAULTS: Record<MessageType, { subject: string; body: string }> = {
 }
 
 // ── Recipient resolution (reuse the pure Phase 58 resolver verbatim) ─────────
-const resolved = computed(() => resolveRecipients(props.service, props.quarters, props.roles, props.people, { ...selection }))
+const resolved = computed(() =>
+  resolveRecipients(props.service, props.quarters, props.roles, props.people, { ...selection }, confirmedKeys.value),
+)
 const reachableCount = computed(() => resolved.value.reachable.length)
 
 function teamReachableCount(group: RoleGroup): number {
@@ -458,6 +524,14 @@ function toggleEveryone() {
   recipientDirty.value = true
   selection.includeEveryone = !selection.includeEveryone
   if (selection.includeEveryone) selection.teams = []
+}
+
+// R413: narrows the resolved preview (and, once queued, the server's
+// authoritative re-resolve) to people with an unconfirmed/needs-
+// reconfirmation assignment. A recipient-filter toggle only — does not
+// itself select a team/individual.
+function toggleUnconfirmedOnly() {
+  selection.unconfirmedOnly = !selection.unconfirmedOnly
 }
 
 function onAddIndividual(event: Event) {
@@ -612,6 +686,7 @@ async function onSend() {
         teams: [...selection.teams],
         individualPersonIds: [...selection.individualPersonIds],
         includeEveryone: selection.includeEveryone,
+        unconfirmedOnly: selection.unconfirmedOnly,
       },
       options: {
         attachServiceLink: attachServiceLink.value,
@@ -640,6 +715,7 @@ function resetComposer() {
   selection.teams = []
   selection.individualPersonIds = []
   selection.includeEveryone = false
+  selection.unconfirmedOnly = false
   type.value = 'oneoff'
   subject.value = TYPE_DEFAULTS.oneoff.subject
   body.value = TYPE_DEFAULTS.oneoff.body
