@@ -87,10 +87,14 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Auto-Generated Share Link
 
-- [ ] **R421**: A service's share link is generated automatically at the Planned/lock transition (reusing the
-  idempotent `ensureShareLink()` — not `maybeRefreshShareLink()`), so the user never has to click "Share
-  Link" manually. Generation is gated to the Planned/lock state so an unfinished Draft plan is never exposed,
-  and idempotency prevents duplicate tokens.
+- [ ] **R421**: A service's share link exists automatically so the user never has to click "Share Link"
+  manually. **(Scope RESOLVED 2026-09-07 — supersedes the original "gate to Planned / no Draft exposure"
+  framing.)** Real UI-created services already mint a link at `createService()`; the gap is tokenless
+  services (seed data, or services created before the 2026-08-17 mint). Keep the `createService()` mint, add
+  an idempotent fail-closed "ensure link exists" self-heal (reusing `ensureShareLink()`, not
+  `maybeRefreshShareLink()`) so tokenless services self-heal without a manual click, and fix the seed script
+  to mint a token. Idempotency prevents duplicate tokens. Draft-sharing behavior is intentionally unchanged
+  (drafts keep their link for volunteer-message `{{service_link}}`); no ShareView status gate is added.
 
 ### Editor Presence
 
