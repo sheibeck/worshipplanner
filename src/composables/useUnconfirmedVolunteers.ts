@@ -210,5 +210,21 @@ export function useUnconfirmedVolunteers(
     return false
   })
 
-  return { rows, loading, error }
+  // WR-02 (135-REVIEW): a service whose rehearseAccess snapshot HAS arrived
+  // but carries no `roleAssignmentsByEmailLower` projection (locked before
+  // Phase 133, never relocked) must not be silently folded into "all
+  // confirmed" — this flags that at least one in-window service has no
+  // assignment data to check confirmations against, so the view can render
+  // an honest "unknown" state instead of a false positive.
+  const hasStaleAssignmentData = computed(() => {
+    void version.value
+    const windowServices = toValue(services)
+    for (const service of windowServices) {
+      const state = statesByServiceId.get(service.id)
+      if (state?.hasRehearseSnapshot && state.roleAssignmentsByEmailLower === undefined) return true
+    }
+    return false
+  })
+
+  return { rows, loading, error, hasStaleAssignmentData }
 }

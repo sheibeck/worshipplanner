@@ -113,6 +113,14 @@
             <p v-else-if="attentionServices.length === 0" class="text-sm text-gray-400">
               No Planned services yet to check confirmations for.
             </p>
+            <!-- WR-02 (135-REVIEW): a service locked before Phase 133 (never
+                 relocked) has no roleAssignmentsByEmailLower projection to
+                 check confirmations against — that is NOT the same as "all
+                 confirmed", so it gets its own honest sub-state rather than
+                 being folded into the positive claim below. -->
+            <p v-else-if="unconfirmedRows.length === 0 && hasStaleAssignmentData" class="text-sm text-gray-400">
+              Some service(s) predate confirmation tracking — relock to check confirmations.
+            </p>
             <p v-else-if="unconfirmedRows.length === 0" class="text-sm text-gray-400">
               Everyone's confirmed for the next {{ attentionServices.length }} service{{ attentionServices.length === 1 ? '' : 's' }}.
             </p>
@@ -243,6 +251,7 @@ const {
   rows: unconfirmedRows,
   loading: unconfirmedLoading,
   error: unconfirmedError,
+  hasStaleAssignmentData,
 } = useUnconfirmedVolunteers(
   () => authStore.orgId,
   () => attentionServices.value,
