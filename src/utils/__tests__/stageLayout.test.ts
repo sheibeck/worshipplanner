@@ -17,6 +17,8 @@ import {
   stagePaletteSkinClass,
   stageMarkerSkinClass,
   buildStagePalette,
+  autoPopulateMarkers,
+  STAGE_BAND,
   STAGE_KINDS,
   STAGE_KIND_META,
 } from '../stageLayout'
@@ -216,6 +218,74 @@ describe('stageLayout helpers', () => {
       expect(groups.find((g) => g.name === 'Vocals')!.items.map((i) => i.kind)).toEqual(['lead', 'vocal', 'choir'])
       expect(groups.find((g) => g.name === 'Mics & DI')!.items.map((i) => i.kind)).toEqual(['mic', 'di'])
       expect(groups.find((g) => g.name === 'Gear')!.items.map((i) => i.kind)).toEqual(['monitor', 'amp', 'stand', 'power', 'tv', 'misc', 'communion'])
+    })
+  })
+
+  describe('autoPopulateMarkers', () => {
+    const assignments = [
+      { id: 'p1', name: 'Alice', roleId: 'r1', roleName: 'Electric Guitar' },
+      { id: 'p2', name: 'Bob', roleId: 'r2', roleName: 'Drums' },
+      { id: 'p1', name: 'Alice', roleId: 'r3', roleName: 'Vocals' }, // Alice double-booked
+    ]
+
+    it('returns [] for an empty input', () => {
+      expect(autoPopulateMarkers([])).toEqual([])
+    })
+
+    it('returns exactly one marker per assignment, including a double-booked person twice', () => {
+      const markers = autoPopulateMarkers(assignments)
+      expect(markers).toHaveLength(3)
+      expect(markers.filter((m) => m.personId === 'p1')).toHaveLength(2)
+    })
+
+    it('carries roleId/roleName + personId/personName so seeded markers match a manual role-marker-with-person', () => {
+      const [m0, m1] = autoPopulateMarkers(assignments)
+      expect(m0!.roleId).toBe('r1')
+      expect(m0!.roleName).toBe('Electric Guitar')
+      expect(m0!.personId).toBe('p1')
+      expect(m0!.personName).toBe('Alice')
+      expect(m1!.roleId).toBe('r2')
+      expect(m1!.personId).toBe('p2')
+    })
+
+    it('places every marker strictly inside the on-stage band', () => {
+      const markers = autoPopulateMarkers(assignments)
+      for (const m of markers) {
+        expect(m.xPct).toBeGreaterThan(STAGE_BAND.minX)
+        expect(m.xPct).toBeLessThan(STAGE_BAND.maxX)
+        expect(m.yPct).toBeLessThan(STAGE_BAND.maxY)
+        expect(m.zone).toBe('onstage')
+      }
+    })
+
+    it('never places two markers at the same (xPct, yPct), even with more entries than one row', () => {
+      const many = Array.from({ length: 9 }, (_, i) => ({
+        id: `p${i}`,
+        name: `Person ${i}`,
+        roleId: `r${i}`,
+        roleName: `Role ${i}`,
+      }))
+      const markers = autoPopulateMarkers(many)
+      const positions = markers.map((m) => `${m.xPct},${m.yPct}`)
+      expect(new Set(positions).size).toBe(positions.length)
+      for (const m of markers) {
+        expect(m.xPct).toBeGreaterThan(STAGE_BAND.minX)
+        expect(m.xPct).toBeLessThan(STAGE_BAND.maxX)
+        expect(m.yPct).toBeLessThan(STAGE_BAND.maxY)
+      }
+    })
+
+    it('is deterministic — same input order produces the same positions on repeat calls', () => {
+      const a = autoPopulateMarkers(assignments)
+      const b = autoPopulateMarkers(assignments)
+      expect(a.map((m) => [m.xPct, m.yPct])).toEqual(b.map((m) => [m.xPct, m.yPct]))
+    })
+
+    it('does not mutate the input array', () => {
+      const input = assignments.map((a) => ({ ...a }))
+      const snapshot = JSON.parse(JSON.stringify(input))
+      autoPopulateMarkers(input)
+      expect(input).toEqual(snapshot)
     })
   })
 })

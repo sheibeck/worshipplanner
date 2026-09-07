@@ -237,3 +237,51 @@ export function createMarker(input: {
     ...(roleId && roleName ? { roleId, roleName } : {}),
   }
 }
+
+// ── Auto-populate (R420) ──────────────────────────────────────────────────
+// Fixed column count for the seeded grid; a small, readable default that
+// wraps to additional rows as the roster grows (Claude's discretion, plan 131-01).
+const AUTO_POPULATE_COLS = 4
+// Inset a few percent inside STAGE_BAND on every edge so seeded markers never
+// sit flush against the band boundary (keeps them strictly onstage).
+const AUTO_POPULATE_INSET_X = 8
+const AUTO_POPULATE_START_Y = 20
+const AUTO_POPULATE_END_Y = STAGE_BAND.maxY - 4
+
+/**
+ * Seeds one StageMarker per (person, role) serving assignment, laid out
+ * deterministically in a non-overlapping grid inside the on-stage band. Pure
+ * and store-free: the caller (ServiceEditorView's one-time seed trigger) owns
+ * the empty-canvas / non-clobber guard — this function never reads or wipes
+ * existing state (R420, non-clobber invariant is load-bearing there, not here).
+ */
+export function autoPopulateMarkers(
+  servingAssignments: { id: string; name: string; roleId: string; roleName: string }[]
+): StageMarker[] {
+  const count = servingAssignments.length
+  if (count === 0) return []
+
+  const cols = AUTO_POPULATE_COLS
+  const rows = Math.ceil(count / cols)
+  const xStart = STAGE_BAND.minX + AUTO_POPULATE_INSET_X
+  const xEnd = STAGE_BAND.maxX - AUTO_POPULATE_INSET_X
+  const colStep = cols > 1 ? (xEnd - xStart) / (cols - 1) : 0
+  const rowStep = rows > 1 ? (AUTO_POPULATE_END_Y - AUTO_POPULATE_START_Y) / (rows - 1) : 0
+
+  return servingAssignments.map((assignment, index) => {
+    const row = Math.floor(index / cols)
+    const col = index % cols
+    const xPct = xStart + col * colStep
+    const yPct = AUTO_POPULATE_START_Y + row * rowStep
+    const marker = createMarker({
+      label: assignment.roleName,
+      xPct,
+      yPct,
+      roleId: assignment.roleId,
+      roleName: assignment.roleName,
+    })
+    marker.personId = assignment.id
+    marker.personName = assignment.name
+    return marker
+  })
+}
