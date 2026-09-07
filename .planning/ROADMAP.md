@@ -24,6 +24,8 @@
 - ✅ **v2.9 — Live Presentation Field Fixes** — Phases 114-116 (shipped & deployed to production 2026-09-04; field fixes from the first real church-projector run — multi-monitor assignment rework (any-role-to-any-monitor, v2 fingerprint, nicknames — R324-R328/R338), live-output readability (measure-and-fit auto-fit engine: per-slide shrink-to-fit within an inset safe-area, lyric lines never wrap mid-line, symmetric margins; Run-screen readability — bigger filmstrip thumbs + next-item end cap + left-most auto-scroll + macOS scrollbar — R329-R332), and lyric-editor/song UX (new-tab edit link, clickable title→SongSelect, Cancel→Close, inline credits editing, hidden History — R333-R337); client-side only; audit PASSED 15/15 reqs + integration WIRED; owner-verified live on audience+confidence; tag v2.9 — see [milestones/v2.9-ROADMAP.md](milestones/v2.9-ROADMAP.md))
 - ✅ **v2.10 — Security & Architecture Hardening** — Phases 117-120 (shipped & deployed to production 2026-09-05; remediated all 22 Medium/Low findings deferred from v2.8's security (backlog 999.5) + architectural (backlog 999.4) reviews — SEC-A-01 unauthenticated `/api/planningcenter` proxy closed, rules/share-PII hardening, store-ownership + god-module decomposition; audit PASSED 22/22 + integration WIRED; a same-day post-deploy subscription-teardown-race hotfix was owner-verified live — R339-R360; see [milestones/v2.10-ROADMAP.md](milestones/v2.10-ROADMAP.md))
 - ✅ **v2.11 — Song File Attachments** — Phases 121-124 (shipped & deployed to production 2026-09-05; step 1 of the file-storage backlog 999.13/SEED-003 — editors attach/manage PDF+MP3 files (≤50MB) + external YouTube/Drive/Dropbox links on a **Song** via a new **Files** tab: multi-file upload w/ progress, Documents/Audio grouping, in-app PDF preview + MP3 player, download, remove; a permanent org-scoped Storage prefix outside `media/` proven exempt from every retention sweep + an editor-only rules gate (isOrgEditor + PDF/MP3/50MB); R361-R373; audit PASSED 13/13 + 6/6 integration seams WIRED; owner-verified local UAT; `storage.rules`+hosting deployed; see [milestones/v2.11-ROADMAP.md](milestones/v2.11-ROADMAP.md))
+- ✅ **v2.12 — Rehearse Mode** — Phases 125-127 (shipped & deployed to production 2026-09-06; passwordless magic-link volunteer access with scoped read-only isolation, "My Schedule" volunteer home listing every Planned service a volunteer is assigned to, and a standalone read-only Volunteer Service View — Rehearse (song list/detail, PDF reader, audio player with speed + whole-track loop) plus read-only Order of Service and Stage Layout tabs, reached only from a My Schedule card — R374-R393; step 2/final of the file-storage backlog 999.13/SEED-003)
+- ✅ **v2.13 — Volunteer Self-Service & Multi-Church Access** — Phases 128-130 (shipped & deployed to production 2026-09-07; public self-service magic-link request page + a shared server-side mint/send core, admin email/copy resend from the Volunteers page reusing that core, and a multi-church volunteer switcher on My Schedule via an `orgName` added to the rehearseAccess projection — R394-R405; see [milestones/v2.13-ROADMAP.md](milestones/v2.13-ROADMAP.md))
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -588,7 +590,7 @@ Full details: [milestones/v2.10-ROADMAP.md](milestones/v2.10-ROADMAP.md) · requ
 
 ### ✅ v2.11 Song File Attachments — SHIPPED & DEPLOYED 2026-09-05 (Phases 121-124) — R361-R373, audit PASSED 13/13. Full detail archived: [milestones/v2.11-ROADMAP.md](milestones/v2.11-ROADMAP.md)
 
-### 🚧 v2.12 Rehearse Mode (Phases 125-127, in planning)
+### ✅ v2.12 Rehearse Mode (Phases 125-127) — SHIPPED & DEPLOYED 2026-09-06
 
 **Milestone Goal:** Give worship volunteers a low-friction, passwordless way to rehearse the services
 they're serving — view/print sheet music & chords and play/practice reference recordings — without
@@ -748,148 +750,228 @@ Plans:
 
 **UI hint**: yes
 
-### 🚧 v2.13 Volunteer Self-Service & Multi-Church Access (Phases 128-130, in planning)
+<details>
+<summary>✅ v2.13 Volunteer Self-Service & Multi-Church Access (Phases 128-130) — SHIPPED & DEPLOYED 2026-09-07</summary>
 
-**Milestone Goal:** Let volunteers get their own passwordless sign-in link on demand and see their
-schedule organized by church — extending v2.12's account-level email-link access with a self-service
-request path, an admin resend affordance, and a multi-church switcher, so a volunteer is never stuck
-waiting on a service email to reach their rehearsal content.
+- [x] Phase 128: Self-Service Magic-Link Request (public, security-critical) + shared mint/send core
+- [x] Phase 129: Admin Resend — Email & Copy
+- [x] Phase 130: Multi-Church Volunteer Switcher
 
-**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R394–R405 (12 mapped, 100% coverage)
+Full details: [milestones/v2.13-ROADMAP.md](milestones/v2.13-ROADMAP.md) · requirements [milestones/v2.13-REQUIREMENTS.md](milestones/v2.13-REQUIREMENTS.md) · audit [milestones/v2.13-MILESTONE-AUDIT.md](milestones/v2.13-MILESTONE-AUDIT.md)
 
-**Key context:** All three features reuse v2.12's account-level Firebase email-link sign-in — the link
-authenticates the *person*, so one link = their whole schedule across every church they serve; the church
-slug scopes only the request/branding/roster-check, not what a volunteer sees after sign-in. The client
-cannot mint links (`generateSignInWithEmailLink` is Admin-SDK-only), so both self-service and admin-copy
-route through a server callable. There is a natural shared server-side mint/send core all link-issuing
-paths depend on — built in Phase 128 (the primary consumer, and where the security gate that guards the
-public path must live), reused by Phase 129 per R402's single-code-path / one-authorization-model rule.
-Reuses existing infra: the Resend send block + `config.sender.fromAddress` / `bareEmailAddress` /
-`fromDisplayName` (functions/src/params.ts), the messaging limiter pattern, the `orgSlugs` public registry
-(ADR-0007) for slug→orgId, and v2.12's `rehearseAccess` / `volunteerAuth` / `useVolunteerServiceDoc` /
-`MyScheduleView`. No project-research pass — every pattern already exists in the codebase (v2.11/v2.12 + the
-messaging/Resend infra). Prod caveat: Resend is still test-mode (real email only reaches the owner inbox)
-until DNS domain verification (backlog 999.6); the admin copy path sidesteps email entirely.
+> Deployed to production 2026-09-07 (self-service magic-link request page + shared mint/send core, admin
+> resend, multi-church volunteer switcher); archived 2026-09-07. Numbering continues from v2.12 (ended
+> Phase 127); v2.13 was Phases 128-130.
+
+</details>
+
+### 🚧 v2.14 Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
+
+**Milestone Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the
+dashboard genuinely useful, add worship-team responsibility confirmation and editor presence, and
+introduce a third "Video" live-stream output with banner/full-screen slides.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R406–R427 (22 mapped, 100% coverage)
+
+**Key context:** A research-first pass (`.planning/research/SUMMARY.md`) ran ahead of requirements. Four
+largely independent feature areas share one hard cross-feature ordering constraint: the two-state
+("I've got it") volunteer-confirmation model (Phase 133) must land before the dashboard's
+unconfirmed-volunteers widget (Phase 135), and editor presence (Phase 134) must land before the
+dashboard's presence roll-up (also Phase 135) — so Phase 135 depends on both. Video output is
+deliberately split into a low-risk Fullscreen slice (Phase 136, a structural copy of v2.9's role
+generalization) before the one genuinely new render — the transparent-default / solid-key-color-fallback
+Banner (Phase 137). **Blackbird is irrelevant to this milestone** (owner decision 2026-09-07) —
+compositing happens in the video room's software (OBS/vMix-style Browser Source consuming a real alpha
+source); there is no external hardware compositing dependency and no feasibility-spike phase. Presence
+gets its own phase because its Firestore rules design (org-scoped `get`/`list`-split) needs a dedicated
+review pass to avoid a smaller structural replay of the proven, live, Critical v2.8 SEC-S-01 cross-tenant
+leak. Trivial wins (auto share-link, Stage Layout auto-populate) ship first to de-risk the milestone early
+— both are single-call-site/pure-function additions reusing already-idempotent code.
 
 **Flagged at roadmap time:**
 
-- Phase 128 (R394–R399) is **security-critical** — a public, unauthenticated email-sending endpoint. It
-  must carry a threat model + rate-limit/enumeration ALLOW/DENY tests, mirroring the security-gate
-  discipline Phase 125 used for `rehearseAccess`. The shared mint/send core is built here (folded into the
-  self-service phase) rather than as a thin standalone phase precisely so the security gate that guards the
-  public path can never be bypassed from a separate helper — do not fold this into a phase that would let
-  the gate be skipped.
+- Phase 135 (Dashboard) needs the exact readiness rollup rule ("what counts as ready") pinned down at
+  `/gsd-discuss-phase 135` — reuse the existing v2.12 My Schedule readiness computation as the base rather
+  than inventing a second, parallel definition.
+- Phase 137 (Video Banner) needs a product decision at `/gsd-discuss-phase 137` (or spec time): what does
+  the Video output show for an item with no `videoOutput` flag set — transparent/key-color fill showing
+  nothing, vs. black.
+- Phase 132's "Planning Center" verbiage removal (R409) must start with a grep inventory/classify pass
+  before any edit — this app has a real, functioning PC export integration, and a blind find-and-replace
+  risks garbling substantive integration copy along with the one incidental banner string in scope.
+- Numbering continues from v2.13, which ended at Phase 130 — v2.14 starts at Phase 131, not reset. (The
+  999.x entries below are backlog, not this milestone; 999.2 and 999.3 are untouched by this numbering.)
 
-- Phase 130 (R403–R405) requires a small projection change: add `orgName` to the `rehearseAccess`
-  projection (`buildRehearseAccess` in `src/utils/rehearseAccess.ts` + the existing
-  `services.resyncRehearseAccessForSong` / `markAsPlanned` write path) so churches can be labeled without an
-  org-document read. Volunteers have ZERO org memberships, so the switcher is distinct from the admin
-  membership switcher and must NEVER call `selectOrg`.
+- [ ] **Phase 131: Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate** - A service's share link exists automatically at the Planned/lock transition and its Stage Layout seeds itself once from the roster on first empty-canvas visit
+- [ ] **Phase 132: Services Page UX Alignment & Verbiage Cleanup** - The `/services` page matches the app's standard header/mobile conventions, share-plan rows alternate-shade for scanability, and incidental "Planning Center" copy is removed
+- [ ] **Phase 133: Volunteer Responsibility Confirmation** - A volunteer confirms ("I've got it") a per-assignment responsibility; a planner sees live status on the roster and can nudge only the unconfirmed
+- [ ] **Phase 134: Editor Presence** - Concurrent viewers/editors of a service see who else is currently present, backed by an org-scoped Firestore heartbeat with a dedicated cross-tenant rules review
+- [ ] **Phase 135: Dashboard Overhaul** - The dashboard becomes an actionable "needs your attention" feed — upcoming services, readiness, unconfirmed volunteers, editor-presence roll-up, empty state
+- [ ] **Phase 136: Video Output — Fullscreen Slice** - A third "Video" monitor role opens a dedicated output route that renders fullscreen exactly like the existing Audience output
+- [ ] **Phase 137: Video Output — Banner Render** - A slide item can be sent to the Video output as a title-safe bottom lower-third banner, transparent by default with a configurable solid key-color fallback
 
-- Numbering continues from v2.12, which ended at Phase 127 — v2.13 starts at Phase 128, not reset. (The
-  999.x entries below are backlog, not this milestone.)
+### Phase 131: Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate
 
-- [ ] **Phase 128: Self-Service Magic-Link Request (public, security-critical) + shared mint/send core** - A volunteer requests their own passwordless sign-in link from a public, church-scoped page — enumeration-safe, roster-gated, rate-limited — through a shared server-side Admin-SDK mint/send core, with recovery from an expired link
-- [ ] **Phase 129: Admin Resend — Email & Copy** - From the Volunteers page, an editor/admin emails or copies a rostered volunteer's sign-in link, reusing the same server-side mint/send core (one code path, one authz model)
-- [ ] **Phase 130: Multi-Church Volunteer Switcher** - A volunteer serving at more than one church switches/filters My Schedule by church (labeled via an `orgName` added to the rehearseAccess projection); a single-church volunteer sees no switcher
-
-### Phase 128: Self-Service Magic-Link Request (public, security-critical) + shared mint/send core
-
-**Goal**: A volunteer can obtain their own passwordless sign-in link on demand from a public,
-church-scoped page — safely (enumeration-safe, roster-gated, rate-limited) through a shared server-side
-Admin-SDK mint/send core — and can recover from an expired or invalid link without help.
-**Depends on**: Nothing (first phase of v2.13)
-**Security-critical**: yes — R397 requires a threat model and rate-limit/enumeration ALLOW/DENY tests on a public, unauthenticated email-sending endpoint, not just a UI guard.
-**Requirements**: R394, R395, R396, R397, R398, R399
+**Goal**: A service's share link exists and is ready the moment a service is Planned/locked, and a new
+service's Stage Layout starts pre-populated with its assigned roles/instruments instead of an empty
+canvas — with zero risk of exposing a Draft or clobbering manual work.
+**Depends on**: Nothing (first phase of v2.14)
+**Requirements**: R420, R421
 **Success Criteria** (what must be TRUE):
 
-  1. A volunteer visits `/{church-slug}/volunteer`, sees the church's name (resolved from the public
-     `orgSlugs` registry), and can enter their email to request a sign-in link; an unknown/expired slug
-     shows a clear "church not found" state instead of a broken page (R394).
+  1. When a service transitions to Planned/locked, its share link exists automatically — the user never
+     has to click "Share Link" for it to be generated (R421).
+  2. A Draft (unlocked) service never has a share link exposed — generation is strictly gated to the
+     Planned/lock transition, reusing `ensureShareLink()`'s existing idempotency (not
+     `maybeRefreshShareLink()`) (R421).
+  3. Locking, unlocking, and relocking the same service never creates a duplicate share token (R421).
+  4. Visiting a service's Stage Layout tab for the first time, with zero elements on the canvas,
+     auto-seeds markers for that service's assigned roles/instruments (R420).
+  5. Revisiting Stage Layout after manual edits — or after a roster change — never regenerates, wipes, or
+     duplicates existing markers; the one-time seed never re-runs against a non-empty canvas (R420).
 
-  2. Submitting any email returns the identical confirmation ("If you're on this church's team, a sign-in
-     link is on its way") whether or not the email is on the roster — a request never reveals whether a
-     given email is a member (R395).
+**Plans**: TBD
 
-  3. A sign-in link is minted server-side (Admin SDK) and sent via Resend only when the entered email is
-     already on that specific church's volunteer roster (`organizations/{orgId}/people`); a non-roster
-     email produces no email at all, but the same enumeration-safe confirmation (R396).
+### Phase 132: Services Page UX Alignment & Verbiage Cleanup
 
-  4. The public request endpoint is rate-limited per email + church and carries a threat model with
-     ALLOW/DENY tests proving it cannot be used to spam a volunteer's inbox, fan out email cost, or
-     enumerate roster membership (R397).
-
-  5. A volunteer reaches the request from the login page's "Are you a volunteer? Get your sign-in link"
-     entry point, and from an expired/invalid link at `/volunteer/verify` via a one-tap "request a new
-     link" that returns them to the same church's request with no re-selection needed (R398, R399).
-
-**Plans**: 2/2 plans executed
-
-Plans:
-
-- [x] 128-01-PLAN.md — Shared Admin-SDK mint/send core (`volunteerLink.ts`) + public `requestVolunteerLink` onCall: roster gate, dedicated rate limiter, enumeration-safe body + timing pad, ALLOW/DENY+TIMING tests (R395, R396, R397, R399) [wave 1]
-- [x] 128-02-PLAN.md — Client wiring: public `/{slug}/volunteer` page (orgSlugs resolve, uniform confirmation), `/:slug/volunteer` route, login "Are you a volunteer?" entry + find-your-church lookup, verify-failure "request a new link" (R394, R395, R398, R399) [wave 2]
-
-**UI hint**: yes
-
-### Phase 129: Admin Resend — Email & Copy
-
-**Goal**: From the Volunteers page, an editor/admin can get a rostered volunteer their sign-in link —
-either emailed as a standalone message or copied to the clipboard for their own channel — reusing the same
-server-side mint/send core as the self-service request, under one authorization model.
-**Depends on**: Phase 128 (reuses its shared server-side Admin-SDK mint/send core; R402 mandates a single code path)
-**Requirements**: R400, R401, R402
+**Goal**: The `/services` page and shared service-link pages match the app's standard UX/mobile
+conventions, and "Planning Center" language appears only where it genuinely describes the PC
+integration/export.
+**Depends on**: Nothing (independent UI/copy polish; touches none of the milestone's new data models)
+**Requirements**: R406, R407, R408, R409
 **Success Criteria** (what must be TRUE):
 
-  1. From the Volunteers page, an editor/admin can email a rostered volunteer their sign-in link as a
-     standalone message, not tied to any one service (R400).
+  1. The `/services` page uses the same standard page-header component used elsewhere in the app (R406).
+  2. On a phone-width viewport, the Services page's tabs and buttons are usable and readable, matching the
+     app's mobile button/header conventions (R407).
+  3. Rows on a shared service-link page alternate a light-gray background, making the plan easier to scan
+     (R408).
+  4. Every "Planning Center" UI-copy occurrence has been inventoried and classified before any edit; only
+     substantive PC integration/export copy retains the phrase, and incidental references — e.g. the
+     Planned/locked banner's "Planning Center already has this plan." sentence — are removed (R409).
 
-  2. From the Volunteers page, an editor/admin can copy a rostered volunteer's sign-in link to the
-     clipboard, to share through their own channel — working even while Resend is in test-mode in
-     production (R401).
-
-  3. Both actions only mint links for people on the church roster who have an email address, and route
-     through the same server-side mint/send core as the self-service request — one code path, one
-     authorization model (R402).
-
-**Plans**: 2/2 plans executed
-
-Plans:
-
-- [x] 129-01-PLAN.md — Backend: extract `mintVolunteerLink` (single mint path, R402) + new authenticated editor/admin-gated, roster-gated `adminVolunteerLink` callable (`mode: 'email' | 'copy'`) + ALLOW/DENY test suite [wave 1] [R400, R401, R402]
-- [x] 129-02-PLAN.md — Client: RosterView edit-drawer "Sign-in Link" section (Email/Copy actions, gated on email) wired to the callable + view tests [wave 2, depends 129-01] [R400, R401]
-
+**Plans**: TBD
 **UI hint**: yes
 
-### Phase 130: Multi-Church Volunteer Switcher
+### Phase 133: Volunteer Responsibility Confirmation
 
-**Goal**: A volunteer serving at more than one church can switch/filter My Schedule (and the volunteer
-service view context) by church, with each church labeled by name — while a volunteer serving at only one
-church sees an unchanged, switcher-free experience.
-**Depends on**: Nothing (independent of Phases 128-129 — a projection + volunteer-UI track building on shipped v2.12 `rehearseAccess`/My Schedule; can run in parallel)
-**Requirements**: R403, R404, R405
+**Goal**: A worship-team volunteer can confirm they know they're responsible for an assignment, and a
+planner can see and act on live confirmation status without it going stale across reassignment or
+relock.
+**Depends on**: Nothing (no dependency on presence or Video output)
+**Requirements**: R410, R411, R412, R413
 **Success Criteria** (what must be TRUE):
 
-  1. A volunteer serving at more than one church sees a church switcher/filter on My Schedule that scopes
-     the displayed services to the selected church (R403).
+  1. A volunteer can tap a per-assignment "I've got it" action in their volunteer-facing surface (My
+     Schedule / volunteer service view), moving that assignment from Unconfirmed to Confirmed — a
+     two-state model, no Decline/replacement (R410).
+  2. A planner sees each assignment's live confirmation status (Confirmed / Unconfirmed) on the service
+     roster via `onSnapshot`, not a one-time fetch (R411).
+  3. Reassigning a slot, or an unlock→relock edit cycle, invalidates a prior confirmation back to "needs
+     reconfirmation" rather than showing a stale checkmark — keyed on stable assignment identity, not
+     person identity (R412).
+  4. A planner can send a reminder message targeting only people with unconfirmed assignments, reusing
+     the existing v1.7 volunteer-messaging send infrastructure as a recipient-targeting change, not a new
+     send path (R413).
 
-  2. The switcher is distinct from the admin membership switcher and never calls `selectOrg` — volunteers
-     have zero org memberships (R403).
-
-  3. Each church is labeled by name, sourced from an `orgName` field added to the `rehearseAccess`
-     projection (via `buildRehearseAccess` and the existing `resyncRehearseAccessForSong` / `markAsPlanned`
-     write path) so no org-document read is required, and the selected-church context carries into the
-     volunteer service view (R404).
-
-  4. A volunteer serving at only one church sees no switcher — the single-church experience is unchanged
-     (R405).
-
-**Plans**: 2/2 plans executed
-
-- [x] 130-01-PLAN.md — Thread `orgName` through the rehearseAccess projection (both write paths) + add distinct-church derivation and a client-side filter to the mySchedule store (wave 1)
-- [x] 130-02-PLAN.md — My Schedule church `<select>` filter (gated on >1 church) + AppSidebar volunteer church-name label (wave 2)
-
+**Plans**: TBD
 **UI hint**: yes
+
+### Phase 134: Editor Presence
+
+**Goal**: Anyone viewing or editing a service can see who else is currently present on the same service,
+cheaply and safely — with no cross-tenant leak and no stale "still viewing" state left behind by an
+ungraceful disconnect.
+**Depends on**: Nothing (fully self-contained; security-critical rules design earns its own review pass)
+**Requirements**: R422, R423
+**Security-critical**: yes — R423 requires a cross-org Firestore rules test proving the `get`/`list`-split,
+org-scoped read idiom, mirroring the discipline that closed v2.8's SEC-S-01 cross-tenant leak.
+**Success Criteria** (what must be TRUE):
+
+  1. Two users viewing/editing the same service each see an indicator naming the other current viewer(s),
+     backed by a Firestore heartbeat (`serverTimestamp()` + `onSnapshot`, coarse ~25-30s interval, paused
+     while the tab is hidden) (R422).
+  2. Navigating away — including an in-app route change that reuses the mounted editor instance, not just
+     a tab close — removes that user from the presence indicator within the client-side soft-TTL
+     staleness window (~60s) (R422).
+  3. A forced-disconnect test (no graceful teardown) proves stale presence still clears via the staleness
+     filter, not just the happy-path unmount (R422).
+  4. A cross-org rules test proves a member of Org A cannot read Org B's presence records — both the `get`
+     and `list` arms are org-membership-scoped, with no unscoped `allow read: if isSignedIn()` (R423).
+  5. Abandoned presence records are removed by a scheduled cleanup backstop (Firestore TTL and/or a
+     `cleanupStalePresence` cron sibling of the existing retention crons), not left to accumulate forever
+     (R423).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 135: Dashboard Overhaul
+
+**Goal**: The dashboard becomes an actionable "needs your attention" feed instead of showing an undefined
+metric, giving a planner one place to see what's coming up and what needs action.
+**Depends on**: Phase 133 (confirmation data for the unconfirmed-volunteers widget) AND Phase 134
+(presence data for the editor-presence roll-up)
+**Requirements**: R414, R415, R416, R417, R418, R419
+**Success Criteria** (what must be TRUE):
+
+  1. The undefined "Volunteer coverage" stat no longer appears anywhere on the dashboard (R414).
+  2. The dashboard lists upcoming services (R415).
+  3. Each listed service shows a readiness signal (songs/media attached, roles filled, slides built, Draft
+     vs Planned/locked) computed via the same rollup already used in v2.12's My Schedule, not a second,
+     parallel definition (R416).
+  4. The dashboard shows which volunteers have not yet confirmed for upcoming services, reading the Phase
+     133 confirmation model (R417).
+  5. The dashboard shows an editor-presence roll-up (who is currently editing which service), reusing the
+     Phase 134 per-service presence data verbatim (R418).
+  6. When there is nothing needing attention, the dashboard shows a clear empty/first-run state instead of
+     a blank or broken layout (R419).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 136: Video Output — Fullscreen Slice
+
+**Goal**: A projectionist can route a service's slides to a third "Video" output — for a live-stream
+video room — fullscreen, independently of the Banner work.
+**Depends on**: Nothing (a close structural copy of v2.9's existing N-assignment output-role
+generalization)
+**Requirements**: R424, R426
+**Success Criteria** (what must be TRUE):
+
+  1. Monitor setup offers "Video" as a third assignable output role alongside Audience/Confidence
+     (`MonitorRole` widened) (R424).
+  2. A monitor assigned the Video role opens a dedicated `VideoOutputView` at its own static route (R424).
+  3. The Video role assignment coexists with existing Audience/Confidence assignments without disrupting
+     them — the N-assignment model already generalized in v2.9 (R424).
+  4. In Fullscreen mode, the Video output renders identically to the existing Audience full-slide output —
+     no visual regression, no new rendering code (R426).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 137: Video Output — Banner Render
+
+**Goal**: A slide can be sent to the Video output as a compositable lower-third banner, so a live-stream
+software compositor (OBS/vMix-style Browser Source) can show live stage video behind the slide text.
+**Depends on**: Phase 136 (extends the Video output route/role it establishes)
+**Requirements**: R425, R427
+**Success Criteria** (what must be TRUE):
+
+  1. An editor can flag a slide item to go to the Video output as either Banner or Full-screen; Banner is
+     selectable/valid only when the item's target output is Video (R425).
+  2. The per-item Banner/Full-screen choice persists via the existing `useAutoSave` deep-watch — no new
+     save call, mirroring the `loop` field precedent (R425).
+  3. A Banner-flagged slide's content renders fit to a bottom lower-third region with a title-safe inset
+     and readable default text sizing (R427).
+  4. The region outside the banner content renders with a transparent background by default, so a
+     software compositor can show live video behind it (R427).
+  5. An editor can configure a solid key-color fallback (default saturated magenta, `<input
+     type="color">`) that replaces the transparent background for a tool that needs chroma-key instead of
+     alpha (R427).
+
+**Plans**: TBD
+**UI hint**: yes
+
 
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
 

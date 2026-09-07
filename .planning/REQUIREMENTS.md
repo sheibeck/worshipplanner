@@ -145,4 +145,25 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| _(filled by roadmap)_ | | |
+| R406 | Phase 132 | Pending |
+| R407 | Phase 132 | Pending |
+| R408 | Phase 132 | Pending |
+| R409 | Phase 132 | Pending |
+| R410 | Phase 133 | Pending |
+| R411 | Phase 133 | Pending |
+| R412 | Phase 133 | Pending |
+| R413 | Phase 133 | Pending |
+| R414 | Phase 135 | Pending |
+| R415 | Phase 135 | Pending |
+| R416 | Phase 135 | Pending |
+| R417 | Phase 135 | Pending |
+| R418 | Phase 135 | Pending |
+| R419 | Phase 135 | Pending |
+| R420 | Phase 131 | Pending |
+| R421 | Phase 131 | Pending |
+| R422 | Phase 134 | Pending |
+| R423 | Phase 134 | Pending |
+| R424 | Phase 136 | Pending |
+| R425 | Phase 137 | Pending |
+| R426 | Phase 136 | Pending |
+| R427 | Phase 137 | Pending |

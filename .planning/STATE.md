@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output
 status: planning
-last_updated: "2026-09-07T05:02:06.931Z"
+last_updated: "2026-09-07T05:35:10.000Z"
 last_activity: 2026-09-07
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -52,7 +52,40 @@ confirm with me before doing so."*
 
 ---
 
-# ▶ ACTIVE MILESTONE — v2.13 Volunteer Self-Service & Multi-Church Access (roadmap created 2026-09-06)
+# ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
+
+**Status:** Roadmap created — ready to plan Phase 131
+
+**Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
+genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
+live-stream output with banner/full-screen slides.
+
+(v2.13 ended at Phase 130); this milestone is **Phases 131–137** (numbering continues, not reset). The
+999.x dirs under `.planning/phases` (incl. 999.2, 999.3) are backlog, not this milestone.
+
+**Key context:** Research-first pass ran (`.planning/research/SUMMARY.md`) ahead of requirements. Four
+largely independent feature areas with one hard cross-feature ordering constraint the roadmap encodes
+directly into phase sequence: the two-state ("I've got it") volunteer-confirmation model (Phase 133) must
+land before the dashboard's unconfirmed-volunteers widget (Phase 135), and editor presence (Phase 134)
+must land before the dashboard's presence roll-up (also Phase 135) — so Phase 135 depends on both 133 and
+134. Video output is deliberately split into a low-risk Fullscreen slice (Phase 136, a structural copy of
+v2.9's role-generalization pattern) before the one genuinely new render — the transparent-default /
+solid-key-color-fallback Banner (Phase 137). **Blackbird is irrelevant to this milestone** — compositing
+happens in the video room's software (OBS/vMix-style Browser Source); there is no hardware dependency and
+no feasibility-spike phase. Presence gets its own phase because its Firestore rules design (org-scoped
+get/list-split) needs a dedicated review pass to avoid a smaller replay of the proven v2.8 SEC-S-01
+cross-tenant leak. Trivial wins (auto share-link, Stage Layout auto-populate) ship first to de-risk the
+milestone early — both are single-call-site/pure-function additions reusing already-idempotent code.
+
+See the `## ★ v2.14 ROADMAP.md phase breakdown` entry below (under Current Position) for the full
+phase-by-phase table, and `.planning/ROADMAP.md` for goals/dependencies/success criteria.
+
+---
+
+# ✔ SHIPPED MILESTONE — v2.13 Volunteer Self-Service & Multi-Church Access (shipped & deployed to production 2026-09-07, archived 2026-09-07)
+
+> ✅ **Shipped and deployed to production 2026-09-07**, archived the same day (tag `v2.13`; see
+> `MILESTONES.md` and `.planning/milestones/v2.13-ROADMAP.md` for the full deploy/audit record).
 
 **Status:** v2.13 milestone complete
 
@@ -1344,7 +1377,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 127 — Volunteer Service View — Rehearse, Order of Service & Stage Layout
+**Current focus:** Phase 131 — Trivial Wins: Auto Share-Link & Stage Layout Auto-Populate (v2.14, first phase)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1354,22 +1387,85 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-09-07 — Milestone v2.14 started
+Phase: 131 of 137 (v2.14 Phase 1 of 7 — Trivial Wins: Auto Share-Link & Stage Layout Auto-Populate)
+Plan: — (not yet planned)
+Status: Roadmap created — ready for /gsd-plan-phase 131
+Last activity: 2026-09-07 — v2.14 ROADMAP.md created (7 phases, 131-137), REQUIREMENTS.md traceability updated, 100% coverage (R406-R427)
 
-### Preceding: Phase 129 (complete)
+### Preceding: Phase 130 (complete — final phase of v2.13, shipped & deployed 2026-09-07)
 
-Plan: 129-01 (Wave 1 — server backend: mintVolunteerLink extraction + adminVolunteerLink callable) + 129-02 (client UI, RosterView.vue) both complete
-Status: Phase 129 code-complete, autonomous build + auto-verified green (functions suite 701/701, root type-check clean); UNDEPLOYED.
-Last activity: 2026-09-06 — 129-01-PLAN.md executed (mintVolunteerLink extracted from mintAndSendVolunteerLink as the sole Admin-SDK mint call site; new authenticated adminVolunteerLink callable added -- members/{uid} editor/admin re-check mirrors queueServiceMessageHandler, roster-gated on emailLower with honest HttpsError codes, mode:'email' sends via the shared core / mode:'copy' returns the raw link; R400/R401/R402 server-side complete; 10-case ALLOW/DENY + single-mint-path test matrix added)
+Status: v2.13 Volunteer Self-Service & Multi-Church Access shipped, deployed to production, and archived 2026-09-07 — multi-church volunteer switcher (My Schedule + sidebar), live volunteer service doc via onSnapshot, and a resolved same-org-collision fix for volunteers serving more than one church.
 
-### Preceding: Phase 128 (complete)
+## ★ v2.14 ROADMAP.md phase breakdown (created 2026-09-07)
 
-Plan: 128-02 (Wave 2 — client wiring) complete; both plans of Phase 128 done (128-01 server core, 128-02 client wiring)
-Status: Phase 128 code-complete, autonomous build + auto-verified green; UNDEPLOYED; manual-only verifications (real Resend delivery, felt rate-limit) deferred to a single batched UAT pass at milestone end per CONTEXT.md.
-Last activity: 2026-09-06 — 128-02-PLAN.md executed (public /:slug/volunteer request page, login-page volunteer entry + find-your-church lookup, verify-failure "request a new link" affordance, R394/R395/R398/R399 complete; router BLOCKER fix removing meta.requiresAuth from /volunteer)
+7 phases (131-137), derived directly from R406-R427 (22 requirements) with a wider phase count than this
+project's `coarse` granularity default because the milestone-level task explicitly called for ~7-9 phases
+to respect two hard cross-feature dependencies research surfaced. Phases sequence: trivial de-risking wins
+first (131); Services-page/share-view/copy polish next since it touches none of the milestone's new data
+models (132); the confirmation model (133), which the dashboard's unconfirmed-volunteers widget depends on;
+editor presence (134), isolated into its own phase because its Firestore rules design needs a dedicated
+cross-tenant review pass (v2.8 SEC-S-01 precedent); the dashboard (135), which depends on BOTH 133
+(confirmation) and 134 (presence); and Video output split into a low-risk Fullscreen slice (136) before the
+one genuinely new render, the transparent-default/solid-key-color Banner (137). Numbering continues from
+v2.13, which ended at Phase 130 — v2.14 starts at Phase 131, not reset; the 999.x phase dirs (incl. 999.2,
+999.3) are backlog, untouched by this numbering.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 131 Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate | A service's share link exists automatically at Planned/lock (idempotent, gated), and its Stage Layout seeds itself once from the roster on first empty-canvas visit, never clobbering manual edits | R420, R421 | Nothing (first phase of v2.14) | no |
+| 132 Services Page UX Alignment & Verbiage Cleanup | The `/services` page matches the app's standard header/mobile conventions, share-plan rows alternate-shade for scanability, and "Planning Center" copy is inventoried/classified so only incidental references are removed | R406, R407, R408, R409 | Nothing (independent UI/copy polish) | yes |
+| 133 Volunteer Responsibility Confirmation | A volunteer can confirm ("I've got it") a per-assignment responsibility; a planner sees live confirmation status on the roster and can nudge only the unconfirmed, with confirmations correctly invalidated on reassignment/relock | R410, R411, R412, R413 | Nothing (no dependency on presence or Video output) | yes |
+| 134 Editor Presence | Concurrent viewers/editors of the same service see who else is currently present, backed by an org-scoped Firestore heartbeat with a dedicated cross-tenant rules review and cleanup backstop | R422, R423 | Nothing (fully self-contained; security-critical rules design gets its own review pass) | yes |
+| 135 Dashboard Overhaul | The dashboard replaces the undefined "Volunteer coverage" stat with an actionable "needs your attention" feed — upcoming services, a reused readiness signal, unconfirmed volunteers, an editor-presence roll-up, and a clear empty state | R414, R415, R416, R417, R418, R419 | Phase 133 (confirmation data for R417) AND Phase 134 (presence data for R418) | yes |
+| 136 Video Output — Fullscreen Slice | Monitor setup offers a third "Video" output role alongside Audience/Confidence, opening a dedicated Video output route that renders fullscreen exactly like the existing Audience output | R424, R426 | Nothing (structural copy of v2.9's N-assignment role generalization) | yes |
+| 137 Video Output — Banner Render | A slide item can be flagged Banner (valid only for the Video output) or Full-screen; a Banner renders fit to a title-safe bottom lower-third with a transparent-by-default background and a configurable solid key-color fallback for chroma-key tools | R425, R427 | Phase 136 (extends the Video output route/role it establishes) | yes |
+
+**Cross-feature dependency notes:**
+- **Confirmation before dashboard (R410 → R417):** Phase 135's unconfirmed-volunteers widget reads the
+  Phase 133 confirmation model; Phase 135 cannot start meaningfully before Phase 133 lands.
+- **Presence before dashboard (R422 → R418):** Phase 135's editor-presence roll-up reuses Phase 134's
+  per-service presence data verbatim — no second presence definition.
+- **Video split (R424/R426 before R425/R427):** the Fullscreen slice (136) is independently demoable and
+  UAT-able without any Banner/transparency work; the Banner phase (137) rides the Video route/role Phase
+  136 establishes and adds the per-item schema field + the one genuinely new rendering surface.
+
+**Security note (R423, Phase 134):** presence records live in an org-scoped
+`services/{serviceId}/presence/{uid}` subcollection; the read rules MUST use the `get`/`list`-split,
+org-membership-scoped idiom (never an unscoped `allow read: if isSignedIn()`) — a structural replay of the
+proven, Critical, live v2.8 SEC-S-01 cross-tenant leak is the exact failure mode this phase's rules review
+guards against. Carry a cross-org rules test and a forced-disconnect test as first-class success criteria,
+plus a scheduled `cleanupStalePresence` cleanup backstop.
+
+**Non-clobber/idempotency guards (R420, R421, Phase 131):** both are first-class success criteria, not
+afterthoughts — auto-share-link must never expose a Draft (gated strictly to the Planned/lock transition)
+and must never mint duplicate tokens on relock (reuses `ensureShareLink`'s existing idempotency, not
+`maybeRefreshShareLink`); Stage Layout auto-populate must never regenerate/wipe/duplicate markers on a
+canvas that already has manual placements.
+
+**Reuse, don't rebuild:** `ensureShareLink()` (Phase 131); the existing v2.12 My Schedule readiness
+computation, not a second definition (Phase 135, R416); the existing v1.7 volunteer-messaging send
+infrastructure as a recipient-targeting change, not a new send path (Phase 133, R413); the existing
+Audience full-slide render, reused byte-for-byte for Video Fullscreen (Phase 136, R426); the existing
+`useAutoSave` deep-watch for the per-item Banner/Full-screen field, mirroring the `loop` field precedent
+(Phase 137, R425).
+
+**Out of scope this milestone (locked at requirements time):** Decline + auto-reopen-slot + replacement
+self-swap on confirmations (backlog); reminder deadline/auto-decline timers; volunteer blockout-date
+management; customizable/drag-and-drop dashboard widget layout; generic BI/analytics dashboard widgets; the
+banner backing-bar/contrast-treatment differentiator (basic legibility — title-safe inset + text sizing —
+stays in scope; the extra contrast treatment is deferred); any "Fill + Key" hardware dual-output path; any
+Blackbird/hardware-compositing integration (confirmed irrelevant by the owner, 2026-09-07); Realtime
+Database for presence (this app is deliberately Firestore-only through 13 shipped milestones).
+
+**Research flags carried into planning:** Phase 135's exact readiness rollup rule ("what counts as ready")
+is a product decision to pin down at `/gsd-discuss-phase 135`, reusing v2.12's My Schedule computation as
+the base. Phase 137's default behavior for a Video-output item with no `videoOutput` flag set (transparent/
+key-color fill showing nothing, vs. black) needs a product decision before the render is built — resolve at
+`/gsd-discuss-phase 137` or spec time.
+
+See `.planning/ROADMAP.md` § v2.14 Services UX Alignment, Dashboard & Live-Stream Output for the full phase
+detail table (goals, dependencies, success criteria). Next step: `/gsd-plan-phase 131` (optionally preceded
+by `/gsd-discuss-phase 131`).
 
 ## ★ v2.13 ROADMAP.md phase breakdown (created 2026-09-06)
 
