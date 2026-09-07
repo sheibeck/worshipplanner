@@ -3048,6 +3048,11 @@ describe('Volunteer confirmation scoped write — R410', () => {
       orgId: 'orgA',
       assignedEmailsLower: ['dana@example.com'],
       roleIdsByEmailLower: { 'dana@example.com': ['r1'] },
+      // WR-02 (133-REVIEW): roleAssignmentsByEmailLower is what the
+      // create/update rule's isAssignedVolunteerForRole() now validates
+      // roleName against — must mirror roleIdsByEmailLower's (roleId,
+      // roleName) pairs for the volunteer ALLOW paths below to keep passing.
+      roleAssignmentsByEmailLower: { 'dana@example.com': [{ roleId: 'r1', roleName: 'Guitar' }] },
     })
 
     // orgA/svcOther: Planned, assigned to a DIFFERENT volunteer (erin) —
@@ -3059,6 +3064,7 @@ describe('Volunteer confirmation scoped write — R410', () => {
       orgId: 'orgA',
       assignedEmailsLower: ['erin@example.com'],
       roleIdsByEmailLower: { 'erin@example.com': ['r1'] },
+      roleAssignmentsByEmailLower: { 'erin@example.com': [{ roleId: 'r1', roleName: 'Guitar' }] },
     })
 
     // orgA/svcDraft: still Draft — never locked (or reopened), so NO
@@ -3074,6 +3080,7 @@ describe('Volunteer confirmation scoped write — R410', () => {
       orgId: 'orgB',
       assignedEmailsLower: ['erin@example.com'],
       roleIdsByEmailLower: { 'erin@example.com': ['r1'] },
+      roleAssignmentsByEmailLower: { 'erin@example.com': [{ roleId: 'r1', roleName: 'Guitar' }] },
     })
   }
 
@@ -3139,6 +3146,23 @@ describe('Volunteer confirmation scoped write — R410', () => {
       setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r9_dana@example.com'), {
         roleId: 'r9',
         roleName: 'Forged Role',
+        emailLower: 'dana@example.com',
+        status: 'confirmed',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(4b) DENY — dana cannot write a confirmation for her real roleId with a forged roleName (WR-02: roleName validated against roleAssignmentsByEmailLower)', async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Forged Role Name',
         emailLower: 'dana@example.com',
         status: 'confirmed',
         confirmedAt: null,
