@@ -2,7 +2,9 @@
   <AppShell>
     <div class="px-6 py-8">
 
-      <!-- Page header -->
+      <!-- Page header. Intentionally UNBORDERED: unlike Songs/Roster/Settings
+           (single bordered header), this page's divider is the tab strip's own
+           `border-b` below — do not add a border here or the page gets a double divider. -->
       <div class="mb-4">
         <h1 class="text-xl font-semibold text-gray-100">Services</h1>
       </div>

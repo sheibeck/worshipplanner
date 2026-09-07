@@ -2184,10 +2184,12 @@ const lockBannerLead = computed(() =>
     : 'Planned — editing is locked.',
 )
 
-const lockBannerBody = computed(() =>
-  hasPcExportEvidence.value
-    ? 'Reopen it for editing to change the order, slides or roles here.'
-    : 'Reopen it for editing to change the order, slides or roles.',
+// R409: the PC-evidence branch used to read "…roles here." — the "here"
+// contrasted with the removed "Planning Center already has this plan." sentence
+// (edit here vs. there). With that sentence gone the contrast is orphaned, so
+// both branches now read identically; collapsed to one string.
+const lockBannerBody = computed(
+  () => 'Reopen it for editing to change the order, slides or roles.',
 )
 
 // R352/ARCH-012: the dated branch this computed used to have was unreachable
