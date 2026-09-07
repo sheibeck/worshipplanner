@@ -1563,6 +1563,14 @@ export interface RecipientSelector {
   teams: string[];
   individualPersonIds: string[];
   includeEveryone: boolean;
+  /** R413: narrow the resolved recipient set to people with at least one
+   *  unconfirmed (or needs-reconfirmation) assignment for this service.
+   *  Persists unchanged on QueuedMessageDoc.recipientSelector — optional,
+   *  absent on every message queued before this phase (no migration).
+   *  sendQueuedMessageHandler re-resolves this AUTHORITATIVELY from the
+   *  confirmations subcollection; the client's own selector value here is
+   *  only its declared intent, never trusted as a final list. */
+  unconfirmedOnly?: boolean;
 }
 
 /** attach-service-link / send-me-a-copy send options (R141). */
@@ -2038,11 +2046,19 @@ export async function sendQueuedMessageHandler(params: {
     roleAssignmentOverrides?: Record<string, string[]>;
   };
 
-  const [orgSnap, quartersSnap, rolesSnap, peopleSnap] = await Promise.all([
+  // R413: unconfirmedOnly needs ONE more Admin-SDK read of the confirmations
+  // subcollection — this is the authoritative enforcement point, never the
+  // client's own selector-declared intent (Anti-Pattern 1). Skipped entirely
+  // when unconfirmedOnly is falsy: no read, no behavior/perf change to any
+  // existing send.
+  const unconfirmedOnly = message.recipientSelector?.unconfirmedOnly === true;
+
+  const [orgSnap, quartersSnap, rolesSnap, peopleSnap, confirmationsSnap] = await Promise.all([
     orgRef.get(),
     orgRef.collection("quarters").get(),
     orgRef.collection("roles").get(),
     orgRef.collection("people").get(),
+    unconfirmedOnly ? serviceRef.collection("confirmations").get() : Promise.resolve(null),
   ]);
   const orgName = fromDisplayName((orgSnap.data() as { name?: string | null } | undefined)?.name);
   const quarters = quartersSnap.docs.map((d) => d.data() as PortedQuarter);
@@ -2052,6 +2068,16 @@ export async function sendQueuedMessageHandler(params: {
     return { id: d.id, ...data, ...coerceLegacyRoleGroup(data) } as PortedRole;
   });
   const people = peopleSnap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as PortedPerson);
+  // Doc id IS `${roleId}_${emailLower}` (the confirmations subcollection's own
+  // key convention, src/utils/confirmations.ts::confirmationKey) — no need to
+  // re-join roleId/emailLower fields by hand.
+  const confirmedKeys = confirmationsSnap
+    ? new Set(
+        confirmationsSnap.docs
+          .filter((d) => (d.data() as { status?: string }).status === "confirmed")
+          .map((d) => d.id),
+      )
+    : undefined;
 
   const assignments = resolveServiceRoleAssignments(
     { date: serviceData.date, roleAssignmentOverrides: serviceData.roleAssignmentOverrides },
@@ -2062,8 +2088,9 @@ export async function sendQueuedMessageHandler(params: {
     teams: (message.recipientSelector?.teams ?? []) as RoleGroup[],
     individualPersonIds: message.recipientSelector?.individualPersonIds ?? [],
     includeEveryone: message.recipientSelector?.includeEveryone ?? false,
+    unconfirmedOnly,
   };
-  const { reachable } = resolveMessageRecipients(assignments, people, selection);
+  const { reachable } = resolveMessageRecipients(assignments, people, selection, confirmedKeys);
 
   // ④ Derive the message-level token context once (the per-recipient
   // {{their_roles}} is applied inside the loop). {{song_list}} comes from the
