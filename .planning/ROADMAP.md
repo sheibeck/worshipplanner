@@ -812,18 +812,19 @@ leak. Trivial wins (auto share-link, Stage Layout auto-populate) ship first to d
 
 ### Phase 131: Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate
 
-**Goal**: A service's share link exists and is ready the moment a service is Planned/locked, and a new
-service's Stage Layout starts pre-populated with its assigned roles/instruments instead of an empty
-canvas — with zero risk of exposing a Draft or clobbering manual work.
+**Goal**: A service's share link always exists automatically — minted at creation and self-healed for any
+tokenless service (seeded or legacy) — and a new service's Stage Layout starts pre-populated with its
+assigned roles/instruments instead of an empty canvas — with zero risk of clobbering manual work.
 **Depends on**: Nothing (first phase of v2.14)
 **Requirements**: R420, R421
 **Success Criteria** (what must be TRUE):
 
   1. When a service transitions to Planned/locked, its share link exists automatically — the user never
      has to click "Share Link" for it to be generated (R421).
-  2. A Draft (unlocked) service never has a share link exposed — generation is strictly gated to the
-     Planned/lock transition, reusing `ensureShareLink()`'s existing idempotency (not
-     `maybeRefreshShareLink()`) (R421).
+  2. Any tokenless service (seeded data, or a service created before the 2026-08-17 mint) self-heals a
+     share link automatically — no manual "Share Link" click — via an idempotent `ensureShareLink()` safety
+     net at the Planned/lock transition (not `maybeRefreshShareLink()`); the creation-time mint is KEPT and
+     draft-sharing behavior is unchanged (owner decision 2026-09-07) (R421).
   3. Locking, unlocking, and relocking the same service never creates a duplicate share token (R421).
   4. Visiting a service's Stage Layout tab for the first time, with zero elements on the canvas,
      auto-seeds markers for that service's assigned roles/instruments (R420).
@@ -832,7 +833,7 @@ canvas — with zero risk of exposing a Draft or clobbering manual work.
 
 **Plans**: 2 plans
 - [ ] 131-01-PLAN.md — Stage Layout auto-populate: pure autoPopulateMarkers() + one-time empty-canvas seed trigger (R420)
-- [ ] 131-02-PLAN.md — Auto share-link at the Planned transition; remove the createService draft-mint (R421) — includes a blocking owner decision on the createService conflict
+- [ ] 131-02-PLAN.md — Auto share-link safety net: keep the createService mint, self-heal tokenless services via ensureShareLink in markAsPlanned, and fix the emulator seed to mint a token (R421)
 
 ### Phase 132: Services Page UX Alignment & Verbiage Cleanup
 
