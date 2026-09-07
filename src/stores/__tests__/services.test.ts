@@ -2034,7 +2034,12 @@ describe('useServiceStore', () => {
     // R377 (Phase 125-02): markAsPlanned now legitimately calls setDoc for the
     // rehearseAccess projection — a DIFFERENT write than the public share
     // payload this test guards. Scope the assertion to shareTokens paths only.
-    it('status-only transitions (markAsPlanned, reopenService) do NOT refresh the share payload', async () => {
+    //
+    // R421 (131-02): markAsPlanned FLIPS here — it now also self-heals the
+    // share link (a fail-closed safety net, see markAsPlanned's ensureShareLink
+    // call), so it DOES refresh the share payload. reopenService adds no such
+    // hook and still does not.
+    it('markAsPlanned now refreshes the share payload (R421 self-heal); reopenService still does not', async () => {
       const { setDoc } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
@@ -2045,7 +2050,9 @@ describe('useServiceStore', () => {
         vi.mocked(setDoc).mock.calls.filter((call) => (call[0] as { path?: string }).path?.startsWith('shareTokens'))
 
       await store.markAsPlanned('service-1')
-      expect(sharePayloadCalls()).toHaveLength(0)
+      expect(sharePayloadCalls().length).toBeGreaterThan(0)
+
+      vi.mocked(setDoc).mockClear()
 
       triggerSnapshot([makeService({ status: 'planned' })])
       await store.reopenService('service-1')
@@ -2316,6 +2323,70 @@ describe('useServiceStore', () => {
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('rehearseAccess projection NOT written'))
       expect(vi.mocked(setDoc)).not.toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    // R421 (131-02) — the fail-closed ensureShareLink self-heal.
+    it('R421: markAsPlanned self-heals a tokenless service by minting a share link', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      // ensureShareLink's identity-doc read (serviceShareLinks/{id}) must be
+      // "not exists" so it mints instead of adopting a phantom existing link.
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      const store = await storeAtStatus('draft')
+
+      await store.markAsPlanned('service-1')
+
+      const shareWrite = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as { path?: string }).path?.startsWith('shareTokens'))
+      expect(shareWrite).toBeDefined()
+    })
+
+    it('R421: a lock/reopen/relock cycle yields exactly one share token (idempotent self-heal)', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('draft')
+
+      // Both markAsPlanned calls below find the SAME pre-existing identity
+      // doc (serviceShareLinks/{id}) — ensureShareLink adopts it rather than
+      // minting a second token, so the relock cycle stays at exactly one.
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ token: 'existing-token' }),
+      } as never)
+      await store.markAsPlanned('service-1')
+
+      triggerSnapshot([makeService({ status: 'planned' })])
+      await store.reopenService('service-1')
+
+      triggerSnapshot([makeService({ status: 'draft' })])
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ token: 'existing-token' }),
+      } as never)
+      await store.markAsPlanned('service-1')
+
+      const shareTokenWrites = vi
+        .mocked(setDoc)
+        .mock.calls.filter((call) => (call[0] as { path?: string }).path?.startsWith('shareTokens/'))
+      const distinctTokenPaths = new Set(shareTokenWrites.map((call) => (call[0] as { path?: string }).path))
+      expect(distinctTokenPaths.size).toBe(1)
+      expect([...distinctTokenPaths][0]).toBe('shareTokens/existing-token')
+    })
+
+    it('R421: a share-link self-heal failure inside markAsPlanned does not block the status transition', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockRejectedValueOnce(new Error('boom'))
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const store = await storeAtStatus('draft')
+
+      await expect(store.markAsPlanned('service-1')).resolves.toBeUndefined()
+
+      expect(updateDoc).toHaveBeenCalled()
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('share-link self-heal failed'),
+        expect.anything(),
+      )
 
       consoleErrorSpy.mockRestore()
     })

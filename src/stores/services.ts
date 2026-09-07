@@ -652,6 +652,23 @@ export const useServiceStore = defineStore('services', () => {
           err,
         )
       }
+
+      // R421 — idempotent share-link self-heal. createService's creation-time
+      // mint (above) is the primary path and is deliberately KEPT; this is a
+      // fail-closed safety net for any tokenless service (seeded data, or one
+      // created before the 2026-08-17 mint) so it still gets a link with no
+      // manual "Share Link" click. ensureShareLink is idempotent (identity-doc
+      // read first) so a lock/reopen/relock cycle never mints a duplicate
+      // token. Mirrors the rehearseAccess catch above: a failure here must
+      // never roll back the already-succeeded status transition.
+      try {
+        await ensureShareLink({ ...service, status: 'planned' }, orgId.value)
+      } catch (err) {
+        console.error(
+          `markAsPlanned: share-link self-heal failed for service ${id} — the status transition already succeeded`,
+          err,
+        )
+      }
     }
   }
 
