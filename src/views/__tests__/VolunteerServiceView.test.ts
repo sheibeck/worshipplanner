@@ -169,6 +169,17 @@ describe('VolunteerServiceView', () => {
       mockDoc.value = makeDoc()
     })
 
+    it('reflects a live doc update (Change A): a second snapshot from the composable re-renders the view', async () => {
+      const wrapper = mount(VolunteerServiceView, { global: { stubs: globalStubs } })
+      expect(wrapper.text()).toContain('Sunday Worship')
+
+      // Simulate the composable's onSnapshot delivering an editor's edit.
+      mockDoc.value = makeDoc({ title: 'Sunday Worship (updated)' })
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.text()).toContain('Sunday Worship (updated)')
+    })
+
     it('renders the service header (name + date) and Rehearse is the default active tab', () => {
       const wrapper = mount(VolunteerServiceView, { global: { stubs: globalStubs } })
       expect(wrapper.text()).toContain('Sunday Worship')
