@@ -365,8 +365,11 @@ async function seedOrg(orgId, name, uid, { aiMasterEnabled }) {
     }
   }
 
-  // one draft service (services.ts:251-261 + service.ts:155-188)
-  await db.collection('organizations').doc(orgId).collection('services').doc('service-1').set({
+  // one draft service (services.ts:251-261 + service.ts:155-188). Doc id is
+  // org-unique (real services use addDoc-generated global IDs) so a volunteer
+  // serving multiple seeded churches doesn't hit colliding "service-1" ids
+  // across orgs in the rehearseAccess collectionGroup / volunteer service view.
+  await db.collection('organizations').doc(orgId).collection('services').doc(`svc-${slug}-1`).set({
     date: nextSunday(),
     name: 'Sunday Morning Worship',
     progression: '1-2-2-3',
@@ -391,7 +394,7 @@ async function seedOrg(orgId, name, uid, { aiMasterEnabled }) {
     for (const roleId of p.roles) roleFrequency[roleId] = { tier: 'regular', n: 4 }
     personQuarterData[p.id] = { personId: p.id, blackoutDates: [], pairedWith: [], roleFrequency }
   }
-  await db.collection('organizations').doc(orgId).collection('quarters').doc('quarter-1').set({
+  await db.collection('organizations').doc(orgId).collection('quarters').doc(`q-${slug}-1`).set({
     label: `Q${qNum} ${qYear}`,
     year: qYear,
     quarter: qNum,

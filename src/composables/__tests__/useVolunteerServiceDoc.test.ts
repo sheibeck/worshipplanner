@@ -46,11 +46,17 @@ vi.mock('@/firebase', () => ({
 }))
 
 const mockLoadMySchedule = vi.fn()
-const mockScheduleState = reactive<{ docs: MyScheduleDoc[] }>({ docs: [] })
+const mockScheduleState = reactive<{ docs: MyScheduleDoc[]; selectedChurch: string | null }>({
+  docs: [],
+  selectedChurch: null,
+})
 vi.mock('@/stores/mySchedule', () => ({
   useMyScheduleStore: () => ({
     get docs() {
       return mockScheduleState.docs
+    },
+    get selectedChurch() {
+      return mockScheduleState.selectedChurch
     },
     loadMySchedule: mockLoadMySchedule,
   }),
@@ -79,6 +85,7 @@ function makeMatch(overrides: Partial<MyScheduleDoc> = {}): MyScheduleDoc {
 describe('useVolunteerServiceDoc', () => {
   beforeEach(() => {
     mockScheduleState.docs = []
+    mockScheduleState.selectedChurch = null
     mockLoadMySchedule.mockReset()
     mockLoadMySchedule.mockResolvedValue(undefined)
     mockOnSnapshot.mockClear()
@@ -188,6 +195,26 @@ describe('useVolunteerServiceDoc', () => {
     expect(mockOnSnapshot).toHaveBeenCalledTimes(2)
     // retry() tears down the prior listener before opening the new one.
     expect(mockUnsubs[0]).toHaveBeenCalledTimes(1)
+  })
+
+  it('prefers the SELECTED church when two docs share a serviceId across orgs (multi-church collision-safe)', async () => {
+    // A volunteer on two churches whose services collide on id "service-1"
+    // (e.g. seeded fixtures). A bare find() would resolve the first (berean);
+    // the composable must prefer the selected church so the card the volunteer
+    // opened from grace's My Schedule shows grace's data.
+    mockScheduleState.docs = [
+      makeMatch({ serviceId: 'service-1', orgId: 'emu-berean' }),
+      makeMatch({ serviceId: 'service-1', orgId: 'emu-grace' }),
+    ]
+    mockScheduleState.selectedChurch = 'emu-grace'
+
+    useVolunteerServiceDoc('service-1')
+    await flushPromises()
+
+    const call = mockDocRef.mock.calls[0] as unknown[]
+    // args: (db, 'organizations', orgId, 'rehearseAccess', serviceId)
+    expect(call[2]).toBe('emu-grace')
+    expect(call[2]).not.toBe('emu-berean')
   })
 
   it('sources orgId exclusively from the matched store doc — never from any other value', async () => {

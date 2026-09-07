@@ -53,10 +53,24 @@ export function useVolunteerServiceDoc(serviceId: MaybeRefOrGetter<string>) {
     doc_.value = null
 
     const mySchedule = useMyScheduleStore()
-    let match = mySchedule.docs.find((d) => d.serviceId === id)
+    // serviceId is unique per org in production (addDoc-generated), but NOT
+    // guaranteed globally unique across orgs (e.g. seeded fixtures reuse
+    // "service-1"). A volunteer serving multiple churches can therefore have
+    // two docs with the same serviceId — a bare find() would resolve the wrong
+    // org and show another church's songs. Prefer the currently-selected
+    // church (the volunteer only ever opens a card from their selected church's
+    // My Schedule after the Phase 130 rework), falling back to any match.
+    const findMatch = () => {
+      const sel = mySchedule.selectedChurch
+      return (
+        (sel ? mySchedule.docs.find((d) => d.serviceId === id && d.orgId === sel) : undefined) ??
+        mySchedule.docs.find((d) => d.serviceId === id)
+      )
+    }
+    let match = findMatch()
     if (!match) {
       await mySchedule.loadMySchedule()
-      match = mySchedule.docs.find((d) => d.serviceId === id)
+      match = findMatch()
     }
     if (!match) {
       // T-127-05 — no store match means either the volunteer was never
