@@ -288,6 +288,23 @@ service cloud.firestore {
               && request.auth.token.email.lower() in rehearseAccessDoc().data.get('assignedEmailsLower', []);
           }
 
+          // WR-01 (133-REVIEW): same exists()-guarded-FIRST shape as
+          // isAssignedVolunteer() above, but binds rehearseAccessDoc()'s
+          // get() ONCE via `let` and reuses it for both the assignedEmailsLower
+          // and roleIdsByEmailLower checks the create/update rule needs —
+          // avoiding a second billed get() on the same doc within one
+          // rule evaluation (see the slideGroups block's own per-request
+          // get()/exists() budget comment at :390-392 for why this matters).
+          function isAssignedVolunteerForRole(roleId) {
+            let access = rehearseAccessDoc();
+            return isSignedIn()
+              && request.auth.token.email != null
+              && request.auth.token.email_verified == true
+              && exists(/databases/$(database)/documents/organizations/$(orgId)/rehearseAccess/$(docId))
+              && request.auth.token.email.lower() in access.data.get('assignedEmailsLower', [])
+              && roleId in access.data.get('roleIdsByEmailLower', {}).get(request.auth.token.email.lower(), []);
+          }
+
           allow get, list: if isOrgMember(orgId) || isAssignedVolunteer();
 
           // Editor arm: the relock-reconciliation write (flips a stale
@@ -299,10 +316,9 @@ service cloud.firestore {
           // can be smuggled onto the doc.
           allow create, update: if isOrgEditor(orgId)
             || (
-              isAssignedVolunteer()
+              isAssignedVolunteerForRole(request.resource.data.roleId)
               && confirmationId == request.resource.data.roleId + '_' + request.resource.data.emailLower
               && request.resource.data.emailLower == request.auth.token.email.lower()
-              && request.resource.data.roleId in rehearseAccessDoc().data.get('roleIdsByEmailLower', {}).get(request.auth.token.email.lower(), [])
               && request.resource.data.status == 'confirmed'
               && request.resource.data.keys().hasOnly(['roleId', 'roleName', 'emailLower', 'status', 'confirmedAt', 'updatedAt'])
             );
