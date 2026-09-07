@@ -9,12 +9,14 @@ export interface AppConfig {
     pptxRenderEnabled: boolean;
     backgroundEnabled: boolean;
     pptxSourceEnabled: boolean;
+    presenceEnabled: boolean;
   };
   retention: {
     mediaDays: number;
     orphanRenderStaleHours: number;
     backgroundDays: number;
     pptxSourceDays: number;
+    presenceStaleMinutes: number;
   };
   deleteCapPerRun: number;
   aiProxy: {
@@ -50,12 +52,14 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     pptxRenderEnabled: false, // PPTX_RENDER_CLEANUP_ENABLED unset today == dry-run (index.ts:1200)
     backgroundEnabled: false, // BACKGROUND_CLEANUP_ENABLED unset today == dry-run (index.ts:1440)
     pptxSourceEnabled: false, // PPTX_SOURCE_CLEANUP_ENABLED unset today == dry-run (index.ts:1668)
+    presenceEnabled: false, // R423: fail-closed/dry-run until the owner enables the presence cron
   },
   retention: {
     mediaDays: 30, // readMediaRetentionDays fallback (index.ts:1010)
     orphanRenderStaleHours: 24, // readOrphanRenderStaleHours fallback (index.ts:1170)
     backgroundDays: 30, // readBackgroundRetentionDays fallback (index.ts:1388)
     pptxSourceDays: 30, // readPptxSourceRetentionDays fallback (index.ts:1634)
+    presenceStaleMinutes: 60, // R423: generous backstop window above the ~60s client TTL
   },
   deleteCapPerRun: 500, // readDeleteCap() fallback (index.ts:961-964)
   aiProxy: {
@@ -155,6 +159,7 @@ function coerceCleanup(raw: unknown): AppConfig["cleanup"] {
     pptxRenderEnabled: coerceEnableFlag(r.pptxRenderEnabled),
     backgroundEnabled: coerceEnableFlag(r.backgroundEnabled),
     pptxSourceEnabled: coerceEnableFlag(r.pptxSourceEnabled),
+    presenceEnabled: coerceEnableFlag(r.presenceEnabled),
   };
 }
 
@@ -173,6 +178,10 @@ function coerceRetention(raw: unknown): AppConfig["retention"] {
     pptxSourceDays: coerceConfigNumber(
       r.pptxSourceDays,
       DEFAULT_APP_CONFIG.retention.pptxSourceDays,
+    ),
+    presenceStaleMinutes: coerceConfigNumber(
+      r.presenceStaleMinutes,
+      DEFAULT_APP_CONFIG.retention.presenceStaleMinutes,
     ),
   };
 }

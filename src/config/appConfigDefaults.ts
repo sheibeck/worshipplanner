@@ -7,12 +7,14 @@ export interface AppConfig {
     pptxRenderEnabled: boolean
     backgroundEnabled: boolean
     pptxSourceEnabled: boolean
+    presenceEnabled: boolean
   }
   retention: {
     mediaDays: number
     orphanRenderStaleHours: number
     backgroundDays: number
     pptxSourceDays: number
+    presenceStaleMinutes: number
   }
   deleteCapPerRun: number
   aiProxy: {
@@ -65,12 +67,14 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     pptxRenderEnabled: false,
     backgroundEnabled: false,
     pptxSourceEnabled: false,
+    presenceEnabled: false,
   },
   retention: {
     mediaDays: 30,
     orphanRenderStaleHours: 24,
     backgroundDays: 30,
     pptxSourceDays: 30,
+    presenceStaleMinutes: 60,
   },
   deleteCapPerRun: 500,
   aiProxy: {

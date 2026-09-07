@@ -699,3 +699,112 @@ export const cleanupPptxSources = onSchedule(
     await cleanupPptxSourcesHandler();
   },
 );
+
+// cleanupStalePresence (R423: presence-doc backstop sweep, Phase 134-03)
+// See .planning/phases/134-editor-presence/134-CONTEXT.md
+// Firestore has no onDisconnect() (that's RTDB-only), so a crashed/closed
+// editor tab leaves a permanent presence doc behind. The client's ~60s
+// staleness filter (Plan 02) hides it from the UI immediately; this cron is
+// the eventual sweep so presence docs never accumulate forever. Runs 04:00
+// UTC -- the free slot between cleanupOrphanRenders (03:00) and
+// cleanupOrphanBackgrounds (05:00), so no two sweeps overlap.
+
+/**
+ * Reads the effective presence staleness window in minutes from a resolved
+ * AppConfig (R181) -- a thin passthrough over
+ * config.retention.presenceStaleMinutes; appConfig.ts's coerceRetention owns
+ * the fail-open-capped default.
+ */
+export function readPresenceStaleMinutes(config: AppConfig): number {
+  return config.retention.presenceStaleMinutes;
+}
+
+export interface PresenceCleanupSummary {
+  scannedCount: number;
+  deletedDocCount: number;
+  dryRun: boolean;
+  /** True when readDeleteCap() stopped a LIVE run before all stale docs were cleared. */
+  cappedByLimit: boolean;
+}
+
+/**
+ * The cleanupStalePresence handler body, exported separately from the
+ * `onSchedule` wrapper (mirroring cleanupOrphanRendersHandler) so it can be
+ * unit-tested directly against mocked Firestore.
+ */
+export async function cleanupStalePresenceHandler(
+  opts: { forceDryRun?: boolean } = {},
+): Promise<PresenceCleanupSummary> {
+  const db = getFirestore();
+  const config = await getAppConfig(db, { fresh: true });
+  // Fail safe: only an explicit opt-in (cleanup.presenceEnabled=true in the
+  // resolved config) enables real deletion. Anything else -- unset, false, a
+  // malformed value -- leaves this a dry run (R181, fail-closed per R184).
+  // R188: forceDryRun (set only by previewCleanupDryRun) short-circuits to
+  // true regardless of config -- the preview can NEVER derive dryRun from
+  // the live flag.
+  const dryRun = opts.forceDryRun === true ? true : !config.cleanup.presenceEnabled;
+
+  const cutoffMs = Date.now() - readPresenceStaleMinutes(config) * 60 * 1000;
+  const deleteCap = readDeleteCap(config);
+
+  let scannedCount = 0;
+  let deletedDocCount = 0;
+  let cappedByLimit = false;
+
+  // No `.where('lastSeen', '<', cutoff)` clause -- a collection-group range
+  // query would need a dedicated index. Presence docs are tiny/few, so this
+  // daily backstop fetches-then-filters in code, mirroring the Storage
+  // sweeps' iterate-all-then-guard discipline.
+  const snapshot = await db.collectionGroup("presence").get();
+
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data() as { lastSeen?: { toMillis?: () => number } } | undefined;
+    const lastSeen = data?.lastSeen;
+    const lastSeenMs = typeof lastSeen?.toMillis === "function" ? lastSeen.toMillis() : NaN;
+    if (Number.isNaN(lastSeenMs) || lastSeenMs > cutoffMs) {
+      // Not stale yet (or timestamp unreadable -- fail safe, skip it).
+      continue;
+    }
+
+    scannedCount++;
+
+    if (dryRun) {
+      // Dry-run is NEVER capped -- the owner needs the true backlog count
+      // before enabling live deletion, not a truncated one.
+      deletedDocCount++;
+      continue;
+    }
+
+    if (deletedDocCount >= deleteCap) {
+      // Bounds this run's blast radius. Idempotent-by-age means the next
+      // daily run resumes deleting the remaining backlog.
+      cappedByLimit = true;
+      break;
+    }
+
+    try {
+      await docSnap.ref.delete();
+      deletedDocCount++;
+    } catch (err) {
+      // Partial-failure tolerance: one bad delete never aborts the run.
+      console.error(`cleanupStalePresence: failed to delete ${docSnap.ref.path}:`, err);
+    }
+  }
+
+  const summary: PresenceCleanupSummary = {
+    scannedCount,
+    deletedDocCount,
+    dryRun,
+    cappedByLimit,
+  };
+  console.log("cleanupStalePresence summary:", summary);
+  return summary;
+}
+
+export const cleanupStalePresence = onSchedule(
+  { schedule: "every day 04:00", timeZone: "UTC" },
+  async () => {
+    await cleanupStalePresenceHandler();
+  },
+);
