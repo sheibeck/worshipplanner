@@ -20,6 +20,11 @@ export interface UnconfirmedVolunteerRow extends UnconfirmedAssignment {
   serviceId: string
   serviceName: string
   serviceDate: string
+  /** Re-derived from the same confirmationStatuses map the pure diff already
+   *  consulted — 'unconfirmed' is the implicit no-doc default (never stored),
+   *  distinguishing it from a stored 'needsReconfirmation' so the view can
+   *  pick the identical gray-vs-amber chip ServiceEditorView.vue uses. */
+  status: ConfirmationStatus | 'unconfirmed'
 }
 
 interface ServiceListenerState {
@@ -157,7 +162,8 @@ export function useUnconfirmedVolunteers(
       if (!state) continue
       const diff = unconfirmedAssignments(state.roleAssignmentsByEmailLower, state.confirmationStatuses)
       for (const row of diff) {
-        result.push({ ...row, serviceId: service.id, serviceName: service.name, serviceDate: service.date })
+        const status = state.confirmationStatuses.get(confirmationKey(row.roleId, row.emailLower)) ?? 'unconfirmed'
+        result.push({ ...row, serviceId: service.id, serviceName: service.name, serviceDate: service.date, status })
       }
     }
     return result

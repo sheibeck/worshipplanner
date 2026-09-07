@@ -89,6 +89,60 @@
             </span>
           </router-link>
         </div>
+
+        <!-- Attention cards row (R417 unconfirmed volunteers; R418 editor
+             presence roll-up is added by Plan 03 alongside this card, per
+             135-UI-SPEC.md's attention-cards row). -->
+        <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 lg:col-span-2">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500">Unconfirmed volunteers</h2>
+              <span
+                v-if="unconfirmedRows.length > 0"
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-900/40 border border-amber-700/50 text-amber-300"
+              >
+                {{ unconfirmedRows.length }}
+              </span>
+            </div>
+
+            <p v-if="unconfirmedError" class="text-sm text-gray-500">Couldn't load unconfirmed volunteers right now.</p>
+            <p v-else-if="unconfirmedLoading" class="text-sm text-gray-500">Checking confirmations…</p>
+            <p v-else-if="attentionServices.length === 0" class="text-sm text-gray-400">
+              No Planned services yet to check confirmations for.
+            </p>
+            <p v-else-if="unconfirmedRows.length === 0" class="text-sm text-gray-400">
+              Everyone's confirmed for the next {{ attentionServices.length }} service{{ attentionServices.length === 1 ? '' : 's' }}.
+            </p>
+            <div v-else class="divide-y divide-gray-800">
+              <router-link
+                v-for="row in visibleUnconfirmedRows"
+                :key="`${row.serviceId}-${row.roleId}-${row.emailLower}`"
+                :to="`/services/${row.serviceId}`"
+                class="flex items-center gap-3 py-2.5 hover:bg-gray-800/40 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-950"
+              >
+                <span :class="unconfirmedChipClass(row)" class="shrink-0">{{ unconfirmedChipLabel(row) }}</span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm text-gray-200">
+                    {{ personDisplayName(row.emailLower) }}
+                    <span class="text-gray-500">· {{ row.roleName }}</span>
+                  </p>
+                </div>
+                <div class="min-w-0 shrink-0 max-w-[45%]">
+                  <p class="truncate text-xs text-gray-500 text-right">
+                    {{ row.serviceName }}, {{ formatServiceDate(row.serviceDate) }}
+                  </p>
+                </div>
+              </router-link>
+              <router-link
+                v-if="extraUnconfirmedCount > 0"
+                to="/volunteers"
+                class="block pt-2.5 text-sm text-indigo-400 hover:text-indigo-300"
+              >
+                +{{ extraUnconfirmedCount }} more — view roster
+              </router-link>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- Song library health (editor only) — full width -->
@@ -123,6 +177,8 @@ import type { Service } from '@/types/service'
 import AppShell from '@/components/AppShell.vue'
 import GettingStarted from '@/components/GettingStarted.vue'
 import { dashboardReadinessOf, serviceReadinessSongs, type DashboardReadinessState } from '@/utils/dashboardReadiness'
+import { useUnconfirmedVolunteers, type UnconfirmedVolunteerRow } from '@/composables/useUnconfirmedVolunteers'
+import type { ConfirmationStatus } from '@/utils/confirmations'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
@@ -150,6 +206,60 @@ const upcomingServices = computed(() =>
 
 const nextService = computed(() => upcomingServices.value[0] ?? null)
 const upcomingAfterNext = computed(() => upcomingServices.value.slice(1, 6))
+
+// ── Unconfirmed volunteers (R417) — bounded fan-out over the next ≤6 upcoming
+// Planned services (135-UI-SPEC.md Widget 2). Draft services have no
+// rehearseAccess/confirmations yet (built at markAsPlanned lock time), so the
+// window is Planned-only, distinct from the feed's own draft-inclusive window.
+const UNCONFIRMED_WINDOW_SIZE = 6
+const attentionServices = computed(() =>
+  upcomingServices.value.filter((s) => s.status === 'planned').slice(0, UNCONFIRMED_WINDOW_SIZE),
+)
+
+const {
+  rows: unconfirmedRows,
+  loading: unconfirmedLoading,
+  error: unconfirmedError,
+} = useUnconfirmedVolunteers(
+  () => authStore.orgId,
+  () => attentionServices.value,
+)
+
+const UNCONFIRMED_ROW_CAP = 8
+const visibleUnconfirmedRows = computed(() => unconfirmedRows.value.slice(0, UNCONFIRMED_ROW_CAP))
+const extraUnconfirmedCount = computed(() =>
+  Math.max(0, unconfirmedRows.value.length - UNCONFIRMED_ROW_CAP),
+)
+
+// Identical chip vocabulary to ServiceEditorView.vue's CONFIRMATION_CHIP_CLASS
+// (Task 3 requirement) — no new chip vocabulary invented.
+const UNCONFIRMED_CHIP_CLASS: Record<ConfirmationStatus | 'unconfirmed', string> = {
+  confirmed:
+    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-800',
+  needsReconfirmation:
+    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/40 text-amber-300 border border-amber-800',
+  unconfirmed:
+    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-800 text-gray-400 border border-gray-700',
+}
+
+const UNCONFIRMED_CHIP_LABEL: Record<ConfirmationStatus | 'unconfirmed', string> = {
+  confirmed: 'Confirmed',
+  needsReconfirmation: 'Needs reconfirmation',
+  unconfirmed: 'Unconfirmed',
+}
+
+function unconfirmedChipClass(row: UnconfirmedVolunteerRow): string {
+  return UNCONFIRMED_CHIP_CLASS[row.status]
+}
+
+function unconfirmedChipLabel(row: UnconfirmedVolunteerRow): string {
+  return UNCONFIRMED_CHIP_LABEL[row.status]
+}
+
+function personDisplayName(emailLower: string): string {
+  const person = rosterStore.people.find((p) => p.email.toLowerCase() === emailLower)
+  return person?.name ?? emailLower
+}
 
 function serviceSongStats(service: Service): { filled: number; total: number } {
   const songSlots = service.slots.filter((s) => s.kind === 'SONG')
