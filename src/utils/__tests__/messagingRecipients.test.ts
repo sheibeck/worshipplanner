@@ -7,6 +7,7 @@ import {
   MESSAGING_TEAM_LABELS,
   type RecipientSelection,
 } from '@/utils/messagingRecipients'
+import { confirmationKey } from '@/utils/confirmations'
 
 const ts = {} as Timestamp
 
@@ -260,5 +261,104 @@ describe('resolveRecipients', () => {
 
     expect(result.reachable).toEqual([])
     expect(result.unreachableCount).toBe(1)
+  })
+
+  describe('unconfirmedOnly (R413)', () => {
+    it('Test I (per-assignment qualification): a person with roleA confirmed and roleB not confirmed is KEPT', () => {
+      const guitar = makeRole({ id: 'role-guitar', group: 'band', order: 0 })
+      const bass = makeRole({ id: 'role-bass', group: 'band', order: 1 })
+      const quarter = makeQuarter({
+        serviceDates: ['2026-08-02'],
+        calendar: {
+          '2026-08-02': { 'role-guitar': ['person-1'], 'role-bass': ['person-1'] },
+        },
+      })
+      const service = makeService({ date: '2026-08-02' })
+      const alice = makePerson({ id: 'person-1', name: 'Alice', email: 'alice@example.com' })
+      const confirmedKeys = new Set([confirmationKey('role-guitar', 'alice@example.com')])
+
+      const result = resolveRecipients(
+        service,
+        [quarter],
+        [guitar, bass],
+        [alice],
+        makeSelection({ teams: ['band'], unconfirmedOnly: true }),
+        confirmedKeys,
+      )
+
+      expect(result.reachable).toEqual([{ id: 'person-1', name: 'Alice', email: 'alice@example.com' }])
+    })
+
+    it('Test J (fully confirmed dropped): a person whose every matched assignment is confirmed is excluded', () => {
+      const guitar = makeRole({ id: 'role-guitar', group: 'band', order: 0 })
+      const quarter = makeQuarter({
+        serviceDates: ['2026-08-02'],
+        calendar: { '2026-08-02': { 'role-guitar': ['person-1'] } },
+      })
+      const service = makeService({ date: '2026-08-02' })
+      const alice = makePerson({ id: 'person-1', name: 'Alice', email: 'alice@example.com' })
+      const confirmedKeys = new Set([confirmationKey('role-guitar', 'alice@example.com')])
+
+      const result = resolveRecipients(
+        service,
+        [quarter],
+        [guitar],
+        [alice],
+        makeSelection({ teams: ['band'], unconfirmedOnly: true }),
+        confirmedKeys,
+      )
+
+      expect(result.reachable).toEqual([])
+      expect(result.unreachableCount).toBe(0)
+    })
+
+    it('Test K (unconfirmedOnly false/absent unchanged): identical to today regardless of confirmedKeys', () => {
+      const guitar = makeRole({ id: 'role-guitar', group: 'band', order: 0 })
+      const quarter = makeQuarter({
+        serviceDates: ['2026-08-02'],
+        calendar: { '2026-08-02': { 'role-guitar': ['person-1'] } },
+      })
+      const service = makeService({ date: '2026-08-02' })
+      const alice = makePerson({ id: 'person-1', name: 'Alice', email: 'alice@example.com' })
+      const confirmedKeys = new Set([confirmationKey('role-guitar', 'alice@example.com')])
+
+      const result = resolveRecipients(
+        service,
+        [quarter],
+        [guitar],
+        [alice],
+        makeSelection({ teams: ['band'], unconfirmedOnly: false }),
+        confirmedKeys,
+      )
+
+      expect(result.reachable).toEqual([{ id: 'person-1', name: 'Alice', email: 'alice@example.com' }])
+    })
+
+    it('Test L (needsReconfirmation/unconfirmed both still targeted): only stored-confirmed keys are excluded', () => {
+      const guitar = makeRole({ id: 'role-guitar', group: 'band', order: 0 })
+      const bass = makeRole({ id: 'role-bass', group: 'band', order: 1 })
+      const quarter = makeQuarter({
+        serviceDates: ['2026-08-02'],
+        calendar: {
+          '2026-08-02': { 'role-guitar': ['person-1'], 'role-bass': ['person-2'] },
+        },
+      })
+      const service = makeService({ date: '2026-08-02' })
+      const alice = makePerson({ id: 'person-1', name: 'Alice', email: 'alice@example.com' })
+      const bob = makePerson({ id: 'person-2', name: 'Bob', email: 'bob@example.com' })
+      // Neither key is in confirmedKeys — both represent needsReconfirmation/unconfirmed.
+      const confirmedKeys = new Set<string>()
+
+      const result = resolveRecipients(
+        service,
+        [quarter],
+        [guitar, bass],
+        [alice, bob],
+        makeSelection({ teams: ['band'], unconfirmedOnly: true }),
+        confirmedKeys,
+      )
+
+      expect(result.reachable.map((r) => r.id).sort()).toEqual(['person-1', 'person-2'])
+    })
   })
 })

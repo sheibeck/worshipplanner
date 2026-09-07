@@ -49,6 +49,11 @@ export interface RecipientSelection {
   teams: RoleGroup[];
   individualPersonIds: string[];
   includeEveryone: boolean;
+  /** R413: narrow the matched set to people with at least one unconfirmed (or
+   *  needs-reconfirmation) assignment for this service — per-assignment, not
+   *  per-person. Hand-mirrored from the client's own field of the same name
+   *  (src/utils/messagingRecipients.ts) — see that file's doc comment. */
+  unconfirmedOnly?: boolean;
 }
 
 export interface ResolvedRoleAssignment {
@@ -113,15 +118,25 @@ export function resolveServiceRoleAssignments(
 /**
  * Resolves a { teams, individualPersonIds, includeEveryone } selection into
  * deduped (by person id), reachability-split recipient lists with per-recipient roleNames.
+ * `confirmedKeys` (R413) is the set of `${roleId}_${emailLower}` keys currently
+ * `'confirmed'` — this is the AUTHORITATIVE server-side filter (the client's
+ * own preview-only mirror lives in src/utils/messagingRecipients.ts); only
+ * consulted when `selection.unconfirmedOnly` is true.
  * See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/serviceRoles.ts)
  */
 export function resolveMessageRecipients(
   assignments: ResolvedRoleAssignment[],
   people: PortedPerson[],
   selection: RecipientSelection,
+  confirmedKeys?: Set<string>,
 ): { reachable: ReachableRecipient[]; unreachableCount: number } {
   const peopleById = new Map(people.map((p) => [p.id, p]));
   const roleNamesByPerson = new Map<string, string[]>();
+  // R413: which roleIds a person matched THROUGH (team-matched assignments
+  // only — mirrors roleNamesByPerson's own scope). A person added purely via
+  // individualPersonIds with no team-matched role has no entry here and is
+  // never filtered by unconfirmedOnly (nothing to check).
+  const roleIdsByPerson = new Map<string, Set<string>>();
   const matchedOrder: string[] = []; // first-seen order, mirrors the client Set iteration
 
   const ensure = (pid: string): string[] => {
@@ -140,6 +155,14 @@ export function resolveMessageRecipients(
     for (const pid of a.effectivePersonIds) {
       const names = ensure(pid);
       if (!names.includes(a.roleName)) names.push(a.roleName);
+      if (selection.unconfirmedOnly) {
+        let ids = roleIdsByPerson.get(pid);
+        if (!ids) {
+          ids = new Set();
+          roleIdsByPerson.set(pid, ids);
+        }
+        ids.add(a.roleId);
+      }
     }
   }
   for (const pid of selection.individualPersonIds) ensure(pid);
@@ -149,6 +172,16 @@ export function resolveMessageRecipients(
   for (const pid of matchedOrder) {
     const person = peopleById.get(pid);
     if (!person) continue; // stale/deleted person id — silently skip, not unreachable
+    if (selection.unconfirmedOnly && confirmedKeys) {
+      const roleIds = roleIdsByPerson.get(pid);
+      if (roleIds && roleIds.size > 0) {
+        const emailLower = person.email.toLowerCase();
+        const allConfirmed = Array.from(roleIds).every((roleId) =>
+          confirmedKeys.has(`${roleId}_${emailLower}`),
+        );
+        if (allConfirmed) continue; // every matched assignment is confirmed — drop
+      }
+    }
     if (person.email === "") {
       unreachableCount++;
     } else {

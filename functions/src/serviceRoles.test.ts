@@ -314,6 +314,79 @@ describe("resolveMessageRecipients", () => {
     // the whole point of R139: A's roles are NOT B's roles
     expect(byId["person-a"]).not.toEqual(byId["person-b"]);
   });
+
+  describe("unconfirmedOnly (R413 — server authoritative filter)", () => {
+    it("Test J (per-assignment qualification): a person with roleA confirmed and roleB not confirmed is KEPT", () => {
+      const guitar = makeRole({ id: "role-guitar", name: "guitar", group: "band", order: 0 });
+      const bass = makeRole({ id: "role-bass", name: "bass", group: "band", order: 1 });
+      const quarter = makeQuarter({
+        serviceDates: ["2026-08-02"],
+        calendar: {
+          "2026-08-02": { "role-guitar": ["person-1"], "role-bass": ["person-1"] },
+        },
+      });
+      const service = makeService({ date: "2026-08-02" });
+      const alice = makePerson({ id: "person-1", name: "Alice", email: "alice@example.com" });
+      const confirmedKeys = new Set(["role-guitar_alice@example.com"]);
+
+      const assignments = resolveServiceRoleAssignments(service, [quarter], [guitar, bass]);
+      const result = resolveMessageRecipients(
+        assignments,
+        [alice],
+        makeSelection({ teams: ["band"], unconfirmedOnly: true }),
+        confirmedKeys,
+      );
+
+      expect(result.reachable).toEqual([
+        { id: "person-1", name: "Alice", email: "alice@example.com", roleNames: ["guitar", "bass"] },
+      ]);
+    });
+
+    it("Test K (fully confirmed dropped): a person whose every matched assignment is confirmed is excluded", () => {
+      const guitar = makeRole({ id: "role-guitar", name: "guitar", group: "band", order: 0 });
+      const quarter = makeQuarter({
+        serviceDates: ["2026-08-02"],
+        calendar: { "2026-08-02": { "role-guitar": ["person-1"] } },
+      });
+      const service = makeService({ date: "2026-08-02" });
+      const alice = makePerson({ id: "person-1", name: "Alice", email: "alice@example.com" });
+      const confirmedKeys = new Set(["role-guitar_alice@example.com"]);
+
+      const assignments = resolveServiceRoleAssignments(service, [quarter], [guitar]);
+      const result = resolveMessageRecipients(
+        assignments,
+        [alice],
+        makeSelection({ teams: ["band"], unconfirmedOnly: true }),
+        confirmedKeys,
+      );
+
+      expect(result.reachable).toEqual([]);
+      expect(result.unreachableCount).toBe(0);
+    });
+
+    it("Test L (unconfirmedOnly false/absent unchanged): identical to today regardless of confirmedKeys", () => {
+      const guitar = makeRole({ id: "role-guitar", name: "guitar", group: "band", order: 0 });
+      const quarter = makeQuarter({
+        serviceDates: ["2026-08-02"],
+        calendar: { "2026-08-02": { "role-guitar": ["person-1"] } },
+      });
+      const service = makeService({ date: "2026-08-02" });
+      const alice = makePerson({ id: "person-1", name: "Alice", email: "alice@example.com" });
+      const confirmedKeys = new Set(["role-guitar_alice@example.com"]);
+
+      const assignments = resolveServiceRoleAssignments(service, [quarter], [guitar]);
+      const result = resolveMessageRecipients(
+        assignments,
+        [alice],
+        makeSelection({ teams: ["band"], unconfirmedOnly: false }),
+        confirmedKeys,
+      );
+
+      expect(result.reachable).toEqual([
+        { id: "person-1", name: "Alice", email: "alice@example.com", roleNames: ["guitar"] },
+      ]);
+    });
+  });
 });
 
 describe("coerceLegacyRoleGroup (R250 read-time compat shim, CR-01 regression)", () => {
