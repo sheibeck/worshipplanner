@@ -16,8 +16,8 @@ export interface ScreenLike {
   isPrimary: boolean
 }
 
-/** The two roles a monitor can be assigned in Run mode. */
-export type MonitorRole = 'audience' | 'confidence'
+/** The three roles a monitor can be assigned in Run mode (R424 adds 'video'). */
+export type MonitorRole = 'audience' | 'confidence' | 'video'
 
 /** One persisted screen-fingerprint -> role assignment. */
 export interface MonitorAssignment {
@@ -124,7 +124,12 @@ function isValidMapping(value: unknown): value is MonitorMapping {
     if (typeof a !== 'object' || a === null) return false
     const assignment = a as { fingerprint?: unknown; role?: unknown; nickname?: unknown }
     if (typeof assignment.fingerprint !== 'string') return false
-    if (assignment.role !== 'audience' && assignment.role !== 'confidence') return false
+    if (
+      assignment.role !== 'audience' &&
+      assignment.role !== 'confidence' &&
+      assignment.role !== 'video'
+    )
+      return false
     if (assignment.nickname === undefined) return true
     return typeof assignment.nickname === 'string' && assignment.nickname.length <= NICKNAME_MAX_LENGTH
   })
