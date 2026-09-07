@@ -4,17 +4,17 @@ milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
 current_phase: 133
 current_phase_name: Volunteer Responsibility Confirmation
-status: executing
-stopped_at: Completed 133-04-PLAN.md
-last_updated: "2026-09-07T17:52:43.800Z"
+status: verifying
+stopped_at: Completed 133-05-PLAN.md
+last_updated: "2026-09-07T18:14:35.962Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 133 execution started
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 10
-  completed_plans: 9
-  percent: 29
+  completed_plans: 10
+  percent: 43
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1395,7 +1395,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 133 (Volunteer Responsibility Confirmation) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-07 — Phase 133 execution started
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
@@ -3614,6 +3614,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 133 P02 | 22min | 2 tasks | 3 files |
 | Phase 133 P03 | 25min | 2 tasks | 2 files |
 | Phase 133 P04 | 20min | 1 tasks | 2 files |
+| Phase 133 P05 | 15min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -4206,6 +4207,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: The R410 confirm control lives exclusively in VolunteerServiceView's tri-tab shell; ScheduleServiceCard.vue stays read-only (133-RESEARCH.md Open Question 1, resolved)
 - [Phase ?]: Confirmations subscription + resolver live directly in ServiceEditorView.vue (no new store) — narrow, single-view-scoped read
 - [Phase ?]: reconcileConfirmations flips stale confirmed->needsReconfirmation on relock (R412), keyed on stable {roleId}_{emailLower} identity; best-effort, mirrors writeRehearseAccessDoc/ensureShareLink catch discipline
+- [Phase ?]: R413: unconfirmedOnly filters per-assignment (not per-person), scoped to team-matched roleIds only; server sendQueuedMessageHandler is the sole authoritative enforcement point (Admin-SDK confirmations read), client MessageComposer toggle is preview-only.
 
 ### Roadmap Evolution
 
@@ -4535,8 +4537,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T17:52:43.731Z
-Stopped at: Completed 133-04-PLAN.md
+Last session: 2026-09-07T18:14:26.288Z
+Stopped at: Completed 133-05-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

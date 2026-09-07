@@ -66,7 +66,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   confirmation is invalidated to "needs reconfirmation" rather than showing a stale checkmark — keyed on
   stable assignment identity.
 
-- [ ] **R413**: A planner can send reminder nudges targeting **only** unconfirmed assignments, reusing the
+- [x] **R413**: A planner can send reminder nudges targeting **only** unconfirmed assignments, reusing the
   existing v1.7 volunteer-messaging send infrastructure (a recipient-targeting change, not a new send path).
 
 ### Dashboard
@@ -174,7 +174,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R410 | Phase 133 | Complete |
 | R411 | Phase 133 | Complete |
 | R412 | Phase 133 | Complete |
-| R413 | Phase 133 | Pending |
+| R413 | Phase 133 | Complete |
 | R414 | Phase 135 | Pending |
 | R415 | Phase 135 | Pending |
 | R416 | Phase 135 | Pending |
