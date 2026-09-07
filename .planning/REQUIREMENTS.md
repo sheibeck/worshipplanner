@@ -47,7 +47,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Verbiage — Remove "Planning Center"
 
-- [ ] **R409**: "Planning Center" references are removed from UI copy that is **not** about the actual PC
+- [x] **R409**: "Planning Center" references are removed from UI copy that is **not** about the actual PC
   integration/export, after inventorying and classifying every occurrence so substantive integration copy
   isn't garbled. Concrete case: the Planned/locked banner ("Planned — editing is locked. Planning Center
   already has this plan. Reopen it…") drops the "Planning Center already has this plan." sentence.
@@ -170,7 +170,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R406 | Phase 132 | Pending |
 | R407 | Phase 132 | Pending |
 | R408 | Phase 132 | Complete |
-| R409 | Phase 132 | Pending |
+| R409 | Phase 132 | Complete |
 | R410 | Phase 133 | Pending |
 | R411 | Phase 133 | Pending |
 | R412 | Phase 133 | Pending |
