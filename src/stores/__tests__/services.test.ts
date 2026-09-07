@@ -2444,6 +2444,180 @@ describe('useServiceStore', () => {
     })
   })
 
+  // ── Plan 133-04 (R412) — relock reconciliation. The default roster/quarters
+  // fixtures (top of file) resolve, for `makeService()`'s default date
+  // 2026-03-08 with no roleAssignmentOverrides, to exactly two valid
+  // confirmation keys: role-guitar_alice@example.com and
+  // role-sound_bob@example.com. Each test below stocks the confirmations
+  // `getDocs` read with whatever pre-existing docs it needs, via
+  // `mockResolvedValueOnce` — under this fixture, reconcileConfirmations's
+  // read is the ONLY `getDocs` call markAsPlanned triggers (ensureShareLink's
+  // own getDocs only fires on its no-existing-link branch, not exercised
+  // here), so a single `mockResolvedValueOnce` reliably targets it.
+  describe('confirmations reconciliation on relock (R412, Plan 133-04)', () => {
+    function confirmationDoc(id: string, data: Record<string, unknown>) {
+      return { id, data: () => data }
+    }
+
+    it('flips a stale confirmed doc to needsReconfirmation when its assignment is no longer valid', async () => {
+      const { getDocs, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          confirmationDoc('role-guitar_dana@example.com', {
+            roleId: 'role-guitar',
+            roleName: 'Guitar',
+            emailLower: 'dana@example.com',
+            status: 'confirmed',
+            confirmedAt: null,
+            updatedAt: { seconds: 1, nanoseconds: 0 },
+          }),
+        ],
+      } as never)
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status: 'draft' })])
+
+      await store.markAsPlanned('service-1')
+
+      const flipCall = vi
+        .mocked(updateDoc)
+        .mock.calls.find((call) =>
+          (call[0] as { path?: string }).path?.includes('confirmations/role-guitar_dana@example.com'),
+        )
+      expect(flipCall).toBeDefined()
+      const payload = flipCall![1] as unknown as Record<string, unknown>
+      expect(payload.status).toBe('needsReconfirmation')
+      expect(payload.updatedAt).toEqual({ seconds: 1000000, nanoseconds: 0 })
+    })
+
+    it('leaves a confirmed doc untouched when its assignment is unchanged across the relock', async () => {
+      const { getDocs, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          confirmationDoc('role-guitar_alice@example.com', {
+            roleId: 'role-guitar',
+            roleName: 'Guitar',
+            emailLower: 'alice@example.com',
+            status: 'confirmed',
+            confirmedAt: { seconds: 1, nanoseconds: 0 },
+            updatedAt: { seconds: 1, nanoseconds: 0 },
+          }),
+        ],
+      } as never)
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status: 'draft' })])
+
+      await store.markAsPlanned('service-1')
+
+      const confirmationWrites = vi
+        .mocked(updateDoc)
+        .mock.calls.filter((call) => (call[0] as { path?: string }).path?.includes('/confirmations/'))
+      expect(confirmationWrites).toHaveLength(0)
+    })
+
+    it('does not re-write a doc already needsReconfirmation, even if its key is still stale', async () => {
+      const { getDocs, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          confirmationDoc('role-sound_dana@example.com', {
+            roleId: 'role-sound',
+            roleName: 'Sound',
+            emailLower: 'dana@example.com',
+            status: 'needsReconfirmation',
+            confirmedAt: null,
+            updatedAt: { seconds: 1, nanoseconds: 0 },
+          }),
+        ],
+      } as never)
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status: 'draft' })])
+
+      await store.markAsPlanned('service-1')
+
+      const confirmationWrites = vi
+        .mocked(updateDoc)
+        .mock.calls.filter((call) => (call[0] as { path?: string }).path?.includes('/confirmations/'))
+      expect(confirmationWrites).toHaveLength(0)
+    })
+
+    it('does not create a doc for a still-unconfirmed assignment', async () => {
+      const { getDocs, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDocs).mockResolvedValueOnce({ empty: true, docs: [] } as never)
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status: 'draft' })])
+
+      await store.markAsPlanned('service-1')
+
+      const confirmationWrites = vi
+        .mocked(updateDoc)
+        .mock.calls.filter((call) => (call[0] as { path?: string }).path?.includes('/confirmations/'))
+      expect(confirmationWrites).toHaveLength(0)
+    })
+
+    it('is best-effort: a confirmations read failure logs and does not block the status transition', async () => {
+      const { getDocs, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDocs).mockRejectedValueOnce(new Error('boom'))
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status: 'draft' })])
+
+      await expect(store.markAsPlanned('service-1')).resolves.toBeUndefined()
+
+      expect(updateDoc).toHaveBeenCalled()
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('confirmations reconciliation failed'),
+        expect.anything(),
+      )
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('is best-effort: a confirmations write (flip) failure logs and does not block the status transition', async () => {
+      const { getDocs, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          confirmationDoc('role-guitar_dana@example.com', {
+            roleId: 'role-guitar',
+            roleName: 'Guitar',
+            emailLower: 'dana@example.com',
+            status: 'confirmed',
+            confirmedAt: null,
+            updatedAt: { seconds: 1, nanoseconds: 0 },
+          }),
+        ],
+      } as never)
+      vi.mocked(updateDoc).mockImplementationOnce(() => Promise.resolve()) // the status-transition write
+      vi.mocked(updateDoc).mockImplementationOnce(() => Promise.reject(new Error('flip failed'))) // the confirmation flip
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status: 'draft' })])
+
+      await expect(store.markAsPlanned('service-1')).resolves.toBeUndefined()
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('confirmations reconciliation failed'),
+        expect.anything(),
+      )
+
+      consoleErrorSpy.mockRestore()
+    })
+  })
+
   // ── Phase 130 (R404): resyncRehearseAccessForSong forwards orgName sourced
   // from a direct getDoc(organizations/{orgId}) — this path deliberately
   // avoids the org-scoped Pinia stores (RESEARCH pitfall 4: forgetting to mock

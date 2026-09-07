@@ -37,6 +37,7 @@ import {
   serviceToLastUsedInput,
   type LastUsedServiceInput,
 } from '@/utils/lastUsed'
+import { computeValidConfirmationKeys, confirmationKey, type ConfirmationDoc } from '@/utils/confirmations'
 import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot, StageMarker } from '@/types/service'
 import type { SongSlot } from '@/types/service'
 import type { RoleGroup, Quarter, Role, Person } from '@/types/roster'
@@ -313,6 +314,53 @@ async function writeRehearseAccessDoc(
     ...rehearseAccess,
     updatedAt: serverTimestamp(),
   })
+}
+
+/**
+ * R412 — relock invalidation. Diffs the valid confirmation key set THIS
+ * relock just resolved (`computeValidConfirmationKeys`, Plan 133-01) against
+ * every stored confirmation doc and flips only the stale `confirmed` ones to
+ * `needsReconfirmation`. A doc whose key is still valid is left completely
+ * untouched (no write, no timestamp bump) — this is what preserves an
+ * unchanged assignment's confirmation across an unrelated roster edit. A doc
+ * already `needsReconfirmation` is left alone too (idempotent, nothing to
+ * flip twice). Keys with no doc at all stay implicit `unconfirmed` — nothing
+ * is created here, mirroring R410's "unconfirmed is never stored" rule.
+ *
+ * The `getDocs` below is the ONE legitimate one-time read for this whole
+ * feature (RESEARCH.md Pitfall 1) — this is the authoritative moment of
+ * change (a relock), not a display read, which must stay `onSnapshot`-only.
+ *
+ * `reopenService` needs no equivalent call: the volunteer's entire
+ * confirmations read/write path is already cut off the moment
+ * `rehearseAccess` is deleted at reopen (RESEARCH.md "R412 — Invalidation
+ * Hook"), so the NEXT `markAsPlanned`'s reconciliation is the only hook that
+ * ever needs to run.
+ */
+async function reconcileConfirmations(
+  service: Service,
+  org: string,
+  quarters: Quarter[],
+  roles: Role[],
+  people: Person[],
+): Promise<void> {
+  const validKeys = computeValidConfirmationKeys(service, quarters, roles, people)
+  const snap = await getDocs(
+    collection(db, 'organizations', org, 'services', service.id, 'confirmations'),
+  )
+  const flips: Promise<void>[] = []
+  for (const d of snap.docs) {
+    const data = d.data() as ConfirmationDoc
+    if (data.status !== 'confirmed') continue
+    if (validKeys.has(confirmationKey(data.roleId, data.emailLower))) continue
+    flips.push(
+      updateDoc(doc(db, 'organizations', org, 'services', service.id, 'confirmations', d.id), {
+        status: 'needsReconfirmation',
+        updatedAt: serverTimestamp(),
+      }),
+    )
+  }
+  await Promise.all(flips)
 }
 
 export const useServiceStore = defineStore('services', () => {
@@ -649,6 +697,29 @@ export const useServiceStore = defineStore('services', () => {
       } catch (err) {
         console.error(
           `markAsPlanned: rehearseAccess projection write failed for service ${id} — the status transition already succeeded`,
+          err,
+        )
+      }
+
+      // R412 — flip stale 'confirmed' docs to 'needsReconfirmation' now this
+      // relock's assignment set is final. Best-effort, same discipline as the
+      // rehearseAccess write above and the share-link self-heal below: a
+      // confirmations read/write failure must never roll back the
+      // already-succeeded status transition. reopenService needs no
+      // equivalent call — see reconcileConfirmations' doc comment.
+      try {
+        const rosterStore = useRosterStore()
+        const quartersStore = useQuartersStore()
+        await reconcileConfirmations(
+          { ...service, status: 'planned' },
+          orgId.value,
+          quartersStore.quarters,
+          rosterStore.roles,
+          rosterStore.people,
+        )
+      } catch (err) {
+        console.error(
+          `markAsPlanned: confirmations reconciliation failed for service ${id} — the status transition already succeeded`,
           err,
         )
       }
