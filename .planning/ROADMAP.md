@@ -895,11 +895,11 @@ relock.
      the existing v1.7 volunteer-messaging send infrastructure as a recipient-targeting change, not a new
      send path (R413).
 
-**Plans**: 1/5 plans executed
+**Plans**: 2/5 plans executed
 Plans:
 
 - [x] 133-01-PLAN.md — Confirmation data model, firestore.rules confirmations block & 12 ALLOW/DENY rules tests (R410, R412)
-- [ ] 133-02-PLAN.md — Volunteer "I've got it" confirm control in VolunteerServiceView (R410)
+- [x] 133-02-PLAN.md — Volunteer "I've got it" confirm control in VolunteerServiceView (R410)
 - [ ] 133-03-PLAN.md — Planner live confirmation-status chips on the Roles tab via onSnapshot (R411)
 - [ ] 133-04-PLAN.md — Relock invalidation: stale confirmed → needsReconfirmation in markAsPlanned (R412)
 - [ ] 133-05-PLAN.md — Unconfirmed-only nudge targeting, client preview + authoritative server re-resolve (R413)
