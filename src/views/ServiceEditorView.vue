@@ -1452,9 +1452,26 @@
                     Reset to schedule
                   </button>
                 </div>
-                <p class="text-sm text-gray-300 mt-1">
-                  {{ effectiveNames(assignment).length > 0 ? effectiveNames(assignment).join(', ') : 'Nobody scheduled' }}
-                </p>
+                <!-- R411: each assigned person carries a live confirmation
+                     status chip (Confirmed / Unconfirmed / Needs
+                     reconfirmation), read from the onSnapshot-driven
+                     confirmationStatuses map above — never a one-time fetch. -->
+                <div class="text-sm text-gray-300 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <template v-if="effectiveNames(assignment).length > 0">
+                    <span
+                      v-for="personId in assignment.effectivePersonIds"
+                      :key="personId"
+                      class="inline-flex items-center gap-1.5"
+                    >
+                      <span>{{ personName(personId) }}</span>
+                      <span
+                        :data-testid="`role-confirm-chip-${assignment.roleId}-${personId}`"
+                        :class="confirmationChipClass(confirmationStatusFor(assignment.roleId, personId))"
+                      >{{ confirmationChipLabel(confirmationStatusFor(assignment.roleId, personId)) }}</span>
+                    </span>
+                  </template>
+                  <span v-else>Nobody scheduled</span>
+                </div>
                 <!-- Override picker: eligible people are those with this role
                      (mirrors QuarterGrid.vue's hasRole). CLASS B, and the most
                      surprising entry in the table — this div had NO `v-if` of any
