@@ -180,6 +180,10 @@ afterEach(() => {
 
 describe('VideoOutputView — shared fullscreen render (R426)', () => {
   it('renders no slide, no spinner, and no copy before any state (index null) — pure black', async () => {
+    // Fullscreen so the (windowed-only) re-enter affordance is hidden,
+    // isolating the "no slide, no spinner, no copy" claim to the pure-black
+    // gate (mirrors AudienceOutputView.test.ts's pure-black describe block).
+    setFullscreenElement(document.createElement('div'))
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
     await flushPromises()
@@ -204,6 +208,7 @@ describe('VideoOutputView — shared fullscreen render (R426)', () => {
   })
 
   it('renders pure black for an out-of-range index — no SlideCanvas, no error copy', async () => {
+    setFullscreenElement(document.createElement('div'))
     const fake = createFakeChannel()
     const wrapper = mountView(fake.factory)
     await flushPromises()

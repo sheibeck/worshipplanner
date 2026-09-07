@@ -120,6 +120,22 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      // R424 — the Video output window. Mirrors /present/audience and
+      // /present/confidence: requiresAuth ONLY (any authenticated org member,
+      // editor or viewer; presentation-only, no editor tier). The org travels
+      // in the ?org= query so the window self-scopes; it is opened
+      // programmatically by useRunControl's openPlaced/openUnplaced (a saved
+      // 'video' monitor assignment) yet is also directly loadable. Phase 136
+      // renders fullscreen via the SAME shared FullscreenSlideOutput render as
+      // Audience (R426) — Phase 137 adds the Banner mode on top. Placed among
+      // the static authed routes, before the trailing public dynamic slug
+      // routes, so it is never shadowed.
+      path: '/present/video/:serviceId',
+      name: 'video-output',
+      component: () => import('../views/VideoOutputView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       // R261/R275 — the standalone Run/Control operator screen. requiresAuth
       // ONLY (any authenticated org member, editor or viewer; running is
       // presentation-only, no editor tier — mirrors /present/audience and
