@@ -570,7 +570,12 @@ just reuse the existing `rolesByEmailLower` names array with a parallel ids arra
 CLIENT reads for rendering. Two flat fields, zero rules-language risk, zero ambiguity — this is the
 resolved recommendation, not an open question for the planner.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> **RESOLVED 2026-09-07 (during planning):** the "I've got it" control lives EXCLUSIVELY in
+> `VolunteerServiceView.vue`'s tri-tab shell (Plan 133-02); `ScheduleServiceCard.vue` stays a read-only
+> `<router-link>` (no invalid nested-interactive-in-`<a>` restructure). Data-model-wise both locations read
+> the same `roleAssignmentsByEmailLower`/confirmations data, so this never blocked data-layer planning.
 
 1. **Exact UI surface for the "I've got it" control on `ScheduleServiceCard.vue`**
    - What we know: the whole card is currently one `<router-link>` (`ScheduleServiceCard.vue:2-8`);
