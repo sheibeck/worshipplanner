@@ -3032,3 +3032,243 @@ describe('My Schedule — constrained collectionGroup list (R378)', () => {
     await assertFails(getDocs(q))
   })
 })
+
+// R410/R412 (Phase 133, security foundation): a volunteer's "I've got it"
+// confirmation write — a NEW scoped WRITE by a non-org-member, layered onto
+// the read-only v2.12 rehearseAccess projection. See 133-RESEARCH.md's
+// Security Domain table for the full 12-row ALLOW/DENY spec this block
+// implements verbatim.
+describe('Volunteer confirmation scoped write — R410', () => {
+  async function seedConfirmationFixtures() {
+    // orgA/svcA: Planned, assigned to dana@example.com for role r1 — the
+    // volunteer's one legitimate write target.
+    await seedDoc('organizations/orgA/services/svcA', { status: 'planned' })
+    await seedDoc('organizations/orgA/rehearseAccess/svcA', {
+      serviceId: 'svcA',
+      orgId: 'orgA',
+      assignedEmailsLower: ['dana@example.com'],
+      roleIdsByEmailLower: { 'dana@example.com': ['r1'] },
+    })
+
+    // orgA/svcOther: Planned, assigned to a DIFFERENT volunteer (erin) —
+    // proves cross-service (same-org) isolation: dana is not in this
+    // service's assignedEmailsLower/roleIdsByEmailLower at all.
+    await seedDoc('organizations/orgA/services/svcOther', { status: 'planned' })
+    await seedDoc('organizations/orgA/rehearseAccess/svcOther', {
+      serviceId: 'svcOther',
+      orgId: 'orgA',
+      assignedEmailsLower: ['erin@example.com'],
+      roleIdsByEmailLower: { 'erin@example.com': ['r1'] },
+    })
+
+    // orgA/svcDraft: still Draft — never locked (or reopened), so NO
+    // rehearseAccess doc exists at all. Proves the exists()-guarded-FIRST
+    // check fails write closed rather than erroring.
+    await seedDoc('organizations/orgA/services/svcDraft', { status: 'draft' })
+
+    // orgB/svcB: Planned in a DIFFERENT org, assigned to a different
+    // volunteer — proves cross-tenant isolation.
+    await seedDoc('organizations/orgB/services/svcB', { status: 'planned' })
+    await seedDoc('organizations/orgB/rehearseAccess/svcB', {
+      serviceId: 'svcB',
+      orgId: 'orgB',
+      assignedEmailsLower: ['erin@example.com'],
+      roleIdsByEmailLower: { 'erin@example.com': ['r1'] },
+    })
+  }
+
+  it('(1) ALLOW — an assigned, verified volunteer creates their own confirmation for a role they are assigned', async () => {
+    await seedConfirmationFixtures()
+    // Mixed-case token email vs. lowercased doc field — proves the required
+    // .lower() normalization on both sides (mirrors the R377 suite's own
+    // Pitfall 5 coverage).
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'Dana@Example.com', email_verified: true })
+      .firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'dana@example.com',
+        status: 'confirmed',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(2) ALLOW — the same volunteer deletes her own confirmation to un-confirm', async () => {
+    await seedConfirmationFixtures()
+    await seedDoc('organizations/orgA/services/svcA/confirmations/r1_dana@example.com', {
+      roleId: 'r1',
+      roleName: 'Guitar',
+      emailLower: 'dana@example.com',
+      status: 'confirmed',
+      confirmedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com')))
+  })
+
+  it('(3) DENY — dana cannot write a confirmation keyed to another assigned volunteer\'s email (self-escalation)', async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_erin@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'erin@example.com',
+        status: 'confirmed',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(4) DENY — dana cannot write a confirmation for a roleId she is not assigned (forged role)', async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r9_dana@example.com'), {
+        roleId: 'r9',
+        roleName: 'Forged Role',
+        emailLower: 'dana@example.com',
+        status: 'confirmed',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(5) DENY — dana (assigned to svcA) cannot write under svcOther\'s confirmations (cross-service, same org)', async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcOther', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'dana@example.com',
+        status: 'confirmed',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(6) DENY — dana (assigned in orgA) cannot write under orgB\'s confirmations (cross-tenant)', async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgB', 'services', 'svcB', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'dana@example.com',
+        status: 'confirmed',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(7) DENY — a volunteer cannot write a confirmation while the parent service is Draft (no rehearseAccess doc exists)', async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcDraft', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'dana@example.com',
+        status: 'confirmed',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(8) DENY — a volunteer cannot write/update the parent services/{serviceId} doc itself (no new write surface added)', async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertFails(updateDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA'), { status: 'draft' }))
+  })
+
+  it('(9) DENY — an email_verified: false account cannot write a confirmation', async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('attackerUid', { email: 'dana@example.com', email_verified: false })
+      .firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'dana@example.com',
+        status: 'confirmed',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(10) ALLOW — an org member writes/updates a confirmation directly (relock-reconciliation path), including status:\'needsReconfirmation\'', async () => {
+    await seedConfirmationFixtures()
+    await seedMembershipDoc('orgA', 'memberUid', 'member')
+    const db = testEnv.authenticatedContext('memberUid').firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'dana@example.com',
+        status: 'needsReconfirmation',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(11) ALLOW — an org member gets/lists the confirmations subcollection', async () => {
+    await seedConfirmationFixtures()
+    await seedDoc('organizations/orgA/services/svcA/confirmations/r1_dana@example.com', {
+      roleId: 'r1',
+      roleName: 'Guitar',
+      emailLower: 'dana@example.com',
+      status: 'confirmed',
+      confirmedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    await seedMembershipDoc('orgA', 'memberUid', 'member')
+    const db = testEnv.authenticatedContext('memberUid').firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com')))
+    await assertSucceeds(getDocs(collection(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations')))
+  })
+
+  it('(12) DENY — a non-assigned, non-member signed-in user cannot read another org\'s confirmations', async () => {
+    await seedConfirmationFixtures()
+    await seedDoc('organizations/orgB/services/svcB/confirmations/r1_erin@example.com', {
+      roleId: 'r1',
+      roleName: 'Guitar',
+      emailLower: 'erin@example.com',
+      status: 'confirmed',
+      confirmedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    const db = testEnv
+      .authenticatedContext('strangerUid', { email: 'stranger@example.com', email_verified: true })
+      .firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgB', 'services', 'svcB', 'confirmations', 'r1_erin@example.com')))
+    await assertFails(getDocs(collection(db, 'organizations', 'orgB', 'services', 'svcB', 'confirmations')))
+  })
+})
