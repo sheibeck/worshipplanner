@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest'
 import { shallowMount, enableAutoUnmount } from '@vue/test-utils'
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
 import type { Service } from '@/types/service'
@@ -92,6 +92,13 @@ vi.mock('firebase/firestore', () => ({
   orderBy: vi.fn(),
   limit: vi.fn(),
   getDocs: vi.fn(() => Promise.resolve({ empty: true, docs: [] })),
+}))
+
+// Phase 134 (R422) — the editor-presence indicator is out of scope for this
+// confirmations-focused file; stubbed to a constant empty list so it never
+// contributes noise to the confirmations onSnapshot/setDoc assertions.
+vi.mock('@/composables/useServicePresence', () => ({
+  useServicePresence: vi.fn(() => ({ presentViewers: ref([]) })),
 }))
 
 const mockSlotSortableDestroy = vi.fn()

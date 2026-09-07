@@ -91,6 +91,21 @@
                 {{ statusLabel }}
               </span>
 
+              <!-- Editor presence indicator (R422) — other current viewers of
+                   this service (heartbeat + client-staleness "who's here" via
+                   useServicePresence). Guarded on presence; collapses to
+                   nothing when nobody else is here. Names render via `{{ }}`
+                   text interpolation ONLY — NEVER v-html — since displayName
+                   is a denormalized, client-supplied field (T-134-05). -->
+              <div
+                v-if="otherPresentViewers.length > 0"
+                class="flex items-center gap-1.5 text-xs text-gray-400"
+                data-testid="service-presence-indicator"
+              >
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
+                <span>{{ otherPresentViewers.map((v) => v.displayName).join(', ') }}</span>
+              </div>
+
               <!-- Save-status ("Saving…/Saved HH:MM" + Undo) RELOCATED here beside
                    the status pill (owner 2026-09-01): it used to sit in its own
                    `sticky top-0` bar above the tab content, where toggling its
@@ -1774,6 +1789,7 @@ import { buildActionBarItems } from '@/views/serviceEditorActionBar'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useAiSongSuggestions } from '@/composables/useAiSongSuggestions'
+import { useServicePresence } from '@/composables/useServicePresence'
 import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanNeededPositionTeamIds, fetchTeamPositions, addNeededPosition } from '@/utils/planningCenterApi'
 import { serverTimestamp, doc, getDoc, setDoc, collection, onSnapshot, type Unsubscribe } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
@@ -4288,6 +4304,17 @@ function subscribeConfirmations(): void {
 // Re-subscribes when the org or the loaded service id changes; the `immediate`
 // run is what fires the initial subscription once localService populates.
 watch([() => authStore.orgId, () => localService.value?.id], subscribeConfirmations, { immediate: true })
+
+// ── Live editor presence (R422) ─────────────────────────────────────────────
+// "Who's here" for the header indicator — heartbeat + client staleness +
+// teardown all live in the composable; this view only renders and excludes
+// the current user's own row.
+const { presentViewers } = useServicePresence(
+  () => authStore.orgId,
+  () => serviceId.value,
+  () => authStore.user,
+)
+const otherPresentViewers = computed(() => presentViewers.value.filter((v) => v.uid !== authStore.user?.uid))
 
 /**
  * Resolves the live confirmation status for a (roleId, personId) assignment.

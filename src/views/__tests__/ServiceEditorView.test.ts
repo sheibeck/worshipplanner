@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest'
 import { shallowMount, enableAutoUnmount, DOMWrapper, flushPromises, type VueWrapper } from '@vue/test-utils'
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
 import type { Service } from '@/types/service'
@@ -123,6 +123,13 @@ vi.mock('firebase/firestore', () => ({
   orderBy: vi.fn(),
   limit: vi.fn(),
   getDocs: vi.fn(() => Promise.resolve({ empty: true, docs: [] })),
+}))
+
+// Phase 134 (R422) — the editor-presence indicator is out of scope for this
+// file's lock/save/messaging assertions; stubbed to a constant empty list so
+// its heartbeat setDoc never pollutes this file's exact-call-count checks.
+vi.mock('@/composables/useServicePresence', () => ({
+  useServicePresence: vi.fn(() => ({ presentViewers: ref([]) })),
 }))
 
 // ── Phase 29-01: multi-instance Sortable capture harness (R044) ────────────────

@@ -13,7 +13,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, shallowMount, flushPromises } from '@vue/test-utils'
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
 import type { Service, HymnSlot } from '@/types/service'
@@ -134,6 +134,12 @@ vi.mock('firebase/firestore', () => ({
   orderBy: vi.fn(),
   limit: vi.fn(),
   getDocs: vi.fn(() => Promise.resolve({ empty: true, docs: [] })),
+}))
+
+// Phase 134 (R422) — the editor-presence indicator is out of scope for this
+// HYMN cross-surface regression suite; stubbed to a constant empty list.
+vi.mock('@/composables/useServicePresence', () => ({
+  useServicePresence: vi.fn(() => ({ presentViewers: ref([]) })),
 }))
 
 // esvApi's fetchPassageText is only reached by the SCRIPTURE branch of
