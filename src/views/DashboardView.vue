@@ -90,11 +90,14 @@
           </router-link>
         </div>
 
-        <!-- Attention cards row (R417 unconfirmed volunteers; R418 editor
-             presence roll-up is added by Plan 03 alongside this card, per
-             135-UI-SPEC.md's attention-cards row). -->
+        <!-- Attention cards row: R417 unconfirmed volunteers + R418 editor
+             presence roll-up. When presence is empty/hidden, the unconfirmed
+             card expands to lg:col-span-2 to fill the row. -->
         <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 lg:col-span-2">
+          <div
+            class="rounded-lg border border-gray-800 bg-gray-900 p-5"
+            :class="{ 'lg:col-span-2': activeEditors.length === 0 }"
+          >
             <div class="flex items-center justify-between mb-3">
               <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500">Unconfirmed volunteers</h2>
               <span
@@ -142,6 +145,25 @@
               </router-link>
             </div>
           </div>
+
+          <!-- R418: read-only editor-presence roll-up; hidden entirely when
+               nobody is currently editing (135-UI-SPEC.md Widget 3). -->
+          <div v-if="activeEditors.length > 0" class="rounded-lg border border-gray-800 bg-gray-900 p-5">
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Currently editing</h2>
+            <div class="divide-y divide-gray-800">
+              <router-link
+                v-for="editor in activeEditors"
+                :key="`${editor.serviceId}-${editor.uid}`"
+                :to="`/services/${editor.serviceId}`"
+                class="flex items-center gap-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-950"
+              >
+                <span class="h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" aria-hidden="true"></span>
+                <p class="min-w-0 truncate text-sm text-gray-200">
+                  {{ editor.displayName }} is editing {{ editor.serviceName }}
+                </p>
+              </router-link>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -178,6 +200,7 @@ import AppShell from '@/components/AppShell.vue'
 import GettingStarted from '@/components/GettingStarted.vue'
 import { dashboardReadinessOf, serviceReadinessSongs, type DashboardReadinessState } from '@/utils/dashboardReadiness'
 import { useUnconfirmedVolunteers, type UnconfirmedVolunteerRow } from '@/composables/useUnconfirmedVolunteers'
+import { usePresenceRollup } from '@/composables/usePresenceRollup'
 import type { ConfirmationStatus } from '@/utils/confirmations'
 
 const authStore = useAuthStore()
@@ -229,6 +252,18 @@ const UNCONFIRMED_ROW_CAP = 8
 const visibleUnconfirmedRows = computed(() => unconfirmedRows.value.slice(0, UNCONFIRMED_ROW_CAP))
 const extraUnconfirmedCount = computed(() =>
   Math.max(0, unconfirmedRows.value.length - UNCONFIRMED_ROW_CAP),
+)
+
+// ── Editor presence roll-up (R418) — bounded fan-out over the same ≤6
+// upcoming-services window as the feed itself (not Planned-restricted like
+// the unconfirmed-volunteers window above — a draft service can still be
+// actively edited). READ-ONLY: the dashboard never writes a presence doc.
+const PRESENCE_WINDOW_SIZE = 6
+const presenceWindow = computed(() => upcomingServices.value.slice(0, PRESENCE_WINDOW_SIZE))
+
+const { activeEditors } = usePresenceRollup(
+  () => authStore.orgId,
+  () => presenceWindow.value,
 )
 
 // Identical chip vocabulary to ServiceEditorView.vue's CONFIRMATION_CHIP_CLASS
