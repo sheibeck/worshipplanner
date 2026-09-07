@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.13
-milestone_name: Volunteer Self-Service & Multi-Church Access (Phases 128-130, in planning)
-status: completed
-stopped_at: Completed 130-02-PLAN.md
-last_updated: "2026-09-07T03:59:25.018Z"
-last_activity: 2026-09-06
-last_activity_desc: Milestone v2.13 completed and archived
+milestone: v2.14
+milestone_name: Services UX Alignment, Dashboard & Live-Stream Output
+status: planning
+last_updated: "2026-09-07T05:02:06.931Z"
+last_activity: 2026-09-07
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
-current_phase: 130
-current_phase_name: Phase 130 complete (Plans 01+02) -- v2.13 (Phases 128-130) fully built, autonomous + auto-verified green, UNDEPLOYED
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1358,10 +1354,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v2.13 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-09-06 — Milestone v2.13 completed and archived
+Status: Defining requirements
+Last activity: 2026-09-07 — Milestone v2.14 started
 
 ### Preceding: Phase 129 (complete)
 

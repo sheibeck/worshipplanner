@@ -8,6 +8,61 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
+## Current Milestone: v2.14 Services UX Alignment, Dashboard & Live-Stream Output
+
+**Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
+genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
+live-stream output with banner/full-screen slides.
+
+**Target features:**
+
+- **Services page UX alignment** — give the main `/services` page the standard page header used elsewhere
+  in the app, and make its tabs and buttons mobile-friendly (they currently don't match the header/button
+  pattern and aren't usable on a phone).
+- **Useful dashboard** — remove the undefined "Volunteer coverage" (never specified what coverage means)
+  and replace the dashboard with actionable content. Confirmed directions: **upcoming services + a
+  readiness signal** (songs/media attached, roles filled, slides built, Draft vs Planned/locked) and
+  **unconfirmed volunteers**; the research pass proposes the final candidate widget set to scope.
+- **Remove "Planning Center" verbiage** — strip Planning Center references from UI copy that isn't about
+  the actual PC integration/export text. Concrete example: the Planned/locked banner reads "Planned —
+  editing is locked. Planning Center already has this plan. Reopen it…"; remove "Planning Center already
+  has this plan."
+- **Worship-team responsibility confirmation** — let a worship-team member confirm they know they're
+  responsible for something in a service. Volunteer taps "I've got it" per assignment in their
+  volunteer-facing surface (My Schedule / volunteer service view from v2.12/2.13); planners see who has
+  confirmed on the roster.
+- **Stage Layout auto-populate** — the per-service Stage Layout auto-populates the assigned
+  roles/instruments for that service (instead of an empty canvas).
+- **Auto-generate service share link** — a service's share link exists/derives automatically; the user
+  should not have to manually click "Share Link" for the link to be generated.
+- **Alternating row shading** — add an alternating light-gray row background to the share service-link
+  pages so it's easier to keep your place scanning each row of the service plan.
+- **Editor presence indicator** — show who else is currently viewing a given service, so concurrent
+  editors are aware of each other (race-condition awareness). A visual indicator that another user is
+  also viewing this service.
+- **"Video" live-stream output (3rd monitor/output type)** — add a third output type "Video" alongside
+  Audience/Confidence. A slide item gains an option to be sent to the Video output as either a **Banner**
+  (fills only a portion of the bottom of the screen — intended so the video room shows live stage video
+  behind, with the slide text along the bottom) or **Full-screen** (the slide fills the entire video
+  picture). Banner is valid **only** when the output is "Video": when Banner + Video, the slide contents
+  are fit to the banner region and the rest of the output is rendered with **alpha transparency** so the
+  video room can composite live video behind the slide. **Scope decision (owner, 2026-09-07):** build the
+  **app side** this milestone (the Video output role, the per-item Banner/Full-screen choice, and the
+  transparent-background banner render). The physical **Blackbird** keying/compositing is treated as an
+  **external integration verified separately**, not owned by this milestone's code.
+
+**Key context / decisions:**
+- **Research-first** (owner, 2026-09-07): a domain/ecosystem research pass runs before requirements —
+  dashboard patterns for worship/church planning tools, live-stream lower-thirds / alpha-keying (chroma /
+  fill+key) conventions, and presence/collaboration ("who's here") indicator patterns.
+- **Video output = app-side only** this milestone; the Blackbird hardware compositing path is flagged as a
+  risk/external dependency, not built. The owner still intends to research the Blackbird behavior.
+- **Confirmation reuses the v2.12/2.13 volunteer surface** (My Schedule / volunteer service view) plus a
+  planner-visible confirmed state on the roster.
+- **Backlog overlap:** `.planning/phases/999.3-monitor-setup-multi-monitor-signal-routing/` is adjacent to
+  the Video-output work; consult it during roadmapping.
+- Requirements continue from the v2.13 range; phases continue from 131.
+
 ## Shipped Milestone: v2.13 Volunteer Self-Service & Multi-Church Access — ✅ SHIPPED & DEPLOYED 2026-09-07
 
 **Goal:** Let volunteers get their own passwordless sign-in link on demand and see their schedule
