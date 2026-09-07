@@ -806,7 +806,7 @@ leak. Trivial wins (auto share-link, Stage Layout auto-populate) ship first to d
   999.x entries below are backlog, not this milestone; 999.2 and 999.3 are untouched by this numbering.)
 
 - [x] **Phase 131: Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate** - A service's share link exists automatically at the Planned/lock transition and its Stage Layout seeds itself once from the roster on first empty-canvas visit *(EXECUTED + code-verified 11/11; visual/emulator UAT deferred to milestone end — v2.14-DEFERRED-VERIFICATION.md)*
-- [ ] **Phase 132: Services Page UX Alignment & Verbiage Cleanup** - The `/services` page matches the app's standard header/mobile conventions, share-plan rows alternate-shade for scanability, and incidental "Planning Center" copy is removed
+- [x] **Phase 132: Services Page UX Alignment & Verbiage Cleanup** - The `/services` page matches the app's standard header/mobile conventions, share-plan rows alternate-shade for scanability, and incidental "Planning Center" copy is removed *(EXECUTED + code-verified 7/10; 3 visual UAT items deferred — v2.14-DEFERRED-VERIFICATION.md)*
 - [ ] **Phase 133: Volunteer Responsibility Confirmation** - A volunteer confirms ("I've got it") a per-assignment responsibility; a planner sees live status on the roster and can nudge only the unconfirmed
 - [ ] **Phase 134: Editor Presence** - Concurrent viewers/editors of a service see who else is currently present, backed by an org-scoped Firestore heartbeat with a dedicated cross-tenant rules review
 - [ ] **Phase 135: Dashboard Overhaul** - The dashboard becomes an actionable "needs your attention" feed — upcoming services, readiness, unconfirmed volunteers, editor-presence roll-up, empty state

@@ -36,10 +36,10 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Services Page & Share-View Polish
 
-- [ ] **R406**: The main `/services` page uses the same standard page header pattern as the rest of the app
+- [x] **R406**: The main `/services` page uses the same standard page header pattern as the rest of the app
   (it currently doesn't match), so it looks and behaves consistently with other pages.
 
-- [ ] **R407**: The `/services` page's tabs and buttons are mobile-friendly — usable and readable on a phone
+- [x] **R407**: The `/services` page's tabs and buttons are mobile-friendly — usable and readable on a phone
   (they currently aren't), matching the app's mobile button/header conventions.
 
 - [x] **R408**: The share service-link pages render service-plan rows with an alternating light-gray row
