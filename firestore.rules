@@ -257,6 +257,61 @@ service cloud.firestore {
           allow read:  if isOrgMember(orgId);
           allow write: if isOrgEditor(orgId);
         }
+
+        // Confirmations — R410/R412 (Phase 133): a volunteer's "I've got it"
+        // for one (roleId, emailLower) assignment on this service. Nested
+        // here (not sibling, like rehearseAccess) so orgId AND docId
+        // (serviceId) both come free from the enclosing path segments — no
+        // client-supplied field is ever trusted for scoping, so cross-org
+        // and cross-service access are structurally impossible, exactly
+        // like messages/lockSnapshots above.
+        //
+        // The volunteer arm reuses rehearseAccess's own exists()-guarded-
+        // FIRST sibling get() idiom (:277-282) rather than re-implementing
+        // assignment resolution here: isAssignedVolunteer() checks the SAME
+        // already-editor-trusted projection every other volunteer read
+        // already depends on. This block NEVER inherits rehearseAccess's
+        // editor-only `write` rule, and it adds ZERO new arms to the
+        // services/{docId} `update` rule above — a volunteer confirming
+        // cannot touch slots/roleAssignmentOverrides/status/anything else
+        // on the parent service doc.
+        match /confirmations/{confirmationId} {
+          function rehearseAccessDoc() {
+            return get(/databases/$(database)/documents/organizations/$(orgId)/rehearseAccess/$(docId));
+          }
+
+          function isAssignedVolunteer() {
+            return isSignedIn()
+              && request.auth.token.email != null
+              && request.auth.token.email_verified == true
+              && exists(/databases/$(database)/documents/organizations/$(orgId)/rehearseAccess/$(docId))
+              && request.auth.token.email.lower() in rehearseAccessDoc().data.get('assignedEmailsLower', []);
+          }
+
+          allow get, list: if isOrgMember(orgId) || isAssignedVolunteer();
+
+          // Editor arm: the relock-reconciliation write (flips a stale
+          // 'confirmed' doc to 'needsReconfirmation'). Volunteer arm: own-
+          // email, own-roleId (checked against roleIdsByEmailLower, never
+          // re-derived), doc-id format matches its own fields, status
+          // pinned to 'confirmed' (only the editor arm may write
+          // 'needsReconfirmation'), and a field allowlist so no extra field
+          // can be smuggled onto the doc.
+          allow create, update: if isOrgMember(orgId)
+            || (
+              isAssignedVolunteer()
+              && confirmationId == request.resource.data.roleId + '_' + request.resource.data.emailLower
+              && request.resource.data.emailLower == request.auth.token.email.lower()
+              && request.resource.data.roleId in rehearseAccessDoc().data.get('roleIdsByEmailLower', {}).get(request.auth.token.email.lower(), [])
+              && request.resource.data.status == 'confirmed'
+              && request.resource.data.keys().hasOnly(['roleId', 'roleName', 'emailLower', 'status', 'confirmedAt', 'updatedAt'])
+            );
+
+          // Un-confirm is a delete of the caller's OWN doc only — R410
+          // allows toggling back to (implicit) Unconfirmed.
+          allow delete: if isOrgMember(orgId)
+            || (isAssignedVolunteer() && resource.data.emailLower == request.auth.token.email.lower());
+        }
       }
 
       // rehearseAccess — R377 (Phase 125, security core): a frozen, PII-safe
