@@ -59,7 +59,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   service view). Assignments are **Unconfirmed** by default and become **Confirmed** — a two-state model
   (no Decline/replacement this milestone).
 
-- [ ] **R411**: A planner sees each assignment's confirmation status (Confirmed / Unconfirmed) on the
+- [x] **R411**: A planner sees each assignment's confirmation status (Confirmed / Unconfirmed) on the
   service roster, read live (`onSnapshot`, not a one-time fetch).
 
 - [x] **R412**: When an underlying assignment is reassigned (or through an unlock→relock edit), a prior
@@ -172,7 +172,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R408 | Phase 132 | Complete |
 | R409 | Phase 132 | Complete |
 | R410 | Phase 133 | Complete |
-| R411 | Phase 133 | Pending |
+| R411 | Phase 133 | Complete |
 | R412 | Phase 133 | Complete |
 | R413 | Phase 133 | Pending |
 | R414 | Phase 135 | Pending |
