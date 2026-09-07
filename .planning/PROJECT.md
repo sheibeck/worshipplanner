@@ -45,11 +45,17 @@ live-stream output with banner/full-screen slides.
   (fills only a portion of the bottom of the screen — intended so the video room shows live stage video
   behind, with the slide text along the bottom) or **Full-screen** (the slide fills the entire video
   picture). Banner is valid **only** when the output is "Video": when Banner + Video, the slide contents
-  are fit to the banner region and the rest of the output is rendered with **alpha transparency** so the
-  video room can composite live video behind the slide. **Scope decision (owner, 2026-09-07):** build the
-  **app side** this milestone (the Video output role, the per-item Banner/Full-screen choice, and the
-  transparent-background banner render). The physical **Blackbird** keying/compositing is treated as an
-  **external integration verified separately**, not owned by this milestone's code.
+  are fit to the banner region and the rest of the output is rendered transparently so the video room can
+  composite live video behind the slide. **Scope decisions (owner, 2026-09-07):**
+  - **Blackbird is irrelevant** to this feature — disregard any hardware-keying/matrix-router framing. There
+    is **no external hardware compositing dependency and no hardware feasibility spike** in this milestone.
+  - Compositing happens in the video room's **software** (OBS/vMix-style Browser Source), which can consume a
+    genuinely transparent (alpha) source. Render the Video output with a **transparent background by
+    default**, plus a **configurable solid key-color fallback** (e.g. magenta) for a tool that needs a
+    chroma key instead of an alpha source — "build both, transparent default."
+  - Build the full **app side** this milestone: the Video output role/route, the per-slide-item
+    Banner/Full-screen choice, and both the transparent and solid-key banner renders. Fullscreen reuses the
+    existing Audience render; the banner (lower-third) render is the one genuinely new rendering surface.
 
 **Key context / decisions:**
 - **Research-first** (owner, 2026-09-07): a domain/ecosystem research pass runs before requirements —
