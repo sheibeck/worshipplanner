@@ -20,18 +20,33 @@ ships first to de-risk the milestone with the smallest review surface.
 <decisions>
 ## Implementation Decisions
 
-### Auto Share-Link (R421)
-- **Trigger point:** call the existing, already-idempotent `ensureShareLink(service, orgId)` from
-  `markAsPlanned()` in `src/stores/services.ts`, mirroring the existing fail-closed, try/catch-wrapped
-  `rehearseAccess` side-write already in that function. Do NOT change `maybeRefreshShareLink()`
-  (auto-refresh-only-if-exists) — that is intentionally restricted and is the wrong hook.
-- **Gate:** generation is strictly gated to the Planned/lock transition. A Draft (unlocked) service never
-  gets a share link created — this preserves the one manual "I'm ready to show this" signal and avoids
-  exposing an unfinished plan via a guessable URL (PITFALL 3 / the v2.8 SEC-S-01 share-token history).
-- **Idempotency:** rely on `ensureShareLink()`'s existing idempotency so lock → unlock → relock never
-  creates a duplicate token. No new token format, no change to share security rules.
-- **Failure handling:** the side-write is best-effort/fail-closed (try/catch) exactly like `rehearseAccess`
-  — a share-link failure must not block the Planned transition itself.
+### Auto Share-Link (R421) — RESOLVED 2026-09-07 (owner decision after planner surfaced a conflict)
+
+**Root cause of the owner's symptom, confirmed in code:** `createService()` in `src/stores/services.ts`
+ALREADY mints a share link at creation (added 2026-08-17 so volunteer-message `{{service_link}}` is never
+empty), so real UI-created services already have a link automatically. The owner's "link isn't
+auto-generated unless I click Share Link" symptom comes from **seeded test data**:
+`functions/seed-emulator-data.mjs:406` writes the seeded service with `shareToken: null`, bypassing
+`createService()`. So there is NO app bug for real services — the gap is tokenless services (seeded data,
+or any service created before the 2026-08-17 mint).
+
+**Resolved scope (owner chose "Safety-net + fix seed"):**
+- **KEEP** the existing `createService()` mint-at-creation — do NOT remove it (removing it regresses the
+  2026-08-17 empty-`{{service_link}}` fix for volunteer messaging composed before lock).
+- **ADD an idempotent "ensure share link exists" safety net** so any tokenless service self-heals
+  automatically (no manual "Share Link" click). Use the existing idempotent `ensureShareLink(service, orgId)`
+  (NOT `maybeRefreshShareLink()`), called from a natural read/lifecycle point — opening a service and/or
+  `markAsPlanned()` — wrapped fail-closed (try/catch) exactly like the existing `rehearseAccess` side-write
+  so a failure never blocks the user. Idempotency guarantees no duplicate token on repeat (lock→unlock→relock
+  included). Planner chooses the precise hook point(s); "on service open if token missing" is the primary
+  self-heal, and `markAsPlanned` is a fine additional safety point.
+- **FIX the seed script** (`functions/seed-emulator-data.mjs`) so seeded services get a real share token
+  (mint one in the seed, or leave it tokenless deliberately and rely on the app's self-heal — but the owner
+  asked to fix the seed, so give seeded services a token so test data matches real data).
+- **DROP the "no Draft exposure / gate-to-Planned" constraint.** Drafts already carry a share link today
+  (intentionally, for `{{service_link}}`), and `ShareView.vue` renders any token regardless of status;
+  My Schedule / Rehearse already gate on Planned (v2.12). This phase does NOT change draft-sharing behavior
+  and does NOT add a ShareView status gate.
 
 ### Stage Layout Auto-Populate (R420)
 - **Input:** the already-computed `stageServingAssignments` (resolved roster/role data) read in
@@ -76,8 +91,11 @@ ships first to de-risk the milestone with the smallest review surface.
 ## Specific Ideas
 
 Reuse over invent — both features are a single call site / one pure function plus a guard. The risk is
-entirely in the guards (no Draft exposure, no duplicate token, no clobber on re-run), so those are
-first-class test/acceptance targets, not happy-path afterthoughts.
+entirely in the guards: for R421, **idempotency** (no duplicate token on self-heal / repeat locks) and
+**fail-closed** (a share-link failure never blocks service open or the Planned transition); for R420,
+**no clobber on re-run** (never regenerate/wipe/duplicate against a non-empty canvas). Those are first-class
+test/acceptance targets. Note the R421 "no Draft exposure" guard was REMOVED by owner decision (2026-09-07)
+— drafts keep their link as today.
 </specifics>
 
 <deferred>
