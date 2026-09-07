@@ -3223,10 +3223,10 @@ describe('Volunteer confirmation scoped write — R410', () => {
     )
   })
 
-  it('(10) ALLOW — an org member writes/updates a confirmation directly (relock-reconciliation path), including status:\'needsReconfirmation\'', async () => {
+  it('(10) ALLOW — an org editor writes/updates a confirmation directly (relock-reconciliation path), including status:\'needsReconfirmation\'', async () => {
     await seedConfirmationFixtures()
-    await seedMembershipDoc('orgA', 'memberUid', 'member')
-    const db = testEnv.authenticatedContext('memberUid').firestore()
+    await seedMembershipDoc('orgA', 'editorUid', 'editor')
+    const db = testEnv.authenticatedContext('editorUid').firestore()
     await assertSucceeds(
       setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com'), {
         roleId: 'r1',
@@ -3237,6 +3237,37 @@ describe('Volunteer confirmation scoped write — R410', () => {
         updatedAt: new Date(),
       }),
     )
+  })
+
+  it('(10b) DENY — a plain org member (non-editor) cannot write/update a confirmation directly (CR-01: editor-only relock arm)', async () => {
+    await seedConfirmationFixtures()
+    await seedMembershipDoc('orgA', 'memberUid', 'member')
+    const db = testEnv.authenticatedContext('memberUid').firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'dana@example.com',
+        status: 'needsReconfirmation',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('(10c) DENY — a plain org member (non-editor) cannot delete another volunteer\'s confirmation directly (CR-01: editor-only relock arm)', async () => {
+    await seedConfirmationFixtures()
+    await seedDoc('organizations/orgA/services/svcA/confirmations/r1_dana@example.com', {
+      roleId: 'r1',
+      roleName: 'Guitar',
+      emailLower: 'dana@example.com',
+      status: 'confirmed',
+      confirmedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    await seedMembershipDoc('orgA', 'memberUid', 'member')
+    const db = testEnv.authenticatedContext('memberUid').firestore()
+    await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com')))
   })
 
   it('(11) ALLOW — an org member gets/lists the confirmations subcollection', async () => {

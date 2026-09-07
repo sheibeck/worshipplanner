@@ -297,7 +297,7 @@ service cloud.firestore {
           // pinned to 'confirmed' (only the editor arm may write
           // 'needsReconfirmation'), and a field allowlist so no extra field
           // can be smuggled onto the doc.
-          allow create, update: if isOrgMember(orgId)
+          allow create, update: if isOrgEditor(orgId)
             || (
               isAssignedVolunteer()
               && confirmationId == request.resource.data.roleId + '_' + request.resource.data.emailLower
@@ -309,7 +309,7 @@ service cloud.firestore {
 
           // Un-confirm is a delete of the caller's OWN doc only — R410
           // allows toggling back to (implicit) Unconfirmed.
-          allow delete: if isOrgMember(orgId)
+          allow delete: if isOrgEditor(orgId)
             || (isAssignedVolunteer() && resource.data.emailLower == request.auth.token.email.lower());
         }
       }
