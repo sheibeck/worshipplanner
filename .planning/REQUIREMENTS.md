@@ -82,7 +82,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [x] **R417**: The dashboard shows an unconfirmed-volunteers widget (who hasn't yet confirmed for upcoming
   services). Depends on R410.
 
-- [ ] **R418**: The dashboard shows an editor-presence roll-up (who is currently editing what), reusing the
+- [x] **R418**: The dashboard shows an editor-presence roll-up (who is currently editing what), reusing the
   per-service presence data from R422.
 
 - [x] **R419**: The dashboard has a clear empty / first-run state when there's nothing needing attention.
@@ -179,7 +179,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R415 | Phase 135 | Complete |
 | R416 | Phase 135 | Complete |
 | R417 | Phase 135 | Complete |
-| R418 | Phase 135 | Pending |
+| R418 | Phase 135 | Complete |
 | R419 | Phase 135 | Complete |
 | R420 | Phase 131 | Complete |
 | R421 | Phase 131 | Complete |
