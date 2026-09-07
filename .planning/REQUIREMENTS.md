@@ -71,11 +71,11 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Dashboard
 
-- [ ] **R414**: The undefined "Volunteer coverage" metric is removed from the dashboard.
-- [ ] **R415**: The dashboard shows an upcoming-services list (a "needs your attention" framing, not
+- [x] **R414**: The undefined "Volunteer coverage" metric is removed from the dashboard.
+- [x] **R415**: The dashboard shows an upcoming-services list (a "needs your attention" framing, not
   BI/metrics).
 
-- [ ] **R416**: The dashboard shows a per-service readiness signal (songs/media attached, roles filled,
+- [x] **R416**: The dashboard shows a per-service readiness signal (songs/media attached, roles filled,
   slides built, Draft vs Planned/locked), **reusing the existing v2.12 My Schedule readiness computation**
   rather than inventing a second, parallel definition.
 
@@ -85,7 +85,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [ ] **R418**: The dashboard shows an editor-presence roll-up (who is currently editing what), reusing the
   per-service presence data from R422.
 
-- [ ] **R419**: The dashboard has a clear empty / first-run state when there's nothing needing attention.
+- [x] **R419**: The dashboard has a clear empty / first-run state when there's nothing needing attention.
 
 ### Stage Layout Auto-Populate
 
@@ -175,12 +175,12 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R411 | Phase 133 | Complete |
 | R412 | Phase 133 | Complete |
 | R413 | Phase 133 | Complete |
-| R414 | Phase 135 | Pending |
-| R415 | Phase 135 | Pending |
-| R416 | Phase 135 | Pending |
+| R414 | Phase 135 | Complete |
+| R415 | Phase 135 | Complete |
+| R416 | Phase 135 | Complete |
 | R417 | Phase 135 | Pending |
 | R418 | Phase 135 | Pending |
-| R419 | Phase 135 | Pending |
+| R419 | Phase 135 | Complete |
 | R420 | Phase 131 | Complete |
 | R421 | Phase 131 | Complete |
 | R422 | Phase 134 | Complete |

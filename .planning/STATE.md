@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
-current_phase: 134
-current_phase_name: Editor Presence
-status: verifying
-stopped_at: Completed 134-02-PLAN.md
-last_updated: "2026-09-07T20:21:33.852Z"
+current_phase: 135
+current_phase_name: Dashboard Overhaul
+status: executing
+stopped_at: Completed 135-01-PLAN.md
+last_updated: "2026-09-07T21:35:03.974Z"
 last_activity: 2026-09-07
-last_activity_desc: Phase 134 execution started
+last_activity_desc: Phase 135 execution started
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 16
+  completed_plans: 14
   percent: 57
 ---
 
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1383,7 +1383,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 134 — Editor Presence
+**Current focus:** Phase 135 — Dashboard Overhaul
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1393,10 +1393,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 135 (Dashboard Overhaul) — next
-Plan: —
-Status: Phase 134 EXECUTED + code-verified (R422/R423, 9/9 must-haves); 2 live-UAT items deferred. Advancing to Phase 135 (deps 133+134 both done).
-Last activity: 2026-09-07 — Phase 134 complete (org-scoped presence subcollection + rules + 12 tests, useServicePresence composable + indicator, cleanupStalePresence cron)
+Phase: 135 (Dashboard Overhaul) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-09-07 — Phase 135 execution started
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
@@ -3620,6 +3620,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 134 P01 | 25min | 2 tasks | 3 files |
 | Phase 134 P03 | 25m | 2 tasks | 6 files |
 | Phase 134 P02 | 30min | 3 tasks | 7 files |
+| Phase 135 P01 | 25min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -4217,6 +4218,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: cleanupStalePresence scheduled 04:00 UTC (free slot between 03:00/05:00 sibling sweeps); presenceStaleMinutes defaults to 60; presence sweep fetches-then-filters in code (no collection-group range index needed)
 - [Phase ?]: presentViewers includes ALL live viewers (self included); the view filters out the current user's own uid, keeping the read shape reusable for Phase 135's dashboard roll-up
 - [Phase ?]: Stubbed useServicePresence (constant empty list) in 4 pre-existing ServiceEditorView test files unrelated to presence, mirroring the existing composable-stub convention, rather than editing 15+ exact setDoc-call-count assertions
+- [Phase ?]: 135-01: dashboardReadinessOf gates songs-needed/media-missing on total > 0 (zero-slots guard), reusing readinessOf verbatim per R416
 
 ### Roadmap Evolution
 
@@ -4546,8 +4548,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T20:21:33.785Z
-Stopped at: Completed 134-02-PLAN.md
+Last session: 2026-09-07T21:35:03.892Z
+Stopped at: Completed 135-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
