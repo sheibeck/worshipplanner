@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.13
 milestone_name: Volunteer Self-Service & Multi-Church Access (Phases 128-130, in planning)
-current_phase: 130
-status: in_progress
+status: completed
 stopped_at: Completed 130-02-PLAN.md
-last_updated: "2026-09-06T23:07:03.514Z"
+last_updated: "2026-09-07T03:59:25.018Z"
 last_activity: 2026-09-06
-last_activity_desc: 130-01-PLAN.md executed (RehearseAccessDoc.orgName added via conditional-spread; markAsPlanned forwards authStore.orgName, resyncRehearseAccessForSong forwards a batched getDoc(organizations/{orgId}) name with a scoped .catch(() => null) degrade; mySchedule store gained selectedChurch/churches/filteredDocs -- pure client-side filter, never imports auth or calls selectOrg; R403/R404/R405 data-layer complete)
+last_activity_desc: Milestone v2.13 completed and archived
 progress:
   total_phases: 3
   completed_phases: 3
   total_plans: 6
   completed_plans: 6
   percent: 100
+current_phase: 130
 current_phase_name: Phase 130 complete (Plans 01+02) -- v2.13 (Phases 128-130) fully built, autonomous + auto-verified green, UNDEPLOYED
 ---
 
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.13 Volunteer Self-Service & Multi-Church Access (roadmap created 2026-09-06)
 
-**Status:** Phases 128, 129, and 130 (all plans each) complete, autonomous build + auto-verified green, UNDEPLOYED — v2.13 fully built, ready for batched UAT/audit/deploy
+**Status:** v2.13 milestone complete
 
 **Goal:** Let volunteers get their own passwordless sign-in link on demand and see their schedule
 organized by church — extending v2.12's account-level email-link access with a self-service request path,
@@ -1358,10 +1358,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 130 Multi-Church Volunteer Switcher
-Plan: 130-01 (Wave 1 — data/projection + mySchedule store backbone) complete; 130-02 (church switcher UI, sidebar church-name label, VolunteerServiceView context) remains
-Status: Phase 130 Plan 01 code-complete, autonomous build + auto-verified green (rehearseAccess.test.ts 21/21, services.test.ts 117/117, mySchedule.test.ts 12/12, root type-check clean); UNDEPLOYED. Ready to execute 130-02.
-Last activity: 2026-09-06 — 130-01-PLAN.md executed (RehearseAccessDoc.orgName added via conditional-spread; markAsPlanned forwards authStore.orgName, resyncRehearseAccessForSong forwards a batched getDoc(organizations/{orgId}) name with a scoped .catch(() => null) degrade; mySchedule store gained selectedChurch/churches/filteredDocs -- pure client-side filter, never imports auth or calls selectOrg; R403/R404/R405 data-layer complete)
+Phase: Milestone v2.13 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-09-06 — Milestone v2.13 completed and archived
 
 ### Preceding: Phase 129 (complete)
 

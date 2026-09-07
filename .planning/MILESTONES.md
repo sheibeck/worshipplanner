@@ -1,5 +1,20 @@
 # Milestones
 
+## v2.13 v2.13 (Shipped: 2026-09-06)
+
+**Phases completed:** 3 phases, 6 plans, 13 tasks
+
+**Key accomplishments:**
+
+- 1. [Rule 1 - Bug] Updated a pre-existing test whose invariant the new code legitimately changes
+- Public `/{slug}/volunteer` request page + login-page volunteer entry + verify-failure re-request, closing the R398 dead-end (`/volunteer` was auth-gated) so a volunteer can actually reach and use 128-01's server core end-to-end.
+- New authenticated `adminVolunteerLink` callable lets an editor/admin email or copy a rostered volunteer's sign-in link through Phase 128's single shared mint core, gated by an independent server-side members/{uid} role re-check.
+- RosterView drawer "Sign-in Link" section with Email/Copy affordances wired to Plan 01's `adminVolunteerLink` callable, plus a Rule-1 regression fix in a sibling test file.
+- Threaded an optional `orgName` field through the rehearseAccess projection (both write paths) and built the mySchedule store's distinct-church derivation + client-side filter backbone.
+- Native `<select>` church filter on My Schedule (gated on >1 church, driving `filteredDocs`) plus a new AppSidebar `v-else-if` branch showing the volunteer's current church name, both sourced from the Wave 1 `mySchedule` Pinia store.
+
+---
+
 ## v2.11 — Song File Attachments (Shipped & deployed to production: 2026-09-05)
 
 **Phases completed:** 4 phases, 8 plans, 18 tasks

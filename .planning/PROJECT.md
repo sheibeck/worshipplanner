@@ -8,7 +8,7 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.13 Volunteer Self-Service & Multi-Church Access
+## Shipped Milestone: v2.13 Volunteer Self-Service & Multi-Church Access — ✅ SHIPPED & DEPLOYED 2026-09-07
 
 **Goal:** Let volunteers get their own passwordless sign-in link on demand and see their schedule
 organized by church — extending v2.12's account-level email-link access with a self-service request
