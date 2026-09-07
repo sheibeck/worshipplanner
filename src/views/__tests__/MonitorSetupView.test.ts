@@ -216,6 +216,45 @@ describe('MonitorSetupView — Save gate: at least one Audience required (CONTEX
   })
 })
 
+describe('MonitorSetupView — Video as a third assignable role (R424)', () => {
+  it('selects role video on a card and flips aria-checked mutually exclusively within that card', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const [fpA] = screens.map((s) => computeFingerprint(s))
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-video"]`).trigger('click')
+
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-video"]`).attributes('aria-checked')).toBe('true')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-none"]`).attributes('aria-checked')).toBe('false')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).attributes('aria-checked')).toBe('false')
+    expect(wrapper.get(`[data-testid="monitor-role-${fpA}-confidence"]`).attributes('aria-checked')).toBe('false')
+  })
+
+  it('keeps the Save gate unchanged: a Video-only assignment cannot Save; adding Audience elsewhere enables it, and both persist', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const [fpA, fpB] = screens.map((s) => computeFingerprint(s))
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-video"]`).trigger('click')
+    expect(wrapper.get('[data-testid="save-button"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-audience"]`).trigger('click')
+    expect(wrapper.get('[data-testid="save-button"]').attributes('disabled')).toBeUndefined()
+
+    await wrapper.get('[data-testid="save-button"]').trigger('click')
+    await flushPromises()
+
+    const raw = localStorage.getItem(MONITOR_CONFIG_STORAGE_KEY)
+    const persisted = JSON.parse(raw!) as MonitorMapping
+    const persistedSet = new Set(persisted.assignments.map((a) => `${a.fingerprint}::${a.role}`))
+    expect(persistedSet).toEqual(new Set([`${fpA}::video`, `${fpB}::audience`]))
+  })
+})
+
 describe('MonitorSetupView — synchronous permission-call contract (Pitfall 1)', () => {
   it('calls window.getScreenDetails synchronously from the Detect click handler, before any awaited microtask resolves', async () => {
     const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
