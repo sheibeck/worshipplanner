@@ -6,7 +6,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch, getDocs, collection, collectionGroup, query, where, orderBy } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch, getDocs, collection, collectionGroup, query, where, orderBy, serverTimestamp } from 'firebase/firestore'
 
 let testEnv: RulesTestEnvironment
 
@@ -3325,5 +3325,151 @@ describe('Volunteer confirmation scoped write — R410', () => {
       .firestore()
     await assertFails(getDoc(doc(db, 'organizations', 'orgB', 'services', 'svcB', 'confirmations', 'r1_erin@example.com')))
     await assertFails(getDocs(collection(db, 'organizations', 'orgB', 'services', 'svcB', 'confirmations')))
+  })
+})
+
+describe('services/{id}/presence — org-scoped heartbeat (R423)', () => {
+  it('(1) ALLOW — an org member writes their OWN presence doc', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberA'), {
+        uid: 'memberA',
+        displayName: 'Mem A',
+        lastSeen: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('(2) ALLOW — an org member reads (get) a seeded presence doc in their org', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    await seedDoc('organizations/orgA/services/svc1/presence/memberA', {
+      uid: 'memberA',
+      displayName: 'Mem A',
+      lastSeen: new Date(),
+    })
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberA')))
+  })
+
+  it('(3) ALLOW — an org member lists the presence subcollection in their org', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    await seedDoc('organizations/orgA/services/svc1/presence/memberA', {
+      uid: 'memberA',
+      displayName: 'Mem A',
+      lastSeen: new Date(),
+    })
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertSucceeds(getDocs(collection(db, 'organizations', 'orgA', 'services', 'svc1', 'presence')))
+  })
+
+  it('(4) ALLOW — an org member deletes their OWN presence doc', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    await seedDoc('organizations/orgA/services/svc1/presence/memberA', {
+      uid: 'memberA',
+      displayName: 'Mem A',
+      lastSeen: new Date(),
+    })
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberA')))
+  })
+
+  it('(5) DENY — a member writes ANOTHER user\'s presence doc', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberB'), {
+        uid: 'memberB',
+        displayName: 'Mem B',
+        lastSeen: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('(6) DENY — a member writes their own-id doc with a forged uid field', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberA'), {
+        uid: 'memberB',
+        displayName: 'Mem A',
+        lastSeen: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('(7) DENY — a write carrying an extra field beyond the allowlist (proves hasOnly)', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberA'), {
+        uid: 'memberA',
+        displayName: 'Mem A',
+        lastSeen: serverTimestamp(),
+        role: 'editor',
+      }),
+    )
+  })
+
+  it('(8) DENY — a member of a DIFFERENT org gets orgA\'s presence doc (cross-org read, SEC-S-01 guard)', async () => {
+    await seedMembershipDoc('orgB', 'memberB', 'member')
+    await seedDoc('organizations/orgA/services/svc1/presence/memberA', {
+      uid: 'memberA',
+      displayName: 'Mem A',
+      lastSeen: new Date(),
+    })
+    const db = testEnv.authenticatedContext('memberB').firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberA')))
+  })
+
+  it('(9) DENY — a member of a DIFFERENT org lists orgA\'s presence subcollection (cross-org enumeration)', async () => {
+    await seedMembershipDoc('orgB', 'memberB', 'member')
+    await seedDoc('organizations/orgA/services/svc1/presence/memberA', {
+      uid: 'memberA',
+      displayName: 'Mem A',
+      lastSeen: new Date(),
+    })
+    const db = testEnv.authenticatedContext('memberB').firestore()
+    await assertFails(getDocs(collection(db, 'organizations', 'orgA', 'services', 'svc1', 'presence')))
+  })
+
+  it('(10) DENY — a member of a DIFFERENT org writes orgA\'s presence doc (cross-org write)', async () => {
+    await seedMembershipDoc('orgB', 'memberB', 'member')
+    const db = testEnv.authenticatedContext('memberB').firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberB'), {
+        uid: 'memberB',
+        displayName: 'Mem B',
+        lastSeen: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('(11) DENY — a signed-in non-member reads and writes a presence doc', async () => {
+    await seedDoc('organizations/orgA/services/svc1/presence/memberA', {
+      uid: 'memberA',
+      displayName: 'Mem A',
+      lastSeen: new Date(),
+    })
+    const db = testEnv.authenticatedContext('strangerUid').firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberA')))
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'strangerUid'), {
+        uid: 'strangerUid',
+        displayName: 'Stranger',
+        lastSeen: serverTimestamp(),
+      }),
+    )
+  })
+
+  it('(12) DENY — a member deletes ANOTHER user\'s presence doc', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    await seedDoc('organizations/orgA/services/svc1/presence/memberB', {
+      uid: 'memberB',
+      displayName: 'Mem B',
+      lastSeen: new Date(),
+    })
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'presence', 'memberB')))
   })
 })
