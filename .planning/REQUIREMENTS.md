@@ -38,8 +38,10 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 - [ ] **R406**: The main `/services` page uses the same standard page header pattern as the rest of the app
   (it currently doesn't match), so it looks and behaves consistently with other pages.
+
 - [ ] **R407**: The `/services` page's tabs and buttons are mobile-friendly — usable and readable on a phone
   (they currently aren't), matching the app's mobile button/header conventions.
+
 - [ ] **R408**: The share service-link pages render service-plan rows with an alternating light-gray row
   background, so it's easier to keep your place scanning each row of the plan.
 
@@ -56,11 +58,14 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   via a per-assignment "I've got it" action in their volunteer-facing surface (My Schedule / volunteer
   service view). Assignments are **Unconfirmed** by default and become **Confirmed** — a two-state model
   (no Decline/replacement this milestone).
+
 - [ ] **R411**: A planner sees each assignment's confirmation status (Confirmed / Unconfirmed) on the
   service roster, read live (`onSnapshot`, not a one-time fetch).
+
 - [ ] **R412**: When an underlying assignment is reassigned (or through an unlock→relock edit), a prior
   confirmation is invalidated to "needs reconfirmation" rather than showing a stale checkmark — keyed on
   stable assignment identity.
+
 - [ ] **R413**: A planner can send reminder nudges targeting **only** unconfirmed assignments, reusing the
   existing v1.7 volunteer-messaging send infrastructure (a recipient-targeting change, not a new send path).
 
@@ -69,13 +74,17 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [ ] **R414**: The undefined "Volunteer coverage" metric is removed from the dashboard.
 - [ ] **R415**: The dashboard shows an upcoming-services list (a "needs your attention" framing, not
   BI/metrics).
+
 - [ ] **R416**: The dashboard shows a per-service readiness signal (songs/media attached, roles filled,
   slides built, Draft vs Planned/locked), **reusing the existing v2.12 My Schedule readiness computation**
   rather than inventing a second, parallel definition.
+
 - [ ] **R417**: The dashboard shows an unconfirmed-volunteers widget (who hasn't yet confirmed for upcoming
   services). Depends on R410.
+
 - [ ] **R418**: The dashboard shows an editor-presence roll-up (who is currently editing what), reusing the
   per-service presence data from R422.
+
 - [ ] **R419**: The dashboard has a clear empty / first-run state when there's nothing needing attention.
 
 ### Stage Layout Auto-Populate
@@ -87,7 +96,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Auto-Generated Share Link
 
-- [ ] **R421**: A service's share link exists automatically so the user never has to click "Share Link"
+- [x] **R421**: A service's share link exists automatically so the user never has to click "Share Link"
   manually. **(Scope RESOLVED 2026-09-07 — supersedes the original "gate to Planned / no Draft exposure"
   framing.)** Real UI-created services already mint a link at `createService()`; the gap is tokenless
   services (seed data, or services created before the 2026-08-17 mint). Keep the `createService()` mint, add
@@ -103,6 +112,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   `onSnapshot`, coarse ~25–30s interval, paused while the tab is hidden) with a client-side soft-TTL
   staleness filter (~60s). Teardown uses `watch(serviceId, …)` (Vue Router reuses the mounted editor
   instance across service navigation, so `onUnmounted` alone is insufficient).
+
 - [ ] **R423**: Presence records are stored in an org-scoped `services/{serviceId}/presence/{uid}`
   subcollection whose read rules use the `get`/`list`-split, org-membership-scoped idiom (no unscoped
   `allow read: if isSignedIn()`), verified by a cross-org rules test; a scheduled cleanup backstop
@@ -114,11 +124,14 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [ ] **R424**: A third output type **"Video"** is added to the multi-monitor output-role system alongside
   Audience/Confidence — `MonitorRole` widened, the monitor setup UI offers it, a `VideoOutputView`
   sibling + its own static route exist. Video assignment coexists with the existing N-assignment role model.
+
 - [ ] **R425**: A slide item can be flagged to be sent to the Video output as either a **Banner** or
   **Full-screen** (per-item authoring UI + schema field), riding the existing autosave path. **Banner is
   valid only when the output is Video.**
+
 - [ ] **R426**: A slide sent Full-screen to the Video output fills the entire video picture, reusing the
   existing Audience full-slide render (no new rendering code).
+
 - [ ] **R427**: A slide sent as a Banner to the Video output renders its contents fit to a bottom
   lower-third region (title-safe inset, readable default text), with the rest of the output rendered
   **transparent by default** so a software compositor shows live video behind it, plus a **configurable
@@ -135,14 +148,19 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 - **Decline + auto-reopen-slot + replacement self-swap** — a real, well-precedented feature, but heavier
   than the owner's two-state "I've got it" ask (research FEATURES.md). → backlog.
+
 - **Generic BI / analytics dashboard widgets** (attendance trends, engagement charts) — the anti-pattern the
   old "coverage %" metric represented; the dashboard is a "needs your attention" feed, not a BI surface.
+
 - **Banner backing-bar / drop-shadow contrast-treatment differentiator** — deferred; basic banner legibility
   (title-safe inset + text sizing) stays in R427. → backlog.
+
 - **"Fill + Key" dual-output hardware video path** — only relevant if the church later adds real
   hardware-keyer equipment; not applicable to the current software-compositor path.
+
 - **Blackbird / any hardware compositing integration** — confirmed irrelevant by the owner (2026-09-07); no
   hardware dependency or feasibility spike in this milestone.
+
 - **Realtime Database for presence** — the app is deliberately Firestore-only through 13 shipped milestones.
 
 ## Traceability
@@ -164,7 +182,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R418 | Phase 135 | Pending |
 | R419 | Phase 135 | Pending |
 | R420 | Phase 131 | Pending |
-| R421 | Phase 131 | Pending |
+| R421 | Phase 131 | Complete |
 | R422 | Phase 134 | Pending |
 | R423 | Phase 134 | Pending |
 | R424 | Phase 136 | Pending |

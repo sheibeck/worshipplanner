@@ -793,12 +793,15 @@ leak. Trivial wins (auto share-link, Stage Layout auto-populate) ship first to d
 - Phase 135 (Dashboard) needs the exact readiness rollup rule ("what counts as ready") pinned down at
   `/gsd-discuss-phase 135` — reuse the existing v2.12 My Schedule readiness computation as the base rather
   than inventing a second, parallel definition.
+
 - Phase 137 (Video Banner) needs a product decision at `/gsd-discuss-phase 137` (or spec time): what does
   the Video output show for an item with no `videoOutput` flag set — transparent/key-color fill showing
   nothing, vs. black.
+
 - Phase 132's "Planning Center" verbiage removal (R409) must start with a grep inventory/classify pass
   before any edit — this app has a real, functioning PC export integration, and a blind find-and-replace
   risks garbling substantive integration copy along with the one incidental banner string in scope.
+
 - Numbering continues from v2.13, which ended at Phase 130 — v2.14 starts at Phase 131, not reset. (The
   999.x entries below are backlog, not this milestone; 999.2 and 999.3 are untouched by this numbering.)
 
@@ -821,19 +824,23 @@ assigned roles/instruments instead of an empty canvas — with zero risk of clob
 
   1. When a service transitions to Planned/locked, its share link exists automatically — the user never
      has to click "Share Link" for it to be generated (R421).
+
   2. Any tokenless service (seeded data, or a service created before the 2026-08-17 mint) self-heals a
      share link automatically — no manual "Share Link" click — via an idempotent `ensureShareLink()` safety
      net at the Planned/lock transition (not `maybeRefreshShareLink()`); the creation-time mint is KEPT and
      draft-sharing behavior is unchanged (owner decision 2026-09-07) (R421).
+
   3. Locking, unlocking, and relocking the same service never creates a duplicate share token (R421).
   4. Visiting a service's Stage Layout tab for the first time, with zero elements on the canvas,
      auto-seeds markers for that service's assigned roles/instruments (R420).
+
   5. Revisiting Stage Layout after manual edits — or after a roster change — never regenerates, wipes, or
      duplicates existing markers; the one-time seed never re-runs against a non-empty canvas (R420).
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
+
 - [ ] 131-01-PLAN.md — Stage Layout auto-populate: pure autoPopulateMarkers() + one-time empty-canvas seed trigger (R420)
-- [ ] 131-02-PLAN.md — Auto share-link safety net: keep the createService mint, self-heal tokenless services via ensureShareLink in markAsPlanned, and fix the emulator seed to mint a token (R421)
+- [x] 131-02-PLAN.md — Auto share-link safety net: keep the createService mint, self-heal tokenless services via ensureShareLink in markAsPlanned, and fix the emulator seed to mint a token (R421)
 
 ### Phase 132: Services Page UX Alignment & Verbiage Cleanup
 
@@ -847,8 +854,10 @@ integration/export.
   1. The `/services` page uses the same standard page-header component used elsewhere in the app (R406).
   2. On a phone-width viewport, the Services page's tabs and buttons are usable and readable, matching the
      app's mobile button/header conventions (R407).
+
   3. Rows on a shared service-link page alternate a light-gray background, making the plan easier to scan
      (R408).
+
   4. Every "Planning Center" UI-copy occurrence has been inventoried and classified before any edit; only
      substantive PC integration/export copy retains the phrase, and incidental references — e.g. the
      Planned/locked banner's "Planning Center already has this plan." sentence — are removed (R409).
@@ -868,11 +877,14 @@ relock.
   1. A volunteer can tap a per-assignment "I've got it" action in their volunteer-facing surface (My
      Schedule / volunteer service view), moving that assignment from Unconfirmed to Confirmed — a
      two-state model, no Decline/replacement (R410).
+
   2. A planner sees each assignment's live confirmation status (Confirmed / Unconfirmed) on the service
      roster via `onSnapshot`, not a one-time fetch (R411).
+
   3. Reassigning a slot, or an unlock→relock edit cycle, invalidates a prior confirmation back to "needs
      reconfirmation" rather than showing a stale checkmark — keyed on stable assignment identity, not
      person identity (R412).
+
   4. A planner can send a reminder message targeting only people with unconfirmed assignments, reusing
      the existing v1.7 volunteer-messaging send infrastructure as a recipient-targeting change, not a new
      send path (R413).
@@ -894,13 +906,17 @@ org-scoped read idiom, mirroring the discipline that closed v2.8's SEC-S-01 cros
   1. Two users viewing/editing the same service each see an indicator naming the other current viewer(s),
      backed by a Firestore heartbeat (`serverTimestamp()` + `onSnapshot`, coarse ~25-30s interval, paused
      while the tab is hidden) (R422).
+
   2. Navigating away — including an in-app route change that reuses the mounted editor instance, not just
      a tab close — removes that user from the presence indicator within the client-side soft-TTL
      staleness window (~60s) (R422).
+
   3. A forced-disconnect test (no graceful teardown) proves stale presence still clears via the staleness
      filter, not just the happy-path unmount (R422).
+
   4. A cross-org rules test proves a member of Org A cannot read Org B's presence records — both the `get`
      and `list` arms are org-membership-scoped, with no unscoped `allow read: if isSignedIn()` (R423).
+
   5. Abandoned presence records are removed by a scheduled cleanup backstop (Firestore TTL and/or a
      `cleanupStalePresence` cron sibling of the existing retention crons), not left to accumulate forever
      (R423).
@@ -922,10 +938,13 @@ metric, giving a planner one place to see what's coming up and what needs action
   3. Each listed service shows a readiness signal (songs/media attached, roles filled, slides built, Draft
      vs Planned/locked) computed via the same rollup already used in v2.12's My Schedule, not a second,
      parallel definition (R416).
+
   4. The dashboard shows which volunteers have not yet confirmed for upcoming services, reading the Phase
      133 confirmation model (R417).
+
   5. The dashboard shows an editor-presence roll-up (who is currently editing which service), reusing the
      Phase 134 per-service presence data verbatim (R418).
+
   6. When there is nothing needing attention, the dashboard shows a clear empty/first-run state instead of
      a blank or broken layout (R419).
 
@@ -943,9 +962,11 @@ generalization)
 
   1. Monitor setup offers "Video" as a third assignable output role alongside Audience/Confidence
      (`MonitorRole` widened) (R424).
+
   2. A monitor assigned the Video role opens a dedicated `VideoOutputView` at its own static route (R424).
   3. The Video role assignment coexists with existing Audience/Confidence assignments without disrupting
      them — the N-assignment model already generalized in v2.9 (R424).
+
   4. In Fullscreen mode, the Video output renders identically to the existing Audience full-slide output —
      no visual regression, no new rendering code (R426).
 
@@ -962,19 +983,22 @@ software compositor (OBS/vMix-style Browser Source) can show live stage video be
 
   1. An editor can flag a slide item to go to the Video output as either Banner or Full-screen; Banner is
      selectable/valid only when the item's target output is Video (R425).
+
   2. The per-item Banner/Full-screen choice persists via the existing `useAutoSave` deep-watch — no new
      save call, mirroring the `loop` field precedent (R425).
+
   3. A Banner-flagged slide's content renders fit to a bottom lower-third region with a title-safe inset
      and readable default text sizing (R427).
+
   4. The region outside the banner content renders with a transparent background by default, so a
      software compositor can show live video behind it (R427).
+
   5. An editor can configure a solid key-color fallback (default saturated magenta, `<input
      type="color">`) that replaces the transparent background for a tool that needs chroma-key instead of
      alpha (R427).
 
 **Plans**: TBD
 **UI hint**: yes
-
 
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
 

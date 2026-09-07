@@ -1,15 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.14
-milestone_name: Services UX Alignment, Dashboard & Live-Stream Output
-status: planning
-last_updated: "2026-09-07T05:35:10.000Z"
+milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
+current_phase: 131
+current_phase_name: Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate
+status: executing
+stopped_at: Completed 131-02-PLAN.md
+last_updated: "2026-09-07T13:33:57.816Z"
 last_activity: 2026-09-07
+last_activity_desc: Phase 131 execution started
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -54,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Roadmap created — ready to plan Phase 131
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -68,7 +72,9 @@ largely independent feature areas with one hard cross-feature ordering constrain
 directly into phase sequence: the two-state ("I've got it") volunteer-confirmation model (Phase 133) must
 land before the dashboard's unconfirmed-volunteers widget (Phase 135), and editor presence (Phase 134)
 must land before the dashboard's presence roll-up (also Phase 135) — so Phase 135 depends on both 133 and
+
 134. Video output is deliberately split into a low-risk Fullscreen slice (Phase 136, a structural copy of
+
 v2.9's role-generalization pattern) before the one genuinely new render — the transparent-default /
 solid-key-color-fallback Banner (Phase 137). **Blackbird is irrelevant to this milestone** — compositing
 happens in the video room's software (OBS/vMix-style Browser Source); there is no hardware dependency and
@@ -1377,7 +1383,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 131 — Trivial Wins: Auto Share-Link & Stage Layout Auto-Populate (v2.14, first phase)
+**Current focus:** Phase 131 — Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1387,10 +1393,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 131 of 137 (v2.14 Phase 1 of 7 — Trivial Wins: Auto Share-Link & Stage Layout Auto-Populate)
-Plan: — (not yet planned)
-Status: Roadmap created — ready for /gsd-plan-phase 131
-Last activity: 2026-09-07 — v2.14 ROADMAP.md created (7 phases, 131-137), REQUIREMENTS.md traceability updated, 100% coverage (R406-R427)
+Phase: 131 (Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-09-07 — Phase 131 execution started
 
 ### Preceding: Phase 130 (complete — final phase of v2.13, shipped & deployed 2026-09-07)
 
@@ -1421,10 +1427,13 @@ v2.13, which ended at Phase 130 — v2.14 starts at Phase 131, not reset; the 99
 | 137 Video Output — Banner Render | A slide item can be flagged Banner (valid only for the Video output) or Full-screen; a Banner renders fit to a title-safe bottom lower-third with a transparent-by-default background and a configurable solid key-color fallback for chroma-key tools | R425, R427 | Phase 136 (extends the Video output route/role it establishes) | yes |
 
 **Cross-feature dependency notes:**
+
 - **Confirmation before dashboard (R410 → R417):** Phase 135's unconfirmed-volunteers widget reads the
   Phase 133 confirmation model; Phase 135 cannot start meaningfully before Phase 133 lands.
+
 - **Presence before dashboard (R422 → R418):** Phase 135's editor-presence roll-up reuses Phase 134's
   per-service presence data verbatim — no second presence definition.
+
 - **Video split (R424/R426 before R425/R427):** the Fullscreen slice (136) is independently demoable and
   UAT-able without any Banner/transparency work; the Banner phase (137) rides the Video route/role Phase
   136 establishes and adds the per-item schema field + the one genuinely new rendering surface.
@@ -3590,6 +3599,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 129 P02 | 27min | 2 tasks | 3 files |
 | Phase 130 P01 | 30min | 3 tasks | 6 files |
 | Phase 130 P02 | 35min | 2 tasks | 4 files |
+| Phase 131 P02 | 20min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -4173,6 +4183,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 130]: 130-01: mySchedule.churches keeps orgName as string | undefined per entry with no fallback baked in -- Plan 02's UI consumers (switcher dropdown vs. sidebar) apply their own fallback text
 - [Phase ?]: 130-02: AppSidebar volunteer label uses a NEW sibling v-else-if div (not a widened admin v-if) to keep the admin authStore.orgName path byte-identical
 - [Phase ?]: 130-02: Sidebar multi+all-selected volunteer label is the literal 'Multiple churches' per the owner's settled decision, diverging from 130-UI-SPEC.md's Copywriting Contract
+- [Phase ?]: Kept createService's mint-at-creation verbatim; markAsPlanned's ensureShareLink self-heal is purely additive (owner's 2026-09-07 resolved scope, R421)
+- [Phase ?]: Seed emulator share token is deterministic (sha256(serviceId).slice(0,36)), not random, so re-seeding overwrites the same docs instead of accumulating orphan tokens
 
 ### Roadmap Evolution
 
@@ -4502,8 +4514,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-06T23:07:03.436Z
-Stopped at: Completed 130-02-PLAN.md
+Last session: 2026-09-07T13:33:57.742Z
+Stopped at: Completed 131-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
