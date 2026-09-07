@@ -107,7 +107,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Editor Presence
 
-- [ ] **R422**: While a user is viewing/editing a service, other viewers of the same service see an
+- [x] **R422**: While a user is viewing/editing a service, other viewers of the same service see an
   indicator of who else is currently present, backed by a Firestore heartbeat (`serverTimestamp()` +
   `onSnapshot`, coarse ~25–30s interval, paused while the tab is hidden) with a client-side soft-TTL
   staleness filter (~60s). Teardown uses `watch(serviceId, …)` (Vue Router reuses the mounted editor
@@ -183,7 +183,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R419 | Phase 135 | Pending |
 | R420 | Phase 131 | Complete |
 | R421 | Phase 131 | Complete |
-| R422 | Phase 134 | Pending |
+| R422 | Phase 134 | Complete |
 | R423 | Phase 134 | Complete |
 | R424 | Phase 136 | Pending |
 | R425 | Phase 137 | Pending |
