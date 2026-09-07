@@ -1393,10 +1393,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 135 (Dashboard Overhaul) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-09-07 — Phase 135 execution started
+Phase: 136 (Video Output — Fullscreen Slice) — next
+Plan: —
+Status: Phase 135 EXECUTED + code-verified (R414–R419, 11/11 must-haves); review blocker+2 warnings fixed; 5 visual UAT items deferred. Advancing to Phase 136.
+Last activity: 2026-09-07 — Phase 135 complete (needs-attention dashboard: feed + worst-of readiness, unconfirmed-volunteers card, read-only presence rollup, empty state; removed Volunteer coverage)
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
@@ -1406,6 +1406,7 @@ Per owner instruction "defer uat to the end". Items accumulate in `.planning/v2.
 - Phase 132 → verification_deferred_human (3 visual items) — resume with `/gsd-verify-work 132`
 - Phase 133 → verification_deferred_human (4 live-browser items; CR-01 security fix already re-verified) — resume with `/gsd-verify-work 133`
 - Phase 134 → verification_deferred_human (2 two-browser live items; presence rules + composable code-verified) — resume with `/gsd-verify-work 134`
+- Phase 135 → verification_deferred_human (5 visual/live dashboard items) — resume with `/gsd-verify-work 135`
 
 ### Preceding: Phase 130 (complete — final phase of v2.13, shipped & deployed 2026-09-07)
 
