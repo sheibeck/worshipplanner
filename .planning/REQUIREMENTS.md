@@ -54,7 +54,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Volunteer Responsibility Confirmation
 
-- [ ] **R410**: A worship-team member can confirm they know they're responsible for something in a service
+- [x] **R410**: A worship-team member can confirm they know they're responsible for something in a service
   via a per-assignment "I've got it" action in their volunteer-facing surface (My Schedule / volunteer
   service view). Assignments are **Unconfirmed** by default and become **Confirmed** — a two-state model
   (no Decline/replacement this milestone).
@@ -62,7 +62,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [ ] **R411**: A planner sees each assignment's confirmation status (Confirmed / Unconfirmed) on the
   service roster, read live (`onSnapshot`, not a one-time fetch).
 
-- [ ] **R412**: When an underlying assignment is reassigned (or through an unlock→relock edit), a prior
+- [x] **R412**: When an underlying assignment is reassigned (or through an unlock→relock edit), a prior
   confirmation is invalidated to "needs reconfirmation" rather than showing a stale checkmark — keyed on
   stable assignment identity.
 
@@ -171,9 +171,9 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R407 | Phase 132 | Pending |
 | R408 | Phase 132 | Complete |
 | R409 | Phase 132 | Complete |
-| R410 | Phase 133 | Pending |
+| R410 | Phase 133 | Complete |
 | R411 | Phase 133 | Pending |
-| R412 | Phase 133 | Pending |
+| R412 | Phase 133 | Complete |
 | R413 | Phase 133 | Pending |
 | R414 | Phase 135 | Pending |
 | R415 | Phase 135 | Pending |

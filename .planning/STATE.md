@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
-current_phase: 132
-current_phase_name: Services Page UX Alignment & Verbiage Cleanup
+current_phase: 133
+current_phase_name: Volunteer Responsibility Confirmation
 status: executing
-stopped_at: Completed 132-03-PLAN.md
-last_updated: "2026-09-07T15:50:46.186Z"
+stopped_at: Completed 133-01-PLAN.md
+last_updated: "2026-09-07T16:57:20.832Z"
 last_activity: 2026-09-07
-last_activity_desc: Phase 132 execution started
+last_activity_desc: Phase 133 execution started
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 10
+  completed_plans: 6
   percent: 29
 ---
 
@@ -1383,7 +1383,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 132 — Services Page UX Alignment & Verbiage Cleanup
+**Current focus:** Phase 133 — Volunteer Responsibility Confirmation
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1393,10 +1393,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 133 (Volunteer Responsibility Confirmation) — next
-Plan: —
-Status: Phase 132 EXECUTED + code-verified (R406–R409, 7/10 must-haves); 3 visual UAT items deferred. Advancing to Phase 133.
-Last activity: 2026-09-07 — Phase 132 complete (Services header + mobile, share-page zebra rows, PC-verbiage cleanup + review fix)
+Phase: 133 (Volunteer Responsibility Confirmation) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-09-07 — Phase 133 execution started
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
@@ -3610,6 +3610,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 131 P01 | ~20min | 2 tasks | 4 files |
 | Phase 132 P02 | 12min | 1 tasks | 1 files |
 | Phase 132 P03 | 20min | 2 tasks | 1 files |
+| Phase 133 P01 | 14min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -4197,6 +4198,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Seed emulator share token is deterministic (sha256(serviceId).slice(0,36)), not random, so re-seeding overwrites the same docs instead of accumulating orphan tokens
 - [Phase ?]: 131-01: Non-clobber invariant implemented with a zero-elements check (load-bearing) plus a per-service seeded-guard Set, so delete-all-then-revisit in the same session never re-seeds; the guard is only set after a successful seed so an empty-assignments visit can still seed later.
 - [Phase ?]: R408: applied bg-gray-50 to odd-index rows only (even rows stay white); added px-2 -mx-2 so the stripe reads as a full row on the narrow max-w-2xl share column
+- [Phase ?]: confirmations lives in its own services/{id}/confirmations subcollection (not on rehearseAccess or services/{id} itself), keyed on roleId+emailLower, mirroring the messages/lockSnapshots pattern
 
 ### Roadmap Evolution
 
@@ -4526,8 +4528,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T15:50:46.113Z
-Stopped at: Completed 132-03-PLAN.md
+Last session: 2026-09-07T16:57:20.766Z
+Stopped at: Completed 133-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
