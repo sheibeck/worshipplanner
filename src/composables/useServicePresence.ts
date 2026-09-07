@@ -39,7 +39,10 @@ export function useServicePresence(
   let unsubscribe: Unsubscribe | null = null
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null
   let nowInterval: ReturnType<typeof setInterval> | null = null
-  let activeServiceId: string | null = null
+  // org/service/uid triple presence is currently live under, so stop() deletes
+  // the right doc even after orgId/currentUser have moved on to new values.
+  // Null when nothing is live (e.g. a guard-rejected start()).
+  let activePresence: { org: string; svc: string; uid: string } | null = null
 
   function presenceDocRef(org: string, svc: string, uid: string) {
     return doc(db, 'organizations', org, 'services', svc, 'presence', uid)
@@ -79,13 +82,14 @@ export function useServicePresence(
     unsubscribe = null
   }
 
-  /** Best-effort teardown for `previousServiceId`: delete the current user's
-   *  own presence doc there, unsubscribe the snapshot, clear the heartbeat. */
-  function stop(previousServiceId: string | null): void {
-    const org = toValue(orgId)
-    const user = toValue(currentUser)
-    if (org && previousServiceId && user?.uid) {
-      void deleteDoc(presenceDocRef(org, previousServiceId, user.uid))
+  /** Best-effort teardown of whatever is currently live: delete the own
+   *  presence doc via `activePresence`, unsubscribe, clear the heartbeat.
+   *  Safe to call when nothing is live. */
+  function stop(): void {
+    if (activePresence) {
+      const { org, svc, uid } = activePresence
+      void deleteDoc(presenceDocRef(org, svc, uid))
+      activePresence = null
     }
     unsubscribeSnapshot()
     clearHeartbeat()
@@ -95,11 +99,11 @@ export function useServicePresence(
     const org = toValue(orgId)
     const svc = toValue(serviceId)
     const user = toValue(currentUser)
-    activeServiceId = svc ?? null
     if (!org || !svc || !user?.uid) {
       presenceDocs.value = []
       return
     }
+    activePresence = { org, svc, uid: user.uid }
 
     // Immediate write so the viewer appears without waiting a full heartbeat.
     writeHeartbeat()
@@ -123,13 +127,16 @@ export function useServicePresence(
     )
   }
 
-  // Re-inits on every serviceId change, including the Router-reuses-the-
-  // mounted-editor-instance case (onUnmounted alone does NOT fire on a param
-  // change — see 134-CONTEXT.md). The immediate first run does the initial start.
+  // Re-inits on org, service, OR user change — not just serviceId — since
+  // orgId resolves after the router guard's auth check (see 134-REVIEW.md
+  // WR-01; mirrors ServiceEditorView.vue's subscribeConfirmations watch) and
+  // the Router-reuses-the-mounted-instance case (see 134-CONTEXT.md). stop()
+  // always runs before start(), including the no-op immediate first call, so
+  // no transition can double up a heartbeat/listener or write post-teardown.
   watch(
-    () => toValue(serviceId),
-    (_newId, oldId) => {
-      if (oldId) stop(oldId)
+    () => [toValue(orgId), toValue(serviceId), toValue(currentUser)?.uid] as const,
+    () => {
+      stop()
       start()
     },
     { immediate: true },
@@ -141,7 +148,7 @@ export function useServicePresence(
   }, NOW_TICK_MS)
 
   onUnmounted(() => {
-    stop(activeServiceId)
+    stop()
     if (nowInterval !== null) {
       clearInterval(nowInterval)
       nowInterval = null
