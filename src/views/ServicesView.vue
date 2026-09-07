@@ -2,6 +2,11 @@
   <AppShell>
     <div class="px-6 py-8">
 
+      <!-- Page header -->
+      <div class="mb-4">
+        <h1 class="text-xl font-semibold text-gray-100">Services</h1>
+      </div>
+
       <!-- Tab bar -->
       <div class="flex items-center gap-1 mb-6 border-b border-gray-800 pb-0">
         <button
