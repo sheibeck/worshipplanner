@@ -45,10 +45,12 @@ import {
   cleanupOrphanRendersHandler,
   cleanupOrphanBackgroundsHandler,
   cleanupPptxSourcesHandler,
+  cleanupStalePresenceHandler,
   cleanupExpiredMedia,
   cleanupOrphanRenders,
   cleanupOrphanBackgrounds,
   cleanupPptxSources,
+  cleanupStalePresence,
 } from "./cleanupSweeps";
 // Shared secret + From-header helpers + share-base-url param. MOVED to the
 // dependency-free ./params so orgProvisioning.ts/adminEmail.ts can reuse them
@@ -1071,13 +1073,19 @@ export const requestPptxRender = onDocumentCreated(
 // previewCleanupDryRun (R188/R190: on-demand blast-radius preview)
 // See .planning/codebase/ARCHITECTURE.md (Backend Behavioral Notes (R318) § functions/src/index.ts)
 
-export type CleanupPreviewType = "media" | "orphanRenders" | "backgrounds" | "pptxSources";
+export type CleanupPreviewType =
+  | "media"
+  | "orphanRenders"
+  | "backgrounds"
+  | "pptxSources"
+  | "presence";
 
 const CLEANUP_PREVIEW_TYPES: CleanupPreviewType[] = [
   "media",
   "orphanRenders",
   "backgrounds",
   "pptxSources",
+  "presence",
 ];
 
 export interface PreviewCleanupDryRunRequest {
@@ -1166,6 +1174,14 @@ export async function previewCleanupDryRunHandler(
         );
       }
       return { wouldDeleteCount: s.deletedObjectCount, wouldDeleteBytes: s.deletedBytes };
+    }
+    case "presence": {
+      const s = await cleanupStalePresenceHandler({ forceDryRun: true });
+      if (!s.dryRun) {
+        throw new Error("previewCleanupDryRun: presence preview did not return dryRun:true");
+      }
+      // Presence docs have no byte size -- wouldDeleteBytes is always 0.
+      return { wouldDeleteCount: s.deletedDocCount, wouldDeleteBytes: 0 };
     }
   }
 }
@@ -2815,4 +2831,4 @@ export { deleteOrganization };
 // wrapper -- mirrors the orgProvisioning block above (a function not
 // re-exported here fails `firebase deploy` with "No function matches the
 // filter"). Keep this on ONE line so the deploy-name set stays greppable. ---
-export { cleanupExpiredMedia, cleanupOrphanRenders, cleanupOrphanBackgrounds, cleanupPptxSources };
+export { cleanupExpiredMedia, cleanupOrphanRenders, cleanupOrphanBackgrounds, cleanupPptxSources, cleanupStalePresence };

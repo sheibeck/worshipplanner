@@ -51,12 +51,14 @@ describe("DEFAULT_APP_CONFIG shape", () => {
         pptxRenderEnabled: false,
         backgroundEnabled: false,
         pptxSourceEnabled: false,
+        presenceEnabled: false,
       },
       retention: {
         mediaDays: 30,
         orphanRenderStaleHours: 24,
         backgroundDays: 30,
         pptxSourceDays: 30,
+        presenceStaleMinutes: 60,
       },
       deleteCapPerRun: 500,
       aiProxy: {

@@ -57,6 +57,7 @@ import {
   cleanupOrphanRendersHandler,
   cleanupOrphanBackgroundsHandler,
   cleanupPptxSourcesHandler,
+  cleanupStalePresenceHandler,
   BACKGROUND_PATH_GUARD,
   BACKGROUND_RETENTION_DAYS,
   readBackgroundRetentionDays,
@@ -1405,6 +1406,147 @@ describe("cleanupOrphanRendersHandler", () => {
   });
 });
 
+describe("cleanupStalePresenceHandler", () => {
+  const STALE_MINUTES = DEFAULT_APP_CONFIG.retention.presenceStaleMinutes + 30; // comfortably past the default 60min window
+  const FRESH_MINUTES = 1; // comfortably inside it
+
+  interface FakePresenceDocOptions {
+    ageMinutes?: number; // omit to simulate an unreadable/missing lastSeen
+    path?: string;
+  }
+
+  function fakePresenceDoc(opts: FakePresenceDocOptions = {}) {
+    const path = opts.path ?? "organizations/orgA/services/svc1/presence/user1";
+    const lastSeen =
+      opts.ageMinutes === undefined
+        ? undefined
+        : { toMillis: () => Date.now() - opts.ageMinutes! * 60 * 1000 };
+    const deleteSpy = vi.fn(async () => undefined);
+    return {
+      data: () => ({ lastSeen }),
+      ref: { path, delete: deleteSpy },
+    };
+  }
+
+  /** A fake collectionGroup("presence").get() chain returning `{ docs }`. */
+  function mockPresenceDb(docs: ReturnType<typeof fakePresenceDoc>[]) {
+    const collectionGroupSpy = vi.fn((name: string) => {
+      if (name !== "presence") {
+        throw new Error(`mockPresenceDb: unexpected collectionGroup "${name}"`);
+      }
+      return { get: vi.fn(async () => ({ docs })) };
+    });
+    vi.mocked(getFirestore).mockReturnValue({ collectionGroup: collectionGroupSpy } as never);
+    return { collectionGroupSpy };
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+  });
+
+  it("DRY-RUN DEFAULT: presenceEnabled unset/false deletes nothing, reports dryRun:true with the would-delete count", async () => {
+    const stale = fakePresenceDoc({ ageMinutes: STALE_MINUTES });
+    const fresh = fakePresenceDoc({ ageMinutes: FRESH_MINUTES });
+    mockPresenceDb([stale, fresh]);
+
+    const summary = await cleanupStalePresenceHandler();
+
+    expect(stale.ref.delete).not.toHaveBeenCalled();
+    expect(fresh.ref.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: true, deletedDocCount: 1, cappedByLimit: false });
+  });
+
+  it("ENABLED: only stale docs are deleted, fresh docs are untouched", async () => {
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, presenceEnabled: true },
+    });
+    const stale = fakePresenceDoc({ ageMinutes: STALE_MINUTES });
+    const fresh = fakePresenceDoc({ ageMinutes: FRESH_MINUTES });
+    mockPresenceDb([stale, fresh]);
+
+    const summary = await cleanupStalePresenceHandler();
+
+    expect(stale.ref.delete).toHaveBeenCalledTimes(1);
+    expect(fresh.ref.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: false, deletedDocCount: 1, cappedByLimit: false });
+  });
+
+  it("DELETE CAP: deleteCapPerRun bounds a LIVE run -- exactly one delete, cappedByLimit:true", async () => {
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, presenceEnabled: true },
+      deleteCapPerRun: 1,
+    });
+    const stale1 = fakePresenceDoc({ ageMinutes: STALE_MINUTES });
+    const stale2 = fakePresenceDoc({ ageMinutes: STALE_MINUTES });
+    mockPresenceDb([stale1, stale2]);
+
+    const summary = await cleanupStalePresenceHandler();
+
+    const totalDeleteCalls =
+      (stale1.ref.delete as ReturnType<typeof vi.fn>).mock.calls.length +
+      (stale2.ref.delete as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(totalDeleteCalls).toBe(1);
+    expect(summary).toMatchObject({ dryRun: false, deletedDocCount: 1, cappedByLimit: true });
+  });
+
+  it("PARTIAL FAILURE: one rejected delete never aborts the run -- the others still delete", async () => {
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, presenceEnabled: true },
+    });
+    const failing = fakePresenceDoc({ ageMinutes: STALE_MINUTES });
+    vi.mocked(failing.ref.delete).mockRejectedValueOnce(new Error("boom"));
+    const okay = fakePresenceDoc({ ageMinutes: STALE_MINUTES });
+    mockPresenceDb([failing, okay]);
+
+    const summary = await cleanupStalePresenceHandler();
+
+    expect(failing.ref.delete).toHaveBeenCalledTimes(1);
+    expect(okay.ref.delete).toHaveBeenCalledTimes(1);
+    expect(summary).toMatchObject({ dryRun: false, deletedDocCount: 1, cappedByLimit: false });
+  });
+
+  it("an unreadable lastSeen is skipped even with the gate enabled -- fail safe", async () => {
+    vi.mocked(getAppConfig).mockResolvedValue({
+      ...DEFAULT_APP_CONFIG,
+      cleanup: { ...DEFAULT_APP_CONFIG.cleanup, presenceEnabled: true },
+    });
+    const unreadable = fakePresenceDoc(); // ageMinutes omitted -> unreadable lastSeen
+    mockPresenceDb([unreadable]);
+
+    const summary = await cleanupStalePresenceHandler();
+
+    expect(unreadable.ref.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: false, deletedDocCount: 0, scannedCount: 0 });
+  });
+});
+
+// R423/CLAUDE.md deploy-visibility guard: a NEW Cloud Function that is not
+// re-exported from index.ts (both the import block AND the
+// `export { ... } from "./cleanupSweeps"` line) is silently dropped by
+// `firebase deploy` ("No function matches the filter"). This test proves the
+// string is present at BOTH sites so a future edit that drops either fails
+// this test rather than production.
+describe("cleanupStalePresence re-export guard", () => {
+  it("is present in index.ts's import-from-cleanupSweeps block AND its cleanupSweeps re-export line", () => {
+    const indexSource = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const importBlockMatch = /import \{[^}]*\} from "\.\/cleanupSweeps";/.exec(indexSource);
+    // The re-export site is a plain `export { ... };` of names already
+    // imported above (NOT a re-`from` statement) -- anchor on the known
+    // sibling names rather than a "from" clause that doesn't exist here.
+    const exportLineMatch =
+      /export \{ cleanupExpiredMedia, cleanupOrphanRenders, cleanupOrphanBackgrounds, cleanupPptxSources[^}]*\};/.exec(
+        indexSource,
+      );
+    expect(importBlockMatch).not.toBeNull();
+    expect(exportLineMatch).not.toBeNull();
+    expect(importBlockMatch![0]).toContain("cleanupStalePresence");
+    expect(exportLineMatch![0]).toContain("cleanupStalePresence");
+  });
+});
+
 describe("BACKGROUND_PATH_GUARD", () => {
   it("matches background objects under orgs/{orgId}/backgrounds/", () => {
     expect(BACKGROUND_PATH_GUARD.test("orgs/orgA/backgrounds/bg1/file.png")).toBe(true);
@@ -2202,12 +2344,22 @@ describe("previewCleanupDryRun", () => {
     return `https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/${encodeURIComponent(objectPath)}?alt=media&token=abc123`;
   }
 
+  // Mirrors cleanupStalePresenceHandler describe block's fakePresenceDoc
+  // shape (a self-contained local copy, same R190 rationale as above).
+  function fakePreviewPresenceDoc(ageMinutes: number) {
+    return {
+      data: () => ({ lastSeen: { toMillis: () => Date.now() - ageMinutes * 60 * 1000 } }),
+      ref: { path: "organizations/orgA/services/svc1/presence/user1", delete: vi.fn(async () => undefined) },
+    };
+  }
+
   interface MockPreviewFirestoreOpts {
     callerDocExists?: boolean;
     pptxRendersDocs?: ReturnType<typeof fakePreviewRenderDoc>[];
     slideGroups?: Array<{ data: () => unknown }>;
     lyrics?: Array<{ data: () => unknown }>;
     slideGroupsThrows?: boolean;
+    presenceDocs?: ReturnType<typeof fakePreviewPresenceDoc>[];
   }
 
   // Combined Firestore mock: supports BOTH the previewCleanupDryRun caller
@@ -2244,6 +2396,7 @@ describe("previewCleanupDryRun", () => {
         };
       }
       if (name === "lyrics") return { get: vi.fn(async () => ({ docs: opts.lyrics ?? [] })) };
+      if (name === "presence") return { get: vi.fn(async () => ({ docs: opts.presenceDocs ?? [] })) };
       throw new Error(`mockPreviewFirestore: unexpected collectionGroup "${name}"`);
     });
 
@@ -2292,7 +2445,7 @@ describe("previewCleanupDryRun", () => {
 
   // --- invalid type ----------------------------------------------------
 
-  it("throws invalid-argument for an unrecognized type, listing only the 4 valid values", async () => {
+  it("throws invalid-argument for an unrecognized type, listing all 5 valid values", async () => {
     mockPreviewFirestore();
 
     await expect(
@@ -2301,7 +2454,7 @@ describe("previewCleanupDryRun", () => {
       ),
     ).rejects.toMatchObject({
       code: "invalid-argument",
-      message: expect.stringContaining("media, orphanRenders, backgrounds, pptxSources"),
+      message: expect.stringContaining("media, orphanRenders, backgrounds, pptxSources, presence"),
     });
   });
 
@@ -2367,6 +2520,18 @@ describe("previewCleanupDryRun", () => {
 
     expect(source.delete).not.toHaveBeenCalled();
     expect(result).toEqual({ wouldDeleteCount: 1, wouldDeleteBytes: 4321 });
+  });
+
+  it("presence: wouldDeleteCount maps from deletedDocCount, wouldDeleteBytes is always 0 (no byte concept)", async () => {
+    const stale = fakePreviewPresenceDoc(DEFAULT_APP_CONFIG.retention.presenceStaleMinutes + 30);
+    const fresh = fakePreviewPresenceDoc(1);
+    mockPreviewFirestore({ presenceDocs: [stale, fresh] });
+
+    const result = await previewCleanupDryRunHandler(fakeRequest({ data: { type: "presence" } }));
+
+    expect(stale.ref.delete).not.toHaveBeenCalled();
+    expect(fresh.ref.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ wouldDeleteCount: 1, wouldDeleteBytes: 0 });
   });
 
   // --- LOAD-BEARING: never deletes even when getAppConfig is ENABLED -----
