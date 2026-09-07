@@ -4,17 +4,17 @@ milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
 current_phase: 136
 current_phase_name: Video Output — Fullscreen Slice
-status: executing
-stopped_at: Completed 136-01-PLAN.md
-last_updated: "2026-09-07T23:18:51.667Z"
+status: verifying
+stopped_at: Completed 136-02-PLAN.md
+last_updated: "2026-09-07T23:46:29.600Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 136 execution started
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 18
-  completed_plans: 17
-  percent: 71
+  completed_plans: 18
+  percent: 86
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1395,7 +1395,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 136 (Video Output — Fullscreen Slice) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-07 — Phase 136 execution started
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
@@ -3625,6 +3625,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 135 P02 | 25min | 3 tasks | 4 files |
 | Phase 135-dashboard-overhaul P03 | 20min | 3 tasks | 4 files |
 | Phase 136 P01 | 10min | 2 tasks | 8 files |
+| Phase 136 P02 | 25min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -4228,6 +4229,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: usePresenceRollup's window is the feed's own draft-inclusive upcomingServices window (not the Planned-only attentionServices window), since a draft service can still be actively edited (R418).
 - [Phase ?]: Unconfirmed volunteers card's lg:col-span-2 is now conditional on activeEditors.length === 0, resolving Plan 02's placeholder — it only spans the full row when the presence card is hidden.
 - [Phase ?]: R424 (role/setup half): MonitorRole widened to a strict 3-member allowlist ('audience'|'confidence'|'video'); canSave gate unchanged (Video optional); RunDisplaysPanel/RunPreflightPanel role typing widened as an in-scope fix since Video assignments already flow into Run Control today.
+- [Phase ?]: R426 satisfied by extracting the Audience render into a shared role/testid-parameterized FullscreenSlideOutput.vue that both AudienceOutputView and the new VideoOutputView delegate to, proven behavior-preserving by the unedited AudienceOutputView test suite.
+- [Phase ?]: /present/video/:serviceId launches through the existing N-assignment machinery with zero useRunControl.ts changes — urlForAssignment/openPlaced/openUnplaced/canGoLive were already role-generic.
 
 ### Roadmap Evolution
 
@@ -4557,8 +4560,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T23:18:51.595Z
-Stopped at: Completed 136-01-PLAN.md
+Last session: 2026-09-07T23:45:03.825Z
+Stopped at: Completed 136-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

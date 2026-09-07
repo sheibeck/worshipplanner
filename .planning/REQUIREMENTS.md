@@ -121,7 +121,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Video Output (Live-Stream)
 
-- [ ] **R424**: A third output type **"Video"** is added to the multi-monitor output-role system alongside
+- [x] **R424**: A third output type **"Video"** is added to the multi-monitor output-role system alongside
   Audience/Confidence — `MonitorRole` widened, the monitor setup UI offers it, a `VideoOutputView`
   sibling + its own static route exist. Video assignment coexists with the existing N-assignment role model.
 
@@ -129,7 +129,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   **Full-screen** (per-item authoring UI + schema field), riding the existing autosave path. **Banner is
   valid only when the output is Video.**
 
-- [ ] **R426**: A slide sent Full-screen to the Video output fills the entire video picture, reusing the
+- [x] **R426**: A slide sent Full-screen to the Video output fills the entire video picture, reusing the
   existing Audience full-slide render (no new rendering code).
 
 - [ ] **R427**: A slide sent as a Banner to the Video output renders its contents fit to a bottom
@@ -185,7 +185,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R421 | Phase 131 | Complete |
 | R422 | Phase 134 | Complete |
 | R423 | Phase 134 | Complete |
-| R424 | Phase 136 | In Progress (136-01 done; 136-02 pending) |
+| R424 | Phase 136 | Complete |
 | R425 | Phase 137 | Pending |
-| R426 | Phase 136 | Pending |
+| R426 | Phase 136 | Complete |
 | R427 | Phase 137 | Pending |
