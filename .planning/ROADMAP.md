@@ -862,11 +862,13 @@ integration/export.
      substantive PC integration/export copy retains the phrase, and incidental references — e.g. the
      Planned/locked banner's "Planning Center already has this plan." sentence — are removed (R409).
 
-**Plans**: 3 plans
+**Plans**: 2/3 plans executed
 Plans:
-- [ ] 132-01-PLAN.md — Standard `<h1>Services</h1>` header + mobile-friendly tabs/buttons on ServicesView (R406, R407)
-- [ ] 132-02-PLAN.md — Alternating light-gray zebra striping on shared service-plan rows in ShareView (R408)
+
+- [x] 132-01-PLAN.md — Standard `<h1>Services</h1>` header + mobile-friendly tabs/buttons on ServicesView (R406, R407)
+- [x] 132-02-PLAN.md — Alternating light-gray zebra striping on shared service-plan rows in ShareView (R408)
 - [ ] 132-03-PLAN.md — Inventory + classify all "Planning Center" UI copy; remove the incidental banner sentence (R409)
+
 **UI hint**: yes
 
 ### Phase 133: Volunteer Responsibility Confirmation

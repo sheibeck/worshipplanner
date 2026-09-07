@@ -42,7 +42,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [ ] **R407**: The `/services` page's tabs and buttons are mobile-friendly — usable and readable on a phone
   (they currently aren't), matching the app's mobile button/header conventions.
 
-- [ ] **R408**: The share service-link pages render service-plan rows with an alternating light-gray row
+- [x] **R408**: The share service-link pages render service-plan rows with an alternating light-gray row
   background, so it's easier to keep your place scanning each row of the plan.
 
 ### Verbiage — Remove "Planning Center"
@@ -169,7 +169,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 |-------------|-------|--------|
 | R406 | Phase 132 | Pending |
 | R407 | Phase 132 | Pending |
-| R408 | Phase 132 | Pending |
+| R408 | Phase 132 | Complete |
 | R409 | Phase 132 | Pending |
 | R410 | Phase 133 | Pending |
 | R411 | Phase 133 | Pending |
