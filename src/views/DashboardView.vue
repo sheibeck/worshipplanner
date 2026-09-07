@@ -12,13 +12,26 @@
       <!-- Getting started checklist: editor only, hides when complete -->
       <GettingStarted v-if="authStore.isEditor" class="mb-6" />
 
-      <!-- Overview panels: single column on mobile, flowing into columns when wide -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-      <!-- Next service -->
-      <section>
+      <!-- Needs-your-attention feed, full width; Song library below -->
+      <div class="space-y-6">
+
+      <!-- R419: all-caught-up empty/first-run state, replaces the feed -->
+      <div v-if="upcomingServices.length === 0" class="rounded-lg border border-dashed border-gray-700 p-6 text-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        <h2 class="text-base font-semibold text-gray-100 mt-3">You're all caught up</h2>
+        <p class="text-sm text-gray-400 mt-1">No upcoming services need your attention right now.</p>
+        <router-link to="/services" class="inline-block mt-4 text-sm text-indigo-400 hover:text-indigo-300">
+          Schedule a service
+        </router-link>
+      </div>
+
+      <!-- Needs-attention feed (R415) -->
+      <section v-else>
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500">Next service</h2>
-          <span v-if="upcomingServices.length > 0" class="text-xs text-gray-600">
+          <span class="text-xs text-gray-600">
             {{ upcomingServices.length }} upcoming
           </span>
         </div>
@@ -57,14 +70,6 @@
           </div>
         </router-link>
 
-        <div v-else class="rounded-lg border border-dashed border-gray-700 p-6 text-center">
-          <p class="text-sm text-gray-400">
-            No upcoming services.
-            <router-link to="/services" class="text-indigo-400 hover:text-indigo-300">Create one</router-link>
-            to get started.
-          </p>
-        </div>
-
         <!-- Following services -->
         <div
           v-if="upcomingAfterNext.length > 0"
@@ -89,47 +94,8 @@
         </div>
       </section>
 
-      <!-- Volunteer & role coverage (editor only — planning concern) -->
+      <!-- Song library health (editor only) — full width -->
       <section v-if="authStore.isEditor">
-        <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Volunteer coverage</h2>
-        <div class="rounded-lg border border-gray-800 bg-gray-900 p-5">
-          <div class="flex items-center gap-8 flex-wrap mb-4">
-            <router-link to="/volunteers" class="block">
-              <p class="text-2xl font-bold text-gray-100">{{ rosterStore.activePeople.length }}</p>
-              <p class="text-xs text-gray-500">Active volunteers</p>
-            </router-link>
-            <div>
-              <p class="text-2xl font-bold" :class="understaffedRoles.length > 0 ? 'text-amber-400' : 'text-gray-100'">
-                {{ understaffedRoles.length }}
-              </p>
-              <p class="text-xs text-gray-500">Under-staffed roles</p>
-            </div>
-          </div>
-          <div v-if="understaffedRoles.length > 0" class="flex flex-wrap gap-2">
-            <router-link
-              v-for="entry in understaffedRoles"
-              :key="entry.role.id"
-              to="/volunteers"
-              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
-              :class="entry.count === 0
-                ? 'bg-red-900/40 border-red-700/50 text-red-300'
-                : 'bg-amber-900/40 border-amber-700/50 text-amber-300'"
-            >
-              {{ entry.role.name }}: {{ entry.count === 0 ? 'none' : `${entry.count} volunteer${entry.count === 1 ? '' : 's'}` }}
-            </router-link>
-          </div>
-          <p v-else-if="rosterStore.roles.length > 0" class="text-sm text-gray-500">
-            Every role has at least 2 volunteers.
-          </p>
-          <p v-else class="text-sm text-gray-500">
-            No roles configured yet —
-            <router-link to="/volunteers" class="text-indigo-400 hover:text-indigo-300">set up roles</router-link>.
-          </p>
-        </div>
-      </section>
-
-      <!-- Song library health (editor only) — full width below the two side panels -->
-      <section v-if="authStore.isEditor" class="lg:col-span-2">
         <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Song library</h2>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <router-link
@@ -211,19 +177,6 @@ function formatServiceDate(date: string): string {
     day: 'numeric',
   })
 }
-
-// ── Volunteer & role coverage ─────────────────────────────────────────────────
-// A role is "under-staffed" when fewer than 2 active volunteers can fill it —
-// a single point of failure (or none at all) for that role.
-const MIN_VOLUNTEERS_PER_ROLE = 2
-const understaffedRoles = computed(() =>
-  rosterStore.rolesSorted
-    .map((role) => ({
-      role,
-      count: rosterStore.activePeople.filter((p) => p.roles.includes(role.id)).length,
-    }))
-    .filter((entry) => entry.count < MIN_VOLUNTEERS_PER_ROLE),
-)
 
 // ── Song library health ───────────────────────────────────────────────────────
 const activeSongs = computed(() => songStore.visibleSongs)
