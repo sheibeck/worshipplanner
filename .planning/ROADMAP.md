@@ -830,7 +830,9 @@ canvas — with zero risk of exposing a Draft or clobbering manual work.
   5. Revisiting Stage Layout after manual edits — or after a roster change — never regenerates, wipes, or
      duplicates existing markers; the one-time seed never re-runs against a non-empty canvas (R420).
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 131-01-PLAN.md — Stage Layout auto-populate: pure autoPopulateMarkers() + one-time empty-canvas seed trigger (R420)
+- [ ] 131-02-PLAN.md — Auto share-link at the Planned transition; remove the createService draft-mint (R421) — includes a blocking owner decision on the createService conflict
 
 ### Phase 132: Services Page UX Alignment & Verbiage Cleanup
 
