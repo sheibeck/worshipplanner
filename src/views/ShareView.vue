@@ -47,7 +47,8 @@
         <div
           v-for="(slot, index) in serviceSnapshot.slots"
           :key="slot.position + '-' + slot.kind + '-' + index"
-          class="py-2.5 border-b border-gray-100"
+          class="py-2.5 px-2 -mx-2 border-b border-gray-100"
+          :class="index % 2 !== 0 ? 'bg-gray-50' : ''"
         >
           <!-- SONG slot -->
           <template v-if="slot.kind === 'SONG'">
