@@ -995,7 +995,9 @@ generalization)
   4. In Fullscreen mode, the Video output renders identically to the existing Audience full-slide output —
      no visual regression, no new rendering code (R426).
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 136-01-PLAN.md — Widen MonitorRole to include 'video' + Monitor Setup offers Video as a third assignable role (R424)
+- [ ] 136-02-PLAN.md — Shared fullscreen render (Audience reuse) + VideoOutputView + /present/video route + launch (R424, R426)
 **UI hint**: yes
 
 ### Phase 137: Video Output — Banner Render
