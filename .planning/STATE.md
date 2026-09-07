@@ -5,15 +5,15 @@ milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 13
 current_phase: 135
 current_phase_name: Dashboard Overhaul
 status: executing
-stopped_at: Completed 135-01-PLAN.md
-last_updated: "2026-09-07T21:35:03.974Z"
+stopped_at: Completed 135-02-PLAN.md
+last_updated: "2026-09-07T21:54:16.584Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 135 execution started
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
   percent: 57
 ---
 
@@ -1394,7 +1394,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 135 (Dashboard Overhaul) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-07 — Phase 135 execution started
 
@@ -3621,6 +3621,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 134 P03 | 25m | 2 tasks | 6 files |
 | Phase 134 P02 | 30min | 3 tasks | 7 files |
 | Phase 135 P01 | 25min | 3 tasks | 3 files |
+| Phase 135 P02 | 25min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -4219,6 +4220,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: presentViewers includes ALL live viewers (self included); the view filters out the current user's own uid, keeping the read shape reusable for Phase 135's dashboard roll-up
 - [Phase ?]: Stubbed useServicePresence (constant empty list) in 4 pre-existing ServiceEditorView test files unrelated to presence, mirroring the existing composable-stub convention, rather than editing 15+ exact setDoc-call-count assertions
 - [Phase ?]: 135-01: dashboardReadinessOf gates songs-needed/media-missing on total > 0 (zero-slots guard), reusing readinessOf verbatim per R416
+- [Phase ?]: unconfirmedAssignments() stays a pure diff util per plan contract; the composable separately re-derives display status (unconfirmed vs needsReconfirmation) for chip coloring
+- [Phase ?]: attentionServices window is Planned-only (not the feed's draft-inclusive window) since Draft services have no rehearseAccess/confirmations docs yet
 
 ### Roadmap Evolution
 
@@ -4548,8 +4551,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T21:35:03.892Z
-Stopped at: Completed 135-01-PLAN.md
+Last session: 2026-09-07T21:54:16.516Z
+Stopped at: Completed 135-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

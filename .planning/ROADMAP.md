@@ -968,10 +968,10 @@ metric, giving a planner one place to see what's coming up and what needs action
   6. When there is nothing needing attention, the dashboard shows a clear empty/first-run state instead of
      a blank or broken layout (R419).
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 - [x] 135-01-PLAN.md — Remove Volunteer coverage; full-width upcoming-services feed with a worst-of readiness signal (reusing readinessOf); all-caught-up empty state (R414/R415/R416/R419)
-- [ ] 135-02-PLAN.md — Unconfirmed-volunteers attention card; bounded ≤6-service confirmations + rehearseAccess fan-out (R417)
+- [x] 135-02-PLAN.md — Unconfirmed-volunteers attention card; bounded ≤6-service confirmations + rehearseAccess fan-out (R417)
 - [ ] 135-03-PLAN.md — Read-only editor-presence roll-up card; hide-when-empty with col-span-2 interplay (R418)
 
 **UI hint**: yes

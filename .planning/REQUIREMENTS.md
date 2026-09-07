@@ -79,7 +79,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   slides built, Draft vs Planned/locked), **reusing the existing v2.12 My Schedule readiness computation**
   rather than inventing a second, parallel definition.
 
-- [ ] **R417**: The dashboard shows an unconfirmed-volunteers widget (who hasn't yet confirmed for upcoming
+- [x] **R417**: The dashboard shows an unconfirmed-volunteers widget (who hasn't yet confirmed for upcoming
   services). Depends on R410.
 
 - [ ] **R418**: The dashboard shows an editor-presence roll-up (who is currently editing what), reusing the
@@ -178,7 +178,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R414 | Phase 135 | Complete |
 | R415 | Phase 135 | Complete |
 | R416 | Phase 135 | Complete |
-| R417 | Phase 135 | Pending |
+| R417 | Phase 135 | Complete |
 | R418 | Phase 135 | Pending |
 | R419 | Phase 135 | Complete |
 | R420 | Phase 131 | Complete |
