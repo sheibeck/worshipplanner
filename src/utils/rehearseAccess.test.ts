@@ -234,6 +234,8 @@ describe('buildRehearseAccess', () => {
         'status',
         'assignedEmailsLower',
         'rolesByEmailLower',
+        'roleIdsByEmailLower',
+        'roleAssignmentsByEmailLower',
         'songs',
         'orderOfService',
         'roleAssignments',
@@ -284,6 +286,47 @@ describe('buildRehearseAccess', () => {
     const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [roleGuitar, roleVocals], [person], [])
 
     expect(result.rolesByEmailLower).toEqual({ 'dana@example.com': ['guitar', 'vocals'] })
+  })
+
+  // Phase 133 (R410/R412): roleIdsByEmailLower / roleAssignmentsByEmailLower —
+  // built in the same loop as rolesByEmailLower, with the same PII-safe,
+  // empty-email-skip discipline.
+  it('gives a person holding two roles both role IDs in roleIdsByEmailLower and both {roleId,roleName} pairs in roleAssignmentsByEmailLower, deduped', () => {
+    const roleGuitar = makeRole({ id: 'role-guitar', name: 'guitar', order: 0 })
+    const roleVocals = makeRole({ id: 'role-vocals', name: 'vocals', order: 1 })
+    const quarter = makeQuarter({
+      serviceDates: ['2026-09-06'],
+      calendar: {
+        '2026-09-06': { 'role-guitar': ['person-1'], 'role-vocals': ['person-1'] },
+      },
+    })
+    const person = makePerson({ id: 'person-1', email: 'Dana@Example.com' })
+    const service = makeService({ date: '2026-09-06' })
+
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [roleGuitar, roleVocals], [person], [])
+
+    expect(result.roleIdsByEmailLower).toEqual({ 'dana@example.com': ['role-guitar', 'role-vocals'] })
+    expect(result.roleAssignmentsByEmailLower).toEqual({
+      'dana@example.com': [
+        { roleId: 'role-guitar', roleName: 'guitar' },
+        { roleId: 'role-vocals', roleName: 'vocals' },
+      ],
+    })
+  })
+
+  it('skips an assigned person with an empty-string email from roleIdsByEmailLower/roleAssignmentsByEmailLower entirely', () => {
+    const role = makeRole()
+    const quarter = makeQuarter({
+      serviceDates: ['2026-09-06'],
+      calendar: { '2026-09-06': { 'role-guitar': ['person-1'] } },
+    })
+    const person = makePerson({ id: 'person-1', email: '' })
+    const service = makeService({ date: '2026-09-06' })
+
+    const result = buildRehearseAccess(service, 'org-1', undefined, [quarter], [role], [person], [])
+
+    expect(result.roleIdsByEmailLower).toEqual({})
+    expect(result.roleAssignmentsByEmailLower).toEqual({})
   })
 
   it('does not duplicate a role name when the same person is scheduled under the same role via override and schedule', () => {

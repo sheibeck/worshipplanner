@@ -71,6 +71,20 @@ export interface RehearseAccessDoc {
    *  already-projected songs[]/attachment URLs. Empty-email persons are
    *  skipped entirely (mirrors assignedEmailsLower's own empty-email skip). */
   rolesByEmailLower: Record<string, string[]>
+  /** Phase 133 (R410/R412) — the RULES-check sibling of
+   *  roleAssignmentsByEmailLower below: role IDS only, keyed by lowercased
+   *  email. firestore.rules' confirmations write rule does a flat `in`
+   *  check against this (cheaper/simpler than matching a list-of-maps —
+   *  133-RESEARCH.md Assumption A2). Same empty-email-skip, lowercased-key
+   *  discipline as rolesByEmailLower. Deduped role ids per email. */
+  roleIdsByEmailLower: Record<string, string[]>
+  /** Phase 133 (R410/R412) — the CLIENT-render sibling of
+   *  roleIdsByEmailLower above: role id+name pairs, keyed by lowercased
+   *  email. Gives a volunteer's own client the roleId it needs to render a
+   *  per-role "I've got it" control and to build a confirmation doc's key
+   *  (`${roleId}_${emailLower}`). Same empty-email-skip, lowercased-key
+   *  discipline as rolesByEmailLower. */
+  roleAssignmentsByEmailLower: Record<string, { roleId: string; roleName: string }[]>
   songs: RehearseSong[]
   /** Read-only running order (Phase 127, R392) — the EXACT per-kind
    *  allowlist `buildServiceSnapshot` enforces (shared via
@@ -142,7 +156,14 @@ export function buildRehearseAccess(
   // directly (not assignedPersonIds) so each role name is attributed to the
   // correct person; empty-email persons are skipped, matching the
   // assignedEmailsLower loop above; role names are deduped via `includes`.
+  // roleIdsByEmailLower / roleAssignmentsByEmailLower (Phase 133, R410/R412)
+  // — built in the SAME loop, mirroring rolesByEmailLower's PII-safe,
+  // empty-email-skip discipline exactly. roleIdsByEmailLower exists
+  // specifically so firestore.rules can do a flat `in` check (A2
+  // resolution, 133-RESEARCH.md) instead of matching a list-of-maps.
   const rolesByEmailLower: Record<string, string[]> = {}
+  const roleIdsByEmailLower: Record<string, string[]> = {}
+  const roleAssignmentsByEmailLower: Record<string, { roleId: string; roleName: string }[]> = {}
   for (const a of assignments) {
     for (const pid of a.effectivePersonIds) {
       const person = peopleById.get(pid)
@@ -150,6 +171,14 @@ export function buildRehearseAccess(
       const emailLower = person.email.toLowerCase()
       const names = (rolesByEmailLower[emailLower] ??= [])
       if (!names.includes(a.roleName)) names.push(a.roleName)
+
+      const ids = (roleIdsByEmailLower[emailLower] ??= [])
+      if (!ids.includes(a.roleId)) ids.push(a.roleId)
+
+      const roleAssignmentsForEmail = (roleAssignmentsByEmailLower[emailLower] ??= [])
+      if (!roleAssignmentsForEmail.some((r) => r.roleId === a.roleId)) {
+        roleAssignmentsForEmail.push({ roleId: a.roleId, roleName: a.roleName })
+      }
     }
   }
 
@@ -236,6 +265,8 @@ export function buildRehearseAccess(
     status: service.status,
     assignedEmailsLower: [...assignedEmailsLower].sort(),
     rolesByEmailLower,
+    roleIdsByEmailLower,
+    roleAssignmentsByEmailLower,
     songs: rehearseSongs,
     orderOfService,
     roleAssignments,
