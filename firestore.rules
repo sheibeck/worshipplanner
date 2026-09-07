@@ -342,6 +342,27 @@ service cloud.firestore {
           allow delete: if isOrgEditor(orgId)
             || (isAssignedVolunteer() && resource.data.emailLower == request.auth.token.email.lower());
         }
+
+        // Presence — R422/R423 (Phase 134): a coarse "who's here" heartbeat
+        // for the service editor. Nested here (not sibling) so orgId AND
+        // docId (serviceId) both come free from the enclosing path segments
+        // -- no client-supplied field is ever trusted for scoping, so
+        // cross-org and cross-service access are structurally impossible,
+        // exactly like lockSnapshots/confirmations above. Read is
+        // org-scoped and get/list-split (never `if true`/unscoped
+        // isSignedIn() -- the SEC-S-01 guard); write/delete is own-doc-only
+        // via presenceId == request.auth.uid, with a tight field allowlist
+        // so no extra field (e.g. a privilege field) can ride onto the doc.
+        match /presence/{presenceId} {
+          allow get, list: if isOrgMember(orgId);
+
+          allow create, update: if isOrgMember(orgId)
+            && presenceId == request.auth.uid
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.keys().hasOnly(['uid', 'displayName', 'lastSeen']);
+
+          allow delete: if isOrgMember(orgId) && presenceId == request.auth.uid;
+        }
       }
 
       // rehearseAccess — R377 (Phase 125, security core): a frozen, PII-safe
