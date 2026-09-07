@@ -1758,11 +1758,12 @@ import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useAiSongSuggestions } from '@/composables/useAiSongSuggestions'
 import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanNeededPositionTeamIds, fetchTeamPositions, addNeededPosition } from '@/utils/planningCenterApi'
-import { serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore'
+import { serverTimestamp, doc, getDoc, setDoc, collection, onSnapshot, type Unsubscribe } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { db, functions } from '@/firebase'
 import { resolveRecipients } from '@/utils/messagingRecipients'
 import { fingerprintSlideGroups, diffServiceSnapshots, type ChangeEntry, type SlideFingerprint } from '@/utils/serviceLockDiff'
+import { confirmationKey, type ConfirmationStatus } from '@/utils/confirmations'
 import Sortable from 'sortablejs'
 
 const route = useRoute()
@@ -2989,6 +2990,9 @@ onUnmounted(() => {
   // Don't unsubscribe serviceStore here — DashboardView may still be using it
   // Tear down the delivery-history listener (its surface is unmounting).
   serviceMessagesStore.unsubscribeServiceMessages()
+  // R411: the confirmations onSnapshot listener must not outlive this view either.
+  unsubscribeConfirmations?.()
+  unsubscribeConfirmations = null
   // The transient lock-notify auto-clear timer must not outlive the view.
   clearLockNotifyTimer()
 })
@@ -4222,6 +4226,88 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
     }
     console.error('Failed to update role override:', err)
   }
+}
+
+// ── Live confirmation status (R411) ─────────────────────────────────────────────
+// A planner-visible read of the confirmations subcollection Plan 01 secured and
+// Plan 02's volunteer confirm bar writes to. Read LIVE via onSnapshot only — NEVER
+// getDoc/getDocs — so a volunteer confirm or a relock's needsReconfirmation flip
+// (Plan 04) reflects on the roster without a reload (133-RESEARCH.md Pitfall 1).
+// Mirrors mySchedule.ts's subscribe/unsubscribe discipline: tear down any prior
+// listener before re-subscribing.
+const confirmationStatuses = ref<Map<string, ConfirmationStatus>>(new Map())
+let unsubscribeConfirmations: Unsubscribe | null = null
+
+function subscribeConfirmations(): void {
+  if (unsubscribeConfirmations) {
+    unsubscribeConfirmations()
+    unsubscribeConfirmations = null
+  }
+  const orgId = authStore.orgId
+  const svcId = localService.value?.id
+  if (!orgId || !svcId) {
+    confirmationStatuses.value = new Map()
+    return
+  }
+  unsubscribeConfirmations = onSnapshot(
+    collection(db, 'organizations', orgId, 'services', svcId, 'confirmations'),
+    (snap) => {
+      const next = new Map<string, ConfirmationStatus>()
+      for (const d of snap.docs) {
+        const data = d.data() as { roleId?: string; emailLower?: string; status?: ConfirmationStatus }
+        if (!data.roleId || !data.emailLower || !data.status) continue
+        next.set(confirmationKey(data.roleId, data.emailLower), data.status)
+      }
+      confirmationStatuses.value = next
+    },
+    (err: unknown) => {
+      // Mirrors mySchedule.ts's subscription error convention — a missing/
+      // misconfigured rule or index is otherwise invisible in the console.
+      console.error('confirmations subscription failed', err)
+    },
+  )
+}
+
+// Re-subscribes when the org or the loaded service id changes; the `immediate`
+// run is what fires the initial subscription once localService populates.
+watch([() => authStore.orgId, () => localService.value?.id], subscribeConfirmations, { immediate: true })
+
+/**
+ * Resolves the live confirmation status for a (roleId, personId) assignment.
+ * 'unconfirmed' is the implicit default: no confirmation doc, or the person
+ * has no email on file (mirrors buildRehearseAccess's own empty-email skip).
+ */
+function confirmationStatusFor(roleId: string, personId: string): ConfirmationStatus | 'unconfirmed' {
+  const person = rosterStore.people.find((p) => p.id === personId)
+  if (!person || !person.email) return 'unconfirmed'
+  return confirmationStatuses.value.get(confirmationKey(roleId, person.email.toLowerCase())) ?? 'unconfirmed'
+}
+
+const CONFIRMATION_CHIP_LABEL: Record<ConfirmationStatus | 'unconfirmed', string> = {
+  confirmed: 'Confirmed',
+  needsReconfirmation: 'Needs reconfirmation',
+  unconfirmed: 'Unconfirmed',
+}
+
+const CONFIRMATION_CHIP_CLASS: Record<ConfirmationStatus | 'unconfirmed', string> = {
+  confirmed:
+    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-800',
+  needsReconfirmation:
+    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/40 text-amber-300 border border-amber-800',
+  unconfirmed:
+    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-800 text-gray-400 border border-gray-700',
+}
+
+function confirmationChipLabel(status: ConfirmationStatus | 'unconfirmed'): string {
+  return CONFIRMATION_CHIP_LABEL[status]
+}
+
+function confirmationChipClass(status: ConfirmationStatus | 'unconfirmed'): string {
+  return CONFIRMATION_CHIP_CLASS[status]
+}
+
+function personName(personId: string): string {
+  return rosterStore.people.find((p) => p.id === personId)?.name ?? personId
 }
 
 async function onResetRoleOverride(roleId: string) {
