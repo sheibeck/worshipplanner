@@ -97,7 +97,7 @@ describe('VolunteerConfirmBar', () => {
     await wrapper.find('[data-testid="confirm-btn-role-vocals"]').trigger('click')
 
     expect(mockSetDoc).toHaveBeenCalledTimes(1)
-    const [ref, payload] = mockSetDoc.mock.calls[0] as [{ path: string }, Record<string, unknown>]
+    const [ref, payload] = mockSetDoc.mock.calls[0] as unknown as [{ path: string }, Record<string, unknown>]
     expect(ref.path).toBe(`${CONFIRMATIONS_PATH}/role-vocals_dana@example.com`)
     expect(payload).toEqual({
       roleId: 'role-vocals',
@@ -179,7 +179,7 @@ describe('VolunteerConfirmBar', () => {
     await wrapper.find('[data-testid="undo-btn-role-vocals"]').trigger('click')
 
     expect(mockDeleteDoc).toHaveBeenCalledTimes(1)
-    const [ref] = mockDeleteDoc.mock.calls[0] as [{ path: string }]
+    const [ref] = mockDeleteDoc.mock.calls[0] as unknown as [{ path: string }]
     expect(ref.path).toBe(`${CONFIRMATIONS_PATH}/role-vocals_dana@example.com`)
   })
 
