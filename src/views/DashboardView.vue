@@ -39,7 +39,7 @@
         <router-link
           v-if="nextService"
           :to="`/services/${nextService.id}`"
-          class="block rounded-lg border border-gray-800 bg-gray-900 p-5 hover:bg-gray-800/50 transition-colors"
+          class="block rounded-lg border border-gray-800 bg-gray-900 p-5 hover:bg-gray-800/50 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-950"
         >
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
@@ -53,11 +53,9 @@
           <div class="mt-4 flex items-center gap-2 flex-wrap">
             <span
               class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
-              :class="serviceSongStats(nextService).total > 0 && serviceSongStats(nextService).filled === serviceSongStats(nextService).total
-                ? 'bg-green-900/40 border-green-700/50 text-green-300'
-                : 'bg-amber-900/40 border-amber-700/50 text-amber-300'"
+              :class="readinessDisplay(nextService).pillClass"
             >
-              {{ serviceSongStats(nextService).filled }}/{{ serviceSongStats(nextService).total }} songs assigned
+              {{ readinessDisplay(nextService).label }}
             </span>
             <span
               class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
@@ -79,17 +77,16 @@
             v-for="s in upcomingAfterNext"
             :key="s.id"
             :to="`/services/${s.id}`"
-            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-gray-800/40 transition-colors"
+            class="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-gray-800/40 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-950"
           >
             <div class="min-w-0">
               <span class="text-sm text-gray-200">{{ s.name }}</span>
               <span class="text-xs text-gray-500 ml-2">{{ formatServiceDate(s.date) }}</span>
             </div>
-            <span
-              class="h-2 w-2 rounded-full shrink-0"
-              :class="isServiceReady(s) ? 'bg-green-500' : 'bg-amber-500'"
-              :title="isServiceReady(s) ? 'All songs assigned' : 'Songs still needed'"
-            ></span>
+            <span class="flex items-center gap-1.5 shrink-0">
+              <span class="h-2 w-2 rounded-full" :class="readinessDisplay(s).dotClass"></span>
+              <span class="text-xs" :class="readinessDisplay(s).textClass">{{ readinessDisplay(s).label }}</span>
+            </span>
           </router-link>
         </div>
       </section>
@@ -125,6 +122,7 @@ import { useRosterStore } from '@/stores/roster'
 import type { Service } from '@/types/service'
 import AppShell from '@/components/AppShell.vue'
 import GettingStarted from '@/components/GettingStarted.vue'
+import { dashboardReadinessOf, serviceReadinessSongs, type DashboardReadinessState } from '@/utils/dashboardReadiness'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
@@ -164,9 +162,57 @@ function hasScripture(service: Service): boolean {
   return scriptureFilled || service.sermonPassage != null
 }
 
-function isServiceReady(service: Service): boolean {
-  const { filled, total } = serviceSongStats(service)
-  return total > 0 && filled === total
+// ── Readiness signal (R416) — combines song-assignment stats + the v2.12
+// media readiness (readinessOf, via dashboardReadinessOf) + lock state into
+// one worst-of display per service. Colors/copy per 135-UI-SPEC.md Widget 1.
+const READINESS_COLOR_CLASSES: Record<
+  DashboardReadinessState,
+  { dot: string; text: string; pill: string }
+> = {
+  'songs-needed': {
+    dot: 'bg-amber-500',
+    text: 'text-amber-400',
+    pill: 'bg-amber-900/40 border-amber-700/50 text-amber-300',
+  },
+  'media-missing': {
+    dot: 'bg-amber-500',
+    text: 'text-amber-400',
+    pill: 'bg-amber-900/40 border-amber-700/50 text-amber-300',
+  },
+  draft: {
+    dot: 'bg-gray-500',
+    text: 'text-gray-400',
+    pill: 'bg-gray-800 border-gray-700 text-gray-400',
+  },
+  ready: {
+    dot: 'bg-green-500',
+    text: 'text-green-400',
+    pill: 'bg-green-900/40 border-green-700/50 text-green-300',
+  },
+}
+
+const songsById = computed(() => new Map(songStore.songs.map((s) => [s.id, s])))
+
+function readinessDisplay(service: Service) {
+  const readinessSongs = serviceReadinessSongs(service, songsById.value)
+  const readiness = dashboardReadinessOf(serviceSongStats(service), readinessSongs, service.status)
+
+  let label: string
+  if (readiness.state === 'songs-needed') {
+    label = `${readiness.songsNeeded} song${readiness.songsNeeded === 1 ? '' : 's'} still needed`
+  } else if (readiness.state === 'media-missing') {
+    label =
+      readiness.missingMediaCount < readinessSongs.length
+        ? `${readiness.missingMediaCount} song${readiness.missingMediaCount === 1 ? '' : 's'} missing media`
+        : 'Songs missing media'
+  } else if (readiness.state === 'draft') {
+    label = 'Draft'
+  } else {
+    label = 'Ready'
+  }
+
+  const colors = READINESS_COLOR_CLASSES[readiness.state]
+  return { ...readiness, label, dotClass: colors.dot, textClass: colors.text, pillClass: colors.pill }
 }
 
 function formatServiceDate(date: string): string {
