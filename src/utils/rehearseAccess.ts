@@ -76,15 +76,18 @@ export interface RehearseAccessDoc {
    *  email. firestore.rules' confirmations write rule does a flat `in`
    *  check against this (cheaper/simpler than matching a list-of-maps —
    *  133-RESEARCH.md Assumption A2). Same empty-email-skip, lowercased-key
-   *  discipline as rolesByEmailLower. Deduped role ids per email. */
-  roleIdsByEmailLower: Record<string, string[]>
+   *  discipline as rolesByEmailLower. Deduped role ids per email.
+   *  Optional, additive-only (this codebase's established no-migration
+   *  schema-growth convention): absent on pre-Phase-133 docs until relocked. */
+  roleIdsByEmailLower?: Record<string, string[]>
   /** Phase 133 (R410/R412) — the CLIENT-render sibling of
    *  roleIdsByEmailLower above: role id+name pairs, keyed by lowercased
    *  email. Gives a volunteer's own client the roleId it needs to render a
    *  per-role "I've got it" control and to build a confirmation doc's key
    *  (`${roleId}_${emailLower}`). Same empty-email-skip, lowercased-key
-   *  discipline as rolesByEmailLower. */
-  roleAssignmentsByEmailLower: Record<string, { roleId: string; roleName: string }[]>
+   *  discipline as rolesByEmailLower. Optional, same additive-only
+   *  convention as roleIdsByEmailLower. */
+  roleAssignmentsByEmailLower?: Record<string, { roleId: string; roleName: string }[]>
   songs: RehearseSong[]
   /** Read-only running order (Phase 127, R392) — the EXACT per-kind
    *  allowlist `buildServiceSnapshot` enforces (shared via
