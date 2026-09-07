@@ -5,15 +5,15 @@ milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 13
 current_phase: 134
 current_phase_name: Editor Presence
 status: executing
-stopped_at: Completed 134-01-PLAN.md
-last_updated: "2026-09-07T19:22:24.895Z"
+stopped_at: Completed 134-03-PLAN.md
+last_updated: "2026-09-07T19:42:33.153Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 134 execution started
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 13
-  completed_plans: 11
+  completed_plans: 12
   percent: 43
 ---
 
@@ -1394,7 +1394,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 134 (Editor Presence) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-07 — Phase 134 execution started
 
@@ -3617,6 +3617,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 133 P04 | 20min | 1 tasks | 2 files |
 | Phase 133 P05 | 15min | 3 tasks | 7 files |
 | Phase 134 P01 | 25min | 2 tasks | 3 files |
+| Phase 134 P03 | 25m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -4211,6 +4212,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: reconcileConfirmations flips stale confirmed->needsReconfirmation on relock (R412), keyed on stable {roleId}_{emailLower} identity; best-effort, mirrors writeRehearseAccessDoc/ensureShareLink catch discipline
 - [Phase ?]: R413: unconfirmedOnly filters per-assignment (not per-person), scoped to team-matched roleIds only; server sendQueuedMessageHandler is the sole authoritative enforcement point (Admin-SDK confirmations read), client MessageComposer toggle is preview-only.
 - [Phase ?]: 134-01: presence heartbeat 30000ms / staleness 60000ms (research-recommended range); isPresenceStale treats null/NaN lastSeen as always-stale
+- [Phase ?]: cleanupStalePresence scheduled 04:00 UTC (free slot between 03:00/05:00 sibling sweeps); presenceStaleMinutes defaults to 60; presence sweep fetches-then-filters in code (no collection-group range index needed)
 
 ### Roadmap Evolution
 
@@ -4540,8 +4542,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T19:22:24.827Z
-Stopped at: Completed 134-01-PLAN.md
+Last session: 2026-09-07T19:42:33.034Z
+Stopped at: Completed 134-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
