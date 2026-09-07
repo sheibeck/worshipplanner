@@ -1,628 +1,271 @@
-# Pitfalls Research — v2.7 Rehearsal, Stage Plans & Presentation Polish
+# Pitfalls Research
 
-**Domain:** Adding 8 features to a mature Vue 3 + Firebase (Blaze) worship-planning app — public rehearsal
-media, per-org Storage rules, freeform drag-and-drop, live-presentation timers, slide-model changes,
-app-wide notifications, and multi-org context switching.
-**Researched:** 2026-08-31
-**Confidence:** HIGH for codebase-grounded findings (read directly from `storage.rules`, `firestore.rules`,
-`src/stores/auth.ts`, `src/stores/orgScopedStores.ts`, `src/stores/toasts.ts`, `src/types/slide.ts`,
-`src/types/songLyrics.ts`, `src/utils/songSectionOrder.ts`, `src/composables/useMediaUpload.ts`,
-`src/views/ShareView.vue`, `src/views/RunControlView.vue`); LOW for the four general web-search findings
-(unverified single-source, cited inline) used only as supporting context for the public-share and a11y
-pitfalls.
+**Domain:** Adding features to a shipped, cost-hardened, multi-tenant Firebase + Vue 3 worship-planning app (v2.14: Services UX alignment, dashboard rework, PC-verbiage cleanup, volunteer confirmation, Stage Layout auto-populate, auto-generated share links, alternating row shading, editor presence, and a third "Video" live-stream output with transparent banner/full-screen slides)
+**Researched:** 2026-09-07
+**Confidence:** MEDIUM-HIGH (project-specific findings HIGH — grounded directly in this repo's `firestore.rules`, `PROJECT.md` history, and component code; the two externally-researched items — browser alpha capture and Firebase presence patterns — are MEDIUM, general industry knowledge not verified against this project's exact hardware/SDKs)
 
 ## Critical Pitfalls
 
-### Pitfall 1: Rehearse mode makes the whole org's Storage bucket world-readable
+### Pitfall 1: Treating "transparent Video banner" as a solved problem when it's an unverified external hardware dependency (Blackbird)
 
 **What goes wrong:**
-`storage.rules` today gates `orgs/{orgId}/media/**` and `orgs/{orgId}/{allPaths=**}` purely on
-`isOrgMember(orgId)` (a signed-in claim check) — there is currently **no unauthenticated read path at
-all**. The Rehearse feature requires the opposite: an anonymous visitor with only a share-link token must
-read specific song attachments. The naive fix — `allow read: if true;` on the existing `orgs/{orgId}/**`
-match, or widening the existing media match — makes **every** file under that org's Storage prefix
-(PPTX source decks, slide background images, other songs' unreleased chord charts, anything ever
-uploaded) world-readable to anyone who enumerates or guesses a path, not just the attachments the
-planner intended to share. Firebase Storage has no native path-listing protection once `read` is `true`,
-and `getDownloadURL()` tokens are themselves durable, unrevocable-from-client bearer tokens once minted
-(LOW-confidence web finding) — so a leaked or logged URL keeps working indefinitely even after the
-service is no longer being rehearsed.
+The milestone scope explicitly separates "app renders a transparent-background banner" (in scope) from "Blackbird composites it over live video" (external, unresearched). The risk is that the app-side work gets built, verified only against a screenshot/DevTools check that the DOM/CSS shows `background: transparent`, and declared done — while the actual end-to-end outcome (a legible lower-third composited live over stage video on the AV room's hardware) is never validated until a live Sunday service, when it's too late to redesign.
+
+Two independent technical facts make this a real risk, not a formality:
+1. A **rendered, on-screen browser window has no alpha channel by the time an external HDMI/SDI capture device or physical video mixer sees it** — the OS compositor flattens every window to opaque RGB before it reaches a display output or a capture card. CSS `background: transparent` only ever matters *within* software that reads the DOM/canvas directly (Chromium's offscreen/headless rendering, an OBS "Browser Source", a screen-capture app that explicitly supports window transparency) — not to a piece of physical hardware digitizing a screen/HDMI signal.
+2. Even within software-only pipelines (OBS, NDI), true alpha pass-through is the exception, not the default: OBS's Browser Source can honor page transparency, but most physical mixer/capture-card ingest paths and most NDI receivers do **not** carry an alpha channel — the standard, hardware-agnostic fallback the whole industry uses for "keyable" overlays is a **solid, known chroma color (green/blue) composited by the downstream device's chroma-key filter**, not real alpha.
+
+The owner has stated the Blackbird device's transparent/keying behavior has not yet been verified — that's the right instinct, but it's easy for the "app-side only" scoping decision to quietly slide into "we don't need to know how Blackbird works to ship this," which is false: the *rendering strategy* the app should build (CSS alpha vs. a solid chroma-key color, e.g. a specific green/magenta) depends entirely on what Blackbird actually accepts, and that choice cannot be safely deferred past the render implementation.
 
 **Why it happens:**
-The existing membership pattern (`isOrgMember`) is the *only* read gate in the file — there is no
-precedent in this codebase for a partial-public-read rule, so the fastest-looking fix is to relax the
-existing broad match rather than add a narrow new one.
+Scope boundaries drawn for good reasons (don't own hardware you can't test) get read as "don't even ask the question," and a plausible-looking `rgba(0,0,0,0)` CSS background feels like proof of correctness in a code review when no one in the loop has confirmed what the hardware chain actually does with it.
 
 **How to avoid:**
-- Give rehearsal attachments their **own dedicated Storage path** distinct from `orgs/{orgId}/media/**`
-  (e.g. `orgs/{orgId}/rehearsalAttachments/{songId}/{attachmentId}/...`), with its **own** `match` block —
-  mirroring how the existing `orgs/{orgId}/media/**` block already gets its own higher size cap
-  independent of the generic `orgs/{orgId}/{allPaths=**}` fallback (Cloud Storage rules do **not**
-  cascade between sibling matches, and this codebase's own comment on that media block already proves it
-  with a dedicated test).
-- Public read on that path must be scoped to **attachments belonging to a currently-shared service's
-  songs only**, not "public read of every attachment the org has ever uploaded" — e.g. gate on a
-  Firestore cross-check to the song being attached to a service with a live `shareTokens`/`serviceShares`
-  doc, or simplest/safest: make public read conditional on the attachment doc itself carrying a
-  `publiclyShareable` flag set only when the attachment is actually referenced from a service that has
-  an active share link. Do not make ALL of a song's attachments public just because ANY one service using
-  that song is shared.
-- Never widen the pre-existing `orgs/{orgId}/{allPaths=**}` or `orgs/{orgId}/media/**` matches themselves
-  — those must stay member-only for PPTX sources, backgrounds, and non-rehearsal media.
-- Prefer short-lived signed URLs (minted server-side, e.g. by a Cloud Function the Rehearse view calls) over
-  a public `allow read` + long-lived `getDownloadURL()` token, especially for MP3s that may carry licensed
-  practice-track content — this also solves cost capping (Pitfall 8) and revocation together.
+- Before building the Video/Banner renderer, spend a short, cheap spike verifying (owner-run, since it needs the physical Blackbird + AV room) what capture/composite path is actually in use: is the browser output going into Blackbird via a capture card (HDMI/SDI — no alpha, ever) or via a software bridge (NDI/OBS Browser Source — alpha *may* be possible)? This single fact determines the entire rendering approach.
+- Design the renderer to support **both** outcomes cheaply: a config flag for "transparent" (real alpha, `background: transparent`) vs. "chroma key" (a configurable solid fill color, defaulting to a saturated key green/magenta chosen to never appear in real slide content/backgrounds). Do not hard-code alpha as the only path.
+- Explicitly label the Video/Banner feature UNVERIFIED-IN-PRODUCTION until the owner confirms a live compositing test with real Blackbird hardware — this is a hardware-in-the-loop UAT gate that code review and automated tests cannot close.
+- Do not let "app-side only" scope quietly expand to include implicit promises about end-to-end keying quality; the roadmap should state the deliverable as "renders full-screen OR a bottom banner region against a background that is either alpha-transparent or a configurable solid key color" — not "produces a broadcast-ready keyed lower-third."
 
 **Warning signs:**
-- Any diff to `storage.rules` that adds `allow read: if true;` to an existing match block instead of a
-  new, narrowly-scoped one.
-- A rules test that only proves "an anonymous user can read *an* attachment" without also proving "an
-  anonymous user CANNOT read a background image / PPTX source / another song's un-shared attachment."
-- `src/storage.rules.test.ts` growing an allow-case for the new path without a paired deny-case against
-  the pre-existing `orgs/{orgId}/media/**` and `orgs/{orgId}/{allPaths=**}` blocks.
+- Any plan/PR that marks the Video/Banner feature "done" based only on a browser screenshot or DevTools inspection, with no note that Blackbird behavior is still unverified.
+- A hard-coded assumption of either pure CSS transparency or a fixed chroma color, with no config knob to switch between them once real hardware behavior is known.
+- The roadmap phase for this feature has no explicit "owner hardware UAT" gate before being called complete.
 
 **Phase to address:**
-The phase that introduces rehearsal-attachment Storage upload/storage rules (before the Rehearse UI phase
-that consumes them). This is the single highest-severity item in the whole milestone — it should be its
-own reviewed phase with a dedicated threat model (STRIDE), not a line item inside a UI phase.
+An early, small "Video output feasibility spike" phase (or the first plan-step of the Video-output phase) should capture the Blackbird/compositing findings and decide alpha-vs-chroma-key *before* the banner-rendering UI work is built — this is the single highest-leverage de-risking action for the whole Video feature and should not be bundled at the tail end of a larger phase.
 
 ---
 
-### Pitfall 2: The cross-service `firestore.exists()` blind spot repeats for the new attachment path
+### Pitfall 2: Firebase presence built the "obvious" way (Firestore-only heartbeat/mount-unmount) leaks stale online state and adds unbounded write cost
 
 **What goes wrong:**
-This exact codebase already shipped a deny-everyone Storage rule once (documented in `CLAUDE.md` and in
-`storage.rules`'s own header comments) because a rule tried to call `firestore.exists()` from
-`storage.rules` to check org membership — and `firestore.exists()` is **permanently inert** in the Storage
-emulator (`firebase-js-sdk#6803`), so the rule *looked* correct in every local test while denying every
-real user in production. The natural instinct for Rehearse's "is this attachment actually shared" check
-(Pitfall 1) is exactly that shape: `storage.rules` reaching into Firestore to check
-`shareTokens`/`serviceShares`/song-attachment metadata. Repeating that pattern reintroduces the identical
-blind spot — a rule that tests GREEN locally and denies (or, worse, allows) everyone in production, with
-no local signal either way.
+The natural-looking implementation — write a `presence/{uid}` Firestore doc with `viewingServiceId` on component mount, delete/clear it on unmount, maybe refresh it every N seconds to look "live" — has two failure modes that are easy to miss in dev (where tabs close cleanly) and only show up in the field:
+1. **Stale presence on ungraceful disconnect.** A closed laptop lid, a lost wifi connection, a crashed tab, or someone just closing the browser without triggering `onUnmounted`/`beforeunload` reliably leaves the presence doc showing that person as "still viewing" indefinitely — Firestore has **no server-side disconnect hook**. Unlike Firebase's Realtime Database, which has `onDisconnect()` (an atomically-registered write that the RTDB server itself fires when a client's actual socket drops, correct even on a crash), Firestore offers nothing equivalent — a client-only "goodbye write" is only best-effort and simply never fires on abrupt disconnects.
+2. **Cost.** A heartbeat-style refresh (e.g., "touch the presence doc every 15s while the editor tab is open") turns into `N editors × (3600/15) = 240 writes/hour each` — small per-user, but this is the exact category of "small, well-intentioned recurring write" that this project's own v1.8 Cost & Billing Hardening milestone was built specifically to catch and cap (per-uid rate limits, `maxInstances` ceilings, retention sweeps). Introducing a *new* uncapped recurring-write pattern in v2.14 undoes that hardening discipline for one more surface, and it scales with concurrent-editor count across every org, not just one church.
 
 **Why it happens:**
-Firestore already holds the "is this service publicly shared" truth (`shareTokens` read:true,
-`serviceShares` read:true), so reaching for `firestore.get()`/`exists()` from `storage.rules` is the most
-natural-looking way to condition a Storage read on it. The emulator gives no error and no warning when
-this happens — it just silently evaluates false.
+Presence "who's viewing this" is a genuinely common feature and most naive tutorials use Firestore because that's the datastore already in the app — they either don't mention RTDB's `onDisconnect()` primitive at all, or treat the staleness as an acceptable UX nit rather than a correctness/cost problem.
 
 **How to avoid:**
-- `storage.rules` must **never** call `firestore.get()`/`exists()`/`firestore.exists()` for the new
-  rehearsal-attachment path, full stop — this codebase's own `isOrgMemberByClaim`/`isOrgDeactivatedForCaller`
-  functions are the established precedent: cross-service truth is pushed onto a **custom auth claim**
-  (for signed-in users) instead.
-- Because Rehearse visitors are **unauthenticated** (no claim to carry truth on), the "is this attachment
-  publicly readable" decision cannot depend on live Firestore state read from `storage.rules` at all. Two
-  workable patterns, both avoiding the cross-service read:
-  1. **Denormalize the flag onto the Storage object itself** at upload/share time (e.g. custom metadata
-     `publiclyReadable: 'true'` set only when a Cloud Function confirms the song is attached to a
-     currently-shared service) and gate the rule on `resource.metadata` — fully emulator-verifiable, no
-     cross-service call.
-  2. **Route all Rehearse reads through a Cloud Function / signed URL** instead of a client-side
-     `storage.rules` read at all — the Function (Admin SDK) does the Firestore check server-side, mints a
-     short-lived signed URL, and `storage.rules` never has to answer "is this shared" itself. This is also
-     the stronger answer to Pitfall 1 and Pitfall 8 simultaneously.
-- Either way, add a rules test in `src/storage.rules.test.ts` for the new path and require it to prove
-  something **beyond** "the emulator returns allow/deny" — e.g. an admin-SDK-seeded fixture the rule can
-  actually see, the same discipline this repo's `CLAUDE.md` demands after the 2026-08-06 incident.
+- **Recommended pattern:** if presence is worth doing right, provision a small **Firebase Realtime Database** instance (this project currently has none — it would be a new piece of infrastructure) purely for ephemeral presence, and use its native `onDisconnect()` to atomically clear a `/presence/{orgId}/{serviceId}/{uid}` node the instant the socket drops — including crashes, closed lids, and network loss — with **zero recurring write cost** (RTDB presence is push-based, not polled, and RTDB pricing is bandwidth/connection-based rather than per-write like Firestore). The client-facing "who's viewing" reactive read still comes from RTDB's realtime listener; nothing needs mirroring into Firestore for the presence indicator itself.
+- **If a new datastore is out of scope for this milestone,** the acceptable Firestore-only fallback is a **staleness-timestamp pattern, never a raw boolean**: write `lastActiveAt: serverTimestamp()` on mount and on a *coarse* interval (e.g., every 60–120s, not 15s), and treat any presence doc older than ~2× that interval as "not actually present" on the read side (client-side filter, or a scheduled Cloud Function sweep that deletes stale docs — reusing this project's existing cleanup-cron pattern from `functions/src/cleanupSweeps.ts`). This bounds both the staleness window and the write rate, and never needs a definitive "someone is gone" signal — it degrades gracefully to "hasn't been seen in 2 minutes."
+- Either way, **do not poll every few seconds** — pick the coarsest interval that still feels "live" for a service-editing session (concurrent-editor awareness, not a chat app), and always clear/mark-stale on `beforeunload`/`visibilitychange` as a best-effort *addition* to the timeout, not a replacement for it.
+- Cap this like every other recurring-write surface in the app: a presence doc write should go through the same "does this scale with orgs × concurrent users × time" review this project already applies (see v1.8's rationale) before shipping.
 
 **Warning signs:**
-- Any new line in `storage.rules` containing `firestore.get(` or `firestore.exists(`.
-- A new rules test that passes in the emulator but was never manually verified against the deployed rule
-  in a real (non-emulator) environment before shipping — exactly the gap that let the original incident
-  reach production undetected for a full milestone.
+- Any presence write on a fixed short interval (< 60s) with no Cloud Function or read-side staleness cutoff to bound it.
+- A presence indicator that only ever clears on a client `onUnmounted`/`beforeunload` handler with no timeout-based fallback — this will visibly show ghost editors within the first week of real use (closed laptop lids, cell reception drops on mobile).
+- No test exercising "tab closed without cleanup" (simulating an ungraceful disconnect), only the happy-path mount/unmount.
 
 **Phase to address:**
-Same phase as Pitfall 1 (rehearsal-attachment Storage rules). Code review for that phase should explicitly
-grep the diff for `firestore.` inside `storage.rules` as a blocking check.
+The editor-presence phase itself must include the staleness-timeout (or RTDB `onDisconnect`) design as a first-class requirement, not an afterthought — this is exactly the kind of "looks done in the demo, leaks in production" bug this app has hit before (see the `storage.rules`/`firestore.exists()` cross-service blind spot documented in CLAUDE.md). Verification should explicitly include a simulated ungraceful-disconnect test.
 
 ---
 
-### Pitfall 3: Stage-layout canvas drag-and-drop repeats the app's own reordering-corruption history
+### Pitfall 3: Firestore security rules exposing presence/"who's viewing" data across orgs — a smaller replay of the v2.8 share-token leak
 
 **What goes wrong:**
-This app has a **documented, repeated** history of drag-and-drop corrupting state — v1.4's phantom
-duplicate items stuck at "No Section," v1.6's drag-into-section bugs sequenced first in that milestone
-specifically because it "blocks trust in every other editing surface." The stage-layout canvas is a new
-*freeform x/y* drag surface (not a reorder-a-list drag, which is what every existing draggable component
-in this codebase does — `SlideGrid`, `SongLyricEditor`'s section rows, `ServiceEditorView`'s slot list, the
-service template editor). None of the app's existing drag code is freeform-position code; there is no
-precedent to reuse, so this is genuinely new surface area, with new failure modes:
-- Native HTML5 Drag and Drop (`dragstart`/`dragover`/`drop`) is **mouse-only by spec** — no major mobile
-  browser fires DnD events from touch (LOW-confidence web finding), so a stage layout built on it would
-  silently not work on a phone/tablet, which is exactly the device tech/sound volunteers are likely to use
-  backstage.
-- Coordinates saved as absolute pixels (rather than percentages of the canvas) break the moment the canvas
-  is resized (window resize, different monitor, print/export) — items drift or overlap.
-- A print/export view of the stage layout is an entirely different rendering context than the live
-  drag-canvas; if position data isn't captured in a resolution-independent unit, print output won't match
-  what was arranged on screen.
+This app has a documented, real precedent: v2.8's SEC-S-01 finding was a **Critical, LIVE, proven cross-tenant leak** where `shareTokens`/`quarterShares`/`serviceShares` had `allow read: if true`, which grants both `get` *and* `list` — letting anyone unauthenticated enumerate every org's share tokens (and therefore every org's shared service plans and volunteer names) via `getDocs(collection(...))`. The fix (now the established idiom in `firestore.rules`, see `shareTokens`/`orgSlugs`/`orgNames`/`quarterShares`/`serviceShares`) is always: **split `get` (by known id, safe to allow broadly) from `list` (must be org-scoped or denied outright)**, because a flat `allow read: if true` silently grants both.
+
+A new presence collection is exactly the same shape of risk in miniature: if it's modeled as `presence/{uid}` or `presence/{serviceId}/{uid}` with a permissive read rule for "any signed-in user can see who's viewing," a `list` query without an org-scoping equality filter would let **any authenticated user of any org enumerate every org's currently-active editors and which services they're viewing** — a smaller but structurally identical version of the same class of bug: cross-tenant `list` where only a scoped `get` (or nothing) should be permitted.
 
 **Why it happens:**
-Freeform canvas positioning "looks like" the existing list drag-and-drop the team has already built
-several times, so it's tempting to reach for the same library/pattern — but list reordering (swap index N
-and M) and freeform placement (store x,y) are different problems with different corruption modes.
+Presence data feels "low stakes" compared to share links or PII, so it's tempting to reach for the loosest rule that makes the feature work (`allow read: if isSignedIn()`), especially under time pressure — but "signed in" says nothing about org membership, and this app is explicitly multi-tenant (any signed-in user could be a member of a different church).
 
 **How to avoid:**
-- Build on **Pointer Events** (`pointerdown`/`pointermove`/`pointerup`), not native HTML5 DnD — one code
-  path across mouse, touch, and pen (LOW-confidence web finding, but consistent with why every serious
-  freeform-canvas library — interact.js, etc. — uses pointer events instead of native DnD).
-- Store position as a **percentage or normalized 0–1 coordinate** relative to the canvas bounding box, not
-  raw pixels — recompute pixel placement from the normalized value on every render, including for
-  print/export, so resize/different-viewport never desyncs the visual from the saved data.
-- Recompute `getBoundingClientRect()` on drag-start and on resize — never cache it across the drag
-  interaction or across mount.
-- Disable default touch scrolling on the draggable surface (`touch-action: none` on drag handles) so a
-  touch-drag doesn't fight the page's own scroll.
-- Persist position writes debounced/on-drop (mirroring the codebase's existing autosave pattern), never on
-  every `pointermove` tick, to avoid a write storm and to keep the "one autosave path" invariant this app
-  already leans on elsewhere.
-- Add an explicit round-trip test: save a position, reload the page, assert the same normalized coordinate
-  comes back — this is the class of bug ("saving positions that don't round-trip") the milestone brief
-  specifically flags, and it is cheap to test directly without any drag simulation.
+- Model presence with the org/service id embedded in the document (or the collection path), and gate `get`/`list` the same way every other per-service collection in this app already does: `isOrgEditor(resource.data.orgId)` (or the service's derived orgId), never a bare `isSignedIn()`.
+- If presence lives in Realtime Database instead of Firestore (Pitfall 2's recommended path), RTDB rules need the equivalent org-scoping — RTDB rules are structurally different (path-based `.read`/`.write`, no `get`/`list` split), so this is not a copy-paste of the Firestore rule; write and test it explicitly rather than assuming RTDB "just inherits" the app's Firestore security model.
+- Add an explicit ALLOW/DENY rules test for presence mirroring the existing `rules.test.ts` coverage pattern for share tokens — verify a member of Org A cannot read Org B's presence docs, both via `get` and via an unscoped `list`.
 
 **Warning signs:**
-- The stage-layout implementation reaches for `@vueuse/core`'s `useDraggable` or a `dragstart`/`drop`-based
-  Vue directive without first confirming it fires under `pointercancel`/touch in a real mobile browser test
-  (not just desktop Chrome devtools' touch emulation, which does not always match real-device behavior).
-- Position fields stored as raw `left`/`top` pixel numbers rather than a percentage/ratio.
-- No test exercises print/export of the stage layout at a different viewport width than it was authored at.
+- A presence security rule that reads `allow read: if isSignedIn()` (or equivalent) with no per-org data filter.
+- No rules test exercises a cross-org read attempt for the new collection.
+- The presence read path in the client uses an unscoped `collection()`/`onSnapshot()` query rather than one `where('orgId','==', orgId)`-filtered (or path-scoped in RTDB) to the current service.
 
 **Phase to address:**
-The stage-layout phase itself — flag it for an execution-time gate that manually drag-tests on a real
-touch device (or at minimum real-device Chrome DevTools remote debugging, not emulated touch) before
-calling the feature done, given this app's specific track record with drag corruption.
+The editor-presence phase's security design should explicitly cite the v2.8 SEC-S-01 pattern and require the get/list split (or RTDB path-scoping) plus a rules test as a completion criterion — this is cheap to get right up front and expensive to discover live (as v2.8 did).
 
 ---
 
-### Pitfall 4: Loop/auto-advance timer leaks or fights manual navigation across output windows
+### Pitfall 4: Auto-generating share links removes the one manual gate that currently prevents sharing an unfinished/Draft service
 
 **What goes wrong:**
-"Run the Service" already runs a non-trivial cross-window coordination system (`runChannel.ts` /
-`BroadcastChannel`, `useOutputWindow.ts`, `useRunControl.ts` with its own `setInterval`-based polling and
-explicit `clearInterval`/`onUnmounted` teardown discipline for monitor-reassignment detection). A per-item
-loop timer is new state layered on top of that same control surface, and the specific ways it can go wrong
-in *this* system are:
-- A timer armed in the control window is not, by itself, visible to the Audience/Confidence output windows
-  — if the loop only advances local component state instead of broadcasting through `runChannel` the same
-  way manual navigation does, the outputs stop following the control window (silent desync, only visible
-  once someone is watching the actual projector).
-- Route-away or item-change while a loop is armed must stop the timer — an interval left running against a
-  now-unmounted or now-irrelevant item will keep firing `advance()` calls against stale state (or worse,
-  against the *next* item the projectionist manually navigated to, making manual clicks appear to "jump"
-  unpredictably a few seconds later).
-- Manual navigation (arrow keys, click-to-jump — both already implemented in `RunControlView`) must
-  **disarm or reset** the loop, not race it — a manual "previous slide" immediately followed by the loop's
-  own scheduled auto-advance would appear to overrule the projectionist's own input.
-- "Go to black" (a new v2.7 feature, scoped to Audience-only per this milestone) must stop the loop from
-  continuing to auto-advance slides that are no longer visible to the congregation, or the loop keeps
-  ticking behind a black screen and lands on an unexpected slide when black is lifted.
-- Drift: `setInterval` accumulates drift over a long-running interval (a 10s-default loop running for a
-  30-minute rehearsal segment); if precision matters for sync with music, a `setInterval`-based
-  auto-advance will visibly drift.
+Today, a share link is created only when a user deliberately clicks "Share Link" — an implicit "I'm ready to show this to volunteers" signal. Auto-generating the link (so it "just exists") removes that signal. If the auto-generation fires as soon as a service is created (or on every save), a still-being-drafted service could have a live, guessable-URL share page from minute one — reachable by anyone with the link, including a volunteer who bookmarked or was sent last week's link pattern, before the plan is finished or reviewed. This app already treats "Draft vs Planned/locked" as a meaningful gate elsewhere (the volunteer "My Schedule" surface deliberately shows **only Planned, non-Draft** services — see v2.12's explicit decision to reuse that gate) — auto-share risks quietly bypassing that same principle for the share-link surface specifically.
+
+A second, related risk: **token/document creation spam**. If "auto-generate" is implemented as "create a new share doc/token on every relevant page load or every autosave" rather than "ensure exactly one exists, idempotently," it will create duplicate share docs/tokens per service (extra Firestore writes, extra orphaned tokens that still need revocation on delete, and — per the `serviceShareLinks`/`shareTokens` rules comments already in this codebase — this app already had a bug class here: `deleteService()` and `ensureShareLink()`'s adoption query both had to be taught to find "every token for a service" because a service could already end up with 2+ tokens).
 
 **Why it happens:**
-The loop is easy to prototype as "a local `setInterval` that calls the same `advance()` function manual
-nav uses" without threading it through the *same* broadcast/teardown discipline `useRunControl.ts` already
-established for every other state change — because it's tempting to treat it as "just another way to
-trigger next slide" rather than as a new, independently-lifecycled timer that needs its own arm/disarm
-rules interacting with every existing navigation input.
+"Auto-generate so the user never has to click Share" is usually implemented the easy way — call the same `ensureShareLink()`-style function opportunistically wherever it's convenient (on service create, on every editor mount) — without pausing to ask (a) should this exist yet, given Draft state, and (b) is this call idempotent/safe to invoke repeatedly.
 
 **How to avoid:**
-- Route every loop-triggered advance through the **exact same** `runChannel` broadcast path manual
-  navigation already uses, not a parallel local-only state mutation — so outputs never desync from control.
-- Scope the timer's lifetime to the **service-item**, not the component: arm on entering the item (if its
-  loop flag is set), disarm on leaving it (manual nav to a different item, item change via any input,
-  unmount) — mirror the existing `onUnmounted`/`clearInterval` discipline already in `useRunControl.ts`
-  rather than inventing a second pattern.
-- Any manual navigation input (keyboard, click-to-jump) must explicitly disarm/reset the current loop timer
-  as its first effect, before applying the navigation itself — otherwise a stale timer can fire moments
-  later.
-- "Go to black" must pause (not just visually hide) the loop's auto-advance — decide explicitly whether
-  black pauses the loop or lets it keep advancing behind the scenes, and make that a documented, tested
-  decision rather than an accident of whatever the black-slide implementation happens to touch.
-- Prefer scheduling successive `setTimeout` calls (each one re-armed after the previous fires) over a bare
-  `setInterval` if any drift-sensitive behavior is expected — simpler to cancel cleanly on unmount too.
+- Reuse the existing `ensureShareLink()` idempotent-adoption pattern (already in `src/stores/services.ts` per the rules comments) rather than writing a new creation path — it already knows how to avoid creating duplicates when a token already exists for a service.
+- Decide and document explicitly **when** auto-generation fires: the safest default, consistent with this app's existing Draft/Planned gate, is to auto-generate the share link **only when a service transitions to Planned/locked** (mirroring the volunteer-surface gate), not on every Draft save. If the product intent is genuinely "the link should exist even for drafts so a planner can preview it," that's a legitimate but different decision — it should be made explicitly, not fallen into, and the share *page* itself should still visibly indicate Draft/unfinished status rather than rendering a normal-looking plan.
+- Verify no double-token-creation path: add a test asserting that calling the auto-generate path twice on the same service does not create a second `shareTokens`/`serviceShares` doc.
+- Confirm the create/update rules already in `firestore.rules` (`isOrgEditor(request.resource.data.orgId)`) apply unchanged to whatever new code path triggers auto-creation — a Cloud Function or trigger-based auto-generation path (as opposed to client-triggered) would run with admin privileges and bypass these rules entirely, which needs its own scoping review if that's the chosen implementation.
 
 **Warning signs:**
-- A loop implementation that calls `setInterval` inside a component's `<script setup>` without a matching
-  `onUnmounted`/route-guard teardown, or without going through `runChannel`.
-- Manually navigating during an active loop produces a slide that "jumps back" a few seconds later.
-- The output windows (Audience/Confidence) show a different slide than the control window after a loop has
-  been running for more than one cycle.
+- Multiple `shareTokens`/`serviceShares` docs found for one service in Firestore during testing.
+- A share link reachable for a service that's still in Draft, with no visual indication on the share page that the plan is unfinished/subject to change.
+- Auto-generation implemented as a client-side `onMounted` hook in the editor rather than tied to a specific state transition (Draft→Planned) or an idempotent ensure-function.
 
 **Phase to address:**
-The loop/auto-advance phase, with its verification explicitly including: (1) manual-nav-during-loop, (2)
-item-change-during-loop, (3) "Go to black"-during-loop, (4) route-away-during-loop, each checked against
-both output windows, not just the control window.
+The auto-generate-share-link phase should explicitly reuse `ensureShareLink()`, state the trigger condition (service lock vs. service creation) as an up-front decision, and include a duplicate-creation regression test — plus a rules review confirming the trigger mechanism (client call vs. Cloud Function/trigger) doesn't need new rule surface.
 
 ---
 
-### Pitfall 5: Black slide corrupts the song's pooled-section slide model or its position-based numbering
+### Pitfall 5: Stage Layout auto-populate clobbers manual placement on re-run, or duplicates markers when roster assignments change
 
 **What goes wrong:**
-This app's lyric model (`src/types/songLyrics.ts`, `src/utils/songSectionOrder.ts`) is **not** a flat list
-of slides — it is a pooled set of `LyricSection`s (`sections`, each with a unique id) referenced by an
-ordered `performanceOrder` array of ids, where a **repeated id is a reference to the same pooled section**
-(editing it edits every occurrence), and section numbering (e.g. "Verse 3") is derived *positionally* per
-`deriveSectionKind()` — stripped from the label and re-numbered among same-kind sections at render time,
-never stored. A black "interlude" slide inserted naively into this model risks several distinct corruptions:
-- If represented as an ordinary `LyricSection` with empty `lines`, it will be swept into the same-kind
-  positional numbering logic (`ADD_SECTION_KINDS` currently has no "Interlude"/"Black" kind) — either
-  crashing the numbering derivation, or worse, silently mislabeling it as e.g. "Verse 4" if it's tagged
-  with an existing kind just to make the type-checker happy.
-  section pool invariant `songSectionOrder.ts` enforces ("every pooled section is referenced at least
-  once, every id in `performanceOrder` resolves to a pooled entry") should be assumed to
-  still hold after a black slide is added and removed — but only if implemented as a first-class pool
-  member, not a special-cased injection into `performanceOrder` alone.
-- If the black slide is meant to be a one-off (this specific occurrence only), the existing pooled/
-  reference semantics are wrong for it by design — the pool model assumes repeats are *intentional shared
-  content* (edit once, reflect everywhere), but a black interlude inserted at one point in one song has no
-  reason to be "the same slide" as a black interlude inserted elsewhere. Reusing the pool mechanism for it
-  invites an accidental repeat-edit bug (editing one black slide's duration/behavior changes another).
-- Export/print and the read-only `ShareView.vue` currently render service slots by `slot.kind` with a
-  `[not assigned]` fallback for anything unrecognized — a black slide slipped through as an ordinary lyric
-  section could either print as a blank/confusing row, or (if filtered out entirely) silently disappear
-  from the printed order of service, which is exactly the "corrupting the export" risk called out in the
-  question.
-- `AssembledSlide`/`Slide` (`src/types/slide.ts`) is a discriminated union on `contentKind`
-  (`lyric | scripture | imported | text | image | video`) consumed by `PresentationViewer.vue`,
-  `SlideGrid.vue`, and the Audience/Confidence output views — none of which currently have a branch for
-  "render nothing, just black." Reusing `contentKind: 'lyric'` with empty `lines` risks every one of those
-  consumers rendering an empty box with the section's UI chrome (label, numbering, edit affordances) rather
-  than a clean black frame — the "mistaken for an empty/broken slide" failure mode the milestone brief
-  explicitly names.
+`StageLayoutEditor.vue` already models markers with a `roleId`/`roleName` tied to a band role, plus an optional `personId`/`personName` pick from `assignablePeople` (the resolved roster for that service), and each marker carries manually-set `xPct`/`yPct` position. "Auto-populate the per-service Stage Layout with the assigned roles/instruments" is trivial to build the first time (empty canvas → generate one marker per assigned role) but has two easy-to-miss failure modes on **re-run** — which will happen constantly in practice, since roster assignments change (a volunteer swaps out, a role gets reassigned) right up until the service locks:
+1. **Clobbering manual placement.** If auto-populate is implemented as "wipe all markers, regenerate from current roster" every time it runs (or every time the roster changes), it destroys any position/note/kind edits the planner already made — the exact "manual placement" the feature is supposed to save time on, not repeatedly discard.
+2. **Duplicating on re-run.** If instead it's implemented as "add a marker for each assigned role that doesn't already have one," the matching key matters: matching only on `roleId` will silently skip re-adding a role whose only marker was deleted on purpose (the planner doesn't want that instrument shown); matching on `personId` will create a *second* marker if the same person is reassigned to a different role; and re-running with no dedup key at all creates visible duplicate markers for the same role/person, cluttering the canvas.
 
 **Why it happens:**
-The lyric editor's existing "Add Section" UX (`ADD_SECTION_KINDS` = Verse/Chorus/Pre-Chorus/Bridge/Tag/
-Ending) is the closest existing pattern to "insert something into a song's slide order," so it's tempting
-to bolt a black slide on as an ADD_SECTION_KINDS entry rather than treat it as what it actually is: a
-distinct content kind, closer to `TextSlide`/`ImageSlide` than to `LyricSlide`.
+"Auto-populate an empty canvas" is usually designed and tested only against the empty-canvas case (the "instead of an empty canvas" framing in the milestone scope), because that's the demo-visible win — the harder, more common case (re-running against a canvas that already has *some* manual edits from a partially-planned service) doesn't get exercised until real usage.
 
 **How to avoid:**
-- Give the black slide its **own `contentKind`** (e.g. `'black'`) in the `Slide` discriminated union,
-  rather than overloading `'lyric'` with empty content — every consumer (`PresentationViewer`,
-  `SlideGrid`, output views, print/export, `ShareView`) then gets an explicit, exhaustive branch to handle
-  it (a plain black `<div>`, no label, no numbering) instead of an accidental fallthrough.
-  reflects "content that renders nothing," not a section that gets numbered/labeled/referenced.
-- If it must live inside a song's slide sequence for editor UX reasons, make it explicitly **excluded**
-  from `deriveSectionKind`/position-numbering (it has no "kind" to number) and explicitly **not**
-  pool-referenced (each insertion is its own entry, never shared across occurrences) — both need to be
-  deliberate, tested exclusions in `songSectionOrder.ts`, not assumed side effects of adding a new kind
-  string.
-- Add a `normalizeLyricOrder`-equivalent invariant test: insert a black slide, duplicate the section,
-  delete it, reorder around it — assert `performanceOrder`/`sections` stay internally consistent the same
-  way the existing pool invariant is tested today.
-- Decide and test explicitly what print/export/`ShareView` do with a black slide (skip it entirely in the
-  printed order of service is the most likely correct answer, since "black" has no print equivalent) —
-  don't let it fall through to a generic `[not assigned]` row.
+- Design auto-populate as a **one-time seed on first load of an empty layout**, not a recurring sync — generate markers only when `elements.length === 0` for that service, and never again automatically. If keeping the layout in sync with later roster changes is genuinely wanted, make it an explicit, opt-in "Sync from roster" button the planner clicks (with a confirmation if it would remove/reposition existing markers), not silent automatic re-running.
+- If any reconciliation logic is built at all, key it on the assignment's stable identity (this app already models `ServingAssignment.id`, distinct from `roleId`/`personId`) so add/remove/reassign are each detectable without ambiguity, and make "remove a marker whose assignment no longer exists" an explicit, reversible action (or leave orphaned markers in place with a visual "unassigned" indicator) rather than silently deleting a planner's manual placement.
+- Preserve `xPct`/`yPct`/`note`/`withVocal` on any marker that already exists for that role/person when reconciling — never regenerate a marker wholesale just because the underlying assignment changed name/role slightly.
 
 **Warning signs:**
-- A black slide implemented as `contentKind: 'lyric'` with `lines: []`.
-- `ADD_SECTION_KINDS` grows a `'Black'`/`'Interlude'` entry that flows through the same positional-numbering
-  code path as Verse/Chorus.
-- No new test in `songSectionOrder.test.ts`/`slideshowAssembler.test.ts` covering insert/duplicate/delete/
-  reorder around a black slide.
-- The printed/exported order of service shows an unexpected blank row, or silently omits an item that
-  should have printed as "(instrumental interlude)" or similar.
+- A test only covers "empty canvas + N assigned roles → N markers," with no test for "canvas already has manually-positioned markers + roster changes → existing positions preserved."
+- Auto-populate fires on every service-editor mount/every roster edit rather than once on a genuinely empty canvas.
+- No stable identity key used for matching markers to assignments (matching by name string, or no matching at all).
 
 **Phase to address:**
-The inline-black-slide phase. This is a data-model decision, not a UI decision — get the `contentKind`
-question settled in that phase's plan before any editor UI is built on top of it, since retrofitting the
-type later means migrating any black slides already saved.
+The Stage Layout auto-populate phase's plan should explicitly define and test the "already has manual edits" and "re-run after roster change" cases as acceptance criteria, not just the empty-canvas happy path.
 
 ---
 
-### Pitfall 6: A generic "system-wide dismissible messages" surface is retrofitted onto a deliberately narrow existing toast store
+### Pitfall 6: Removing "Planning Center" verbiage sweeps up the real PC integration/export copy along with it
 
 **What goes wrong:**
-`src/stores/toasts.ts` already exists and is explicitly documented as "a minimal, single-purpose
-failure-toast store... deliberately NOT a general notification system: no priorities, no categories, no
-positions, no hover-to-pause, no success/info variants" — it always renders as a red "Save failed."
-banner, and **always** auto-dismisses after a fixed 6 seconds via a `setTimeout` armed inside the store.
-Meanwhile the specific bug this milestone wants fixed — the "monitors not configured" warning that gets
-stuck — lives as its own **separate, ad-hoc inline banner** in `RunControlView.vue` ("Your monitor setup
-changed" / "Open monitor setup"), not routed through `toasts.ts` at all. Two distinct failure modes are
-easy to fall into:
-1. Reusing `toasts.ts` as-is for the monitor warning: a 6-second auto-dismiss is **wrong** for a
-   "monitors not configured" warning, which needs to persist **until the underlying condition is actually
-   resolved** (monitors get configured), not disappear on a timer while the problem is still real — this
-   would trade "stuck forever" for "silently vanishes while still broken," arguably worse.
-2. Building the new "system-wide dismissible" mechanism from scratch without first generalizing/replacing
-   `toasts.ts`, leaving the app with **two parallel notification systems** (the old red-only failure toast,
-   and the new general one) — inconsistent look, inconsistent dismiss behavior, and the exact ad-hoc
-   pattern (like `RunControlView`'s inline banner) that the milestone is trying to eliminate likely
-   persists in other screens that were never touched.
+The concrete example in scope — "Planning Center already has this plan" in the Planned/locked banner — is one string among what a text search for "Planning Center" will surface across the whole app, and this project has a **real, functioning Planning Center integration** (an export/proxy path — see `src/utils/planningCenterApi.ts` and the v2.2/v2.6 milestone history referencing "full Planning Center export slot coverage" and a live gate in the scripture-push branch). A blanket find-and-replace or an overzealous "remove all PC mentions" pass risks deleting or garbling copy that legitimately describes the actual integration/export feature (button labels, tooltips, settings toggles, error messages referencing the real PC API), breaking user understanding of a feature that still exists and still does something.
 
 **Why it happens:**
-`toasts.ts`'s narrow scope was a deliberate, documented design choice at the time (R041) — it was never
-meant to be the app's general notification system, so extending it without revisiting that decision (or
-explicitly retiring it in favor of a new general store) produces exactly this collision.
+"Remove Planning Center verbiage" reads as a simple text-hygiene task, inviting a fast, non-contextual search-and-delete rather than a per-occurrence judgment call about whether the string is *incidental* mention-dropping (implying an unbuilt/irrelevant coupling, like the banner text) versus *substantive* description of the real integration.
 
 **How to avoid:**
-- Treat this as a **design decision to make explicitly**, not an incremental patch: either (a) generalize
-  `toasts.ts`/`ToastHost.vue` into the one system-wide store (adding severity/category, a `persistent: true`
-  flag that suppresses the auto-dismiss timer, and a real dismiss button already present today), and migrate
-  every ad-hoc warning banner (starting with `RunControlView`'s monitor-changed banner) onto it — or (b)
-  build a new store and formally deprecate/replace `toasts.ts`. Do not let both coexist past this milestone.
-- A message must be able to be **conditionally re-armed/cleared by its owning feature**, not just by a
-  timer or a click — the monitor warning specifically needs to clear itself the instant monitors ARE
-  configured (an app-state-driven dismiss), in addition to being manually dismissible. Model this as the
-  message carrying an optional "auto-clear condition" or simply having the owning composable call
-  `dismiss(id)` itself when the condition resolves, on top of (not instead of) manual dismiss.
-  banners.
-- Every message should default to `aria-live="polite"`/`role="status"` (never `assertive`) per accessible-
-  toast conventions (LOW-confidence web finding, consistent with `ToastHost.vue`'s existing `role="alert"`
-  posture which — note — is technically `assertive`-equivalent and should be reconsidered for non-error
-  informational messages under the new general system).
-- Persistent/unresolved-condition warnings should not carry ANY auto-dismiss timer at all — only condition-
-  resolution or explicit user dismissal should clear them (LOW-confidence web finding).
+- Enumerate every occurrence of "Planning Center"/"PC" in UI-facing strings first (a grep pass), and classify each one explicitly as "incidental verbiage to remove" vs. "real integration copy to keep" before touching any of them — do not do this as a blind replace.
+- Cross-check the removal list against `planningCenterApi.ts`'s actual call sites and the export/settings UI that surfaces PC-specific actions (export buttons, PC connection status, the scripture-push gate) — anything a user would need to understand *that specific feature* stays.
+- Include a targeted manual smoke-check of the PC export/integration flow itself after the copy sweep, not just a visual diff of the banner text, to confirm no functional string (e.g., an error message a user needs to act on) was accidentally altered.
 
 **Warning signs:**
-- A PR that adds a new store/component for "system-wide messages" while `src/stores/toasts.ts` and
-  `ToastHost.vue` remain untouched and still separately mounted.
-- The monitor-not-configured banner in `RunControlView.vue` still lives as bespoke inline template markup
-  after this milestone ships, rather than being migrated onto the new/generalized system.
-- Any new message type inherits the unconditional 6-second `setTimeout` without an opt-out for
-  persistent/condition-driven messages.
+- A diff touching `planningCenterApi.ts`-adjacent components (export buttons, connection settings) when the intended change was only the Planned-banner copy.
+- Any occurrence removed without a one-line note on *why* it was incidental rather than substantive.
 
 **Phase to address:**
-The dismissible-messages phase — scope it explicitly to include (1) generalizing or replacing `toasts.ts`,
-and (2) migrating at least the `RunControlView` monitor-warning banner onto the new system as its proof
-case, not just building the mechanism in isolation.
+The PC-verbiage-removal work item (likely bundled into the Services-page or dashboard phase) should start with a full grep inventory and classification pass as its first step, with the classification itself reviewed before any edits land.
 
 ---
 
-### Pitfall 7: Church switcher bypasses (or only partially reuses) the already-hardened multi-org reset path
-
-**What goes wrong — the good news first:**
-This is the pitfall with the **best existing foundation** in the milestone: `src/stores/auth.ts` already
-has a working, documented, bug-fixed multi-org switch primitive — `selectOrg(targetOrgId)` — used by the
-existing multi-org login picker, and a super-admin equivalent `enterOrgAsSuperAdmin`/`exitSuperAdminView`.
-Both call a shared `resetOrgScopedStores()` (`src/stores/orgScopedStores.ts`) that explicitly unsubscribes
-**every** org-scoped Pinia store's Firestore listener (services, songs, roster, teams, quarters,
-slideGroups, scriptureSlides, importedSlides, pptxRenders, serviceMessages, songLyrics) *before* the new
-org's data loads — a fix the codebase's own comments trace to a real, previously-shipped bug ("quick
-260823-switch-church-cache": stale prior-org data flashing on screen because Vue Router mounts the
-destination view before the source view unmounts). The risk for v2.7 is **not** designing this from
-scratch — it's regressing the fix that already exists:
-- A new user-menu "Switch Church" UI that calls Firestore/claim logic directly instead of reusing
-  `selectOrg()` would skip `resetOrgScopedStores()` entirely, reintroducing the exact stale-data flash bug
-  that was already found and fixed once.
-- Any **new** org-scoped Pinia store this milestone adds (rehearsal-attachments store, stage-layout store)
-  will **not** be included in `resetOrgScopedStores()`'s hard-coded call list unless someone remembers to
-  add it — a switch would leave the previous org's stage layout or attachment list visible/stale after
-  switching to a different church, silently, with no error.
-- `selectOrg()` itself only proceeds if `memberships.value.some((m) => m.id === targetOrgId)` — i.e. it
-  already assumes the caller is a genuine multi-org member. The user-menu entry point must not expose
-  "switch" to a single-org user (no-op looks like a bug) and must source its list from the same
-  `memberships` the picker already uses, not a fresh query.
-- The org **claim** (`orgId`/`role` on the JWT) only ever tracks the user's **primary** org
-  (`orgIds[0]`) per the codebase's own documented "Known limitation (D-01/D-04)" comment — a non-primary
-  org switch is served by the Firestore-membership arm alone, which is fine for Firestore reads but means
-  `storage.rules`' claim-only `isOrgMemberByClaim` may not reflect the just-switched-to org for a
-  non-primary org until the claim is later refreshed. If the church switcher is used to reach a non-primary
-  org and the user then tries a Storage-touching action (upload a rehearsal attachment, view a stage-layout
-  asset), the claim-vs-active-org mismatch could deny Storage access even though the Firestore-side switch
-  succeeded.
-
-**Why it happens:**
-The multi-org reset machinery lives inside `auth.ts`/`orgScopedStores.ts`, not in an obviously-named
-"how to add org switching" doc — a developer building the new user-menu entry point who doesn't first read
-those two files could easily reimplement a shallower version (e.g. just setting `orgId.value` and
-re-navigating) that looks correct in casual testing but reintroduces the stale-data bug.
-
-**How to avoid:**
-- The user-menu church switcher must call the **existing** `selectOrg(targetOrgId)` — not a new,
-  parallel implementation — for any multi-org member (mirroring what the current login-time picker
-  already does).
-- Any new org-scoped store this milestone introduces (rehearsal attachments, stage layout) must be added to
-  `resetOrgScopedStores()`'s call list as part of that store's own phase, not deferred to "whoever builds
-  the switcher notices it's missing."
-- Verify (with a test, not just manual click-through) that switching orgs via the new user-menu entry point
-  clears rehearsal-attachment and stage-layout state from the previously active org, the same way the
-  existing "quick 260823" regression test presumably covers the pre-existing stores.
-- If the church switcher is expected to work for a non-primary org, explicitly decide whether to call
-  `refreshOrgClaim(targetOrgId, true)` (the awaited-claim-refresh path `auth.ts` already exposes) after
-  `selectOrg()`, or document/verify that Storage access on a non-primary org load correctly falls through to
-  Firestore-membership-equivalent behavior — do not leave this as an untested assumption for the new
-  Storage-touching features (attachments, stage layout) added in this same milestone.
-
-**Warning signs:**
-- The new church-switcher component contains its own Firestore query or `orgId.value = ...` assignment
-  instead of calling `authStore.selectOrg()`.
-- `orgScopedStores.ts`'s `resetOrgScopedStores()` function is not touched by the phases that add the
-  rehearsal-attachments or stage-layout stores.
-- After switching churches via the user menu, briefly seeing the previous church's stage layout or
-  attachment list before the new church's data loads.
-- Uploading a rehearsal attachment or saving a stage layout immediately after switching to a non-primary
-  org intermittently fails Storage rules while Firestore writes succeed.
-
-**Phase to address:**
-The church-switcher phase itself (reuse verification), plus a checklist item on the rehearsal-attachments
-and stage-layout phases to register their new stores with `resetOrgScopedStores()`.
-
----
-
-### Pitfall 8: Storage/egress cost blast radius from user-uploaded rehearsal media on the Blaze plan
+### Pitfall 7: Volunteer "I've got it" confirmation races with roster/assignment edits and produces stale or contradictory state
 
 **What goes wrong:**
-v1.8 was an entire milestone dedicated to capping runaway Blaze-plan costs (AI proxy rate limits, Storage
-retention sweeps, Resend send caps, Cloud Run instance ceilings) — this app's owner has already paid real
-money for an uncapped cost surface once. Rehearsal attachments introduce a **new, and larger**, cost
-surface than anything capped so far:
-- MP3s and PDFs are materially larger than the media already gated by `useMediaUpload.ts`'s existing
-  50MB cap, and — unlike that existing media path — they are now being read by **anonymous public
-  visitors** (volunteers via the share link), not just signed-in org members. Storage **egress** (bytes
-  served, not just bytes stored) scales with every rehearsal play, and a popular/frequently-rehearsed song
-  attached across many services multiplies reads with no natural ceiling.
-- Public unauthenticated `getDownloadURL()` links, once minted, keep serving egress-billed bytes for as
-  long as the object exists and the token is valid — there's no login wall to slow down casual sharing of
-  the link beyond its intended volunteers (a shared rehearse link forwarded well beyond the team, or
-  indexed/crawled, could serve MP3 bytes to strangers indefinitely).
-- No existing retention sweep (`cleanupOrphanBackgrounds`, `cleanupPptxSources`, the v1.8 media sweep)
-  targets rehearsal attachments — they'd need their own orphan/age detection or they accumulate forever,
-  the same "unbounded storage growth" pattern v1.8 already had to retrofit for backgrounds/PPTX sources.
-- YouTube links (no Storage cost at all) are the cheap option and should be the **preferred** path for
-  video content the milestone brief explicitly allows as an alternative to uploaded media — but nothing in
-  the current design prevents a planner from uploading a video-sized file to the MP3/PDF attachment slot
-  instead of linking YouTube, if the upload validation only checks `audio/*`/`application/pdf` MIME types
-  loosely.
+Confirmation state ("I've got it") is a new piece of per-assignment state layered onto an existing roster/assignment model that a planner can still edit concurrently (reassign a role, swap a volunteer, unlock and re-lock a service). Without care, several race/staleness scenarios surface quickly:
+- A volunteer confirms an assignment; the planner then reassigns that role to someone else — does the confirmation silently persist against the old assignment (now shown against the wrong/departed person), or does it need to be explicitly cleared? If it's not cleared, the roster's "confirmed" indicator can lie.
+- Two tabs/devices for the same volunteer (a real scenario now that this app supports magic-link, cross-device volunteer access) could race a confirm/unconfirm toggle, and whichever write lands last wins with no indication to the other tab that it's now showing stale state — consistent with this app's own documented general pattern of needing "watch for org/service changes and re-subscribe" (see the church-switch re-subscribe fix precedent) rather than assuming a single snapshot is ground truth forever.
+- If confirmation triggers a notification (to the planner, e.g., "so-and-so confirmed"), an unlock/reassign/relock cycle could either double-fire that notification or never re-arm it for the new assignment, depending on whether the notification logic keys off the assignment's identity or the confirmation event alone.
 
 **Why it happens:**
-v1.8's cost hardening covered every cost surface that existed *at the time* — a brand-new public read path
-on new, larger media types is exactly the kind of surface that wasn't and couldn't have been anticipated,
-and it's easy to treat "we already solved cost" as covering this too.
+Confirmation looks like a simple boolean toggle in isolation, but this app's assignments are not immutable — they're actively edited during the drafting/re-locking cycle this project already has dedicated mechanics for (draft, lock, unlock-and-relock with scoped diffs, per v1.7's "re-lock scoped change diff"). A feature designed against a static snapshot of "who's assigned" will not survive that lifecycle.
 
 **How to avoid:**
-- Set an explicit, conservative per-attachment size cap **smaller than convenience would suggest** —
-  distinct from (and likely smaller than) the existing 50MB media cap, enforced both client-side
-  (mirroring `useMediaUpload.ts`'s pre-upload `validate()`) and server-side in `storage.rules`
-  (`request.resource.size < N`), the same two-layer pattern the codebase already uses everywhere else.
-- Strongly steer toward **YouTube links over uploaded video/large-audio** in the attachment UI — this
-  feature already supports YouTube per the milestone brief; make it the path of least resistance so most
-  attachments cost the org nothing in Storage/egress.
-- Prefer signed URLs with a short expiry (minted per Rehearse-page-load, not once and cached) over a
-  permanent public `getDownloadURL()` token — this bounds how long a leaked/over-shared link keeps costing
-  egress, and doubles as the Pitfall 1/2 security fix.
-- Add rehearsal attachments to the retention-sweep family (or explicitly, consciously decide they're
-  exempt and document why) rather than leaving them as a new unswept accumulation surface — mirror
-  `cleanupOrphanBackgrounds`'s dry-run-first, reference-detection pattern from v1.8.
-- Consider a per-org or per-attachment play-count/egress budget or alert threshold, given this is now
-  **unauthenticated public** egress rather than authenticated in-app usage — the cost profile is
-  structurally different from every other Storage path in the app (all of which require org membership
-  today).
+- Key confirmation state on the same stable assignment identity the roster already uses (not on a derived display string), and explicitly clear/invalidate a confirmation when its underlying assignment is reassigned to a different person — surface that as "needs reconfirmation," not as an orphaned checkmark.
+- Read confirmation state via the same live-subscription pattern (`onSnapshot`) already used elsewhere in this app (e.g., the v2.13 live volunteer-service doc) rather than a one-time fetch, so a planner's roster view reflects a volunteer's confirmation (or a reassignment invalidating it) without a manual refresh.
+- If confirmation drives a notification to the planner, reuse this project's existing volunteer-messaging queue/kill-switch infrastructure (v1.7) rather than building a second, parallel notification path — and key it off the assignment id so a reassignment doesn't produce a phantom re-notify or a silently dropped one.
 
 **Warning signs:**
-- The new attachment upload composable copies `MEDIA_MAX_BYTES` (50MB) verbatim rather than choosing a
-  cap appropriate to the new, larger and now-public asset class.
-- No corresponding `storage.rules` size cap on the new attachment path (client-only validation, mirroring
-  the exact gap the existing `orgs/{orgId}/media/**` and generic paths both correctly avoid today).
-- Rehearsal attachments are never added to any retention-sweep discussion or explicitly marked "exempt,
-  because X" in `PROJECT.md`/roadmap.
-- No mechanism differentiates "public egress via the share link" from "in-app authenticated reads" in any
-  cost dashboard/log the owner already relies on from v1.8.
+- A roster view showing a confirmed checkmark for a person who is no longer actually assigned to that role (found by reassigning after confirming, in manual test).
+- Confirmation read via a one-time `getDoc` rather than a live listener, so a planner has to reload to see updates.
+- No test covers "confirm, then reassign the role" as a sequence.
 
 **Phase to address:**
-The rehearsal-attachment upload/Storage-rules phase (cap + rules) and, separately, a cost-review checkpoint
-before this milestone ships to production — given this app's history (v1.8 existed specifically because an
-earlier surface shipped uncapped), do not let this ship without an explicit owner-visible cost decision,
-mirroring the Pitfall 1 security review.
+The volunteer-confirmation phase's plan should explicitly test the reassign-after-confirm and unlock/relock sequences, not just the confirm-then-display happy path, and should specify up front whether confirmation is scoped to a service-lock-state or persists across unlock/relock.
 
 ---
 
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|--------------------|-----------------|------------------|
-| Reusing `toasts.ts` unmodified for the monitor warning (accepting its 6s auto-dismiss) | Fastest path to "something is dismissible" | Warning vanishes while the underlying problem (no monitors configured) is still real — worse than today's stuck-forever bug in a different way | Never — this is the exact bug class the milestone exists to fix |
-| Widening `orgs/{orgId}/{allPaths=**}` read to `if true` instead of a new scoped match | Fastest path to "the share link can read the MP3" | Every file the org has ever uploaded becomes world-readable, permanently, with no way to audit who accessed what | Never |
-| Skipping `resetOrgScopedStores()` registration for a new store "just for this milestone" | Saves one line per new store | Silent stale-org-data leak the next time anyone switches churches, hard to reproduce/debug later | Never — the fix is one line, there's no scenario where skipping it is worth the risk |
-| Native HTML5 drag-and-drop for the stage canvas because it's less code to write | Faster initial desktop-only implementation | Silently broken on touch devices (the ones tech volunteers likely use), discovered late via a real complaint, not a test | Only if the stage-layout feature is explicitly scoped desktop-only for v2.7 — must be a stated decision, not a default |
-| `setInterval`-based loop without routing through `runChannel` | Simplest possible loop prototype | Output windows visibly desync from the control window; a real projector shows the wrong slide | Never for anything beyond a local dev spike |
+|----------|-------------------|-----------------|------------------|
+| Hard-coding a single chroma-key color for the Video/Banner output instead of a config knob | Faster to ship the first version | Re-plumbing required the moment the real Blackbird behavior is confirmed to need alpha instead (or a different key color) | Only as a placeholder explicitly flagged "swap once Blackbird verified" — never presented as final |
+| Firestore-only presence with a short heartbeat interval, deferring RTDB `onDisconnect` | No new infrastructure (RTDB) to provision this milestone | Recurring per-editor write cost that compounds with concurrent-editor count across orgs, plus ghost "still viewing" indicators after crashes | Acceptable only with a generous staleness timeout (60–120s+) and a scheduled cleanup sweep — never as a raw boolean with no expiry |
+| Auto-generating a share link on service creation rather than on lock/Planned transition | Simpler trigger logic (fire-and-forget) | A guessable-URL share page can exist for a Draft plan the planner isn't ready to show anyone | Only if the share page itself visibly marks Draft/unfinished state so an early visitor isn't misled |
+| Stage Layout auto-populate that regenerates all markers on every load | Simple, stateless implementation | Destroys planner's manual positioning/notes on every reload, defeating the point of allowing manual placement at all | Never — even an MVP version must gate on "canvas currently empty" |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|-----------------|-------------------|
-| Firebase Storage (public rehearse reads) | Minting a permanent `getDownloadURL()` token and treating it as revocable | Use short-lived signed URLs (Admin SDK) minted per page-load, or accept the token is effectively permanent and scope/size it accordingly |
-| `firestore.rules`/`storage.rules` cross-service checks | Calling `firestore.get()`/`exists()` from `storage.rules` for the new attachment path | Denormalize the needed truth onto Storage custom metadata, or route the read through a server-side Cloud Function that checks Firestore itself |
-| YouTube embeds on the public Rehearse page | Eagerly rendering a live `<iframe>` for every attached video on page load | Click-to-load facade/thumbnail that only loads the iframe (ideally `youtube-nocookie.com`) on explicit user interaction |
-| Multi-org custom claim | Assuming `selectOrg()`'s claim state is immediately consistent for a non-primary org | The claim only ever tracks the primary org (documented D-01/D-04 limitation) — verify Storage-touching new features against a non-primary-org switch explicitly |
+| Blackbird hardware / external video mixer | Assuming CSS `background: transparent` on a browser output window is sufficient for the mixer to key/composite correctly | Confirm (owner, hardware-in-the-loop) whether the capture path is HDMI/SDI (no alpha ever — needs a solid chroma-key color) or a software bridge like NDI/OBS Browser Source (alpha may be possible) *before* finalizing the renderer's transparency strategy; build both a transparent-CSS mode and a configurable solid-key-color mode |
+| Firebase Realtime Database (new, if adopted for presence) | Assuming RTDB inherits the app's existing Firestore security-rule model/idioms automatically | RTDB rules are structurally different (path-based, no get/list split) — write and test org-scoping explicitly, don't assume parity with `firestore.rules` |
+| Planning Center (existing) | Deleting/altering PC-related copy indiscriminately while removing "verbiage," including strings that describe the real export/integration feature | Classify every occurrence (incidental vs. substantive) before editing; smoke-test the actual PC export flow after the copy sweep |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|-----------------|
-| `setInterval`-based loop timer drift | Auto-advance timing slowly diverges from the configured interval over a long rehearsal | Prefer chained `setTimeout` re-arming, or accept drift as out of scope for a rehearsal-timing (not music-sync) feature | Noticeable after tens of minutes of continuous looping |
-| Public egress with no per-attachment cap | A single popular rehearsal MP3 racks up disproportionate Storage egress billing | Size cap + YouTube-preferred UX + signed URLs with short expiry | As soon as the share link is used by more than a handful of volunteers regularly |
-| Freeform canvas writing position on every `pointermove` | Excessive Firestore writes, autosave contention with the rest of the service editor | Debounce persistence to drag-end (mirror the app's existing autosave debounce pattern) | Immediately, at even light usage — this is a correctness/cost issue, not a scale one |
+| Short-interval Firestore presence heartbeat | Rising Firestore write counts correlating with concurrent-editor count rather than with real user actions; shows up in the same billing dashboards v1.8 built to watch | Coarsen the interval (60s+) and/or move to RTDB; cap with a scheduled cleanup sweep | Noticeable once more than a handful of orgs have simultaneous multi-editor sessions regularly |
+| Stage Layout re-render/regeneration on every roster snapshot update | Canvas visibly "jumps"/resets whenever a roster doc updates elsewhere (e.g., another tab reassigns a role) | Only regenerate markers on an explicit empty-canvas seed or an explicit opt-in sync action, never reactively on every roster change | As soon as two people (planner + a scheduler making roster edits) are active around the same service concurrently |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Public read scoped to "org" instead of "the specific shared song/attachment" | Anonymous visitors can read every attachment/background/PPTX source the org has ever stored, not just what's shared | Dedicated, narrowly-scoped Storage path + rule for rehearsal attachments only |
-| `storage.rules` reaching into Firestore for the share-check | Repeats the exact deny-everyone-undetectable-locally bug this codebase already shipped once | Denormalized metadata flag or server-side signed-URL issuance instead |
-| Long-lived public tokens for potentially copyrighted practice tracks | A leaked/forwarded link keeps serving licensed audio indefinitely, with no revocation path from the client | Short-lived signed URLs, or explicit owner acknowledgment that tokens are effectively permanent for this content class |
-| Church switcher UI reimplementing org-context logic ad hoc | Reopens the stale-cross-org-data class of bug, or a claim/Firestore inconsistency, in a NEW code path outside the already-hardened one | Always call the existing `selectOrg()`/`resetOrgScopedStores()` primitives |
+| Presence collection with `allow read: if isSignedIn()` (or equivalent unscoped read) | Cross-tenant enumeration of who's-online/what-service, structurally identical to the v2.8 SEC-S-01 cross-tenant share-token leak (Critical, proven live) | Gate get/list on the resource's `orgId` using the existing `isOrgEditor()` idiom; add an explicit cross-org rules test |
+| Auto-generated share link created via a path that bypasses the existing `isOrgEditor(request.resource.data.orgId)` create rule (e.g., an admin-privileged Cloud Function trigger) | A trigger-based creation path runs with admin rights and isn't subject to `firestore.rules` at all — any bug in the trigger's own org-scoping becomes a direct data-isolation bug with no rules-layer backstop | If auto-generation must be server-side/triggered, replicate the org-scoping check in the function code itself and add a function-level test for it — do not rely on client-side rules to catch a server-side bug |
+| Share link auto-generated for a Draft service, then indexed/crawled/bookmarked before the plan is finalized | A stale or since-changed "preview" of an unfinished plan reaches a volunteer or gets shared further, with no clear signal it was provisional | Gate auto-generation on lock/Planned state (mirroring the existing My Schedule Draft-exclusion gate), or clearly mark Draft state on the share page itself |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
-|---------|--------------|-------------------|
-| Black slide renders as an empty/blank-looking editor row | Planner thinks the insert failed or the song is broken | Give the black slide explicit, distinct chrome in the editor ("Black / Interlude" label) even though it's blank in presentation |
-| Loop auto-advance keeps running behind "Go to black" | Slides quietly change while blacked out; lifting black shows an unexpected slide | Explicitly pause the loop while black is active (or document/test the alternative choice deliberately) |
-| Monitor-warning auto-clears on a timer instead of on resolution | Warning disappears while monitors are still misconfigured, projectionist unaware | Auto-clear only when the underlying condition resolves; timer-based auto-dismiss is for transient failures, not persistent setup state |
-| Stage-layout canvas unusable on the touch device tech volunteers actually carry backstage | Feature effectively unshippable for its real users | Pointer-Events-based implementation, tested on a real touch device before calling the phase done |
+|---------|-------------|-------------------|
+| Services page restyle changes tab/button layout without re-testing at phone width | The stated problem (tabs/buttons don't match the header pattern and aren't usable on a phone) recurs in a new form — restyled but still not actually mobile-usable | Test the reworked Services page against the same phone-width breakpoints already established elsewhere in the app (this app has an existing "standard page header" pattern to match, not a from-scratch design) |
+| Dashboard "readiness" signal (songs/media attached, roles filled, slides built) computed inconsistently with the gates used elsewhere (Draft/Planned, My Schedule's readiness indicator) | A dashboard could show a service as "ready" while My Schedule (v2.12) or the roster shows something different, confusing planners about what's actually true | Reuse the same readiness/completeness computation this app already has for the volunteer-facing readiness indicator (v2.12's "all ready / N songs missing media / waiting on charts") rather than inventing a second, parallel definition |
+| "Unconfirmed volunteers" dashboard widget doesn't account for confirmation being invalidated on reassignment (Pitfall 7) | A volunteer shows as "unconfirmed" for a role they were never actually told about (post-reassignment), or a planner is falsely reassured by a stale confirmed state | Wire the dashboard widget off the same live confirmation-state source the roster and My Schedule use, keyed on current assignment identity |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Rehearse public read:** Often missing a deny-case proving the SAME anonymous request cannot read a
-      background image, PPTX source, or an attachment NOT belonging to a currently-shared service — verify
-      with a paired allow/deny test in `src/storage.rules.test.ts`, not just the allow case.
-- [ ] **Church switcher:** Often missing registration of any NEW org-scoped store (rehearsal attachments,
-      stage layout) in `resetOrgScopedStores()` — verify by switching orgs and confirming the new stores'
-      data is empty/reloaded, not stale.
-- [ ] **Loop timer:** Often missing a route-away/manual-nav/black-slide interaction test — verify the loop
-      stops or disarms correctly, checked in an OUTPUT window, not just the control window.
-- [ ] **Black slide:** Often missing an export/print pass-through check — verify the printed order of
-      service and the public `ShareView` handle it sensibly (skip, or a clean labeled line), not a blank
-      `[not assigned]`-style fallback.
-- [ ] **Cost cap:** Often missing a server-side `storage.rules` size cap that mirrors client-side
-      validation — verify by attempting an oversized upload directly against the emulator/rules, not just
-      through the UI's own validation.
+- [ ] **Video/Banner transparent output:** Renders correctly with `background: transparent` in a browser preview — but has NOT been verified through the actual Blackbird capture/composite chain on real hardware. Verify: owner runs an end-to-end hardware test before calling this feature complete, not just a DevTools/screenshot check.
+- [ ] **Editor presence indicator:** Shows other viewers correctly during a clean multi-tab test session — but has NOT been tested against an ungraceful disconnect (closed lid, killed tab, lost network). Verify: force-kill a viewing tab/process and confirm the presence indicator clears within the expected staleness window, not never.
+- [ ] **Auto-generated share link:** A new service gets a share link automatically — but has NOT been checked for (a) whether it fires for still-Draft services, and (b) whether re-triggering the auto-generate path a second time creates a duplicate token. Verify: create a service, don't lock it, check the share link's reachability and Draft-state visibility; then trigger auto-generate twice and confirm only one token/doc exists.
+- [ ] **Stage Layout auto-populate:** Populates correctly on a brand-new, empty service — but has NOT been tested against a service where the planner already manually repositioned markers and then the roster changes. Verify: manually move a marker, change the underlying roster assignment, and confirm the manual position/notes survive (or that any removal is explicit/reversible, not silent).
+- [ ] **Volunteer confirmation:** Confirms correctly in the simple case (assign → volunteer confirms → planner sees it) — but has NOT been tested against reassignment-after-confirm or unlock/relock cycles. Verify: confirm an assignment, then reassign the role to someone else, and confirm the roster no longer shows a stale confirmed checkmark against the departed assignment.
+- [ ] **"Planning Center" verbiage removal:** Removes the cited banner text — but has NOT been checked against the real PC export/integration UI for accidentally-altered functional copy. Verify: exercise the actual Planning Center export flow after the copy sweep and confirm its labels/errors are unchanged.
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
-|---------|-----------------|------------------|
-| Storage rule accidentally makes the whole org bucket public | HIGH | Immediately redeploy a corrected `storage.rules`; rotate/replace exposed Storage objects if any contain sensitive content (treat as a real incident, mirroring the 2026-08-06 deny-everyone response posture in reverse — an ALLOW-everyone incident is worse) |
-| Church switcher ships without full store reset | MEDIUM | Add the missing store(s) to `resetOrgScopedStores()`, no data migration needed — this is a pure client-state bug, not a data-integrity one |
-| Black slide implemented inside the pooled-section model, later found to corrupt numbering | MEDIUM–HIGH | Requires a data migration for any songs that already saved a black slide the wrong way, plus a type change — cheaper to get right the first time (see Pitfall 5) |
-| Loop timer desyncs outputs from control | LOW | Client-side bug fix only, no data corruption — reload the output windows to resync |
+|---------|----------------|------------------|
+| Video/Banner shipped as pure-alpha but Blackbird actually needs a solid chroma key | MEDIUM | Add a config toggle (transparent vs. solid-key-color) after the fact — the render logic (fit-to-banner-region, rest-of-frame background) is the same either way; only the background value/CSS changes, so this is a scoped fix, not a rewrite, if the renderer was built with a single background-style variable in the first place |
+| Presence leaked stale "online" state in production before RTDB/staleness-timeout was added | LOW | Add the staleness-timestamp read-side filter (or a one-off cleanup Cloud Function run once) — this doesn't require a schema migration, just a query/read-side change plus a manual sweep of existing stale docs |
+| Duplicate share tokens discovered for existing services | LOW-MEDIUM | Reuse the same "find every token for a service" query this app's `deleteService()` already implements to enumerate and dedupe (keep the most recently created, revoke the rest) — this exact recovery mechanism already exists in the codebase for a related bug |
+| Stage Layout auto-populate already clobbered manual placements for existing services before the fix landed | HIGH (data, not code) | There is likely no reliable way to recover a planner's specific prior manual positions once overwritten — the fix is forward-looking (stop clobbering going forward) plus an apology/heads-up to affected planners, not a data recovery script |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|-------------------|----------------|
-| 1. Public rehearse media exposure | Rehearsal-attachment Storage/rules phase | `storage.rules.test.ts` allow+deny pairs proving scope is limited to shared-song attachments only |
-| 2. `firestore.exists()` blind spot repeat | Same phase as (1) | Code review greps the diff for `firestore.` inside `storage.rules`; no cross-service call present |
-| 3. Stage-layout drag corruption | Stage-layout canvas phase | Manual/real-device touch drag test; position round-trip test; resize/print consistency test |
-| 4. Loop timer leaks/races | Loop/auto-advance phase | Manual-nav-during-loop, item-change, black-slide, and route-away tests checked against BOTH output windows |
-| 5. Black slide model corruption | Inline black slide phase | `songSectionOrder`/slideshow-assembler tests for insert/duplicate/delete/reorder; export/print/ShareView pass-through test |
-| 6. Notification system collision | Dismissible-messages phase | `toasts.ts`/`ToastHost.vue` generalized or replaced; `RunControlView` monitor banner migrated as proof case |
-| 7. Church switcher reset regression | Church-switcher phase | Reuses `selectOrg()`; new stores registered in `resetOrgScopedStores()`; switch-and-verify-cleared test |
-| 8. Storage/egress cost blast radius | Rehearsal-attachment upload phase + a pre-ship cost review | Server-side size cap present; YouTube steered as default; signed-URL/expiry decision documented; retention-sweep decision documented |
+| Blackbird/alpha-capture feasibility unverified | An early, small feasibility-spike phase (or Phase 1 of the Video-output work), before the banner-rendering UI is built | Owner-run hardware test compositing a live app output through the real Blackbird chain; app renderer supports both an alpha and a solid-key-color mode |
+| Firestore-only presence leaks stale state / uncapped write cost | The editor-presence phase | A forced ungraceful-disconnect test (kill the tab/process) shows the indicator clearing within the defined staleness window; a written note on the chosen write-interval and its cost impact |
+| Presence security rule exposes cross-org data | The editor-presence phase (security design step) | A rules test proving a member of Org A cannot `get` or `list` Org B's presence data |
+| Auto-share-link creates duplicates or exposes Draft services | The auto-generate-share-link phase | A test asserting idempotent creation (no duplicate token on repeat trigger) and an explicit decision + test for the Draft-vs-Planned trigger condition |
+| Stage Layout auto-populate clobbers/duplicates | The Stage-Layout-auto-populate phase | A test covering "existing manual edits survive a roster change" and "re-running does not duplicate markers" |
+| PC-verbiage removal touches real integration copy | The Services-page/dashboard copy-cleanup phase | A grep-based inventory + classification reviewed before edits, plus a manual smoke-check of the PC export flow post-change |
+| Volunteer confirmation races with reassignment | The volunteer-confirmation phase | A test sequence: confirm → reassign role → assert stale confirmation is cleared/invalidated, not silently shown as still-confirmed |
+| Services-page mobile restyle doesn't actually fix mobile usability | The Services-page UX-alignment phase | Manual verification at the app's existing phone-width breakpoints, not just a visual pass at desktop width |
 
 ## Sources
 
-- `.planning/PROJECT.md` — milestone scope, v1.8 cost-hardening history, v1.4/v1.6 drag-and-drop
-  corruption history, storage.rules incident record, key decisions log (HIGH — primary project record).
-- `storage.rules`, `firestore.rules` — direct read of the current rules, including the documented
-  `firestore.exists()`-in-Storage-emulator incident and the claim-only membership pattern (HIGH — primary
-  source, current state).
-- `CLAUDE.md` — the 2026-08-06 deny-everyone incident writeup and testing-command guidance (HIGH — primary
-  source).
-- `src/stores/auth.ts`, `src/stores/orgScopedStores.ts` — `selectOrg`/`enterOrgAsSuperAdmin`/
-  `resetOrgScopedStores` and the documented "quick 260823-switch-church-cache" bug fix (HIGH — primary
-  source, current state).
-- `src/stores/toasts.ts`, `src/components/ToastHost.vue` — documented scope-narrowing decision (R041) and
-  current auto-dismiss behavior (HIGH — primary source, current state).
-- `src/types/slide.ts`, `src/types/songLyrics.ts`, `src/utils/songSectionOrder.ts` — the pooled-section /
-  positional-numbering slide model (HIGH — primary source, current state).
-- `src/composables/useMediaUpload.ts`, `src/views/ShareView.vue`, `src/views/RunControlView.vue`,
-  `src/utils/runChannel.ts`, `src/composables/useRunControl.ts` — existing upload cap pattern, public
-  share-page shape, and run-control timer/broadcast discipline (HIGH — primary source, current state).
-- [A guide to Firebase Storage download URLs and tokens](https://www.sentinelstand.com/article/guide-to-firebase-storage-download-urls-tokens) — LOW confidence, single web source, supporting context for Pitfall 1/8.
-- [Firebase Storage READ security rules: almost pointless, as currently implemented (firebase-js-sdk#5342)](https://github.com/firebase/firebase-js-sdk/issues/5342) — LOW confidence, supporting context for Pitfall 1.
-- [What Is youtube-nocookie.com?](https://swarmify.com/blog/what-is-youtube-nocookie/) — LOW confidence, supporting context for Pitfall 1 (YouTube embed risk).
-- [Stop Building Silent Toasts: A 5-Minute Guide to aria-live](https://medium.com/@andrescoronel1209/accessible-toast-notifications-with-aria-live-1619ac6f25ba) — LOW confidence, supporting context for Pitfall 6.
-- [Defining "Toast" Messages — Adrian Roselli](https://adrianroselli.com/2020/01/defining-toast-messages.html) — LOW confidence, supporting context for Pitfall 6.
-- [HTML5 Drag & Drop — Not the API You're Looking For](https://www.sam.today/blog/html5-dnd-the-api-that-is-gaslighting-you) — LOW confidence, supporting context for Pitfall 3.
-- [drag-drop-touch-js/dragdroptouch polyfill](https://github.com/drag-drop-touch-js/dragdroptouch) — LOW confidence, supporting context for Pitfall 3.
+- `.planning/PROJECT.md` — v2.14 milestone scope and owner decisions (Blackbird external-dependency framing, "app-side only" scope decision 2026-09-07); v2.8 milestone record (SEC-S-01 Critical cross-tenant share-token leak, its `get`/`list` split fix); v2.12/v2.13 records (My Schedule Draft-exclusion gate, live volunteer-service-doc `onSnapshot` pattern, church-switch re-subscribe precedent); v1.7/v1.8 records (volunteer-messaging queue + kill-switch infra, cost/billing-hardening rationale for recurring-write surfaces).
+- `firestore.rules` (this repo) — the `shareTokens`/`orgSlugs`/`orgNames`/`quarterShares`/`serviceShares` get/list-split idiom and inline rationale comments (SEC-S-01/SEC-ISO-06), directly informing the presence and share-link pitfalls.
+- `src/components/stage/StageLayoutEditor.vue` (this repo) — existing marker/assignment data model (`StageMarker`, `ServingAssignment`, `roleId`/`personId`), informing the auto-populate reconciliation pitfall.
+- CLAUDE.md (this repo) — the `firestore.exists()`-in-Storage-emulator blind spot as a documented precedent for "looks correct, isn't verified against the real environment," directly analogous to the Blackbird-verification risk.
+- [OBS Forums — "How to Make Background Transparent?"](https://obsproject.com/forum/threads/how-to-make-background-transparent.108643/) and related OBS/chroma-key threads (MEDIUM confidence, general web) — browser-source transparency is software-pipeline-dependent, not a universal property of a rendered browser window; physical mixer/capture-card paths conventionally rely on chroma-key color, not alpha.
+- General Firebase documentation on Realtime Database `onDisconnect()`/presence patterns and Firestore's lack of an equivalent primitive (MEDIUM confidence, general web, not verified against this project's exact SDK versions) — informs the recommended RTDB-or-staleness-timeout presence pattern.
 
 ---
-*Pitfalls research for: WorshipPlanner v2.7 (Rehearsal, Stage Plans & Presentation Polish)*
-*Researched: 2026-08-31*
+*Pitfalls research for: Adding Services UX/dashboard/PC-copy/confirmation/Stage-Layout-auto-populate/auto-share/row-shading/presence/Video-output features to a shipped, cost-hardened, multi-tenant Firebase worship-planning app*
+*Researched: 2026-09-07*

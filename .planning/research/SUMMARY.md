@@ -1,310 +1,209 @@
 # Project Research Summary
 
-**Project:** WorshipPlanner — v2.7 (Presentation Polish & Multi-Org Usability)
-**Domain:** Feature-integration research for a mature Vue 3 + Firebase worship-service planning app
-**Researched:** 2026-08-31
-**Confidence:** HIGH
+**Project:** WorshipPlanner v2.14 — Services UX Alignment, Dashboard & Live-Stream Video Output
+**Domain:** Subsequent-milestone integration into a shipped Vue 3 + Firebase (Firestore/Auth/Functions/Storage) worship-planning SaaS
+**Researched:** 2026-09-07
+**Confidence:** HIGH (architecture and pitfalls grounded directly in this repo's source; stack near-zero-new-dependency; features cross-checked against multiple competitor sources)
 
-## Scope Note (owner narrowed scope after research was commissioned)
-
-Research was originally commissioned for eight feature areas. The owner has since **deferred two
-of them to a future milestone**: (a) song rehearsal attachments (PDF/MP3/YouTube) and (b) Rehearse
-mode on the public shared link. This SUMMARY, and the roadmap it feeds, cover **only the six
-in-scope v2.7 features** below. The deferred cluster is summarized separately at the end so its
-findings — especially the security/cost risk — aren't lost before the future milestone picks it up.
+> **Owner corrections applied (post-research, override any contradicting research text):** Blackbird is
+> **not part of this feature at all** — there is no external hardware compositing dependency, and no
+> "Blackbird/alpha feasibility spike" phase. Compositing happens in the video room's **software**
+> (OBS/vMix-style Browser Source), which can consume a genuinely transparent (alpha) source. The owner
+> chose **"build both, transparent default"**: the Video output renders **transparent by default** for
+> the Banner's non-content region, plus a **configurable solid key-color fallback** (e.g. magenta) for
+> tools that need chroma-key instead of alpha. This makes Video output a **low-hardware-risk, purely
+> app-side feature** — every place below that references "Blackbird verification," a "feasibility spike,"
+> or a "hardware-in-the-loop UAT gate" for the Video output has been removed or reframed accordingly.
 
 ## Executive Summary
 
-v2.7 is a **pure integration milestone** against a mature codebase — every in-scope feature reuses
-an existing mechanism rather than introducing new architecture, and the stack research concluded
-**zero new npm dependencies are required**. The six features are: an inline black slide in the
-lyric editor, scoping "Go to black" to the Audience output only, a system-wide dismissible
-message/banner store, a per-item loop timer in Run mode, a user-menu church switcher for
-multi-org members, and a freeform visual stage-layout canvas per service. All six trace directly
-to existing, already-proven patterns in this codebase: the pooled-section slide model, the
-single-writer runChannel/useRunControl broadcast discipline, the existing (if too-narrow)
-toasts.ts Pinia store, the already-hardened selectOrg()/resetOrgScopedStores() multi-org
-reset path, and Pointer Events for freeform drag (a genuinely new interaction pattern for this
-app, but a native-API one, not a new library).
+This milestone adds four largely independent features to a mature, cost-hardened, multi-tenant app:
+a redesigned dashboard (readiness signal + unconfirmed-volunteers widget, replacing a metrics-style
+"coverage" stat that never had a real denominator), a two-state volunteer confirmation model
+("I've got it"), a third live-stream "Video" output role with per-item Banner/Full-screen rendering,
+and three smaller integration features (Stage Layout auto-populate from roster, auto-generated share
+links, editor presence). All four map cleanly onto existing architecture: the app is Firestore-only
+(no Realtime Database anywhere in the codebase), already has a generalized N-assignment output-role
+system (v2.4/v2.9), an idempotent share-link minting function, and a stage-layout marker/geometry
+library — so nearly every feature is additive to an existing pattern rather than new infrastructure.
 
-The recommended approach is dependency-honoring, not feature-parallel: build the **cross-cutting
-UI primitives first** (the dismissible-message store, the church switcher) since they are fully
-decoupled from everything else and de-risk the rest of the milestone quickly, then the **isolated
-Run-flow fixes** (audience-only blackout, black slide, loop), and **stage layout last**, since it
-is architecturally independent but the single largest, riskiest, most novel build (a new freeform
-canvas interaction pattern with its own data model and Firestore rules block).
+The recommended approach is: reuse rather than invent. Presence rides the same Firestore
+heartbeat + `onSnapshot` + client-side staleness pattern (no RTDB) already implied by this app's
+Firestore-only posture, scoped as a true nested subcollection under `services/{serviceId}` mirroring
+the existing `lockSnapshots` precedent. The Video output is a third value threaded through the existing
+`MonitorRole` enum, and per-item Banner/Full-screen is a slot-level field riding the existing
+`useAutoSave` deep-watch — no new save path. Auto-share-link is one new call site (`ensureShareLink`
+from `markAsPlanned`) reusing already-idempotent code. Stage Layout auto-populate is a pure function
+over already-computed roster data, gated strictly to a one-time seed of an empty canvas.
 
-The dominant risk pattern across all four research files is **this app's own repeated history of
-drag-and-drop corrupting state** (v1.4 phantom duplicates, v1.6 drag-into-section bugs) — the
-stage-layout canvas is new freeform x/y drag code with no existing precedent to reuse, so it needs
-its own careful design (Pointer Events, percentage coordinates, debounced persistence, real
-touch-device testing) rather than treating it as "just another drag feature." The secondary risk
-is a **notification-system collision**: toasts.ts is deliberately narrow (failure-only, 6s
-auto-dismiss) and must be generalized or replaced — not left running in parallel with a new store
-— or the milestone risks producing two incompatible notification mechanisms.
+The key risks are not build risk — they are **regression-of-existing-safety-property** risks: (1) a
+presence collection with an unscoped read rule would be a smaller replay of the proven, Critical,
+live v2.8 SEC-S-01 cross-tenant share-token leak; (2) auto-generating share links without gating on
+Planned/lock state would silently remove the one manual "I'm ready to show this" signal the app
+currently has, exposing Draft plans; (3) confirmation state and Stage Layout markers must survive
+concurrent roster edits without going stale or clobbering manual work — both are variations on "looks
+done against the happy path, breaks against this app's actual edit lifecycle" (draft → lock → unlock →
+relock). None of these require new research to resolve; they require the phase plans to explicitly
+test the non-happy-path.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new dependencies. The dismissible-message store is a small in-house Pinia extension of the
-existing toasts.ts/ToastHost.vue pattern. The loop timer is a plain setInterval/composable
-routed through the existing runChannel/postIndex choke point. The church switcher is pure
-reuse of already-shipped auth.ts primitives (selectOrg, resetOrgScopedStores). The stage
-layout canvas uses **native Pointer Events + percentage-based {zone, xPct, yPct} coordinates**,
-explicitly rejecting vue-konva/interactjs/vuedraggable as overkill for placing a bounded set
-of free-text-labeled markers into two zones — none of the app's existing SortableJS-based drag
-code fits this (that's list-reorder, not freeform placement).
+Both new-tech features (Video output, presence) are architecture/pattern additions, not new
+dependencies. See `.planning/research/STACK.md` for full detail.
 
-**Core technologies (all pre-existing):**
-- Pinia — dismissible-message store, mirrors every other cross-cutting store in the app
-- Native Pointer Events API — unifies mouse/touch/pen for the stage-layout drag surface, no polyfill needed for this app's supported-browser bar
-- Native setInterval in a composable — per-item loop timer
-- Existing runChannel.ts/useRunControl.ts single-writer broadcast — the loop and blackout-scoping changes are pure app-state changes over the existing wire protocol, no new transport
+**Core technologies:**
+- CSS `background: transparent` on the Video output's non-banner region — honored by embedded-renderer capture paths (OBS/vMix Browser Source) since those render off-screen via CEF with a real alpha channel; the owner has confirmed the actual downstream path is exactly this kind of software compositor, not raw HDMI/SDI capture, so this is the **primary** mechanism, not a fallback.
+- Configurable solid key-color fill (`<input type="color">`, no library), default a saturated magenta — the fallback for any downstream tool that still needs chroma-key instead of consuming true alpha.
+- Firestore `serverTimestamp()` heartbeat doc + `onSnapshot` (already pinned, `firebase@^12.0.0`) — real-time presence, reusing the exact primitive every other live feature in this app already uses.
+- Firestore TTL policy (GA, server-side config) — cost/hygiene backstop for abandoned presence docs; never the primary staleness signal (client-side "older than ~60s" check is instant, TTL is "typically within 24 hours").
+- No new npm packages for either feature; both slot into existing composable/store conventions (`useOutputWindow`, a new `usePresence`-style composable mirroring `runChannel`).
+
+**Explicitly avoid:** Firebase Realtime Database (a second database/security model for one small feature — this app is deliberately Firestore-only through 13 shipped milestones), Electron/Tauri or any native shell for "true" window transparency, an NDI/WebRTC bridge, and any canvas/WebGL chroma-key **removal** library (this app is the sender producing a clean signal, not a receiver decoding one).
 
 ### Expected Features
 
-**Must have (table stakes for v2.7 — all P1 per FEATURES.md):**
-- Inline black slide insertable in a song's slide sequence, as a new authored slide kind (not a live control)
-- "Go to black" scoped to the Audience output only — confidence monitor stays visible (bug fix, restores the independent-output-toggle model every reference tool — e.g. ProPresenter — already uses)
-- Per-item loop checkbox with a default 10s interval + dropdown/custom value, looping that item's own slides
-- System-wide dismissible messages: state-driven banners that auto-clear when their trigger condition resolves, plus always-available manual dismiss
-- Church switcher in the user menu for multi-org members, showing each org + the user's role, full state reset on switch
-- Freeform stage-layout canvas per service with on-stage/off-stage zones and free-text-labeled draggable markers (including one-off markers, e.g. a guest-speaker mic)
+See `.planning/research/FEATURES.md` for full detail, including competitor analysis (Planning Center, Breeze, Pushpay, WorshipTools, Connecteam, InitLive, Better Impact).
 
-**Should have / defer within v2.7 scope (P2, add after validation):**
-- Auto-generated stage-plot input list derived from placed markers
-- Seed a new service's stage layout from the org's last-used layout (copy-on-create)
-- Fine-grained per-slide custom loop timing (vs. one interval per item)
+**Must have (table stakes):**
+- Upcoming services list on the dashboard — near-zero new data modeling, matches every competitor.
+- Readiness signal per service (songs/media, roles filled, slides built, Draft vs Planned) — all source data already exists; the work is defining and testing the rollup rule, and it **must reuse** the same readiness computation already surfaced to volunteers in My Schedule (v2.12) rather than inventing a second, parallel definition.
+- Confirmed/Unconfirmed state on volunteer assignments + a per-assignment "I've got it" action — two states only, not the fuller accept/decline/blockout/replacement model competitors have.
+- Planner-visible confirmation status on the roster, feeding the dashboard's unconfirmed-volunteers widget.
+- Video output role (3rd output type) with per-item Banner/Full-screen choice and transparent-default banner render.
+- Stage Layout auto-populate from roster assignments (one-time seed of an empty canvas).
+- Auto-generated service share link (gated to the Planned/lock transition, mirroring the existing My Schedule Draft-exclusion gate).
 
-**Anti-features (explicitly do not build):**
-- A constrained instrument/equipment icon library for the stage plot — fights the free-text, one-off-marker requirement directly; use free-text labels instead
-- A global notification history/log of dismissed messages — no demonstrated need beyond the narrow "don't get stuck" fix
-- A dedicated live instant-blackout/logo-cut master control — still deferred (carried over from v2.4 research); v2.7 only fixes output-scoping of the existing "Go to black"
+**Should have (competitive differentiators):**
+- Reminder nudges targeting only unconfirmed assignments — reuses existing v1.7 volunteer-messaging send infrastructure, mostly a targeting/query change.
+- A visible contrast treatment (drop shadow or semi-transparent backing bar) behind banner text — broadcast/church-lyric convention research consistently flags plain text with no backing as a legibility risk.
+- Editor presence roll-up on the dashboard itself, if the per-service indicator is built anyway.
+
+**Defer (backlog):**
+- Decline + auto-reopen-slot + replacement self-swap (real, well-precedented feature, but heavier than the owner's ask).
+- Volunteer blockout-date management.
+- Confirmation deadline/auto-decline timers.
+- Customizable/drag-and-drop dashboard widgets.
+- Generic BI/analytics dashboard widgets (attendance trends, engagement charts) — the anti-pattern the "coverage %" metric already represented.
+- A "Fill + Key" dual-output video path (only relevant if the church later adds real hardware-keyer equipment; not applicable to the current software-compositor path).
 
 ### Architecture Approach
 
-This is integration research, not greenfield design — every feature slots into an existing code
-path. The dismissible-message store generalizes toasts.ts in place (widen push/dismiss,
-add a keyed setSticky/clearSticky API for condition-driven banners) rather than building a
-parallel system. The church switcher exposes the already-shipped selectOrg() +
-resetOrgScopedStores() machinery from the user menu (AppSidebar.vue) instead of reimplementing
-org-switch logic. The audience-only blackout fix is the smallest possible diff: stop
-ConfidenceOutputView.vue from consuming the shared blackout flag, rather than widening the
-RunState wire protocol. The black slide is a new LyricSection.kind/Slide.contentKind variant
-resolved at slideshowAssembler.ts's three existing content-resolution sites — it reuses 100% of
-the pool/order/drag machinery already in SongLyricEditor.vue, with zero changes needed in
-Run/Audience/Confidence composables (they already iterate assembledSlideshow generically). The
-loop timer lives entirely inside useRunControl.ts (the documented single writer), arming on
-watch(currentSlotIndex) and resetting via the existing postIndex() choke point so manual
-navigation never fights it. The stage layout is a new top-level org-scoped Firestore collection
-(stageLayouts/{serviceId}, mirroring serviceShareLinks), a new rules block modeled on the
-existing slideGroups draft-locked pattern, and a genuinely new StageLayoutEditor.vue freeform
-canvas — the one component in this milestone with no direct code-reuse precedent.
+Every recommendation in `.planning/research/ARCHITECTURE.md` was verified directly against this repo's source (not inferred from domain generalities). The core pattern across all four features: **extend existing generalized systems**, don't build parallel ones.
 
 **Major components:**
-1. src/stores/notifications.ts (generalized toasts.ts) + NotificationHost.vue — cross-cutting, ships first
-2. AppSidebar.vue church-switcher menu entry — reuses auth.ts's selectOrg/resetOrgScopedStores
-3. ConfidenceOutputView.vue blackout-consumption removal — smallest diff, isolated
-4. SongLyricEditor.vue + slideshowAssembler.ts + slideDisplay.ts/SlideCanvas.vue — new blackout slide kind
-5. useRunControl.ts loop composable — timer armed/disarmed through the existing postIndex choke point
-6. StageLayoutEditor.vue + src/stores/stageLayouts.ts + new stageLayouts/{serviceId} Firestore collection/rules — the one net-new subsystem
+1. **`MonitorRole` widened to include `'video'`** (`src/utils/monitorConfig.ts`, `MonitorSetupView.vue`, a new `VideoOutputView.vue` sibling of `AudienceOutputView`/`ConfidenceOutputView`, a new static route) — Video is a third value threaded through the same N-assignment role system v2.9 already generalized, not a parallel subsystem.
+2. **Per-item `videoOutput: { mode: 'banner' | 'fullscreen' }`** on `MediaAttachableSlot` (`src/types/service.ts`), riding the existing `useAutoSave` deep-watch exactly like the precedent `loop` field — no new save call, no new store, no new rules surface.
+3. **`useServicePresence.ts` composable** (not a Pinia store) — a true nested Firestore subcollection `services/{serviceId}/presence/{uid}`, heartbeat every ~20-30s (paused while tab hidden), client-side soft-TTL staleness filter (~45-60s), `watch(serviceId, ...)` teardown on navigate (required because Vue Router reuses the mounted `ServiceEditorView` instance across param changes — `onUnmounted` does not fire), plus an optional `cleanupStalePresence` cron sibling to the existing `*_CLEANUP_ENABLED` retention-cron family.
+4. **`autoPopulateMarkers()`** pure function in `src/utils/stageLayout.ts` over the already-computed `stageServingAssignments`, triggered once when the Stage Layout tab first becomes active for a service with zero elements — never re-run once populated.
+5. **One new call site**: `ensureShareLink(service, orgId)` called from `markAsPlanned()`, mirroring the existing fail-closed, try/catch-wrapped `rehearseAccess` side-write pattern already in that function — `maybeRefreshShareLink` (auto-refresh-only-if-exists) is explicitly NOT the function to change.
 
-### Critical Pitfalls (in-scope features only)
+### Critical Pitfalls
 
-1. **Stage-layout canvas repeats this app's own drag-and-drop corruption history** (v1.4 phantom duplicates, v1.6 drag-into-section bugs) — avoid by using Pointer Events (not native HTML5 DnD, which is mouse-only by spec), storing position as percentage/normalized coordinates (never raw pixels), debouncing persistence to drag-end, and testing on a real touch device before calling the phase done.
-2. **Loop timer leaks or fights manual navigation / desyncs output windows** — avoid by routing every loop-triggered advance through the exact same runChannel broadcast path (never local-only state), scoping the timer's lifetime to the service-item via watch(currentSlotIndex), and explicitly deciding/testing whether "Go to black" pauses the loop.
-3. **Black slide corrupts the pooled-section slide model or positional numbering** — avoid by giving it its own contentKind (not 'lyric' with empty content), explicitly excluding it from deriveSectionKind/positional numbering, and never letting it be pool-referenced/shared across occurrences. Get this data-model decision settled before any editor UI is built — retrofitting later means migrating already-saved black slides.
-4. **A generic dismissible-message system is retrofitted onto the deliberately narrow toasts.ts, or built as a second, parallel system** — avoid by explicitly generalizing/replacing toasts.ts in this phase and migrating the known stuck-banner cases (RunControlView's monitor-reassign banner, MonitorSetupView's save-outcome warning) onto it as the proof case, not just building the mechanism in isolation.
-5. **Church switcher bypasses the already-hardened multi-org reset path** — avoid by calling the existing selectOrg() (never a new parallel implementation), and registering the stage-layout store (the one new org-scoped store this milestone adds) in resetOrgScopedStores()'s call list as part of that feature's own phase — this is the single item most likely to be silently forgotten.
+Full detail, warning signs, and a "Looks Done But Isn't" checklist in `.planning/research/PITFALLS.md`. Top items, with the Blackbird-hardware framing removed per owner correction:
 
-## Deferred (Future Milestone): Rehearsal Attachments & Public Rehearse Mode
-
-Out of scope for v2.7, but the highest-risk area researched — carry this warning forward:
-
-- **Public Storage exposure risk (Critical Pitfall #1 in PITFALLS.md):** naively widening
-  storage.rules to let an anonymous Rehearse visitor read a song attachment risks making the
-  **entire org's Storage bucket world-readable** if the fix is a blanket allow read: if true
-  on an existing broad match. Requires a dedicated, narrowly-scoped Storage path
-  (e.g. orgs/{orgId}/rehearsalAttachments/...) with its own rule, never a widened existing match.
-- **The firestore.exists() cross-service blind spot repeats:** this codebase already shipped a
-  deny-everyone Storage rule once because firestore.exists() is inert in the Storage emulator
-  (documented incident, CLAUDE.md 2026-08-06). The "is this attachment actually shared" check for
-  an anonymous visitor must not repeat that pattern — denormalize onto Storage custom metadata, or
-  route through a server-side Cloud Function/signed URL, never a storage.rules-side Firestore read.
-- **Egress/cost blast radius:** v1.8 was an entire milestone dedicated to capping Blaze-plan costs;
-  public, unauthenticated, per-play Storage egress on MP3s/PDFs is a structurally new and larger
-  cost surface than anything capped so far, with no existing retention sweep covering it.
-- Recommended future-milestone approach (from STACK/ARCHITECTURE research, not re-litigated here):
-  Storage download-token URL as a bearer capability denormalized into the frozen public share
-  snapshot (same pattern roleAssignments/bpm already use), a dedicated size-capped Storage path,
-  and steering users toward YouTube links (zero Storage cost) over uploaded audio/PDF wherever
-  possible.
+1. **Presence security rule scoping** — a presence collection with an unscoped `allow read: if isSignedIn()` would be a smaller structural replay of the proven, Critical, live v2.8 SEC-S-01 cross-tenant share-token leak (that fix required splitting `get` from `list`). Gate get/list on `isOrgMember(orgId)` from day one; add an explicit cross-org rules test.
+2. **Presence staleness and cost** — a naive "write on mount, delete on unmount" pattern leaks stale "still viewing" state on any ungraceful disconnect (closed lid, crashed tab — Firestore has no `onDisconnect()`), and a too-frequent heartbeat reintroduces exactly the uncapped-recurring-write pattern v1.8's cost hardening was built to catch. Use a coarse heartbeat (~25-30s) + client-side staleness filter (~60s) as the correctness mechanism, TTL only as an eventual cleanup backstop.
+3. **Auto-share-link Draft exposure** — auto-generating on every save (rather than gating to the Planned/lock transition) would create a guessable-URL share page for an unfinished plan, silently removing the one manual "I'm ready" gate this app currently has. Gate on `markAsPlanned`, reuse `ensureShareLink`'s existing idempotency to avoid duplicate tokens.
+4. **Stage Layout clobber/duplicate on re-run** — auto-populate must be a one-time seed of an empty canvas, never a recurring sync; re-running against a canvas with manual edits (the common case, since roster changes right up until lock) must never regenerate/wipe/duplicate markers.
+5. **Volunteer confirmation vs. concurrent roster edits** — confirmation state must be keyed on stable assignment identity and explicitly invalidated ("needs reconfirmation," not a stale checkmark) when the underlying assignment is reassigned; read via live `onSnapshot`, not one-time fetch, matching the v2.13 live-volunteer-doc precedent.
+6. **"Planning Center" verbiage removal scope** — this app has a real, functioning PC export integration; a blind find-and-replace on "Planning Center" strings risks garbling substantive integration copy along with the one incidental banner string in scope. Inventory and classify every occurrence before editing.
 
 ## Implications for Roadmap
 
-Dependency-honoring build order for the **six in-scope v2.7 features**, per ARCHITECTURE.md's
-"Suggested Build Order" (renumbered here to match in-scope numbering) and cross-checked against
-FEATURES.md's dependency graph and PITFALLS.md's phase mapping:
+Based on combined research, the four feature areas cluster into three risk/complexity tiers with almost no cross-feature code dependency (only one hard ordering constraint: confirmation model before the "unconfirmed volunteers" dashboard widget). Suggested phase structure:
 
-### Phase 1: Dismissible message store (foundation)
-**Rationale:** Fully decoupled from every other v2.7 feature — no data-model or rules dependency.
-Fixes a real, currently-annoying bug (the stuck "monitors not configured" banner) fast, and later
-Run-flow phases (blackout relabel, any Run-side follow-up) should land against the new/generalized
-store, not the old ad-hoc ref-gated banner.
-**Delivers:** Generalized notifications.ts (extends toasts.ts) with a keyed setSticky/clearSticky
-API for condition-driven banners, plus a dismiss() manual-dismiss path on every message. Migrates
-RunControlView.vue's monitor-reassign banner and MonitorSetupView.vue's save-outcome warning
-onto it as proof cases.
-**Addresses:** System-wide dismissible messages (table stakes, P1)
-**Avoids:** Notification system collision (two parallel mechanisms coexisting)
+### Phase 1: Trivial wins — Auto share-link + Stage Layout auto-populate
+**Rationale:** Both are single-call-site or pure-function additions with zero new schema and all dependencies already shipped (Phase 107 stage layout, existing `ensureShareLink`). Lowest risk, most self-contained; good for de-risking the milestone early and building momentum.
+**Delivers:** Share link auto-created on Planned transition (idempotent, gated to lock state); Stage Layout seeds itself once from roster assignments on first empty-canvas visit.
+**Addresses:** FEATURES.md table stakes — auto-share-link, Stage Layout auto-populate.
+**Avoids:** Pitfall 4 (Draft exposure / duplicate tokens) and Pitfall 5 (clobber/duplicate on re-run) — both require the non-clobber/idempotency guard to be a first-class acceptance criterion, not an afterthought.
 
-### Phase 2: User-menu church switcher
-**Rationale:** Fully independent of everything else in this milestone; zero data-model or rules
-dependency; safe to parallelize with Phase 1 if capacity allows, but sequenced second here since
-it shares no risk surface with Phase 1 and both are good "quick win" candidates early in the
-milestone.
-**Delivers:** ChurchSwitcherMenu.vue (or AppSidebar.vue addition) reusing authStore.selectOrg()
-for regular multi-org members, distinct from the existing super-admin enterOrgAsSuperAdmin path;
-shows each org + the user's role; full state reset via resetOrgScopedStores().
-**Addresses:** Church switcher (table stakes, P1)
-**Avoids:** Bypassing the already-hardened multi-org reset path (must call selectOrg(), not reimplement)
+### Phase 2: Volunteer Confirmation
+**Rationale:** Must land before or alongside the dashboard's "unconfirmed volunteers" widget — the one hard cross-feature ordering constraint research surfaced. No dependency on presence or Video output.
+**Delivers:** Two-state (Unconfirmed default / Confirmed) model on assignments, "I've got it" action in the existing My Schedule / volunteer service surface, planner-visible status chip on the roster.
+**Addresses:** FEATURES.md Section 2 table stakes; explicitly scoped to two states, deferring Decline/replacement/blockout.
+**Avoids:** Pitfall 7 (confirmation racing reassignment/unlock-relock) — plan must test confirm-then-reassign and unlock/relock sequences as acceptance criteria, not just the happy path.
 
-### Phase 3: "Go to black" scoped to Audience output only
-**Rationale:** Small, isolated, no dependency on anything else in the milestone. A quick, low-risk
-win to bank while the team is already inside RunControlView.vue/useRunControl.ts from Phase 1's
-monitor-banner migration — good sequencing locality, not a hard dependency.
-**Delivers:** ConfidenceOutputView.vue stops consuming the shared blackout flag for its overlay
-(the minimal-diff fix, no RunState wire-protocol change); RunHeader.vue's blackout control
-relabeled ("Blackout audience") for operator clarity.
-**Addresses:** "Go to black" scoped to Audience only (table stakes / bug fix, P1)
-**Avoids:** N/A directly, but sets correct precedent for output-scoping before Phase 5 (loop) touches the same Run-flow code
+### Phase 3: Dashboard
+**Rationale:** Depends on Phase 2 (confirmation model) for the unconfirmed-volunteers widget; the readiness signal has no new data dependency and could ship earlier if sequencing needs it, but is grouped here since both widgets share the same "needs your attention" framing and layout work.
+**Delivers:** Upcoming services list, readiness signal per service (reusing the existing v2.12 readiness computation, not a new definition), unconfirmed volunteers widget, empty/first-run state.
+**Addresses:** FEATURES.md Section 1 table stakes; explicitly excludes generic BI/analytics widgets and the old undefined "coverage %" metric.
+**Avoids:** UX pitfall of the readiness signal disagreeing with My Schedule's existing readiness indicator — reuse, don't reinvent, the rollup rule.
 
-### Phase 4: Inline black slide in the lyric editor
-**Rationale:** Self-contained within the song-lyrics/slideshow-assembler subsystem; no dependency
-on attachments or stage layout (both deferred anyway). Sequenced before the loop phase so looping
-can be validated against a slideshow that can already contain a black interlude slide — the two
-features are the most likely to interact during a rehearsal-length item.
-**Delivers:** New LyricSection.kind: 'blackout' / Slide.contentKind: 'blackout' variant,
-resolved at all three slideshowAssembler.ts content-resolution sites; editor UI chip in
-SongLyricEditor.vue's ADD_SECTION_KINDS; a new render branch in SlideCanvas.vue; explicit
-exclusion from positional numbering and pool-referencing.
-**Addresses:** Inline black slide (table stakes, P1)
-**Avoids:** Black slide corrupting the pooled-section model or positional numbering; get this settled as a data-model decision before UI, not after
+### Phase 4: Editor Presence
+**Rationale:** Fully self-contained (no dependency on any other v2.14 feature); needs its own Firestore rules + composable review pass separate from visual polish, so it benefits from being its own phase rather than bundled into the dashboard or service editor work.
+**Delivers:** `services/{serviceId}/presence/{uid}` subcollection, `useServicePresence.ts` composable (heartbeat, staleness filter, teardown-on-navigate), header UI in `ServiceEditorView.vue`, optional `cleanupStalePresence` cron.
+**Uses:** Firestore heartbeat + `onSnapshot` pattern from STACK.md; the `lockSnapshots` nested-subcollection rule precedent from ARCHITECTURE.md.
+**Implements:** ARCHITECTURE.md Section 2 (composable, not a store; denormalized `displayName`; `watch(serviceId)` teardown).
+**Avoids:** Pitfall 2 (stale presence / uncapped writes) and Pitfall 3 (cross-org read leak, structurally identical to v2.8 SEC-S-01) — both must be first-class requirements of this phase's rules design and verification, with an explicit forced-disconnect test and a cross-org rules test.
 
-### Phase 5: Per-item loop timer
-**Rationale:** Builds inside useRunControl.ts, benefits from Phase 1 already being in place for
-any loop-state messaging, and from Phase 4 existing so looping a song with an inline black
-interlude is exercised as part of verification.
-**Delivers:** ServiceSlot.loop?: { enabled, intervalSeconds } field; timer armed via
-watch(currentSlotIndex), routed through the existing postIndex() choke point so manual nav
-resets rather than fights it; explicit decision on whether "Go to black" pauses the loop.
-**Addresses:** Per-item loop checkbox with interval control (table stakes, P1)
-**Avoids:** Loop timer leaking, racing manual nav, or desyncing output windows; verification must explicitly test manual-nav-during-loop, item-change-during-loop, black-during-loop, and route-away-during-loop, checked in an OUTPUT window, not just control
+### Phase 5: Video Output — Fullscreen slice
+**Rationale:** Sequence the Video output internally before combining: type-widening and a Fullscreen-only render are low-risk (reusing `AudienceOutputView`'s exact pattern) and independently demoable/UAT-able, without needing the Banner transparency work at all.
+**Delivers:** `MonitorRole` widened to `'video'`, `MonitorSetupView.vue` 3-way UI, `VideoOutputView.vue` in Fullscreen mode (reused `AudienceOutputView` render, no new rendering code), new static route.
+**Uses:** ARCHITECTURE.md Section 1 integration plan verbatim (this is the best-verified part of the whole research set — every file/change cited against real source).
+**Research flag:** Standard pattern, skip research-phase — this is a close structural copy of v2.9's existing N-assignment role generalization.
 
-### Phase 6: Visual stage layout per service
-**Rationale:** Architecturally independent of every other v2.7 feature (its only dependency is
-deciding the per-service marker data shape, which is new modeling regardless of sequencing).
-Sequenced **last** deliberately: it is the single largest, most novel build in the milestone (new
-Firestore collection + rules block + a genuinely new freeform-canvas interaction pattern with no
-existing drag precedent to reuse), and this app has a documented history of drag-and-drop
-corrupting state — give it the most implementation runway and the most mature notification/state
-patterns (Phases 1-5) already proven before tackling it.
-**Delivers:** New stageLayouts/{serviceId} top-level Firestore collection (mirrors
-serviceShareLinks), rules block modeled on slideGroups' draft-locked pattern,
-StageLayoutEditor.vue (Pointer Events, percentage {zone, xPct, yPct} coordinates, debounced
-persistence), src/stores/stageLayouts.ts registered in resetOrgScopedStores(), free-text-labeled
-markers supporting one-off additions (e.g. guest-speaker mic).
-**Addresses:** Freeform stage-layout canvas with on/off-stage zones + free-text markers, including one-off markers (table stakes, P1)
-**Avoids:** Repeating this app's own drag-and-drop corruption history; reinforces the checklist item to register the new store in resetOrgScopedStores()
+### Phase 6: Video Output — Banner render (transparent-default + solid key-color fallback)
+**Rationale:** The only piece of genuinely new rendering code across the whole milestone; sequence last within Video output so it doesn't block shipping the Fullscreen slice. Per the owner's correction, this has **no hardware dependency and no feasibility-spike phase** — it is pure app-side CSS/DOM work.
+**Delivers:** Per-item `videoOutput: { mode: 'banner' | 'fullscreen' }` schema field + `SlidesTab` authoring UI; a new bottom-strip `useContainScale` region rendering the slide via the existing `SlideCanvas` pipeline; the region's background defaults to CSS `background: transparent`, with a configurable solid key-color fallback (default saturated magenta, `<input type="color">`) for any downstream tool needing chroma-key instead of alpha.
+**Addresses:** FEATURES.md Section 3 table stakes (banner region title-safe inset, 1-2 line text sizing) and the contrast-treatment differentiator (drop shadow / backing bar).
+**Research flag:** Needs a product decision at `discuss-phase`/spec time — what does the Video output show for an item with no `videoOutput` flag set (transparent/key-color fill showing nothing, vs. black)? This is a product decision, not a technical unknown, and should be resolved before the render is built.
 
 ### Phase Ordering Rationale
 
-- **Cross-cutting infrastructure first (Phases 1-2):** the dismissible-message store and church
-  switcher have zero dependency on any other v2.7 feature and de-risk the milestone early with
-  fast, low-risk wins.
-- **Isolated Run-flow fixes next (Phases 3-5):** audience-only blackout, black slide, and loop all
-  touch the same RunControlView.vue/useRunControl.ts/slideshow-assembler subsystem — grouping
-  them together (blackout scoping then black slide then loop, since loop benefits from a testable
-  black-slide interlude existing first) means fewer context-switches and lets the loop phase's
-  verification exercise the black-slide phase's output.
-- **Stage layout last (Phase 6):** the only genuinely novel subsystem in this milestone (new
-  collection, new rules block, new drag interaction pattern) — sequencing it last means it inherits
-  the most mature, already-proven-in-this-milestone patterns (notification store, org-store-reset
-  discipline) rather than being built in isolation early, and gives it the most implementation
-  runway given this app's drag-and-drop track record.
-- **No feature in this six-item scope has a hard blocking dependency on another** — every phase
-  above could technically be reordered or parallelized by workstream capacity except that Phase 4
-  (black slide) should precede Phase 5 (loop) for verification-quality reasons, not a hard
-  technical dependency.
+- Trivial/self-contained features (share-link, stage-layout) ship first to de-risk the milestone early with minimal review surface.
+- Confirmation precedes the dashboard because it is the one hard data dependency research found across all three original feature areas.
+- Presence is isolated into its own phase specifically because its security-rule design needs a dedicated review pass (v2.8 SEC-S-01 precedent) rather than being folded into a larger phase where that review could get rushed.
+- Video output is split into two phases (Fullscreen, then Banner) so the higher-risk, genuinely-new rendering work (Banner transparency) doesn't block the lower-risk, high-value Fullscreen slice from shipping and being demoable independently.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 6 (stage layout):** the freeform canvas drag interaction is the one sub-feature flagged
-  by ARCHITECTURE.md as "likely to need its own phase-level design pass (drag math, palette of
-  element kinds, zone boundaries) rather than a straight port of an existing pattern" — this app
-  has no existing freeform-drag precedent to reuse, unlike every other phase.
+Phases likely needing deeper research/product decisions during planning:
+- **Phase 3 (Dashboard):** the exact readiness rollup rule (e.g., "3 of 4 checks green" vs. binary) is a product decision to pin down at `discuss-phase`, not a research gap — flag for `discuss-phase`.
+- **Phase 6 (Video Banner render):** the "no `videoOutput` flag set" default behavior (transparent-fill-showing-nothing vs. black) needs a product decision before the render is built.
 
 Phases with standard patterns (skip research-phase):
-- **Phase 1 (notification store):** direct extension of an existing, already-understood Pinia store.
-- **Phase 2 (church switcher):** pure UI exposure of already-shipped, already-tested auth.ts primitives.
-- **Phase 3 (audience-only blackout):** minimal template-level diff, no new architecture.
-- **Phase 4 (black slide):** reuses 100% of the existing pool/order/drag machinery in SongLyricEditor.vue; the only design work is the contentKind decision, already resolved by ARCHITECTURE.md.
-- **Phase 5 (loop timer):** a documented, well-understood composable pattern (useRunControl.ts's existing choke-point discipline) with a clear implementation sketch already in ARCHITECTURE.md.
+- **Phase 1 (Auto share-link, Stage Layout auto-populate):** both are close structural copies of existing, already-tested functions/primitives in this repo.
+- **Phase 4 (Editor Presence):** the heartbeat/staleness/rules pattern is well-precedented (both in this repo's existing rule idioms and in general Firestore-presence practice), even though it's new code.
+- **Phase 5 (Video Fullscreen slice):** a direct structural copy of v2.9's role-generalization pattern.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Every recommendation grounded in direct reads of package.json and existing composables; zero new dependencies needed, so version-drift risk is minimal |
-| Features | MEDIUM | Cross-checked against 2+ independent sources per claim (Planning Center, ProPresenter, WorshipTools, stage-plot trade press, SaaS-UX pattern sources), but no authoritative code-doc provider was available this pass — treat exact UI conventions as strong precedent, verify against real UAT once built |
-| Architecture | HIGH | Every integration point cited against real files read in this pass (runChannel.ts, useRunControl.ts, ShareView.vue, storage.rules, firestore.rules, songLyrics.ts, songSectionOrder.ts, auth.ts, orgScopedStores.ts, toasts.ts, etc.) — pure internal-integration analysis, not inference |
-| Pitfalls | HIGH for codebase-grounded findings (stage-layout drag history, notification collision, church-switcher reset path, black-slide model corruption, loop desync — all read directly from source and this project's own documented incident history); LOW for a handful of general web-search-sourced supporting claims (native HTML5 DnD touch behavior, aria-live conventions) used only as secondary context |
+| Stack | HIGH (architecture/platform-limits) / MEDIUM (presence heartbeat-interval convention) | No new dependencies; the transparent-vs-chroma-key split is corroborated by OBS/CEF technical sources. No single documented standard for presence heartbeat interval — treated as a reasonable default, not a verified constant. |
+| Features | MEDIUM | Cross-checked across 4+ independent competitor sources (Planning Center, Breeze, Pushpay, WorshipTools, Connecteam, InitLive, Better Impact) for confirmation and dashboard conventions; ProPresenter has no published "readiness dashboard" concept to confirm against (absence-of-evidence, flagged explicitly). |
+| Architecture | HIGH | Every recommendation verified directly against this repo's real source files in-session (`useOutputWindow.ts`, `useRunControl.ts`, `monitorConfig.ts`, `services.ts`, `stageLayout.ts`, `firestore.rules`, `service.ts`), not inferred from general patterns. |
+| Pitfalls | HIGH (project-specific findings) / MEDIUM (externally-researched browser-alpha and Firebase-presence general patterns) | Project-specific pitfalls (v2.8 SEC-S-01 precedent, Draft/Planned gate, stage-layout data model) are grounded in this repo's actual history and code. |
 
-**Overall confidence:** HIGH
+**Overall confidence:** HIGH — this is a well-understood integration into a mature, well-documented codebase, not greenfield research. The Blackbird/hardware-verification framing in the original Pitfalls and Architecture research is **superseded** by the owner's 2026-09-07 correction (software-compositor path, transparent-default + key-color fallback, no hardware dependency, no feasibility-spike phase).
 
 ### Gaps to Address
 
-- **Stage-layout freeform-drag interaction design** is the one area where no existing in-app
-  pattern can be ported wholesale — flag for --research-phase or a dedicated design pass during
-  Phase 6 planning (drag math, marker palette, zone-boundary UX), not a gap in the research itself
-  so much as a genuinely new build.
-- **Whether "Go to black" should pause the per-item loop** (Phase 5/3 interaction) is explicitly
-  named in PITFALLS.md as a decision that must be made deliberately and tested, not left as an
-  accident of implementation order — resolve during Phase 5 planning.
-- **FEATURES.md's confidence is MEDIUM** (no premium search API was available for that research
-  pass) — the comparable-product conventions (Planning Center, ProPresenter, WorshipTools) are
-  useful directional confirmation for the in-scope features (blackout output-scoping, per-item
-  loop defaults, dismissible-notification conventions) but should be treated as strong precedent to
-  imitate, not a verbatim spec.
+- **Readiness rollup rule definition** (Phase 3) — all source data exists, but the exact "what counts as ready" logic is undefined; resolve at `discuss-phase` for the Dashboard phase, reusing the existing v2.12 My Schedule readiness computation as the base rather than inventing a second definition.
+- **Video output default behavior for un-flagged items** (Phase 6) — transparent/key-color fill (nothing shown) vs. black; resolve at spec/discuss-phase before the Banner render is built.
+- **Presence heartbeat interval and staleness window** — no single canonical number exists industry-wide; the research's ~25-30s heartbeat / ~60s staleness recommendation is a reasonable default to adopt as-is rather than something requiring further research.
+- **Confirmation reminder-nudge scope** (P2 differentiator) — deferred pending real usage data on how often assignments go unconfirmed; not a blocker for v2.14 launch.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct codebase reads: .planning/PROJECT.md, CLAUDE.md, src/utils/runChannel.ts,
-  src/composables/useRunControl.ts, src/composables/useOutputWindow.ts,
-  src/views/RunControlView.vue, src/views/AudienceOutputView.vue,
-  src/views/ConfidenceOutputView.vue, storage.rules, firestore.rules, src/types/song.ts,
-  src/types/service.ts, src/types/slide.ts, src/types/songLyrics.ts,
-  src/utils/songSectionOrder.ts, src/utils/slideshowAssembler.ts,
-  src/components/slides/slideDisplay.ts, src/views/ShareView.vue, src/stores/services.ts,
-  src/stores/toasts.ts, src/stores/auth.ts, src/stores/orgScopedStores.ts,
-  src/components/SongLyricEditor.vue, src/composables/useMediaUpload.ts,
-  src/router/index.ts, src/components/AppSidebar.vue, package.json
+- In-repo verification: `src/composables/useOutputWindow.ts`, `useRunControl.ts`, `src/utils/monitorConfig.ts`, `src/views/AudienceOutputView.vue`/`ConfidenceOutputView.vue`, `src/router/index.ts`, `src/types/service.ts`/`slide.ts`, `src/utils/stageLayout.ts`, `src/components/stage/StageLayoutEditor.vue`, `src/views/ServiceEditorView.vue`, `src/stores/services.ts`, `firestore.rules`, `functions/src/index.ts`, `.planning/PROJECT.md`, `CLAUDE.md`.
+- Firebase docs — "Manage data retention with TTL policies | Firestore" (official docs, GA confirmation).
 
 ### Secondary (MEDIUM confidence)
-- Planning Center Services / ProPresenter (Renewed Vision) official docs and support articles —
-  loop/auto-advance, output-toggle, and chord-chart conventions
-- WorshipTools, Stageplot Pro, ProSoundWeb, Sonicbids, Church AVL — stage-plot minimum-viable-feature convergence
-- LogRocket, SaaSUI, Carbon Design System — toast/banner UX convention
-- Slack/Notion-referenced SaaS multi-tenant/workspace-switcher pattern sources
+- Planning Center Help/Blog (dashboard "needs attention" pattern, confirm/decline/blockout state model, auto-reschedule).
+- Breeze, Pushpay, WorshipTools, Connecteam, InitLive, Better Impact (volunteer confirmation state model convergence).
+- Adobe, Restream, eks.tv, Switcher Studio, StreamYard, Church Motion Graphics (lower-third/banner placement, typography, title-safe conventions).
+- OBS Forums, "Production-ready green screen in the browser" (Jim Fisher) — CEF-based Browser Source alpha handling, corroborating the owner's software-compositor framing.
+- General SaaS dashboard UX practice (UX Collective, Eleken, FlowmazeUX, 2026 sources).
 
 ### Tertiary (LOW confidence)
-- Single-source web findings on Firebase Storage download-token permanence, native HTML5 DnD
-  touch-event behavior, and aria-live toast conventions — used only as supporting context, not
-  load-bearing for any in-scope v2.7 decision
+- ProPresenter documentation — absence of a published "readiness dashboard" concept (absence-of-evidence, not evidence-of-absence).
+- General Firestore-presence community write-ups (heartbeat + staleness + TTL pattern) — no single canonical source, treated as convention not standard.
 
 ---
-*Research completed: 2026-08-31*
+*Research completed: 2026-09-07*
 *Ready for roadmap: yes*

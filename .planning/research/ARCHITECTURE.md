@@ -1,653 +1,529 @@
-# Architecture Research — v2.7 Feature Integration
+# Architecture Research — v2.14 Integration
 
-**Domain:** Vue 3 + Firebase worship-service planning app (mature codebase, Phase 104+)
-**Researched:** 2026-08-31
-**Confidence:** HIGH (every integration point below is cited against real files read in this pass, not inferred)
+**Domain:** Subsequent-milestone integration into a shipped Vue 3 + Firebase worship-planning SPA
+**Researched:** 2026-09-07
+**Confidence:** HIGH (all findings verified against real source files in this repo, not general patterns)
 
-This is **integration research**, not greenfield architecture. All eight v2.7 features are analyzed
-against the actual code paths they must slot into. No new framework/library choices are proposed —
-every feature reuses an existing mechanism (BroadcastChannel run protocol, org-scoped Firestore/Storage
-rules, the slide-group pool/order model, the frozen share-snapshot pattern, the multi-org custom claim).
-
-## System Overview (as it exists today)
-
-```
-┌────────────────────────────────────────────────────────────────────────────┐
-│  AUTHENTICATED APP (Vue 3 SPA, Pinia stores, Firestore onSnapshot)          │
-│                                                                              │
-│  ServiceEditorView.vue ── tabs: Service Order | Slides | Roles (slideout)   │
-│    └─ SongLyricEditor.vue (Sections list = slide order, D-01/D-03)         │
-│    └─ SlideGrid.vue / slideGroupMaterializer.ts / slideshowAssembler.ts    │
-│                                                                              │
-│  RunControlView.vue ── SINGLE WRITER of wp-run-{serviceId} BroadcastChannel │
-│    useRunControl.ts (index/seq/blackout/live/rehearsing state)             │
-│    useServiceAssembly.ts (read-only assembled slideshow, shared)           │
-│                                                                              │
-│  AudienceOutputView.vue / ConfidenceOutputView.vue ── receive-only          │
-│    useOutputWindow.ts (onState → index/blackout; NEVER postState)          │
-│                                                                              │
-│  AppSidebar.vue ── user-menu block (displayName/logout today)              │
-└────────────────────────────────────────────────────────────────────────────┘
-                          │ Firestore (org-scoped, firestore.rules)
-                          │ Storage (org-scoped, storage.rules — claim-only membership)
-                          ▼
-┌────────────────────────────────────────────────────────────────────────────┐
-│  UNAUTHENTICATED PUBLIC SURFACE                                            │
-│  ShareView.vue ── reads a FROZEN ServiceSnapshot doc (shareTokens/          │
-│    {token} or serviceShares/{slug}__service-{date}), never the live         │
-│    org-scoped collections. buildServiceSnapshot() (src/stores/services.ts) │
-│    is the ONE place that decides what's in that frozen payload.            │
-└────────────────────────────────────────────────────────────────────────────┘
-```
-
-Two facts drive almost every design decision below:
-
-1. **The run protocol is a single-writer BroadcastChannel** (`src/utils/runChannel.ts`): control posts
-   `{type:'state', index, blackout, seq}`; both output windows apply the *same* `RunState` object. There
-   is currently no per-output targeting.
-2. **The public share page never touches org-scoped Firestore/Storage rules.** `ShareView.vue` does a
-   single `getDoc` against a *pre-built, frozen* snapshot document that is publicly readable by rule
-   (`allow read: if true` on `shareTokens/{token}` and `serviceShares/{shareId}`). Everything the public
-   page can show must already be denormalized into that snapshot at share-write time — this is the
-   existing precedent (`roleAssignments` is a PII-safe name-only projection, not the raw `Person` docs).
+This is not greenfield ecosystem research. Every recommendation below cites the existing file(s) it
+integrates with or replaces, and the "new vs modified" split is explicit per file. Confidence is HIGH
+throughout because every claim was checked against the current `src/` tree in this session
+(`useOutputWindow.ts`, `useRunControl.ts`, `monitorConfig.ts`, `services.ts`, `stageLayout.ts`,
+`StageLayoutEditor.vue`, `firestore.rules`, `service.ts`, `slide.ts`), not inferred from the domain in
+general.
 
 ---
 
-## Feature 1 — Song rehearsal attachments (PDF/MP3/YouTube)
+## 1. Video output — third output role
 
-**Where it lives:** on the `Song` document (`src/types/song.ts`), not the service item — reusable across
-every service that uses the song, exactly like `Arrangement`/`themes`/`tags` already are.
+### Current shape (verified)
+
+The two existing outputs are **not** one parameterized route — they are two structurally identical
+sibling files with two static router entries:
+
+- `src/utils/monitorConfig.ts` — `export type MonitorRole = 'audience' | 'confidence'` is the single
+  source of truth for the role enum. `MonitorAssignment { fingerprint, role, nickname? }` and
+  `MonitorMapping { assignments: MonitorAssignment[] }` are persisted to **`localStorage`** (key
+  `wp:runMonitorConfig:v2`), device-scoped, never Firestore (ADR-0183 — deliberate, a monitor
+  assignment describes "the physical cable plugged into this device," not shared state).
+- `src/views/MonitorSetupView.vue` — role assignment UI; `roleLabel()` hardcodes `'Audience'`/
+  `'Confidence'`; `canSave` gates on "at least one Audience assignment."
+- `src/composables/useOutputWindow.ts` — the **shared lifecycle core** every output window mounts
+  (`role?: MonitorRole` option, fullscreen delegation, wake lock, font-load gate, receive-only
+  `RunChannel` binding). `AudienceOutputView.vue` and `ConfidenceOutputView.vue` are thin templates
+  over it, diverging only in rendering (single pane vs current+next split, background suppression).
+- `src/composables/useRunControl.ts` — the control-side single writer. `windowNameFor()`,
+  `urlForAssignment()` (builds `/present/${assignment.role}/${serviceId}?org=...`), `openAllPlaced`/
+  `openAllUnplaced`/`openMixed`, the `≥1-Audience` go-live gate (`canGoLive`), the per-role aggregate
+  dot (`roleOpen()` — already N-assignment-aware since v2.9, i.e. multiple *same-role* monitors, not
+  multiple *role types*).
+- `src/router/index.ts` — **two separate static routes**, `/present/audience/:serviceId` →
+  `AudienceOutputView.vue` and `/present/confidence/:serviceId` → `ConfidenceOutputView.vue`. There is
+  no single dynamic `/present/:role/:serviceId` despite `urlForAssignment` building the role into the
+  path — each role is its own route record today.
+
+### Integration plan
+
+**Video is a third value threaded through the existing `MonitorRole` enum, not a parallel system.**
+Every file above generalizes the same way v2.9 generalized "audience/confidence" from a fixed pair to
+an N-assignment list — this is additive, not a rewrite.
+
+| File | Change |
+|---|---|
+| `src/utils/monitorConfig.ts` | **Modify.** `MonitorRole = 'audience' \| 'confidence' \| 'video'`. `isValidMapping`'s role check (`'audience' \| 'confidence'`) must widen or the persisted-mapping validator silently drops every Video assignment (T-91-01 untrusted-localStorage-read guard). |
+| `src/views/MonitorSetupView.vue` | **Modify.** `roleLabel()` → 3-way switch. `canSave`'s "≥1 Audience" gate is unaffected (Video is optional, same as Confidence today). |
+| `src/views/VideoOutputView.vue` | **New.** Sibling of `AudienceOutputView.vue`/`ConfidenceOutputView.vue`, built on the same `useOutputWindow({ role: 'video' })`. Diverges in template only — see banner/fullscreen render below. |
+| `src/composables/useOutputWindow.ts` | **Unchanged** (already role-agnostic — `role` only affects `reportFullscreenState`'s postMessage payload). |
+| `src/composables/useRunControl.ts` | **Modify, narrowly.** `evaluateOpenResults`'s "audience must open" success gate stays audience-only (unchanged — Video, like Confidence, is optional to go live). `roleOpen('video')` works for free (it's already generic over `MonitorRole`). No structural change needed beyond the type widening. |
+| `src/router/index.ts` | **New route.** `/present/video/:serviceId` → `VideoOutputView.vue`, `requiresAuth` only, mirroring the other two — literal third entry, not a dynamic `:role` param (matches existing pattern). |
+
+### Per-item Banner \| Fullscreen routing flag — where it lives
+
+The milestone's own vocabulary ("slide item," matching the Run rail's "item" = one `ServiceSlot`) and
+the existing precedent — `MediaAttachableSlot.loop` (`{ enabled, intervalSeconds }`) is already a
+**per-slot** field threaded into `RunRow.loop` for the Run rail's loop indicator — point to the same
+placement for the new flag:
+
+```typescript
+// src/types/service.ts — MediaAttachableSlot, alongside the existing `loop?` field
+videoOutput?: {
+  mode: 'banner' | 'fullscreen'
+}
+```
+
+Absent = "not routed to Video" (Video output shows nothing for that item — see open question below).
+This is a **slot-level** flag (one item, every slide within it inherits the same mode), not a per-slide
+flag — there is no product requirement for a song's slide 3 to be Banner while slide 4 is Fullscreen,
+and modeling it any finer would need a UI control per-slide in `SlidesTab`, not per-item.
+
+**Thread path**, mirroring `loop`'s exact precedent:
+
+1. **Authoring** — a control beside the existing per-item Loop checkbox in `SlidesTab.vue` (or its
+   item-settings sub-component), editable only in `canEditService.value` (Draft), guarded exactly like
+   `onToggleLoop`/`onStageMarkerAdd` in `ServiceEditorView.vue`. Writes `slot.videoOutput` directly on
+   `localService.value`, riding the existing single `useAutoSave(localService, ...)` deep-watch — **no
+   new save call, no new store, no new rules surface** (same "ride the existing autosave" pattern the
+   Phase 107 stage-layout comment documents explicitly).
+2. **Rail derivation** — `useRunControl.ts`'s `railRows` computed already maps `item.slot.loop?.enabled`
+   into `RailRow.loop`; add `videoOutput: item.slot.videoOutput` the same way, so the Run screen can show
+   a small "→ Video (Banner)" chip per item (operator visibility — was this item supposed to show on the
+   video feed?).
+3. **Output window resolution** — `VideoOutputView.vue` mounts `useOutputWindow({ role: 'video' })`,
+   which already exposes `assembledSlideshow` and (via `useServiceAssembly`) the full read-only
+   `localService` ref. `AssembledSlide` only carries `slotIndex` (not the slot object itself), so
+   `VideoOutputView` resolves the routing flag the same way `useRunControl`'s `currentLoopSlot()` does:
+   `localService.value.slots[currentSlide.value.slotIndex]?.videoOutput`. No new wiring needed —
+   `useServiceAssembly` already gives every output window the full slot array for free.
+
+### Banner render vs Fullscreen render — compositing model
+
+**This is the one place a naive implementation will silently fail against real hardware, and it is
+worth stating plainly even though this file's job is architecture, not pitfalls.**
+
+`Fullscreen` mode is a non-issue: it is the *existing* `AudienceOutputView` render (the canonical
+1280×720 stage via `useContainScale`, `SlideCanvas` with background shown) reused verbatim for the
+`video` role — same component, same `REFERENCE_WIDTH`/`REFERENCE_HEIGHT` contract already shared by
+Audience and Confidence (R329).
+
+`Banner` mode is a **new composition**, not a smaller version of Fullscreen:
+
+- Reuse `useContainScale` (already the shared "fit a fixed-ratio stage into an arbitrary region"
+  primitive both existing outputs use) but scope its target container to a **bottom strip** of the
+  viewport (e.g. the bottom ~20–25%) rather than the whole screen, and mount `SlideCanvas` into that
+  strip only.
+- The **rest of the frame** ("alpha transparency…so the video room can composite live video behind")
+  cannot be literal browser-window alpha — a Chromium/Edge window handed to an HDMI/SDI capture path
+  (Blackbird) always renders as fully opaque pixels; there is no OS-level API this app can call to make
+  a browser window's rendered surface carry a real per-pixel alpha channel to external capture hardware.
+  The only two implementations that actually work with a hardware keyer are:
+  1. **Chroma-key fill** — paint the non-banner region a single, configurable solid color (pure green
+     `#00FF00` or magenta, the two hardware-safe choices — not from `SLIDE_FONTS`/typography config,
+     a dedicated new setting) and let Blackbird's own chroma-key input do the keying. This is almost
+     certainly what "alpha transparency" means in practice for a hardware compositor, and is the
+     industry-standard pattern (ProPresenter/vMix/OBS "green screen out" mode).
+  2. **Alpha-aware capture path** (e.g. a browser flag / OS window with a punched-out region reported
+     via a capture-card driver that understands per-app alpha) — exists on some professional
+     video-switcher software but is not something a Chromium tab can opt into; out of scope for a
+     browser-based app.
+- **Recommendation:** build (1). Add a Video-output config field (Settings or Monitor Setup, org- or
+  device-scoped — device-scoped fits the "physical cable" precedent `monitorConfig.ts` already
+  established for Audience/Confidence) for the chroma-key color, default a saturated green. This keeps
+  the "app-side only, Blackbird is external and verified separately" scope line the owner already drew
+  (PROJECT.md v2.14) intact: the app emits a solid, known, capture-safe color; the physical keying is
+  Blackbird's job, unchanged from today.
+- **Open question for the roadmap/spec phase:** what does the Video output show for an item with no
+  `videoOutput` flag at all (most items, in the common case where only a handful of items — e.g. lower
+  thirds during a testimony — ever route to Video)? Two candidates: (a) full chroma-key fill (nothing
+  shown — the video room sees pure live camera the whole time except flagged items), or (b) black.
+  (a) is almost certainly correct given the feature's purpose, but this is a product decision, not an
+  architecture one — flag it for `discuss-phase`.
+
+### Build-order dependency (Video output)
+
+`MonitorRole` type widening → `monitorConfig.ts` validator widening → `MonitorSetupView.vue` 3-way UI →
+`VideoOutputView.vue` (Fullscreen render, reusing existing patterns — low risk) → per-item
+`videoOutput` flag (schema + `SlidesTab` UI + autosave, independent of the output window existing) →
+Banner render (the new bottom-strip `useContainScale` region + chroma-key fill — the one genuinely new
+piece of rendering code) → `useRunControl.ts` rail-chip wiring (cosmetic, can land any time after the
+flag exists). The **flag** and the **output role** are independently shippable and can be built in
+parallel by two workstreams; only the Banner *render* strictly needs both.
+
+---
+
+## 2. Editor presence ("who else is viewing")
+
+### Current shape (verified — the absence that matters)
+
+There is **no Realtime Database usage anywhere in this project** (`grep` for `getDatabase`/
+`firebase/database`/`onDisconnect` across `src/` and `functions/src/` returned nothing) — Firestore is
+the sole data layer, per `.env.local`'s Firebase config and every store in `src/stores/`. This matters
+because **Firestore has no `onDisconnect()` primitive** (that is an RTDB-only feature) — a presence
+design here cannot rely on "the server notices the socket dropped." It must be a client-driven
+heartbeat with client-side staleness filtering, exactly the constraint every Firestore-based presence
+implementation (this is a very well-trodden problem outside this codebase too) has to accept.
+
+Two existing precedents in this codebase are directly reusable:
+
+- **Denormalization on write** — `StageMarker` carries `personId` **and** `personName` side by side so
+  a read-only renderer (share/print) never needs a join (`src/types/service.ts`). A presence doc should
+  denormalize the viewer's `displayName` the same way, since `organizations/{orgId}/members/{uid}`
+  already carries `displayName` at invite time (`src/stores/auth.ts` — `patch.displayName =
+  user.value!.displayName`) — no new join, no new store subscription just to label the indicator.
+- **`route.params`-driven per-service subscription with explicit teardown on change** —
+  `ServiceEditorView.vue`'s `watch(serviceId, (newId, oldId) => { if (oldId && oldId !== newId)
+  saveStatus.clear(...) })` and the sibling `watch([serviceId, () => authStore.isEditor], () =>
+  serviceMessagesStore.subscribeServiceMessages(...), { immediate: true })` are the load-bearing idiom
+  to copy. **This is not optional plumbing**: `ServiceEditorView` reads `serviceId` from
+  `route.params.id` reactively (line 2543), meaning Vue Router **reuses the mounted component instance**
+  when navigating from one service's editor to another's (same route record, different param) —
+  `onUnmounted` does **not** fire on that navigation. A presence composable that only cleans up in
+  `onUnmounted` will leave a stale "still viewing" ghost on the service the user just left. It must
+  `watch(serviceId, ...)` and explicitly delete the *old* service's presence doc before writing the new
+  one, exactly like the `saveStatus.clear` precedent above.
 
 ### Data model
 
-```ts
-// src/types/song.ts — additive field on Song
-export interface SongAttachment {
-  id: string                                   // crypto.randomUUID()
-  kind: 'pdf' | 'mp3' | 'youtube'
-  label: string                                 // "Chord Chart", "Reference Track"
-  url: string                                   // Storage download-token URL (pdf/mp3) or raw YouTube URL
-  storagePath?: string                          // orgs/{orgId}/attachments/{songId}/{attachmentId}/{filename} — pdf/mp3 only, lets a delete revoke the file
-  createdAt: Timestamp
-}
-
-// Song gains: attachments: SongAttachment[]
+```
+organizations/{orgId}/services/{serviceId}/presence/{uid}
+  displayName: string   // denormalized from members/{uid}, avoids a join
+  lastSeenAt: Timestamp // serverTimestamp(), refreshed on every heartbeat
 ```
 
-Mirrors the existing `Arrangement[]` embedded-array-on-Song shape exactly — no new subcollection, no
-new store. `useSongStore` (`src/stores/songs.ts`) already owns the full `Song` document lifecycle;
-attachments are just another field on the same upsert path.
+This is a **true nested subcollection** under `services/{serviceId}`, not a top-level collection with a
+`serviceId` field (the `slideGroups` pattern). The precedent for true nesting under `services/{docId}`
+already exists: `match /organizations/{orgId}/services/{serviceId}/lockSnapshots/{snapshotId}`
+(`firestore.rules`) — presence is a direct sibling of `lockSnapshots`, same shape of rule.
 
-### Storage
+**Doc id = uid**, not an auto-id — one presence doc per (service, person), so a heartbeat is always an
+idempotent `setDoc(..., { merge: true })` and a second tab from the same person never creates a
+duplicate "ghost viewer."
 
-New path `orgs/{orgId}/attachments/{songId}/{attachmentId}/{filename}`, parallel to the existing
-`orgs/{orgId}/media/{allPaths=**}` block in `storage.rules`. **Do not reuse the `media/` path** — that
-one carries a 50MB cap sized for slide audio/video beds (R014); PDFs/MP3 rehearsal attachments want
-their own, smaller cap (recommend 15MB — a chord-chart PDF and a reference MP3 are both well under
-this). Add a third `match` block in `storage.rules`, same `isOrgMember(orgId)` read/write gate as the
-other two — **no rules change for authenticated in-app access**, this is a pure copy of the existing
-pattern (`storage.rules:95-112`).
+### Firestore rules
 
 ```
-match /orgs/{orgId}/attachments/{allPaths=**} {
+match /organizations/{orgId}/services/{serviceId}/presence/{uid} {
   allow read: if isOrgMember(orgId);
-  allow write: if isOrgMember(orgId) && request.resource.size < 15728640; // 15MB
+  allow write: if isOrgMember(orgId) && request.auth.uid == uid;
 }
 ```
 
-`firestore.rules` needs **no change** — `songs/{songId}` is already `allow read, write: if isOrgEditor(orgId)`
-(`firestore.rules:433-444`), and `attachments` is just a new field on that same document, not a new
-collection.
+Mirrors `isOrgMember`/`isOrgEditor`'s existing shape exactly (`firestore.rules:18-47`) — every org
+member (viewer or editor) can **see** who else is viewing (the feature's whole point — "race-condition
+awareness," not an editor-only privilege), but can only **write their own** presence doc. No new helper
+function needed.
 
-### Components / composables
+### Client lifecycle (composable, not a Pinia store)
 
-- **New:** `useAttachmentUpload.ts` — a near-verbatim clone of `useMediaUpload.ts`
-  (`src/composables/useMediaUpload.ts`), swapping the validate() MIME allow-list (`application/pdf`,
-  `audio/*`) and the path/cap constants. Reuse the resumable-upload + `getDownloadURL()` pattern exactly.
-- **New:** `SongAttachments.vue` (or a section inside `SongSlideOver.vue`, the song editor slideout) —
-  list existing attachments, upload PDF/MP3, add a YouTube URL (no upload, just a validated link field),
-  remove (deletes the Storage object via `storagePath` when present).
-- **Modified:** `src/stores/songs.ts` gains `addAttachment`/`removeAttachment` actions mirroring the
-  existing arrangement CRUD actions already there.
+Recommend `src/composables/useServicePresence.ts`, **not** a new Pinia store registered in
+`orgScopedStores.ts`. Rationale: presence is scoped to exactly one mounted view
+(`ServiceEditorView.vue`'s header), has no cross-route reactivity requirement, and every comparable
+per-view lifecycle concern in this codebase (`useOutputWindow`, `useRunControl`, `useLoopTimer`) is
+already a composable, not a store — a new store would be the first `orgScopedStores.ts` registration
+whose only consumer is a single view, breaking that file's existing pattern of "stores that outlive
+one component."
 
-### Where it surfaces (this milestone)
-
-Only inside the app's song editor (attach/manage) and — critically — inside the public Rehearse mode
-(Feature 2). **Not** surfaced inside `ServiceEditorView.vue`'s Slides tab — attachments are rehearsal
-aids, not presentation content, and stay out of the slide-group model entirely (D001/D002 precedent:
-songs are canonical, slides mirror the service order, and this milestone's own decision log says
-attachments live "on the Song (stable), reusable across services").
-
----
-
-## Feature 2 — Rehearse mode on the PUBLIC share page (the trickiest integration)
-
-### The core problem
-
-`ShareView.vue` (`src/views/ShareView.vue:165-188`) does exactly one `getDoc` against a **frozen**
-snapshot — it has no Firebase Auth context, no org-scoped store, and firestore.rules would deny it read
-access to `organizations/{orgId}/songs/{songId}` even if it tried (`songs` is editor-tier only,
-`firestore.rules:433`). There is no live path from the public page to the Song stable at all.
-
-**The share snapshot must therefore carry everything Rehearse mode needs, denormalized, at share-write
-time** — this is not a new pattern, it is the *same* pattern `buildServiceSnapshot()`
-(`src/stores/services.ts:111-161`) already uses for `roleAssignments` (resolves `personId → name`, embeds
-names only, never the raw `Person` doc) and for `bpm` (resolves the song's arrangement BPM into the slot
-at snapshot-build time, never re-reads the Song live).
-
-### Design: extend `buildServiceSnapshot()` to carry attachment refs per song slot
-
-```ts
-// ServiceSnapshot (src/stores/services.ts) gains, per SONG slot with a songId:
-slots: ServiceSlot[]   // SongSlot gains an optional `attachments?: SongAttachment[]` in the SNAPSHOT
-                        // ONLY — never on the live ServiceSlot type, mirroring how `bpm` is added to
-                        // slotsWithBpm in buildServiceSnapshot without touching ServiceSlot itself.
-```
-
-`buildServiceSnapshot()`'s existing `slotsWithBpm` map (`services.ts:122-134`) already does a per-SONG-slot
-`songStore.songs.find(...)` lookup — extend that same map to also spread `attachments: song?.attachments ?? []`
-onto the slot. Zero new Firestore reads (the song store is already subscribed and consulted for `bpm`).
-
-### The Storage-read problem for an anonymous visitor
-
-Even with attachment metadata inside the snapshot, the PDF/MP3 **file bytes** live under
-`orgs/{orgId}/attachments/...`, gated by `isOrgMember(orgId)` in `storage.rules` — an anonymous Rehearse
-visitor has no auth token at all, let alone an org claim. Two structurally different fixes exist:
-
-1. **Change storage.rules to allow public read on that one path.** Rejected: this project has a
-   documented incident (CLAUDE.md, 2026-08-06) about a mis-scoped Storage rule silently denying/allowing
-   the wrong population, and a same-service `firestore.exists()`-gated "is this a valid share" check is
-   the exact pattern (`firestore.exists()` inert in the Storage emulator, `storage.rules:8-14`) that
-   already burned this project once. A rules-level "is there a live, non-revoked share token for this
-   org" check is unverifiable in the emulator for the same documented reason.
-2. **Rely on the Storage download-token URL as the capability, and store that URL — not a rules-gated
-   reference — inside the frozen snapshot.** This is the recommended path, and it requires **no
-   storage.rules change at all**. `getDownloadURL()` (already used verbatim by `useMediaUpload.ts:109`)
-   returns a URL carrying a `token` query parameter; Firebase Storage serves that URL to any requester
-   holding the URL, independent of `storage.rules`, by design (rules govern the SDK/API surface used to
-   *obtain* access; the token URL itself is a bearer capability once minted — the same mechanism this
-   app already relies on for the authenticated in-app upload/preview flow). Storing that URL string
-   verbatim in the `SongAttachment.url` field (Feature 1) and copying it unmodified into the public
-   snapshot (Feature 2) means the Rehearse page just renders `<a :href>`/`<audio :src>` against a plain
-   string — no auth, no rules evaluation, no new Cloud Function.
-
-**Call out explicitly as a risk to confirm at implementation time, not now:** a download-token URL is a
-bearer secret — anyone who obtains it (by viewing the public Rehearse page's page source, same as any
-public share link already exposes the whole `ServiceSnapshot`) can fetch that one file indefinitely,
-even after the share link is later revoked (revoking `shareTokens/{token}` stops new snapshot reads, but
-does not invalidate an already-issued Storage token). This is an accepted, low-severity residual —
-rehearsal PDFs/MP3s are not sensitive content, and it mirrors the same "signed URL as capability"
-pattern the project's own `render-service` and PPTX pipeline already lean on. Do not attempt to "fix" it
-by rotating tokens on revoke; that is out of scope and unnecessary for this content class.
-
-YouTube attachments need no Storage consideration at all — the raw URL is embedded directly and rendered
-as a link/iframe.
-
-### Rehearse UI
-
-- **New:** a "Rehearse" button on `ShareView.vue`, gated on `serviceSnapshot.value.slots.some(s => s.kind === 'SONG' && s.attachments?.length)`.
-- **New:** `RehearseView.vue` (or an in-`ShareView` panel, `showRehearse` toggle) — a per-song list
-  (song title, attachment chips: PDF opens in new tab, MP3 plays inline `<audio>`, YouTube embeds or
-  links out). Reads `serviceSnapshot.value.slots` filtered to `kind === 'SONG'`, exactly the data
-  already loaded by `ShareView.vue`'s existing `onMounted` fetch — **no second network round-trip.**
-- **Router:** add `/share/:token/rehearse` and `/:slug/service-:date/rehearse` as sibling routes to the
-  existing `share`/`service-memorable-share` routes (`src/router/index.ts:148-170`), or keep it a
-  same-component toggle (`showRehearse` ref) to avoid a second `getDoc` entirely — **prefer the toggle**,
-  since a second route would re-fetch the same snapshot for no benefit and complicate the "share a direct
-  Rehearse link" case that isn't a stated requirement this milestone.
-
-### Freshness
-
-The existing "frozen snapshot, refreshed on next editor save via `maybeRefreshShareLink`" cadence
-(`services.ts:924, 1001-1004`) applies unchanged — attachments a planner adds after a service was last
-shared won't appear in Rehearse until the next share-link refresh, exactly like a role reassignment or a
-song swap doesn't appear until then either. No new staleness class is introduced.
-
----
-
-## Feature 3 — Visual stage layout per service
-
-### Where it lives
-
-A new tab on `ServiceEditorView.vue`, alongside the existing `service-order` / `slides` / `roles` tabs
-(`src/views/ServiceEditorView.vue:712-770` — the `role="tablist"` block driven by `activeTab` string ref
-and `handleTabKeydown`). Add `svc-tab-stage` following the exact same button/`v-show` panel pattern.
-
-### Data model
-
-**One document per service**, keyed by `serviceId` (mirrors `serviceShareLinks/{serviceId}` and the
-1:1 `slideGroups` pattern), **not** nested under `services/{docId}` — a nested subcollection two levels
-deep would fall through every existing rules block and hit the global deny (the exact class of bug the
-`firestore.rules` comments repeatedly warn about for `slideGroups`/`pptxRenders`). A top-level org-scoped
-collection referencing `serviceId` by field is the established, proven-safe shape.
-
-```ts
-// src/types/stageLayout.ts (new file)
-export interface StageElement {
-  id: string
-  kind: 'instrument' | 'mic' | 'monitor' | 'diBox' | 'other'
-  label: string        // "Acoustic Guitar", "Extra Mic 1", "Podium Mic"
-  zone: 'stage' | 'off-stage-left' | 'off-stage-right'   // R: "on-stage and off-stage (side) zones"
-  x: number             // 0-100, percent within the zone's canvas
-  y: number
-  notes?: string
-}
-
-export interface StageLayout {
-  id: string             // == serviceId
-  serviceId: string
-  elements: StageElement[]
-  createdAt: Timestamp
-  updatedAt: Timestamp
+```typescript
+export function useServicePresence(serviceId: Ref<string>, orgId: Ref<string | null>) {
+  // onSnapshot(presence subcollection) → otherViewers ref, filtered client-side:
+  //   only docs where lastSeenAt is within a soft-TTL window (e.g. 45s) AND uid !== own uid.
+  //   A doc that stopped heartbeating (crashed tab, no unmount fired) simply ages out of this
+  //   filter — the SAME staleness-tolerant idiom the monitor-reassign delta-match already uses
+  //   (matchMapping's 'partial' status), just applied to time instead of screen fingerprints.
+  //
+  // heartbeat: setDoc({merge:true}) every ~20s while the tab is visible (skip while
+  //   document.visibilityState === 'hidden' — mirrors useOutputWindow's handleVisibilityChange
+  //   re-acquire-on-return idiom, applied in reverse: pause while hidden, not just resume).
+  //
+  // watch(serviceId, (newId, oldId) => { if (oldId) deleteDoc(old presence doc); write new },
+  //   { immediate: true }) — REQUIRED, see the component-reuse note above.
+  //
+  // onUnmounted: deleteDoc (final navigation away from any service editor).
+  // beforeunload: best-effort deleteDoc (fire-and-forget, mirrors useRunControl's own
+  //   beforeunload listener — cannot await inside the handler, but Firestore's SDK will
+  //   attempt the write before the tab closes on a fast enough connection; this is
+  //   best-effort ONLY, which is why the soft-TTL client-side filter above is the real
+  //   correctness backstop, not this handler).
 }
 ```
 
-### firestore.rules
+**Cleanup for docs that never get an explicit delete** (crashed tab, killed process, offline device):
+the soft-TTL client-side filter above already makes stale docs invisible to other viewers immediately —
+correctness does not depend on deletion. But the docs will accumulate in Firestore indefinitely without
+a sweep. This codebase already has the exact infrastructure for that: the `*_CLEANUP_ENABLED`
+Cloud Functions retention-cron family (`cleanupExpiredMedia`, `cleanupOrphanBackgrounds`,
+`cleanupPptxSources`, all `onSchedule` in `functions/src/index.ts`, all dry-run-by-default, all gated
+through the v1.9 Owner Console's Firestore-backed config doc). Add a `cleanupStalePresence` sibling
+(e.g. delete anything older than 24h via a `collectionGroup('presence')` query) rather than inventing a
+new cleanup mechanism — this is pure hygiene, not correctness, and can ship in the same milestone or be
+deferred to backlog without blocking the feature (the client-side filter is what makes the indicator
+correct; the cron is what keeps Firestore tidy).
 
-Add a dedicated `match /stageLayouts/{serviceId}` block, modeled **exactly** on the existing
-`slideGroups/{groupId}` block (`firestore.rules:378-430`): member read, editor write, gated on the
-**parent service's stored status being draft** (`parentDraft(serviceId)`) — this keeps Stage locking in
-lockstep with Service Order/Slides/Roles, consistent with the v1.4 "a service is editable only while in
-Draft" decision already logged in `PROJECT.md`'s Key Decisions table. Unlike `slideGroups`, this is a
-single document per service (not one per slot), so the create/update/delete conditions are simpler —
-no `hasAll(['serviceId'])` per-entry bookkeeping needed, just the same `parentDraft`/`parentGone` guards.
+### Where it renders
 
-### Components
+`ServiceEditorView.vue`'s header (near the date/title, `lines 37-58` region) — small avatar-initial
+chips or a "· 2 others viewing" text, one composable call, no new tab/panel. This is a header-only
+concern; it does not touch `SlidesTab`, `StageLayoutEditor`, or any other tab content.
 
-- **New:** `StageLayoutEditor.vue` — a freeform absolute-positioned canvas (draggable chips, percentage
-  x/y, drop into one of the two/three zones). No new drag library needed if simple pointer-drag suffices;
-  SortableJS (already a dependency, used by `SongLyricEditor.vue`/`ServiceEditorView.vue`/`SlideGrid.vue`)
-  is list-reorder-shaped, not freeform-canvas-shaped, so this is genuinely new interaction code, not a
-  Sortable reuse — flag this as the one sub-feature likely to need its own phase-level design pass
-  (drag math, palette of element kinds, zone boundaries) rather than a straight port of an existing
-  pattern.
-- **New:** `src/stores/stageLayouts.ts` — mirrors `src/stores/slideGroups.ts`'s org-scoped
-  subscribe/CRUD shape (see `src/stores/orgScopedStores.ts` for the reset-on-org-switch registration
-  every org-scoped store must join).
+### Build-order dependency (Presence)
 
-### Read-only rendering on share/print
-
-Same trickiest-integration shape as Feature 2, at smaller scale: the public `ShareView.vue` cannot read
-`stageLayouts/{serviceId}` directly (editor-tier-adjacent rules). **Denormalize into `ServiceSnapshot`**
-exactly like `roleAssignments` and (Feature 2's) `attachments` — `buildServiceSnapshot()` gains a
-`stageLayout?: { elements: StageElement[] }` field, populated from the already-subscribed stage-layout
-store at snapshot-build time. This gives ONE rendering path for both the public share page and any
-future in-app print view — no second data shape to maintain. Render as a simple absolute-positioned
-`<div>` grid reading the same `x`/`y`/`zone` percentages the editor wrote; genuinely read-only, no drag
-code needed on this side.
-
-Note: the app's existing "print" surface (`ServiceEditorView.vue`, `ServiceCard.vue` — `window.print`/
-`@media print`, text-only order-of-service) does not currently render any visual/slide content at all.
-Extending it to show the stage diagram is a straightforward `@media print` CSS addition once the
-snapshot-driven read-only renderer exists — treat it as the same component reused in two contexts, not
-two components.
+Firestore rule (new subcollection block) → `useServicePresence.ts` composable (heartbeat + snapshot +
+teardown) → `ServiceEditorView.vue` header wiring (one composable call + a small chip component) →
+`cleanupStalePresence` cron (independent, can land any time, does not block the feature going live).
+No dependency on any other v2.14 feature.
 
 ---
 
-## Feature 4 — Inline black slide in the lyric editor
+## 3. Stage Layout auto-populate from roster
 
-### The exact reuse target
+### Current shape (verified)
 
-`SongLyricEditor.vue`'s "Sections" list **is** the slide order (D-01/D-03) — a pool
-(`LyricSection[]`) plus an ordered reference list (`performanceOrder: string[]`), edited via
-`songSectionOrder.ts`'s pure helpers (`addSection`, `moveRow`, `duplicateRow`, `removeRow`). A black
-slide is just another **row in that same list** — not a new `ServiceSlot`, not a new service section,
-exactly matching the requirement ("without introducing a new blank service section").
+This is the **best-understood** integration point of the four — the exact data this feature needs
+already exists as a computed in `ServiceEditorView.vue`:
 
-### Data model — additive, non-breaking
+```typescript
+// ServiceEditorView.vue, already shipped (Phase 107)
+const stageBandRoles = computed(() =>
+  rosterStore.roles.filter((r) => r.group === 'band').map((r) => ({ id: r.id, name: r.name })))
 
-```ts
-// src/types/songLyrics.ts — LyricSection gains:
-export interface LyricSection {
-  id: string
-  label: string
-  lines: string[]
-  slideBreaks?: number[]
-  /** NEW — additive, absent = 'lyric' (every existing section). 'blackout' marks
-   *  an inline black/interlude slide: no lyric text, rendered pure black. */
-  kind?: 'lyric' | 'blackout'
+const stageServingAssignments = computed(() => {
+  // one { id, name, roleId, roleName } per PERSON assigned to a band role for THIS
+  // service, resolved from resolvedRoleAssignments.value (the roster→schedule
+  // resolution already used by the Roles tab), denormalized with name lookups
+  // from rosterStore.people
+})
+```
+
+`stageServingAssignments` is already passed into `StageLayoutEditor.vue` as `assignablePeople` — it is
+the manual "pick a person" source in today's edit-marker drawer (`StageLayoutEditor.vue:124-130`,
+`orderedPeople`). Auto-populate does not need any new roster-resolution logic; it needs a **seeding
+function** that turns this same list into `StageMarker[]` instead of waiting for a human to drag markers
+one at a time.
+
+`src/utils/stageLayout.ts` already has every geometry/creation primitive needed:
+`createMarker({ label, xPct, yPct, roleId, roleName, zone? })` (mints a marker with a fresh id, deriving
+`zone` from position via `zoneFromPosition`), `buildStagePalette(bandRoles)` (the same role→instrument
+mapping the palette already uses).
+
+### Integration plan
+
+**New pure function, `src/utils/stageLayout.ts`:**
+
+```typescript
+export function autoPopulateMarkers(
+  servingAssignments: { id: string; name: string; roleId: string; roleName: string }[],
+): StageMarker[] {
+  // One marker per (person, role) pair — mirrors stageServingAssignments' own
+  // "a person in two roles appears twice" contract (ServiceEditorView.vue comment,
+  // line ~4130) so a person double-booked (e.g. plays bass AND sings) gets two
+  // markers, matching how the manual picker already treats that case.
+  // Layout: a simple deterministic grid/arc within STAGE_BAND (on-stage), one row
+  // per role-group ordering (Vocals, then Instruments), so the auto-fill result
+  // looks like a plausible stage plan, not a pile of overlapping markers at
+  // center-stage (the manual-add cascade offset in StageLayoutEditor.onAddItem
+  // is NOT sufficient for N simultaneous markers — it staggers by 2.5% per add,
+  // fine for occasional single drops, not for seeding 6-10 markers at once).
 }
 ```
 
-No `SourceRef` change needed in `src/types/slideGroup.ts` — a black-slide section is still referenced
-via the existing `{ kind: 'lyric', songId, sectionId }` ref shape; only the **resolved content** differs,
-decided from `section.kind` at slide-build time.
+**Trigger point — `ServiceEditorView.vue`, alongside the existing `onStageMarkerAdd`/`onStageMarkerUpdate`
+handlers (lines 2302-2338):**
 
-```ts
-// src/types/slide.ts — new Slide variant + widened union
-export interface BlackoutSlide extends SlideBase {
-  contentKind: 'blackout'
-}
-export type SlideContentKind = 'lyric' | 'scripture' | 'imported' | 'text' | 'image' | 'video' | 'blackout'
-export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide | TextSlide | ImageSlide | VideoSlide | BlackoutSlide
-```
-
-### Exact resolution touch points (verified against real code)
-
-`src/utils/slideshowAssembler.ts` builds `LyricSlide` content from a resolved `LyricSection` in **three**
-places — all three need the identical one-line branch (`section.kind === 'blackout' → { contentKind:
-'blackout' }` instead of the lyric-content object):
-
-1. `resolveEntryContent()`'s `case 'lyric'` branch (~line 179-190) — the stored-group resolution path
-   used by Run/Audience/Confidence.
-2. The fallback derivation's per-group-split loop (~line 534-545).
-3. The fallback derivation's non-split loop (~line 583-591).
-
-### Editor UI
-
-- `SongLyricEditor.vue`'s `ADD_SECTION_KINDS` chip row (`songSectionOrder.ts`, consumed at
-  `SongLyricEditor.vue:254-260`) gains a `'Black Slide'` chip calling `onAddSection('BLACKOUT')`, which
-  `songSectionOrder.ts::addSection` must special-case to mint a section with `kind: 'blackout'`, empty
-  `lines: []`, and an auto label like `"Black Slide"` (numbered on collision, same as other
-  auto-labelled sections already are).
-- The row rendering (`SongLyricEditor.vue:104-239`) needs one branch: a `kind === 'blackout'` row shows
-  a black swatch preview instead of the lyric textarea/split-divider UI — everything else (drag handle,
-  position number, Duplicate, Remove, expand/collapse) is unchanged, since those all operate on
-  `performanceOrder`/`orderSlotIds`, agnostic to section content.
-
-### Downstream consumption — free by construction
-
-Because Run/Audience/Confidence/print all render through the same `AssembledSlide` → `SlideCanvas.vue` /
-`src/components/slides/slideDisplay.ts` pipeline, **no changes are needed in `useRunControl.ts`,
-`useOutputWindow.ts`, `RunControlView.vue`, `AudienceOutputView.vue`, or `ConfidenceOutputView.vue`** —
-they already iterate `assembledSlideshow` generically. Two small additions are needed at the rendering
-leaf:
-
-- `src/components/slides/slideDisplay.ts` — `cardKindFor()`-equivalent narrowing (`:397-400`) needs a
-  `contentKind === 'blackout'` branch (today it special-cases only `'lyric'` for the
-  LyricSlide/CopyrightSlide split).
-- `src/components/slides/SlideCanvas.vue` — one new render branch: pure black fill, no text, honoring
-  `audioUrl`/`audioLoop` exactly like every other slide kind already does (so a black interlude slide
-  can still carry a bed track — free reuse of `SlideBase.audioUrl`).
-
-The print/text-only order-of-service surface never renders slide *content*, so it needs no change here.
-
----
-
-## Feature 5 — Loop a service item (per-item flag + interval, auto-advance)
-
-### Where the flag lives
-
-On the `ServiceSlot` itself — every slot kind already shares `MediaAttachableSlot` (`src/types/service.ts:39-61`)
-for cross-kind optional fields (`notes`). Add loop config there, same pattern:
-
-```ts
-// MediaAttachableSlot gains:
-loop?: {
-  enabled: boolean
-  intervalSeconds: number   // default 10, per the milestone's stated default; dropdown + custom value
+```typescript
+function onAutoPopulateStageLayout() {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  const existing = localService.value.stageLayout?.elements ?? []
+  if (existing.length > 0) return // NEVER clobber manual placements — see below
+  const markers = autoPopulateMarkers(stageServingAssignments.value)
+  if (markers.length === 0) return
+  localService.value.stageLayout = { elements: markers }
+  // rides the existing useAutoSave deep-watch, identical to onStageMarkerAdd — no new save call.
 }
 ```
 
-Optional, absent-safe, no migration — identical lifecycle to `notes`/`label` (`stripUndefined` before
-Firestore write, per the established pattern noted on those fields).
+**Two design decisions the roadmap/spec phase must pin down, both already implied by the milestone
+framing ("seeding an empty canvas without clobbering manual placements"):**
 
-### Editor UI
+1. **When does this run — automatically or on a button?** The stated requirement ("auto-populates…
+   instead of an empty canvas") reads as *automatic on first visit to an empty Stage Layout tab*, not a
+   manual "Auto-fill" button. Recommend: `watch` the Stage Layout tab's `active` flag (the same
+   `v-show="activeTab === 'stage'"` gate already in the template) and call `onAutoPopulateStageLayout()`
+   the first time it becomes active for a service with zero elements. **Never re-run once
+   `stageLayout.elements.length > 0`** — this is the load-bearing non-clobber guard, and it is trivial
+   to enforce because it is the *exact same guard* `onStageMarkerAdd` already needs (`stageLayout ??
+   { elements: [] }` init pattern) — just gated the other direction (skip entirely, rather than init-if-
+   absent, when already populated).
+2. **What happens when the roster assignment changes AFTER auto-populate ran** (e.g. a volunteer swap
+   after the layout was seeded)? The non-clobber rule means the seeded markers do **not** live-update —
+   they were a one-time convenience seed, and from that point the canvas is exactly as manually-owned as
+   if a human had built it from scratch. This matches the milestone's own framing exactly ("seeding…
+   without clobbering manual placements" implies one-shot, not a live binding) and avoids the much
+   harder problem of diffing/reconciling a freeform canvas against a changing roster. Worth stating
+   explicitly in the phase spec so it is not re-litigated as a bug later.
 
-A checkbox + interval control next to each item in `ServiceEditorView.vue`'s Service Order tab (same
-row real-estate class as the existing per-item notes field, R122/Phase 54) — editor-only, draft-locked
-like every other Service Order field (the `firestore.rules` `services/{docId}` `storedStatus() ==
-'draft'` gate already covers this; it is a field on the existing `slots` array, no new rules surface).
+### Build-order dependency (Stage Layout auto-populate)
 
-### Driving the auto-advance without breaking manual nav — the design decision
-
-The loop timer must live in **exactly one place: the control window** (`useRunControl.ts`), because that
-composable is the documented single writer of the run channel (`RunControlView.vue`'s own header
-comment: "This view is the SINGLE WRITER of wp-run-{serviceId}"). The output windows are receive-only by
-design (`useOutputWindow.ts` — "NEVER post state ourselves") and must stay that way; a timer in an output
-window would violate that architecture and could race two output windows independently advancing.
-
-Concretely, in `useRunControl.ts`:
-
-- A `watch(currentSlotIndex)` (the composable already derives this) checks whether the *current item's*
-  `ServiceSlot.loop?.enabled` is true. If so, arm a `setInterval(() => goBySlide(1) — with wraparound to
-  the item's FIRST slide instead of falling through to the next item, not `goByItem`)` at
-  `loop.intervalSeconds * 1000`.
-- **Manual navigation must disarm/rearm cleanly, not fight the timer.** The existing `postIndex()` choke
-  point (every navigation call, keyboard or click, already routes through it — `useRunControl.ts:111-115`)
-  is the correct place to reset the interval's clock: any call to `postIndex` while a loop is armed
-  restarts the interval from zero, so a manual arrow-key press never fights a stale timer tick landing a
-  moment later. This reuses the existing single-choke-point discipline already documented in that file
-  ("The ONE place run state is written") rather than adding a second.
-- Leaving the item (via `goByItem`/`jumpToSlot` to a different slot) must clear the interval — a `watch`
-  on `currentSlotIndex` (not `index`) is the right granularity, since looping is scoped to "this item's
-  slides," matching the existing `filmstrip` computed's own item-scoping (`useRunControl.ts:1041-1052`).
-- Rehearse mode (`rehearse()`, no output windows opened) should still honor loop for on-screen preview
-  parity — the timer logic is agnostic to whether outputs are open, since it only calls `postIndex`.
-
-No `runChannel.ts` protocol change is needed — looping is entirely a control-side navigation decision;
-from the channel's perspective it is indistinguishable from the operator pressing the right-arrow key
-repeatedly. This is the cleanest possible integration: zero wire-protocol changes, one new composable
-concern inside `useRunControl.ts`.
+No dependency on any other v2.14 feature — `stageServingAssignments` and `stageLayout.ts` are both
+already shipped (Phase 107, v2.7). This is the **lowest-risk, most self-contained** of the four
+features and a good candidate for an early phase: `autoPopulateMarkers()` pure function + unit tests →
+`ServiceEditorView.vue` trigger wiring → UAT on the seeded layout's visual layout quality (this is the
+one part that needs a human eye — "does the auto-grid look like a plausible stage plan" is not something
+a unit test can verify).
 
 ---
 
-## Feature 6 — "Go to black" — Audience-only
+## 4. Auto-generate service share link
 
-### Today's shape
+### Current shape (verified — the exact mechanism, not an approximation)
 
-`RunState` (`src/utils/runChannel.ts:26-30`) carries one shared `blackout: boolean` field, applied
-identically by both `AudienceOutputView.vue` and `ConfidenceOutputView.vue` via the shared
-`useOutputWindow.ts` composable (`blackout` ref set from `state.blackout` in `onState`, rendered as a
-full-bleed black overlay in both views — confirmed at `AudienceOutputView.vue:26-35` and
-`ConfidenceOutputView.vue:69-77`, both driven by the identical `v-if="blackout"` pattern).
+`src/stores/services.ts` already has **two separate functions with two separate contracts**, and this
+feature is a matter of calling the right one from a new call site, not building new minting logic:
 
-### Two ways to scope it — recommend the smaller one
+- **`ensureShareLink(service, orgId)`** (aliased as `createShareToken` for the two existing call sites,
+  `ServiceEditorView.vue:3509` and `ServiceCard.vue:209`, both manual "Share Link" button clicks) — the
+  full mint-or-adopt-and-write path: checks `serviceShareLinks/{serviceId}` for an existing token,
+  else adopts an already-circulated `shareTokens` doc for that service (multi-token de-dup), else mints
+  a fresh 144-bit token (`mintShareToken()`), persists it via a transaction, then writes the public
+  `shareTokens/{token}` + `serviceShares/{slug}__service-{date}` payloads. **This is the function that
+  creates a share link where none existed.**
+- **`maybeRefreshShareLink(id, overrides)`** — called automatically today from `updateService()`
+  (every autosave) and from the two role-override write paths. It **only refreshes an already-existing**
+  link (reads `serviceShareLinks/{id}`, and if it does not exist, sets an in-memory `false` cache flag
+  and returns — deliberately structured so "an ordinary edit to a never-shared service" can never
+  accidentally publish it, per the function's own doc comment). **This is explicitly NOT the function to
+  change** — widening it to auto-create would invert its own documented safety contract.
 
-**Option A (wire-protocol change):** widen `RunState.blackout` to `{ audience: boolean }` or add a second
-field, threading it through `runChannel.ts`'s message shape guard, `useRunControl.ts`'s `postBlackout`,
-and both output composables. More "correct" long-term if a future feature ever needs confidence-only
-blackout too, but touches the shared channel contract, its tests (`RunControlView.output.test.ts`,
-`AudienceOutputView.test.ts`, `ConfidenceOutputView.test.ts`, `useOutputWindow.test.ts` all assert on
-today's flat shape), and both output views.
+The correct integration point is therefore: **call `ensureShareLink` automatically from exactly one
+more call site**, not modify `maybeRefreshShareLink`.
 
-**Option B (recommended — minimal, matches the stated requirement exactly):** the requirement is
-literally "leave the confidence monitor visible" — a **permanent** product decision, not a per-toggle
-choice the operator makes. So `ConfidenceOutputView.vue` simply **stops consuming `blackout` for its
-overlay** — delete/guard the `v-if="blackout"` block at `ConfidenceOutputView.vue:69-77` (or gate it
-`false` outright), while `useOutputWindow.ts` keeps returning `blackout` unchanged (still needed by
-`AudienceOutputView.vue`, and harmless to leave wired for Confidence in case a future milestone wants a
-per-output toggle). `RunHeader.vue`'s blackout control (`@toggle-blackout="postBlackout(!blackout)"`,
-`RunControlView.vue:27`) gets a relabel ("Blackout audience") for operator clarity but its wiring is
-unchanged.
+### Where — the lifecycle moment
 
-This is the lower-risk, smaller-diff choice — one view loses three lines of template, zero composable/
-channel/type changes, zero test-shape changes to the channel contract. Recommend Option B unless a
-later milestone actually needs independent per-output blackout.
+`markAsPlanned(id)` (`services.ts:580`) is the Draft→Planned status transition, and it already
+establishes the precedent this feature should follow to the letter: it performs a **best-effort,
+fail-closed side write that must never roll back the status transition itself** — the `rehearseAccess`
+projection write (R377, Phase 125) sits inside its own `try/catch` *after* the status `updateDoc`
+already succeeded, logging on failure but not throwing:
 
----
-
-## Feature 7 — System-wide dismissible messages
-
-### What exists today (two divergent, incompatible mechanisms)
-
-1. **`useToasts` (`src/stores/toasts.ts`)** — a real Pinia store, but deliberately narrow ("NOT a general
-   notification system," per its own header comment): one array, auto-dismiss after 6s, no manual
-   dismiss UI, no priorities/categories.
-2. **Ad-hoc `v-if`-gated inline banners with no store at all** — e.g. the `run-reassign-banner`
-   ("Your monitor setup changed…", `RunControlView.vue:43-90`), driven by `monitorChanged` (a plain
-   composable `ref` in `useRunControl.ts`), cleared **only** by a successful `reopenReassignedOutputs()`
-   call — there is no manual dismiss path today, which is precisely the "gets stuck on screen" defect
-   the milestone names. `MonitorSetupView.vue`'s `saveOutcome === 'not-persisted-warning'` banner
-   (`MonitorSetupView.vue:131`) is the same shape: a local `ref`, no store, no dismiss.
-
-### Design: generalize `useToasts` into the one message store; retire ad-hoc `ref`-gated banners
-
-```ts
-// src/stores/toasts.ts → rename/extend to src/stores/notifications.ts (or widen in place)
-export interface Notification {
-  id: string
-  message: string
-  variant: 'info' | 'warning' | 'error'
-  autoDismissMs?: number      // undefined = sticky until manually dismissed or condition clears
-  dismissible: boolean        // true for every toast; true for every banner too, per this milestone's requirement
+```typescript
+// services.ts, markAsPlanned — existing code, shown for the pattern to copy
+try {
+  const rosterStore = useRosterStore()
+  // ...
+  await writeRehearseAccessDoc(...)
+} catch (err) {
+  console.error(`markAsPlanned: rehearseAccess projection write failed for service ${id} — the status transition already succeeded`, err)
 }
 ```
 
-Keep the existing `push`/`dismiss` shape (already used across the app for toasts) — widen it to accept
-`variant`/`autoDismissMs`/`dismissible`, defaulting to today's toast behavior (`variant:'error'`,
-`autoDismissMs:6000`, `dismissible:true`) so every existing `toasts.push(msg)` call site keeps working
-unchanged. Add a second call shape for a **state-driven, condition-cleared** notification (the
-monitor-warning class): `notifications.setSticky(key, message, variant)` / `notifications.clearSticky(key)`
-— a keyed slot (not a growing array) so the SAME banner is replaced/cleared in place rather than
-accumulating duplicates on every re-check, and a manual dismiss (`X` button) always works immediately
-regardless of whether the underlying condition (e.g. `monitorChanged`) has cleared yet — the two are
-independent: dismissing hides it now; the condition clearing prevents it from being re-raised.
+**Add a sibling try/catch calling `ensureShareLink(service, orgId.value)` in the same place**, same
+fail-closed shape. This is the right lifecycle moment for three independent reasons, not just
+convenience:
 
-### Migration of the two known stuck-banner cases
+1. **Consistency with the existing volunteer-visibility gate.** My Schedule / the volunteer rehearse
+   view already only ever shows **Planned** (non-Draft) services (v2.12 decision, reusing "the same
+   not-Draft/lock gate Run the Service uses"). A share link auto-created at Draft time would exist
+   before the service is meant to be externally visible at all — auto-creating it exactly when the
+   service crosses into Planned keeps "shareable" and "volunteer-visible" as the same trigger, not two
+   different ones a future maintainer has to keep in sync by hand.
+2. **`ensureShareLink` is already idempotent and safe to call speculatively.** It checks
+   `serviceShareLinks/{id}` first and returns the existing token unchanged if one already exists (from
+   a prior manual Share click, or from a prior Plan→Reopen→Plan cycle) — calling it on every
+   `markAsPlanned` transition, including a re-Plan after Reopen, never mints a second token or
+   orphans the first. No new guard logic needed beyond "call it here too."
+3. **It does not remove the manual button.** The existing "Share Link" click on `ServiceEditorView.vue`
+   and `ServiceCard.vue` keeps working exactly as today (still calls `createShareToken` →
+   `ensureShareLink`, which will now simply return the already-auto-created token instantly instead of
+   minting fresh) — this is purely additive, zero risk to the existing manual flow, and the UI copy can
+   evolve at leisure (e.g. showing the link immediately once Planned, rather than requiring the click)
+   without any store-layer change beyond this one new call site.
 
-- `RunControlView.vue`'s `run-reassign-banner`: replace the local `monitorChanged` ref-driven `v-if`
-  with `notifications.setSticky('monitor-reassign', ...)` set from `useRunControl.ts`'s
-  `onScreensChange()` (where `monitorChanged.value = true` is set today), cleared from the same two
-  places that already clear it (`reopenReassignedOutputs`, and a still-matching benign refresh in
-  `onScreensChange`) **plus** a manual dismiss button routed through `notifications.dismiss()`.
-- `MonitorSetupView.vue`'s `saveOutcome === 'not-persisted-warning'`: same treatment — becomes a sticky
-  notification cleared either by a successful save or a manual dismiss.
+### What does NOT need to change
 
-### Rendering
+- `writeSharePayload` (the `shareTokens`/`serviceShares` payload writer) — unchanged, reused verbatim.
+- `maybeRefreshShareLink` — unchanged; it continues to be the "keep an already-shared service's public
+  payload current after every edit" hook, now simply hit sooner in the lifecycle (right after
+  `markAsPlanned` creates the link) rather than needing a first manual click before it starts doing
+  anything.
+- Firestore rules for `shareTokens`/`serviceShareLinks`/`serviceShares` — unchanged. The write still
+  originates from an authenticated editor's client SDK exactly as today (`ensureShareLink` is client-
+  side, not a Cloud Function); `markAsPlanned` is already an editor-gated client call, so no new rules
+  surface is opened.
 
-A single new `NotificationHost.vue` (sibling of/replacing the current toast host, if one exists — check
-for `ToastHost.vue` at execution time) mounted once at the app shell, rendering both the auto-dismiss
-toast list and any active sticky notifications with a uniform dismiss (`×`) affordance and `variant`
-styling. **This is the one feature in this milestone that should ship FIRST** among the "supporting
-infrastructure" work — see Build Order below — because Feature 7 is a pure prerequisite for making
-Feature 6/monitor-warning fix land cleanly, not the reverse.
+### Build-order dependency (Auto share-link)
 
----
-
-## Feature 8 — User-menu church switcher
-
-### The two existing mechanisms — reuse both, expose only one
-
-`src/stores/auth.ts` already has everything needed:
-
-- **Regular multi-org member path:** `selectOrg(targetOrgId)` (`auth.ts:674-685`) — validates
-  `memberships.value.some(m => m.id === targetOrgId)`, remembers the choice
-  (`rememberOrg`/`readRememberedOrg`), resets every org-scoped store
-  (`resetOrgScopedStores()`, imported dynamically to avoid an auth↔store import cycle — follow this same
-  dynamic-import pattern for any new caller), and reloads org context. Today this is **only** reachable
-  from `SelectChurchView.vue`, itself only reached via the router's org-selection gate when there's no
-  remembered org. It has never been exposed as a live, in-context switch — this milestone's whole job for
-  Feature 8 is exposing it from the user menu instead of leaving it router-gated.
-- **Super-admin path:** `enterOrgAsSuperAdmin(targetOrgId)` (`auth.ts:706-718`) — already used from the
-  Owner Console's "enter any church" per-row action, sets no membership doc, surfaces a "viewing as
-  super-admin" banner (`viewingAsSuperAdmin`), exited via `exitSuperAdminView`. **Already shipped in
-  v2.1** — this feature does not touch it; it just needs to keep being the super-admin's route, not
-  `selectOrg`.
-
-### Where regular-member and super-admin paths differ (must branch correctly)
-
-`selectOrg` requires the target org to be in the caller's own `memberships` list (a real membership doc
-or claim entry) — it is **not** usable for "enter a church I don't belong to." `enterOrgAsSuperAdmin` is
-the opposite: it deliberately creates no membership doc and is gated purely on the `superAdmin` custom
-claim. The new church-switcher UI must therefore branch on `authStore.isSuperAdmin` /
-`authStore.viewingAsSuperAdmin`:
-
-- **Regular member, `memberships.length > 1`:** show "Switch church" in the user menu, listing
-  `authStore.memberships` (already the exact `{id, name, active}[]` shape `SelectChurchView.vue`
-  renders), calling `selectOrg(id)` on selection.
-- **Super-admin already viewing a church via `enterOrgAsSuperAdmin`:** the existing "viewing as
-  super-admin" banner + `exitSuperAdminView` affordance is unchanged; the new user-menu entry should
-  either be suppressed while `viewingAsSuperAdmin` is true (avoid two competing switch mechanisms
-  stacked in the UI) or, if the super-admin ALSO holds real memberships elsewhere, list those via the
-  same `selectOrg` path — the two are not mutually exclusive but the UI must not conflate them.
-
-### Component
-
-- **New:** `ChurchSwitcherMenu.vue` (or inline addition to `AppSidebar.vue`'s existing user-menu block —
-  `AppSidebar.vue` lines ~58 (`displayName`) / ~221-239 (`logout`) are the exact insertion point: a new
-  menu item between the account info and Log out, dropdown/submenu listing `memberships`).
-- **Modified:** `AppSidebar.vue` — add the menu entry, gated `v-if="authStore.memberships.length > 1"`.
-
-No Firestore/Storage rules change — this feature is pure client-side reuse of already-shipped,
-already-secured mechanisms (the security boundary is the custom claim checked server-side on every
-subsequent read/write, exactly as it is today for `SelectChurchView.vue`).
+Zero dependency on any other v2.14 feature or on any new schema. This is a **single new call site**
+inside an existing, already-tested function — the smallest, safest, and fastest of the four to build,
+and a good candidate to land first or in parallel with anything else (it touches only
+`src/stores/services.ts`).
 
 ---
 
-## Cross-Cutting Patterns This Milestone Reuses (do not reinvent)
+## Cross-Feature Build Order (for the roadmap)
 
-| Pattern | Precedent | Reused by |
-|---|---|---|
-| Denormalize into the frozen public snapshot rather than granting new public rules access | `roleAssignments` in `buildServiceSnapshot()` | Features 2, 3 |
-| Storage download-token URL as a bearer capability, not a rules grant | `useMediaUpload.ts`'s `getDownloadURL()` | Feature 2 |
-| Additive optional field on an existing shared interface, absent = old behavior, no migration | `MediaAttachableSlot.notes`, `LyricSection.slideBreaks` | Features 1, 4, 5 |
-| One document per service, keyed by `serviceId`, org-scoped top-level collection (not nested) | `serviceShareLinks/{serviceId}` | Feature 3 |
-| A brand-new rules block modeled on `slideGroups`' parent-draft gate | `firestore.rules:378-430` | Feature 3 |
-| Single-writer BroadcastChannel; outputs stay receive-only | `useRunControl.ts` / `useOutputWindow.ts` | Features 5, 6 |
-| One choke-point function for every state mutation (`postIndex`) | `useRunControl.ts:111-115` | Feature 5 |
-| Org-scoped store reset on org switch, dynamic import to avoid a cycle | `resetOrgScopedStores()` in `selectOrg`/`enterOrgAsSuperAdmin` | Feature 8 |
-| Keyed/sticky store slot vs. growing auto-dismiss array | New for Feature 7 — no existing precedent, first of its kind in this codebase | Feature 7 |
+None of the four features depend on each other's code, but they cluster into three risk/complexity
+tiers worth sequencing deliberately:
 
-## Anti-Patterns To Avoid In This Milestone
+1. **Trivial, ship first (de-risk the milestone early):**
+   - Auto-generate share link (`markAsPlanned` + `ensureShareLink` call) — single call site, existing
+     tested primitives.
+   - Stage Layout auto-populate — new pure function + one trigger, all dependencies already shipped.
 
-- **Do not** grant `storage.rules` a new public/anonymous read arm for attachments or stage-layout media.
-  This codebase has one documented production incident from a cross-service Storage rule
-  (CLAUDE.md, 2026-08-06); the download-token-URL approach (Feature 2) sidesteps rules entirely and is
-  provably safe by the same mechanism the app's authenticated flows already depend on.
-- **Do not** let an output window (`AudienceOutputView.vue`/`ConfidenceOutputView.vue`) originate its own
-  navigation state (loop timer, blackout scoping). Both composables' own doc comments state the
-  receive-only contract explicitly; violating it for Feature 5 or 6 would reintroduce the exact class of
-  race the single-writer design exists to prevent.
-- **Do not** widen `ServiceSlot`/`SourceRef` with a brand-new discriminated variant for the black slide
-  (Feature 4) when the existing `LyricSection.kind` + resolved-`Slide`-variant approach needs zero
-  `SourceRef` change and reuses 100% of the existing pool/order/drag machinery.
-- **Do not** build Feature 6 by widening the `RunState` wire protocol unless a second, independent
-  per-output toggle is actually needed later — the stated requirement is a permanent product decision,
-  not a runtime option, and the smaller diff (Option B) is fully sufficient and lower-risk.
+2. **Medium, independent, needs its own rules + composable:**
+   - Editor presence — new Firestore subcollection + rule + composable + header UI. No dependency on
+     Video output or Stage Layout. Land the rules-and-composable core before the header UI polish so the
+     write-scoping/staleness-filter logic gets its own review pass separate from visual design.
 
-## Suggested Build Order (dependency-honoring)
+3. **Highest complexity, sequence internally before combining:**
+   - Video output — sequence as: (a) `MonitorRole` type widening + `MonitorSetupView` UI + bare
+     `VideoOutputView.vue` in **Fullscreen-only** mode first (this alone is low-risk, reusing
+     `AudienceOutputView`'s exact pattern and is independently demoable/UAT-able), **then** (b) the
+     per-item `videoOutput` schema field + `SlidesTab` authoring UI, **then** (c) the Banner render (new
+     bottom-strip `useContainScale` region + chroma-key fill config) as the final, riskiest slice — it is
+     the only piece of genuinely new rendering code across all four features and the only one whose
+     real-world correctness cannot be fully verified without the actual Blackbird hardware (explicitly
+     out of this milestone's ownership per the owner's 2026-09-07 scope decision). Do not let (c) block
+     shipping (a)+(b) — a Video output that only does Fullscreen is already a complete, useful slice.
 
-1. **Feature 7 — dismissible message store** (foundation; several later phases, and the existing
-   monitor-reassign banner bug, depend on it existing first — build it before touching Run Control at
-   all, so Feature 6's header relabel and any Run-side follow-up land against the new store, not the old
-   `ref`).
-2. **Feature 8 — user-menu church switcher** (fully independent of everything else in this milestone;
-   zero data-model or rules dependency; safe to parallelize with #1).
-3. **Feature 6 — "Go to black" audience-only** (small, isolated, no dependency on anything else; do it
-   early to bank a quick, low-risk win and validate the notification-store integration on the monitor
-   banner while the team is already inside `RunControlView.vue`/`useRunControl.ts`).
-4. **Feature 4 — inline black slide in the lyric editor** (self-contained within the song-lyrics/
-   slideshow-assembler subsystem; no dependency on attachments or stage layout; do before Feature 5 since
-   Feature 5's loop logic should be validated against a slideshow that can already contain a black
-   interlude slide — the two features are the most likely to interact during a rehearsal-length item).
-5. **Feature 5 — loop a service item** (builds inside `useRunControl.ts`, benefits from #1 already being
-   in place for any loop-state messaging, and from #4 existing so looping a song with an inline black
-   interlude is exercised).
-6. **Feature 1 — song rehearsal attachments** (foundational data model + Storage path; **must land before
-   Feature 2**, which consumes it).
-7. **Feature 2 — Rehearse mode on the public share page** (hard dependency on #1's `SongAttachment` shape
-   and Storage path existing first; also the highest-risk feature in the milestone — schedule it with the
-   most buffer, and treat the snapshot-denormalization + Storage-token-URL design above as settled before
-   planning starts, not re-litigated mid-phase).
-8. **Feature 3 — visual stage layout per service** (independent data model/rules/store, but its
-   read-only public rendering reuses the exact denormalization pattern Feature 2 establishes — sequencing
-   it after #2 means the team applies a now-proven pattern rather than inventing it twice. The freeform
-   canvas UI itself has no dependency on any other v2.7 feature and could be built in parallel with #6/#7
-   if a second workstream is available; the *snapshot* half should still land after #2).
+**Suggested phase-level dependency graph:**
 
-Features 1→2 and the "snapshot denormalization" thread through 2→3 are the only hard sequencing
-constraints; everything else can be reordered or parallelized by workstream capacity.
+```
+Auto share-link ──────────────────────────────────────────────────► (ship anytime)
+Stage Layout auto-populate ───────────────────────────────────────► (ship anytime)
+Editor presence: rules+composable → header UI ────────────────────► (self-contained)
+Video: MonitorRole widen → MonitorSetupView UI → VideoOutputView(Fullscreen) ─┐
+Video: videoOutput schema → SlidesTab authoring UI ───────────────────────────┼─► Banner render (needs both)
+                                                                               ┘
+```
 
 ## Sources
 
-All findings are grounded in the following files, read in full or in the cited ranges during this
-research pass (2026-08-31): `.planning/PROJECT.md`; `src/utils/runChannel.ts`;
-`src/composables/useRunControl.ts`; `src/composables/useOutputWindow.ts`; `src/views/RunControlView.vue`;
-`src/views/AudienceOutputView.vue`; `src/views/ConfidenceOutputView.vue`;
-`src/components/run/RunPreflightPanel.vue`; `src/components/run/RunDisplaysPanel.vue`; `storage.rules`;
-`firestore.rules`; `src/types/song.ts`; `src/types/service.ts`; `src/types/slide.ts`;
-`src/types/slideGroup.ts`; `src/types/songLyrics.ts`; `src/views/ShareView.vue`;
-`src/utils/shareTokens.ts`; `src/stores/services.ts` (`buildServiceSnapshot`, `writeSharePayload`);
-`src/stores/toasts.ts`; `src/stores/auth.ts` (`selectOrg`, `enterOrgAsSuperAdmin`, `memberships`);
-`src/components/SongLyricEditor.vue`; `src/composables/useMediaUpload.ts`;
-`src/utils/slideGroupMaterializer.ts`; `src/utils/slideshowAssembler.ts`;
-`src/components/slides/slideDisplay.ts`; `src/router/index.ts`; `src/components/AppSidebar.vue`.
-
-No external/ecosystem research was performed — this is a pure internal-integration analysis per the
-milestone context, and every recommendation traces to an existing, already-shipped pattern in this
-codebase rather than a third-party library choice.
+- `src/composables/useOutputWindow.ts`, `useRunControl.ts` (verified in full — the shared output
+  lifecycle + control-side single-writer architecture)
+- `src/utils/monitorConfig.ts` (verified in full — MonitorRole/MonitorMapping, localStorage persistence
+  rationale, ADR-0183)
+- `src/views/AudienceOutputView.vue`, `ConfidenceOutputView.vue` (verified in full — the sibling-template
+  pattern Video output extends)
+- `src/router/index.ts` (verified — the two static `/present/{role}/:serviceId` route entries)
+- `src/types/service.ts`, `src/types/slide.ts` (verified in full — `MediaAttachableSlot.loop` precedent
+  for the new `videoOutput` field, `StageMarker`'s denormalization pattern reused for presence)
+- `src/utils/stageLayout.ts`, `src/components/stage/StageLayoutEditor.vue` (verified — palette/marker
+  creation primitives and the existing `assignablePeople` prop, the exact input the auto-populate
+  feature needs)
+- `src/views/ServiceEditorView.vue` (verified — `stageBandRoles`/`stageServingAssignments` computeds,
+  `onStageMarkerAdd`/`onStageMarkerUpdate` handlers, the `watch(serviceId, ...)` teardown-on-navigate
+  idiom, the component-reuse-across-param-change behavior this implies for presence)
+- `src/stores/services.ts` (verified in full for the share-link section — `ensureShareLink`,
+  `writeSharePayload`, `maybeRefreshShareLink`, `markAsPlanned`'s existing fail-closed side-write
+  pattern for `rehearseAccess`)
+- `firestore.rules` (verified — `isOrgMember`/`isOrgEditor` helpers, the `lockSnapshots` nested-
+  subcollection precedent for the new `presence` subcollection, the `rehearseAccess` block's
+  live-parent-status-check idiom)
+- `functions/src/index.ts` (verified — the `onSchedule` retention-cron family pattern for the optional
+  presence cleanup sweep)
+- Confirmed absence: no `firebase/database` / Realtime Database usage anywhere in `src/` or
+  `functions/src/` — presence must be Firestore-heartbeat-based, not RTDB-`onDisconnect`-based.
+- `.planning/PROJECT.md` (v2.14 target-feature list, v2.4/v2.7/v2.9/v2.12/v2.13 milestone summaries for
+  historical context on the multi-monitor and stage-layout features being extended)
 
 ---
-*Architecture research for: v2.7 Rehearsal, Stage Plans & Presentation Polish*
-*Researched: 2026-08-31*
+*Architecture research for: WorshipPlanner v2.14 (Services UX Alignment, Dashboard & Live-Stream Output)*
+*Researched: 2026-09-07*
