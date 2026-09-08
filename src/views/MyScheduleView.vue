@@ -66,7 +66,11 @@
               :roles="rolesFor(doc)"
               :is-next-up="doc.serviceId === groups.nextUpId"
               :is-past="false"
-            />
+            >
+              <template #actions>
+                <VolunteerConfirmBar :org-id="doc.orgId" :service-id="doc.serviceId" :my-assignments="assignmentsFor(doc)" />
+              </template>
+            </ScheduleServiceCard>
           </div>
         </section>
 
@@ -86,7 +90,11 @@
               :roles="rolesFor(doc)"
               :is-next-up="doc.serviceId === groups.nextUpId"
               :is-past="false"
-            />
+            >
+              <template #actions>
+                <VolunteerConfirmBar :org-id="doc.orgId" :service-id="doc.serviceId" :my-assignments="assignmentsFor(doc)" />
+              </template>
+            </ScheduleServiceCard>
           </div>
         </section>
 
@@ -138,6 +146,7 @@ import { useMyScheduleStore, type MyScheduleDoc } from '@/stores/mySchedule'
 import { groupMySchedule, countdownLabel } from '@/utils/myScheduleGrouping'
 import AppShell from '@/components/AppShell.vue'
 import ScheduleServiceCard from '@/components/ScheduleServiceCard.vue'
+import VolunteerConfirmBar from '@/components/rehearse/VolunteerConfirmBar.vue'
 
 const authStore = useAuthStore()
 const mySchedule = useMyScheduleStore()
@@ -162,6 +171,13 @@ const groups = computed(() => groupMySchedule(mySchedule.filteredDocs))
 
 function rolesFor(doc: MyScheduleDoc): string[] {
   return doc.rolesByEmailLower[myEmailLower.value] ?? []
+}
+
+// 260908-nq5: the {roleId, roleName}[] the Confirm/Decline control needs — the
+// same projection VolunteerConfirmBar took on the (now-removed) service-page
+// mount. Absent on legacy docs predating roleAssignmentsByEmailLower → [].
+function assignmentsFor(doc: MyScheduleDoc): { roleId: string; roleName: string }[] {
+  return doc.roleAssignmentsByEmailLower?.[myEmailLower.value] ?? []
 }
 
 // First-name-only extraction for the greeting — deliberately NOT

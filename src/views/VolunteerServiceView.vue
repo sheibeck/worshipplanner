@@ -46,16 +46,8 @@
         <p class="text-sm text-gray-400 shrink-0">{{ formattedDate }}</p>
       </div>
 
-      <!-- "I've got it" confirm strip (R410) — deliberately lives here, NOT
-           inside ScheduleServiceCard's whole-card router-link (133-RESEARCH.md
-           Open Question 1, resolved). Renders nothing for a volunteer with no
-           assignments on this service (e.g. a legacy doc predating
-           roleAssignmentsByEmailLower). -->
-      <VolunteerConfirmBar
-        :org-id="doc.orgId"
-        :service-id="doc.serviceId"
-        :my-assignments="myAssignments"
-      />
+      <!-- 260908-nq5: the Confirm/Decline control moved to My Schedule (next to
+           each service's Rehearse button); it no longer lives on this page. -->
 
       <!-- Tabs — ServiceEditorView.vue's exact tablist container + tab-button
            classes + roving-tabindex + handleTabKeydown pattern (127-UI-SPEC.md §1).
@@ -198,7 +190,6 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useVolunteerServiceDoc } from '@/composables/useVolunteerServiceDoc'
-import { auth } from '@/firebase'
 import AppShell from '@/components/AppShell.vue'
 import RehearseSongList from '@/components/rehearse/RehearseSongList.vue'
 import RehearseSongDetail from '@/components/rehearse/RehearseSongDetail.vue'
@@ -206,7 +197,6 @@ import RehearseFileReader from '@/components/rehearse/RehearseFileReader.vue'
 import RehearseAudioPlayerBar from '@/components/rehearse/RehearseAudioPlayerBar.vue'
 import VolunteerOrderOfService from '@/components/rehearse/VolunteerOrderOfService.vue'
 import VolunteerStageLayoutTab from '@/components/rehearse/VolunteerStageLayoutTab.vue'
-import VolunteerConfirmBar from '@/components/rehearse/VolunteerConfirmBar.vue'
 import type { RehearseAttachment } from '@/utils/rehearseAccess'
 
 const route = useRoute()
@@ -229,15 +219,6 @@ const formattedDate = computed(() => {
   if (!doc.value) return ''
   const [y, m, d] = doc.value.serviceDate.split('-').map(Number) as [number, number, number]
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-})
-
-// R410: the signed-in volunteer's own roles on this service, for
-// VolunteerConfirmBar. `roleAssignmentsByEmailLower` is optional (absent on
-// legacy docs predating Phase 133) — an absent field or unmatched email
-// safely yields [], and the bar renders nothing (no crash).
-const myAssignments = computed(() => {
-  const emailLower = auth.currentUser?.email?.toLowerCase() ?? ''
-  return doc.value?.roleAssignmentsByEmailLower?.[emailLower] ?? []
 })
 
 // ── Tabs (reused pattern: ServiceEditorView.vue's handleTabKeydown) ────────

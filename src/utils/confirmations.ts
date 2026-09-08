@@ -13,8 +13,11 @@ import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 
 /** 'unconfirmed' is NEVER a stored value — it is the implicit default for
  *  any (roleId, emailLower) pair with no confirmation doc at all (R410,
- *  "Unconfirmed default, implicit"). Only these two are ever written. */
-export type ConfirmationStatus = 'confirmed' | 'needsReconfirmation'
+ *  "Unconfirmed default, implicit"). The stored values:
+ *   - 'confirmed' / 'declined' — the volunteer's own whole-service response
+ *     (260908-nq5: Decline is a distinct state a leader sees on the dashboard).
+ *   - 'needsReconfirmation' — editor-only, written by the relock reconciliation. */
+export type ConfirmationStatus = 'confirmed' | 'declined' | 'needsReconfirmation'
 
 export interface ConfirmationDoc {
   roleId: string
@@ -23,7 +26,8 @@ export interface ConfirmationDoc {
   roleName: string
   emailLower: string
   status: ConfirmationStatus
-  /** serverTimestamp() when status flips to 'confirmed'; null otherwise. */
+  /** serverTimestamp() when status flips to 'confirmed'; null otherwise
+   *  (including 'declined' and 'needsReconfirmation'). */
   confirmedAt: Timestamp | null
   /** serverTimestamp() on every write (volunteer confirm/unconfirm, or the
    *  editor-side relock reconciliation). */

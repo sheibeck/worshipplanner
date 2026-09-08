@@ -25,6 +25,10 @@ const globalStubs = {
   AppShell: {
     template: '<div><slot /></div>',
   },
+  // 260908-nq5: the Confirm/Decline control now renders in each upcoming card's
+  // #actions slot. It owns a live Firestore listener; stub it here — this suite
+  // covers grouping + the Rehearse link, and VolunteerConfirmBar has its own tests.
+  VolunteerConfirmBar: { template: '<div data-testid="confirm-bar-stub" />' },
 }
 
 const mockSelectOrg = vi.fn()
@@ -202,11 +206,12 @@ describe('MyScheduleView', () => {
 
       const nextUpCard = cards.find((c) => c.text().includes('Sunday Worship'))!
       expect(nextUpCard.find('[data-testid="next-up-pill"]').exists()).toBe(true)
-      expect(nextUpCard.attributes('href')).toBe('/volunteer/service/svc-this-week')
+      // 260908-nq5: the card is no longer a link — the Rehearse link carries the href.
+      expect(nextUpCard.find('[data-testid="rehearse-link"]').attributes('href')).toBe('/volunteer/service/svc-this-week')
 
       const laterCard = cards.find((c) => c.text().includes('Youth Night'))!
       expect(laterCard.find('[data-testid="next-up-pill"]').exists()).toBe(false)
-      expect(laterCard.attributes('href')).toBe('/volunteer/service/svc-later')
+      expect(laterCard.find('[data-testid="rehearse-link"]').attributes('href')).toBe('/volunteer/service/svc-later')
     })
 
     it('reveals the past section on toggle, with an Open service link for the past card', async () => {
@@ -218,7 +223,7 @@ describe('MyScheduleView', () => {
 
       const card = wrapper.get('[data-testid="schedule-card"]')
       expect(card.text()).toContain('Open service')
-      expect(card.attributes('href')).toBe('/volunteer/service/svc-past')
+      expect(card.find('[data-testid="rehearse-link"]').attributes('href')).toBe('/volunteer/service/svc-past')
     })
 
     it('shows the first-name-only greeting, never displayLabel\'s "Dana R." form', () => {

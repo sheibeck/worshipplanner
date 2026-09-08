@@ -14,7 +14,7 @@ describe('unconfirmedAssignments', () => {
 
     const result = unconfirmedAssignments(roleAssignmentsByEmailLower, statuses)
 
-    expect(result).toEqual([{ emailLower: 'alice@example.com', roleId: 'role-1', roleName: 'Vocals' }])
+    expect(result).toEqual([{ emailLower: 'alice@example.com', roleId: 'role-1', roleName: 'Vocals', status: 'unconfirmed' }])
   })
 
   it('includes a pair whose status is needsReconfirmation', () => {
@@ -27,7 +27,20 @@ describe('unconfirmedAssignments', () => {
 
     const result = unconfirmedAssignments(roleAssignmentsByEmailLower, statuses)
 
-    expect(result).toEqual([{ emailLower: 'alice@example.com', roleId: 'role-1', roleName: 'Vocals' }])
+    expect(result).toEqual([{ emailLower: 'alice@example.com', roleId: 'role-1', roleName: 'Vocals', status: 'needsReconfirmation' }])
+  })
+
+  it('includes a pair whose status is declined (260908-nq5)', () => {
+    const roleAssignmentsByEmailLower = {
+      'alice@example.com': [{ roleId: 'role-1', roleName: 'Vocals' }],
+    }
+    const statuses = new Map<string, ConfirmationStatus>([
+      [confirmationKey('role-1', 'alice@example.com'), 'declined'],
+    ])
+
+    const result = unconfirmedAssignments(roleAssignmentsByEmailLower, statuses)
+
+    expect(result).toEqual([{ emailLower: 'alice@example.com', roleId: 'role-1', roleName: 'Vocals', status: 'declined' }])
   })
 
   it('excludes a pair whose status is confirmed', () => {
@@ -68,7 +81,7 @@ describe('unconfirmedAssignments', () => {
 
     const result = unconfirmedAssignments(roleAssignmentsByEmailLower, statuses)
 
-    expect(result).toEqual([{ emailLower: 'alice@example.com', roleId: 'role-2', roleName: 'Guitar' }])
+    expect(result).toEqual([{ emailLower: 'alice@example.com', roleId: 'role-2', roleName: 'Guitar', status: 'unconfirmed' }])
   })
 
   it('preserves input iteration order across multiple emails and roles', () => {
@@ -84,9 +97,9 @@ describe('unconfirmedAssignments', () => {
     const result = unconfirmedAssignments(roleAssignmentsByEmailLower, statuses)
 
     expect(result).toEqual([
-      { emailLower: 'bob@example.com', roleId: 'role-3', roleName: 'Drums' },
-      { emailLower: 'alice@example.com', roleId: 'role-1', roleName: 'Vocals' },
-      { emailLower: 'alice@example.com', roleId: 'role-2', roleName: 'Guitar' },
+      { emailLower: 'bob@example.com', roleId: 'role-3', roleName: 'Drums', status: 'unconfirmed' },
+      { emailLower: 'alice@example.com', roleId: 'role-1', roleName: 'Vocals', status: 'unconfirmed' },
+      { emailLower: 'alice@example.com', roleId: 'role-2', roleName: 'Guitar', status: 'unconfirmed' },
     ])
   })
 })

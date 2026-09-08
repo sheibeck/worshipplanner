@@ -1,9 +1,10 @@
 <template>
-  <router-link
-    :to="to"
-    :aria-label="ariaLabel"
+  <!-- 260908-nq5: the card is NO LONGER a whole-surface link — that let real
+       Confirm/Decline buttons live in Zone 3 next to a dedicated "Rehearse →"
+       link-button. Navigation now happens ONLY by clicking that link. -->
+  <div
     data-testid="schedule-card"
-    class="flex flex-col sm:flex-row items-stretch gap-4 rounded-xl border p-4 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-950"
+    class="flex flex-col sm:flex-row items-stretch gap-4 rounded-xl border p-4 transition-colors"
     :class="cardClass"
   >
     <!-- Zone 1 — Date block (126-UI-SPEC.md §4/§11: a vertical block at sm+,
@@ -71,14 +72,25 @@
       </div>
     </div>
 
-    <!-- Zone 3 — Right -->
-    <div class="w-full sm:w-[212px] sm:shrink-0 flex flex-col sm:items-end justify-center gap-2 sm:text-right mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-800">
+    <!-- Zone 3 — Right: countdown, then an actions row with the volunteer's
+         Confirm/Decline (slotted by My Schedule) to the LEFT of the real
+         Rehearse link-button. -->
+    <div class="w-full sm:w-auto sm:shrink-0 flex flex-col sm:items-end justify-center gap-2 sm:text-right mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-800">
       <span class="text-sm font-medium" :class="isNextUp ? 'text-indigo-300' : 'text-gray-300'">{{ countdown }}</span>
-      <span class="w-full sm:w-auto text-center inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium" :class="ctaClass">
-        {{ isPast ? 'Open service' : 'Rehearse →' }}
-      </span>
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:justify-end">
+        <slot name="actions" />
+        <router-link
+          :to="to"
+          :aria-label="ariaLabel"
+          data-testid="rehearse-link"
+          class="text-center inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-950"
+          :class="ctaClass"
+        >
+          {{ isPast ? 'Open service' : 'Rehearse →' }}
+        </router-link>
+      </div>
     </div>
-  </router-link>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -148,15 +160,17 @@ const readinessColorClass = computed(() => {
 })
 
 const cardClass = computed(() => {
+  // No whole-card hover any more — the card isn't clickable (260908-nq5).
   if (props.isNextUp) return 'border-indigo-500/50 ring-1 ring-indigo-500/10 bg-gray-900'
   if (props.isPast) return 'border-gray-800/60 bg-gray-900/60'
-  return 'border-gray-800 bg-gray-900 hover:border-gray-700'
+  return 'border-gray-800 bg-gray-900'
 })
 
+// Rehearse is now a real bordered link-button in every state (260908-nq5).
 const ctaClass = computed(() => {
-  if (props.isPast) return 'text-gray-400'
-  if (props.isNextUp) return 'border border-indigo-500 text-indigo-300'
-  return 'text-indigo-400'
+  if (props.isPast) return 'border-gray-700 text-gray-300 hover:bg-gray-800'
+  if (props.isNextUp) return 'border-indigo-500 text-indigo-200 hover:bg-indigo-600/20'
+  return 'border-indigo-600 text-indigo-300 hover:bg-indigo-900/30'
 })
 
 // A11y: the visible "Rehearse →"/"Open service" text carries no date/context

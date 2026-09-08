@@ -4422,6 +4422,7 @@ function confirmationStatusFor(roleId: string, personId: string): ConfirmationSt
 const CONFIRMATION_CHIP_LABEL: Record<ConfirmationStatus | 'unconfirmed', string> = {
   confirmed: 'Confirmed',
   needsReconfirmation: 'Needs reconfirmation',
+  declined: 'Declined',
   unconfirmed: 'Unconfirmed',
 }
 
@@ -4430,6 +4431,9 @@ const CONFIRMATION_CHIP_CLASS: Record<ConfirmationStatus | 'unconfirmed', string
     'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-800',
   needsReconfirmation:
     'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/40 text-amber-300 border border-amber-800',
+  // 260908-nq5: a volunteer who declined — red, the strongest signal.
+  declined:
+    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-900/40 text-red-300 border border-red-800',
   unconfirmed:
     'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-800 text-gray-400 border border-gray-700',
 }

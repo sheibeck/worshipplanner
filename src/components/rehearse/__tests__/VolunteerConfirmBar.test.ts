@@ -86,18 +86,23 @@ describe('VolunteerConfirmBar', () => {
     expect(mockOnSnapshot).not.toHaveBeenCalled()
   })
 
-  it('renders one prominent "Confirm service" button when unconfirmed, and subscribes live', () => {
+  it('renders Confirm and Decline buttons when unconfirmed, and subscribes live', () => {
     const wrapper = mount(VolunteerConfirmBar, {
       props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: ASSIGNMENTS },
     })
     expect(mockOnSnapshot).toHaveBeenCalledTimes(1)
-    const btn = wrapper.find('[data-testid="confirm-service-btn"]')
-    expect(btn.exists()).toBe(true)
-    expect(btn.text()).toContain('Confirm service')
-    expect(wrapper.find('[data-testid="confirm-service-state"]').exists()).toBe(false)
+    const confirm = wrapper.find('[data-testid="confirm-service-btn"]')
+    const decline = wrapper.find('[data-testid="decline-service-btn"]')
+    expect(confirm.exists()).toBe(true)
+    expect(decline.exists()).toBe(true)
+    expect(confirm.text()).toContain('Confirm')
+    expect(decline.text()).toContain('Decline')
+    // Neither is the active/pressed state while unconfirmed.
+    expect(confirm.attributes('aria-pressed')).toBe('false')
+    expect(decline.attributes('aria-pressed')).toBe('false')
   })
 
-  it('clicking "Confirm service" writes setDoc with the exact confirmed payload at the right path/key', async () => {
+  it('clicking Confirm writes setDoc with the exact confirmed payload at the right path/key', async () => {
     const wrapper = mount(VolunteerConfirmBar, {
       props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: ASSIGNMENTS },
     })
@@ -117,7 +122,26 @@ describe('VolunteerConfirmBar', () => {
     })
   })
 
-  it('confirms the WHOLE service — one click writes a confirmed doc for every role the volunteer holds', async () => {
+  it('clicking Decline writes a declined payload (confirmedAt null) for every role the volunteer holds', async () => {
+    const wrapper = mount(VolunteerConfirmBar, {
+      props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: TWO_ASSIGNMENTS },
+    })
+
+    await wrapper.find('[data-testid="decline-service-btn"]').trigger('click')
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(2)
+    const calls = mockSetDoc.mock.calls as unknown as [{ path: string }, Record<string, unknown>][]
+    expect(calls.map((c) => c[0].path).sort()).toEqual([
+      `${CONFIRMATIONS_PATH}/role-keys_dana@example.com`,
+      `${CONFIRMATIONS_PATH}/role-vocals_dana@example.com`,
+    ])
+    for (const [, payload] of calls) {
+      expect(payload.status).toBe('declined')
+      expect(payload.confirmedAt).toBeNull()
+    }
+  })
+
+  it('confirms the WHOLE service — one Confirm click writes a confirmed doc for every role', async () => {
     const wrapper = mount(VolunteerConfirmBar, {
       props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: TWO_ASSIGNMENTS },
     })
@@ -132,33 +156,60 @@ describe('VolunteerConfirmBar', () => {
     ])
   })
 
-  it('flips to a single "confirmed for this service" state (+ Undo) once every role is confirmed', async () => {
+  it('once every role is confirmed, Confirm reads "Confirmed" and is the pressed state; clicking it again undoes (deletes) every role', async () => {
     const wrapper = mount(VolunteerConfirmBar, {
       props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: TWO_ASSIGNMENTS },
     })
 
-    // Only one of the two roles confirmed -> still shows the CTA (worst-of).
+    // Only one of two confirmed -> worst-of keeps it unconfirmed (not pressed).
     emitSnapshot(CONFIRMATIONS_PATH, [
       { id: 'role-vocals_dana@example.com', data: { roleId: 'role-vocals', emailLower: 'dana@example.com', status: 'confirmed' } },
     ])
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-testid="confirm-service-btn"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="confirm-service-state"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="confirm-service-btn"]').attributes('aria-pressed')).toBe('false')
 
-    // Both roles confirmed -> confirmed state.
+    // Both confirmed -> Confirm is pressed and labelled "Confirmed".
     emitSnapshot(CONFIRMATIONS_PATH, [
       { id: 'role-vocals_dana@example.com', data: { roleId: 'role-vocals', emailLower: 'dana@example.com', status: 'confirmed' } },
       { id: 'role-keys_dana@example.com', data: { roleId: 'role-keys', emailLower: 'dana@example.com', status: 'confirmed' } },
     ])
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-testid="confirm-service-btn"]').exists()).toBe(false)
-    const state = wrapper.find('[data-testid="confirm-service-state"]')
-    expect(state.exists()).toBe(true)
-    expect(state.text()).toContain("You're confirmed for this service")
-    expect(wrapper.find('[data-testid="unconfirm-service-btn"]').exists()).toBe(true)
+    const confirm = wrapper.find('[data-testid="confirm-service-btn"]')
+    expect(confirm.attributes('aria-pressed')).toBe('true')
+    expect(confirm.text()).toContain('Confirmed')
+
+    // Clicking the already-active Confirm undoes it (delete every role's doc).
+    await confirm.trigger('click')
+    expect(mockDeleteDoc).toHaveBeenCalledTimes(2)
+    const paths = mockDeleteDoc.mock.calls.map((c) => (c as unknown as [{ path: string }])[0].path).sort()
+    expect(paths).toEqual([
+      `${CONFIRMATIONS_PATH}/role-keys_dana@example.com`,
+      `${CONFIRMATIONS_PATH}/role-vocals_dana@example.com`,
+    ])
   })
 
-  it('a needsReconfirmation role resurfaces a prominent "Reconfirm service" button', async () => {
+  it('declined: Decline reads "Declined" and is the pressed state; clicking it again undoes (deletes)', async () => {
+    const wrapper = mount(VolunteerConfirmBar, {
+      props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: ASSIGNMENTS },
+    })
+
+    emitSnapshot(CONFIRMATIONS_PATH, [
+      { id: 'role-vocals_dana@example.com', data: { roleId: 'role-vocals', emailLower: 'dana@example.com', status: 'declined' } },
+    ])
+    await wrapper.vm.$nextTick()
+
+    const decline = wrapper.find('[data-testid="decline-service-btn"]')
+    expect(decline.attributes('aria-pressed')).toBe('true')
+    expect(decline.text()).toContain('Declined')
+
+    await decline.trigger('click')
+    expect(mockDeleteDoc).toHaveBeenCalledTimes(1)
+    expect((mockDeleteDoc.mock.calls[0] as unknown as [{ path: string }])[0].path).toBe(
+      `${CONFIRMATIONS_PATH}/role-vocals_dana@example.com`,
+    )
+  })
+
+  it('a needsReconfirmation role shows the reconfirm hint and leaves neither button pressed', async () => {
     const wrapper = mount(VolunteerConfirmBar, {
       props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: ASSIGNMENTS },
     })
@@ -168,32 +219,9 @@ describe('VolunteerConfirmBar', () => {
     ])
     await wrapper.vm.$nextTick()
 
-    const btn = wrapper.find('[data-testid="reconfirm-service-btn"]')
-    expect(btn.exists()).toBe(true)
-    expect(btn.text()).toContain('Reconfirm service')
-    expect(wrapper.find('[data-testid="confirm-service-state"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="unconfirm-service-btn"]').exists()).toBe(false)
-  })
-
-  it('clicking Undo deletes the confirmation doc for every role the volunteer holds', async () => {
-    const wrapper = mount(VolunteerConfirmBar, {
-      props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: TWO_ASSIGNMENTS },
-    })
-
-    emitSnapshot(CONFIRMATIONS_PATH, [
-      { id: 'role-vocals_dana@example.com', data: { roleId: 'role-vocals', emailLower: 'dana@example.com', status: 'confirmed' } },
-      { id: 'role-keys_dana@example.com', data: { roleId: 'role-keys', emailLower: 'dana@example.com', status: 'confirmed' } },
-    ])
-    await wrapper.vm.$nextTick()
-
-    await wrapper.find('[data-testid="unconfirm-service-btn"]').trigger('click')
-
-    expect(mockDeleteDoc).toHaveBeenCalledTimes(2)
-    const paths = mockDeleteDoc.mock.calls.map((c) => (c as unknown as [{ path: string }])[0].path).sort()
-    expect(paths).toEqual([
-      `${CONFIRMATIONS_PATH}/role-keys_dana@example.com`,
-      `${CONFIRMATIONS_PATH}/role-vocals_dana@example.com`,
-    ])
+    expect(wrapper.find('[data-testid="confirm-service-reconfirm-hint"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="confirm-service-btn"]').attributes('aria-pressed')).toBe('false')
+    expect(wrapper.find('[data-testid="decline-service-btn"]').attributes('aria-pressed')).toBe('false')
   })
 
   it('tears down the previous listener and re-subscribes when serviceId changes', async () => {

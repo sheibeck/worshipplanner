@@ -3104,6 +3104,40 @@ describe('Volunteer confirmation scoped write — R410', () => {
     )
   })
 
+  it("(1b) ALLOW — the same volunteer writes a 'declined' confirmation for her own assigned role (260908-nq5)", async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'dana@example.com',
+        status: 'declined',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it("(1c) DENY — a volunteer still cannot write status:'needsReconfirmation' (editor-only relock arm)", async () => {
+    await seedConfirmationFixtures()
+    const db = testEnv
+      .authenticatedContext('danaUid', { email: 'dana@example.com', email_verified: true })
+      .firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svcA', 'confirmations', 'r1_dana@example.com'), {
+        roleId: 'r1',
+        roleName: 'Guitar',
+        emailLower: 'dana@example.com',
+        status: 'needsReconfirmation',
+        confirmedAt: null,
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
   it('(2) ALLOW — the same volunteer deletes her own confirmation to un-confirm', async () => {
     await seedConfirmationFixtures()
     await seedDoc('organizations/orgA/services/svcA/confirmations/r1_dana@example.com', {

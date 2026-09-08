@@ -10,14 +10,20 @@ export interface UnconfirmedAssignment {
   emailLower: string
   roleId: string
   roleName: string
+  /** The attention status driving this row's chip: 'unconfirmed' (no doc),
+   *  'needsReconfirmation' (stale after a relock), or 'declined' (260908-nq5 —
+   *  the volunteer actively declined). 'confirmed' rows never appear here. */
+  status: 'unconfirmed' | 'needsReconfirmation' | 'declined'
 }
 
 /**
  * Diffs a service's roleAssignmentsByEmailLower projection against its live
- * confirmation statuses. A pair is unconfirmed when it has no entry in
- * `confirmationStatuses` (the implicit default, per confirmations.ts) or the
- * stored status is 'needsReconfirmation' — mirrors ServiceEditorView.vue's
- * confirmationStatusFor default semantics exactly. Order is stable (input
+ * confirmation statuses. A pair needs attention when it has no entry in
+ * `confirmationStatuses` (the implicit 'unconfirmed' default, per
+ * confirmations.ts), the stored status is 'needsReconfirmation', or the
+ * volunteer 'declined' (260908-nq5) — mirrors ServiceEditorView.vue's
+ * confirmationStatusFor default semantics. Each row carries its own status so
+ * the dashboard can chip declined rows distinctly. Order is stable (input
  * iteration order) so callers can slice deterministically.
  */
 export function unconfirmedAssignments(
@@ -29,10 +35,10 @@ export function unconfirmedAssignments(
   const result: UnconfirmedAssignment[] = []
   for (const [emailLower, roles] of Object.entries(roleAssignmentsByEmailLower)) {
     for (const { roleId, roleName } of roles) {
-      const status = confirmationStatuses.get(confirmationKey(roleId, emailLower))
-      if (status === undefined || status === 'needsReconfirmation') {
-        result.push({ emailLower, roleId, roleName })
-      }
+      const stored = confirmationStatuses.get(confirmationKey(roleId, emailLower))
+      if (stored === 'confirmed') continue
+      const status = stored ?? 'unconfirmed'
+      result.push({ emailLower, roleId, roleName, status })
     }
   }
   return result

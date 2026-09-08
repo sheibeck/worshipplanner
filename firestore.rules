@@ -325,15 +325,15 @@ service cloud.firestore {
           // email, own-(roleId, roleName) pair (checked against
           // roleIdsByEmailLower/roleAssignmentsByEmailLower, never
           // re-derived), doc-id format matches its own fields, status
-          // pinned to 'confirmed' (only the editor arm may write
-          // 'needsReconfirmation'), and a field allowlist so no extra field
-          // can be smuggled onto the doc.
+          // limited to 'confirmed' or 'declined' (260908-nq5 — only the editor
+          // arm may write 'needsReconfirmation'), and a field allowlist so no
+          // extra field can be smuggled onto the doc.
           allow create, update: if isOrgEditor(orgId)
             || (
               isAssignedVolunteerForRole(request.resource.data.roleId, request.resource.data.roleName)
               && confirmationId == request.resource.data.roleId + '_' + request.resource.data.emailLower
               && request.resource.data.emailLower == request.auth.token.email.lower()
-              && request.resource.data.status == 'confirmed'
+              && request.resource.data.status in ['confirmed', 'declined']
               && request.resource.data.keys().hasOnly(['roleId', 'roleName', 'emailLower', 'status', 'confirmedAt', 'updatedAt'])
             );
 

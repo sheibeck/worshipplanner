@@ -140,7 +140,7 @@
                 </div>
                 <div class="min-w-0 shrink-0 max-w-[45%]">
                   <p class="truncate text-xs text-gray-500 text-right">
-                    {{ row.serviceName }}, {{ formatServiceDate(row.serviceDate) }}
+                    {{ formatServiceDateLong(row.serviceDate) }}
                   </p>
                 </div>
               </router-link>
@@ -282,6 +282,10 @@ const UNCONFIRMED_CHIP_CLASS: Record<ConfirmationStatus | 'unconfirmed', string>
     'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-800',
   needsReconfirmation:
     'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/40 text-amber-300 border border-amber-800',
+  // 260908-nq5: a volunteer who actively declined — the strongest attention
+  // signal (a leader likely needs a replacement), so red, not gray/amber.
+  declined:
+    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-900/40 text-red-300 border border-red-800',
   unconfirmed:
     'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-800 text-gray-400 border border-gray-700',
 }
@@ -289,6 +293,7 @@ const UNCONFIRMED_CHIP_CLASS: Record<ConfirmationStatus | 'unconfirmed', string>
 const UNCONFIRMED_CHIP_LABEL: Record<ConfirmationStatus | 'unconfirmed', string> = {
   confirmed: 'Confirmed',
   needsReconfirmation: 'Needs reconfirmation',
+  declined: 'Declined',
   unconfirmed: 'Unconfirmed',
 }
 
@@ -374,6 +379,18 @@ function formatServiceDate(date: string): string {
   return new Date(y!, m! - 1, d!).toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
+    day: 'numeric',
+  })
+}
+
+// 260908-nq5: the unconfirmed-volunteers rows identify the service by its DATE,
+// not its name — service names were blank/inconsistent for some rows, and the
+// date (e.g. "Sunday, September 7") is the unambiguous handle a leader scans by.
+function formatServiceDateLong(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(y!, m! - 1, d!).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
     day: 'numeric',
   })
 }
