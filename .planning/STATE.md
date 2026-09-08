@@ -1393,10 +1393,50 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: ALL 7 PHASES (131–137) EXECUTED + code-verified — milestone lifecycle next (audit → complete → cleanup)
+Phase: ALL 7 PHASES (131–137) built + audited PASS — owner doing LOCAL UAT; iterating on UAT findings
 Plan: —
-Status: v2.14 fully BUILT (131–137, R406–R427), all auto-verified green; batched human UAT deferred to milestone end (v2.14-DEFERRED-VERIFICATION.md). UNDEPLOYED. Running milestone audit next.
-Last activity: 2026-09-07 — Phase 137 complete (per-item Banner/Full-screen + lower-third banner render with transparent-default + key-color fallback)
+Status: v2.14 fully BUILT (131–137, R406–R427); milestone audit PASS (v2.14-MILESTONE-AUDIT.md: 22/22 code,
+6/6 seams WIRED). UNDEPLOYED. Owner chose to run local UAT before deploy (2026-09-07). NOT archived/closed.
+As of 2026-09-08 the owner is UATing against local emulators and reporting fixes, which are being applied +
+committed directly on master (see "UAT fixes applied" below). NEXT: continue UAT-fix loop; on clean UAT →
+owner deploy go-ahead (confirm-then-deploy: rules+functions+hosting; cleanupStalePresence cron DRY-RUN by
+default) → `/gsd-complete-milestone v2.14`.
+
+### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
+1. `1e96cc34`+`37229a02` (132) — /services tab strip: killed the spurious white vertical scrollbar, then made
+   ALL tab strips scroll horizontally on mobile with NO visible bar (new `.scrollbar-hide` in main.css applied
+   to Services/Roster/Quarter/OwnerConsole/ServiceEditor/VolunteerService tab bars).
+2. `9b8cbb0a` (133) — reworked the volunteer confirm control from per-role "I've got it" pills to ONE prominent
+   primary "Confirm service" button (VolunteerConfirmBar.vue) that confirms ALL the volunteer's roles for the
+   service at once (aggregate worst-of state; test rewritten, incl. multi-role batch).
+3. `fb05ab15` (131) — Stage Layout now auto-seeds from the roster at LOCK time (onMarkAsPlanned), not only on a
+   Stage-Layout-tab visit — fixes "locked without opening the tab → volunteer sees empty stage."
+4. `c14c4407` (137) — the per-item Banner/Full-screen picker now HIDES on a locked service (matches +Add
+   music/background) instead of showing read-only (SlideGrid `showVideoOutputControl` + test).
+5. `8394b797` (run) — the Displays-panel "Go fullscreen" button is now AMBER (warning) while a display is
+   open-but-not-fullscreen.
+6. `d89f8ef1` (run) — removed the stale hard-coded Audience/Confidence dots from the Run top bar (were wrong
+   with Video; the Displays panel already owns reopen/fullscreen). RunHeader + RunControlView + test cleaned.
+All 6: type-check clean; targeted tests green.
+
+### ⚠ OPEN REGRESSION to fix FIRST (found by full-suite run 2026-09-08)
+Full `npx vitest run` = 222 passed / **2 failed files**: `src/storage.rules.test.ts` (expected baseline) PLUS a
+NEW failure introduced by fix #3 (`fb05ab15`, stage-seed-on-lock):
+- `src/views/__tests__/ServiceEditorView.test.ts` → **CR-03** ("an outstanding autosave error stays visible in
+  the lock banner instead of vanishing when Mark as Planned locks the service").
+- **Cause:** `onMarkAsPlanned` now calls `onAutoPopulateStageLayout()` at the top of its try block, BEFORE
+  `autoSave.flush()`. When the roster resolves markers, that seed MUTATES `localService`, which triggers a
+  fresh (successful) autosave that CLEARS the outstanding save-error CR-03 requires to persist in the lock
+  banner (the test does `mockUpdateService.mockRejectedValueOnce` — one failure, so the seed's follow-up save
+  succeeds and wipes the error surface).
+- **Fix direction:** keep the seed-on-lock, but don't let it clear a pre-existing save error — e.g. skip the
+  seed when `saveStatus('service-...')` is `'error'` (there's a pending failed edit), OR seed without routing
+  through the error-clearing autosave path. Then re-run `ServiceEditorView.test.ts` + full `npx vitest run`;
+  the ONLY remaining failing file must be `src/storage.rules.test.ts`. (The `.stage.test.ts` seed tests all
+  still pass; this is purely the CR-03 error-persistence interaction.)
+
+Last activity: 2026-09-08 — applying owner UAT fixes (6 committed on master); v2.14 UNDEPLOYED. NEXT: fix the
+CR-03 regression above, re-confirm baseline, continue UAT, then deploy on owner go-ahead.
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
