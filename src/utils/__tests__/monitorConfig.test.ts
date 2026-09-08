@@ -5,11 +5,14 @@ import {
   saveMapping,
   loadMapping,
   matchMapping,
+  saveVideoKeyColor,
+  loadVideoKeyColor,
   MONITOR_CONFIG_STORAGE_KEY,
+  VIDEO_KEY_COLOR_STORAGE_KEY,
   SCREEN_QUERY_PARAM,
   NICKNAME_MAX_LENGTH,
 } from '@/utils/monitorConfig'
-import type { ScreenLike, MonitorMapping, MonitorAssignment } from '@/utils/monitorConfig'
+import type { ScreenLike, MonitorMapping, MonitorAssignment, VideoKeyColor } from '@/utils/monitorConfig'
 
 /** A minimal in-memory Storage-like stub, clearable between tests. */
 function makeMemoryStorage(): Storage {
@@ -385,5 +388,61 @@ describe('matchMapping', () => {
 describe('SCREEN_QUERY_PARAM', () => {
   it('is the opener->popup fingerprint hand-off contract constant', () => {
     expect(SCREEN_QUERY_PARAM).toBe('screen')
+  })
+})
+
+describe('saveVideoKeyColor / loadVideoKeyColor (R427)', () => {
+  let storage: Storage
+
+  beforeEach(() => {
+    storage = makeMemoryStorage()
+  })
+
+  it('returns the transparent-default when nothing is stored', () => {
+    expect(loadVideoKeyColor(storage)).toEqual({ enabled: false, colorHex: '#FF00FF' })
+  })
+
+  it('round-trips a valid enabled value', () => {
+    const value: VideoKeyColor = { enabled: true, colorHex: '#00FF00' }
+    saveVideoKeyColor(value, storage)
+    expect(loadVideoKeyColor(storage)).toEqual(value)
+  })
+
+  it('rejects a malformed colorHex (CSS expression) on read and falls back to the default', () => {
+    storage.setItem(VIDEO_KEY_COLOR_STORAGE_KEY, JSON.stringify({ enabled: true, colorHex: 'expression(alert(1))' }))
+    expect(loadVideoKeyColor(storage)).toEqual({ enabled: false, colorHex: '#FF00FF' })
+  })
+
+  it('rejects a non-hex CSS keyword (e.g. "red") on read and falls back to the default', () => {
+    storage.setItem(VIDEO_KEY_COLOR_STORAGE_KEY, JSON.stringify({ enabled: true, colorHex: 'red' }))
+    expect(loadVideoKeyColor(storage)).toEqual({ enabled: false, colorHex: '#FF00FF' })
+  })
+
+  it('rejects a stored value whose enabled field is not a boolean', () => {
+    storage.setItem(VIDEO_KEY_COLOR_STORAGE_KEY, JSON.stringify({ enabled: 'yes', colorHex: '#FF00FF' }))
+    expect(loadVideoKeyColor(storage)).toEqual({ enabled: false, colorHex: '#FF00FF' })
+  })
+
+  it('returns the default (never throws) when the stored value is malformed JSON', () => {
+    storage.setItem(VIDEO_KEY_COLOR_STORAGE_KEY, '{not valid json')
+    expect(() => loadVideoKeyColor(storage)).not.toThrow()
+    expect(loadVideoKeyColor(storage)).toEqual({ enabled: false, colorHex: '#FF00FF' })
+  })
+
+  it('saveVideoKeyColor never throws when the storage backend throws; it silently no-ops', () => {
+    const throwing = makeThrowingStorage()
+    expect(() => saveVideoKeyColor({ enabled: true, colorHex: '#00FF00' }, throwing)).not.toThrow()
+  })
+
+  it('loadVideoKeyColor never throws when the storage backend throws; it returns the default', () => {
+    const throwing = makeThrowingStorage()
+    expect(() => loadVideoKeyColor(throwing)).not.toThrow()
+    expect(loadVideoKeyColor(throwing)).toEqual({ enabled: false, colorHex: '#FF00FF' })
+  })
+
+  it('persists under a fixed device-scoped key with no uid/org interpolation', () => {
+    expect(VIDEO_KEY_COLOR_STORAGE_KEY).toBe('wp:videoKeyColor:v1')
+    saveVideoKeyColor({ enabled: true, colorHex: '#00FF00' }, storage)
+    expect(storage.getItem(VIDEO_KEY_COLOR_STORAGE_KEY)).not.toBeNull()
   })
 })
