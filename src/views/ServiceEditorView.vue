@@ -1782,7 +1782,7 @@ import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference, scri
 import type { CongregationalSection } from '@/types/slide'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
 import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
-import { autoPopulateMarkers, foldPlayAndSing, isVocalRoleName } from '@/utils/stageLayout'
+import { autoPopulateMarkers, foldPlayAndSing, reconcileBandMarkers } from '@/utils/stageLayout'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
 import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, ScriptureRef, SlotKind, ServiceSection, StageMarker } from '@/types/service'
 import type { VWType, Song } from '@/types/song'
@@ -4309,10 +4309,9 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
 
   try {
     await serviceStore.setRoleOverride(localService.value.id, assignment.roleId, nextPersonIds)
-    // 260908-cou: keep the stage layout in sync with the role change (only after
-    // the override actually persisted). Removal prunes the chit; the vocal-fold
-    // sets/clears withVocal on the person's instrument chits.
-    reconcileStageForRoleChange(assignment.roleId, personId, isRemoving)
+    // 260908-cou: keep the stage layout a live mirror of the band assignments
+    // (only after the override actually persisted).
+    syncStageWithRoles()
   } catch (err) {
     // Roll back the optimistic update so the UI doesn't show a state that
     // was never actually persisted.
@@ -4328,42 +4327,30 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
 }
 
 /**
- * 260908-cou — reconcile the stage layout after a Roles-tab role toggle persists.
- * Only Band-group roles affect the stage. Mutates `localService.stageLayout`,
- * riding the existing useAutoSave deep-watch (no new store call), same as the
- * seed. Never creates a new chit — seed owns chit creation/positioning; this only
- * removes and re-flags `withVocal`.
+ * 260908-cou — keep the stage layout a live mirror of the current Band role
+ * assignments after a Roles-tab edit (checkbox toggle OR reset-to-schedule).
+ * Adds a chit for a newly-assigned band member (auto-placed), removes one whose
+ * person is no longer assigned that role, and folds play+sing (withVocal). Runs
+ * the SAME band-filter + fold the one-time seed uses, then reconciles.
  *
- *  - remove an instrument role  → drop that person's chit for that role
- *  - remove a vocal role        → clear withVocal on the person's instrument chits
- *  - add a vocal role           → set withVocal on the person's instrument chits
- *  - add an instrument role      → no-op (no auto-placement)
+ * Only reconciles a NON-EMPTY layout: an empty canvas is left for the one-time
+ * seed to create on the next Stage-Layout visit, and a deliberately cleared
+ * layout stays cleared (preserving the WR-01 delete-all invariant). Mutates
+ * `localService.stageLayout`, riding the existing useAutoSave deep-watch.
  */
-function reconcileStageForRoleChange(roleId: string, personId: string, isRemoving: boolean): void {
+function syncStageWithRoles(): void {
   const svc = localService.value
-  const elements = svc?.stageLayout?.elements
-  if (!svc || !elements || elements.length === 0) return
-  const role = rosterStore.roles.find((r) => r.id === roleId)
-  if (!role || role.group !== 'band') return
-  const roleIsVocal = isVocalRoleName(role.name)
-  // A person's instrument chit: their marker on a non-vocal Band role.
-  const isPersonInstrumentChit = (m: StageMarker) =>
-    m.personId === personId && !!m.roleId && !isVocalRoleName(m.roleName ?? '')
-
-  let next = elements
-  if (isRemoving && !roleIsVocal) {
-    next = elements.filter((m) => !(m.personId === personId && m.roleId === roleId))
-  } else if (roleIsVocal) {
-    // Removing the vocal clears "+ Vocal"; adding it sets "+ Vocal".
-    const wantVocal = !isRemoving
-    next = elements.map((m) => {
-      if (!isPersonInstrumentChit(m) || !!m.withVocal === wantVocal) return m
-      if (wantVocal) return { ...m, withVocal: true }
-      const { withVocal: _drop, ...rest } = m
-      return rest
-    })
+  if (!svc || !canEditService.value) return
+  const existing = svc.stageLayout?.elements ?? []
+  if (existing.length === 0) return
+  const bandAssignments = stageServingAssignments.value.filter(
+    (a) => rosterStore.roles.find((r) => r.id === a.roleId)?.group === 'band',
+  )
+  const desired = foldPlayAndSing(bandAssignments)
+  const next = reconcileBandMarkers(existing, desired)
+  if (JSON.stringify(next) !== JSON.stringify(existing)) {
+    svc.stageLayout = { elements: next }
   }
-  if (next !== elements) svc.stageLayout = { ...svc.stageLayout, elements: next }
 }
 
 // ── Live confirmation status (R411) ─────────────────────────────────────────────
@@ -4477,6 +4464,9 @@ async function onResetRoleOverride(roleId: string) {
 
   try {
     await serviceStore.clearRoleOverride(localService.value.id, roleId)
+    // 260908-cou: reset-to-schedule can add or drop people in bulk — mirror the
+    // resulting band assignments onto the stage (same reconcile as the toggle).
+    syncStageWithRoles()
   } catch (err) {
     // Roll back the optimistic delete so the UI doesn't show a cleared state
     // that was never actually persisted.

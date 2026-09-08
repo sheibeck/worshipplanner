@@ -798,5 +798,63 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
       expect(alice[0]!.roleId).toBe('role-gtr')
       expect(alice[0]!.withVocal).toBeUndefined()
     })
+
+    it('live: adding a new band member to a role ADDS their chit to a seeded stage (auto-placed)', async () => {
+      // Alice plays Guitar (seeds a chit); Carol can play Drums but is NOT yet assigned.
+      mockRoles = [
+        { id: 'role-gtr', name: 'Guitar', group: 'band', defaultCount: 1, order: 0 },
+        { id: 'role-drm', name: 'Drums', group: 'band', defaultCount: 1, order: 1 },
+      ]
+      mockRosterPeople = [
+        { id: 'person-1', name: 'Alice', email: '', phone: '', active: true, roles: ['role-gtr'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+        { id: 'person-3', name: 'Carol', email: '', phone: '', active: true, roles: ['role-drm'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+      ]
+      mockQuarters = [
+        {
+          id: 'q1', label: 'Q1 2026', year: 2026, quarter: 1, serviceDates: ['2026-03-08'],
+          roleOverridesByDate: {}, personQuarterData: {},
+          calendar: { '2026-03-08': { 'role-gtr': ['person-1'] } },
+          status: 'finalized', shareToken: null, createdAt: mockTimestamp, updatedAt: mockTimestamp,
+        },
+      ]
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+      expect(markersOf(wrapper).some((m) => m.personId === 'person-3')).toBe(false)
+
+      const vm = wrapper.vm as unknown as { onToggleOverridePerson: (a: unknown, p: string) => Promise<void> }
+      await vm.onToggleOverridePerson({ roleId: 'role-drm', effectivePersonIds: [] }, 'person-3')
+      await wrapper.vm.$nextTick()
+
+      const carol = markersOf(wrapper).find((m) => m.personId === 'person-3')
+      expect(carol).toBeTruthy()
+      expect(carol!.roleId).toBe('role-drm')
+      expect(carol!.personName).toBe('Carol')
+    })
+
+    it('live: reset-to-schedule removes the chit for a person the reset unassigns', async () => {
+      // Schedule leaves Bass empty; a service override adds Bob to Bass → seeds a
+      // Bob-Bass chit. Resetting Bass to schedule unassigns Bob → his chit goes.
+      mockRoles = [{ id: 'role-bass', name: 'Bass', group: 'band', defaultCount: 1, order: 0 }]
+      mockRosterPeople = [
+        { id: 'person-2', name: 'Bob', email: '', phone: '', active: true, roles: ['role-bass'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+      ]
+      mockQuarters = [
+        {
+          id: 'q1', label: 'Q1 2026', year: 2026, quarter: 1, serviceDates: ['2026-03-08'],
+          roleOverridesByDate: {}, personQuarterData: {},
+          calendar: { '2026-03-08': {} },
+          status: 'finalized', shareToken: null, createdAt: mockTimestamp, updatedAt: mockTimestamp,
+        },
+      ]
+      const wrapper = await mountView({ roleAssignmentOverrides: { 'role-bass': ['person-2'] } })
+      await goToStageTab(wrapper)
+      expect(markersOf(wrapper).some((m) => m.personId === 'person-2')).toBe(true)
+
+      const vm = wrapper.vm as unknown as { onResetRoleOverride: (roleId: string) => Promise<void> }
+      await vm.onResetRoleOverride('role-bass')
+      await wrapper.vm.$nextTick()
+
+      expect(markersOf(wrapper).some((m) => m.personId === 'person-2')).toBe(false)
+    })
   })
 })

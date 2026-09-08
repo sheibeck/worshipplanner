@@ -338,3 +338,101 @@ export function autoPopulateMarkers(
     return marker
   })
 }
+
+// ── Live reconcile (260908-cou fix) — stage band chits mirror band assignments ─
+// After a Roles-tab edit the stage should track the roster: add a chit for a
+// newly-assigned band member, drop one whose person is no longer assigned that
+// role, and fold play+sing. This is the incremental counterpart to the one-time
+// seed (autoPopulateMarkers), so it must NOT reflow existing markers — it keeps
+// each kept marker's position and only appends new chits into free grid cells.
+
+/** Treat a grid cell as taken when an existing marker sits within this % on both
+ *  axes — keeps a newly-placed chit from landing on top of one already there. */
+const PLACEMENT_MIN_GAP = 6
+
+/**
+ * A stable placement grid (4 columns across the on-stage band, rows stepping
+ * down at a fixed pitch) that new chits drop into. Fixed pitch — NOT scaled to
+ * the chit count like autoPopulateMarkers — so adding one chit never moves the
+ * others.
+ */
+function placementCells(): { x: number; y: number }[] {
+  const xStart = STAGE_BAND.minX + AUTO_POPULATE_INSET_X
+  const xEnd = STAGE_BAND.maxX - AUTO_POPULATE_INSET_X
+  const colStep = (xEnd - xStart) / (AUTO_POPULATE_COLS - 1)
+  const rowStep = 12
+  const cells: { x: number; y: number }[] = []
+  for (let row = 0; ; row++) {
+    const y = AUTO_POPULATE_START_Y + row * rowStep
+    if (y > AUTO_POPULATE_END_Y) break
+    for (let col = 0; col < AUTO_POPULATE_COLS; col++) cells.push({ x: xStart + col * colStep, y })
+  }
+  return cells
+}
+
+function cellIsFree(cell: { x: number; y: number }, occupied: { x: number; y: number }[]): boolean {
+  return !occupied.some((o) => Math.abs(o.x - cell.x) < PLACEMENT_MIN_GAP && Math.abs(o.y - cell.y) < PLACEMENT_MIN_GAP)
+}
+
+/** Stable key for a (person, role) band-assignment chit. */
+function bandChitKey(personId: string, roleId: string): string {
+  return `${personId} ${roleId}`
+}
+
+/**
+ * Reconcile the stage's Band-assignment chits against the desired folded band
+ * assignments. Pure and store-free (the caller owns the empty-canvas guard).
+ *
+ * - A "managed" marker = one carrying BOTH a personId and a roleId (an assigned
+ *   band-role chit, seeded or hand-assigned). Gear, unassigned spots, and
+ *   fixed-kind markers have no personId/roleId and are left untouched.
+ * - Managed markers whose (person, role) is still desired are KEPT in place, with
+ *   `withVocal` updated to match the fold; those no longer desired are DROPPED.
+ * - Desired assignments with no managed marker yet are ADDED, each placed in the
+ *   first free grid cell (existing markers, including manual ones, are avoided).
+ */
+export function reconcileBandMarkers(existing: StageMarker[], desired: SeedAssignment[]): StageMarker[] {
+  const desiredByKey = new Map<string, SeedAssignment>()
+  for (const a of desired) desiredByKey.set(bandChitKey(a.id, a.roleId), a)
+
+  const result: StageMarker[] = []
+  const keptKeys = new Set<string>()
+  for (const m of existing) {
+    const managed = !!m.personId && !!m.roleId
+    if (!managed) {
+      result.push(m)
+      continue
+    }
+    const key = bandChitKey(m.personId!, m.roleId!)
+    const want = desiredByKey.get(key)
+    if (!want) continue // stale assignment → drop the chit
+    keptKeys.add(key)
+    const wantVocal = !!want.withVocal
+    if (!!m.withVocal === wantVocal) {
+      result.push(m)
+    } else if (wantVocal) {
+      result.push({ ...m, withVocal: true })
+    } else {
+      const { withVocal: _drop, ...rest } = m
+      result.push(rest)
+    }
+  }
+
+  const toAdd = desired.filter((a) => !keptKeys.has(bandChitKey(a.id, a.roleId)))
+  if (toAdd.length > 0) {
+    const cells = placementCells()
+    const occupied = result.map((m) => ({ x: m.xPct, y: m.yPct }))
+    for (const a of toAdd) {
+      const cell =
+        cells.find((c) => cellIsFree(c, occupied)) ??
+        cells[occupied.length % cells.length] ?? { x: STAGE_BAND.minX + AUTO_POPULATE_INSET_X, y: AUTO_POPULATE_START_Y }
+      const marker = createMarker({ label: a.roleName, xPct: cell.x, yPct: cell.y, roleId: a.roleId, roleName: a.roleName })
+      marker.personId = a.id
+      marker.personName = a.name
+      if (a.withVocal) marker.withVocal = true
+      result.push(marker)
+      occupied.push({ x: cell.x, y: cell.y })
+    }
+  }
+  return result
+}

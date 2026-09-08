@@ -20,10 +20,12 @@ import {
   autoPopulateMarkers,
   foldPlayAndSing,
   isVocalRoleName,
+  reconcileBandMarkers,
   STAGE_BAND,
   STAGE_KINDS,
   STAGE_KIND_META,
 } from '../stageLayout'
+import type { StageMarker } from '@/types/service'
 
 const rect = (overrides?: Partial<{ left: number; top: number; width: number; height: number }>) => ({
   left: 100,
@@ -355,6 +357,62 @@ describe('stageLayout helpers', () => {
       expect(input).toEqual(snapshot)
       // Alice's single folded chit (Guitar) precedes Bob's Bass chit.
       expect(out.map((a) => a.roleId)).toEqual(['r-gtr', 'r-bass'])
+    })
+  })
+
+  describe('reconcileBandMarkers (260908-cou live mirror)', () => {
+    const chit = (over: Partial<StageMarker> = {}): StageMarker => ({
+      id: `m-${over.personId ?? 'x'}-${over.roleId ?? 'x'}`,
+      label: over.roleName ?? 'Role',
+      zone: 'onstage',
+      xPct: 30,
+      yPct: 30,
+      ...over,
+    })
+
+    it('drops a managed chit whose (person, role) is no longer assigned', () => {
+      const existing = [chit({ personId: 'p1', roleId: 'r-gtr', roleName: 'Guitar' })]
+      const out = reconcileBandMarkers(existing, [])
+      expect(out).toEqual([])
+    })
+
+    it('keeps a still-assigned managed chit in place (same position)', () => {
+      const existing = [chit({ personId: 'p1', roleId: 'r-gtr', roleName: 'Guitar', xPct: 42, yPct: 51 })]
+      const out = reconcileBandMarkers(existing, [{ id: 'p1', name: 'Alice', roleId: 'r-gtr', roleName: 'Guitar' }])
+      expect(out).toHaveLength(1)
+      expect(out[0]).toMatchObject({ personId: 'p1', roleId: 'r-gtr', xPct: 42, yPct: 51 })
+    })
+
+    it('adds a chit for a newly-assigned band member, placed inside the on-stage band and not on top of an existing marker', () => {
+      const existing = [chit({ personId: 'p1', roleId: 'r-gtr', roleName: 'Guitar', xPct: 30, yPct: 20 })]
+      const out = reconcileBandMarkers(existing, [
+        { id: 'p1', name: 'Alice', roleId: 'r-gtr', roleName: 'Guitar' },
+        { id: 'p2', name: 'Bob', roleId: 'r-drm', roleName: 'Drums' },
+      ])
+      expect(out).toHaveLength(2)
+      const bob = out.find((m) => m.personId === 'p2')!
+      expect(bob).toMatchObject({ roleId: 'r-drm', personName: 'Bob' })
+      expect(bob.xPct).toBeGreaterThan(STAGE_BAND.minX)
+      expect(bob.xPct).toBeLessThan(STAGE_BAND.maxX)
+      expect(bob.yPct).toBeLessThan(STAGE_BAND.maxY)
+      // Not stacked on Alice's marker.
+      const alice = out.find((m) => m.personId === 'p1')!
+      expect(Math.abs(bob.xPct - alice.xPct) > 3 || Math.abs(bob.yPct - alice.yPct) > 3).toBe(true)
+    })
+
+    it('sets withVocal when the fold now wants it and clears it when it does not', () => {
+      const existing = [chit({ personId: 'p1', roleId: 'r-gtr', roleName: 'Guitar' })]
+      const on = reconcileBandMarkers(existing, [{ id: 'p1', name: 'Alice', roleId: 'r-gtr', roleName: 'Guitar', withVocal: true }])
+      expect(on[0]!.withVocal).toBe(true)
+      const off = reconcileBandMarkers(on, [{ id: 'p1', name: 'Alice', roleId: 'r-gtr', roleName: 'Guitar' }])
+      expect(off[0]!.withVocal).toBeUndefined()
+    })
+
+    it('leaves unmanaged markers (gear / no person) untouched', () => {
+      const gear: StageMarker = chit({ id: 'gear-1', kind: 'mic', roleName: undefined, xPct: 12, yPct: 60 })
+      const emptyRole: StageMarker = chit({ id: 'spot-1', roleId: 'r-gtr', roleName: 'Guitar', xPct: 15, yPct: 25 }) // no personId
+      const out = reconcileBandMarkers([gear, emptyRole], [])
+      expect(out).toEqual([gear, emptyRole])
     })
   })
 })
