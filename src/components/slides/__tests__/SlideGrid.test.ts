@@ -2586,10 +2586,9 @@ describe('SlideGrid — per-item Video output Banner/Full-screen (R425, Phase 13
     expect(wrapper.find('[data-testid="slot-video-output-row"]').exists()).toBe(false)
   })
 
-  it('renders read-only (editable=false) but still visible for a locked service', () => {
+  it('is HIDDEN on a locked service (UAT 2026-09-08 — matches +Add music/background, not shown read-only)', () => {
     const wrapper = mountGrid({ selectedSlot: makeSlot({ kind: 'SONG', id: 's', position: 0 } as never), isEditor: true, serviceLocked: true })
-    expect(wrapper.find('[data-testid="slot-video-output-row"]').exists()).toBe(true)
-    expect((wrapper.get('[data-testid="slot-video-output-banner-btn"]').element as HTMLButtonElement).disabled).toBe(true)
+    expect(wrapper.find('[data-testid="slot-video-output-row"]').exists()).toBe(false)
   })
 
   it('choosing Banner emits video-output-change with the slot array index and { mode: "banner" }', async () => {

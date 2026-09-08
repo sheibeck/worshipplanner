@@ -152,13 +152,13 @@
 
         <!-- Per-item Video-output Banner/Full-screen choice (R425, Phase 137) —
              unlike Loop, offered for EVERY slot kind (no isLoopableSlot-style
-             gate; 137-UI-SPEC.md Surface 1 scope decision). Locked service
-             shows the setting read-only (`editable="!serviceLocked"`), not
-             hidden. -->
+             gate; 137-UI-SPEC.md Surface 1 scope decision). HIDDEN on a locked
+             service (UAT 2026-09-08 — matches the +Add music / +Add background
+             controls, which hide when locked rather than showing read-only). -->
         <SlotVideoOutputControl
           v-if="showVideoOutputControl"
           :slot="selectedSlot!"
-          :editable="!serviceLocked"
+          :editable="true"
           @change="(videoOutput) => emit('video-output-change', slotArrayIndex, videoOutput)"
         />
 
@@ -530,10 +530,10 @@ const isSongGroup = computed(() => props.selectedSlot?.kind === 'SONG')
 const isLoopableSlot = computed(() => props.selectedSlot?.kind === 'MISC' || props.selectedSlot?.kind === 'ANNOUNCEMENTS')
 const canLoopSlot = computed(() => isLoopableSlot.value && props.isEditor && !props.serviceLocked)
 // Video-output Banner/Full-screen (R425) is offered for EVERY slot kind
-// (no isLoopableSlot-style gate) — editor-only, but shown (read-only) even
-// when locked, so `serviceLocked` gates the control's `editable` prop, not
-// its presence.
-const showVideoOutputControl = computed(() => Boolean(props.selectedSlot) && props.isEditor)
+// (no isLoopableSlot-style gate) — editor-only, and HIDDEN on a locked service
+// (UAT 2026-09-08), matching +Add music / +Add background (`canWriteGroupMedia`)
+// and Loop (`canLoopSlot`) rather than showing a read-only control.
+const showVideoOutputControl = computed(() => Boolean(props.selectedSlot) && props.isEditor && !props.serviceLocked)
 
 /**
  * The SONG group's own song id, read straight off the selected slot (a
