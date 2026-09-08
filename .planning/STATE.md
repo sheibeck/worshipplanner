@@ -1417,26 +1417,21 @@ default) → `/gsd-complete-milestone v2.14`.
    open-but-not-fullscreen.
 6. `d89f8ef1` (run) — removed the stale hard-coded Audience/Confidence dots from the Run top bar (were wrong
    with Video; the Displays panel already owns reopen/fullscreen). RunHeader + RunControlView + test cleaned.
-All 6: type-check clean; targeted tests green.
+7. `93a5bb5b` (132) — **fixes the CR-03 regression** fix #3 introduced: `onMarkAsPlanned` now guards the
+   stage-seed on `saveStatus.entryFor(surfaceId) !== 'error'`, so a locked service with a pending failed edit
+   keeps its save-error visible in the lock banner instead of the seed's follow-up save silently clearing it.
+   The Stage-Layout-tab watcher still seeds once the error resolves. Full `npx vitest run` back to the
+   `storage.rules.test.ts`-only baseline (224 passed / 1 failed file).
+8. `29f51936` (run, /gsd-quick) — the on-air **Live** status pill is now industry-standard RED (`--color-live`
+   #e5484d), not green. Rehearsing stays amber, Not-open muted.
+9. `6d1d026c` (run, /gsd-quick) — clicking a filmstrip thumbnail now keeps the active-green frame instead
+   of a competing blue: the button's indigo focus ring moved from `focus:` to `focus-visible:`, so a mouse
+   click no longer overrides `ring-green-500`. Hotkey and click paths now highlight identically.
+All: type-check clean; targeted tests green; full suite at baseline.
 
-### ⚠ OPEN REGRESSION to fix FIRST (found by full-suite run 2026-09-08)
-Full `npx vitest run` = 222 passed / **2 failed files**: `src/storage.rules.test.ts` (expected baseline) PLUS a
-NEW failure introduced by fix #3 (`fb05ab15`, stage-seed-on-lock):
-- `src/views/__tests__/ServiceEditorView.test.ts` → **CR-03** ("an outstanding autosave error stays visible in
-  the lock banner instead of vanishing when Mark as Planned locks the service").
-- **Cause:** `onMarkAsPlanned` now calls `onAutoPopulateStageLayout()` at the top of its try block, BEFORE
-  `autoSave.flush()`. When the roster resolves markers, that seed MUTATES `localService`, which triggers a
-  fresh (successful) autosave that CLEARS the outstanding save-error CR-03 requires to persist in the lock
-  banner (the test does `mockUpdateService.mockRejectedValueOnce` — one failure, so the seed's follow-up save
-  succeeds and wipes the error surface).
-- **Fix direction:** keep the seed-on-lock, but don't let it clear a pre-existing save error — e.g. skip the
-  seed when `saveStatus('service-...')` is `'error'` (there's a pending failed edit), OR seed without routing
-  through the error-clearing autosave path. Then re-run `ServiceEditorView.test.ts` + full `npx vitest run`;
-  the ONLY remaining failing file must be `src/storage.rules.test.ts`. (The `.stage.test.ts` seed tests all
-  still pass; this is purely the CR-03 error-persistence interaction.)
-
-Last activity: 2026-09-08 — applying owner UAT fixes (6 committed on master); v2.14 UNDEPLOYED. NEXT: fix the
-CR-03 regression above, re-confirm baseline, continue UAT, then deploy on owner go-ahead.
+Last activity: 2026-09-08 — CR-03 regression FIXED + 2 /gsd-quick UAT polish fixes (Live-red, thumb-green);
+v2.14 UNDEPLOYED, full suite at `storage.rules.test.ts`-only baseline. NEXT: continue owner UAT, then deploy
+on owner go-ahead (confirm-then-deploy: rules+functions+hosting; cleanupStalePresence cron DRY-RUN).
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
