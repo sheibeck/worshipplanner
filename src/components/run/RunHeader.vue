@@ -9,31 +9,18 @@ const props = defineProps<{
   positionLabel: string
   clock: string
   elapsed: string
-  audienceOpen: boolean
-  confidenceOpen: boolean
   blackout: boolean
 }>()
 
 // Owner fix #7: green ONLY on a real go-live (live && !rehearsing).
 const trulyLive = computed(() => props.live && !props.rehearsing)
 
-const emit = defineEmits<{
+defineEmits<{
   exit: []
-  reopen: [role: 'audience' | 'confidence']
   // Owner UAT: the blackout toggle asks the parent (single writer) to flip the
   // projector-black state — the parent calls postBlackout(!blackout).
   'toggle-blackout': []
 }>()
-
-/** See ADR-0099 (docs/adr/0099-a-display-dot-is-a-reopen-affordance-only-when-it-represents.md) */
-const audienceReopenable = computed(() => props.live && !props.audienceOpen)
-const confidenceReopenable = computed(() => props.live && !props.confidenceOpen)
-
-function onReopen(role: 'audience' | 'confidence') {
-  const reopenable = role === 'audience' ? audienceReopenable.value : confidenceReopenable.value
-  if (!reopenable) return // passive pre-live / already-open dot — never emit reopen
-  emit('reopen', role)
-}
 </script>
 
 <template>
@@ -70,52 +57,12 @@ function onReopen(role: 'audience' | 'confidence') {
       <span class="run-header__elapsed" data-testid="run-elapsed">{{ elapsed }}</span>
     </span>
 
-    <!-- Displays cluster: audience + confidence dots (green when open, amber/muted
-         otherwise) that reopen their display on click. -->
-    <div class="run-displays">
-      <button
-        type="button"
-        class="run-display"
-        :class="[
-          audienceOpen ? 'run-display--open' : 'run-display--closed',
-          audienceReopenable ? '' : 'run-display--static',
-        ]"
-        data-testid="run-display-dot-audience"
-        :disabled="!audienceReopenable"
-        :aria-label="
-          audienceOpen
-            ? 'Audience display open'
-            : audienceReopenable
-              ? 'Audience display not open — reopen'
-              : 'Audience display not open'
-        "
-        @click="onReopen('audience')"
-      >
-        <span class="run-display__dot" aria-hidden="true"></span>
-        Audience
-      </button>
-      <button
-        type="button"
-        class="run-display"
-        :class="[
-          confidenceOpen ? 'run-display--open' : 'run-display--closed',
-          confidenceReopenable ? '' : 'run-display--static',
-        ]"
-        data-testid="run-display-dot-confidence"
-        :disabled="!confidenceReopenable"
-        :aria-label="
-          confidenceOpen
-            ? 'Confidence display open'
-            : confidenceReopenable
-              ? 'Confidence display not open — reopen'
-              : 'Confidence display not open'
-        "
-        @click="onReopen('confidence')"
-      >
-        <span class="run-display__dot" aria-hidden="true"></span>
-        Confidence
-      </button>
-    </div>
+    <!-- The old top-bar Audience/Confidence dots were removed (owner UAT 2026-09-08):
+         they were hard-coded to two fixed roles (wrong once you use Video), and the
+         Displays Panel below already lists every actual output + its reopen/fullscreen
+         controls. This zero-width spacer keeps the right-hand cluster (blackout, exit)
+         right-aligned, exactly as `.run-displays`' `margin-left:auto` did. -->
+    <div class="run-header__spacer" aria-hidden="true"></div>
 
     <!-- BLACKOUT TOGGLE (owner UAT) — a single live-ops control replacing the old
          Black/Clear output panel. Shown ONLY when truly live (live && !rehearsing):
@@ -255,48 +202,10 @@ function onReopen(role: 'audience' | 'confidence') {
   color: var(--color-neutral-600);
 }
 
-.run-displays {
+/* Absorbs free space so the right-hand cluster (blackout, exit) stays right-
+   aligned — replaces the removed `.run-displays` margin-left:auto (owner UAT). */
+.run-header__spacer {
   margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-}
-.run-display {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0 8px;
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.run-display__dot {
-  height: 8px;
-  width: 8px;
-  flex: none;
-  border-radius: 9999px;
-}
-.run-display--open {
-  color: var(--color-ok);
-}
-.run-display--open .run-display__dot {
-  background: var(--color-ok);
-}
-.run-display--closed {
-  color: var(--color-amber);
-}
-.run-display--closed .run-display__dot {
-  background: var(--color-amber);
-}
-.run-display:hover:not(:disabled) {
-  background: var(--color-surface);
-}
-/* Passive status indicator (pre-live or already-open): no reopen affordance. */
-.run-display--static {
-  cursor: default;
 }
 
 /* Blackout toggle — a live-ops control. Neutral when the projector is showing,

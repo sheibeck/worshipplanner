@@ -719,54 +719,12 @@ describe('RunControlView — in-item filmstrip jump + scaled next-up (R282/R276)
   })
 })
 
-// ── 97 REVIEW WR-01: pre-live / rehearse display dots open NO window (R283) ──────
-// The header Audience/Confidence dots must NOT be a reopen affordance outside a
-// live session with a held go-live. Pre-flight the dot is a passive (disabled)
-// indicator; during Rehearse (live, but no getScreenDetails was ever resolved) a
-// stray emit is caught by reopenOutput's liveScreenDetails===null guard. Either
-// way NO output window opens outside the go-live gesture (window.open is stubbed
-// to null on mount, so any reopen would register as a call).
-describe('RunControlView — pre-live display dots are passive (WR-01/R283)', () => {
-  it('clicking a pre-flight Audience/Confidence header dot opens NO window and the dot is disabled', async () => {
-    const fake = createFakeChannel()
-    const wrapper = mountView(fake.factory)
-    await flushPromises()
-
-    // State A (pre-live): the dots render but are DISABLED passive indicators.
-    const audienceDot = wrapper.find('[data-testid="run-display-dot-audience"]')
-    const confidenceDot = wrapper.find('[data-testid="run-display-dot-confidence"]')
-    expect(audienceDot.exists()).toBe(true)
-    expect(confidenceDot.exists()).toBe(true)
-    expect(audienceDot.attributes('disabled')).toBeDefined()
-    expect(confidenceDot.attributes('disabled')).toBeDefined()
-
-    const openCallsBefore = vi.mocked(window.open).mock.calls.length
-    await audienceDot.trigger('click')
-    await confidenceDot.trigger('click')
-    await flushPromises()
-
-    // No reopen fired: window.open was never called from a pre-live dot click, so
-    // no un-positioned output window was opened outside the go-live gesture.
-    expect(vi.mocked(window.open).mock.calls.length).toBe(openCallsBefore)
-  })
-
-  it('after rehearse (live, NO windows) clicking a header dot still opens NO window (reopenOutput no-ops)', async () => {
-    const fake = createFakeChannel()
-    const wrapper = mountView(fake.factory)
-    await flushPromises()
-
-    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
-    await flushPromises()
-
-    // Rehearse never resolved getScreenDetails, so liveScreenDetails is null and the
-    // reopenOutput guard no-ops even though the dot is now actionable (live && !open).
-    const openCallsBefore = vi.mocked(window.open).mock.calls.length
-    await wrapper.find('[data-testid="run-display-dot-audience"]').trigger('click')
-    await wrapper.find('[data-testid="run-display-dot-confidence"]').trigger('click')
-    await flushPromises()
-    expect(vi.mocked(window.open).mock.calls.length).toBe(openCallsBefore)
-  })
-})
+// ── The top-bar Audience/Confidence header dots were REMOVED (owner UAT 2026-09-08):
+// they were hard-coded to two fixed roles (wrong once Video is used) and duplicated
+// the Displays Panel, which owns reopen/fullscreen. The old WR-01/R283 tests here
+// (pre-live/rehearse dot clicks open NO window) asserted the removed dots; reopen
+// safety is now covered by the Displays Panel's own tests (RunControlView.output.test.ts
+// + RunDisplaysPanel). No header-dot tests remain.
 
 // ── 97 REVIEW WR-02: pre-flight Enter triggers go-live; inert once live ─────────
 describe('RunControlView — Enter goes live from pre-flight (WR-02)', () => {

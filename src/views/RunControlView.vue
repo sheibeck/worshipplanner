@@ -19,11 +19,8 @@
       :positionLabel="positionLabel"
       :clock="clock"
       :elapsed="elapsed"
-      :audienceOpen="audienceOpen"
-      :confidenceOpen="confidenceOpen"
       :blackout="blackout"
       @exit="onExitRequest"
-      @reopen="reopenOutput"
       @toggle-blackout="postBlackout(!blackout)"
     />
 
