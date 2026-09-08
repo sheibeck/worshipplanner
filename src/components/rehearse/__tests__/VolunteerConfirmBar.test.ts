@@ -1,8 +1,10 @@
 /**
  * Phase 133 Plan 02 (R410) — VolunteerConfirmBar.vue: the volunteer-facing
- * "I've got it" control. Mirrors ConfigurationTab.test.ts's firebase/firestore
- * onSnapshot-callback-capture harness so the mount never touches real
- * Firestore, and useVolunteerServiceDoc.test.ts's @/firebase stub convention.
+ * confirmation control. Reworked at UAT (2026-09-08) from per-role "I've got it"
+ * pills to a single prominent primary "Confirm service" button that confirms the
+ * volunteer's WHOLE responsibility (all their roles) for the service at once.
+ * Mirrors ConfigurationTab.test.ts's firebase/firestore onSnapshot-callback-
+ * capture harness so the mount never touches real Firestore.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
@@ -60,6 +62,10 @@ function emitSnapshot(path: string, docs: { id: string; data: Record<string, unk
 }
 
 const ASSIGNMENTS = [{ roleId: 'role-vocals', roleName: 'Vocals' }]
+const TWO_ASSIGNMENTS = [
+  { roleId: 'role-vocals', roleName: 'Vocals' },
+  { roleId: 'role-keys', roleName: 'Keys' },
+]
 const CONFIRMATIONS_PATH = 'organizations/org-1/services/svc-1/confirmations'
 
 describe('VolunteerConfirmBar', () => {
@@ -80,21 +86,23 @@ describe('VolunteerConfirmBar', () => {
     expect(mockOnSnapshot).not.toHaveBeenCalled()
   })
 
-  it('renders one "I\'ve got it" control per unconfirmed role, and subscribes live', () => {
+  it('renders one prominent "Confirm service" button when unconfirmed, and subscribes live', () => {
     const wrapper = mount(VolunteerConfirmBar, {
       props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: ASSIGNMENTS },
     })
     expect(mockOnSnapshot).toHaveBeenCalledTimes(1)
-    expect(wrapper.find('[data-testid="confirm-btn-role-vocals"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="confirm-state-role-vocals"]').exists()).toBe(false)
+    const btn = wrapper.find('[data-testid="confirm-service-btn"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.text()).toContain('Confirm service')
+    expect(wrapper.find('[data-testid="confirm-service-state"]').exists()).toBe(false)
   })
 
-  it('clicking "I\'ve got it" writes setDoc with the exact confirmed payload at the right path/key', async () => {
+  it('clicking "Confirm service" writes setDoc with the exact confirmed payload at the right path/key', async () => {
     const wrapper = mount(VolunteerConfirmBar, {
       props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: ASSIGNMENTS },
     })
 
-    await wrapper.find('[data-testid="confirm-btn-role-vocals"]').trigger('click')
+    await wrapper.find('[data-testid="confirm-service-btn"]').trigger('click')
 
     expect(mockSetDoc).toHaveBeenCalledTimes(1)
     const [ref, payload] = mockSetDoc.mock.calls[0] as unknown as [{ path: string }, Record<string, unknown>]
@@ -109,78 +117,83 @@ describe('VolunteerConfirmBar', () => {
     })
   })
 
-  it('a live snapshot emitting a confirmed doc flips the control to Confirmed + shows Undo', async () => {
+  it('confirms the WHOLE service — one click writes a confirmed doc for every role the volunteer holds', async () => {
     const wrapper = mount(VolunteerConfirmBar, {
-      props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: ASSIGNMENTS },
+      props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: TWO_ASSIGNMENTS },
     })
 
+    await wrapper.find('[data-testid="confirm-service-btn"]').trigger('click')
+
+    expect(mockSetDoc).toHaveBeenCalledTimes(2)
+    const paths = mockSetDoc.mock.calls.map((c) => (c as unknown as [{ path: string }])[0].path).sort()
+    expect(paths).toEqual([
+      `${CONFIRMATIONS_PATH}/role-keys_dana@example.com`,
+      `${CONFIRMATIONS_PATH}/role-vocals_dana@example.com`,
+    ])
+  })
+
+  it('flips to a single "confirmed for this service" state (+ Undo) once every role is confirmed', async () => {
+    const wrapper = mount(VolunteerConfirmBar, {
+      props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: TWO_ASSIGNMENTS },
+    })
+
+    // Only one of the two roles confirmed -> still shows the CTA (worst-of).
     emitSnapshot(CONFIRMATIONS_PATH, [
-      {
-        id: 'role-vocals_dana@example.com',
-        data: {
-          roleId: 'role-vocals',
-          roleName: 'Vocals',
-          emailLower: 'dana@example.com',
-          status: 'confirmed',
-        },
-      },
+      { id: 'role-vocals_dana@example.com', data: { roleId: 'role-vocals', emailLower: 'dana@example.com', status: 'confirmed' } },
     ])
     await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="confirm-service-btn"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="confirm-service-state"]').exists()).toBe(false)
 
-    expect(wrapper.find('[data-testid="confirm-btn-role-vocals"]').exists()).toBe(false)
-    const state = wrapper.find('[data-testid="confirm-state-role-vocals"]')
+    // Both roles confirmed -> confirmed state.
+    emitSnapshot(CONFIRMATIONS_PATH, [
+      { id: 'role-vocals_dana@example.com', data: { roleId: 'role-vocals', emailLower: 'dana@example.com', status: 'confirmed' } },
+      { id: 'role-keys_dana@example.com', data: { roleId: 'role-keys', emailLower: 'dana@example.com', status: 'confirmed' } },
+    ])
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="confirm-service-btn"]').exists()).toBe(false)
+    const state = wrapper.find('[data-testid="confirm-service-state"]')
     expect(state.exists()).toBe(true)
-    expect(state.text()).toContain('Confirmed')
-    expect(wrapper.find('[data-testid="undo-btn-role-vocals"]').exists()).toBe(true)
+    expect(state.text()).toContain("You're confirmed for this service")
+    expect(wrapper.find('[data-testid="unconfirm-service-btn"]').exists()).toBe(true)
   })
 
-  it('a live snapshot emitting needsReconfirmation renders a distinct treatment with confirm still available', async () => {
+  it('a needsReconfirmation role resurfaces a prominent "Reconfirm service" button', async () => {
     const wrapper = mount(VolunteerConfirmBar, {
       props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: ASSIGNMENTS },
     })
 
     emitSnapshot(CONFIRMATIONS_PATH, [
-      {
-        id: 'role-vocals_dana@example.com',
-        data: {
-          roleId: 'role-vocals',
-          roleName: 'Vocals',
-          emailLower: 'dana@example.com',
-          status: 'needsReconfirmation',
-        },
-      },
+      { id: 'role-vocals_dana@example.com', data: { roleId: 'role-vocals', emailLower: 'dana@example.com', status: 'needsReconfirmation' } },
     ])
     await wrapper.vm.$nextTick()
 
-    const state = wrapper.find('[data-testid="confirm-state-role-vocals"]')
-    expect(state.text()).toContain('Please reconfirm')
-    expect(wrapper.find('[data-testid="confirm-btn-role-vocals"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="undo-btn-role-vocals"]').exists()).toBe(false)
+    const btn = wrapper.find('[data-testid="reconfirm-service-btn"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.text()).toContain('Reconfirm service')
+    expect(wrapper.find('[data-testid="confirm-service-state"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="unconfirm-service-btn"]').exists()).toBe(false)
   })
 
-  it('clicking Undo calls deleteDoc on the caller\'s own confirmation path', async () => {
+  it('clicking Undo deletes the confirmation doc for every role the volunteer holds', async () => {
     const wrapper = mount(VolunteerConfirmBar, {
-      props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: ASSIGNMENTS },
+      props: { orgId: 'org-1', serviceId: 'svc-1', myAssignments: TWO_ASSIGNMENTS },
     })
 
     emitSnapshot(CONFIRMATIONS_PATH, [
-      {
-        id: 'role-vocals_dana@example.com',
-        data: {
-          roleId: 'role-vocals',
-          roleName: 'Vocals',
-          emailLower: 'dana@example.com',
-          status: 'confirmed',
-        },
-      },
+      { id: 'role-vocals_dana@example.com', data: { roleId: 'role-vocals', emailLower: 'dana@example.com', status: 'confirmed' } },
+      { id: 'role-keys_dana@example.com', data: { roleId: 'role-keys', emailLower: 'dana@example.com', status: 'confirmed' } },
     ])
     await wrapper.vm.$nextTick()
 
-    await wrapper.find('[data-testid="undo-btn-role-vocals"]').trigger('click')
+    await wrapper.find('[data-testid="unconfirm-service-btn"]').trigger('click')
 
-    expect(mockDeleteDoc).toHaveBeenCalledTimes(1)
-    const [ref] = mockDeleteDoc.mock.calls[0] as unknown as [{ path: string }]
-    expect(ref.path).toBe(`${CONFIRMATIONS_PATH}/role-vocals_dana@example.com`)
+    expect(mockDeleteDoc).toHaveBeenCalledTimes(2)
+    const paths = mockDeleteDoc.mock.calls.map((c) => (c as unknown as [{ path: string }])[0].path).sort()
+    expect(paths).toEqual([
+      `${CONFIRMATIONS_PATH}/role-keys_dana@example.com`,
+      `${CONFIRMATIONS_PATH}/role-vocals_dana@example.com`,
+    ])
   })
 
   it('tears down the previous listener and re-subscribes when serviceId changes', async () => {
