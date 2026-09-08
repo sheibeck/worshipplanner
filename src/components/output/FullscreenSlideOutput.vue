@@ -11,7 +11,7 @@
     :ref="setRootRefs"
     :data-testid="`${testid}-output`"
     class="fixed inset-0 bg-black flex items-center justify-center"
-    :style="rootStyle"
+    :style="[rootStyle, bannerBackgroundStyle]"
   >
     <!-- R329 canonical stage — a fixed 1280x720 box (REFERENCE_WIDTH/HEIGHT) that
          SlideCanvas always fills, so its per-slide auto-fit measures against the
@@ -21,9 +21,10 @@
          bounded font gate has resolved; otherwise the surface is pure black with
          zero elements (deliberate divergence from PresentationViewer's spinner +
          "Loading slideshow…" heading — a projector must never flash a spinner or
-         copy at a congregation). -->
+         copy at a congregation). isVideoBanner is always false for every non-video
+         role, so this branch is UNCHANGED for them (R427 is Video-only). -->
     <div
-      v-if="currentSlide && fontReady"
+      v-if="currentSlide && fontReady && !isVideoBanner"
       :data-testid="`${testid}-stage`"
       class="relative overflow-hidden"
       :style="stageStyle"
@@ -33,6 +34,34 @@
         :slide="currentSlide"
         :interactive="false"
       />
+    </div>
+
+    <!-- R427 — the Video-only banner branch: a bottom lower-third band (28% of
+         the frame height) instead of the full-stage. A SECOND, smaller
+         useContainScale region (1280x200) mirrors the full-stage pattern above,
+         with its own title-safe inset (64px horizontal / 16px top / 12px
+         bottom) wrapping SlideCanvas. The band itself carries NO background so
+         the root's transparent/key-color fill (bannerBackgroundStyle) shows
+         through any letterbox bars inside it. -->
+    <div
+      v-if="currentSlide && fontReady && isVideoBanner"
+      ref="bannerContainerRef"
+      :data-testid="`${testid}-banner-band`"
+      class="absolute inset-x-0 bottom-0 overflow-hidden flex items-center justify-center"
+      style="height: 28%"
+    >
+      <div class="relative overflow-hidden" :style="bannerStageStyle">
+        <div
+          class="absolute inset-0 flex items-center justify-center"
+          style="padding: 16px 64px 12px 64px"
+        >
+          <SlideCanvas
+            ref="bannerSlideCanvasRef"
+            :slide="currentSlide"
+            :interactive="false"
+          />
+        </div>
+      </div>
     </div>
 
     <!-- R280 — full-bleed blackout overlay. When the control posts blackout:true
@@ -82,13 +111,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount, nextTick, type ComponentPublicInstance } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, nextTick, type ComponentPublicInstance, type CSSProperties } from 'vue'
 import type { AssembledSlide } from '@/types/slide'
 import { useOutputWindow } from '@/composables/useOutputWindow'
 import { useContainScale, REFERENCE_WIDTH, REFERENCE_HEIGHT } from '@/composables/useSlideAutoFit'
 import type { BroadcastChannelFactory } from '@/utils/runChannel'
-import type { MonitorRole } from '@/utils/monitorConfig'
+import { loadVideoKeyColor, type MonitorRole } from '@/utils/monitorConfig'
 import SlideCanvas from '@/components/slides/SlideCanvas.vue'
+
+/** The band's reference geometry (R427/137-UI-SPEC.md Surface 2) — 1280x200,
+ *  ~28% of the 1280x720 full-stage reference height. A second, smaller
+ *  useContainScale region alongside the main stage's, never replacing it. */
+const BANNER_REFERENCE_WIDTH = 1280
+const BANNER_REFERENCE_HEIGHT = 200
 
 /**
  * Testability seam (93-PATTERNS §4): the run-channel factory is injectable so
@@ -109,8 +144,17 @@ const props = defineProps<{
 }>()
 
 // See ADR-0210 (docs/adr/0210-the-shared-output-window-lifecycle-core-r272-reuse-not-fork.md)
-const { assembledSlideshow, index, blackout, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
-  useOutputWindow({ channelFactory: props.channelFactory, role: props.role })
+const {
+  assembledSlideshow,
+  localService,
+  index,
+  blackout,
+  fontReady,
+  rootRef,
+  rootStyle,
+  isFullscreen,
+  handleReenterFullscreen,
+} = useOutputWindow({ channelFactory: props.channelFactory, role: props.role })
 
 // R329 — the canonical 1280x720 stage scaled to CONTAIN this fixed root
 // (letterboxed, never stretched); containerRef shares the same DOM node as
@@ -136,14 +180,52 @@ const currentSlide = computed<AssembledSlide | null>(() =>
 )
 const slideCanvasRef = ref<InstanceType<typeof SlideCanvas> | null>(null)
 
+// ── R427 — Video-only banner branch ──────────────────────────────────────────
+// Resolved the same way useRunControl's currentLoopSlot() resolves `loop`:
+// localService.slots[currentSlide.slotIndex]?.videoOutput?.mode — no new
+// wiring, just a second field read off the same slot. Strict `=== 'banner'`:
+// absent, 'fullscreen', or any tampered value degrades to the unchanged
+// full-stage render (T-137-02 — no crash surface).
+const currentSlideVideoOutputMode = computed<string | undefined>(
+  () => localService.value?.slots[currentSlide.value?.slotIndex ?? -1]?.videoOutput?.mode,
+)
+const isVideoBanner = computed(() => props.role === 'video' && currentSlideVideoOutputMode.value === 'banner')
+
+// Read once at setup — this standalone output window opens fresh per launch,
+// so a live storage-event listener is unnecessary (discretionary per plan).
+const keyColor = loadVideoKeyColor()
+const bannerBackgroundStyle = computed<CSSProperties>(() => {
+  if (!isVideoBanner.value) return {}
+  return { background: keyColor.enabled ? keyColor.colorHex : 'transparent' }
+})
+
+// A SECOND, smaller useContainScale region (1280x200) for the band — mirrors
+// the full-stage containerRef/stageStyle pattern above, never replacing it.
+const { containerRef: bannerContainerRef, scale: bannerContainScale } = useContainScale({
+  refW: BANNER_REFERENCE_WIDTH,
+  refH: BANNER_REFERENCE_HEIGHT,
+})
+const bannerStageStyle = computed(() => ({
+  width: `${BANNER_REFERENCE_WIDTH}px`,
+  height: `${BANNER_REFERENCE_HEIGHT}px`,
+  transform: `scale(${bannerContainScale.value})`,
+  transformOrigin: 'center',
+}))
+const bannerSlideCanvasRef = ref<InstanceType<typeof SlideCanvas> | null>(null)
+
+/** Only one of the two branches renders at a time, so exactly one ref is non-null. */
+function activeSlideCanvasRef() {
+  return slideCanvasRef.value ?? bannerSlideCanvasRef.value
+}
+
 // Drive the T-23-08 pause -> (index already written) -> play sequence through the
 // exposed handles exactly as PresentationViewer.goToIndex. A default (pre-flush)
 // watcher runs BEFORE the canvas re-renders, so pause() hits the outgoing slide's
 // media, then after nextTick the canvas holds the new slide and play() starts it.
 watch(index, async () => {
-  slideCanvasRef.value?.pause()
+  activeSlideCanvasRef()?.pause()
   await nextTick()
-  slideCanvasRef.value?.play()
+  activeSlideCanvasRef()?.play()
 })
 
 // Deferred first play — re-homed from the old onMounted (audience 256-259) to a
@@ -152,11 +234,11 @@ watch(index, async () => {
 // mounts, play() is called after the DOM update.
 watch(fontReady, (ready) => {
   if (!ready) return
-  void nextTick().then(() => slideCanvasRef.value?.play())
+  void nextTick().then(() => activeSlideCanvasRef()?.play())
 })
 
-// slideCanvasRef is nulled by Vue before onUnmounted runs, so pause() here.
+// Refs are nulled by Vue before onUnmounted runs, so pause() here.
 onBeforeUnmount(() => {
-  slideCanvasRef.value?.pause()
+  activeSlideCanvasRef()?.pause()
 })
 </script>

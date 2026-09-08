@@ -27,7 +27,10 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
   const route = useRoute()
 
   // See ADR-0123 (docs/adr/0123-lifecycle.md)
-  const { serviceId, assembledSlideshow } = useServiceAssembly()
+  // localService (Plan 02, R427) — additive: exposes the raw slot array so a
+  // banner-capable render can resolve `localService.slots[slotIndex].videoOutput`
+  // (the same resolution path useRunControl's currentLoopSlot() uses for `loop`).
+  const { serviceId, assembledSlideshow, localService } = useServiceAssembly()
 
   // ── Run channel (receive-only) ─────────────────────────────────────────────
   const index = ref<number | null>(null)
@@ -244,5 +247,15 @@ export function useOutputWindow(options: UseOutputWindowOptions = {}) {
     serviceStore.unsubscribeAll()
   })
 
-  return { assembledSlideshow, index, blackout, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen }
+  return {
+    assembledSlideshow,
+    localService,
+    index,
+    blackout,
+    fontReady,
+    rootRef,
+    rootStyle,
+    isFullscreen,
+    handleReenterFullscreen,
+  }
 }
