@@ -4,17 +4,17 @@ milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
 current_phase: 137
 current_phase_name: Video Output — Banner Render
-status: executing
-stopped_at: Completed 137-01-PLAN.md
-last_updated: "2026-09-08T01:16:27.831Z"
+status: verifying
+stopped_at: Completed 137-02-PLAN.md
+last_updated: "2026-09-08T01:45:50.464Z"
 last_activity: 2026-09-07
 last_activity_desc: Phase 137 execution started
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 20
-  completed_plans: 19
-  percent: 86
+  completed_plans: 20
+  percent: 100
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1395,7 +1395,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 137 (Video Output — Banner Render) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-07 — Phase 137 execution started
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
@@ -3628,6 +3628,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 136 P01 | 10min | 2 tasks | 8 files |
 | Phase 136 P02 | 25min | 2 tasks | 5 files |
 | Phase 137 P01 | 14min | 2 tasks | 7 files |
+| Phase 137 P02 | 55min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -4234,6 +4235,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R426 satisfied by extracting the Audience render into a shared role/testid-parameterized FullscreenSlideOutput.vue that both AudienceOutputView and the new VideoOutputView delegate to, proven behavior-preserving by the unedited AudienceOutputView test suite.
 - [Phase ?]: /present/video/:serviceId launches through the existing N-assignment machinery with zero useRunControl.ts changes — urlForAssignment/openPlaced/openUnplaced/canGoLive were already role-generic.
 - [Phase ?]: R425: videoOutput shown for EVERY slot kind (no isLoopableSlot-style gate), unlike loop; locked service renders it read-only-but-visible, not hidden
+- [Phase ?]: Key-color setting stored per-device (localStorage wp:videoKeyColor:v1), sibling of MONITOR_CONFIG_STORAGE_KEY — mirrors existing device-local reasoning for monitor role mappings
+- [Phase ?]: Root bg-black class stays unconditional; banner mode's transparent/key-color background is an inline override only, so fullscreen/non-video path carries zero new markup or conditions
 
 ### Roadmap Evolution
 
@@ -4563,8 +4566,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-08T01:16:27.740Z
-Stopped at: Completed 137-01-PLAN.md
+Last session: 2026-09-08T01:45:50.384Z
+Stopped at: Completed 137-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

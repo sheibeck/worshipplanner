@@ -132,7 +132,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 - [x] **R426**: A slide sent Full-screen to the Video output fills the entire video picture, reusing the
   existing Audience full-slide render (no new rendering code).
 
-- [ ] **R427**: A slide sent as a Banner to the Video output renders its contents fit to a bottom
+- [x] **R427**: A slide sent as a Banner to the Video output renders its contents fit to a bottom
   lower-third region (title-safe inset, readable default text), with the rest of the output rendered
   **transparent by default** so a software compositor shows live video behind it, plus a **configurable
   solid key-color fallback** (default saturated magenta, `<input type="color">`) for a tool that needs a
@@ -188,4 +188,4 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R424 | Phase 136 | Complete |
 | R425 | Phase 137 | Complete |
 | R426 | Phase 136 | Complete |
-| R427 | Phase 137 | Pending |
+| R427 | Phase 137 | Complete |
