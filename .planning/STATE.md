@@ -1427,11 +1427,18 @@ default) → `/gsd-complete-milestone v2.14`.
 9. `6d1d026c` (run, /gsd-quick) — clicking a filmstrip thumbnail now keeps the active-green frame instead
    of a competing blue: the button's indigo focus ring moved from `focus:` to `focus-visible:`, so a mouse
    click no longer overrides `ring-green-500`. Hotkey and click paths now highlight identically.
+10. `04f55a78` (132) — ContextualActionBar buttons (Review Slides etc.) now stack full-width on mobile
+    (`w-full sm:w-auto` + justify-center), matching the full-width Mark as Planned button instead of sitting
+    short beside it. Only the wrapper had been stretching under the parent's `[&>*]:w-full`.
+11. `fe2456aa` (131) — stage-layout auto-seed now includes ONLY Band-group roles (`Role.group === 'band'`);
+    Tech/Other assignments are excluded (the stage plot is where performers stand). Manual assignable-people
+    picker stays unfiltered. New stage test asserts Tech+Other are not seeded.
 All: type-check clean; targeted tests green; full suite at baseline.
 
-Last activity: 2026-09-08 — CR-03 regression FIXED + 2 /gsd-quick UAT polish fixes (Live-red, thumb-green);
-v2.14 UNDEPLOYED, full suite at `storage.rules.test.ts`-only baseline. NEXT: continue owner UAT, then deploy
-on owner go-ahead (confirm-then-deploy: rules+functions+hosting; cleanupStalePresence cron DRY-RUN).
+Last activity: 2026-09-08 — CR-03 regression FIXED + 4 more owner UAT fixes (Live-red, thumb-green,
+Review-Slides mobile width, Band-only stage seed); v2.14 UNDEPLOYED, full suite at `storage.rules.test.ts`-only
+baseline. NEXT: continue owner UAT, then deploy on owner go-ahead (confirm-then-deploy:
+rules+functions+hosting; cleanupStalePresence cron DRY-RUN).
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
