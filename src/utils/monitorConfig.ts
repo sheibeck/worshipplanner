@@ -186,3 +186,66 @@ export function matchMapping(savedMapping: MonitorMapping, liveScreens: ScreenLi
   if (kept.length === savedMapping.assignments.length && newScreens.length === 0) return { status: 'matched' }
   return { status: 'partial', kept, newScreens }
 }
+
+// ── Video output key-color (R427, Phase 137) ────────────────────────────────
+// Per-device localStorage, sibling of MONITOR_CONFIG_STORAGE_KEY above (same
+// device-local reasoning — chroma-key is a physical video-room compositor
+// property, not an org setting). See 137-UI-SPEC.md Surface 3.
+
+/** The fixed localStorage key for the Video output's background setting. */
+export const VIDEO_KEY_COLOR_STORAGE_KEY = 'wp:videoKeyColor:v1'
+
+/** The Video output's non-content-region background: transparent (default) or a solid key color. */
+export interface VideoKeyColor {
+  enabled: boolean
+  colorHex: string
+}
+
+/** Transparent is the zero-config default (magenta only applies once enabled). */
+const DEFAULT_VIDEO_KEY_COLOR: VideoKeyColor = { enabled: false, colorHex: '#FF00FF' }
+
+/** Strict 6-digit hex, e.g. `#FF00FF` — T-137-01 injection guard (this value is later interpolated into an inline CSS `background`). */
+const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/
+
+function isValidVideoKeyColor(value: unknown): value is VideoKeyColor {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as { enabled?: unknown; colorHex?: unknown }
+  if (typeof v.enabled !== 'boolean') return false
+  if (typeof v.colorHex !== 'string') return false
+  return HEX_COLOR_PATTERN.test(v.colorHex)
+}
+
+/**
+ * Persists the Video output's background setting under the fixed device-scoped
+ * key. ALL storage access is wrapped in try/catch — a private-mode/disabled
+ * storage throw silently no-ops rather than propagating (mirrors saveMapping).
+ */
+export function saveVideoKeyColor(value: VideoKeyColor, storageOverride?: Storage): void {
+  const storage = resolveStorage(storageOverride)
+  if (!storage) return
+  try {
+    storage.setItem(VIDEO_KEY_COLOR_STORAGE_KEY, JSON.stringify(value))
+  } catch {
+    // Private mode / disabled storage — silent no-op.
+  }
+}
+
+/**
+ * Loads the Video output's background setting. Returns the transparent-default
+ * when nothing is saved, when the stored value fails to parse, when it does not
+ * validate (T-137-01 — untrusted-localStorage-read guard, including a
+ * non-hex/malformed `colorHex`), or when the storage backend itself throws.
+ * Never throws.
+ */
+export function loadVideoKeyColor(storageOverride?: Storage): VideoKeyColor {
+  const storage = resolveStorage(storageOverride)
+  if (!storage) return DEFAULT_VIDEO_KEY_COLOR
+  try {
+    const raw = storage.getItem(VIDEO_KEY_COLOR_STORAGE_KEY)
+    if (raw === null) return DEFAULT_VIDEO_KEY_COLOR
+    const parsed: unknown = JSON.parse(raw)
+    return isValidVideoKeyColor(parsed) ? parsed : DEFAULT_VIDEO_KEY_COLOR
+  } catch {
+    return DEFAULT_VIDEO_KEY_COLOR
+  }
+}

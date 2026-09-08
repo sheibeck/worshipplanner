@@ -132,6 +132,38 @@
               Change
             </button>
           </div>
+
+          <!-- R427 — the Video output's background setting. Shown only when a
+               live monitor currently has role 'video' assigned; a setting for
+               an output that isn't assigned to any screen is dead chrome. -->
+          <div v-if="hasVideoRoleAssigned" class="mt-4 rounded-lg bg-gray-900 border border-gray-800 p-4" data-testid="video-key-color-card">
+            <h2 class="text-sm font-semibold text-gray-100">Video output background</h2>
+            <p class="text-xs text-gray-400 mt-1">
+              Controls what's behind the banner on the Video output. Leave this off for a transparent
+              background — works with most software compositors (OBS, vMix Browser Source).
+            </p>
+            <label class="mt-3 flex items-center gap-2 text-sm text-gray-300">
+              <input
+                type="checkbox"
+                data-testid="video-key-color-toggle"
+                class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                v-model="videoKeyColor.enabled"
+                @change="onVideoKeyColorChange"
+              />
+              Use a solid key color instead of transparent
+            </label>
+            <div v-if="videoKeyColor.enabled" class="mt-2 flex items-center gap-2">
+              <input
+                type="color"
+                data-testid="video-key-color-picker"
+                aria-label="Key color"
+                class="h-8 w-8 rounded border border-gray-700 bg-gray-800 p-0"
+                v-model="videoKeyColor.colorHex"
+                @change="onVideoKeyColorChange"
+              />
+              <span class="text-xs text-gray-400 font-mono">{{ videoKeyColor.colorHex }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -150,11 +182,14 @@ import {
   saveMapping,
   loadMapping,
   matchMapping,
+  saveVideoKeyColor,
+  loadVideoKeyColor,
   type MonitorMapping,
   type MonitorAssignment,
   type MonitorRole,
   type ScreenLike,
   type MatchResultV2,
+  type VideoKeyColor,
 } from '@/utils/monitorConfig'
 
 type Phase = 'prompt' | 'detecting' | 'denied' | 'unavailable' | 'granted'
@@ -200,6 +235,15 @@ const saveOutcome = ref<'idle' | 'saved' | 'not-persisted-warning'>('idle')
 // See ADR-0213 (docs/adr/0213-state-dirtyedits-tracks-whether-the-operator-has-made-unsave.md)
 const dirtyEdits = ref(false)
 const refreshNoticeVisible = ref(false)
+
+// R427 — the Video output's background setting card. Visible only when a live
+// monitor has role 'video' assigned; a setting for an output that isn't
+// assigned to any screen is dead chrome (137-UI-SPEC.md Surface 3).
+const hasVideoRoleAssigned = computed(() => Object.values(roleByFingerprint).includes('video'))
+const videoKeyColor = reactive<VideoKeyColor>(loadVideoKeyColor())
+function onVideoKeyColorChange() {
+  saveVideoKeyColor({ enabled: videoKeyColor.enabled, colorHex: videoKeyColor.colorHex })
+}
 
 // Not reactive — a raw handle to the live ScreenDetails object for the
 // screenschange listener, removed in onUnmounted.
