@@ -25,9 +25,10 @@ defineEmits<{
 
 <template>
   <header class="run-header" data-testid="run-header">
-    <!-- LIVE status — three honest states (owner fix #4 + #7): green "Live" on a
-         real go-live, YELLOW "Rehearsing" during a rehearsal, muted "Not open"
-         before. Green (run-status--live) means the outputs are genuinely live. -->
+    <!-- LIVE status — three honest states (owner fix #4 + #7; red 2026-09-08):
+         RED "Live" on a real go-live (industry-standard on-air red), YELLOW
+         "Rehearsing" during a rehearsal, muted "Not open" before.
+         run-status--live means the outputs are genuinely live. -->
     <span
       class="run-status"
       :class="
@@ -114,6 +115,8 @@ defineEmits<{
   --color-neutral-800: #3f424d;
   --color-ok: #6fbf8b;
   --color-amber: #e0b23c;
+  /* Industry-standard "on air" red for the Live pill (owner UAT 2026-09-08). */
+  --color-live: #e5484d;
 
   height: 58px;
   flex: none;
@@ -146,12 +149,12 @@ defineEmits<{
   border-radius: 9999px;
 }
 .run-status--live {
-  color: var(--color-ok);
-  background: rgba(111, 191, 139, 0.12);
-  border: 1px solid rgba(111, 191, 139, 0.4);
+  color: var(--color-live);
+  background: rgba(229, 72, 77, 0.12);
+  border: 1px solid rgba(229, 72, 77, 0.4);
 }
 .run-status--live .run-status__dot {
-  background: var(--color-ok);
+  background: var(--color-live);
 }
 .run-status--idle {
   color: var(--color-amber);
