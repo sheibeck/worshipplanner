@@ -1393,10 +1393,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 136 (Video Output — Fullscreen Slice) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-09-07 — Phase 136 execution started
+Phase: 137 (Video Output — Banner Render) — next (FINAL phase of v2.14)
+Plan: —
+Status: Phase 136 EXECUTED + code-verified (R424/R426, 9/9 must-haves); 2 review warnings fixed; 1 hardware UAT item deferred. Advancing to Phase 137.
+Last activity: 2026-09-07 — Phase 136 complete (3rd "Video" output role + shared FullscreenSlideOutput extraction + /present/video route)
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
@@ -1407,6 +1407,7 @@ Per owner instruction "defer uat to the end". Items accumulate in `.planning/v2.
 - Phase 133 → verification_deferred_human (4 live-browser items; CR-01 security fix already re-verified) — resume with `/gsd-verify-work 133`
 - Phase 134 → verification_deferred_human (2 two-browser live items; presence rules + composable code-verified) — resume with `/gsd-verify-work 134`
 - Phase 135 → verification_deferred_human (5 visual/live dashboard items) — resume with `/gsd-verify-work 135`
+- Phase 136 → verification_deferred_human (1 two-monitor hardware item; Video output fullscreen) — resume with `/gsd-verify-work 136`
 
 ### Preceding: Phase 130 (complete — final phase of v2.13, shipped & deployed 2026-09-07)
 
