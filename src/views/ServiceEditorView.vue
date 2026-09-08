@@ -722,7 +722,7 @@
              buttons, not a restyle; each button keeps its own class strings,
              `:class` expression and `@click` assignment unchanged. -->
         <!-- See ADR-0217 (docs/adr/0217-roving-tabindex-on-the-tab-bar-above-removes-inactive-tabs-f.md) -->
-        <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
+        <div role="tablist" class="flex items-center gap-1 overflow-x-auto scrollbar-hide mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
           <button
             id="svc-tab-service-order"
             ref="serviceOrderTabButtonRef"
@@ -3141,6 +3141,13 @@ async function onMarkAsPlanned(): Promise<void> {
   lifecycleError.value = null
   isTransitioning.value = true
   try {
+    // R420 (UAT 2026-09-08): seed the Stage Layout from the roster at lock time,
+    // not only on a Stage-Layout-tab visit. A service can be locked without ever
+    // opening that tab (as it was here), which otherwise leaves volunteers looking
+    // at an empty stage. onAutoPopulateStageLayout() no-ops when already seeded,
+    // when the canvas already has manual markers, or when the roster is empty; the
+    // flush() below persists the seed while the service is still draft/writable.
+    onAutoPopulateStageLayout()
     // BL-02, second trigger. flush() disarms the timer and persists whatever
     // was pending while still draft/writable — a no-op when nothing is
     // pending (better under P-02 than the old unconditional onSave() call).
