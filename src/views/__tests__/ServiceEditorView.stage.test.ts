@@ -582,6 +582,35 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
       expect((payload as { stageLayoutAutoSeeded: boolean }).stageLayoutAutoSeeded).toBe(true)
     })
 
+    it('seeds only Band-group roles — Tech and Other assignments are excluded from the auto-seed (owner UAT 2026-09-08)', async () => {
+      // Band role-vox → Alice, PLUS a Tech role → Bob and an Other role → Carol,
+      // all resolved for the same service date. Only the Band marker must seed.
+      mockRoles = [
+        { id: 'role-vox', name: 'Vocals', group: 'band', multiRole: true, defaultCount: 1, order: 0 },
+        { id: 'role-sound', name: 'Sound', group: 'tech', defaultCount: 1, order: 1 },
+        { id: 'role-greeter', name: 'Greeter', group: 'other', defaultCount: 1, order: 2 },
+      ]
+      mockRosterPeople = [
+        { id: 'person-1', name: 'Alice', email: '', phone: '', active: true, roles: ['role-vox'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+        { id: 'person-2', name: 'Bob', email: '', phone: '', active: true, roles: ['role-sound'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+        { id: 'person-3', name: 'Carol', email: '', phone: '', active: true, roles: ['role-greeter'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+      ]
+      mockQuarters = [
+        {
+          id: 'q1', label: 'Q1 2026', year: 2026, quarter: 1, serviceDates: ['2026-03-08'],
+          roleOverridesByDate: {}, personQuarterData: {},
+          calendar: { '2026-03-08': { 'role-vox': ['person-1'], 'role-sound': ['person-2'], 'role-greeter': ['person-3'] } },
+          status: 'finalized', shareToken: null, createdAt: mockTimestamp, updatedAt: mockTimestamp,
+        },
+      ]
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+
+      const elements = wrapper.findComponent(StageLayoutEditor).props('elements') as StageMarker[]
+      expect(elements).toHaveLength(1)
+      expect(elements[0]).toMatchObject({ roleId: 'role-vox', personId: 'person-1' })
+    })
+
     it('never seeds against a canvas that already has elements — existing markers are byte-for-byte unchanged', async () => {
       seedAssignableRoster()
       const existing: StageMarker = { id: 'manual-1', label: 'Hand-placed', kind: 'mic', zone: 'onstage', xPct: 25, yPct: 25 }

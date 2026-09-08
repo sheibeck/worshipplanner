@@ -2410,7 +2410,14 @@ function onAutoPopulateStageLayout() {
   const existing = localService.value.stageLayout?.elements ?? []
   if (existing.length > 0) return
   if (localService.value.stageLayoutAutoSeeded) return
-  const seeded = autoPopulateMarkers(stageServingAssignments.value)
+  // Seed only Band-group roles (owner UAT 2026-09-08): the stage plot is where
+  // performers physically stand, so Tech and Other teams are excluded from the
+  // auto-seed. The manual assignable-people picker (stageServingAssignments)
+  // stays unfiltered — a planner can still place anyone by hand.
+  const bandAssignments = stageServingAssignments.value.filter(
+    (a) => rosterStore.roles.find((r) => r.id === a.roleId)?.group === 'band',
+  )
+  const seeded = autoPopulateMarkers(bandAssignments)
   if (seeded.length === 0) return
   localService.value.stageLayout = { elements: seeded }
   localService.value.stageLayoutAutoSeeded = true
