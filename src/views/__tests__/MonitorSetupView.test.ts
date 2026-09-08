@@ -311,6 +311,45 @@ describe('MonitorSetupView — persistence round-trip + matched reload (State B2
   })
 })
 
+describe('MonitorSetupView — WR-01: matched summary sorts by role rank, not fingerprint, across all 3 roles', () => {
+  it('renders Audience, then Confidence, then Video in that order even when fingerprints sort alphabetically the other way', async () => {
+    // Labels are chosen so alphabetical fingerprint order (Confidence, Video,
+    // Audience) is the OPPOSITE of role rank order (Audience, Confidence,
+    // Video) — this only passes if the sort uses a rank table, not the old
+    // `a.role === 'audience' ? -1 : 1` ternary (non-transitive once a third
+    // role exists) or a fingerprint-first comparison.
+    const audienceScreen = makeScreen({ label: 'Zebra Wall' })
+    const confidenceScreen = makeScreen({ label: 'Apple Monitor', left: 1920 })
+    const videoScreen = makeScreen({ label: 'Mango Screen', left: 3840 })
+    const allScreens = [audienceScreen, confidenceScreen, videoScreen]
+
+    const fpAudience = computeFingerprint(audienceScreen, allScreens)
+    const fpConfidence = computeFingerprint(confidenceScreen, allScreens)
+    const fpVideo = computeFingerprint(videoScreen, allScreens)
+
+    saveMapping({
+      assignments: [
+        { fingerprint: fpAudience, role: 'audience' },
+        { fingerprint: fpConfidence, role: 'confidence' },
+        { fingerprint: fpVideo, role: 'video' },
+      ],
+      savedAt: Date.now(),
+    })
+
+    installGetScreenDetails(allScreens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    expect(wrapper.text()).toContain('Your displays are set up')
+
+    const summaryLines = wrapper.findAll('.space-y-1 p').map((p) => p.text())
+    expect(summaryLines).toHaveLength(3)
+    expect(summaryLines[0]).toContain('Audience')
+    expect(summaryLines[1]).toContain('Confidence')
+    expect(summaryLines[2]).toContain('Video')
+  })
+})
+
 describe('MonitorSetupView — nickname save + reload round-trip (R338)', () => {
   it('persists a nickname with its assignment and shows it nickname-first on the matched summary after reload', async () => {
     const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]

@@ -237,12 +237,21 @@ function screenLabelFor(fingerprint: string): string {
   return `${item.screen.label || 'Unknown'} (${item.screen.width} x ${item.screen.height})`
 }
 
+// WR-01: fixed rank table (not a role-name ternary) so the comparator stays a
+// proper total order as MonitorRole grows past two values — a ternary keyed
+// on `=== 'audience'` is only antisymmetric for exactly two roles.
+const ROLE_SORT_RANK: Record<MonitorRole, number> = { audience: 0, confidence: 1, video: 2 }
+
 // A summary list for the B2 "already configured" view — lists EVERY assigned
 // monitor (any count, incl. multiple Audience), not two fixed slots.
 const matchedSummaryList = computed(() =>
   Object.entries(roleByFingerprint)
     .map(([fingerprint, role]) => ({ fingerprint, role }))
-    .sort((a, b) => (a.role === b.role ? a.fingerprint.localeCompare(b.fingerprint) : a.role === 'audience' ? -1 : 1)),
+    .sort((a, b) =>
+      ROLE_SORT_RANK[a.role] === ROLE_SORT_RANK[b.role]
+        ? a.fingerprint.localeCompare(b.fingerprint)
+        : ROLE_SORT_RANK[a.role] - ROLE_SORT_RANK[b.role],
+    ),
 )
 
 function onSelectRole(fingerprint: string, role: MonitorRole | null) {
