@@ -18,10 +18,12 @@ import MonitorSetupView from '../MonitorSetupView.vue'
 import { useToasts } from '@/stores/toasts'
 import {
   MONITOR_CONFIG_STORAGE_KEY,
+  VIDEO_KEY_COLOR_STORAGE_KEY,
   computeFingerprint,
   saveMapping,
   type MonitorMapping,
   type ScreenLike,
+  type VideoKeyColor,
 } from '@/utils/monitorConfig'
 
 enableAutoUnmount(afterEach)
@@ -486,6 +488,102 @@ describe('MonitorSetupView — WR-02: a same-layout re-detect must not discard u
     expect(wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).attributes('aria-checked')).toBe('false')
     expect(wrapper.text()).not.toContain('Your displays are set up')
     expect(wrapper.find('[data-testid="refresh-kept-notice"]').exists()).toBe(true)
+  })
+})
+
+describe('MonitorSetupView — REVIEW-FIX CR-01/WR-01: Video output background (key-color) card', () => {
+  it('is HIDDEN when no monitor has the video role', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const [fpA, fpB] = screens.map((s) => computeFingerprint(s))
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-confidence"]`).trigger('click')
+
+    expect(wrapper.find('[data-testid="video-key-color-card"]').exists()).toBe(false)
+  })
+
+  it('is VISIBLE in the editable-grid view once a monitor is assigned the video role', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const [fpA, fpB] = screens.map((s) => computeFingerprint(s))
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    expect(wrapper.find('[data-testid="video-key-color-card"]').exists()).toBe(false)
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-video"]`).trigger('click')
+
+    expect(wrapper.find('[data-testid="video-key-color-card"]').exists()).toBe(true)
+  })
+
+  it('CR-01 regression: is VISIBLE in the matched/"already set up" state (B2) without clicking Reassign roles', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const fpA = computeFingerprint(screens[0]!)
+    const fpB = computeFingerprint(screens[1]!)
+
+    saveMapping({
+      assignments: [
+        { fingerprint: fpA, role: 'audience' },
+        { fingerprint: fpB, role: 'video' },
+      ],
+      savedAt: Date.now(),
+    })
+
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    // Confirm we actually landed on the B2 "already set up" summary, not the
+    // editable grid — this is the exact state CR-01 found unreachable in.
+    expect(wrapper.text()).toContain('Your displays are set up')
+    expect(wrapper.find('[data-testid="save-button"]').exists()).toBe(false)
+
+    expect(wrapper.find('[data-testid="video-key-color-card"]').exists()).toBe(true)
+  })
+
+  it('round-trips the enable checkbox + color picker through saveVideoKeyColor/loadVideoKeyColor', async () => {
+    const screens = [makeScreen({ label: 'Front Wall' }), makeScreen({ label: 'Stage Monitor', left: 1920 })]
+    const [fpA, fpB] = screens.map((s) => computeFingerprint(s))
+    installGetScreenDetails(screens)
+    const wrapper = mountView()
+    await detect(wrapper)
+
+    await wrapper.get(`[data-testid="monitor-role-${fpA}-audience"]`).trigger('click')
+    await wrapper.get(`[data-testid="monitor-role-${fpB}-video"]`).trigger('click')
+
+    const toggle = wrapper.get('[data-testid="video-key-color-toggle"]')
+    await toggle.setValue(true)
+
+    expect(wrapper.find('[data-testid="video-key-color-picker"]').exists()).toBe(true)
+
+    const picker = wrapper.get('[data-testid="video-key-color-picker"]')
+    await picker.setValue('#00ff00')
+
+    const raw = localStorage.getItem(VIDEO_KEY_COLOR_STORAGE_KEY)
+    expect(raw).not.toBeNull()
+    const persisted = JSON.parse(raw!) as VideoKeyColor
+    expect(persisted).toEqual({ enabled: true, colorHex: '#00ff00' })
+
+    // Persist the monitor-role mapping too (Save), so a fresh mount lands on
+    // the B2 "already set up" branch with the video role still assigned —
+    // otherwise the key-color card (gated on hasVideoRoleAssigned) would not
+    // even render on the second mount, and this would test nothing.
+    await wrapper.get('[data-testid="save-button"]').trigger('click')
+    await flushPromises()
+    wrapper.unmount()
+
+    const secondWrapper = mountView()
+    await detect(secondWrapper)
+    expect(secondWrapper.get('[data-testid="video-key-color-toggle"]').element as HTMLInputElement).toMatchObject({
+      checked: true,
+    })
+    expect(secondWrapper.get('[data-testid="video-key-color-picker"]').element as HTMLInputElement).toMatchObject({
+      value: '#00ff00',
+    })
   })
 })
 
