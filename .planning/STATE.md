@@ -1393,10 +1393,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 137 (Video Output — Banner Render) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-09-07 — Phase 137 execution started
+Phase: ALL 7 PHASES (131–137) EXECUTED + code-verified — milestone lifecycle next (audit → complete → cleanup)
+Plan: —
+Status: v2.14 fully BUILT (131–137, R406–R427), all auto-verified green; batched human UAT deferred to milestone end (v2.14-DEFERRED-VERIFICATION.md). UNDEPLOYED. Running milestone audit next.
+Last activity: 2026-09-07 — Phase 137 complete (per-item Banner/Full-screen + lower-third banner render with transparent-default + key-color fallback)
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
@@ -1408,6 +1408,7 @@ Per owner instruction "defer uat to the end". Items accumulate in `.planning/v2.
 - Phase 134 → verification_deferred_human (2 two-browser live items; presence rules + composable code-verified) — resume with `/gsd-verify-work 134`
 - Phase 135 → verification_deferred_human (5 visual/live dashboard items) — resume with `/gsd-verify-work 135`
 - Phase 136 → verification_deferred_human (1 two-monitor hardware item; Video output fullscreen) — resume with `/gsd-verify-work 136`
+- Phase 137 → verification_deferred_human (4 live-video/compositor items; banner render + key-color) — resume with `/gsd-verify-work 137`
 
 ### Preceding: Phase 130 (complete — final phase of v2.13, shipped & deployed 2026-09-07)
 
