@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-wrap items-center gap-3" data-testid="contextual-action-bar">
+  <div class="flex flex-wrap items-center gap-2 sm:gap-3" data-testid="contextual-action-bar">
     <template v-for="item in items" :key="item.key">
       <button
         type="button"
@@ -138,8 +138,13 @@ import type { ActionBarItem, ActionBarTone } from './actionBarItems'
 
 defineProps<{ items: ActionBarItem[] }>()
 
+// w-full sm:w-auto + justify-center sm:justify-start: below `sm`, each button
+// stretches to fill the full-width flex-wrap row (one per line, matching the
+// parent cluster's `[&>*]:w-full` Mark-as-Planned button); at `sm`+ they return
+// to content width in an inline wrapping row (owner UAT 2026-09-08 — Review
+// Slides was short next to a full-width Mark as Planned on mobile).
 const BASE_CLASS =
-  'print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed'
+  'print:hidden inline-flex w-full sm:w-auto items-center justify-center sm:justify-start gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors border disabled:opacity-50 disabled:cursor-not-allowed'
 
 const TONE_CLASSES: Record<ActionBarTone, string> = {
   primary: 'text-white bg-indigo-600 hover:bg-indigo-500 border-transparent',
