@@ -798,10 +798,12 @@
             Stage Layout
           </button>
           <!-- Messages tab (63-01, R149): appended last (Service Order · Slides ·
-               Roles · Stage Layout · Messages). Copies the Roles button verbatim;
-               gated on the Roles editor check PLUS the messaging kill-switch. -->
+               Roles · Stage Layout · Messages). Copies the Roles button verbatim.
+               260908-dgq: editor-gated ONLY — the tab now shows even when org
+               messaging is off, and the panel explains how to turn it on (so an
+               editor isn't left unaware the feature exists). -->
           <button
-            v-if="authStore.isEditor && isMessagingEnabled()"
+            v-if="authStore.isEditor"
             id="svc-tab-messages"
             ref="messagesTabButtonRef"
             role="tab"
@@ -1595,13 +1597,30 @@
           aria-labelledby="svc-tab-messages"
           data-testid="messages-panel"
         >
+        <!-- 260908-dgq: org messaging is off. Explain it and link to Settings
+             instead of an empty tab. Editor-only (the tab already is, but the
+             notice guards explicitly). When off, the defaults + history panels
+             below are suppressed by their own isMessagingEnabled() gates. -->
+        <div
+          v-if="authStore.isEditor && !isMessagingEnabled()"
+          data-testid="messaging-off-notice"
+          class="mb-3 rounded-lg border border-amber-700/50 bg-amber-950/20 p-4"
+        >
+          <p class="text-sm text-amber-200">
+            Messaging is off.
+            <router-link :to="{ name: 'settings' }" class="text-indigo-300 hover:text-indigo-200 underline">Configure messaging</router-link>
+            so your team gets service plan updates.
+          </p>
+        </div>
+
         <!-- Messaging defaults (58-05, R132) — per-service overrides that inherit
              from OrgSettings.messaging until explicitly changed. Same shell/tier
              as Teams and Sermon Context above; reuses the exact inherit-or-
              override select idiom + Draft-editable/locked-read-only branch
              structure already shipped for the per-slot Bible-version override
-             below (see the SCRIPTURE slot's `#version` select). -->
-        <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3" data-testid="messaging-defaults-panel">
+             below (see the SCRIPTURE slot's `#version` select). 260908-dgq:
+             gated on isMessagingEnabled() — when off, the notice above shows. -->
+        <div v-if="isMessagingEnabled()" class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3" data-testid="messaging-defaults-panel">
           <div class="flex items-start gap-4">
             <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap mt-1">Messaging defaults</h2>
             <div class="flex-1 space-y-3">
@@ -1833,7 +1852,8 @@ const visibleTabOrder = computed<ServiceEditorTabId[]>(() => {
   const tabs: ServiceEditorTabId[] = ['service-order', 'slides']
   if (authStore.isEditor) tabs.push('roles')
   if (authStore.isEditor) tabs.push('stage')
-  if (authStore.isEditor && isMessagingEnabled()) tabs.push('messages')
+  // 260908-dgq: editor-gated only — the tab shows even when messaging is off.
+  if (authStore.isEditor) tabs.push('messages')
   return tabs
 })
 const serviceOrderTabButtonRef = ref<HTMLButtonElement | null>(null)

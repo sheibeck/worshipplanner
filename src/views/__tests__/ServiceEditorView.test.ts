@@ -8445,8 +8445,11 @@ describe('ServiceEditorView - Messaging defaults panel (58-05, R132)', () => {
     mockAuthState.isEditor = true
     mockAuthState.orgId = 'org-1'
     // Restore conservative org defaults each test (a prior test may flip them).
+    // 260908-dgq: the defaults panel now only renders when messaging is ON (when
+    // off, the Messages tab shows the "Messaging is off" notice instead), so this
+    // describe — which is entirely about the defaults selects — runs with it on.
     mockAuthState.settings.messaging = {
-      enabled: false,
+      enabled: true,
       lockNotifyDefault: false,
       reminderEnabled: false,
       reminderDaysBefore: 3,
@@ -8650,12 +8653,44 @@ describe('ServiceEditorView - Messages tab: relocated defaults + history (63-01,
     expect(wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))).toBeUndefined()
   })
 
-  it('HIDES the Messages tab button when org messaging is OFF', async () => {
+  it('260908-dgq: SHOWS the Messages tab button for an editor even when org messaging is OFF', async () => {
     mockAuthState.settings.messaging.enabled = false
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))).toBeUndefined()
+    const btn = wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))
+    expect(btn?.exists()).toBe(true)
+  })
+
+  it('260908-dgq: messaging OFF → the panel shows the off-notice (with a Settings link) and HIDES the defaults panel', async () => {
+    mockAuthState.settings.messaging.enabled = false
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))
+    await messagesBtn!.trigger('click')
+
+    const panel = wrapper.find('[data-testid="messages-panel"]')
+    const notice = panel.find('[data-testid="messaging-off-notice"]')
+    expect(notice.exists()).toBe(true)
+    expect(notice.text()).toContain('Messaging is off')
+    // The "Configure messaging" link routes to Settings.
+    expect(notice.find('a').exists()).toBe(true)
+    // The editable defaults panel is suppressed while messaging is off.
+    expect(panel.find('[data-testid="messaging-defaults-panel"]').exists()).toBe(false)
+  })
+
+  it('260908-dgq: messaging ON → the off-notice is absent and the defaults panel shows', async () => {
+    mockAuthState.settings.messaging.enabled = true
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const messagesBtn = wrapper.findAll('button').find((b) => b.text() === 'Messages' && b.classes().includes('rounded-t-md'))
+    await messagesBtn!.trigger('click')
+
+    const panel = wrapper.find('[data-testid="messages-panel"]')
+    expect(panel.find('[data-testid="messaging-off-notice"]').exists()).toBe(false)
+    expect(panel.find('[data-testid="messaging-defaults-panel"]').exists()).toBe(true)
   })
 
   it('relocates the defaults panel + history INTO the messages-panel (not service-order-panel)', async () => {
