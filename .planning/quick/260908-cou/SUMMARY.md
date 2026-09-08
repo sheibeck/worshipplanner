@@ -53,8 +53,26 @@ suite at baseline (`storage.rules.test.ts` only).
 
 - Fold into one chit (not two). · Live + on seed.
 
+## Follow-up fix (owner UAT, same day) — full live mirror
+
+Owner found the first cut only partially tracked: **"Reset to schedule"** didn't
+touch the stage (`onResetRoleOverride` had no reconcile), and **adding a new band
+member** added no chit (the reconcile deliberately never created markers).
+
+Replaced the piecemeal per-(role,person) reconcile with a full **live mirror**:
+new pure `reconcileBandMarkers(existing, desired)` drops stale managed chits,
+keeps assigned ones in place (updating `withVocal`), and ADDS newly-assigned band
+members into free grid cells (never reflowing existing markers).
+`syncStageWithRoles()` runs it from BOTH `onToggleOverridePerson` and
+`onResetRoleOverride` after the write persists. Only reconciles a non-empty
+layout (the one-time seed still owns first creation; a cleared layout stays
+cleared — WR-01). +6 `reconcileBandMarkers` unit tests, +2 integration tests
+(reset removes a chit; adding a member adds an auto-placed chit). Stage 27/27,
+util 42/42, type-check clean.
+
 ## Non-goals / edges (see PLAN.md)
 
-- Live add of an instrument role creates no new chit (seed owns placement).
+- The one-time seed still owns FIRST creation; `syncStageWithRoles` only mirrors a
+  layout that already has ≥1 chit (a deliberately-emptied stage stays empty).
 - Removing a folded instrument chit does not resurrect a Vocals chit for a person
   who still sings.
