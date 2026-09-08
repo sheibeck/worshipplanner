@@ -224,12 +224,15 @@ const rows = computed<Row[]>(() => {
              fullscreen state (reported by the output): once the display is
              fullscreen it shows a done ✓, and it flips BACK to the action the
              instant someone presses Escape out of fullscreen. -->
+        <!-- Amber (owner UAT 2026-09-08): an open-but-not-fullscreen display is a
+             WARNING — the output should be fullscreen for the congregation, so the
+             action button is amber (not the neutral indigo) until it is. -->
         <button
           v-if="row.state === 'open' && !row.fullscreen"
           type="button"
           :data-testid="`run-display-fullscreen-${row.testidSuffix}`"
           :aria-label="`Make the ${row.title} display fullscreen`"
-          class="min-h-9 flex-none rounded-md bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-xs font-medium text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          class="min-h-9 flex-none rounded-md bg-amber-500 hover:bg-amber-400 px-3 py-1.5 text-xs font-semibold text-gray-950 focus:outline-none focus:ring-2 focus:ring-amber-400"
           @click="emit('fullscreen', row.id)"
         >
           Go fullscreen
