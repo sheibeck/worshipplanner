@@ -1441,12 +1441,21 @@
               </p>
             </div>
 
-            <div class="space-y-2">
-              <div
-                v-for="assignment in resolvedRoleAssignments"
-                :key="assignment.roleId"
-                class="rounded-lg bg-gray-900 border border-gray-800 p-3"
-              >
+            <!-- 260908-owm: grouped by Band/Tech/Other with a divider header per
+                 group; cards are a responsive grid (stack on mobile, 2-up at sm,
+                 3-up at lg) instead of one full-width column. -->
+            <div class="space-y-6">
+              <div v-for="group in roleAssignmentGroups" :key="group.key">
+                <div class="flex items-center gap-3 mb-2">
+                  <span class="text-[11px] font-semibold uppercase tracking-widest text-gray-500 shrink-0">{{ group.label }}</span>
+                  <span class="flex-1 border-t border-gray-800"></span>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div
+                    v-for="assignment in group.assignments"
+                    :key="assignment.roleId"
+                    class="rounded-lg bg-gray-900 border border-gray-800 p-3"
+                  >
                 <div class="flex items-center justify-between gap-3 flex-wrap">
                   <div class="flex items-center gap-2 min-w-0">
                     <p class="text-sm font-medium text-gray-100">{{ assignment.roleName }}</p>
@@ -1514,6 +1523,8 @@
                     {{ person.name }}
                   </label>
                   <span v-if="eligiblePeople(assignment.roleId).length === 0" class="text-xs text-gray-600 italic">No eligible people have this role</span>
+                </div>
+                  </div>
                 </div>
               </div>
               <p v-if="resolvedRoleAssignments.length === 0" class="text-sm text-gray-500 italic">No roles configured yet.</p>
@@ -4250,6 +4261,27 @@ const resolvedRoleAssignments = computed<ResolvedRoleAssignment[]>(() => {
 const hasQuarterForServiceDate = computed(() => {
   if (!authStore.isEditor || !localService.value) return false
   return findQuarterForDate(quartersStore.quarters, localService.value.date) !== undefined
+})
+
+// 260908-owm: group the Roles-tab assignments by their role's group (Band/Tech/
+// Other) so the tab renders a divider header + a responsive card grid per group.
+// A role whose group can't be resolved falls into 'other'. Empty groups drop out.
+const ROLE_GROUP_ORDER = [
+  { key: 'band', label: 'Band' },
+  { key: 'tech', label: 'Tech' },
+  { key: 'other', label: 'Other' },
+] as const
+const roleAssignmentGroups = computed(() => {
+  const byGroup = new Map<string, ResolvedRoleAssignment[]>()
+  for (const a of resolvedRoleAssignments.value) {
+    const group = rosterStore.roles.find((r) => r.id === a.roleId)?.group ?? 'other'
+    const list = byGroup.get(group)
+    if (list) list.push(a)
+    else byGroup.set(group, [a])
+  }
+  return ROLE_GROUP_ORDER.map((g) => ({ ...g, assignments: byGroup.get(g.key) ?? [] })).filter(
+    (g) => g.assignments.length > 0,
+  )
 })
 
 // The org's Band roles — the Stage Layout tab's Instruments palette mirrors
