@@ -19,10 +19,13 @@
           data-testid="run-filmstrip-slide"
           :data-index="thumb.index"
           :aria-current="thumb.index === currentIndex ? 'true' : undefined"
-          class="relative aspect-video w-48 flex-none overflow-hidden rounded-md bg-black ring-2 focus:outline-none focus:ring-indigo-400"
+          class="relative aspect-video w-48 flex-none overflow-hidden rounded-md bg-black ring-2 focus:outline-none focus-visible:ring-indigo-400"
           :class="thumb.index === currentIndex ? 'ring-green-500' : 'ring-gray-700 hover:ring-indigo-500'"
           @click="emit('jump', thumb.index)"
         >
+          <!-- focus-visible (not focus): a mouse click jumps + leaves the active
+               thumb green; only keyboard focus paints the indigo ring, so a
+               clicked thumb never shows a competing blue frame (owner UAT 2026-09-08). -->
           <!-- See .planning/codebase/ARCHITECTURE.md (§ Component & Composable Behavioral Notes (R318) -> src/components/run/RunFilmstrip.vue) -->
           <div class="absolute left-0 top-0" :style="thumbStageStyle">
             <SlideCanvas :slide="thumb.slide" :interactive="false" />
