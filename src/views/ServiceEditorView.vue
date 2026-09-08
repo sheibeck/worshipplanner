@@ -4365,16 +4365,19 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
  * person is no longer assigned that role, and folds play+sing (withVocal). Runs
  * the SAME band-filter + fold the one-time seed uses, then reconciles.
  *
- * Only reconciles a NON-EMPTY layout: an empty canvas is left for the one-time
- * seed to create on the next Stage-Layout visit, and a deliberately cleared
- * layout stays cleared (preserving the WR-01 delete-all invariant). Mutates
- * `localService.stageLayout`, riding the existing useAutoSave deep-watch.
+ * Gate: reconcile once the layout has been SEEDED (`stageLayoutAutoSeeded`), OR
+ * whenever it currently has chits. This deliberately still reconciles a layout
+ * that reconciliation itself emptied — otherwise removing the last person would
+ * strand the layout at empty and no later re-add could bring chits back
+ * (260908-owm bug). A never-seeded, empty layout is still skipped so the
+ * one-time seed owns first creation. Mutates `localService.stageLayout`, riding
+ * the existing useAutoSave deep-watch.
  */
 function syncStageWithRoles(): void {
   const svc = localService.value
   if (!svc || !canEditService.value) return
   const existing = svc.stageLayout?.elements ?? []
-  if (existing.length === 0) return
+  if (existing.length === 0 && !svc.stageLayoutAutoSeeded) return
   const bandAssignments = stageServingAssignments.value.filter(
     (a) => rosterStore.roles.find((r) => r.id === a.roleId)?.group === 'band',
   )

@@ -856,5 +856,38 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
 
       expect(markersOf(wrapper).some((m) => m.personId === 'person-2')).toBe(false)
     })
+
+    it('live: re-adding a person after removals emptied the layout brings their chit back (260908-owm)', async () => {
+      // One-person roster — removing them empties the (seeded) layout entirely.
+      mockRoles = [{ id: 'role-gtr', name: 'Guitar', group: 'band', defaultCount: 1, order: 0 }]
+      mockRosterPeople = [
+        { id: 'person-1', name: 'Alice', email: '', phone: '', active: true, roles: ['role-gtr'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+      ]
+      mockQuarters = [
+        {
+          id: 'q1', label: 'Q1 2026', year: 2026, quarter: 1, serviceDates: ['2026-03-08'],
+          roleOverridesByDate: {}, personQuarterData: {},
+          calendar: { '2026-03-08': { 'role-gtr': ['person-1'] } },
+          status: 'finalized', shareToken: null, createdAt: mockTimestamp, updatedAt: mockTimestamp,
+        },
+      ]
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+      expect(markersOf(wrapper).some((m) => m.personId === 'person-1')).toBe(true)
+
+      const vm = wrapper.vm as unknown as { onToggleOverridePerson: (a: unknown, p: string) => Promise<void> }
+
+      // Remove Alice → the seeded layout empties completely.
+      await vm.onToggleOverridePerson({ roleId: 'role-gtr', effectivePersonIds: ['person-1'] }, 'person-1')
+      await wrapper.vm.$nextTick()
+      expect(markersOf(wrapper)).toHaveLength(0)
+
+      // Re-add Alice → her chit comes back even though the layout was empty.
+      await vm.onToggleOverridePerson({ roleId: 'role-gtr', effectivePersonIds: [] }, 'person-1')
+      await wrapper.vm.$nextTick()
+      const alice = markersOf(wrapper).find((m) => m.personId === 'person-1')
+      expect(alice).toBeTruthy()
+      expect(alice!.roleId).toBe('role-gtr')
+    })
   })
 })
