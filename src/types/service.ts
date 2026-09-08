@@ -58,6 +58,16 @@ export interface MediaAttachableSlot {
     enabled: boolean
     intervalSeconds: number
   }
+  /**
+   * Per-item Video-output display choice (R425, Phase 137). Additive/optional,
+   * sibling of `loop` — absent on every existing service doc, no migration.
+   * Meaningful ONLY on the Video output; Audience/Confidence always render
+   * full-screen and ignore this field. Absent or `'fullscreen'` = full-screen
+   * (the default); `'banner'` = lower-third (Plan 02's render).
+   */
+  videoOutput?: {
+    mode: 'banner' | 'fullscreen'
+  }
 }
 
 export interface SongSlot extends MediaAttachableSlot {
