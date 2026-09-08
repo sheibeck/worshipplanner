@@ -70,6 +70,16 @@ cleared — WR-01). +6 `reconcileBandMarkers` unit tests, +2 integration tests
 (reset removes a chit; adding a member adds an auto-placed chit). Stage 27/27,
 util 42/42, type-check clean.
 
+## Second follow-up fix (owner UAT) — repopulate an emptied layout
+
+Owner found that once role removals emptied the stage layout entirely, re-adding
+people via the Roles checkboxes never brought chits back. Cause: `syncStageWithRoles`
+short-circuited on `existing.length === 0`, so an emptied layout was stranded.
+Fix (`810693da`): gate on `existing.length === 0 && !stageLayoutAutoSeeded` — a
+never-seeded empty layout is still left for the one-time seed, but a SEEDED layout
+keeps mirroring role edits even after reconciliation emptied it. +regression test
+(seed → remove all → re-add → chit returns). Stage suite 28/28.
+
 ## Non-goals / edges (see PLAN.md)
 
 - The one-time seed still owns FIRST creation; `syncStageWithRoles` only mirrors a
