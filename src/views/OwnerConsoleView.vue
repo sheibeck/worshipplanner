@@ -8,7 +8,7 @@
       </div>
 
       <!-- See ADR-0217 (docs/adr/0217-roving-tabindex-on-the-tab-bar-above-removes-inactive-tabs-f.md) -->
-      <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
+      <div role="tablist" class="flex items-center gap-1 overflow-x-auto scrollbar-hide mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
         <button
           id="owner-tab-configuration"
           ref="configurationTabButtonRef"

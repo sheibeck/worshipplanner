@@ -11,10 +11,10 @@
 
       <!-- Tab bar -->
       <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-1 mb-6 border-b border-gray-800 pb-2 sm:pb-0">
-        <!-- overflow-y-hidden: overflow-x-auto alone makes the Y axis compute to `auto`,
-             and the tabs' `-mb-px`/`border-b-2` underline overhangs ~1px, which showed a
-             spurious native vertical scrollbar after the last tab (R407 follow-up). -->
-        <div class="flex items-center gap-1 overflow-x-auto overflow-y-hidden">
+        <!-- scrollbar-hide: scroll the tabs left/right on mobile when wider than the
+             screen, with NO visible scrollbar (also hides the spurious ~1px vertical
+             bar that overflow-x-auto's computed overflow-y would otherwise show). R407. -->
+        <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide">
           <button
             type="button"
             class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2 shrink-0"

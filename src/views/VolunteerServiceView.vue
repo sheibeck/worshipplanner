@@ -60,7 +60,7 @@
       <!-- Tabs — ServiceEditorView.vue's exact tablist container + tab-button
            classes + roving-tabindex + handleTabKeydown pattern (127-UI-SPEC.md §1).
            Always 3 tabs, never reordered/hidden. -->
-      <div role="tablist" class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
+      <div role="tablist" class="flex items-center gap-1 overflow-x-auto scrollbar-hide mb-3 border-b border-gray-800 pb-0" @keydown="handleTabKeydown">
         <button
           id="vsv-tab-rehearse"
           ref="rehearseTabButtonRef"

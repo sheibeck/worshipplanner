@@ -33,7 +33,7 @@
       </div>
 
       <!-- Tab bar (mirrors ServicesView.vue) -->
-      <div class="flex items-center gap-1 mb-6 border-b border-gray-800 pb-0">
+      <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide mb-6 border-b border-gray-800 pb-0">
         <button
           type="button"
           class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"

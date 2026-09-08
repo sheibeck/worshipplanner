@@ -24,3 +24,17 @@ body,
   --slide-font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --slide-font-weight: 400;
 }
+
+/*
+ * scrollbar-hide (UAT 2026-09-08): tab bars scroll left/right on mobile when
+ * wider than the screen, WITHOUT a visible scrollbar. Applied to the app's tab
+ * strips alongside `overflow-x-auto`. Scrolling (touch/drag/wheel) still works;
+ * only the bar is hidden — on every engine.
+ */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* legacy Edge/IE */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chromium/Safari */
+}
