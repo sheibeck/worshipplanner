@@ -102,16 +102,11 @@ import SlideCanvas from '@/components/slides/SlideCanvas.vue'
  * the correct window; `testid` is the data-testid prefix so each caller keeps its
  * own stable testids (`audience-*`, `video-*`, ...) without a copy-pasted render.
  */
-const props = withDefaults(
-  defineProps<{
-    role: MonitorRole
-    channelFactory?: BroadcastChannelFactory
-    testid?: string
-  }>(),
-  {
-    testid: 'audience',
-  },
-)
+const props = defineProps<{
+  role: MonitorRole
+  channelFactory?: BroadcastChannelFactory
+  testid: string
+}>()
 
 // See ADR-0210 (docs/adr/0210-the-shared-output-window-lifecycle-core-r272-reuse-not-fork.md)
 const { assembledSlideshow, index, blackout, fontReady, rootRef, rootStyle, isFullscreen, handleReenterFullscreen } =
