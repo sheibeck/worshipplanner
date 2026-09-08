@@ -3147,7 +3147,17 @@ async function onMarkAsPlanned(): Promise<void> {
     // at an empty stage. onAutoPopulateStageLayout() no-ops when already seeded,
     // when the canvas already has manual markers, or when the roster is empty; the
     // flush() below persists the seed while the service is still draft/writable.
-    onAutoPopulateStageLayout()
+    //
+    // CR-03 guard: skip the seed when an autosave is already sitting in 'error'.
+    // The seed mutates localService, which arms — and the flush() below forces —
+    // a fresh write; if that succeeds it clears the outstanding save-error that
+    // must stay visible in the lock banner (32-REVIEW CR-03). A failed prior edit
+    // means the user already has an unsaved change to resolve; do not paper over
+    // it by seeding on top. The Stage-Layout-tab watcher still seeds later once
+    // the error is cleared.
+    if (saveStatus.entryFor(surfaceId.value).status !== 'error') {
+      onAutoPopulateStageLayout()
+    }
     // BL-02, second trigger. flush() disarms the timer and persists whatever
     // was pending while still draft/writable — a no-op when nothing is
     // pending (better under P-02 than the old unconditional onSave() call).
