@@ -125,7 +125,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   Audience/Confidence — `MonitorRole` widened, the monitor setup UI offers it, a `VideoOutputView`
   sibling + its own static route exist. Video assignment coexists with the existing N-assignment role model.
 
-- [ ] **R425**: A slide item can be flagged to be sent to the Video output as either a **Banner** or
+- [x] **R425**: A slide item can be flagged to be sent to the Video output as either a **Banner** or
   **Full-screen** (per-item authoring UI + schema field), riding the existing autosave path. **Banner is
   valid only when the output is Video.**
 
@@ -186,6 +186,6 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 | R422 | Phase 134 | Complete |
 | R423 | Phase 134 | Complete |
 | R424 | Phase 136 | Complete |
-| R425 | Phase 137 | Pending |
+| R425 | Phase 137 | Complete |
 | R426 | Phase 136 | Complete |
 | R427 | Phase 137 | Pending |

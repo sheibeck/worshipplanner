@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
-current_phase: 136
-current_phase_name: Video Output — Fullscreen Slice
-status: verifying
-stopped_at: Completed 136-02-PLAN.md
-last_updated: "2026-09-07T23:46:29.600Z"
+current_phase: 137
+current_phase_name: Video Output — Banner Render
+status: executing
+stopped_at: Completed 137-01-PLAN.md
+last_updated: "2026-09-08T01:16:27.831Z"
 last_activity: 2026-09-07
-last_activity_desc: Phase 136 execution started
+last_activity_desc: Phase 137 execution started
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 18
-  completed_plans: 18
+  total_plans: 20
+  completed_plans: 19
   percent: 86
 ---
 
@@ -58,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1383,7 +1383,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 136 — Video Output — Fullscreen Slice
+**Current focus:** Phase 137 — Video Output — Banner Render
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1393,10 +1393,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 137 (Video Output — Banner Render) — next (FINAL phase of v2.14)
-Plan: —
-Status: Phase 136 EXECUTED + code-verified (R424/R426, 9/9 must-haves); 2 review warnings fixed; 1 hardware UAT item deferred. Advancing to Phase 137.
-Last activity: 2026-09-07 — Phase 136 complete (3rd "Video" output role + shared FullscreenSlideOutput extraction + /present/video route)
+Phase: 137 (Video Output — Banner Render) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-09-07 — Phase 137 execution started
 
 ### v2.14 Deferred Verification (autonomous run — batched to milestone end)
 
@@ -3627,6 +3627,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 135-dashboard-overhaul P03 | 20min | 3 tasks | 4 files |
 | Phase 136 P01 | 10min | 2 tasks | 8 files |
 | Phase 136 P02 | 25min | 2 tasks | 5 files |
+| Phase 137 P01 | 14min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -4232,6 +4233,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R424 (role/setup half): MonitorRole widened to a strict 3-member allowlist ('audience'|'confidence'|'video'); canSave gate unchanged (Video optional); RunDisplaysPanel/RunPreflightPanel role typing widened as an in-scope fix since Video assignments already flow into Run Control today.
 - [Phase ?]: R426 satisfied by extracting the Audience render into a shared role/testid-parameterized FullscreenSlideOutput.vue that both AudienceOutputView and the new VideoOutputView delegate to, proven behavior-preserving by the unedited AudienceOutputView test suite.
 - [Phase ?]: /present/video/:serviceId launches through the existing N-assignment machinery with zero useRunControl.ts changes — urlForAssignment/openPlaced/openUnplaced/canGoLive were already role-generic.
+- [Phase ?]: R425: videoOutput shown for EVERY slot kind (no isLoopableSlot-style gate), unlike loop; locked service renders it read-only-but-visible, not hidden
 
 ### Roadmap Evolution
 
@@ -4561,8 +4563,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-07T23:45:03.825Z
-Stopped at: Completed 136-02-PLAN.md
+Last session: 2026-09-08T01:16:27.740Z
+Stopped at: Completed 137-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
