@@ -700,4 +700,103 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
       expect(wrapper.findComponent(StageLayoutEditor).props('elements')).toHaveLength(1)
     })
   })
+
+  // 260908-cou — stage chit ↔ role-assignment sync (fold play+sing, live remove/re-flag).
+  describe('stage ↔ role sync (260908-cou)', () => {
+    // Alice plays Guitar AND sings; Bob plays Bass only. Both resolved for the date.
+    function seedPlayAndSingRoster() {
+      mockRoles = [
+        { id: 'role-gtr', name: 'Guitar', group: 'band', defaultCount: 1, order: 0 },
+        { id: 'role-vox', name: 'Vocals', group: 'band', multiRole: true, defaultCount: 1, order: 1 },
+        { id: 'role-bass', name: 'Bass', group: 'band', defaultCount: 1, order: 2 },
+      ]
+      mockRosterPeople = [
+        { id: 'person-1', name: 'Alice', email: '', phone: '', active: true, roles: ['role-gtr', 'role-vox'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+        { id: 'person-2', name: 'Bob', email: '', phone: '', active: true, roles: ['role-bass'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+      ]
+      mockQuarters = [
+        {
+          id: 'q1', label: 'Q1 2026', year: 2026, quarter: 1, serviceDates: ['2026-03-08'],
+          roleOverridesByDate: {}, personQuarterData: {},
+          calendar: { '2026-03-08': { 'role-gtr': ['person-1'], 'role-vox': ['person-1'], 'role-bass': ['person-2'] } },
+          status: 'finalized', shareToken: null, createdAt: mockTimestamp, updatedAt: mockTimestamp,
+        },
+      ]
+    }
+
+    function markersOf(wrapper: Awaited<ReturnType<typeof mountView>>): StageMarker[] {
+      return ((wrapper.vm as unknown as { localService: { stageLayout?: { elements: StageMarker[] } } }).localService.stageLayout?.elements) ?? []
+    }
+
+    it('seed folds a play+sing person into ONE instrument chit with withVocal, no separate Vocals chit', async () => {
+      seedPlayAndSingRoster()
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+
+      const elements = markersOf(wrapper)
+      // Alice → one Guitar chit (withVocal), NOT a Guitar + a Vocals chit; Bob → Bass.
+      expect(elements).toHaveLength(2)
+      const alice = elements.filter((m) => m.personId === 'person-1')
+      expect(alice).toHaveLength(1)
+      expect(alice[0]).toMatchObject({ roleId: 'role-gtr', withVocal: true })
+      expect(elements.some((m) => m.roleId === 'role-vox')).toBe(false)
+    })
+
+    it('live: unchecking a person from an instrument role removes their chit', async () => {
+      seedPlayAndSingRoster()
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+      const vm = wrapper.vm as unknown as { onToggleOverridePerson: (a: unknown, p: string) => Promise<void> }
+      expect(markersOf(wrapper).some((m) => m.personId === 'person-2')).toBe(true)
+
+      await vm.onToggleOverridePerson({ roleId: 'role-bass', effectivePersonIds: ['person-2'] }, 'person-2')
+      await wrapper.vm.$nextTick()
+
+      expect(markersOf(wrapper).some((m) => m.personId === 'person-2')).toBe(false)
+    })
+
+    it('live: checking a band member into a vocal role sets withVocal on their instrument chit', async () => {
+      // Alice starts on Guitar only (not singing yet) → a plain Guitar chit.
+      mockRoles = [
+        { id: 'role-gtr', name: 'Guitar', group: 'band', defaultCount: 1, order: 0 },
+        { id: 'role-vox', name: 'Vocals', group: 'band', multiRole: true, defaultCount: 1, order: 1 },
+      ]
+      mockRosterPeople = [
+        { id: 'person-1', name: 'Alice', email: '', phone: '', active: true, roles: ['role-gtr', 'role-vox'], pcPersonId: null, createdAt: mockTimestamp, updatedAt: mockTimestamp },
+      ]
+      mockQuarters = [
+        {
+          id: 'q1', label: 'Q1 2026', year: 2026, quarter: 1, serviceDates: ['2026-03-08'],
+          roleOverridesByDate: {}, personQuarterData: {},
+          calendar: { '2026-03-08': { 'role-gtr': ['person-1'] } },
+          status: 'finalized', shareToken: null, createdAt: mockTimestamp, updatedAt: mockTimestamp,
+        },
+      ]
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+      const vm = wrapper.vm as unknown as { onToggleOverridePerson: (a: unknown, p: string) => Promise<void> }
+      expect(markersOf(wrapper).find((m) => m.personId === 'person-1')?.withVocal).toBeUndefined()
+
+      await vm.onToggleOverridePerson({ roleId: 'role-vox', effectivePersonIds: [] }, 'person-1')
+      await wrapper.vm.$nextTick()
+
+      expect(markersOf(wrapper).find((m) => m.personId === 'person-1')?.withVocal).toBe(true)
+    })
+
+    it('live: unchecking a play+sing person from the vocal role clears withVocal but keeps the instrument chit', async () => {
+      seedPlayAndSingRoster()
+      const wrapper = await mountView()
+      await goToStageTab(wrapper)
+      const vm = wrapper.vm as unknown as { onToggleOverridePerson: (a: unknown, p: string) => Promise<void> }
+      expect(markersOf(wrapper).find((m) => m.personId === 'person-1')?.withVocal).toBe(true)
+
+      await vm.onToggleOverridePerson({ roleId: 'role-vox', effectivePersonIds: ['person-1'] }, 'person-1')
+      await wrapper.vm.$nextTick()
+
+      const alice = markersOf(wrapper).filter((m) => m.personId === 'person-1')
+      expect(alice).toHaveLength(1)
+      expect(alice[0]!.roleId).toBe('role-gtr')
+      expect(alice[0]!.withVocal).toBeUndefined()
+    })
+  })
 })

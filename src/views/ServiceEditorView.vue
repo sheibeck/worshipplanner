@@ -1763,7 +1763,7 @@ import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference, scri
 import type { CongregationalSection } from '@/types/slide'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
 import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
-import { autoPopulateMarkers } from '@/utils/stageLayout'
+import { autoPopulateMarkers, foldPlayAndSing, isVocalRoleName } from '@/utils/stageLayout'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
 import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, ScriptureRef, SlotKind, ServiceSection, StageMarker } from '@/types/service'
 import type { VWType, Song } from '@/types/song'
@@ -2417,7 +2417,10 @@ function onAutoPopulateStageLayout() {
   const bandAssignments = stageServingAssignments.value.filter(
     (a) => rosterStore.roles.find((r) => r.id === a.roleId)?.group === 'band',
   )
-  const seeded = autoPopulateMarkers(bandAssignments)
+  // 260908-cou: fold play-and-sing — a person on an instrument role who also
+  // holds a vocal role seeds as ONE instrument chit with withVocal (no separate
+  // Vocals chit). Pure vocalists keep their Vocals chit.
+  const seeded = autoPopulateMarkers(foldPlayAndSing(bandAssignments))
   if (seeded.length === 0) return
   localService.value.stageLayout = { elements: seeded }
   localService.value.stageLayoutAutoSeeded = true
@@ -4268,8 +4271,9 @@ function eligiblePeople(roleId: string): Person[] {
 async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, personId: string) {
   if (!canEditService.value) return
   if (!localService.value) return
+  const isRemoving = assignment.effectivePersonIds.includes(personId)
   const current = new Set(assignment.effectivePersonIds)
-  if (current.has(personId)) {
+  if (isRemoving) {
     current.delete(personId)
   } else {
     current.add(personId)
@@ -4285,6 +4289,10 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
 
   try {
     await serviceStore.setRoleOverride(localService.value.id, assignment.roleId, nextPersonIds)
+    // 260908-cou: keep the stage layout in sync with the role change (only after
+    // the override actually persisted). Removal prunes the chit; the vocal-fold
+    // sets/clears withVocal on the person's instrument chits.
+    reconcileStageForRoleChange(assignment.roleId, personId, isRemoving)
   } catch (err) {
     // Roll back the optimistic update so the UI doesn't show a state that
     // was never actually persisted.
@@ -4297,6 +4305,45 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
     }
     console.error('Failed to update role override:', err)
   }
+}
+
+/**
+ * 260908-cou — reconcile the stage layout after a Roles-tab role toggle persists.
+ * Only Band-group roles affect the stage. Mutates `localService.stageLayout`,
+ * riding the existing useAutoSave deep-watch (no new store call), same as the
+ * seed. Never creates a new chit — seed owns chit creation/positioning; this only
+ * removes and re-flags `withVocal`.
+ *
+ *  - remove an instrument role  → drop that person's chit for that role
+ *  - remove a vocal role        → clear withVocal on the person's instrument chits
+ *  - add a vocal role           → set withVocal on the person's instrument chits
+ *  - add an instrument role      → no-op (no auto-placement)
+ */
+function reconcileStageForRoleChange(roleId: string, personId: string, isRemoving: boolean): void {
+  const svc = localService.value
+  const elements = svc?.stageLayout?.elements
+  if (!svc || !elements || elements.length === 0) return
+  const role = rosterStore.roles.find((r) => r.id === roleId)
+  if (!role || role.group !== 'band') return
+  const roleIsVocal = isVocalRoleName(role.name)
+  // A person's instrument chit: their marker on a non-vocal Band role.
+  const isPersonInstrumentChit = (m: StageMarker) =>
+    m.personId === personId && !!m.roleId && !isVocalRoleName(m.roleName ?? '')
+
+  let next = elements
+  if (isRemoving && !roleIsVocal) {
+    next = elements.filter((m) => !(m.personId === personId && m.roleId === roleId))
+  } else if (roleIsVocal) {
+    // Removing the vocal clears "+ Vocal"; adding it sets "+ Vocal".
+    const wantVocal = !isRemoving
+    next = elements.map((m) => {
+      if (!isPersonInstrumentChit(m) || !!m.withVocal === wantVocal) return m
+      if (wantVocal) return { ...m, withVocal: true }
+      const { withVocal: _drop, ...rest } = m
+      return rest
+    })
+  }
+  if (next !== elements) svc.stageLayout = { ...svc.stageLayout, elements: next }
 }
 
 // ── Live confirmation status (R411) ─────────────────────────────────────────────

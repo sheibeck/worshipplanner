@@ -18,6 +18,8 @@ import {
   stageMarkerSkinClass,
   buildStagePalette,
   autoPopulateMarkers,
+  foldPlayAndSing,
+  isVocalRoleName,
   STAGE_BAND,
   STAGE_KINDS,
   STAGE_KIND_META,
@@ -286,6 +288,73 @@ describe('stageLayout helpers', () => {
       const snapshot = JSON.parse(JSON.stringify(input))
       autoPopulateMarkers(input)
       expect(input).toEqual(snapshot)
+    })
+
+    it('carries a truthy per-assignment withVocal onto the marker (260908-cou)', () => {
+      const [m] = autoPopulateMarkers([{ id: 'p1', name: 'Alice', roleId: 'r1', roleName: 'Guitar', withVocal: true }])
+      expect(m!.withVocal).toBe(true)
+      const [n] = autoPopulateMarkers([{ id: 'p2', name: 'Bob', roleId: 'r2', roleName: 'Guitar' }])
+      expect(n!.withVocal).toBeUndefined()
+    })
+  })
+
+  describe('isVocalRoleName (260908-cou)', () => {
+    it('matches singing roles by name', () => {
+      for (const n of ['Vocals', 'Backing Vocals', 'BGV vox', 'Choir', 'Singer', 'Lead Vocal']) {
+        expect(isVocalRoleName(n)).toBe(true)
+      }
+    })
+    it('does not misclassify instruments — "Lead Guitar" is not vocal', () => {
+      for (const n of ['Guitar', 'Lead Guitar', 'Bass', 'Keys', 'Drums', 'Acoustic']) {
+        expect(isVocalRoleName(n)).toBe(false)
+      }
+    })
+  })
+
+  describe('foldPlayAndSing (260908-cou)', () => {
+    it('folds a play+sing person into their instrument chit with withVocal, dropping the vocal assignment', () => {
+      const out = foldPlayAndSing([
+        { id: 'p1', name: 'Alice', roleId: 'r-gtr', roleName: 'Guitar' },
+        { id: 'p1', name: 'Alice', roleId: 'r-vox', roleName: 'Vocals' },
+      ])
+      expect(out).toHaveLength(1)
+      expect(out[0]).toMatchObject({ roleId: 'r-gtr', withVocal: true })
+    })
+
+    it('leaves a pure vocalist with a Vocals chit and no withVocal', () => {
+      const out = foldPlayAndSing([{ id: 'p2', name: 'Bob', roleId: 'r-vox', roleName: 'Vocals' }])
+      expect(out).toHaveLength(1)
+      expect(out[0]).toMatchObject({ roleId: 'r-vox' })
+      expect(out[0]!.withVocal).toBeUndefined()
+    })
+
+    it('leaves an instrument-only player unchanged (no withVocal)', () => {
+      const out = foldPlayAndSing([{ id: 'p3', name: 'Cara', roleId: 'r-drm', roleName: 'Drums' }])
+      expect(out).toEqual([{ id: 'p3', name: 'Cara', roleId: 'r-drm', roleName: 'Drums' }])
+    })
+
+    it('a two-instrument singer gets both instrument chits withVocal and no vocal chit', () => {
+      const out = foldPlayAndSing([
+        { id: 'p4', name: 'Dan', roleId: 'r-gtr', roleName: 'Guitar' },
+        { id: 'p4', name: 'Dan', roleId: 'r-key', roleName: 'Keys' },
+        { id: 'p4', name: 'Dan', roleId: 'r-vox', roleName: 'Vocals' },
+      ])
+      expect(out).toHaveLength(2)
+      expect(out.every((a) => a.withVocal === true)).toBe(true)
+      expect(out.some((a) => isVocalRoleName(a.roleName))).toBe(false)
+    })
+
+    it('is order-preserving and non-mutating', () => {
+      const input = [
+        { id: 'p1', name: 'Alice', roleId: 'r-vox', roleName: 'Vocals' },
+        { id: 'p1', name: 'Alice', roleId: 'r-gtr', roleName: 'Guitar' },
+        { id: 'p2', name: 'Bob', roleId: 'r-bass', roleName: 'Bass' },
+      ]
+      const snapshot = JSON.parse(JSON.stringify(input))
+      const out = foldPlayAndSing(input)
+      expect(input).toEqual(snapshot)
+      // Alice's single folded chit (Guitar) precedes Bob's Bass chit.
+      expect(out.map((a) => a.roleId)).toEqual(['r-gtr', 'r-bass'])
     })
   })
 })

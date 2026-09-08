@@ -248,15 +248,67 @@ const AUTO_POPULATE_INSET_X = 8
 const AUTO_POPULATE_START_Y = 20
 const AUTO_POPULATE_END_Y = STAGE_BAND.maxY - 4
 
+/** One serving assignment fed to the stage-layout auto-seed. `withVocal` is set
+ *  by foldPlayAndSing for an instrument assignment whose person also sings. */
+export interface SeedAssignment {
+  id: string
+  name: string
+  roleId: string
+  roleName: string
+  withVocal?: boolean
+}
+
+/**
+ * True when a role's NAME reads as a singing role (so a band member assigned it
+ * "also sings"). Matches vocal/vox/choir/sing; deliberately NOT "lead", so
+ * "Lead Guitar" is not misclassified as vocals. Pure — name-only, no store.
+ */
+export function isVocalRoleName(roleName: string): boolean {
+  return /vocal|vox|choir|sing/i.test(roleName)
+}
+
+/**
+ * Folds a person's play-and-sing assignments (260908-cou): for anyone holding
+ * BOTH an instrument (non-vocal Band) role AND a vocal role the same service,
+ * keep their instrument assignment(s) with `withVocal: true` and DROP their
+ * vocal assignment(s) — so they seed as one "Guitar + Vocal" chit, not two.
+ * A pure vocalist keeps their vocal assignment as-is; an instrument-only player
+ * is unchanged. Order-preserving and non-mutating (mirrors the input contract of
+ * autoPopulateMarkers). Callers pass Band-group assignments only.
+ */
+export function foldPlayAndSing(assignments: SeedAssignment[]): SeedAssignment[] {
+  const byPerson = new Map<string, SeedAssignment[]>()
+  for (const a of assignments) {
+    const list = byPerson.get(a.id)
+    if (list) list.push(a)
+    else byPerson.set(a.id, [a])
+  }
+  const out: SeedAssignment[] = []
+  for (const a of assignments) {
+    const roleIsVocal = isVocalRoleName(a.roleName)
+    const personRoles = byPerson.get(a.id) ?? [a]
+    const hasInstrument = personRoles.some((p) => !isVocalRoleName(p.roleName))
+    if (roleIsVocal) {
+      if (hasInstrument) continue // fold: the vocal is carried on the instrument chit
+      out.push(a) // pure vocalist keeps a Vocals chit
+    } else {
+      const singsToo = personRoles.some((p) => isVocalRoleName(p.roleName))
+      out.push(singsToo || a.withVocal ? { ...a, withVocal: true } : a)
+    }
+  }
+  return out
+}
+
 /**
  * Seeds one StageMarker per (person, role) serving assignment, laid out
  * deterministically in a non-overlapping grid inside the on-stage band. Pure
  * and store-free: the caller (ServiceEditorView's one-time seed trigger) owns
  * the empty-canvas / non-clobber guard — this function never reads or wipes
  * existing state (R420, non-clobber invariant is load-bearing there, not here).
+ * A truthy per-assignment `withVocal` rides onto the marker (260908-cou).
  */
 export function autoPopulateMarkers(
-  servingAssignments: { id: string; name: string; roleId: string; roleName: string }[]
+  servingAssignments: SeedAssignment[]
 ): StageMarker[] {
   const count = servingAssignments.length
   if (count === 0) return []
@@ -282,6 +334,7 @@ export function autoPopulateMarkers(
     })
     marker.personId = assignment.id
     marker.personName = assignment.name
+    if (assignment.withVocal) marker.withVocal = true
     return marker
   })
 }
