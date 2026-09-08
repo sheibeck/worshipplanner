@@ -1026,7 +1026,9 @@ software compositor (OBS/vMix-style Browser Source) can show live stage video be
      type="color">`) that replaces the transparent background for a tool that needs chroma-key instead of
      alpha (R427).
 
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 137-01-PLAN.md — R425: per-item Banner/Full-screen authoring control + `videoOutput` schema field + autosave persistence (Wave 1)
+- [ ] 137-02-PLAN.md — R427: Video-only banner lower-third render (transparent-default) + per-device key-color setting (Wave 2, depends on 137-01)
 **UI hint**: yes
 
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
