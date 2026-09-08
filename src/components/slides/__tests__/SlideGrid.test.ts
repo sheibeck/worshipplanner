@@ -2572,3 +2572,30 @@ describe('SlideGrid — per-item loop (MISC/ANNOUNCEMENTS only, owner 2026-09-01
     expect(emitted[0]).toEqual([2, { enabled: true, intervalSeconds: 10 }])
   })
 })
+
+describe('SlideGrid — per-item Video output Banner/Full-screen (R425, Phase 137)', () => {
+  it('shows the video-output control for a non-loopable kind (SONG), unlike the loop control', () => {
+    const songSlot = makeSlot({ kind: 'SONG', id: 's', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
+    const wrapper = mountGrid({ selectedSlot: songSlot, isEditor: true })
+    expect(wrapper.find('[data-testid="slot-video-output-row"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slot-loop-row"]').exists()).toBe(false)
+  })
+
+  it('hides the video-output control for a viewer (isEditor: false)', () => {
+    const wrapper = mountGrid({ selectedSlot: makeSlot({ kind: 'SONG', id: 's', position: 0 } as never), isEditor: false })
+    expect(wrapper.find('[data-testid="slot-video-output-row"]').exists()).toBe(false)
+  })
+
+  it('renders read-only (editable=false) but still visible for a locked service', () => {
+    const wrapper = mountGrid({ selectedSlot: makeSlot({ kind: 'SONG', id: 's', position: 0 } as never), isEditor: true, serviceLocked: true })
+    expect(wrapper.find('[data-testid="slot-video-output-row"]').exists()).toBe(true)
+    expect((wrapper.get('[data-testid="slot-video-output-banner-btn"]').element as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('choosing Banner emits video-output-change with the slot array index and { mode: "banner" }', async () => {
+    const wrapper = mountGrid({ selectedSlot: makeSlot({ kind: 'SONG', id: 's', position: 0 } as never), slotArrayIndex: 3 })
+    await wrapper.get('[data-testid="slot-video-output-banner-btn"]').trigger('click')
+    const emitted = wrapper.emitted('video-output-change')!
+    expect(emitted[0]).toEqual([3, { mode: 'banner' }])
+  })
+})

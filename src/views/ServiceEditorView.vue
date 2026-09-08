@@ -1547,6 +1547,7 @@
             @navigate-to-scripture-editor="handleNavigateToScriptureEditor"
             @present="onPresent"
             @loop-change="onSlotLoopChange"
+            @video-output-change="onSlotVideoOutputChange"
           />
           <PresentationViewer
             v-if="presenting"
@@ -2325,6 +2326,19 @@ function onSlotLoopChange(index: number, loop: NonNullable<ServiceSlot['loop']>)
   const slot = localService.value.slots[index]
   if (!slot) return
   slot.loop = loop
+}
+
+// ── Per-item Video-output authoring (R425, Phase 137) ───────────────────────
+// Mirrors onSlotLoopChange verbatim: SlidesTab relays SlideGrid's
+// `video-output-change(index, videoOutput)`, and this handler just persists
+// it onto `slot.videoOutput`, riding the EXISTING single useAutoSave
+// deep-watch — no new save call.
+function onSlotVideoOutputChange(index: number, videoOutput: NonNullable<ServiceSlot['videoOutput']>) {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  slot.videoOutput = videoOutput
 }
 
 // ── Stage Layout authoring (R313/R314, Phase 107) ───────────────────────────

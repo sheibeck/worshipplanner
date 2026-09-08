@@ -32,6 +32,7 @@
           @edit-congregational="onEditCongregational"
           @edit-in-song="onEditInSongBadge"
           @loop-change="(index, loop) => emit('loop-change', index, loop)"
+          @video-output-change="(index, videoOutput) => emit('video-output-change', index, videoOutput)"
         />
       </div>
     </div>
@@ -120,6 +121,9 @@ const emit = defineEmits<{
   /** Per-item LOOP change (MISC/ANNOUNCEMENTS only) relayed up from SlideGrid;
    *  ServiceEditorView persists it onto `slot.loop`. */
   (e: 'loop-change', index: number, loop: NonNullable<ServiceSlot['loop']>): void
+  /** Per-item Video-output Banner/Full-screen change (R425) relayed up from
+   *  SlideGrid; ServiceEditorView persists it onto `slot.videoOutput`. */
+  (e: 'video-output-change', index: number, videoOutput: NonNullable<ServiceSlot['videoOutput']>): void
 }>()
 
 const router = useRouter()

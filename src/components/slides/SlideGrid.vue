@@ -136,7 +136,7 @@
            (or, for background, on the minimal testid wrapper below) rather
            than on a padded child div — there is no padded child div left. -->
       <div
-        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl || showRemoveImportedControl || canLoopSlot"
+        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl || showRemoveImportedControl || canLoopSlot || showVideoOutputControl"
         class="mx-6 mt-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
         data-testid="slide-grid-group-media-panel"
       >
@@ -148,6 +148,18 @@
           :slot="selectedSlot!"
           :editable="true"
           @change="(loop) => emit('loop-change', slotArrayIndex, loop)"
+        />
+
+        <!-- Per-item Video-output Banner/Full-screen choice (R425, Phase 137) —
+             unlike Loop, offered for EVERY slot kind (no isLoopableSlot-style
+             gate; 137-UI-SPEC.md Surface 1 scope decision). Locked service
+             shows the setting read-only (`editable="!serviceLocked"`), not
+             hidden. -->
+        <SlotVideoOutputControl
+          v-if="showVideoOutputControl"
+          :slot="selectedSlot!"
+          :editable="!serviceLocked"
+          @change="(videoOutput) => emit('video-output-change', slotArrayIndex, videoOutput)"
         />
 
         <!-- Group music bar (25-06, R032). Emit-only control; this component
@@ -379,6 +391,7 @@ import SlideGroupMusicControl from './SlideGroupMusicControl.vue'
 import BackgroundControl from './BackgroundControl.vue'
 import SlideDropTarget from './SlideDropTarget.vue'
 import SlotLoopControl from './SlotLoopControl.vue'
+import SlotVideoOutputControl from './SlotVideoOutputControl.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import { resolveDrop, UNSUPPORTED_FILE_MESSAGE } from './dropRouting'
 import {
@@ -455,6 +468,13 @@ const emit = defineEmits<{
    * `slot.loop` through the existing autosave path.
    */
   'loop-change': [index: number, loop: NonNullable<ServiceSlot['loop']>]
+  /**
+   * The per-item Video-output Banner/Full-screen control changed (R425,
+   * Phase 137). Carries the selected slot's raw array index + the new
+   * videoOutput object; SlidesTab relays it to ServiceEditorView, which
+   * persists it onto `slot.videoOutput` through the existing autosave path.
+   */
+  'video-output-change': [index: number, videoOutput: NonNullable<ServiceSlot['videoOutput']>]
 }>()
 
 const slideGroupsStore = useSlideGroups()
@@ -509,6 +529,11 @@ const isSongGroup = computed(() => props.selectedSlot?.kind === 'SONG')
 // (owner 2026-09-01). Editor-only + draft-locked like every other write here.
 const isLoopableSlot = computed(() => props.selectedSlot?.kind === 'MISC' || props.selectedSlot?.kind === 'ANNOUNCEMENTS')
 const canLoopSlot = computed(() => isLoopableSlot.value && props.isEditor && !props.serviceLocked)
+// Video-output Banner/Full-screen (R425) is offered for EVERY slot kind
+// (no isLoopableSlot-style gate) — editor-only, but shown (read-only) even
+// when locked, so `serviceLocked` gates the control's `editable` prop, not
+// its presence.
+const showVideoOutputControl = computed(() => Boolean(props.selectedSlot) && props.isEditor)
 
 /**
  * The SONG group's own song id, read straight off the selected slot (a
