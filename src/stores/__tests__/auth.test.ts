@@ -251,6 +251,13 @@ describe('useAuthStore', () => {
     } catch {
       /* jsdom may not expose sessionStorage in every config */
     }
+    // R428 (Phase 138) — the localStorage fallback tier must not leak between
+    // tests either, same rationale as the sessionStorage.clear() above.
+    try {
+      localStorage.clear()
+    } catch {
+      /* jsdom may not expose localStorage in every config */
+    }
   })
 
   describe('initial state', () => {
@@ -433,6 +440,25 @@ describe('useAuthStore', () => {
         vi.mocked(signOut).mock.invocationCallOrder[0]!,
       )
     })
+
+    // R428 (Phase 138) — clearRememberedOrg is now the two-tier clear site;
+    // a leftover localStorage entry would leak the previous user's church to
+    // whoever signs in next on a shared/kiosk computer.
+    it('clears both the sessionStorage and localStorage remembered-org tiers', async () => {
+      mockMultiOrg()
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      await store.selectOrg('org-2')
+      expect(sessionStorage.getItem('wp.selectedOrg')).not.toBeNull()
+      expect(localStorage.getItem('wp.selectedOrg.persist')).not.toBeNull()
+
+      await store.logout()
+
+      expect(sessionStorage.getItem('wp.selectedOrg')).toBeNull()
+      expect(localStorage.getItem('wp.selectedOrg.persist')).toBeNull()
+    })
   })
 
   describe('ensureUserDocument', () => {
@@ -535,6 +561,36 @@ describe('useAuthStore', () => {
       expect(store.orgId).toBe('org-1')
       expect(store.needsOrgSelection).toBe(false)
       expect(store.requiresOrgSelection).toBe(false)
+    })
+
+    // R428 (Phase 138) — a genuinely-new tab starts with empty sessionStorage
+    // but shares the uid-scoped localStorage fallback tier, so the intended
+    // org restores instead of bouncing to the church picker.
+    it('restores the active org from the localStorage fallback in a new tab', async () => {
+      mockMultiOrg()
+      localStorage.setItem('wp.selectedOrg.persist', JSON.stringify({ uid: 'test-uid', orgId: 'org-2' }))
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.orgId).toBe('org-2')
+      expect(store.needsOrgSelection).toBe(false)
+      expect(store.requiresOrgSelection).toBe(false)
+    })
+
+    // R428 (Phase 138) — the ids.includes(remembered) re-validation in
+    // loadOrgContext must still reject a persisted org the user is no longer
+    // a member of, regardless of which storage tier it came from.
+    it('does not honor a stale persisted org from localStorage the user is not a member of', async () => {
+      mockMultiOrg()
+      localStorage.setItem(
+        'wp.selectedOrg.persist',
+        JSON.stringify({ uid: 'test-uid', orgId: 'org-not-mine' }),
+      )
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.orgId).toBeNull()
+      expect(store.needsOrgSelection).toBe(true)
     })
 
     it('hasNoOrg is true when the user belongs to no organization', async () => {
