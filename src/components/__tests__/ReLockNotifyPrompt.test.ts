@@ -26,6 +26,18 @@ vi.mock('@/firebase', () => ({
   functions: {},
 }))
 
+// R434 — services store seam. This file mocked no store before this phase;
+// ensureShareLink defaults to a resolved link so the happy path (link exists,
+// {{service_link}} appended) is the default across all pre-existing tests.
+const mockEnsureShareLink = vi.fn<(...args: unknown[]) => Promise<string>>(() =>
+  Promise.resolve('https://example.com/share/mock-token'),
+)
+vi.mock('@/stores/services', () => ({
+  useServiceStore: () => ({
+    ensureShareLink: (...args: unknown[]) => mockEnsureShareLink(...args),
+  }),
+}))
+
 // Teleport-to-body: every query goes through body(), per Vue Test Utils'
 // documented Teleport testing pattern (same as MessageComposer.test.ts).
 enableAutoUnmount(afterEach)
@@ -143,6 +155,7 @@ describe('ReLockNotifyPrompt', () => {
     vi.clearAllMocks()
     mockHttpsCallable.mockReturnValue(mockQueueServiceMessage)
     mockQueueServiceMessage.mockResolvedValue({ data: { messageId: 'msg-1' } })
+    mockEnsureShareLink.mockResolvedValue('https://example.com/share/mock-token')
   })
 
   it('renders one checkable row per ChangeEntry with its type badge, description, and team-label chips', () => {
@@ -263,6 +276,58 @@ describe('ReLockNotifyPrompt', () => {
       expect(wrapper.emitted('sent')).toBeTruthy()
       expect(wrapper.emitted('sent')!.length).toBe(1)
       expect(wrapper.emitted('cancel')).toBeFalsy()
+    })
+
+    // R434 — the auto-generated notice never carried a plan link. These three
+    // tests cover the fix: the service_link token is appended when a link
+    // resolves, ensureShareLink is a non-blocking precondition, and a
+    // link-less service degrades gracefully (no dangling label).
+
+    it('the service_link token appears in the sent body when a share link resolves', async () => {
+      mountPrompt()
+      await q('send-btn').trigger('click')
+      await flushPromises()
+
+      const payload = mockQueueServiceMessage.mock.calls[0]![0] as Record<string, unknown>
+      expect(payload.body).toContain('View the full plan:')
+      expect(payload.body).toContain('{{service_link}}')
+    })
+
+    it('calls ensureShareLink with the service and orgId before queueServiceMessage', async () => {
+      mountPrompt()
+      await q('send-btn').trigger('click')
+      await flushPromises()
+
+      expect(mockEnsureShareLink).toHaveBeenCalledTimes(1)
+      expect(mockEnsureShareLink).toHaveBeenCalledWith(service, 'org-1')
+      expect(mockEnsureShareLink.mock.invocationCallOrder[0]!).toBeLessThan(
+        mockQueueServiceMessage.mock.invocationCallOrder[0]!,
+      )
+    })
+
+    it('a rejected ensureShareLink is swallowed (non-blocking) and the message still sends', async () => {
+      mockEnsureShareLink.mockRejectedValueOnce(new Error('mint failed'))
+      const wrapper = mountPrompt()
+
+      await q('send-btn').trigger('click')
+      await flushPromises()
+
+      expect(mockQueueServiceMessage).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('sent')).toBeTruthy()
+      expect(wrapper.emitted('sent')!.length).toBe(1)
+    })
+
+    it('omits the plan-link line entirely when ensureShareLink resolves an empty string', async () => {
+      mockEnsureShareLink.mockResolvedValueOnce('')
+      mountPrompt()
+
+      await q('send-btn').trigger('click')
+      await flushPromises()
+
+      const payload = mockQueueServiceMessage.mock.calls[0]![0] as Record<string, unknown>
+      expect(payload.body).not.toContain('{{service_link}}')
+      expect(payload.body).not.toContain('View the full plan:')
+      expect(payload.body).toContain('Here’s what changed since the last lock:')
     })
 
     it('sends changeDiff = only the CHECKED entries and the Everyone selector when Everyone is chosen', async () => {
