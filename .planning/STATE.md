@@ -1,15 +1,19 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.15
-milestone_name: Service Times, Vamps & Field Fixes
-status: planning
-last_updated: "2026-09-09T14:43:40.374Z"
+milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
+current_phase: 138
+current_phase_name: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link
+status: executing
+stopped_at: Completed 138-01-PLAN.md
+last_updated: "2026-09-09T17:47:20.446Z"
 last_activity: 2026-09-09
+last_activity_desc: Phase 138 execution started
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -54,7 +58,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1390,7 +1394,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 137 — Video Output — Banner Render
+**Current focus:** Phase 138 — Field Fixes — Church-Picker Deep-Link & Service-Update Email Link
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1400,10 +1404,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 138 (not yet planned)
-Plan: —
-Status: Roadmap created — ready to plan Phase 138
-Last activity: 2026-09-09 — v2.15 ROADMAP.md created (4 phases, 138-141; R428-R440, 13/13 mapped)
+Phase: 138 (Field Fixes — Church-Picker Deep-Link & Service-Update Email Link) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-09-09 — Phase 138 execution started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3702,6 +3706,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 136 P02 | 25min | 2 tasks | 5 files |
 | Phase 137 P01 | 14min | 2 tasks | 7 files |
 | Phase 137 P02 | 55min | 2 tasks | 6 files |
+| Phase 138 P01 | 25min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -4310,6 +4315,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R425: videoOutput shown for EVERY slot kind (no isLoopableSlot-style gate), unlike loop; locked service renders it read-only-but-visible, not hidden
 - [Phase ?]: Key-color setting stored per-device (localStorage wp:videoKeyColor:v1), sibling of MONITOR_CONFIG_STORAGE_KEY — mirrors existing device-local reasoning for monitor role mappings
 - [Phase ?]: Root bg-black class stays unconditional; banner mode's transparent/key-color background is an inline override only, so fullscreen/non-video path carries zero new markup or conditions
+- [Phase ?]: R428: two-tier remembered-org storage (sessionStorage primary + uid-scoped localStorage fallback) added inside auth.ts's three private helpers only; loadOrgContext, needsOrgSelection, router guard unchanged
 
 ### Roadmap Evolution
 
@@ -4646,8 +4652,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-08T01:45:50.384Z
-Stopped at: Completed 137-02-PLAN.md
+Last session: 2026-09-09T17:47:20.358Z
+Stopped at: Completed 138-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

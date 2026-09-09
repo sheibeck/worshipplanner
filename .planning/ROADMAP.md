@@ -796,12 +796,14 @@ v2.15" section; research: `.planning/research/SUMMARY.md`, `ARCHITECTURE.md`, `P
   audible echo on real speakers. Both must be verified on **real multi-monitor hardware with real
   speakers**, on a fresh browser profile — not provable by mocked-`play()` unit tests. Treat as a
   human/hardware-UAT gate before this phase is considered done.
+
 - Phase 139 (Rehearsal & Report Times) must decide and test three things before/while building the UI:
   plain-string storage (never `Date`/`Timestamp`, to avoid timezone reinterpretation), a single shared
   chronological sort for the rehearsals array (never trust array-storage order), and copy-not-live-read
   org defaults (so editing an org default never retroactively changes an already-locked, already-shared
   service). All three must also thread through both hand-maintained public projections
   (`buildServiceSnapshot` and `buildRehearseAccess`) or volunteer-facing surfaces silently show nothing.
+
 - Phase 140 (Vamps CRUD & Storage) inherits the known `firestore.exists()`-in-Storage-emulator blind spot
   (see CLAUDE.md) when its new `vamp-files/` `storage.rules` block mirrors the `song-files/` shape — annotate
   the expected-local-failure allow-cases from day one and verify the real upload in a deployed environment,
@@ -823,16 +825,20 @@ service-update email reliably includes a working link to the plan.
   1. A multi-church member who opens a nav link in a new browser tab, or follows a deep link into a fresh
      tab, lands on the intended page rather than the church picker, as long as they are still a member of
      the previously-active org (R428).
+
   2. Signing out clears the persisted active-org selection from every storage tier used for it, so a
      different user signing in next on the same shared computer sees no leftover church selection (R428).
+
   3. A user who has been removed from an org since it was last remembered is not silently routed into that
      org from a new tab — the existing stale-membership re-validation still applies (R428).
+
   4. Every service-update / order-of-service notification email — including the auto-generated re-lock
      change notice — is sent with a working link to the service's plan, even for a service that had no
      share link yet at send time (R434).
 
-**Plans**: 2 plans (Wave 1, parallel — no file overlap)
-- [ ] 138-01-PLAN.md — R428: two-tier (sessionStorage + uid-scoped localStorage) remembered-org storage in auth.ts so a new tab / deep link restores the active church; preserves stale-membership re-validation, clears both tiers on sign-out
+**Plans**: 1/2 plans executed
+
+- [x] 138-01-PLAN.md — R428: two-tier (sessionStorage + uid-scoped localStorage) remembered-org storage in auth.ts so a new tab / deep link restores the active church; preserves stale-membership re-validation, clears both tiers on sign-out
 - [ ] 138-02-PLAN.md — R434: append the plan-link token to the re-lock notice body + ensureShareLink soft-fail precondition before send in ReLockNotifyPrompt.vue; graceful omission when no link resolves
 
 ### Phase 139: Rehearsal & Report Times
@@ -845,12 +851,15 @@ those times are visible everywhere a service's date already appears.
 
   1. An editor sets org-level default rehearsal time(s) and a default day-of report time on the
      organization settings page, and those defaults persist (R429).
+
   2. A newly created service pre-fills its rehearsal time(s) and report time by copying the org defaults;
      the planner then dates each rehearsal and can adjust any time; changing an org default afterward never
      retroactively changes an already-created service's stored times (R429, R432).
+
   3. A planner can add, edit, and remove multiple dated rehearsals (each its own date + time) and a single
      day-of report time directly in the service editor, with rehearsals always displayed in chronological
      order regardless of entry order (R430, R431).
+
   4. The service's rehearsal times and report time are shown alongside the date on the dashboard, My
      Schedule, the volunteer service view, and the public share/plan view — threaded through both
      `buildServiceSnapshot` and `buildRehearseAccess` (R433).
@@ -867,9 +876,11 @@ those times are visible everywhere a service's date already appears.
 
   1. An editor creates a vamp with a name, a musical key, and one attached MP3 (≤50MB) from a dedicated
      Vamps page reachable from the sidebar nav, alongside Songs (R435).
+
   2. An editor edits a vamp's name/key, replaces or removes its MP3, and deletes the vamp (R435).
   3. The Vamps list is browsable and searchable, including by key, matching the Songs list UX and built to
      the imported `Vamps.dc.html` design (R436).
+
   4. Vamp files upload into a retention-exempt, org-scoped Storage prefix (`orgs/{orgId}/vamp-files/…`)
      that is editor-gated in `storage.rules` and structurally excluded from every cleanup sweep (R435).
 
@@ -886,14 +897,18 @@ live in Run the Service, with no silent failures.
 
   1. A planner assigns a vamp to a slide in the service editor via a "Choose a Vamp" picker (and can
      clear/change the assignment), attaching the vamp's audio to that slide (R437).
+
   2. When a slide with an assigned vamp goes live in Run the Service, the vamp plays and loops until the
      slide changes or the assignment is cleared, and is audible **only** from the Audience output —
      Confidence and Video stay muted so one machine driving multiple monitors does not triple-play/echo the
      audio (R438).
+
   3. A projectionist arms audio with an explicit gesture on the Run/control screen before going live, so
      the vamp actually plays in the non-interactive output window(s) despite browser autoplay policy (R439).
+
   4. If audio playback is still blocked after arming, the control screen shows a visible warning — never a
      silent failure with no on-screen indication (R439).
+
   5. Deleting a vamp assigned to one or more upcoming services' slides shows a warning naming the affected
      count but still allows the deletion (R440).
 
@@ -904,7 +919,6 @@ UAT gate.
 
 **Plans**: TBD
 **UI hint**: yes
-
 
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
 

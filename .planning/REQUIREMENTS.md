@@ -38,7 +38,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Deep-Link / New-Tab Church Fix
 
-- [ ] **R428**: A multi-church member who opens a nav link in a **new browser tab** (right-click → open in
+- [x] **R428**: A multi-church member who opens a nav link in a **new browser tab** (right-click → open in
   new tab) or follows a deep link into a fresh tab lands on the **intended page**, not the church picker —
   the active church is restored from uid-scoped persistent storage that a genuinely-new tab can read. The
   fix preserves the existing safeguards: the persisted church is honored only if it is still in the user's
@@ -125,6 +125,7 @@ Acknowledged but deferred — not in this milestone's roadmap.
 - **TIME-EXTRA-01**: Calendar / ICS export of a volunteer's rehearsal + report times.
 - **TIME-EXTRA-02**: Per-team / per-role rehearsal-time visibility scoping (Planning Center supports it;
   out of scope here).
+
 - **TIME-EXTRA-03**: Dedicated `{{report_time}}` / `{{rehearsal_dates}}` merge tokens for messaging.
 
 ### Vamps — Extras
@@ -154,7 +155,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R428 | Phase 138 | Pending |
+| R428 | Phase 138 | Complete |
 | R429 | Phase 139 | Pending |
 | R430 | Phase 139 | Pending |
 | R431 | Phase 139 | Pending |
@@ -169,11 +170,13 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R440 | Phase 141 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 13 total (R428–R440)
 - Mapped to phases: 13 (100%)
 - Unmapped: 0
 
 **Phase map:**
+
 - Phase 138 — Field Fixes: Church-Picker Deep-Link & Service-Update Email Link (R428, R434)
 - Phase 139 — Rehearsal & Report Times (R429, R430, R431, R432, R433)
 - Phase 140 — Vamps Library: CRUD & Storage (R435, R436)
