@@ -392,10 +392,16 @@ const mockReopenService = vi.fn<(id: string) => Promise<void>>(() => Promise.res
 // which the component imports from the (fully mocked) '@/stores/services'. A
 // lightweight stub is enough — the tests assert only that a snapshot object was
 // written, not its full shape (the real builder needs live Pinia stores).
-const mockBuildServiceSnapshot = vi.fn((svc: Service) => ({
-  name: svc.name,
-  status: svc.status,
-  slots: svc.slots,
+// 138-02: vi.hoisted() — this is read EAGERLY as a top-level property of the
+// vi.mock('@/stores/services') factory's returned object (unlike the other
+// mocks below, which are only closed over inside the deferred useServiceStore()
+// arrow and so don't need hoisting). See the ServiceLockedErrorStub note above.
+const { mockBuildServiceSnapshot } = vi.hoisted(() => ({
+  mockBuildServiceSnapshot: vi.fn((svc: Service) => ({
+    name: svc.name,
+    status: svc.status,
+    slots: svc.slots,
+  })),
 }))
 const mockAssignSongToSlot = vi.fn<
   (id: string, index: number, song: { id: string; title: string; key: string }) => Promise<void>
@@ -421,20 +427,28 @@ const mockCreateShareToken = vi.fn(
 // can. Because this whole module is mocked, the mock must export a REAL class
 // or that `instanceof` is unsatisfiable and the branch is untestable. Shape
 // mirrors `src/stores/services.ts:52-65` exactly.
-class ServiceLockedErrorStub extends Error {
-  readonly serviceId: string
-  readonly storedStatus: string
+// 138-02: moved into vi.hoisted() — ReLockNotifyPrompt.vue now also imports
+// '@/stores/services' (R434), which can shift when this file's vi.mock factory
+// below first resolves the module ahead of this plain class declaration's
+// position in source order, throwing a TDZ ReferenceError. vi.hoisted()
+// guarantees initialization before any vi.mock factory needs it.
+const { ServiceLockedErrorStub } = vi.hoisted(() => {
+  class ServiceLockedErrorStub extends Error {
+    readonly serviceId: string
+    readonly storedStatus: string
 
-  constructor(serviceId: string, storedStatus: string, action = 'update') {
-    super(
-      `R036: refusing to ${action} service ${serviceId} — its stored status is ` +
-        `"${storedStatus}", not "draft". Reopen it for editing first.`,
-    )
-    this.name = 'ServiceLockedError'
-    this.serviceId = serviceId
-    this.storedStatus = storedStatus
+    constructor(serviceId: string, storedStatus: string, action = 'update') {
+      super(
+        `R036: refusing to ${action} service ${serviceId} — its stored status is ` +
+          `"${storedStatus}", not "draft". Reopen it for editing first.`,
+      )
+      this.name = 'ServiceLockedError'
+      this.serviceId = serviceId
+      this.storedStatus = storedStatus
+    }
   }
-}
+  return { ServiceLockedErrorStub }
+})
 
 vi.mock('@/stores/services', () => ({
   ServiceLockedError: ServiceLockedErrorStub,
