@@ -468,6 +468,9 @@ vi.mock('@/stores/services', () => ({
     clearRoleOverride: mockClearRoleOverride,
     setServiceMessagingDefaults: mockSetServiceMessagingDefaults,
     createShareToken: mockCreateShareToken,
+    // WR-01 (138): ReLockNotifyPrompt (mounted un-stubbed here) calls this on Send;
+    // stub it so a future Send-click test can't throw + get masked by the soft-fail catch.
+    ensureShareLink: vi.fn(() => Promise.resolve('')),
     // R039 (32-01): arrow function evaluated lazily at call time — same reason
     // `services: mockServicesList` above stays live across a test's mutation
     // of `mockOwnWriteEchoIds` rather than snapshotting it at mock-creation time.

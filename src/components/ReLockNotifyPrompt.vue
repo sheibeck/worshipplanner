@@ -315,16 +315,18 @@ async function onSend() {
     // R434 — self-heal the share link before send, mirroring markAsPlanned's
     // soft-fail pattern (services.ts:735-740): a mint failure must never
     // block the notice itself.
-    let shareLink = ''
+    // ensureShareLink returns a share *token* (not a resolved URL); the server
+    // renders {{service_link}} from it at send time.
+    let shareToken = ''
     try {
-      shareLink = await servicesStore.ensureShareLink(props.service, props.orgId)
+      shareToken = await servicesStore.ensureShareLink(props.service, props.orgId)
     } catch (err) {
       console.error('[ReLockNotifyPrompt] ensureShareLink self-heal failed (non-blocking):', err)
     }
     // Append the plan-link line only when a link resolved — a genuinely
     // link-less service (mint failed/swallowed) omits the whole line rather
     // than shipping a dangling label with nothing after it (A1 decision).
-    const body = shareLink.trim()
+    const body = shareToken.trim()
       ? [bodyText.value, '', 'View the full plan: {{service_link}}'].join('\n')
       : bodyText.value
     const queueServiceMessage = httpsCallable<RelockQueueMessageRequest, { messageId: string }>(functions, 'queueServiceMessage')
