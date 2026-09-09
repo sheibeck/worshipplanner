@@ -29,6 +29,7 @@ import {
   readAiProxyLimits,
   readNumericKnob,
   resolveOrgId,
+  resolveActiveOrgId,
   verifyAppCaller,
   enforceModelAndTokens,
   checkAndConsumeRateLimit,
@@ -4196,6 +4197,40 @@ describe("resolveOrgId", () => {
 
   it("returns null when the orgId claim is an empty string", () => {
     expect(resolveOrgId({ orgId: "" } as never)).toBeNull();
+  });
+});
+
+describe("resolveActiveOrgId", () => {
+  it("falls back to the primary orgId claim when no header is sent", () => {
+    expect(resolveActiveOrgId({ orgId: "primary" } as never, undefined)).toBe("primary");
+  });
+
+  it("falls back to the primary claim when the header is an empty string", () => {
+    expect(resolveActiveOrgId({ orgId: "primary" } as never, "")).toBe("primary");
+  });
+
+  it("honors the header org when the caller is a member of it (orgs claim map)", () => {
+    const decoded = { orgId: "primary", orgs: { primary: "editor", other: "editor" } } as never;
+    expect(resolveActiveOrgId(decoded, "other")).toBe("other");
+  });
+
+  it("honors the header org for a super-admin even without a membership entry", () => {
+    const decoded = { orgId: "primary", superAdmin: true } as never;
+    expect(resolveActiveOrgId(decoded, "someOtherOrg")).toBe("someOtherOrg");
+  });
+
+  it("IGNORES the header org and falls back to primary when the caller is neither a member nor super-admin", () => {
+    const decoded = { orgId: "primary", orgs: { primary: "editor" } } as never;
+    expect(resolveActiveOrgId(decoded, "notMine")).toBe("primary");
+  });
+
+  it("returns null when there is no primary claim and the header is not honored", () => {
+    expect(resolveActiveOrgId({ orgs: { a: "editor" } } as never, "notMine")).toBeNull();
+  });
+
+  it("does not treat a superAdmin claim that is not strictly true as super-admin", () => {
+    const decoded = { orgId: "primary", superAdmin: "true" } as never;
+    expect(resolveActiveOrgId(decoded, "notMine")).toBe("primary");
   });
 });
 

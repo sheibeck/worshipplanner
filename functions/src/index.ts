@@ -180,6 +180,36 @@ export function resolveOrgId(decoded: DecodedIdToken): string | null {
   return typeof orgId === "string" && orgId.length > 0 ? orgId : null;
 }
 
+/**
+ * The org the caller is ACTIVELY operating in, for the per-org AI/Bible
+ * enablement gate. A multi-church user switches churches in-app WITHOUT a new
+ * login, so the primary `orgId` claim (orgIds[0], baked in at sign-in) does
+ * NOT follow the switch -- gating on it 403s a church that has AI enabled
+ * whenever it isn't the user's primary. The client sends the active org in
+ * `X-Org-Id`; honor it ONLY when the VERIFIED token proves the caller may act
+ * there -- a member (the `orgs` claim map lists every membership) or a
+ * super-admin (who enters any org without a membership doc). Otherwise fall
+ * back to the primary `orgId` claim. Never trust the header alone: it is
+ * client-supplied, so a non-member/non-super-admin can never widen their gate.
+ */
+export function resolveActiveOrgId(
+  decoded: DecodedIdToken,
+  headerOrgId: string | undefined,
+): string | null {
+  const primary = resolveOrgId(decoded);
+  if (typeof headerOrgId === "string" && headerOrgId.length > 0) {
+    const claims = decoded as unknown as Record<string, unknown>;
+    const orgs = claims["orgs"];
+    const isMember =
+      typeof orgs === "object" &&
+      orgs !== null &&
+      Object.prototype.hasOwnProperty.call(orgs, headerOrgId);
+    const isSuperAdmin = claims["superAdmin"] === true;
+    if (isMember || isSuperAdmin) return headerOrgId;
+  }
+  return primary;
+}
+
 /** R161/R162 tunable knobs -- all env-configurable with generous defaults so
  * a fresh deploy works with zero config (v1.8 grant: no .env file is written
  * by this plan). Mirrors the existing env-read style at MEDIA_CLEANUP_ENABLED
@@ -588,7 +618,11 @@ export const api = onRequest(
       // R242/R243: the org-AI-enablement gate runs FIRST, before any other
       // anthropic control (appConfig read, rate limit, enforceModelAndTokens)
       // See ADR-0024 (docs/adr/0024-a-disabled-org-must-never-reach-even-the-cheapest-of-those-c.md)
-      const callerOrgId = resolveOrgId(decodedCaller!);
+      const aiHeaderOrgId = req.headers["x-org-id"];
+      const callerOrgId = resolveActiveOrgId(
+        decodedCaller!,
+        typeof aiHeaderOrgId === "string" ? aiHeaderOrgId : undefined,
+      );
       if (!callerOrgId) {
         res.status(403).json({ error: "AI features require an organization." });
         return;
@@ -651,7 +685,11 @@ export const api = onRequest(
     // null caller). planningcenter is not a Bible service and is untouched
     // by this condition, falling through exactly as before.
     if (service === "esv" || service === "nlt") {
-      const callerOrgId = resolveOrgId(decodedCaller!);
+      const bibleHeaderOrgId = req.headers["x-org-id"];
+      const callerOrgId = resolveActiveOrgId(
+        decodedCaller!,
+        typeof bibleHeaderOrgId === "string" ? bibleHeaderOrgId : undefined,
+      );
       if (!callerOrgId) {
         res.status(403).json({ error: "Bible API features require an organization." });
         return;
