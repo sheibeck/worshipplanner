@@ -45,14 +45,15 @@ because they already attach `X-App-Auth` via `getAppAuthHeaders()`.
 
 ## Deploy
 
-**Client-only (hosting); no `functions/` or rules change.** ⚠ **NOT YET DEPLOYED**
-— needs owner confirmation, then `firebase deploy --only hosting`. Note: a hosting
-deploy also ships every other undeployed hosting change queued on master
-(260908-dgq/-owm/-cou, 260903-dismissible-monitor-warnings,
-20260905-slideout-close-button-only, etc.), and 260908-nq5 additionally needs
-`firestore:rules`. After deploy the owner re-enters **Client Id** + **Secret**
-(from `api.planningcenteronline.com/personal_access_tokens`) in prod Settings and
-confirms Save & Validate + export succeed.
+**Client-only (hosting); no `functions/` change.** ✅ **DEPLOYED to production
+2026-09-08** via `firebase deploy --only hosting,firestore:rules` (owner granted
+a blanket deploy). The hosting release also shipped every other frontend change
+queued on master (260908-dgq/-owm/-nq5/-cou, 260903-dismissible-monitor-warnings,
+20260905-slideout-close-button-only, 260901-lua, 260830-l9c), and 260908-nq5's
+`firestore.rules` relaxation went live with the rules half. **Owner next step:**
+re-enter **Client Id** + **Secret** (from
+`api.planningcenteronline.com/personal_access_tokens`) in prod Settings and
+confirm Save & Validate + export succeed.
 
 ## Deferred — AI 403 (separate issue)
 
