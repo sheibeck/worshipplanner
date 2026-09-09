@@ -1455,6 +1455,43 @@ describe('useSlideshowAssembly', () => {
       errSpy.mockRestore()
     })
 
+    it('quick/260909: a permission-denied materialization (service locked mid-write) is quieted to a warn, not an error, and still does not abort the batch', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const denied = Object.assign(new Error('Missing or insufficient permissions'), {
+        code: 'permission-denied',
+      })
+      mockMaterializeGroupIfMissing.mockRejectedValueOnce(denied)
+
+      const service = ref<Service | null>(
+        makeService([
+          hymnSlot({ position: 0, id: 'slot-denied', hymnName: 'Denied' }),
+          hymnSlot({ position: 1, id: 'slot-after', hymnName: 'After' }),
+        ]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      // HI-01 containment still holds: the later candidate is still attempted.
+      const attempted = mockMaterializeGroupIfMissing.mock.calls.map(
+        ([, input]) => (input as SlideGroup).slotId,
+      )
+      expect(attempted).toContain('slot-after')
+      // Quieted to a warn; the scary error line is NOT emitted for this expected race.
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[useSlideshowAssembly] group materialization skipped (service locked mid-write)',
+      )
+      expect(errSpy).not.toHaveBeenCalledWith(
+        '[useSlideshowAssembly] group materialization write failed:',
+        expect.any(Error),
+      )
+
+      warnSpy.mockRestore()
+      errSpy.mockRestore()
+    })
+
     it('drainGroupWrites resolves only once an in-flight group write has settled', async () => {
       let releaseWrite!: () => void
       mockMaterializeGroupIfMissing.mockImplementationOnce(

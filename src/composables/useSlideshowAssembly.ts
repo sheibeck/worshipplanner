@@ -7,6 +7,7 @@ import { useSlideGroups } from '@/stores/slideGroups'
 import { usePptxRenders } from '@/stores/pptxRenders'
 import { lyricsQuery } from '@/stores/songLyrics'
 import { resolveImageUrl } from '@/utils/pptxUpload'
+import { isPermissionDenied } from '@/utils/firestoreListener'
 import { renderedPagePath } from '@/utils/renderedPagePaths'
 import { assembleSlideshow, type AssemblyInputs } from '@/utils/slideshowAssembler'
 import { buildInitialGroup, rebuildGroup, sourceSignature, type RebuildResult } from '@/utils/slideGroupMaterializer'
@@ -522,7 +523,17 @@ export function useSlideshowAssembly(
         // in the same batch is silently skipped, not just the denied one.
         // The slot stays a candidate, so a legitimate retry (after a reopen)
         // still happens on the next recompute.
-        console.error('[useSlideshowAssembly] group materialization write failed:', err)
+        //
+        // quick/260909: a `permission-denied` here is EXPECTED and benign — a
+        // fire-and-forget write issued while the service was draft can land just
+        // after it locks (planned/exported), which the slideGroups rule rejects.
+        // No data is lost (re-materializes on the next draft edit), so log it
+        // quietly rather than as a scary error; genuine failures still error.
+        if (isPermissionDenied(err)) {
+          console.warn('[useSlideshowAssembly] group materialization skipped (service locked mid-write)')
+        } else {
+          console.error('[useSlideshowAssembly] group materialization write failed:', err)
+        }
       } finally {
         materializingSlotIds.delete(candidate.slotId)
       }
@@ -662,7 +673,14 @@ export function useSlideshowAssembly(
         // reopen, until an unrelated remote snapshot happened to mint a new
         // group object.
         appliedGroupRefForSlot.delete(outcome.slotId)
-        console.error('[useSlideshowAssembly] group rebuild write failed:', err)
+        // quick/260909: same benign `permission-denied` race as materialization
+        // above — a rebuild write can land just after the service locks. Quiet
+        // it; genuine failures still error.
+        if (isPermissionDenied(err)) {
+          console.warn('[useSlideshowAssembly] group rebuild skipped (service locked mid-write)')
+        } else {
+          console.error('[useSlideshowAssembly] group rebuild write failed:', err)
+        }
       }
     }
   }
