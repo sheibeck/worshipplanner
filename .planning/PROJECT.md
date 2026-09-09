@@ -8,7 +8,20 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
-## Current Milestone: v2.14 Services UX Alignment, Dashboard & Live-Stream Output
+## Current State
+
+**Shipped through v2.14** (2026-09-09), deployed to production. Latest milestone — Services UX
+alignment, a "needs your attention" dashboard, volunteer responsibility confirmation, Firestore-only
+editor presence, and a third **"Video"** live-stream output (fullscreen + per-item banner lower-third).
+Plus post-v2.13 production hotfixes tagged **v2.13.1** (Planning Center 401 auth fix, multi-church
+AI/Bible active-church gate, Bible-API-off UX + mark-planned lock-race fixes). See ROADMAP.md for the
+full milestone history; per-milestone detail archived under `.planning/milestones/`.
+
+**Next milestone:** not yet defined — run `/gsd-new-milestone` to scope it. Standing follow-ups that
+outlived milestones: Resend verified-domain email (backlog 999.6), the WorshipBuilder rename/domain
+(backlog 999.2), and the batched v2.14 human/hardware UAT (`v2.14-DEFERRED-VERIFICATION.md`, owner-accepted).
+
+## v2.14 (shipped) — original goal & target features
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"

@@ -4,11 +4,11 @@ milestone: v2.14
 milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
 current_phase: 137
 current_phase_name: Video Output — Banner Render
-status: verifying
-stopped_at: Completed 137-02-PLAN.md
-last_updated: "2026-09-08T01:45:50.464Z"
-last_activity: 2026-09-07
-last_activity_desc: Phase 137 execution started
+status: milestone_shipped
+stopped_at: v2.14 closed, archived & tagged 2026-09-09 (override_closeout — UAT owner-accepted as deferred); awaiting /gsd-new-milestone
+last_updated: "2026-09-09"
+last_activity: 2026-09-09
+last_activity_desc: v2.14 milestone audited (PASSED) + completed/archived; production hotfixes v2.13.1 shipped
 progress:
   total_phases: 7
   completed_phases: 7
@@ -938,6 +938,17 @@ settled by explicit Q&A at launch (2026-08-19).
 - Gates: type-check via `npm run type-check` (vue-tsc --build); app-suite baseline is the 2 known-failing
   files (`storage.rules.test.ts`, `RosterView.test.ts`); functions suite via `cd functions && npm test`;
   render-service via `cd render-service && npm test`.
+
+---
+
+## Deferred Items (v2.14 close, 2026-09-09)
+
+Items acknowledged and deferred at **v2.14** milestone close on 2026-09-09 (owner chose "Accept UAT, close now" → `override_closeout`):
+
+| Category | Item | Status | Note |
+|----------|------|--------|------|
+| verification | Phases 131-137 human/hardware UAT | deferred | Batched in `v2.14-DEFERRED-VERIFICATION.md` (~20 visual/hardware items incl. real-display Video output). All code-truths verified; audit PASSED 7/7 + 22/22 + 5/5 seams. Owner-accepted. |
+| debug | v2-10-shared-store-teardown-race | resolved-stale | The teardown race was fixed by the v2.10 post-deploy hotfix (owner-verified live per v2.10 ROADMAP); the debug-session file was merely left in `investigating`. Treat as resolved; the stale file can be triaged/closed separately. |
 
 ---
 
