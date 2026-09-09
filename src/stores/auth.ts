@@ -63,15 +63,31 @@ export const CLAIM_REFRESH_MAX_ATTEMPTS = 4
 export const CLAIM_REFRESH_DELAY_MS = 1500
 
 // Per-session memory of which church a multi-org user chose to enter. Kept in
-// sessionStorage (NOT localStorage) so it survives a page refresh but a full
-// logout clears it — matching "log out and back in to switch churches". Keyed
-// by uid so one browser session can't leak a choice across accounts. Every
-// access is guarded: sessionStorage throws in some privacy modes.
+// sessionStorage so it survives a page refresh but a full logout clears it —
+// matching "log out and back in to switch churches". Keyed by uid so one
+// browser session can't leak a choice across accounts. Every access is
+// guarded: sessionStorage throws in some privacy modes.
+// R428 (Phase 138) — sessionStorage alone isn't inherited by a genuinely-new
+// tab, bouncing a multi-church member to the picker on a right-click-open-in-
+// new-tab or deep link. A uid-scoped localStorage fallback tier is consulted
+// only when sessionStorage has nothing; both tiers are written and cleared
+// together. No storage-event listener — a new tab reads on load only, never
+// live-syncs (deliberate per-tab isolation, unchanged).
 const SELECTED_ORG_STORAGE_KEY = 'wp.selectedOrg'
+const SELECTED_ORG_LOCAL_KEY = 'wp.selectedOrg.persist'
 
 function readRememberedOrg(uid: string): string | null {
   try {
     const raw = sessionStorage.getItem(SELECTED_ORG_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as { uid?: string; orgId?: string }
+      if (parsed.uid === uid && typeof parsed.orgId === 'string') return parsed.orgId
+    }
+  } catch {
+    // fall through to the localStorage tier
+  }
+  try {
+    const raw = localStorage.getItem(SELECTED_ORG_LOCAL_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as { uid?: string; orgId?: string }
     return parsed.uid === uid && typeof parsed.orgId === 'string' ? parsed.orgId : null
@@ -81,17 +97,28 @@ function readRememberedOrg(uid: string): string | null {
 }
 
 function rememberOrg(uid: string, orgId: string): void {
+  const payload = JSON.stringify({ uid, orgId })
   try {
-    sessionStorage.setItem(SELECTED_ORG_STORAGE_KEY, JSON.stringify({ uid, orgId }))
+    sessionStorage.setItem(SELECTED_ORG_STORAGE_KEY, payload)
   } catch {
     // sessionStorage unavailable (private mode / disabled) — the choice simply
     // won't persist across a refresh; not fatal.
+  }
+  try {
+    localStorage.setItem(SELECTED_ORG_LOCAL_KEY, payload)
+  } catch {
+    // localStorage unavailable — the new-tab fallback simply won't apply.
   }
 }
 
 function clearRememberedOrg(): void {
   try {
     sessionStorage.removeItem(SELECTED_ORG_STORAGE_KEY)
+  } catch {
+    // ignore — see rememberOrg
+  }
+  try {
+    localStorage.removeItem(SELECTED_ORG_LOCAL_KEY)
   } catch {
     // ignore — see rememberOrg
   }
