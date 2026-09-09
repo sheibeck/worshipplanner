@@ -238,6 +238,85 @@
           </div>
         </div>
 
+        <!-- "Times" subsection (R429-R431, Phase 139) — mirrors the date
+             picker's own `v-if="!canEditService"` / `v-else` split above
+             (line ~51-65): a read-only viewer/locked-service branch showing
+             only DATED rehearsals (undated rows are editor-only seed state,
+             filtered here the same way both public projections filter them —
+             139-RESEARCH.md Pattern 2), and a canEditService-gated add/edit/
+             remove list showing EVERY row, including undated ones, so the
+             planner can date each org-default-seeded rehearsal. Writes flow
+             through the SAME debounced-autosave -> `updateService(id,
+             { rehearsals, reportTime })` path as every other field (onSave
+             below) — no new save mechanism. -->
+        <div class="mb-3" data-testid="service-times-section">
+          <p
+            v-if="!canEditService && (readOnlyRehearsals.length > 0 || !!localService.reportTime)"
+            class="text-sm text-gray-400"
+            data-testid="service-times-readonly"
+          >
+            <span v-if="localService.reportTime">Report {{ formatWallClockTime(localService.reportTime) }}</span>
+            <span v-if="localService.reportTime && readOnlyRehearsals.length > 0"> &middot; </span>
+            <span v-if="readOnlyRehearsals.length > 0">
+              Rehearsal{{ readOnlyRehearsals.length > 1 ? 's' : '' }}:
+              {{ readOnlyRehearsals.map((r) => `${formatRehearsalDateShort(r.date)}, ${formatWallClockTime(r.time)}`).join('; ') }}
+            </span>
+          </p>
+
+          <template v-else>
+            <h2 class="text-sm font-semibold text-gray-300 mb-2">Times</h2>
+            <div class="space-y-2 mb-2">
+              <div
+                v-for="rehearsal in editableRehearsals"
+                :key="rehearsal.id"
+                class="flex items-center gap-2"
+              >
+                <input
+                  type="date"
+                  :value="rehearsal.date"
+                  data-testid="rehearsal-date-input"
+                  class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  @change="onRehearsalDateChange(rehearsal.id, ($event.target as HTMLInputElement).value)"
+                />
+                <input
+                  type="time"
+                  :value="rehearsal.time"
+                  data-testid="rehearsal-time-input"
+                  class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  @change="onRehearsalTimeChange(rehearsal.id, ($event.target as HTMLInputElement).value)"
+                />
+                <button
+                  type="button"
+                  data-testid="remove-rehearsal-btn"
+                  class="text-xs text-red-400 hover:text-red-300 transition-colors"
+                  @click="onRemoveRehearsal(rehearsal.id)"
+                >
+                  Remove
+                </button>
+              </div>
+              <button
+                type="button"
+                data-testid="add-rehearsal-btn"
+                class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                @click="onAddRehearsal"
+              >
+                + Add rehearsal
+              </button>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs text-gray-400" for="report-time-input">Report time</label>
+              <input
+                id="report-time-input"
+                type="time"
+                :value="localService.reportTime ?? ''"
+                data-testid="report-time-input"
+                class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                @change="onReportTimeChange(($event.target as HTMLInputElement).value)"
+              />
+            </div>
+          </template>
+        </div>
+
         <!-- Failed-transition surface while DRAFT. The locked counterpart
              lives in the lock banner, because the autosave error line above
              is removed at locked statuses (31-04) — precisely when a failed
@@ -1834,6 +1913,7 @@ import { db, functions } from '@/firebase'
 import { resolveRecipients } from '@/utils/messagingRecipients'
 import { fingerprintSlideGroups, diffServiceSnapshots, type ChangeEntry, type SlideFingerprint } from '@/utils/serviceLockDiff'
 import { confirmationKey, type ConfirmationStatus } from '@/utils/confirmations'
+import { sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
 import Sortable from 'sortablejs'
 
 const route = useRoute()
@@ -2700,6 +2780,63 @@ function onDateChange(newDate: string) {
   if (!canEditService.value) return
   if (!localService.value || !newDate) return
   localService.value.date = newDate
+}
+
+// ── "Times" subsection (R429-R431, Phase 139) ───────────────────────────────────
+// Mirrors onDateChange's handler-gates-itself pattern (R036/30-VERIFICATION I-01)
+// verbatim: every handler below re-checks canEditService itself, not just the
+// template's v-else, since the control stays reachable for one tick after a
+// status flip.
+
+/** Editor-only render order: EVERY row, including undated seed rows, so the
+ *  planner can see and date each org-default-seeded rehearsal. */
+const editableRehearsals = computed(() => sortRehearsals(localService.value?.rehearsals ?? []))
+
+/** Read-only (viewer / locked-service) render order: DATED rows only — mirrors
+ *  buildServiceSnapshot/buildRehearseAccess's own filter so this page never
+ *  shows a "no date" artifact a volunteer/public viewer would never see either. */
+const readOnlyRehearsals = computed(() =>
+  sortRehearsals((localService.value?.rehearsals ?? []).filter((r) => r.date !== '')),
+)
+
+/** 'YYYY-MM-DD' -> short local-midnight label (e.g. "Sep 11"), same
+ *  split-then-construct idiom as `parsedDate` above — never `new Date(str)`. */
+function formatRehearsalDateShort(ymd: string): string {
+  const [year, month, day] = ymd.split('-').map(Number) as [number, number, number]
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function onAddRehearsal(): void {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  if (!localService.value.rehearsals) localService.value.rehearsals = []
+  localService.value.rehearsals.push({ id: crypto.randomUUID(), date: '', time: '' })
+}
+
+function onRemoveRehearsal(id: string): void {
+  if (!canEditService.value) return
+  if (!localService.value?.rehearsals) return
+  localService.value.rehearsals = localService.value.rehearsals.filter((r) => r.id !== id)
+}
+
+function onRehearsalDateChange(id: string, newDate: string): void {
+  if (!canEditService.value) return
+  const rehearsal = localService.value?.rehearsals?.find((r) => r.id === id)
+  if (!rehearsal) return
+  rehearsal.date = newDate
+}
+
+function onRehearsalTimeChange(id: string, newTime: string): void {
+  if (!canEditService.value) return
+  const rehearsal = localService.value?.rehearsals?.find((r) => r.id === id)
+  if (!rehearsal) return
+  rehearsal.time = newTime
+}
+
+function onReportTimeChange(newTime: string): void {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  localService.value.reportTime = newTime
 }
 
 const isDirty = computed(() => {
@@ -4680,6 +4817,14 @@ async function onSave() {
       // reach Firestore. Booleans are never stripped by stripUndefined, so
       // no `?? null` substitution is needed the way stageLayout needs one.
       stageLayoutAutoSeeded: data.stageLayoutAutoSeeded,
+      // R429-R431 (Phase 139) — top-level fields like stageLayout above, not
+      // ones riding a wholesale-replaced sub-array. `reportTime` uses the
+      // same "send '', don't omit" trick as OrgSettings.reportTimeDefault
+      // (139-RESEARCH.md §2) so clearing the field to empty actually
+      // overwrites the remote value instead of stripUndefined dropping the
+      // key and leaving a stale time in place.
+      rehearsals: data.rehearsals ?? [],
+      reportTime: data.reportTime ?? '',
     }
     // See ADR-0235 (docs/adr/0235-snapshot-exactly-what-is-about-to-be-sent-so-the-mark-clean.md)
     const sentSnapshot = JSON.stringify(payload)
@@ -4708,6 +4853,13 @@ async function onSave() {
         // Must mirror the field this file's `payload` above sends, same
         // reasoning as stageLayout immediately above (WR-01, 131-REVIEW.md).
         stageLayoutAutoSeeded: localService.value.stageLayoutAutoSeeded,
+        // Must mirror the SAME `?? []`/`?? ''` substitutions `payload` above
+        // used to build `sentSnapshot` (R429-R431, Phase 139) — otherwise this
+        // comparison would never match once a Times edit is in play,
+        // permanently stranding isDirty the same way an unmirrored stageLayout
+        // edit would.
+        rehearsals: localService.value.rehearsals ?? [],
+        reportTime: localService.value.reportTime ?? '',
       }) === sentSnapshot
     ) {
       originalService.value = JSON.parse(JSON.stringify(localService.value))

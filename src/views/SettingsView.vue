@@ -540,6 +540,82 @@
         </div>
       </div>
 
+      <!-- Rehearsal & Report Defaults (R429, Phase 139) — mirrors the Messaging
+           section's structure exactly: h2 label, explanatory copy, add/remove
+           list inputs, one "Saved!"/error line. These are starting values
+           copied into a service's OWN rehearsals[]/reportTime at creation
+           (createService, services.ts) — editing a default here never changes
+           an already-created service (139-CONTEXT.md's copy-not-live-bind
+           decision). -->
+      <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
+        <h2 class="text-sm font-semibold text-gray-300 mb-3">Rehearsal &amp; Report Defaults</h2>
+
+        <p class="text-xs text-gray-400 mb-3">
+          Starting rehearsal time(s) and a report time copied onto every new service — a
+          planner can still add, edit, or remove them per service in the editor.
+        </p>
+
+        <div class="space-y-2">
+          <label class="block text-xs text-gray-400 mb-1">Default rehearsal time(s)</label>
+          <div
+            v-for="(time, index) in rehearsalTimeDefaultsInput"
+            :key="index"
+            class="flex items-center gap-2"
+          >
+            <input
+              v-model="rehearsalTimeDefaultsInput[index]"
+              type="time"
+              :disabled="!authStore.isEditor"
+              :data-testid="`rehearsal-default-time-${index}`"
+              class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <button
+              v-if="authStore.isEditor"
+              type="button"
+              data-testid="remove-rehearsal-default-btn"
+              class="text-xs text-red-400 hover:text-red-300 transition-colors"
+              @click="onRemoveRehearsalDefault(index)"
+            >
+              Remove
+            </button>
+          </div>
+          <button
+            v-if="authStore.isEditor"
+            type="button"
+            data-testid="add-rehearsal-default-btn"
+            class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            @click="onAddRehearsalDefault"
+          >
+            + Add rehearsal time
+          </button>
+        </div>
+
+        <div class="mt-4">
+          <label class="block text-xs text-gray-400 mb-1">Default report time</label>
+          <input
+            v-model="reportTimeDefaultInput"
+            type="time"
+            :disabled="!authStore.isEditor"
+            data-testid="report-time-default-input"
+            class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+
+        <button
+          v-if="authStore.isEditor"
+          type="button"
+          data-testid="save-rehearsal-defaults-btn"
+          :disabled="isSavingRehearsalDefaults"
+          class="mt-4 inline-flex items-center rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50"
+          @click="onSaveRehearsalDefaults"
+        >
+          Save defaults
+        </button>
+
+        <p v-if="rehearsalDefaultsSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+        <p v-if="rehearsalDefaultsSaveError" class="text-red-400 text-sm mt-2">{{ rehearsalDefaultsSaveError }}</p>
+      </div>
+
     </div>
   </AppShell>
 </template>
@@ -654,6 +730,17 @@ const TIMEZONE_OPTIONS = [
 const timezoneInput = ref(authStore.settings.timezone)
 const timezoneSavedFeedback = ref(false)
 const timezoneSaveError = ref<string | null>(null)
+
+// ── Rehearsal & Report Defaults state (R429, Phase 139) ─────────────────────────
+// Seeded from authStore.settings.rehearsalTimeDefaults/reportTimeDefault, which
+// resolve via DEFAULT_ORG_SETTINGS ([] / '') for a fresh org — same seed pattern
+// as messagingEnabledInput above. A copy (`[...]`), never the live array, so
+// add/remove/edit here don't mutate the store until Save is clicked.
+const rehearsalTimeDefaultsInput = ref<string[]>([...authStore.settings.rehearsalTimeDefaults])
+const reportTimeDefaultInput = ref(authStore.settings.reportTimeDefault)
+const isSavingRehearsalDefaults = ref(false)
+const rehearsalDefaultsSavedFeedback = ref(false)
+const rehearsalDefaultsSaveError = ref<string | null>(null)
 
 /** Per-family weight ramp (46-01's SLIDE_FONTS), re-derived every time the
  *  selected family changes — drives the Weight <select>'s option list. */
@@ -1241,6 +1328,57 @@ async function onChangeTimezone() {
     console.error('[SettingsView] save timezone error:', err)
     timezoneSaveError.value = 'Failed to save. Please try again.'
     timezoneInput.value = previous
+  }
+}
+
+// ── Rehearsal & Report Defaults actions (R429) ───────────────────────────────────
+// Mirrors the Messaging section's save-handler shape (revert-on-failure, timed
+// "Saved!" feedback) but writes via authStore.updateOrgSettings — the dot-path
+// write + local mirror-write in one call, same as ServiceTemplateEditor.vue's
+// onSave. Both fields save together as a single "Save defaults" action, unlike
+// Messaging's per-toggle autosave, since this is a small add/remove list.
+
+function onAddRehearsalDefault(): void {
+  if (!authStore.isEditor) return
+  rehearsalTimeDefaultsInput.value.push('')
+}
+
+function onRemoveRehearsalDefault(index: number): void {
+  if (!authStore.isEditor) return
+  rehearsalTimeDefaultsInput.value.splice(index, 1)
+}
+
+async function onSaveRehearsalDefaults(): Promise<void> {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const previousRehearsalDefaults = [...authStore.settings.rehearsalTimeDefaults]
+  const previousReportTimeDefault = authStore.settings.reportTimeDefault
+  // Blank rows (an add with no time picked yet) are dropped rather than saved
+  // as an empty-string default — a rehearsal default with no time is not a
+  // meaningful default.
+  const newRehearsalDefaults = rehearsalTimeDefaultsInput.value.filter((t) => t !== '')
+  const newReportTimeDefault = reportTimeDefaultInput.value
+  rehearsalDefaultsSaveError.value = null
+  isSavingRehearsalDefaults.value = true
+
+  try {
+    await authStore.updateOrgSettings({
+      'settings.rehearsalTimeDefaults': newRehearsalDefaults,
+      'settings.reportTimeDefault': newReportTimeDefault,
+    })
+    rehearsalTimeDefaultsInput.value = newRehearsalDefaults
+
+    rehearsalDefaultsSavedFeedback.value = true
+    setTimeout(() => {
+      rehearsalDefaultsSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save rehearsalTimeDefaults/reportTimeDefault error:', err)
+    rehearsalDefaultsSaveError.value = 'Failed to save. Please try again.'
+    rehearsalTimeDefaultsInput.value = previousRehearsalDefaults
+    reportTimeDefaultInput.value = previousReportTimeDefault
+  } finally {
+    isSavingRehearsalDefaults.value = false
   }
 }
 </script>
