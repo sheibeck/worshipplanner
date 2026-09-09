@@ -117,7 +117,7 @@ Acknowledged but deferred — not in this milestone's roadmap.
 ### Rehearsal / Service Location
 
 - **LOC-01**: A rehearsal (and/or the service) carries an optional **location/venue** field shown next to
-  its time. (Carried-over open item from v2.12 "venue/call-time card fields"; deferred by owner 2026-09-09
+  its time. (Carried-over open item from v2.12 "venue/call-time card fields") — deferred by owner 2026-09-09
   to keep v2.15 scoped to times only.)
 
 ### Times — Extras
@@ -154,25 +154,31 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R428 | TBD | Pending |
-| R429 | TBD | Pending |
-| R430 | TBD | Pending |
-| R431 | TBD | Pending |
-| R432 | TBD | Pending |
-| R433 | TBD | Pending |
-| R434 | TBD | Pending |
-| R435 | TBD | Pending |
-| R436 | TBD | Pending |
-| R437 | TBD | Pending |
-| R438 | TBD | Pending |
-| R439 | TBD | Pending |
-| R440 | TBD | Pending |
+| R428 | Phase 138 | Pending |
+| R429 | Phase 139 | Pending |
+| R430 | Phase 139 | Pending |
+| R431 | Phase 139 | Pending |
+| R432 | Phase 139 | Pending |
+| R433 | Phase 139 | Pending |
+| R434 | Phase 138 | Pending |
+| R435 | Phase 140 | Pending |
+| R436 | Phase 140 | Pending |
+| R437 | Phase 141 | Pending |
+| R438 | Phase 141 | Pending |
+| R439 | Phase 141 | Pending |
+| R440 | Phase 141 | Pending |
 
 **Coverage:**
 - v1 requirements: 13 total (R428–R440)
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 13 ⚠️ (filled in by roadmap)
+- Mapped to phases: 13 (100%)
+- Unmapped: 0
+
+**Phase map:**
+- Phase 138 — Field Fixes: Church-Picker Deep-Link & Service-Update Email Link (R428, R434)
+- Phase 139 — Rehearsal & Report Times (R429, R430, R431, R432, R433)
+- Phase 140 — Vamps Library: CRUD & Storage (R435, R436)
+- Phase 141 — Vamp Slide Assignment & Live Playback (R437, R438, R439, R440)
 
 ---
 *Requirements defined: 2026-09-09*
-*Last updated: 2026-09-09 after initial v2.15 definition*
+*Last updated: 2026-09-09 after v2.15 ROADMAP.md creation — 4 phases (138-141), 13/13 requirements mapped*

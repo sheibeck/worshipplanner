@@ -1400,10 +1400,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 138 (not yet planned)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-09-09 — Milestone v2.15 started
+Status: Roadmap created — ready to plan Phase 138
+Last activity: 2026-09-09 — v2.15 ROADMAP.md created (4 phases, 138-141; R428-R440, 13/13 mapped)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -1469,6 +1469,22 @@ Per owner instruction "defer uat to the end". Items accumulate in `.planning/v2.
 ### Preceding: Phase 130 (complete — final phase of v2.13, shipped & deployed 2026-09-07)
 
 Status: v2.13 Volunteer Self-Service & Multi-Church Access shipped, deployed to production, and archived 2026-09-07 — multi-church volunteer switcher (My Schedule + sidebar), live volunteer service doc via onSnapshot, and a resolved same-org-collision fix for volunteers serving more than one church.
+
+## ★ v2.15 ROADMAP.md phase breakdown (created 2026-09-09)
+
+4 phases (138-141), derived from R428-R440 (13 requirements). Research (SUMMARY.md/ARCHITECTURE.md/
+PITFALLS.md) suggested a 6-phase split; compressed to 4 to fit this project's `coarse` granularity default
+and avoid two single-requirement phases the granularity guidance flags as over-fragmentation — the two
+independent, already-diagnosed defect fixes (church-picker deep-link, service-update email link) merge
+into one "Field Fixes" phase (138), and the rehearsal/report-time data-model phase merges with its own
+editor-UI + display-threading phase into one "Rehearsal & Report Times" phase (139), since GSD phases
+already sequence their internal plans (data-model plan before UI plan) without needing a phase boundary
+to enforce it. Vamps CRUD/Storage (140) and vamp-to-slide assignment + live playback (141) stay split,
+per the research's explicit instruction to keep the headline audio-risk work (autoplay-arming, the
+Audience-only `suppressAudio` mute, triple-play-echo avoidance) isolated in its own phase with its own
+real-hardware/real-speaker UAT gate — it is the one phase in this milestone research flags as genuinely
+unverified by unit tests alone. Dependencies: 138 and 139 are both independent of everything else and of
+each other; 140 is independent; 141 depends on 140 (needs vamps to exist before one can be assigned).
 
 ## ★ v2.14 ROADMAP.md phase breakdown (created 2026-09-07)
 

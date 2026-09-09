@@ -768,6 +768,142 @@ Full details: [milestones/v2.13-ROADMAP.md](milestones/v2.13-ROADMAP.md) · requ
 
 ### ✅ v2.14 Services UX Alignment, Dashboard & Live-Stream Output — SHIPPED & DEPLOYED 2026-09-09 (Phases 131-137) — R406-R427, audit PASSED (7/7 phases, 22/22 reqs, 5/5 integration seams); human/hardware UAT owner-accepted as deferred (`v2.14-DEFERRED-VERIFICATION.md`). Full detail archived: [milestones/v2.14-ROADMAP.md](milestones/v2.14-ROADMAP.md)
 
+### 🚧 v2.15 Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
+
+**Milestone Goal:** Give services real rehearsal/report *times* (with org-level defaults) surfaced
+everywhere the date already shows, add a keyed **Vamps** library whose mp3 plays live as slide audio,
+always link service-update emails to the plan, and fix the deep-link → church-picker bug.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R428–R440 (13 mapped, 100% coverage)
+
+**Key context:** Research-first pass complete (`.planning/research/SUMMARY.md`, HIGH confidence) — this
+milestone is almost entirely reuse: Vamps mirror the v2.11 Song/file-upload pattern 1:1 and reuse the
+shipped per-slide `audioUrl`/`audioLoop`/`AudioPlayer` pipeline (no new render surface); rehearsal/report
+times are plain `HH:mm`/`YYYY-MM-DD` strings (never a `Timestamp`), matching `Service.date`'s existing
+convention; the org-level rehearsal/report default is **time-of-day only** — the planner dates each
+rehearsal on the service, the default only supplies default times, copied (never live-read) onto a new
+service. A vamp is one key + one MP3 (1:1 with Song); assigning it to a slide denormalizes its `audioUrl`
+into the slide's existing per-slide audio field. A live vamp is audible from the **Audience output only**
+— Confidence and Video stay muted to avoid a triple-play echo on one multi-monitor machine. Deleting an
+in-use vamp warns (shows the affected count) but is allowed. Full detail: PROJECT.md's "Current Milestone:
+v2.15" section; research: `.planning/research/SUMMARY.md`, `ARCHITECTURE.md`, `PITFALLS.md`.
+
+**Flagged at roadmap time:**
+
+- Phase 141 (Vamp Slide Assignment & Live Playback) is this milestone's headline risk — a vamp failing to
+  autoplay in a non-interactive Run output window has zero on-screen indication today, and all three
+  output windows (Audience/Confidence/Video) independently calling `.play()` on the same URL risks an
+  audible echo on real speakers. Both must be verified on **real multi-monitor hardware with real
+  speakers**, on a fresh browser profile — not provable by mocked-`play()` unit tests. Treat as a
+  human/hardware-UAT gate before this phase is considered done.
+- Phase 139 (Rehearsal & Report Times) must decide and test three things before/while building the UI:
+  plain-string storage (never `Date`/`Timestamp`, to avoid timezone reinterpretation), a single shared
+  chronological sort for the rehearsals array (never trust array-storage order), and copy-not-live-read
+  org defaults (so editing an org default never retroactively changes an already-locked, already-shared
+  service). All three must also thread through both hand-maintained public projections
+  (`buildServiceSnapshot` and `buildRehearseAccess`) or volunteer-facing surfaces silently show nothing.
+- Phase 140 (Vamps CRUD & Storage) inherits the known `firestore.exists()`-in-Storage-emulator blind spot
+  (see CLAUDE.md) when its new `vamp-files/` `storage.rules` block mirrors the `song-files/` shape — annotate
+  the expected-local-failure allow-cases from day one and verify the real upload in a deployed environment,
+  don't trust a green local rules run.
+
+- [ ] **Phase 138: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link** - A multi-church user opening a nav link in a new tab lands on the intended page, and every service-update email reliably links to the plan
+- [ ] **Phase 139: Rehearsal & Report Times** - Services carry real rehearsal/report times pre-filled from org-level defaults, editable per service, and visible everywhere the date already shows
+- [ ] **Phase 140: Vamps Library — CRUD & Storage** - Editors build and maintain a keyed library of vamp audio, mirroring how they manage Songs
+- [ ] **Phase 141: Vamp Slide Assignment & Live Playback** - A planner assigns a vamp to a slide and it plays audibly and reliably in Run the Service, with no silent failures
+
+### Phase 138: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link
+
+**Goal**: Multi-church users reliably land on their intended page from a new tab or deep link, and every
+service-update email reliably includes a working link to the plan.
+**Depends on**: Nothing (first phase of v2.15; two independent, already-diagnosed defect fixes)
+**Requirements**: R428, R434
+**Success Criteria** (what must be TRUE):
+
+  1. A multi-church member who opens a nav link in a new browser tab, or follows a deep link into a fresh
+     tab, lands on the intended page rather than the church picker, as long as they are still a member of
+     the previously-active org (R428).
+  2. Signing out clears the persisted active-org selection from every storage tier used for it, so a
+     different user signing in next on the same shared computer sees no leftover church selection (R428).
+  3. A user who has been removed from an org since it was last remembered is not silently routed into that
+     org from a new tab — the existing stale-membership re-validation still applies (R428).
+  4. Every service-update / order-of-service notification email — including the auto-generated re-lock
+     change notice — is sent with a working link to the service's plan, even for a service that had no
+     share link yet at send time (R434).
+
+**Plans**: TBD
+
+### Phase 139: Rehearsal & Report Times
+
+**Goal**: Every service carries real rehearsal and report times, pre-filled from org-level defaults, and
+those times are visible everywhere a service's date already appears.
+**Depends on**: Nothing (independent of Phase 138)
+**Requirements**: R429, R430, R431, R432, R433
+**Success Criteria** (what must be TRUE):
+
+  1. An editor sets org-level default rehearsal time(s) and a default day-of report time on the
+     organization settings page, and those defaults persist (R429).
+  2. A newly created service pre-fills its rehearsal time(s) and report time by copying the org defaults;
+     the planner then dates each rehearsal and can adjust any time; changing an org default afterward never
+     retroactively changes an already-created service's stored times (R429, R432).
+  3. A planner can add, edit, and remove multiple dated rehearsals (each its own date + time) and a single
+     day-of report time directly in the service editor, with rehearsals always displayed in chronological
+     order regardless of entry order (R430, R431).
+  4. The service's rehearsal times and report time are shown alongside the date on the dashboard, My
+     Schedule, the volunteer service view, and the public share/plan view — threaded through both
+     `buildServiceSnapshot` and `buildRehearseAccess` (R433).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 140: Vamps Library — CRUD & Storage
+
+**Goal**: Editors can build and maintain a keyed library of vamp audio, mirroring how they manage Songs.
+**Depends on**: Nothing (independent of Phases 138-139)
+**Requirements**: R435, R436
+**Success Criteria** (what must be TRUE):
+
+  1. An editor creates a vamp with a name, a musical key, and one attached MP3 (≤50MB) from a dedicated
+     Vamps page reachable from the sidebar nav, alongside Songs (R435).
+  2. An editor edits a vamp's name/key, replaces or removes its MP3, and deletes the vamp (R435).
+  3. The Vamps list is browsable and searchable, including by key, matching the Songs list UX and built to
+     the imported `Vamps.dc.html` design (R436).
+  4. Vamp files upload into a retention-exempt, org-scoped Storage prefix (`orgs/{orgId}/vamp-files/…`)
+     that is editor-gated in `storage.rules` and structurally excluded from every cleanup sweep (R435).
+
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 141: Vamp Slide Assignment & Live Playback
+
+**Goal**: A planner can assign a vamp to a slide, and it plays audibly and reliably as that slide goes
+live in Run the Service, with no silent failures.
+**Depends on**: Phase 140 (needs vamps to exist before one can be assigned)
+**Requirements**: R437, R438, R439, R440
+**Success Criteria** (what must be TRUE):
+
+  1. A planner assigns a vamp to a slide in the service editor via a "Choose a Vamp" picker (and can
+     clear/change the assignment), attaching the vamp's audio to that slide (R437).
+  2. When a slide with an assigned vamp goes live in Run the Service, the vamp plays and loops until the
+     slide changes or the assignment is cleared, and is audible **only** from the Audience output —
+     Confidence and Video stay muted so one machine driving multiple monitors does not triple-play/echo the
+     audio (R438).
+  3. A projectionist arms audio with an explicit gesture on the Run/control screen before going live, so
+     the vamp actually plays in the non-interactive output window(s) despite browser autoplay policy (R439).
+  4. If audio playback is still blocked after arming, the control screen shows a visible warning — never a
+     silent failure with no on-screen indication (R439).
+  5. Deleting a vamp assigned to one or more upcoming services' slides shows a warning naming the affected
+     count but still allows the deletion (R440).
+
+**Verification note**: Success criteria 2-4 are this milestone's headline risk and require real
+multi-monitor hardware with real speakers, on a fresh browser profile — not provable by unit tests alone
+(silent autoplay-block + triple-play-echo are both browser/hardware-dependent). Treat as a human/hardware
+UAT gate.
+
+**Plans**: TBD
+**UI hint**: yes
+
+
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
 
 **Goal:** [Captured for future planning] Consolidates all 11 Medium/Low security findings
