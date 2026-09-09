@@ -84,6 +84,24 @@
             </p>
           </button>
 
+          <!-- Bible API off: no in-app preview is possible, so offer a
+               BibleGateway deep-link for this suggestion (same R298 helper +
+               effectiveVersion as the manual fallback below) — shown next to
+               the reference without needing to expand. -->
+          <div v-if="!authStore.isBibleApiEnabled" class="px-3 pb-2">
+            <a
+              :href="aiSuggestionBibleGatewayLink(result)"
+              target="_blank"
+              rel="noopener"
+              class="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Open in BibleGateway
+            </a>
+          </div>
+
           <!-- Expanded preview -->
           <div v-if="expandedPreview === ri" class="px-3 pb-3 space-y-2">
             <div v-if="aiPreviewLoading" class="flex items-center gap-2 text-xs text-gray-400">
@@ -565,6 +583,22 @@ function aiResultOverlapsSermon(result: AiScriptureSuggestion): boolean {
     verseEnd: result.verseEnd,
   }
   return scripturesOverlap(ref, props.sermonPassage)
+}
+
+// R298 sibling for AI suggestions: with the Bible API off there is no in-app
+// preview, so each suggestion offers a BibleGateway deep-link. Uses the same
+// bibleGatewayLink helper + effectiveVersion as the manual fallback so the
+// version never disagrees with the rest of the component.
+function aiSuggestionBibleGatewayLink(result: AiScriptureSuggestion): string {
+  return bibleGatewayLink(
+    {
+      book: result.book,
+      chapter: result.chapter,
+      verseStart: result.verseStart,
+      verseEnd: result.verseEnd,
+    },
+    effectiveVersion.value,
+  )
 }
 
 // Suppress unused warning for isComplete — available for future template use

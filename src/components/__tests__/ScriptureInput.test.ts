@@ -776,6 +776,79 @@ describe('ESV/NLT preview routing (45-04, R090)', () => {
     expect(wrapper.text()).not.toContain('Mocked passage text')
   })
 
+  it('quick/260909: with the Bible API off, each AI suggestion shows an Open in BibleGateway deep-link', async () => {
+    mockBibleApiEnabled = false
+    mockBibleVersion = 'NLT'
+    const { getScriptureSuggestions } = await import('@/utils/claudeApi')
+    vi.mocked(getScriptureSuggestions).mockResolvedValueOnce([
+      {
+        book: 'John',
+        chapter: 3,
+        verseStart: 16,
+        verseEnd: 17,
+        reason: 'test reason',
+        recentlyUsed: false,
+        weeksAgoUsed: null,
+      },
+    ])
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        modelValue: null,
+        sermonPassage: null,
+        showOverlapWarning: true,
+        showAiSuggest: true,
+        label: 'Scripture Reading',
+      },
+    })
+    await wrapper.find('input[placeholder^="Search passages"]').setValue('comfort')
+    await wrapper.find('input[placeholder^="Search passages"]').trigger('keydown.enter')
+    await flushPromises()
+
+    const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
+    expect(link).toBeTruthy()
+    expect(link!.attributes('target')).toBe('_blank')
+    expect(link!.attributes('rel')).toBe('noopener')
+    expect(link!.attributes('href')).toContain('biblegateway.com/passage')
+    expect(link!.attributes('href')).toContain(encodeURIComponent('John 3:16-17'))
+    expect(link!.attributes('href')).toContain('version=NLT')
+  })
+
+  it('quick/260909: no per-suggestion BibleGateway link when the Bible API is enabled', async () => {
+    mockBibleApiEnabled = true
+    const { getScriptureSuggestions } = await import('@/utils/claudeApi')
+    vi.mocked(getScriptureSuggestions).mockResolvedValueOnce([
+      {
+        book: 'John',
+        chapter: 3,
+        verseStart: 16,
+        verseEnd: 17,
+        reason: 'test reason',
+        recentlyUsed: false,
+        weeksAgoUsed: null,
+      },
+    ])
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        modelValue: null,
+        sermonPassage: null,
+        showOverlapWarning: true,
+        showAiSuggest: true,
+        label: 'Scripture Reading',
+      },
+    })
+    await wrapper.find('input[placeholder^="Search passages"]').setValue('comfort')
+    await wrapper.find('input[placeholder^="Search passages"]').trigger('keydown.enter')
+    await flushPromises()
+
+    // A suggestion rendered, but with the API on there is no per-suggestion
+    // "Open in BibleGateway" affordance (the in-app preview covers it).
+    expect(wrapper.findAll('button').some((b) => b.text().includes('John'))).toBe(true)
+    const link = wrapper.findAll('a').find((a) => a.text().includes('Open in BibleGateway'))
+    expect(link).toBeFalsy()
+  })
+
   it('the AI-suggestion expanded preview also routes by the church setting (NLT)', async () => {
     mockBibleVersion = 'NLT'
     const { getScriptureSuggestions } = await import('@/utils/claudeApi')
