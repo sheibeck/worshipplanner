@@ -248,10 +248,19 @@
              planner can date each org-default-seeded rehearsal. Writes flow
              through the SAME debounced-autosave -> `updateService(id,
              { rehearsals, reportTime })` path as every other field (onSave
-             below) — no new save mechanism. -->
+             below) — no new save mechanism.
+
+             CR-02 (139-REVIEW.md): the `v-if` MUST be a bare `!canEditService`
+             (the "anything to show" check moves to `v-show` on the read-only
+             `<p>`, not into the branch condition) — folding both into one
+             `v-if` let the editable branch render for a non-editor/locked
+             viewer whenever there was nothing to show yet. The three inputs
+             also carry `:disabled="!canEditService"` as defense in depth,
+             matching SettingsView.vue's equivalent inputs. -->
         <div class="mb-3" data-testid="service-times-section">
           <p
-            v-if="!canEditService && (readOnlyRehearsals.length > 0 || !!localService.reportTime)"
+            v-if="!canEditService"
+            v-show="readOnlyRehearsals.length > 0 || !!localService.reportTime"
             class="text-sm text-gray-400"
             data-testid="service-times-readonly"
           >
@@ -274,6 +283,7 @@
                 <input
                   type="date"
                   :value="rehearsal.date"
+                  :disabled="!canEditService"
                   data-testid="rehearsal-date-input"
                   class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   @change="onRehearsalDateChange(rehearsal.id, ($event.target as HTMLInputElement).value)"
@@ -281,12 +291,14 @@
                 <input
                   type="time"
                   :value="rehearsal.time"
+                  :disabled="!canEditService"
                   data-testid="rehearsal-time-input"
                   class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   @change="onRehearsalTimeChange(rehearsal.id, ($event.target as HTMLInputElement).value)"
                 />
                 <button
                   type="button"
+                  :disabled="!canEditService"
                   data-testid="remove-rehearsal-btn"
                   class="text-xs text-red-400 hover:text-red-300 transition-colors"
                   @click="onRemoveRehearsal(rehearsal.id)"
@@ -296,6 +308,7 @@
               </div>
               <button
                 type="button"
+                :disabled="!canEditService"
                 data-testid="add-rehearsal-btn"
                 class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
                 @click="onAddRehearsal"
@@ -309,6 +322,7 @@
                 id="report-time-input"
                 type="time"
                 :value="localService.reportTime ?? ''"
+                :disabled="!canEditService"
                 data-testid="report-time-input"
                 class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 @change="onReportTimeChange(($event.target as HTMLInputElement).value)"
