@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.15
 milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
-current_phase: 138
-current_phase_name: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link
-status: verifying
-stopped_at: Completed 138-02-PLAN.md
-last_updated: "2026-09-09T18:26:50.828Z"
+current_phase: 139
+current_phase_name: Rehearsal & Report Times
+status: executing
+stopped_at: Completed 139-01-PLAN.md
+last_updated: "2026-09-09T20:12:12.646Z"
 last_activity: 2026-09-09
-last_activity_desc: Phase 138 execution started
+last_activity_desc: Phase 139 execution started
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
   percent: 25
 ---
 
@@ -70,7 +70,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1406,7 +1406,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 138 — Field Fixes — Church-Picker Deep-Link & Service-Update Email Link
+**Current focus:** Phase 139 — Rehearsal & Report Times
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1416,10 +1416,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 138 (Field Fixes — Church-Picker Deep-Link & Service-Update Email Link) — EXECUTING
+Phase: 139 (Rehearsal & Report Times) — EXECUTING
 Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-09-09 — Phase 138 execution started
+Status: Ready to execute
+Last activity: 2026-09-09 — Phase 139 execution started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3720,6 +3720,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 137 P02 | 55min | 2 tasks | 6 files |
 | Phase 138 P01 | 25min | 1 tasks | 2 files |
 | Phase 138 P02 | 45min | 1 tasks | 3 files |
+| Phase 139 P01 | 21min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -4330,6 +4331,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Root bg-black class stays unconditional; banner mode's transparent/key-color background is an inline override only, so fullscreen/non-video path carries zero new markup or conditions
 - [Phase ?]: R428: two-tier remembered-org storage (sessionStorage primary + uid-scoped localStorage fallback) added inside auth.ts's three private helpers only; loadOrgContext, needsOrgSelection, router guard unchanged
 - [Phase ?]: R434 A1 resolved as client-side graceful omission: append {{service_link}} to the sent body only when ensureShareLink resolves a non-empty link; no server-side guard added to sendQueuedMessageHandler.
+- [Phase ?]: 139-01: rehearsals/reportTime stored as plain YYYY-MM-DD/HH:mm strings (never Timestamp), mirroring Service.date
+- [Phase ?]: 139-01: undated rehearsals (date === '') filtered from both public projections but kept visible in the editor's raw Service doc
+- [Phase ?]: 139-01: no deep-merge branch needed in applyOrgSnapshot for rehearsalTimeDefaults/reportTimeDefault — confirmed flat fields
 
 ### Roadmap Evolution
 
@@ -4666,8 +4670,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-09T18:26:50.753Z
-Stopped at: Completed 138-02-PLAN.md
+Last session: 2026-09-09T20:12:12.572Z
+Stopped at: Completed 139-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

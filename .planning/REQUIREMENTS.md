@@ -47,26 +47,26 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Service Rehearsal & Report Times — Org Defaults
 
-- [ ] **R429**: An editor configures **organization-level defaults** on the organization settings page: a
+- [x] **R429**: An editor configures **organization-level defaults** on the organization settings page: a
   default **day-of report time** and one or more **default rehearsal time(s)** (time-of-day only). These
   defaults are persisted on the org `settings` and pre-fill new services (see R432).
 
 ### Service Rehearsal & Report Times — Per-Service
 
-- [ ] **R430**: A planner can add, edit, and remove **multiple rehearsals** on a service, each with its own
+- [x] **R430**: A planner can add, edit, and remove **multiple rehearsals** on a service, each with its own
   **date and time**, directly in the service editor. Rehearsals display in chronological order regardless of
   entry order.
 
-- [ ] **R431**: A planner can set a single **day-of report time** on a service (a wall-clock time on the
+- [x] **R431**: A planner can set a single **day-of report time** on a service (a wall-clock time on the
   service date), editable in the service editor.
 
-- [ ] **R432**: When a service is created, its rehearsal time(s) and report time **pre-fill by copying** the
+- [x] **R432**: When a service is created, its rehearsal time(s) and report time **pre-fill by copying** the
   org defaults (the planner then dates each rehearsal and can adjust). Changing an org default **never**
   retroactively mutates an existing service.
 
 ### Service Rehearsal & Report Times — Display
 
-- [ ] **R433**: Everywhere a service's **date** is already shown — the dashboard, My Schedule, the volunteer
+- [x] **R433**: Everywhere a service's **date** is already shown — the dashboard, My Schedule, the volunteer
   service view, and the share/plan (public) views — the service's **rehearsal times and report time are shown
   alongside the date**. The new fields are threaded through **both** hand-maintained public projections
   (`buildServiceSnapshot` and `buildRehearseAccess`) so volunteer-facing and shared surfaces render the real
@@ -156,11 +156,11 @@ Which phases cover which requirements. Populated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R428 | Phase 138 | Complete |
-| R429 | Phase 139 | Pending |
-| R430 | Phase 139 | Pending |
-| R431 | Phase 139 | Pending |
-| R432 | Phase 139 | Pending |
-| R433 | Phase 139 | Pending |
+| R429 | Phase 139 | Complete |
+| R430 | Phase 139 | Complete |
+| R431 | Phase 139 | Complete |
+| R432 | Phase 139 | Complete |
+| R433 | Phase 139 | Complete |
 | R434 | Phase 138 | Complete |
 | R435 | Phase 140 | Pending |
 | R436 | Phase 140 | Pending |
