@@ -172,12 +172,30 @@ vi.mock('@/stores/quarters', () => ({
 // rehearseAccess projection — orgName added alongside the existing settings
 // shape, defaulting to a non-null value so existing tests keep seeing the
 // same orgName-present behavior unless a test overrides it.
+// Phase 139 (R429/R432): createService now also reads
+// rehearsalTimeDefaults/reportTimeDefault — both default empty/unset so
+// every pre-existing createService test here keeps seeing an empty
+// rehearsals[] / '' reportTime unless a test overrides them.
 const mockAuthState = reactive<{
   orgName: string | null
-  settings: { aiEnabled: boolean; pcEnabled: boolean; vwModeEnabled: boolean; defaultServiceTemplate: ServiceTemplateEntry[] }
+  settings: {
+    aiEnabled: boolean
+    pcEnabled: boolean
+    vwModeEnabled: boolean
+    defaultServiceTemplate: ServiceTemplateEntry[]
+    rehearsalTimeDefaults: string[]
+    reportTimeDefault: string
+  }
 }>({
   orgName: 'Grace Church',
-  settings: { aiEnabled: true, pcEnabled: true, vwModeEnabled: true, defaultServiceTemplate: [] },
+  settings: {
+    aiEnabled: true,
+    pcEnabled: true,
+    vwModeEnabled: true,
+    defaultServiceTemplate: [],
+    rehearsalTimeDefaults: [],
+    reportTimeDefault: '',
+  },
 })
 
 vi.mock('@/stores/auth', () => ({
@@ -244,6 +262,8 @@ describe('useServiceStore', () => {
     mockAuthState.settings.pcEnabled = true
     mockAuthState.settings.vwModeEnabled = true
     mockAuthState.settings.defaultServiceTemplate = []
+    mockAuthState.settings.rehearsalTimeDefaults = []
+    mockAuthState.settings.reportTimeDefault = ''
   })
 
   describe('initial state', () => {

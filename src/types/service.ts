@@ -267,6 +267,25 @@ export interface Service {
    * field existed, which is treated as "not yet seeded."
    */
   stageLayoutAutoSeeded?: boolean
+  /**
+   * Additive, no-migration (R429-R433, Phase 139): absent on every service
+   * doc written before this field existed, which is the legitimate "no
+   * times set" state.
+   *
+   * Multiple dated rehearsals (R430). Plain date+time strings — NEVER
+   * Timestamp — mirroring `date`'s own convention exactly (avoids timezone
+   * rebinding against `OrgSettings.timezone`; a rehearsal time is a
+   * wall-clock label for a single physical venue, not an absolute instant).
+   * Display order is NEVER trusted from array/storage order — always run
+   * through the shared `sortRehearsals()` util (src/utils/rehearsalTimes.ts).
+   */
+  rehearsals?: { id: string; date: string; time: string }[]
+  /**
+   * Single day-of report time (R431), `'HH:mm'` 24h (native
+   * `<input type="time">` value format — no AM/PM parsing needed at the
+   * input boundary).
+   */
+  reportTime?: string
 }
 
 export type ServiceInput = Omit<Service, 'id' | 'createdAt' | 'updatedAt'>

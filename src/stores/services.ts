@@ -455,6 +455,17 @@ export const useServiceStore = defineStore('services', () => {
       effectiveTemplate,
       authStore.settings.vwModeEnabled,
     )
+    // R429/R432 (Phase 139) — copy org defaults into the new doc's OWN
+    // fields, once, at creation. NEVER read authStore.settings.rehearsal-
+    // TimeDefaults/reportTimeDefault from a display component — a later
+    // org-default edit must not retroactively change an already-created
+    // service. Mirrors the `defaultServiceTemplate` read immediately above.
+    const rehearsals = authStore.settings.rehearsalTimeDefaults.map((time) => ({
+      id: crypto.randomUUID(),
+      date: '', // planner dates each rehearsal — an org default cannot know a future service's date
+      time,
+    }))
+    const reportTime = authStore.settings.reportTimeDefault
     const ref = await addDoc(collection(db, 'organizations', orgId.value, 'services'), {
       ...data,
       progression: '1-2-2-3',
@@ -463,6 +474,8 @@ export const useServiceStore = defineStore('services', () => {
       notes: '',
       sermonPassage: null,
       sermonTopic: '',
+      rehearsals,
+      reportTime,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
@@ -484,6 +497,8 @@ export const useServiceStore = defineStore('services', () => {
         notes: '',
         sermonPassage: null,
         sermonTopic: '',
+        rehearsals,
+        reportTime,
       } as Service
       await ensureShareLink(created, orgId.value)
     } catch (err) {
