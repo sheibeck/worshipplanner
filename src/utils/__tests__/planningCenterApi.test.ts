@@ -3,6 +3,13 @@ import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, 
 import type { Timestamp } from 'firebase/firestore'
 import type { VWType } from '@/types/song'
 
+// The PC proxy holds the real secret server-side; the client attaches an
+// app-auth token so the Cloud Function proxy accepts the request. Mock the
+// helper so unit tests have a deterministic token without touching Firebase Auth.
+vi.mock('@/utils/appAuth', () => ({
+  getAppAuthHeaders: vi.fn().mockResolvedValue({ 'X-App-Auth': 'test-token' }),
+}))
+
 // Mock esvApi before importing planningCenterApi
 vi.mock('@/utils/esvApi', () => ({
   fetchPassageText: vi.fn(),

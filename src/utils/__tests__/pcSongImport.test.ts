@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// The PC proxy holds the real secret server-side; the client attaches an
+// app-auth token so the Cloud Function proxy accepts the request. Mock the
+// helper so unit tests have a deterministic token without touching Firebase Auth.
+vi.mock('@/utils/appAuth', () => ({
+  getAppAuthHeaders: vi.fn().mockResolvedValue({ 'X-App-Auth': 'test-token' }),
+}))
+
 // Mock firebase/firestore Timestamp
 vi.mock('firebase/firestore', () => ({
   Timestamp: {

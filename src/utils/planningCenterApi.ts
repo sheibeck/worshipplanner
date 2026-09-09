@@ -5,6 +5,7 @@ import { formatScriptureRef } from '@/utils/planningCenterExport'
 import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 import { miscLabel } from '@/utils/slotTypes'
 import { fetchScriptureText } from '@/utils/scriptureApi'
+import { getAppAuthHeaders } from '@/utils/appAuth'
 
 /**
  * Base URL for Planning Center API calls.
@@ -34,6 +35,7 @@ export async function validatePcCredentials(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
       },
     })
 
@@ -63,6 +65,7 @@ export async function fetchServiceTypes(
     headers: {
       Authorization: basicAuthHeader(appId, secret),
       Accept: 'application/json',
+      ...(await getAppAuthHeaders()),
     },
   })
 
@@ -89,6 +92,7 @@ export async function fetchTemplates(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
       },
     },
   )
@@ -116,6 +120,7 @@ export async function fetchServiceTypeTeams(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
       },
     },
   )
@@ -155,6 +160,7 @@ export async function fetchPlans(
     headers: {
       Authorization: basicAuthHeader(appId, secret),
       Accept: 'application/json',
+      ...(await getAppAuthHeaders()),
     },
   })
 
@@ -199,6 +205,7 @@ export async function fetchPlanItems(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
       },
     },
   )
@@ -240,6 +247,7 @@ export async function createPlan(
     headers: {
       Authorization: basicAuthHeader(appId, secret),
       Accept: 'application/json',
+      ...(await getAppAuthHeaders()),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -275,6 +283,7 @@ export async function fetchTemplateItems(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
       },
     },
   )
@@ -338,6 +347,7 @@ export async function createPlanTime(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -375,6 +385,7 @@ export async function fetchPlanTimes(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
       },
     },
   )
@@ -456,6 +467,7 @@ export async function createItem(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ data }),
@@ -510,6 +522,7 @@ export async function updateItem(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -545,6 +558,7 @@ export async function deleteItem(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
       },
     },
   )
@@ -570,6 +584,7 @@ export async function fetchPlanNeededPositionTeamIds(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
       },
     },
   )
@@ -601,6 +616,7 @@ export async function fetchTeamPositions(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
       },
     },
   )
@@ -635,6 +651,7 @@ export async function addNeededPosition(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -678,6 +695,7 @@ export async function searchSongByCcli(
         headers: {
           Authorization: basicAuthHeader(appId, secret),
           Accept: 'application/json',
+          ...(await getAppAuthHeaders()),
         },
       },
     )
@@ -709,6 +727,7 @@ export async function fetchSongArrangements(
   const headers = {
     Authorization: basicAuthHeader(appId, secret),
     Accept: 'application/json',
+    ...(await getAppAuthHeaders()),
   }
   const url = `${PC_BASE_URL}/songs/${pcSongId}/arrangements?per_page=25`
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -753,6 +772,7 @@ export async function fetchLastScheduledItem(
         headers: {
           Authorization: basicAuthHeader(appId, secret),
           Accept: 'application/json',
+          ...(await getAppAuthHeaders()),
         },
       },
     )
@@ -783,6 +803,7 @@ export async function fetchLastScheduledItem(
         headers: {
           Authorization: basicAuthHeader(appId, secret),
           Accept: 'application/json',
+          ...(await getAppAuthHeaders()),
         },
       },
     )
@@ -837,6 +858,7 @@ export async function createItemNote(
       headers: {
         Authorization: basicAuthHeader(appId, secret),
         Accept: 'application/json',
+        ...(await getAppAuthHeaders()),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -1105,7 +1127,7 @@ export async function fetchAllPeople(appId: string, secret: string): Promise<PcP
     // Retry on 429 respecting Retry-After
     for (let attempt = 0; ; attempt++) {
       response = await fetch(url, {
-        headers: { Authorization: authHeader, Accept: 'application/json' },
+        headers: { Authorization: authHeader, Accept: 'application/json', ...(await getAppAuthHeaders()) },
       })
       if (response.status !== 429 || attempt >= 3) break
       const retryAfter = response.headers.get('Retry-After')
@@ -1170,7 +1192,7 @@ export async function fetchPeopleForTeamPositions(
     // Retry on 429 respecting Retry-After
     for (let attempt = 0; ; attempt++) {
       response = await fetch(url, {
-        headers: { Authorization: authHeader, Accept: 'application/json' },
+        headers: { Authorization: authHeader, Accept: 'application/json', ...(await getAppAuthHeaders()) },
       })
       if (response.status !== 429 || attempt >= 3) break
       const retryAfter = response.headers.get('Retry-After')
@@ -1256,6 +1278,7 @@ async function fetchPersonEmails(appId: string, secret: string, personId: string
     headers: {
       Authorization: basicAuthHeader(appId, secret),
       Accept: 'application/json',
+      ...(await getAppAuthHeaders()),
     },
   })
   if (!response.ok) return []

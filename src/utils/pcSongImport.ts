@@ -1,6 +1,7 @@
 import { Timestamp } from 'firebase/firestore'
 import { fetchSongArrangements, fetchLastScheduledItem } from '@/utils/planningCenterApi'
 import type { UpsertSongInput, VWType } from '@/types/song'
+import { getAppAuthHeaders } from '@/utils/appAuth'
 
 /**
  * Base URL for Planning Center API — same as PC_BASE_URL in planningCenterApi.ts.
@@ -154,7 +155,7 @@ export async function fetchAllPcSongs(
     // Retry on 429 respecting Retry-After
     for (let attempt = 0; ; attempt++) {
       response = await fetch(url, {
-        headers: { Authorization: authHeader, Accept: 'application/json' },
+        headers: { Authorization: authHeader, Accept: 'application/json', ...(await getAppAuthHeaders()) },
       })
       if (response.status !== 429 || attempt >= 3) break
       const retryAfter = response.headers.get('Retry-After')
