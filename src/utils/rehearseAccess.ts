@@ -11,7 +11,7 @@ import type { PublicStageMarker } from '@/stores/services'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { mapOrderedSlots, mapStageMarkers, resolvePersonName } from '@/utils/serviceProjection'
 import { orderSlotsBySection } from '@/utils/slotTypes'
-import { sortRehearsals } from '@/utils/rehearsalTimes'
+import { isDisplayableRehearsal, sortRehearsals } from '@/utils/rehearsalTimes'
 
 export interface RehearseAttachment {
   id: string
@@ -267,10 +267,11 @@ export function buildRehearseAccess(
   // markers, mirroring buildServiceSnapshot's own omission pattern.
   const stageLayoutElements = mapStageMarkers(service.stageLayout?.elements ?? [])
 
-  // R429-R433 (Phase 139) — SAME undated-filter/sort treatment as
-  // buildServiceSnapshot (src/stores/services.ts): undated rehearsals are
-  // editor-only seed state, meaningless on a volunteer-facing surface.
-  const datedRehearsals = (service.rehearsals ?? []).filter((r) => r.date !== '')
+  // R429-R433 (Phase 139) — SAME undated/untimed-filter/sort treatment as
+  // buildServiceSnapshot (src/stores/services.ts): a date-only or fully-
+  // undated rehearsal is editor-only seed/in-progress state, meaningless on
+  // a volunteer-facing surface (CR-01, 139-REVIEW.md).
+  const datedRehearsals = (service.rehearsals ?? []).filter(isDisplayableRehearsal)
 
   return {
     serviceId: service.id,

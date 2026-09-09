@@ -93,7 +93,7 @@ import TeamTagPill from '@/components/TeamTagPill.vue'
 import { scriptureWebLink } from '@/utils/scripture'
 import { orderSlotsBySection, miscLabel } from '@/utils/slotTypes'
 import { useAuthStore } from '@/stores/auth'
-import { sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
+import { isDisplayableRehearsal, sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
 
 const props = defineProps<{
   service: Service
@@ -156,16 +156,17 @@ const formattedDate = computed(() => {
 })
 
 // R429-R433 (Phase 139) — this card reads props.service (the LIVE Service),
-// not a projection, so filter-to-dated + sort must happen HERE, mirroring
-// buildServiceSnapshot/buildRehearseAccess's own treatment (139-RESEARCH.md
-// §6 row 3) — undated org-default-seeded rows are editor-only state and
-// must not appear on this read-only card.
+// not a projection, so filter-to-displayable + sort must happen HERE,
+// mirroring buildServiceSnapshot/buildRehearseAccess's own treatment
+// (139-RESEARCH.md §6 row 3) — undated or untimed org-default-seeded rows
+// are editor-only/in-progress state and must not appear on this read-only
+// card (CR-01, 139-REVIEW.md).
 const formattedReportTime = computed(() =>
   props.service.reportTime ? formatWallClockTime(props.service.reportTime) : '',
 )
 
 const formattedRehearsals = computed(() => {
-  const dated = (props.service.rehearsals ?? []).filter((r) => r.date !== '')
+  const dated = (props.service.rehearsals ?? []).filter(isDisplayableRehearsal)
   return sortRehearsals(dated).map((r) => {
     const [year, month, day] = r.date.split('-').map(Number) as [number, number, number]
     const dateLabel = new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })

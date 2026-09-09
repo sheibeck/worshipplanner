@@ -220,7 +220,7 @@ import { dashboardReadinessOf, serviceReadinessSongs, type DashboardReadinessSta
 import { useUnconfirmedVolunteers, type UnconfirmedVolunteerRow } from '@/composables/useUnconfirmedVolunteers'
 import { usePresenceRollup } from '@/composables/usePresenceRollup'
 import type { ConfirmationStatus } from '@/utils/confirmations'
-import { sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
+import { isDisplayableRehearsal, sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
@@ -408,14 +408,15 @@ function formatServiceDateLong(date: string): string {
 
 // R429-R433 (Phase 139) — both dashboard service surfaces read the LIVE
 // Service directly (no projection hop, same as formatServiceDate above), so
-// filter-to-dated + sort must happen HERE, mirroring buildServiceSnapshot/
-// buildRehearseAccess's own treatment (139-RESEARCH.md §6 rows 1-2) — undated
-// org-default-seeded rows are editor-only state and must not appear here.
+// filter-to-displayable + sort must happen HERE, mirroring
+// buildServiceSnapshot/buildRehearseAccess's own treatment (139-RESEARCH.md
+// §6 rows 1-2) — undated or untimed org-default-seeded rows are editor-only/
+// in-progress state and must not appear here (CR-01, 139-REVIEW.md).
 // Returns '' (never renders) when the service has neither a report time nor
-// any dated rehearsal.
+// any displayable rehearsal.
 function serviceTimesLabel(service: Service): string {
   const reportTime = service.reportTime ? formatWallClockTime(service.reportTime) : ''
-  const dated = sortRehearsals((service.rehearsals ?? []).filter((r) => r.date !== ''))
+  const dated = sortRehearsals((service.rehearsals ?? []).filter(isDisplayableRehearsal))
   const rehearsals = dated.map((r) => {
     const [y, m, d] = r.date.split('-').map(Number) as [number, number, number]
     const dateLabel = new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })

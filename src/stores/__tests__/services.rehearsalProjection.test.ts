@@ -116,6 +116,24 @@ describe('buildServiceSnapshot / buildRehearseAccess — rehearsals/reportTime p
     expect(rehearseAccess.rehearsals).toEqual([{ id: 'dated', date: '2026-09-04', time: '19:00' }])
   })
 
+  it('both builders filter a dated-but-timeless rehearsal (time: "") out of the projection (CR-01)', async () => {
+    const { buildServiceSnapshot } = await import('../services')
+    const { buildRehearseAccess } = await import('@/utils/rehearseAccess')
+
+    const service = makeService({
+      rehearsals: [
+        { id: 'complete', date: '2026-09-04', time: '19:00' },
+        { id: 'dated-timeless', date: '2026-09-11', time: '' },
+      ],
+    }) as unknown as Service
+
+    const snapshot = buildServiceSnapshot(service)
+    expect(snapshot.rehearsals).toEqual([{ id: 'complete', date: '2026-09-04', time: '19:00' }])
+
+    const rehearseAccess = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [])
+    expect(rehearseAccess.rehearsals).toEqual([{ id: 'complete', date: '2026-09-04', time: '19:00' }])
+  })
+
   it('both builders return rehearsals in chronological order even when the source array is out of order', async () => {
     const { buildServiceSnapshot } = await import('../services')
     const { buildRehearseAccess } = await import('@/utils/rehearseAccess')
@@ -155,6 +173,21 @@ describe('buildServiceSnapshot / buildRehearseAccess — rehearsals/reportTime p
 
     const service = makeService({
       rehearsals: [{ id: 'undated', date: '', time: '18:00' }],
+    }) as unknown as Service
+
+    const snapshot = buildServiceSnapshot(service)
+    expect('rehearsals' in snapshot).toBe(false)
+
+    const rehearseAccess = buildRehearseAccess(service, 'org-1', undefined, [], [], [], [])
+    expect('rehearsals' in rehearseAccess).toBe(false)
+  })
+
+  it('an all-dated-but-timeless rehearsals array is also OMITTED (not written as []) (CR-01)', async () => {
+    const { buildServiceSnapshot } = await import('../services')
+    const { buildRehearseAccess } = await import('@/utils/rehearseAccess')
+
+    const service = makeService({
+      rehearsals: [{ id: 'dated-timeless', date: '2026-09-11', time: '' }],
     }) as unknown as Service
 
     const snapshot = buildServiceSnapshot(service)

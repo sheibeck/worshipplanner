@@ -1913,7 +1913,7 @@ import { db, functions } from '@/firebase'
 import { resolveRecipients } from '@/utils/messagingRecipients'
 import { fingerprintSlideGroups, diffServiceSnapshots, type ChangeEntry, type SlideFingerprint } from '@/utils/serviceLockDiff'
 import { confirmationKey, type ConfirmationStatus } from '@/utils/confirmations'
-import { sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
+import { isDisplayableRehearsal, sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
 import Sortable from 'sortablejs'
 
 const route = useRoute()
@@ -2792,11 +2792,13 @@ function onDateChange(newDate: string) {
  *  planner can see and date each org-default-seeded rehearsal. */
 const editableRehearsals = computed(() => sortRehearsals(localService.value?.rehearsals ?? []))
 
-/** Read-only (viewer / locked-service) render order: DATED rows only — mirrors
- *  buildServiceSnapshot/buildRehearseAccess's own filter so this page never
- *  shows a "no date" artifact a volunteer/public viewer would never see either. */
+/** Read-only (viewer / locked-service) render order: displayable rows only
+ *  (both date AND time set) — mirrors buildServiceSnapshot/buildRehearseAccess's
+ *  own filter so this page never shows a partially-filled "Invalid Date"
+ *  artifact a volunteer/public viewer would never see either (CR-01,
+ *  139-REVIEW.md). */
 const readOnlyRehearsals = computed(() =>
-  sortRehearsals((localService.value?.rehearsals ?? []).filter((r) => r.date !== '')),
+  sortRehearsals((localService.value?.rehearsals ?? []).filter(isDisplayableRehearsal)),
 )
 
 /** 'YYYY-MM-DD' -> short local-midnight label (e.g. "Sep 11"), same

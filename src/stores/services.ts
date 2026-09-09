@@ -31,7 +31,7 @@ import { stripUndefined } from '@/utils/stripUndefined'
 import { mapSlotAllowlist, mapStageMarkerAllowlist, resolvePersonName } from '@/utils/serviceProjection'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import { buildRehearseAccess } from '@/utils/rehearseAccess'
-import { sortRehearsals } from '@/utils/rehearsalTimes'
+import { isDisplayableRehearsal, sortRehearsals } from '@/utils/rehearsalTimes'
 import {
   computeLastUsedDate,
   serviceDateToMillis,
@@ -193,10 +193,12 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     ...(marker.note ? { note: marker.note } : {}),
   }))
 
-  // R429-R433 (Phase 139) — undated rehearsals (date === '') are editor-only
-  // seed state (org-default copy not yet dated by the planner); meaningless
-  // on a read-only surface, so filtered before sort/attach.
-  const datedRehearsals = (service.rehearsals ?? []).filter((r) => r.date !== '')
+  // R429-R433 (Phase 139) — undated OR untimed rehearsals are editor-only
+  // seed/in-progress state (org-default copy not yet dated, or dated but not
+  // yet timed by the planner); meaningless on a read-only surface, so
+  // filtered before sort/attach. CR-01 (139-REVIEW.md): a date-only row must
+  // be excluded too, not just a fully-undated one — see isDisplayableRehearsal.
+  const datedRehearsals = (service.rehearsals ?? []).filter(isDisplayableRehearsal)
 
   return {
     date: service.date,

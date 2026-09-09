@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { sortRehearsals, formatWallClockTime, type Rehearsal } from '../rehearsalTimes'
+import { sortRehearsals, formatWallClockTime, isDisplayableRehearsal, type Rehearsal } from '../rehearsalTimes'
 
 describe('sortRehearsals', () => {
   it('orders by date ascending then time ascending, regardless of insert order', () => {
@@ -48,6 +48,12 @@ describe('formatWallClockTime', () => {
     expect(formatWallClockTime('00:00')).toBe('12:00 AM')
   })
 
+  it('returns "" (not "Invalid Date") for an empty/blank input', () => {
+    // CR-01 (139-REVIEW.md) — a date-only rehearsal row reaches this with
+    // time === '' and must never surface the literal string "Invalid Date".
+    expect(formatWallClockTime('')).toBe('')
+  })
+
   describe('timezone stability', () => {
     const originalTz = process.env.TZ
 
@@ -70,5 +76,26 @@ describe('formatWallClockTime', () => {
       expect(extremeResult).toBe('6:30 PM')
       expect(negativeResult).toBe('6:30 PM')
     })
+  })
+})
+
+describe('isDisplayableRehearsal', () => {
+  // CR-01 (139-REVIEW.md) — a rehearsal is only "real" for a read-only
+  // surface when BOTH date and time are set. A dated-but-timeless row is a
+  // plausible mid-edit autosave state and must be excluded.
+  it('is true only when both date and time are set', () => {
+    expect(isDisplayableRehearsal({ id: 'a', date: '2026-09-11', time: '19:00' })).toBe(true)
+  })
+
+  it('is false when date is blank', () => {
+    expect(isDisplayableRehearsal({ id: 'a', date: '', time: '19:00' })).toBe(false)
+  })
+
+  it('is false when time is blank (dated-but-timeless)', () => {
+    expect(isDisplayableRehearsal({ id: 'a', date: '2026-09-11', time: '' })).toBe(false)
+  })
+
+  it('is false when both are blank', () => {
+    expect(isDisplayableRehearsal({ id: 'a', date: '', time: '' })).toBe(false)
   })
 })

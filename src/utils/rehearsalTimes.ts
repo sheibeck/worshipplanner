@@ -32,8 +32,26 @@ export function sortRehearsals(rehearsals: Rehearsal[]): Rehearsal[] {
  * parse date+time as a combined ISO string (timezone-ambiguous) — construct a
  * throwaway local Date purely to borrow toLocaleTimeString, so the result is
  * stable regardless of the runner/viewer's system timezone.
+ *
+ * CR-01 (139-REVIEW.md) — defensive: an empty/malformed input degrades to
+ * '' rather than the literal string "Invalid Date" reaching a display
+ * surface. `isDisplayableRehearsal` is the primary guard; this is the
+ * second line of defense for any caller that skips it.
  */
 export function formatWallClockTime(hhmm: string): string {
+  if (!hhmm) return ''
   const [h, m] = hhmm.split(':').map(Number) as [number, number]
+  if (Number.isNaN(h) || Number.isNaN(m)) return ''
   return new Date(2000, 0, 1, h, m).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+/**
+ * CR-01 (139-REVIEW.md) / IN-02 — the single shared "is this rehearsal real
+ * enough for a read-only display" predicate. Requires BOTH date and time:
+ * a date-only row (planner picked a date, hasn't picked a time yet) is a
+ * plausible mid-edit state that autosaves immediately and must not reach any
+ * read-only surface, including the public Share page.
+ */
+export function isDisplayableRehearsal(r: Rehearsal): boolean {
+  return r.date !== '' && r.time !== ''
 }
