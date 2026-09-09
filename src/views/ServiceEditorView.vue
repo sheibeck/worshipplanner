@@ -1209,7 +1209,13 @@
                            raw override (not the resolved value) is passed to the children,
                            which each apply `?? org default` — an unset slot behaves as today. -->
                       <template #version>
+                        <!-- The per-item ESV/NLT override only makes sense while
+                             the org's Bible API is on (it governs the auto-fetch
+                             translation). When off there is no fetch, so the
+                             selector is hidden — the manual BibleGateway path is
+                             version-labelled elsewhere. -->
                         <select
+                          v-if="authStore.isBibleApiEnabled"
                           :value="(slot as ScriptureSlot).bibleVersion ?? ''"
                           data-testid="slot-scripture-version"
                           class="flex-none rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -3198,6 +3204,14 @@ async function onMarkAsPlanned(): Promise<void> {
     // the error is cleared.
     if (saveStatus.entryFor(surfaceId.value).status !== 'error') {
       onAutoPopulateStageLayout()
+      // R420 follow-up (quick 260909): the seed mutates localService, but the
+      // autosave watcher arms 'pending' asynchronously (next tick). Without this
+      // await, the flush() below runs its "nothing pending" check BEFORE the
+      // watcher fires, no-ops, and the seed's debounce then races the lock —
+      // firing during markAsPlanned's round-trip and rejecting with
+      // ServiceLockedError (and losing the seed). Awaiting a tick lets 'pending'
+      // arm so flush() actually persists the seed while still draft.
+      await nextTick()
     }
     // BL-02, second trigger. flush() disarms the timer and persists whatever
     // was pending while still draft/writable — a no-op when nothing is

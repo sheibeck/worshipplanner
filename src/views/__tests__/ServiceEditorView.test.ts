@@ -544,6 +544,11 @@ const mockAuthState = reactive<{
   // pre-existing test in this file keeps its current behavior -- no test
   // in this file toggles the AI action-bar item today.
   isAiEnabled: boolean
+  // quick/260909: the per-item Scripture ESV/NLT selector is now gated on
+  // authStore.isBibleApiEnabled (hidden when the org's Bible API is off).
+  // Defaults to true so every pre-existing test keeps its current behavior;
+  // only the Bible-API-off test below flips it.
+  isBibleApiEnabled: boolean
 }>({
   user: { uid: 'user-1' },
   isEditor: false,
@@ -565,6 +570,7 @@ const mockAuthState = reactive<{
     },
   },
   isAiEnabled: true,
+  isBibleApiEnabled: true,
 })
 
 vi.mock('@/stores/auth', () => ({
@@ -2897,6 +2903,21 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     const wrapper = await mountView()
 
     expect(wrapper.find('[data-testid="slot-scripture-version"]').exists()).toBe(false)
+  })
+
+  it('quick/260909: the version selector is HIDDEN when the org Bible API is off, even for an editor', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'SCRIPTURE', id: 'sv3', position: 0, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6, section: 'worship' }],
+    }]
+    mockAuthState.isEditor = true
+    mockAuthState.isBibleApiEnabled = false
+    try {
+      const wrapper = await mountView()
+      expect(wrapper.find('[data-testid="slot-scripture-version"]').exists()).toBe(false)
+    } finally {
+      mockAuthState.isBibleApiEnabled = true
+    }
   })
 
   // ── UI-02: legacy body round-trips into the read-only viewer via notes ?? body ─
@@ -7691,11 +7712,22 @@ describe('ServiceEditorView - ME-02/ME-03/R247: lastUsedAt on Mark as Planned', 
     // ME-02: `assignSongToSlot` is the round trip that rewrote `slots` from the
     // store snapshot — the reorder-clobbering hazard. It must not be used here.
     expect(mockAssignSongToSlot).not.toHaveBeenCalled()
-    // ...and no `slots` write of any kind rides along with the transition.
+    // R420 (quick 260908-cou) seeds the Stage Layout at lock, and quick/260909
+    // makes that seed flush BEFORE the lock (a nextTick lets the autosave arm so
+    // flush persists it while still draft, instead of a debounce racing the lock
+    // → ServiceLockedError). So a single full-document autosave may ride along.
+    // ME-02's guarantee is unchanged: any such write must carry the slots
+    // UNCHANGED (no id dropped, added, or re-minted — no reorder-clobber), NOT
+    // that no slots write occurs at all.
     const slotWrites = mockUpdateService.mock.calls.filter(
       ([, patch]) => (patch as Record<string, unknown>).slots !== undefined,
     )
-    expect(slotWrites).toHaveLength(0)
+    expect(slotWrites.length).toBeLessThanOrEqual(1)
+    const originalIds = mockService.slots.map((s) => s.id).sort()
+    for (const [, patch] of slotWrites) {
+      const writtenIds = (patch as { slots: Array<{ id: string }> }).slots.map((s) => s.id).sort()
+      expect(writtenIds).toEqual(originalIds)
+    }
   })
 
   it('a failed markAsPlanned leaves lastUsedAt untouched — no song aged for a service that was never scheduled', async () => {
