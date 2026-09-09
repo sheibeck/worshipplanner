@@ -507,7 +507,7 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
   it('hides the credentials block when the integration is off and shows it again when on', async () => {
     const wrapper = mountSettingsView()
 
-    // Starts on: credentials display block (masked App ID/Secret) is visible.
+    // Starts on: credentials display block (masked Client Id/Secret) is visible.
     expect(wrapper.text()).toContain('Edit Credentials')
 
     const checkboxes = toggleCheckboxes(wrapper)

@@ -101,7 +101,7 @@
           <template v-if="authStore.hasPcCredentials && !editingPcCreds">
             <div class="space-y-2 mb-3">
               <div>
-                <span class="text-xs text-gray-400">App ID: </span>
+                <span class="text-xs text-gray-400">Client Id: </span>
                 <span class="font-mono text-sm text-gray-400">............</span>
               </div>
               <div>
@@ -141,12 +141,12 @@
             <form @submit.prevent="onSavePcCredentials">
               <div class="space-y-3">
                 <div>
-                  <label class="block text-xs text-gray-400 mb-1">App ID</label>
+                  <label class="block text-xs text-gray-400 mb-1">Client Id</label>
                   <input
                     v-model="pcAppIdInput"
                     type="text"
                     autocomplete="off"
-                    placeholder="Your Planning Center App ID"
+                    placeholder="Your Planning Center Client Id"
                     class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
                   />
                 </div>
@@ -162,12 +162,12 @@
                 </div>
                 <p class="text-xs">
                   <a
-                    href="https://planningcenteronline.com/api_passwords"
+                    href="https://api.planningcenteronline.com/personal_access_tokens"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="text-indigo-400 hover:text-indigo-300"
                   >
-                    Generate at planningcenteronline.com/api_passwords
+                    Generate at api.planningcenteronline.com/personal_access_tokens
                   </a>
                 </p>
               </div>
