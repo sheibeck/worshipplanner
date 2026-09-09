@@ -11,6 +11,7 @@ import type { PublicStageMarker } from '@/stores/services'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { mapOrderedSlots, mapStageMarkers, resolvePersonName } from '@/utils/serviceProjection'
 import { orderSlotsBySection } from '@/utils/slotTypes'
+import { sortRehearsals } from '@/utils/rehearsalTimes'
 
 export interface RehearseAttachment {
   id: string
@@ -61,6 +62,13 @@ export interface RehearseAccessDoc {
    *  Optional: pre-Phase-130 docs lack it until re-projected. */
   orgName?: string
   serviceDate: string
+  /** Read-only public projection of `Service.rehearsals`/`.reportTime`
+   *  (R429-R433, Phase 139) — SAME sort/filter treatment as
+   *  `ServiceSnapshot.rehearsals`/`.reportTime` (services.ts): sorted
+   *  chronologically via the shared `sortRehearsals`, undated rows filtered
+   *  out. Conditional-spread, absent when there is nothing to show. */
+  rehearsals?: { id: string; date: string; time: string }[]
+  reportTime?: string
   title: string
   status: string
   assignedEmailsLower: string[]
@@ -259,11 +267,18 @@ export function buildRehearseAccess(
   // markers, mirroring buildServiceSnapshot's own omission pattern.
   const stageLayoutElements = mapStageMarkers(service.stageLayout?.elements ?? [])
 
+  // R429-R433 (Phase 139) — SAME undated-filter/sort treatment as
+  // buildServiceSnapshot (src/stores/services.ts): undated rehearsals are
+  // editor-only seed state, meaningless on a volunteer-facing surface.
+  const datedRehearsals = (service.rehearsals ?? []).filter((r) => r.date !== '')
+
   return {
     serviceId: service.id,
     orgId,
     ...(orgName ? { orgName } : {}),
     serviceDate: service.date,
+    ...(datedRehearsals.length > 0 ? { rehearsals: sortRehearsals(datedRehearsals) } : {}),
+    ...(service.reportTime ? { reportTime: service.reportTime } : {}),
     title: service.name,
     status: service.status,
     assignedEmailsLower: [...assignedEmailsLower].sort(),

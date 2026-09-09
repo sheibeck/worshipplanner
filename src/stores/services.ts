@@ -31,6 +31,7 @@ import { stripUndefined } from '@/utils/stripUndefined'
 import { mapSlotAllowlist, mapStageMarkerAllowlist, resolvePersonName } from '@/utils/serviceProjection'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import { buildRehearseAccess } from '@/utils/rehearseAccess'
+import { sortRehearsals } from '@/utils/rehearsalTimes'
 import {
   computeLastUsedDate,
   serviceDateToMillis,
@@ -89,6 +90,12 @@ export class ServiceLockedError extends Error {
  */
 export interface ServiceSnapshot {
   date: string
+  /** Read-only public projection of `Service.rehearsals`/`.reportTime` (R429-R433,
+   *  Phase 139) — sorted chronologically, undated rows filtered out (editor-only
+   *  state, meaningless on a read-only surface). Conditional-spread, same omit
+   *  pattern as `stageLayout` below. */
+  rehearsals?: { id: string; date: string; time: string }[]
+  reportTime?: string
   name: string
   progression: Progression
   teams: string[]
@@ -186,8 +193,15 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
     ...(marker.note ? { note: marker.note } : {}),
   }))
 
+  // R429-R433 (Phase 139) — undated rehearsals (date === '') are editor-only
+  // seed state (org-default copy not yet dated by the planner); meaningless
+  // on a read-only surface, so filtered before sort/attach.
+  const datedRehearsals = (service.rehearsals ?? []).filter((r) => r.date !== '')
+
   return {
     date: service.date,
+    ...(datedRehearsals.length > 0 ? { rehearsals: sortRehearsals(datedRehearsals) } : {}),
+    ...(service.reportTime ? { reportTime: service.reportTime } : {}),
     name: service.name,
     progression: service.progression,
     teams: service.teams,
