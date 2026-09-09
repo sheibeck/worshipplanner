@@ -183,6 +183,7 @@ import { ref, computed, watch } from 'vue'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/firebase'
 import { resolveRecipients, MESSAGING_TEAM_LABELS, type RecipientSelection } from '@/utils/messagingRecipients'
+import { useServiceStore } from '@/stores/services'
 import type { ChangeEntry } from '@/utils/serviceLockDiff'
 import type { Service } from '@/types/service'
 import type { Quarter, Role, Person, RoleGroup } from '@/types/roster'
@@ -233,6 +234,8 @@ const KILL_SWITCH_ERROR = 'Messaging is turned off for your organization — Loc
 
 const titleId = 'relock-notify-title'
 const sublineId = 'relock-notify-subline'
+
+const servicesStore = useServiceStore()
 
 // ── State ────────────────────────────────────────────────────────────────────
 // Per-row checked flags, keyed by entry index; every row starts checked.
@@ -309,13 +312,28 @@ async function onSend() {
   sending.value = true
   sendError.value = ''
   try {
+    // R434 — self-heal the share link before send, mirroring markAsPlanned's
+    // soft-fail pattern (services.ts:735-740): a mint failure must never
+    // block the notice itself.
+    let shareLink = ''
+    try {
+      shareLink = await servicesStore.ensureShareLink(props.service, props.orgId)
+    } catch (err) {
+      console.error('[ReLockNotifyPrompt] ensureShareLink self-heal failed (non-blocking):', err)
+    }
+    // Append the plan-link line only when a link resolved — a genuinely
+    // link-less service (mint failed/swallowed) omits the whole line rather
+    // than shipping a dangling label with nothing after it (A1 decision).
+    const body = shareLink.trim()
+      ? [bodyText.value, '', 'View the full plan: {{service_link}}'].join('\n')
+      : bodyText.value
     const queueServiceMessage = httpsCallable<RelockQueueMessageRequest, { messageId: string }>(functions, 'queueServiceMessage')
     await queueServiceMessage({
       orgId: props.orgId,
       serviceId: props.service.id,
       type: 'relock-notification',
       subject: subject.value,
-      body: bodyText.value,
+      body,
       recipientSelector: {
         teams: [...selection.value.teams],
         individualPersonIds: [],
