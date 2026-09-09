@@ -43,7 +43,23 @@
            not a full-bleed band. -->
       <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 mb-3">
         <h1 class="text-xl font-semibold text-gray-100 truncate" :title="doc.title">{{ doc.title }}</h1>
-        <p class="text-sm text-gray-400 shrink-0">{{ formattedDate }}</p>
+        <div class="text-sm text-gray-400 shrink-0 sm:text-right">
+          <p>{{ formattedDate }}</p>
+          <!-- R429-R433 (Phase 139) — doc.rehearsals/.reportTime arrive
+               already filtered-to-dated and chronologically sorted by
+               buildRehearseAccess; render as-is. -->
+          <p
+            v-if="formattedReportTime || formattedRehearsals.length > 0"
+            class="text-xs text-gray-500"
+            data-testid="vsv-times"
+          >
+            <span v-if="formattedReportTime">Report {{ formattedReportTime }}</span>
+            <span v-if="formattedReportTime && formattedRehearsals.length > 0"> &middot; </span>
+            <span v-if="formattedRehearsals.length > 0">
+              Rehearsal{{ formattedRehearsals.length > 1 ? 's' : '' }}: {{ formattedRehearsals.join('; ') }}
+            </span>
+          </p>
+        </div>
       </div>
 
       <!-- 260908-nq5: the Confirm/Decline control moved to My Schedule (next to
@@ -198,6 +214,7 @@ import RehearseAudioPlayerBar from '@/components/rehearse/RehearseAudioPlayerBar
 import VolunteerOrderOfService from '@/components/rehearse/VolunteerOrderOfService.vue'
 import VolunteerStageLayoutTab from '@/components/rehearse/VolunteerStageLayoutTab.vue'
 import type { RehearseAttachment } from '@/utils/rehearseAccess'
+import { formatWallClockTime } from '@/utils/rehearsalTimes'
 
 const route = useRoute()
 
@@ -220,6 +237,21 @@ const formattedDate = computed(() => {
   const [y, m, d] = doc.value.serviceDate.split('-').map(Number) as [number, number, number]
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 })
+
+// R429-R433 (Phase 139) — doc.rehearsals/.reportTime are already
+// filtered-to-dated and chronologically sorted by buildRehearseAccess; this
+// computed only formats for display, it never re-filters or re-sorts.
+const formattedReportTime = computed(() =>
+  doc.value?.reportTime ? formatWallClockTime(doc.value.reportTime) : '',
+)
+
+const formattedRehearsals = computed(() =>
+  (doc.value?.rehearsals ?? []).map((r) => {
+    const [y, m, d] = r.date.split('-').map(Number) as [number, number, number]
+    const dateLabel = new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return `${dateLabel}, ${formatWallClockTime(r.time)}`
+  }),
+)
 
 // ── Tabs (reused pattern: ServiceEditorView.vue's handleTabKeydown) ────────
 type VsvTabId = 'rehearse' | 'order' | 'stage'

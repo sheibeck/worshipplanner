@@ -37,8 +37,24 @@
         </span>
       </div>
 
-      <!-- Time·venue and call time are omitted entirely — Service has no
-           time-of-day/venue field yet (126-UI-SPEC.md Data Dependencies). -->
+      <!-- Report/rehearsal times (R429-R433, Phase 139) — closes the
+           "Service has no time-of-day/venue field yet" gap noted above.
+           `reportTime`/`rehearsals` arrive already filtered-to-dated and
+           chronologically sorted by whichever projection builder fed this
+           card (buildRehearseAccess via MyScheduleView) — render as-is,
+           never re-filter/re-sort here. Venue is still out of scope
+           (139-CONTEXT.md deferred to v2 LOC-01). -->
+      <p
+        v-if="formattedReportTime || formattedRehearsals.length > 0"
+        class="text-xs text-gray-400"
+        data-testid="schedule-card-times"
+      >
+        <span v-if="formattedReportTime">Report {{ formattedReportTime }}</span>
+        <span v-if="formattedReportTime && formattedRehearsals.length > 0"> &middot; </span>
+        <span v-if="formattedRehearsals.length > 0">
+          Rehearsal{{ formattedRehearsals.length > 1 ? 's' : '' }}: {{ formattedRehearsals.join('; ') }}
+        </span>
+      </p>
 
       <div class="flex flex-wrap items-center gap-1.5 mt-1">
         <span class="text-xs text-gray-500">You're on:</span>
@@ -99,6 +115,7 @@ import StageKindIcon from '@/components/stage/StageKindIcon.vue'
 import { roleChipIcon } from '@/utils/roleChipIcon'
 import { countdownLabel, readinessOf } from '@/utils/myScheduleGrouping'
 import type { RehearseSong } from '@/utils/rehearseAccess'
+import { formatWallClockTime } from '@/utils/rehearsalTimes'
 
 const props = defineProps<{
   serviceId: string
@@ -108,6 +125,11 @@ const props = defineProps<{
   roles: string[]
   isNextUp: boolean
   isPast: boolean
+  /** R429-R433 (Phase 139) — optional so every pre-existing call site still
+   *  typechecks unchanged; absent renders nothing (see formattedReportTime/
+   *  formattedRehearsals below). */
+  reportTime?: string
+  rehearsals?: { id: string; date: string; time: string }[]
 }>()
 
 const to = computed(() => `/volunteer/service/${props.serviceId}`)
@@ -125,6 +147,20 @@ const weekdayLabel = computed(() => parsedDate.value.toLocaleDateString('en-US',
 const fullDateLabel = computed(() => parsedDate.value.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }))
 
 const countdown = computed(() => countdownLabel(props.serviceDate))
+
+// R429-R433 (Phase 139) — props arrive pre-filtered/pre-sorted by
+// buildRehearseAccess; this component only formats for display, it never
+// re-filters or re-sorts (139-RESEARCH.md §6 / Pitfall 2).
+const formattedReportTime = computed(() => (props.reportTime ? formatWallClockTime(props.reportTime) : ''))
+
+const formattedRehearsals = computed(() =>
+  (props.rehearsals ?? []).map((r) => {
+    // Same split-then-construct idiom as parsedDate above — never `new Date(str)`.
+    const [y, m, d] = r.date.split('-').map(Number) as [number, number, number]
+    const dateLabel = new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return `${dateLabel}, ${formatWallClockTime(r.time)}`
+  }),
+)
 
 // Rule 1 deviation (mirrors myScheduleGrouping.ts's readinessOf fix, 126-02):
 // the real SongAttachmentKind values are 'document' (PDF-family) / 'audio'

@@ -37,6 +37,20 @@
       <div class="mb-6">
         <h1 class="text-xl font-bold text-gray-900">{{ formattedDate }}</h1>
         <p v-if="serviceSnapshot.name" class="text-base text-gray-700 mt-0.5">{{ serviceSnapshot.name }}</p>
+        <!-- R429-R433 (Phase 139) — serviceSnapshot.rehearsals/.reportTime
+             arrive already filtered-to-dated and chronologically sorted by
+             buildServiceSnapshot; render as-is, never re-filter/re-sort. -->
+        <p
+          v-if="formattedReportTime || formattedRehearsals.length > 0"
+          class="text-sm text-gray-600 mt-0.5"
+          data-testid="share-times"
+        >
+          <span v-if="formattedReportTime">Report {{ formattedReportTime }}</span>
+          <span v-if="formattedReportTime && formattedRehearsals.length > 0"> &middot; </span>
+          <span v-if="formattedRehearsals.length > 0">
+            Rehearsal{{ formattedRehearsals.length > 1 ? 's' : '' }}: {{ formattedRehearsals.join('; ') }}
+          </span>
+        </p>
         <p class="text-sm text-gray-600 mt-1">{{ teamsDisplay }}</p>
       </div>
 
@@ -145,6 +159,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
+import { formatWallClockTime } from '@/utils/rehearsalTimes'
 import StageLayoutView from '@/components/stage/StageLayoutView.vue'
 import type { ScriptureRef } from '@/types/service'
 import type { PublicServiceSnapshot } from '@/stores/services'
@@ -192,6 +207,24 @@ const formattedDate = computed(() => {
     year: 'numeric',
   })
 })
+
+// R429-R433 (Phase 139) — serviceSnapshot.rehearsals/.reportTime are already
+// filtered-to-dated and chronologically sorted by buildServiceSnapshot; this
+// computed only formats for display, it never re-filters or re-sorts.
+const formattedReportTime = computed(() =>
+  serviceSnapshot.value?.reportTime ? formatWallClockTime(serviceSnapshot.value.reportTime) : '',
+)
+
+const formattedRehearsals = computed(() =>
+  (serviceSnapshot.value?.rehearsals ?? []).map((r) => {
+    const [year, month, day] = r.date.split('-').map(Number)
+    const dateLabel = new Date(year!, month! - 1, day!).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })
+    return `${dateLabel}, ${formatWallClockTime(r.time)}`
+  }),
+)
 
 const teamsDisplay = computed(() => {
   if (!serviceSnapshot.value?.teams) return 'Standard Band'
