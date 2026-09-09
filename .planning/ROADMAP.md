@@ -836,10 +836,10 @@ service-update email reliably includes a working link to the plan.
      change notice — is sent with a working link to the service's plan, even for a service that had no
      share link yet at send time (R434).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 - [x] 138-01-PLAN.md — R428: two-tier (sessionStorage + uid-scoped localStorage) remembered-org storage in auth.ts so a new tab / deep link restores the active church; preserves stale-membership re-validation, clears both tiers on sign-out
-- [ ] 138-02-PLAN.md — R434: append the plan-link token to the re-lock notice body + ensureShareLink soft-fail precondition before send in ReLockNotifyPrompt.vue; graceful omission when no link resolves
+- [x] 138-02-PLAN.md — R434: append the plan-link token to the re-lock notice body + ensureShareLink soft-fail precondition before send in ReLockNotifyPrompt.vue; graceful omission when no link resolves
 
 ### Phase 139: Rehearsal & Report Times
 

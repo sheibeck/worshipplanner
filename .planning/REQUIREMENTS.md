@@ -74,7 +74,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Service-Update Email Link
 
-- [ ] **R434**: Every service-update / order-of-service notification email (including the auto-generated
+- [x] **R434**: Every service-update / order-of-service notification email (including the auto-generated
   re-lock change notice) **includes a working link to the service plan** (the public share link). The share
   link is **guaranteed to exist before the email is sent** (ensured/self-healed if absent), so an update
   email never goes out with an empty or broken plan link.
@@ -161,7 +161,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R431 | Phase 139 | Pending |
 | R432 | Phase 139 | Pending |
 | R433 | Phase 139 | Pending |
-| R434 | Phase 138 | Pending |
+| R434 | Phase 138 | Complete |
 | R435 | Phase 140 | Pending |
 | R436 | Phase 140 | Pending |
 | R437 | Phase 141 | Pending |
