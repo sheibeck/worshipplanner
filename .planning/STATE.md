@@ -17,6 +17,18 @@ progress:
   percent: 25
 ---
 
+## Deferred Verification (v2.15 — ACTIVE, batched to milestone end)
+
+Per the owner's 2026-09-09 instruction ("use gsd-autonomous. defer uat to the end"), v2.15 phases are
+built + auto-verified green (unit tests, type-check, code review, nyquist, security), with real-browser /
+hardware / human UAT batched into `.planning/v2.15-DEFERRED-VERIFICATION.md` for one owner pass at
+milestone end. These phases are executed, not fully closed — do NOT re-run them; close them via the
+batched UAT. Deferrals are PENDING, never counted as owner-accepted.
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 138 | verification_deferred_human (auto-verified 7/7 must-haves green + SECURED 5/5 + nyquist validated; real-browser new-tab/deep-link church restore UAT pending) | /gsd-verify-work 138 |
+
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
 
 Per the owner's 2026-09-03 instruction ("run v2.9 autonomously, defer UAT to the end"), phases are built +

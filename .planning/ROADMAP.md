@@ -809,7 +809,7 @@ v2.15" section; research: `.planning/research/SUMMARY.md`, `ARCHITECTURE.md`, `P
   the expected-local-failure allow-cases from day one and verify the real upload in a deployed environment,
   don't trust a green local rules run.
 
-- [ ] **Phase 138: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link** - A multi-church user opening a nav link in a new tab lands on the intended page, and every service-update email reliably links to the plan
+- [x] **Phase 138: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link** - A multi-church user opening a nav link in a new tab lands on the intended page, and every service-update email reliably links to the plan _(executed + auto-verified 7/7, SECURED, nyquist-validated; browser UAT deferred → v2.15-DEFERRED-VERIFICATION.md)_
 - [ ] **Phase 139: Rehearsal & Report Times** - Services carry real rehearsal/report times pre-filled from org-level defaults, editable per service, and visible everywhere the date already shows
 - [ ] **Phase 140: Vamps Library — CRUD & Storage** - Editors build and maintain a keyed library of vamp audio, mirroring how they manage Songs
 - [ ] **Phase 141: Vamp Slide Assignment & Live Playback** - A planner assigns a vamp to a slide and it plays audibly and reliably in Run the Service, with no silent failures
