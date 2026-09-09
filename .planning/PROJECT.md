@@ -17,9 +17,61 @@ Plus post-v2.13 production hotfixes tagged **v2.13.1** (Planning Center 401 auth
 AI/Bible active-church gate, Bible-API-off UX + mark-planned lock-race fixes). See ROADMAP.md for the
 full milestone history; per-milestone detail archived under `.planning/milestones/`.
 
-**Next milestone:** not yet defined — run `/gsd-new-milestone` to scope it. Standing follow-ups that
-outlived milestones: Resend verified-domain email (backlog 999.6), the WorshipBuilder rename/domain
-(backlog 999.2), and the batched v2.14 human/hardware UAT (`v2.14-DEFERRED-VERIFICATION.md`, owner-accepted).
+**Active milestone:** **v2.15 Service Times, Vamps & Field Fixes** — see the section below. Standing
+follow-ups that outlived milestones: Resend verified-domain email (backlog 999.6), the WorshipBuilder
+rename/domain (backlog 999.2), and the batched v2.14 human/hardware UAT (`v2.14-DEFERRED-VERIFICATION.md`,
+owner-accepted).
+
+## Current Milestone: v2.15 Service Times, Vamps & Field Fixes
+
+**Goal:** Give services real rehearsal/report *times* (with org-level defaults) surfaced everywhere the
+date already shows, add a keyed **Vamps** library whose mp3 plays live as slide audio, always link
+service-update emails to the plan, and fix the deep-link → church-picker bug.
+
+**Target features:**
+
+- **Deep-link / new-tab church-picker fix** — right-clicking a nav link (or opening a deep link in a fresh
+  tab) currently bounces multi-church users to `/select-church` because the active org is persisted only in
+  `sessionStorage` (`src/stores/auth.ts` `SELECTED_ORG_STORAGE_KEY`), which a genuinely new tab does not
+  inherit. Persist the active org where a new tab can restore it (localStorage keyed by uid, or restore from
+  the deep-link target) so the intended page loads. Single-church users are already unaffected.
+- **Rehearsal & report times on services** — a service currently has only a date-only `date` string (no time
+  fields at all). Add: **(a)** org-settings **defaults** (a default rehearsal schedule + a day-of "report
+  time") on the organization settings page (`OrgSettings` / `SettingsView.vue`); **(b)** a per-service model
+  carrying **multiple dated rehearsals** (each its own date + time) plus **one day-of report time**, editable
+  in the service and pre-filled from the org defaults; **(c)** display of those times **everywhere the date
+  already shows** — dashboard, My Schedule, the volunteer service view, and the share/plan views — plus the
+  public projections (`ServiceSnapshot`, `rehearseAccess`) that feed them.
+- **Service-update emails link to the plan** — order-of-service update emails always include the service-plan
+  (share) link. The `{{service_link}}` merge token + `resolveServiceLink`/`ensureShareLink` already exist;
+  this wires and verifies the token into the update/reminder email flow so no update email ever goes out
+  without a link to the plan.
+- **Vamps library (new)** — a **Vamps** page/nav entry alongside Songs. Each vamp is **one key, one mp3**
+  (modeled 1:1 like a Song), created and managed with its mp3 attached via the shipped v2.11 storage pattern
+  (MP3-capable `useSongFileUpload`, org-scoped `song-files/`-style prefix, ≤50 MB, retention-exempt,
+  editor-gated `storage.rules`). A vamp can be **assigned to a slide in a service**, and it **plays live as
+  that slide's audio** — reusing the already-shipped per-slide `audioUrl` + `audioLoop` + `AudioPlayer`
+  presentation mechanism rather than building a new render/audio surface. Verify audible output under
+  browser autoplay policy in the non-interactive Run outputs.
+
+**Key context / decisions:**
+- **Research-first** (owner, 2026-09-09): a 4-agent domain/ecosystem research pass runs before requirements —
+  worship vamp/pad-library conventions and live-audio-under-a-slide practice, rehearsal/call-time scheduling
+  patterns, and service-time display/notification conventions.
+- **Model choices (owner, 2026-09-09):** multiple dated rehearsals + a single day-of report time; a vamp is
+  **one key per entry** (create separate vamps per key), mirroring a Song 1:1; vamp→slide assignment reuses
+  the existing per-slide live-audio pipeline (no new render surface).
+- **Heavy reuse (from recon):** v2.11 song-attachment storage (`useSongFileUpload`, `src/utils/songFiles.ts`,
+  `song-files/` prefix), the shipped per-slide `audioUrl`/`AudioPlayer`/`audioLoop` (`src/types/slideGroup.ts`,
+  `src/components/AudioPlayer.vue`, `PresentationViewer.vue`), the messaging `{{service_link}}` token
+  (`functions/src/messageTokens.ts`, `resolveServiceLink`), `OrgSettings`/`DEFAULT_ORG_SETTINGS` +
+  `SettingsView.vue` + `applyOrgSnapshot`/`updateOrgSettings` (`src/stores/auth.ts`), and the router
+  org-selection guard (`src/router/index.ts:270-352`).
+- **Design import:** the Vamps UI is built to the owner's Claude Design project **`Vamps.dc.html`** (with its
+  `_ds/nocturne-.../_ds_bundle.js`, `styles.css`, `support.js`), imported during the Vamps UI phase via the
+  claude_design MCP (`https://api.anthropic.com/v1/design/mcp`) and mapped to the app's dark gray-950
+  language, as v2.11/v2.12 did.
+- Requirements continue from the v2.14 range (last R427); phases continue from **138**.
 
 ## v2.14 (shipped) — original goal & target features
 

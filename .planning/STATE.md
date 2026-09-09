@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.14
-milestone_name: Services UX Alignment, Dashboard & Live-Stream Output (Phases 131-137, in planning)
-current_phase: 137
-current_phase_name: Video Output — Banner Render
-status: milestone_shipped
-stopped_at: v2.14 closed, archived & tagged 2026-09-09 (override_closeout — UAT owner-accepted as deferred); awaiting /gsd-new-milestone
-last_updated: "2026-09-09"
+milestone: v2.15
+milestone_name: Service Times, Vamps & Field Fixes
+status: planning
+last_updated: "2026-09-09T14:43:40.374Z"
 last_activity: 2026-09-09
-last_activity_desc: v2.14 milestone audited (PASSED) + completed/archived; production hotfixes v2.13.1 shipped
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 20
-  completed_plans: 20
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
@@ -1404,43 +1400,50 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: ALL 7 PHASES (131–137) built + audited PASS — owner doing LOCAL UAT; iterating on UAT findings
+Phase: Not started (defining requirements)
 Plan: —
-Status: v2.14 fully BUILT (131–137, R406–R427); milestone audit PASS (v2.14-MILESTONE-AUDIT.md: 22/22 code,
-6/6 seams WIRED). UNDEPLOYED. Owner chose to run local UAT before deploy (2026-09-07). NOT archived/closed.
-As of 2026-09-08 the owner is UATing against local emulators and reporting fixes, which are being applied +
-committed directly on master (see "UAT fixes applied" below). NEXT: continue UAT-fix loop; on clean UAT →
-owner deploy go-ahead (confirm-then-deploy: rules+functions+hosting; cleanupStalePresence cron DRY-RUN by
-default) → `/gsd-complete-milestone v2.14`.
+Status: Defining requirements
+Last activity: 2026-09-09 — Milestone v2.15 started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
+
 1. `1e96cc34`+`37229a02` (132) — /services tab strip: killed the spurious white vertical scrollbar, then made
    ALL tab strips scroll horizontally on mobile with NO visible bar (new `.scrollbar-hide` in main.css applied
    to Services/Roster/Quarter/OwnerConsole/ServiceEditor/VolunteerService tab bars).
+
 2. `9b8cbb0a` (133) — reworked the volunteer confirm control from per-role "I've got it" pills to ONE prominent
    primary "Confirm service" button (VolunteerConfirmBar.vue) that confirms ALL the volunteer's roles for the
    service at once (aggregate worst-of state; test rewritten, incl. multi-role batch).
+
 3. `fb05ab15` (131) — Stage Layout now auto-seeds from the roster at LOCK time (onMarkAsPlanned), not only on a
    Stage-Layout-tab visit — fixes "locked without opening the tab → volunteer sees empty stage."
+
 4. `c14c4407` (137) — the per-item Banner/Full-screen picker now HIDES on a locked service (matches +Add
    music/background) instead of showing read-only (SlideGrid `showVideoOutputControl` + test).
+
 5. `8394b797` (run) — the Displays-panel "Go fullscreen" button is now AMBER (warning) while a display is
    open-but-not-fullscreen.
+
 6. `d89f8ef1` (run) — removed the stale hard-coded Audience/Confidence dots from the Run top bar (were wrong
    with Video; the Displays panel already owns reopen/fullscreen). RunHeader + RunControlView + test cleaned.
+
 7. `93a5bb5b` (132) — **fixes the CR-03 regression** fix #3 introduced: `onMarkAsPlanned` now guards the
    stage-seed on `saveStatus.entryFor(surfaceId) !== 'error'`, so a locked service with a pending failed edit
    keeps its save-error visible in the lock banner instead of the seed's follow-up save silently clearing it.
    The Stage-Layout-tab watcher still seeds once the error resolves. Full `npx vitest run` back to the
    `storage.rules.test.ts`-only baseline (224 passed / 1 failed file).
+
 8. `29f51936` (run, /gsd-quick) — the on-air **Live** status pill is now industry-standard RED (`--color-live`
    #e5484d), not green. Rehearsing stays amber, Not-open muted.
+
 9. `6d1d026c` (run, /gsd-quick) — clicking a filmstrip thumbnail now keeps the active-green frame instead
    of a competing blue: the button's indigo focus ring moved from `focus:` to `focus-visible:`, so a mouse
    click no longer overrides `ring-green-500`. Hotkey and click paths now highlight identically.
+
 10. `04f55a78` (132) — ContextualActionBar buttons (Review Slides etc.) now stack full-width on mobile
     (`w-full sm:w-auto` + justify-center), matching the full-width Mark as Planned button instead of sitting
     short beside it. Only the wrapper had been stretching under the parent's `[&>*]:w-full`.
+
 11. `fe2456aa` (131) — stage-layout auto-seed now includes ONLY Band-group roles (`Role.group === 'band'`);
     Tech/Other assignments are excluded (the stage plot is where performers stand). Manual assignable-people
     picker stays unfiltered. New stage test asserts Tech+Other are not seeded.
