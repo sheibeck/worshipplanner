@@ -4,17 +4,17 @@ milestone: v2.15
 milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
 current_phase: 139
 current_phase_name: Rehearsal & Report Times
-status: executing
-stopped_at: Completed 139-01-PLAN.md
-last_updated: "2026-09-09T20:12:12.646Z"
+status: planning
+stopped_at: Phase 139 executed + auto-verified (UAT deferred); advancing to Phase 140
+last_updated: "2026-09-09T20:30:00.000Z"
 last_activity: 2026-09-09
-last_activity_desc: Phase 139 execution started
+last_activity_desc: Phase 139 executed + auto-verified (browser/visual UAT deferred, batched)
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 25
+  completed_plans: 4
+  percent: 50
 ---
 
 ## Deferred Verification (v2.15 — ACTIVE, batched to milestone end)
@@ -28,6 +28,7 @@ batched UAT. Deferrals are PENDING, never counted as owner-accepted.
 | Phase | State | Resume |
 |-------|-------|--------|
 | 138 | verification_deferred_human (auto-verified 7/7 must-haves green + SECURED 5/5 + nyquist validated; real-browser new-tab/deep-link church restore UAT pending) | /gsd-verify-work 138 |
+| 139 | verification_deferred_human (auto-verified 6/6 must-haves green + SECURED 7/7 + nyquist validated; 2 code-review criticals fixed; cross-surface time display + org-defaults settings UX UAT pending) | /gsd-verify-work 139 |
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
 

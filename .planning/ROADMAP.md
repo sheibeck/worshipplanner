@@ -810,7 +810,7 @@ v2.15" section; research: `.planning/research/SUMMARY.md`, `ARCHITECTURE.md`, `P
   don't trust a green local rules run.
 
 - [x] **Phase 138: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link** - A multi-church user opening a nav link in a new tab lands on the intended page, and every service-update email reliably links to the plan _(executed + auto-verified 7/7, SECURED, nyquist-validated; browser UAT deferred → v2.15-DEFERRED-VERIFICATION.md)_
-- [ ] **Phase 139: Rehearsal & Report Times** - Services carry real rehearsal/report times pre-filled from org-level defaults, editable per service, and visible everywhere the date already shows
+- [x] **Phase 139: Rehearsal & Report Times** - Services carry real rehearsal/report times pre-filled from org-level defaults, editable per service, and visible everywhere the date already shows _(executed + auto-verified 6/6, SECURED, nyquist-validated, 2 code-review criticals fixed; visual/UX UAT deferred → v2.15-DEFERRED-VERIFICATION.md)_
 - [ ] **Phase 140: Vamps Library — CRUD & Storage** - Editors build and maintain a keyed library of vamp audio, mirroring how they manage Songs
 - [ ] **Phase 141: Vamp Slide Assignment & Live Playback** - A planner assigns a vamp to a slide and it plays audibly and reliably in Run the Service, with no silent failures
 
@@ -868,7 +868,7 @@ those times are visible everywhere a service's date already appears.
 **UI hint**: yes
 
 - [x] 139-01-PLAN.md — R429–R433 foundation (Wave 1): additive `Service`/`OrgSettings` types + `DEFAULT_ORG_SETTINGS`, shared `src/utils/rehearsalTimes.ts` (`sortRehearsals` + 12-hour `formatWallClockTime`), `createService` copy-not-live-bind pre-fill, and BOTH public projections (`buildServiceSnapshot` + `buildRehearseAccess`) threaded atomically; 3 Wave-0 unit tests
-- [ ] 139-02-PLAN.md — R429/R430/R431/R433 UI + display (Wave 2): editor "Times" subsection + Settings "Rehearsal & Report Defaults" section; time display on ServiceCard, ScheduleServiceCard (My Schedule ×3 call sites), ShareView, DashboardView, VolunteerServiceView; + ScheduleServiceCard component test
+- [x] 139-02-PLAN.md — R429/R430/R431/R433 UI + display (Wave 2): editor "Times" subsection + Settings "Rehearsal & Report Defaults" section; time display on ServiceCard, ScheduleServiceCard (My Schedule ×3 call sites), ShareView, DashboardView, VolunteerServiceView; + ScheduleServiceCard component test
 
 ### Phase 140: Vamps Library — CRUD & Storage
 
