@@ -45,6 +45,11 @@
             <div class="min-w-0">
               <p class="text-base font-semibold text-gray-100 truncate">{{ nextService.name }}</p>
               <p class="text-sm text-gray-400 mt-0.5">{{ formatServiceDate(nextService.date) }}</p>
+              <p
+                v-if="serviceTimesLabel(nextService)"
+                class="text-xs text-gray-500 mt-0.5"
+                data-testid="dashboard-next-service-times"
+              >{{ serviceTimesLabel(nextService) }}</p>
             </div>
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
@@ -82,6 +87,11 @@
             <div class="min-w-0">
               <span class="text-sm text-gray-200">{{ s.name }}</span>
               <span class="text-xs text-gray-500 ml-2">{{ formatServiceDate(s.date) }}</span>
+              <span
+                v-if="serviceTimesLabel(s)"
+                class="text-xs text-gray-600 ml-2"
+                data-testid="dashboard-following-service-times"
+              >{{ serviceTimesLabel(s) }}</span>
             </div>
             <span class="flex items-center gap-1.5 shrink-0">
               <span class="h-2 w-2 rounded-full" :class="readinessDisplay(s).dotClass"></span>
@@ -210,6 +220,7 @@ import { dashboardReadinessOf, serviceReadinessSongs, type DashboardReadinessSta
 import { useUnconfirmedVolunteers, type UnconfirmedVolunteerRow } from '@/composables/useUnconfirmedVolunteers'
 import { usePresenceRollup } from '@/composables/usePresenceRollup'
 import type { ConfirmationStatus } from '@/utils/confirmations'
+import { sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
@@ -393,6 +404,27 @@ function formatServiceDateLong(date: string): string {
     month: 'long',
     day: 'numeric',
   })
+}
+
+// R429-R433 (Phase 139) — both dashboard service surfaces read the LIVE
+// Service directly (no projection hop, same as formatServiceDate above), so
+// filter-to-dated + sort must happen HERE, mirroring buildServiceSnapshot/
+// buildRehearseAccess's own treatment (139-RESEARCH.md §6 rows 1-2) — undated
+// org-default-seeded rows are editor-only state and must not appear here.
+// Returns '' (never renders) when the service has neither a report time nor
+// any dated rehearsal.
+function serviceTimesLabel(service: Service): string {
+  const reportTime = service.reportTime ? formatWallClockTime(service.reportTime) : ''
+  const dated = sortRehearsals((service.rehearsals ?? []).filter((r) => r.date !== ''))
+  const rehearsals = dated.map((r) => {
+    const [y, m, d] = r.date.split('-').map(Number) as [number, number, number]
+    const dateLabel = new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return `${dateLabel}, ${formatWallClockTime(r.time)}`
+  })
+  const parts: string[] = []
+  if (reportTime) parts.push(`Report ${reportTime}`)
+  if (rehearsals.length > 0) parts.push(`Rehearsal${rehearsals.length > 1 ? 's' : ''}: ${rehearsals.join('; ')}`)
+  return parts.join(' · ')
 }
 
 // ── Song library health ───────────────────────────────────────────────────────

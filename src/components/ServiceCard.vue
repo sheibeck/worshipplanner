@@ -17,6 +17,21 @@
           {{ service.status }}
         </span>
       </div>
+      <!-- Report/rehearsal times (R429-R433, Phase 139) — reads the LIVE
+           Service directly (no projection hop, same as formattedDate above),
+           so undated seed rows must be filtered + sorted HERE, matching what
+           the two public projections already do for their own consumers. -->
+      <p
+        v-if="formattedReportTime || formattedRehearsals.length > 0"
+        class="text-xs text-gray-500 mb-1"
+        data-testid="service-card-times"
+      >
+        <span v-if="formattedReportTime">Report {{ formattedReportTime }}</span>
+        <span v-if="formattedReportTime && formattedRehearsals.length > 0"> &middot; </span>
+        <span v-if="formattedRehearsals.length > 0">
+          Rehearsal{{ formattedRehearsals.length > 1 ? 's' : '' }}: {{ formattedRehearsals.join('; ') }}
+        </span>
+      </p>
       <!-- Team badges -->
       <div v-if="service.teams.length" class="flex flex-wrap gap-1 mb-1">
         <TeamTagPill v-for="team in displayTeams" :key="team" :tag="team" />
@@ -78,6 +93,7 @@ import TeamTagPill from '@/components/TeamTagPill.vue'
 import { scriptureWebLink } from '@/utils/scripture'
 import { orderSlotsBySection, miscLabel } from '@/utils/slotTypes'
 import { useAuthStore } from '@/stores/auth'
+import { sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
 
 const props = defineProps<{
   service: Service
@@ -137,6 +153,24 @@ const formattedDate = computed(() => {
     options.year = 'numeric'
   }
   return d.toLocaleDateString('en-US', options)
+})
+
+// R429-R433 (Phase 139) — this card reads props.service (the LIVE Service),
+// not a projection, so filter-to-dated + sort must happen HERE, mirroring
+// buildServiceSnapshot/buildRehearseAccess's own treatment (139-RESEARCH.md
+// §6 row 3) — undated org-default-seeded rows are editor-only state and
+// must not appear on this read-only card.
+const formattedReportTime = computed(() =>
+  props.service.reportTime ? formatWallClockTime(props.service.reportTime) : '',
+)
+
+const formattedRehearsals = computed(() => {
+  const dated = (props.service.rehearsals ?? []).filter((r) => r.date !== '')
+  return sortRehearsals(dated).map((r) => {
+    const [year, month, day] = r.date.split('-').map(Number) as [number, number, number]
+    const dateLabel = new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return `${dateLabel}, ${formatWallClockTime(r.time)}`
+  })
 })
 
 const sermonPassageLabel = computed(() => {

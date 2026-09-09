@@ -135,8 +135,15 @@ let mockLockNotifyDefault = false
 let mockReminderEnabled = false
 let mockReminderDaysBefore = 7
 let mockTimezone = 'America/Chicago'
+// R429 (Phase 139) — Rehearsal & Report Defaults section. Defaults mirror
+// DEFAULT_ORG_SETTINGS ([] / '') so every pre-existing test in this file
+// (none of which target the new section) keeps seeing the same "no defaults
+// set yet" state it saw before this field existed.
+let mockRehearsalTimeDefaults: string[] = []
+let mockReportTimeDefault = ''
 
 const mockSetPcCredentials = vi.fn()
+const mockUpdateOrgSettings = vi.fn(() => Promise.resolve())
 
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
@@ -277,7 +284,28 @@ vi.mock('@/stores/auth', () => ({
       set timezone(v: string) {
         mockTimezone = v
       },
+      // R429 (Phase 139): setters required for onSaveRehearsalDefaults'
+      // local input state (bound directly, not via authStore.settings.* —
+      // see rehearsalTimeDefaultsInput/reportTimeDefaultInput in
+      // SettingsView.vue), but the getters are still read at setup time by
+      // `ref<string[]>([...authStore.settings.rehearsalTimeDefaults])` /
+      // `ref(authStore.settings.reportTimeDefault)` — without these the
+      // component throws "is not iterable" on mount, mirroring every other
+      // settings.* field above.
+      get rehearsalTimeDefaults() {
+        return mockRehearsalTimeDefaults
+      },
+      set rehearsalTimeDefaults(v: string[]) {
+        mockRehearsalTimeDefaults = v
+      },
+      get reportTimeDefault() {
+        return mockReportTimeDefault
+      },
+      set reportTimeDefault(v: string) {
+        mockReportTimeDefault = v
+      },
     },
+    updateOrgSettings: mockUpdateOrgSettings,
   }),
 }))
 
@@ -314,9 +342,12 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
   })
 
   it('renders the Planning Center Integration heading', () => {
@@ -365,9 +396,12 @@ describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
   })
 
   it('writes a dot-path leaf key when the AI toggle changes', async () => {
@@ -474,9 +508,12 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
   })
 
   it('never clears Planning Center credentials when the integration is turned off', async () => {
@@ -555,9 +592,12 @@ describe('SettingsView — no Services template card (R113)', () => {
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
   })
 
   it('no longer renders the template-editor button or the template summary', () => {
@@ -590,9 +630,12 @@ describe('SettingsView Bible Translation card (R090) — 45-02', () => {
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
   })
 
   it('renders the Bible Translation heading and both option labels', () => {
@@ -695,9 +738,12 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
     mockLoadFontCss.mockClear()
   })
 
@@ -853,9 +899,12 @@ describe('SettingsView Messaging card — kill-switch + automatic email defaults
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
   })
 
   it('renders the Messaging heading with the kill-switch unchecked for a fresh org', () => {
@@ -1022,9 +1071,12 @@ describe('SettingsView organization timezone select (R133) — 58-04', () => {
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
   })
 
   it('renders the timezone select regardless of the kill-switch state (always visible)', () => {
@@ -1096,9 +1148,12 @@ describe('SettingsView AI Features card visibility (Phase 82, R242/R243)', () =>
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
   })
 
   it('AI: is not rendered in the DOM at all when the master gate is off', () => {
@@ -1144,9 +1199,12 @@ describe('SettingsView Bible Translation card visibility (R300)', () => {
     mockReminderEnabled = false
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
+    mockRehearsalTimeDefaults = []
+    mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
+    mockUpdateOrgSettings.mockClear()
   })
 
   it('Bible: is not rendered in the DOM at all when the org Bible API is off', () => {
