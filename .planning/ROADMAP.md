@@ -864,8 +864,11 @@ those times are visible everywhere a service's date already appears.
      Schedule, the volunteer service view, and the public share/plan view — threaded through both
      `buildServiceSnapshot` and `buildRehearseAccess` (R433).
 
-**Plans**: TBD
+**Plans**: 2 plans
 **UI hint**: yes
+
+- [ ] 139-01-PLAN.md — R429–R433 foundation (Wave 1): additive `Service`/`OrgSettings` types + `DEFAULT_ORG_SETTINGS`, shared `src/utils/rehearsalTimes.ts` (`sortRehearsals` + 12-hour `formatWallClockTime`), `createService` copy-not-live-bind pre-fill, and BOTH public projections (`buildServiceSnapshot` + `buildRehearseAccess`) threaded atomically; 3 Wave-0 unit tests
+- [ ] 139-02-PLAN.md — R429/R430/R431/R433 UI + display (Wave 2): editor "Times" subsection + Settings "Rehearsal & Report Defaults" section; time display on ServiceCard, ScheduleServiceCard (My Schedule ×3 call sites), ShareView, DashboardView, VolunteerServiceView; + ScheduleServiceCard component test
 
 ### Phase 140: Vamps Library — CRUD & Storage
 
