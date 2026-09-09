@@ -167,8 +167,8 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R406 | Phase 132 | Pending |
-| R407 | Phase 132 | Pending |
+| R406 | Phase 132 | Complete |
+| R407 | Phase 132 | Complete |
 | R408 | Phase 132 | Complete |
 | R409 | Phase 132 | Complete |
 | R410 | Phase 133 | Complete |
