@@ -804,10 +804,11 @@ v2.15" section; research: `.planning/research/SUMMARY.md`, `ARCHITECTURE.md`, `P
   service). All three must also thread through both hand-maintained public projections
   (`buildServiceSnapshot` and `buildRehearseAccess`) or volunteer-facing surfaces silently show nothing.
 
-- Phase 140 (Vamps CRUD & Storage) inherits the known `firestore.exists()`-in-Storage-emulator blind spot
-  (see CLAUDE.md) when its new `vamp-files/` `storage.rules` block mirrors the `song-files/` shape — annotate
-  the expected-local-failure allow-cases from day one and verify the real upload in a deployed environment,
-  don't trust a green local rules run.
+- Phase 140 (Vamps CRUD & Storage): the new `vamp-files/` `storage.rules` block mirrors the `song-files/`
+  shape. **Correction (140 research, 2026-09-09):** `storage.rules` has been **claim-only since Deploy 2
+  (2026-08-12)**, so the historical `firestore.exists()`-in-Storage-emulator blind spot no longer applies —
+  the vamp-files allow-cases pass in the emulator with **no** expected-local-failure annotations. Still verify
+  a real MP3 upload in a deployed environment as batched UAT.
 
 - [x] **Phase 138: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link** - A multi-church user opening a nav link in a new tab lands on the intended page, and every service-update email reliably links to the plan _(executed + auto-verified 7/7, SECURED, nyquist-validated; browser UAT deferred → v2.15-DEFERRED-VERIFICATION.md)_
 - [x] **Phase 139: Rehearsal & Report Times** - Services carry real rehearsal/report times pre-filled from org-level defaults, editable per service, and visible everywhere the date already shows _(executed + auto-verified 6/6, SECURED, nyquist-validated, 2 code-review criticals fixed; visual/UX UAT deferred → v2.15-DEFERRED-VERIFICATION.md)_
@@ -877,8 +878,9 @@ those times are visible everywhere a service's date already appears.
 **Requirements**: R435, R436
 **Success Criteria** (what must be TRUE):
 
-  1. An editor creates a vamp with a name, a musical key, and one attached MP3 (≤50MB) from a dedicated
-     Vamps page reachable from the sidebar nav, alongside Songs (R435).
+  1. An editor creates a vamp with a name, a musical key, an optional tempo, and one attached MP3 (≤50MB)
+     from a **"Vamps" tab on the Songs page** (Songs | Vamps tabs — per Vamps.dc.html), not a separate
+     sidebar route (R435).
 
   2. An editor edits a vamp's name/key, replaces or removes its MP3, and deletes the vamp (R435).
   3. The Vamps list is browsable and searchable, including by key, matching the Songs list UX and built to
