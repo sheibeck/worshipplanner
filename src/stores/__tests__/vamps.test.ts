@@ -195,7 +195,7 @@ describe('useVampStore', () => {
         createdAt: { seconds: 1, nanoseconds: 0 },
         createdBy: 'user-1',
       }
-      await store.updateVamp('vamp-1', { attachment })
+      await store.updateVamp('vamp-1', { attachment: attachment as any })
 
       const [, payload] = (updateDoc as ReturnType<typeof vi.fn>).mock.calls[0]!
       expect(payload.attachment).toEqual(attachment)

@@ -10,6 +10,7 @@ import { usePptxRenders } from './pptxRenders'
 import { useServiceMessagesStore } from './serviceMessages'
 import { useSongLyricsStore } from './songLyrics'
 import { useMembersStore } from './members'
+import { useVampStore } from './vamps'
 
 /**
  * See .planning/codebase/STACK.md (Store & Entry-Point Stack Notes (R318) ->
@@ -36,4 +37,7 @@ export function resetOrgScopedStores(): void {
   // out of GettingStarted.vue's own onSnapshot; registered here for org-switch
   // teardown parity with the other 10 org-scoped stores above.
   useMembersStore().unsubscribeAll()
+  // Phase 140 (R435/T-140-12) — church-switch teardown for the Vamps library
+  // listener; a missing registration here leaks Church-A vamps into Church B.
+  useVampStore().unsubscribeAll()
 }
