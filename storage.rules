@@ -119,22 +119,42 @@ service firebase.storage {
       allow delete: if isOrgEditor(orgId);
     }
 
+    // Phase 140 (R435): permanent, org-scoped home for Vamp MP3 attachments —
+    // sibling of song-files/ (same immutable-per-path, editor-gated shape),
+    // narrowed to audio only.
+    match /orgs/{orgId}/vamp-files/{allPaths=**} {
+      allow read: if isOrgMember(orgId);
+
+      allow create: if isOrgEditor(orgId)
+                       && request.resource.size < 52428800
+                       && request.resource.contentType == 'audio/mpeg';
+
+      // Immutable — every upload (incl. a replace) lands on a fresh
+      // {uploadId} path segment (140-01's vampFileStoragePath), so denying
+      // update closes the in-place-overwrite bypass of the create-time check.
+      allow update: if false;
+
+      allow delete: if isOrgEditor(orgId);
+    }
+
     match /orgs/{orgId}/{allPaths=**} {
-      // Song-files is excluded here — it has its own, MORE RESTRICTIVE block
-      // above. Storage rule blocks are OR-combined, so without this exclusion
-      // this catch-all's permissive isOrgMember/<25MB grant would still allow
-      // an oversized-for-song-files-but-under-25MB, or non-PDF/MP3, write to
-      // song-files/ regardless of the dedicated block's deny (122-RESEARCH.md
-      // Pitfall 1). This exclusion is MANDATORY, not optional.
+      // Song-files and vamp-files are excluded here — each has its own, MORE
+      // RESTRICTIVE block above. Storage rule blocks are OR-combined, so
+      // without this exclusion this catch-all's permissive isOrgMember/<25MB
+      // grant would still allow an oversized-for-that-block-but-under-25MB,
+      // or wrong-type, write to song-files/ or vamp-files/ regardless of the
+      // dedicated block's deny (122-RESEARCH.md Pitfall 1; same reasoning
+      // applied to vamp-files in 140-RESEARCH.md). This exclusion is
+      // MANDATORY, not optional.
       allow read: if isOrgMember(orgId)
-                     && !resource.name.matches('^orgs/[^/]+/song-files/.*');
+                     && !resource.name.matches('^orgs/[^/]+/(song-files|vamp-files)/.*');
 
       // Same membership condition for write, plus a per-upload size ceiling. 25MB
       // (26214400 bytes) is the researched starting cap for this milestone's PPTX
       // imports (21-RESEARCH.md Open Question 3) — tunable, not a hard product limit.
       allow write: if isOrgMember(orgId)
                       && request.resource.size < 26214400
-                      && !request.resource.name.matches('^orgs/[^/]+/song-files/.*');
+                      && !request.resource.name.matches('^orgs/[^/]+/(song-files|vamp-files)/.*');
     }
   }
 }
