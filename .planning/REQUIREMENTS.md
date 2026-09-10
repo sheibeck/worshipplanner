@@ -81,14 +81,20 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Vamps Library
 
-- [ ] **R435**: An editor can **create and manage vamps** from a dedicated **Vamps** page reachable from the
-  sidebar nav (alongside Songs). Each vamp has a **name**, a **musical key**, and **one attached MP3**
-  (≤50 MB), uploaded via the shipped resumable-upload pipeline into a retention-exempt, org-scoped Storage
-  prefix (`orgs/{orgId}/vamp-files/…`, editor-gated in `storage.rules`, structurally exempt from every
-  cleanup sweep). An editor can edit a vamp's name/key, replace/remove its MP3, and delete the vamp.
+- [ ] **R435**: An editor can **create and manage vamps** from a **"Vamps" tab on the Songs page** (a
+  `Songs | Vamps` tab bar — per the owner's "Vamps tab in the songs page" and the `Vamps.dc.html` Turn-12
+  design), **not** a separate sidebar route. Each vamp has a **name**, a **musical key**, an **optional
+  tempo** (freeform, e.g. "68 bpm"), and **one attached MP3** (≤50 MB), uploaded via the shipped
+  resumable-upload pipeline into a retention-exempt, org-scoped Storage prefix (`orgs/{orgId}/vamp-files/…`,
+  editor-gated in `storage.rules`, structurally exempt from every cleanup sweep). An editor can edit a
+  vamp's name/key/tempo, replace/remove its MP3, and delete the vamp. _(Scope refined 2026-09-09 to match
+  the owner-supplied design: tab-not-page + optional tempo.)_
 
-- [ ] **R436**: The Vamps list is **browsable and searchable** (including by key), mirroring the Songs list
-  UX and built to the imported **`Vamps.dc.html`** Claude Design (mapped to the app's dark gray-950 language).
+- [ ] **R436**: The Vamps tab is a **flat, browsable, searchable one-vamp-per-row table** (columns:
+  Vamp · Key · Tempo · Audio, searchable by vamp name or key; a "No MP3 attached" warning state), with a
+  slide-out editor (Name, Key chip-picker, Tempo, MP3 attach/play/remove, Delete) — built to the imported
+  **`Vamps.dc.html`** Claude Design (Turn 12 "one row, one vamp"), mapped to the app's dark gray-950 language
+  mirroring the existing Songs table/slide-over components.
 
 ### Vamp Slide Assignment & Live Playback
 
