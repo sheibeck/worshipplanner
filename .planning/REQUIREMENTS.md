@@ -81,7 +81,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Vamps Library
 
-- [ ] **R435**: An editor can **create and manage vamps** from a **"Vamps" tab on the Songs page** (a
+- [x] **R435**: An editor can **create and manage vamps** from a **"Vamps" tab on the Songs page** (a
   `Songs | Vamps` tab bar — per the owner's "Vamps tab in the songs page" and the `Vamps.dc.html` Turn-12
   design), **not** a separate sidebar route. Each vamp has a **name**, a **musical key**, an **optional
   tempo** (freeform, e.g. "68 bpm"), and **one attached MP3** (≤50 MB), uploaded via the shipped
@@ -90,7 +90,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   vamp's name/key/tempo, replace/remove its MP3, and delete the vamp. _(Scope refined 2026-09-09 to match
   the owner-supplied design: tab-not-page + optional tempo.)_
 
-- [ ] **R436**: The Vamps tab is a **flat, browsable, searchable one-vamp-per-row table** (columns:
+- [x] **R436**: The Vamps tab is a **flat, browsable, searchable one-vamp-per-row table** (columns:
   Vamp · Key · Tempo · Audio, searchable by vamp name or key; a "No MP3 attached" warning state), with a
   slide-out editor (Name, Key chip-picker, Tempo, MP3 attach/play/remove, Delete) — built to the imported
   **`Vamps.dc.html`** Claude Design (Turn 12 "one row, one vamp"), mapped to the app's dark gray-950 language
@@ -168,8 +168,8 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R432 | Phase 139 | Complete |
 | R433 | Phase 139 | Complete |
 | R434 | Phase 138 | Complete |
-| R435 | Phase 140 | Pending |
-| R436 | Phase 140 | Pending |
+| R435 | Phase 140 | Complete |
+| R436 | Phase 140 | Complete |
 | R437 | Phase 141 | Pending |
 | R438 | Phase 141 | Pending |
 | R439 | Phase 141 | Pending |

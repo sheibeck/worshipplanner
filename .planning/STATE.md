@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.15
 milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
-current_phase: 139
-current_phase_name: Rehearsal & Report Times
-status: planning
-stopped_at: Phase 139 executed + auto-verified (UAT deferred); advancing to Phase 140
-last_updated: "2026-09-09T20:30:00.000Z"
-last_activity: 2026-09-09
-last_activity_desc: Phase 139 executed + auto-verified (browser/visual UAT deferred, batched)
+current_phase: 140
+current_phase_name: Vamps Library — CRUD & Storage
+status: executing
+stopped_at: Completed 140-01-PLAN.md (client/data foundation); ready for 140-02 (storage rules) / 140-03 (UI)
+last_updated: "2026-09-10T13:27:48.039Z"
+last_activity: 2026-09-10
+last_activity_desc: Phase 140 execution started
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 7
+  completed_plans: 5
   percent: 50
 ---
 
@@ -1407,7 +1407,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 139 — Rehearsal & Report Times
+**Current focus:** Phase 140 — Vamps Library — CRUD & Storage
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1417,10 +1417,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 139 (Rehearsal & Report Times) — EXECUTING
-Plan: 2 of 2
+Phase: 140 (Vamps Library — CRUD & Storage) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-09-09 — Phase 139 execution started
+Last activity: 2026-09-10 — Phase 140 execution started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3722,6 +3722,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 138 P01 | 25min | 1 tasks | 2 files |
 | Phase 138 P02 | 45min | 1 tasks | 3 files |
 | Phase 139 P01 | 21min | 3 tasks | 8 files |
+| Phase 140 P01 | 45min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -4335,6 +4336,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 139-01: rehearsals/reportTime stored as plain YYYY-MM-DD/HH:mm strings (never Timestamp), mirroring Service.date
 - [Phase ?]: 139-01: undated rehearsals (date === '') filtered from both public projections but kept visible in the editor's raw Service doc
 - [Phase ?]: 139-01: no deep-merge branch needed in applyOrgSnapshot for rehearsalTimeDefaults/reportTimeDefault — confirmed flat fields
+- [Phase ?]: 140-01: Vamps client/data foundation — single-step hard delete, separate 12-key VAMP_KEYS constant, plain updateVamp attachment writes (no arrayUnion), per-upload-id Storage path for replace-safety, best-effort non-blocking duration capture
 
 ### Roadmap Evolution
 
@@ -4671,8 +4673,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-09T20:12:12.572Z
-Stopped at: Completed 139-01-PLAN.md
+Last session: 2026-09-10T13:27:38.571Z
+Stopped at: Completed 140-01-PLAN.md (client/data foundation); ready for 140-02 (storage rules) / 140-03 (UI)
 Resume file: None
 
 ## Operator Next Steps
