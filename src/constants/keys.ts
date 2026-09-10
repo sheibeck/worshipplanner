@@ -11,3 +11,10 @@ export const MAJOR_KEYS = [
 export const MINOR_KEYS = [
   'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'Abm', 'Am', 'Bbm', 'Bm',
 ] as const
+
+/** R435/R436 — the Vamps chip-picker's closed 12-key set (one enharmonic
+ * spelling per pitch class). Deliberately NOT MAJOR_KEYS (14 entries, both
+ * enharmonic spellings) — see 140-RESEARCH.md Pattern 1. */
+export const VAMP_KEYS = [
+  'C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B',
+] as const
