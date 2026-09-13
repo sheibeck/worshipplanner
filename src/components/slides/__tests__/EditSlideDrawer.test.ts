@@ -5,6 +5,7 @@ import EditSlideDrawer from '../EditSlideDrawer.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
+import type { Vamp } from '@/types/vamp'
 
 // --- 26-05 Task 3: the drawer calls the slideGroups store directly for its
 // fresh-base label/notes writes (Pattern 2/Pitfall 2). Mocked here so Task 1's
@@ -73,6 +74,23 @@ vi.mock('@/composables/useBackgroundUpload', () => ({
     isUploading: backgroundUploadIsUploadingRef,
     uploadBackground: mockUploadBackground,
     reset: mockResetBackgroundUpload,
+  }),
+}))
+
+// --- 141-01: the drawer reads useVampStore() only (vamps/isLoading/orgId) —
+// mocked with getters so a test can mutate mockVamps/mockVampsLoading and
+// have the drawer observe the change without a real Pinia store. ---
+let mockVamps: Vamp[] = []
+let mockVampsLoading = false
+vi.mock('@/stores/vamps', () => ({
+  useVampStore: () => ({
+    get vamps() {
+      return mockVamps
+    },
+    get isLoading() {
+      return mockVampsLoading
+    },
+    orgId: 'org-1',
   }),
 }))
 
@@ -276,6 +294,27 @@ function makeOwnBackgroundFixtures(url = 'https://example.com/orgs/org-1/backgro
     slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Hello', backgroundImageUrl: url, backgroundSource: 'slide' } as never,
   })
   return { entry, assembledSlide }
+}
+
+function makeVamp(overrides: Partial<Vamp> = {}): Vamp {
+  return {
+    id: 'vamp-1',
+    name: 'Open Response',
+    key: 'G',
+    tempo: '68 bpm',
+    attachment: {
+      storagePath: 'orgs/org-1/vamp-files/vamp-1/u1/open-response.mp3',
+      downloadUrl: 'https://cdn.example/open-response.mp3',
+      fileName: 'open-response.mp3',
+      mimeType: 'audio/mpeg',
+      sizeBytes: 100,
+      createdAt: {} as never,
+      createdBy: 'user-1',
+    },
+    createdAt: {} as never,
+    updatedAt: {} as never,
+    ...overrides,
+  }
 }
 
 function mountDrawer(props: Partial<InstanceType<typeof EditSlideDrawer>['$props']> = {}) {
@@ -2412,5 +2451,231 @@ describe('EditSlideDrawer - pending-render edit guard (R236)', () => {
     expect(body().find('[data-testid="drawer-pending-render-notice"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(true)
     expect(body().find('[data-testid="background-attach"]').exists()).toBe(true)
+  })
+})
+
+describe('EditSlideDrawer (Phase 141-01 — vamp assignment)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+    mockVamps = [
+      makeVamp({ id: 'vamp-1', name: 'Open Response', key: 'G' }),
+      makeVamp({
+        id: 'vamp-2',
+        name: 'Waiting',
+        key: 'D',
+        attachment: {
+          storagePath: 'orgs/org-1/vamp-files/vamp-2/u1/waiting.mp3',
+          downloadUrl: 'https://cdn.example/waiting.mp3',
+          fileName: 'waiting.mp3',
+          mimeType: 'audio/mpeg',
+          sizeBytes: 100,
+          createdAt: {} as never,
+          createdBy: 'user-1',
+        },
+      }),
+      makeVamp({ id: 'vamp-3', name: 'No File', key: 'A', attachment: null }),
+    ]
+    mockVampsLoading = false
+  })
+
+  it('assigns a vamp from empty audio through replaceGroupSlides with the locked four-field write, passes other entries through by reference, and closes the panel', async () => {
+    const entryOne = makeEntry({ id: 'entry-1' })
+    const entryTwo = makeEntry({ id: 'entry-2', label: 'Untouched' })
+    const group = makeGroup({ slides: [entryOne, entryTwo] })
+    mountDrawer({ entry: entryOne, group })
+
+    await body().find('[data-testid="vamp-picker-open"]').trigger('click')
+    expect(body().find('[data-testid="vamp-picker-panel"]').exists()).toBe(true)
+
+    await body().find('[data-vamp-id="vamp-1"][data-testid="vamp-picker-row"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const [orgId, slotId, next, sourceSignature, base] = mockReplaceGroupSlides.mock.calls[0]!
+    expect(orgId).toBe('org-1')
+    expect(slotId).toBe(group.slotId)
+    expect(sourceSignature).toBe(group.sourceSignature)
+    expect(base).toEqual(group.slides)
+    const written = (next as GroupSlideEntry[]).find((e) => e.id === 'entry-1')!
+    expect(written).toEqual({
+      ...entryOne,
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      audioLoop: true,
+      vampId: 'vamp-1',
+      vampLabel: 'Open Response · G',
+    })
+    expect((next as GroupSlideEntry[]).find((e) => e.id === 'entry-2')).toEqual(entryTwo)
+    expect(body().find('[data-testid="vamp-picker-panel"]').exists()).toBe(false)
+  })
+
+  it('shows vamp-picker-open beside a manually uploaded audio (no vampId), and selecting a vamp replaces it with no confirm', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/manual.mp3' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="audio-file-row"]').exists()).toBe(true)
+    expect(body().find('[data-testid="vamp-picker-open"]').exists()).toBe(true)
+
+    await body().find('[data-testid="vamp-picker-open"]').trigger('click')
+    await body().find('[data-vamp-id="vamp-1"][data-testid="vamp-picker-row"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = (mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]).find((e) => e.id === 'entry-1')!
+    expect(written.audioUrl).toBe('https://cdn.example/open-response.mp3')
+    expect(written.vampId).toBe('vamp-1')
+  })
+
+  it('renders the assigned row (label/title/Change/Clear), keeps the loop checkbox enabled+checked, and hides audio-file-name/audio-remove', () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      vampId: 'vamp-1',
+      vampLabel: 'Open Response · G',
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      audioLoop: true,
+    })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="vamp-assigned-row"]').exists()).toBe(true)
+    const label = body().find('[data-testid="vamp-assigned-label"]')
+    expect(label.text()).toBe('Vamp: Open Response · G')
+    expect(label.attributes('title')).toBe('Open Response · G')
+    expect(body().find('[data-testid="vamp-change"]').exists()).toBe(true)
+    expect(body().find('[data-testid="vamp-clear"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-file-name"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-remove"]').exists()).toBe(false)
+    expect(body().find('audio').exists()).toBe(true)
+
+    const checkbox = body().find('[data-testid="audio-loop-checkbox"]').element as HTMLInputElement
+    expect(checkbox.disabled).toBe(false)
+    expect(checkbox.checked).toBe(true)
+  })
+
+  it('Change opens the picker with the current vamp pre-selected, and selecting a different vamp writes the new four fields', async () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      vampId: 'vamp-1',
+      vampLabel: 'Open Response · G',
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      audioLoop: true,
+    })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="vamp-change"]').trigger('click')
+    const selectedRow = body().find('[data-vamp-id="vamp-1"][data-testid="vamp-picker-row"]')
+    expect(selectedRow.classes()).toContain('bg-indigo-950/40')
+
+    await body().find('[data-vamp-id="vamp-2"][data-testid="vamp-picker-row"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = (mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]).find((e) => e.id === 'entry-1')!
+    expect(written.vampId).toBe('vamp-2')
+    expect(written.vampLabel).toBe('Waiting · D')
+    expect(written.audioUrl).toBe('https://cdn.example/waiting.mp3')
+  })
+
+  it('selecting the already-assigned vamp again makes no write (idempotent) and closes the panel', async () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      vampId: 'vamp-1',
+      vampLabel: 'Open Response · G',
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      audioLoop: true,
+    })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="vamp-change"]').trigger('click')
+    await body().find('[data-vamp-id="vamp-1"][data-testid="vamp-picker-row"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    expect(body().find('[data-testid="vamp-picker-panel"]').exists()).toBe(false)
+  })
+
+  it('Clear removes vampId/vampLabel/audioUrl/audioLoop in one write with no undefined values, passing other entries through by reference', async () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      vampId: 'vamp-1',
+      vampLabel: 'Open Response · G',
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      audioLoop: true,
+    })
+    const entryTwo = makeEntry({ id: 'entry-2', label: 'Untouched' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry, entryTwo] }) })
+
+    await body().find('[data-testid="vamp-clear"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const next = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const written = next.find((e) => e.id === 'entry-1')!
+    expect(written).not.toHaveProperty('vampId')
+    expect(written).not.toHaveProperty('vampLabel')
+    expect(written).not.toHaveProperty('audioUrl')
+    expect(written).not.toHaveProperty('audioLoop')
+    expect(Object.values(written)).not.toContain(undefined)
+    expect(next.find((e) => e.id === 'entry-2')).toEqual(entryTwo)
+  })
+
+  it('shows the stale hint only when isLoading is false and the vampId does not resolve, and Clear still works', async () => {
+    mockVamps = []
+    const entry = makeEntry({
+      id: 'entry-1',
+      vampId: 'vamp-gone',
+      vampLabel: 'Deleted Vamp · A',
+      audioUrl: 'https://cdn.example/x.mp3',
+      audioLoop: true,
+    })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="vamp-assigned-stale"]').exists()).toBe(true)
+    expect(body().find('[data-testid="vamp-assigned-stale"]').text()).toBe('(no longer in library)')
+
+    await body().find('[data-testid="vamp-clear"]').trigger('click')
+    await flushPromises()
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+    mockVampsLoading = true
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="vamp-assigned-stale"]').exists()).toBe(false)
+  })
+
+  it('renders "Vamp" (no label) when vampId is set but vampLabel is absent, and Change/Clear still render', () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      vampId: 'vamp-1',
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      audioLoop: true,
+    })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    // Template renders "Vamp: " + label; a missing label yields "Vamp:", trimmed here to "Vamp".
+    expect(body().find('[data-testid="vamp-assigned-label"]').text().replace(/:$/, '')).toBe('Vamp')
+    expect(body().find('[data-testid="vamp-change"]').exists()).toBe(true)
+    expect(body().find('[data-testid="vamp-clear"]').exists()).toBe(true)
+  })
+
+  it('hides vamp-picker-open/vamp-change/vamp-clear for a viewer or a locked service, but still shows the Vamp label', () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      vampId: 'vamp-1',
+      vampLabel: 'Open Response · G',
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      audioLoop: true,
+    })
+    const viewerWrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }), isEditor: false })
+    expect(body().find('[data-testid="vamp-picker-open"]').exists()).toBe(false)
+    expect(body().find('[data-testid="vamp-change"]').exists()).toBe(false)
+    expect(body().find('[data-testid="vamp-clear"]').exists()).toBe(false)
+    expect(body().find('[data-testid="vamp-assigned-label"]').exists()).toBe(true)
+    viewerWrapper.unmount()
+
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }), isEditor: true, serviceLocked: true })
+    expect(body().find('[data-testid="vamp-picker-open"]').exists()).toBe(false)
+    expect(body().find('[data-testid="vamp-change"]').exists()).toBe(false)
+    expect(body().find('[data-testid="vamp-clear"]').exists()).toBe(false)
+    expect(body().find('[data-testid="vamp-assigned-label"]').exists()).toBe(true)
   })
 })
