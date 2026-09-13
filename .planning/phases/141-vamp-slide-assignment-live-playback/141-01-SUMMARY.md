@@ -154,3 +154,9 @@ None — no external service configuration required.
 ---
 *Phase: 141-vamp-slide-assignment-live-playback*
 *Completed: 2026-09-13*
+
+## Self-Check: PASSED
+
+All 8 files (2 created source/test files + 4 modified source files + 1 modified test-suite entry +
+this SUMMARY) confirmed present on disk. All 7 commit hashes (33ce439f, 5df1d2bc, be9f8854, 50fff052,
+f54b6af8, 24a3f0e2, 5007c0b5) confirmed present in `git log`.
