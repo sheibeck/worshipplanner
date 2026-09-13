@@ -698,7 +698,7 @@ this RESEARCH.md's Architecture Patterns to match those older documents; they ar
 | A2 | `countAssignments`'s "upcoming" count and `deleteVamp`'s "any assignment" Storage-keep check are two separate queries/branches, not one shared boolean | Code Examples note | If the planner instead reuses one boolean for both, an editor could see "not assigned in any upcoming service" (0 shown) yet have the MP3 silently kept anyway (or vice versa) because the vamp is assigned to a PAST service only — a confusing but non-destructive mismatch between displayed count and actual Storage-cascade behavior. |
 | A3 | `RunPreviewPair.vue`'s embedded, ref-less `SlideCanvas`/`AudioPlayer` is genuinely never played anywhere in the current codebase (verified by absence of a `ref` binding and absence of any `.play()` call in that file) | Pitfall 5 | If some other, unread code path does hold a ref into that instance and calls `.play()`, suppressing/leaving it unsuppressed could matter for echo; a targeted `grep -n "RunPreviewPair"` across the codebase during planning would confirm this is the only consumer. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `countAssignments` return a single boolean-plus-count, or does `deleteVamp` need its own
    independent "any assignment, any service" query separate from the upcoming-only display count?**
@@ -711,6 +711,7 @@ this RESEARCH.md's Architecture Patterns to match those older documents; they ar
    - Recommendation: one scan, two derived values (the code example above naturally supports this — the
      `serviceIds` set is "any assignment," and the date-filtered count is the upcoming subset) — this is a
      planning-time implementation-shape choice, not a product ambiguity, and should not block planning.
+   - RESOLVED: Plan 141-04 Task 1 implements one scan with two derived values (`countAssignments`).
 
 2. **Should `RunPreviewPair.vue`'s inert `SlideCanvas` instances also receive `:suppress-audio="true"`?**
    - What we know: they never play today and remain harmless after this phase (Pitfall 5, Assumption A3).
@@ -719,6 +720,7 @@ this RESEARCH.md's Architecture Patterns to match those older documents; they ar
    - Recommendation: include it as a one-line, low-risk hardening task in the same plan that adds
      `suppressAudio` to `SlideCanvas.vue`, purely for defense-in-depth — not required for R438's must-haves,
      but essentially free once the prop exists.
+   - RESOLVED: Plan 141-03 Task 2 passes `:suppress-audio="true"` on both RunPreviewPair preview canvases.
 
 ## Environment Availability
 

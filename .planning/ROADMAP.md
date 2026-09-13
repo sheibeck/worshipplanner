@@ -911,12 +911,13 @@ live in Run the Service, with no silent failures.
      clear/change the assignment), attaching the vamp's audio to that slide (R437).
 
   2. When a slide with an assigned vamp goes live in Run the Service, the vamp plays and loops until the
-     slide changes or the assignment is cleared, and is audible **only** from the Audience output —
-     Confidence and Video stay muted so one machine driving multiple monitors does not triple-play/echo the
-     audio (R438).
+     slide changes or the assignment is cleared, and is audible **only from the computer running the
+     service** (the Run control window) — the Audience, Confidence and Video outputs are silent, so one
+     machine driving multiple monitors never triple-plays/echoes the audio (R438; owner decision 2026-09-13,
+     supersedes the earlier "Audience output only" wording).
 
   3. A projectionist arms audio with an explicit gesture on the Run/control screen before going live, so
-     the vamp actually plays in the non-interactive output window(s) despite browser autoplay policy (R439).
+     the vamp actually plays from that window despite browser autoplay policy (R439).
 
   4. If audio playback is still blocked after arming, the control screen shows a visible warning — never a
      silent failure with no on-screen indication (R439).
@@ -924,12 +925,28 @@ live in Run the Service, with no silent failures.
   5. Deleting a vamp assigned to one or more upcoming services' slides shows a warning naming the affected
      count but still allows the deletion (R440).
 
-**Verification note**: Success criteria 2-4 are this milestone's headline risk and require real
-multi-monitor hardware with real speakers, on a fresh browser profile — not provable by unit tests alone
-(silent autoplay-block + triple-play-echo are both browser/hardware-dependent). Treat as a human/hardware
+**Verification note**: Success criteria 2-4 require real speakers on a fresh browser profile — not provable
+by unit tests alone (browser autoplay policy and audible output are hardware-dependent). With audio owned by
+the control window the cross-window echo risk is removed by construction, but the run remains a human/hardware
 UAT gate.
 
-**Plans**: TBD
+**Planning note (2026-09-13):** the owner's discuss-phase decision (141-CONTEXT.md) overrides success
+criteria 2-3's output-window wording — vamp audio plays ONLY from the Run control window; Audience,
+Confidence and Video are all silent via `suppressAudio`. No cross-window audio-unlock handshake is built.
+
+**Plans**: 4 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 141-01-PLAN.md — R437 editor assignment (Wave 1): `GroupSlideEntry.vampId`/`vampLabel`, `VampPicker.vue`, EditSlideDrawer assign/change/clear + stale hint, `useVampStore` subscribe inside ServiceEditorView's editor gate
+- [ ] 141-02-PLAN.md — R438 output silence (Wave 1): `SlideCanvas.suppressAudio` (mirrors `suppressBackground`) hardcoded true at all four output-tier SlideCanvas mounts
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 141-03-PLAN.md — R438/R439 control-window audio owner (Wave 2): single `AudioPlayer` in RunControlView driven by useRunControl (armed/blackout/slide-change/exit), `Audio: Off/Armed` arm toggle + playing dot, blocked banner with retry, `Audio unavailable`, ♪ Vamp preview badges
+- [ ] 141-04-PLAN.md — R440 delete warning (Wave 2): `useVampStore.countAssignments` best-effort scan, `deleteVamp` keeps the MP3 when assigned anywhere, VampSlideOver `Assigned in N upcoming service(s)` / `May be assigned to slides.` copy
+
 **UI hint**: yes
 
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)

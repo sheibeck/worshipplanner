@@ -103,14 +103,14 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   plus a display-only `vampId` so the editor shows which vamp is assigned) and can be cleared/changed.
 
 - [ ] **R438**: When a slide with an assigned vamp is live in **Run the Service**, the vamp **plays and
-  loops** until the slide changes or it is cleared, and is **audible from the Audience output only** —
-  the Confidence and Video outputs are muted so a single machine driving multiple monitors does not
-  triple-play/echo the audio.
+  loops** until the slide changes or it is cleared, and is **audible only from the computer running the
+  service (the Run control window)** — the Audience, Confidence and Video outputs are silent, so a single
+  machine driving multiple monitors never triple-plays/echoes the audio. (Owner decision 2026-09-13;
+  supersedes the earlier "Audience output only" wording.)
 
-- [ ] **R439**: A projectionist **arms audio** with a gesture on the Run/control screen so a vamp plays in
-  the non-interactive output window(s) despite browser autoplay policy; if audio is still blocked, the
-  failure is **surfaced back to the control screen** as a visible warning (never a silent failure with no
-  on-screen indication).
+- [ ] **R439**: A projectionist **arms audio** with a gesture on the Run/control screen so a vamp plays from
+  that window despite browser autoplay policy; if audio is still blocked, the failure is **surfaced on the
+  control screen** as a visible warning (never a silent failure with no on-screen indication).
 
 - [ ] **R440**: Deleting a vamp that is currently **assigned to one or more upcoming services' slides**
   **warns** the editor (showing how many services are affected) but **allows** the deletion; already-assigned
