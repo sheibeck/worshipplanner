@@ -334,6 +334,9 @@ const props = defineProps<{
   /** Phase 90/94 — when true, ignore the slide's own resolved background
    *  and render black-only (the confidence-monitor contract lands here). */
   suppressBackground?: boolean
+  /** Phase 141 (R438) — when true, never mount the slide's audio: the Run
+   *  control window is the single audio owner; every output passes true. */
+  suppressAudio?: boolean
   /** Whether the canvas responds to its own autoplay-blocked affordances.
    *  PresentationViewer's existing behavior is the `interactive: true`
    *  (default-on-there) case; a non-interactive preview shows none. */
@@ -384,7 +387,10 @@ const currentRenderFailureSentence = computed(() =>
   renderFailureSentence(props.slide?.slide.renderFailureReason),
 )
 
-const currentAudioUrl = computed<string | null>(() => props.slide?.slide.audioUrl ?? null)
+const currentAudioUrl = computed<string | null>(() => {
+  if (props.suppressAudio) return null
+  return props.slide?.slide.audioUrl ?? null
+})
 /**
  * A video slide's own source (D-17/D-18) — video has no bed layer, so this
  * resolves ONLY from the current slide's own `videoSrc` when it IS a video
