@@ -72,6 +72,10 @@ export interface GroupSlideEntry {
   audioLoop?: boolean
   /** Per-slide background image (R056) — the most specific tier of the slide/group/song cascade `resolveEntryMedia` resolves; greenfield, no migration (D-19). */
   backgroundImageUrl?: string
+  /** R437 — denormalized vamp assignment, display-only; never live-resolved. */
+  vampId?: string
+  /** R437 — `{name} · {key}` label captured at assignment; stale after a vamp rename by design. */
+  vampLabel?: string
 }
 
 /**
