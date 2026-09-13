@@ -1885,6 +1885,7 @@ import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
 import { useTeamsStore } from '@/stores/teams'
+import { useVampStore } from '@/stores/vamps'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useSaveStatus, hasVisibleSaveStatus } from '@/stores/saveStatus'
 import { slotLabel, kindBadgeClass, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
@@ -1938,6 +1939,7 @@ const songStore = useSongStore()
 const rosterStore = useRosterStore()
 const quartersStore = useQuartersStore()
 const teamsStore = useTeamsStore()
+const vampStore = useVampStore()
 const serviceMessagesStore = useServiceMessagesStore()
 // R029/D-03 cascade target — the group delete cascade's scoped write action.
 // Reads for the delete-warning copy go through useSlideshowAssembly's
@@ -3170,6 +3172,10 @@ function initStores() {
     }
     if (!quartersStore.orgId) {
       quartersStore.subscribe(orgId)
+    }
+    // R437 — the slide drawer's vamp picker reads this store; editor-gated because vamps is read-gated to editors (firestore.rules generic catch-all).
+    if (!vampStore.orgId) {
+      vampStore.subscribe(orgId)
     }
     // Phase 79 (R229/R241): the checkbox row now reads the shared teams
     // store instead of a hard-coded array, so it needs subscribing +
