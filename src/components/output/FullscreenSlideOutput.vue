@@ -29,10 +29,13 @@
       class="relative overflow-hidden"
       :style="stageStyle"
     >
+      <!-- R438 (Phase 141): outputs never carry audio — the Run control window
+           is the single audio owner. -->
       <SlideCanvas
         ref="slideCanvasRef"
         :slide="currentSlide"
         :interactive="false"
+        :suppress-audio="true"
       />
     </div>
 
@@ -59,6 +62,7 @@
             ref="bannerSlideCanvasRef"
             :slide="currentSlide"
             :interactive="false"
+            :suppress-audio="true"
           />
         </div>
       </div>

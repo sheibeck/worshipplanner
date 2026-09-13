@@ -38,6 +38,7 @@
           :slide="currentSlide"
           :suppressBackground="true"
           :interactive="false"
+          :suppress-audio="true"
         />
       </div>
     </div>
@@ -70,6 +71,7 @@
           :slide="nextSlide"
           :suppressBackground="true"
           :interactive="false"
+          :suppress-audio="true"
         />
       </div>
       <span
