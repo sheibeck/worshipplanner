@@ -80,6 +80,26 @@ vi.mock('@/stores/songs', () => ({
   }),
 }))
 
+// ── @/stores/vamps mock (140-03) — the minimum surface SongsView.vue reads
+//    at mount for the Vamps tab (count badge, VampTable props, the
+//    church-switch watch's subscribe/unsubscribeAll). ──
+let mockVamps: unknown[] = []
+const mockVampSubscribe = vi.fn()
+const mockVampUnsubscribeAll = vi.fn()
+
+vi.mock('@/stores/vamps', () => ({
+  useVampStore: () => ({
+    get vamps() {
+      return mockVamps
+    },
+    filteredVamps: [] as unknown[],
+    isLoading: false,
+    searchQuery: '',
+    subscribe: mockVampSubscribe,
+    unsubscribeAll: mockVampUnsubscribeAll,
+  }),
+}))
+
 // ── vue-router mock ──
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {} }),
@@ -98,6 +118,8 @@ function mountSongsView() {
         SongFilters: { template: '<div />' },
         SongTable: { template: '<div />' },
         SongSlideOver: { template: '<div />' },
+        VampTable: { template: '<div data-testid="vamp-table-stub" />' },
+        VampSlideOver: { template: '<div />' },
         BatchQuickAssign: { template: '<div />' },
         PcImportModal: { template: '<div />' },
       },
@@ -127,6 +149,9 @@ describe('SongsView (Wave 0 harness — Phase 39)', () => {
     mockRestoreSong.mockClear()
     mockHardDeleteSong.mockClear()
     mockClearTagFilter.mockClear()
+    mockVamps = []
+    mockVampSubscribe.mockClear()
+    mockVampUnsubscribeAll.mockClear()
   })
 
   it('finds the "Import Songs" trigger (default mock has settings.pcEnabled true)', () => {
@@ -194,6 +219,37 @@ describe('SongsView (Wave 0 harness — Phase 39)', () => {
       await confirmDeleteButton!.trigger('click')
 
       expect(mockHardDeleteSong).toHaveBeenCalledWith('song-1')
+    })
+  })
+
+  // 140-03 (R436): the Songs | Vamps tab bar. Kept light — full visual
+  // rendering + real MP3 upload are the Manual-Only UAT items in
+  // 140-VALIDATION.md.
+  describe('Songs | Vamps tab bar (140-03)', () => {
+    it('renders the tab bar with the Songs tab active by default', () => {
+      const wrapper = mountSongsView()
+      expect(wrapper.find('[data-testid="songs-vamps-tab-bar"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="tab-songs"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="tab-vamps"]').exists()).toBe(true)
+      // v-show, not v-if — the Vamps region exists in the DOM but is hidden
+      // until its tab is active.
+      expect(wrapper.find('[data-testid="vamp-table-stub"]').isVisible()).toBe(false)
+    })
+
+    it('switching to the Vamps tab shows the Vamps region (VampTable) and keeps the page title "Songs"', async () => {
+      const wrapper = mountSongsView()
+      await wrapper.get('[data-testid="tab-vamps"]').trigger('click')
+
+      expect(wrapper.get('h1').text()).toBe('Songs')
+      const vampTableStub = wrapper.find('[data-testid="vamp-table-stub"]')
+      expect(vampTableStub.exists()).toBe(true)
+      // v-show, not v-if — the Songs region stays in the DOM (display:none).
+      expect(wrapper.find('[data-testid="tab-songs"]').exists()).toBe(true)
+    })
+
+    it('subscribes the vampStore to the current org on mount (church-switch safety)', () => {
+      mountSongsView()
+      expect(mockVampSubscribe).toHaveBeenCalledWith('org-1')
     })
   })
 })

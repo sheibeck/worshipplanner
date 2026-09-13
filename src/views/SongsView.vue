@@ -20,46 +20,89 @@
             </p>
           </div>
           <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
-            <!-- Batch Assign — visible only when uncategorized songs exist -->
-            <button
-              v-if="uncategorizedSongs.length > 0"
-              @click="batchMode = true"
-              class="inline-flex items-center gap-2 rounded-md border border-amber-700 bg-amber-900/20 px-3 py-2 text-sm font-medium text-amber-300 hover:bg-amber-900/40 hover:text-amber-200 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-              Batch Assign ({{ uncategorizedSongs.length }})
-            </button>
-            <!-- Show Hidden toggle — only visible when there are hidden songs or panel is open -->
-            <button
-              v-if="hiddenSongs.length > 0 || showHidden"
-              @click="showHidden = !showHidden"
-              class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800/50 px-3 py-2 text-sm font-medium text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
-            >
-              {{ showHidden ? 'Hide Hidden' : `Hidden (${hiddenSongs.length})` }}
-            </button>
-            <button
-              v-if="authStore.settings.pcEnabled"
-              @click="importModalOpen = true"
-              class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              Import Songs
-            </button>
-            <button
-              @click="onAddSong"
-              class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              Add Song
-            </button>
+            <template v-if="activeTab === 'songs'">
+              <!-- Batch Assign — visible only when uncategorized songs exist -->
+              <button
+                v-if="uncategorizedSongs.length > 0"
+                @click="batchMode = true"
+                class="inline-flex items-center gap-2 rounded-md border border-amber-700 bg-amber-900/20 px-3 py-2 text-sm font-medium text-amber-300 hover:bg-amber-900/40 hover:text-amber-200 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Batch Assign ({{ uncategorizedSongs.length }})
+              </button>
+              <!-- Show Hidden toggle — only visible when there are hidden songs or panel is open -->
+              <button
+                v-if="hiddenSongs.length > 0 || showHidden"
+                @click="showHidden = !showHidden"
+                class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800/50 px-3 py-2 text-sm font-medium text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+              >
+                {{ showHidden ? 'Hide Hidden' : `Hidden (${hiddenSongs.length})` }}
+              </button>
+              <button
+                v-if="authStore.settings.pcEnabled"
+                @click="importModalOpen = true"
+                class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Import Songs
+              </button>
+              <button
+                @click="onAddSong"
+                class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Add Song
+              </button>
+            </template>
+            <!-- Vamps tab: a single "New Vamp" affordance, same position as "Add Song" -->
+            <template v-else>
+              <button
+                @click="onAddVamp"
+                class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                New Vamp
+              </button>
+            </template>
           </div>
         </div>
+
+        <!-- Songs | Vamps tab bar (140-03, R436) — page title above stays "Songs"
+             regardless of the active tab. -->
+        <div class="flex border-b border-gray-800 mb-4" data-testid="songs-vamps-tab-bar">
+          <button
+            type="button"
+            data-testid="tab-songs"
+            class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+            :class="activeTab === 'songs' ? 'text-indigo-400 border-indigo-500' : 'text-gray-400 border-transparent hover:text-gray-300'"
+            @click="activeTab = 'songs'"
+          >
+            Songs
+            <span class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-indigo-900/50 text-indigo-300 border-indigo-800">{{ songStore.filteredSongs.length }}</span>
+          </button>
+          <button
+            type="button"
+            data-testid="tab-vamps"
+            class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+            :class="activeTab === 'vamps' ? 'text-indigo-400 border-indigo-500' : 'text-gray-400 border-transparent hover:text-gray-300'"
+            @click="activeTab = 'vamps'"
+          >
+            Vamps
+            <span class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-indigo-900/50 text-indigo-300 border-indigo-800">{{ vampStore.vamps.length }}</span>
+          </button>
+        </div>
+
+        <!-- Songs tab content: unchanged behavior/subscription, only visibility
+             toggled (v-show preserves SongTable's internal state, e.g. sort/scroll). -->
+        <div v-show="activeTab === 'songs'">
 
         <!-- Filters + song table, browsed through the shared SongBrowser shell (R240) -->
         <SongBrowser
@@ -190,6 +233,17 @@
             </div>
           </div>
         </div>
+        </div>
+
+        <!-- Vamps tab content (140-03, R435/R436) -->
+        <div v-show="activeTab === 'vamps'">
+          <VampTable
+            :vamps="vampStore.filteredVamps"
+            :loading="vampStore.isLoading"
+            @select="onSelectVamp"
+            @add="onAddVamp"
+          />
+        </div>
       </template>
     </div>
 
@@ -201,6 +255,15 @@
       @close="slideOverOpen = false"
       @saved="slideOverOpen = false"
       @deleted="slideOverOpen = false"
+    />
+
+    <!-- Vamp slide-over panel (140-03) -->
+    <VampSlideOver
+      :open="vampSlideOverOpen"
+      :vamp="selectedVamp"
+      @close="vampSlideOverOpen = false"
+      @saved="vampSlideOverOpen = false"
+      @deleted="vampSlideOverOpen = false"
     />
 
     <!-- PC import modal -->
@@ -217,20 +280,28 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
+import { useVampStore } from '@/stores/vamps'
 import type { Song } from '@/types/song'
+import type { Vamp } from '@/types/vamp'
 import { parseSongEditRequest, clearSongEditRequest, type SongEditTab } from '@/utils/songEditLink'
 import AppShell from '@/components/AppShell.vue'
 import SongBrowser from '@/components/SongBrowser.vue'
 import SongFilters from '@/components/SongFilters.vue'
 import SongTable from '@/components/SongTable.vue'
 import SongSlideOver from '@/components/SongSlideOver.vue'
+import VampTable from '@/components/VampTable.vue'
+import VampSlideOver from '@/components/VampSlideOver.vue'
 import BatchQuickAssign from '@/components/BatchQuickAssign.vue'
 import PcImportModal from '@/components/PcImportModal.vue'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
+const vampStore = useVampStore()
 const route = useRoute()
 const router = useRouter()
+
+// Songs | Vamps tab (140-03, R436). Page title stays "Songs" regardless.
+const activeTab = ref<'songs' | 'vamps'>('songs')
 
 // Slide-over state
 const selectedSong = ref<Song | null>(null)
@@ -239,6 +310,10 @@ const slideOverOpen = ref(false)
 // other opening path, so the editor falls back to its own Details default).
 const requestedTab = ref<SongEditTab | undefined>(undefined)
 let stopSongEditWatch: (() => void) | null = null
+
+// Vamp slide-over state (140-03)
+const selectedVamp = ref<Vamp | null>(null)
+const vampSlideOverOpen = ref(false)
 
 // Import modal state
 const importModalOpen = ref(false)
@@ -360,6 +435,19 @@ watch(
   { immediate: true },
 )
 
+// 140-03 (T-140-12) — the local re-subscribe half of church-switch safety for
+// the Vamps tab, alongside (not replacing) the songStore watch above. The
+// global teardown (resetOrgScopedStores -> useVampStore().unsubscribeAll())
+// was already registered in 140-01.
+watch(
+  () => authStore.orgId,
+  (orgId) => {
+    vampStore.unsubscribeAll()
+    if (orgId) vampStore.subscribe(orgId)
+  },
+  { immediate: true },
+)
+
 // 26-02 (D-14/D-15): honour an arriving "Edit in song" link — `?edit=<songId>`
 // with an optional `?tab=`. The song catalogue is a live subscription, so the
 // requested song is very often not loaded yet at mount. Resolve immediately if
@@ -440,5 +528,15 @@ function onAddSong() {
 function onImported(count: number) {
   importModalOpen.value = false
   console.log(`[SongsView] imported ${count} songs`)
+}
+
+function onSelectVamp(vamp: Vamp) {
+  selectedVamp.value = vamp
+  vampSlideOverOpen.value = true
+}
+
+function onAddVamp() {
+  selectedVamp.value = null
+  vampSlideOverOpen.value = true
 }
 </script>
