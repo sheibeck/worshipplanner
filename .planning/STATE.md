@@ -5,15 +5,15 @@ milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
 current_phase: 140
 current_phase_name: Vamps Library — CRUD & Storage
 status: executing
-stopped_at: Completed 140-01-PLAN.md (client/data foundation); ready for 140-02 (storage rules) / 140-03 (UI)
-last_updated: "2026-09-10T13:27:48.039Z"
-last_activity: 2026-09-10
+stopped_at: Completed 140-02-PLAN.md (storage rules + rules-test proofs); ready for 140-03 (Vamps UI)
+last_updated: "2026-09-13T17:32:55.983Z"
+last_activity: 2026-09-13
 last_activity_desc: Phase 140 execution started
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
   percent: 50
 ---
 
@@ -1420,7 +1420,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 Phase: 140 (Vamps Library — CRUD & Storage) — EXECUTING
 Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-09-10 — Phase 140 execution started
+Last activity: 2026-09-13 — Phase 140 execution started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3723,6 +3723,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 138 P02 | 45min | 1 tasks | 3 files |
 | Phase 139 P01 | 21min | 3 tasks | 8 files |
 | Phase 140 P01 | 45min | 3 tasks | 10 files |
+| Phase 140 P02 | 35min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -4337,6 +4338,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 139-01: undated rehearsals (date === '') filtered from both public projections but kept visible in the editor's raw Service doc
 - [Phase ?]: 139-01: no deep-merge branch needed in applyOrgSnapshot for rehearsalTimeDefaults/reportTimeDefault — confirmed flat fields
 - [Phase ?]: 140-01: Vamps client/data foundation — single-step hard delete, separate 12-key VAMP_KEYS constant, plain updateVamp attachment writes (no arrayUnion), per-upload-id Storage path for replace-safety, best-effort non-blocking duration capture
+- [Phase ?]: Task 1 (vamp-files storage.rules block + catch-all widening) landed in a prior interrupted session (cee31f3d); verified against plan spec rather than redone in this session
+- [Phase ?]: src/rules.test.ts proves the existing generic Firestore catch-all already covers organizations/{orgId}/vamps with zero firestore.rules changes
 
 ### Roadmap Evolution
 
@@ -4673,8 +4676,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-10T13:27:38.571Z
-Stopped at: Completed 140-01-PLAN.md (client/data foundation); ready for 140-02 (storage rules) / 140-03 (UI)
+Last session: 2026-09-13T17:32:55.890Z
+Stopped at: Completed 140-02-PLAN.md (storage rules + rules-test proofs); ready for 140-03 (Vamps UI)
 Resume file: None
 
 ## Operator Next Steps

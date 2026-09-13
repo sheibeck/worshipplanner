@@ -889,12 +889,12 @@ those times are visible everywhere a service's date already appears.
   4. Vamp files upload into a retention-exempt, org-scoped Storage prefix (`orgs/{orgId}/vamp-files/…`)
      that is editor-gated in `storage.rules` and structurally excluded from every cleanup sweep (R435).
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 Plans:
 
 - [x] 140-01-PLAN.md — R435/R436 client+data foundation (Wave 1): `Vamp` type, `VAMP_KEYS`, `vampFiles.ts`, `useVampStore` (+ orgScopedStores teardown), `useVampFileUpload`
-- [ ] 140-02-PLAN.md — R435 server authority (Wave 1): `vamp-files/` `storage.rules` block + catch-all exclusion, storage-rules + Firestore-catch-all vamps tests
+- [x] 140-02-PLAN.md — R435 server authority (Wave 1): `vamp-files/` `storage.rules` block + catch-all exclusion, storage-rules + Firestore-catch-all vamps tests
 - [ ] 140-03-PLAN.md — R435/R436 Vamps UI (Wave 2): `Songs | Vamps` tab bar in SongsView, `VampTable.vue`, `VampSlideOver.vue` + component tests
 
 **UI hint**: yes
