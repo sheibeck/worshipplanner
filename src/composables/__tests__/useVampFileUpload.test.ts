@@ -63,7 +63,7 @@ describe('useVampFileUpload', () => {
 
   it('addFile with a valid MP3 creates one uploading row', () => {
     mockUploadBytesResumable.mockReturnValue(makeTask('unused'))
-    vi.spyOn(useVampStore(), 'updateVamp').mockResolvedValue(undefined)
+    vi.spyOn(useVampStore(), 'setAttachment').mockResolvedValue(undefined)
 
     const { uploads, addFile } = useVampFileUpload()
     const mp3File = makeFile('track.mp3', 'audio/mpeg', 2048)
@@ -78,7 +78,7 @@ describe('useVampFileUpload', () => {
     const task = makeTask('unused')
     mockUploadBytesResumable.mockReturnValue(task)
     mockGetDownloadURL.mockResolvedValue('https://cdn.example.com/track.mp3')
-    const updateVampSpy = vi.spyOn(useVampStore(), 'updateVamp').mockResolvedValue(undefined)
+    const setAttachmentSpy = vi.spyOn(useVampStore(), 'setAttachment').mockResolvedValue(undefined)
 
     const { uploads, announcement, addFile } = useVampFileUpload()
     const mp3File = makeFile('track.mp3', 'audio/mpeg', 2048)
@@ -98,10 +98,10 @@ describe('useVampFileUpload', () => {
     expect(uploads.value).toHaveLength(0)
     expect(announcement.value).toContain('track.mp3')
 
-    expect(updateVampSpy).toHaveBeenCalledOnce()
-    const [vampId, payload] = updateVampSpy.mock.calls[0]!
+    expect(setAttachmentSpy).toHaveBeenCalledOnce()
+    const [vampId, payload] = setAttachmentSpy.mock.calls[0]!
     expect(vampId).toBe('vamp1')
-    const attachment = (payload as { attachment: VampAttachment }).attachment
+    const attachment = payload as VampAttachment
     expect(attachment.storagePath).toMatch(/^orgs\/org1\/vamp-files\/vamp1\/[^/]+\/track\.mp3$/)
     expect(attachment.downloadUrl).toBe('https://cdn.example.com/track.mp3')
     expect(attachment.fileName).toBe('track.mp3')
@@ -118,7 +118,7 @@ describe('useVampFileUpload', () => {
       .mockReturnValueOnce(firstTask)
       .mockReturnValueOnce(secondTask)
     mockGetDownloadURL.mockResolvedValue('https://cdn.example.com/track.mp3')
-    vi.spyOn(useVampStore(), 'updateVamp').mockResolvedValue(undefined)
+    vi.spyOn(useVampStore(), 'setAttachment').mockResolvedValue(undefined)
 
     const { addFile } = useVampFileUpload()
     addFile(makeFile('track.mp3', 'audio/mpeg', 2048), { vampId: 'vamp1', orgId: 'org1', createdBy: 'user1' })
@@ -138,7 +138,7 @@ describe('useVampFileUpload', () => {
 
   it('rejects a non-mp3 file with a rejected row and starts no upload', () => {
     mockUploadBytesResumable.mockReturnValue(makeTask('unused'))
-    vi.spyOn(useVampStore(), 'updateVamp').mockResolvedValue(undefined)
+    vi.spyOn(useVampStore(), 'setAttachment').mockResolvedValue(undefined)
 
     const { uploads, addFile } = useVampFileUpload()
     const pdfFile = makeFile('song.pdf', 'application/pdf', 1024)
@@ -152,7 +152,7 @@ describe('useVampFileUpload', () => {
 
   it('an editor\'s real MP3 is not blocked by an earlier rejected file', () => {
     mockUploadBytesResumable.mockReturnValue(makeTask('unused'))
-    vi.spyOn(useVampStore(), 'updateVamp').mockResolvedValue(undefined)
+    vi.spyOn(useVampStore(), 'setAttachment').mockResolvedValue(undefined)
 
     const { addFile } = useVampFileUpload()
     addFile(makeFile('cover.png', 'image/png', 1024), { vampId: 'vamp1', orgId: 'org1', createdBy: 'user1' })
@@ -163,7 +163,7 @@ describe('useVampFileUpload', () => {
 
   it('rejects a file >= VAMP_FILE_MAX_BYTES with no upload started', () => {
     mockUploadBytesResumable.mockReturnValue(makeTask('unused'))
-    vi.spyOn(useVampStore(), 'updateVamp').mockResolvedValue(undefined)
+    vi.spyOn(useVampStore(), 'setAttachment').mockResolvedValue(undefined)
 
     const { uploads, addFile } = useVampFileUpload()
     const bigFile = makeFile('huge.mp3', 'audio/mpeg', VAMP_FILE_MAX_BYTES)
@@ -178,7 +178,7 @@ describe('useVampFileUpload', () => {
   it('sets an error row when the upload task itself errors', async () => {
     const task = makeTask('unused')
     mockUploadBytesResumable.mockReturnValue(task)
-    vi.spyOn(useVampStore(), 'updateVamp').mockResolvedValue(undefined)
+    vi.spyOn(useVampStore(), 'setAttachment').mockResolvedValue(undefined)
 
     const { uploads, addFile } = useVampFileUpload()
     addFile(makeFile('track.mp3', 'audio/mpeg', 2048), { vampId: 'vamp1', orgId: 'org1', createdBy: 'user1' })
@@ -191,7 +191,7 @@ describe('useVampFileUpload', () => {
 
   it('reset() empties the uploads list', () => {
     mockUploadBytesResumable.mockReturnValue(makeTask('unused'))
-    vi.spyOn(useVampStore(), 'updateVamp').mockResolvedValue(undefined)
+    vi.spyOn(useVampStore(), 'setAttachment').mockResolvedValue(undefined)
 
     const { uploads, addFile, reset } = useVampFileUpload()
     addFile(makeFile('track.mp3', 'audio/mpeg', 2048), { vampId: 'vamp1', orgId: 'org1', createdBy: 'user1' })
@@ -217,7 +217,7 @@ describe('useVampFileUpload', () => {
     const task = makeTask('unused')
     mockUploadBytesResumable.mockReturnValue(task)
     mockGetDownloadURL.mockResolvedValue('https://cdn.example.com/track.mp3')
-    const updateVampSpy = vi.spyOn(useVampStore(), 'updateVamp').mockResolvedValue(undefined)
+    const setAttachmentSpy = vi.spyOn(useVampStore(), 'setAttachment').mockResolvedValue(undefined)
 
     const { addFile } = useVampFileUpload()
     addFile(makeFile('track.mp3', 'audio/mpeg', 2048), { vampId: 'vamp1', orgId: 'org1', createdBy: 'user1' })
@@ -225,9 +225,9 @@ describe('useVampFileUpload', () => {
     await new Promise((resolve) => setTimeout(resolve, 400))
     await flushPromises()
 
-    expect(updateVampSpy).toHaveBeenCalledOnce()
-    const [, payload] = updateVampSpy.mock.calls[0]!
-    const attachment = (payload as { attachment: VampAttachment }).attachment
+    expect(setAttachmentSpy).toHaveBeenCalledOnce()
+    const [, payload] = setAttachmentSpy.mock.calls[0]!
+    const attachment = payload as VampAttachment
     expect(attachment.storagePath).toBeDefined()
     expect('durationSec' in attachment ? attachment.durationSec : undefined).toBeUndefined()
   })

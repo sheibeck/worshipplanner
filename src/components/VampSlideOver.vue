@@ -461,7 +461,7 @@ function onFileInputChange(e: Event) {
 async function removeAttachment() {
   const id = effectiveId.value
   if (!id) return
-  await vampStore.updateVamp(id, { attachment: null })
+  await vampStore.removeAttachment(id)
 }
 
 function togglePlay() {

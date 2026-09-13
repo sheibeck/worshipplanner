@@ -179,7 +179,7 @@ export function useVampFileUpload(): UseVampFileUploadReturn {
               createdAt: Timestamp.now(),
               createdBy: ctx.createdBy,
             }
-            await useVampStore().updateVamp(ctx.vampId, { attachment })
+            await useVampStore().setAttachment(ctx.vampId, attachment)
             removeRow(rowId)
             announcement.value = `Uploaded ${file.name}.`
           })

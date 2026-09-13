@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import type { VampAttachment } from '@/types/vamp'
 
 // Track onSnapshot callbacks and unsubscribe fns
 let snapshotCallback: ((snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void) | null = null
@@ -266,6 +267,78 @@ describe('useVampStore', () => {
       expect(consoleSpy).toHaveBeenCalled()
       expect(deleteDoc).toHaveBeenCalledOnce()
       consoleSpy.mockRestore()
+    })
+  })
+
+  describe('setAttachment / removeAttachment (WR-02)', () => {
+    const existing = {
+      storagePath: 'orgs/org-1/vamp-files/vamp-1/u1/old.mp3',
+      downloadUrl: 'https://cdn.example.com/old.mp3',
+      fileName: 'old.mp3',
+      mimeType: 'audio/mpeg',
+      sizeBytes: 1024,
+      createdAt: { seconds: 1, nanoseconds: 0 } as unknown as VampAttachment['createdAt'],
+      createdBy: 'user-1',
+    } satisfies VampAttachment
+
+    it('removeAttachment nulls the slot then deletes the superseded Storage object', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { deleteObject } = await import('firebase/storage')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeVamp({ attachment: existing })])
+
+      await store.removeAttachment('vamp-1')
+
+      const [, payload] = (updateDoc as ReturnType<typeof vi.fn>).mock.calls[0]!
+      expect((payload as { attachment: unknown }).attachment).toBeNull()
+      expect(deleteObject).toHaveBeenCalledOnce()
+      const [ref] = (deleteObject as ReturnType<typeof vi.fn>).mock.calls[0]!
+      expect((ref as { path: string }).path).toBe(existing.storagePath)
+    })
+
+    it('setAttachment with a replacement deletes only the previous object', async () => {
+      const { deleteObject } = await import('firebase/storage')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeVamp({ attachment: existing })])
+
+      await store.setAttachment('vamp-1', { ...existing, storagePath: 'orgs/org-1/vamp-files/vamp-1/u2/new.mp3', fileName: 'new.mp3' })
+
+      expect(deleteObject).toHaveBeenCalledOnce()
+      const [ref] = (deleteObject as ReturnType<typeof vi.fn>).mock.calls[0]!
+      expect((ref as { path: string }).path).toBe(existing.storagePath)
+    })
+
+    it('setAttachment skips deleteObject when there was no previous attachment', async () => {
+      const { deleteObject } = await import('firebase/storage')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeVamp({ attachment: null })])
+
+      await store.setAttachment('vamp-1', existing)
+
+      expect(deleteObject).not.toHaveBeenCalled()
+    })
+
+    it('a failed Storage delete is logged and never rejects the write', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { deleteObject } = await import('firebase/storage')
+      ;(deleteObject as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('boom'))
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeVamp({ attachment: existing })])
+
+      await expect(store.removeAttachment('vamp-1')).resolves.toBeUndefined()
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      expect(errorSpy).toHaveBeenCalled()
+      errorSpy.mockRestore()
     })
   })
 

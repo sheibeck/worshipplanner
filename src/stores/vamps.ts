@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore'
 import { ref as storageRef, deleteObject } from 'firebase/storage'
 import { db, storage } from '@/firebase'
-import type { Vamp, UpsertVampInput } from '@/types/vamp'
+import type { Vamp, VampAttachment, UpsertVampInput } from '@/types/vamp'
 
 /** R435/R436 — org-scoped Vamps library store. Narrowed mirror of
  * songs.ts: no legacy-field normalization, no tag/VW-type/import machinery,
@@ -68,6 +68,25 @@ export const useVampStore = defineStore('vamps', () => {
     })
   }
 
+  // Single-slot write. The superseded Storage object is deleted best-effort
+  // AFTER the doc write (logged, never blocking) — mirrors removeSongAttachment.
+  async function setAttachment(id: string, attachment: VampAttachment | null) {
+    if (!orgId.value) return
+    const previousPath = vamps.value.find((v) => v.id === id)?.attachment?.storagePath
+    await updateVamp(id, { attachment })
+    if (previousPath && previousPath !== attachment?.storagePath) {
+      try {
+        await deleteObject(storageRef(storage, previousPath))
+      } catch (err) {
+        console.error(`setAttachment: failed to delete Storage object ${previousPath}:`, err)
+      }
+    }
+  }
+
+  function removeAttachment(id: string) {
+    return setAttachment(id, null)
+  }
+
   // Single-step hard delete (locked decision — no soft-delete/restore). The
   // Storage cascade is best-effort: a failed deleteObject is logged and
   // never aborts the doc delete, mirroring hardDeleteSong's convention.
@@ -102,6 +121,8 @@ export const useVampStore = defineStore('vamps', () => {
     unsubscribeAll,
     addVamp,
     updateVamp,
+    setAttachment,
+    removeAttachment,
     deleteVamp,
   }
 })
