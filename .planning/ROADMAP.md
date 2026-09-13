@@ -934,13 +934,13 @@ UAT gate.
 criteria 2-3's output-window wording — vamp audio plays ONLY from the Run control window; Audience,
 Confidence and Video are all silent via `suppressAudio`. No cross-window audio-unlock handshake is built.
 
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 
 Plans:
 **Wave 1**
 
 - [x] 141-01-PLAN.md — R437 editor assignment (Wave 1): `GroupSlideEntry.vampId`/`vampLabel`, `VampPicker.vue`, EditSlideDrawer assign/change/clear + stale hint, `useVampStore` subscribe inside ServiceEditorView's editor gate
-- [ ] 141-02-PLAN.md — R438 output silence (Wave 1): `SlideCanvas.suppressAudio` (mirrors `suppressBackground`) hardcoded true at all four output-tier SlideCanvas mounts
+- [x] 141-02-PLAN.md — R438 output silence (Wave 1): `SlideCanvas.suppressAudio` (mirrors `suppressBackground`) hardcoded true at all four output-tier SlideCanvas mounts
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
