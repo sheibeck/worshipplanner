@@ -5,16 +5,16 @@ milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
 current_phase: 140
 current_phase_name: Vamps Library — CRUD & Storage
 status: executing
-stopped_at: Completed 140-02-PLAN.md (storage rules + rules-test proofs); ready for 140-03 (Vamps UI)
-last_updated: "2026-09-13T17:32:55.983Z"
+stopped_at: Completed 140-03-PLAN.md (Vamps UI — tab bar, table, slide-over); Phase 140 (Vamps Library CRUD & Storage) complete, all 3 plans executed
+last_updated: "2026-09-13T18:04:10.283Z"
 last_activity: 2026-09-13
 last_activity_desc: Phase 140 execution started
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 7
-  completed_plans: 6
-  percent: 50
+  completed_plans: 7
+  percent: 75
 ---
 
 ## Deferred Verification (v2.15 — ACTIVE, batched to milestone end)
@@ -1418,7 +1418,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 140 (Vamps Library — CRUD & Storage) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-13 — Phase 140 execution started
 
@@ -3724,6 +3724,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 139 P01 | 21min | 3 tasks | 8 files |
 | Phase 140 P01 | 45min | 3 tasks | 10 files |
 | Phase 140 P02 | 35min | 2 tasks | 3 files |
+| Phase 140 P03 | 90min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -4340,6 +4341,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 140-01: Vamps client/data foundation — single-step hard delete, separate 12-key VAMP_KEYS constant, plain updateVamp attachment writes (no arrayUnion), per-upload-id Storage path for replace-safety, best-effort non-blocking duration capture
 - [Phase ?]: Task 1 (vamp-files storage.rules block + catch-all widening) landed in a prior interrupted session (cee31f3d); verified against plan spec rather than redone in this session
 - [Phase ?]: src/rules.test.ts proves the existing generic Firestore catch-all already covers organizations/{orgId}/vamps with zero firestore.rules changes
+- [Phase ?]: VampSlideOver create-save does not emit 'saved' — only update-save does — so the drawer stays open for the create->edit MP3-attach transition
+- [Phase ?]: Songs tab content wrapped in v-show (not v-if) to preserve SongTable sort/scroll state across a Songs|Vamps tab switch
 
 ### Roadmap Evolution
 
@@ -4676,8 +4679,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-13T17:32:55.890Z
-Stopped at: Completed 140-02-PLAN.md (storage rules + rules-test proofs); ready for 140-03 (Vamps UI)
+Last session: 2026-09-13T18:04:10.213Z
+Stopped at: Completed 140-03-PLAN.md (Vamps UI — tab bar, table, slide-over); Phase 140 (Vamps Library CRUD & Storage) complete, all 3 plans executed
 Resume file: None
 
 ## Operator Next Steps
