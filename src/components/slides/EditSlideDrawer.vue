@@ -277,22 +277,42 @@
                  now (the slide's own audio wins over the group bed, D-10).
                  Rendered regardless of isEditor so a viewer still hears/sees
                  what's attached — only the Remove control below is gated. -->
-            <div v-if="audioState" class="rounded-md bg-gray-800 border border-gray-700 p-2" data-testid="audio-file-row">
+            <div
+              v-if="audioState"
+              class="rounded-md bg-gray-800 border border-gray-700 p-2"
+              :data-testid="isVampAssigned ? 'vamp-assigned-row' : 'audio-file-row'"
+            >
               <div class="flex flex-wrap items-center gap-1.5">
-                <span class="min-w-0 flex-1 truncate text-[13px] text-gray-200" data-testid="audio-file-name">{{ attachedAudioFileName }}</span>
-                <!-- The shared AudioPlayer does not preload and reports no
-                     duration today (26-UI-SPEC.md § Slide Audio) — this stays
-                     unset rather than a placeholder/zero; see the ref's own
-                     comment below. -->
-                <span v-if="audioDurationText" class="text-[11px] text-gray-500" data-testid="audio-duration">{{ audioDurationText }}</span>
-                <span v-if="audioFailed" class="text-[11px] font-medium text-red-400" data-testid="audio-unavailable">Unavailable</span>
-                <button
-                  v-if="canMutate"
-                  type="button"
-                  class="text-xs text-gray-500 hover:text-red-400 transition-colors"
-                  data-testid="audio-remove"
-                  @click="onRemoveAudio"
-                >Remove</button>
+                <!-- R437 — a vamp-assigned entry shows the denormalized label + Change/Clear instead of the file/Remove cluster. -->
+                <template v-if="isVampAssigned">
+                  <span class="min-w-0 flex-1 truncate text-[13px] text-gray-200" data-testid="vamp-assigned-label" :title="assignedVampLabel">Vamp: {{ assignedVampLabel }}</span>
+                  <span v-if="vampStale" class="text-[11px] text-gray-500" data-testid="vamp-assigned-stale">(no longer in library)</span>
+                  <button v-if="canMutate" type="button" class="text-xs font-medium text-indigo-400 hover:text-indigo-300 shrink-0" data-testid="vamp-change" @click="openVampPicker">Change</button>
+                  <button v-if="canMutate" type="button" class="text-xs text-gray-500 hover:text-red-400 transition-colors shrink-0" data-testid="vamp-clear" @click="clearVampAssignment">Clear</button>
+                </template>
+                <template v-else>
+                  <span class="min-w-0 flex-1 truncate text-[13px] text-gray-200" data-testid="audio-file-name">{{ attachedAudioFileName }}</span>
+                  <!-- The shared AudioPlayer does not preload and reports no
+                       duration today (26-UI-SPEC.md § Slide Audio) — this stays
+                       unset rather than a placeholder/zero; see the ref's own
+                       comment below. -->
+                  <span v-if="audioDurationText" class="text-[11px] text-gray-500" data-testid="audio-duration">{{ audioDurationText }}</span>
+                  <span v-if="audioFailed" class="text-[11px] font-medium text-red-400" data-testid="audio-unavailable">Unavailable</span>
+                  <button
+                    v-if="canMutate"
+                    type="button"
+                    class="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+                    data-testid="vamp-picker-open"
+                    @click="openVampPicker"
+                  >Choose a vamp</button>
+                  <button
+                    v-if="canMutate"
+                    type="button"
+                    class="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                    data-testid="audio-remove"
+                    @click="onRemoveAudio"
+                  >Remove</button>
+                </template>
               </div>
               <p v-if="audioState === 'group'" class="mt-1 text-[11px] text-gray-500" data-testid="audio-shared-caption">Shared with every other slide in this group</p>
               <!-- See ADR-0104 (docs/adr/0104-this-drawer-s-own-failure-state-26-research-md-pitfall-6.md) -->
@@ -313,6 +333,7 @@
                   class="text-[11px] text-gray-400 file:mr-1 file:rounded file:border-0 file:bg-gray-700 file:px-2 file:py-0.5 file:text-gray-200 w-40"
                   @change="onAudioFileSelected"
                 />
+                <button type="button" class="text-xs font-medium text-indigo-400 hover:text-indigo-300" data-testid="vamp-picker-open" @click="openVampPicker">Choose a vamp</button>
               </div>
             </div>
 
@@ -320,6 +341,15 @@
               Uploading... {{ Math.round(audioUploadProgress) }}%
             </p>
             <p v-if="audioUploadError" data-testid="audio-upload-error" class="mt-1 text-[11px] text-red-400">{{ audioUploadError }}</p>
+
+            <!-- R437 — inline picker, mounted below the row/attach block. -->
+            <VampPicker
+              v-if="vampPickerOpen && canMutate"
+              :vamps="vampStore.vamps"
+              :loading="vampStore.isLoading"
+              :selected-vamp-id="props.entry?.vampId ?? null"
+              @select="onVampSelected"
+            />
 
             <!-- Loop (D-11): meaningful only where audio actually plays —
                  omitted entirely in the "nothing attached" state. -->
@@ -483,8 +513,10 @@ import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide, CongregationalSection } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+import type { Vamp } from '@/types/vamp'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useAuthStore } from '@/stores/auth'
+import { useVampStore } from '@/stores/vamps'
 import { cssVarsFor } from '@/utils/slideTypography'
 import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel, backgroundImageLabel, deleteSlideConfirmBody, speakerDisplayName } from './slideDisplay'
 import { congregationalSectionFromRef } from '@/utils/scripture'
@@ -492,6 +524,7 @@ import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import { useBackgroundUpload } from '@/composables/useBackgroundUpload'
 import AudioPlayer from '../AudioPlayer.vue'
+import VampPicker from '../VampPicker.vue'
 
 const props = withDefaults(defineProps<{
   open: boolean
@@ -540,6 +573,7 @@ const emit = defineEmits<{
 
 const slideGroupsStore = useSlideGroups()
 const authStore = useAuthStore()
+const vampStore = useVampStore()
 
 /**
  * R093 (46-04) — this drawer's ONE CSS-variable wrapper (key_links: three
@@ -853,8 +887,72 @@ watch(
   () => props.entry?.id,
   () => {
     audioFailed.value = false
+    vampPickerOpen.value = false
   },
 )
+
+// ── R437 (141-01): vamp assignment — Choose a vamp / Change / Clear ────────
+
+const vampPickerOpen = ref(false)
+
+/** A vamp is "assigned" only while its denormalized audioUrl is actually what's covering the slide (D-10 precedence). */
+const isVampAssigned = computed(() => audioState.value === 'slide' && !!props.entry?.vampId)
+const assignedVampLabel = computed(() => props.entry?.vampLabel ?? '')
+/** `!isLoading` guard prevents a false stale flash before the first snapshot, and keeps the hint off for a viewer whose store never subscribes (RESEARCH Pitfall 2). */
+const vampStale = computed(
+  () => isVampAssigned.value && !vampStore.isLoading && !vampStore.vamps.some((v) => v.id === props.entry?.vampId),
+)
+
+function openVampPicker(): void {
+  if (!canMutate.value) return
+  vampPickerOpen.value = true
+}
+
+function closeVampPicker(): void {
+  vampPickerOpen.value = false
+}
+
+/** Denormalizes the vamp's MP3 into this entry's own audioUrl/audioLoop (R437) through the same fresh-base helper attachSlideAudio uses. */
+async function attachVampToSlide(vamp: Vamp): Promise<void> {
+  if (!canMutate.value) return
+  if (!props.group || !props.entry || !vamp.attachment?.downloadUrl) return
+  const downloadUrl = vamp.attachment.downloadUrl
+  const label = `${vamp.name} · ${vamp.key}`
+  const entry = props.entry
+  // Idempotent: re-selecting the already-assigned vamp issues no write.
+  if (entry.vampId === vamp.id && entry.audioUrl === downloadUrl && entry.audioLoop === true && entry.vampLabel === label) {
+    return
+  }
+  const entryId = entry.id
+  const base = props.group.slides
+  const next = base.map((e) =>
+    e.id === entryId ? { ...e, audioUrl: downloadUrl, audioLoop: true, vampId: vamp.id, vampLabel: label } : e,
+  )
+  await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
+}
+
+/** Removes the vamp assignment AND its denormalized audio in one write — `delete` on a copy, never `undefined` (mirrors removeSlideAudio). */
+async function clearVampAssignment(): Promise<void> {
+  if (!canMutate.value) return
+  if (!props.group || !props.entry) return
+  const entryId = props.entry.id
+  const base = props.group.slides
+  const next = base.map((e) => {
+    if (e.id !== entryId) return e
+    const rest = { ...e }
+    delete rest.vampId
+    delete rest.vampLabel
+    delete rest.audioUrl
+    delete rest.audioLoop
+    return rest
+  })
+  await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
+}
+
+async function onVampSelected(vamp: Vamp): Promise<void> {
+  await attachVampToSlide(vamp)
+  closeVampPicker()
+}
 
 const {
   progress: audioUploadProgress,
