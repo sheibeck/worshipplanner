@@ -530,4 +530,20 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
     await vi.advanceTimersByTimeAsync(0)
     expect(wrapper.findAll('audio').length).toBeLessThanOrEqual(1)
   })
+
+  it('badge (R438): current shows the full label on slide a, next is absent on slide b (no vampId); after advancing, current is absent and next shows the label-less "♪ Vamp" (entry-c)', async () => {
+    const { wrapper } = mountView()
+    await rehearseFake(wrapper)
+
+    expect(wrapper.find('[data-testid="run-current-vamp-badge"]').text()).toBe(
+      '♪ Vamp: Open Response · G',
+    )
+    expect(wrapper.find('[data-testid="run-next-vamp-badge"]').exists()).toBe(false)
+
+    keydown('ArrowRight') // a -> b
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(wrapper.find('[data-testid="run-current-vamp-badge"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-next-vamp-badge"]').text()).toBe('♪ Vamp')
+  })
 })

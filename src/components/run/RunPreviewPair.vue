@@ -43,6 +43,9 @@
           ></span>
           {{ rehearsing ? 'Rehearsing' : 'LIVE' }}
         </span>
+        <!-- R438 (Phase 141) — denormalized vamp label, resolved by useRunControl
+             via groupsBySlotId; never read off the assembled slide. -->
+        <span v-if="currentVampLabel != null" data-testid="run-current-vamp-badge" class="inline-flex items-center gap-1.5 rounded-full bg-gray-900/80 px-2.5 py-1 text-xs font-medium text-violet-300 max-w-[220px] truncate" :title="currentVampLabel">♪ Vamp{{ currentVampLabel ? ': ' + currentVampLabel : '' }}</span>
       </div>
       <div
         ref="currentBox"
@@ -55,7 +58,9 @@
           class="absolute left-0 top-0"
           :style="stageStyle(currentScale)"
         >
-          <SlideCanvas :slide="current" :interactive="false" />
+          <!-- Phase 141 — previews are thumbnails; the control window's single
+               AudioPlayer (RunControlView) is the only audio owner. -->
+          <SlideCanvas :slide="current" :interactive="false" :suppress-audio="true" />
         </div>
         <div
           v-else
@@ -87,8 +92,10 @@
          now sized to a matching (even-split) box. "End of service" when next
          is null. -->
     <div data-testid="run-next-pane">
-      <div class="mb-2 flex items-center">
+      <div class="mb-2 flex items-center gap-2">
         <span class="text-xs font-semibold text-gray-400">Next up</span>
+        <!-- R438 (Phase 141) — see the current-pane badge above for provenance. -->
+        <span v-if="nextVampLabel != null" data-testid="run-next-vamp-badge" class="inline-flex items-center gap-1.5 rounded-full bg-gray-900/80 px-2.5 py-1 text-xs font-medium text-violet-300 max-w-[220px] truncate" :title="nextVampLabel">♪ Vamp{{ nextVampLabel ? ': ' + nextVampLabel : '' }}</span>
       </div>
       <div
         ref="nextBox"
@@ -100,7 +107,9 @@
           class="absolute left-0 top-0"
           :style="stageStyle(nextScale)"
         >
-          <SlideCanvas :slide="next" :interactive="false" />
+          <!-- Phase 141 — previews are thumbnails; the control window's single
+               AudioPlayer (RunControlView) is the only audio owner. -->
+          <SlideCanvas :slide="next" :interactive="false" :suppress-audio="true" />
         </div>
         <div
           v-else
@@ -136,6 +145,11 @@ defineProps<{
   /** True when the operator has blacked out the outputs — the On-screen (program)
    *  preview shows a BLACK overlay so the projectionist sees the audience is black. */
   blackout?: boolean
+  /** R438 — denormalized vamp label resolved by useRunControl via groupsBySlotId;
+   *  '' = assigned without a label (UI-SPEC E6 partial); null/undefined = no badge. */
+  currentVampLabel?: string | null
+  /** R438 — same contract as currentVampLabel, for the Next-up pane. */
+  nextVampLabel?: string | null
 }>()
 
 /** The inline style for a scale-to-fit stage: fixed reference size, scaled down

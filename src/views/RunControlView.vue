@@ -263,7 +263,15 @@
              a slot under each; the filmstrip keeps its own horizontal scroll so
              it stays usable in the left column. `rehearsing` makes the
              On-screen tag/ring read yellow "Rehearsing" in rehearse mode. -->
-        <RunPreviewPair :current="current" :next="next" :live="live" :rehearsing="rehearsing" :blackout="blackout">
+        <RunPreviewPair
+          :current="current"
+          :next="next"
+          :live="live"
+          :rehearsing="rehearsing"
+          :blackout="blackout"
+          :currentVampLabel="currentVampLabel"
+          :nextVampLabel="nextVampLabel"
+        >
           <template #under-current>
             <RunFilmstrip
               :slides="filmstripSlides"
