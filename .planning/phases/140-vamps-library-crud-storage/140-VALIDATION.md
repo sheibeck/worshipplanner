@@ -1,9 +1,9 @@
 ---
 phase: 140
 slug: vamps-library-crud-storage
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-09-09
 ---
 
@@ -39,7 +39,15 @@ Type-check gate: `npm run type-check` (vue-tsc --build).
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | Status |
 |---------|------|------|-------------|-----------|-------------------|--------|
-| _seeded by planner_ | — | — | R435, R436 | unit/rules | `npx vitest run` | ⬜ pending |
+| 140-01 T1 | 01 | 1 | R435 | unit | `npx vitest run src/utils/__tests__/vampFiles.test.ts` (6) | ✅ green |
+| 140-01 T2 | 01 | 1 | R435 | unit | `npx vitest run src/stores/__tests__/vamps.test.ts src/stores/__tests__/orgScopedStores.test.ts` (21 + 1) | ✅ green |
+| 140-01 T3 | 01 | 1 | R435 | unit | `npx vitest run src/composables/__tests__/useVampFileUpload.test.ts` (10) | ✅ green |
+| 140-02 T1 | 02 | 1 | R435 | rules (emulator) | `npm run test:rules` — storage.rules vamp-files block + catch-all exclusion | ✅ green (310/310) |
+| 140-02 T2 | 02 | 1 | R435 | rules (emulator) | `npm run test:rules` — 11 vamp-files cases + vamps Firestore catch-all cases | ✅ green (310/310) |
+| 140-03 T1 | 03 | 2 | R436 | component | `npx vitest run src/components/__tests__/VampTable.test.ts` (8) | ✅ green |
+| 140-03 T2 | 03 | 2 | R435, R436 | component | `npx vitest run src/components/__tests__/VampSlideOver.test.ts` (7) | ✅ green |
+| 140-03 T3 | 03 | 2 | R436 | view | `npx vitest run src/views/__tests__/SongsView.test.ts` (8) | ✅ green |
+| review fixes CR-01/WR-01/WR-02 | — | — | R435, R436 | unit/component | covered by the files above (+9 tests added in fix commits) | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -47,14 +55,14 @@ Type-check gate: `npm run type-check` (vue-tsc --build).
 
 ## Wave 0 Requirements
 
-- [ ] `src/stores/__tests__/vamps.test.ts` — vamps store CRUD (create/update/delete, per-org subscribe),
+- [x] `src/stores/__tests__/vamps.test.ts` — vamps store CRUD (create/update/delete, per-org subscribe),
   mirroring the songs store test — R435.
-- [ ] `src/utils/__tests__/vampFiles.test.ts` — `vampFileStoragePath` (incl. the per-upload-id segment that
+- [x] `src/utils/__tests__/vampFiles.test.ts` — `vampFileStoragePath` (incl. the per-upload-id segment that
   avoids the immutable-rule replace collision), size cap (≤50 MB), mime allow-list (`audio/mpeg`) — R435.
-- [ ] `storage.rules` vamp-files allow/deny cases (editor create/read/delete allowed; non-editor denied;
+- [x] `storage.rules` vamp-files allow/deny cases (editor create/read/delete allowed; non-editor denied;
   non-mp3 / oversize denied). NOTE: storage.rules is now claim-only (2026-08-12), so allow-cases pass in the
   emulator — NO expected-local-failure annotations needed (unlike the historical song-files note) — R435.
-- [ ] Church-switch safety: `useVampStore` registered in `resetOrgScopedStores()` — a store-reset test or
+- [x] Church-switch safety: `useVampStore` registered in `resetOrgScopedStores()` — a store-reset test or
   assertion.
 
 *Final list finalized by the planner.*
@@ -74,11 +82,21 @@ Type-check gate: `npm run type-check` (vue-tsc --build).
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** validated 2026-09-13 (autonomous run; manual-only rows batched to v2.15-DEFERRED-VERIFICATION.md)
+
+## Validation Audit 2026-09-13
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+All 4 Wave 0 requirements landed with green tests (61 app-side tests in 7 files; rules suite 310/310 with the emulator). Type-check clean. Manual-only rows unchanged.
