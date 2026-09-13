@@ -238,7 +238,7 @@
         <!-- Vamps tab content (140-03, R435/R436) -->
         <div v-show="activeTab === 'vamps'">
           <VampTable
-            :vamps="vampStore.filteredVamps"
+            :vamps="vampStore.vamps"
             :loading="vampStore.isLoading"
             @select="onSelectVamp"
             @add="onAddVamp"

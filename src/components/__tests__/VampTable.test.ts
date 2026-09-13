@@ -31,8 +31,14 @@ function makeVamp(overrides: Partial<Vamp> = {}): Vamp {
   }
 }
 
-function mountTable(vamps: Vamp[] = [makeVamp()], loading = false) {
-  mockFilteredVamps = vamps
+// WR-01/IN-01: `filteredVamps` defaults to `vamps` (the common case, no
+// active search) but a caller can pass a different `filteredVamps` to
+// actually exercise the "prop = library total, store = search-narrowed"
+// contract — a no-match search is exactly `vamps` non-empty and
+// `filteredVamps` empty, which the old always-equal helper could never
+// produce.
+function mountTable(vamps: Vamp[] = [makeVamp()], loading = false, filteredVamps: Vamp[] = vamps) {
+  mockFilteredVamps = filteredVamps
   return mount(VampTable, { props: { vamps, loading } })
 }
 
@@ -118,5 +124,41 @@ describe('VampTable', () => {
     expect(addButton).toBeTruthy()
     await addButton!.trigger('click')
     expect(wrapper.emitted('add')).toBeTruthy()
+  })
+
+  // WR-01/IN-01: a non-empty library (props.vamps) with a search that
+  // matches nothing (store.filteredVamps === []) must show "No vamps match
+  // your search.", NOT the "Your vamp library is empty" CTA — the two
+  // states collapsed into one when SongsView.vue passed the already-
+  // filtered list as the `vamps` prop.
+  it('shows "No vamps match your search." (not the empty-library CTA) when vamps is non-empty but filteredVamps is empty', () => {
+    const vamps = [makeVamp({ id: 'v1' }), makeVamp({ id: 'v2' })]
+    const wrapper = mountTable(vamps, false, [])
+
+    expect(wrapper.text()).toContain('No vamps match your search.')
+    expect(wrapper.text()).not.toContain('Your vamp library is empty')
+  })
+
+  it('the sub-head reports the library total, not the filtered count, while a search is active', () => {
+    const vamps = [
+      makeVamp({ id: 'v1', attachment: null }),
+      makeVamp({
+        id: 'v2',
+        attachment: {
+          storagePath: 'orgs/org-1/vamp-files/v2/u1/track.mp3',
+          downloadUrl: 'https://example.com/track.mp3',
+          fileName: 'track.mp3',
+          mimeType: 'audio/mpeg',
+          sizeBytes: 100,
+          createdAt: {} as never,
+          createdBy: 'user-1',
+        },
+      }),
+    ]
+    // Search narrows to just v2 — the sub-head must still read the library
+    // totals (2 vamps · 1 with audio), not the filtered totals (1 · 1).
+    const wrapper = mountTable(vamps, false, [vamps[1]!])
+
+    expect(wrapper.get('[data-testid="vamp-subhead"]').text()).toBe('2 vamps · 1 with audio')
   })
 })
