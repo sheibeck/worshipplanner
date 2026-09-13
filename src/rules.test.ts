@@ -104,6 +104,33 @@ describe('Cross-org isolation', () => {
   })
 })
 
+// Phase 140 (R435/140-RESEARCH.md Pitfall 4): proves the EXISTING generic
+// nested-collection catch-all (firestore.rules' `match /{collection}/{docId}`
+// under organizations/{orgId}) already covers organizations/{orgId}/vamps/{id}
+// with ZERO firestore.rules changes -- this is a TEST, not a rule change.
+// Mirrors the "songs" editor-read case above and the cross-org denial case
+// immediately above it, retargeted at vamps.
+describe('Vamps collection — generic catch-all coverage (R435, Phase 140, zero rule change)', () => {
+  it('allows org editor to read/write vamps (organizations/{orgId}/vamps)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA/vamps/v1', { name: 'Intro Vamp', key: 'G' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'vamps', 'v1')))
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'vamps', 'v1'), { name: 'Intro Vamp', key: 'G' }),
+    )
+  })
+
+  it('denies cross-org read of vamps', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgB/vamps/v1', { name: 'Other Church Vamp', key: 'C' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgB', 'vamps', 'v1')))
+  })
+})
+
 describe('User profile isolation', () => {
   it('allows user to read own profile', async () => {
     const context = testEnv.authenticatedContext('userA')

@@ -504,6 +504,113 @@ describe('storage.rules — song-files path (R364, R372, Phase 122)', () => {
   })
 })
 
+// Phase 140 (R435): vamp-files/ is a dedicated, permanent Storage prefix for
+// Vamp MP3 attachments -- sibling of song-files/ (same immutable-per-path,
+// editor-gated shape), narrowed to audio only. Claim-arm-only convention,
+// same as the song-files block above -- no members document is seeded for
+// the allow cases.
+describe('storage.rules — vamp-files path (R435, Phase 140)', () => {
+  it('allows an editor to upload an MP3 under the 50MB cap', async () => {
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/vamp-files/v1/u1/track.mp3')
+
+    await assertSucceeds(
+      uploadBytes(fileRef, SONG_FILE_UNDER_CAP_BYTES, { contentType: 'audio/mpeg' }),
+    )
+  })
+
+  it('allows a viewer to READ a vamp-files object (read is member-gated, not editor-gated)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const storage = context.storage()
+      await uploadBytes(ref(storage, 'orgs/orgA/vamp-files/v2/u1/track.mp3'), SMALL_BYTES, {
+        contentType: 'audio/mpeg',
+      })
+    })
+
+    const context = testEnv.authenticatedContext('userB', { orgId: 'orgA', role: 'viewer' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/vamp-files/v2/u1/track.mp3')
+
+    await assertSucceeds(getBytes(fileRef))
+  })
+
+  it('DENIES a viewer from uploading (write is editor-gated)', async () => {
+    const context = testEnv.authenticatedContext('userC', { orgId: 'orgA', role: 'viewer' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/vamp-files/v3/u1/track.mp3')
+
+    await assertFails(
+      uploadBytes(fileRef, SMALL_BYTES, { contentType: 'audio/mpeg' }),
+    )
+  })
+
+  it('DENIES an oversize upload even from an editor', async () => {
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/vamp-files/v4/u1/track.mp3')
+
+    await assertFails(
+      uploadBytes(fileRef, SONG_FILE_OVER_CAP_BYTES, { contentType: 'audio/mpeg' }),
+    )
+  })
+
+  // THE catch-all-OR-override regression proof (T-140-15): a SMALL non-mp3
+  // file, well under even the catch-all's 25MB cap, so the ONLY thing that
+  // can deny it is the type check reached through the catch-all's
+  // vamp-files/ exclusion -- proves the OR-combination fix, not merely the
+  // size cap (140-RESEARCH.md, mirroring 122-RESEARCH.md Pitfall 1).
+  it('DENIES a small non-MP3 upload from an editor (proves the catch-all cannot OR-override the type gate)', async () => {
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/vamp-files/v5/u1/malware.exe')
+
+    await assertFails(
+      uploadBytes(fileRef, SMALL_BYTES, { contentType: 'application/x-msdownload' }),
+    )
+  })
+
+  it('allows an editor to delete a vamp-files object', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const storage = context.storage()
+      await uploadBytes(ref(storage, 'orgs/orgA/vamp-files/v6/u1/track.mp3'), SMALL_BYTES, {
+        contentType: 'audio/mpeg',
+      })
+    })
+
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/vamp-files/v6/u1/track.mp3')
+
+    await assertSucceeds(deleteObject(fileRef))
+  })
+
+  it('DENIES a viewer from deleting a vamp-files object', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const storage = context.storage()
+      await uploadBytes(ref(storage, 'orgs/orgA/vamp-files/v7/u1/track.mp3'), SMALL_BYTES, {
+        contentType: 'audio/mpeg',
+      })
+    })
+
+    const context = testEnv.authenticatedContext('userB', { orgId: 'orgA', role: 'viewer' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/vamp-files/v7/u1/track.mp3')
+
+    await assertFails(deleteObject(fileRef))
+  })
+
+  it('DENIES a caller whose claim names a different organization (cross-org isolation)', async () => {
+    const context = testEnv.authenticatedContext('userD', { orgId: 'orgB', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/vamp-files/v8/u1/track.mp3')
+
+    await assertFails(
+      uploadBytes(fileRef, SMALL_BYTES, { contentType: 'audio/mpeg' }),
+    )
+  })
+})
+
 // SEC-ISO-02 (Phase 113): syncOrgMembershipClaimHandler's "clear" branch now
 // calls getAuth().revokeRefreshTokens(uid) on member-doc delete
 // (functions/src/orgMembershipClaims.ts, functions/src/orgMembershipClaims.test.ts
