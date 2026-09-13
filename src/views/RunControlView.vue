@@ -20,9 +20,38 @@
       :clock="clock"
       :elapsed="elapsed"
       :blackout="blackout"
+      :audioArmed="audioArmed"
+      :audioNeeded="audioNeeded"
+      :audioPlaying="audioPlaying"
+      :audioUnavailable="audioUnavailable"
       @exit="onExitRequest"
       @toggle-blackout="postBlackout(!blackout)"
+      @toggle-audio="toggleAudioArmed"
     />
+
+    <!-- R438/R439 (Phase 141) — the control window's ONE AudioPlayer, keyed on
+         the live slide's audioUrl so it rebinds ONLY when the url changes (a
+         resend/hello for the same slide never restarts playback). Zero-size +
+         aria-hidden: this is a playback device, not a visible control. -->
+    <div
+      v-if="live && current?.slide.audioUrl"
+      data-testid="run-control-audio"
+      class="h-0 w-0 overflow-hidden"
+      aria-hidden="true"
+    >
+      <AudioPlayer
+        :key="current.slide.audioUrl"
+        ref="audioElRef"
+        chromeless
+        :src="current.slide.audioUrl"
+        :loop="current.slide.audioLoop === true"
+        @autoplay-blocked="onAudioBlocked"
+        @error="onAudioError"
+        @play="onAudioPlay"
+        @pause="onAudioPause"
+        @ended="onAudioPause"
+      />
+    </div>
 
     <!-- OUTPUT-STATUS CLUSTER REMOVED (owner fix #3). The redundant top status band
          (the spinner / "Displays ready" summary / per-role closed-recovery rows /
@@ -147,6 +176,40 @@
           <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
         </svg>
       </button>
+    </div>
+
+    <!-- AUDIO BLOCKED (R439, Phase 141) — the browser rejected an armed play()
+         call. No dismiss (×): it self-clears the instant playback succeeds, so
+         it is never a stale, ignorable notice like the banners above it. -->
+    <div
+      v-if="audioBlocked"
+      data-testid="run-audio-blocked-banner"
+      class="flex-none m-4 flex items-start gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3 text-amber-200"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        class="mt-0.5 h-5 w-5 flex-none text-amber-400"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <div class="min-w-0 flex-1">
+        <p class="font-medium">Audio blocked — click to play</p>
+        <button
+          type="button"
+          data-testid="run-audio-blocked-retry"
+          class="mt-3 min-h-11 inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          @click="retryPlayAudio"
+        >
+          Play audio
+        </button>
+      </div>
     </div>
 
     <!-- 2. MAIN REGION — the order-of-service rail (both states) + State A
@@ -279,6 +342,7 @@
 import { ref, watch } from 'vue'
 import type { BroadcastChannelFactory } from '@/utils/runChannel'
 import { useRunControl } from '@/composables/useRunControl'
+import AudioPlayer from '@/components/AudioPlayer.vue'
 import RunHeader from '@/components/run/RunHeader.vue'
 import RunPreflightPanel from '@/components/run/RunPreflightPanel.vue'
 import RunRail from '@/components/run/RunRail.vue'
@@ -352,6 +416,21 @@ const {
   cancelExit,
   confirmExit,
   cancelBtnRef,
+  // control-window audio (R438/R439)
+  audioElRef,
+  audioArmed,
+  audioBlocked,
+  audioUnavailable,
+  audioPlaying,
+  audioNeeded,
+  toggleAudioArmed,
+  retryPlayAudio,
+  onAudioBlocked,
+  onAudioError,
+  onAudioPlay,
+  onAudioPause,
+  currentVampLabel,
+  nextVampLabel,
 } = useRunControl({ channelFactory: props.channelFactory })
 
 // Dismiss state for the State-A blocked/partial output banners (v2.9). Resets

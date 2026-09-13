@@ -10,6 +10,14 @@ const props = defineProps<{
   clock: string
   elapsed: string
   blackout: boolean
+  /** R439 — armed/off, drives the "Audio: Off / Armed" toggle. */
+  audioArmed?: boolean
+  /** R439 — true when Off and the live/next slide carries audio (amber pulse). */
+  audioNeeded?: boolean
+  /** R438 — true only while armed AND audio is actually sounding. */
+  audioPlaying?: boolean
+  /** R439 — a media error (e.g. a deleted file) — never a silent failure. */
+  audioUnavailable?: boolean
 }>()
 
 // Owner fix #7: green ONLY on a real go-live (live && !rehearsing).
@@ -20,6 +28,8 @@ defineEmits<{
   // Owner UAT: the blackout toggle asks the parent (single writer) to flip the
   // projector-black state — the parent calls postBlackout(!blackout).
   'toggle-blackout': []
+  // R439: the arm click asks the parent (single writer) to flip audioArmed.
+  'toggle-audio': []
 }>()
 </script>
 
@@ -64,6 +74,43 @@ defineEmits<{
          controls. This zero-width spacer keeps the right-hand cluster (blackout, exit)
          right-aligned, exactly as `.run-displays`' `margin-left:auto` did. -->
     <div class="run-header__spacer" aria-hidden="true"></div>
+
+    <!-- AUDIO ARM TOGGLE (R439, Phase 141) — the same-document click IS the
+         autoplay-policy gesture; visible whenever `live` (rehearsal included —
+         the control window plays during a rehearsal too), unlike `.run-blackout`
+         which stays `trulyLive`-only. -->
+    <button
+      v-if="live"
+      type="button"
+      class="run-audio-toggle"
+      :class="{
+        'run-audio-toggle--armed': audioArmed,
+        'run-audio-toggle--needed': !audioArmed && audioNeeded,
+      }"
+      data-testid="run-audio-toggle"
+      :aria-pressed="audioArmed ? 'true' : 'false'"
+      :aria-label="
+        audioArmed ? 'Audio armed — click to turn off' : 'Arm audio playback for this Run session'
+      "
+      @click="$emit('toggle-audio')"
+    >
+      {{ audioArmed ? 'Audio: Armed' : 'Audio: Off' }}
+      <span
+        v-if="audioPlaying"
+        class="run-audio-toggle__dot"
+        data-testid="run-audio-playing"
+        aria-hidden="true"
+      ></span>
+    </button>
+    <span
+      v-if="live && audioUnavailable"
+      data-testid="run-audio-unavailable"
+      class="text-[11px] font-medium text-red-400 whitespace-nowrap"
+      >Audio unavailable</span
+    >
+    <span class="sr-only" aria-live="polite" data-testid="run-audio-needed-prompt">{{
+      live && !audioArmed && audioNeeded ? 'This slide has audio — arm audio to hear it.' : ''
+    }}</span>
 
     <!-- BLACKOUT TOGGLE (owner UAT) — a single live-ops control replacing the old
          Black/Clear output panel. Shown ONLY when truly live (live && !rehearsing):
@@ -233,6 +280,64 @@ defineEmits<{
   color: #fff;
   border-color: rgba(255, 255, 255, 0.5);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+/* Audio arm toggle (R439) — same shape/sizing as .run-blackout, a sibling
+   live-ops pill button, PLUS a fixed min-width (E3 overflow) so toggling
+   between "Audio: Off" and "Audio: Armed" never shifts its neighbors. */
+.run-audio-toggle {
+  min-height: 44px;
+  min-width: 7.5rem;
+  padding: 0 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 8px;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.run-audio-toggle:hover {
+  border-color: var(--color-neutral-600);
+}
+.run-audio-toggle--armed {
+  border-color: #9184d9;
+  color: #9184d9;
+}
+/* Pulses amber ONLY while Off and the live/next slide carries audio (R439's
+   prompt-before-going-live signal) — never combined with --armed. */
+.run-audio-toggle--needed {
+  animation: run-audio-pulse 1.6s ease-in-out infinite;
+}
+@keyframes run-audio-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(224, 178, 60, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(224, 178, 60, 0.25);
+  }
+}
+/* Playing indicator — a small pulsing accent dot, visible only while armed
+   AND audio is actually sounding. */
+.run-audio-toggle__dot {
+  height: 6px;
+  width: 6px;
+  border-radius: 9999px;
+  background: #9184d9;
+  animation: run-audio-playing-pulse 1.2s ease-in-out infinite;
+}
+@keyframes run-audio-playing-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .run-exit {

@@ -17,6 +17,7 @@ import { useServiceAssembly } from '@/composables/useServiceAssembly'
 import { useRunTimers } from '@/composables/useRunTimers'
 import { useLoopTimer } from '@/composables/useLoopTimer'
 import { useToasts } from '@/stores/toasts'
+import { useSlideGroups } from '@/stores/slideGroups'
 import {
   openRunChannel,
   type BroadcastChannelFactory,
@@ -80,6 +81,16 @@ const DEFAULT_AUDIENCE_ASSIGNMENT: MonitorAssignment = { fingerprint: 'default-a
 const DEFAULT_CONFIDENCE_ASSIGNMENT: MonitorAssignment = { fingerprint: 'default-confidence', role: 'confidence' }
 
 /**
+ * R438/R439: the minimal shape useRunControl needs from the control window's
+ * single AudioPlayer mount — declared here (not imported from the component)
+ * so this composable stays component-free.
+ */
+export interface AudioPlayerHandle {
+  play(): Promise<void>
+  pause(): void
+}
+
+/**
  * The enriched rail row shape the rail derivation produces (RunControlView's old
  * railRows). Exported so downstream Phase 97 child components (the rail list) can
  * type their row prop against the one source of truth.
@@ -127,6 +138,10 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   // See ADR-0127 (docs/adr/0127-which-display-was-refused-when-exactly-one-of-the-two-window.md)
   const { serviceId, orgIdRef, localService, assembledSlideshow } = useServiceAssembly()
   const router = useRouter()
+  // R437 Pattern 4: the ♪ badge reads the raw GroupSlideEntry via this singleton
+  // directly — importing it here (not widening useServiceAssembly's return)
+  // keeps the blast radius to this one composable.
+  const slideGroupsStore = useSlideGroups()
 
   // Phase 104 (R309/R310) — the app-wide dismissible-message store. The
   // monitor-reassign sticky ('monitor-reassign', below) is the R310 proof
@@ -222,6 +237,104 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     index.value == null ? null : (assembledSlideshow.value[index.value + 1] ?? null),
   )
   const currentSlotIndex = computed<number | null>(() => current.value?.slotIndex ?? null)
+
+  // ── Control-window audio (R438/R439) ────────────────────────────────────────
+  // 2026-09-13 owner override (141-CONTEXT.md): the Run control window is the
+  // SINGLE audio owner — one AudioPlayer mounted in RunControlView.vue, driven
+  // imperatively off current/blackout/live, mirroring reconcileLoop's own
+  // blackout-aware watcher below (RESEARCH Pitfall 4). No cross-window message.
+  const audioElRef = ref<AudioPlayerHandle | null>(null)
+  const audioArmed = ref(false)
+  const audioBlocked = ref(false)
+  const audioUnavailable = ref(false)
+  const audioPlaying = ref(false)
+  const audioNeeded = computed(
+    () =>
+      live.value &&
+      !audioArmed.value &&
+      (!!current.value?.slide.audioUrl || !!next.value?.slide.audioUrl),
+  )
+
+  function stopAudio() {
+    audioElRef.value?.pause()
+    audioPlaying.value = false
+  }
+
+  /** Gated on armed + not-black — the only place `.play()` is ever called. */
+  function tryPlayAudio() {
+    if (!audioArmed.value || blackout.value) return
+    // AudioPlayer.vue owns the rejected-play/abort distinction via its
+    // autoplay-blocked/error emits — no catch is added here (RESEARCH Pattern 3).
+    void audioElRef.value?.play()
+  }
+
+  /** The R439 arm gesture — a same-document click that also primes playback. */
+  function toggleAudioArmed() {
+    audioArmed.value = !audioArmed.value
+    if (audioArmed.value) {
+      audioBlocked.value = false
+      tryPlayAudio()
+    } else {
+      stopAudio()
+    }
+  }
+
+  function retryPlayAudio() {
+    audioBlocked.value = false
+    tryPlayAudio()
+  }
+
+  function onAudioBlocked() {
+    audioBlocked.value = true
+    audioPlaying.value = false
+  }
+  function onAudioError() {
+    audioUnavailable.value = true
+    audioPlaying.value = false
+  }
+  function onAudioPlay() {
+    audioPlaying.value = true
+    audioBlocked.value = false
+  }
+  function onAudioPause() {
+    audioPlaying.value = false
+  }
+
+  // Multi-source: fires only when the slide IDENTITY or its audioUrl actually
+  // changes — never on a hello resend or a same-object re-assembly.
+  watch(
+    [() => current.value?.slide.id ?? null, () => current.value?.slide.audioUrl ?? null],
+    async () => {
+      audioBlocked.value = false
+      audioUnavailable.value = false
+      stopAudio()
+      await nextTick()
+      tryPlayAudio()
+    },
+  )
+  // "Go to black" pauses; clearing it resumes — mirrors reconcileLoop's own
+  // postBlackout-driven pause/resume for the loop timer.
+  watch(blackout, (v) => {
+    if (v) stopAudio()
+    else tryPlayAudio()
+  })
+
+  /**
+   * R437 Pattern 4: the ♪ badge cannot be read off AssembledSlide/Slide (the
+   * assembler deliberately never carries vamp fields) — resolve it via the raw
+   * GroupSlideEntry instead. `null` = no assignment; `''` = assigned without a
+   * label (UI-SPEC E6 partial).
+   */
+  function vampLabelFor(slide: AssembledSlide | null): string | null {
+    if (!slide?.groupId || !slide.groupSlideId) return null
+    const entry = slideGroupsStore.groupsBySlotId
+      .get(slide.groupId)
+      ?.slides.find((e) => e.id === slide.groupSlideId)
+    if (!entry?.vampId) return null
+    return entry.vampLabel ?? ''
+  }
+  const currentVampLabel = computed(() => vampLabelFor(current.value))
+  const nextVampLabel = computed(() => vampLabelFor(next.value))
 
   const rail = computed(() => (localService.value ? sortedSlotsWithIndex(localService.value) : []))
   const firstIndexBySlot = computed(() => firstAssembledIndexBySlot(assembledSlideshow.value))
@@ -989,6 +1102,11 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     live.value = false
     rehearsing.value = false
     blackout.value = false
+    // R439: arm state is never persisted — reset to Off every teardown.
+    audioArmed.value = false
+    audioBlocked.value = false
+    audioUnavailable.value = false
+    stopAudio()
     fullscreenByWindowName.value = {}
     resetElapsed()
     // Blank the projector FIRST — close the output windows before the channel
@@ -1020,6 +1138,11 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     rehearsing.value = false
     live.value = false
     blackout.value = false
+    // R439: arm state is never persisted — reset to Off every teardown.
+    audioArmed.value = false
+    audioBlocked.value = false
+    audioUnavailable.value = false
+    stopAudio()
     resetElapsed()
   }
 
@@ -1300,6 +1423,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     stopRecoveryWatchers()
     // Never leak the fullscreen-delegation message listener past teardown.
     removeFullscreenDelegation()
+    // R438: never leave audio playing past unmount.
+    stopAudio()
     handle?.close()
     document.removeEventListener('keydown', handleKeydown)
     // WR-02: never leak the mapping-refresh listeners past teardown.
@@ -1383,5 +1508,20 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     cancelExit,
     confirmExit,
     cancelBtnRef,
+    // control-window audio (R438/R439)
+    audioElRef,
+    audioArmed,
+    audioBlocked,
+    audioUnavailable,
+    audioPlaying,
+    audioNeeded,
+    toggleAudioArmed,
+    retryPlayAudio,
+    onAudioBlocked,
+    onAudioError,
+    onAudioPlay,
+    onAudioPause,
+    currentVampLabel,
+    nextVampLabel,
   }
 }
