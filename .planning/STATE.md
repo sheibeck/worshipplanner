@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.15
 milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
-current_phase: 140
-current_phase_name: Vamps Library — CRUD & Storage
-status: phase_140_executed_verification_deferred
-stopped_at: Phase 141 UI-SPEC approved; next = plan-phase 141
-last_updated: "2026-09-13T21:35:06.798Z"
+current_phase: 141
+current_phase_name: Vamp Slide Assignment & Live Playback
+status: executing
+stopped_at: Completed 141-01-PLAN.md
+last_updated: "2026-09-13T22:59:57.860Z"
 last_activity: 2026-09-13
-last_activity_desc: Phase 140 execution started
+last_activity_desc: Phase 141 execution started
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
-  percent: 75
+  total_plans: 11
+  completed_plans: 8
+  percent: 73
 ---
 
 ## Deferred Verification (v2.15 — ACTIVE, batched to milestone end)
@@ -1408,7 +1408,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 140 — Vamps Library — CRUD & Storage
+**Current focus:** Phase 141 — Vamp Slide Assignment & Live Playback
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1418,10 +1418,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 140 (Vamps Library — CRUD & Storage) — EXECUTING
-Plan: 3 of 3
+Phase: 141 (Vamp Slide Assignment & Live Playback) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-09-13 — Phase 140 execution started
+Last activity: 2026-09-13 — Phase 141 execution started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3726,6 +3726,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 140 P01 | 45min | 3 tasks | 10 files |
 | Phase 140 P02 | 35min | 2 tasks | 3 files |
 | Phase 140 P03 | 90min | 3 tasks | 6 files |
+| Phase 141 P01 | ~35min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -4344,6 +4345,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: src/rules.test.ts proves the existing generic Firestore catch-all already covers organizations/{orgId}/vamps with zero firestore.rules changes
 - [Phase ?]: VampSlideOver create-save does not emit 'saved' — only update-save does — so the drawer stays open for the create->edit MP3-attach transition
 - [Phase ?]: Songs tab content wrapped in v-show (not v-if) to preserve SongTable sort/scroll state across a Songs|Vamps tab switch
+- [Phase ?]: 141-01: vampStore.subscribe(orgId) placed inside ServiceEditorView's isEditor gate (vamps is editor-read-gated by firestore.rules' generic catch-all)
 
 ### Roadmap Evolution
 
@@ -4680,9 +4682,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-13T21:35:06.728Z
-Stopped at: Phase 141 UI-SPEC approved; next = plan-phase 141
-Resume file: .planning/phases/141-vamp-slide-assignment-live-playback/141-UI-SPEC.md
+Last session: 2026-09-13T22:59:57.785Z
+Stopped at: Completed 141-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 

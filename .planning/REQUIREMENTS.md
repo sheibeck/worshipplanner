@@ -98,7 +98,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Vamp Slide Assignment & Live Playback
 
-- [ ] **R437**: A planner can **assign a vamp to a slide** in a service. The assignment attaches the vamp's
+- [x] **R437**: A planner can **assign a vamp to a slide** in a service. The assignment attaches the vamp's
   audio to that slide (the vamp's `audioUrl` denormalized into the slide's existing per-slide audio field,
   plus a display-only `vampId` so the editor shows which vamp is assigned) and can be cleared/changed.
 
@@ -170,7 +170,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R434 | Phase 138 | Complete |
 | R435 | Phase 140 | Complete |
 | R436 | Phase 140 | Complete |
-| R437 | Phase 141 | Pending |
+| R437 | Phase 141 | Complete |
 | R438 | Phase 141 | Pending |
 | R439 | Phase 141 | Pending |
 | R440 | Phase 141 | Pending |
