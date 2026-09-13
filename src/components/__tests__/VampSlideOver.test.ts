@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import VampSlideOver from '../VampSlideOver.vue'
 import type { Vamp } from '@/types/vamp'
+import type { UploadRow } from '@/composables/useVampFileUpload'
 import { VAMP_KEYS } from '@/constants/keys'
 
 // Mirrors SongTable.test.ts's convention: mock the store modules directly
@@ -20,14 +22,23 @@ const mockVampStore = {
 }
 vi.mock('@/stores/vamps', () => ({ useVampStore: () => mockVampStore }))
 
+// CR-01: real refs (not plain { value: [] } objects) so <script setup>'s
+// template auto-unref actually reflects mutations — a plain object here
+// previously made `uploads.length`/`v-for="row in uploads"` silently
+// evaluate against an unref'd non-array and never render anything, which is
+// how the missing upload-feedback UI shipped without a failing test.
+const mockUploads = ref<UploadRow[]>([])
+const mockAnnouncement = ref('')
 const mockAddFile = vi.fn()
+const mockDismiss = vi.fn()
+const mockReset = vi.fn()
 vi.mock('@/composables/useVampFileUpload', () => ({
   useVampFileUpload: () => ({
-    uploads: { value: [] },
-    announcement: { value: '' },
+    uploads: mockUploads,
+    announcement: mockAnnouncement,
     addFile: mockAddFile,
-    dismiss: vi.fn(),
-    reset: vi.fn(),
+    dismiss: mockDismiss,
+    reset: mockReset,
   }),
 }))
 
@@ -67,6 +78,10 @@ describe('VampSlideOver', () => {
     mockUpdateVamp.mockClear()
     mockDeleteVamp.mockClear()
     mockAddFile.mockClear()
+    mockDismiss.mockClear()
+    mockReset.mockClear()
+    mockUploads.value = []
+    mockAnnouncement.value = ''
     mockVamps = []
   })
 
@@ -132,5 +147,40 @@ describe('VampSlideOver', () => {
 
     expect(mockDeleteVamp).toHaveBeenCalledWith('vamp-9')
     expect(wrapper.emitted('deleted')).toBeTruthy()
+  })
+
+  // CR-01: a rejected/failed upload must surface visibly — previously
+  // `useVampFileUpload`'s uploads/announcement were destructured-away and
+  // never rendered, so this state was invisible to the user.
+  it('renders a visible error row and the aria-live announcement for a rejected upload', () => {
+    mockUploads.value = [
+      { id: 'row-1', name: 'huge.mp3', progress: 0, status: 'rejected', message: "'huge.mp3' is too large — max 50 MB." },
+    ]
+    const wrapper = mountSlideOver(makeVamp())
+
+    expect(wrapper.find('[data-testid="vamp-mp3-upload-rows"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="vamp-mp3-upload-error"]').text()).toBe(
+      "'huge.mp3' is too large — max 50 MB.",
+    )
+  })
+
+  it('dismissing a failed upload row calls dismiss with its id', async () => {
+    mockUploads.value = [
+      { id: 'row-1', name: 'huge.mp3', progress: 0, status: 'rejected', message: 'too large' },
+    ]
+    const wrapper = mountSlideOver(makeVamp())
+
+    await wrapper.get('[data-testid="vamp-mp3-upload-dismiss"]').trigger('click')
+    expect(mockDismiss).toHaveBeenCalledWith('row-1')
+  })
+
+  // CR-01: an in-flight upload disables the drop-zone so a second click
+  // can't start a concurrent upload that races the first on updateVamp.
+  it('disables the drop-zone while an upload for this vamp is in progress', () => {
+    mockUploads.value = [{ id: 'row-1', name: 'track.mp3', progress: 40, status: 'uploading' }]
+    const wrapper = mountSlideOver(makeVamp({ attachment: null }))
+
+    const dropzone = wrapper.get('[data-testid="vamp-mp3-dropzone"]')
+    expect(dropzone.attributes('disabled')).toBeDefined()
   })
 })

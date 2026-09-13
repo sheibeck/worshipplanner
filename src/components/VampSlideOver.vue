@@ -133,8 +133,9 @@
                 <button
                   type="button"
                   data-testid="vamp-mp3-dropzone"
-                  class="w-full border-2 border-dashed rounded-lg px-6 py-8 text-center transition-colors"
+                  class="w-full border-2 border-dashed rounded-lg px-6 py-8 text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   :class="dragOver ? 'border-indigo-500 bg-indigo-950/20' : 'border-gray-700 bg-gray-800/40'"
+                  :disabled="isUploading"
                   @click="openFilePicker"
                   @dragover.prevent="dragOver = true"
                   @dragleave.prevent="dragOver = false"
@@ -202,6 +203,42 @@
                 <p v-if="playing && audioErrored" class="text-xs text-red-400 mt-1" data-testid="vamp-mp3-audio-error">
                   Couldn't play this file.
                 </p>
+              </div>
+
+              <!-- CR-01: upload progress/error/rejection feedback — mirrors
+                   SongFilesTab.vue's uploads rows + aria-live announcement,
+                   the half of useVampFileUpload's return value this drawer
+                   previously never rendered. Rendered regardless of which
+                   branch above is active (an upload can be in flight before
+                   liveAttachment exists, or a replace while it already does). -->
+              <p class="sr-only" role="status" aria-live="polite" data-testid="vamp-mp3-upload-status">
+                {{ announcement }}
+              </p>
+              <div v-if="uploads.length > 0" class="mt-2 space-y-2" data-testid="vamp-mp3-upload-rows">
+                <div
+                  v-for="row in uploads"
+                  :key="row.id"
+                  class="px-3 py-2 rounded-md bg-gray-800/60 border border-gray-800"
+                >
+                  <p class="text-sm text-gray-200 truncate" :title="row.name">{{ row.name }}</p>
+                  <div v-if="row.status === 'uploading'" class="mt-1 h-1.5 rounded-full bg-gray-800">
+                    <div class="h-1.5 rounded-full bg-indigo-500" :style="{ width: row.progress + '%' }"></div>
+                  </div>
+                  <div v-else class="flex items-center gap-2 mt-1">
+                    <span class="flex-1 text-xs text-red-400" data-testid="vamp-mp3-upload-error">{{ row.message }}</span>
+                    <button
+                      type="button"
+                      :aria-label="`Dismiss ${row.name}`"
+                      data-testid="vamp-mp3-upload-dismiss"
+                      class="p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300 shrink-0"
+                      @click="dismiss(row.id)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </div>
             </template>
           </div>
@@ -277,7 +314,7 @@ const emit = defineEmits<{
 
 const vampStore = useVampStore()
 const authStore = useAuthStore()
-const { addFile } = useVampFileUpload()
+const { addFile, uploads, announcement, dismiss, reset } = useVampFileUpload()
 
 interface FormState {
   name: string
@@ -332,6 +369,10 @@ watch(
     localId.value = null
     playing.value = false
     audioErrored.value = false
+    // CR-01: a lingering upload row/error from a previously-open vamp must
+    // not bleed into this one — the composable instance is scoped to this
+    // component instance, not per-vamp.
+    reset()
   },
   { immediate: true },
 )
@@ -383,7 +424,13 @@ async function onDelete() {
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const dragOver = ref(false)
 
+// CR-01: a vamp has exactly one MP3 slot, so any 'uploading' row belongs to
+// this vamp — block a second concurrent upload from starting and racing the
+// first on updateVamp (last-write-wins).
+const isUploading = computed(() => uploads.value.some((r) => r.status === 'uploading'))
+
 function openFilePicker() {
+  if (isUploading.value) return
   fileInputRef.value?.click()
 }
 
@@ -399,6 +446,7 @@ function attach(file: File) {
 
 function onDrop(e: DragEvent) {
   dragOver.value = false
+  if (isUploading.value) return
   const file = e.dataTransfer?.files?.[0]
   if (file) attach(file)
 }
