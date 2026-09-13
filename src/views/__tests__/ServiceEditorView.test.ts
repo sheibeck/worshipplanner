@@ -695,6 +695,23 @@ vi.mock('@/stores/quarters', () => ({
   }),
 }))
 
+// 141-01: the slide drawer's vamp picker reads useVampStore(); ServiceEditorView
+// only needs to subscribe it (inside the isEditor gate, like roster/quarters).
+// The getter lets a test pre-set an already-subscribed org.
+let mockVampsOrgId: string | null = null
+const mockVampSubscribe = vi.fn()
+vi.mock('@/stores/vamps', () => ({
+  useVampStore: () => ({
+    vamps: [],
+    isLoading: false,
+    get orgId() {
+      return mockVampsOrgId
+    },
+    subscribe: mockVampSubscribe,
+    unsubscribeAll: vi.fn(),
+  }),
+}))
+
 // Phase 79 (R229/R241/RESEARCH Pitfall 6): the team checkbox row now reads the
 // shared teams store instead of a hard-coded array. Seeded with the same 4
 // default team names the old hard-coded team-list constant carried, so the
@@ -1689,6 +1706,8 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
     mockQuarters = []
     mockRosterSubscribe.mockClear()
     mockQuartersSubscribe.mockClear()
+    mockVampsOrgId = null
+    mockVampSubscribe.mockClear()
   })
 
   it('editor: Roles tab lists seeded role assignments resolved from the quarterly schedule', async () => {
@@ -1798,6 +1817,39 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
 
     expect(mockRosterSubscribe).toHaveBeenCalledWith('org-1')
     expect(mockQuartersSubscribe).toHaveBeenCalledWith('org-1')
+  })
+
+  // ── 141-01 regression: vampStore is subscribed inside the isEditor gate ────
+  it('viewer: vamps are never subscribed (141-01)', async () => {
+    mockAuthState.isEditor = false
+
+    await mountView()
+
+    expect(mockVampSubscribe).not.toHaveBeenCalled()
+  })
+
+  it('editor: vamps are subscribed (inside the isEditor gate) once authStore.isEditor flips true after mount (141-01)', async () => {
+    mockAuthState.isEditor = false
+
+    await mountView()
+
+    expect(mockVampSubscribe).not.toHaveBeenCalled()
+
+    mockAuthState.isEditor = true
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(mockVampSubscribe).toHaveBeenCalledWith('org-1')
+    expect(mockVampSubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('editor: an already-subscribed vamp org is not re-subscribed (141-01)', async () => {
+    mockAuthState.isEditor = true
+    mockVampsOrgId = 'org-1'
+
+    await mountView()
+
+    expect(mockVampSubscribe).not.toHaveBeenCalled()
   })
 
   // ── WR-02 regression ──────────────────────────────────────────────────────────
