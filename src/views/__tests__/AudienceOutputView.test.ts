@@ -47,7 +47,7 @@ vi.mock('vue-router', () => ({
 // A stable, Firestore-free services store: the view watches `services` (initial-
 // load only), reads `orgId` to gate subscribe(), and calls unsubscribeAll() on
 // unmount. Hoisted so the vi.mock factory can reference it.
-const { serviceStoreMock, fakeSlides, slideCanvasSpies } = vi.hoisted(() => {
+const { serviceStoreMock, fakeSlides, slideCanvasSpies, canvasSuppressAudio } = vi.hoisted(() => {
   function fakeSlide(id: string): unknown {
     return {
       slide: {
@@ -76,6 +76,9 @@ const { serviceStoreMock, fakeSlides, slideCanvasSpies } = vi.hoisted(() => {
     // stub exposes, so the T-23-08 pause→nextTick→play ordering is assertable —
     // matching how the real SlideCanvas exposes play/pause via defineExpose.
     slideCanvasSpies: { play: vi.fn(), pause: vi.fn() },
+    // Phase 141 (R438) — per-instance suppressAudio values the stub records so
+    // "every output-tier SlideCanvas received suppressAudio=true" is provable.
+    canvasSuppressAudio: [] as boolean[],
   }
 })
 
@@ -114,11 +117,13 @@ vi.mock('@/components/slides/SlideCanvas.vue', async () => {
       props: {
         slide: { type: Object, required: false, default: undefined },
         interactive: { type: Boolean, default: false },
+        suppressAudio: { type: Boolean, default: false },
       },
       setup(props, { expose }) {
         // WR-01: expose the shared spies (not bare no-ops) so the parent's
         // slideCanvasRef.pause()/play() calls land on inspectable mocks.
         expose({ play: slideCanvasSpies.play, pause: slideCanvasSpies.pause })
+        canvasSuppressAudio.push(props.suppressAudio)
         return () =>
           h(
             'div',
@@ -220,6 +225,7 @@ beforeEach(() => {
   // WR-01: fresh invocationCallOrder per test for the pause→play ordering check.
   slideCanvasSpies.play.mockClear()
   slideCanvasSpies.pause.mockClear()
+  canvasSuppressAudio.length = 0
   // R278 self-fullscreen tests seed a localStorage monitor mapping; clear so each
   // test starts from a known-empty mapping (no cross-test bleed).
   localStorage.clear()
@@ -268,6 +274,21 @@ describe('AudienceOutputView — channel-driven slide (R270/R271)', () => {
     fake.emitState(0, 3)
     await flushPromises()
     expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('c')
+  })
+})
+
+describe('AudienceOutputView — suppressAudio (R438, Phase 141)', () => {
+  it('every SlideCanvas in this output receives suppressAudio=true', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(0, 1)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(true)
+
+    expect(canvasSuppressAudio.length).toBeGreaterThanOrEqual(1)
+    expect(canvasSuppressAudio.every((v) => v === true)).toBe(true)
   })
 })
 

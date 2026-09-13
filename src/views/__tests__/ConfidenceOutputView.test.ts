@@ -88,6 +88,7 @@ const { serviceStoreMock, fakeSlides, canvasRegistry } = vi.hoisted(() => {
     canvasRegistry: [] as Array<{
       slideId: string | undefined
       suppressBackground: boolean
+      suppressAudio: boolean
       interactive: boolean
       play: ReturnType<typeof vi.fn>
       pause: ReturnType<typeof vi.fn>
@@ -134,6 +135,7 @@ vi.mock('@/components/slides/SlideCanvas.vue', async () => {
       props: {
         slide: { type: Object, required: false, default: undefined },
         suppressBackground: { type: Boolean, default: false },
+        suppressAudio: { type: Boolean, default: false },
         interactive: { type: Boolean, default: false },
       },
       setup(props, { expose }) {
@@ -143,6 +145,7 @@ vi.mock('@/components/slides/SlideCanvas.vue', async () => {
         canvasRegistry.push({
           slideId: (props.slide as { slide?: { id?: string } } | undefined)?.slide?.id,
           suppressBackground: props.suppressBackground,
+          suppressAudio: props.suppressAudio,
           interactive: props.interactive,
           play,
           pause,
@@ -344,6 +347,18 @@ describe('ConfidenceOutputView — two-pane current+next render (R272)', () => {
     expect(canvasRegistry).toHaveLength(2)
     expect(canvasRegistry.every((c) => c.suppressBackground === true)).toBe(true)
     expect(canvasRegistry.every((c) => c.interactive === false)).toBe(true)
+  })
+
+  it('every SlideCanvas in this output receives suppressAudio=true (R438, Phase 141)', async () => {
+    const fake = createFakeChannel()
+    mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(1, 1)
+    await flushPromises()
+
+    expect(canvasRegistry.length).toBeGreaterThanOrEqual(2)
+    expect(canvasRegistry.every((c) => c.suppressAudio === true)).toBe(true)
   })
 })
 

@@ -40,7 +40,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
 
-const { serviceStoreMock, fakeSlides, slideCanvasSpies } = vi.hoisted(() => {
+const { serviceStoreMock, fakeSlides, slideCanvasSpies, canvasSuppressAudio } = vi.hoisted(() => {
   function fakeSlide(id: string): unknown {
     return {
       slide: {
@@ -66,6 +66,9 @@ const { serviceStoreMock, fakeSlides, slideCanvasSpies } = vi.hoisted(() => {
     },
     fakeSlides: [fakeSlide('a'), fakeSlide('b'), fakeSlide('c')],
     slideCanvasSpies: { play: vi.fn(), pause: vi.fn() },
+    // Phase 141 (R438) — per-instance suppressAudio values the stub records so
+    // "every output-tier SlideCanvas received suppressAudio=true" is provable.
+    canvasSuppressAudio: [] as boolean[],
   }
 })
 
@@ -99,9 +102,11 @@ vi.mock('@/components/slides/SlideCanvas.vue', async () => {
       props: {
         slide: { type: Object, required: false, default: undefined },
         interactive: { type: Boolean, default: false },
+        suppressAudio: { type: Boolean, default: false },
       },
       setup(props, { expose }) {
         expose({ play: slideCanvasSpies.play, pause: slideCanvasSpies.pause })
+        canvasSuppressAudio.push(props.suppressAudio)
         return () =>
           h(
             'div',
@@ -169,6 +174,7 @@ beforeEach(() => {
   mockRoute.query.org = 'org-1'
   slideCanvasSpies.play.mockClear()
   slideCanvasSpies.pause.mockClear()
+  canvasSuppressAudio.length = 0
   localStorage.clear()
 })
 
@@ -238,6 +244,21 @@ describe('VideoOutputView — shared fullscreen render (R426)', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="video-blackout"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="slide-canvas"]').text()).toBe('a')
+  })
+})
+
+describe('VideoOutputView — suppressAudio (R438, Phase 141)', () => {
+  it('every SlideCanvas in this output receives suppressAudio=true', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    fake.emitState(0, 1)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-canvas"]').exists()).toBe(true)
+
+    expect(canvasSuppressAudio.length).toBeGreaterThanOrEqual(1)
+    expect(canvasSuppressAudio.every((v) => v === true)).toBe(true)
   })
 })
 
