@@ -358,6 +358,72 @@ describe('SlideCanvas', () => {
     })
   })
 
+  // ── suppressAudio (Phase 141 — output windows are silent) ────────────────
+
+  describe('suppressAudio (Phase 141 — output windows are silent)', () => {
+    beforeEach(() => {
+      window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+      window.HTMLMediaElement.prototype.pause = vi.fn()
+    })
+
+    it('absent/false renders presentation-audio containing an <audio> element (unchanged)', async () => {
+      const wrapper = mount(SlideCanvas, { props: { slide: audioSlide('a', 'https://example.com/bed.mp3') } })
+      await flushPromises()
+
+      const audioWrapper = wrapper.find('[data-testid="presentation-audio"]')
+      expect(audioWrapper.exists()).toBe(true)
+      expect(audioWrapper.find('audio').exists()).toBe(true)
+    })
+
+    it('true renders NO presentation-audio wrapper and NO <audio> element', async () => {
+      const wrapper = mount(SlideCanvas, {
+        props: { slide: audioSlide('a', 'https://example.com/bed.mp3'), suppressAudio: true },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="presentation-audio"]').exists()).toBe(false)
+      expect(wrapper.find('audio').exists()).toBe(false)
+    })
+
+    it('true on a blackout slide with audioUrl also renders no presentation-audio', async () => {
+      const slide = blackoutSlide('a', { audioUrl: 'https://example.com/bed.mp3' })
+      const wrapper = mount(SlideCanvas, { props: { slide, suppressAudio: true } })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="presentation-audio"]').exists()).toBe(false)
+    })
+
+    it('true: exposed play() then pause() never invoke HTMLMediaElement play/pause and do not throw', async () => {
+      const wrapper = mount(SlideCanvas, {
+        props: { slide: audioSlide('a', 'https://example.com/bed.mp3'), suppressAudio: true },
+      })
+      await flushPromises()
+
+      const vm = wrapper.vm as unknown as { play: () => void; pause: () => void }
+      expect(() => {
+        vm.play()
+        vm.pause()
+      }).not.toThrow()
+      await flushPromises()
+
+      expect(window.HTMLMediaElement.prototype.play).not.toHaveBeenCalled()
+      expect(window.HTMLMediaElement.prototype.pause).not.toHaveBeenCalled()
+    })
+
+    it('toggling from true to false on a mounted canvas mounts presentation-audio (reactive gate)', async () => {
+      const wrapper = mount(SlideCanvas, {
+        props: { slide: audioSlide('a', 'https://example.com/bed.mp3'), suppressAudio: true },
+      })
+      await flushPromises()
+      expect(wrapper.find('[data-testid="presentation-audio"]').exists()).toBe(false)
+
+      await wrapper.setProps({ suppressAudio: false })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="presentation-audio"]').exists()).toBe(true)
+    })
+  })
+
   // ── Exposed play()/pause() ordering + media-error degradation ─────────────
 
   describe('media pause/play + error', () => {
