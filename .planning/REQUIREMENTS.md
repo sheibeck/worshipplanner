@@ -112,7 +112,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   that window despite browser autoplay policy; if audio is still blocked, the failure is **surfaced on the
   control screen** as a visible warning (never a silent failure with no on-screen indication).
 
-- [ ] **R440**: Deleting a vamp that is currently **assigned to one or more upcoming services' slides**
+- [x] **R440**: Deleting a vamp that is currently **assigned to one or more upcoming services' slides**
   **warns** the editor (showing how many services are affected) but **allows** the deletion; already-assigned
   slides retain their attached audio until re-materialized.
 
@@ -173,7 +173,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R437 | Phase 141 | Complete |
 | R438 | Phase 141 | Complete |
 | R439 | Phase 141 | Complete |
-| R440 | Phase 141 | Pending |
+| R440 | Phase 141 | Complete |
 
 **Coverage:**
 

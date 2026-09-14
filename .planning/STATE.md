@@ -4,17 +4,17 @@ milestone: v2.15
 milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
 current_phase: 141
 current_phase_name: Vamp Slide Assignment & Live Playback
-status: executing
-stopped_at: Completed 141-03-PLAN.md
-last_updated: "2026-09-14T00:02:52.725Z"
+status: verifying
+stopped_at: Completed 141-04-PLAN.md
+last_updated: "2026-09-14T00:32:37.219Z"
 last_activity: 2026-09-13
 last_activity_desc: Phase 141 execution started
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 9
-  percent: 75
+  completed_plans: 11
+  percent: 100
 ---
 
 ## Deferred Verification (v2.15 — ACTIVE, batched to milestone end)
@@ -72,7 +72,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1420,7 +1420,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 141 (Vamp Slide Assignment & Live Playback) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-13 — Phase 141 execution started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
@@ -3729,6 +3729,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 141 P01 | ~35min | 3 tasks | 7 files |
 | Phase 141 P02 | ~25min | 2 tasks | 7 files |
 | Phase 141 P03 | ~50min | 2 tasks | 6 files |
+| Phase 141 P04 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -4351,6 +4352,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 141-02: SlideCanvas.suppressAudio mirrors suppressBackground exactly; all four output-tier mounts hardcoded true; AudienceOutputView/VideoOutputView left untouched (delegate to FullscreenSlideOutput).
 - [Phase ?]: Control-window audio uses a multi-source watch([slideId, audioUrl]) + AudioPlayer keyed on audioUrl so a same-slide resend never restarts playback, but any slide-identity change still pauses/replays (even across same-url slides) — mirrors reconcileLoop's blackout-aware watcher
 - [Phase ?]: The ♪ Vamp badge resolves via useSlideGroups().groupsBySlotId (raw GroupSlideEntry), never AssembledSlide/Slide — the assembler stays vamp-unaware by design (141-CONTEXT.md)
+- [Phase ?]: countAssignments re-scans inside deleteVamp itself (not reusing the confirm-time UI result) — self-contained/testable at the cost of a second scan on delete; accepted per CONTEXT.md's best-effort framing
+- [Phase ?]: deleteVamp treats a failed scan identically to a proven assignment (keepAttachment = scan === null || scan.assignedAnywhere) — fail-safe toward not silently breaking a slide's audio
 
 ### Roadmap Evolution
 
@@ -4687,9 +4690,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-14T00:02:52.628Z
-Stopped at: Completed 141-03-PLAN.md
-Resume file: 141-04-PLAN.md
+Last session: 2026-09-14T00:32:37.141Z
+Stopped at: Completed 141-04-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 
