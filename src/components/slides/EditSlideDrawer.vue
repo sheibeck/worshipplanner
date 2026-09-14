@@ -927,6 +927,7 @@ async function attachVampToSlide(vamp: Vamp): Promise<void> {
   const downloadUrl = vamp.attachment.downloadUrl
   const label = `${vamp.name} · ${vamp.key}`
   const entry = props.entry
+  beginVampWrite()
   // Idempotent: re-selecting the already-assigned vamp issues no write.
   if (entry.vampId === vamp.id && entry.audioUrl === downloadUrl && entry.audioLoop === true && entry.vampLabel === label) {
     return
@@ -936,7 +937,6 @@ async function attachVampToSlide(vamp: Vamp): Promise<void> {
   const next = base.map((e) =>
     e.id === entryId ? { ...e, audioUrl: downloadUrl, audioLoop: true, vampId: vamp.id, vampLabel: label } : e,
   )
-  beginVampWrite()
   try {
     await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
   } catch (err) {

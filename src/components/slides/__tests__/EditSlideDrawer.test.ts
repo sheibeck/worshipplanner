@@ -2739,4 +2739,30 @@ describe('EditSlideDrawer (Phase 141-01 — vamp assignment)', () => {
     expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(2)
     expect(body().find('[data-testid="drawer-status"]').text()).not.toContain("Couldn't update vamp assignment")
   })
+
+  it('iter-3: re-selecting the already-assigned vamp after a failed change clears the stale banner without writing', async () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      vampId: 'vamp-1',
+      vampLabel: 'Open Response · G',
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      audioLoop: true,
+    })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    // A change to a different vamp fails and shows the banner.
+    mockReplaceGroupSlides.mockRejectedValueOnce(new Error('permission-denied'))
+    await body().find('[data-testid="vamp-change"]').trigger('click')
+    await body().find('[data-vamp-id="vamp-2"][data-testid="vamp-picker-row"]').trigger('click')
+    await flushPromises()
+    expect(body().find('[data-testid="drawer-status"]').text()).toBe("Couldn't update vamp assignment. Try again.")
+
+    // Re-selecting the still-assigned vamp is idempotent (no write) but must clear the banner.
+    await body().find('[data-testid="vamp-change"]').trigger('click')
+    await body().find('[data-vamp-id="vamp-1"][data-testid="vamp-picker-row"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    expect(body().find('[data-testid="drawer-status"]').text()).not.toContain("Couldn't update vamp assignment")
+  })
 })
