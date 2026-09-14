@@ -1,171 +1,114 @@
 ---
 phase: 141-vamp-slide-assignment-live-playback
-reviewed: 2026-09-13T00:00:00Z
+reviewed: 2026-09-13T22:00:00Z
 depth: standard
-files_reviewed: 25
+files_reviewed: 4
 files_reviewed_list:
-  - src/types/slideGroup.ts
-  - src/types/vamp.ts
-  - src/components/VampPicker.vue
-  - src/components/__tests__/VampPicker.test.ts
   - src/components/slides/EditSlideDrawer.vue
   - src/components/slides/__tests__/EditSlideDrawer.test.ts
-  - src/views/ServiceEditorView.vue
-  - src/views/__tests__/ServiceEditorView.test.ts
-  - src/components/slides/SlideCanvas.vue
-  - src/components/slides/__tests__/SlideCanvas.test.ts
-  - src/components/output/FullscreenSlideOutput.vue
-  - src/views/ConfidenceOutputView.vue
-  - src/views/__tests__/AudienceOutputView.test.ts
-  - src/views/__tests__/ConfidenceOutputView.test.ts
-  - src/views/__tests__/VideoOutputView.test.ts
-  - src/composables/useRunControl.ts
-  - src/views/RunControlView.vue
-  - src/components/run/RunHeader.vue
-  - src/components/run/RunPreviewPair.vue
-  - src/views/__tests__/RunControlView.audio.test.ts
-  - src/components/run/__tests__/RunPreviewPair.test.ts
-  - src/stores/vamps.ts
-  - src/stores/__tests__/vamps.test.ts
+  - src/components/VampPicker.vue
   - src/components/VampSlideOver.vue
-  - src/components/__tests__/VampSlideOver.test.ts
 findings:
   critical: 0
-  warning: 4
+  warning: 0
   info: 1
-  total: 5
-status: issues_found
+  total: 1
+status: clean
 ---
 
-# Phase 141: Code Review Report
+# Phase 141: Code Review Report (Re-review, iteration 3 — final)
 
 **Reviewed:** 2026-09-13
 **Depth:** standard
-**Files Reviewed:** 25
+**Files Reviewed:** 4 (scoped re-check per orchestrator instruction; all other phase files confirmed unchanged since iteration 2)
 **Status:** issues_found
 
 ## Summary
 
-Reviewed the Phase 141 diff against `33ce439f^`: vamp assignment in `EditSlideDrawer.vue`/`VampPicker.vue`,
-the control-window-only audio state machine in `useRunControl.ts`/`RunControlView.vue`, `suppressAudio`
-propagation through `SlideCanvas.vue` and all three output views, and the R440 delete-warning scan in
-`vamps.ts`/`VampSlideOver.vue`.
+Re-reviewed the iteration-2 fix (commit `6c7d2f6b`, `141-REVIEW-FIX.md` "Iteration 2") for the prior
+WR-01 finding: "a failed vamp write leaves a stale error message on screen even after a subsequent
+write succeeds."
 
-The core mechanisms hold up well under adversarial tracing:
-- `suppressAudio` gates both the resolved value (`currentAudioUrl`) and the `<AudioPlayer>` mount site in
-  `SlideCanvas.vue`, and all three output-tier call sites (`FullscreenSlideOutput.vue` for
-  Audience/Video, `ConfidenceOutputView.vue`) hardcode it `true`, with tests that record and assert the
-  actual per-instance prop value rather than just checking the component compiles.
-- The control-window audio state machine (`tryPlayAudio`/`postBlackout`/the `[id, audioUrl]` watch) correctly
-  gates `.play()` on armed-and-not-blackout, pauses on slide change/blackout/exit, and resets arm state on
-  every teardown path (`endServiceTeardown`, `endRehearsal`) and on `onUnmounted`. The real `AudioPlayer.vue`
-  (not a stub) is exercised in `RunControlView.audio.test.ts`, giving good confidence in the
-  autoplay-blocked/error wiring.
-- `EditSlideDrawer.vue`'s assign/change/clear paths write through the single `replaceGroupSlides` fresh-base
-  helper, never write `undefined` into an entry field (uses `delete` on a shallow copy, matching the
-  existing `removeSlideAudio` idiom), and the idempotent-reselect / stale-vamp-hint logic is correctly gated
-  on `vampStore.isLoading` (which defaults `true` and never flips for a viewer whose store never subscribes
-  — `ServiceEditorView.vue` subscribes `useVampStore()` strictly inside the `isEditor` gate, and this is
-  regression-tested).
-- `countAssignments`/`deleteVamp` in `vamps.ts` fail open (`scan === null` keeps the attachment), count
-  distinct `serviceId`s, filter on `date >= todayYmd()`, and leave Phase 140's `setAttachment`/
-  `removeAttachment` byte-for-byte untouched (confirmed via `git diff`).
+**WR-01 (iteration-2 finding) is fixed for the case it was raised against.** `attachVampToSlide` and
+`clearVampAssignment` both now call `beginVampWrite()` — which clears `vampStatusText` and resets
+`status` from `'error'` back to `'idle'` — immediately before the `replaceGroupSlides` call, and
+`failVampWrite()` in the `catch` (`EditSlideDrawer.vue:939-947, 964-971, 974-982`). Traced both
+functions' success and failure paths by hand:
+- Fail → retry-same-pick → success: `beginVampWrite()` on the retry clears the stale error before the
+  second write starts; the write then succeeds and nothing re-sets it, so `statusText` reads `''`
+  (idle) afterward — banner correctly gone.
+- `writeField`'s pre-existing `vampStatusText.value = null` at the start of every text-field write
+  (`:1209`) still guards the reverse direction (a vamp error surviving into an unrelated field edit).
 
-Four warnings below are worth fixing before this ships to real operators; none are data-loss or security
-issues, but two are genuinely reproducible UI/robustness defects introduced by this phase's new code
-(items WR-01 and WR-03).
+Confirmed by running the actual code path, not just reading the fix's own claim: `npx vitest run
+src/components/slides/__tests__/EditSlideDrawer.test.ts` — 185/185 passing, including the new `iter-2:
+a successful retry after a failed assign clears the stale error banner` test
+(`EditSlideDrawer.test.ts:2723-2741`), and `VampPicker.test.ts` + `VampSlideOver.test.ts` — 27/27
+passing (both untouched by this commit; re-run as a regression check, not because they were expected
+to change). The long WR-03 rationale comments were correctly trimmed to one line each per CLAUDE.md's
+short-comment convention, with no loss of the load-bearing "why."
+
+**No regression found from this fix.** One residual gap survives in the same feature area, found while
+tracing `attachVampToSlide`'s early-return branch that the iteration-2 fix's regression test doesn't
+exercise — see WR-06 below.
 
 ## Warnings
 
-### WR-01: Vamp picker's open/closed state is never reset when the drawer closes, only when the selected entry changes
+### WR-06: The idempotent re-select guard in `attachVampToSlide` bypasses `beginVampWrite()`, so a stale error from a *different* failed assignment survives re-selecting the vamp that's already assigned
 
-**File:** `src/components/slides/EditSlideDrawer.vue:886-892, 896, 906-913`
+**File:** `src/components/slides/EditSlideDrawer.vue:924-947`
 
-**Issue:** `vampPickerOpen` is a local `ref(false)` reset only by the `watch(() => props.entry?.id, ...)`
-handler (line 886-892) and by `closeVampPicker()` (called only from `onVampSelected`, line 952-955). Nothing
-resets it when the drawer itself closes. `SlidesTab.vue` mounts `EditSlideDrawer` unconditionally
-(`<EditSlideDrawer :open="drawerOpen" ... />`, no `v-if` around the component) — the component instance,
-and therefore `vampPickerOpen`, persists across every open/close cycle. Reproduction: open the drawer on a
-slide with no audio, click "Choose a vamp" (picker opens), click the drawer's own close button (X) without
-picking a vamp, then reopen the drawer for the *same* slide (e.g. click it again in the grid without
-selecting a different slide in between) — `props.entry?.id` never changes, so the picker panel is still
-expanded on reopen, taking up layout space and showing a search box the operator never asked for. This is
-new code (confirmed via `git diff 33ce439f^..HEAD`) — there is no equivalent leak for other per-slide UI
-state in this file, because nothing else in the drawer has state that outlives a `props.entry` change.
+**Issue:** `attachVampToSlide`'s idempotency check (`entry.vampId === vamp.id && entry.audioUrl ===
+downloadUrl && entry.audioLoop === true && entry.vampLabel === label`) returns **before**
+`beginVampWrite()` is called:
 
-**Fix:** Reset it in the same `watch(isOpenAndResolvable, ...)` handler that already handles focus/keydown
-teardown on close (around line 643-647):
 ```ts
-} else {
-  window.removeEventListener('keydown', onKeydown)
-  previouslyFocused?.focus?.()
-  previouslyFocused = null
-  vampPickerOpen.value = false // WR-01: don't leak the picker open across a close/reopen
+if (entry.vampId === vamp.id && entry.audioUrl === downloadUrl && entry.audioLoop === true && entry.vampLabel === label) {
+  return
+}
+const entryId = entry.id
+const base = props.group.slides
+const next = base.map((e) => ...)
+beginVampWrite()   // <- never reached on the idempotent-return path
+try {
+  await slideGroupsStore.replaceGroupSlides(...)
+} catch (err) {
+  console.error('Failed to assign vamp to slide:', err)
+  failVampWrite()
 }
 ```
 
-### WR-02: The inline vamp picker has no cancel/close affordance of its own
+The iteration-2 fix only clears the banner when a write is actually attempted. It leaves this path
+uncovered: Vamp A is assigned and showing correctly; the operator opens "Change" and picks Vamp B; that
+write rejects (`failVampWrite()` sets the error banner, and — because the write never landed — the
+entry is still showing "Vamp: A" per D-10 precedence, unchanged). The operator, reacting to the error,
+reopens the picker and picks Vamp A — the vamp already shown as assigned. `attachVampToSlide` hits the
+idempotency check, returns immediately, and never calls `beginVampWrite()`. The row correctly still
+reads "Vamp: A" (accurate), but `drawer-status` keeps showing "Couldn't update vamp assignment. Try
+again." indefinitely, because nothing on this path — or any other code path in the file — clears it
+apart from a text-field edit or a *non-idempotent* vamp write. This is the same class of bug the
+iteration-2 fix targeted, just on the one branch its guard (and its new regression test, which never
+re-selects the *currently-assigned* vamp) doesn't reach.
 
-**File:** `src/components/slides/EditSlideDrawer.vue:346-352`, `src/components/VampPicker.vue`
+**Fix:** Call `beginVampWrite()` before the idempotency check rather than after it — clearing a stale
+banner is safe to do unconditionally, since it doesn't itself issue a write and doesn't disturb the
+"no write on idempotent re-select" contract the existing test at `EditSlideDrawer.test.ts:2578-2594`
+asserts:
 
-**Issue:** Once opened via "Choose a vamp" or "Change" (`openVampPicker()`), the only way `vampPickerOpen`
-returns to `false` is selecting a vamp (`onVampSelected` → `closeVampPicker()`) or the entry changing. There
-is no close/cancel button on `VampPicker.vue` itself, and no click-outside dismissal. An operator who opens
-the picker, changes their mind, and wants to keep the currently-assigned vamp (or the currently-attached
-manual file) has no way to back out except switching to a different slide and back (which happens to reset
-it via the entry-id watch) or closing the whole drawer (which, per WR-01, doesn't even reliably work).
-
-**Fix:** Add a small "Cancel" affordance to `VampPicker.vue` (a new `cancel` emit) or a close button in the
-picker's header row in `EditSlideDrawer.vue`, wired to `closeVampPicker()`.
-
-### WR-03: Vamp assign/clear writes have no error handling — a failed write is a silent no-feedback failure
-
-**File:** `src/components/slides/EditSlideDrawer.vue:916-932` (`attachVampToSlide`), `934-950`
-(`clearVampAssignment`)
-
-**Issue:** Both functions `await slideGroupsStore.replaceGroupSlides(...)` with no `try`/`catch` and no
-status update. Contrast with `onSpeakerToggle`, `onDuplicate`, and `onConfirmDelete` in the same file, which
-all wrap their write in `try { ... } catch (err) { console.error(...) }`, and with the debounced text-field
-path (`writeField`) which additionally sets a visible `status.value = 'error'` rendered as "Failed to save.
-Please try again." in the header. If `replaceGroupSlides` rejects here (permission-denied, a stale
-`sourceSignature` conflict, offline), the operator sees the picker close (or stay open, per `onVampSelected`
-which calls `closeVampPicker()` unconditionally after `attachVampToSlide` regardless of whether it
-succeeded) with no error surfaced anywhere — the audio row still shows the *old* state (no vamp, or the
-previous vamp), and nothing tells the operator the assignment didn't take. This is exactly the kind of
-"never a silent failure" gap the phase's own R439 (audio blocked/unavailable) design explicitly guards
-against for playback — the same principle doesn't reach the assignment write path itself. There is no test
-in `EditSlideDrawer.test.ts` that exercises a rejected `replaceGroupSlides` for the vamp paths (the loop/
-speaker/notes paths are equally exercisable but also untested for the failure branch — this file's error
-paths generally aren't unit-tested — but the vamp path additionally lacks even the `console.error` a
-maintainer could grep for in production logs).
-
-**Fix:** Wrap both writes the same way `onSpeakerToggle` does:
 ```ts
 async function attachVampToSlide(vamp: Vamp): Promise<void> {
-  ...
-  try {
-    await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
-  } catch (err) {
-    console.error('Failed to assign vamp to slide:', err)
-    // surface via the existing `status`/statusText mechanism, or a dedicated flag
+  if (!canMutate.value) return
+  if (!props.group || !props.entry || !vamp.attachment?.downloadUrl) return
+  const downloadUrl = vamp.attachment.downloadUrl
+  const label = `${vamp.name} · ${vamp.key}`
+  const entry = props.entry
+  beginVampWrite()
+  // Idempotent: re-selecting the already-assigned vamp issues no write.
+  if (entry.vampId === vamp.id && entry.audioUrl === downloadUrl && entry.audioLoop === true && entry.vampLabel === label) {
+    return
   }
-}
+  ...
 ```
-
-### WR-04: `VampSlideOver.vue`'s delete has no error handling either
-
-**File:** `src/components/VampSlideOver.vue:443-453`
-
-**Issue:** `onDelete()` awaits `vampStore.deleteVamp(id)` inside a bare `try { ... } finally { isDeleting.value
-= false }` — there is no `catch`. If `deleteVamp` rejects (e.g. `deleteDoc` permission-denied), `isDeleting`
-resets and the delete-confirm panel just sits there with no error message; the operator has no way to know
-the delete failed versus succeeded-and-still-showing (the drawer only closes/emits `deleted` on the caller's
-own success path, so nothing here tells them which happened). `deleteVamp` itself is designed to be
-fail-open only for the *scan* (`countAssignments`), not for the final `deleteDoc` call, which can still
-throw.
-
-**Fix:** Add a `catch` that surfaces an inline error (mirroring the pattern already used for
-`vamp-mp3-upload-error` rows a few lines above in the same file) instead of relying on `finally` alone.
 
 ## Info
 
@@ -173,22 +116,25 @@ throw.
 
 **File:** `src/components/VampSlideOver.vue:259-264`
 
-**Issue:** When `countAssignments` returns `{ assignedAnywhere: true, upcomingServiceCount: 0 }` (the vamp
-is only referenced by services whose date is before today), the confirm dialog shows neither
-`vamp-delete-warning` (`affectedServiceCount > 0` is false) nor `vamp-delete-warning-generic` (`scanFailed`
-is false) — the operator sees a plain "Delete '{name}'? This cannot be undone." with no indication that
-`deleteVamp` will keep the MP3 object in Storage indefinitely (per R440's `keepAttachment` logic in
-`vamps.ts`). This matches the letter of the 141-CONTEXT.md decision (the warning copy is defined only for
-the upcoming-count and scan-failure cases), so it is not a spec violation, but it is a UX blind spot: the
-orphaned Storage object has no further UI path to ever being cleaned up, and the operator is never told it
-exists.
+**Issue:** Unchanged since iteration 1 and iteration 2 — left unaddressed per instruction (explicitly
+Info-scope, out of the `critical_warning` fix scope for both prior fix rounds). When
+`countAssignments` returns `{ assignedAnywhere: true, upcomingServiceCount: 0 }` (the vamp is only
+referenced by past services), the confirm dialog shows neither the upcoming-count warning nor the
+generic scan-failure warning — the operator sees a plain delete confirm with no indication that
+`deleteVamp` will keep the MP3 in Storage indefinitely (R440's `keepAttachment` logic). Matches the
+letter of the locked 141-CONTEXT.md decision (the warning copy is defined only for the upcoming-count
+and scan-failure cases), so this is a UX blind spot, not a spec violation.
 
 **Fix (optional):** Consider a third, lower-key copy variant ("Keeps its audio on past services.") when
-`assignedAnywhere && upcomingServiceCount === 0`, purely for operator awareness — not required by the locked
-decision.
+`assignedAnywhere && upcomingServiceCount === 0`, purely for operator awareness — not required by the
+locked decision.
 
 ---
 
 _Reviewed: 2026-09-13_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+
+## Orchestrator note (iteration 3 close-out)
+
+WR-06 (banner not reset on the idempotent re-select path) was fixed in commit `5ad2126e` `fix(141): reset the vamp error banner before the idempotent re-select guard` with a regression test; `EditSlideDrawer.test.ts` 186/186, `VampPicker`/`VampSlideOver` 27/27, type-check clean. Status set to `clean` with IN-01 (Info) carried. The auto fix loop reached its 3-iteration cap; no Critical/Warning findings remain.
