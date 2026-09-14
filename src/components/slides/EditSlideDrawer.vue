@@ -596,6 +596,12 @@ let previouslyFocused: HTMLElement | null = null
 /** Closed, or open with nothing resolvable behind the selection: render nothing. */
 const isOpenAndResolvable = computed(() => props.open && props.entry !== null)
 
+// WR-01: declared here (not down by the rest of R437, 141-01) so the
+// `immediate: true` close watch below — which can fire synchronously during
+// setup for a drawer mounted already-closed or entryless — never reads this
+// before its own initialization.
+const vampPickerOpen = ref(false)
+
 /**
  * R054: a song's slides are canonical, edited only from the Song Lyrics
  * screen — this drawer must offer no CRUD on them at all. Read from the
@@ -644,6 +650,8 @@ watch(
       window.removeEventListener('keydown', onKeydown)
       previouslyFocused?.focus?.()
       previouslyFocused = null
+      // WR-01: don't leak the picker open across a close/reopen of the same entry.
+      vampPickerOpen.value = false
     }
   },
   { immediate: true },
@@ -892,8 +900,7 @@ watch(
 )
 
 // ── R437 (141-01): vamp assignment — Choose a vamp / Change / Clear ────────
-
-const vampPickerOpen = ref(false)
+// (vampPickerOpen itself is declared earlier, by isOpenAndResolvable — see WR-01 comment there.)
 
 /** A vamp is "assigned" only while its denormalized audioUrl is actually what's covering the slide (D-10 precedence). */
 const isVampAssigned = computed(() => audioState.value === 'slide' && !!props.entry?.vampId)

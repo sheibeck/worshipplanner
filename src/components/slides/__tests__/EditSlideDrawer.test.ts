@@ -2678,4 +2678,19 @@ describe('EditSlideDrawer (Phase 141-01 — vamp assignment)', () => {
     expect(body().find('[data-testid="vamp-clear"]').exists()).toBe(false)
     expect(body().find('[data-testid="vamp-assigned-label"]').exists()).toBe(true)
   })
+
+  it('WR-01: closing the drawer resets the picker, so reopening on the same entry does not show it still expanded', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }), open: true })
+
+    await body().find('[data-testid="vamp-picker-open"]').trigger('click')
+    expect(body().find('[data-testid="vamp-picker-panel"]').exists()).toBe(true)
+
+    // Close via the drawer's own × button (never selecting a vamp), then reopen
+    // on the SAME entry — before WR-01, only an entry-id change reset the picker.
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ open: true })
+
+    expect(body().find('[data-testid="vamp-picker-panel"]').exists()).toBe(false)
+  })
 })
