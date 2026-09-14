@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 import VampSlideOver from '../VampSlideOver.vue'
 import type { Vamp } from '@/types/vamp'
@@ -11,6 +11,7 @@ import { VAMP_KEYS } from '@/constants/keys'
 const mockAddVamp = vi.fn(() => Promise.resolve('new-vamp-id'))
 const mockUpdateVamp = vi.fn(() => Promise.resolve())
 const mockDeleteVamp = vi.fn(() => Promise.resolve())
+const mockCountAssignments = vi.fn(() => Promise.resolve({ assignedAnywhere: false, upcomingServiceCount: 0 }))
 let mockVamps: Vamp[] = []
 const mockVampStore = {
   get vamps() {
@@ -19,6 +20,7 @@ const mockVampStore = {
   addVamp: mockAddVamp,
   updateVamp: mockUpdateVamp,
   deleteVamp: mockDeleteVamp,
+  countAssignments: mockCountAssignments,
 }
 vi.mock('@/stores/vamps', () => ({ useVampStore: () => mockVampStore }))
 
@@ -77,6 +79,8 @@ describe('VampSlideOver', () => {
     mockAddVamp.mockClear()
     mockUpdateVamp.mockClear()
     mockDeleteVamp.mockClear()
+    mockCountAssignments.mockClear()
+    mockCountAssignments.mockImplementation(() => Promise.resolve({ assignedAnywhere: false, upcomingServiceCount: 0 }))
     mockAddFile.mockClear()
     mockDismiss.mockClear()
     mockReset.mockClear()
@@ -147,6 +151,120 @@ describe('VampSlideOver', () => {
 
     expect(mockDeleteVamp).toHaveBeenCalledWith('vamp-9')
     expect(wrapper.emitted('deleted')).toBeTruthy()
+  })
+
+  describe('VampSlideOver — R440 delete warning', () => {
+    it('calls countAssignments exactly once per confirm open, with the vamp id', async () => {
+      const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+      expect(mockCountAssignments).toHaveBeenCalledTimes(1)
+      expect(mockCountAssignments).toHaveBeenCalledWith('vamp-9')
+
+      await wrapper.get('[data-testid="vamp-delete-cancel"]').trigger('click')
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+      expect(mockCountAssignments).toHaveBeenCalledTimes(2)
+    })
+
+    it('shows the plural warning for upcomingServiceCount 3 above the unchanged confirm body', async () => {
+      mockCountAssignments.mockImplementation(() => Promise.resolve({ assignedAnywhere: true, upcomingServiceCount: 3 }))
+      const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9', name: 'Open Response' }))
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="vamp-delete-warning"]').text()).toBe(
+        'Assigned in 3 upcoming services — those slides keep their audio.',
+      )
+      expect(wrapper.text()).toContain('Delete "Open Response"? This cannot be undone.')
+    })
+
+    it('shows the singular warning for upcomingServiceCount 1', async () => {
+      mockCountAssignments.mockImplementation(() => Promise.resolve({ assignedAnywhere: true, upcomingServiceCount: 1 }))
+      const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="vamp-delete-warning"]').text()).toBe(
+        'Assigned in 1 upcoming service — those slides keep their audio.',
+      )
+    })
+
+    it('renders no warning line when assignedAnywhere is true but upcomingServiceCount is 0, or nothing is assigned', async () => {
+      mockCountAssignments.mockImplementation(() => Promise.resolve({ assignedAnywhere: true, upcomingServiceCount: 0 }))
+      const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="vamp-delete-warning"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="vamp-delete-warning-generic"]').exists()).toBe(false)
+
+      mockCountAssignments.mockImplementation(() => Promise.resolve({ assignedAnywhere: false, upcomingServiceCount: 0 }))
+      const wrapper2 = mountSlideOver(makeVamp({ id: 'vamp-10' }))
+      await wrapper2.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+      expect(wrapper2.find('[data-testid="vamp-delete-warning"]').exists()).toBe(false)
+      expect(wrapper2.find('[data-testid="vamp-delete-warning-generic"]').exists()).toBe(false)
+    })
+
+    it('shows the generic warning when countAssignments resolves null', async () => {
+      mockCountAssignments.mockImplementation(() => Promise.resolve(null as never))
+      const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="vamp-delete-warning-generic"]').text()).toBe('May be assigned to slides.')
+      expect(wrapper.find('[data-testid="vamp-delete-warning"]').exists()).toBe(false)
+    })
+
+    it('shows the generic warning when countAssignments rejects', async () => {
+      mockCountAssignments.mockRejectedValueOnce(new Error('denied'))
+      const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="vamp-delete-warning-generic"]').text()).toBe('May be assigned to slides.')
+    })
+
+    it('never blocks Delete while the scan is still pending', async () => {
+      mockCountAssignments.mockReturnValueOnce(new Promise(() => {}))
+      const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+
+      const deleteButton = wrapper.get('[data-testid="vamp-delete-confirm-button"]')
+      expect(deleteButton.attributes('disabled')).toBeUndefined()
+      await deleteButton.trigger('click')
+      await flushPromises()
+
+      expect(mockDeleteVamp).toHaveBeenCalledWith('vamp-9')
+      expect(wrapper.emitted('deleted')).toBeTruthy()
+    })
+
+    it('still calls deleteVamp and emits deleted after a scan failure', async () => {
+      mockCountAssignments.mockRejectedValueOnce(new Error('denied'))
+      const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+
+      await wrapper.get('[data-testid="vamp-delete-confirm-button"]').trigger('click')
+      await flushPromises()
+
+      expect(mockDeleteVamp).toHaveBeenCalledWith('vamp-9')
+      expect(wrapper.emitted('deleted')).toBeTruthy()
+    })
+
+    it('resets affectedServiceCount and scanFailed when the drawer is reopened for a different vamp', async () => {
+      mockCountAssignments.mockImplementation(() => Promise.resolve({ assignedAnywhere: true, upcomingServiceCount: 2 }))
+      const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
+      await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="vamp-delete-warning"]').exists()).toBe(true)
+
+      // Close then reopen (open: false -> true) — must reset stale warning state.
+      await wrapper.setProps({ open: false })
+      await wrapper.setProps({ open: true, vamp: makeVamp({ id: 'vamp-10' }) })
+
+      expect(wrapper.find('[data-testid="vamp-delete-confirm"]').exists()).toBe(false)
+    })
   })
 
   // CR-01: a rejected/failed upload must surface visibly — previously

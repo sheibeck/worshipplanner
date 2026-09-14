@@ -256,6 +256,12 @@
               </button>
             </div>
             <div v-else class="rounded-lg bg-red-900/20 border border-red-800 p-4" data-testid="vamp-delete-confirm">
+              <p v-if="affectedServiceCount != null && affectedServiceCount > 0" class="text-sm text-amber-300 mb-2" data-testid="vamp-delete-warning">
+                Assigned in {{ affectedServiceCount }} upcoming service{{ affectedServiceCount === 1 ? '' : 's' }} — those slides keep their audio.
+              </p>
+              <p v-else-if="scanFailed" class="text-sm text-amber-300 mb-2" data-testid="vamp-delete-warning-generic">
+                May be assigned to slides.
+              </p>
               <p class="text-sm text-gray-200 mb-3">
                 Delete <strong class="text-white">"{{ form.name }}"</strong>? This cannot be undone.
               </p>
@@ -336,6 +342,11 @@ const isSaving = ref(false)
 const isDeleting = ref(false)
 const showDeleteConfirm = ref(false)
 
+// R440 — best-effort affected-service count, scanned once per confirm open.
+// Never read by onDelete(): deletion must never be gated on the scan.
+const affectedServiceCount = ref<number | null>(null)
+const scanFailed = ref(false)
+
 // Set once addVamp resolves for a brand-new vamp — the create->edit
 // transition the drawer needs so the MP3 drop-zone becomes usable for the
 // just-created vamp. Cleared whenever the drawer reopens.
@@ -366,6 +377,8 @@ watch(
     form.value = props.vamp ? vampToForm(props.vamp) : emptyForm()
     nameError.value = false
     showDeleteConfirm.value = false
+    affectedServiceCount.value = null
+    scanFailed.value = false
     localId.value = null
     playing.value = false
     audioErrored.value = false
@@ -376,6 +389,26 @@ watch(
   },
   { immediate: true },
 )
+
+// R440 — one scan per confirm open, best-effort. Nothing here (or in
+// onDelete()) gates the Delete action on the scan's outcome.
+watch(showDeleteConfirm, async (isOpen) => {
+  if (!isOpen) return
+  affectedServiceCount.value = null
+  scanFailed.value = false
+  const id = effectiveId.value
+  if (!id) return
+  try {
+    const scan = await vampStore.countAssignments(id)
+    if (scan === null) {
+      scanFailed.value = true
+    } else {
+      affectedServiceCount.value = scan.upcomingServiceCount
+    }
+  } catch {
+    scanFailed.value = true
+  }
+})
 
 async function onSave() {
   const name = form.value.name.trim()
