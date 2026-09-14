@@ -2706,4 +2706,17 @@ describe('EditSlideDrawer (Phase 141-01 — vamp assignment)', () => {
     expect(body().find('[data-testid="vamp-picker-panel"]').exists()).toBe(false)
     expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
   })
+
+  it('WR-03: a rejected assign write is surfaced via drawer-status instead of failing silently', async () => {
+    mockReplaceGroupSlides.mockRejectedValueOnce(new Error('permission-denied'))
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="vamp-picker-open"]').trigger('click')
+    await body().find('[data-vamp-id="vamp-1"][data-testid="vamp-picker-row"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    expect(body().find('[data-testid="drawer-status"]').text()).toBe("Couldn't update vamp assignment. Try again.")
+  })
 })
