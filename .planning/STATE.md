@@ -5,8 +5,8 @@ milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
 current_phase: 141
 current_phase_name: Vamp Slide Assignment & Live Playback
 status: executing
-stopped_at: Completed 141-02-PLAN.md
-last_updated: "2026-09-13T23:19:26.953Z"
+stopped_at: Completed 141-03-PLAN.md
+last_updated: "2026-09-14T00:02:52.725Z"
 last_activity: 2026-09-13
 last_activity_desc: Phase 141 execution started
 progress:
@@ -1419,7 +1419,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 141 (Vamp Slide Assignment & Live Playback) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-09-13 — Phase 141 execution started
 
@@ -3728,6 +3728,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 140 P03 | 90min | 3 tasks | 6 files |
 | Phase 141 P01 | ~35min | 3 tasks | 7 files |
 | Phase 141 P02 | ~25min | 2 tasks | 7 files |
+| Phase 141 P03 | ~50min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -4348,6 +4349,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Songs tab content wrapped in v-show (not v-if) to preserve SongTable sort/scroll state across a Songs|Vamps tab switch
 - [Phase ?]: 141-01: vampStore.subscribe(orgId) placed inside ServiceEditorView's isEditor gate (vamps is editor-read-gated by firestore.rules' generic catch-all)
 - [Phase ?]: 141-02: SlideCanvas.suppressAudio mirrors suppressBackground exactly; all four output-tier mounts hardcoded true; AudienceOutputView/VideoOutputView left untouched (delegate to FullscreenSlideOutput).
+- [Phase ?]: Control-window audio uses a multi-source watch([slideId, audioUrl]) + AudioPlayer keyed on audioUrl so a same-slide resend never restarts playback, but any slide-identity change still pauses/replays (even across same-url slides) — mirrors reconcileLoop's blackout-aware watcher
+- [Phase ?]: The ♪ Vamp badge resolves via useSlideGroups().groupsBySlotId (raw GroupSlideEntry), never AssembledSlide/Slide — the assembler stays vamp-unaware by design (141-CONTEXT.md)
 
 ### Roadmap Evolution
 
@@ -4684,9 +4687,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-13T23:19:26.868Z
-Stopped at: Completed 141-02-PLAN.md
-Resume file: None
+Last session: 2026-09-14T00:02:52.628Z
+Stopped at: Completed 141-03-PLAN.md
+Resume file: 141-04-PLAN.md
 
 ## Operator Next Steps
 

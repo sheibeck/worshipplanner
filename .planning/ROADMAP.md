@@ -934,7 +934,7 @@ UAT gate.
 criteria 2-3's output-window wording — vamp audio plays ONLY from the Run control window; Audience,
 Confidence and Video are all silent via `suppressAudio`. No cross-window audio-unlock handshake is built.
 
-**Plans**: 2/4 plans executed
+**Plans**: 3/4 plans executed
 
 Plans:
 **Wave 1**
@@ -944,7 +944,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 141-03-PLAN.md — R438/R439 control-window audio owner (Wave 2): single `AudioPlayer` in RunControlView driven by useRunControl (armed/blackout/slide-change/exit), `Audio: Off/Armed` arm toggle + playing dot, blocked banner with retry, `Audio unavailable`, ♪ Vamp preview badges
+- [x] 141-03-PLAN.md — R438/R439 control-window audio owner (Wave 2): single `AudioPlayer` in RunControlView driven by useRunControl (armed/blackout/slide-change/exit), `Audio: Off/Armed` arm toggle + playing dot, blocked banner with retry, `Audio unavailable`, ♪ Vamp preview badges
 - [ ] 141-04-PLAN.md — R440 delete warning (Wave 2): `useVampStore.countAssignments` best-effort scan, `deleteVamp` keeps the MP3 when assigned anywhere, VampSlideOver `Assigned in N upcoming service(s)` / `May be assigned to slides.` copy
 
 **UI hint**: yes

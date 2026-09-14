@@ -108,7 +108,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   machine driving multiple monitors never triple-plays/echoes the audio. (Owner decision 2026-09-13;
   supersedes the earlier "Audience output only" wording.)
 
-- [ ] **R439**: A projectionist **arms audio** with a gesture on the Run/control screen so a vamp plays from
+- [x] **R439**: A projectionist **arms audio** with a gesture on the Run/control screen so a vamp plays from
   that window despite browser autoplay policy; if audio is still blocked, the failure is **surfaced on the
   control screen** as a visible warning (never a silent failure with no on-screen indication).
 
@@ -172,7 +172,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R436 | Phase 140 | Complete |
 | R437 | Phase 141 | Complete |
 | R438 | Phase 141 | Complete |
-| R439 | Phase 141 | Pending |
+| R439 | Phase 141 | Complete |
 | R440 | Phase 141 | Pending |
 
 **Coverage:**
