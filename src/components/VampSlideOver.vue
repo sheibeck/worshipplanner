@@ -265,6 +265,9 @@
               <p class="text-sm text-gray-200 mb-3">
                 Delete <strong class="text-white">"{{ form.name }}"</strong>? This cannot be undone.
               </p>
+              <p v-if="deleteError" class="text-sm text-red-400 mb-3" data-testid="vamp-delete-error">
+                {{ deleteError }}
+              </p>
               <div class="flex gap-2">
                 <button
                   type="button"
@@ -341,6 +344,8 @@ const nameError = ref(false)
 const isSaving = ref(false)
 const isDeleting = ref(false)
 const showDeleteConfirm = ref(false)
+/** WR-04: surfaces a rejected deleteDoc (the scan itself already fails open) instead of relying on `finally` alone, which left no signal the delete didn't happen. */
+const deleteError = ref<string | null>(null)
 
 // R440 — best-effort affected-service count, scanned once per confirm open.
 // Never read by onDelete(): deletion must never be gated on the scan.
@@ -377,6 +382,7 @@ watch(
     form.value = props.vamp ? vampToForm(props.vamp) : emptyForm()
     nameError.value = false
     showDeleteConfirm.value = false
+    deleteError.value = null
     affectedServiceCount.value = null
     scanFailed.value = false
     localId.value = null
@@ -444,9 +450,16 @@ async function onDelete() {
   const id = effectiveId.value
   if (!id) return
   isDeleting.value = true
+  deleteError.value = null
   try {
     await vampStore.deleteVamp(id)
     emit('deleted')
+  } catch (err) {
+    // WR-04: deleteVamp's own scan (countAssignments) fails open, but the
+    // final deleteDoc can still reject (e.g. permission-denied) — `finally`
+    // alone left no way to tell a failed delete apart from a successful one.
+    console.error('Failed to delete vamp:', err)
+    deleteError.value = "Couldn't delete vamp. Try again."
   } finally {
     isDeleting.value = false
   }

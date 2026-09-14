@@ -153,6 +153,21 @@ describe('VampSlideOver', () => {
     expect(wrapper.emitted('deleted')).toBeTruthy()
   })
 
+  it('WR-04: a rejected deleteVamp surfaces an inline error and keeps the confirm open instead of relying on finally alone', async () => {
+    mockDeleteVamp.mockImplementationOnce(() => Promise.reject(new Error('permission-denied')))
+    const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
+    await wrapper.get('[data-testid="vamp-delete-button"]').trigger('click')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="vamp-delete-confirm-button"]').trigger('click')
+    await flushPromises()
+
+    expect(mockDeleteVamp).toHaveBeenCalledWith('vamp-9')
+    expect(wrapper.emitted('deleted')).toBeFalsy()
+    expect(wrapper.find('[data-testid="vamp-delete-confirm"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="vamp-delete-error"]').text()).toBe("Couldn't delete vamp. Try again.")
+  })
+
   describe('VampSlideOver — R440 delete warning', () => {
     it('calls countAssignments exactly once per confirm open, with the vamp id', async () => {
       const wrapper = mountSlideOver(makeVamp({ id: 'vamp-9' }))
