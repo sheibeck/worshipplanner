@@ -106,6 +106,14 @@ describe('VampPicker', () => {
     expect(wrapper.emitted('select')?.[0]).toEqual([vamp])
   })
 
+  it('WR-02: emits cancel exactly once from its own Cancel button, with no select', async () => {
+    const vamp = makeVamp({ id: 'v1' })
+    const wrapper = mount(VampPicker, { props: { vamps: [vamp] } })
+    await wrapper.get('[data-testid="vamp-picker-cancel"]').trigger('click')
+    expect(wrapper.emitted('cancel')).toHaveLength(1)
+    expect(wrapper.emitted('select')).toBeFalsy()
+  })
+
   it('highlights the row matching selectedVampId with the selected classes and checkmark', () => {
     const vamps = [makeVamp({ id: 'v1', name: 'A' }), makeVamp({ id: 'v2', name: 'B' })]
     const wrapper = mount(VampPicker, { props: { vamps, selectedVampId: 'v2' } })

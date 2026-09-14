@@ -8,6 +8,17 @@
       class="w-full rounded-md bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 mb-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
     />
 
+    <!-- WR-02: the panel's own close affordance — until now the only way out
+         was picking a vamp or the entry changing underneath it. -->
+    <button
+      type="button"
+      data-testid="vamp-picker-cancel"
+      class="mb-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+      @click="emit('cancel')"
+    >
+      Cancel
+    </button>
+
     <!-- Loading -->
     <p v-if="loading" class="text-xs text-gray-500 px-2 py-3 text-center" data-testid="vamp-picker-loading">
       Loading vamps...
@@ -116,7 +127,7 @@ const props = defineProps<{
   selectedVampId?: string | null
 }>()
 
-const emit = defineEmits<{ select: [vamp: Vamp] }>()
+const emit = defineEmits<{ select: [vamp: Vamp]; cancel: [] }>()
 
 const search = ref('')
 

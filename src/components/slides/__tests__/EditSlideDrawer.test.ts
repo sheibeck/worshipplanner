@@ -2693,4 +2693,17 @@ describe('EditSlideDrawer (Phase 141-01 — vamp assignment)', () => {
 
     expect(body().find('[data-testid="vamp-picker-panel"]').exists()).toBe(false)
   })
+
+  it('WR-02: the picker\'s own Cancel button closes it without writing anything', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="vamp-picker-open"]').trigger('click')
+    expect(body().find('[data-testid="vamp-picker-panel"]').exists()).toBe(true)
+
+    await body().find('[data-testid="vamp-picker-cancel"]').trigger('click')
+
+    expect(body().find('[data-testid="vamp-picker-panel"]').exists()).toBe(false)
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+  })
 })

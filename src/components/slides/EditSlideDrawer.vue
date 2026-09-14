@@ -349,6 +349,7 @@
               :loading="vampStore.isLoading"
               :selected-vamp-id="props.entry?.vampId ?? null"
               @select="onVampSelected"
+              @cancel="closeVampPicker"
             />
 
             <!-- Loop (D-11): meaningful only where audio actually plays —
