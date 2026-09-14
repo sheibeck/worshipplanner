@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import type { VampAttachment } from '@/types/vamp'
+import { todayYmd } from '@/utils/myScheduleGrouping'
 
 // Track onSnapshot callbacks and unsubscribe fns
 let snapshotCallback: ((snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void) | null = null
@@ -19,6 +20,8 @@ vi.mock('firebase/firestore', () => {
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-vamp-id' })),
     updateDoc: vi.fn(() => Promise.resolve()),
     deleteDoc: vi.fn(() => Promise.resolve()),
+    getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+    getDoc: vi.fn(() => Promise.resolve({ exists: () => false, data: () => ({}) })),
     query: vi.fn((ref) => ref),
     orderBy: vi.fn(),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
@@ -267,6 +270,185 @@ describe('useVampStore', () => {
       expect(consoleSpy).toHaveBeenCalled()
       expect(deleteDoc).toHaveBeenCalledOnce()
       consoleSpy.mockRestore()
+    })
+  })
+
+  describe('countAssignments (R440)', () => {
+    it('counts distinct upcoming services and calls getDoc once per distinct serviceId', async () => {
+      const { getDocs, getDoc } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      const yesterday = (() => {
+        const d = new Date()
+        d.setDate(d.getDate() - 1)
+        return todayYmd(d)
+      })()
+
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        docs: [
+          { id: 'sg-1', data: () => ({ serviceId: 'svc-A', slides: [{ id: 's1', vampId: 'vamp-1' }, { id: 's2', vampId: 'vamp-1' }] }) },
+          { id: 'sg-2', data: () => ({ serviceId: 'svc-B', slides: [{ id: 's3', vampId: 'vamp-1' }] }) },
+          { id: 'sg-3', data: () => ({ serviceId: 'svc-C', slides: [{ id: 's4', vampId: 'other-vamp' }] }) },
+        ],
+      })
+      ;(getDoc as ReturnType<typeof vi.fn>).mockImplementation((ref: { id: string }) => {
+        if (ref.id === 'svc-A') return Promise.resolve({ exists: () => true, data: () => ({ date: todayYmd() }) })
+        if (ref.id === 'svc-B') return Promise.resolve({ exists: () => true, data: () => ({ date: yesterday }) })
+        return Promise.resolve({ exists: () => false, data: () => ({}) })
+      })
+
+      const result = await store.countAssignments('vamp-1')
+
+      expect(result).toEqual({ assignedAnywhere: true, upcomingServiceCount: 1 })
+      expect(getDoc).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not count a service whose getDoc reports it does not exist', async () => {
+      const { getDocs, getDoc } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        docs: [{ id: 'sg-1', data: () => ({ serviceId: 'svc-A', slides: [{ id: 's1', vampId: 'vamp-1' }] }) }],
+      })
+      ;(getDoc as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ exists: () => false, data: () => ({}) })
+
+      const result = await store.countAssignments('vamp-1')
+
+      expect(result).toEqual({ assignedAnywhere: true, upcomingServiceCount: 0 })
+    })
+
+    it('returns assignedAnywhere false and upcomingServiceCount 0 with no matching slideGroups, and never calls getDoc', async () => {
+      const { getDocs, getDoc } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        docs: [{ id: 'sg-1', data: () => ({ serviceId: 'svc-A', slides: [{ id: 's1', vampId: 'other-vamp' }] }) }],
+      })
+
+      const result = await store.countAssignments('vamp-1')
+
+      expect(result).toEqual({ assignedAnywhere: false, upcomingServiceCount: 0 })
+      expect(getDoc).not.toHaveBeenCalled()
+    })
+
+    it('resolves null (never throws) when getDocs rejects, and logs the error', async () => {
+      const { getDocs } = await import('firebase/firestore')
+      ;(getDocs as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('boom'))
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      const result = await store.countAssignments('vamp-1')
+
+      expect(result).toBeNull()
+      expect(consoleSpy).toHaveBeenCalled()
+      consoleSpy.mockRestore()
+    })
+
+    it('resolves null without calling getDocs when orgId is unset', async () => {
+      const { getDocs } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+
+      const result = await store.countAssignments('vamp-1')
+
+      expect(result).toBeNull()
+      expect(getDocs).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('deleteVamp — conditional Storage keep (R440)', () => {
+    const attachment = {
+      storagePath: 'orgs/org-1/vamp-files/vamp-1/u1/a.mp3',
+      downloadUrl: 'https://cdn.example.com/a.mp3',
+      fileName: 'a.mp3',
+      mimeType: 'audio/mpeg',
+      sizeBytes: 2048,
+      createdAt: { seconds: 1, nanoseconds: 0 },
+      createdBy: 'user-1',
+    }
+
+    it('keeps the MP3 when the scan reports assignedAnywhere true, even with upcomingServiceCount 0 (past-only assignment)', async () => {
+      const { getDocs, getDoc, deleteDoc } = await import('firebase/firestore')
+      const { deleteObject } = await import('firebase/storage')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeVamp({ attachment })])
+
+      const yesterday = (() => {
+        const d = new Date()
+        d.setDate(d.getDate() - 1)
+        return todayYmd(d)
+      })()
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        docs: [{ id: 'sg-1', data: () => ({ serviceId: 'svc-A', slides: [{ id: 's1', vampId: 'vamp-1' }] }) }],
+      })
+      ;(getDoc as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ exists: () => true, data: () => ({ date: yesterday }) })
+
+      await store.deleteVamp('vamp-1')
+
+      expect(deleteObject).not.toHaveBeenCalled()
+      expect(deleteDoc).toHaveBeenCalledOnce()
+    })
+
+    it('cascades the Storage delete when the scan reports assignedAnywhere false (Phase 140 behavior preserved)', async () => {
+      const { getDocs, deleteDoc } = await import('firebase/firestore')
+      const { deleteObject } = await import('firebase/storage')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeVamp({ attachment })])
+
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ docs: [] })
+
+      await store.deleteVamp('vamp-1')
+
+      expect(deleteObject).toHaveBeenCalledOnce()
+      expect(deleteDoc).toHaveBeenCalledOnce()
+      const deleteObjectCallOrder = (deleteObject as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!
+      const deleteDocCallOrder = (deleteDoc as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!
+      expect(deleteObjectCallOrder).toBeLessThan(deleteDocCallOrder)
+    })
+
+    it('keeps the MP3 (fail-safe) when the scan fails', async () => {
+      const { getDocs, deleteDoc } = await import('firebase/firestore')
+      const { deleteObject } = await import('firebase/storage')
+      ;(getDocs as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('denied'))
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeVamp({ attachment })])
+
+      await store.deleteVamp('vamp-1')
+
+      expect(deleteObject).not.toHaveBeenCalled()
+      expect(deleteDoc).toHaveBeenCalledOnce()
+      consoleSpy.mockRestore()
+    })
+
+    it('deleteVamp on a missing vamp id resolves without throwing (idempotent)', async () => {
+      const { getDocs, deleteDoc } = await import('firebase/firestore')
+      const { deleteObject } = await import('firebase/storage')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeVamp({ id: 'vamp-1', attachment })])
+
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ docs: [] })
+
+      await expect(store.deleteVamp('missing-id')).resolves.toBeUndefined()
+
+      expect(deleteObject).not.toHaveBeenCalled()
+      expect(deleteDoc).toHaveBeenCalledOnce()
     })
   })
 

@@ -7,6 +7,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDocs,
+  getDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -14,7 +16,10 @@ import {
 } from 'firebase/firestore'
 import { ref as storageRef, deleteObject } from 'firebase/storage'
 import { db, storage } from '@/firebase'
-import type { Vamp, VampAttachment, UpsertVampInput } from '@/types/vamp'
+import { todayYmd } from '@/utils/myScheduleGrouping'
+import type { Vamp, VampAttachment, UpsertVampInput, VampAssignmentScan } from '@/types/vamp'
+import type { SlideGroup } from '@/types/slideGroup'
+import type { Service } from '@/types/service'
 
 /** R435/R436 — org-scoped Vamps library store. Narrowed mirror of
  * songs.ts: no legacy-field normalization, no tag/VW-type/import machinery,
@@ -87,13 +92,47 @@ export const useVampStore = defineStore('vamps', () => {
     return setAttachment(id, null)
   }
 
+  // R440 — mirrors services.ts resyncRehearseAccessForSong: best-effort,
+  // advisory, never blocks the delete. One scan, two derived values (never
+  // conflate the upcoming-only count with the any-assignment keep decision).
+  async function countAssignments(vampId: string): Promise<VampAssignmentScan | null> {
+    const org = orgId.value
+    if (!org) return null
+    try {
+      const groupsSnap = await getDocs(collection(db, 'organizations', org, 'slideGroups'))
+      const serviceIds = new Set<string>()
+      for (const d of groupsSnap.docs) {
+        const data = d.data() as SlideGroup
+        if (data.slides?.some((e) => e.vampId === vampId) && data.serviceId) {
+          serviceIds.add(data.serviceId)
+        }
+      }
+      if (serviceIds.size === 0) return { assignedAnywhere: false, upcomingServiceCount: 0 }
+      const today = todayYmd()
+      const snaps = await Promise.all(
+        [...serviceIds].map((sid) => getDoc(doc(db, 'organizations', org, 'services', sid))),
+      )
+      const upcomingServiceCount = snaps.filter(
+        (s) => s.exists() && ((s.data() as Service).date ?? '') >= today,
+      ).length
+      return { assignedAnywhere: true, upcomingServiceCount }
+    } catch (err) {
+      console.error('countAssignments: scan failed:', err)
+      return null
+    }
+  }
+
   // Single-step hard delete (locked decision — no soft-delete/restore). The
   // Storage cascade is best-effort: a failed deleteObject is logged and
   // never aborts the doc delete, mirroring hardDeleteSong's convention.
   async function deleteVamp(id: string) {
     if (!orgId.value) return
     const vamp = vamps.value.find((v) => v.id === id)
-    if (vamp?.attachment?.storagePath) {
+    // R440 — assigned slides keep their denormalized audioUrl, so the object
+    // must outlive the doc; a failed scan keeps it too (fail-safe).
+    const scan = await countAssignments(id)
+    const keepAttachment = scan === null || scan.assignedAnywhere
+    if (!keepAttachment && vamp?.attachment?.storagePath) {
       try {
         await deleteObject(storageRef(storage, vamp.attachment.storagePath))
       } catch (err) {
@@ -124,5 +163,6 @@ export const useVampStore = defineStore('vamps', () => {
     setAttachment,
     removeAttachment,
     deleteVamp,
+    countAssignments,
   }
 })

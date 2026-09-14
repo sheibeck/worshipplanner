@@ -28,3 +28,11 @@ export interface Vamp {
 }
 
 export type UpsertVampInput = Omit<Vamp, 'id' | 'createdAt' | 'updatedAt'>
+
+/** R440 — one org-wide slideGroups scan, two derived values: the
+ * any-assignment Storage-keep decision and the upcoming-services warning
+ * count. Never conflate them. */
+export interface VampAssignmentScan {
+  assignedAnywhere: boolean
+  upcomingServiceCount: number
+}
