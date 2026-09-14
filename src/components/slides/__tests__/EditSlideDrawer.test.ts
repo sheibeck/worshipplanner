@@ -2719,4 +2719,24 @@ describe('EditSlideDrawer (Phase 141-01 — vamp assignment)', () => {
     expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
     expect(body().find('[data-testid="drawer-status"]').text()).toBe("Couldn't update vamp assignment. Try again.")
   })
+
+  it('iter-2: a successful retry after a failed assign clears the stale error banner', async () => {
+    mockReplaceGroupSlides.mockRejectedValueOnce(new Error('permission-denied'))
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="vamp-picker-open"]').trigger('click')
+    await body().find('[data-vamp-id="vamp-1"][data-testid="vamp-picker-row"]').trigger('click')
+    await flushPromises()
+    expect(body().find('[data-testid="drawer-status"]').text()).toBe("Couldn't update vamp assignment. Try again.")
+
+    // Retry: the entry is unchanged (the failed write never landed), so the same pick is a real write.
+    mockReplaceGroupSlides.mockResolvedValueOnce(undefined)
+    await body().find('[data-testid="vamp-picker-open"]').trigger('click')
+    await body().find('[data-vamp-id="vamp-1"][data-testid="vamp-picker-row"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(2)
+    expect(body().find('[data-testid="drawer-status"]').text()).not.toContain("Couldn't update vamp assignment")
+  })
 })

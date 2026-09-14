@@ -936,17 +936,13 @@ async function attachVampToSlide(vamp: Vamp): Promise<void> {
   const next = base.map((e) =>
     e.id === entryId ? { ...e, audioUrl: downloadUrl, audioLoop: true, vampId: vamp.id, vampLabel: label } : e,
   )
+  beginVampWrite()
   try {
     await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
   } catch (err) {
-    // WR-03: this write had no error handling at all — a rejection (permission-denied,
-    // a stale sourceSignature, offline) left the operator with no feedback and the
-    // old audio state still showing, exactly the silent failure R439 guards against
-    // for playback. Mirrors onSpeakerToggle's console.error, plus the visible
-    // drawer-status slot writeField already uses for a failed field write.
+    // WR-03: surface a rejected write through the drawer-status slot (never silent).
     console.error('Failed to assign vamp to slide:', err)
-    vampStatusText.value = "Couldn't update vamp assignment. Try again."
-    status.value = 'error'
+    failVampWrite()
   }
 }
 
@@ -965,14 +961,24 @@ async function clearVampAssignment(): Promise<void> {
     delete rest.audioLoop
     return rest
   })
+  beginVampWrite()
   try {
     await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
   } catch (err) {
-    // WR-03: same silent-failure gap as attachVampToSlide above.
     console.error('Failed to clear vamp assignment:', err)
-    vampStatusText.value = "Couldn't update vamp assignment. Try again."
-    status.value = 'error'
+    failVampWrite()
   }
+}
+
+// A retried vamp write must not leave the previous failure's banner up (141-REVIEW iter-2).
+function beginVampWrite(): void {
+  vampStatusText.value = null
+  if (status.value === 'error') status.value = 'idle'
+}
+
+function failVampWrite(): void {
+  vampStatusText.value = "Couldn't update vamp assignment. Try again."
+  status.value = 'error'
 }
 
 async function onVampSelected(vamp: Vamp): Promise<void> {
@@ -1139,7 +1145,7 @@ const localNotes = ref('')
 /** Only meaningful when `sourceKind === 'text'` (D-13's one editable exception) — stays '' and unwritten-to for every other kind. */
 const localBody = ref('')
 const status = ref<FieldStatus>('idle')
-/** WR-03: overrides the generic error copy below for a failed vamp assign/clear write, through the same `status`/`drawer-status` slot rather than a second error surface. Cleared whenever a text-field write starts, so a stale vamp message can never survive into an unrelated field error. */
+/** WR-03: vamp-specific copy for the shared `drawer-status` error slot; cleared when any write starts. */
 const vampStatusText = ref<string | null>(null)
 
 /**
