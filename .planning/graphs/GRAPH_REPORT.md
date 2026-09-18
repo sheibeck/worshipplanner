@@ -1,16 +1,16 @@
 # Graph Report - worshipplanner  (2026-09-13)
 
 ## Corpus Check
-- 2816 files · ~5,690,837 words
+- 2817 files · ~6,388,494 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 33655 nodes · 32905 edges · 2970 communities (2673 shown, 297 thin omitted)
+- 34953 nodes · 34206 edges · 2970 communities (2674 shown, 296 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 82 edges (avg confidence: 0.61)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `520b66a7`
+- Built from commit: `9c775d72`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -2866,7 +2866,7 @@
 - [[_COMMUNITY_applyEditQuery|applyEditQuery]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Communities (1848 total, 316 thin omitted)` - 1268 edges
+1. `Communities (2970 total, 297 thin omitted)` - 2553 edges
 2. `Bucket B — Behavioral/Architectural` - 117 edges
 3. `Bucket A — Decision-Rationale` - 95 edges
 4. `Project State` - 56 edges
@@ -2892,11 +2892,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (2970 total, 297 thin omitted)
+## Communities (2970 total, 296 thin omitted)
 
 ### Community 0 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.00
-Nodes (1268): Communities (1848 total, 316 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+1260 more)
+Nodes (2553): Communities (2970 total, 297 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2545 more)
 
 ### Community 1 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.02
@@ -2933,7 +2933,7 @@ Nodes (95): Bucket A — Decision-Rationale, `firestore.rules`, `functions/src/a
 
 ### Community 5 - "ServiceEditorView.vue"
 Cohesion: 0.03
-Nodes (85): assignedVampLabel, attachedAudioFileName, attachedAudioUrl, attachSlideAudio(), attachSlideBackground(), attachVampToSlide(), audioDurationText, audioFailed (+77 more)
+Nodes (89): assignedVampLabel, attachedAudioFileName, attachedAudioUrl, attachSlideAudio(), attachSlideBackground(), attachVampToSlide(), audioDurationText, audioFailed (+81 more)
 
 ### Community 6 - "QuarterView.vue"
 Cohesion: 0.03
@@ -2953,7 +2953,7 @@ Nodes (61): ADR-0050, ADR-0051, ADR-0052, ADR-0053, patchNestedClaimKey(), Admin
 
 ### Community 10 - "Phase 16: Quarterly Schedule Share Link — Research"
 Cohesion: 0.05
-Nodes (56): close(), emit, onItemClick(), onPanelKeydown(), onTriggerClick(), panelRef, props, triggerRef (+48 more)
+Nodes (50): close(), emit, onItemClick(), onPanelKeydown(), onTriggerClick(), panelRef, props, triggerRef (+42 more)
 
 ### Community 11 - "Phase 3: Service Planning - Research"
 Cohesion: 0.04
@@ -3008,8 +3008,8 @@ Cohesion: 0.04
 Nodes (46): Alternatives Considered, Anti-Patterns to Avoid, Architecture Patterns, Claude's Discretion, Code Examples, Common Pitfalls, Core, Deferred Ideas (OUT OF SCOPE) (+38 more)
 
 ### Community 24 - "Phase 10: Export Naming, Template Replace, PC Teams, Orchestra Filter — Research"
-Cohesion: 0.04
-Nodes (46): Backlog, Milestones, Phase 999.2: Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG), Phase 999.3: Monitor Setup — route one signal to multiple monitors; no signal mandatory (✅ COMPLETE), Phase 999.4: v2.8 Architectural Review — Medium/Low findings (ARCH-002..023) (PROMOTED to v2.10), Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10), Phases, Roadmap: WorshipPlanner (+38 more)
+Cohesion: 0.07
+Nodes (28): Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation, Phase 126: My Schedule — Volunteer Home (+20 more)
 
 ### Community 25 - "Phase 4: Output - Research"
 Cohesion: 0.04
@@ -3264,16 +3264,16 @@ Cohesion: 0.06
 Nodes (36): Component & Composable Behavioral Notes (R318), src/components/actionBarItems.ts, src/components/admin/CleanupEnableConfirmDialog.vue, src/components/admin/DeactivateOrgConfirmDialog.vue, src/components/ContextualActionBar.vue, src/components/MiscLabelBadge.vue, src/components/PptxImportModal.vue, src/components/run/RunFilmstrip.vue (+28 more)
 
 ### Community 88 - "Human Verification Required"
-Cohesion: 0.06
-Nodes (29): Outcome notes — where delivery differed from the original wording, Requirements — all met, Requirements: v1.3 — Slides Tab Rework, Still live for future milestones, Verification, Requirements — v2.0 Multi-Church Onboarding & Owner Console Tabs (Phases 72–74), Phase 72: Owner Console Tabs, Phase 73: Multi-Org Storage Auth Claim (+21 more)
+Cohesion: 0.04
+Nodes (41): Phase 10: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions, Phase 11: Song catalog & service planner improvements, Phase 12: Advanced song search and multi-select persistent tag filtering (picker + Songs panel), Phase 13: Volunteer Role Scheduling, Phase 14: In-App Quarterly Availability Editor, Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules, Phase 16.1: Song list tags & columns customization (INSERTED), Phase 16: Quarterly Schedule share link — matrix view, name filter, cross-screen volunteer editing & UX overhaul (+33 more)
 
 ### Community 89 - "Pattern Assignments"
 Cohesion: 0.06
 Nodes (35): Applicable ASVS Categories, Architectural Responsibility Map, Assumptions Log, Both Legitimate Creation Flows, Traced, Claude's Discretion, Common Pitfalls, Deferred Ideas (OUT OF SCOPE), Don't Hand-Roll (+27 more)
 
 ### Community 90 - "ServiceCard.vue"
-Cohesion: 0.06
-Nodes (28): Deployment status (safe config LIVE 2026-08-20), Integration — PASS (0 blockers), Owner-gated / deferred (intentional — not gaps), Phase verifications (all read), Requirements coverage — 12/12 satisfied (3-source cross-reference), Scope, v1.8 Cost & Billing Hardening — Milestone Audit, Verdict (+20 more)
+Cohesion: 0.05
+Nodes (37): Deployment status (safe config LIVE 2026-08-20), Integration — PASS (0 blockers), Owner-gated / deferred (intentional — not gaps), Phase verifications (all read), Requirements coverage — 12/12 satisfied (3-source cross-reference), Scope, v1.8 Cost & Billing Hardening — Milestone Audit, Verdict (+29 more)
 
 ### Community 91 - "SongSlotPicker.vue"
 Cohesion: 0.06
@@ -3516,8 +3516,8 @@ Cohesion: 0.08
 Nodes (24): ARCH-005 — [Low, resolved] Org-provisioning Cloud Functions ARE deployed to production; the Phase 110 "UNDEPLOYED" premise is stale, ARCH-018 — [Medium] Super-admin's universal `isOrgEditor` grant is a genuine, unmitigated privilege-scope weakness (re-evaluated from Phase 78/110 "accepted"; folds in `SEC-ISO-04`), Artifacts this phase produces, Critical/High (→ Phase 113), Medium/Low (→ backlog), Phase 112 Security Review — Consolidated Report, Scope, SEC-A-01 — [Medium] `/api/planningcenter` is reachable with no authentication, unlike every sibling proxy route (+16 more)
 
 ### Community 151 - "Canonical References"
-Cohesion: 0.08
-Nodes (24): Backlog, Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 114: Multi-Monitor Assignment Rework (+16 more)
+Cohesion: 0.06
+Nodes (34): 1. Requirement Coverage (R295–R301), 2. Milestone-Goal Achievement — Full Path Traced, 3. Cross-Phase Integration Seams, 4. Consistency of Decisions, 5. Deploy Posture, 6. Test/Gate Health — Independently Re-Run (not taken from documents), 7. Known/Accepted Debt (not milestone gaps), 8. Minor Findings (documentation only, non-blocking) (+26 more)
 
 ### Community 152 - "Codebase Map"
 Cohesion: 0.16
@@ -4370,8 +4370,8 @@ Cohesion: 0.12
 Nodes (16): Claude's Discretion, Deferred Ideas, Established Patterns, Existing Code Insights, Implementation Decisions, Integration Points, Phase 118: Security — Firestore Rules & Public Share Hardening - Context, Phase Boundary (+8 more)
 
 ### Community 362 - "Phase 16 Plan 04: Scheduler Pairing Honors Per-Role Frequency Summary"
-Cohesion: 0.12
-Nodes (17): Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 117: Security — Proxy Authentication, Rate Limits & Quotas, Phase 118: Security — Firestore Rules & Public Share Hardening, Phase 119: Architecture — Correctness, Batching & Store-Ownership Fixes (+9 more)
+Cohesion: 0.08
+Nodes (25): Backlog, Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 117: Security — Proxy Authentication, Rate Limits & Quotas (+17 more)
 
 ### Community 363 - "Phase 16 Plan 06: Roster Frequency Cleanup + Collapsible Sections Summary"
 Cohesion: 0.12
@@ -5339,7 +5339,7 @@ Nodes (22): audioEl, emit, onEnded(), onError(), onPause(), onPlay(), play(), re
 
 ### Community 602 - "SongLyricEditor.vue"
 Cohesion: 0.04
-Nodes (39): authStore, confirmRemove(), creditsForm, currentLyrics, EditableLyricsState, editableState, editingCredits, expandedRowKeys (+31 more)
+Nodes (30): authStore, creditsForm, currentLyrics, EditableLyricsState, editableState, editingCredits, expandedRowKeys, hasCredits (+22 more)
 
 ### Community 603 - "T06: Performance Order Builder with drag-and-drop reorder, section add/remove, and reset — 8 passing tests"
 Cohesion: 0.13
@@ -5503,7 +5503,7 @@ Nodes (42): API Proxy Architecture, APIs & External Services, Authentication & I
 
 ### Community 643 - "Graph Report - worshipplanner-fbbba7ac  (2026-07-16)"
 Cohesion: 0.18
-Nodes (10): Community Hubs (Navigation), Corpus Check, God Nodes (most connected - your core abstractions), Graph Freshness, Graph Report - worshipplanner  (2026-07-25), Import Cycles, Knowledge Gaps, Suggested Questions (+2 more)
+Nodes (10): Community Hubs (Navigation), Corpus Check, God Nodes (most connected - your core abstractions), Graph Freshness, Graph Report - worshipplanner  (2026-09-13), Import Cycles, Knowledge Gaps, Suggested Questions (+2 more)
 
 ### Community 644 - "Quick Task 9: Allow Scripture Preview with Book and Chapter Only — Summary"
 Cohesion: 0.18
@@ -6730,8 +6730,8 @@ Cohesion: 0.15
 Nodes (12): CR-01: Viewer-generated share links silently drop "Who's Serving" (roster/quarters store is never subscribed for non-editors, but the Share button is not editor-gated), Critical Issues, IN-01: `serviceSnapshot` is typed `any`, losing type safety across the whole component, IN-02: Confusing (though not incorrect) optional-chaining comparison in the Who's Serving guard, IN-03: Dead code — `vwTypeLabels` lookup is declared and immediately voided, never actually used, IN-04: Unused `ScriptureRef` type import, Info, Phase 17: Code Review Report (+4 more)
 
 ### Community 951 - "S02: Scripture and Congregational Reading Slides"
-Cohesion: 0.15
-Nodes (12): Phase 10: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions, Phase 11: Song catalog & service planner improvements, Phase 12: Advanced song search and multi-select persistent tag filtering (picker + Songs panel), Phase 13: Volunteer Role Scheduling, Phase 14: In-App Quarterly Availability Editor, Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules, Phase 16.1: Song list tags & columns customization (INSERTED), Phase 16: Quarterly Schedule share link — matrix view, name filter, cross-screen volunteer editing & UX overhaul (+4 more)
+Cohesion: 0.17
+Nodes (11): Fixed Issues, Iteration 2 (orchestrator, inline), Iteration 3 (orchestrator, inline), Phase 141: Code Review Fix Report, Verification, WR-01: Vamp picker's open/closed state is never reset when the drawer closes, only when the selected entry changes, WR-02: The inline vamp picker has no cancel/close affordance of its own, WR-03: Vamp assign/clear writes have no error handling — a failed write is a silent no-feedback failure (+3 more)
 
 ### Community 952 - "package.json"
 Cohesion: 0.15
@@ -8540,8 +8540,8 @@ Cohesion: 0.20
 Nodes (9): Future Requirements (deferred), Live-Output Readability & Layout, Lyric Editor & Song UX, Multi-Monitor Assignment (Run the Service), Out of Scope, Requirements Archive: v2.9 Live Presentation Field Fixes, Requirements: WorshipPlanner — Milestone v2.9, Traceability (+1 more)
 
 ### Community 1396 - "14-02-PLAN.md"
-Cohesion: 0.20
-Nodes (9): IN-01: No warning is shown for a vamp assigned only to past services, even though the MP3 is silently retained, Info, Phase 141: Code Review Report, Summary, Warnings, WR-01: Vamp picker's open/closed state is never reset when the drawer closes, only when the selected entry changes, WR-02: The inline vamp picker has no cancel/close affordance of its own, WR-03: Vamp assign/clear writes have no error handling — a failed write is a silent no-feedback failure (+1 more)
+Cohesion: 0.25
+Nodes (7): IN-01: No warning is shown for a vamp assigned only to past services, even though the MP3 is silently retained, Info, Orchestrator note (iteration 3 close-out), Phase 141: Code Review Report (Re-review, iteration 3 — final), Summary, Warnings, WR-06: The idempotent re-select guard in `attachVampToSlide` bypasses `beginVampWrite()`, so a stale error from a *different* failed assignment survives re-selecting the vamp that's already assigned
 
 ### Community 1397 - "14-03-PLAN.md"
 Cohesion: 0.20
@@ -8865,8 +8865,8 @@ Cohesion: 0.22
 Nodes (8): Analogs to mirror 1:1 (open these and change only names + default):, Component + store gates (bare vitest — excludes rules.test.ts + render-service per CLAUDE.md), Deferred deploy hand-over (DO NOT RUN this phase), Full-suite regression, Server contract this plan mirrors (finalized by Plan 01):, STRIDE Threat Register, Trust Boundaries, Type gate
 
 ### Community 1475 - "Code Examples"
-Cohesion: 0.22
-Nodes (9): Future Requirements (deferred), Gated Bible API Behavior, Manual Fallback (Bible API OFF), Out of Scope, Outcomes, Owner Console Control, Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback, Traceability (+1 more)
+Cohesion: 0.25
+Nodes (9): confirmRemove(), expandRowKey(), isExpanded(), mintSlotId(), onAddSection(), onDuplicate(), onRemove(), orderIndexForRow() (+1 more)
 
 ### Community 1476 - "15-01-PLAN.md"
 Cohesion: 0.22
@@ -11348,6 +11348,10 @@ Nodes (3): heading, props, roles
 Cohesion: 0.33
 Nodes (3): ASSIGNMENTS, { mockOnSnapshot, snapshotCallbacks, mockUnsubscribe, mockSetDoc, mockDeleteDoc, emailState }, TWO_ASSIGNMENTS
 
+### Community 2177 - "SlidePlanRail.test.ts"
+Cohesion: 0.15
+Nodes (7): emit, props, RailRow, rows, showEmptyState, showSkeleton, mockTimestamp
+
 ### Community 2178 - "ToastHost.vue"
 Cohesion: 0.33
 Nodes (4): orderedToasts, SEVERITY, SeverityConfig, toastStore
@@ -13217,24 +13221,24 @@ Cohesion: 0.67
 Nodes (3): clearSongEditQueryParam(), openSongEditRequest(), resolveSongEditRequest()
 
 ## Knowledge Gaps
-- **24466 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+24461 more)
+- **25757 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+25752 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **297 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **296 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Communities (1848 total, 316 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
-  _High betweenness centrality (0.002) - this node is a cross-community bridge._
+- **Why does `Communities (2970 total, 297 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
+  _High betweenness centrality (0.004) - this node is a cross-community bridge._
+- **Why does `Project State` connect `Project State` to `★ v1.4 RESEARCH FINDINGS — read before planning any v1.4 phase`, `★★ STANDING AUTONOMY GRANT — v1.5, granted 2026-08-06`, `Deferred Items`, `⏸ RESUME HERE (2026-07-28 — v1.4 roadmap created, ready to plan Phase 29)`, `✅ v1.4 AUTONOMOUS RUN COMPLETE — 2026-08-03 (first pass)`, `★ v2.7 ROADMAP.md phase breakdown (created 2026-09-01)`, `Current Position`, `★ v1.3 STANDING DECISIONS — apply to every remaining phase (25-28)`, `Deferred UI Follow-up (post-milestone — user request 2026-07-25)`, `🚀 RENDER SERVICE DEPLOYED — 2026-08-06`, `★★ STANDING AUTONOMY GRANT — v1.6, granted 2026-08-11`, `14-04-PLAN.md`, `⛔ AUTONOMOUS RUN STOPPED BEFORE MILESTONE LIFECYCLE — 2026-08-05, and why`, `SongSlideOver.vue`, `⛔ v1.5 AUTONOMOUS RUN STOPPED BEFORE MILESTONE LIFECYCLE — 2026-08-09, and why`, `Accumulated Context`, `★★ STANDING AUTONOMY GRANT — v1.7, granted 2026-08-13`?**
+  _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `main` to the rest of the system?**
-  _24469 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _25760 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
-  _Cohesion score 0.0015772870662460567 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0007833920877399138 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.017094017094017096 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.021549213744903904 - nodes in this community are weakly interconnected._
 - **Should `ServiceEditorView.vue` be split into smaller, more focused modules?**
   _Cohesion score 0.011111111111111112 - nodes in this community are weakly interconnected._
-- **Should `ServiceEditorView.vue` be split into smaller, more focused modules?**
-  _Cohesion score 0.021052631578947368 - nodes in this community are weakly interconnected._
