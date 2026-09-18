@@ -6,6 +6,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   doc,
   getDocs,
   getDoc,
@@ -55,20 +56,31 @@ export const useVampStore = defineStore('vamps', () => {
     isLoading.value = true
   }
 
+  // Firestore rejects `undefined` field values (no ignoreUndefinedProperties),
+  // and the editor sends `tempo: undefined` for a blank optional BPM.
+  function withoutUndefined<T extends object>(data: T): Partial<T> {
+    return Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined)) as Partial<T>
+  }
+
   async function addVamp(data: UpsertVampInput): Promise<string | undefined> {
     if (!orgId.value) return undefined
     const docRef = await addDoc(collection(db, 'organizations', orgId.value, 'vamps'), {
-      ...data,
+      ...withoutUndefined(data),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })
     return docRef.id
   }
 
+  // An explicit `undefined` on update means "clear it" → deleteField(); an
+  // absent key means "leave it alone".
   async function updateVamp(id: string, data: Partial<UpsertVampInput>) {
     if (!orgId.value) return
+    const payload = Object.fromEntries(
+      Object.entries(data).map(([k, v]) => [k, v === undefined ? deleteField() : v]),
+    )
     await updateDoc(doc(db, 'organizations', orgId.value, 'vamps', id), {
-      ...data,
+      ...payload,
       updatedAt: serverTimestamp(),
     })
   }
