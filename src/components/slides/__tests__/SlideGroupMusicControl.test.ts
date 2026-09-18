@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import SlideGroupMusicControl from '../SlideGroupMusicControl.vue'
 import AudioPlayer from '@/components/AudioPlayer.vue'
 import VampPicker from '@/components/VampPicker.vue'
@@ -253,7 +253,7 @@ describe('SlideGroupMusicControl', () => {
   })
 })
 
-describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2)', () => {
+describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2, 260918-pms)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     progressRef.value = 0
@@ -279,48 +279,78 @@ describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2)', () => {
     updatedAt: {} as never,
   } as Vamp
 
-  it('no bed, isEditor true: renders group-music-add AND group-music-choose-vamp; isEditor false: renders neither', () => {
-    const editorWrapper = mount(SlideGroupMusicControl, {
-      props: { slideCount: 6, orgId: 'org-1', isEditor: true },
-    })
-    expect(editorWrapper.find('[data-testid="group-music-add"]').exists()).toBe(true)
-    expect(editorWrapper.get('[data-testid="group-music-choose-vamp"]').text()).toBe('Choose a vamp')
+  // 260918-pms — the vamp button's class list must be byte-identical to its
+  // `group-music-add` neighbour.
+  const NEIGHBOUR_BUTTON_CLASSES = [
+    'inline-flex',
+    'cursor-pointer',
+    'items-center',
+    'gap-1.5',
+    'rounded-md',
+    'border',
+    'border-gray-700',
+    'px-2.5',
+    'py-1.5',
+    'text-xs',
+    'font-medium',
+    'text-gray-300',
+    'transition-colors',
+    'hover:bg-gray-800',
+  ]
 
-    const viewerWrapper = mount(SlideGroupMusicControl, {
-      props: { slideCount: 6, orgId: 'org-1', isEditor: false },
+  function mountControl(props: Record<string, unknown>) {
+    return mount(SlideGroupMusicControl, {
+      props,
+      global: {
+        // VampPickerSlideOver teleports its markup — render the default slot
+        // in place so it's reachable via wrapper.find (established convention).
+        stubs: { Teleport: { template: '<div><slot /></div>' } },
+      },
     })
+  }
+
+  it('no bed, isEditor true: renders group-music-add AND a real "+ Add a vamp for this group" button matching the neighbour styling; isEditor false: renders neither', () => {
+    const editorWrapper = mountControl({ slideCount: 6, orgId: 'org-1', isEditor: true })
+    expect(editorWrapper.find('[data-testid="group-music-add"]').exists()).toBe(true)
+    const chooseVamp = editorWrapper.get('[data-testid="group-music-choose-vamp"]')
+    expect(chooseVamp.element.tagName).toBe('BUTTON')
+    expect(chooseVamp.attributes('type')).toBe('button')
+    expect(chooseVamp.text()).toBe('+ Add a vamp for this group')
+    expect(chooseVamp.classes()).toEqual(NEIGHBOUR_BUTTON_CLASSES)
+    expect(chooseVamp.classes()).toEqual(editorWrapper.get('[data-testid="group-music-add"]').classes())
+
+    const viewerWrapper = mountControl({ slideCount: 6, orgId: 'org-1', isEditor: false })
     expect(viewerWrapper.find('[data-testid="group-music-add"]').exists()).toBe(false)
     expect(viewerWrapper.find('[data-testid="group-music-choose-vamp"]').exists()).toBe(false)
   })
 
-  it('uploaded bed (no bedVampId): filename + choose-vamp + remove render, no vamp label', () => {
-    const wrapper = mount(SlideGroupMusicControl, {
-      props: {
-        audioUrl: 'https://storage.example.com/existing.mp3',
-        slideCount: 6,
-        orgId: 'org-1',
-        isEditor: true,
-      },
+  it('uploaded bed (no bedVampId): filename + a real "+ Add a vamp for this group" button + remove render, no vamp label', () => {
+    const wrapper = mountControl({
+      audioUrl: 'https://storage.example.com/existing.mp3',
+      slideCount: 6,
+      orgId: 'org-1',
+      isEditor: true,
     })
 
     expect(wrapper.find('[data-testid="group-music-filename"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="group-music-choose-vamp"]').exists()).toBe(true)
+    const chooseVamp = wrapper.get('[data-testid="group-music-choose-vamp"]')
+    expect(chooseVamp.element.tagName).toBe('BUTTON')
+    expect(chooseVamp.text()).toBe('+ Add a vamp for this group')
+    expect(chooseVamp.classes()).toEqual(NEIGHBOUR_BUTTON_CLASSES)
     expect(wrapper.find('[data-testid="group-music-remove"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="group-music-vamp-label"]').exists()).toBe(false)
   })
 
-  it('vamp bed: shows Vamp label with title, scope line, preview, Change/Clear; hides filename/remove/stale', () => {
-    const wrapper = mount(SlideGroupMusicControl, {
-      props: {
-        audioUrl: 'https://cdn.example/open-response.mp3',
-        bedVampId: 'vamp-1',
-        bedVampLabel: 'Open Response · G',
-        vamps: [vamp1],
-        vampsLoading: false,
-        slideCount: 4,
-        orgId: 'org-1',
-        isEditor: true,
-      },
+  it('vamp bed: shows Vamp label with title, scope line, preview, Change/Clear (Change keeps its small-action styling); hides filename/remove/stale', () => {
+    const wrapper = mountControl({
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Open Response · G',
+      vamps: [vamp1],
+      vampsLoading: false,
+      slideCount: 4,
+      orgId: 'org-1',
+      isEditor: true,
     })
 
     const label = wrapper.get('[data-testid="group-music-vamp-label"]')
@@ -329,23 +359,24 @@ describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2)', () => {
     expect(wrapper.find('[data-testid="group-music-filename"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="group-music-scope"]').text()).toBe('plays across all 4 slides')
     expect(wrapper.find('[data-testid="group-music-preview"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="group-music-vamp-change"]').text()).toBe('Change')
+    const change = wrapper.get('[data-testid="group-music-vamp-change"]')
+    expect(change.text()).toBe('Change')
+    expect(change.classes()).toContain('text-indigo-400')
+    expect(change.classes()).not.toContain('border-gray-700')
     expect(wrapper.get('[data-testid="group-music-vamp-clear"]').text()).toBe('Clear')
     expect(wrapper.find('[data-testid="group-music-remove"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="group-music-vamp-stale"]').exists()).toBe(false)
   })
 
   it('clicking group-music-vamp-clear emits remove exactly once, never attach/attach-vamp', async () => {
-    const wrapper = mount(SlideGroupMusicControl, {
-      props: {
-        audioUrl: 'https://cdn.example/open-response.mp3',
-        bedVampId: 'vamp-1',
-        bedVampLabel: 'Open Response · G',
-        vamps: [vamp1],
-        slideCount: 4,
-        orgId: 'org-1',
-        isEditor: true,
-      },
+    const wrapper = mountControl({
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Open Response · G',
+      vamps: [vamp1],
+      slideCount: 4,
+      orgId: 'org-1',
+      isEditor: true,
     })
 
     await wrapper.get('[data-testid="group-music-vamp-clear"]').trigger('click')
@@ -356,48 +387,42 @@ describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2)', () => {
   })
 
   it('a vamp not in the loaded list shows the stale hint when not loading, and hides it while loading; Clear still emits remove', async () => {
-    const wrapper = mount(SlideGroupMusicControl, {
-      props: {
-        audioUrl: 'https://cdn.example/gone.mp3',
-        bedVampId: 'vamp-gone',
-        bedVampLabel: 'Gone · A',
-        vamps: [vamp1],
-        vampsLoading: false,
-        slideCount: 4,
-        orgId: 'org-1',
-        isEditor: true,
-      },
+    const wrapper = mountControl({
+      audioUrl: 'https://cdn.example/gone.mp3',
+      bedVampId: 'vamp-gone',
+      bedVampLabel: 'Gone · A',
+      vamps: [vamp1],
+      vampsLoading: false,
+      slideCount: 4,
+      orgId: 'org-1',
+      isEditor: true,
     })
     expect(wrapper.get('[data-testid="group-music-vamp-stale"]').text()).toBe('(no longer in library)')
     await wrapper.get('[data-testid="group-music-vamp-clear"]').trigger('click')
     expect(wrapper.emitted('remove')).toEqual([[]])
 
-    const loadingWrapper = mount(SlideGroupMusicControl, {
-      props: {
-        audioUrl: 'https://cdn.example/gone.mp3',
-        bedVampId: 'vamp-gone',
-        bedVampLabel: 'Gone · A',
-        vamps: [vamp1],
-        vampsLoading: true,
-        slideCount: 4,
-        orgId: 'org-1',
-        isEditor: true,
-      },
+    const loadingWrapper = mountControl({
+      audioUrl: 'https://cdn.example/gone.mp3',
+      bedVampId: 'vamp-gone',
+      bedVampLabel: 'Gone · A',
+      vamps: [vamp1],
+      vampsLoading: true,
+      slideCount: 4,
+      orgId: 'org-1',
+      isEditor: true,
     })
     expect(loadingWrapper.find('[data-testid="group-music-vamp-stale"]').exists()).toBe(false)
   })
 
-  it('vamp bed with isEditor false: label and preview render; Change, Clear and Choose a vamp do not', () => {
-    const wrapper = mount(SlideGroupMusicControl, {
-      props: {
-        audioUrl: 'https://cdn.example/open-response.mp3',
-        bedVampId: 'vamp-1',
-        bedVampLabel: 'Open Response · G',
-        vamps: [vamp1],
-        slideCount: 4,
-        orgId: 'org-1',
-        isEditor: false,
-      },
+  it('vamp bed with isEditor false: label and preview render; Change, Clear and the vamp button do not, nor does the slide-over', () => {
+    const wrapper = mountControl({
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Open Response · G',
+      vamps: [vamp1],
+      slideCount: 4,
+      orgId: 'org-1',
+      isEditor: false,
     })
 
     expect(wrapper.find('[data-testid="group-music-vamp-label"]').exists()).toBe(true)
@@ -405,53 +430,113 @@ describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2)', () => {
     expect(wrapper.find('[data-testid="group-music-vamp-change"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="group-music-vamp-clear"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="group-music-choose-vamp"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(false)
   })
 
-  it('clicking group-music-choose-vamp mounts VampPicker; select emits attach-vamp and unmounts; cancel unmounts with no emit', async () => {
-    const wrapper = mount(SlideGroupMusicControl, {
-      props: { slideCount: 6, orgId: 'org-1', isEditor: true, vamps: [vamp1], vampsLoading: false },
-    })
+  it('nothing renders inline before any click — no slide-over, no VampPicker', () => {
+    const wrapper = mountControl({ slideCount: 6, orgId: 'org-1', isEditor: true, vamps: [vamp1] })
+
+    expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(false)
+    expect(wrapper.findComponent(VampPicker).exists()).toBe(false)
+  })
+
+  it('clicking group-music-choose-vamp opens the slide-over with the vamp library; selecting a vamp emits attach-vamp and closes it', async () => {
+    const wrapper = mountControl({ slideCount: 6, orgId: 'org-1', isEditor: true, vamps: [vamp1], vampsLoading: false })
 
     await wrapper.get('[data-testid="group-music-choose-vamp"]').trigger('click')
+
+    const slideOver = wrapper.get('[data-testid="vamp-picker-slide-over"]')
+    expect(slideOver.exists()).toBe(true)
+    expect(wrapper.get('[data-testid="vamp-picker-slide-over-title"]').text()).toBe('Choose a vamp')
+    expect(slideOver.find('[data-testid="vamp-picker-panel"]').exists()).toBe(true)
+
     const picker = wrapper.findComponent(VampPicker)
     expect(picker.exists()).toBe(true)
     expect(picker.props('vamps')).toEqual([vamp1])
     expect(picker.props('loading')).toBe(false)
+    expect(picker.props('selectedVampId')).toBe(null)
 
     await picker.vm.$emit('select', vamp1)
     expect(wrapper.emitted('attach-vamp')).toEqual([[vamp1]])
-    expect(wrapper.findComponent(VampPicker).exists()).toBe(false)
-
-    await wrapper.get('[data-testid="group-music-choose-vamp"]').trigger('click')
-    await wrapper.findComponent(VampPicker).vm.$emit('cancel')
-    expect(wrapper.findComponent(VampPicker).exists()).toBe(false)
-    expect(wrapper.emitted('attach-vamp')!.length).toBe(1)
+    expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(false)
   })
 
-  it('clicking group-music-vamp-change on a vamp bed mounts the picker with the current vamp pre-selected', async () => {
-    const wrapper = mount(SlideGroupMusicControl, {
-      props: {
-        audioUrl: 'https://cdn.example/open-response.mp3',
-        bedVampId: 'vamp-1',
-        bedVampLabel: 'Open Response · G',
-        vamps: [vamp1],
-        slideCount: 4,
-        orgId: 'org-1',
-        isEditor: true,
-      },
+  it('cancelling the picker closes the slide-over with no emit', async () => {
+    const wrapper = mountControl({ slideCount: 6, orgId: 'org-1', isEditor: true, vamps: [vamp1] })
+
+    await wrapper.get('[data-testid="group-music-choose-vamp"]').trigger('click')
+    await wrapper.get('[data-testid="vamp-picker-cancel"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(false)
+    expect(wrapper.emitted('attach-vamp')).toBeUndefined()
+  })
+
+  it('clicking the backdrop closes the slide-over with no emit', async () => {
+    const wrapper = mountControl({ slideCount: 6, orgId: 'org-1', isEditor: true, vamps: [vamp1] })
+
+    await wrapper.get('[data-testid="group-music-choose-vamp"]').trigger('click')
+    await wrapper.get('[data-testid="vamp-picker-slide-over-backdrop"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(false)
+    expect(wrapper.emitted('attach-vamp')).toBeUndefined()
+  })
+
+  it('clicking the header close button closes the slide-over with no emit', async () => {
+    const wrapper = mountControl({ slideCount: 6, orgId: 'org-1', isEditor: true, vamps: [vamp1] })
+
+    await wrapper.get('[data-testid="group-music-choose-vamp"]').trigger('click')
+    await wrapper.get('[data-testid="vamp-picker-slide-over-close"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(false)
+    expect(wrapper.emitted('attach-vamp')).toBeUndefined()
+  })
+
+  it('Escape closes the slide-over with no emit', async () => {
+    const wrapper = mountControl({ slideCount: 6, orgId: 'org-1', isEditor: true, vamps: [vamp1] })
+
+    await wrapper.get('[data-testid="group-music-choose-vamp"]').trigger('click')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await nextTick()
+
+    expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(false)
+    expect(wrapper.emitted('attach-vamp')).toBeUndefined()
+  })
+
+  it('uploaded-bed state: clicking group-music-choose-vamp opens the slide-over with no vamp pre-selected', async () => {
+    const wrapper = mountControl({
+      audioUrl: 'https://storage.example.com/existing.mp3',
+      slideCount: 6,
+      orgId: 'org-1',
+      isEditor: true,
+      vamps: [vamp1],
+    })
+
+    await wrapper.get('[data-testid="group-music-choose-vamp"]').trigger('click')
+
+    expect(wrapper.get('[data-testid="vamp-picker-slide-over"]').exists()).toBe(true)
+    expect(wrapper.findComponent(VampPicker).props('selectedVampId')).toBe(null)
+  })
+
+  it('clicking group-music-vamp-change on a vamp bed opens the slide-over with the current vamp pre-selected', async () => {
+    const wrapper = mountControl({
+      audioUrl: 'https://cdn.example/open-response.mp3',
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Open Response · G',
+      vamps: [vamp1],
+      slideCount: 4,
+      orgId: 'org-1',
+      isEditor: true,
     })
 
     await wrapper.get('[data-testid="group-music-vamp-change"]').trigger('click')
-    const picker = wrapper.findComponent(VampPicker)
-    expect(picker.exists()).toBe(true)
-    expect(picker.props('selectedVampId')).toBe('vamp-1')
+
+    expect(wrapper.get('[data-testid="vamp-picker-slide-over"]').exists()).toBe(true)
+    expect(wrapper.findComponent(VampPicker).props('selectedVampId')).toBe('vamp-1')
   })
 
   it('selecting a file via group-music-input still emits attach(url) exactly as before', async () => {
     mockUploadMedia.mockResolvedValue('https://storage.example.com/org-1/media/def/pad.mp3')
-    const wrapper = mount(SlideGroupMusicControl, {
-      props: { slideCount: 6, orgId: 'org-1', isEditor: true },
-    })
+    const wrapper = mountControl({ slideCount: 6, orgId: 'org-1', isEditor: true })
 
     await selectFile(wrapper, 'group-music-input', makeFile('pad.mp3', 'audio/mpeg'))
 
