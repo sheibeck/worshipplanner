@@ -110,3 +110,6 @@ tmp/
 .gsd/DISCUSSION-MANIFEST.json
 .gsd/milestones/**/*-CONTINUE.md
 .gsd/milestones/**/continue.md
+
+# graphify transient rebuild lock (holds the running PID)
+.planning/graphs/.rebuild.lock
