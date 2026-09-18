@@ -324,14 +324,23 @@ export function useRunControl(options: UseRunControlOptions = {}) {
    * assembler deliberately never carries vamp fields) — resolve it via the raw
    * GroupSlideEntry instead. `null` = no assignment; `''` = assigned without a
    * label (UI-SPEC E6 partial).
+   *
+   * 260918-nm2 — falls back to the group's bedVampId when the slide has no
+   * own audio (keyed on groupId alone so the groupSlideId-less reference
+   * slide resolves too). An entry expected but not found (a stale
+   * groupSlideId) is treated as "unknown", not "no own audio" — it is
+   * excluded from the bed fallback so a genuinely own-audio slide never
+   * borrows the bed's badge.
    */
   function vampLabelFor(slide: AssembledSlide | null): string | null {
-    if (!slide?.groupId || !slide.groupSlideId) return null
-    const entry = slideGroupsStore.groupsBySlotId
-      .get(slide.groupId)
-      ?.slides.find((e) => e.id === slide.groupSlideId)
-    if (!entry?.vampId) return null
-    return entry.vampLabel ?? ''
+    if (!slide?.groupId) return null
+    const group = slideGroupsStore.groupsBySlotId.get(slide.groupId)
+    if (!group) return null
+    const entry = slide.groupSlideId ? group.slides.find((e) => e.id === slide.groupSlideId) : undefined
+    if (entry?.vampId) return entry.vampLabel ?? ''
+    if (slide.groupSlideId && !entry) return null
+    if (!entry?.audioUrl && group.bedVampId) return group.bedVampLabel ?? ''
+    return null
   }
   const currentVampLabel = computed(() => vampLabelFor(current.value))
   const nextVampLabel = computed(() => vampLabelFor(next.value))

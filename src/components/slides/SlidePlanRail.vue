@@ -147,7 +147,12 @@ const rows = computed<RailRow[]>(() => {
         count,
         title: slotDisplayTitle(slot),
         badgeClass: KIND_BADGE_CLASSES[slot.kind],
-        bedLabel: group?.bedAudioUrl ? bedAudioLabel(group.bedAudioUrl) : null,
+        // 260918-nm2 — vamp bed shows its label, not the MP3 filename
+        bedLabel: group?.bedVampId
+          ? `Vamp${group.bedVampLabel ? ': ' + group.bedVampLabel : ''}`
+          : group?.bedAudioUrl
+            ? bedAudioLabel(group.bedAudioUrl)
+            : null,
         selected: slot.id === props.selectedSlotId,
       }
     })

@@ -529,7 +529,7 @@ describe('useSlideGroups', () => {
       })
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as Record<string, unknown>
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
       expect(payload.bedAudioUrl).toBe('https://cdn.example/open-response.mp3')
       expect(payload.bedVampId).toBe('vamp-1')
       expect(payload.bedVampLabel).toBe('Open Response · G')
@@ -557,7 +557,7 @@ describe('useSlideGroups', () => {
 
       await store.setGroupBedMedia('org-1', 'slot-1', { serviceId: 'service-1', clearAudio: true })
 
-      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as Record<string, unknown>
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
       expect(payload.bedAudioUrl).toBe('__deleteField__')
       expect(payload.bedVampId).toBe('__deleteField__')
       expect(payload.bedVampLabel).toBe('__deleteField__')
@@ -584,7 +584,7 @@ describe('useSlideGroups', () => {
         bedAudioUrl: 'https://example.com/bed.mp3',
       })
 
-      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as Record<string, unknown>
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
       expect(payload.bedAudioUrl).toBe('https://example.com/bed.mp3')
       expect(payload.bedVampId).toBe('__deleteField__')
       expect(payload.bedVampLabel).toBe('__deleteField__')
