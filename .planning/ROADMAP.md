@@ -949,6 +949,33 @@ Plans:
 
 **UI hint**: yes
 
+### Phase 999.6: Rework rehearsal/report times — dated rehearsals + move Times to a tab after Messages (BACKLOG)
+
+**Goal:** [Captured for future planning] Rework the Phase 139 (v2.15, R429–R433) rehearsal/report-time UX.
+Owner feedback 2026-09-18 during the v2.15 prod UAT:
+
+- **Every rehearsal must have a date.** Today an org-default rehearsal time pre-fills a rehearsal row with
+  the default time and a *blank* date (139 design: "default time, blank date"); rehearsals should not exist
+  without a date. Keep the org-level default *times* concept, but a rehearsal row is only real once dated
+  (decide during discuss: prompt for the date on add, or default it relative to the service date).
+- **Default report time is fine as-is** (org default → copied onto the new service).
+- **Move the "Times" block off the top of the service editor.** The `Times` / `+ Add rehearsal` /
+  `Report time` cluster currently sits above the tab strip in `ServiceEditorView.vue`; it belongs in its own
+  **tab after "Messages"** (Service Order · Slides · Roles · Stage Layout · Messages · **Times**), following
+  the existing tab-strip UX patterns (mobile-scrolling `.scrollbar-hide` strip, editor/locked read-only
+  gating, same autosave behaviour). Cross-surface display (dashboard, services card, My Schedule, volunteer
+  view, public plan page — R433) is unchanged.
+
+**Requirements:** TBD (revises R429/R430/R431; R432/R433 unchanged)
+**Plans:** 0 plans
+
+Area: `src/views/ServiceEditorView.vue` (Times block ~lines 300–330 + tab strip), `src/types/service.ts`
+(`rehearsals?: { id; date; time }[]`, `reportTime`), `SettingsView` org defaults, the two hand-maintained
+projections (`buildServiceSnapshot`, `buildRehearseAccess`) if the shape changes.
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
 
 **Goal:** [Captured for future planning] Consolidates all 11 Medium/Low security findings
