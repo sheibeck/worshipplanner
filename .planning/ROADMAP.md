@@ -768,7 +768,7 @@ Full details: [milestones/v2.13-ROADMAP.md](milestones/v2.13-ROADMAP.md) · requ
 
 ### ✅ v2.14 Services UX Alignment, Dashboard & Live-Stream Output — SHIPPED & DEPLOYED 2026-09-09 (Phases 131-137) — R406-R427, audit PASSED (7/7 phases, 22/22 reqs, 5/5 integration seams); human/hardware UAT owner-accepted as deferred (`v2.14-DEFERRED-VERIFICATION.md`). Full detail archived: [milestones/v2.14-ROADMAP.md](milestones/v2.14-ROADMAP.md)
 
-### 🚧 v2.15 Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
+### 🚧 v2.15 Service Times, Vamps & Field Fixes (Phases 138-141 — all executed + auto-verified 2026-09-18; OPEN at batched-UAT gate, UNDEPLOYED)
 
 **Milestone Goal:** Give services real rehearsal/report *times* (with org-level defaults) surfaced
 everywhere the date already shows, add a keyed **Vamps** library whose mp3 plays live as slide audio,
@@ -812,8 +812,8 @@ v2.15" section; research: `.planning/research/SUMMARY.md`, `ARCHITECTURE.md`, `P
 
 - [x] **Phase 138: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link** - A multi-church user opening a nav link in a new tab lands on the intended page, and every service-update email reliably links to the plan _(executed + auto-verified 7/7, SECURED, nyquist-validated; browser UAT deferred → v2.15-DEFERRED-VERIFICATION.md)_
 - [x] **Phase 139: Rehearsal & Report Times** - Services carry real rehearsal/report times pre-filled from org-level defaults, editable per service, and visible everywhere the date already shows _(executed + auto-verified 6/6, SECURED, nyquist-validated, 2 code-review criticals fixed; visual/UX UAT deferred → v2.15-DEFERRED-VERIFICATION.md)_
-- [ ] **Phase 140: Vamps Library — CRUD & Storage** - Editors build and maintain a keyed library of vamp audio, mirroring how they manage Songs
-- [ ] **Phase 141: Vamp Slide Assignment & Live Playback** - A planner assigns a vamp to a slide and it plays audibly and reliably in Run the Service, with no silent failures
+- [x] **Phase 140: Vamps Library — CRUD & Storage** - Editors build and maintain a keyed library of vamp audio, mirroring how they manage Songs _(executed + auto-verified 9/9, SECURED 8/8, nyquist-validated, 1 code-review critical + 2 warnings fixed; visual/deployed-MP3 UAT deferred → v2.15-DEFERRED-VERIFICATION.md)_
+- [x] **Phase 141: Vamp Slide Assignment & Live Playback** - A planner assigns a vamp to a slide and it plays audibly and reliably in Run the Service, with no silent failures _(executed + auto-verified 5/5, SECURED 18/18, nyquist-validated 0 gaps, 4 code-review warnings fixed; real-speaker/fresh-profile UAT deferred → v2.15-DEFERRED-VERIFICATION.md)_
 
 ### Phase 138: Field Fixes — Church-Picker Deep-Link & Service-Update Email Link
 

@@ -4,11 +4,11 @@ milestone: v2.15
 milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
 current_phase: 141
 current_phase_name: Vamp Slide Assignment & Live Playback
-status: verifying
-stopped_at: Completed 141-04-PLAN.md
+status: awaiting_batched_uat
+stopped_at: Phase 141 verified (human_needed) — all v2.15 phases executed; owner UAT pass pending
 last_updated: "2026-09-14T00:32:37.219Z"
-last_activity: 2026-09-13
-last_activity_desc: Phase 141 execution started
+last_activity: 2026-09-18
+last_activity_desc: Phase 141 verified + secured + nyquist-validated + UI-reviewed; v2.15 at batched-UAT gate
 progress:
   total_phases: 4
   completed_phases: 4
@@ -25,11 +25,18 @@ hardware / human UAT batched into `.planning/v2.15-DEFERRED-VERIFICATION.md` for
 milestone end. These phases are executed, not fully closed — do NOT re-run them; close them via the
 batched UAT. Deferrals are PENDING, never counted as owner-accepted.
 
+**2026-09-18 — all four v2.15 phases are now executed + auto-verified.** The autonomous run resumed at
+Phase 141's missing verify step (the 2026-09-13 session ended after code review, before the verifier ran),
+produced 141-VERIFICATION.md (human_needed, 5/5), 141-UAT.md, 141-VALIDATION.md (validated), 141-SECURITY.md
+(secured) and 141-UI-REVIEW.md. **The milestone is now at the batched-UAT gate** — nothing is deployed;
+owner pass per `v2.15-DEFERRED-VERIFICATION.md` (incl. its closeout checklist) is the next step.
+
 | Phase | State | Resume |
 |-------|-------|--------|
 | 138 | verification_deferred_human (auto-verified 7/7 must-haves green + SECURED 5/5 + nyquist validated; real-browser new-tab/deep-link church restore UAT pending) | /gsd-verify-work 138 |
 | 139 | verification_deferred_human (auto-verified 6/6 must-haves green + SECURED 7/7 + nyquist validated; 2 code-review criticals fixed; cross-surface time display + org-defaults settings UX UAT pending) | /gsd-verify-work 139 |
 | 140 | verification_deferred_human (auto-verified 9/9 must-haves green + SECURED 8/8 + nyquist validated; 1 code-review critical + 2 warnings fixed; Vamps-tab visual fidelity + deployed MP3 upload/replace/remove round-trip UAT pending) | /gsd-verify-work 140 |
+| 141 | verification_deferred_human (auto-verified 5/5 must-haves green + SECURED 18/18 + nyquist validated 0 gaps; 4 code-review warnings fixed over 3 iterations; full-suite regression gate + type-check clean 2026-09-18; real-speaker/fresh-profile arm + blocked-banner + visual fidelity + delete-keeps-MP3 UAT pending) | /gsd-verify-work 141 |
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
 
@@ -1418,10 +1425,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 141 (Vamp Slide Assignment & Live Playback) — EXECUTING
+Phase: 141 (Vamp Slide Assignment & Live Playback) — EXECUTED + AUTO-VERIFIED (human_needed, deferred to batched UAT)
 Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-09-13 — Phase 141 execution started
+Status: All v2.15 phases (138–141) executed + auto-verified; milestone OPEN at the batched-UAT gate (not deployed, not audited/archived)
+Last activity: 2026-09-18 — Phase 141 verify/secure/nyquist/UI-review closeout; v2.15-DEFERRED-VERIFICATION.md complete
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
