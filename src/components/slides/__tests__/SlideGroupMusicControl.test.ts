@@ -298,7 +298,7 @@ describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2, 260918-pm
     'hover:bg-gray-800',
   ]
 
-  function mountControl(props: Record<string, unknown>) {
+  function mountControl(props: InstanceType<typeof SlideGroupMusicControl>['$props']) {
     return mount(SlideGroupMusicControl, {
       props,
       global: {
@@ -446,7 +446,6 @@ describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2, 260918-pm
     await wrapper.get('[data-testid="group-music-choose-vamp"]').trigger('click')
 
     const slideOver = wrapper.get('[data-testid="vamp-picker-slide-over"]')
-    expect(slideOver.exists()).toBe(true)
     expect(wrapper.get('[data-testid="vamp-picker-slide-over-title"]').text()).toBe('Choose a vamp')
     expect(slideOver.find('[data-testid="vamp-picker-panel"]').exists()).toBe(true)
 
@@ -513,7 +512,7 @@ describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2, 260918-pm
 
     await wrapper.get('[data-testid="group-music-choose-vamp"]').trigger('click')
 
-    expect(wrapper.get('[data-testid="vamp-picker-slide-over"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(true)
     expect(wrapper.findComponent(VampPicker).props('selectedVampId')).toBe(null)
   })
 
@@ -530,7 +529,7 @@ describe('SlideGroupMusicControl — group-level vamp bed (260918-nm2, 260918-pm
 
     await wrapper.get('[data-testid="group-music-vamp-change"]').trigger('click')
 
-    expect(wrapper.get('[data-testid="vamp-picker-slide-over"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(true)
     expect(wrapper.findComponent(VampPicker).props('selectedVampId')).toBe('vamp-1')
   })
 

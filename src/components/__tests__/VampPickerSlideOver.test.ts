@@ -53,7 +53,6 @@ describe('VampPickerSlideOver', () => {
     const wrapper = mountSlideOver({ open: true, vamps: [vamp1, vamp2], loading: true, selectedVampId: 'vamp-1' })
 
     const slideOver = wrapper.get('[data-testid="vamp-picker-slide-over"]')
-    expect(slideOver.exists()).toBe(true)
     expect(wrapper.get('[data-testid="vamp-picker-slide-over-title"]').text()).toBe('Choose a vamp')
     expect(wrapper.get('[data-testid="vamp-picker-slide-over-close"]').attributes('aria-label')).toBe('Close')
 

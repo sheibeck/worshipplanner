@@ -45,10 +45,10 @@
           <button
             v-if="isEditor"
             type="button"
-            class="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
             data-testid="group-music-choose-vamp"
             @click="openVampPicker"
-          >Choose a vamp</button>
+          >+ Add a vamp for this group</button>
           <button
             v-if="isEditor"
             type="button"
@@ -94,20 +94,20 @@
         </label>
         <button
           type="button"
-          class="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+          class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
           data-testid="group-music-choose-vamp"
           @click="openVampPicker"
-        >Choose a vamp</button>
+        >+ Add a vamp for this group</button>
       </div>
     </template>
 
-    <VampPicker
-      v-if="vampPickerOpen && isEditor"
+    <VampPickerSlideOver
+      :open="vampPickerOpen && isEditor"
       :vamps="vamps"
       :loading="vampsLoading"
       :selected-vamp-id="bedVampId ?? null"
       @select="onVampSelected"
-      @cancel="closeVampPicker"
+      @close="closeVampPicker"
     />
 
     <p v-if="isUploading" data-testid="media-upload-progress" class="mt-1 text-indigo-400">
@@ -124,7 +124,7 @@
 import { ref, computed } from 'vue'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import AudioPlayer from '../AudioPlayer.vue'
-import VampPicker from '../VampPicker.vue'
+import VampPickerSlideOver from '../VampPickerSlideOver.vue'
 import type { Vamp } from '@/types/vamp'
 import { bedAudioLabel } from './slideDisplay'
 
@@ -205,6 +205,7 @@ function onRemove(): void {
 }
 
 // 260918-nm2 — group-level vamp bed: emit-only, mirrors EditSlideDrawer's per-slide precedent.
+// 260918-pms — picker now opens in VampPickerSlideOver, not inline.
 const vampPickerOpen = ref(false)
 const isVampBed = computed(() => !!props.audioUrl && !!props.bedVampId)
 const vampStale = computed(
