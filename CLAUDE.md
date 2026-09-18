@@ -32,11 +32,6 @@ record and 1461 files of quarantined worktree snapshots — was deleted on 2026-
 instruction: *"We are no longer using anything in there and we don't want it to be influencing our
 decisions."*
 
-The quarantined copies were not merely dead weight. Their test files import through the `@/` alias,
-which the root Vite config resolves to the **real** `src/` — so a correct change to live source could
-fail a frozen snapshot. They also contributed 10 of the 14 failing files in the test baseline, hiding
-real failures behind permanent noise.
-
 `.planning/` is the only planning state. Do not resurrect `.gsd/` or cite it as precedent; recover it
 from git history only if explicitly asked.
 
@@ -76,12 +71,8 @@ plan or phase is type-clean.
   harness scopes to projectId `test-project` while the app uses `worship-planner-bc515`, so both the
   rules install and the per-test `clearFirestore()` leave real data alone.
 
-Known-failing baseline: `src/storage.rules.test.ts` only (Storage-emulator dependent — see below).
-
-> **Updated 2026-08-27 (v2.3 Phase 88):** `src/views/__tests__/RosterView.test.ts`'s stale "Roles config"
-> assertion was fixed when the Roles/Teams tabs moved to the slideout UX, so it is **no longer** a baseline
-> failure. The baseline is now the single `storage.rules.test.ts` file. A bare `npx vitest run` should show
-> exactly one failing file.
+Known-failing baseline: `src/storage.rules.test.ts` only (Storage-emulator dependent — see below). A bare
+`npx vitest run` should show exactly one failing file.
 
 > ### ⚠ `src/storage.rules.test.ts` IS A REAL DEFECT — corrected 2026-08-06
 >
@@ -131,12 +122,5 @@ main checkout at `C:\projects\worshipplanner\.env.local`. Without these values y
   `VITE_FIREBASE_*` var is missing (guard added so an empty-apiKey bundle can never ship
   again; the original incident was a build from a worktree lacking `.env.local`).
 
-**Setup in a new worktree (do this before running emulator/tests/build):**
-
-- Preferred — symlink to the single source of truth (needs Windows admin / Developer Mode):
-  `New-Item -ItemType SymbolicLink -Path .\.env.local -Target C:\projects\worshipplanner\.env.local`
-- Fallback — copy it (works without elevation, but goes stale if the source changes):
-  `Copy-Item C:\projects\worshipplanner\.env.local .\.env.local`
-
-The `vite build` guard only checks `VITE_FIREBASE_*`, but the file also carries `ESV_API_KEY`,
-`CLAUDE_API_KEY`, and `VITE_PLANNINGCENTER_*` — copy/symlink the whole file, don't cherry-pick.
+**In a new worktree, run the `worktree-env-setup` skill** (symlink or copy the whole file from the main
+checkout — never cherry-pick keys) before running the emulator, tests, or a build.
