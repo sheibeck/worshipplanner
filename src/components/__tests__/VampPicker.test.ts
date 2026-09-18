@@ -25,6 +25,24 @@ function makeVamp(overrides: Partial<Vamp> = {}): Vamp {
 }
 
 describe('VampPicker', () => {
+  // 260918-pms — inside a full-height slide-over the picker fills the body
+  // instead of rendering as a capped inline card.
+  it('fill: default keeps the inline card (mt-2 panel, max-h-56 list)', () => {
+    const wrapper = mount(VampPicker, { props: { vamps: [makeVamp({ id: 'v1', name: 'A', key: 'C' })] } })
+    expect(wrapper.get('[data-testid="vamp-picker-panel"]').classes()).toContain('mt-2')
+    expect(wrapper.get('[data-testid="vamp-picker-list"]').classes()).toContain('max-h-56')
+  })
+
+  it('fill: true drops the inline margin and the list height cap so the list can grow', () => {
+    const wrapper = mount(VampPicker, { props: { vamps: [makeVamp({ id: 'v1', name: 'A', key: 'C' })], fill: true } })
+    const panel = wrapper.get('[data-testid="vamp-picker-panel"]').classes()
+    const list = wrapper.get('[data-testid="vamp-picker-list"]').classes()
+    expect(panel).not.toContain('mt-2')
+    expect(panel).toContain('flex-1')
+    expect(list).not.toContain('max-h-56')
+    expect(list).toContain('flex-1')
+  })
+
   it('renders two enabled rows and one disabled no-MP3 row from three vamps', () => {
     const vamps = [
       makeVamp({ id: 'v-waiting', name: 'Waiting', key: 'D' }),

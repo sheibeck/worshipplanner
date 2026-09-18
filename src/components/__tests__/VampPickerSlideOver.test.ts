@@ -42,6 +42,11 @@ function mountSlideOver(
 }
 
 describe('VampPickerSlideOver', () => {
+  it('hosts VampPicker with fill so the list grows to the panel height (260918-pms)', () => {
+    const wrapper = mountSlideOver({ open: true })
+    expect(wrapper.findComponent(VampPicker).props('fill')).toBe(true)
+  })
+
   it('open: false renders nothing — no slide-over, no backdrop, no VampPicker', () => {
     const wrapper = mountSlideOver({ open: false })
     expect(wrapper.find('[data-testid="vamp-picker-slide-over"]').exists()).toBe(false)
