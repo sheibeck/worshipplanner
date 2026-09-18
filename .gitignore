@@ -36,8 +36,10 @@ coverage/
 *.stackdump
 
 # Claude Code local tooling state (per-machine; not shared via the repo).
-# settings.local.json and worktrees/ are already covered by the global gitignore.
+# .claude/skills/ IS shared (project skills). settings.local.json is also in the
+# global gitignore on the primary machine; listed here so clones behave the same.
 .claude/settings.json
+.claude/settings.local.json
 .claude/scheduled_tasks.lock
 
 # Graphify: commit the graph data (graph.json — for /gsd-graphify query) and the GRAPH_REPORT.md
