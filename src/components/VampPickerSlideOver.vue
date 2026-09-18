@@ -50,8 +50,9 @@
         </div>
 
         <!-- Body -->
-        <div class="flex-1 overflow-y-auto px-5 py-5">
+        <div class="flex-1 min-h-0 flex flex-col px-5 py-5">
           <VampPicker
+            fill
             :vamps="vamps"
             :loading="loading"
             :selected-vamp-id="selectedVampId ?? null"
@@ -66,7 +67,7 @@
 
 <script setup lang="ts">
 // 260918-pms — the app's slide-over shell (RoleSlideOver.vue) hosting the
-// unchanged VampPicker; Escape handling mirrors EditSlideDrawer.vue.
+// VampPicker in fill mode; Escape handling mirrors EditSlideDrawer.vue.
 import { watch, onUnmounted } from 'vue'
 import VampPicker from './VampPicker.vue'
 import type { Vamp } from '@/types/vamp'

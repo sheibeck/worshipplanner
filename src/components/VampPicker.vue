@@ -1,5 +1,5 @@
 <template>
-  <div class="mt-2 rounded-md bg-gray-800 border border-gray-700 p-2" data-testid="vamp-picker-panel">
+  <div :class="[fill ? 'flex-1 min-h-0 flex flex-col' : 'mt-2', 'rounded-md bg-gray-800 border border-gray-700 p-2']" data-testid="vamp-picker-panel">
     <input
       v-model="search"
       type="text"
@@ -43,7 +43,7 @@
     </p>
 
     <!-- Rows -->
-    <ul v-else class="max-h-56 overflow-y-auto space-y-1" data-testid="vamp-picker-list">
+    <ul v-else :class="[fill ? 'flex-1 min-h-0' : 'max-h-56', 'overflow-y-auto space-y-1']" data-testid="vamp-picker-list">
       <li v-for="vamp in filtered" :key="vamp.id">
         <button
           v-if="vamp.attachment?.downloadUrl"
@@ -125,6 +125,8 @@ const props = defineProps<{
   vamps: Vamp[]
   loading?: boolean
   selectedVampId?: string | null
+  /** 260918-pms — fill the host (slide-over body) instead of rendering as a capped inline card. */
+  fill?: boolean
 }>()
 
 const emit = defineEmits<{ select: [vamp: Vamp]; cancel: [] }>()
