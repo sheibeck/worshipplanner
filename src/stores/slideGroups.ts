@@ -116,6 +116,8 @@ export const useSlideGroups = defineStore('slideGroups', () => {
   interface BedMediaPatch {
     serviceId: string
     bedAudioUrl?: string
+    bedVampId?: string
+    bedVampLabel?: string
     clearAudio?: boolean
   }
 
@@ -140,8 +142,21 @@ export const useSlideGroups = defineStore('slideGroups', () => {
 
     if (existing.exists()) {
       const update: Record<string, unknown> = { updatedAt: serverTimestamp() }
-      if (patch.clearAudio) update.bedAudioUrl = deleteField()
-      else if (patch.bedAudioUrl !== undefined) update.bedAudioUrl = patch.bedAudioUrl
+      if (patch.clearAudio) {
+        update.bedAudioUrl = deleteField()
+        update.bedVampId = deleteField()
+        update.bedVampLabel = deleteField()
+      } else if (patch.bedAudioUrl !== undefined) {
+        update.bedAudioUrl = patch.bedAudioUrl
+        if (patch.bedVampId) {
+          update.bedVampId = patch.bedVampId
+          update.bedVampLabel = patch.bedVampLabel ?? ''
+        } else {
+          // URL-only write = uploaded file; evict any vamp label so it cannot go stale (260918-nm2)
+          update.bedVampId = deleteField()
+          update.bedVampLabel = deleteField()
+        }
+      }
       await updateDoc(ref, update)
       return
     }
@@ -155,6 +170,8 @@ export const useSlideGroups = defineStore('slideGroups', () => {
           serviceId: patch.serviceId,
           slides: [],
           bedAudioUrl: patch.bedAudioUrl,
+          bedVampId: patch.bedVampId,
+          bedVampLabel: patch.bedVampLabel,
         }),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

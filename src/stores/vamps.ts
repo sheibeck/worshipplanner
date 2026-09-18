@@ -115,7 +115,10 @@ export const useVampStore = defineStore('vamps', () => {
       const serviceIds = new Set<string>()
       for (const d of groupsSnap.docs) {
         const data = d.data() as SlideGroup
-        if (data.slides?.some((e) => e.vampId === vampId) && data.serviceId) {
+        if (
+          (data.bedVampId === vampId || data.slides?.some((e) => e.vampId === vampId)) &&
+          data.serviceId
+        ) {
           serviceIds.add(data.serviceId)
         }
       }

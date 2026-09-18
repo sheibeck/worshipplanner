@@ -302,6 +302,8 @@ function resolveEntryMedia(
   // A group bed never loops (D-04) — audioLoop is copied ONLY when the audio
   // came from the entry itself, never when it resolved from the bed.
   if (!audioFromBed && entry.audioUrl && entry.audioLoop) media.audioLoop = true
+  // vamp-sourced beds loop — 260918-nm2 exception to D-04
+  if (audioFromBed && group.bedVampId) media.audioLoop = true
   if (backgroundImageUrl) media.backgroundImageUrl = backgroundImageUrl
   if (backgroundSource) media.backgroundSource = backgroundSource
   return media
@@ -409,6 +411,8 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       id: `${slot.id}:ref`,
       position: globalPosition,
       ...(audioUrl ? { audioUrl } : {}),
+      // vamp-sourced beds loop — 260918-nm2 exception to D-04
+      ...(audioUrl && group.bedVampId ? { audioLoop: true } : {}),
       ...(backgroundImageUrl ? { backgroundImageUrl } : {}),
       ...(backgroundImageUrl ? { backgroundSource: 'group' as const } : {}),
     } as Slide
