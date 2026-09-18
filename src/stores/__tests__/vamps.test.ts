@@ -25,6 +25,7 @@ vi.mock('firebase/firestore', () => {
     query: vi.fn((ref) => ref),
     orderBy: vi.fn(),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
+    deleteField: vi.fn(() => ({ __sentinel: 'deleteField' })),
   }
 })
 
@@ -167,9 +168,52 @@ describe('useVampStore', () => {
       expect(payload.updatedAt).toEqual(serverTimestamp())
       expect(id).toBe('new-vamp-id')
     })
+
+    // Prod bug 2026-09-18: VampSlideOver sends `tempo: undefined` when the
+    // optional BPM is blank and the Firestore SDK rejects undefined values
+    // ("Unsupported field value: undefined (found in field tempo)").
+    it('omits undefined optional fields from the addDoc payload (blank tempo)', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      await store.addVamp({ name: 'Open Response', key: 'G', tempo: undefined, attachment: null })
+
+      const [, payload] = (addDoc as ReturnType<typeof vi.fn>).mock.calls[0]!
+      expect('tempo' in payload).toBe(false)
+      expect(payload.attachment).toBeNull()
+      expect(Object.values(payload)).not.toContain(undefined)
+    })
   })
 
   describe('updateVamp', () => {
+    it('turns an explicit undefined tempo into deleteField() so clearing the BPM persists', async () => {
+      const { updateDoc, deleteField } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      await store.updateVamp('vamp-1', { name: 'Open Response', key: 'G', tempo: undefined })
+
+      const [, payload] = (updateDoc as ReturnType<typeof vi.fn>).mock.calls[0]!
+      expect(payload.tempo).toEqual(deleteField())
+      expect(payload.name).toBe('Open Response')
+      expect(Object.values(payload)).not.toContain(undefined)
+    })
+
+    it('leaves tempo untouched when the key is absent from the partial update', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      await store.updateVamp('vamp-1', { name: 'Renamed' })
+
+      const [, payload] = (updateDoc as ReturnType<typeof vi.fn>).mock.calls[0]!
+      expect('tempo' in payload).toBe(false)
+    })
+
     it('calls updateDoc on the vamp doc with serverTimestamp updatedAt', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useVampStore } = await import('../vamps')
