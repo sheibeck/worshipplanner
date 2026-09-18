@@ -176,9 +176,14 @@
           :slide-count="cards.length"
           :org-id="orgId"
           :is-editor="canWriteGroupMedia"
+          :bed-vamp-id="group?.bedVampId"
+          :bed-vamp-label="group?.bedVampLabel"
+          :vamps="vampStore.vamps"
+          :vamps-loading="vampStore.isLoading"
           flush
           @attach="onAttachGroupMusic"
           @remove="onRemoveGroupMusic"
+          @attach-vamp="onAttachGroupVamp"
         />
 
         <!-- Group background control (R055, 33-08), same "don't render an
@@ -380,8 +385,10 @@ import type { ServiceSlot, ServiceSection } from '@/types/service'
 import { SERVICE_SECTIONS } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+import type { Vamp } from '@/types/vamp'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useImportedSlides } from '@/stores/importedSlides'
+import { useVampStore } from '@/stores/vamps'
 import { useAuthStore } from '@/stores/auth'
 import { cssVarsFor } from '@/utils/slideTypography'
 import { useMediaUpload } from '@/composables/useMediaUpload'
@@ -479,6 +486,8 @@ const emit = defineEmits<{
 
 const slideGroupsStore = useSlideGroups()
 const importedSlidesStore = useImportedSlides()
+// 260918-nm2 — ServiceEditorView.initStores already subscribes this store inside the isEditor gate.
+const vampStore = useVampStore()
 const authStore = useAuthStore()
 
 /**
@@ -679,6 +688,32 @@ async function onAttachGroupMusic(url: string): Promise<void> {
     })
   } catch (err) {
     console.error('Failed to attach group music:', err)
+  }
+}
+
+// 260918-nm2 — group-level vamp bed assign; label literal matches EditSlideDrawer.attachVampToSlide.
+async function onAttachGroupVamp(vamp: Vamp): Promise<void> {
+  if (!canWriteGroupMedia.value) return
+  if (!props.selectedSlot) return
+  const downloadUrl = vamp.attachment?.downloadUrl
+  if (!downloadUrl) return
+  const label = `${vamp.name} · ${vamp.key}`
+  if (
+    props.group?.bedVampId === vamp.id &&
+    props.group.bedAudioUrl === downloadUrl &&
+    props.group.bedVampLabel === label
+  ) {
+    return
+  }
+  try {
+    await slideGroupsStore.setGroupBedMedia(props.orgId, props.selectedSlot.id, {
+      serviceId: props.serviceId,
+      bedAudioUrl: downloadUrl,
+      bedVampId: vamp.id,
+      bedVampLabel: label,
+    })
+  } catch (err) {
+    console.error('Failed to attach group vamp:', err)
   }
 }
 

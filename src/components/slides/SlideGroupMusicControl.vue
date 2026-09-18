@@ -1,10 +1,15 @@
 <template>
   <div :class="flush ? '' : 'rounded-md border border-gray-800 bg-gray-900 px-3 py-2'" data-testid="slide-group-music-control">
+    <!-- 260918-nm2 — group-level vamp bed; emit-only, SlideGrid owns the write -->
     <template v-if="audioUrl">
       <div class="flex flex-wrap items-center gap-3">
         <span class="text-indigo-400" aria-hidden="true">&#9834;</span>
         <div class="min-w-0 flex-1">
-          <p class="truncate text-sm text-gray-100" data-testid="group-music-filename">{{ fileName }}</p>
+          <template v-if="isVampBed">
+            <p class="truncate text-sm text-gray-100" data-testid="group-music-vamp-label" :title="bedVampLabel">Vamp: {{ bedVampLabel }}</p>
+            <span v-if="vampStale" class="text-[11px] text-gray-500" data-testid="group-music-vamp-stale">(no longer in library)</span>
+          </template>
+          <p v-else class="truncate text-sm text-gray-100" data-testid="group-music-filename">{{ fileName }}</p>
           <p class="text-[11px] text-gray-500" data-testid="group-music-scope">plays across all {{ slideCount }} slides</p>
         </div>
 
@@ -20,18 +25,43 @@
           </svg>
         </button>
 
-        <button
-          v-if="isEditor"
-          type="button"
-          class="text-gray-500 hover:text-red-400 transition-colors"
-          data-testid="group-music-remove"
-          aria-label="Remove group music"
-          @click="onRemove"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+        <template v-if="isVampBed">
+          <button
+            v-if="isEditor"
+            type="button"
+            class="text-xs font-medium text-indigo-400 hover:text-indigo-300 shrink-0"
+            data-testid="group-music-vamp-change"
+            @click="openVampPicker"
+          >Change</button>
+          <button
+            v-if="isEditor"
+            type="button"
+            class="text-xs text-gray-500 hover:text-red-400 transition-colors shrink-0"
+            data-testid="group-music-vamp-clear"
+            @click="onRemove"
+          >Clear</button>
+        </template>
+        <template v-else>
+          <button
+            v-if="isEditor"
+            type="button"
+            class="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+            data-testid="group-music-choose-vamp"
+            @click="openVampPicker"
+          >Choose a vamp</button>
+          <button
+            v-if="isEditor"
+            type="button"
+            class="text-gray-500 hover:text-red-400 transition-colors"
+            data-testid="group-music-remove"
+            aria-label="Remove group music"
+            @click="onRemove"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </template>
       </div>
 
       <!-- Chromeless so the ONLY playback affordance is the icon-only button
@@ -48,20 +78,37 @@
     </template>
 
     <template v-else-if="isEditor">
-      <label
-        class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
-        data-testid="group-music-add"
-      >
-        &#65291; Add music for this group
-        <input
-          type="file"
-          accept="audio/*"
-          class="hidden"
-          data-testid="group-music-input"
-          @change="onFileSelected"
-        />
-      </label>
+      <div class="flex flex-wrap items-center gap-3">
+        <label
+          class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
+          data-testid="group-music-add"
+        >
+          &#65291; Add music for this group
+          <input
+            type="file"
+            accept="audio/*"
+            class="hidden"
+            data-testid="group-music-input"
+            @change="onFileSelected"
+          />
+        </label>
+        <button
+          type="button"
+          class="text-xs font-medium text-indigo-400 hover:text-indigo-300"
+          data-testid="group-music-choose-vamp"
+          @click="openVampPicker"
+        >Choose a vamp</button>
+      </div>
     </template>
+
+    <VampPicker
+      v-if="vampPickerOpen && isEditor"
+      :vamps="vamps"
+      :loading="vampsLoading"
+      :selected-vamp-id="bedVampId ?? null"
+      @select="onVampSelected"
+      @cancel="closeVampPicker"
+    />
 
     <p v-if="isUploading" data-testid="media-upload-progress" class="mt-1 text-indigo-400">
       Uploading... {{ Math.round(progress) }}%
@@ -77,6 +124,8 @@
 import { ref, computed } from 'vue'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import AudioPlayer from '../AudioPlayer.vue'
+import VampPicker from '../VampPicker.vue'
+import type { Vamp } from '@/types/vamp'
 import { bedAudioLabel } from './slideDisplay'
 
 const props = withDefaults(defineProps<{
@@ -95,11 +144,20 @@ const props = withDefaults(defineProps<{
    * Defaults false so every pre-existing call site is visually unchanged.
    */
   flush?: boolean
-}>(), { flush: false })
+  /** 260918-nm2 — the group's denormalized bed vamp id, or undefined for an uploaded/no bed. */
+  bedVampId?: string
+  /** 260918-nm2 — the group's denormalized bed vamp label (`{name} · {key}`). */
+  bedVampLabel?: string
+  /** 260918-nm2 — the org's vamp library, passed through to the inline VampPicker. */
+  vamps?: Vamp[]
+  /** 260918-nm2 — whether the vamp library is still loading (gates the stale hint). */
+  vampsLoading?: boolean
+}>(), { flush: false, vamps: () => [], vampsLoading: false })
 
 const emit = defineEmits<{
   attach: [url: string]
   remove: []
+  'attach-vamp': [vamp: Vamp]
 }>()
 
 const { progress, error, isUploading, uploadMedia, reset } = useMediaUpload()
@@ -144,5 +202,26 @@ async function onFileSelected(event: Event): Promise<void> {
 
 function onRemove(): void {
   emit('remove')
+}
+
+// 260918-nm2 — group-level vamp bed: emit-only, mirrors EditSlideDrawer's per-slide precedent.
+const vampPickerOpen = ref(false)
+const isVampBed = computed(() => !!props.audioUrl && !!props.bedVampId)
+const vampStale = computed(
+  () => isVampBed.value && !props.vampsLoading && !props.vamps.some((v) => v.id === props.bedVampId),
+)
+
+function openVampPicker(): void {
+  if (!props.isEditor) return
+  vampPickerOpen.value = true
+}
+
+function closeVampPicker(): void {
+  vampPickerOpen.value = false
+}
+
+function onVampSelected(vamp: Vamp): void {
+  emit('attach-vamp', vamp)
+  closeVampPicker()
 }
 </script>
