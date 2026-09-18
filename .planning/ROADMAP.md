@@ -768,7 +768,7 @@ Full details: [milestones/v2.13-ROADMAP.md](milestones/v2.13-ROADMAP.md) · requ
 
 ### ✅ v2.14 Services UX Alignment, Dashboard & Live-Stream Output — SHIPPED & DEPLOYED 2026-09-09 (Phases 131-137) — R406-R427, audit PASSED (7/7 phases, 22/22 reqs, 5/5 integration seams); human/hardware UAT owner-accepted as deferred (`v2.14-DEFERRED-VERIFICATION.md`). Full detail archived: [milestones/v2.14-ROADMAP.md](milestones/v2.14-ROADMAP.md)
 
-### 🚧 v2.15 Service Times, Vamps & Field Fixes (Phases 138-141 — all executed + auto-verified 2026-09-18; OPEN at batched-UAT gate, UNDEPLOYED)
+### 🚧 v2.15 Service Times, Vamps & Field Fixes (Phases 138-141 — all executed + auto-verified; DEPLOYED to prod 2026-09-18 (hosting + storage rules); OPEN pending batched owner UAT)
 
 **Milestone Goal:** Give services real rehearsal/report *times* (with org-level defaults) surfaced
 everywhere the date already shows, add a keyed **Vamps** library whose mp3 plays live as slide audio,

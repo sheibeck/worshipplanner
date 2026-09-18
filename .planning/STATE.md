@@ -5,10 +5,10 @@ milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
 current_phase: 141
 current_phase_name: Vamp Slide Assignment & Live Playback
 status: awaiting_batched_uat
-stopped_at: Phase 141 verified (human_needed) — all v2.15 phases executed; owner UAT pass pending
+stopped_at: v2.15 DEPLOYED to prod 2026-09-18 (hosting + storage rules, owner-confirmed); batched owner UAT against prod pending
 last_updated: "2026-09-14T00:32:37.219Z"
 last_activity: 2026-09-18
-last_activity_desc: Phase 141 verified + secured + nyquist-validated + UI-reviewed; v2.15 at batched-UAT gate
+last_activity_desc: v2.15 deployed to prod (hosting + storage rules) after Phase 141 closeout; batched owner UAT pending
 progress:
   total_phases: 4
   completed_phases: 4
@@ -28,8 +28,11 @@ batched UAT. Deferrals are PENDING, never counted as owner-accepted.
 **2026-09-18 — all four v2.15 phases are now executed + auto-verified.** The autonomous run resumed at
 Phase 141's missing verify step (the 2026-09-13 session ended after code review, before the verifier ran),
 produced 141-VERIFICATION.md (human_needed, 5/5), 141-UAT.md, 141-VALIDATION.md (validated), 141-SECURITY.md
-(secured) and 141-UI-REVIEW.md. **The milestone is now at the batched-UAT gate** — nothing is deployed;
-owner pass per `v2.15-DEFERRED-VERIFICATION.md` (incl. its closeout checklist) is the next step.
+(secured) and 141-UI-REVIEW.md. **Deployed to production 2026-09-18** (owner chose deploy-first at the gate and confirmed the exact
+set: `firebase deploy --only hosting,storage` → hosting bundle `index-CuOoegJ0.js` from `33fdc29b` + the
+vamp-files `storage.rules` block; functions/firestore.rules/indexes unchanged since v2.14). **The milestone
+remains OPEN** — the owner UAT pass per `v2.15-DEFERRED-VERIFICATION.md` (now against prod) is the next
+step, then audit → complete.
 
 | Phase | State | Resume |
 |-------|-------|--------|
@@ -1427,7 +1430,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 141 (Vamp Slide Assignment & Live Playback) — EXECUTED + AUTO-VERIFIED (human_needed, deferred to batched UAT)
 Plan: 4 of 4
-Status: All v2.15 phases (138–141) executed + auto-verified; milestone OPEN at the batched-UAT gate (not deployed, not audited/archived)
+Status: All v2.15 phases (138–141) executed + auto-verified and DEPLOYED to prod 2026-09-18 (hosting + storage rules); milestone OPEN pending the batched owner UAT, then audit/archive
 Last activity: 2026-09-18 — Phase 141 verify/secure/nyquist/UI-review closeout; v2.15-DEFERRED-VERIFICATION.md complete
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
