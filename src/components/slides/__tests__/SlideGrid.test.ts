@@ -11,8 +11,26 @@ import PptxImportModal from '@/components/PptxImportModal.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+import type { Vamp } from '@/types/vamp'
 import type { EnsureGroupMaterializedResult, MenuItem } from '../slideDisplay'
 import { UNSUPPORTED_FILE_MESSAGE } from '../dropRouting'
+
+// --- 260918-nm2: group-level vamp bed wiring — mocked with getters so a test
+// can mutate mockVamps/mockVampsLoading, mirroring EditSlideDrawer.test.ts's
+// convention. ---
+let mockVamps: Vamp[] = []
+let mockVampsLoading = false
+vi.mock('@/stores/vamps', () => ({
+  useVampStore: () => ({
+    get vamps() {
+      return mockVamps
+    },
+    get isLoading() {
+      return mockVampsLoading
+    },
+    orgId: 'org-1',
+  }),
+}))
 
 // --- 25-05: SlideGrid calls the slideGroups store directly (add-slide, drag-reorder) ---
 // --- 25-06 Task 2: also calls setGroupBedMedia directly for the group music bar ---
@@ -671,6 +689,150 @@ describe('SlideGrid', () => {
       }).not.toThrow()
       await Promise.resolve()
       await Promise.resolve()
+    })
+  })
+
+  describe('SlideGrid — group-level vamp bed wiring (260918-nm2)', () => {
+    const vamp1: Vamp = {
+      id: 'vamp-1',
+      name: 'Open Response',
+      key: 'G',
+      tempo: '68 bpm',
+      attachment: {
+        storagePath: 'orgs/org-1/vamp-files/vamp-1/u1/open-response.mp3',
+        downloadUrl: 'https://cdn.example.com/open-response.mp3',
+        fileName: 'open-response.mp3',
+        mimeType: 'audio/mpeg',
+        sizeBytes: 100,
+        createdAt: {} as never,
+        createdBy: 'user-1',
+      },
+      createdAt: {} as never,
+      updatedAt: {} as never,
+    } as Vamp
+
+    const vamp3NoFile: Vamp = {
+      id: 'vamp-3',
+      name: 'No File',
+      key: 'A',
+      attachment: null,
+      createdAt: {} as never,
+      updatedAt: {} as never,
+    } as Vamp
+
+    beforeEach(() => {
+      mockVamps = [vamp1, vamp3NoFile]
+      mockVampsLoading = false
+    })
+
+    it('SlideGroupMusicControl receives bedVampId/bedVampLabel from group and vamps/vampsLoading from the mocked store', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        bedAudioUrl: 'https://cdn.example.com/open-response.mp3',
+        bedVampId: 'vamp-1',
+        bedVampLabel: 'Open Response · G',
+        slides: [],
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, group })
+
+      const control = wrapper.findComponent(SlideGroupMusicControl)
+      expect(control.props('bedVampId')).toBe('vamp-1')
+      expect(control.props('bedVampLabel')).toBe('Open Response · G')
+      expect(control.props('vamps')).toEqual([vamp1, vamp3NoFile])
+      expect(control.props('vampsLoading')).toBe(false)
+    })
+
+    it('attach-vamp with a vamp carrying an attachment writes url + id + label through setGroupBedMedia', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp1)
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).toHaveBeenCalledTimes(1)
+      expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-1', {
+        serviceId: 'service-9',
+        bedAudioUrl: 'https://cdn.example.com/open-response.mp3',
+        bedVampId: 'vamp-1',
+        bedVampLabel: 'Open Response · G',
+      })
+    })
+
+    it('attach-vamp with a vamp whose attachment is null writes nothing', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp3NoFile)
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+    })
+
+    it('attach-vamp is idempotent when the mounted group already has the same bedVampId/bedAudioUrl/bedVampLabel', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        bedAudioUrl: 'https://cdn.example.com/open-response.mp3',
+        bedVampId: 'vamp-1',
+        bedVampLabel: 'Open Response · G',
+        slides: [],
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp1)
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+    })
+
+    it('attach-vamp over an uploaded bed (bedAudioUrl set, no bedVampId) replaces it with a single write, no confirm', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        bedAudioUrl: 'https://storage.example.com/uploaded.mp3',
+        slides: [],
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp1)
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).toHaveBeenCalledTimes(1)
+      expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-1', {
+        serviceId: 'service-9',
+        bedAudioUrl: 'https://cdn.example.com/open-response.mp3',
+        bedVampId: 'vamp-1',
+        bedVampLabel: 'Open Response · G',
+      })
+      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+    })
+
+    it('remove on a vamp-bed group still writes the unchanged clearAudio shape', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        bedAudioUrl: 'https://cdn.example.com/open-response.mp3',
+        bedVampId: 'vamp-1',
+        bedVampLabel: 'Open Response · G',
+        slides: [],
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('remove')
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-1', {
+        serviceId: 'service-9',
+        clearAudio: true,
+      })
+    })
+
+    it('with isEditor false, attach-vamp writes nothing', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group, isEditor: false })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp1)
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
     })
   })
 
