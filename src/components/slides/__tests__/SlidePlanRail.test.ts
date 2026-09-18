@@ -101,6 +101,63 @@ describe('SlidePlanRail', () => {
     expect(wrapper.find('[data-testid="rail-row-slot-nobed"] [data-testid="rail-row-bed"]').exists()).toBe(false)
   })
 
+  it('renders "Vamp: {label}" instead of the filename for a vamp bed (260918-nm2)', () => {
+    const slots: ServiceSlot[] = [
+      makeSlot({ kind: 'SONG', id: 'slot-vamp', position: 0, songId: 's1', songTitle: 'Vamp Bed', songKey: null, requiredVwType: 1 } as never),
+    ]
+    const groupsBySlotId = new Map<string, SlideGroup>([
+      [
+        'slot-vamp',
+        makeGroup({
+          id: 'slot-vamp',
+          slotId: 'slot-vamp',
+          bedAudioUrl: 'https://example.com/pad.mp3',
+          bedVampId: 'vamp-1',
+          bedVampLabel: 'Open Response · G',
+        }),
+      ],
+    ])
+    const wrapper = mountRail({ slots, groupsBySlotId })
+    expect(wrapper.get('[data-testid="rail-row-slot-vamp"] [data-testid="rail-row-bed"]').text()).toBe('♪ Vamp: Open Response · G')
+  })
+
+  it('an uploaded-only bed still renders the decoded filename (260918-nm2)', () => {
+    const slots: ServiceSlot[] = [
+      makeSlot({ kind: 'SONG', id: 'slot-uploaded', position: 0, songId: 's1', songTitle: 'Uploaded Bed', songKey: null, requiredVwType: 1 } as never),
+    ]
+    const groupsBySlotId = new Map<string, SlideGroup>([
+      [
+        'slot-uploaded',
+        makeGroup({
+          id: 'slot-uploaded',
+          slotId: 'slot-uploaded',
+          bedAudioUrl: 'https://storage.example.com/org-1/media/abc/pad_Cmaj_soft.mp3',
+        }),
+      ],
+    ])
+    const wrapper = mountRail({ slots, groupsBySlotId })
+    expect(wrapper.get('[data-testid="rail-row-slot-uploaded"] [data-testid="rail-row-bed"]').text()).toContain('pad_Cmaj_soft.mp3')
+  })
+
+  it('a vamp bed with no label renders "Vamp" (260918-nm2)', () => {
+    const slots: ServiceSlot[] = [
+      makeSlot({ kind: 'SONG', id: 'slot-nolabel', position: 0, songId: 's1', songTitle: 'No Label', songKey: null, requiredVwType: 1 } as never),
+    ]
+    const groupsBySlotId = new Map<string, SlideGroup>([
+      [
+        'slot-nolabel',
+        makeGroup({
+          id: 'slot-nolabel',
+          slotId: 'slot-nolabel',
+          bedAudioUrl: 'https://example.com/pad.mp3',
+          bedVampId: 'vamp-1',
+        }),
+      ],
+    ])
+    const wrapper = mountRail({ slots, groupsBySlotId })
+    expect(wrapper.get('[data-testid="rail-row-slot-nolabel"] [data-testid="rail-row-bed"]').text()).toBe('♪ Vamp')
+  })
+
   it('emits select with the clicked row\'s slot id', async () => {
     const slots: ServiceSlot[] = [
       makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 }),

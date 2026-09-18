@@ -102,7 +102,10 @@ const H = vi.hoisted(() => {
   // 141-01 GroupSlideEntry shape — entry-a carries a full vampLabel, entry-c
   // carries a vampId with NO label (E6 partial, used by Task 2's badge tests),
   // entry-b/entry-d carry neither.
-  const groupsBySlotId = new Map<string, { slides: { id: string; vampId?: string; vampLabel?: string }[] }>([
+  const groupsBySlotId = new Map<
+    string,
+    { slides: { id: string; vampId?: string; vampLabel?: string; audioUrl?: string }[]; bedVampId?: string; bedVampLabel?: string }
+  >([
     [
       'slot-0',
       {
@@ -545,5 +548,91 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
 
     expect(wrapper.find('[data-testid="run-current-vamp-badge"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="run-next-vamp-badge"]').text()).toBe('♪ Vamp')
+  })
+})
+
+describe('badge — group-level vamp bed (260918-nm2)', () => {
+  let originalSlot0: ReturnType<typeof H.groupsBySlotId.get>
+  let originalSlot1: ReturnType<typeof H.groupsBySlotId.get>
+
+  beforeEach(() => {
+    originalSlot0 = H.groupsBySlotId.get('slot-0')
+    originalSlot1 = H.groupsBySlotId.get('slot-1')
+  })
+
+  afterEach(() => {
+    if (originalSlot0) H.groupsBySlotId.set('slot-0', originalSlot0)
+    if (originalSlot1) H.groupsBySlotId.set('slot-1', originalSlot1)
+  })
+
+  it('entry-level vampId wins on slide a; no-own-audio slide b shows the group bed label; advancing carries it forward', async () => {
+    H.groupsBySlotId.set('slot-0', {
+      slides: [
+        { id: 'entry-a', vampId: 'vamp-1', vampLabel: 'Open Response · G' },
+        { id: 'entry-b' },
+      ],
+      bedVampId: 'vamp-9',
+      bedVampLabel: 'Pad · C',
+    })
+
+    const { wrapper } = mountView()
+    await rehearseFake(wrapper)
+
+    expect(wrapper.find('[data-testid="run-current-vamp-badge"]').text()).toBe('♪ Vamp: Open Response · G')
+    expect(wrapper.find('[data-testid="run-next-vamp-badge"]').text()).toBe('♪ Vamp: Pad · C')
+
+    keydown('ArrowRight') // a -> b
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(wrapper.find('[data-testid="run-current-vamp-badge"]').text()).toBe('♪ Vamp: Pad · C')
+  })
+
+  it('entry-level vampId wins even without a label; a slide whose entry is not even in the group carries no badge', async () => {
+    H.groupsBySlotId.set('slot-1', {
+      slides: [{ id: 'entry-c', vampId: 'vamp-2' }],
+      bedVampId: 'vamp-9',
+      bedVampLabel: 'Pad · C',
+    })
+
+    const { wrapper } = mountView()
+    await rehearseFake(wrapper)
+
+    keydown('ArrowRight') // a -> b
+    await vi.advanceTimersByTimeAsync(0)
+    keydown('ArrowRight') // b -> c
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(wrapper.find('[data-testid="run-current-vamp-badge"]').text()).toBe('♪ Vamp')
+
+    keydown('ArrowRight') // c -> d
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(wrapper.find('[data-testid="run-current-vamp-badge"]').exists()).toBe(false)
+  })
+
+  it('a group bed with bedVampId but no bedVampLabel shows the label-less ♪ Vamp on a no-own-audio slide', async () => {
+    H.groupsBySlotId.set('slot-0', {
+      slides: [
+        { id: 'entry-a', vampId: 'vamp-1', vampLabel: 'Open Response · G' },
+        { id: 'entry-b' },
+      ],
+      bedVampId: 'vamp-9',
+    })
+
+    const { wrapper } = mountView()
+    await rehearseFake(wrapper)
+
+    keydown('ArrowRight') // a -> b
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(wrapper.find('[data-testid="run-current-vamp-badge"]').text()).toBe('♪ Vamp')
+  })
+
+  it('the pre-existing badge test fixture (no bedVampId) is unaffected by this describe block', async () => {
+    const { wrapper } = mountView()
+    await rehearseFake(wrapper)
+
+    expect(wrapper.find('[data-testid="run-current-vamp-badge"]').text()).toBe('♪ Vamp: Open Response · G')
+    expect(wrapper.find('[data-testid="run-next-vamp-badge"]').exists()).toBe(false)
   })
 })
