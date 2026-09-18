@@ -408,6 +408,108 @@ describe('useVampStore', () => {
     })
   })
 
+  describe('countAssignments — group-level bedVampId (260918-nm2)', () => {
+    it('counts a group whose bedVampId matches and has no matching entry vampId', async () => {
+      const { getDocs, getDoc } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        docs: [{ id: 'sg-1', data: () => ({ serviceId: 'svc-G', bedVampId: 'vamp-1', slides: [] }) }],
+      })
+      ;(getDoc as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ date: todayYmd() }),
+      })
+
+      const result = await store.countAssignments('vamp-1')
+
+      expect(result).toEqual({ assignedAnywhere: true, upcomingServiceCount: 1 })
+      expect(getDoc).toHaveBeenCalledTimes(1)
+    })
+
+    it('counts a service once when a group carries both bedVampId and a matching entry vampId', async () => {
+      const { getDocs, getDoc } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        docs: [
+          {
+            id: 'sg-1',
+            data: () => ({
+              serviceId: 'svc-G',
+              bedVampId: 'vamp-1',
+              slides: [{ id: 's1', vampId: 'vamp-1' }],
+            }),
+          },
+        ],
+      })
+      ;(getDoc as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ date: todayYmd() }),
+      })
+
+      const result = await store.countAssignments('vamp-1')
+
+      expect(result).toEqual({ assignedAnywhere: true, upcomingServiceCount: 1 })
+      expect(getDoc).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not count a group whose bedVampId does not match', async () => {
+      const { getDocs, getDoc } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        docs: [{ id: 'sg-1', data: () => ({ serviceId: 'svc-G', bedVampId: 'other-vamp', slides: [] }) }],
+      })
+
+      const result = await store.countAssignments('vamp-1')
+
+      expect(result).toEqual({ assignedAnywhere: false, upcomingServiceCount: 0 })
+      expect(getDoc).not.toHaveBeenCalled()
+    })
+
+    it('deleteVamp keeps the MP3 when the only assignment is a group-level bedVampId', async () => {
+      const { getDocs, getDoc, deleteDoc } = await import('firebase/firestore')
+      const { deleteObject } = await import('firebase/storage')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeVamp({
+          id: 'vamp-1',
+          attachment: {
+            storagePath: 'orgs/org-1/vamp-files/vamp-1/u1/a.mp3',
+            downloadUrl: 'https://cdn.example.com/a.mp3',
+            fileName: 'a.mp3',
+            mimeType: 'audio/mpeg',
+            sizeBytes: 2048,
+            createdAt: { seconds: 1, nanoseconds: 0 },
+            createdBy: 'user-1',
+          },
+        }),
+      ])
+
+      ;(getDocs as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        docs: [{ id: 'sg-1', data: () => ({ serviceId: 'svc-G', bedVampId: 'vamp-1', slides: [] }) }],
+      })
+      ;(getDoc as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ date: todayYmd() }),
+      })
+
+      await store.deleteVamp('vamp-1')
+
+      expect(deleteObject).not.toHaveBeenCalled()
+      expect(deleteDoc).toHaveBeenCalledOnce()
+    })
+  })
+
   describe('deleteVamp — conditional Storage keep (R440)', () => {
     const attachment = {
       storagePath: 'orgs/org-1/vamp-files/vamp-1/u1/a.mp3',

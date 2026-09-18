@@ -2030,6 +2030,165 @@ describe('assembleSlideshow — D-04 two-level audio precedence (R030)', () => {
   })
 })
 
+describe('assembleSlideshow — group-level vamp bed loops (260918-nm2)', () => {
+  it('a vamp-sourced bed loops on a no-own-audio entry; an uploaded-only bed does not (D-04 contrast)', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const vampGroup = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedAudioUrl: 'https://example.com/bed.mp3',
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Pad · C',
+    })
+    const vampResult = assembleSlideshow(
+      service,
+      makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', vampGroup]]),
+      }),
+    )
+
+    expect(vampResult[0]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
+    expect(vampResult[0]!.slide.audioLoop).toBe(true)
+    expect(vampResult[0]!.audioFromBed).toBe(true)
+
+    const uploadedGroup = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedAudioUrl: 'https://example.com/bed.mp3',
+    })
+    const uploadedResult = assembleSlideshow(
+      service,
+      makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', uploadedGroup]]),
+      }),
+    )
+
+    expect('audioLoop' in uploadedResult[0]!.slide).toBe(false)
+  })
+
+  it("a sibling entry with its own audioUrl wins over a vamp-sourced bed — no leaked audioLoop", () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const entries: GroupSlideEntry[] = [
+      makeGroupSlideEntry({
+        id: 'e1',
+        order: 0,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
+        audioUrl: 'https://example.com/own.mp3',
+      }),
+      makeGroupSlideEntry({
+        id: 'e2',
+        order: 1,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-2' },
+      }),
+    ]
+    const group = makeSlideGroup({
+      id: 'slot-scripture-0',
+      slotId: 'slot-scripture-0',
+      slides: entries,
+      bedAudioUrl: 'https://example.com/bed.mp3',
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Pad · C',
+    })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.audioUrl).toBe('https://example.com/own.mp3')
+    expect(result[0]!.audioFromBed).toBe(false)
+    expect('audioLoop' in result[0]!.slide).toBe(false)
+    expect(result[1]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
+    expect(result[1]!.slide.audioLoop).toBe(true)
+  })
+
+  it('a video entry inside a vamp-bed group suppresses the bed — no audioUrl, no audioLoop', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const videoEntry = makeGroupSlideEntry({
+      id: 'entry-video',
+      order: 0,
+      sourceRef: { kind: 'video', videoSrc: 'https://example.com/own-footage.mp4' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-scripture-0',
+      slotId: 'slot-scripture-0',
+      slides: [videoEntry],
+      bedAudioUrl: 'https://example.com/bed.mp3',
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Pad · C',
+    })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect('audioUrl' in result[0]!.slide).toBe(false)
+    expect('audioLoop' in result[0]!.slide).toBe(false)
+    expect(result[0]!.audioFromBed).toBe(false)
+  })
+
+  it('the stored-path scripture reference slide loops for a vamp bed and does not for an uploaded-only bed', () => {
+    const sections = [makeCongregationalSection({ speaker: 'LEADER', text: 'One' })]
+    const slot = scriptureSlot({ id: 'slot-scripture-0', congregationalSections: sections })
+    const entries: GroupSlideEntry[] = sections.map((section, i) =>
+      makeGroupSlideEntry({
+        id: `entry-scripture-${i}`,
+        order: i,
+        sourceRef: { kind: 'scripture', speaker: section.speaker, text: section.text },
+      }),
+    )
+
+    const vampGroup = makeSlideGroup({
+      id: slot.id,
+      slotId: slot.id,
+      slides: entries,
+      bedAudioUrl: 'https://example.com/bed.mp3',
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Pad · C',
+    })
+    const vampResult = assembleSlideshow(
+      makeService([slot]),
+      makeInputs({ groupsBySlotId: new Map([[slot.id, vampGroup]]) }),
+    )
+    const vampRef = vampResult[0]!
+
+    expect(vampRef.slide.audioUrl).toBe('https://example.com/bed.mp3')
+    expect(vampRef.slide.audioLoop).toBe(true)
+    expect(vampRef.audioFromBed).toBe(true)
+
+    const uploadedGroup = makeSlideGroup({
+      id: slot.id,
+      slotId: slot.id,
+      slides: entries,
+      bedAudioUrl: 'https://example.com/bed.mp3',
+    })
+    const uploadedResult = assembleSlideshow(
+      makeService([slot]),
+      makeInputs({ groupsBySlotId: new Map([[slot.id, uploadedGroup]]) }),
+    )
+
+    expect('audioLoop' in uploadedResult[0]!.slide).toBe(false)
+  })
+})
+
 describe('assembleSlideshow — D-17 video entries and authored text entries', () => {
   it('a group entry with a video source ref assembles to one slide whose content kind is video and whose own source equals the stored entry source', () => {
     const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })

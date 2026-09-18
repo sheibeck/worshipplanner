@@ -509,6 +509,132 @@ describe('useSlideGroups', () => {
     })
   })
 
+  describe('setGroupBedMedia — group-level vamp bed (260918-nm2)', () => {
+    it('writes bedAudioUrl, bedVampId and bedVampLabel together against an existing doc, none deleted', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc(),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedAudioUrl: 'https://cdn.example/open-response.mp3',
+        bedVampId: 'vamp-1',
+        bedVampLabel: 'Open Response · G',
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as Record<string, unknown>
+      expect(payload.bedAudioUrl).toBe('https://cdn.example/open-response.mp3')
+      expect(payload.bedVampId).toBe('vamp-1')
+      expect(payload.bedVampLabel).toBe('Open Response · G')
+      expect(payload.bedVampId).not.toBe('__deleteField__')
+      expect(payload.bedVampLabel).not.toBe('__deleteField__')
+      expect(payload.updatedAt).toBeDefined()
+      expect('slides' in payload).toBe(false)
+    })
+
+    it('deletes bedAudioUrl, bedVampId and bedVampLabel on clearAudio', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () =>
+          makeGroupDoc({
+            bedAudioUrl: 'https://example.com/old.mp3',
+            bedVampId: 'vamp-1',
+            bedVampLabel: 'Old · A',
+          }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', { serviceId: 'service-1', clearAudio: true })
+
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as Record<string, unknown>
+      expect(payload.bedAudioUrl).toBe('__deleteField__')
+      expect(payload.bedVampId).toBe('__deleteField__')
+      expect(payload.bedVampLabel).toBe('__deleteField__')
+    })
+
+    it('a URL-only write (upload/drop over a vamp bed) deletes bedVampId and bedVampLabel', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () =>
+          makeGroupDoc({
+            bedAudioUrl: 'https://example.com/old.mp3',
+            bedVampId: 'vamp-1',
+            bedVampLabel: 'Old · A',
+          }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedAudioUrl: 'https://example.com/bed.mp3',
+      })
+
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as Record<string, unknown>
+      expect(payload.bedAudioUrl).toBe('https://example.com/bed.mp3')
+      expect(payload.bedVampId).toBe('__deleteField__')
+      expect(payload.bedVampLabel).toBe('__deleteField__')
+    })
+
+    it('creates a skeleton doc with bedVampId/bedVampLabel when the group does not exist yet', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedAudioUrl: 'https://cdn.example/open-response.mp3',
+        bedVampId: 'vamp-1',
+        bedVampLabel: 'Open Response · G',
+      })
+
+      const payload = vi.mocked(setDoc).mock.calls[0]![1] as Record<string, unknown>
+      expect(payload.bedVampId).toBe('vamp-1')
+      expect(payload.bedVampLabel).toBe('Open Response · G')
+    })
+
+    it('creates a skeleton doc with NO bedVampId/bedVampLabel keys for a URL-only patch (stripUndefined drops them)', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedAudioUrl: 'https://example.com/bed.mp3',
+      })
+
+      const payload = vi.mocked(setDoc).mock.calls[0]![1] as Record<string, unknown>
+      expect('bedVampId' in payload).toBe(false)
+      expect('bedVampLabel' in payload).toBe(false)
+    })
+  })
+
   describe('setGroupBackground', () => {
     it('issues an updateDoc touching only the background field and updatedAt against an existing group — no slides key, no bed key', async () => {
       const { getDoc, updateDoc } = await import('firebase/firestore')
