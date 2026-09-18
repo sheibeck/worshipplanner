@@ -8,7 +8,7 @@ status: awaiting_batched_uat
 stopped_at: v2.15 DEPLOYED to prod 2026-09-18 (hosting + storage rules, owner-confirmed); batched owner UAT against prod pending
 last_updated: "2026-09-14T00:32:37.219Z"
 last_activity: 2026-09-18
-last_activity_desc: v2.15 deployed to prod (hosting + storage rules) after Phase 141 closeout; batched owner UAT pending
+last_activity_desc: Completed quick task 260918-nm2 — group-level vamp bed (Choose a vamp on the group media panel); v2.15 batched UAT in progress
 progress:
   total_phases: 4
   completed_phases: 4
@@ -4401,6 +4401,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 260918-nm2 | **Group-level vamp bed** (owner UAT request 2026-09-18). The Slides-tab group media panel gains **Choose a vamp** beside "＋ Add music for this group": assigning writes the vamp MP3 into `SlideGroup.bedAudioUrl` + new display-only `bedVampId`/`bedVampLabel` (`setGroupBedMedia`; Clear/remove `deleteField`s all three; a URL-only upload evicts the vamp fields so the label can never go stale). Assigned state shows `Vamp: {label}` · plays across all N slides · Change/Clear (+ "(no longer in library)"), inline `VampPicker`. **Vamp-sourced beds loop** — explicit, narrow exception to D-04 (uploaded beds still never loop) in `resolveEntryMedia` + the synthetic scripture-ref slide. Run: `useRunControl.vampLabelFor` falls back to the group bed (entry vampId wins; unresolved groupSlideId → no badge); `SlidePlanRail` shows `Vamp: {label}` for a vamp bed. R440: `countAssignments` also matches `bedVampId` so `deleteVamp` keeps the MP3 for group-assigned vamps. 6 TDD commits, 54 new tests, 415/415 on the 8 touched files, type-check clean. **⚠ NOT DEPLOYED yet** — ships with the next `firebase deploy --only hosting` (per-deploy confirmation). | 2026-09-18 | baaa138e, 6c865756, ee4fe910, b93f99af, 65aa5e0a, f2676601 | [260918-nm2](.planning/quick/260918-nm2-group-level-vamp-bed-choose-a-vamp-on-th/) |
 | 9 | Subscribe to updates so that if 2 or more people are looking at the Services listing or the Edit Service screen they can see updates made by other people who are looking at the same thing | 2026-03-12 | e0ce5e1 | [9-subscribe-to-updates-so-that-if-2-or-mor](.planning/milestones/quick-archive/9-subscribe-to-updates-so-that-if-2-or-mor/) |
 | 10 | Allow closing the scripture preview in edit mode | 2026-03-12 | 9c3bd1f | [10-allow-closing-the-scripture-preview-in-e](.planning/milestones/quick-archive/10-allow-closing-the-scripture-preview-in-e/) |
 | 260701-awp | Fix song-picker sticky header (search + tag filters) rendering behind scrolling song list | 2026-07-01 | 5de0ae2 | [260701-awp-fix-song-picker-sticky-header-search-tag](.planning/milestones/quick-archive/260701-awp-fix-song-picker-sticky-header-search-tag/) |
