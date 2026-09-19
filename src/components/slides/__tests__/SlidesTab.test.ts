@@ -269,6 +269,79 @@ describe('SlidesTab', () => {
       expect(grid.props('ensureGroupMaterialized')).toBe(ensureGroupMaterialized)
       expect(grid.props('orgId')).toBe('org-1')
     })
+
+    // 142 — Background popover recents: derived client-side from
+    // groupsBySlotId (sorted by updatedAt desc) plus song-inherited
+    // assembled slides (plan order, no timestamp), deduped, capped to 4.
+    describe('recentBackgrounds (142)', () => {
+      it('combines group-owned backgrounds sorted by updatedAt desc with song-inherited backgrounds in plan order, deduped', async () => {
+        const groupA = makeGroup({ id: 'a', slotId: 'a', backgroundImageUrl: 'https://s/a.jpg', updatedAt: { seconds: 100 } as never, slides: [] })
+        const groupB = makeGroup({ id: 'b', slotId: 'b', backgroundImageUrl: 'https://s/b.jpg', updatedAt: { seconds: 300 } as never, slides: [] })
+        const groupC = makeGroup({ id: 'c', slotId: 'c', slides: [] })
+        const groupD = makeGroup({ id: 'd', slotId: 'd', backgroundImageUrl: 'https://s/a.jpg', updatedAt: { seconds: 200 } as never, slides: [] })
+        const groupsBySlotId = new Map([
+          ['a', groupA],
+          ['b', groupB],
+          ['c', groupC],
+          ['d', groupD],
+        ])
+
+        const songAssembled = makeAssembled(0, 'song-slide')
+        songAssembled.slide = { ...songAssembled.slide, backgroundSource: 'song', backgroundImageUrl: 'https://s/song.jpg' } as never
+        const groupSourcedAssembled = makeAssembled(0, 'group-slide')
+        groupSourcedAssembled.slide = { ...groupSourcedAssembled.slide, backgroundSource: 'group', backgroundImageUrl: 'https://s/b.jpg' } as never
+
+        const wrapper = mountTab({
+          slots: [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })],
+          groupsBySlotId,
+          assembledSlideshow: [songAssembled, groupSourcedAssembled],
+        })
+        await wrapper.vm.$nextTick()
+
+        expect(wrapper.findComponent(SlideGrid).props('recentBackgrounds')).toEqual([
+          { url: 'https://s/b.jpg', label: 'b.jpg' },
+          { url: 'https://s/a.jpg', label: 'a.jpg' },
+          { url: 'https://s/song.jpg', label: 'song.jpg' },
+        ])
+      })
+
+      it('caps recentBackgrounds to 4 when six distinct group backgrounds exist', async () => {
+        const groupsBySlotId = new Map(
+          Array.from({ length: 6 }, (_, i) => [
+            `slot-${i}`,
+            makeGroup({
+              id: `slot-${i}`,
+              slotId: `slot-${i}`,
+              backgroundImageUrl: `https://s/${i}.jpg`,
+              updatedAt: { seconds: i } as never,
+              slides: [],
+            }),
+          ]),
+        )
+        const wrapper = mountTab({ slots: [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })], groupsBySlotId })
+        await wrapper.vm.$nextTick()
+        expect(wrapper.findComponent(SlideGrid).props('recentBackgrounds')).toHaveLength(4)
+      })
+
+      it('is empty when no group or song-inherited background exists', async () => {
+        const wrapper = mountTab({ slots: [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })] })
+        await wrapper.vm.$nextTick()
+        expect(wrapper.findComponent(SlideGrid).props('recentBackgrounds')).toEqual([])
+      })
+
+      it('updates reactively when groupsBySlotId changes', async () => {
+        const wrapper = mountTab({ slots: [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })] })
+        await wrapper.vm.$nextTick()
+        expect(wrapper.findComponent(SlideGrid).props('recentBackgrounds')).toEqual([])
+
+        const newGroup = makeGroup({ backgroundImageUrl: 'https://s/new.jpg', updatedAt: { seconds: 1 } as never, slides: [] })
+        await wrapper.setProps({ groupsBySlotId: new Map([['slot-1', newGroup]]) })
+
+        expect(wrapper.findComponent(SlideGrid).props('recentBackgrounds')).toEqual([
+          { url: 'https://s/new.jpg', label: 'new.jpg' },
+        ])
+      })
+    })
   })
 
   describe('"Edit in scripture" relay (Phase 26-03, D-15)', () => {

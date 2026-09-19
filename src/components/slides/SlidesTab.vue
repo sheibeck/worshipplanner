@@ -27,6 +27,7 @@
           :org-id="orgId"
           :service-id="serviceId"
           :ensure-group-materialized="ensureGroupMaterialized"
+          :recent-backgrounds="recentBackgrounds"
           @select="onSelectSlide"
           @menu-action="onMenuAction"
           @edit-congregational="onEditCongregational"
@@ -91,7 +92,7 @@ import { buildSongEditLink, type SongEditTab } from '@/utils/songEditLink'
 import SlidePlanRail from './SlidePlanRail.vue'
 import SlideGrid from './SlideGrid.vue'
 import EditSlideDrawer from './EditSlideDrawer.vue'
-import type { EnsureGroupMaterializedResult, MenuItemKey } from './slideDisplay'
+import { backgroundImageLabel, type EnsureGroupMaterializedResult, type MenuItemKey } from './slideDisplay'
 
 const props = withDefaults(defineProps<{
   slots: ServiceSlot[]
@@ -259,6 +260,39 @@ const selectedSlotPosition = computed(() => {
 const selectedGroup = computed<SlideGroup | null>(() => {
   if (selectedSlotId.value === null) return null
   return props.groupsBySlotId.get(selectedSlotId.value) ?? null
+})
+
+/**
+ * 142 — Background popover recents, derived from already-subscribed data (no
+ * read); song-sourced entries have no updatedAt, so they trail in plan order.
+ */
+const recentBackgrounds = computed<{ url: string; label: string }[]>(() => {
+  const urls = new Set<string>()
+  const list: { url: string; label: string }[] = []
+
+  const groups = [...props.groupsBySlotId.values()]
+    .filter((g) => Boolean(g.backgroundImageUrl))
+    .sort((a, b) => {
+      const aSeconds = (a.updatedAt as { seconds?: number } | undefined)?.seconds ?? 0
+      const bSeconds = (b.updatedAt as { seconds?: number } | undefined)?.seconds ?? 0
+      return bSeconds - aSeconds
+    })
+  for (const g of groups) {
+    const url = g.backgroundImageUrl!
+    if (urls.has(url)) continue
+    urls.add(url)
+    list.push({ url, label: backgroundImageLabel(url) })
+  }
+
+  for (const assembled of props.assembledSlideshow) {
+    const { backgroundSource, backgroundImageUrl } = assembled.slide
+    if (!(backgroundSource === 'song' && backgroundImageUrl)) continue
+    if (urls.has(backgroundImageUrl)) continue
+    urls.add(backgroundImageUrl)
+    list.push({ url: backgroundImageUrl, label: backgroundImageLabel(backgroundImageUrl) })
+  }
+
+  return list.slice(0, 4)
 })
 
 /** See ADR-0105 (docs/adr/0105-open-it-follows-the-selection-it-never-closes-itself-on-a.md) */
