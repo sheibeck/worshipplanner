@@ -2077,6 +2077,35 @@ describe('assembleSlideshow — group-level vamp bed loops (260918-nm2)', () => 
     expect('audioLoop' in uploadedResult[0]!.slide).toBe(false)
   })
 
+  it('bedVampId with no bedAudioUrl resolves no audio and no loop (142 — live playback tolerates a no-MP3 vamp bed)', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const noMp3VampGroup = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Pad · C',
+    })
+    const result = assembleSlideshow(
+      service,
+      makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', noMp3VampGroup]]),
+      }),
+    )
+
+    expect(result[0]!.slide.audioUrl).toBeUndefined()
+    expect(result[0]!.slide.audioLoop).toBeFalsy()
+    expect(result[0]!.audioFromBed).toBe(false)
+  })
+
   it("a sibling entry with its own audioUrl wins over a vamp-sourced bed — no leaked audioLoop", () => {
     const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
     const service = makeService([slot])

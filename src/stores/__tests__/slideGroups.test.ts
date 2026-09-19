@@ -635,6 +635,100 @@ describe('useSlideGroups', () => {
     })
   })
 
+  describe('setGroupBedMedia — no-MP3 vamp against an existing doc (Phase 142)', () => {
+    it('writes bedVampId/bedVampLabel and deletes a prior bedAudioUrl when no URL is supplied', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc({ bedAudioUrl: 'https://example.com/old.mp3' }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedVampId: 'vamp-3',
+        bedVampLabel: 'Vamp C · C',
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(payload.bedVampId).toBe('vamp-3')
+      expect(payload.bedVampLabel).toBe('Vamp C · C')
+      expect(payload.bedAudioUrl).toBe('__deleteField__')
+      expect(payload.updatedAt).toBeDefined()
+      expect('slides' in payload).toBe(false)
+    })
+
+    it('writes bedVampId/bedVampLabel with an explicit delete sentinel even when the existing doc has no prior media', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc(),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedVampId: 'vamp-3',
+        bedVampLabel: 'Vamp C · C',
+      })
+
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(payload.bedAudioUrl).toBe('__deleteField__')
+    })
+
+    it('a patch carrying a URL still takes the bedAudioUrl branch even when bedVampId is also present', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc({ bedAudioUrl: 'https://example.com/old.mp3' }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedAudioUrl: 'https://cdn.example/x.mp3',
+        bedVampId: 'vamp-1',
+        bedVampLabel: 'A · G',
+      })
+
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(payload.bedAudioUrl).toBe('https://cdn.example/x.mp3')
+    })
+
+    it('a fresh doc (no existing group) still uses the setDoc/stripUndefined path unchanged — no bedAudioUrl key at all', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedVampId: 'vamp-3',
+        bedVampLabel: 'Vamp C · C',
+      })
+
+      const payload = vi.mocked(setDoc).mock.calls[0]![1] as Record<string, unknown>
+      expect(payload.bedVampId).toBe('vamp-3')
+      expect(payload.bedVampLabel).toBe('Vamp C · C')
+      expect('bedAudioUrl' in payload).toBe(false)
+    })
+  })
+
   describe('setGroupBackground', () => {
     it('issues an updateDoc touching only the background field and updatedAt against an existing group — no slides key, no bed key', async () => {
       const { getDoc, updateDoc } = await import('firebase/firestore')

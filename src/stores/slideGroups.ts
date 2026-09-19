@@ -156,6 +156,11 @@ export const useSlideGroups = defineStore('slideGroups', () => {
           update.bedVampId = deleteField()
           update.bedVampLabel = deleteField()
         }
+      } else if (patch.bedVampId) {
+        // no-MP3 vamp: keep id/label, clear any stale URL (142)
+        update.bedVampId = patch.bedVampId
+        update.bedVampLabel = patch.bedVampLabel ?? ''
+        update.bedAudioUrl = deleteField()
       }
       await updateDoc(ref, update)
       return
