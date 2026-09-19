@@ -19,6 +19,7 @@ import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
 import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
 import type { PptxRenderDoc } from '@/types/pptxRender'
+import type { Vamp } from '@/types/vamp'
 import { slotLabel } from './slotTypes'
 import {
   formatScriptureReference,
@@ -55,6 +56,12 @@ export interface AssemblyInputs {
    * See .planning/codebase/ARCHITECTURE.md (Utils Behavioral Notes — src/utils/slideshowAssembler.ts)
    */
   renderedImageUrlsByImportId?: Map<string, string[]>
+  /**
+   * Live vamps keyed by `Vamp.id` (260919-mvw). OPTIONAL — absent means
+   * stored URLs only; the stored `audioUrl` / `bedAudioUrl` remain the
+   * deleted-vamp fallback (R440).
+   */
+  vampsById?: ReadonlyMap<string, Vamp>
 }
 
 /** A Slide variant's fields minus the id/position this engine assigns on emit. */
@@ -269,11 +276,18 @@ interface ResolvedGroupMedia {
   backgroundSource?: 'slide' | 'group' | 'song'
 }
 
+// Live vamp URL wins over the stored snapshot (260919-mvw).
+function liveVampAudioUrl(vampId: string | undefined, inputs: AssemblyInputs): string | undefined {
+  if (!vampId) return undefined
+  return inputs.vampsById?.get(vampId)?.attachment?.downloadUrl || undefined
+}
+
 /** See ADR-0199 (docs/adr/0199-no-blackout-arm-here-this-whole-case-lyric-branch-is-unreach.md) */
 function resolveEntryMedia(
   group: SlideGroup,
   entry: GroupSlideEntry,
   song: SongLyrics | undefined,
+  inputs: AssemblyInputs,
 ): ResolvedGroupMedia {
   // See ADR-0200 (docs/adr/0200-r055-r056-r057-slide-group-song-most-specific-wins-computed.md)
   const backgroundImageUrl = entry.backgroundImageUrl ?? group.backgroundImageUrl ?? song?.backgroundImageUrl
@@ -293,15 +307,18 @@ function resolveEntryMedia(
   }
 
   // Effective audio: the entry's OWN audio wins; otherwise fall back to the
-  // group's bed. `audioFromBed` is true only in the fallback case.
-  const audioFromBed = !entry.audioUrl && !!group.bedAudioUrl
-  const resolvedAudioUrl = entry.audioUrl ?? group.bedAudioUrl
+  // group's bed. `audioFromBed` is true only in the fallback case. Each side
+  // prefers the live vamp URL over the stored snapshot (260919-mvw).
+  const entryAudioUrl = liveVampAudioUrl(entry.vampId, inputs) ?? entry.audioUrl
+  const bedAudioUrl = liveVampAudioUrl(group.bedVampId, inputs) ?? group.bedAudioUrl
+  const audioFromBed = !entryAudioUrl && !!bedAudioUrl
+  const resolvedAudioUrl = entryAudioUrl ?? bedAudioUrl
 
   const media: ResolvedGroupMedia = { audioFromBed }
   if (resolvedAudioUrl) media.audioUrl = resolvedAudioUrl
   // A group bed never loops (D-04) — audioLoop is copied ONLY when the audio
   // came from the entry itself, never when it resolved from the bed.
-  if (!audioFromBed && entry.audioUrl && entry.audioLoop) media.audioLoop = true
+  if (!audioFromBed && entryAudioUrl && entry.audioLoop) media.audioLoop = true
   // vamp-sourced beds loop — 260918-nm2 exception to D-04
   if (audioFromBed && group.bedVampId) media.audioLoop = true
   if (backgroundImageUrl) media.backgroundImageUrl = backgroundImageUrl
@@ -367,7 +384,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         : entry.sourceRef.kind === 'lyric' || entry.sourceRef.kind === 'copyright'
           ? inputs.songLyricsById.get(entry.sourceRef.songId)
           : undefined
-    const media = resolveEntryMedia(group, entry, song)
+    const media = resolveEntryMedia(group, entry, song, inputs)
     // See ADR-0198 (docs/adr/0198-two-resolution-paths-per-slot-1-a-slot-with-a-materialized.md)
     const slideId = idOverride ?? entry.id
     const slide = {
@@ -405,7 +422,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     ref: ScriptureRef,
   ): void => {
     const backgroundImageUrl = group.backgroundImageUrl
-    const audioUrl = group.bedAudioUrl
+    const audioUrl = liveVampAudioUrl(group.bedVampId, inputs) ?? group.bedAudioUrl
     const slide = {
       ...buildScriptureReferenceContent(ref),
       id: `${slot.id}:ref`,
