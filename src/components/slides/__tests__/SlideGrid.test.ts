@@ -1059,9 +1059,14 @@ describe('SlideGrid', () => {
 
       // Zero DESCENDANTS carry the bordered/background chrome — only the
       // panel wrapper itself does (asserted above) — so the subtree contains
-      // exactly one bordered box, not one per control.
+      // exactly one bordered box, not one per control. (142: SlotVideoOutputControl's
+      // own inactive-tile fill legitimately carries bg-gray-900 as part of its
+      // per-tile UI-SPEC §3 restyle — excluded here, it is not a second panel box.)
       expect(panel.findAll('.border-gray-800').length).toBe(0)
-      expect(panel.findAll('.bg-gray-900').length).toBe(0)
+      const bgGray900OutsideVideoOutputTiles = panel
+        .findAll('.bg-gray-900')
+        .filter((el) => !(el.attributes('data-testid') ?? '').startsWith('slot-video-output-'))
+      expect(bgGray900OutsideVideoOutputTiles.length).toBe(0)
     })
 
     // Owner follow-up #2 (direct feedback on the running app, pasted DOM

@@ -57,8 +57,26 @@ describe('SlotVideoOutputControl', () => {
     expect(wrapper.emitted('change')).toBeUndefined()
   })
 
-  it('caption copy states scope: "Video output only"', () => {
+  it('with no slot.videoOutput, the caption is the fullscreen hint', () => {
     const wrapper = mountControl()
-    expect(wrapper.get('[data-testid="slot-video-output-caption"]').text()).toBe('Video output only')
+    expect(wrapper.get('[data-testid="slot-video-output-caption"]').text()).toBe(
+      'Fills the screen on every output.',
+    )
+  })
+
+  it("with mode: 'banner', the caption is the banner hint", () => {
+    const wrapper = mountControl({ mode: 'banner' })
+    expect(wrapper.get('[data-testid="slot-video-output-caption"]').text()).toBe(
+      'Lower third over the live camera feed. Video output only.',
+    )
+  })
+
+  it('the active tile carries border-indigo-600 and the radiogroup wrapper has the display-mode aria-label', () => {
+    const wrapper = mountControl({ mode: 'banner' })
+    expect(wrapper.get('[data-testid="slot-video-output-banner-btn"]').classes()).toContain('border-indigo-600')
+    expect(wrapper.get('[data-testid="slot-video-output-fullscreen-btn"]').classes()).not.toContain(
+      'border-indigo-600',
+    )
+    expect(wrapper.get('[role="radiogroup"]').attributes('aria-label')).toBe('Video output display mode')
   })
 })
