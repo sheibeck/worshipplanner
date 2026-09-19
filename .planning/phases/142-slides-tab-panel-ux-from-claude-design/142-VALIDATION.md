@@ -29,8 +29,9 @@ created: 2026-09-19
 
 ## Sampling Rate
 
-- **After every task commit:** Run the quick run command (add `src/components/slides/__tests__/SlideGroupSetupStrip.test.ts` once Wave 0 creates it)
-- **After every plan wave:** Run `npx vitest run` (full app suite) + `npm run type-check`
+- **After every task commit:** Run the quick run command (add `src/components/slides/__tests__/SlideGroupSetupStrip.test.ts` once Plan 03 creates it) — each PLAN.md task's `<verify><automated>` is a scoped subset of it
+- **After every plan (end of its last task):** `npm run type-check` (vue-tsc --build)
+- **Phase gate (142-04-T3):** `npx vitest run` (full app suite, detached) + `npm run type-check`
 - **Before `/gsd-verify-work`:** Full suite green (2-file baseline) AND `npm run type-check` clean — `vue-tsc --build`, never `-p tsconfig.app.json` (CLAUDE.md gate)
 - **Max feedback latency:** 30 seconds (quick run)
 
@@ -42,13 +43,18 @@ Filled in by the planner from PLAN.md task IDs. Decision → test mapping from 1
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | — | — | D: setGroupBedMedia no-MP3 vamp patch (existing-doc path) | — | Write stays scoped to the caller's org/service | unit | `npx vitest run src/stores/__tests__/slideGroups.test.ts -t "bedVamp"` | ✅ (new case) | ⬜ pending |
-| TBD | — | — | D: chip state table (set/unset/vamp-no-MP3/inherited/open/locked) | — | Locked → inert spans, no popover, no write | unit | `npx vitest run src/components/slides/__tests__/SlideGroupSetupStrip.test.ts` | ❌ W0 | ⬜ pending |
-| TBD | — | — | D: audioTab derivation incl. no-MP3 vamp | — | N/A | unit | `npx vitest run src/components/slides/__tests__/SlideGroupMusicControl.test.ts` | ✅ (new cases) | ⬜ pending |
-| TBD | — | — | D: VampPicker `allowUnattached` | — | Per-slide drawer call site unchanged (no-MP3 rows still disabled) | unit | `npx vitest run src/components/__tests__/VampPicker.test.ts` | ✅ (new cases) | ⬜ pending |
-| TBD | — | — | D: BackgroundControl chip-popover variant; panel variant byte-identical | — | Song-level call site untouched | unit | `npx vitest run src/components/slides/__tests__/BackgroundControl.test.ts` | ✅ (new cases) | ⬜ pending |
-| TBD | — | — | D: panel gate → `Boolean(selectedSlot)`; testid migration | — | N/A | unit | `npx vitest run src/components/slides/__tests__/SlideGrid.test.ts` | ✅ (migrate ~42 refs) | ⬜ pending |
-| TBD | — | — | D: live playback tolerates `bedVampId` without `bedAudioUrl` | — | N/A | unit | `npx vitest run src/utils/__tests__/slideshowAssembler.test.ts` | ✅ (verify/add case) | ⬜ pending |
+| 142-01-T1 | 142-01 | 1 | D: setGroupBedMedia no-MP3 vamp patch (existing-doc path) — CONTEXT › Audio slot | T-142-01 | Stale `bedAudioUrl` is `deleteField()`ed, never left behind; write stays scoped to the caller's org/slot doc | unit | `npx vitest run src/stores/__tests__/slideGroups.test.ts -t "no-MP3 vamp against an existing doc"` | ✅ (new describe) | ⬜ pending |
+| 142-01-T1 | 142-01 | 1 | D: live playback tolerates `bedVampId` without `bedAudioUrl` (regression only) | — | N/A | unit | `npx vitest run src/utils/__tests__/slideshowAssembler.test.ts -t "bedVampId with no bedAudioUrl"` | ✅ (new case) | ⬜ pending |
+| 142-01-T2 | 142-01 | 1 | D: BackgroundControl `variant="chip-popover"` (None · recents · ＋ upload/drop · inherited explainer); panel variant byte-identical — CONTEXT › Background & Display chips | T-142-02, T-142-03 | Drop goes through `useBackgroundUpload.validate()`; tiles gated `isEditor && !inheritedFrom`; song-level call site untouched (existing describe unmodified) | unit | `npx vitest run src/components/slides/__tests__/BackgroundControl.test.ts` | ✅ (new describe) | ⬜ pending |
+| 142-01-T3 | 142-01 | 1 | D: Display tiles + dynamic `sizeHint` hint copy; same `videoOutput.mode` write — CONTEXT › Background & Display chips | — | `select()`/emit unchanged; `:disabled="!editable"` kept as defensive plumbing | unit | `npx vitest run src/components/slides/__tests__/SlotVideoOutputControl.test.ts` | ✅ (updated cases) | ⬜ pending |
+| 142-02-T1 | 142-02 | 1 | D: VampPicker `allowUnattached` — CONTEXT › Audio slot (no-MP3 vamp assignable) | T-142-09 | Default `false`; per-slide drawer (`EditSlideDrawer.vue`) call site unchanged — no-MP3 rows still disabled there | unit | `npx vitest run src/components/__tests__/VampPicker.test.ts src/components/slides/__tests__/EditSlideDrawer.test.ts` | ✅ (new cases) | ⬜ pending |
+| 142-02-T2 | 142-02 | 1 | D: Track row "duration when known" — AudioPlayer `loadedmetadata` emit (additive) | — | N/A (Run-control audio suite re-run to prove no change) | unit | `npx vitest run src/components/__tests__/AudioPlayer.test.ts src/views/__tests__/RunControlView.audio.test.ts` | ✅ (new cases) | ⬜ pending |
+| 142-02-T3 | 142-02 | 1 | D: `audioTab` derivation incl. no-MP3 vamp; None/Track/Vamp tabs; inline VampPicker; Track row — CONTEXT › Audio slot | T-142-06, T-142-07, T-142-08 | Tabs disabled / Replace / Remove / picker hidden for `!isEditor`; None → `remove` (explicit-clear path); rejected upload emits nothing | unit | `npx vitest run src/components/slides/__tests__/SlideGroupMusicControl.test.ts src/components/slides/__tests__/SlideGrid.test.ts` | ✅ (rewritten suite) | ⬜ pending |
+| 142-03-T1 | 142-03 | 2 | D: chip state table (set / unset "Add" dashed / vamp-no-MP3 amber / inherited "(song)" / locked inert span); caption singular/plural — CONTEXT › Layout | T-142-11 | Locked / non-editor → `<span>`, no caret, no aria-haspopup, no popover, no control mounts, no write | unit | `npx vitest run src/components/slides/__tests__/SlideGroupSetupStrip.test.ts -t "chips"` | ❌ W0 → created by this task | ⬜ pending |
+| 142-03-T2 | 142-03 | 2 | D: one popover at a time; click-outside / Esc close; focus in/return; group-switch reset; edge flip; six passthrough emits — CONTEXT › Layout | T-142-12 | Global listeners added only while open, removed on close AND unmount | unit | `npx vitest run src/components/slides/__tests__/SlideGroupSetupStrip.test.ts -t "lifecycle\|passthrough"` | ❌ W0 → created by this task | ⬜ pending |
+| 142-04-T1 | 142-04 | 3 | D: panel gate → `Boolean(selectedSlot)`; chips lead, Loop/Congregational/Remove-imported trail; `onAttachGroupVamp` no-URL guard removed; testid migration (~42 refs) — CONTEXT › Layout + Audio slot | T-142-15, T-142-16, T-142-18 | Every handler still re-checks `canWriteGroupMedia` (≥ 8 occurrences); viewers/locked get inert chips; no-MP3 patch has no `bedAudioUrl` key | unit | `npx vitest run src/components/slides/__tests__/SlideGrid.test.ts` | ✅ (migrated) | ⬜ pending |
+| 142-04-T2 | 142-04 | 3 | D: Background recents derived in SlidesTab (groups by `updatedAt` desc, then song-inherited in plan order, deduped, ≤ 4, no new read) — CONTEXT › Background (Claude's discretion resolved) | T-142-17 | No new Firestore read / subscription (`getDocs`/`onSnapshot`/`useSongs` absent from SlidesTab.vue) | unit | `npx vitest run src/components/slides/__tests__/SlidesTab.test.ts -t "recentBackgrounds"` | ✅ (new cases) | ⬜ pending |
+| 142-04-T3 | 142-04 | 3 | Phase gate — full app suite at the 2-file baseline + `npm run type-check` | — | N/A | full suite + type-check | `npm run type-check && npx vitest run` (detached, ~9 min) | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
