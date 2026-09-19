@@ -8,6 +8,7 @@ import type { ScriptureReading } from '@/types/scriptureReading'
 import type { Song } from '@/types/song'
 import type { ImportedDeck } from '@/types/importedDeck'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+import type { Vamp } from '@/types/vamp'
 
 // --- Stubbed scriptureSlides store (D001/D005 pattern used by ScriptureSlideEditor.test.ts) ---
 const mockSubscribeReadings = vi.fn()
@@ -93,6 +94,21 @@ vi.mock('@/stores/slideGroups', () => ({
       deleteGroup: mockDeleteGroup,
       setGroupBedMedia: mockSetGroupBedMedia,
       replaceGroupSlides: mockReplaceGroupSlides,
+    }),
+}))
+
+// --- Stubbed vamps store (260919-mvw) — live vamp audio resolution ---
+const mockSubscribeVamps = vi.fn()
+const vampsState = reactive<{ vamps: Vamp[] }>({ vamps: [] })
+
+vi.mock('@/stores/vamps', () => ({
+  useVampStore: () =>
+    reactive({
+      vamps: vampsState.vamps,
+      isLoading: false,
+      orgId: null,
+      subscribe: mockSubscribeVamps,
+      unsubscribeAll: vi.fn(),
     }),
 }))
 
@@ -313,6 +329,7 @@ describe('useSlideshowAssembly', () => {
     importedState.decks = []
     songsState.songs = []
     slideGroupsState.groups = []
+    vampsState.vamps = []
     // Phase 42: the pptxRenders store's map is not a vi.fn() mock, so
     // `vi.clearAllMocks()` above never touches it — reset it explicitly, or a
     // render document set by one test would leak into the next.
@@ -2083,6 +2100,93 @@ describe('useSlideshowAssembly', () => {
       await nextTick()
 
       expect(() => capturedCallback!({ empty: true, docs: [] })).not.toThrow()
+    })
+  })
+
+  // --- vamp store subscription + live vamp audio (260919-mvw) ---
+  describe('vamp store subscription + live vamp audio (260919-mvw)', () => {
+    function makeVamp(overrides: Partial<Vamp> = {}): Vamp {
+      return {
+        id: 'vamp-1',
+        name: 'Key of C',
+        key: 'C',
+        attachment: {
+          storagePath: 'orgs/org-1/vamps/vamp-1/key-of-c.mp3',
+          downloadUrl: 'https://cdn.example/key-of-c.mp3',
+          fileName: 'key-of-c.mp3',
+          mimeType: 'audio/mpeg',
+          sizeBytes: 1024,
+          createdAt: {} as never,
+          createdBy: 'u1',
+        },
+        createdAt: {} as never,
+        updatedAt: {} as never,
+        ...overrides,
+      }
+    }
+
+    function vampBedGroup(overrides: Partial<SlideGroup> = {}): SlideGroup {
+      return {
+        id: 'slot-hymn-0',
+        slotId: 'slot-hymn-0',
+        serviceId: 'service-1',
+        bedVampId: 'vamp-1',
+        bedVampLabel: 'Key of C · C',
+        slides: [{ id: 'entry-1', order: 0, sourceRef: { kind: 'text' } } as GroupSlideEntry],
+        createdAt: {} as never,
+        updatedAt: {} as never,
+        ...overrides,
+      }
+    }
+
+    it('subscribes the vamp store once with the org id alongside groups', async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0 })]))
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      expect(mockSubscribeVamps).toHaveBeenCalledTimes(1)
+      expect(mockSubscribeVamps).toHaveBeenCalledWith('org-1')
+
+      service.value = makeService([hymnSlot({ position: 0, hymnName: 'Renamed' })])
+      await nextTick()
+      expect(mockSubscribeVamps).toHaveBeenCalledTimes(1)
+    })
+
+    it('a bedVampId-only group plays the live vamp MP3 (owner repro)', async () => {
+      vampsState.vamps = [makeVamp()]
+      slideGroupsState.groups = [vampBedGroup()]
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-0' })]))
+      const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      expect(assembledSlideshow.value[0]!.slide.audioUrl).toBe('https://cdn.example/key-of-c.mp3')
+      expect(assembledSlideshow.value[0]!.audioFromBed).toBe(true)
+      expect(assembledSlideshow.value[0]!.slide.audioLoop).toBe(true)
+    })
+
+    it('attaching the MP3 after assignment reaches the assembler live', async () => {
+      vampsState.vamps = [makeVamp({ attachment: null })]
+      slideGroupsState.groups = [vampBedGroup()]
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-0' })]))
+      const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      expect(assembledSlideshow.value[0]!.slide.audioUrl).toBeUndefined()
+
+      vampsState.vamps.splice(0, 1, makeVamp())
+      await nextTick()
+
+      expect(assembledSlideshow.value[0]!.slide.audioUrl).toBe('https://cdn.example/key-of-c.mp3')
+    })
+
+    it('a deleted vamp keeps the stored bed URL (R440)', async () => {
+      vampsState.vamps = []
+      slideGroupsState.groups = [vampBedGroup({ bedAudioUrl: 'https://cdn.example/kept.mp3' })]
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-0' })]))
+      const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      expect(assembledSlideshow.value[0]!.slide.audioUrl).toBe('https://cdn.example/kept.mp3')
     })
   })
 })

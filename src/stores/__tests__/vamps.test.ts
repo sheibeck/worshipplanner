@@ -151,6 +151,27 @@ describe('useVampStore', () => {
       store.subscribe('org-2')
       expect(mockUnsubscribe).toHaveBeenCalledOnce()
     })
+
+    // 260919-mvw: a volunteer / viewer's denied vamps read must stay silent —
+    // the assembler falls back to stored URLs.
+    it('passes an error handler that swallows permission-denied and logs anything else', async () => {
+      const { onSnapshot } = await import('firebase/firestore')
+      const { useVampStore } = await import('../vamps')
+      const store = useVampStore()
+      store.subscribe('org-1')
+
+      const onError = vi.mocked(onSnapshot).mock.calls[0]![2] as (err: unknown) => void
+      expect(typeof onError).toBe('function')
+
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      expect(() => onError({ code: 'permission-denied' })).not.toThrow()
+      expect(spy).not.toHaveBeenCalled()
+      expect(store.vamps).toEqual([])
+
+      onError({ code: 'unavailable' })
+      expect(spy).toHaveBeenCalledOnce()
+      spy.mockRestore()
+    })
   })
 
   describe('addVamp', () => {
