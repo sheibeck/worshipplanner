@@ -6,7 +6,8 @@
        <SlideCanvas :interactive="false">; navigation is the transport/rail's job,
        so there is NO push-to-live control here (no run-take / run-push-live testid
        — that preserves the single-selection contract the control suite asserts).
-       The live frame is GREEN (owner fix #4 — the design used red). Preserves
+       The live frame is on-air RED matching the header's Live pill (260919-k9j;
+       it was green from owner fix #4 until then). Preserves
        run-current-preview / run-next-preview + the "End of service" empty copy the
        dual-preview test asserts. Key/BPM omitted (no data).
 
@@ -28,7 +29,7 @@
     <div data-testid="run-current-pane">
       <div class="mb-2 flex items-center gap-2">
         <span class="text-xs font-semibold text-gray-400">On screen</span>
-        <!-- Owner UAT: in rehearse mode the tag/ring is YELLOW "Rehearsing" (green
+        <!-- Owner UAT: in rehearse mode the tag/ring is YELLOW "Rehearsing" (red
              LIVE is reserved for a real go-live), matching the header status tile. -->
         <span
           v-if="live"
@@ -38,7 +39,7 @@
         >
           <span
             class="h-2 w-2 rounded-full"
-            :class="rehearsing ? 'bg-amber-400' : 'bg-green-500'"
+            :class="rehearsing ? 'bg-amber-400' : 'bg-red-500'"
             aria-hidden="true"
           ></span>
           {{ rehearsing ? 'Rehearsing' : 'LIVE' }}
@@ -51,7 +52,7 @@
         ref="currentBox"
         data-testid="run-current-preview"
         class="relative aspect-video overflow-hidden rounded-lg bg-black ring-2"
-        :class="live ? (rehearsing ? 'ring-amber-400' : 'ring-green-500') : 'ring-gray-700'"
+        :class="live ? (rehearsing ? 'ring-amber-400' : 'ring-red-500') : 'ring-gray-700'"
       >
         <div
           v-if="current"
@@ -136,11 +137,11 @@ defineProps<{
   current: AssembledSlide | null
   /** The upcoming slide (subordinate preview). */
   next: AssembledSlide | null
-  /** True once go-live/rehearse has begun — turns the program frame GREEN (or
-   *  amber when `rehearsing`). */
+  /** True once go-live/rehearse has begun — turns the program frame on-air RED
+   *  (or amber when `rehearsing`). */
   live: boolean
   /** True while rehearsing (no outputs) — the program tag/ring reads amber
-   *  "Rehearsing" instead of green "LIVE" (owner UAT). */
+   *  "Rehearsing" instead of red "LIVE" (owner UAT). */
   rehearsing?: boolean
   /** True when the operator has blacked out the outputs — the On-screen (program)
    *  preview shows a BLACK overlay so the projectionist sees the audience is black. */

@@ -1698,14 +1698,15 @@ at the tiny thumb width wrapped every word into a stacked mess.
 
 **Module overview (R277):** the State-B live header. PURE presentation: props-in / emits-out, no
 channel, no store, no timer logic — the parent (`RunControlView`, wired in 97-09) owns all state and
-passes the `live` flag plus the clock/elapsed strings from `useRunTimers`. Owner fix #4: the live
-status is GREEN only when truly live, and a muted/amber "Not open" otherwise — never a pre-live red.
-Owner fix #7: a REHEARSAL is a distinct third state — YELLOW "Rehearsing" (never green) with an "End
-Rehearsal" exit label — so green unambiguously means the outputs are really live. All three states
-are driven by the `live`/`rehearsing` props the parent sets, never derived from any output-status
-machine here: green "Live" when `live && !rehearsing`, amber "Rehearsing" when `rehearsing`, muted
-"Not open" otherwise. The Nocturne Run-scoped palette (97-UI-SPEC) is applied via local CSS custom
-properties on the root only — this does not retheme the app.
+passes the `live` flag plus the clock/elapsed strings from `useRunTimers`. Owner fix #4/#UAT
+2026-09-08: the live status is on-air RED (`.run-status--live`, `--color-live: #e5484d`) only when
+truly live, and a muted/amber "Not open" otherwise — never a pre-live red. Owner fix #7: a REHEARSAL
+is a distinct third state — YELLOW "Rehearsing" (never red) with an "End Rehearsal" exit label — so
+red unambiguously means the outputs are really live. All three states are driven by the
+`live`/`rehearsing` props the parent sets, never derived from any output-status machine here: RED
+"Live" when `live && !rehearsing`, amber "Rehearsing" when `rehearsing`, muted "Not open" otherwise.
+The Nocturne Run-scoped palette (97-UI-SPEC) is applied via local CSS custom properties on the root
+only — this does not retheme the app.
 
 ### src/components/run/RunPreviewPair.vue
 
@@ -1713,7 +1714,9 @@ properties on the root only — this does not retheme the app.
 a PURE display child. Both panes render the real `SlideCanvas` with `:interactive="false"`; the
 previews own no navigation (the transport/rail posts index changes), so there is deliberately no
 emit and no run-take / run-push-live control here — that keeps the single-selection contract intact.
-The live frame is GREEN when `live` is true. Owner UAT fix (Next-up font too big): `SlideCanvas` has
+The live frame is on-air RED (`ring-red-500`, `bg-red-500` dot) when `live` is true and amber while
+`rehearsing`, matching the header's Live pill (green until quick 260919-k9j, 2026-09-19). Owner UAT
+fix (Next-up font too big): `SlideCanvas` has
 no font-size prop — its text is sized in fixed projector px, scaled only by `--slide-font-scale`, so
 scaling a box-sized canvas by 0.8 still left the font enormous in the small preview box. Instead each
 canvas renders at a fixed `REFERENCE_WIDTH × REFERENCE_HEIGHT` (1280×720, 16:9) stage — where the
