@@ -149,4 +149,51 @@ describe('RunFilmstrip — end-of-item cap (R331)', () => {
     expect(cap.text()).toContain('End of service')
     expect(cap.text()).not.toContain('Next:')
   })
+
+  it('is a real, enabled button that emits next-item on click when nextItemLabel is present (260919-k9j)', async () => {
+    const wrapper = mount(RunFilmstrip, {
+      props: { slides: [fakeSlide('a')], indices: [0], currentIndex: 0, nextItemLabel: 'Sermon' },
+    })
+    const cap = wrapper.find('[data-testid="run-filmstrip-endcap"]')
+    expect(cap.element.tagName).toBe('BUTTON')
+    expect(cap.attributes('type')).toBe('button')
+    expect(cap.attributes('disabled')).toBeUndefined()
+    expect(cap.attributes('aria-label')).toBe('Go to next item: Sermon')
+    expect(cap.text()).toContain('Sermon')
+    expect(cap.text()).toContain('End of item')
+    expect(cap.classes()).toContain('focus-visible:ring-indigo-400')
+    expect(cap.classes()).toContain('focus:outline-none')
+
+    await cap.trigger('click')
+    expect(wrapper.emitted('next-item')).toEqual([[]])
+    expect(wrapper.emitted('jump')).toBeUndefined()
+  })
+
+  it('is a disabled button with no emit when nextItemLabel is null (260919-k9j)', async () => {
+    const wrapper = mount(RunFilmstrip, {
+      props: { slides: [fakeSlide('a')], indices: [0], currentIndex: 0, nextItemLabel: null },
+    })
+    const cap = wrapper.find('[data-testid="run-filmstrip-endcap"]')
+    expect(cap.element.tagName).toBe('BUTTON')
+    expect(cap.attributes('disabled')).toBeDefined()
+    expect(cap.attributes('aria-label')).toBe('End of service')
+    expect(cap.text()).toContain('End of service')
+    expect(cap.text()).not.toContain('Next:')
+
+    await cap.trigger('click')
+    expect(wrapper.emitted('next-item')).toBeUndefined()
+  })
+
+  it('is a disabled button with no emit when nextItemLabel is omitted (260919-k9j)', async () => {
+    const wrapper = mount(RunFilmstrip, {
+      props: { slides: [fakeSlide('a')], indices: [0], currentIndex: 0 },
+    })
+    const cap = wrapper.find('[data-testid="run-filmstrip-endcap"]')
+    expect(cap.element.tagName).toBe('BUTTON')
+    expect(cap.attributes('disabled')).toBeDefined()
+    expect(cap.attributes('aria-label')).toBe('End of service')
+
+    await cap.trigger('click')
+    expect(wrapper.emitted('next-item')).toBeUndefined()
+  })
 })

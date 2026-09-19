@@ -717,6 +717,37 @@ describe('RunControlView — in-item filmstrip jump + scaled next-up (R282/R276)
     expect(nextPreview.exists()).toBe(true)
     expect(nextPreview.html()).toContain('scale(')
   })
+
+  it('clicking the end-of-item cap advances to the next order item exactly like ArrowDown (skipping the empty slot) (260919-k9j)', async () => {
+    const fake = createFakeChannel()
+    const wrapper = mountView(fake.factory)
+    await flushPromises()
+
+    await wrapper.find('[data-testid="run-rehearse-btn"]').trigger('click')
+    await flushPromises()
+
+    const cap = wrapper.find('[data-testid="run-filmstrip-endcap"]')
+    expect(cap.exists()).toBe(true)
+    expect(cap.attributes('disabled')).toBeUndefined()
+
+    await cap.trigger('click')
+    await flushPromises()
+
+    // Same result as the ArrowDown test: slot 1 is empty, so the click lands
+    // on slot 2's first slide (GLOBAL index 2).
+    expect(fake.states()[fake.states().length - 1]!.index).toBe(2)
+    expect(wrapper.find('[data-testid="run-current-preview"]').text()).toBe('c')
+
+    // Now at the last item — the cap is disabled and a click posts nothing.
+    const capAtEnd = wrapper.find('[data-testid="run-filmstrip-endcap"]')
+    expect(capAtEnd.text()).toContain('End of service')
+    expect(capAtEnd.attributes('disabled')).toBeDefined()
+
+    const before = fake.states().length
+    await capAtEnd.trigger('click')
+    await flushPromises()
+    expect(fake.states().length).toBe(before)
+  })
 })
 
 // ── The top-bar Audience/Confidence header dots were REMOVED (owner UAT 2026-09-08):
