@@ -5,7 +5,7 @@ milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141 — all execu
 current_phase: 142
 current_phase_name: Slides Tab panel UX from Claude Design
 status: verifying
-stopped_at: Completed 142-04-PLAN.md
+stopped_at: Phase 142 + quick 260919-k9j deployed to prod 2026-09-19 (hosting only; owner-confirmed); v2.15 batched owner UAT (138-142) against prod is next, then audit -> complete
 last_updated: "2026-09-19T06:43:45.434Z"
 last_activity: 2026-09-19
 last_activity_desc: Completed quick task 260919-k9j — Run the Service fixes (LIVE red, audio defaults On, End-of-item click); Phase 142 built + deferred to batched UAT
@@ -40,7 +40,7 @@ step, then audit → complete.
 | 139 | verification_deferred_human (auto-verified 6/6 must-haves green + SECURED 7/7 + nyquist validated; 2 code-review criticals fixed; cross-surface time display + org-defaults settings UX UAT pending) | /gsd-verify-work 139 |
 | 140 | verification_deferred_human (auto-verified 9/9 must-haves green + SECURED 8/8 + nyquist validated; 1 code-review critical + 2 warnings fixed; Vamps-tab visual fidelity + deployed MP3 upload/replace/remove round-trip UAT pending) | /gsd-verify-work 140 |
 | 141 | verification_deferred_human (auto-verified 5/5 must-haves green + SECURED 18/18 + nyquist validated 0 gaps; 4 code-review warnings fixed over 3 iterations; full-suite regression gate + type-check clean 2026-09-18; real-speaker/fresh-profile arm + blocked-banner + visual fidelity + delete-keeps-MP3 UAT pending) | /gsd-verify-work 141 |
-| 142 | verification_deferred_human (added 2026-09-19 via /gsd-autonomous --only 142; auto-verified 17/17 must-haves green + SECURED 19/19 + nyquist validated 0 gaps; 1 code-review warning fixed; UI audit 21/24 with focus-ring fix applied; full suite at the 2-file baseline + type-check clean; NOT deployed yet; chip-row fidelity + popover edge-flip + drag-drop upload + one-slot audio/no-MP3 vamp live + 2 backstops UAT pending) | /gsd-verify-work 142 |
+| 142 | verification_deferred_human (added 2026-09-19 via /gsd-autonomous --only 142; auto-verified 17/17 must-haves green + SECURED 19/19 + nyquist validated 0 gaps; 1 code-review warning fixed; UI audit 21/24 with focus-ring fix applied; full suite at the 2-file baseline + type-check clean; DEPLOYED to prod 2026-09-19 (hosting, bundle index-D9t7Dynj.js from 9b50ebd0, owner-confirmed); chip-row fidelity + popover edge-flip + drag-drop upload + one-slot audio/no-MP3 vamp live + 2 backstops UAT pending) | /gsd-verify-work 142 |
 
 ## Deferred Verification (v2.9 — ACTIVE, batched to milestone end)
 
