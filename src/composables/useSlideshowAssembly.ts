@@ -5,6 +5,7 @@ import { useScriptureSlides } from '@/stores/scriptureSlides'
 import { useImportedSlides } from '@/stores/importedSlides'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { usePptxRenders } from '@/stores/pptxRenders'
+import { useVampStore } from '@/stores/vamps'
 import { lyricsQuery } from '@/stores/songLyrics'
 import { resolveImageUrl } from '@/utils/pptxUpload'
 import { isPermissionDenied } from '@/utils/firestoreListener'
@@ -15,6 +16,7 @@ import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS, type Service } from '@/types/
 import type { AssembledSlide, AssembledSection } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { SlideGroup, SlideGroupInput, GroupSlideEntry } from '@/types/slideGroup'
+import type { Vamp } from '@/types/vamp'
 
 /** Tears down a lyrics subscription opened by a {@link LyricsSubscriber}. */
 export type LyricsUnsubscribe = () => void
@@ -122,6 +124,7 @@ export function useSlideshowAssembly(
   const importedStore = useImportedSlides()
   const slideGroupsStore = useSlideGroups()
   const pptxRendersStore = usePptxRenders()
+  const vampStore = useVampStore()
   const subscribeLyrics = options?.lyricsSubscriber ?? defaultLyricsSubscriber
 
   // See ADR-0137 (docs/adr/0137-activeslideshowassemblyinstances-still-includes-this-instanc.md)
@@ -146,6 +149,11 @@ export function useSlideshowAssembly(
         scriptureStore.subscribeReadings(id)
         importedStore.subscribeDecks(id)
         slideGroupsStore.subscribeGroups(id)
+        // 260919-mvw — live vamp URLs for the assembler; guarded on the
+        // store's orgId because the views subscribe too and `subscribe`
+        // replaces the listener; teardown belongs to `resetOrgScopedStores`,
+        // not `cleanup()`.
+        if (vampStore.orgId !== id) vampStore.subscribe(id)
         subscribedOrgId.value = id
       }
     },
@@ -164,6 +172,16 @@ export function useSlideshowAssembly(
     const map = new Map<string, (typeof importedStore.decks)[number]>()
     for (const deck of importedStore.decks) {
       map.set(deck.id, deck)
+    }
+    return map
+  })
+
+  // 260919-mvw — live vamps keyed by id, fed to the assembler's audio
+  // resolution only.
+  const vampsById = computed<Map<string, Vamp>>(() => {
+    const map = new Map<string, Vamp>()
+    for (const vamp of vampStore.vamps) {
+      map.set(vamp.id, vamp)
     }
     return map
   })
@@ -417,6 +435,7 @@ export function useSlideshowAssembly(
       groupsBySlotId: assemblyGroupsBySlotId.value,
       pptxRendersByImportId: pptxRendersStore.rendersByImportId,
       renderedImageUrlsByImportId: renderedImageUrlsByImportId.value,
+      vampsById: vampsById.value,
     })
   })
 

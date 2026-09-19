@@ -18,6 +18,7 @@ import {
 import { ref as storageRef, deleteObject } from 'firebase/storage'
 import { db, storage } from '@/firebase'
 import { todayYmd } from '@/utils/myScheduleGrouping'
+import { ignorePermissionDenied } from '@/utils/firestoreListener'
 import type { Vamp, VampAttachment, UpsertVampInput, VampAssignmentScan } from '@/types/vamp'
 import type { SlideGroup } from '@/types/slideGroup'
 import type { Service } from '@/types/service'
@@ -42,10 +43,16 @@ export const useVampStore = defineStore('vamps', () => {
       collection(db, 'organizations', orgIdValue, 'vamps'),
       orderBy('name'),
     )
-    unsubscribeFn = onSnapshot(q, (snap) => {
-      vamps.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Vamp)
-      isLoading.value = false
-    })
+    // Volunteers / viewers have no vamps read — stay quiet, the assembler
+    // falls back to stored URLs (260919-mvw).
+    unsubscribeFn = onSnapshot(
+      q,
+      (snap) => {
+        vamps.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Vamp)
+        isLoading.value = false
+      },
+      ignorePermissionDenied('vamps store'),
+    )
   }
 
   function unsubscribeAll() {

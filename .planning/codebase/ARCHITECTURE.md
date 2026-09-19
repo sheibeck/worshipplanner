@@ -1219,6 +1219,15 @@ one section (38-02). R105 (Phase 49): the reference eyebrow no longer lives on t
 slide — it has its own dedicated leading slide emitted at assembly time, so `isFirstSection` no
 longer exists on the type.
 
+**`AssemblyInputs.vampsById` (quick 260919-mvw):** vamp audio is resolved from the LIVE vamp doc —
+`resolveEntryMedia` and the synthetic reference slide prefer
+`vampsById.get(entry.vampId | group.bedVampId)?.attachment?.downloadUrl` over the stored
+`entry.audioUrl` / `group.bedAudioUrl`; the stored URLs are the deleted-vamp fallback (R440) and the
+only source when the map is absent (no `vampsById` passed, or a volunteer whose vamps read is
+denied). Fixes the Phase 142 no-MP3-then-attach case and the replaced-MP3 dead link (`setAttachment`
+deletes the superseded Storage object). Labels (`vampLabel` / `bedVampLabel`) stay denormalized; loop
+rule unchanged (vamp bed loops, entry-own loops per `entry.audioLoop`). OPTIONAL, `ReadonlyMap`.
+
 ### src/utils/slideTypography.ts
 
 **Module overview (46-RESEARCH.md Pattern 1-3):** pure, independently-testable slide-typography
@@ -2284,7 +2293,11 @@ re-sync. Builds the content maps `assembleSlideshow` needs from live Pinia store
 by loading the current (newest) lyrics doc for every distinct songId referenced by a SONG slot (the
 songLyrics store itself only ever subscribes to a single song at a time, so it cannot be reused
 directly here). A song's slide order is read from that lyrics document's `performanceOrder` field
-alone (R035/D-03) — there is no second order source and no precedence chain.
+alone (R035/D-03) — there is no second order source and no precedence chain. Quick 260919-mvw — the
+org watch also subscribes `useVampStore` (guarded on the store's own `orgId`; never torn down in
+`cleanup()`, `resetOrgScopedStores` owns that; the listener swallows `permission-denied` via
+`ignorePermissionDenied`) and passes a `vampsById` computed to `assembleSlideshow` only — not to the
+materializer inputs.
 
 **`LyricsSubscriber`:** opens a LIVE subscription to a song's current (newest) lyrics document.
 `onUpdate` fires with the newest doc (or `null` when none exists) on the initial snapshot AND on
