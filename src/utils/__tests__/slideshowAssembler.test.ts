@@ -16,6 +16,7 @@ import type { ImportedDeck } from '@/types/importedDeck'
 import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide, VideoSlide, BlackoutSlide, CongregationalSection } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import type { PptxRenderDoc } from '@/types/pptxRender'
+import type { Vamp } from '@/types/vamp'
 import type { Timestamp } from 'firebase/firestore'
 import { slotLabel, reindexSlots, orderSlotsBySection } from '@/utils/slotTypes'
 import { resolveImportedRender, importedEntryIdentities, type ImportedRenderResolution } from '@/utils/importedRenderReconciler'
@@ -2215,6 +2216,302 @@ describe('assembleSlideshow — group-level vamp bed loops (260918-nm2)', () => 
     )
 
     expect('audioLoop' in uploadedResult[0]!.slide).toBe(false)
+  })
+})
+
+describe('assembleSlideshow — vamp audio resolves from the live vamp doc (260919-mvw)', () => {
+  function makeVamp(overrides: Partial<Vamp> = {}): Vamp {
+    return {
+      id: 'vamp-1',
+      name: 'Key of C',
+      key: 'C',
+      attachment: {
+        storagePath: 'orgs/org-1/vamps/vamp-1/key-of-c.mp3',
+        downloadUrl: 'https://cdn.example/key-of-c.mp3',
+        fileName: 'key-of-c.mp3',
+        mimeType: 'audio/mpeg',
+        sizeBytes: 1024,
+        createdAt: mockTimestamp,
+        createdBy: 'u1',
+      },
+      createdAt: mockTimestamp,
+      updatedAt: mockTimestamp,
+      ...overrides,
+    }
+  }
+
+  it('owner repro: bedVampId with no bedAudioUrl resolves the live vamp MP3', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Key of C · C',
+    })
+    const result = assembleSlideshow(
+      service,
+      makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+        vampsById: new Map([['vamp-1', makeVamp()]]),
+      }),
+    )
+
+    expect(result[0]!.slide.audioUrl).toBe('https://cdn.example/key-of-c.mp3')
+    expect(result[0]!.audioFromBed).toBe(true)
+    expect(result[0]!.slide.audioLoop).toBe(true)
+  })
+
+  it('replaced MP3: the live vamp URL wins over a stale stored bedAudioUrl', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Key of C · C',
+      bedAudioUrl: 'https://cdn.example/old.mp3',
+    })
+    const result = assembleSlideshow(
+      service,
+      makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+        vampsById: new Map([['vamp-1', makeVamp({ attachment: { ...makeVamp().attachment!, downloadUrl: 'https://cdn.example/new.mp3' } })]]),
+      }),
+    )
+
+    expect(result[0]!.slide.audioUrl).toBe('https://cdn.example/new.mp3')
+    expect(result[0]!.audioFromBed).toBe(true)
+    expect(result[0]!.slide.audioLoop).toBe(true)
+  })
+
+  it('R440 deleted vamp: falls back to the stored bedAudioUrl when the vamp is absent from the map', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Key of C · C',
+      bedAudioUrl: 'https://cdn.example/kept.mp3',
+    })
+    const result = assembleSlideshow(
+      service,
+      makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+        vampsById: new Map(),
+      }),
+    )
+
+    expect(result[0]!.slide.audioUrl).toBe('https://cdn.example/kept.mp3')
+    expect(result[0]!.audioFromBed).toBe(true)
+    expect(result[0]!.slide.audioLoop).toBe(true)
+  })
+
+  it('live vamp with attachment: null (MP3 removed) falls back to the stored bedAudioUrl', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Key of C · C',
+      bedAudioUrl: 'https://cdn.example/kept.mp3',
+    })
+    const result = assembleSlideshow(
+      service,
+      makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+        vampsById: new Map([['vamp-1', makeVamp({ attachment: null })]]),
+      }),
+    )
+
+    expect(result[0]!.slide.audioUrl).toBe('https://cdn.example/kept.mp3')
+  })
+
+  it('entry-level: the live vamp URL wins over a stale stored entry.audioUrl, entry keeps its own loop flag', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
+      vampId: 'vamp-1',
+      vampLabel: 'Key of C · C',
+      audioUrl: 'https://cdn.example/old.mp3',
+      audioLoop: true,
+    })
+    const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
+    const result = assembleSlideshow(
+      service,
+      makeInputs({
+        scriptureReadingsById: new Map([['reading-1', reading]]),
+        groupsBySlotId: new Map([['slot-scripture-0', group]]),
+        vampsById: new Map([['vamp-1', makeVamp({ attachment: { ...makeVamp().attachment!, downloadUrl: 'https://cdn.example/new.mp3' } })]]),
+      }),
+    )
+
+    expect(result[0]!.slide.audioUrl).toBe('https://cdn.example/new.mp3')
+    expect(result[0]!.audioFromBed).toBe(false)
+    expect(result[0]!.slide.audioLoop).toBe(true)
+  })
+
+  it('entry-level with audioLoop omitted: the entry-own loop stays the stored flag (false)', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
+      vampId: 'vamp-1',
+      vampLabel: 'Key of C · C',
+      audioUrl: 'https://cdn.example/old.mp3',
+    })
+    const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
+    const result = assembleSlideshow(
+      service,
+      makeInputs({
+        scriptureReadingsById: new Map([['reading-1', reading]]),
+        groupsBySlotId: new Map([['slot-scripture-0', group]]),
+        vampsById: new Map([['vamp-1', makeVamp()]]),
+      }),
+    )
+
+    expect('audioLoop' in result[0]!.slide).toBe(false)
+  })
+
+  it('precedence intact: a plain uploaded entry.audioUrl (no vampId) wins over a live-resolving bed', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
+      audioUrl: 'https://cdn.example/own.mp3',
+    })
+    const group = makeSlideGroup({
+      id: 'slot-scripture-0',
+      slotId: 'slot-scripture-0',
+      slides: [entry],
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Key of C · C',
+    })
+    const result = assembleSlideshow(
+      service,
+      makeInputs({
+        scriptureReadingsById: new Map([['reading-1', reading]]),
+        groupsBySlotId: new Map([['slot-scripture-0', group]]),
+        vampsById: new Map([['vamp-1', makeVamp()]]),
+      }),
+    )
+
+    expect(result[0]!.slide.audioUrl).toBe('https://cdn.example/own.mp3')
+    expect(result[0]!.audioFromBed).toBe(false)
+    expect('audioLoop' in result[0]!.slide).toBe(false)
+  })
+
+  it('synthetic reference slide resolves the live vamp URL for a congregational scripture bed', () => {
+    const sections = [makeCongregationalSection({ speaker: 'LEADER', text: 'One' })]
+    const slot = scriptureSlot({ id: 'slot-scripture-0', congregationalSections: sections })
+    const entries: GroupSlideEntry[] = sections.map((section, i) =>
+      makeGroupSlideEntry({
+        id: `entry-scripture-${i}`,
+        order: i,
+        sourceRef: { kind: 'scripture', speaker: section.speaker, text: section.text },
+      }),
+    )
+    const group = makeSlideGroup({
+      id: slot.id,
+      slotId: slot.id,
+      slides: entries,
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Key of C · C',
+    })
+    const result = assembleSlideshow(
+      makeService([slot]),
+      makeInputs({
+        groupsBySlotId: new Map([[slot.id, group]]),
+        vampsById: new Map([['vamp-1', makeVamp()]]),
+      }),
+    )
+
+    expect(result[0]!.slide.id).toBe('slot-scripture-0:ref')
+    expect(result[0]!.slide.audioUrl).toBe('https://cdn.example/key-of-c.mp3')
+    expect(result[0]!.slide.audioLoop).toBe(true)
+    expect(result[0]!.audioFromBed).toBe(true)
+  })
+
+  it('regression: no vampsById key behaves byte-identically to an empty vampsById map, using the stored bedAudioUrl', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedVampId: 'vamp-1',
+      bedVampLabel: 'Key of C · C',
+      bedAudioUrl: 'https://cdn.example/kept.mp3',
+    })
+
+    const noKeyResult = assembleSlideshow(
+      service,
+      makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      }),
+    )
+    const emptyMapResult = assembleSlideshow(
+      service,
+      makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+        vampsById: new Map(),
+      }),
+    )
+
+    expect(noKeyResult).toEqual(emptyMapResult)
+    expect(noKeyResult[0]!.slide.audioUrl).toBe('https://cdn.example/kept.mp3')
   })
 })
 
