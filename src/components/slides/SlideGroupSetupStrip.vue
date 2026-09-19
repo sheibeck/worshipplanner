@@ -38,7 +38,7 @@
            grid's own overflow-y-auto region, so it is never clipped by a
            scroll ancestor. alignRight is computed on open, not CSS-only. -->
       <div
-        v-if="openChip === chip.id"
+        v-if="openChip === chip.id && editable"
         :id="popoverId(chip.id)"
         role="dialog"
         aria-modal="false"
@@ -330,5 +330,13 @@ onUnmounted(() => {
 // Same reset precedent as SlideGrid.vue's openMenuEntryId watcher (ADR-0115).
 watch(() => props.selectedSlot.id, () => {
   openChip.value = null
+})
+
+// Force-close an already-open popover if the lock flips mid-session
+// (WR-01, 142-REVIEW.md): the chip button swaps to an inert span, but
+// without this the popover kept mounting with hardcoded-editable child
+// controls and no feedback on click.
+watch(() => props.editable, (editable) => {
+  if (!editable) close()
 })
 </script>

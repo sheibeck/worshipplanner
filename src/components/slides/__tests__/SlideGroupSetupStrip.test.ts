@@ -390,6 +390,21 @@ describe('SlideGroupSetupStrip — popover lifecycle (142)', () => {
     expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(false)
   })
 
+  it('editable flipping to false while a popover is open closes it and removes its listeners (WR-01)', async () => {
+    const docRemoveSpy = vi.spyOn(document, 'removeEventListener')
+    const winRemoveSpy = vi.spyOn(window, 'removeEventListener')
+
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'audio')
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(true)
+
+    await wrapper.setProps({ editable: false })
+
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(false)
+    expect(docRemoveSpy.mock.calls.filter((c) => c[0] === 'pointerdown')).toHaveLength(1)
+    expect(winRemoveSpy.mock.calls.filter((c) => c[0] === 'keydown')).toHaveLength(1)
+  })
+
   it('pointerdown/keydown listeners are added once on open, removed once on close, and removed on unmount while open', async () => {
     const docAddSpy = vi.spyOn(document, 'addEventListener')
     const docRemoveSpy = vi.spyOn(document, 'removeEventListener')
