@@ -1104,8 +1104,15 @@ Work this will cover when promoted:
 **Plans:** 4 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 142-01-PLAN.md — Wave 1: `setGroupBedMedia` no-MP3-vamp fix (existing-doc regression test) + `BackgroundControl variant="chip-popover"` (recents · ＋ upload/drop · inherited explainer) + `SlotVideoOutputControl` tiles with dynamic hint copy
 - [ ] 142-02-PLAN.md — Wave 1: `VampPicker allowUnattached` + `AudioPlayer loadedmetadata` + `SlideGroupMusicControl` reworked around a None/Track/Vamp `audioTab` derivation with inline picker and Track row (suite rewritten)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 142-03-PLAN.md — Wave 2: new `SlideGroupSetupStrip.vue` (7a chip row + per-chip popovers, single-open, Esc/click-outside/focus, inert-span locked mode, scope caption) + its test file
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 142-04-PLAN.md — Wave 3: `SlideGrid.vue` integration (gate → `Boolean(selectedSlot)`, strip mount, no-URL vamp guard removed) + `SlidesTab` recents + `SlideGrid.test.ts` testid migration + full-suite/type-check phase gate

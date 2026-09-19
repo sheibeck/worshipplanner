@@ -1,20 +1,20 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.15
-milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141, in planning)
+milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141 — all executed + auto-verified; DEPLOYED to prod 2026-09-18 (hosting + storage rules); OPEN pending batched owner UAT)
 current_phase: 141
 current_phase_name: Vamp Slide Assignment & Live Playback
-status: awaiting_batched_uat
-stopped_at: v2.15 DEPLOYED to prod 2026-09-18 (hosting + storage rules, owner-confirmed); batched owner UAT against prod pending
-last_updated: "2026-09-14T00:32:37.219Z"
+status: executing
+stopped_at: Phase 142 UI-SPEC approved
+last_updated: "2026-09-19T05:23:01.025Z"
 last_activity: 2026-09-18
-last_activity_desc: Completed quick task 260918-pms — group vamp affordance is a real button opening a slide-over; v2.15 batched UAT in progress
+last_activity_desc: Phase 141 verify/secure/nyquist/UI-review closeout; v2.15-DEFERRED-VERIFICATION.md complete
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 4
   total_plans: 11
   completed_plans: 11
-  percent: 100
+  percent: 80
 ---
 
 ## Deferred Verification (v2.15 — ACTIVE, batched to milestone end)
@@ -82,7 +82,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -4703,9 +4703,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-14T00:32:37.141Z
-Stopped at: Completed 141-04-PLAN.md
-Resume file: None
+Last session: 2026-09-19T04:39:38.653Z
+Stopped at: Phase 142 UI-SPEC approved
+Resume file: .planning/phases/142-slides-tab-panel-ux-from-claude-design/142-UI-SPEC.md
 
 ## Operator Next Steps
 
