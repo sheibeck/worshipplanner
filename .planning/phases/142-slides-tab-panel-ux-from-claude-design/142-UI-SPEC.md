@@ -124,7 +124,7 @@ body text, or the trailing "applies to all N slides…" caption (stays `text-gra
 
 ## UI Considerations
 
-Applicable state considerations resolved: 24 covered, 2 backstop, 0 unresolved.
+Applicable state considerations resolved: 31 covered, 2 backstop, 0 unresolved (probe engine: 4 surfaces × applicable categories = 30; every engine-proposed category has a row below).
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
@@ -154,6 +154,14 @@ Applicable state considerations resolved: 24 covered, 2 backstop, 0 unresolved.
 | overflow | Display tile hint text | ✅ covered | Fixed two-line max copy (`leading-[1.45]`), never user text, never wraps past two lines at 232px width |
 | empty | Panel wrapper (`slide-grid-group-media-panel`) | ✅ covered | Gate simplifies to `Boolean(selectedSlot)` — the panel is never empty now that Display always renders a chip (Component Spec §7 records the exact gate change) |
 | error | Background/Audio write failure (Firestore) | 🧪 backstop | `onAttachGroupBackground`/`onAttachGroupVamp`/`onAttachGroupMusic` already only `console.error` on failure (pre-existing pattern, unchanged by this phase); no visible error surfaces beyond the upload-composable errors above. Backstop: verify at UAT that a failed group-media write doesn't silently leave the popover showing a value that never actually saved. |
+| loading | Chip row | ✅ covered | Chips derive solely from `group` / `selectedSlot` props (`videoOutput.mode`, `backgroundImageUrl`, `bedAudioUrl`, `bedVampId`, `bedVampLabel`) — the vamp label is stored on the group, so no chip waits on `useVampStore`; the row has no loading state of its own |
+| error | Chip row | ✅ covered | Chips show stored state only; a failed write leaves the chip on its prior value (see the Firestore write-failure backstop row) — no chip-level error surface |
+| empty | Display popover | ✅ covered | Not reachable — `videoOutput.mode` defaults to `fullscreen`, so Display always has a selected tile |
+| loading | Display popover | ✅ covered | No async content — both tiles and the hint are static; opens synchronously |
+| error | Display popover | ✅ covered | The only failure is the `videoOutput` emit's downstream write; covered by the Firestore write-failure backstop row |
+| partial | Display popover | ✅ covered | Not reachable — the setting is a two-value radio; there is no half-set state |
+| long-text | Display popover | ✅ covered | Tile labels ("Full-screen", "Banner") and hint copy are fixed strings, never user text (see the overflow row for the hint) |
+| zero-one-many | Audio popover — Vamp list | ✅ covered | 0 vamps → VampPicker's empty row; 1 → a single selectable row; many → the list scrolls inside the `h-[200px]` container with the search input pinned (Component Spec §5) |
 
 ---
 
