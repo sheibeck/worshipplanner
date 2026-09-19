@@ -3,8 +3,8 @@ phase: 142
 slug: slides-tab-panel-ux-from-claude-design
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
 # audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
-status: draft
-nyquist_compliant: false
+status: validated
+nyquist_compliant: true
 wave_0_complete: true
 created: 2026-09-19
 ---
@@ -81,11 +81,27 @@ Filled in by the planner from PLAN.md task IDs. Decision → test mapping from 1
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-09-19
+
+## Validation Audit 2026-09-19
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+All 11 tasks (12 map rows) carry an automated `<verify>` command and are green. Independently re-run by the
+phase verifier: the 8 plan-named suites (358/358) and 3 regression suites — `EditSlideDrawer`,
+`RunControlView.audio`, `AudioPlayer` (216/216). Orchestrator post-merge gate: full `npx vitest run` at the
+documented 2-file baseline (240/241 files, 5965 tests; only `src/storage.rules.test.ts` fails) and
+`npm run type-check` clean. The code-review fix for WR-01 (`38adec2e`) added a live `editable` true→false
+regression test to `SlideGroupSetupStrip.test.ts`. The three Manual-Only rows remain human UAT items
+(mirrored in `142-UAT.md` and the v2.15 batched UAT file).
