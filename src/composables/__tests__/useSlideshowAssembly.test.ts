@@ -101,6 +101,12 @@ vi.mock('@/stores/slideGroups', () => ({
 const mockSubscribeVamps = vi.fn()
 const vampsState = reactive<{ vamps: Vamp[] }>({ vamps: [] })
 
+// 260919-mvw — the vamp subscribe is editor-gated (vamps are editor-read-only).
+const mockAuthState = { isEditor: true }
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => mockAuthState,
+}))
+
 vi.mock('@/stores/vamps', () => ({
   useVampStore: () =>
     reactive({
@@ -2138,6 +2144,18 @@ describe('useSlideshowAssembly', () => {
         ...overrides,
       }
     }
+
+    it('viewer: never subscribes the vamp store (vamps are editor-read-only)', async () => {
+      mockAuthState.isEditor = false
+      try {
+        const service = ref<Service | null>(makeService([hymnSlot({ position: 0 })]))
+        useSlideshowAssembly(service, 'org-1')
+        await nextTick()
+        expect(mockSubscribeVamps).not.toHaveBeenCalled()
+      } finally {
+        mockAuthState.isEditor = true
+      }
+    })
 
     it('subscribes the vamp store once with the org id alongside groups', async () => {
       const service = ref<Service | null>(makeService([hymnSlot({ position: 0 })]))

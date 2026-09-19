@@ -6,6 +6,7 @@ import { useImportedSlides } from '@/stores/importedSlides'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { usePptxRenders } from '@/stores/pptxRenders'
 import { useVampStore } from '@/stores/vamps'
+import { useAuthStore } from '@/stores/auth'
 import { lyricsQuery } from '@/stores/songLyrics'
 import { resolveImageUrl } from '@/utils/pptxUpload'
 import { isPermissionDenied } from '@/utils/firestoreListener'
@@ -125,6 +126,7 @@ export function useSlideshowAssembly(
   const slideGroupsStore = useSlideGroups()
   const pptxRendersStore = usePptxRenders()
   const vampStore = useVampStore()
+  const authStore = useAuthStore()
   const subscribeLyrics = options?.lyricsSubscriber ?? defaultLyricsSubscriber
 
   // See ADR-0137 (docs/adr/0137-activeslideshowassemblyinstances-still-includes-this-instanc.md)
@@ -149,11 +151,12 @@ export function useSlideshowAssembly(
         scriptureStore.subscribeReadings(id)
         importedStore.subscribeDecks(id)
         slideGroupsStore.subscribeGroups(id)
-        // 260919-mvw — live vamp URLs for the assembler; guarded on the
-        // store's orgId because the views subscribe too and `subscribe`
-        // replaces the listener; teardown belongs to `resetOrgScopedStores`,
-        // not `cleanup()`.
-        if (vampStore.orgId !== id) vampStore.subscribe(id)
+        // 260919-mvw — live vamp URLs for the assembler. Editor-gated (vamps
+        // are read-gated to editors in firestore.rules; viewers/volunteers
+        // fall back to the stored URL snapshot) and guarded on the store's
+        // orgId because the views subscribe too and `subscribe` replaces the
+        // listener; teardown belongs to `resetOrgScopedStores`, not `cleanup()`.
+        if (authStore.isEditor && vampStore.orgId !== id) vampStore.subscribe(id)
         subscribedOrgId.value = id
       }
     },
