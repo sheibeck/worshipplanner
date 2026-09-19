@@ -298,9 +298,12 @@ function onPointerDown(e: PointerEvent): void {
 function focusIntoPopover(): void {
   const el = popoverRef.value
   if (!el) return
-  const target = el.querySelector<HTMLElement>(
-    '[role="tab"][aria-selected="true"], button:not([disabled]), input:not([type="hidden"])',
-  )
+  // The active tab must win over an earlier, merely-first, plain button —
+  // a combined CSS selector list returns the first DOM match across ALL
+  // alternatives, not the first-listed selector, so a non-default active
+  // Audio tab (e.g. Vamp) would otherwise wrongly focus the first (None) tab.
+  const activeTab = el.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+  const target = activeTab ?? el.querySelector<HTMLElement>('button:not([disabled]), input:not([type="hidden"])')
   ;(target ?? el).focus()
 }
 

@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { mount, enableAutoUnmount } from '@vue/test-utils'
+import { mount, enableAutoUnmount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 import SlideGroupSetupStrip from '../SlideGroupSetupStrip.vue'
+import BackgroundControl from '../BackgroundControl.vue'
+import SlideGroupMusicControl from '../SlideGroupMusicControl.vue'
 import { bedAudioLabel, backgroundImageLabel } from '../slideDisplay'
 import type { ServiceSlot } from '@/types/service'
 import type { SlideGroup } from '@/types/slideGroup'
@@ -100,6 +102,18 @@ enableAutoUnmount(afterEach)
 function stripTestidOrder(wrapper: ReturnType<typeof mountStrip>): (string | null)[] {
   const strip = wrapper.get('[data-testid="slide-group-setup-strip"]')
   return Array.from(strip.element.querySelectorAll('[data-testid]')).map((el) => el.getAttribute('data-testid'))
+}
+
+/**
+ * Clicks the given chip and drains the async openChip watcher (which itself
+ * awaits `nextTick()` before computing `alignRight`/focus) — a single
+ * `trigger('click')` await is not enough because that watcher continuation
+ * is queued one microtask behind the outer await; `flushPromises()` drains
+ * both.
+ */
+async function openChip(wrapper: ReturnType<typeof mountStrip>, id: 'display' | 'background' | 'audio') {
+  await wrapper.get(`[data-testid="slide-group-setup-chip-${id}"]`).trigger('click')
+  await flushPromises()
 }
 
 describe('SlideGroupSetupStrip — chips (142)', () => {
@@ -257,5 +271,236 @@ describe('SlideGroupSetupStrip — chips (142)', () => {
     expect(caption.classes()).toEqual(
       expect.arrayContaining(['basis-full', 'sm:basis-auto', 'sm:ms-auto', 'text-right', 'text-gray-500']),
     )
+  })
+})
+
+describe('SlideGroupSetupStrip — popover lifecycle (142)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('click display chip opens its own popover with the correct dialog attributes, the open pill styling, and no sibling popovers', async () => {
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'display')
+
+    const chip = wrapper.get('[data-testid="slide-group-setup-chip-display"]')
+    const popover = wrapper.get('[data-testid="slide-group-setup-popover-display"]')
+    expect(popover.attributes('role')).toBe('dialog')
+    expect(popover.attributes('aria-modal')).toBe('false')
+    expect(popover.attributes('aria-label')).toBe('Display options')
+    expect(popover.attributes('tabindex')).toBe('-1')
+    expect(popover.attributes('id')).toBe(chip.attributes('aria-controls'))
+
+    expect(chip.attributes('aria-expanded')).toBe('true')
+    expect(chip.attributes('aria-label')).toBe('Display options, expanded')
+    expect(chip.classes()).toContain('border-indigo-700')
+    expect(chip.classes()).toContain('bg-indigo-950/40')
+
+    expect(popover.find('[data-testid="slot-video-output-row"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-background"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(false)
+  })
+
+  it('opening a second chip closes the first — exactly one popover, exactly one expanded chip', async () => {
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'display')
+    await openChip(wrapper, 'background')
+
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-display"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-background"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid^="slide-group-setup-popover-"]')).toHaveLength(1)
+    expect(wrapper.findAll('[aria-expanded="true"]')).toHaveLength(1)
+  })
+
+  it('re-clicking the open chip closes its popover', async () => {
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'audio')
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(true)
+    await openChip(wrapper, 'audio')
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(false)
+  })
+
+  it('the audio popover carries w-[258px]; display and background popovers carry w-[232px]', async () => {
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'audio')
+    expect(wrapper.get('[data-testid="slide-group-setup-popover-audio"]').classes()).toContain('w-[258px]')
+    await openChip(wrapper, 'audio') // close audio
+
+    await openChip(wrapper, 'display')
+    expect(wrapper.get('[data-testid="slide-group-setup-popover-display"]').classes()).toContain('w-[232px]')
+    await openChip(wrapper, 'display') // close display
+
+    await openChip(wrapper, 'background')
+    expect(wrapper.get('[data-testid="slide-group-setup-popover-background"]').classes()).toContain('w-[232px]')
+  })
+
+  it('focus moves into the popover on open — Audio: active tab, Display: first tile, Background: None swatch', async () => {
+    const audioWrapper = mountStrip({})
+    await openChip(audioWrapper, 'audio')
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('group-music-audio-tab-none')
+    expect(document.activeElement?.getAttribute('aria-selected')).toBe('true')
+    audioWrapper.unmount()
+
+    const displayWrapper = mountStrip({})
+    await openChip(displayWrapper, 'display')
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('slot-video-output-fullscreen-btn')
+    displayWrapper.unmount()
+
+    const backgroundWrapper = mountStrip({})
+    await openChip(backgroundWrapper, 'background')
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('background-control-swatch-none')
+    backgroundWrapper.unmount()
+  })
+
+  it('Escape closes the popover and returns focus to the chip that opened it', async () => {
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'audio')
+    const chipEl = wrapper.get('[data-testid="slide-group-setup-chip-audio"]').element
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(chipEl)
+  })
+
+  it('pointerdown outside closes the popover; inside the popover or on the open chip itself does not', async () => {
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'audio')
+
+    const popoverEl = wrapper.get('[data-testid="slide-group-setup-popover-audio"]').element
+    popoverEl.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(true)
+
+    const chipEl = wrapper.get('[data-testid="slide-group-setup-chip-audio"]').element
+    chipEl.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(true)
+
+    document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(false)
+  })
+
+  it('switching selectedSlot while open closes the popover', async () => {
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'audio')
+    await wrapper.setProps({ selectedSlot: makeSlot({ id: 'slot-2' }) })
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(false)
+  })
+
+  it('pointerdown/keydown listeners are added once on open, removed once on close, and removed on unmount while open', async () => {
+    const docAddSpy = vi.spyOn(document, 'addEventListener')
+    const docRemoveSpy = vi.spyOn(document, 'removeEventListener')
+    const winAddSpy = vi.spyOn(window, 'addEventListener')
+    const winRemoveSpy = vi.spyOn(window, 'removeEventListener')
+
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'audio')
+    expect(docAddSpy.mock.calls.filter((c) => c[0] === 'pointerdown')).toHaveLength(1)
+    expect(winAddSpy.mock.calls.filter((c) => c[0] === 'keydown')).toHaveLength(1)
+
+    await openChip(wrapper, 'audio') // close
+    expect(docRemoveSpy.mock.calls.filter((c) => c[0] === 'pointerdown')).toHaveLength(1)
+    expect(winRemoveSpy.mock.calls.filter((c) => c[0] === 'keydown')).toHaveLength(1)
+
+    await openChip(wrapper, 'audio') // open again
+    wrapper.unmount()
+    expect(docRemoveSpy.mock.calls.filter((c) => c[0] === 'pointerdown')).toHaveLength(2)
+    expect(winRemoveSpy.mock.calls.filter((c) => c[0] === 'keydown')).toHaveLength(2)
+  })
+
+  it('edge flip: flips to right-0 when the popover would overflow the viewport, stays left-0 otherwise', async () => {
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      right: window.innerWidth + 50,
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+    const overflowWrapper = mountStrip({})
+    await openChip(overflowWrapper, 'audio')
+    const overflowPopover = overflowWrapper.get('[data-testid="slide-group-setup-popover-audio"]')
+    expect(overflowPopover.classes()).toContain('right-0')
+    expect(overflowPopover.classes()).not.toContain('left-0')
+    rectSpy.mockRestore()
+
+    const fitWrapper = mountStrip({})
+    await openChip(fitWrapper, 'audio')
+    const fitPopover = fitWrapper.get('[data-testid="slide-group-setup-popover-audio"]')
+    expect(fitPopover.classes()).toContain('left-0')
+    expect(fitPopover.classes()).not.toContain('right-0')
+  })
+
+  it('Tab does not close the popover (no focus trap, no blur-close)', async () => {
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'audio')
+    const popover = wrapper.get('[data-testid="slide-group-setup-popover-audio"]')
+    await popover.trigger('keydown', { key: 'Tab' })
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(true)
+  })
+})
+
+describe('SlideGroupSetupStrip — passthrough emits (142)', () => {
+  it('passthrough — display: clicking the Banner tile emits video-output-change with { mode: "banner" }', async () => {
+    const wrapper = mountStrip({})
+    await openChip(wrapper, 'display')
+    await wrapper.get('[data-testid="slot-video-output-banner-btn"]').trigger('click')
+    expect(wrapper.emitted('video-output-change')).toEqual([[{ mode: 'banner' }]])
+  })
+
+  it('passthrough — background: props bind through; attach/remove relay to attach-background/remove-background', async () => {
+    const recents = [{ url: 'https://x/a.jpg', label: 'a.jpg' }]
+    const inherited = { url: 'https://x/song.jpg', label: 'song.jpg' }
+    const wrapper = mountStrip({ recentBackgrounds: recents, inheritedBackground: inherited, group: makeGroup({}) })
+    await openChip(wrapper, 'background')
+
+    const bg = wrapper.getComponent(BackgroundControl)
+    expect(bg.props('variant')).toBe('chip-popover')
+    expect(bg.props('recents')).toEqual(recents)
+    expect(bg.props('inheritedFrom')).toEqual(inherited)
+    expect(bg.props('isEditor')).toBe(true)
+    expect(bg.props('orgId')).toBe('org-1')
+
+    await bg.vm.$emit('attach', 'https://x/bg.jpg')
+    expect(wrapper.emitted('attach-background')).toEqual([['https://x/bg.jpg']])
+
+    await bg.vm.$emit('remove')
+    expect(wrapper.emitted('remove-background')).toHaveLength(1)
+  })
+
+  it('passthrough — audio: props bind through; attach/remove/attach-vamp/close relay correctly', async () => {
+    const vamp: Vamp = { id: 'v-1', name: 'Vamp A', key: 'C', createdAt: {} as never, updatedAt: {} as never }
+    const wrapper = mountStrip({
+      group: makeGroup({ bedAudioUrl: 'https://x/track.mp3' }),
+      vamps: [vamp],
+      vampsLoading: false,
+    })
+    await openChip(wrapper, 'audio')
+
+    const music = wrapper.getComponent(SlideGroupMusicControl)
+    expect(music.props('audioUrl')).toBe('https://x/track.mp3')
+    expect(music.props('bedVampId')).toBeUndefined()
+    expect(music.props('bedVampLabel')).toBeUndefined()
+    expect(music.props('vamps')).toEqual([vamp])
+    expect(music.props('vampsLoading')).toBe(false)
+    expect(music.props('isEditor')).toBe(true)
+
+    await music.vm.$emit('attach', 'https://x/new-track.mp3')
+    expect(wrapper.emitted('attach-music')).toEqual([['https://x/new-track.mp3']])
+
+    await music.vm.$emit('remove')
+    expect(wrapper.emitted('remove-music')).toHaveLength(1)
+
+    await music.vm.$emit('attach-vamp', vamp)
+    expect(wrapper.emitted('attach-vamp')).toEqual([[vamp]])
+
+    await music.vm.$emit('close')
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(false)
   })
 })
