@@ -115,4 +115,28 @@ describe('AudioPlayer', () => {
     expect(defaultWrapper.emitted('autoplay-blocked')).toBeTruthy()
     expect(defaultWrapper.find('[data-testid="audio-play-affordance"]').exists()).toBe(true)
   })
+
+  // 142 — hosts (e.g. SlideGroupMusicControl's Track row) show a duration once the element knows it.
+  it('emits loadedmetadata with the finite duration once the element reports it', async () => {
+    const wrapper = mount(AudioPlayer, { props: { src: 'https://example.com/song.mp3' } })
+    const audio = wrapper.find('audio')
+    Object.defineProperty(audio.element, 'duration', { value: 134.4, configurable: true })
+
+    await audio.trigger('loadedmetadata')
+
+    expect(wrapper.emitted('loadedmetadata')).toEqual([[134.4]])
+  })
+
+  it('emits nothing on loadedmetadata when duration is Infinity or NaN', async () => {
+    const wrapper = mount(AudioPlayer, { props: { src: 'https://example.com/song.mp3' } })
+    const audio = wrapper.find('audio')
+
+    Object.defineProperty(audio.element, 'duration', { value: Infinity, configurable: true })
+    await audio.trigger('loadedmetadata')
+    expect(wrapper.emitted('loadedmetadata')).toBeFalsy()
+
+    Object.defineProperty(audio.element, 'duration', { value: NaN, configurable: true })
+    await audio.trigger('loadedmetadata')
+    expect(wrapper.emitted('loadedmetadata')).toBeFalsy()
+  })
 })

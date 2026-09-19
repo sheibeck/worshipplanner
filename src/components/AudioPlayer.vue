@@ -17,6 +17,7 @@
       @pause="onPause"
       @ended="onEnded"
       @error="onError"
+      @loadedmetadata="onLoadedMetadata"
     />
     <button
       v-if="showPlayAffordance && !chromeless"
@@ -55,6 +56,7 @@ const emit = defineEmits<{
   ended: []
   error: [event: Event]
   'autoplay-blocked': []
+  loadedmetadata: [durationSeconds: number]
 }>()
 
 const audioEl = ref<HTMLAudioElement | null>(null)
@@ -74,6 +76,12 @@ function onEnded(): void {
 
 function onError(event: Event): void {
   emit('error', event)
+}
+
+// 142 — lets a host show a track length once the element knows it (preload=none → known after first play)
+function onLoadedMetadata(): void {
+  const d = audioEl.value?.duration
+  if (typeof d === 'number' && Number.isFinite(d)) emit('loadedmetadata', d)
 }
 
 async function play(): Promise<void> {
