@@ -305,3 +305,222 @@ describe('BackgroundControl', () => {
     expect(wrapper.get('[data-testid="background-control-filename"]').classes()).toContain('truncate')
   })
 })
+
+describe('BackgroundControl — variant="chip-popover" (Phase 142)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    progressRef.value = 0
+    errorRef.value = null
+    isUploadingRef.value = false
+  })
+
+  const RECENTS = [
+    { url: 'https://storage.example.com/recent-1.jpg', label: 'recent-1.jpg' },
+    { url: 'https://storage.example.com/recent-2.jpg', label: 'recent-2.jpg' },
+  ]
+
+  it('no imageUrl, no inheritedFrom, 2 recents, isEditor true — renders None (highlighted), 2 recent swatches, upload tile, and the chip caption; none of the panel-variant testids render', () => {
+    const wrapper = mount(BackgroundControl, {
+      props: { variant: 'chip-popover', recents: RECENTS, isEditor: true, orgId: 'org-1' },
+    })
+
+    const none = wrapper.get('[data-testid="background-control-swatch-none"]')
+    expect(none.classes()).toContain('border-indigo-600')
+    const recents = wrapper.findAll('[data-testid="background-control-swatch-recent"]')
+    expect(recents).toHaveLength(2)
+    expect(recents.map((r) => r.attributes('data-url'))).toEqual(RECENTS.map((r) => r.url))
+    const upload = wrapper.get('[data-testid="background-control-swatch-upload"]')
+    expect(upload.attributes('aria-label')).toBe('Upload a background image')
+    expect(upload.find('[data-testid="background-control-input"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="background-control-chip-caption"]').text()).toBe(
+      'Recent in this service · drop a file on ＋',
+    )
+
+    expect(wrapper.find('[data-testid="background-control-add"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-caption"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-image"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-filename"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-remove"]').exists()).toBe(false)
+  })
+
+  it('imageUrl equals recents[1].url — that recent swatch is highlighted, None is not', () => {
+    const wrapper = mount(BackgroundControl, {
+      props: {
+        variant: 'chip-popover',
+        recents: RECENTS,
+        imageUrl: RECENTS[1]!.url,
+        isEditor: true,
+        orgId: 'org-1',
+      },
+    })
+
+    const recents = wrapper.findAll('[data-testid="background-control-swatch-recent"]')
+    const activeRecent = recents.find((r) => r.attributes('data-url') === RECENTS[1]!.url)!
+    expect(activeRecent.classes()).toContain('border-indigo-600')
+    expect(wrapper.get('[data-testid="background-control-swatch-none"]').classes()).not.toContain(
+      'border-indigo-600',
+    )
+  })
+
+  it('imageUrl set but not present in recents — a recent swatch for imageUrl renders first', () => {
+    const wrapper = mount(BackgroundControl, {
+      props: {
+        variant: 'chip-popover',
+        recents: RECENTS,
+        imageUrl: 'https://storage.example.com/current-not-in-recents.jpg',
+        isEditor: true,
+        orgId: 'org-1',
+      },
+    })
+
+    const recents = wrapper.findAll('[data-testid="background-control-swatch-recent"]')
+    expect(recents[0]!.attributes('data-url')).toBe('https://storage.example.com/current-not-in-recents.jpg')
+    expect(recents[0]!.classes()).toContain('border-indigo-600')
+  })
+
+  it('recents empty and no imageUrl — exactly None + upload tiles, no recent swatches', () => {
+    const wrapper = mount(BackgroundControl, {
+      props: { variant: 'chip-popover', recents: [], isEditor: true, orgId: 'org-1' },
+    })
+
+    expect(wrapper.find('[data-testid="background-control-swatch-none"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="background-control-swatch-upload"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="background-control-swatch-recent"]')).toHaveLength(0)
+  })
+
+  it('recents = 6 entries — at most 4 recent swatches render', () => {
+    const sixRecents = Array.from({ length: 6 }, (_, i) => ({
+      url: `https://storage.example.com/r${i}.jpg`,
+      label: `r${i}.jpg`,
+    }))
+    const wrapper = mount(BackgroundControl, {
+      props: { variant: 'chip-popover', recents: sixRecents, isEditor: true, orgId: 'org-1' },
+    })
+
+    expect(wrapper.findAll('[data-testid="background-control-swatch-recent"]').length).toBeLessThanOrEqual(4)
+  })
+
+  it('clicking None with imageUrl set emits remove once; clicking None with no imageUrl emits nothing', async () => {
+    const withImage = mount(BackgroundControl, {
+      props: {
+        variant: 'chip-popover',
+        recents: RECENTS,
+        imageUrl: 'https://storage.example.com/current.jpg',
+        isEditor: true,
+        orgId: 'org-1',
+      },
+    })
+    await withImage.get('[data-testid="background-control-swatch-none"]').trigger('click')
+    expect(withImage.emitted('remove')).toEqual([[]])
+
+    const withoutImage = mount(BackgroundControl, {
+      props: { variant: 'chip-popover', recents: RECENTS, isEditor: true, orgId: 'org-1' },
+    })
+    await withoutImage.get('[data-testid="background-control-swatch-none"]').trigger('click')
+    expect(withoutImage.emitted('remove')).toBeUndefined()
+  })
+
+  it('clicking a recent swatch emits attach with that url; clicking the already-active recent emits nothing', async () => {
+    const wrapper = mount(BackgroundControl, {
+      props: {
+        variant: 'chip-popover',
+        recents: RECENTS,
+        imageUrl: RECENTS[0]!.url,
+        isEditor: true,
+        orgId: 'org-1',
+      },
+    })
+
+    const recents = wrapper.findAll('[data-testid="background-control-swatch-recent"]')
+    const active = recents.find((r) => r.attributes('data-url') === RECENTS[0]!.url)!
+    const inactive = recents.find((r) => r.attributes('data-url') === RECENTS[1]!.url)!
+
+    await active.trigger('click')
+    expect(wrapper.emitted('attach')).toBeUndefined()
+
+    await inactive.trigger('click')
+    expect(wrapper.emitted('attach')).toEqual([[RECENTS[1]!.url]])
+  })
+
+  it('drop on the tile row uploads the file and emits attach with the resolved url; a rejected upload emits nothing and shows the error', async () => {
+    mockUploadBackground.mockResolvedValue('https://storage.example.com/dropped.jpg')
+    const wrapper = mount(BackgroundControl, {
+      props: { variant: 'chip-popover', recents: RECENTS, isEditor: true, orgId: 'org-1' },
+    })
+
+    const file = makeFile('dropped.jpg', 'image/jpeg')
+    await wrapper.findAll('.flex.gap-2')[1]!.trigger('drop', { dataTransfer: { files: [file] } })
+
+    expect(mockUploadBackground).toHaveBeenCalledWith(expect.any(File), 'org-1')
+    expect(wrapper.emitted('attach')).toEqual([['https://storage.example.com/dropped.jpg']])
+  })
+
+  it('a rejected drop upload emits nothing and the error renders', async () => {
+    mockUploadBackground.mockImplementation(() => {
+      errorRef.value = 'Unsupported file type "text/plain" — only images can be set as a background.'
+      return Promise.reject(new Error('Unsupported file type'))
+    })
+    const wrapper = mount(BackgroundControl, {
+      props: { variant: 'chip-popover', recents: RECENTS, isEditor: true, orgId: 'org-1' },
+    })
+
+    const file = makeFile('notes.txt', 'text/plain')
+    await wrapper.findAll('.flex.gap-2')[1]!.trigger('drop', { dataTransfer: { files: [file] } })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(wrapper.emitted('attach')).toBeUndefined()
+    const errorEl = wrapper.find('[data-testid="background-control-upload-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.text()).toContain('Unsupported file type')
+  })
+
+  it('dragover on the tile row adds the drag-active class to the upload tile; dragleave removes it', async () => {
+    const wrapper = mount(BackgroundControl, {
+      props: { variant: 'chip-popover', recents: RECENTS, isEditor: true, orgId: 'org-1' },
+    })
+
+    const uploadTile = wrapper.get('[data-testid="background-control-swatch-upload"]')
+    await uploadTile.trigger('dragover')
+    expect(wrapper.get('[data-testid="background-control-swatch-upload"]').classes()).toContain('border-indigo-500')
+
+    await uploadTile.trigger('dragleave')
+    expect(wrapper.get('[data-testid="background-control-swatch-upload"]').classes()).not.toContain(
+      'border-indigo-500',
+    )
+  })
+
+  it('inheritedFrom set — no swatches, no file input, no chip caption; renders the inherited explainer', () => {
+    const wrapper = mount(BackgroundControl, {
+      props: {
+        variant: 'chip-popover',
+        recents: RECENTS,
+        inheritedFrom: { url: 'https://storage.example.com/song-bg.jpg', label: 'song-bg.jpg' },
+        isEditor: true,
+        orgId: 'org-1',
+      },
+    })
+
+    expect(wrapper.find('[data-testid="background-control-swatch-none"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-swatch-recent"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-swatch-upload"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-chip-caption"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="background-control-inherited-explainer"]').text()).toBe(
+      "Managed on the song — edit it from the song's Lyrics tab.",
+    )
+  })
+
+  it('isEditor false and no inheritedFrom — no tiles render, the chip caption still renders', () => {
+    const wrapper = mount(BackgroundControl, {
+      props: { variant: 'chip-popover', recents: RECENTS, isEditor: false, orgId: 'org-1' },
+    })
+
+    expect(wrapper.find('[data-testid="background-control-swatch-none"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-swatch-recent"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="background-control-swatch-upload"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="background-control-chip-caption"]').text()).toBe(
+      'Recent in this service · drop a file on ＋',
+    )
+  })
+})
