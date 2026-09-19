@@ -1905,6 +1905,40 @@ amber warning, never as the empty state). `selectedTab` is a transient override 
 either prop changes. Vamp picking is inline (`VampPicker` `fill allow-unattached`); the slide-over is
 no longer used at this call site. `close` asks the hosting popover to close. Still emit-only.
 
+### src/components/slides/SlideGroupSetupStrip.vue
+
+**Module overview (Phase 142, variant 7a):** the new thin composing wrapper for the group-media panel
+— one row of three chips (Display · Background · Audio), each stating its current value and opening
+its own small absolutely-positioned popover that hosts the already-finished `SlotVideoOutputControl`,
+`BackgroundControl variant="chip-popover"`, and `SlideGroupMusicControl`. Owns only UI state: a single
+`openChip: ChipId | null` ref (only one popover open at a time — mirrors `SlideGrid.vue`'s
+`openMenuEntryId` shape collapsed to one ref instead of many booleans), `alignRight` for the
+viewport-edge flip, the `pointerdown`/`keydown` listener lifecycle, and focus management. It never
+imports a store or writes to Firestore — it bubbles six passthrough emits (`attach-music`,
+`remove-music`, `attach-vamp`, `attach-background`, `remove-background`, `video-output-change`) that
+`SlideGrid.vue`'s existing (unchanged) write handlers consume, exactly as the three composed controls
+already did individually.
+
+**Locked/non-editor rendering — supersedes the old hide-when-locked rule:** when `editable` is false,
+all three chips still render, as inert `<span>`s (not `<button>`s, no `aria-haspopup`/`aria-expanded`,
+no caret, no click handler) — visible-but-inert, matching `SlotVideoOutputControl`'s existing pattern
+but going one step further (span, not `disabled` button) so the chip drops out of the tab order
+entirely. Because the popover only ever mounts when a chip is a clickable button, an inert chip's
+popover — and therefore the control inside it — never mounts at all; `:is-editor="true"` passed
+unconditionally into each popover's control is safe because the chip-level gate is the single source
+of truth for lockedness (142-RESEARCH.md Open Question 2).
+
+**Group-switch reset:** a `watch(() => props.selectedSlot.id, ...)` closes any open popover when the
+selected group changes — the identical precedent `SlideGrid.vue`'s `openMenuEntryId` watcher already
+establishes (ADR-0115).
+
+**No portal-based popover mount:** the popover is plain `position:absolute`, not a `<Teleport>` — the
+`slide-grid-group-media-panel` this strip lives inside sits above `SlideGrid.vue`'s own
+`overflow-y-auto` scroll region, so a plain absolutely-positioned popover can never be clipped by a
+scroll ancestor. `alignRight` is computed once on open (`getBoundingClientRect()` vs
+`window.innerWidth`), not a CSS-only media query, because the flip depends on the chip's own
+horizontal position within the wrapped row.
+
 ### src/components/slides/SlidesTab.vue
 
 **`serviceLocked` prop (★ R036):** the lifecycle lock, threaded DISTINCT from `isEditor` rather than
