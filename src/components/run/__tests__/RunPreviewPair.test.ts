@@ -117,3 +117,44 @@ describe('RunPreviewPair — blackout mirror on the On-screen preview (owner UAT
     expect(omitted.find('[data-testid="run-current-blackout"]').exists()).toBe(false)
   })
 })
+
+describe('RunPreviewPair — On-screen LIVE tag/ring is on-air red (260919-k9j)', () => {
+  it('is on-air red when live and not rehearsing', () => {
+    const w = mount(RunPreviewPair, {
+      props: { current: null, next: null, live: true },
+    })
+    const tag = w.find('[data-testid="run-current-live-tag"]')
+    expect(tag.exists()).toBe(true)
+    expect(tag.text()).toBe('LIVE')
+    const dot = tag.find('span')
+    expect(dot.classes()).toContain('bg-red-500')
+    expect(dot.classes()).not.toContain('bg-amber-400')
+    const pane = w.find('[data-testid="run-current-preview"]')
+    expect(pane.classes()).toContain('ring-red-500')
+    expect(pane.classes()).not.toContain('ring-gray-700')
+    expect(w.html()).not.toContain('green-500')
+  })
+
+  it('stays amber while rehearsing', () => {
+    const w = mount(RunPreviewPair, {
+      props: { current: null, next: null, live: true, rehearsing: true },
+    })
+    const tag = w.find('[data-testid="run-current-live-tag"]')
+    expect(tag.text()).toBe('Rehearsing')
+    const dot = tag.find('span')
+    expect(dot.classes()).toContain('bg-amber-400')
+    expect(dot.classes()).not.toContain('bg-red-500')
+    const pane = w.find('[data-testid="run-current-preview"]')
+    expect(pane.classes()).toContain('ring-amber-400')
+    expect(pane.classes()).not.toContain('ring-red-500')
+  })
+
+  it('is gray pre-live with no tag', () => {
+    const w = mount(RunPreviewPair, {
+      props: { current: null, next: null, live: false },
+    })
+    expect(w.find('[data-testid="run-current-live-tag"]').exists()).toBe(false)
+    const pane = w.find('[data-testid="run-current-preview"]')
+    expect(pane.classes()).toContain('ring-gray-700')
+  })
+})
