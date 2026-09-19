@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.15
 milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141 — all executed + auto-verified; DEPLOYED to prod 2026-09-18 (hosting + storage rules); OPEN pending batched owner UAT)
-current_phase: 141
-current_phase_name: Vamp Slide Assignment & Live Playback
+current_phase: 142
+current_phase_name: Slides Tab panel UX from Claude Design
 status: executing
-stopped_at: Phase 142 UI-SPEC approved
-last_updated: "2026-09-19T05:23:01.025Z"
-last_activity: 2026-09-18
-last_activity_desc: Phase 141 verify/secure/nyquist/UI-review closeout; v2.15-DEFERRED-VERIFICATION.md complete
+stopped_at: Completed 142-01-PLAN.md
+last_updated: "2026-09-19T05:37:08.180Z"
+last_activity: 2026-09-19
+last_activity_desc: Phase 142 execution started
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 15
+  completed_plans: 12
   percent: 80
 ---
 
@@ -1418,7 +1418,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 141 — Vamp Slide Assignment & Live Playback
+**Current focus:** Phase 142 — Slides Tab panel UX from Claude Design
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1428,10 +1428,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 141 (Vamp Slide Assignment & Live Playback) — EXECUTED + AUTO-VERIFIED (human_needed, deferred to batched UAT)
-Plan: 4 of 4
-Status: All v2.15 phases (138–141) executed + auto-verified and DEPLOYED to prod 2026-09-18 (hosting + storage rules); milestone OPEN pending the batched owner UAT, then audit/archive
-Last activity: 2026-09-18 — Phase 141 verify/secure/nyquist/UI-review closeout; v2.15-DEFERRED-VERIFICATION.md complete
+Phase: 142 (Slides Tab panel UX from Claude Design) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-09-19 — Phase 142 execution started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3740,6 +3740,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 141 P02 | ~25min | 2 tasks | 7 files |
 | Phase 141 P03 | ~50min | 2 tasks | 6 files |
 | Phase 141 P04 | 25min | 2 tasks | 4 files |
+| Phase 142 P01 | 15min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -4364,6 +4365,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: The ♪ Vamp badge resolves via useSlideGroups().groupsBySlotId (raw GroupSlideEntry), never AssembledSlide/Slide — the assembler stays vamp-unaware by design (141-CONTEXT.md)
 - [Phase ?]: countAssignments re-scans inside deleteVamp itself (not reusing the confirm-time UI result) — self-contained/testable at the cost of a second scan on delete; accepted per CONTEXT.md's best-effort framing
 - [Phase ?]: deleteVamp treats a failed scan identically to a proven assignment (keepAttachment = scan === null || scan.assignedAnywhere) — fail-safe toward not silently breaking a slide's audio
+- [Phase ?]: setGroupBedMedia: no-MP3 vamp branch keyed on bedVampId presence, deleteField()s bedAudioUrl explicitly to prevent stale playback
+- [Phase ?]: BackgroundControl variant prop split keeps panel (SongLyricEditor.vue) byte-identical while adding chip-popover for the group strip
 
 ### Roadmap Evolution
 
@@ -4703,9 +4706,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-19T04:39:38.653Z
-Stopped at: Phase 142 UI-SPEC approved
-Resume file: .planning/phases/142-slides-tab-panel-ux-from-claude-design/142-UI-SPEC.md
+Last session: 2026-09-19T05:37:08.108Z
+Stopped at: Completed 142-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 
