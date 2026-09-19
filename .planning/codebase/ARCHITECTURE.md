@@ -1706,7 +1706,10 @@ red unambiguously means the outputs are really live. All three states are driven
 `live`/`rehearsing` props the parent sets, never derived from any output-status machine here: RED
 "Live" when `live && !rehearsing`, amber "Rehearsing" when `rehearsing`, muted "Not open" otherwise.
 The Nocturne Run-scoped palette (97-UI-SPEC) is applied via local CSS custom properties on the root
-only — this does not retheme the app.
+only — this does not retheme the app. The R439 audio toggle reads `Audio: Off / On` and is On by
+default for every session (quick 260919-k9j) — `useRunControl`'s `watch(live)` rising edge sets
+`audioArmed` true and starts playback after `nextTick`; the amber `--needed` pulse and sr-only prompt
+appear only after the operator turns it Off; a rejected `play()` still raises the blocked banner.
 
 ### src/components/run/RunPreviewPair.vue
 

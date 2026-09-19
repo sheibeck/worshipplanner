@@ -10,7 +10,7 @@ const props = defineProps<{
   clock: string
   elapsed: string
   blackout: boolean
-  /** R439 — armed/off, drives the "Audio: Off / Armed" toggle. */
+  /** R439 — on/off, drives the "Audio: Off / On" toggle (On by default, 260919-k9j). */
   audioArmed?: boolean
   /** R439 — true when Off and the live/next slide carries audio (amber pulse). */
   audioNeeded?: boolean
@@ -75,10 +75,10 @@ defineEmits<{
          right-aligned, exactly as `.run-displays`' `margin-left:auto` did. -->
     <div class="run-header__spacer" aria-hidden="true"></div>
 
-    <!-- AUDIO ARM TOGGLE (R439, Phase 141) — the same-document click IS the
-         autoplay-policy gesture; visible whenever `live` (rehearsal included —
-         the control window plays during a rehearsal too), unlike `.run-blackout`
-         which stays `trulyLive`-only. -->
+    <!-- AUDIO ON/OFF TOGGLE (R439; On by default since 260919-k9j — the go-live
+         click is the gesture; this click turns it off and back on); visible
+         whenever `live` (rehearsal included — the control window plays during
+         a rehearsal too), unlike `.run-blackout` which stays `trulyLive`-only. -->
     <button
       v-if="live"
       type="button"
@@ -90,11 +90,11 @@ defineEmits<{
       data-testid="run-audio-toggle"
       :aria-pressed="audioArmed ? 'true' : 'false'"
       :aria-label="
-        audioArmed ? 'Audio armed — click to turn off' : 'Arm audio playback for this Run session'
+        audioArmed ? 'Audio on — click to turn off' : 'Turn audio on for this Run session'
       "
       @click="$emit('toggle-audio')"
     >
-      {{ audioArmed ? 'Audio: Armed' : 'Audio: Off' }}
+      {{ audioArmed ? 'Audio: On' : 'Audio: Off' }}
       <span
         v-if="audioPlaying"
         class="run-audio-toggle__dot"
@@ -109,7 +109,7 @@ defineEmits<{
       >Audio unavailable</span
     >
     <span class="sr-only" aria-live="polite" data-testid="run-audio-needed-prompt">{{
-      live && !audioArmed && audioNeeded ? 'This slide has audio — arm audio to hear it.' : ''
+      live && !audioArmed && audioNeeded ? 'This slide has audio — turn audio on to hear it.' : ''
     }}</span>
 
     <!-- BLACKOUT TOGGLE (owner UAT) — a single live-ops control replacing the old
@@ -282,9 +282,9 @@ defineEmits<{
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
 }
 
-/* Audio arm toggle (R439) — same shape/sizing as .run-blackout, a sibling
+/* Audio on/off toggle (R439) — same shape/sizing as .run-blackout, a sibling
    live-ops pill button, PLUS a fixed min-width (E3 overflow) so toggling
-   between "Audio: Off" and "Audio: Armed" never shifts its neighbors. */
+   between "Audio: Off" and "Audio: On" never shifts its neighbors. */
 .run-audio-toggle {
   min-height: 44px;
   min-width: 7.5rem;

@@ -268,7 +268,7 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     void audioElRef.value?.play()
   }
 
-  /** The R439 arm gesture — a same-document click that also primes playback. */
+  /** The R439 On/Off toggle — On by default since 260919-k9j; a same-document click flips it. */
   function toggleAudioArmed() {
     audioArmed.value = !audioArmed.value
     if (audioArmed.value) {
@@ -317,6 +317,15 @@ export function useRunControl(options: UseRunControlOptions = {}) {
   watch(blackout, (v) => {
     if (v) stopAudio()
     else tryPlayAudio()
+  })
+  // Audio is On for every session since 260919-k9j — the go-live / rehearse
+  // click is the gesture; the AudioPlayer mounts on `live`, hence the tick.
+  watch(live, async (v) => {
+    if (!v) return
+    audioArmed.value = true
+    audioBlocked.value = false
+    await nextTick()
+    tryPlayAudio()
   })
 
   /**
@@ -1111,7 +1120,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     live.value = false
     rehearsing.value = false
     blackout.value = false
-    // R439: arm state is never persisted — reset to Off every teardown.
+    // R439: reset to Off here; the watch(live) rising edge turns audio back On
+    // at the next go-live (260919-k9j).
     audioArmed.value = false
     audioBlocked.value = false
     audioUnavailable.value = false
@@ -1147,7 +1157,8 @@ export function useRunControl(options: UseRunControlOptions = {}) {
     rehearsing.value = false
     live.value = false
     blackout.value = false
-    // R439: arm state is never persisted — reset to Off every teardown.
+    // R439: reset to Off here; the watch(live) rising edge turns audio back On
+    // at the next go-live (260919-k9j).
     audioArmed.value = false
     audioBlocked.value = false
     audioUnavailable.value = false
