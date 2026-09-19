@@ -1873,6 +1873,13 @@ song groups without blocking group media"). Every corresponding HANDLER re-check
 computed — 30-VERIFICATION I-01 found six of seven mutation entry points guarded by a template
 `v-if` alone, and a lifecycle lock layered over that alone inherits its fragility.
 
+**Phase 142 — group-media panel gate:** the panel renders whenever a group is selected
+(`Boolean(selectedSlot)`); `SlideGroupSetupStrip` hosts Display/Background/Audio chips and receives
+`canWriteGroupMedia` as `editable` (button vs inert span). The old per-control existence gates are
+gone; a locked service shows the chips inert rather than hiding music/background.
+`onAttachGroupVamp` accepts a vamp with no MP3 (writes id/label only). Every handler still
+re-checks `canWriteGroupMedia`.
+
 **`appendToGroup` append contract (R050):** the one append contract every write path routes
 through — sorts a copy of `entries` by `order`, concatenates `additions` in the order given, then
 renumbers every element to its array index, so array order and `order` are the same statement

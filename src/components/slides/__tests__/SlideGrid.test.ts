@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, flushPromises, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
+import { mount, flushPromises, DOMWrapper, enableAutoUnmount, type VueWrapper } from '@vue/test-utils'
 import { ref } from 'vue'
 import type { Options as SortableOptions } from 'sortablejs'
 import SlideGrid from '../SlideGrid.vue'
@@ -204,6 +204,13 @@ function simulateCardDrag(fromPos: number, toPos: number) {
 
 function makeFile(name: string, type: string): File {
   return new File(['bytes'], name, { type })
+}
+
+// 142 — chips are BUTTONs when editable; their popovers only mount once
+// opened, so any assertion against a chip's mounted child control must open
+// the chip first.
+async function openChip(wrapper: VueWrapper, id: 'display' | 'background' | 'audio') {
+  await wrapper.get(`[data-testid="slide-group-setup-chip-${id}"]`).trigger('click')
 }
 
 // PptxImportModal is mounted FOR REAL inside SlideGrid (25-07 Task 3) and
@@ -594,7 +601,7 @@ describe('SlideGrid', () => {
 
   // --- 25-06 Task 2: group music bar mount + bed persistence ---
   describe('group music bar (25-06 Task 2)', () => {
-    it('renders the music control between the header and the card grid, receiving the bed audio and slide count', () => {
+    it('renders the strip between the header and the card grid; opening the audio chip receives the bed audio', async () => {
       const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
       const group = makeGroup({
         bedAudioUrl: 'https://storage.example.com/pad.mp3',
@@ -605,21 +612,22 @@ describe('SlideGrid', () => {
 
       const html = wrapper.html()
       const headerIndex = html.indexOf('slide-grid-title')
-      const musicIndex = html.indexOf('slide-group-music-control')
+      const stripIndex = html.indexOf('slide-group-setup-strip')
       const cardsIndex = html.indexOf('slide-grid-cards')
       expect(headerIndex).toBeGreaterThan(-1)
-      expect(musicIndex).toBeGreaterThan(headerIndex)
-      expect(cardsIndex).toBeGreaterThan(musicIndex)
+      expect(stripIndex).toBeGreaterThan(headerIndex)
+      expect(cardsIndex).toBeGreaterThan(stripIndex)
 
+      await openChip(wrapper, 'audio')
       const musicControl = wrapper.findComponent(SlideGroupMusicControl)
       expect(musicControl.props('audioUrl')).toBe('https://storage.example.com/pad.mp3')
-      // 142 interim — Plan 04 rewrites this block
     })
 
     it('writes an emitted URL to the selected group bed via the scoped write, with the selected slot id', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
 
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
       await Promise.resolve()
 
@@ -634,6 +642,7 @@ describe('SlideGrid', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
 
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('remove')
       await Promise.resolve()
 
@@ -648,6 +657,7 @@ describe('SlideGrid', () => {
       const ensureGroupMaterialized = vi.fn().mockResolvedValue({ entries: [], sourceSignature: undefined })
       const wrapper = mountGrid({ selectedSlot: slot, group: null, ensureGroupMaterialized })
 
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
       await Promise.resolve()
 
@@ -659,11 +669,13 @@ describe('SlideGrid', () => {
       const slotA = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const groupA = makeGroup({ id: 'slot-1', slotId: 'slot-1', bedAudioUrl: 'https://storage.example.com/a.mp3', slides: [] })
       const wrapper = mountGrid({ selectedSlot: slotA, group: groupA })
+      await openChip(wrapper, 'audio')
       expect(wrapper.findComponent(SlideGroupMusicControl).props('audioUrl')).toBe('https://storage.example.com/a.mp3')
 
       const slotB = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 1 })
       const groupB = makeGroup({ id: 'slot-2', slotId: 'slot-2', bedAudioUrl: 'https://storage.example.com/b.mp3', slides: [] })
       await wrapper.setProps({ selectedSlot: slotB, group: groupB })
+      await openChip(wrapper, 'audio')
 
       expect(wrapper.findComponent(SlideGroupMusicControl).props('audioUrl')).toBe('https://storage.example.com/b.mp3')
     })
@@ -672,6 +684,7 @@ describe('SlideGrid', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot })
 
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('remove')
       await Promise.resolve()
@@ -684,6 +697,7 @@ describe('SlideGrid', () => {
       mockSetGroupBedMedia.mockRejectedValueOnce(new Error('write failed'))
       const wrapper = mountGrid({ selectedSlot: slot })
 
+      await openChip(wrapper, 'audio')
       expect(() => {
         wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
       }).not.toThrow()
@@ -725,7 +739,7 @@ describe('SlideGrid', () => {
       mockVampsLoading = false
     })
 
-    it('SlideGroupMusicControl receives bedVampId/bedVampLabel from group and vamps/vampsLoading from the mocked store', () => {
+    it('SlideGroupMusicControl receives bedVampId/bedVampLabel from group and vamps/vampsLoading from the mocked store', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({
         bedAudioUrl: 'https://cdn.example.com/open-response.mp3',
@@ -735,6 +749,7 @@ describe('SlideGrid', () => {
       })
       const wrapper = mountGrid({ selectedSlot: slot, group })
 
+      await openChip(wrapper, 'audio')
       const control = wrapper.findComponent(SlideGroupMusicControl)
       expect(control.props('bedVampId')).toBe('vamp-1')
       expect(control.props('bedVampLabel')).toBe('Open Response · G')
@@ -746,6 +761,7 @@ describe('SlideGrid', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
 
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp1)
       await Promise.resolve()
 
@@ -758,10 +774,33 @@ describe('SlideGrid', () => {
       })
     })
 
-    it('attach-vamp with a vamp whose attachment is null writes nothing', async () => {
+    // 142 — a no-MP3 vamp no longer early-returns: the store's third branch
+    // (Plan 01) accepts id/label with no bedAudioUrl, so live playback shows
+    // the amber "no MP3" chip instead of silently dropping the selection.
+    it('attach-vamp with a vamp whose attachment is null writes id/label only, with no bedAudioUrl key', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
 
+      await openChip(wrapper, 'audio')
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp3NoFile)
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).toHaveBeenCalledTimes(1)
+      const [, , patch] = mockSetGroupBedMedia.mock.calls[0]!
+      expect(patch).toEqual({
+        serviceId: 'service-9',
+        bedVampId: 'vamp-3',
+        bedVampLabel: 'No File · A',
+      })
+      expect('bedAudioUrl' in patch).toBe(false)
+    })
+
+    it('re-attaching the same no-MP3 vamp when the group already holds that bedVampId/bedVampLabel and no bedAudioUrl writes nothing (idempotent)', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ bedVampId: 'vamp-3', bedVampLabel: 'No File · A', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group })
+
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp3NoFile)
       await Promise.resolve()
 
@@ -778,6 +817,7 @@ describe('SlideGrid', () => {
       })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group })
 
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp1)
       await Promise.resolve()
 
@@ -792,6 +832,7 @@ describe('SlideGrid', () => {
       })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group })
 
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp1)
       await Promise.resolve()
 
@@ -802,7 +843,6 @@ describe('SlideGrid', () => {
         bedVampId: 'vamp-1',
         bedVampLabel: 'Open Response · G',
       })
-      expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
     })
 
     it('remove on a vamp-bed group still writes the unchanged clearAudio shape', async () => {
@@ -815,6 +855,7 @@ describe('SlideGrid', () => {
       })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group })
 
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('remove')
       await Promise.resolve()
 
@@ -824,21 +865,26 @@ describe('SlideGrid', () => {
       })
     })
 
-    it('with isEditor false, attach-vamp writes nothing', async () => {
+    // 142 — a non-editable chip renders as an inert <span> (no click handler,
+    // no popover mount at all), so the write-permission re-check inside the
+    // handler is defense-in-depth behind a UI path that no longer exists.
+    it('with isEditor false, the audio chip is an inert span and no popover/control ever mounts — no write path exists', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group, isEditor: false })
 
-      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach-vamp', vamp1)
-      await Promise.resolve()
-
+      const chip = wrapper.get('[data-testid="slide-group-setup-chip-audio"]')
+      expect(chip.element.tagName).toBe('SPAN')
+      await chip.trigger('click')
+      expect(wrapper.find('[data-testid="slide-group-setup-popover-audio"]').exists()).toBe(false)
+      expect(wrapper.findComponent(SlideGroupMusicControl).exists()).toBe(false)
       expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
     })
   })
 
   // --- 33-08 Task 2: group background control mounted below the music control (R055) ---
   describe('group background control (33-08 Task 2)', () => {
-    it('renders the thumbnail, the filename and the caption with the real card count substituted', () => {
+    it('opening the background chip mounts BackgroundControl with variant chip-popover and the group image url', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({
         backgroundImageUrl: 'https://storage.example.com/backgrounds/mtn.jpg',
@@ -851,44 +897,47 @@ describe('SlideGrid', () => {
       const assembledSlideshow = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2'), makeAssembled(0, 'e3')]
       const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
 
+      await openChip(wrapper, 'background')
       const control = wrapper.findComponent(BackgroundControl)
+      expect(control.props('variant')).toBe('chip-popover')
       expect(control.props('imageUrl')).toBe('https://storage.example.com/backgrounds/mtn.jpg')
-      expect(control.props('caption')).toBe('applies to all 3 slides in this group, unless a slide sets its own')
     })
 
-    it('does not render the wrapper when there is no group background and no write permission', () => {
+    // 142 — locked/non-editor supersedes the old hide-when-locked rule: the
+    // chip renders (as an inert span, showing real state) instead of
+    // disappearing, and clicking it opens no popover.
+    it('the background chip is an inert span with no write permission, and clicking it opens no popover', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, isEditor: false, group: null })
-      expect(wrapper.find('[data-testid="slide-grid-group-background"]').exists()).toBe(false)
+      const chip = wrapper.get('[data-testid="slide-group-setup-chip-background"]')
+      expect(chip.element.tagName).toBe('SPAN')
+      await chip.trigger('click')
+      expect(wrapper.find('[data-testid="slide-group-setup-popover-background"]').exists()).toBe(false)
     })
 
-    it('renders the wrapper when there is a group background but no write permission', () => {
+    it('with a group background set but no write permission, the inert chip still shows the value', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({ backgroundImageUrl: 'https://storage.example.com/bg.jpg', slides: [] })
       const wrapper = mountGrid({ selectedSlot: slot, isEditor: false, group })
-      expect(wrapper.find('[data-testid="slide-grid-group-background"]').exists()).toBe(true)
+      const chip = wrapper.get('[data-testid="slide-group-setup-chip-background"]')
+      expect(chip.element.tagName).toBe('SPAN')
+      expect(chip.text()).toContain('bg.jpg')
     })
 
-    it('renders the empty-state add affordance label when permitted and nothing is set', () => {
+    it('shows the "Add" dashed state on the chip when nothing is set, and the upload tile in the popover', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, isEditor: true, group: null })
-      const control = wrapper.findComponent(BackgroundControl)
-      expect(control.props('addLabel')).toBe('+ Add background for this group')
-    })
-
-    it("threads the group-level removeLabel declared in the Copywriting Contract into the control's aria-label", () => {
-      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
-      const group = makeGroup({ backgroundImageUrl: 'https://storage.example.com/bg.jpg', slides: [] })
-      const wrapper = mountGrid({ selectedSlot: slot, isEditor: true, group })
-      const control = wrapper.findComponent(BackgroundControl)
-      expect(control.props('removeLabel')).toBe('Remove group background')
-      expect(wrapper.get('[data-testid="background-control-remove"]').attributes('aria-label')).toBe('Remove group background')
+      const chip = wrapper.get('[data-testid="slide-group-setup-chip-background"]')
+      expect(chip.text()).toContain('Add')
+      await openChip(wrapper, 'background')
+      expect(wrapper.find('[data-testid="background-control-swatch-upload"]').exists()).toBe(true)
     })
 
     it("relays the control's attach emit to setGroupBackground with the URL, and remove with the clear flag — carrying no slides key", async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
 
+      await openChip(wrapper, 'background')
       await wrapper.findComponent(BackgroundControl).vm.$emit('attach', 'https://storage.example.com/new.jpg')
       await Promise.resolve()
 
@@ -908,7 +957,25 @@ describe('SlideGrid', () => {
       expect('slides' in removePatch).toBe(false)
     })
 
-    it('shows the inherited display for a SONG group with no own background whose slides resolve from the song tier, and undefined for a PRAYER group in the same shape', () => {
+    // 142 — clicking the None swatch while a background is set is the
+    // chip-popover's own remove affordance (replaces the old
+    // `background-control-remove` aria-label test, retired with the panel variant).
+    it('clicking the None swatch while a background is set produces the clearBackground write', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ backgroundImageUrl: 'https://storage.example.com/bg.jpg', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', group })
+
+      await openChip(wrapper, 'background')
+      await wrapper.get('[data-testid="background-control-swatch-none"]').trigger('click')
+      await Promise.resolve()
+
+      expect(mockSetGroupBackground).toHaveBeenCalledWith('org-1', 'slot-1', {
+        serviceId: 'service-9',
+        clearBackground: true,
+      })
+    })
+
+    it('shows the inherited state ("(song)") on the chip and the explainer (no upload tile) in the popover for a SONG group with no own background, and neither for a PRAYER group in the same shape', async () => {
       const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
       const songGroup = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'lyric', songId: 's1', sectionId: 'v1' } }] })
       const songAssembled = [
@@ -918,11 +985,11 @@ describe('SlideGrid', () => {
         }),
       ]
       const songWrapper = mountGrid({ selectedSlot: songSlot, assembledSlideshow: songAssembled, group: songGroup })
-      const songControl = songWrapper.findComponent(BackgroundControl)
-      expect(songControl.props('inheritedFrom')).toEqual({
-        url: 'https://storage.example.com/backgrounds/song-bg.jpg',
-        label: 'song-bg.jpg',
-      })
+      const songChip = songWrapper.get('[data-testid="slide-group-setup-chip-background"]')
+      expect(songChip.text()).toContain('(song)')
+      await openChip(songWrapper, 'background')
+      expect(songWrapper.find('[data-testid="background-control-inherited-explainer"]').exists()).toBe(true)
+      expect(songWrapper.find('[data-testid="background-control-swatch-upload"]').exists()).toBe(false)
 
       const prayerSlot = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 0 })
       const prayerGroup = makeGroup({ id: 'slot-2', slotId: 'slot-2', slides: [{ id: 'e2', order: 0, sourceRef: { kind: 'text' } }] })
@@ -933,10 +1000,12 @@ describe('SlideGrid', () => {
         }),
       ]
       const prayerWrapper = mountGrid({ selectedSlot: prayerSlot, assembledSlideshow: prayerAssembled, group: prayerGroup })
-      expect(prayerWrapper.findComponent(BackgroundControl).props('inheritedFrom')).toBeUndefined()
+      const prayerChip = prayerWrapper.get('[data-testid="slide-group-setup-chip-background"]')
+      expect(prayerChip.text()).not.toContain('(song)')
+      expect(prayerChip.text()).toContain('Add')
     })
 
-    it('does not show the inherited display for a SONG group that already has its own background', () => {
+    it('does not show the inherited state for a SONG group that already has its own background', async () => {
       const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
       const songGroup = makeGroup({
         backgroundImageUrl: 'https://storage.example.com/own.jpg',
@@ -949,23 +1018,25 @@ describe('SlideGrid', () => {
         }),
       ]
       const wrapper = mountGrid({ selectedSlot: songSlot, assembledSlideshow: songAssembled, group: songGroup })
-      expect(wrapper.findComponent(BackgroundControl).props('inheritedFrom')).toBeUndefined()
+      const chip = wrapper.get('[data-testid="slide-group-setup-chip-background"]')
+      expect(chip.text()).not.toContain('(song)')
+      expect(chip.text()).toContain('own.jpg')
+      await openChip(wrapper, 'background')
+      expect(wrapper.find('[data-testid="background-control-inherited-explainer"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="background-control-swatch-upload"]').exists()).toBe(true)
     })
 
-    it('a SONG group renders the control (background is group media, unlike the read-only slide structure)', () => {
+    it('a SONG group renders the background chip as a BUTTON (background is group media, unlike the read-only slide structure)', () => {
       const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
       const wrapper = mountGrid({ selectedSlot: songSlot, isEditor: true, group: null })
-      expect(wrapper.find('[data-testid="slide-grid-group-background"]').exists()).toBe(true)
-      expect(wrapper.findComponent(BackgroundControl).exists()).toBe(true)
+      expect(wrapper.get('[data-testid="slide-group-setup-chip-background"]').element.tagName).toBe('BUTTON')
     })
 
-    it('a group with zero slides still renders the control when permitted', () => {
+    it('a group with zero slides still mounts the control when permitted', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, isEditor: true, assembledSlideshow: [], group: null })
+      await openChip(wrapper, 'background')
       expect(wrapper.findComponent(BackgroundControl).exists()).toBe(true)
-      expect(wrapper.findComponent(BackgroundControl).props('caption')).toBe(
-        'applies to all 0 slides in this group, unless a slide sets its own',
-      )
     })
 
     it("leaves the music control's own wrapper, props and write path unchanged", async () => {
@@ -973,6 +1044,7 @@ describe('SlideGrid', () => {
       const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
       const wrapper = mountGrid({ selectedSlot: slot, group })
 
+      await openChip(wrapper, 'audio')
       expect(wrapper.find('[data-testid="slide-group-music-control"]').exists()).toBe(true)
       expect(wrapper.findComponent(SlideGroupMusicControl).props('audioUrl')).toBe('https://storage.example.com/pad.mp3')
 
@@ -984,55 +1056,38 @@ describe('SlideGrid', () => {
 
   // --- 34-11 Task 1 (34-UAT F2): the merged group-media panel — render matrix ---
   describe('group media panel (34-11 Task 1)', () => {
-    it('shows one panel containing both controls, music first, when both would render', () => {
+    // 142 — the six-condition OR collapsed to Boolean(selectedSlot): the
+    // panel is present for every combination of editability/lock/group-state
+    // once a plan item is selected, because the Display chip always renders
+    // a value. Absent only when nothing is selected.
+    it('panel renders for editor-unlocked, viewer, and editor-locked, with or without a materialized group', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({
         bedAudioUrl: 'https://storage.example.com/pad.mp3',
         backgroundImageUrl: 'https://storage.example.com/bg.jpg',
         slides: [],
       })
-      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
-
-      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
-      expect(panel.findComponent(BackgroundControl).exists()).toBe(true)
-
-      const html = panel.html()
-      expect(html.indexOf('slide-group-music-control')).toBeLessThan(html.indexOf('background-control'))
+      const cases: { isEditor: boolean; serviceLocked: boolean; group: SlideGroup | null }[] = [
+        { isEditor: true, serviceLocked: false, group: null },
+        { isEditor: true, serviceLocked: false, group },
+        { isEditor: false, serviceLocked: false, group: null },
+        { isEditor: false, serviceLocked: false, group },
+        { isEditor: true, serviceLocked: true, group: null },
+        { isEditor: true, serviceLocked: true, group },
+      ]
+      for (const c of cases) {
+        const wrapper = mountGrid({ selectedSlot: slot, ...c })
+        expect(wrapper.find('[data-testid="slide-grid-group-media-panel"]').exists()).toBe(true)
+        expect(wrapper.find('[data-testid="slide-group-setup-strip"]').exists()).toBe(true)
+      }
     })
 
-    it('shows the panel with only the music control for bed audio and no write permission', () => {
-      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
-      const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
-      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: false })
-
-      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
-      expect(panel.findComponent(BackgroundControl).exists()).toBe(false)
-    })
-
-    it('shows the panel with only the background control for a group background and no write permission', () => {
-      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
-      const group = makeGroup({ backgroundImageUrl: 'https://storage.example.com/bg.jpg', slides: [] })
-      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: false })
-
-      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      expect(panel.findComponent(BackgroundControl).exists()).toBe(true)
-      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(false)
-    })
-
-    it('renders no panel element at all with neither bed audio nor background and no write permission', () => {
-      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
-      const wrapper = mountGrid({ selectedSlot: slot, group: null, isEditor: false })
+    it('panel is absent only when no plan item is selected', () => {
+      const wrapper = mountGrid({ selectedSlot: null })
       expect(wrapper.find('[data-testid="slide-grid-group-media-panel"]').exists()).toBe(false)
     })
 
-    // Owner follow-up: "let's at least merge them into a single panel instead
-    // of two". 34-11 already merged the STRUCTURE (one wrapper element); this
-    // pins the VISUAL merge — one bordered box, not two — by asserting the
-    // panel wrapper carries the border/background chrome and both inner
-    // controls render `flush` (i.e. neither paints its own).
-    it('renders ONE bordered/background box for the merged panel, not two — both controls render flush inside the panel chrome', () => {
+    it('the panel wrapper carries the border/background/padding chrome; the strip root carries none of it', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({
         bedAudioUrl: 'https://storage.example.com/pad.mp3',
@@ -1047,80 +1102,17 @@ describe('SlideGrid', () => {
       expect(panelClasses).toContain('border')
       expect(panelClasses).toContain('border-gray-800')
       expect(panelClasses).toContain('bg-gray-900')
-
-      const musicRoot = wrapper.get('[data-testid="slide-group-music-control"]')
-      const backgroundRoot = wrapper.get('[data-testid="background-control"]')
-      for (const el of [musicRoot, backgroundRoot]) {
-        const classes = el.classes()
-        expect(classes).not.toContain('border')
-        expect(classes).not.toContain('border-gray-800')
-        expect(classes).not.toContain('bg-gray-900')
-      }
-
-      // Zero DESCENDANTS carry the bordered/background chrome — only the
-      // panel wrapper itself does (asserted above) — so the subtree contains
-      // exactly one bordered box, not one per control. (142: SlotVideoOutputControl's
-      // own inactive-tile fill legitimately carries bg-gray-900 as part of its
-      // per-tile UI-SPEC §3 restyle, and SlideGroupMusicControl's own None/Track/Vamp
-      // tablist legitimately carries border-gray-800 as part of its UI-SPEC §5 restyle —
-      // both excluded here, neither is a second panel box.)
-      const borderGray800OutsideAudioTabs = panel
-        .findAll('.border-gray-800')
-        .filter((el) => (el.attributes('data-testid') ?? '') !== 'group-music-audio-tabs')
-      expect(borderGray800OutsideAudioTabs.length).toBe(0)
-      const bgGray900OutsideVideoOutputTiles = panel
-        .findAll('.bg-gray-900')
-        .filter((el) => {
-          const testid = el.attributes('data-testid') ?? ''
-          // group-music-track-row: SlideGroupMusicControl's own §5 Track-row
-          // chrome, same non-panel-box carve-out as the video-output tiles above.
-          return !testid.startsWith('slot-video-output-') && testid !== 'group-music-track-row'
-        })
-      expect(bgGray900OutsideVideoOutputTiles.length).toBe(0)
-    })
-
-    // Owner follow-up #2 (direct feedback on the running app, pasted DOM
-    // included two `<div class="px-3 py-2">` children plus `divide-y` on the
-    // panel): "you still have add music and add background for group
-    // buttons in their own panels ... get rid of the extra panel". The
-    // previous test (34-11 Task 1) only proved the CHROME (border/bg) lived
-    // once on the panel — it did not catch the divider line plus two
-    // separately-padded child wrappers, which is what actually made the two
-    // controls still read as stacked panels on screen. This pins that: no
-    // divider class on the panel, and no nested child element carrying its
-    // own `px-3`+`py-2` padding pair — both controls share ONE padded
-    // region.
-    it('has no divider seam and no per-control padded child wrapper — one padded region for both controls', () => {
-      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
-      const group = makeGroup({
-        bedAudioUrl: 'https://storage.example.com/pad.mp3',
-        backgroundImageUrl: 'https://storage.example.com/bg.jpg',
-        slides: [],
-      })
-      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
-
-      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      const panelClasses = panel.classes()
-      expect(panelClasses).not.toContain('divide-y')
-      expect(panelClasses).not.toContain('divide-gray-800')
-      // Padding lives once, on the panel itself.
       expect(panelClasses).toContain('px-3')
       expect(panelClasses).toContain('py-2')
 
-      // No descendant re-introduces its own px-3 + py-2 padded block — that
-      // was the "second panel" the owner was pointing at.
-      const paddedDescendants = panel
-        .findAll('*')
-        .filter((el) => el.classes().includes('px-3') && el.classes().includes('py-2'))
-      expect(paddedDescendants.length).toBe(0)
+      const stripClasses = wrapper.get('[data-testid="slide-group-setup-strip"]').classes()
+      expect(stripClasses).not.toContain('border-gray-800')
+      expect(stripClasses).not.toContain('bg-gray-900')
     })
 
-    // Owner follow-up #3 (third pass on this same panel): "I want add music
-    // for group and add background for group to be next to each other, not
-    // on top of each other." The panel is visually merged (one border, one
-    // padded region, no divider) but was still `flex-col`, so the two
-    // controls stacked vertically. This pins the AXIS fix.
-    it('lays the panel out as a wrapping horizontal row with both controls as flex items', () => {
+    // "Don't containerize each button" (owner follow-up #4) still holds: the
+    // strip row wraps rather than stacking or forcing equal-width columns.
+    it('the strip root lays the chips out as a wrapping row, not containerized columns', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({
         bedAudioUrl: 'https://storage.example.com/pad.mp3',
@@ -1128,99 +1120,33 @@ describe('SlideGrid', () => {
         slides: [],
       })
       const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
-
-      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      const panelClasses = panel.classes()
-      expect(panelClasses).toContain('flex')
-      expect(panelClasses).toContain('flex-wrap')
-      expect(panelClasses).toContain('items-start')
-      expect(panelClasses).not.toContain('flex-col')
+      const stripClasses = wrapper.get('[data-testid="slide-group-setup-strip"]').classes()
+      expect(stripClasses).toContain('flex')
+      expect(stripClasses).toContain('flex-wrap')
+      expect(stripClasses).not.toContain('flex-col')
     })
 
-    // Owner follow-up #4 (fourth pass, pasted DOM again): "now you have them
-    // in their own <div> containers. Let's use flex, and don't containerize
-    // each button." Follow-up #3's `min-w-[14rem] flex-1` satisfied the AXIS
-    // but made each child claim an equal half of the row regardless of its
-    // content — two half-width columns, one per button. The grow factor and
-    // the width floor are what produced that, so both must stay gone; the
-    // retained `min-w-0 max-w-full` only caps an attached long filename.
-    it('sizes each control to its own content — no grow factor or width floor turning the buttons into columns', () => {
-      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
-      const group = makeGroup({
-        bedAudioUrl: 'https://storage.example.com/pad.mp3',
-        backgroundImageUrl: 'https://storage.example.com/bg.jpg',
-        slides: [],
-      })
-      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
-
-      const musicRoot = wrapper.get('[data-testid="slide-group-music-control"]')
-      const backgroundWrapper = wrapper.get('[data-testid="slide-grid-group-background"]')
-      for (const el of [musicRoot, backgroundWrapper]) {
-        const classes = el.classes()
-        expect(classes).not.toContain('flex-1')
-        expect(classes).not.toContain('min-w-[14rem]')
-        expect(classes).toContain('min-w-0')
-        expect(classes).toContain('max-w-full')
-      }
-    })
-
-    // Owner follow-up #4, second half: "Move the label for 'applies to all
-    // slides, ...' so that it shows below the buttons." The caption used to
-    // render inside `BackgroundControl`, stacked ABOVE that control's button
-    // — which is what knocked the two buttons out of horizontal alignment.
-    it('renders the group caption on its own full-width line below both buttons, not inside the background control', () => {
-      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
-      const group = makeGroup({ slides: [] })
-      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
-
-      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      const caption = panel.get('[data-testid="slide-grid-group-background-caption"]')
-      expect(caption.text()).toBe(
+    // Owner follow-up #4, second half, now generalized to the whole row: the
+    // caption renders below the chips (and trailing actions), never above.
+    it('renders slide-group-setup-caption after the chips, singular for one slide and plural otherwise', () => {
+      const slotA = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const groupA = makeGroup({ slides: [] })
+      const wrapperA = mountGrid({ selectedSlot: slotA, group: groupA, isEditor: true })
+      expect(wrapperA.get('[data-testid="slide-group-setup-caption"]').text()).toBe(
         'applies to all 0 slides in this group, unless a slide sets its own',
       )
-      // `basis-full` is what gives it a whole flex line to itself.
-      expect(caption.classes()).toContain('basis-full')
 
-      // The control no longer paints a caption of its own — otherwise the
-      // copy would appear twice, and the stacked one would still be pushing
-      // the background button out of line with the music button.
-      const backgroundRoot = wrapper.get('[data-testid="background-control"]')
-      expect(backgroundRoot.find('[data-testid="background-control-caption"]').exists()).toBe(false)
+      const slotB = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 0 })
+      const groupB = makeGroup({ id: 'slot-2', slotId: 'slot-2', slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
+      const assembledB = [makeAssembled(0, 'e1')]
+      const wrapperB = mountGrid({ selectedSlot: slotB, group: groupB, assembledSlideshow: assembledB, isEditor: true })
+      expect(wrapperB.get('[data-testid="slide-group-setup-caption"]').text()).toBe(
+        'applies to all 1 slide in this group, unless a slide sets its own',
+      )
 
-      // It sits AFTER both controls in source order, so it reads as a line
-      // below the button row rather than a heading above it.
+      const panel = wrapperA.get('[data-testid="slide-grid-group-media-panel"]')
       const html = panel.html()
-      expect(html.indexOf('slide-grid-group-background-caption')).toBeGreaterThan(
-        html.indexOf('background-control-add'),
-      )
-      // 142 interim — Plan 04 rewrites this block
-      expect(html.indexOf('slide-grid-group-background-caption')).toBeGreaterThan(
-        html.indexOf('group-music-audio-tab-none'),
-      )
-    })
-
-    // The relocated caption is still the background's caption — it must not
-    // survive when the background control itself is absent.
-    it('does not render the relocated caption when only the music control shows', () => {
-      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
-      const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
-      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: false })
-
-      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
-      expect(panel.findComponent(BackgroundControl).exists()).toBe(false)
-      expect(
-        panel.find('[data-testid="slide-grid-group-background-caption"]').exists(),
-      ).toBe(false)
-    })
-
-    it('shows the panel with both controls for anyone who can write group media, regardless of current group state', () => {
-      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
-      const wrapper = mountGrid({ selectedSlot: slot, group: null, isEditor: true })
-
-      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
-      expect(panel.findComponent(BackgroundControl).exists()).toBe(true)
+      expect(html.indexOf('slide-group-setup-caption')).toBeGreaterThan(html.indexOf('slide-group-setup-chip-audio'))
     })
 
     it('leaves the media error and reorder error elements as unaffected siblings positioned below the panel', async () => {
@@ -1246,7 +1172,7 @@ describe('SlideGrid', () => {
   // --- 34-11 Task 2 (34-UAT F2): the merge changed layout, not behaviour —
   // pinned as executable assertions rather than a commit-message claim. ---
   describe('group media panel — no-behaviour-change regression (34-11 Task 2)', () => {
-    it('renders the caption inside the panel with the real card count for two different card counts', () => {
+    it('renders slide-group-setup-caption with the real card count for two different card counts', () => {
       const slotA = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const groupA = makeGroup({
         slides: [
@@ -1256,7 +1182,7 @@ describe('SlideGrid', () => {
       })
       const assembledA = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2')]
       const wrapperA = mountGrid({ selectedSlot: slotA, group: groupA, assembledSlideshow: assembledA, isEditor: true })
-      expect(wrapperA.findComponent(BackgroundControl).props('caption')).toBe(
+      expect(wrapperA.get('[data-testid="slide-group-setup-caption"]').text()).toBe(
         'applies to all 2 slides in this group, unless a slide sets its own',
       )
 
@@ -1271,12 +1197,15 @@ describe('SlideGrid', () => {
       })
       const assembledB = Array.from({ length: 5 }, (_, i) => makeAssembled(0, `f${i}`))
       const wrapperB = mountGrid({ selectedSlot: slotB, group: groupB, assembledSlideshow: assembledB, isEditor: true })
-      expect(wrapperB.findComponent(BackgroundControl).props('caption')).toBe(
+      expect(wrapperB.get('[data-testid="slide-group-setup-caption"]').text()).toBe(
         'applies to all 5 slides in this group, unless a slide sets its own',
       )
     })
 
-    it('renders the inherited-from label in the DOM for a song group inheriting the song background, and omits it once the group has its own', () => {
+    // 142 — the caption no longer suppresses while a song background is
+    // inherited (CONTEXT.md: the popover carries the inherited explainer
+    // instead); it renders for every selected group.
+    it('shows the inherited state via chip text + popover explainer for a song group inheriting the song background, and the group\'s own value otherwise — the caption renders in both cases', async () => {
       const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
       const songGroup = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'lyric', songId: 's1', sectionId: 'v1' } }] })
       const inheritingAssembled = [
@@ -1291,8 +1220,9 @@ describe('SlideGrid', () => {
         group: songGroup,
         isEditor: true,
       })
-      const inheritedEl = inheritingWrapper.get('[data-testid="background-control-inherited"]')
-      expect(inheritedEl.text()).toBe('inherited from the song — song-bg.jpg')
+      expect(inheritingWrapper.get('[data-testid="slide-group-setup-chip-background"]').text()).toContain('(song)')
+      await openChip(inheritingWrapper, 'background')
+      expect(inheritingWrapper.find('[data-testid="background-control-inherited-explainer"]').exists()).toBe(true)
 
       const ownGroup = makeGroup({
         backgroundImageUrl: 'https://storage.example.com/own.jpg',
@@ -1302,22 +1232,14 @@ describe('SlideGrid', () => {
         makeAssembled(0, 'e1', 'SONG', { backgroundSource: 'slide', backgroundImageUrl: 'https://storage.example.com/own.jpg' }),
       ]
       const ownWrapper = mountGrid({ selectedSlot: songSlot, assembledSlideshow: ownAssembled, group: ownGroup, isEditor: true })
-      expect(ownWrapper.find('[data-testid="background-control-inherited"]').exists()).toBe(false)
+      expect(ownWrapper.get('[data-testid="slide-group-setup-chip-background"]').text()).not.toContain('(song)')
 
-      // The relocated caption (owner follow-up #4) stands in the same
-      // either/or relationship to the inherited line that the control's own
-      // caption used to: exactly one of them describes the background at a
-      // time. Moving the caption out of the control must not turn that into
-      // "both at once".
-      expect(
-        inheritingWrapper.find('[data-testid="slide-grid-group-background-caption"]').exists(),
-      ).toBe(false)
-      expect(
-        ownWrapper.find('[data-testid="slide-grid-group-background-caption"]').exists(),
-      ).toBe(true)
+      // The caption is no longer either/or with the inherited state — both render now.
+      expect(inheritingWrapper.find('[data-testid="slide-group-setup-caption"]').exists()).toBe(true)
+      expect(ownWrapper.find('[data-testid="slide-group-setup-caption"]').exists()).toBe(true)
     })
 
-    it('omits the inherited-from label for a non-song group even when its slides resolve a "song" backgroundSource', () => {
+    it('omits the inherited state for a non-song group even when its slides resolve a "song" backgroundSource', () => {
       const prayerSlot = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 0 })
       const prayerGroup = makeGroup({ id: 'slot-2', slotId: 'slot-2', slides: [{ id: 'e2', order: 0, sourceRef: { kind: 'text' } }] })
       const prayerAssembled = [
@@ -1327,7 +1249,7 @@ describe('SlideGrid', () => {
         }),
       ]
       const wrapper = mountGrid({ selectedSlot: prayerSlot, assembledSlideshow: prayerAssembled, group: prayerGroup, isEditor: true })
-      expect(wrapper.find('[data-testid="background-control-inherited"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="slide-group-setup-chip-background"]').text()).not.toContain('(song)')
     })
 
     // ★ Deviation from the plan's literal wording (see 34-11-SUMMARY.md): the
@@ -1340,16 +1262,18 @@ describe('SlideGrid', () => {
     // applies, so group media stays writable for a song group. This test
     // pins the real (byte-unchanged) behaviour and still catches a
     // wrong-gate regression: if a future edit routed background through
-    // `canMutateGroup` instead of `canWriteGroupMedia`, the add affordance
-    // would disappear here and this assertion would fail.
-    it('a song group can still write group media on a draft service (canWriteGroupMedia carve-out), while remaining unable to mutate its slides (canMutateGroup)', () => {
+    // `canMutateGroup` instead of `canWriteGroupMedia`, the chips would stop
+    // being BUTTONs here and this assertion would fail.
+    it('a song group can still write group media on a draft service (canWriteGroupMedia carve-out), while remaining unable to mutate its slides (canMutateGroup)', async () => {
       const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
       const wrapper = mountGrid({ selectedSlot: songSlot, isEditor: true, serviceLocked: false, group: null })
 
-      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      expect(panel.find('[data-testid="background-control-add"]').exists()).toBe(true)
-      // 142 interim — Plan 04 rewrites this block
-      expect(panel.find('[data-testid="group-music-audio-tab-none"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="slide-group-setup-chip-background"]').element.tagName).toBe('BUTTON')
+      await openChip(wrapper, 'background')
+      expect(wrapper.find('[data-testid="background-control-swatch-upload"]').exists()).toBe(true)
+
+      await openChip(wrapper, 'audio')
+      expect(wrapper.find('[data-testid="group-music-audio-tab-none"]').exists()).toBe(true)
 
       // The DISTINCT gate: slide mutation (add/import/reorder) stays locked
       // for a song group even though group-media writes do not (R054).
@@ -1360,6 +1284,7 @@ describe('SlideGrid', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', isEditor: true })
 
+      await openChip(wrapper, 'audio')
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
       await Promise.resolve()
 
@@ -1373,6 +1298,7 @@ describe('SlideGrid', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', isEditor: true })
 
+      await openChip(wrapper, 'background')
       await wrapper.findComponent(BackgroundControl).vm.$emit('remove')
       await Promise.resolve()
 
@@ -1818,12 +1744,11 @@ describe('SlideGrid', () => {
       expect(withoutComments).not.toContain('slide-grid-import')
     })
 
-    it('the merged group-media panel still renders both music and background controls, unchanged, for an editable group', () => {
+    it('the merged group-media panel still renders the background chip alongside the strip, unchanged, for an editable group', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, isEditor: true })
       const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
-      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
-      expect(panel.find('[data-testid="slide-grid-group-background"]').exists()).toBe(true)
+      expect(panel.find('[data-testid="slide-group-setup-chip-background"]').exists()).toBe(true)
     })
 
     it('the drop tile is still the last child of the cards container, keeping SortableJS index arithmetic unchanged', () => {
@@ -2126,6 +2051,7 @@ describe('SlideGrid', () => {
       const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
       const wrapper = mountGrid({ selectedSlot: makeSongSlot(), group })
 
+      await openChip(wrapper, 'audio')
       const musicControl = wrapper.findComponent(SlideGroupMusicControl)
       expect(musicControl.exists()).toBe(true)
       expect(musicControl.props('audioUrl')).toBe('https://storage.example.com/pad.mp3')
@@ -2414,21 +2340,23 @@ describe('SlideGrid - locked service (R036)', () => {
     expect(empty.text()).not.toContain('Add a slide, or drop a file below.')
   })
 
-  it('renders NO group music control at all when locked with no bed audio (E5 — no empty bordered box)', () => {
+  // 142 — the audio chip is an inert span when locked (supersede-hide rule);
+  // SlideGroupMusicControl only ever mounts inside an editable chip's popover.
+  it('the audio chip is an inert span when locked with no bed audio, and SlideGroupMusicControl never mounts', () => {
     const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
     const wrapper = mountGrid({ selectedSlot: slot, group: makeGroup({ slides: [] }), serviceLocked: true })
+    expect(wrapper.get('[data-testid="slide-group-setup-chip-audio"]').element.tagName).toBe('SPAN')
     expect(wrapper.findComponent(SlideGroupMusicControl).exists()).toBe(false)
   })
 
-  it('still renders the group music control when a bed IS attached — playback is not mutation', () => {
+  it('shows the bed audio value directly on the inert chip when locked — playback state is visible without a popover', () => {
     const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
     const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
     const wrapper = mountGrid({ selectedSlot: slot, group, serviceLocked: true })
 
-    const control = wrapper.findComponent(SlideGroupMusicControl)
-    expect(control.exists()).toBe(true)
-    // ...but with no remove affordance, because that IS mutation.
-    expect(control.props('isEditor')).toBe(false)
+    const chip = wrapper.get('[data-testid="slide-group-setup-chip-audio"]')
+    expect(chip.element.tagName).toBe('SPAN')
+    expect(chip.text()).toContain('pad.mp3')
   })
 
   it('hands SlideCard reorderable=false and creates no Sortable instance while locked', () => {
@@ -2528,13 +2456,13 @@ describe('SlideGrid - locked service (R036)', () => {
     const wrapper = mountGrid({ selectedSlot: makeSongSlot(), serviceLocked: false })
     // R054 removes create/import/reorder but NOT group media (30-03).
     expect(wrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(false)
-    expect(wrapper.findComponent(SlideGroupMusicControl).props('isEditor')).toBe(true)
+    expect(wrapper.get('[data-testid="slide-group-setup-chip-audio"]').element.tagName).toBe('BUTTON')
   })
 
   it('a song group on a LOCKED service loses group media too', () => {
     const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
     const wrapper = mountGrid({ selectedSlot: makeSongSlot(), group, serviceLocked: true })
-    expect(wrapper.findComponent(SlideGroupMusicControl).props('isEditor')).toBe(false)
+    expect(wrapper.get('[data-testid="slide-group-setup-chip-audio"]').element.tagName).toBe('SPAN')
   })
 })
 
@@ -2753,25 +2681,47 @@ describe('SlideGrid — per-item loop (MISC/ANNOUNCEMENTS only, owner 2026-09-01
 })
 
 describe('SlideGrid — per-item Video output Banner/Full-screen (R425, Phase 137)', () => {
-  it('shows the video-output control for a non-loopable kind (SONG), unlike the loop control', () => {
+  it('the Display chip is a BUTTON with text "Full-screen" for a non-loopable kind (SONG); opening it shows slot-video-output-row inside its own popover', async () => {
     const songSlot = makeSlot({ kind: 'SONG', id: 's', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
     const wrapper = mountGrid({ selectedSlot: songSlot, isEditor: true })
-    expect(wrapper.find('[data-testid="slot-video-output-row"]').exists()).toBe(true)
+    const chip = wrapper.get('[data-testid="slide-group-setup-chip-display"]')
+    expect(chip.element.tagName).toBe('BUTTON')
+    expect(chip.text()).toContain('Full-screen')
     expect(wrapper.find('[data-testid="slot-loop-row"]').exists()).toBe(false)
+
+    await openChip(wrapper, 'display')
+    expect(wrapper.find('[data-testid="slide-group-setup-popover-display"] [data-testid="slot-video-output-row"]').exists()).toBe(true)
   })
 
-  it('hides the video-output control for a viewer (isEditor: false)', () => {
+  // 142 — locked/non-editor no longer hides the chip (supersede-hide rule);
+  // it renders as an inert span showing the real value, and clicking it
+  // opens no popover.
+  it('the Display chip is an inert span for a viewer (isEditor: false), and clicking it opens no popover', async () => {
     const wrapper = mountGrid({ selectedSlot: makeSlot({ kind: 'SONG', id: 's', position: 0 } as never), isEditor: false })
+    const chip = wrapper.get('[data-testid="slide-group-setup-chip-display"]')
+    expect(chip.element.tagName).toBe('SPAN')
+    expect(chip.text()).toContain('Full-screen')
+    await chip.trigger('click')
     expect(wrapper.find('[data-testid="slot-video-output-row"]').exists()).toBe(false)
   })
 
-  it('is HIDDEN on a locked service (UAT 2026-09-08 — matches +Add music/background, not shown read-only)', () => {
+  it('the Display chip is an inert span on a locked service (UAT 2026-09-08 — matches Background/Audio, shown inert rather than hidden)', async () => {
     const wrapper = mountGrid({ selectedSlot: makeSlot({ kind: 'SONG', id: 's', position: 0 } as never), isEditor: true, serviceLocked: true })
+    const chip = wrapper.get('[data-testid="slide-group-setup-chip-display"]')
+    expect(chip.element.tagName).toBe('SPAN')
+    await chip.trigger('click')
     expect(wrapper.find('[data-testid="slot-video-output-row"]').exists()).toBe(false)
+  })
+
+  it('shows "Banner" on the chip when slot.videoOutput.mode is banner', () => {
+    const slot = makeSlot({ kind: 'SONG', id: 's', position: 0, videoOutput: { mode: 'banner' } } as never)
+    const wrapper = mountGrid({ selectedSlot: slot, isEditor: true })
+    expect(wrapper.get('[data-testid="slide-group-setup-chip-display"]').text()).toContain('Banner')
   })
 
   it('choosing Banner emits video-output-change with the slot array index and { mode: "banner" }', async () => {
     const wrapper = mountGrid({ selectedSlot: makeSlot({ kind: 'SONG', id: 's', position: 0 } as never), slotArrayIndex: 3 })
+    await openChip(wrapper, 'display')
     await wrapper.get('[data-testid="slot-video-output-banner-btn"]').trigger('click')
     const emitted = wrapper.emitted('video-output-change')!
     expect(emitted[0]).toEqual([3, { mode: 'banner' }])

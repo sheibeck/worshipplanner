@@ -69,197 +69,64 @@
         @cancel="showImportModal = false"
       />
 
-      <!-- Group media panel (34-11, 34-UAT F2; owner follow-up x2) — music and
-           background merged into ONE VISUAL panel, not just one structural
-           wrapper. 34-11 merged the two controls under one
-           `data-testid="slide-grid-group-media-panel"` element and moved the
-           border/background chrome up to this wrapper via the `flush` prop,
-           but the wrapper still carried `divide-y divide-gray-800` PLUS each
-           control still sat in its own `px-3 py-2` child div — the divider
-           line and the two separate padded blocks together still read as two
-           stacked panels on screen. Per direct owner feedback on the running
-           app ("get rid of the extra panel ... instead the background button
-           should go in the same panel as the add music button") the divider
-           and the per-control padding are removed: padding lives ONCE on the
-           panel itself, `gap-3` keeps the two controls from colliding
-           without drawing a seam between them. Deliberately still confined to
-           wrapper/prop plumbing: no new component, no relocation out of this
-           file, no restyle of either control's internals.
-
-           Owner follow-up #3 (direct feedback on the running app, third pass
-           on this same panel): "I want add music for group and add
-           background for group to be next to each other, not on top of each
-           other." The panel became a wrapping row (`flex-wrap`) instead of
-           `flex-col`.
-
-           Owner follow-up #4 (fourth pass, pasted DOM again): "now you have
-           them in their own <div> containers. Let's use flex, and don't
-           containerize each button. Move the label for 'applies to all
-           slides, ...' so that it shows below the buttons." Two distinct
-           corrections:
-
-           (a) Follow-up #3's `min-w-[14rem] flex-1` on each child turned the
-               two buttons into two half-width COLUMNS — a grow factor makes
-               each child claim an equal share of the row whether or not its
-               content needs it, which reads as a container per button. The
-               children now carry no grow factor and no width floor at all,
-               so each flex item sizes to its own button and the two sit
-               adjacent. `min-w-0 max-w-full` is retained deliberately and is
-               NOT layout-shaping: it exists only so an attached state with a
-               long filename is capped at the panel width and lets the
-               control's own inner `truncate` engage, instead of running off
-               the right edge. Without a grow factor there is no `flex-wrap`
-               crush risk, so no width floor is needed to force wrapping.
-
-           (b) The group caption was rendered INSIDE `BackgroundControl`,
-               stacked above only that control's button — which is precisely
-               what pushed the two buttons out of alignment with each other.
-               It moves out here via the control's `hide-caption` prop and
-               renders as a `basis-full` flex item, i.e. its own full-width
-               line BELOW both buttons. `groupBackgroundCaption` stays the
-               single source of that copy — it is still passed to the control
-               as `caption` (the prop remains part of the component's
-               contract and the song-level call site still renders it), it is
-               simply painted here instead.
-
-           `items-start` is retained because either control can grow a
-           filename/progress/error row once attached, and they would
-           otherwise center against each other's differing heights.
-
-           ★ 31-UI-SPEC E5 still applies at the PANEL level, not just to each
-           control inside it: two controls that each correctly decline to
-           render an empty box on their own would together produce an empty
-           PANEL if the panel's own wrapper were left ungated — so the panel
-           carries the disjunction of both controls' conditions one level up.
-           Each control's own gate (`showGroupMusicControl` /
-           `showGroupBackgroundControl`) now lives directly on the control
-           (or, for background, on the minimal testid wrapper below) rather
-           than on a padded child div — there is no padded child div left. -->
+      <!-- 142 — 7a chip row (Display · Background · Audio); per-kind actions
+           trail in #trailing. Gate is Boolean(selectedSlot): Display always
+           renders a chip, so the panel is never empty. See
+           ARCHITECTURE.md § SlideGrid.vue. -->
       <div
-        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl || showRemoveImportedControl || canLoopSlot || showVideoOutputControl"
-        class="mx-6 mt-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
+        v-if="Boolean(selectedSlot)"
+        class="mx-6 mt-3 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
         data-testid="slide-grid-group-media-panel"
       >
-        <!-- Per-item Loop (MISC/ANNOUNCEMENTS only) — relocated here from the
-             Service Order tab (owner 2026-09-01), sitting with the group's
-             "+ Add music" / "+ Add background" item controls. Never for Song. -->
-        <SlotLoopControl
-          v-if="canLoopSlot"
-          :slot="selectedSlot!"
-          :editable="true"
-          @change="(loop) => emit('loop-change', slotArrayIndex, loop)"
-        />
-
-        <!-- Per-item Video-output Banner/Full-screen choice (R425, Phase 137) —
-             unlike Loop, offered for EVERY slot kind (no isLoopableSlot-style
-             gate; 137-UI-SPEC.md Surface 1 scope decision). HIDDEN on a locked
-             service (UAT 2026-09-08 — matches the +Add music / +Add background
-             controls, which hide when locked rather than showing read-only). -->
-        <SlotVideoOutputControl
-          v-if="showVideoOutputControl"
-          :slot="selectedSlot!"
-          :editable="true"
-          @change="(videoOutput) => emit('video-output-change', slotArrayIndex, videoOutput)"
-        />
-
-        <!-- Group music bar (25-06, R032). Emit-only control; this component
-             intercepts both events and writes the selected group's bed via
-             the slideGroups store's scoped write (the sole surviving
-             attach/remove surface for group-bed audio; the Service Order
-             tab's equivalent control was removed in Phase 27-04). Gate moved
-             directly onto the component (no wrapper needed — no testid was
-             ever attached to its old child div). -->
-        <SlideGroupMusicControl
-          v-if="showGroupMusicControl"
-          class="min-w-0 max-w-full"
-          :audio-url="group?.bedAudioUrl"
+        <SlideGroupSetupStrip
+          :selected-slot="selectedSlot!"
+          :group="group"
+          :editable="canWriteGroupMedia"
           :slide-count="cards.length"
           :org-id="orgId"
-          :is-editor="canWriteGroupMedia"
-          :bed-vamp-id="group?.bedVampId"
-          :bed-vamp-label="group?.bedVampLabel"
+          :inherited-background="songBackgroundForInheritedDisplay"
+          :recent-backgrounds="recentBackgrounds"
           :vamps="vampStore.vamps"
           :vamps-loading="vampStore.isLoading"
-          flush
-          @attach="onAttachGroupMusic"
-          @remove="onRemoveGroupMusic"
+          @attach-music="onAttachGroupMusic"
+          @remove-music="onRemoveGroupMusic"
           @attach-vamp="onAttachGroupVamp"
-        />
-
-        <!-- Group background control (R055, 33-08), same "don't render an
-             empty box" gate for the same recorded reason (31-UI-SPEC E5).
-             Background is group MEDIA exactly like the bed audio above it,
-             so it uses the SAME `canWriteGroupMedia` gate — never
-             `canMutateGroup` — including that gate's deliberate song-group
-             carve-out.
-
-             This wrapper div is intentionally NOT deleted along with the
-             padding: `data-testid="slide-grid-group-background"` used to
-             live on the (now-removed) `px-3 py-2` child div, and existing
-             assertions depend on it. `BackgroundControl`'s own root already
-             carries `data-testid="background-control"`, so the testid can't
-             move onto the component without a collision. This div carries
-             ONLY the testid and the `v-if` gate — no padding, no border, no
-             background — so it adds no visual chrome of its own. -->
-        <div
-          v-if="showGroupBackgroundControl"
-          class="min-w-0 max-w-full"
-          data-testid="slide-grid-group-background"
+          @attach-background="onAttachGroupBackground"
+          @remove-background="onRemoveGroupBackground"
+          @video-output-change="(videoOutput) => emit('video-output-change', slotArrayIndex, videoOutput)"
         >
-          <BackgroundControl
-            :image-url="group?.backgroundImageUrl"
-            :caption="groupBackgroundCaption"
-            :inherited-from="songBackgroundForInheritedDisplay"
-            :is-editor="canWriteGroupMedia"
-            :org-id="orgId"
-            add-label="+ Add background for this group"
-            remove-label="Remove group background"
-            flush
-            hide-caption
-            @attach="onAttachGroupBackground"
-            @remove="onRemoveGroupBackground"
-          />
-        </div>
+          <template #trailing>
+            <!-- Per-item Loop (MISC/ANNOUNCEMENTS only) — never for Song. -->
+            <SlotLoopControl
+              v-if="canLoopSlot"
+              :slot="selectedSlot!"
+              :editable="true"
+              @change="(loop) => emit('loop-change', slotArrayIndex, loop)"
+            />
 
-        <!-- Congregational-reading action (owner request) — a discoverable
-             button beside "+ Add background for this group" that opens the same
-             editor the slide 3-dot menu's `edit-in-scripture` does. Scripture
-             groups only. Label reflects whether a reading already exists. -->
-        <button
-          v-if="showCongregationalControl"
-          type="button"
-          data-testid="slide-grid-congregational-btn"
-          @click="emit('edit-congregational')"
-          class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
-        >
-          {{ congregationalButtonLabel }}
-        </button>
+            <!-- Congregational-reading action (owner request) — opens the
+                 same editor the slide 3-dot menu's `edit-in-scripture` does.
+                 Scripture groups only. -->
+            <button
+              v-if="showCongregationalControl"
+              type="button"
+              data-testid="slide-grid-congregational-btn"
+              @click="emit('edit-congregational')"
+              class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
+            >
+              {{ congregationalButtonLabel }}
+            </button>
 
-        <!-- R106 (Phase 50) — per-group bulk removal of imported-deck
-             entries, styled to match the congregational button beside it.
-             Offered only when the group has at least one imported entry
-             (`hasImportedEntries`) AND the caller can mutate the group's
-             slides (`canMutateGroup`) — same gate `handler` re-checks. -->
-        <button
-          v-if="showRemoveImportedControl"
-          type="button"
-          data-testid="slide-grid-remove-imported-btn"
-          @click="onRemoveImportedSlides"
-          class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
-        >Remove imported slides</button>
-
-        <!-- The group caption, relocated out of `BackgroundControl` (owner
-             follow-up #4 (b) above). `basis-full` makes it take a whole flex
-             line of its own, so it sits BELOW both add-buttons rather than
-             above one of them. Suppressed while `songBackgroundForInheritedDisplay`
-             is set, because in that case the control renders the "inherited
-             from the song" provenance line in the caption's place — showing
-             both would state two different things about the same background. -->
-        <p
-          v-if="showGroupBackgroundControl && !songBackgroundForInheritedDisplay"
-          class="basis-full text-[11px] text-gray-500"
-          data-testid="slide-grid-group-background-caption"
-        >{{ groupBackgroundCaption }}</p>
+            <!-- R106 (Phase 50) — per-group bulk removal of imported-deck entries. -->
+            <button
+              v-if="showRemoveImportedControl"
+              type="button"
+              data-testid="slide-grid-remove-imported-btn"
+              @click="onRemoveImportedSlides"
+              class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
+            >Remove imported slides</button>
+          </template>
+        </SlideGroupSetupStrip>
       </div>
 
       <div
@@ -394,11 +261,9 @@ import { cssVarsFor } from '@/utils/slideTypography'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
-import SlideGroupMusicControl from './SlideGroupMusicControl.vue'
-import BackgroundControl from './BackgroundControl.vue'
 import SlideDropTarget from './SlideDropTarget.vue'
 import SlotLoopControl from './SlotLoopControl.vue'
-import SlotVideoOutputControl from './SlotVideoOutputControl.vue'
+import SlideGroupSetupStrip from './SlideGroupSetupStrip.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import { resolveDrop, UNSUPPORTED_FILE_MESSAGE } from './dropRouting'
 import {
@@ -439,7 +304,12 @@ const props = withDefaults(defineProps<{
   serviceId: string
   /** On-demand group materializer (25-05 Task 1) — resolved before every append so a plan item with no group yet can still receive a slide (R032). */
   ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
-}>(), { serviceLocked: false })
+  /**
+   * 142 — recents for the Background popover; derived in SlidesTab from
+   * already-loaded groups, no read here.
+   */
+  recentBackgrounds?: { url: string; label: string }[]
+}>(), { serviceLocked: false, recentBackgrounds: () => [] })
 
 const emit = defineEmits<{
   select: [slideId: string]
@@ -538,11 +408,6 @@ const isSongGroup = computed(() => props.selectedSlot?.kind === 'SONG')
 // (owner 2026-09-01). Editor-only + draft-locked like every other write here.
 const isLoopableSlot = computed(() => props.selectedSlot?.kind === 'MISC' || props.selectedSlot?.kind === 'ANNOUNCEMENTS')
 const canLoopSlot = computed(() => isLoopableSlot.value && props.isEditor && !props.serviceLocked)
-// Video-output Banner/Full-screen (R425) is offered for EVERY slot kind
-// (no isLoopableSlot-style gate) — editor-only, and HIDDEN on a locked service
-// (UAT 2026-09-08), matching +Add music / +Add background (`canWriteGroupMedia`)
-// and Loop (`canLoopSlot`) rather than showing a read-only control.
-const showVideoOutputControl = computed(() => Boolean(props.selectedSlot) && props.isEditor && !props.serviceLocked)
 
 /**
  * The SONG group's own song id, read straight off the selected slot (a
@@ -578,18 +443,6 @@ const songEditLabel = computed<string>(() => {
  */
 const canMutateGroup = computed(() => props.isEditor && !props.serviceLocked && !isSongGroup.value)
 const canWriteGroupMedia = computed(() => props.isEditor && !props.serviceLocked)
-
-/**
- * 34-11 (34-UAT F2): each control's own wrapper-visibility condition, copied
- * VERBATIM from the two sibling wrapper `v-if`s the merged group-media panel
- * (below) replaces. The media-present half is not simplified away to
- * `canWriteGroupMedia` alone — it is what keeps a locked service showing
- * what it already has (31-UI-SPEC E5), independent of write permission.
- */
-const showGroupMusicControl = computed(() => Boolean(props.group?.bedAudioUrl) || canWriteGroupMedia.value)
-const showGroupBackgroundControl = computed(
-  () => Boolean(props.group?.backgroundImageUrl) || canWriteGroupMedia.value,
-)
 
 /**
  * Congregational-reading group action (owner request): a discoverable button
@@ -692,11 +545,13 @@ async function onAttachGroupMusic(url: string): Promise<void> {
 }
 
 // 260918-nm2 — group-level vamp bed assign; label literal matches EditSlideDrawer.attachVampToSlide.
+// 142 — a vamp with no MP3 is allowed at the group level: the patch omits
+// bedAudioUrl entirely rather than early-returning, so the store's third
+// branch (setGroupBedMedia) deleteField()s any stale URL.
 async function onAttachGroupVamp(vamp: Vamp): Promise<void> {
   if (!canWriteGroupMedia.value) return
   if (!props.selectedSlot) return
   const downloadUrl = vamp.attachment?.downloadUrl
-  if (!downloadUrl) return
   const label = `${vamp.name} · ${vamp.key}`
   if (
     props.group?.bedVampId === vamp.id &&
@@ -708,9 +563,9 @@ async function onAttachGroupVamp(vamp: Vamp): Promise<void> {
   try {
     await slideGroupsStore.setGroupBedMedia(props.orgId, props.selectedSlot.id, {
       serviceId: props.serviceId,
-      bedAudioUrl: downloadUrl,
       bedVampId: vamp.id,
       bedVampLabel: label,
+      ...(downloadUrl ? { bedAudioUrl: downloadUrl } : {}),
     })
   } catch (err) {
     console.error('Failed to attach group vamp:', err)
@@ -735,15 +590,6 @@ async function onRemoveGroupMusic(): Promise<void> {
 }
 
 // See ADR-0116 (docs/adr/0116-no-on-demand-materialization-step-is-needed-here-unlike-ever.md)
-
-/**
- * `applies to all {N} slides in this group, unless a slide sets its own` —
- * the Copywriting Contract's group-background caption, with the real card
- * count substituted (R055).
- */
-const groupBackgroundCaption = computed(
-  () => `applies to all ${cards.value.length} slides in this group, unless a slide sets its own`,
-)
 
 /**
  * Populated ONLY for a SONG group whose own background is empty while the
