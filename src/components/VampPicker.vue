@@ -46,7 +46,7 @@
     <ul v-else :class="[fill ? 'flex-1 min-h-0' : 'max-h-56', 'overflow-y-auto space-y-1']" data-testid="vamp-picker-list">
       <li v-for="vamp in filtered" :key="vamp.id">
         <button
-          v-if="vamp.attachment?.downloadUrl"
+          v-if="vamp.attachment?.downloadUrl || allowUnattached"
           type="button"
           data-testid="vamp-picker-row"
           :data-vamp-id="vamp.id"
@@ -75,7 +75,27 @@
             class="font-mono text-xs px-2 py-0.5 rounded-full bg-gray-900 border border-gray-700 text-gray-300 shrink-0"
             >{{ vamp.key }}</span
           >
-          <span class="font-mono text-xs text-gray-500 shrink-0">{{ vamp.tempo || '—' }}</span>
+          <template v-if="vamp.attachment?.downloadUrl">
+            <span class="font-mono text-xs text-gray-500 shrink-0">{{ vamp.tempo || '—' }}</span>
+          </template>
+          <span v-else class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-400 shrink-0">
+            <svg
+              class="h-3.5 w-3.5"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+              />
+            </svg>
+            No MP3
+          </span>
         </button>
         <div
           v-else
@@ -127,6 +147,8 @@ const props = defineProps<{
   selectedVampId?: string | null
   /** 260918-pms — fill the host (slide-over body) instead of rendering as a capped inline card. */
   fill?: boolean
+  /** 142 — group slot may hold a vamp with no MP3; per-slide drawer keeps rows disabled */
+  allowUnattached?: boolean
 }>()
 
 const emit = defineEmits<{ select: [vamp: Vamp]; cancel: [] }>()

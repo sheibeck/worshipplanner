@@ -143,4 +143,36 @@ describe('VampPicker', () => {
     expect(unselectedRow.classes()).not.toContain('bg-indigo-950/40')
     expect(unselectedRow.find('svg').exists()).toBe(false)
   })
+
+  // 142 — allowUnattached lets the group slot's Audio popover pick a no-MP3 vamp inline.
+  it('allowUnattached: true renders all rows enabled, including a no-MP3 vamp', () => {
+    const vamps = [
+      makeVamp({ id: 'v-waiting', name: 'Waiting', key: 'D' }),
+      makeVamp({ id: 'v-no-file', name: 'No File', key: 'A', attachment: null }),
+      makeVamp({ id: 'v-open', name: 'Open Response', key: 'G' }),
+    ]
+    const wrapper = mount(VampPicker, { props: { vamps, allowUnattached: true } })
+    expect(wrapper.findAll('[data-testid="vamp-picker-row"]')).toHaveLength(3)
+    expect(wrapper.findAll('[data-testid="vamp-picker-row-disabled"]')).toHaveLength(0)
+  })
+
+  it('allowUnattached: true — the no-MP3 row shows the amber No MP3 tag (not tempo) and emits select on click', async () => {
+    const noMp3 = makeVamp({ id: 'v-no-file', name: 'No File', key: 'A', attachment: null })
+    const wrapper = mount(VampPicker, { props: { vamps: [noMp3], allowUnattached: true } })
+    const row = wrapper.get('[data-testid="vamp-picker-row"]')
+    expect(row.text()).toContain('No MP3')
+    expect(row.get('.text-amber-400').text()).toContain('No MP3')
+    await row.trigger('click')
+    expect(wrapper.emitted('select')).toHaveLength(1)
+    expect(wrapper.emitted('select')?.[0]).toEqual([noMp3])
+  })
+
+  it('allowUnattached: true — selectedVampId on the no-MP3 row keeps the selected classes/checkmark and the No MP3 tag', () => {
+    const noMp3 = makeVamp({ id: 'v-no-file', name: 'No File', key: 'A', attachment: null })
+    const wrapper = mount(VampPicker, { props: { vamps: [noMp3], allowUnattached: true, selectedVampId: 'v-no-file' } })
+    const row = wrapper.get('[data-testid="vamp-picker-row"]')
+    expect(row.classes()).toContain('bg-indigo-950/40')
+    expect(row.find('svg').exists()).toBe(true)
+    expect(row.text()).toContain('No MP3')
+  })
 })
