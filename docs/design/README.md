@@ -5,9 +5,17 @@
 Verbatim export of `Slides Tab.dc.html` from the Claude Design project
 **"Worship Planner Slideshow Design"** (`e8e6c287-3e88-402f-88e1-7ad6d5101fa2`).
 
-**RE-PULLED 2026-08-03 via the `DesignSync` tool** (`get_project` → `list_files` →
-`get_file`). It had grown 49 KB → 93 KB since the 2026-07-25 pull, gaining a whole
-new turn. **This is how to re-pull it** — no manual export needed:
+**RE-PULLED 2026-09-19 via the `DesignSync` tool** (`list_files` → `get_file`) for
+Phase 142. It had grown 93 KB → 204 KB since the 2026-08-03 pull, gaining Turns 4–7
+(Turn 3's Service Order screen was superseded by Turn 4, "Service Order, tightened").
+**Turns 6 and 7 — the group options panel (Display / Background / Audio) — are the
+Phase 142 source; the owner chose variant `7a` (three chips, each its own popover).**
+The project now also holds sibling screens (`Vamps.dc.html`, `Rehearsal.dc.html`,
+`Run Service.dc.html`, `Stage Layout.dc.html`, `Playlists.dc.html`, `Song Files.dc.html`,
+`Volunteer Home.dc.html`) that are NOT vendored here.
+
+Previously re-pulled 2026-08-03 (49 KB → 93 KB, gaining Turn 3). **This is how to
+re-pull it** — no manual export needed:
 
 ```
 DesignSync get_file  projectId=e8e6c287-3e88-402f-88e1-7ad6d5101fa2  path="Slides Tab.dc.html"
