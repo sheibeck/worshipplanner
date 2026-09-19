@@ -5,15 +5,15 @@ milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141 — all execu
 current_phase: 142
 current_phase_name: Slides Tab panel UX from Claude Design
 status: executing
-stopped_at: Completed 142-01-PLAN.md
-last_updated: "2026-09-19T05:37:08.180Z"
+stopped_at: Completed 142-02-PLAN.md
+last_updated: "2026-09-19T05:53:06.977Z"
 last_activity: 2026-09-19
 last_activity_desc: Phase 142 execution started
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 15
-  completed_plans: 12
+  completed_plans: 13
   percent: 80
 ---
 
@@ -1429,7 +1429,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 142 (Slides Tab panel UX from Claude Design) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-09-19 — Phase 142 execution started
 
@@ -3741,6 +3741,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 141 P03 | ~50min | 2 tasks | 6 files |
 | Phase 141 P04 | 25min | 2 tasks | 4 files |
 | Phase 142 P01 | 15min | 3 tasks | 8 files |
+| Phase 142 P02 | 16min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -4367,6 +4368,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: deleteVamp treats a failed scan identically to a proven assignment (keepAttachment = scan === null || scan.assignedAnywhere) — fail-safe toward not silently breaking a slide's audio
 - [Phase ?]: setGroupBedMedia: no-MP3 vamp branch keyed on bedVampId presence, deleteField()s bedAudioUrl explicitly to prevent stale playback
 - [Phase ?]: BackgroundControl variant prop split keeps panel (SongLyricEditor.vue) byte-identical while adding chip-popover for the group strip
+- [Phase ?]: isVampBed redefined as !!bedVampId (RESEARCH Finding 5) so a no-MP3 vamp bed drives the Vamp tab instead of being miscategorized as unassigned
+- [Phase ?]: SlideGroupMusicControl's None/Track/Vamp tabs written as three literal buttons instead of a v-for, to satisfy the plan's literal data-testid grep acceptance criteria
 
 ### Roadmap Evolution
 
@@ -4706,8 +4709,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-19T05:37:08.108Z
-Stopped at: Completed 142-01-PLAN.md
+Last session: 2026-09-19T05:53:06.905Z
+Stopped at: Completed 142-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

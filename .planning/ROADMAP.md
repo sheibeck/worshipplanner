@@ -1101,13 +1101,13 @@ Work this will cover when promoted:
 **Goal:** Rework the slide banner / audio / background-image panel UX to match the owner's Claude Design "Slides Tab" mockup. Design source: import project `https://claude.ai/design/p/e8e6c287-3e88-402f-88e1-7ad6d5101fa2?file=Slides+Tab.dc.html` via the `claude_design` MCP (`https://api.anthropic.com/v1/design/mcp`, auth via `/design-login`); focus on `Slides Tab.dc.html` (whole project readable) and read `support.js`, which it imports. Implement `Slides Tab.dc.html` in the app's slide/banner/audio/background panel.
 **Requirements**: none newly mapped — the requirement surface is 142-CONTEXT.md's locked decisions + the approved 142-UI-SPEC.md; plans cite the existing R-IDs this work touches (R032 group music, R055 group background, R425 video output, R437 vamp assignment)
 **Depends on:** Phase 141
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
 **Wave 1**
 
 - [x] 142-01-PLAN.md — Wave 1: `setGroupBedMedia` no-MP3-vamp fix (existing-doc regression test) + `BackgroundControl variant="chip-popover"` (recents · ＋ upload/drop · inherited explainer) + `SlotVideoOutputControl` tiles with dynamic hint copy
-- [ ] 142-02-PLAN.md — Wave 1: `VampPicker allowUnattached` + `AudioPlayer loadedmetadata` + `SlideGroupMusicControl` reworked around a None/Track/Vamp `audioTab` derivation with inline picker and Track row (suite rewritten)
+- [x] 142-02-PLAN.md — Wave 1: `VampPicker allowUnattached` + `AudioPlayer loadedmetadata` + `SlideGroupMusicControl` reworked around a None/Track/Vamp `audioTab` derivation with inline picker and Track row (suite rewritten)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
