@@ -249,7 +249,7 @@
       <!-- STATE B (live): the program/next-up preview split (RunPreviewPair) with
            the Displays panel as a right column beside/under the next-up preview
            (owner fix #4 — relocated from the bottom) and the in-item click-to-jump
-           filmstrip (RunFilmstrip -> postIndex). Blackout is now a single toggle in
+           filmstrip (RunFilmstrip -> postIndex; end cap -> goByItem(1)). Blackout is now a single toggle in
            the RunHeader (owner UAT — the old Black/Clear output panel was removed).
            RunDisplaysPanel now also carries the closed-window RECOVERY (R274) the
            removed top status band used to (owner fix #3). -->
@@ -279,6 +279,7 @@
               :currentIndex="index"
               :nextItemLabel="nextItemLabel"
               @jump="postIndex"
+              @next-item="goByItem(1)"
             />
           </template>
           <template #under-next>
@@ -407,6 +408,7 @@ const {
   nextItemLabel,
   jumpToSlot,
   goBySlide,
+  goByItem,
   postIndex,
   // output state machine + recovery (banners inline; closed-recovery on the panel)
   outputStatus,

@@ -1692,7 +1692,10 @@ each thumb as a scaled non-interactive `SlideCanvas`; the current slide gets the
 Owner UAT: each thumb renders a true mini-slide by laying `SlideCanvas` out at the 1280×720
 reference stage (where fonts are proportionally correct) and scaling the WHOLE stage down to the
 thumb, so text and layout shrink together (same technique as `RunPreviewPair`) — rendering directly
-at the tiny thumb width wrapped every word into a stacked mess.
+at the tiny thumb width wrapped every word into a stacked mess. The R331 end cap is a real `<button>`
+since quick 260919-k9j — enabled while `nextItemLabel` is set (aria-label `Go to next item: {label}`),
+it emits `next-item`, which `RunControlView` wires to `goByItem(1)` (the same call as the `ArrowDown`
+key), and it is `disabled` at end of service.
 
 ### src/components/run/RunHeader.vue
 

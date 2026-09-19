@@ -32,10 +32,16 @@
           </div>
         </button>
         <!-- R331: always-rendered end cap naming the next service item (or end
-             of service), replacing the old static "Next item →" span. -->
-        <div
+             of service), replacing the old static "Next item →" span.
+             260919-k9j — a real button; click emits next-item (parent ->
+             goByItem(1), the ArrowDown path); disabled at end of service. -->
+        <button
+          type="button"
           data-testid="run-filmstrip-endcap"
-          class="flex aspect-video w-48 flex-none flex-col items-center justify-center rounded-md border border-dashed border-gray-700 px-2 text-center text-xs text-gray-400"
+          :disabled="!props.nextItemLabel"
+          :aria-label="props.nextItemLabel ? `Go to next item: ${props.nextItemLabel}` : 'End of service'"
+          class="flex aspect-video w-48 flex-none flex-col items-center justify-center rounded-md border border-dashed border-gray-700 px-2 text-center text-xs text-gray-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 enabled:cursor-pointer enabled:hover:border-indigo-500 enabled:hover:text-gray-200 disabled:cursor-default"
+          @click="onEndcapClick"
         >
           <template v-if="props.nextItemLabel">
             <span>End of item</span>
@@ -44,7 +50,7 @@
           <template v-else>
             <span>End of service</span>
           </template>
-        </div>
+        </button>
       </div>
       <!-- R332: edge fade signalling more content off-screen; decorative only,
            pointer-events-none so it never intercepts thumb clicks. -->
@@ -74,7 +80,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   jump: [index: number]
+  'next-item': []
 }>()
+
+/** Belt-and-braces with `disabled` — early-return when there is no next item. */
+function onEndcapClick() {
+  if (!props.nextItemLabel) return
+  emit('next-item')
+}
 
 /**
  * Zip slides with their parallel array indices once, so the template reads a
