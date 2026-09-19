@@ -958,6 +958,7 @@ Owner feedback 2026-09-18 during the v2.15 prod UAT:
   the default time and a *blank* date (139 design: "default time, blank date"); rehearsals should not exist
   without a date. Keep the org-level default *times* concept, but a rehearsal row is only real once dated
   (decide during discuss: prompt for the date on add, or default it relative to the service date).
+
 - **Default report time is fine as-is** (org default → copied onto the new service).
 - **Move the "Times" block off the top of the service editor.** The `Times` / `+ Add rehearsal` /
   `Report time` cluster currently sits above the tab strip in `ServiceEditorView.vue`; it belongs in its own
@@ -974,6 +975,7 @@ Area: `src/views/ServiceEditorView.vue` (Times block ~lines 300–330 + tab stri
 projections (`buildServiceSnapshot`, `buildRehearseAccess`) if the shape changes.
 
 Plans:
+
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
 ### Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10)
@@ -1093,3 +1095,14 @@ Work this will cover when promoted:
 
 > **Promoted 2026-08-31:** Phase 999.3 (Per-org Bible API toggle with BibleGateway manual fallback) was
 > promoted into the active milestone **v2.6** (requirements R295–R301). See the v2.6 phases below.
+
+### Phase 142: Slides Tab panel UX from Claude Design
+
+**Goal:** Rework the slide banner / audio / background-image panel UX to match the owner's Claude Design "Slides Tab" mockup. Design source: import project `https://claude.ai/design/p/e8e6c287-3e88-402f-88e1-7ad6d5101fa2?file=Slides+Tab.dc.html` via the `claude_design` MCP (`https://api.anthropic.com/v1/design/mcp`, auth via `/design-login`); focus on `Slides Tab.dc.html` (whole project readable) and read `support.js`, which it imports. Implement `Slides Tab.dc.html` in the app's slide/banner/audio/background panel.
+**Requirements**: TBD
+**Depends on:** Phase 141
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 142 to break down)
