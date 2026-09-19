@@ -13,7 +13,7 @@
           role="tab"
           :aria-selected="audioTab === 'none'"
           :disabled="!isEditor"
-          class="flex-1 rounded px-2 py-1.5 text-center text-[11px] transition-colors"
+          class="flex-1 rounded px-2 py-1.5 text-center text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           :class="audioTab === 'none' ? 'bg-indigo-950/60 text-indigo-200' : 'text-gray-400 hover:text-gray-200'"
           data-testid="group-music-audio-tab-none"
           @click="setAudioTab('none')"
@@ -23,7 +23,7 @@
           role="tab"
           :aria-selected="audioTab === 'track'"
           :disabled="!isEditor"
-          class="flex-1 rounded px-2 py-1.5 text-center text-[11px] transition-colors"
+          class="flex-1 rounded px-2 py-1.5 text-center text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           :class="audioTab === 'track' ? 'bg-indigo-950/60 text-indigo-200' : 'text-gray-400 hover:text-gray-200'"
           data-testid="group-music-audio-tab-track"
           @click="setAudioTab('track')"
@@ -33,7 +33,7 @@
           role="tab"
           :aria-selected="audioTab === 'vamp'"
           :disabled="!isEditor"
-          class="flex-1 rounded px-2 py-1.5 text-center text-[11px] transition-colors"
+          class="flex-1 rounded px-2 py-1.5 text-center text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           :class="audioTab === 'vamp' ? 'bg-indigo-950/60 text-indigo-200' : 'text-gray-400 hover:text-gray-200'"
           data-testid="group-music-audio-tab-vamp"
           @click="setAudioTab('vamp')"
@@ -51,7 +51,7 @@
         >
           <button
             type="button"
-            class="text-gray-400 hover:text-indigo-300 transition-colors"
+            class="text-gray-400 hover:text-indigo-300 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             data-testid="group-music-preview"
             aria-label="Preview group music"
             @click="togglePreview"
@@ -60,7 +60,7 @@
           <span v-if="duration" class="shrink-0 text-[10.5px] text-gray-500" data-testid="group-music-track-duration">{{ duration }}</span>
           <label
             v-if="isEditor"
-            class="shrink-0 cursor-pointer text-[10.5px] font-medium text-indigo-400 hover:text-indigo-300"
+            class="shrink-0 cursor-pointer text-[10.5px] font-medium text-indigo-400 hover:text-indigo-300 rounded focus-within:ring-2 focus-within:ring-indigo-500"
             data-testid="group-music-track-replace"
           >
             Replace
@@ -69,7 +69,7 @@
           <button
             v-if="isEditor"
             type="button"
-            class="shrink-0 text-[10.5px] text-gray-500 hover:text-red-400 transition-colors"
+            class="shrink-0 text-[10.5px] text-gray-500 hover:text-red-400 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             data-testid="group-music-track-remove"
             @click="onRemove"
           >Remove</button>

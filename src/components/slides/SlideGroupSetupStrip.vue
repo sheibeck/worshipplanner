@@ -9,7 +9,7 @@
       <button
         v-if="editable"
         type="button"
-        class="inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] transition-colors"
+        class="inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         :class="chip.pillClass"
         aria-haspopup="dialog"
         :aria-expanded="openChip === chip.id"

@@ -11,7 +11,7 @@
         >
           <button
             type="button"
-            class="h-8 w-11 flex-none rounded-md border flex items-center justify-center text-[10px] text-gray-500"
+            class="h-8 w-11 flex-none rounded-md border flex items-center justify-center text-[10px] text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             :class="!imageUrl ? 'border-indigo-600' : 'border-gray-700'"
             data-testid="background-control-swatch-none"
             @click="selectNone"
@@ -20,7 +20,7 @@
             v-for="r in swatches"
             :key="r.url"
             type="button"
-            class="h-8 w-11 flex-none rounded-md border bg-cover bg-center"
+            class="h-8 w-11 flex-none rounded-md border bg-cover bg-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             :class="imageUrl === r.url ? 'border-2 border-indigo-600' : 'border border-gray-700'"
             :style="{ backgroundImage: `url(${r.url})` }"
             :aria-label="r.label"
@@ -29,7 +29,7 @@
             @click="selectRecent(r)"
           ></button>
           <label
-            class="h-8 w-11 flex-none rounded-md border border-dashed flex items-center justify-center text-gray-500 cursor-pointer transition-colors"
+            class="h-8 w-11 flex-none rounded-md border border-dashed flex items-center justify-center text-gray-500 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-indigo-500"
             :class="isDragOver ? 'border-indigo-500 bg-indigo-950/20' : 'border-gray-700 hover:border-indigo-700'"
             data-testid="background-control-swatch-upload"
             aria-label="Upload a background image"
@@ -45,7 +45,7 @@
           </label>
         </div>
         <p v-if="!inheritedFrom" class="text-[10.5px] text-gray-500" data-testid="background-control-chip-caption">
-          Recent in this service &middot; drop a file on ＋
+          Recent in this service · drop a file on ＋
         </p>
         <p v-else class="text-[10.5px] leading-[1.45] text-gray-400" data-testid="background-control-inherited-explainer">
           Managed on the song &mdash; edit it from the song's Lyrics tab.

@@ -37,7 +37,7 @@ function select(next: 'banner' | 'fullscreen') {
         :aria-checked="mode === 'fullscreen'"
         :disabled="!editable"
         data-testid="slot-video-output-fullscreen-btn"
-        class="flex-1 flex flex-col gap-1.5 rounded-md border p-1.5 transition-colors"
+        class="flex-1 flex flex-col gap-1.5 rounded-md border p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         :class="mode === 'fullscreen' ? 'border-indigo-600 bg-indigo-950/30' : 'border-gray-700 bg-gray-900 hover:border-gray-600'"
         @click="select('fullscreen')"
       >
@@ -52,7 +52,7 @@ function select(next: 'banner' | 'fullscreen') {
         :aria-checked="mode === 'banner'"
         :disabled="!editable"
         data-testid="slot-video-output-banner-btn"
-        class="flex-1 flex flex-col gap-1.5 rounded-md border p-1.5 transition-colors"
+        class="flex-1 flex flex-col gap-1.5 rounded-md border p-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         :class="mode === 'banner' ? 'border-indigo-600 bg-indigo-950/30' : 'border-gray-700 bg-gray-900 hover:border-gray-600'"
         @click="select('banner')"
       >
