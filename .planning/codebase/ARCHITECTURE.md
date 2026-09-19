@@ -1899,6 +1899,12 @@ both events and calls the slideGroups store's scoped bed write. A failed upload 
 reactive `error` and emits NOTHING — it can never clear an existing group bed attachment
 (T-25-06-03).
 
+**Phase 142 — one audio slot:** the body is a None/Track/Vamp segmented control; the tab is derived
+from `bedVampId`/`audioUrl` (vamp wins whenever the id is set, so a no-MP3 vamp renders as Vamp +
+amber warning, never as the empty state). `selectedTab` is a transient override that resets when
+either prop changes. Vamp picking is inline (`VampPicker` `fill allow-unattached`); the slide-over is
+no longer used at this call site. `close` asks the hosting popover to close. Still emit-only.
+
 ### src/components/slides/SlidesTab.vue
 
 **`serviceLocked` prop (★ R036):** the lifecycle lock, threaded DISTINCT from `isEditor` rather than

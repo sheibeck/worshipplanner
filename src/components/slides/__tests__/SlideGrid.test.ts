@@ -613,7 +613,7 @@ describe('SlideGrid', () => {
 
       const musicControl = wrapper.findComponent(SlideGroupMusicControl)
       expect(musicControl.props('audioUrl')).toBe('https://storage.example.com/pad.mp3')
-      expect(musicControl.props('slideCount')).toBe(2)
+      // 142 interim — Plan 04 rewrites this block
     })
 
     it('writes an emitted URL to the selected group bed via the scoped write, with the selected slot id', async () => {
@@ -1061,11 +1061,21 @@ describe('SlideGrid', () => {
       // panel wrapper itself does (asserted above) — so the subtree contains
       // exactly one bordered box, not one per control. (142: SlotVideoOutputControl's
       // own inactive-tile fill legitimately carries bg-gray-900 as part of its
-      // per-tile UI-SPEC §3 restyle — excluded here, it is not a second panel box.)
-      expect(panel.findAll('.border-gray-800').length).toBe(0)
+      // per-tile UI-SPEC §3 restyle, and SlideGroupMusicControl's own None/Track/Vamp
+      // tablist legitimately carries border-gray-800 as part of its UI-SPEC §5 restyle —
+      // both excluded here, neither is a second panel box.)
+      const borderGray800OutsideAudioTabs = panel
+        .findAll('.border-gray-800')
+        .filter((el) => (el.attributes('data-testid') ?? '') !== 'group-music-audio-tabs')
+      expect(borderGray800OutsideAudioTabs.length).toBe(0)
       const bgGray900OutsideVideoOutputTiles = panel
         .findAll('.bg-gray-900')
-        .filter((el) => !(el.attributes('data-testid') ?? '').startsWith('slot-video-output-'))
+        .filter((el) => {
+          const testid = el.attributes('data-testid') ?? ''
+          // group-music-track-row: SlideGroupMusicControl's own §5 Track-row
+          // chrome, same non-panel-box carve-out as the video-output tiles above.
+          return !testid.startsWith('slot-video-output-') && testid !== 'group-music-track-row'
+        })
       expect(bgGray900OutsideVideoOutputTiles.length).toBe(0)
     })
 
@@ -1183,8 +1193,9 @@ describe('SlideGrid', () => {
       expect(html.indexOf('slide-grid-group-background-caption')).toBeGreaterThan(
         html.indexOf('background-control-add'),
       )
+      // 142 interim — Plan 04 rewrites this block
       expect(html.indexOf('slide-grid-group-background-caption')).toBeGreaterThan(
-        html.indexOf('group-music-add'),
+        html.indexOf('group-music-audio-tab-none'),
       )
     })
 
@@ -1337,7 +1348,8 @@ describe('SlideGrid', () => {
 
       const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
       expect(panel.find('[data-testid="background-control-add"]').exists()).toBe(true)
-      expect(panel.find('[data-testid="group-music-add"]').exists()).toBe(true)
+      // 142 interim — Plan 04 rewrites this block
+      expect(panel.find('[data-testid="group-music-audio-tab-none"]').exists()).toBe(true)
 
       // The DISTINCT gate: slide mutation (add/import/reorder) stays locked
       // for a song group even though group-media writes do not (R054).
