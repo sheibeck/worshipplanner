@@ -4,17 +4,17 @@ milestone: v2.15
 milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141 — all executed + auto-verified; DEPLOYED to prod 2026-09-18 (hosting + storage rules); OPEN pending batched owner UAT)
 current_phase: 142
 current_phase_name: Slides Tab panel UX from Claude Design
-status: executing
-stopped_at: Completed 142-03-PLAN.md
-last_updated: "2026-09-19T06:10:29.738Z"
+status: verifying
+stopped_at: Completed 142-04-PLAN.md
+last_updated: "2026-09-19T06:43:45.434Z"
 last_activity: 2026-09-19
 last_activity_desc: Phase 142 execution started
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 15
-  completed_plans: 14
-  percent: 80
+  completed_plans: 15
+  percent: 100
 ---
 
 ## Deferred Verification (v2.15 — ACTIVE, batched to milestone end)
@@ -82,7 +82,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1430,7 +1430,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 142 (Slides Tab panel UX from Claude Design) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-19 — Phase 142 execution started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
@@ -3743,6 +3743,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 142 P01 | 15min | 3 tasks | 8 files |
 | Phase 142 P02 | 16min | 3 tasks | 8 files |
 | Phase 142 P03 | 15min | 2 tasks | 3 files |
+| Phase 142 P04 | 31min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -4372,6 +4373,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: isVampBed redefined as !!bedVampId (RESEARCH Finding 5) so a no-MP3 vamp bed drives the Vamp tab instead of being miscategorized as unassigned
 - [Phase ?]: SlideGroupMusicControl's None/Track/Vamp tabs written as three literal buttons instead of a v-for, to satisfy the plan's literal data-testid grep acceptance criteria
 - [Phase ?]: 142-03: focusIntoPopover checks the active aria-selected tab explicitly before falling back to the first enabled control — a combined CSS selector list returns the DOM-first match, not the first-listed selector, which would have wrongly focused the None tab whenever Vamp was active
+- [Phase ?]: 142-04: onAttachGroupVamp's role=dialog test dropped rather than migrated — strip's own popover legitimately carries role=dialog while open
+- [Phase ?]: 142-04: locked/non-editor tests rewritten to assert inert-span chip + no popover, since the child control never mounts at all under the supersede-hide rule
+- [Phase ?]: 142-04: SlidesTab.recentBackgrounds casts updatedAt through {seconds?:number} so plain test fixtures sort safely without a real Timestamp instance
 
 ### Roadmap Evolution
 
@@ -4711,8 +4715,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-19T06:10:29.664Z
-Stopped at: Completed 142-03-PLAN.md
+Last session: 2026-09-19T06:43:45.362Z
+Stopped at: Completed 142-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
