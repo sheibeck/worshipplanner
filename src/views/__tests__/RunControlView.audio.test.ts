@@ -316,20 +316,19 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
     expect(wrapper.find('[data-testid="run-control-audio"]').exists()).toBe(false)
   })
 
-  it('goes live Off, pulses --needed, prompts, and mounts (but does not play) the audio element', async () => {
+  it('go-live (rehearse) starts On and plays with no click', async () => {
     const { wrapper } = mountView()
     await rehearseFake(wrapper)
 
     const toggle = wrapper.find('[data-testid="run-audio-toggle"]')
     expect(toggle.exists()).toBe(true)
-    expect(toggle.text()).toBe('Audio: Off')
-    expect(toggle.attributes('aria-pressed')).toBe('false')
-    expect(toggle.attributes('aria-label')).toBe('Arm audio playback for this Run session')
-    expect(toggle.classes()).toContain('run-audio-toggle--needed')
+    expect(toggle.text()).toBe('Audio: On')
+    expect(toggle.attributes('aria-pressed')).toBe('true')
+    expect(toggle.attributes('aria-label')).toBe('Audio on — click to turn off')
+    expect(toggle.classes()).toContain('run-audio-toggle--armed')
+    expect(toggle.classes()).not.toContain('run-audio-toggle--needed')
 
-    expect(wrapper.find('[data-testid="run-audio-needed-prompt"]').text()).toBe(
-      'This slide has audio — arm audio to hear it.',
-    )
+    expect(wrapper.find('[data-testid="run-audio-needed-prompt"]').text()).toBe('')
 
     const mount_ = wrapper.find('[data-testid="run-control-audio"]')
     expect(mount_.exists()).toBe(true)
@@ -339,10 +338,11 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
     expect(el.src).toBe('https://cdn.example/open-response.mp3')
     expect(el.loop).toBe(true)
 
-    expect(calls).not.toContain('play')
+    expect(calls).toEqual(['play'])
+    expect(wrapper.find('[data-testid="run-audio-playing"]').exists()).toBe(true)
   })
 
-  it('arming plays immediately and shows the playing dot; no slide change required', async () => {
+  it('one click turns audio Off and pauses', async () => {
     const { wrapper } = mountView()
     await rehearseFake(wrapper)
 
@@ -350,16 +350,19 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
     await vi.advanceTimersByTimeAsync(0)
 
     const toggle = wrapper.find('[data-testid="run-audio-toggle"]')
-    expect(toggle.text()).toContain('Audio: Armed')
-    expect(toggle.attributes('aria-pressed')).toBe('true')
-    expect(toggle.attributes('aria-label')).toBe('Audio armed — click to turn off')
-    expect(toggle.classes()).not.toContain('run-audio-toggle--needed')
-    expect(wrapper.find('[data-testid="run-audio-needed-prompt"]').text()).toBe('')
-    expect(calls).toEqual(['play'])
-    expect(wrapper.find('[data-testid="run-audio-playing"]').exists()).toBe(true)
+    expect(toggle.text()).toBe('Audio: Off')
+    expect(toggle.attributes('aria-pressed')).toBe('false')
+    expect(toggle.attributes('aria-label')).toBe('Turn audio on for this Run session')
+    expect(toggle.classes()).toContain('run-audio-toggle--needed')
+    expect(toggle.classes()).not.toContain('run-audio-toggle--armed')
+    expect(wrapper.find('[data-testid="run-audio-needed-prompt"]').text()).toBe(
+      'This slide has audio — turn audio on to hear it.',
+    )
+    expect(calls).toEqual(['play', 'pause'])
+    expect(wrapper.find('[data-testid="run-audio-playing"]').exists()).toBe(false)
   })
 
-  it('a second click disarms and pauses', async () => {
+  it('a second click turns it back On and replays', async () => {
     const { wrapper } = mountView()
     await rehearseFake(wrapper)
     await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
@@ -368,16 +371,14 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
     await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(wrapper.find('[data-testid="run-audio-toggle"]').text()).toBe('Audio: Off')
-    expect(calls).toContain('pause')
-    expect(wrapper.find('[data-testid="run-audio-playing"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="run-audio-toggle"]').text()).toBe('Audio: On')
+    expect(calls).toEqual(['play', 'pause', 'play'])
+    expect(wrapper.find('[data-testid="run-audio-playing"]').exists()).toBe(true)
   })
 
   it('a hello resend for the same slide does not restart playback or remount', async () => {
     const { wrapper, fake } = mountView()
     await rehearseFake(wrapper)
-    await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
-    await vi.advanceTimersByTimeAsync(0)
     const before = wrapper.find('audio').element
 
     fake.deliver({ type: 'hello' })
@@ -392,8 +393,6 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
   it('advancing to a slide with no audio pauses and unmounts the element, with no extra play', async () => {
     const { wrapper } = mountView()
     await rehearseFake(wrapper)
-    await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
-    await vi.advanceTimersByTimeAsync(0)
 
     keydown('ArrowRight')
     await vi.advanceTimersByTimeAsync(0)
@@ -406,8 +405,6 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
   it('advancing to a slide with new audio pauses-before-playing (single element); the SAME url reuses the SAME element', async () => {
     const { wrapper } = mountView()
     await rehearseFake(wrapper)
-    await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
-    await vi.advanceTimersByTimeAsync(0)
 
     keydown('ArrowRight') // a -> b (no audio)
     await vi.advanceTimersByTimeAsync(0)
@@ -435,8 +432,6 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
     const { wrapper } = mountView()
     await goLiveFake(wrapper)
 
-    await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
-    await vi.advanceTimersByTimeAsync(0)
     expect(calls).toEqual(['play'])
 
     await wrapper.find('[data-testid="run-blackout-toggle"]').trigger('click')
@@ -455,7 +450,7 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
     expect(calls.filter((c) => c === 'play').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('a rejected play() while armed shows the blocked banner; the retry replays and clears it', async () => {
+  it('a rejected play() at go-live shows the blocked banner (toggle still On); the retry replays and clears it', async () => {
     window.HTMLMediaElement.prototype.play = vi.fn().mockImplementation(() => {
       calls.push('play-rejected')
       return Promise.reject(new DOMException('blocked', 'NotAllowedError'))
@@ -463,12 +458,15 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
     const { wrapper } = mountView()
     await rehearseFake(wrapper)
 
-    await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
-    await vi.advanceTimersByTimeAsync(0)
+    const toggle = wrapper.find('[data-testid="run-audio-toggle"]')
+    expect(toggle.text()).toBe('Audio: On')
+    expect(toggle.attributes('aria-pressed')).toBe('true')
 
     const banner = wrapper.find('[data-testid="run-audio-blocked-banner"]')
     expect(banner.exists()).toBe(true)
     expect(banner.text()).toContain('Audio blocked — click to play')
+    expect(wrapper.find('[data-testid="run-audio-playing"]').exists()).toBe(false)
+    expect(calls).toEqual(['play-rejected'])
     const retry = wrapper.find('[data-testid="run-audio-blocked-retry"]')
     expect(retry.exists()).toBe(true)
     expect(retry.text()).toBe('Play audio')
@@ -488,8 +486,6 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
   it('a media error shows the unavailable indicator; advancing to another audio slide clears it', async () => {
     const { wrapper } = mountView()
     await rehearseFake(wrapper)
-    await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
-    await vi.advanceTimersByTimeAsync(0)
 
     await wrapper.find('[data-testid="run-control-audio"] audio').trigger('error')
     await vi.advanceTimersByTimeAsync(0)
@@ -505,29 +501,28 @@ describe('RunControlView — control-window audio (R438/R439, Phase 141)', () =>
     expect(wrapper.find('[data-testid="run-audio-unavailable"]').exists()).toBe(false)
   })
 
-  it('exiting a rehearsal pauses and resets arm state to Off for the NEXT rehearsal', async () => {
+  it('exit + next session starts On again (a manual Off is not remembered)', async () => {
     const { wrapper } = mountView()
     await rehearseFake(wrapper)
     await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
     await vi.advanceTimersByTimeAsync(0)
-    expect(calls).toEqual(['play'])
+    expect(wrapper.find('[data-testid="run-audio-toggle"]').text()).toBe('Audio: Off')
 
     await wrapper.find('[data-testid="run-exit-btn"]').trigger('click')
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(calls).toContain('pause')
     expect(wrapper.find('[data-testid="run-audio-toggle"]').exists()).toBe(false)
+    expect(calls).toContain('pause')
 
     await rehearseFake(wrapper)
-    expect(wrapper.find('[data-testid="run-audio-toggle"]').text()).toBe('Audio: Off')
+    expect(wrapper.find('[data-testid="run-audio-toggle"]').text()).toBe('Audio: On')
+    expect(calls.filter((c) => c === 'play')).toHaveLength(2)
+    expect(wrapper.find('[data-testid="run-audio-playing"]').exists()).toBe(true)
   })
 
   it('never more than one <audio> element exists in the control window at once', async () => {
     const { wrapper } = mountView()
     await rehearseFake(wrapper)
-    expect(wrapper.findAll('audio').length).toBeLessThanOrEqual(1)
-    await wrapper.find('[data-testid="run-audio-toggle"]').trigger('click')
-    await vi.advanceTimersByTimeAsync(0)
     expect(wrapper.findAll('audio').length).toBeLessThanOrEqual(1)
     keydown('ArrowRight')
     await vi.advanceTimersByTimeAsync(0)
