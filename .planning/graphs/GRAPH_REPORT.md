@@ -1,16 +1,16 @@
 # Graph Report - worshipplanner  (2026-09-19)
 
 ## Corpus Check
-- 2850 files · ~6,557,427 words
+- 2854 files · ~6,573,381 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 35421 nodes · 34668 edges · 3003 communities (2705 shown, 298 thin omitted)
+- 35465 nodes · 34711 edges · 3008 communities (2710 shown, 298 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 82 edges (avg confidence: 0.61)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `51f72995`
+- Built from commit: `826d09d7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -2897,18 +2897,23 @@
 - [[_COMMUNITY_Phase 142 Code Review Report|Phase 142: Code Review Report]]
 - [[_COMMUNITY_142-SECURITY|142-SECURITY.md]]
 - [[_COMMUNITY_onDuplicate|onDuplicate]]
+- [[_COMMUNITY_Requirements WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback|Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback]]
+- [[_COMMUNITY_Requirements WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback|Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback]]
+- [[_COMMUNITY_onDuplicate|onDuplicate]]
+- [[_COMMUNITY_song.ts|song.ts]]
+- [[_COMMUNITY_260919-mvw-PLAN|260919-mvw-PLAN.md]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Communities (3002 total, 298 thin omitted)` - 2584 edges
+1. `Communities (3008 total, 298 thin omitted)` - 2590 edges
 2. `Bucket B — Behavioral/Architectural` - 117 edges
 3. `Bucket A — Decision-Rationale` - 95 edges
 4. `Project State` - 56 edges
 5. `Pending Human Verification — carried forward into the next milestone` - 48 edges
 6. `Pending Human Verification — v1.4` - 38 edges
 7. `Component & Composable Behavioral Notes (R318)` - 37 edges
-8. `v1.8 Cost & Billing Hardening (Phases 65-67) — SHIPPED 2026-08-20` - 29 edges
-9. `Utils Behavioral Notes (R318)` - 29 edges
-10. `getAppConfig()` - 26 edges
+8. `Utils Behavioral Notes (R318)` - 29 edges
+9. `getAppConfig()` - 26 edges
+10. `v1.8 Cost & Billing Hardening (Phases 65-67) — SHIPPED 2026-08-20` - 26 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `backfillOrgMembershipClaims()` --indirect_call--> `memberships()`  [INFERRED]
@@ -2925,11 +2930,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (3003 total, 298 thin omitted)
+## Communities (3008 total, 298 thin omitted)
 
 ### Community 0 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.00
-Nodes (2584): Communities (3002 total, 298 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2576 more)
+Nodes (2590): Communities (3008 total, 298 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2582 more)
 
 ### Community 1 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.02
@@ -3041,8 +3046,8 @@ Cohesion: 0.04
 Nodes (46): Alternatives Considered, Anti-Patterns to Avoid, Architecture Patterns, Claude's Discretion, Code Examples, Common Pitfalls, Core, Deferred Ideas (OUT OF SCOPE) (+38 more)
 
 ### Community 24 - "Phase 10: Export Naming, Template Replace, PC Teams, Orchestra Filter — Research"
-Cohesion: 0.08
-Nodes (25): Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation, Phase 126: My Schedule — Volunteer Home, Phase 127: Volunteer Service View — Rehearse, Order of Service & Stage Layout (+17 more)
+Cohesion: 0.07
+Nodes (28): Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation, Phase 126: My Schedule — Volunteer Home (+20 more)
 
 ### Community 25 - "Phase 4: Output - Research"
 Cohesion: 0.04
@@ -3109,8 +3114,8 @@ Cohesion: 0.04
 Nodes (46): addSlotAsItem — title modification (SONG and HYMN cases), Anti-Patterns to Avoid, Architectural Responsibility Map, Architecture Patterns, Assumptions Log, Claude's Discretion, Code Examples, Common Pitfalls (+38 more)
 
 ### Community 41 - "service.ts"
-Cohesion: 0.10
-Nodes (23): HymnSlot, ImportedSlot, MediaAttachableSlot, NonAssignableSlot, Progression, ScriptureSlot, Service, SERVICE_SECTION_LABELS (+15 more)
+Cohesion: 0.14
+Nodes (20): ScriptureReading, HymnSlot, ImportedSlot, MediaAttachableSlot, NonAssignableSlot, Progression, ScriptureRef, ScriptureSlot (+12 more)
 
 ### Community 42 - "Phase 16.1: Song list tags & columns customization - Research"
 Cohesion: 0.04
@@ -3297,8 +3302,8 @@ Cohesion: 0.05
 Nodes (37): Component & Composable Behavioral Notes (R318), src/components/actionBarItems.ts, src/components/admin/CleanupEnableConfirmDialog.vue, src/components/admin/DeactivateOrgConfirmDialog.vue, src/components/ContextualActionBar.vue, src/components/MiscLabelBadge.vue, src/components/PptxImportModal.vue, src/components/run/RunFilmstrip.vue (+29 more)
 
 ### Community 88 - "Human Verification Required"
-Cohesion: 0.05
-Nodes (33): Phase 10: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions, Phase 11: Song catalog & service planner improvements, Phase 12: Advanced song search and multi-select persistent tag filtering (picker + Songs panel), Phase 13: Volunteer Role Scheduling, Phase 14: In-App Quarterly Availability Editor, Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules, Phase 16.1: Song list tags & columns customization (INSERTED), Phase 16: Quarterly Schedule share link — matrix view, name filter, cross-screen volunteer editing & UX overhaul (+25 more)
+Cohesion: 0.04
+Nodes (41): Phase 10: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions, Phase 11: Song catalog & service planner improvements, Phase 12: Advanced song search and multi-select persistent tag filtering (picker + Songs panel), Phase 13: Volunteer Role Scheduling, Phase 14: In-App Quarterly Availability Editor, Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules, Phase 16.1: Song list tags & columns customization (INSERTED), Phase 16: Quarterly Schedule share link — matrix view, name filter, cross-screen volunteer editing & UX overhaul (+33 more)
 
 ### Community 89 - "Pattern Assignments"
 Cohesion: 0.06
@@ -3389,8 +3394,8 @@ Cohesion: 0.07
 Nodes (28): Auto-Save Architecture, CCLI Parser, CCLI SongSelect Paste Format (Research Finding), Constraints and Watch-Outs, Data Model: Subcollection vs. Embedded, Don't Hand-Roll, First Proof (Highest Risk / Biggest Unblocker), Full Unit Suite (+20 more)
 
 ### Community 111 - "Progress"
-Cohesion: 0.06
-Nodes (32): Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation, Phase 126: My Schedule — Volunteer Home (+24 more)
+Cohesion: 0.07
+Nodes (29): Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation, Phase 126: My Schedule — Volunteer Home (+21 more)
 
 ### Community 112 - "QuarterShareView.vue"
 Cohesion: 0.07
@@ -3743,8 +3748,8 @@ Cohesion: 0.10
 Nodes (11): ADR-0123, ADR-0124, ADR-0125, handleFullscreenChange(), Host, mockRoute, { serviceStoreMock, fakeSlides }, ADR-0214 (+3 more)
 
 ### Community 197 - "v1 Requirements"
-Cohesion: 0.18
-Nodes (18): ADR-0173, ImportedDeck, ScriptureReading, ScriptureRef, ServiceSection, AssembledSection, AssembledSlide, BlackoutSlide (+10 more)
+Cohesion: 0.22
+Nodes (14): ADR-0173, ImportedDeck, ServiceSection, AssembledSection, AssembledSlide, BlackoutSlide, CopyrightSlide, ImageSlide (+6 more)
 
 ### Community 198 - "Info"
 Cohesion: 0.10
@@ -3919,8 +3924,8 @@ Cohesion: 0.11
 Nodes (18): mockCallable, mockDoc, mockGetDoc, mockRouteParams, churchName, email, genuineError, handleSubmit() (+10 more)
 
 ### Community 241 - "Phase 6 Plan 02: AI Song Suggestions UI Summary"
-Cohesion: 0.14
-Nodes (14): ADR-0205, ADR-0206, ADD_SECTION_KINDS, addSection(), AddSectionKind, buildSectionRows(), deriveSectionKind(), linesAreEquivalent() (+6 more)
+Cohesion: 0.15
+Nodes (13): ADR-0205, ADR-0206, ADD_SECTION_KINDS, addSection(), AddSectionKind, buildSectionRows(), deriveSectionKind(), linesAreEquivalent() (+5 more)
 
 ### Community 242 - "Phase 6 Plan 03: AI Scripture Discovery Summary"
 Cohesion: 0.16
@@ -4007,12 +4012,12 @@ Cohesion: 0.12
 Nodes (11): FieldSaveState, fieldStates, fromAddressLive, fromAddressValid, fromAddressWarning, isUnverifiableHost(), onSaveText(), stateFor() (+3 more)
 
 ### Community 263 - "Phase 16 Plan 11: Remove Deprecated Frequency Fields Summary"
-Cohesion: 0.15
-Nodes (16): AggregateStatus, clearAll(), confirmations, error, myEmailLower, onConfirm(), onDecline(), props (+8 more)
+Cohesion: 0.24
+Nodes (11): AggregateStatus, clearAll(), confirmations, error, myEmailLower, onConfirm(), onDecline(), props (+3 more)
 
 ### Community 264 - "Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary"
-Cohesion: 0.11
-Nodes (11): calls, createFakeChannel(), FakeWin, H, mockRouterPush, mountView(), openedWins, PostedMessage (+3 more)
+Cohesion: 0.12
+Nodes (10): calls, createFakeChannel(), FakeWin, H, mockRouterPush, mountView(), openedWins, PostedMessage (+2 more)
 
 ### Community 265 - "Phase 17: Sync schedule with planned services - Research"
 Cohesion: 0.11
@@ -4403,8 +4408,8 @@ Cohesion: 0.12
 Nodes (16): Claude's Discretion, Deferred Ideas, Established Patterns, Existing Code Insights, Implementation Decisions, Integration Points, Phase 118: Security — Firestore Rules & Public Share Hardening - Context, Phase Boundary (+8 more)
 
 ### Community 362 - "Phase 16 Plan 04: Scheduler Pairing Honors Per-Role Frequency Summary"
-Cohesion: 0.12
-Nodes (17): Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 117: Security — Proxy Authentication, Rate Limits & Quotas, Phase 118: Security — Firestore Rules & Public Share Hardening, Phase 119: Architecture — Correctness, Batching & Store-Ownership Fixes (+9 more)
+Cohesion: 0.05
+Nodes (35): Backlog, Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 117: Security — Proxy Authentication, Rate Limits & Quotas (+27 more)
 
 ### Community 363 - "Phase 16 Plan 06: Roster Frequency Cleanup + Collapsible Sections Summary"
 Cohesion: 0.12
@@ -4523,8 +4528,8 @@ Nodes (12): mockAuthState, {
 }, mockQuarters, mockRoles, mockRosterPeople, mockRoute, mockService, mockServicesList (+4 more)
 
 ### Community 390 - "Phase 14 Plan 01: Frequency Tier Data Contract + Scheduler Two-Pass Fill Summary"
-Cohesion: 0.18
-Nodes (14): ADR-0179, ADR-0180, ADR-0181, ADR-0182, importedEntryContent, importedEntryIdentities(), ImportedRenderMode, ImportedRenderResolution (+6 more)
+Cohesion: 0.19
+Nodes (13): ADR-0179, ADR-0180, ADR-0181, ADR-0182, importedEntryContent, ImportedRenderMode, ImportedRenderResolution, importedSourceSignature() (+5 more)
 
 ### Community 391 - "Phase 14 Plan 02: Selective Planning Center Fetch Summary"
 Cohesion: 0.12
@@ -4939,8 +4944,8 @@ Cohesion: 0.09
 Nodes (3): body(), mockSlideTypography, slideText()
 
 ### Community 494 - "slideshowAssembler.ts"
-Cohesion: 0.11
-Nodes (29): ADR-0198, ADR-0199, ADR-0200, ADR-0201, ADR-0202, resolveImportedRender(), BIBLE_BOOKS, bibleGatewayLink() (+21 more)
+Cohesion: 0.14
+Nodes (26): ADR-0198, ADR-0199, ADR-0200, ADR-0201, ADR-0202, importedEntryIdentities(), resolveImportedRender(), congregationalSectionFromRef() (+18 more)
 
 ### Community 495 - "RosterView.test.ts"
 Cohesion: 0.10
@@ -6723,8 +6728,8 @@ Cohesion: 0.14
 Nodes (13): unsubscribeAllMembersStore, unsubscribeAllPptxRenders, unsubscribeAllQuartersStore, unsubscribeAllRosterStore, unsubscribeAllServiceStore, unsubscribeAllSongStore, unsubscribeAllTeamsStore, unsubscribeAllVampStore (+5 more)
 
 ### Community 941 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles"
-Cohesion: 0.14
-Nodes (11): authStore, firstName, greeting, groups, myEmailLower, mySchedule, nextUpDoc, showPast (+3 more)
+Cohesion: 0.11
+Nodes (15): teardown(), useVolunteerServiceDoc(), VolunteerServiceDocState, authStore, firstName, greeting, groups, myEmailLower (+7 more)
 
 ### Community 942 - "Quick Task 9: Real-time remote update merge in ServiceEditorView"
 Cohesion: 0.15
@@ -7290,6 +7295,7 @@ Nodes (7): dismissedStatus, {
   nextItemLabel,
   jumpToSlot,
   goBySlide,
+  goByItem,
   postIndex,
   // output state machine + recovery (banners inline; closed-recovery on the panel)
   outputStatus,
@@ -8225,8 +8231,8 @@ Cohesion: 0.18
 Nodes (4): emit, errored, loading, props
 
 ### Community 1309 - "13-03-PLAN.md"
-Cohesion: 0.06
-Nodes (27): alignRight, Chip, ChipId, chipRefs, chips, ChipState, close(), closeAndRefocus() (+19 more)
+Cohesion: 0.09
+Nodes (18): alignRight, Chip, ChipId, chipRefs, chips, ChipState, close(), closeAndRefocus() (+10 more)
 
 ### Community 1310 - "13-04-PLAN.md"
 Cohesion: 0.24
@@ -8611,7 +8617,7 @@ Nodes (8): CardState, DisplayItem, emit, props, Row, rows, setupHelpDismissed, s
 
 ### Community 1403 - "15-01-PLAN.md"
 Cohesion: 0.20
-Nodes (4): emit, props, thumbs, thumbStageStyle
+Nodes (5): emit, onEndcapClick(), props, thumbs, thumbStageStyle
 
 ### Community 1404 - "15-02-PLAN.md"
 Cohesion: 0.20
@@ -11930,8 +11936,8 @@ Cohesion: 0.40
 Nodes (3): SnapshotCallback, snapshotCallbacks, unsubscribeSpies
 
 ### Community 2319 - "navSharedStoreTeardownRace.regression.test.ts"
-Cohesion: 0.60
-Nodes (4): driveRoundTrip(), makeView(), orgId, pick()
+Cohesion: 0.38
+Nodes (6): driveRoundTrip(), makeSharedStore(), makeView(), orgId, pick(), data()
 
 ### Community 2320 - "vamp.ts"
 Cohesion: 0.40
@@ -13282,8 +13288,8 @@ Cohesion: 0.50
 Nodes (3): Design (locked by the owner/orchestrator — implement exactly), STRIDE Threat Register, Trust Boundaries
 
 ### Community 2977 - "onDuplicate"
-Cohesion: 0.08
-Nodes (21): Backlog, Milestones, Phase 999.2: Rename app to WorshipBuilder + make worshipbuilder.web.app the primary URL (BACKLOG), Phase 999.3: Monitor Setup — route one signal to multiple monitors; no signal mandatory (✅ COMPLETE), Phase 999.4: v2.8 Architectural Review — Medium/Low findings (ARCH-002..023) (PROMOTED to v2.10), Phase 999.5: v2.8 Security Review — Medium/Low findings (11) (PROMOTED to v2.10), Phases, Roadmap: WorshipPlanner (+13 more)
+Cohesion: 0.12
+Nodes (15): Accomplishments, Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified, Issues Encountered, Metrics, Next Phase Readiness (+7 more)
 
 ### Community 2978 - "260918-pms-PLAN.md"
 Cohesion: 0.50
@@ -13342,16 +13348,16 @@ Cohesion: 0.14
 Nodes (13): Detailed Findings, Files Audited, Orchestrator follow-up — 2026-09-19, Phase 142 — UI Review, Pillar 1: Copywriting (3/4), Pillar 2: Visuals (3/4), Pillar 3: Color (4/4), Pillar 4: Typography (4/4) (+5 more)
 
 ### Community 2994 - "Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING"
-Cohesion: 0.22
-Nodes (8): Cross-phase integration: PASS, Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING, PENDING before ship (NOT done), Phase verifications (all PASSED, code-level), Requirements coverage: 12/12 (code), Security, Test baseline, Verdict
+Cohesion: 0.20
+Nodes (9): Milestone v2.14: Services UX Alignment, Dashboard & Live-Stream Video Output, Phase 131: Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate, Phase 132: Services Page UX Alignment & Verbiage Cleanup, Phase 133: Volunteer Responsibility Confirmation, Phase 134: Editor Presence, Phase 135: Dashboard Overhaul, Phase 136: Video Output — Fullscreen Slice, Phase 137: Video Output — Banner Render (+1 more)
 
 ### Community 2995 - "dropRouting.ts"
 Cohesion: 0.33
 Nodes (5): IN-01: `SlidesTab.vue`'s `recentBackgrounds` sort reimplements ad-hoc Firestore-timestamp coercion instead of the existing safe helper, IN-02: Watcher comment assumes popover transitions always pass through `null`, which is false, Info, Phase 142: Code Review Report, Summary
 
 ### Community 2996 - "Milestone v2.14: Services UX Alignment, Dashboard & Live-Stream Video Output"
-Cohesion: 0.20
-Nodes (9): Milestone v2.14: Services UX Alignment, Dashboard & Live-Stream Video Output, Phase 131: Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate, Phase 132: Services Page UX Alignment & Verbiage Cleanup, Phase 133: Volunteer Responsibility Confirmation, Phase 134: Editor Presence, Phase 135: Dashboard Overhaul, Phase 136: Video Output — Fullscreen Slice, Phase 137: Video Output — Banner Render (+1 more)
+Cohesion: 0.50
+Nodes (3): Design (locked by the owner/orchestrator — implement exactly), STRIDE Threat Register, Trust Boundaries
 
 ### Community 2997 - "Tests"
 Cohesion: 0.20
@@ -13374,27 +13380,47 @@ Cohesion: 0.29
 Nodes (6): Accepted Risks Log, SECURED, Security Audit Trail, Sign-Off, Threat Register, Trust Boundaries
 
 ### Community 3002 - "onDuplicate"
+Cohesion: 0.17
+Nodes (11): Accomplishments, Decisions Made, Deviations from Plan, Files Created/Modified, Issues Encountered, Next Phase Readiness, Performance, Quick Task 260919-mvw: Vamp audio resolves from the live vamp doc Summary (+3 more)
+
+### Community 3003 - "Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback"
+Cohesion: 0.27
+Nodes (6): BIBLE_BOOKS, bibleGatewayLink(), esvLink(), nltLink(), parseScriptureInput(), scriptureWebLink()
+
+### Community 3004 - "Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback"
+Cohesion: 0.20
+Nodes (9): emit, mode, props, select(), sizeHint, SlotVideoOutput, mountControl(), slot() (+1 more)
+
+### Community 3005 - "onDuplicate"
 Cohesion: 0.25
 Nodes (9): confirmRemove(), expandRowKey(), isExpanded(), mintSlotId(), onAddSection(), onDuplicate(), onRemove(), orderIndexForRow() (+1 more)
 
+### Community 3006 - "song.ts"
+Cohesion: 0.25
+Nodes (7): Arrangement, Song, SongAttachment, SongAttachmentKind, SongAttachmentLinkSource, UpsertSongInput, VW_TYPE_LABELS
+
+### Community 3007 - "260919-mvw-PLAN.md"
+Cohesion: 0.50
+Nodes (3): Design (locked by the owner/orchestrator — implement exactly), STRIDE Threat Register, Trust Boundaries
+
 ## Knowledge Gaps
-- **26107 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+26102 more)
+- **26138 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+26133 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **298 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Communities (3002 total, 298 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
+- **Why does `Communities (3008 total, 298 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Why does `data()` connect `Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary` to `ServiceEditorView.test.ts`, `Phase 16 Plan 11: Remove Deprecated Frequency Fields Summary`, `Phase 3: Service Planning - Research`, `Phase 17: Sync schedule with planned services - Research`, `RosterImportModal.vue`, `Implementation Landscape`, `Phase 16: Quarterly Schedule Share Link — Research`?**
+- **Why does `data()` connect `navSharedStoreTeardownRace.regression.test.ts` to `ServiceEditorView.test.ts`, `Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary`, `Phase 3: Service Planning - Research`, `Phase 17: Sync schedule with planned services - Research`, `RosterImportModal.vue`, `Implementation Landscape`, `Phase 16: Quarterly Schedule Share Link — Research`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Why does `sendQueuedMessageHandler()` connect `Phase 16: Quarterly Schedule Share Link — Research` to `Communities (496 total, 90 thin omitted)`, `QuarterView.vue`, `Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary`, `messageTokens.ts`, `Phase 6 Plan 03: AI Scripture Discovery Summary`?**
+- **Why does `sendQueuedMessageHandler()` connect `Phase 16: Quarterly Schedule Share Link — Research` to `Communities (496 total, 90 thin omitted)`, `QuarterView.vue`, `messageTokens.ts`, `navSharedStoreTeardownRace.regression.test.ts`, `Phase 6 Plan 03: AI Scripture Discovery Summary`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `main` to the rest of the system?**
-  _26110 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _26141 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
-  _Cohesion score 0.0007739938080495357 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0007722007722007722 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.017094017094017096 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
