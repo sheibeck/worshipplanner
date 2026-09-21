@@ -1,16 +1,16 @@
-# Graph Report - worshipplanner  (2026-09-19)
+# Graph Report - worshipplanner  (2026-09-21)
 
 ## Corpus Check
-- 2854 files · ~6,573,381 words
+- 2855 files · ~6,574,851 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 35465 nodes · 34711 edges · 3008 communities (2710 shown, 298 thin omitted)
+- 35474 nodes · 34719 edges · 3008 communities (2710 shown, 298 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 82 edges (avg confidence: 0.61)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `826d09d7`
+- Built from commit: `421731e0`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -3114,8 +3114,8 @@ Cohesion: 0.04
 Nodes (46): addSlotAsItem — title modification (SONG and HYMN cases), Anti-Patterns to Avoid, Architectural Responsibility Map, Architecture Patterns, Assumptions Log, Claude's Discretion, Code Examples, Common Pitfalls (+38 more)
 
 ### Community 41 - "service.ts"
-Cohesion: 0.14
-Nodes (20): ScriptureReading, HymnSlot, ImportedSlot, MediaAttachableSlot, NonAssignableSlot, Progression, ScriptureRef, ScriptureSlot (+12 more)
+Cohesion: 0.10
+Nodes (23): HymnSlot, ImportedSlot, MediaAttachableSlot, NonAssignableSlot, Progression, ScriptureSlot, Service, SERVICE_SECTION_LABELS (+15 more)
 
 ### Community 42 - "Phase 16.1: Song list tags & columns customization - Research"
 Cohesion: 0.04
@@ -3554,8 +3554,8 @@ Cohesion: 0.08
 Nodes (24): ARCH-005 — [Low, resolved] Org-provisioning Cloud Functions ARE deployed to production; the Phase 110 "UNDEPLOYED" premise is stale, ARCH-018 — [Medium] Super-admin's universal `isOrgEditor` grant is a genuine, unmitigated privilege-scope weakness (re-evaluated from Phase 78/110 "accepted"; folds in `SEC-ISO-04`), Artifacts this phase produces, Critical/High (→ Phase 113), Medium/Low (→ backlog), Phase 112 Security Review — Consolidated Report, Scope, SEC-A-01 — [Medium] `/api/planningcenter` is reachable with no authentication, unlike every sibling proxy route (+16 more)
 
 ### Community 151 - "Canonical References"
-Cohesion: 0.08
-Nodes (24): Backlog, Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 114: Multi-Monitor Assignment Rework (+16 more)
+Cohesion: 0.06
+Nodes (34): 1. Requirement Coverage (R295–R301), 2. Milestone-Goal Achievement — Full Path Traced, 3. Cross-Phase Integration Seams, 4. Consistency of Decisions, 5. Deploy Posture, 6. Test/Gate Health — Independently Re-Run (not taken from documents), 7. Known/Accepted Debt (not milestone gaps), 8. Minor Findings (documentation only, non-blocking) (+26 more)
 
 ### Community 152 - "Codebase Map"
 Cohesion: 0.16
@@ -3748,8 +3748,8 @@ Cohesion: 0.10
 Nodes (11): ADR-0123, ADR-0124, ADR-0125, handleFullscreenChange(), Host, mockRoute, { serviceStoreMock, fakeSlides }, ADR-0214 (+3 more)
 
 ### Community 197 - "v1 Requirements"
-Cohesion: 0.22
-Nodes (14): ADR-0173, ImportedDeck, ServiceSection, AssembledSection, AssembledSlide, BlackoutSlide, CopyrightSlide, ImageSlide (+6 more)
+Cohesion: 0.18
+Nodes (18): ADR-0173, ImportedDeck, ScriptureReading, ScriptureRef, ServiceSection, AssembledSection, AssembledSlide, BlackoutSlide (+10 more)
 
 ### Community 198 - "Info"
 Cohesion: 0.10
@@ -4012,12 +4012,12 @@ Cohesion: 0.12
 Nodes (11): FieldSaveState, fieldStates, fromAddressLive, fromAddressValid, fromAddressWarning, isUnverifiableHost(), onSaveText(), stateFor() (+3 more)
 
 ### Community 263 - "Phase 16 Plan 11: Remove Deprecated Frequency Fields Summary"
-Cohesion: 0.24
-Nodes (11): AggregateStatus, clearAll(), confirmations, error, myEmailLower, onConfirm(), onDecline(), props (+3 more)
+Cohesion: 0.15
+Nodes (16): AggregateStatus, clearAll(), confirmations, error, myEmailLower, onConfirm(), onDecline(), props (+8 more)
 
 ### Community 264 - "Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary"
-Cohesion: 0.12
-Nodes (10): calls, createFakeChannel(), FakeWin, H, mockRouterPush, mountView(), openedWins, PostedMessage (+2 more)
+Cohesion: 0.11
+Nodes (11): calls, createFakeChannel(), FakeWin, H, mockRouterPush, mountView(), openedWins, PostedMessage (+3 more)
 
 ### Community 265 - "Phase 17: Sync schedule with planned services - Research"
 Cohesion: 0.11
@@ -4408,8 +4408,8 @@ Cohesion: 0.12
 Nodes (16): Claude's Discretion, Deferred Ideas, Established Patterns, Existing Code Insights, Implementation Decisions, Integration Points, Phase 118: Security — Firestore Rules & Public Share Hardening - Context, Phase Boundary (+8 more)
 
 ### Community 362 - "Phase 16 Plan 04: Scheduler Pairing Honors Per-Role Frequency Summary"
-Cohesion: 0.05
-Nodes (35): Backlog, Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 117: Security — Proxy Authentication, Rate Limits & Quotas (+27 more)
+Cohesion: 0.08
+Nodes (25): Backlog, Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 117: Security — Proxy Authentication, Rate Limits & Quotas (+17 more)
 
 ### Community 363 - "Phase 16 Plan 06: Roster Frequency Cleanup + Collapsible Sections Summary"
 Cohesion: 0.12
@@ -6728,8 +6728,8 @@ Cohesion: 0.14
 Nodes (13): unsubscribeAllMembersStore, unsubscribeAllPptxRenders, unsubscribeAllQuartersStore, unsubscribeAllRosterStore, unsubscribeAllServiceStore, unsubscribeAllSongStore, unsubscribeAllTeamsStore, unsubscribeAllVampStore (+5 more)
 
 ### Community 941 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles"
-Cohesion: 0.11
-Nodes (15): teardown(), useVolunteerServiceDoc(), VolunteerServiceDocState, authStore, firstName, greeting, groups, myEmailLower (+7 more)
+Cohesion: 0.14
+Nodes (11): authStore, firstName, greeting, groups, myEmailLower, mySchedule, nextUpDoc, showPast (+3 more)
 
 ### Community 942 - "Quick Task 9: Real-time remote update merge in ServiceEditorView"
 Cohesion: 0.15
@@ -11936,8 +11936,8 @@ Cohesion: 0.40
 Nodes (3): SnapshotCallback, snapshotCallbacks, unsubscribeSpies
 
 ### Community 2319 - "navSharedStoreTeardownRace.regression.test.ts"
-Cohesion: 0.38
-Nodes (6): driveRoundTrip(), makeSharedStore(), makeView(), orgId, pick(), data()
+Cohesion: 0.60
+Nodes (4): driveRoundTrip(), makeView(), orgId, pick()
 
 ### Community 2320 - "vamp.ts"
 Cohesion: 0.40
@@ -13396,15 +13396,15 @@ Cohesion: 0.25
 Nodes (9): confirmRemove(), expandRowKey(), isExpanded(), mintSlotId(), onAddSection(), onDuplicate(), onRemove(), orderIndexForRow() (+1 more)
 
 ### Community 3006 - "song.ts"
-Cohesion: 0.25
-Nodes (7): Arrangement, Song, SongAttachment, SongAttachmentKind, SongAttachmentLinkSource, UpsertSongInput, VW_TYPE_LABELS
+Cohesion: 0.22
+Nodes (8): Cross-Phase Integration (gsd-integration-checker), Deferred Human UAT (owner-deferred 2026-09-09: "defer uat to the end"), E2E Flows, Phase Verification, Requirements Coverage (3-source cross-reference), Scope, Tech Debt, v2.15 Milestone Audit — Service Times, Vamps & Field Fixes
 
 ### Community 3007 - "260919-mvw-PLAN.md"
 Cohesion: 0.50
 Nodes (3): Design (locked by the owner/orchestrator — implement exactly), STRIDE Threat Register, Trust Boundaries
 
 ## Knowledge Gaps
-- **26138 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+26133 more)
+- **26145 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+26140 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **298 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -13413,12 +13413,12 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Communities (3008 total, 298 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Why does `data()` connect `navSharedStoreTeardownRace.regression.test.ts` to `ServiceEditorView.test.ts`, `Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary`, `Phase 3: Service Planning - Research`, `Phase 17: Sync schedule with planned services - Research`, `RosterImportModal.vue`, `Implementation Landscape`, `Phase 16: Quarterly Schedule Share Link — Research`?**
+- **Why does `data()` connect `Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary` to `ServiceEditorView.test.ts`, `Phase 16 Plan 11: Remove Deprecated Frequency Fields Summary`, `Phase 3: Service Planning - Research`, `Phase 17: Sync schedule with planned services - Research`, `RosterImportModal.vue`, `Implementation Landscape`, `Phase 16: Quarterly Schedule Share Link — Research`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
-- **Why does `sendQueuedMessageHandler()` connect `Phase 16: Quarterly Schedule Share Link — Research` to `Communities (496 total, 90 thin omitted)`, `QuarterView.vue`, `messageTokens.ts`, `navSharedStoreTeardownRace.regression.test.ts`, `Phase 6 Plan 03: AI Scripture Discovery Summary`?**
+- **Why does `sendQueuedMessageHandler()` connect `Phase 16: Quarterly Schedule Share Link — Research` to `Communities (496 total, 90 thin omitted)`, `QuarterView.vue`, `Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary`, `messageTokens.ts`, `Phase 6 Plan 03: AI Scripture Discovery Summary`?**
   _High betweenness centrality (0.001) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `main` to the rest of the system?**
-  _26141 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _26148 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.0007722007722007722 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**

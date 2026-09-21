@@ -1,5 +1,33 @@
 # Milestones
 
+## v2.15 Service Times, Vamps & Field Fixes (Shipped & deployed to production: 2026-09-21)
+
+**Phases completed:** 5 phases (138–142), 15 plans, 51 tasks · **Requirements:** R428–R440 (13/13)
+**Git range:** e7ad44c5..cfa31efa (185 commits, 89 src/rules files, +10,628 / −828) · **Timeline:** 2026-09-09 → 2026-09-21
+**Deployed:** hosting + storage rules 2026-09-18 (138–141); hosting 2026-09-19 ×2 (142, quick tasks); hosting 2026-09-21 (re-release, bundle `index-DS7tZFO4.js`)
+**Closeout:** `override_closeout` — audit PASSED (5/5 phases, 13/13 reqs, 14/14 integration, 3/3 flows); 22 batched human/hardware UAT items **waived by the owner** at close (see Known Deferred)
+
+**Delivered:** Services carry real rehearsal and report times (org-level default *times* copied onto each new service, editable per service, shown on every surface the date already appears plus both public projections); a keyed **Vamps** library whose MP3 plays live as slide or group-bed audio from the Run control window; service-update emails that always link to the plan; a fixed new-tab/deep-link church picker; and the Claude Design "Slides Tab" chip-strip panel.
+
+**Key accomplishments:**
+
+1. **Rehearsal & report times (139)** — additive `Service`/`OrgSettings` schema with plain `HH:mm`/`YYYY-MM-DD` strings, one shared timezone-stable sort/format util, copy-not-live-bind org-default pre-fill in `createService`, Settings defaults UI, editor Times subsection (editor-gated), and both `buildServiceSnapshot`/`buildRehearseAccess` projections feeding dashboard, services list, My Schedule, volunteer view and the public share page.
+2. **Vamps library (140)** — `Vamp` type + `useVampStore` (org-scoped CRUD, Storage-cascade delete, church-switch teardown), resumable MP3 upload, editor-gated `vamp-files/` `storage.rules` block (audio/mpeg-only, immutable-per-path, retention-exempt), and a Songs | Vamps tab with a flat searchable table + slide-out editor built to the owner's `Vamps.dc.html` design.
+3. **Vamp slide assignment & live playback (141)** — `VampPicker` in the slide drawer, one chromeless `AudioPlayer` in `RunControlView` driven by an armed/blocked/unavailable/playing state machine (blocked-audio banner + one-click retry), `suppressAudio` structurally muting all three output windows, and delete-warns-but-allows with the MP3 kept for already-assigned slides (R440).
+4. **Slides Tab chip strip (142, Claude Design 7a)** — new `SlideGroupSetupStrip` with Display · Background · Audio chips and popovers (inert when locked), one-slot None/Track/Vamp audio, MP3-less vamps assignable with an amber warning, Background recents + drag-and-drop upload, Display thumbnail tiles; fixed the `setGroupBedMedia` no-MP3-vamp write bug.
+5. **Field fixes (138)** — uid-scoped localStorage fallback so a genuinely new tab restores a multi-church member's org (R428); `ReLockNotifyPrompt` self-heals the share link and always appends the plan link to update emails (R434).
+
+**Quick tasks shipped in-milestone:** 260909 (multi-church AI/Bible gate; scripture-selector lock fixes), 260918-nm2/-pms (group-level vamp bed + "Choose a vamp" button), 260919-k9j (Run: LIVE tag red, audio ON by default on go-live, End-of-item cap click advances), 260919-mvw (vamp audio resolves from the live vamp doc so a later-attached MP3 plays; editor-gated subscribe).
+
+### Known Deferred
+
+- **22 batched human/hardware UAT items** (`milestones/v2.15-DEFERRED-VERIFICATION.md`) — owner chose "waive and close" 2026-09-21 after running prod since 09-18. Not owner-*verified*: real-speaker/fresh-profile audibility (R438/R439), prod MP3 round-trips (R435), new-tab church restore (R428), delivered email link (R434), visual fidelity vs the 140/141/142 UI-SPECs, popover viewport geometry, OS drag-and-drop, and the two 142 backstops. Regressions found later → quick task.
+- **Backlog 999.6** — owner UX feedback from prod: every rehearsal must have a date; move Times to its own tab.
+- `useVampStore` has no dedicated subscription-error state (inherited 141→142 backstop); SlideGrid group-media write failures are `console.error`-only.
+
+---
+
+
 ## v2.13 v2.13 (Shipped: 2026-09-06)
 
 **Phases completed:** 3 phases, 6 plans, 13 tasks

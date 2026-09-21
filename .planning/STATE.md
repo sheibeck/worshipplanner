@@ -1,23 +1,35 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.15
-milestone_name: Service Times, Vamps & Field Fixes (Phases 138-141 — all executed + auto-verified; DEPLOYED to prod 2026-09-18 (hosting + storage rules); OPEN pending batched owner UAT)
-current_phase: 142
-current_phase_name: Slides Tab panel UX from Claude Design
-status: verifying
-stopped_at: Second prod deploy 2026-09-19 (hosting, index-DS7tZFO4.js from 826d09d7) — quick 260919-mvw live-vamp-audio fix + editor gate; v2.15 batched owner UAT (138-142 + quick tasks) against prod is next, then audit -> complete
-last_updated: "2026-09-19T06:43:45.434Z"
-last_activity: 2026-09-19
-last_activity_desc: Completed quick task 260919-mvw — vamp audio resolves from the live vamp doc (attach/replace after assign now plays); 260919-k9j + Phase 142 deployed earlier today
+milestone_name: Service Times, Vamps & Field Fixes — SHIPPED & DEPLOYED 2026-09-21 (closed; next milestone not yet scoped)
+status: completed
+stopped_at: v2.15 closed 2026-09-21 (audit passed, 22 UAT items owner-waived, tag v2.15). Next: /gsd-new-milestone (candidates: backlog 999.6 rehearsal-date UX rework, 999.2 WorshipBuilder rename)
+last_updated: "2026-09-21T16:02:46.653Z"
+last_activity: 2026-09-21
+last_activity_desc: Milestone v2.15 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
   total_plans: 15
   completed_plans: 15
   percent: 100
+current_phase: 142
+current_phase_name: Slides Tab panel UX from Claude Design
 ---
 
-## Deferred Verification (v2.15 — ACTIVE, batched to milestone end)
+## Deferred Items (v2.15 close — 2026-09-21)
+
+Items acknowledged and deferred at **v2.15** milestone close on 2026-09-21 (owner chose "Waive and close" → `override_closeout`):
+
+| Category | Item | Status | Note |
+|----------|------|--------|------|
+| verification | Phases 138-142 human/hardware UAT (22 items) | waived | Batched in `milestones/v2.15-DEFERRED-VERIFICATION.md`, items marked `[~]`. Audit PASSED 13/13 reqs + 14/14 integration + 3/3 flows; all 5 phases SECURED + Nyquist-compliant. Owner ran prod from 2026-09-18 (feedback → 999.6, quick 260919-k9j/-mvw) but did not tick the list — waived, not verified. |
+| uat | 141-UAT.md (4 pending), 142-UAT.md (5 pending) | waived | Same items as above; files archived under `milestones/v2.15-phases/`. |
+| debug | v2-10-shared-store-teardown-race | resolved | Closed + moved to `debug/resolved/` this session (fixed in the v2.10 hotfix; regression test `src/__tests__/navSharedStoreTeardownRace.regression.test.ts`). |
+
+---
+
+## Deferred Verification (v2.15 — CLOSED 2026-09-21, kept for the record)
 
 Per the owner's 2026-09-09 instruction ("use gsd-autonomous. defer uat to the end"), v2.15 phases are
 built + auto-verified green (unit tests, type-check, code review, nyquist, security), with real-browser /
@@ -83,7 +95,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** v2.15 milestone complete
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1429,10 +1441,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 142 (Slides Tab panel UX from Claude Design) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-09-19 — Phase 142 execution started
+Phase: Milestone v2.15 complete
+Plan: —
+Status: Awaiting next milestone — v2.15 shipped, tagged and deployed; run /gsd-new-milestone
+Last activity: 2026-09-21 — Milestone v2.15 completed and archived
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 

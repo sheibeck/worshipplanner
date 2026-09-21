@@ -281,6 +281,74 @@ and an `appConfig`-backed Owner Console on/off toggle.
   confirm); hosting deliberately not deployed (client changes still local-only) and Resend DNS verification
   deferred — both standing owner follow-ups.
 
+## Milestone: v2.15 — Service Times, Vamps & Field Fixes
+
+**Shipped:** 2026-09-21 (deployed to prod 09-18, 09-19 ×2, 09-21)
+**Phases:** 5 (138–142) | **Plans:** 15 | **Tasks:** 51 | **Commits:** 185 over 12 days
+
+### What Was Built
+Org-default rehearsal/report *times* copied onto each new service, editable per service (multiple dated
+rehearsals + one day-of report time) and shown on all six date surfaces plus both public projections; a
+keyed **Vamps** library (Songs → Vamps tab, one key + one MP3, editor-gated `vamp-files/` storage) that a
+planner assigns per slide or as a group bed and that plays live from the Run control window (armed by
+default, outputs structurally muted, blocked-audio banner + retry, delete-warns-but-keeps-MP3); service
+update emails that always carry a self-healed plan link; a fixed new-tab/deep-link church picker; and, added
+mid-milestone from the owner's Claude Design mockup, the Slides Tab chip strip (Display · Background · Audio
+popovers). Four in-milestone quick tasks fixed what the owner found on prod (group vamp bed, Run header
+defaults, live-vamp-doc URL resolution).
+
+### What Worked
+- **Research-first + reuse** — the 4-agent research pass correctly predicted 140–142 would be near-pure
+  reuse of the v2.11 attachment pattern and the shipped `AudioPlayer` pipeline; Phase 140 landed in one
+  session with zero new rule shapes.
+- **Release-gate full suite caught a real regression** — the ungated vamp subscribe (260919-mvw) broke
+  Phase 141's "viewers never subscribe vamps" tests; the editor gate went in before deploy.
+- **Owner on prod early** — deploying 138–141 on 09-18 (before 142 was even scoped) produced actionable
+  feedback within a day (999.6, the Run header defaults, the silent-vamp bug) that no jsdom test could.
+- **Design import via DesignSync** — pulling `Slides Tab.dc.html` and picking variant 7a with the owner
+  before planning gave 142 a locked visual contract; the UI audit scored 21/24 first pass.
+
+### What Was Inefficient
+- **The "my vamp isn't playing" bug had two roots** and took two quick tasks: audio defaulted to *off* on
+  go-live (k9j) *and* the assembler read the stored URL, not the live vamp doc (mvw). The 141 verifier
+  marked both paths human-only; a single "attach MP3 after assigning" unit case would have caught the second.
+- **Memory exhaustion** — emulators + Vite + Chrome + a full vitest run OOM'd twice ("Fatal process out of
+  memory: Zone"), then starved `git push` and the `firebase` CLI. `NODE_OPTIONS=--max-old-space-size=6144
+  --maxWorkers=4` is the working recipe; don't run the full suite with the emulators resident.
+- **Phase 139's SUMMARY had to be reconstructed** by the orchestrator after an executor timed out — its
+  one-liner is garbage in the auto-generated MILESTONES entry (hand-fixed at close).
+- **22 batched UAT items were never run** and were waived at close — the deferral policy worked as designed
+  (nothing self-approved), but a 22-item list is too long to expect an owner to tick; batch by risk, not by
+  phase.
+
+### Patterns Established
+- **Editor-gated subscriptions for editor-read collections** — any store whose Firestore rule is the
+  `isOrgEditor` catch-all must be subscribed behind `authStore.isEditor` (and swallow permission-denied).
+- **Live-doc-first, stored-copy-fallback** for denormalized media URLs (`liveVampAudioUrl`): the stored URL
+  exists only to survive the source doc's deletion.
+- **Rising-edge defaults in `useRunControl`** — go-live is the gesture that arms audio; don't make the
+  projectionist find a toggle.
+- **Chip + popover strip** (`SlideGroupSetupStrip`) as the group-level control pattern: inert `<span>` when
+  locked, `v-if` popovers that can never mount a write control for a viewer.
+
+### Key Lessons
+- **A verifier marking a path "human-only" is a coverage gap to close, not a label to accept** — the
+  live-vamp-URL case was unit-testable all along.
+- **Deploy early inside an autonomous milestone.** The owner's prod use surfaced more real defects in one
+  day than the batched UAT list would have.
+- **Full-suite runs need headroom** — check resident memory before `npx vitest run`; a starved box fails
+  in confusing places (git's credential helper, the firebase CLI module loader) long after the test crash.
+- **Close-out hygiene**: `milestone complete` is a one-shot mutator — commit first, and expect to hand-fix
+  the auto-generated MILESTONES entry.
+
+### Cost Observations
+- Model mix: **opus** for planners, researchers and the autonomous orchestrator; **sonnet** for executors,
+  verifiers, reviewers and auditors; **haiku** for the integration checker.
+- Deploys: 4 hosting (+1 storage rules) — all owner-confirmed per-deploy; functions/firestore.rules/indexes
+  untouched since v2.14.
+- Notable: Phase 142 (4 plans / 11 tasks / 3 waves) went discuss → UI-spec → plan → execute → review → UI
+  audit → security → verify → deploy in a single session.
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -292,6 +360,7 @@ and an `appConfig`-backed Owner Console on/off toggle.
 | v1.6 | 7 | Client-side reliability milestone; owner-attributed close, deployed same day |
 | v1.7 | 7 | First messaging/backend-send milestone; deploy-gated Functions built against a mocked provider, one owner deploy at close; two stacked milestones combined at archive |
 | v2.2 | 5 | Phases added mid-milestone from owner testing feedback; a delivered requirement (R230) removed at close and reconciled across all records; hosting deployed at close with backend owner-gated |
+| v2.15 | 5 | Research-first autonomous run with prod deployed mid-milestone (owner feedback → 4 quick tasks + 1 backlog phase); a Claude Design phase (142) added from a mockup; 22-item batched UAT owner-waived at close (override_closeout) |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -308,3 +377,6 @@ and an `appConfig`-backed Owner Console on/off toggle.
    this control do in every on/off combination?" before building it — and if a delivered requirement is
    later removed, amend every record (requirements, audit, decisions log) in the same breath so the close
    stays honest.
+5. **A verifier's "human-only" label is a coverage gap, not a verdict** (v2.15 live-vamp URL). If the
+   causal chain is code, write the unit case; reserve human UAT for hardware, real browsers and visual
+   judgment — and deploy early so the owner's real use finds what the list would not.

@@ -10,19 +10,34 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 
 ## Current State
 
-**Shipped through v2.14** (2026-09-09), deployed to production. Latest milestone — Services UX
-alignment, a "needs your attention" dashboard, volunteer responsibility confirmation, Firestore-only
-editor presence, and a third **"Video"** live-stream output (fullscreen + per-item banner lower-third).
-Plus post-v2.13 production hotfixes tagged **v2.13.1** (Planning Center 401 auth fix, multi-church
-AI/Bible active-church gate, Bible-API-off UX + mark-planned lock-race fixes). See ROADMAP.md for the
-full milestone history; per-milestone detail archived under `.planning/milestones/`.
+**Shipped through v2.15** (2026-09-21), deployed to production. Latest milestone — org-default
+rehearsal/report *times* copied onto each service and shown on every date surface + both public
+projections; a keyed **Vamps** library (Songs → Vamps tab, one key + one MP3) assignable per slide or as a
+group bed and audible live from the Run control window only; service-update emails always carry the plan
+link; new-tab/deep-link church restore for multi-church members; and the Claude Design "Slides Tab" 7a
+chip strip (Display · Background · Audio popovers). See ROADMAP.md for the full milestone history;
+per-milestone detail archived under `.planning/milestones/`.
 
-**Active milestone:** **v2.15 Service Times, Vamps & Field Fixes** — see the section below. Standing
-follow-ups that outlived milestones: Resend verified-domain email (backlog 999.6), the WorshipBuilder
-rename/domain (backlog 999.2), and the batched v2.14 human/hardware UAT (`v2.14-DEFERRED-VERIFICATION.md`,
-owner-accepted).
+**Active milestone:** none — next is `/gsd-new-milestone`. Standing follow-ups that outlived milestones:
+backlog **999.6** (owner UX feedback from v2.15 prod use: every rehearsal must have a date; Times on its
+own tab), backlog **999.2** (WorshipBuilder rename/domain), Resend verified-domain email, and the
+owner-waived v2.14/v2.15 human-hardware UAT lists (`milestones/v2.1{4,5}-DEFERRED-VERIFICATION.md`).
 
-## Current Milestone: v2.15 Service Times, Vamps & Field Fixes
+## Shipped Milestone: v2.15 Service Times, Vamps & Field Fixes — ✅ SHIPPED & DEPLOYED 2026-09-21
+
+**Outcome:** Phases 138–142, R428–R440 all satisfied (audit 13/13 reqs, 14/14 integration, 3/3 flows);
+22 batched human/hardware UAT items owner-waived at close (`override_closeout`). Phase 142 (Slides Tab
+chip strip from the owner's Claude Design mockup, variant 7a) was added mid-milestone on 2026-09-19.
+Notable decisions: rehearsal/report times are plain strings (never `Timestamp`) with a single shared sort;
+org defaults are *time-of-day only* and are copied, never live-bound; a vamp is one key + one MP3 (1:1 with
+Song); live vamp audio is audible from the **Run control window only** (owner override of the original
+"Audience output" plan — outputs are structurally muted via `suppressAudio`); audio is armed **by default**
+on go-live (quick 260919-k9j) with a blocked-audio banner + retry; the assembler resolves vamp audio from
+the **live vamp doc** with the stored URL as a deleted-vamp fallback (quick 260919-mvw, editor-gated
+subscribe); design sources are pulled with `DesignSync get_file` (the `claude_design` MCP is not
+configured).
+
+## v2.15 (shipped) — original goal & target features
 
 **Goal:** Give services real rehearsal/report *times* (with org-level defaults) surfaced everywhere the
 date already shows, add a keyed **Vamps** library whose mp3 plays live as slide audio, always link
@@ -764,6 +779,12 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Validated
 
+- ✓ Rehearsal & report times — org-default *times* (Settings) copied onto each new service, multiple dated rehearsals + one day-of report time editable per service (editor-gated), shown everywhere the date shows incl. both public projections — v2.15 (R429–R433; owner feedback → 999.6 date-required rework)
+- ✓ Vamps library — Songs → Vamps tab, one key + one MP3 ≤ 50 MB per vamp, editor-gated `vamp-files/` storage (retention-exempt), flat searchable table + slide-out editor — v2.15 (R435–R436)
+- ✓ Vamp slide assignment & live playback — per-slide or group-bed vamp, audible from the Run control window only (outputs muted), armed by default with blocked-audio banner + retry, delete-warns-but-keeps-MP3, live-vamp-doc URL resolution — v2.15 (R437–R440)
+- ✓ Service-update emails always link to the plan (self-healed share link) — v2.15 (R434)
+- ✓ Multi-church new-tab / deep-link church restore (uid-scoped localStorage tier) — v2.15 (R428)
+- ✓ Slides Tab group panel as the Claude Design 7a chip strip (Display · Background · Audio popovers; MP3-less vamps assignable) — v2.15 (Phase 142)
 - ✓ Song file attachments — editors attach/manage PDF + MP3 files (≤ 50 MB, editor+type+size gated in `storage.rules` via a new `isOrgEditor` helper + a `song-files/` block + a catch-all OR-exclusion) and external YouTube/Drive/Dropbox links on a **Song**, via a new **Files** tab (Songs-list Files column, multi-file upload w/ per-file progress + duplicate denial + dismissable messages, Documents/Audio grouped rows, in-app PDF preview modal + inline MP3 player, download (blob Save-dialog + new-tab fallback), remove via an atomic `runTransaction`); attachments are additive on the Song doc under an org-scoped Storage prefix **outside `media/`**, proven exempt from every retention sweep by a locking test, with a `hardDeleteSong` cascade (R361–R373) — **v2.11** (shipped & deployed to production 2026-09-05; `storage.rules`+hosting; audit PASSED 13/13 reqs + 6/6 integration seams; owner-verified local UAT; step 1 of backlog 999.13/SEED-003 — Rehearse-mode is next; archived: `milestones/v2.11-REQUIREMENTS.md`).
 
 - ✓ Per-org Bible API toggle & manual fallback — a super-admin enables/disables the paid ESV/NLT Bible API per church from the Owner Console (`setOrgBibleEnabled`, default OFF, client-write-denied); a single `scriptureApi.ts` dispatcher + server `checkOrgBibleEnablement` gate on the `api` proxy's esv/nlt branches enforce it with no regression when enabled; when disabled, scripture/congregational editors offer an "Open in BibleGateway" deep-link (owner removed the paste box + off-state message before ship — plain scripture is reference-only, congregational composed in the existing reading textarea, AI split still runs on that text under the independent AI gate); Settings hides the Bible Translation card when off (R295–R301) — **v2.6** (shipped & deployed to production 2026-08-31; tag `v2.6`; audit PASSED 7/7 reqs + 5/5 integration seams; two code-review rounds caught a Planning-Center-export gate bypass + two fallback data-loss bugs; human/visual UAT deferred; each production org incl. Berean must be enabled by hand via the Owner Console since default is OFF; archived: `milestones/v2.6-REQUIREMENTS.md`).
@@ -1018,6 +1039,11 @@ Administrative, Communication, Rehearsal, Service time, Training, Physical setup
 | Per-org Teams modeled on roster Roles (own subcollection + store) | Churches differ in their team lists; mirroring the proven roles half kept the store/UX/seed patterns identical and low-risk | ✓ Good — v2.2; replaced the hard-coded Berean team list |
 | Removed the per-team song-tag AI filter (R230) after shipping it | It only fed AI song suggestions, was inert when AI was off, and presented a live-looking control that did nothing — confusing for no real benefit | ✓ Good — v2.2 (2026-08-25); team selection no longer narrows the AI pool |
 | Per-org AI is OFF by default behind a super-admin master gate | AI is a metered cost the platform owner controls per church; `aiMasterEnabled` two-gates every affordance (`isAiEnabled = master && church setting`) and the proxy fails closed | ✓ Good — v2.2 (R242–R243); mirrors the `active`/`setOrgActive` pattern |
+| Rehearsal/report times as plain `HH:mm` / `YYYY-MM-DD` strings with one shared sort; org defaults time-of-day only, copied not live-bound (v2.15) | Avoids timezone reinterpretation and retroactive edits to already-shared services | ✓ Good — shipped; owner wants every rehearsal dated (999.6), a UX change not a data-model change |
+| A vamp is one key + one MP3, mirroring Song 1:1; assignment denormalizes into the slide/group audio field, resolved live from the vamp doc with the stored URL as a deleted-vamp fallback (v2.15) | Reuses the v2.11 storage pattern and the shipped AudioPlayer pipeline; no new render surface | ✓ Good — 140–142 were almost pure reuse; live-doc resolution fixed the "attached the MP3 later, nothing plays" bug |
+| Live vamp audio from the Run control window only; outputs structurally muted; audio armed by default on go-live with a blocked banner + retry (v2.15) | Owner override of the "Audience output" plan — avoids multi-window echo and silent autoplay failures | ✓ Good — owner-tested live 2026-09-19 |
+| Vamp subscribe is editor-gated (`authStore.isEditor`) (v2.15) | Firestore catch-all is `isOrgEditor` read; an ungated subscribe broke the 141 viewer tests at the release gate | ✓ Good |
+| Batched human/hardware UAT waived at v2.15 close (override_closeout) | Owner ran prod from 09-18 and chose to close; deferrals stay labelled waived, never verified | — Pending — regressions become quick tasks |
 
 ## Evolution
 
@@ -1147,3 +1173,6 @@ reset errors, Resend returned-error check, persistent/red invite feedback + a Re
 `functions:sendInviteOnboardingEmail` deployed to prod; **standing owner follow-ups: hosting deploy +
 Resend DNS domain verification** (until verified, the test sender only reaches the owner's own inbox).
 Archived: `milestones/v2.5-ROADMAP.md` · `milestones/v2.5-REQUIREMENTS.md` · `milestones/v2.5-MILESTONE-AUDIT.md`.*
+
+---
+*Last updated: 2026-09-21 after v2.15 milestone (shipped, deployed, tagged; UAT owner-waived; next: /gsd-new-milestone)*

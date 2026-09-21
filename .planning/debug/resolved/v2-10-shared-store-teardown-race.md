@@ -1,8 +1,8 @@
 ---
-status: investigating
+status: resolved
 trigger: "v2.10 regression: RosterView data gone on nav-away-and-back; GettingStarted reappears every other time; schedule/quarters missing after church switch. No console errors. Root-cause as ONE systemic bug, minimal holistic fix, do NOT deploy."
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-09-21
 ---
 
 ## Current Focus
@@ -64,3 +64,7 @@ files_changed:
   - src/views/ServicesView.vue
   - src/views/SongsView.vue
   - src/components/GettingStarted.vue
+
+## Resolution
+
+Fixed by the v2.10 post-deploy hotfix (shared org-scoped stores no longer torn down in per-view `onUnmounted`); owner-verified live. Permanent regression test: `src/__tests__/navSharedStoreTeardownRace.regression.test.ts`. File was left in `investigating` by mistake; closed 2026-09-21 at the v2.15 milestone close (already recorded resolved-stale at the v2.14 close).
