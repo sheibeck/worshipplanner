@@ -28,7 +28,7 @@
 - ✅ **v2.13 — Volunteer Self-Service & Multi-Church Access** — Phases 128-130 (shipped & deployed to production 2026-09-07; public self-service magic-link request page + a shared server-side mint/send core, admin email/copy resend from the Volunteers page reusing that core, and a multi-church volunteer switcher on My Schedule via an `orgName` added to the rehearseAccess projection — R394-R405; see [milestones/v2.13-ROADMAP.md](milestones/v2.13-ROADMAP.md))
 - ✅ **v2.14 — Services UX Alignment, Dashboard & Live-Stream Video Output** — Phases 131-137 (shipped & deployed to production 2026-09-09; Services page brought to the app's standard header/mobile pattern + `/share` zebra banding + incidental PC-verbiage cleanup, a "needs your attention" dashboard (readiness feed + unconfirmed-volunteers + live editor-presence roll-up + empty state), volunteer responsibility confirmation with live planner roster status + unconfirmed-only nudge (a Critical rules gap CR-01 caught+fixed in review), Firestore-only editor presence, and a third **"Video"** live-stream output — fullscreen slice + per-item Banner lower-third with transparency/key-color fallback — R406-R427; audit PASSED 7/7 phases + 22/22 reqs + 5/5 integration seams; human/hardware UAT owner-accepted as deferred (override_closeout); tag v2.14 — see [milestones/v2.14-ROADMAP.md](milestones/v2.14-ROADMAP.md))
 - ✅ **v2.15 — Service Times, Vamps & Field Fixes** — Phases 138-142 (shipped & deployed to production 2026-09-21; org-default rehearsal/report *times* copied onto each service and shown on all 6 date surfaces + both public projections, a keyed **Vamps** library (Songs → Vamps tab, one key + one MP3 ≤50 MB, editor-gated `vamp-files/` storage) assignable per slide or as a group bed and audible live from the Run control window only (armed by default, outputs muted, blocked-audio banner + retry, delete-warns-but-keeps-MP3), service-update emails always carry a self-healed plan link, new-tab/deep-link church restore for multi-church members, and the Claude Design "Slides Tab" 7a chip strip (Display · Background · Audio popovers) — R428-R440; audit PASSED 5/5 phases + 13/13 reqs + 14/14 integration + 3/3 flows; 22 human/hardware UAT items owner-waived (override_closeout); tag v2.15 — see [milestones/v2.15-ROADMAP.md](milestones/v2.15-ROADMAP.md))
-- 🚧 **v2.16 — Dated Rehearsals & WorshipBuilder** — Phases 143-145 (in progress; every rehearsal dated and the rehearsal/report-time controls moved into their own **Times** tab after Messages, with legacy undated rows flagged and recoverable (backlog 999.6); the app renamed **WorshipBuilder** across the web app and outbound email; and a cutover to `worshipbuilder.web.app` as the single hosting target, with the old addresses redirecting to the same path and carrying each browser's saved settings across (backlog 999.2) — R441-R453; production cutover owner-gated per deploy)
+- 🚧 **v2.16 — Dated Rehearsals & WorshipBuilder** — Phases 143-145 (in progress; every rehearsal dated and the rehearsal/report-time controls moved into their own **Times** tab after Messages, with legacy undated rows flagged and recoverable (backlog 999.6); the app renamed **WorshipBuilder** across the web app and outbound email; and a cutover to `worshipbuilder.web.app` as the single hosting target, with the old addresses redirecting to the same path (carrying saved settings across was descoped by the owner on 2026-10-27, R452) (backlog 999.2) — R441-R453; production cutover owner-gated per deploy)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -787,7 +787,8 @@ change (hosting, functions, Storage CORS, console settings) needs **per-deploy o
 rehearsal has a date. The org-default rehearsal *times* stay, and the org-default report time is unchanged.
 Whether a new rehearsal gets its date picked on add or defaulted from the service date is a discuss-phase
 decision for 143. Old domain = **redirect to the same path/query/hash + carry the browser's allowlisted
-`wp` `localStorage` settings**. Auth sessions (per-origin IndexedDB) and the multi-screen window-placement
+`wp` `localStorage` settings**. (**Superseded 2026-10-27 by the owner:** plain redirect only, nothing is
+carried, and R452 is descoped; see Phase 145 below.) Auth sessions (per-origin IndexedDB) and the multi-screen window-placement
 permission are **not** carried, so everyone signs in once on the new domain and each Run computer re-grants
 the permission. Already true in prod (verified 2026-10-27): `worshipbuilder.web.app` is an Auth authorized
 domain, and the browser API key has no HTTP-referrer restriction. Not yet done: `worshipbuilder.firebaseapp.com`
@@ -808,6 +809,8 @@ authorized domain, Storage CORS, and the `SERVICE_SHARE_BASE_URL` default. Full 
     client-side bridge on a browser's first visit. The hand-off has to be allowlisted (`wp`-prefixed keys
     only) and shape-validated, never overwrite a value already set on the new domain, and never carry auth
     state. Phase research picks the transport and should keep the payload out of server logs.
+    **Superseded 2026-10-27 (owner):** no bridge and no hand-off. The old site is a plain Hosting
+    redirect, and each Run computer re-sets its setup once on the new domain (R452 descoped).
 
   - Google sign-in keeps the existing `authDomain` (`worship-planner-bc515.firebaseapp.com`) this milestone;
     switching it is v2 → backlog 999.14. Redirecting the old `firebaseapp.com` address therefore must not
@@ -816,9 +819,9 @@ authorized domain, Storage CORS, and the `SERVICE_SHARE_BASE_URL` default. Full 
 
   - `firebase.json` today is one unnamed hosting block (→ default site, `predeploy: npm run build`), and
     `.firebaserc` has no hosting targets. The phase turns this into two site targets: the app → `worshipbuilder`,
-    and the redirect bridge → the default `worship-planner-bc515` site.
+    and the redirect → the default `worship-planner-bc515` site.
 
-  - Order matters: allowlists (R450) → new site live (R448/R449) → old site redirects (R451/R452), never
+  - Order matters: allowlists (R450) → new site live (R448/R449) → old site redirects (R451), never
     during a service. The runbook (R453) owns the sequence, and each production step is owner-confirmed.
 
 - **Phase 144 ships independently, on the current domain, but before 145.** Its email-copy change is a
@@ -826,7 +829,7 @@ authorized domain, Storage CORS, and the `SERVICE_SHARE_BASE_URL` default. Full 
 
 - [ ] **Phase 143: Dated Rehearsals & Times Tab** - Every rehearsal carries a date, and a service's rehearsal/report-time controls live in their own Times tab after Messages. Legacy undated rows are recoverable, and cross-surface display is unchanged
 - [ ] **Phase 144: WorshipBuilder Rename** - Every user-facing app name in the web app and in outbound email reads WorshipBuilder; internal identifiers are untouched
-- [ ] **Phase 145: Domain Cutover to worshipbuilder.web.app** - The app is served, linked and allowlisted on worshipbuilder.web.app, and the old addresses redirect to the same page and carry each browser's saved setup. The owner gets a runbook for the owner-gated production cutover
+- [ ] **Phase 145: Domain Cutover to worshipbuilder.web.app** - The app is served, linked and allowlisted on worshipbuilder.web.app, and the old addresses redirect to the same page (saved per-browser setup is re-set once; R452 descoped 2026-10-27). The owner gets a runbook for the owner-gated production cutover
 
 ### Phase 143: Dated Rehearsals & Times Tab
 
@@ -900,9 +903,9 @@ Area: user-facing strings in `src/` views/components and `index.html`; email cop
 
 ### Phase 145: Domain Cutover to worshipbuilder.web.app
 
-**Goal**: The app lives at `https://worshipbuilder.web.app`: it is served, linked and allowlisted there. Every old address keeps working by sending people to the same page on the new domain and carrying their browser's saved setup across. The owner has an ordered runbook for the owner-gated production cutover.
+**Goal**: The app lives at `https://worshipbuilder.web.app`: it is served, linked and allowlisted there. Every old address keeps working by sending people to the same page on the new domain. The owner has an ordered runbook for the owner-gated production cutover. (Carrying each browser's saved setup across was descoped by the owner on 2026-10-27: R452.)
 **Depends on**: Phase 144 (the rename lands before the move, so the new domain debuts as WorshipBuilder)
-**Requirements**: R448, R449, R450, R451, R452, R453
+**Requirements**: R448, R449, R450, R451, R453 (R452 descoped 2026-10-27)
 **Promoted from**: backlog 999.2 (domain half)
 **Owner-gated**: yes. The Storage CORS re-apply, the Auth authorized-domain change, the new-site deploy and the old-site redirect deploy are all production changes, and each needs per-deploy owner confirmation under the standing deploy policy. Code, config, tests and the runbook are built and verified autonomously; the cutover itself waits for the owner.
 **Success Criteria** (what must be TRUE):
@@ -911,9 +914,9 @@ Area: user-facing strings in `src/` views/components and `index.html`; email cop
 
   2. Allowlists are updated before cutover: Storage CORS is re-applied to the bucket, `worshipbuilder.firebaseapp.com` is added to Auth authorized domains, and so is any other origin-scoped config research finds. On the new domain, uploads, downloads, Google sign-in, password sign-in and magic-link sign-in all work (R450).
 
-  3. Any request to `worship-planner-bc515.web.app` or `worship-planner-bc515.firebaseapp.com` lands on the same path, query string and hash on `worshipbuilder.web.app`. Existing share links, already-emailed magic links, bookmarks and home-screen shortcuts keep working. Google sign-in still uses the old `firebaseapp.com` auth domain, and it keeps working once the redirect is live (R451).
+  3. Any request to `worship-planner-bc515.web.app` or `worship-planner-bc515.firebaseapp.com` lands on the same path, query string and hash on `worshipbuilder.web.app` (Hosting's reserved `/__/*` paths excepted: they keep serving sign-in). Existing share links, already-emailed magic links, bookmarks and home-screen shortcuts keep working. Google sign-in still uses the old `firebaseapp.com` auth domain, and it keeps working once the redirect is live (R451).
 
-  4. On a browser's first visit through an old address, that browser's saved setup appears on the new domain: Run monitor assignments and nicknames, video key color, last-selected church, and list/column/section prefs. A value already set on the new domain is never overwritten, no authentication state transfers, and a crafted hand-off link cannot plant a non-allowlisted or malformed key (R452).
+  4. ~~On a browser's first visit through an old address, that browser's saved setup appears on the new domain (R452).~~ **Descoped 2026-10-27 (owner):** the owner is the sole user, so nothing is carried across. Run monitor setup, video key color, the selected church and list prefs are re-set once on the new domain (runbook Step 7), and an open tab needs one page refresh after the update (accepted loss).
 
   5. The owner can follow a cutover runbook that covers: the pre-cutover allowlist steps; deploy order (new site live before the old site redirects); not cutting over during a service; the one-time sign-in on the new domain; re-granting the multi-screen (window placement) permission on each Run computer; optional console renames (Firebase public-facing project name, OAuth consent-screen app name); rollback; and a post-cutover smoke checklist (R453).
 
@@ -922,19 +925,19 @@ Area: user-facing strings in `src/` views/components and `index.html`; email cop
 Plans:
 **Wave 1**
 
-- [ ] 145-01-PLAN.md — two targeted hosting sites (app -> worshipbuilder, legacy -> worship-planner-bc515 bridge) + .firebaserc targets + shape/header tests + targeted deploy docs; SERVICE_SHARE_BASE_URL default -> new origin + one-slash link tests; storage-cors.json +2 origins + CORS guard + old-origin source scan (R448, R449, R450, R451) [wave 1]
-- [ ] 145-02-PLAN.md — receiving-side settings hand-off: src/originHandoff allowlist/denylist + per-key validators + base64url #wph1= codec + fill-if-absent apply + boot bootstrap as main.ts's first import + one-time "new address" notice (R452) [wave 1]
+- [ ] 145-01-PLAN.md — two targeted hosting sites (app -> worshipbuilder; legacy -> worship-planner-bc515 as a plain 302 Hosting redirect to the same path + query, never capturing /__/*) + .firebaserc targets + one-file legacy-site/ public dir + shape/redirect/header tests (R448, R451) [wave 1]
+- [ ] 145-02-PLAN.md — SERVICE_SHARE_BASE_URL default -> new origin + one-slash link tests; storage-cors.json +2 origins + CORS guard + old-origin source scan + DEPLOY-EMAIL-DOMAIN.md (R449, R450) [wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 145-03-PLAN.md — old-site bridge (constant-origin redirect + allowlisted fragment payload + once-per-browser flag) + vite.config.legacy.ts -> dist-legacy + build:legacy; owner cutover runbook + guard test; ADR-0247; ARCHITECTURE.md entry (R448, R450, R451, R452, R453) [wave 2]
+- [ ] 145-03-PLAN.md — owner cutover runbook + guard test (CRLF-tolerant status-only env checks); ADR-0247 (plain redirect, no hand-off); INTEGRATIONS.md targeted deploy docs (R448, R450, R451, R453) [wave 2]
 
 **Owner-gated**: no production change in this phase. Storage CORS apply, authorized domain, `hosting:app`, functions and `hosting:legacy` deploys are owner-confirmed runbook steps at milestone end.
-**UI hint**: no (the old-site bridge is a non-visual redirect, not a designed screen)
+**UI hint**: no (the old site is a non-visual Hosting redirect, not a designed screen)
 
-Area: `firebase.json` + `.firebaserc` (multi-site hosting targets), `functions/src/params.ts`
+Area: `firebase.json` + `.firebaserc` (multi-site hosting targets + legacy redirect), `functions/src/params.ts`
 (`SERVICE_SHARE_BASE_URL` default), client-side link builders, `storage-cors.json`, Auth authorized domains
-(console), the old-site redirect + settings-hand-off bridge, and the build/deploy docs + cutover runbook.
+(console), and the build/deploy docs + cutover runbook.
 
 ### Phase 999.14: Custom domain + verified Resend email sender (BACKLOG)
 
@@ -957,8 +960,8 @@ v2.16's v2 requirements ("Custom Domain & Email", 2026-10-27).
 **Plans:** 0 plans
 
 When promoted, the new domain needs the same origin treatment Phase 145 gives `worshipbuilder.web.app`:
-Storage CORS, Auth authorized domains, the `SERVICE_SHARE_BASE_URL` default, and redirect/hand-off from
-the prior address if it becomes the primary.
+Storage CORS, Auth authorized domains, the `SERVICE_SHARE_BASE_URL` default, and a redirect from the
+prior address if it becomes the primary.
 
 Plans:
 

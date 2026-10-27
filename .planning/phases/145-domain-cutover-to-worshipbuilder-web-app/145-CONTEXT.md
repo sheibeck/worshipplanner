@@ -174,3 +174,39 @@ permission; a naive origin move silently wipes them. The cutover must not happen
   sign-in on the new domain is smoke-tested **before** the bridge deploy (OAuth-origin behavior is
   [ASSUMED] fine); rollback = console "Roll back" on the legacy site or
   `firebase hosting:clone worshipbuilder:live worship-planner-bc515:live`.
+
+## Amendment 2 — owner scope cut 2026-10-27 (authoritative; supersedes the bridge, receiving-side and hand-off text above)
+
+Owner, verbatim: *"We don't need backward compatibility or open tab concurrency with the old system. I'm the
+only one using this system at this stage. It's expected that an update requires a page refresh. That's
+acceptable loss."* Then chose **"Plain redirect only"**.
+
+- **R452 descoped.** No settings hand-off of any kind: no `src/originHandoff/`, no `main.ts` bootstrap, no
+  arrival notice, no allowlist/codec, no `monitorConfig.ts` export change, no CollapsibleSection guard. The
+  owner re-sets Run monitor setup, video key color, the selected church and window-placement / Automatic
+  Fullscreen once on the new domain (runbook). REQUIREMENTS.md keeps the R452 row, marked descoped.
+- **No open-tab handling.** The legacy site drops the `/api/**` rewrite; an open old tab needs one page
+  refresh after the update (accepted loss). No open-tab truths, runbook text or UAT items.
+- **Plain Hosting redirect on the legacy target** (no bridge page, no `src/legacy/`, no `vite.config.legacy.ts`,
+  no `build:legacy`, no `dist-legacy/`). Old addresses jump to the same path + query on
+  `https://worshipbuilder.web.app`; the browser carries the hash across the redirect (RFC 9110 §10.2.2), so
+  emailed volunteer links and bookmarks keep working. Planner choices (Claude's discretion, recorded in
+  ADR-0247):
+  - two `regex` redirect rules, both type **302**: `^/$` → `https://worshipbuilder.web.app/`, then
+    `^/((?:[^_]|_(?:[^_]|$)).*)$` → `https://worshipbuilder.web.app/:1`. The root needs its own rule because
+    an empty capture does not compile into the destination (Hosting emulator, verified 2026-10-27). The
+    catch-all never matches a path beginning `/__`: the docs put reserved `/__/*` ahead of redirects, but the
+    Hosting emulator applied a catch-all redirect to `/__/firebase/init.json`, and Google sign-in, password
+    reset and magic links depend on the old `firebaseapp.com` `/__/auth/*` until backlog 999.14.
+  - **302, not 301:** browsers do not cache a 302, so a rollback takes effect for every browser at once;
+    permanence gains nothing for a noindex app with one user. 301 is a 999.14 decision when the old site retires.
+  - Query strings: undocumented in the Hosting docs; the emulator (superstatic) appends the original query
+    (verified for root, deep paths, trailing slashes, multi-param and magic-link-style queries). The emulator
+    double-encodes reserved-character escapes such as `%2F` in query values; production is checked by the
+    runbook's post-deploy curl before relying on it. The app's own link families carry no such escapes.
+  - Legacy `public` is a committed one-file static directory `legacy-site/` (a hand-written "moved" page with a
+    link to the new address), so no build output is committed and the site has a harmless fallback page.
+- **Kept:** hosting targets (`app` → `worshipbuilder`, `legacy` → `worship-planner-bc515`), the
+  `SERVICE_SHARE_BASE_URL` default + one-slash link tests, `storage-cors.json` new origins + CORS guard, the
+  old-origin source scan, `functions/DEPLOY-EMAIL-DOMAIN.md`, the owner runbook (R453) minus settings carry,
+  once-per-browser and open-tab material, and ADR-0247 reworded for a plain redirect.

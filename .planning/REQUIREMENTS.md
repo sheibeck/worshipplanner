@@ -93,11 +93,15 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   send every request to the **same path, query string and hash** on `worshipbuilder.web.app`, so existing
   share links, magic links in already-sent emails, bookmarks and home-screen shortcuts keep working.
 
-- [ ] **R452**: On a browser's first visit through an old address, that browser's saved per-browser setup is
+- [ ] ~~**R452**: On a browser's first visit through an old address, that browser's saved per-browser setup is
   carried to the new domain — Run monitor assignments and nicknames, video key color, last-selected church,
   and list/column/section preferences (the app's own `wp`-prefixed `localStorage` keys). The hand-off is
   **allowlisted and shape-validated**, never overwrites a value already set on the new domain, and never
-  transfers authentication state; a crafted link cannot plant arbitrary keys.
+  transfers authentication state; a crafted link cannot plant arbitrary keys.~~
+  **Descoped 2026-10-27 (owner decision):** the owner is the only user at this stage, so the old addresses
+  get a plain redirect to the same page and nothing is carried. Run monitor setup, video key color, the
+  selected church and list prefs are re-set once on the new domain (runbook Step 7). No settings hand-off
+  code ships; reopen as a new requirement only if other churches need it before the old site retires.
 
 - [ ] **R453**: A cutover runbook gives the owner the exact ordered steps and checks: the pre-cutover
   allowlist steps, deploy order (new site live before the old site starts redirecting), "don't cut over
@@ -153,7 +157,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R449 | Phase 145 | Pending |
 | R450 | Phase 145 | Pending |
 | R451 | Phase 145 | Pending |
-| R452 | Phase 145 | Pending |
+| R452 | Phase 145 | Descoped (owner, 2026-10-27) |
 | R453 | Phase 145 | Pending |
 
 **Coverage:**
@@ -161,15 +165,16 @@ Which phases cover which requirements. Populated during roadmap creation.
 - v1 requirements: 13 total (R441–R453)
 - Mapped to phases: 13 (100%)
 - Unmapped: 0
+- Descoped: 1 (R452, owner decision 2026-10-27; 12 active)
 
 **Phase map:**
 
 - Phase 143 — Dated Rehearsals & Times Tab (R441, R442, R443, R444, R445) — promoted from backlog 999.6
 - Phase 144 — WorshipBuilder Rename (R446, R447) — promoted from backlog 999.2 (rename half)
-- Phase 145 — Domain Cutover to worshipbuilder.web.app (R448, R449, R450, R451, R452, R453) — promoted from backlog 999.2 (domain half); depends on 144; production steps owner-gated per deploy
+- Phase 145 — Domain Cutover to worshipbuilder.web.app (R448, R449, R450, R451, R453; R452 descoped 2026-10-27) — promoted from backlog 999.2 (domain half); depends on 144; production steps owner-gated per deploy
 
 v2 "Custom Domain & Email" requirements are tracked as backlog **999.14** in ROADMAP.md.
 
 ---
 *Requirements defined: 2026-10-27*
-*Last updated: 2026-10-27 after v2.16 ROADMAP.md creation — 3 phases (143-145), 13/13 requirements mapped*
+*Last updated: 2026-10-27 after Phase 145 planning — R452 descoped by the owner (plain redirect, no settings carry); 13/13 mapped, 12 active*
