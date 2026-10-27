@@ -63,7 +63,10 @@ phase (see `81-01-SUMMARY.md`).
 
 **`SERVICE_SHARE_BASE_URL` is intentionally left alone.** Per the locked project decision, this
 runbook changes ONLY the sender address — `SERVICE_SHARE_BASE_URL` (the base URL embedded in
-share links) stays on the Firebase Hosting default (`https://worship-planner-bc515.web.app`).
+share links) defaults to `https://worshipbuilder.web.app` (Phase 145; it was the old
+`worship-planner-bc515.web.app` before). A `SERVICE_SHARE_BASE_URL` line in the owner's local
+`functions/.env` overrides that default at deploy time, so check it during the cutover — see
+`docs/runbooks/worshipbuilder-cutover.md`.
 It is independent of the sending domain and does not need to match it. Only touch it if the
 owner separately decides share links should also originate from a custom domain — that is a
 Functions `defineString` param and DOES require a redeploy, which is out of scope here.

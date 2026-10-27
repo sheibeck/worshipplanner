@@ -3,7 +3,9 @@
     "origin": [
       "https://worship-planner-bc515.web.app",
       "https://worship-planner-bc515.firebaseapp.com",
-      "http://localhost:5173"
+      "http://localhost:5173",
+      "https://worshipbuilder.web.app",
+      "https://worshipbuilder.firebaseapp.com"
     ],
     "method": ["GET", "HEAD"],
     "responseHeader": [
