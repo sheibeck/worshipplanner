@@ -808,13 +808,16 @@ authorized domain, Storage CORS, and the `SERVICE_SHARE_BASE_URL` default. Full 
     client-side bridge on a browser's first visit. The hand-off has to be allowlisted (`wp`-prefixed keys
     only) and shape-validated, never overwrite a value already set on the new domain, and never carry auth
     state. Phase research picks the transport and should keep the payload out of server logs.
+
   - Google sign-in keeps the existing `authDomain` (`worship-planner-bc515.firebaseapp.com`) this milestone;
     switching it is v2 → backlog 999.14. Redirecting the old `firebaseapp.com` address therefore must not
     break its `/__/auth/*` handler. Before cutover, verify that Hosting's reserved `/__/` namespace takes
     precedence over configured redirects.
+
   - `firebase.json` today is one unnamed hosting block (→ default site, `predeploy: npm run build`), and
     `.firebaserc` has no hosting targets. The phase turns this into two site targets: the app → `worshipbuilder`,
     and the redirect bridge → the default `worship-planner-bc515` site.
+
   - Order matters: allowlists (R450) → new site live (R448/R449) → old site redirects (R451/R452), never
     during a service. The runbook (R453) owns the sequence, and each production step is owner-confirmed.
 
@@ -846,9 +849,13 @@ authorized domain, Storage CORS, and the `SERVICE_SHARE_BASE_URL` default. Full 
 **Plans**: 3 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 143-01-PLAN.md — createService stops seeding undated rows (report-time copy kept) + Settings helper copy + ADR-0245 + R445 cross-surface regression tests (R442, R443, R445) [wave 1]
 - [ ] 143-02-PLAN.md — formatRehearsalDateShort moved to rehearsalTimes.ts + ServiceTimesPanel.vue (add form, default-time chips, legacy markers, reject-clear, read-only list) + architecture note (R441, R442, R443, R444) [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 143-03-PLAN.md — Times tab wired into ServiceEditorView (tab + editor-only dot + panel, header block removed, validated R036-gated handlers) + action-bar 'times' branch + tab-order test updates (R441, R442, R443, R444) [wave 2]
 
 **UI hint**: yes
@@ -915,9 +922,11 @@ v2.16's v2 requirements ("Custom Domain & Email", 2026-10-27).
 
 - **Custom domain → Hosting:** buy a domain (the owner has none yet, 2026-10-27) and map it to the
   `worshipbuilder` Hosting site, which is the single app target after v2.16 Phase 145.
+
 - **Verified Resend sender:** verify that domain in Resend so volunteer, invite and magic-link email
   reaches real inboxes. A `*.web.app` address can never be verified in Resend, so until this lands the
   test sender only reaches the owner's inbox (a standing follow-up since v2.5).
+
 - **Optional — Google sign-in shows the new name:** switch the Auth `authDomain` to the new domain so the
   Google account chooser stops naming `worship-planner-bc515.firebaseapp.com`. Update the OAuth client's
   authorized redirect URI first.

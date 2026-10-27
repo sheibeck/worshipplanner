@@ -2,9 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.16
 milestone_name: Dated Rehearsals & WorshipBuilder
+current_phase: 143
+current_phase_name: not yet planned
 status: planning
-last_updated: "2026-10-27T13:52:03.952Z"
+stopped_at: Phase 143 UI-SPEC approved
+last_updated: "2026-10-27T14:12:15.052Z"
 last_activity: 2026-10-27
+last_activity_desc: v2.16 ROADMAP.md created (3 phases, 143-145; R441-R453, 13/13 mapped)
 progress:
   total_phases: 3
   completed_phases: 0
@@ -19,11 +23,12 @@ progress:
   `worshipbuilder.web.app`); old domain = **redirect + carry per-browser settings**; no milestone-level
   research. Run via `/gsd-autonomous` with human/visual/hardware UAT **batched to milestone end** —
   deferrals are PENDING, never owner-accepted. Production deploys still need per-deploy owner confirmation.
+
 - Prod Auth change made 2026-10-27 with explicit owner consent: Email/Password provider enabled with
   `passwordRequired: false` (Email-link on) via the Identity Toolkit admin API — it had been **disabled**,
   so v2.5 password sign-in and v2.12/v2.13 volunteer magic-link sign-in could not work in production.
-- Owner has no email domain yet: Resend verified-sender stays deferred (backlog).
 
+- Owner has no email domain yet: Resend verified-sender stays deferred (backlog).
 
 ## Deferred Items (v2.15 close — 2026-09-21)
 
@@ -4759,9 +4764,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-09-19T06:43:45.362Z
-Stopped at: Completed 142-04-PLAN.md
-Resume file: None
+Last session: 2026-10-27T14:12:14.982Z
+Stopped at: Phase 143 UI-SPEC approved
+Resume file: .planning/phases/143-dated-rehearsals-times-tab/143-UI-SPEC.md
 
 ## Operator Next Steps
 
