@@ -263,3 +263,4 @@ re-deriving the rationale). Plus an optional **Source comments** backlink list o
 | ADR-0243 | [HIDE-ON-FAIL when messaging is off (owner UAT, 2026-08-17): "The](./0243-hide-on-fail-when-messaging-is-off-owner-uat-2026-08-17-the.md) | Accepted |
 | ADR-0244 | ["Suggest All Songs" is a live AI entry point (calls](./0244-suggest-all-songs-is-a-live-ai-entry-point-calls.md) | Accepted |
 | ADR-0245 | [Rehearsals are always dated; org-default times pre-fill the add form](./0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md) | Accepted |
+| ADR-0246 | [App brand is WorshipBuilder; internal identifiers keep their names](./0246-app-brand-is-worshipbuilder-internal-identifiers-keep-their-names.md) | Accepted |
