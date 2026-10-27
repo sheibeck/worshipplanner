@@ -4,9 +4,9 @@ milestone: v2.16
 milestone_name: Dated Rehearsals & WorshipBuilder
 current_phase: 143
 current_phase_name: Dated Rehearsals & Times Tab
-status: verifying
+status: executing
 stopped_at: Completed 143-03-PLAN.md
-last_updated: "2026-10-27T15:49:13.807Z"
+last_updated: "2026-10-27T16:48:34.294Z"
 last_activity: 2026-10-27
 last_activity_desc: Phase 143 execution started
 progress:
@@ -119,7 +119,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1467,7 +1467,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 143 (Dated Rehearsals & Times Tab) — EXECUTING
 Plan: 3 of 3
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Last activity: 2026-10-27 — Phase 143 execution started
 
 Progress: [██████████] 100% (0/3 phases)
