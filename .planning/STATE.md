@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v2.16
 milestone_name: Dated Rehearsals & WorshipBuilder
 current_phase: 143
-current_phase_name: not yet planned
-status: planning
-stopped_at: Phase 143 UI-SPEC approved
-last_updated: "2026-10-27T14:12:15.052Z"
+current_phase_name: Dated Rehearsals & Times Tab
+status: executing
+stopped_at: Completed 143-01-PLAN.md
+last_updated: "2026-10-27T14:59:32.813Z"
 last_activity: 2026-10-27
-last_activity_desc: v2.16 ROADMAP.md created (3 phases, 143-145; R441-R453, 13/13 mapped)
+last_activity_desc: Phase 143 execution started
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
   percent: 0
 ---
 
@@ -108,7 +108,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** v2.15 milestone complete
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1444,7 +1444,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 143 — Dated Rehearsals & Times Tab (v2.16, Phases 143-145)
+**Current focus:** Phase 143 — Dated Rehearsals & Times Tab
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1454,12 +1454,12 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 143 (not yet planned)
-Plan: —
-Status: Roadmap created — ready to plan Phase 143
-Last activity: 2026-10-27 — v2.16 ROADMAP.md created (3 phases, 143-145; R441-R453, 13/13 mapped)
+Phase: 143 (Dated Rehearsals & Times Tab) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-10-27 — Phase 143 execution started
 
-Progress: [░░░░░░░░░░] 0% (0/3 phases)
+Progress: [███░░░░░░░] 33% (0/3 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3791,6 +3791,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 142 P02 | 16min | 3 tasks | 8 files |
 | Phase 142 P03 | 15min | 2 tasks | 3 files |
 | Phase 142 P04 | 31min | 3 tasks | 6 files |
+| Phase 143 P01 | 25min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -4423,6 +4424,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 142-04: onAttachGroupVamp's role=dialog test dropped rather than migrated — strip's own popover legitimately carries role=dialog while open
 - [Phase ?]: 142-04: locked/non-editor tests rewritten to assert inert-span chip + no popover, since the child control never mounts at all under the supersede-hide rule
 - [Phase ?]: 142-04: SlidesTab.recentBackgrounds casts updatedAt through {seconds?:number} so plain test fixtures sort safely without a real Timestamp instance
+- [Phase ?]: 143-01: createService writes rehearsals [] explicitly; org default rehearsal times only pre-fill the Times-tab add form (ADR-0245); reportTime still copied at creation
 
 ### Roadmap Evolution
 
@@ -4764,9 +4766,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-10-27T14:12:14.982Z
-Stopped at: Phase 143 UI-SPEC approved
-Resume file: .planning/phases/143-dated-rehearsals-times-tab/143-UI-SPEC.md
+Last session: 2026-10-27T14:59:32.649Z
+Stopped at: Completed 143-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 

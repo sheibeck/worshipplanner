@@ -38,13 +38,13 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   and an existing rehearsal's date cannot be cleared back to blank. The editor can no longer create an
   undated rehearsal row.
 
-- [ ] **R442**: The org-default rehearsal time(s) still apply, **without creating undated rows**: a new
+- [x] **R442**: The org-default rehearsal time(s) still apply, **without creating undated rows**: a new
   service no longer receives date-less placeholder rehearsals; instead the org default(s) supply the
   rehearsal time when rehearsals are added (or are applied as dated rows relative to the service date —
   decided in discuss). The org-default **report time** keeps its current behavior (copied onto a new
   service). Changing an org default still never mutates an existing service.
 
-- [ ] **R443**: Services created under v2.15 that already carry **undated** rehearsal rows lose no data: the
+- [x] **R443**: Services created under v2.15 that already carry **undated** rehearsal rows lose no data: the
   planner sees each such row flagged as needing a date and can date or remove it, and an undated row stays
   hidden from every read-only and public surface until it is dated. No migration guesses dates.
 
@@ -57,7 +57,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   (editable in Draft by editors, read-only when locked or for non-editors), and the same autosave and save
   status. Nothing for times remains above the tab strip.
 
-- [ ] **R445**: Everywhere rehearsals and report time display today (dashboard, Services cards, My Schedule,
+- [x] **R445**: Everywhere rehearsals and report time display today (dashboard, Services cards, My Schedule,
   the volunteer service view, the public plan/share page, and both public projections
   `buildServiceSnapshot` / `buildRehearseAccess`) keeps working unchanged for dated rehearsals — the R433
   behavior is regression-guarded, not reworked.
@@ -115,6 +115,7 @@ Deferred to a future release. Tracked but not in this roadmap.
 - **Custom domain + verified email sender** — buy a domain, map it to the `worshipbuilder` Hosting site,
   and verify it in Resend so volunteer email reaches real inboxes (a `*.web.app` address can never be
   verified). Owner has no domain yet (2026-10-27).
+
 - **Google sign-in shows the new name** — switch the Auth `authDomain` to the new domain (needs the OAuth
   client's redirect URI updated) so the Google account chooser stops naming `worship-planner-bc515.firebaseapp.com`.
 
@@ -142,10 +143,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R441 | Phase 143 | Pending |
-| R442 | Phase 143 | Pending |
-| R443 | Phase 143 | Pending |
+| R442 | Phase 143 | Complete |
+| R443 | Phase 143 | Complete |
 | R444 | Phase 143 | Pending |
-| R445 | Phase 143 | Pending |
+| R445 | Phase 143 | Complete |
 | R446 | Phase 144 | Pending |
 | R447 | Phase 144 | Pending |
 | R448 | Phase 145 | Pending |
