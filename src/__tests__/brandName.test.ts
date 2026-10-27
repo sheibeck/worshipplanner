@@ -166,7 +166,7 @@ describe('brand guard (R446/R447)', () => {
       'Worship_Planner',
       'WorshipPlanner',
       'worship planner',
-      'Worship Planner',
+      'Worship\u00a0Planner', // non-breaking space
     ]) {
       expect(hasOldName('src/x.vue', `<p>Welcome to ${v}</p>`), v).toBe(true)
     }
