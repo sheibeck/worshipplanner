@@ -40,6 +40,7 @@ owner-accepted.
 | Phase | State | Resume |
 |-------|-------|--------|
 | 143 | verification_deferred_human (auto-verified 5/5 roadmap criteria, full suite at baseline 6055 pass, type-check clean, code review clean after 1 fix round; 6 browser/visual/AT UAT items pending) | /gsd-verify-work 143 |
+| 144 | verification_deferred_human (auto-verified 12/12, root suite at baseline + functions 722/722, type gates clean, identifier gate clean, code review clean after 1 fix round incl. new functions predeploy build; 4 post-deploy/visual/decision UAT items pending) | /gsd-verify-work 144 |
 
 ## Deferred Items (v2.15 close — 2026-09-21)
 
