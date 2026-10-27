@@ -28,79 +28,69 @@ files_reviewed_list:
   - src/views/__tests__/serviceEditorActionBar.test.ts
 findings:
   critical: 0
-  warning: 3
+  warning: 0
   info: 3
-  total: 6
-status: issues_found
+  total: 3
+status: clean
 ---
 
-# Phase 143: Code Review Report
+# Phase 143: Code Review Report (iteration 2)
 
 **Reviewed:** 2026-10-27
 **Depth:** standard
 **Files Reviewed:** 22
-**Status:** issues_found
+**Status:** clean (no critical or warning findings; 3 info items remain)
 
 ## Summary
 
-The phase swaps the seeded-undated-row model for an add-form-only model. It adds `ServiceTimesPanel.vue`, a Times tab, parent-side handler guards, and the `createService` change to `rehearsals: []`. The core invariants hold. Read-only surfaces still go through the unchanged `isDisplayableRehearsal` filter. The read-only branch of the panel is a bare `v-if="!canEdit"`, so the editable branch can never render for a viewer. Every parent handler re-checks `canEditService`. The `createService` change cannot leak undated rows. The autosave payload and its post-save snapshot comparison already mirror `rehearsals`/`reportTime`, so `isDirty` does not strand.
+This pass re-reviewed the phase after the iteration-1 fixes (d1910d89 for WR-01, 716aea7a for WR-02). I traced each fix and the code it touches. I also evaluated the skipped WR-03.
 
-No blockers. The three warnings are all input-validation edge cases at the panel/parent boundary, plus one duplicate-key case.
+**WR-01 (resolved).** `YMD_RE` and `HM_RE` now have a single definition in `src/utils/rehearsalTimes.ts`. The panel and `ServiceEditorView.vue` both import them.
+- Add path: `canAdd` requires both patterns, so a malformed date can never reach `emit('add')`. `onSubmitAdd` re-checks `canAdd`, so a form submit by Enter is covered too.
+- Edit path: `onFieldChange` handles three cases in order.
+  - A cleared value on a dated row is forced back to the stored value, with the existing "needs a date" message.
+  - A cleared value on an already-empty legacy row returns silently.
+  - A malformed non-empty value forces `el.value` back and shows the "not valid" message. This also works for a legacy empty row, where `current` is `''`.
+- Parent guards: `onRehearsalDateChange` and `onRehearsalTimeChange` use the same regexes, so the panel and parent can no longer disagree.
+- Regex precedence: in `newDate === '' ? rehearsal.date !== '' : !YMD_RE.test(newDate)`, the ternary binds correctly. An empty value is only allowed through for a row that is already empty.
+- Year cap: `max="9999-12-31"` on both date inputs stops the 5-6 digit year at the source in Chrome.
+- Tests: the three new panel tests cover the malformed edit, the malformed add, and the `max` attribute.
 
-## Warnings
+**WR-02 (resolved).**
+- Save: `onSaveRehearsalDefaults` de-duplicates with `[...new Set(filter(...))]`. Order is preserved, and the local input list is reset to the de-duplicated array after a successful save.
+- Panel: `chipTimes` is a de-duplicated computed, and the chip row is gated on `chipTimes.length > 1`. This covers legacy duplicates that are already saved. The `:key="t"` values are now unique.
+- Tests: both are covered.
 
-### WR-01: Parent regex guards silently drop values the panel accepts (6-digit year typo loses the rehearsal or desyncs the DOM)
+**WR-03 (skip rationale accepted).** The fixer's reasoning holds.
+- The Remove button lives only inside the `v-else` branch of `v-if="!canEdit"`, and the add form with its date input is mounted in that same branch. The prop that gates both is the same value as the parent's `canEditService`.
+- The only way for focus to be lost is the lock flipping between the click and the re-render. In that case the whole editable branch unmounts, and no alternative focus target in this component would survive.
+- `nextTick(() => newDateInput.value?.focus())` is null-safe.
+- Making it correct would need a new focusable root or a parent-owned ref, which is disproportionate for a transient edge case. I am not re-raising it.
 
-**File:** `src/views/ServiceEditorView.vue:2759-2795` (guards), `src/components/ServiceTimesPanel.vue:69-82,103-116`
-**Issue:** The panel treats any non-empty `<input type=date>` value as valid. The parent then applies `YMD_RE = /^\d{4}-\d{2}-\d{2}$/` and silently returns on a mismatch. Chrome lets a user keep typing digits into the year segment, up to 6 digits, so a typo such as year `20266` yields the value `20266-01-01`. That value fails the regex. Two outcomes follow:
-- **Add path:** `onSubmitAdd` emits, the parent drops the row without a message, and the panel then clears `newDate`, resets the time and refocuses. The planner sees the form reset as if the add succeeded, and no row appears. This is silent data loss.
-- **Edit path:** `onFieldChange` emits `date-change`, the parent rejects it, and the model keeps the old date. The native input keeps showing the rejected value, because Vue does not repaint an unchanged one-way binding. The panel's own revert-forcing exists for exactly this case, but it only covers the `''` case. The DOM and the state then disagree, and the planner believes the new date was saved.
-
-**Fix:** Validate in the panel with the same patterns as the parent, so the reject-clear and revert UX also covers malformed values. Share the regexes from `rehearsalTimes.ts`.
-```ts
-// rehearsalTimes.ts
-export const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
-export const HM_RE = /^\d{2}:\d{2}$/
-
-// ServiceTimesPanel.vue
-const canAdd = computed(() => props.canEdit && YMD_RE.test(newDate.value) && HM_RE.test(newTime.value))
-// onFieldChange: treat a non-matching, non-empty value like the '' case
-const valid = field === 'date' ? YMD_RE.test(next) : HM_RE.test(next)
-if (next !== '' && !valid && current !== '') { el.value = current; showRevert(row.id, field); return }
-```
-Also add `max="9999-12-31"` to the date inputs. The two guard sites then share one definition.
-
-### WR-02: Duplicate org default times produce duplicate `:key` values and two "pressed" chips
-
-**File:** `src/components/ServiceTimesPanel.vue:289-302`, `src/views/SettingsView.vue:1352`
-**Issue:** The Settings save only filters out `''` entries (`rehearsalTimeDefaultsInput.value.filter((t) => t !== '')`), so `['18:30','18:30']` persists. The panel then renders chips with `:key="t"`, which duplicates the key. Vue warns, patching is unreliable, and both chips show `aria-pressed=true`.
-**Fix:** De-duplicate when saving in SettingsView (`[...new Set(...)]`), and defensively in the panel (`const chips = computed(() => [...new Set(props.defaultTimes)])`, rendered with `chips.length > 1`).
-
-### WR-03: Panel row removal and field edits have no guard against a stale `canEdit` flip while the revert timer is live (minor), and Remove steals focus unconditionally
-
-**File:** `src/components/ServiceTimesPanel.vue:122-125`
-**Issue:** `onRemove` always calls `focusAddDate()`, even when the emit was a no-op in the parent (service just locked, so `canEditService` is false and the add form has been unmounted by the `v-if`). `nextTick(() => newDateInput.value?.focus())` is null-safe, so nothing crashes. A keyboard user is left with focus dropped to `<body>` after the editable branch unmounts. This is a minor a11y and robustness issue rather than a crash.
-**Fix:** Only move focus when the add input is still mounted. The optional chain already covers the null case, so the practical fix is to focus the next remaining row's control (or the tab button) when the add form is gone. Low priority.
+I found no new bugs, security issues, or regressions in the changed hunks. The read-only branch is still a bare `v-if="!canEdit"`, and every parent handler still re-checks `canEditService`. The `serviceEditorActionBar` and store changes are unchanged since the previous pass.
 
 ## Info
 
-### IN-01: Attention dot is gated on `authStore.isEditor`, not `canEditService`
+### IN-01: Attention dot gated on `authStore.isEditor`, not `canEditService` (carried over, unchanged)
 
-**File:** `src/views/ServiceEditorView.vue:~842`
-**Issue:** On a locked service, an editor sees the amber "needs attention" dot for legacy undated rows. The panel is read-only there and hides those rows, so the dot points at nothing actionable.
-**Fix:** Gate on `canEditService && hasNonDisplayableRehearsal`, or accept the current behavior and document it in ADR-0245.
+**File:** `src/views/ServiceEditorView.vue:837`
+**Issue:** On a locked service, an editor still sees the "needs attention" indicator for legacy undated rows. The panel is read-only there and hides those rows, so the indicator points at nothing actionable.
+**Fix:** Gate on `canEditService && hasNonDisplayableRehearsal`, or record the current behavior in ADR-0245.
 
-### IN-02: Dynamically inserted `role="status"` revert message may not be announced
+### IN-02: Dynamically inserted `role="status"` message may not be announced (carried over, unchanged)
 
-**File:** `src/components/ServiceTimesPanel.vue:232-243`
-**Issue:** A live region that is inserted into the DOM already populated is announced unreliably by some screen readers. The reject-clear explanation therefore may not reach those users.
-**Fix:** Keep a persistent `<p role="status" class="sr-only">` container per panel and update its text, or use `aria-live="polite"` on a stable wrapper.
+**File:** `src/components/ServiceTimesPanel.vue:243-258`
+**Issue:** Some screen readers announce a live region inserted already populated unreliably. The reject-clear and invalid-value explanations may therefore not reach those users.
+**Fix:** Keep a persistent `role="status"` container per row (or one per panel) and update only its text.
 
-### IN-03: `services.rehearsalDefaults.test.ts` second case no longer tests rehearsal copy independence
+### IN-03: Misleading test name and dead `:disabled="!canEdit"` bindings (partly carried over)
 
-**File:** `src/stores/__tests__/services.rehearsalDefaults.test.ts:~100-120`
-**Issue:** With `rehearsals` now always `[]`, the "copy-not-live-bind ... byte-identical" test asserts `[]` equals `[]` for rehearsals. Only the `reportTime` half remains meaningful. The test name still implies rehearsal coverage.
-**Fix:** Rename it to focus on the `reportTime` copy. Optionally add an assertion that mutating `rehearsalTimeDefaults` afterward does not change the already-created payload's `rehearsals` (still `[]`).
+**File:** `src/stores/__tests__/services.rehearsalDefaults.test.ts` (~100-120); `src/components/ServiceTimesPanel.vue:185,218,227,235`
+**Issue:**
+- With `rehearsals` always `[]`, the "copy-not-live-bind" test only meaningfully covers `reportTime`, but its name still implies rehearsal coverage.
+- The `:disabled="!canEdit"` bindings sit inside the `v-else` (canEdit true) branch, so they are always false and are dead code. This is harmless, but it can mislead a reader into thinking a disabled editable state exists.
+
+**Fix:** Rename the test to focus on the `reportTime` copy. Drop the redundant `:disabled` bindings, or leave them as deliberate defense in depth with a one-line note.
 
 ---
 
