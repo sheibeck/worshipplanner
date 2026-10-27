@@ -66,6 +66,22 @@ describe("sendAdminOnboardingEmail", () => {
     expect(arg.text).toContain("Sign in to WorshipBuilder to get started: https://app.example.com");
   });
 
+  it("kind='added' with a trailing-slash base renders exactly one slash-free origin (R449)", async () => {
+    fakeShareBaseUrl = "https://worshipbuilder.web.app/";
+    mockConfig("onboarding@resend.dev");
+
+    await sendAdminOnboardingEmail({
+      db: FAKE_DB,
+      to: "admin@church.org",
+      orgName: "Grace Church",
+      kind: "added",
+    });
+
+    const arg = mockSend.mock.calls[0]![0] as { text: string };
+    expect(arg.text).toContain("Sign in to WorshipBuilder to get started: https://worshipbuilder.web.app");
+    expect(arg.text).not.toContain("worshipbuilder.web.app/");
+  });
+
   it("kind='invited': distinct subject telling them to sign in WITH THIS EMAIL", async () => {
     mockConfig("onboarding@resend.dev");
 

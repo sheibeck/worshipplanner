@@ -17,10 +17,12 @@ export const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
  * app's hosting domain so links always render; override at deploy time for a
  * custom domain or locally (e.g. http://localhost:5173) for dev links. A blank
  * value renders as '' rather than a broken URL. A `*.web.app` address can never
- * be verified in Resend (Google-managed, no DNS access).
+ * be verified in Resend (Google-managed, no DNS access). A SERVICE_SHARE_BASE_URL
+ * line in the local functions/.env wins over this default at deploy (see the
+ * cutover runbook).
  */
 export const SERVICE_SHARE_BASE_URL = defineString("SERVICE_SHARE_BASE_URL", {
-  default: "https://worship-planner-bc515.web.app",
+  default: "https://worshipbuilder.web.app",
 });
 
 /**

@@ -6021,6 +6021,33 @@ describe("sendQueuedMessageHandler", () => {
     expect(alice.text).toBe("Plan: https://app.example.com/share/new_token");
   });
 
+  it("trailing-slash base: {{service_link}} still has exactly one slash before /share (R449)", async () => {
+    fakeShareBaseUrl = "https://worshipbuilder.web.app/";
+    const cfg = twoRecipientConfig({ body: "Plan: {{service_link}}" });
+    cfg.shareTokens = [{ token: "new_token", orgId: ORG_ID, createdAtMs: 5000 }];
+    const { db } = makeSendDb(cfg);
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const alice = mockSend.mock.calls.find((c) => (c[0] as { to: string }).to === "alice@example.com")![0] as { text: string };
+    expect(alice.text).toBe("Plan: https://worshipbuilder.web.app/share/new_token");
+  });
+
+  it("trailing-slash base: the rehearse magic-link continue URL is origin + /volunteer/verify (R449)", async () => {
+    fakeShareBaseUrl = "https://worshipbuilder.web.app/";
+    const { db } = makeSendDb(twoRecipientConfig());
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await sendQueuedMessageHandler({ orgId: ORG_ID, serviceId: SERVICE_ID, messageId: MESSAGE_ID });
+
+    const mint = vi.mocked(vi.mocked(getAuth)().generateSignInWithEmailLink);
+    expect(mint.mock.calls[0]![1]).toEqual({
+      url: "https://worshipbuilder.web.app/volunteer/verify",
+      handleCodeInApp: true,
+    });
+  });
+
   it("{{service_link}} renders '' when no share token exists for the service (A1 empty substitution)", async () => {
     fakeShareBaseUrl = "https://app.example.com";
     const cfg = twoRecipientConfig({ body: "Plan:{{service_link}}" });

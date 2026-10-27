@@ -84,6 +84,20 @@ describe("mintAndSendVolunteerLink", () => {
     expect(mockSend).toHaveBeenCalledTimes(1);
   });
 
+  it("trailing-slash base still yields exactly one slash before /volunteer/verify (R449)", async () => {
+    fakeShareBaseUrl = "https://worshipbuilder.web.app/";
+
+    await mintAndSendVolunteerLink({
+      db,
+      to: "vol@example.com",
+      orgName: "Grace Church",
+      slug: "grace-church",
+    });
+
+    const [, settings] = mockGenerateLink.mock.calls[0];
+    expect(settings.url).toBe("https://worshipbuilder.web.app/volunteer/verify?slug=grace-church");
+  });
+
   it("sends a standalone subject/body (NOT a service-reminder template), embedding the minted link", async () => {
     await mintAndSendVolunteerLink({
       db,

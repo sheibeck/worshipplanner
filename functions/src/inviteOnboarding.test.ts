@@ -284,6 +284,19 @@ describe("google", () => {
     expect(arg.text).toContain("You've been invited to help lead Grace Church on WorshipBuilder.");
   });
 
+  it("trailing-slash base renders the origin with no double or trailing slash (R449)", async () => {
+    fakeShareBaseUrl = "https://worshipbuilder.web.app/";
+    mockAuth();
+    const fake = seedOrg(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db());
+
+    await sendInviteOnboardingEmailHandler(fakeRequest({ data: { email: "Bob@GMAIL.com" } }));
+
+    const arg = mockSend.mock.calls[0]![0] as { text: string };
+    expect(arg.text).toContain("to get started: https://worshipbuilder.web.app");
+    expect(arg.text).not.toContain("worshipbuilder.web.app/");
+  });
+
   it("a Resend API error (returned, not thrown) resolves emailSent:false, not a false 'sent'", async () => {
     // The Resend SDK resolves with { data, error } on an API-level rejection
     // (e.g. test-mode "can only send to your own address"); it does NOT throw.
@@ -337,6 +350,20 @@ describe("set-password / createUser", () => {
     expect(arg.text.toLowerCase()).toContain("google");
     expect(arg.subject).toBe("You've been invited to Grace Church on WorshipBuilder");
     expect(arg.text).toContain("You've been invited to help lead Grace Church on WorshipBuilder.");
+  });
+
+  it("trailing-slash base: the password-reset continue URL has no trailing slash (R449)", async () => {
+    fakeShareBaseUrl = "https://worshipbuilder.web.app/";
+    const { generatePasswordResetLink } = mockAuth();
+    const fake = seedOrg(new FakeFirestore());
+    vi.mocked(getFirestore).mockReturnValue(fake.db());
+
+    await sendInviteOnboardingEmailHandler(fakeRequest());
+
+    const resetArgs = generatePasswordResetLink.mock.calls[0] as unknown as [string, unknown];
+    expect(resetArgs[1]).toEqual({
+      url: "https://worshipbuilder.web.app",
+    });
   });
 
   it("existing user: getUserByEmail resolves -> createUser NOT called, link+send still happen", async () => {
