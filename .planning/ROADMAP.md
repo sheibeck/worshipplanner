@@ -843,7 +843,14 @@ authorized domain, Storage CORS, and the `SERVICE_SHARE_BASE_URL` default. Full 
 
   5. Dated rehearsals and the report time still show exactly as before on the dashboard, Services cards, My Schedule, the volunteer service view, the public plan/share page and both public projections (`buildServiceSnapshot` / `buildRehearseAccess`), with regression tests guarding the R433 behavior (R445).
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+
+- [ ] 143-01-PLAN.md — createService stops seeding undated rows (report-time copy kept) + Settings helper copy + ADR-0245 + R445 cross-surface regression tests (R442, R443, R445) [wave 1]
+- [ ] 143-02-PLAN.md — formatRehearsalDateShort moved to rehearsalTimes.ts + ServiceTimesPanel.vue (add form, default-time chips, legacy markers, reject-clear, read-only list) + architecture note (R441, R442, R443, R444) [wave 1]
+- [ ] 143-03-PLAN.md — Times tab wired into ServiceEditorView (tab + editor-only dot + panel, header block removed, validated R036-gated handlers) + action-bar 'times' branch + tab-order test updates (R441, R442, R443, R444) [wave 2]
+
 **UI hint**: yes
 
 Area: `src/views/ServiceEditorView.vue` (Times block above the tab strip + the tab strip itself),
