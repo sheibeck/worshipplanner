@@ -1,7 +1,7 @@
 ---
 phase: 144
 slug: worshipbuilder-rename
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-10-27
@@ -20,6 +20,8 @@ changes. Source of decisions: `144-CONTEXT.md` (locked; none re-asked).
 
 ## Design System
 
+**Visual hierarchy:** unchanged — the `<h1>` brand heading on the auth/volunteer screens and the sidebar/shell brand span remain the focal brand elements; only their text changes.
+
 Unchanged — inherited from existing markup at the lines listed in the Copywriting Contract.
 
 | Property | Value |
@@ -35,7 +37,7 @@ Unchanged — inherited from existing markup at the lines listed in the Copywrit
 ## Spacing Scale
 
 Unchanged — inherited from existing markup at the listed lines. No spacing token is added, altered, or removed.
-Exceptions: none.
+Exceptions: `ml-3` (12px) on `AppShell.vue:30` is pre-existing and unchanged — outside the standard set but retained because this phase is copy-only.
 
 Note on width: "WorshipBuilder" (14 chars) is shorter than "Worship Planner" (15 chars incl. space), so no
 wrap/overflow regression is possible in any brand slot. The footer strings ("Shared from WorshipBuilder",
@@ -62,7 +64,7 @@ Unchanged — inherited. The executor MUST NOT edit any class attribute. Existin
 
 Unchanged — inherited from existing markup (gray-950 dark app surfaces, white/gray-200/100 brand text, light
 gray-200 border / gray-400 text on share and print footers). No accent or destructive color is introduced.
-Accent reserved for: not applicable (no accent usage in this phase).
+Accent reserved for: none — no accent element is touched in this phase.
 
 ---
 
