@@ -5,15 +5,15 @@ milestone_name: Dated Rehearsals & WorshipBuilder
 current_phase: 143
 current_phase_name: Dated Rehearsals & Times Tab
 status: executing
-stopped_at: Completed 143-01-PLAN.md
-last_updated: "2026-10-27T14:59:32.813Z"
+stopped_at: Completed 143-02-PLAN.md
+last_updated: "2026-10-27T15:14:19.920Z"
 last_activity: 2026-10-27
 last_activity_desc: Phase 143 execution started
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -1455,11 +1455,11 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 143 (Dated Rehearsals & Times Tab) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-10-27 — Phase 143 execution started
 
-Progress: [███░░░░░░░] 33% (0/3 phases)
+Progress: [███████░░░] 67% (0/3 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3792,6 +3792,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 142 P03 | 15min | 2 tasks | 3 files |
 | Phase 142 P04 | 31min | 3 tasks | 6 files |
 | Phase 143 P01 | 25min | 3 tasks | 12 files |
+| Phase 143 P02 | 25min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -4425,6 +4426,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 142-04: locked/non-editor tests rewritten to assert inert-span chip + no popover, since the child control never mounts at all under the supersede-hide rule
 - [Phase ?]: 142-04: SlidesTab.recentBackgrounds casts updatedAt through {seconds?:number} so plain test fixtures sort safely without a real Timestamp instance
 - [Phase ?]: 143-01: createService writes rehearsals [] explicitly; org default rehearsal times only pre-fill the Times-tab add form (ADR-0245); reportTime still copied at creation
+- [Phase ?]: 143-02: legacy non-displayable rehearsal rows render first in the Times panel (local partition); sortRehearsals unchanged
 
 ### Roadmap Evolution
 
@@ -4766,8 +4768,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-10-27T14:59:32.649Z
-Stopped at: Completed 143-01-PLAN.md
+Last session: 2026-10-27T15:14:19.843Z
+Stopped at: Completed 143-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
