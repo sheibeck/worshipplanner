@@ -1,7 +1,7 @@
 ---
 phase: 143
 slug: dated-rehearsals-times-tab
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-10-27
@@ -45,20 +45,21 @@ Declared values (multiples of 4), mapped to the Tailwind classes already used in
 | xs | 4px | `gap-1` tab strip gap; chip-to-chip micro gap; amber dot offset from tab label (`ml-1`) |
 | sm | 8px | `gap-2` between date input / time input / Remove in a row; `space-y-2` between rehearsal rows; chip row `gap-2` |
 | md | 16px | `p-4` section card padding; `px-4` tab padding; `space-y-4` between the Report time and Rehearsals sections |
-| lg | 24px | `mt-6` gap between the add form and the list when the list is non-empty (if a divider is used) |
+| md- | 12px | `mb-3` under section headings/helper; `mt-3 pt-3` divider between the list and the add form (inherited from the editor's existing `mb-3` rhythm) |
+| lg | 24px | not used (the divider uses 12px, see md-) |
 | xl | 32px | not used |
 | 2xl | 48px | not used |
 | 3xl | 64px | not used |
 
 Exceptions: the amber tab dot is 8px (`h-2 w-2`, a multiple of 4 and the only fixed-size element). Input vertical padding
 keeps the existing `py-1.5` (6px) / `px-2` used by the current rehearsal inputs, so migrated controls look identical to
-today; this is an inherited exception, not a new one. The Add button reuses `px-4 py-2` (16/8px).
+today; this is an inherited exception, not a new one. The Add button reuses `px-4 py-2` (16/8px). The reused amber marker badge keeps its inherited `px-1.5 py-0.5` (6/2px) padding.
 
 ---
 
 ## Typography
 
-Only sizes/weights already present in the editor are used (3 sizes, 2 weights):
+Only sizes/weights already present in the editor are used (3 sizes, 3 weights: 400/600 plus 500 inherited from the sibling tab and button recipes):
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
@@ -99,6 +100,8 @@ Disabled controls: `disabled:opacity-50 disabled:cursor-not-allowed` (existing `
 ---
 
 ## Layout & Components
+
+**Focal point:** in the editable state, the Rehearsals add form (the only primary/indigo action on the tab); in the read-only state, the rehearsal list.
 
 ### Tab button (R444)
 
@@ -188,7 +191,7 @@ remains above the tab strip. Its inline comment is replaced by at most a 1-2 lin
 - **Legacy row (no date or no time):** the marker and amber border are shown; setting the missing field clears the marker immediately. The reject-clear rule applies only once the field has a value.
 - **Remove:** immediate, no confirm dialog (consistent with existing Remove behavior in Times and Settings; recoverable by re-adding). Focus moves to the Add form's date input after removal.
 - **Save status:** the existing persistent save status line in the editor header region continues to reflect autosave (no new indicator in the panel).
-- **Keyboard / a11y:** tab uses the existing roving-tabindex (ADR-0217) with arrow keys; `'times'` must be in `visibleTabOrder` so ArrowRight from Messages (editor) / Slides (viewer) wraps correctly. All inputs have visible `<label>`s (new form, report time) or an `aria-label` on row inputs ("Rehearsal date", "Rehearsal time"). Touch targets: inputs and Add button are >=36px tall on desktop; on mobile (<640px) form inputs and Add button are full width (`w-full`) so they are comfortable tap targets. Amber is never the only signal: the text marker "Needs a date" accompanies it, and the tab dot has `sr-only` text.
+- **Keyboard / a11y:** tab uses the existing roving-tabindex (ADR-0217) with arrow keys; `'times'` must be in `visibleTabOrder` so ArrowRight from Messages (editor) / Slides (viewer) wraps correctly. All inputs have visible `<label>`s (new form, report time) or an `aria-label` on row inputs ("Rehearsal date", "Rehearsal time"). Touch targets: inputs render about 34px tall on desktop (text-sm + inherited `py-1.5` + border, identical to today's controls) and the Add button about 36px; on mobile (<640px) form inputs and Add button are full width (`w-full`) so they are comfortable tap targets. Amber is never the only signal: the text marker "Needs a date" accompanies it, and the tab dot has `sr-only` text.
 - **Tab persistence:** switching tabs uses `v-show` so form state (a half-filled add form) survives tab changes within a session.
 
 ---
@@ -223,7 +226,7 @@ Empty-state rows for the editable view render the heading as `text-sm font-mediu
 
 ## UI Considerations
 
-Applicable state considerations resolved: 8 covered, 1 backstop, 1 unresolved
+Applicable state considerations resolved: 9 covered, 1 backstop, 0 unresolved
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
@@ -236,7 +239,7 @@ Applicable state considerations resolved: 8 covered, 1 backstop, 1 unresolved
 | permission | Editor non-Draft / viewer | ✅ covered | Times tab is visible to everyone; edit controls render only when `canEditService`, otherwise the read-only list is shown; amber dot is editors-only. |
 | responsive | Rehearsal rows / add form | ✅ covered | Rows and the add form stack vertically below 640px with full-width inputs, inline from 640px up. |
 | overflow | Tab strip with 6 tabs on narrow screens | 🧪 backstop | The strip already has `overflow-x-auto scrollbar-hide`; verify via visual check at 360px that the Times tab is reachable by scroll and the active tab scrolls into view. |
-| long-text | Many rehearsals (10+) | ⚠ unresolved | No cap or pagination is specified; planner assumes the list simply grows with the page (no inner scroll). |
+| long-text | Many rehearsals (10+) | covered | No cap, no inner scroll: the list grows with the page (the tab panel scrolls with the editor). Real services carry 0-3 rehearsals, so a cap adds no value. |
 
 ---
 
