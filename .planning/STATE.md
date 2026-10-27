@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.16
 milestone_name: Dated Rehearsals & WorshipBuilder
-current_phase: 143
-current_phase_name: Dated Rehearsals & Times Tab
+current_phase: 144
+current_phase_name: WorshipBuilder Rename
 status: executing
-stopped_at: Completed 143-03-PLAN.md
-last_updated: "2026-10-27T16:48:34.294Z"
+stopped_at: Completed 144-01-PLAN.md
+last_updated: "2026-10-27T17:05:00.820Z"
 last_activity: 2026-10-27
-last_activity_desc: Phase 143 execution started
+last_activity_desc: Phase 144 execution started
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
   percent: 33
 ---
 
@@ -1455,7 +1455,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 143 — Dated Rehearsals & Times Tab
+**Current focus:** Phase 144 — WorshipBuilder Rename
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1465,12 +1465,12 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 143 (Dated Rehearsals & Times Tab) — EXECUTING
-Plan: 3 of 3
+Phase: 144 (WorshipBuilder Rename) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-10-27 — Phase 143 execution started
+Last activity: 2026-10-27 — Phase 144 execution started
 
-Progress: [██████████] 100% (0/3 phases)
+Progress: [████████░░] 80% (0/3 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3805,6 +3805,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 143 P01 | 25min | 3 tasks | 12 files |
 | Phase 143 P02 | 25min | 3 tasks | 5 files |
 | Phase 143 P03 | 35min | 3 tasks | 6 files |
+| Phase 144 P01 | 25min | 2 tasks | 26 files |
 
 ## Accumulated Context
 
@@ -4440,6 +4441,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 143-01: createService writes rehearsals [] explicitly; org default rehearsal times only pre-fill the Times-tab add form (ADR-0245); reportTime still copied at creation
 - [Phase ?]: 143-02: legacy non-displayable rehearsal rows render first in the Times panel (local partition); sortRehearsals unchanged
 - [Phase ?]: [143-03] Times tab unconditional in visibleTabOrder; handlers only create dated+timed rows and reject clearing a dated/timed value (R036-gated, regex-validated)
+- [Phase ?]: Phase 144-01: brand literals edited in place (no shared constant); U1/U2 covered by 144-02 static guard (ADR-0246 exception)
 
 ### Roadmap Evolution
 
@@ -4781,8 +4783,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-10-27T15:49:13.725Z
-Stopped at: Completed 143-03-PLAN.md
+Last session: 2026-10-27T17:05:00.704Z
+Stopped at: Completed 144-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
