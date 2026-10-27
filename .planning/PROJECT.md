@@ -1,8 +1,9 @@
-# WorshipPlanner
+# WorshipBuilder (formerly WorshipPlanner)
 
 ## What This Is
 
-A worship service planning app for church worship teams that builds weekly service orders using the Vertical Worship methodology. It manages a song stable with CSV import, suggests songs based on VW category and rotation, provides AI-powered song and scripture discovery, and delivers printable/shareable service plans with team RBAC. Built with Vue 3 and Firebase, it complements Planning Center — you plan here, then execute there.
+**WorshipBuilder** (https://worshipbuilder.web.app; renamed from WorshipPlanner in v2.16 — internal identifiers such as
+the Firebase project id `worship-planner-bc515`, `wp` storage keys and package names keep the old name) is a worship service planning app for church worship teams that builds weekly service orders using the Vertical Worship methodology. It manages a song stable with CSV import, suggests songs based on VW category and rotation, provides AI-powered song and scripture discovery, and delivers printable/shareable service plans with team RBAC. Built with Vue 3 and Firebase, it complements Planning Center — you plan here, then execute there.
 
 ## Core Value
 
@@ -10,21 +11,33 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 
 ## Current State
 
-**Shipped through v2.15** (2026-09-21), deployed to production. Latest milestone — org-default
-rehearsal/report *times* copied onto each service and shown on every date surface + both public
-projections; a keyed **Vamps** library (Songs → Vamps tab, one key + one MP3) assignable per slide or as a
-group bed and audible live from the Run control window only; service-update emails always carry the plan
-link; new-tab/deep-link church restore for multi-church members; and the Claude Design "Slides Tab" 7a
-chip strip (Display · Background · Audio popovers). See ROADMAP.md for the full milestone history;
-per-milestone detail archived under `.planning/milestones/`.
+**Shipped through v2.16** (2026-10-27), deployed to production. Latest milestone — every rehearsal has a date
+and time, edited in a new **Times** tab; the app is renamed **WorshipBuilder** on every screen and email; and it
+lives at **https://worshipbuilder.web.app**, with the old `worship-planner-bc515.web.app` / `.firebaseapp.com`
+addresses 302-redirecting to the same page (reserved `/__/*` auth paths untouched, because `authDomain` is still
+`worship-planner-bc515.firebaseapp.com`). See ROADMAP.md for the full milestone history; per-milestone detail
+archived under `.planning/milestones/`.
 
-**Active milestone:** v2.16 (below). Standing follow-ups that outlived milestones: Resend verified-domain
-email (owner has no domain yet — backlog), and the owner-waived v2.14/v2.15 human-hardware UAT lists
-(`milestones/v2.1{4,5}-DEFERRED-VERIFICATION.md`). Prod Auth's Email/Password + Email-link provider — found
-disabled 2026-10-27, which had left v2.5 password and v2.12/v2.13 magic-link sign-in non-functional in
-production — was enabled by owner consent the same day (Identity Toolkit config, `passwordRequired: false`).
+**No active milestone** — next one is scoped via `/gsd-new-milestone`. Standing follow-ups: the volunteer magic
+link on the new domain is untested (no volunteers yet); each Run computer needs a one-time re-setup on the new
+address (sign in, church, Run monitor setup, video key color, Window management + Automatic Fullscreen);
+backlog **999.14** (custom domain + verified Resend sender + `authDomain` switch — the old site must stay up
+until then) and **999.15** (default rehearsal day and time); the owner-waived v2.14–v2.16 UAT lists
+(`milestones/v2.1{4,5,6}-DEFERRED-VERIFICATION.md`).
 
-## Current Milestone: v2.16 Dated Rehearsals & WorshipBuilder
+## Shipped Milestone: v2.16 Dated Rehearsals & WorshipBuilder — ✅ SHIPPED & DEPLOYED 2026-10-27
+
+**Outcome:** Phases 143–145, R441–R453 (12/12 active; R452 settings carry-over descoped by the owner — sole
+user, plain redirect only). Audit tech_debt with no blockers (14/14 integration, 3/3 flows; all phases
+Nyquist-compliant and secured). Production cutover run the same day via `docs/runbooks/worshipbuilder-cutover.md`
+with per-step owner approval; owner verified Google sign-in and song upload/playback on the new address and
+the Times tab + rename locally, and waived the rest (`override_closeout`). Notable decisions: the old site is a
+pure Hosting **302 regex redirect** (no bridge page, no JS) that never matches `/__…`; the share/sign-in base
+URL default moved to the new origin but the owner's gitignored `functions/.env` override must match it; every
+email subject now names the app; only targeted `hosting:app` / `hosting:legacy` deploys are safe now that
+`firebase.json` holds two sites.
+
+## v2.16 (shipped) — original goal & target features
 
 **Goal:** Act on the owner's v2.15 field feedback on rehearsal times, and move the app to its new name and
 domain (`worshipbuilder.web.app`) without breaking existing links or any church computer's Sunday setup.
@@ -42,8 +55,8 @@ domain (`worshipbuilder.web.app`) without breaking existing links or any church 
 - **Domain cutover to `worshipbuilder.web.app`** (backlog 999.2) — the `worshipbuilder` Hosting site becomes
   the single app deploy target; server-generated links (`SERVICE_SHARE_BASE_URL`) move to it; origin
   allowlists (`storage-cors.json`, Auth authorized domains) include it; the old
-  `worship-planner-bc515.web.app` address **redirects every path + query to the same page on the new domain
-  and carries that browser's saved setup across** (Run monitor assignments/nicknames, video key color,
+  `worship-planner-bc515.web.app` address **redirects every path + query to the same page on the new domain**
+  (the planned carry-over of that browser's saved setup was descoped by the owner on 2026-10-27) (Run monitor assignments/nicknames, video key color,
   selected church, list prefs — all per-origin `localStorage`). Prod deploy is per-deploy owner-confirmed.
 
 **Key context / decisions:**
@@ -866,14 +879,13 @@ for non-technical users — plus item-editing and preview polish.
 - ✓ Scripture slides can be generated as congregational readings with LLM-assisted splitting — v1.4 (Phase 34), and each section is now its own editable slide — v1.4 (Phase 38)
 - ✓ Lyric paste warns when copyright information is missing, and happens inline — v1.4 (Phase 35)
 - ✓ Every tabbed screen shows only the actions relevant to the open tab — v1.4 (Phase 36)
+- ✓ Every rehearsal on a service has a date and time; editors manage rehearsals and report time in a Times tab after Messages; legacy undated rows are flagged for editors and hidden everywhere else — v2.16 (Phase 143)
+- ✓ Every user-facing screen and app-naming email says WorshipBuilder; internal identifiers unchanged — v2.16 (Phase 144)
+- ✓ The app is served at https://worshipbuilder.web.app, every generated link points there, origin allowlists include it, and the old addresses redirect to the same page — v2.16 (Phase 145)
 
 ### Active
 
-**v2.16 Dated Rehearsals & WorshipBuilder** — 🚧 in planning (started 2026-10-27). Backlog 999.6 (every
-rehearsal dated; Times moved to its own tab after Messages) + 999.2 (rename to WorshipBuilder; cut hosting over
-to `worshipbuilder.web.app`, old domain redirects + carries per-browser settings). Run via `/gsd-autonomous`,
-human UAT batched to milestone end. Requirements continue from R441; phases from 143. See
-`.planning/REQUIREMENTS.md`.
+**v2.16 Dated Rehearsals & WorshipBuilder** — ✅ SHIPPED & DEPLOYED 2026-10-27 (moved to Validated above).
 
 **v2.12 Rehearse Mode** — 🚧 in planning (started 2026-09-05). Step 2 (final) of the file-storage backlog
 (999.13 / SEED-003). Passwordless magic-link access (Firebase `signInWithEmailLink`, roster-email-tied, not
@@ -1082,6 +1094,9 @@ Administrative, Communication, Rehearsal, Service time, Training, Physical setup
 | A vamp is one key + one MP3, mirroring Song 1:1; assignment denormalizes into the slide/group audio field, resolved live from the vamp doc with the stored URL as a deleted-vamp fallback (v2.15) | Reuses the v2.11 storage pattern and the shipped AudioPlayer pipeline; no new render surface | ✓ Good — 140–142 were almost pure reuse; live-doc resolution fixed the "attached the MP3 later, nothing plays" bug |
 | Live vamp audio from the Run control window only; outputs structurally muted; audio armed by default on go-live with a blocked banner + retry (v2.15) | Owner override of the "Audience output" plan — avoids multi-window echo and silent autoplay failures | ✓ Good — owner-tested live 2026-09-19 |
 | Vamp subscribe is editor-gated (`authStore.isEditor`) (v2.15) | Firestore catch-all is `isOrgEditor` read; an ungated subscribe broke the 141 viewer tests at the release gate | ✓ Good |
+| Every rehearsal is dated; undated legacy rows are flagged for editors, never migrated with a guessed date (v2.16) | Owner field feedback (999.6): an undated rehearsal is meaningless to volunteers | ✓ Good — owner-checked locally |
+| Brand renamed to WorshipBuilder in UI + email copy only; internal identifiers keep the old name (v2.16, ADR-0246) | Renaming the project id / storage keys would sign everyone out and drop per-browser settings | ✓ Good |
+| Old domain = plain 302 Hosting redirect that skips `/__…`; no settings carry-over (v2.16, ADR-0247) | Owner is the sole user; Google sign-in still runs on the old auth domain until 999.14 | ✓ Good — production curls confirmed path + query kept and `/__/*` served |
 | Batched human/hardware UAT waived at v2.15 close (override_closeout) | Owner ran prod from 09-18 and chose to close; deferrals stay labelled waived, never verified | — Pending — regressions become quick tasks |
 
 ## Evolution
@@ -1215,3 +1230,4 @@ Archived: `milestones/v2.5-ROADMAP.md` · `milestones/v2.5-REQUIREMENTS.md` · `
 
 ---
 *Last updated: 2026-10-27 — milestone v2.16 Dated Rehearsals & WorshipBuilder started*
+*Last updated: 2026-10-27 — archived milestone v2.16 Dated Rehearsals & WorshipBuilder (Phases 143-145, R441-R453; R452 descoped), shipped & deployed to production the same day*

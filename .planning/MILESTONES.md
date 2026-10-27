@@ -1,5 +1,32 @@
 # Milestones
 
+## v2.16 Dated Rehearsals & WorshipBuilder (Shipped & deployed to production: 2026-10-27)
+
+**Phases completed:** 3 phases (143–145), 8 plans · **Requirements:** R441–R453 (12/12 active; R452 descoped by owner)
+**Git range:** 44b1fb8b..b3eef5d4 (100 commits, 68 src/functions/config/docs files, +2,835 / −296) · **Timeline:** 2026-10-27 (one day)
+**Deployed:** 2026-10-27 via `docs/runbooks/worshipbuilder-cutover.md`, each step owner-approved: Storage CORS (5 origins), Auth authorized domain `worshipbuilder.firebaseapp.com`, `hosting:app` → worshipbuilder.web.app, all functions (27; `cleanupStalePresence` created for the first time), `hosting:legacy` → old addresses 302 to the new one
+**Closeout:** `override_closeout` — audit tech_debt with no blockers (12/12 reqs, 14/14 integration, 3/3 flows; all 3 phases Nyquist-compliant + secured); owner verified Google sign-in and song upload/playback on the new address and the 143 Times tab + 144 rename locally, then waived the rest ("Let's just approve and wrap this up")
+
+**Delivered:** Every rehearsal now has a date and time, edited in a new Times tab; the app is called **WorshipBuilder** on every screen and email; and it lives at **https://worshipbuilder.web.app**, with the old `worship-planner-bc515` addresses redirecting to the same page.
+
+**Key accomplishments:**
+
+1. **Dated rehearsals & Times tab (143)** — new services start with no rehearsals; `ServiceTimesPanel` only creates dated+timed rows (add disabled until both are set, default-time chips, reject-clear revert), legacy undated rows are flagged "Needs a date/time" for editors with an amber tab dot, and every read surface still shows only dated rehearsals (R441–R445, ADR-0245).
+2. **WorshipBuilder rename (144)** — 14 UI sites and every app-naming email (incl. both subjects that had no brand, owner decision) say WorshipBuilder; internal identifiers (project id, `wp` storage keys, package names) unchanged; `brandName.test.ts` guard; functions `predeploy` build so deploys always ship fresh email copy (ADR-0246).
+3. **Domain cutover (145)** — two-target Hosting (`app` → worshipbuilder, `legacy` → plain 302 regex redirect that never touches `/__/*`, keeping Google sign-in on the old auth domain), share/sign-in link default → new origin with one-slash tests for every link family, Storage CORS gains the new origins, old-origin source scan, and an owner cutover runbook guarded by a 17-test structure test (ADR-0247).
+4. **Production cutover** — run end to end the same day with per-step owner approval; all curl checks passed (reserved `/__/*` paths still served, path + query preserved, `%2F` not re-encoded).
+
+### Known Deferred
+
+- **Volunteer magic link on the new domain** — not tested (no volunteers yet); owner: "More testing in that area to come in the future."
+- **Per-Run-computer setup** — sign in once, re-select church, re-create Run monitor setup + video key color, re-grant Window management + Automatic Fullscreen at each Run computer's next use.
+- **Waived checks** (`milestones/v2.16-DEFERRED-VERIFICATION.md`): screen-reader announce (143-5), read-surface spot check (143-6), real emails (144-1), invite link check, password sign-in, download Save dialog and share link on the new address.
+- **R452 settings carry-over** descoped (owner is the sole user; a page refresh after the update is acceptable).
+- Tech debt (audit): no technical guard against a bare `firebase deploy` / `--only hosting` publishing the redirect (runbook warns, test-guarded); code-review Info IN-01..IN-05; read surfaces rely on the write-time undated filter.
+- **Backlog:** 999.14 custom domain + verified Resend sender + `authDomain` switch; 999.15 default rehearsal day and time.
+
+---
+
 ## v2.15 Service Times, Vamps & Field Fixes (Shipped & deployed to production: 2026-09-21)
 
 **Phases completed:** 5 phases (138–142), 15 plans, 51 tasks · **Requirements:** R428–R440 (13/13)
@@ -26,7 +53,6 @@
 - `useVampStore` has no dedicated subscription-error state (inherited 141→142 backstop); SlideGrid group-media write failures are `console.error`-only.
 
 ---
-
 
 ## v2.13 v2.13 (Shipped: 2026-09-06)
 

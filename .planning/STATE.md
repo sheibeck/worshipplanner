@@ -2,22 +2,22 @@
 gsd_state_version: 1.0
 milestone: v2.16
 milestone_name: Dated Rehearsals & WorshipBuilder
-current_phase: 145
-current_phase_name: Domain Cutover to worshipbuilder.web.app
-status: verifying
+status: completed
 stopped_at: Completed 145-03-PLAN.md
-last_updated: "2026-10-27T22:08:12.801Z"
+last_updated: "2026-10-27T23:25:13.713Z"
 last_activity: 2026-10-27
-last_activity_desc: Phase 145 execution started
+last_activity_desc: Milestone v2.16 completed and archived
 progress:
   total_phases: 3
   completed_phases: 3
   total_plans: 8
   completed_plans: 8
   percent: 100
+current_phase: 145
+current_phase_name: Domain Cutover to worshipbuilder.web.app
 ---
 
-## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27)
+## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27) — CLOSED: milestone shipped + archived 2026-10-27
 
 - Scope approved: backlog 999.6 (dated rehearsals + Times tab) + 999.2 (WorshipBuilder rename + cutover to
   `worshipbuilder.web.app`); old domain = **plain redirect only** (settings carry-over R452 descoped by owner later on 2026-10-27 — sole
@@ -135,7 +135,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** v2.16 milestone complete
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1481,12 +1481,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 145 (Domain Cutover to worshipbuilder.web.app) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-10-27 — Phase 145 execution started
-
-Progress: [██████████] 100% (0/3 phases)
+Phase: Milestone v2.16 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-27 — Milestone v2.16 completed and archived
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
