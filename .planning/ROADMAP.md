@@ -886,7 +886,7 @@ Area: `src/views/ServiceEditorView.vue` (Times block above the tab strip + the t
 Plans:
 **Wave 1**
 
-- [ ] 144-01-PLAN.md — UI rename U1-U14 (tab title, splash, sidebar/mobile header, login, church picker, volunteer pages, Shared/Generated-from footers) + R446 rendered-text assertions in 9 existing tests (R446) [wave 1]
+- [ ] 144-01-PLAN.md — UI rename U1-U14 (tab title, splash, sidebar/mobile header, login, church picker, volunteer pages, Shared/Generated-from footers) + R446 rendered-text assertions in 9 existing tests and 2 new minimal tests (VolunteerSignInView, RosterPrintLayout) (R446) [wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

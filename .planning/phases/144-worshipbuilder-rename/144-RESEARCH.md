@@ -214,9 +214,11 @@ Threat note: the only behavioral risk is a rename accidentally touching identifi
 
 All other claims were verified by grep/run in this session.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-None blocking. Minor: confirm the exact org-name fixture string in `inviteOnboarding.test.ts` `seedOrg` when writing the subject assertion (read at plan/execute time).
+None blocking.
+- Org-name fixture string in `inviteOnboarding.test.ts` `seedOrg`: RESOLVED. `inviteOnboarding.test.ts:60` sets `ORG_NAME = "Grace Church"`.
+- A1, `readdirSync(..., { recursive: true })` availability: RESOLVED. Root tests run on Node v22.23.2, so `readdirSync({ recursive: true })` is supported (`@types/node` 24.11 types the option).
 
 ## Sources
 
