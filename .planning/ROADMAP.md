@@ -881,7 +881,7 @@ Area: `src/views/ServiceEditorView.vue` (Times block above the tab strip + the t
 
   4. Internal identifiers are unchanged: the Firebase project id, `wp`-prefixed storage keys and code symbols. After the rename ships, a returning user's sign-in, saved Run monitor setup, selected church and list prefs carry on as before (R446).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 Plans:
 **Wave 1**
@@ -890,7 +890,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 144-02-PLAN.md — Email copy E1-E12 + functions test updates T1-T4 (R447) + static brand guard src/__tests__/brandName.test.ts + ADR-0246 + phase gates (R446, R447) [wave 2]
+- [x] 144-02-PLAN.md — Email copy E1-E12 + functions test updates T1-T4 (R447) + static brand guard src/__tests__/brandName.test.ts + ADR-0246 + phase gates (R446, R447) [wave 2]
 
 **Deploy**: hosting + functions (email copy). Rebuild functions first; each production deploy is owner-confirmed.
 **UI hint**: yes (copy-only; no layout change)

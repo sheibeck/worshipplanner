@@ -4,17 +4,17 @@ milestone: v2.16
 milestone_name: Dated Rehearsals & WorshipBuilder
 current_phase: 144
 current_phase_name: WorshipBuilder Rename
-status: executing
-stopped_at: Completed 144-01-PLAN.md
-last_updated: "2026-10-27T17:05:00.820Z"
+status: verifying
+stopped_at: Completed 144-02-PLAN.md
+last_updated: "2026-10-27T17:24:25.399Z"
 last_activity: 2026-10-27
 last_activity_desc: Phase 144 execution started
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
-  percent: 33
+  completed_plans: 5
+  percent: 67
 ---
 
 ## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27)
@@ -119,7 +119,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1467,10 +1467,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 144 (WorshipBuilder Rename) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-27 — Phase 144 execution started
 
-Progress: [████████░░] 80% (0/3 phases)
+Progress: [██████████] 100% (0/3 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3806,6 +3806,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 143 P02 | 25min | 3 tasks | 5 files |
 | Phase 143 P03 | 35min | 3 tasks | 6 files |
 | Phase 144 P01 | 25min | 2 tasks | 26 files |
+| Phase 144 P02 | 30min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -4442,6 +4443,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 143-02: legacy non-displayable rehearsal rows render first in the Times panel (local partition); sortRehearsals unchanged
 - [Phase ?]: [143-03] Times tab unconditional in visibleTabOrder; handlers only create dated+timed rows and reject clearing a dated/timed value (R036-gated, regex-validated)
 - [Phase ?]: Phase 144-01: brand literals edited in place (no shared constant); U1/U2 covered by 144-02 static guard (ADR-0246 exception)
+- [Phase ?]: Phase 144-02: email subjects naming no app stay unchanged (pinned by exact tests); brand guard at src/__tests__/brandName.test.ts; ADR-0246
 
 ### Roadmap Evolution
 
@@ -4783,8 +4785,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-10-27T17:05:00.704Z
-Stopped at: Completed 144-01-PLAN.md
+Last session: 2026-10-27T17:24:25.319Z
+Stopped at: Completed 144-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

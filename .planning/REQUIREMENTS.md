@@ -64,13 +64,13 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Rename — WorshipBuilder
 
-- [ ] **R446**: Every user-facing occurrence of the app name in the web app reads **WorshipBuilder** — the
+- [x] **R446**: Every user-facing occurrence of the app name in the web app reads **WorshipBuilder** — the
   browser tab title, the app shell/sidebar header, the login and church-picker screens, the volunteer
   sign-in / request / link-complete pages, and the "Shared from" / "Generated from" footers on the share,
   quarter-share, service-print and roster-print views. Internal identifiers (Firebase project id, storage
   keys, code symbols) are unchanged.
 
-- [ ] **R447**: Every outbound email that names the app — member invite, admin invite, onboarding, and the
+- [x] **R447**: Every outbound email that names the app — member invite, admin invite, onboarding, and the
   volunteer sign-in (magic-link) email — says **WorshipBuilder** in its subject and body.
 
 ### Domain Cutover — worshipbuilder.web.app
@@ -147,8 +147,8 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R443 | Phase 143 | Complete |
 | R444 | Phase 143 | Complete |
 | R445 | Phase 143 | Complete |
-| R446 | Phase 144 | Pending |
-| R447 | Phase 144 | Pending |
+| R446 | Phase 144 | Complete |
+| R447 | Phase 144 | Complete |
 | R448 | Phase 145 | Pending |
 | R449 | Phase 145 | Pending |
 | R450 | Phase 145 | Pending |
