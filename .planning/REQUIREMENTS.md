@@ -79,12 +79,12 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   deploy publishes the app — with its `/api/**` → `api` function rewrite, SPA fallback and cache headers —
   to `https://worshipbuilder.web.app`, and the build/deploy docs reference it.
 
-- [ ] **R449**: Every link the app generates points at `https://worshipbuilder.web.app` — share/plan links,
+- [x] **R449**: Every link the app generates points at `https://worshipbuilder.web.app` — share/plan links,
   volunteer magic-link continue URLs, and the sign-in links in invite/admin emails (the
   `SERVICE_SHARE_BASE_URL` default and any client-side link builders) — and no hard-coded old-domain URL
   remains in app or function code.
 
-- [ ] **R450**: Every origin allowlist includes the new domain **before** cutover — Storage bucket CORS
+- [x] **R450**: Every origin allowlist includes the new domain **before** cutover — Storage bucket CORS
   (`storage-cors.json`, re-applied to the bucket), Firebase Auth authorized domains (add
   `worshipbuilder.firebaseapp.com`), and any other origin-scoped configuration research finds — so uploads,
   downloads, Google sign-in, password sign-in and magic links all work on the new domain.
@@ -154,8 +154,8 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R446 | Phase 144 | Complete |
 | R447 | Phase 144 | Complete |
 | R448 | Phase 145 | Complete |
-| R449 | Phase 145 | Pending |
-| R450 | Phase 145 | Pending |
+| R449 | Phase 145 | Complete |
+| R450 | Phase 145 | Complete |
 | R451 | Phase 145 | Complete |
 | R452 | Phase 145 | Descoped (owner, 2026-10-27) |
 | R453 | Phase 145 | Pending |

@@ -920,13 +920,13 @@ Area: user-facing strings in `src/` views/components and `index.html`; email cop
 
   5. The owner can follow a cutover runbook that covers: the pre-cutover allowlist steps; deploy order (new site live before the old site redirects); not cutting over during a service; the one-time sign-in on the new domain; re-granting the multi-screen (window placement) permission on each Run computer; optional console renames (Firebase public-facing project name, OAuth consent-screen app name); rollback; and a post-cutover smoke checklist (R453).
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 Plans:
 **Wave 1**
 
 - [x] 145-01-PLAN.md — two targeted hosting sites (app -> worshipbuilder; legacy -> worship-planner-bc515 as a plain 302 Hosting redirect to the same path + query, never capturing /__/*) + .firebaserc targets + one-file legacy-site/ public dir + shape/redirect/header tests (R448, R451) [wave 1]
-- [ ] 145-02-PLAN.md — SERVICE_SHARE_BASE_URL default -> new origin + one-slash link tests; storage-cors.json +2 origins + CORS guard + old-origin source scan + DEPLOY-EMAIL-DOMAIN.md (R449, R450) [wave 1]
+- [x] 145-02-PLAN.md — SERVICE_SHARE_BASE_URL default -> new origin + one-slash link tests; storage-cors.json +2 origins + CORS guard + old-origin source scan + DEPLOY-EMAIL-DOMAIN.md (R449, R450) [wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

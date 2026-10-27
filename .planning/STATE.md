@@ -5,15 +5,15 @@ milestone_name: Dated Rehearsals & WorshipBuilder
 current_phase: 145
 current_phase_name: Domain Cutover to worshipbuilder.web.app
 status: executing
-stopped_at: Completed 145-01-PLAN.md
-last_updated: "2026-10-27T21:34:48.964Z"
+stopped_at: Completed 145-02-PLAN.md
+last_updated: "2026-10-27T21:45:35.414Z"
 last_activity: 2026-10-27
 last_activity_desc: Phase 145 execution started
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 67
 ---
 
@@ -1468,11 +1468,11 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 145 (Domain Cutover to worshipbuilder.web.app) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-10-27 — Phase 145 execution started
 
-Progress: [████████░░] 75% (0/3 phases)
+Progress: [█████████░] 88% (0/3 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3810,6 +3810,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 144 P01 | 25min | 2 tasks | 26 files |
 | Phase 144 P02 | 30min | 2 tasks | 10 files |
 | Phase 145 P01 | 15min | 1 tasks | 5 files |
+| Phase 145 P02 | 15min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -4448,6 +4449,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Phase 144-01: brand literals edited in place (no shared constant); U1/U2 covered by 144-02 static guard (ADR-0246 exception)
 - [Phase ?]: Phase 144-02: email subjects naming no app stay unchanged (pinned by exact tests); brand guard at src/__tests__/brandName.test.ts; ADR-0246
 - [Phase ?]: 145-01: legacy hosting target is redirects-only (two 302 regex rules; second excludes /__ to keep /__/auth/* and init.json served); .firebaserc hand-written in target:apply shape
+- [Phase ?]: [145-02] Share-link default = https://worshipbuilder.web.app; builders unchanged; CORS file edited only (bucket apply is an owner runbook step)
 
 ### Roadmap Evolution
 
@@ -4789,8 +4791,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-10-27T21:34:48.878Z
-Stopped at: Completed 145-01-PLAN.md
+Last session: 2026-10-27T21:45:35.342Z
+Stopped at: Completed 145-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
