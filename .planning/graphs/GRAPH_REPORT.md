@@ -1,16 +1,16 @@
 # Graph Report - worshipplanner  (2026-10-27)
 
 ## Corpus Check
-- 2927 files · ~6,738,831 words
+- 2927 files · ~6,739,881 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 36404 nodes · 35607 edges · 3091 communities (2791 shown, 300 thin omitted)
+- 36407 nodes · 35610 edges · 3091 communities (2791 shown, 300 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 86 edges (avg confidence: 0.62)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e67594ba`
+- Built from commit: `67dab5f7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -2986,7 +2986,7 @@
 - [[_COMMUNITY_slideGroups.ts|slideGroups.ts]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Communities (3088 total, 300 thin omitted)` - 2667 edges
+1. `Communities (3091 total, 300 thin omitted)` - 2670 edges
 2. `Bucket B — Behavioral/Architectural` - 117 edges
 3. `Bucket A — Decision-Rationale` - 95 edges
 4. `Project State` - 57 edges
@@ -3016,7 +3016,7 @@
 
 ### Community 0 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.00
-Nodes (2667): Communities (3088 total, 300 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2659 more)
+Nodes (2670): Communities (3091 total, 300 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2662 more)
 
 ### Community 1 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.02
@@ -3384,8 +3384,8 @@ Cohesion: 0.05
 Nodes (38): Component & Composable Behavioral Notes (R318), src/components/actionBarItems.ts, src/components/admin/CleanupEnableConfirmDialog.vue, src/components/admin/DeactivateOrgConfirmDialog.vue, src/components/ContextualActionBar.vue, src/components/MiscLabelBadge.vue, src/components/PptxImportModal.vue, src/components/run/RunFilmstrip.vue (+30 more)
 
 ### Community 88 - "Human Verification Required"
-Cohesion: 0.04
-Nodes (38): Outcome notes — where delivery differed from the original wording, Requirements — all met, Requirements: v1.3 — Slides Tab Rework, Still live for future milestones, Verification, Requirements — v2.0 Multi-Church Onboarding & Owner Console Tabs (Phases 72–74), Phase 72: Owner Console Tabs, Phase 73: Multi-Org Storage Auth Claim (+30 more)
+Cohesion: 0.06
+Nodes (29): Outcome notes — where delivery differed from the original wording, Requirements — all met, Requirements: v1.3 — Slides Tab Rework, Still live for future milestones, Verification, Requirements — v2.0 Multi-Church Onboarding & Owner Console Tabs (Phases 72–74), Phase 72: Owner Console Tabs, Phase 73: Multi-Org Storage Auth Claim (+21 more)
 
 ### Community 89 - "Pattern Assignments"
 Cohesion: 0.06
@@ -9150,8 +9150,8 @@ Cohesion: 0.24
 Nodes (10): editorDb(), seedConfirmationFixtures(), seedDoc(), seedGroup(), seedMembershipDoc(), seedMyScheduleFixtures(), seedParent(), seedRehearseFixtures() (+2 more)
 
 ### Community 1520 - "roster.ts"
-Cohesion: 0.12
-Nodes (16): ADR-0156, ADR-0171, useImportedSlides, useMembersStore, resetOrgScopedStores(), usePptxRenders, useRosterStore, useScriptureSlides (+8 more)
+Cohesion: 0.10
+Nodes (21): ADR-0156, ADR-0167, ADR-0168, ADR-0169, ADR-0170, ADR-0171, useImportedSlides, useMembersStore (+13 more)
 
 ### Community 1521 - "services.ts"
 Cohesion: 0.10
@@ -13802,23 +13802,23 @@ Cohesion: 0.25
 Nodes (7): Definition of done, Integration (gsd-integration-checker, read-only, 2026-10-27), Next, Phases, Requirements (3-source cross-reference), Tech debt, v2.16 Milestone Audit — Dated Rehearsals & WorshipBuilder
 
 ### Community 3090 - "slideGroups.ts"
-Cohesion: 0.33
-Nodes (5): ADR-0167, ADR-0168, ADR-0169, ADR-0170, useSlideGroups
+Cohesion: 0.20
+Nodes (9): Milestone v2.14: Services UX Alignment, Dashboard & Live-Stream Video Output, Phase 131: Trivial Wins — Auto Share-Link & Stage Layout Auto-Populate, Phase 132: Services Page UX Alignment & Verbiage Cleanup, Phase 133: Volunteer Responsibility Confirmation, Phase 134: Editor Presence, Phase 135: Dashboard Overhaul, Phase 136: Video Output — Fullscreen Slice, Phase 137: Video Output — Banner Render (+1 more)
 
 ## Knowledge Gaps
-- **26860 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+26855 more)
+- **26863 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+26858 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **300 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Communities (3088 total, 300 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
+- **Why does `Communities (3091 total, 300 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `main` to the rest of the system?**
-  _26863 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _26866 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
-  _Cohesion score 0.0007499062617172854 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.000749063670411985 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.017094017094017096 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
