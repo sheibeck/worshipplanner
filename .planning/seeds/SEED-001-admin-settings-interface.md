@@ -1,11 +1,20 @@
 ---
-status: deferred
+status: harvested
 trigger_when: next milestone is scoped, or any work touches admin/settings UI, or the v1.8 cost-control env knobs need changing
 planted_during: v1.8 Cost & Billing Hardening (phases 65–67)
 planted_date: 2026-08-20
 deferred_date: 2026-08-25
+harvested_during: v1.9 Owner Admin Console (phases 68-71)
+harvested_date: 2026-10-27
 ---
 # SEED-001: Owner-only admin interface for the v1.8 cost/cleanup settings
+
+> **HARVESTED (recorded 2026-10-27).** Delivered by **v1.9 Owner Admin Console** (phases 68–71, R175–R192,
+> shipped 2026-08-23): super-admin claim gate, every knob below moved from `process.env` into the
+> Firestore-backed `appConfig/global` doc, an Owner Console UI with validation/provenance, and a dry-run
+> blast-radius preview gating every `*_CLEANUP_ENABLED` flip. Only the deploy-time instance caps
+> (`AI_PROXY_MAX_INSTANCES`, `GLOBAL_MAX_INSTANCES`) remain env vars — inherently deploy-time. The
+> "deferred" note below predates this bookkeeping and is kept for history.
 
 > **DEFERRED (2026-08-25).** Not taken in v2.2 (which scoped to configurability + hardening cleanup, not
 > the cost/cleanup admin surface). Parked so the v2.2 close audit starts from a clean slate — the idea is

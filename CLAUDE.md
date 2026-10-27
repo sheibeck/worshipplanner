@@ -19,10 +19,9 @@ Rules:
   `/gsd:graphify diff`.
 - After modifying code, run `/gsd:graphify build` to keep the graph current.
 
-> ⚠ **The graph needs a rebuild.** It was last built while `.gsd/` still existed, so it resolves
-> symbols to `.gsd/quarantine/worktrees/**` copies that are now deleted (e.g. `ServiceSlot` → a
-> quarantined `service.ts`). Run `/gsd:graphify build` before trusting a query; until then, verify any
-> graph hit against the real path under `src/`.
+> The `.gsd/`-era graph problem is resolved: the graph was rebuilt after the `.gsd/` deletion and now
+> resolves symbols to real `src/` paths (verified 2026-10-27: `ServiceSlot` → `src/types/service.ts`).
+> Archived planning docs under `.planning/milestones/` also appear as nodes — prefer `src/` hits.
 
 ## The `.gsd/` directory is gone
 
