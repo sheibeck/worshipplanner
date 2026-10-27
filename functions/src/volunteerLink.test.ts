@@ -99,6 +99,8 @@ describe("mintAndSendVolunteerLink", () => {
     expect(sendArgs.subject).not.toMatch(/invited/i);
     expect(sendArgs.subject).toMatch(/Grace Church/);
     expect(sendArgs.text).toContain(MINTED_LINK);
+    expect(sendArgs.text).toContain("Here's your one-time sign-in link for Grace Church on WorshipBuilder:");
+    expect(sendArgs.subject).toBe("Your sign-in link for Grace Church");
   });
 
   it("builds a header-safe From using bareEmailAddress + fromDisplayName(orgName)", async () => {

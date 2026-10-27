@@ -77,12 +77,12 @@ function buildGoogleNotifyContent(
   to: string,
   baseUrl: string,
 ): { subject: string; text: string } {
-  const subject = `You've been invited to ${orgName} on Worship Planner`;
+  const subject = `You've been invited to ${orgName} on WorshipBuilder`;
   const signIn = baseUrl
     ? `Sign in with Google using this email address (${to}) to get started: ${baseUrl}`
     : `Sign in with Google using this email address (${to}) to get started.`;
   const text =
-    `You've been invited to help lead ${orgName} on Worship Planner.\n\n` +
+    `You've been invited to help lead ${orgName} on WorshipBuilder.\n\n` +
     `${signIn}\n\n` +
     `No password is needed -- just sign in with Google using ${to}.`;
   return { subject, text };
@@ -94,10 +94,10 @@ function buildSetPasswordContent(
   baseUrl: string,
   resetLink: string,
 ): { subject: string; text: string } {
-  const subject = `You've been invited to ${orgName} on Worship Planner`;
+  const subject = `You've been invited to ${orgName} on WorshipBuilder`;
   const signInLine = baseUrl ? `Sign in at: ${baseUrl}` : "";
   const text =
-    `You've been invited to help lead ${orgName} on Worship Planner.\n\n` +
+    `You've been invited to help lead ${orgName} on WorshipBuilder.\n\n` +
     `Set your password to get started: ${resetLink}\n\n` +
     `Or, if ${to} is a Google Workspace address, you can sign in with Google instead -- no password needed.` +
     (signInLine ? `\n\n${signInLine}` : "");

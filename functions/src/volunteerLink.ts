@@ -74,7 +74,7 @@ export async function mintAndSendVolunteerLink(
 
   const subject = `Your sign-in link for ${orgName}`;
   const text =
-    `Here's your one-time sign-in link for ${orgName} on Worship Planner:\n\n` +
+    `Here's your one-time sign-in link for ${orgName} on WorshipBuilder:\n\n` +
     `${link}\n\n` +
     "This link is just for you -- please don't share it. If you didn't request " +
     "this, you can safely ignore this email.";

@@ -277,9 +277,11 @@ describe("google", () => {
     expect(result).toEqual({ emailSent: true, kind: "google-notify" });
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(createUser).not.toHaveBeenCalled();
-    const arg = mockSend.mock.calls[0]![0] as { to: string; text: string };
+    const arg = mockSend.mock.calls[0]![0] as { to: string; subject: string; text: string };
     expect(arg.to).toBe("bob@gmail.com");
     expect(arg.text.toLowerCase()).toContain("google");
+    expect(arg.subject).toBe("You've been invited to Grace Church on WorshipBuilder");
+    expect(arg.text).toContain("You've been invited to help lead Grace Church on WorshipBuilder.");
   });
 
   it("a Resend API error (returned, not thrown) resolves emailSent:false, not a false 'sent'", async () => {
@@ -330,9 +332,11 @@ describe("set-password / createUser", () => {
     expect(createUser).toHaveBeenCalledWith({ email: INVITEE_EMAIL });
     expect(generatePasswordResetLink).toHaveBeenCalledTimes(1);
     expect(mockSend).toHaveBeenCalledTimes(1);
-    const arg = mockSend.mock.calls[0]![0] as { text: string };
+    const arg = mockSend.mock.calls[0]![0] as { subject: string; text: string };
     expect(arg.text).toContain("https://app.example.com/reset/abc123");
     expect(arg.text.toLowerCase()).toContain("google");
+    expect(arg.subject).toBe("You've been invited to Grace Church on WorshipBuilder");
+    expect(arg.text).toContain("You've been invited to help lead Grace Church on WorshipBuilder.");
   });
 
   it("existing user: getUserByEmail resolves -> createUser NOT called, link+send still happen", async () => {

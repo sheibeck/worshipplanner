@@ -62,6 +62,8 @@ describe("sendAdminOnboardingEmail", () => {
     expect(arg.subject).toBe("You've been added as an admin to Grace Church");
     expect(arg.text).toContain("added as an admin to Grace Church");
     expect(arg.text).toContain("https://app.example.com");
+    expect(arg.text).toContain("You've been added as an admin to Grace Church on WorshipBuilder.");
+    expect(arg.text).toContain("Sign in to WorshipBuilder to get started: https://app.example.com");
   });
 
   it("kind='invited': distinct subject telling them to sign in WITH THIS EMAIL", async () => {
@@ -75,9 +77,33 @@ describe("sendAdminOnboardingEmail", () => {
     });
 
     const arg = mockSend.mock.calls[0]![0] as { subject: string; text: string };
-    expect(arg.subject).toBe("You've been invited to Grace Church on Worship Planner");
+    expect(arg.subject).toBe("You've been invited to Grace Church on WorshipBuilder");
     expect(arg.text).toContain("newadmin@church.org");
     expect(arg.text.toLowerCase()).toContain("sign in");
+    expect(arg.text).toContain("You've been invited to help lead Grace Church on WorshipBuilder.");
+    expect(arg.text).toContain(
+      "Sign in to WorshipBuilder with this email address (newadmin@church.org) to get started: https://app.example.com",
+    );
+  });
+
+  it("kind='invited' with a blank SERVICE_SHARE_BASE_URL still names WorshipBuilder (R447)", async () => {
+    fakeShareBaseUrl = "";
+    mockConfig("onboarding@resend.dev");
+
+    await sendAdminOnboardingEmail({
+      db: FAKE_DB,
+      to: "newadmin@church.org",
+      orgName: "Grace Church",
+      kind: "invited",
+    });
+
+    const arg = mockSend.mock.calls[0]![0] as { subject: string; text: string };
+    expect(arg.subject).toBe("You've been invited to Grace Church on WorshipBuilder");
+    expect(arg.text).toContain(
+      "Sign in to WorshipBuilder with this email address (newadmin@church.org) to get started.",
+    );
+    expect(arg.text).not.toContain("http");
+    expect(arg.text).not.toContain("undefined");
   });
 
   it("omits the app link gracefully when SERVICE_SHARE_BASE_URL is blank (no broken URL, no 'undefined')", async () => {
@@ -94,7 +120,7 @@ describe("sendAdminOnboardingEmail", () => {
     const arg = mockSend.mock.calls[0]![0] as { text: string };
     expect(arg.text).not.toContain("http");
     expect(arg.text).not.toContain("undefined");
-    expect(arg.text).toContain("Sign in to Worship Planner");
+    expect(arg.text).toContain("Sign in to WorshipBuilder to get started.");
   });
 
   it("peels a legacy decorated fromAddress so the From never nests angle brackets", async () => {

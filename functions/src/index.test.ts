@@ -5748,13 +5748,13 @@ describe("sendQueuedMessageHandler", () => {
 
   it("peels a display name already in config.sender.fromAddress so wrapping never nests brackets (422 repro)", async () => {
     // Reproduces the reported 422: a "Name <email>" config value wrapped again
-    // produced "My's Church" <Worship Planner <noreply@…>>. bareEmailAddress must
+    // produced "My's Church" <WorshipBuilder <noreply@…>>. bareEmailAddress must
     // extract just the address → a single, valid quoted-name form.
     vi.mocked(getAppConfig).mockResolvedValue({
       ...DEFAULT_APP_CONFIG,
       sender: {
         ...DEFAULT_APP_CONFIG.sender,
-        fromAddress: "Worship Planner <noreply@worshipplanner.app>",
+        fromAddress: "WorshipBuilder <noreply@worshipplanner.app>",
       },
     });
     const { db } = makeSendDb(twoRecipientConfig());
@@ -5764,7 +5764,7 @@ describe("sendQueuedMessageHandler", () => {
 
     const from = (mockSend.mock.calls[0][0] as { from: string }).from;
     expect(from).toBe('"Test Church" <noreply@worshipplanner.app>');
-    expect(from).not.toContain("<Worship Planner");
+    expect(from).not.toContain("<WorshipBuilder");
     expect((from.match(/</g) ?? []).length).toBe(1);
   });
 

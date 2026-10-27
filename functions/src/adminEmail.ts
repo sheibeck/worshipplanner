@@ -39,10 +39,10 @@ function resolveAppBaseUrl(): string {
 function buildAddedContent(orgName: string, baseUrl: string): { subject: string; text: string } {
   const subject = `You've been added as an admin to ${orgName}`;
   const signIn = baseUrl
-    ? `Sign in to Worship Planner to get started: ${baseUrl}`
-    : "Sign in to Worship Planner to get started.";
+    ? `Sign in to WorshipBuilder to get started: ${baseUrl}`
+    : "Sign in to WorshipBuilder to get started.";
   const text =
-    `You've been added as an admin to ${orgName} on Worship Planner.\n\n` +
+    `You've been added as an admin to ${orgName} on WorshipBuilder.\n\n` +
     `${signIn}\n\n` +
     `You can now manage services, songs, and volunteers for ${orgName}.`;
   return { subject, text };
@@ -53,12 +53,12 @@ function buildInvitedContent(
   to: string,
   baseUrl: string,
 ): { subject: string; text: string } {
-  const subject = `You've been invited to ${orgName} on Worship Planner`;
+  const subject = `You've been invited to ${orgName} on WorshipBuilder`;
   const signIn = baseUrl
-    ? `Sign in to Worship Planner with this email address (${to}) to get started: ${baseUrl}`
-    : `Sign in to Worship Planner with this email address (${to}) to get started.`;
+    ? `Sign in to WorshipBuilder with this email address (${to}) to get started: ${baseUrl}`
+    : `Sign in to WorshipBuilder with this email address (${to}) to get started.`;
   const text =
-    `You've been invited to help lead ${orgName} on Worship Planner.\n\n` +
+    `You've been invited to help lead ${orgName} on WorshipBuilder.\n\n` +
     `${signIn}\n\n` +
     `Signing in with ${to} activates your admin access to ${orgName}.`;
   return { subject, text };
