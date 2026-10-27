@@ -213,6 +213,14 @@ firebase hosting:clone worshipbuilder:live worship-planner-bc515:live
 
 Because the redirect is a 302, browsers do not remember it, so the rollback reaches every browser at once.
 
+Verify the old address serves the app again (expect `200 text/html`, not `302`):
+
+```bash
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" https://worship-planner-bc515.web.app/
+```
+
+Warning: the repo's `firebase.json` still holds the redirect after a rollback. Until the cause is fixed and the config is changed, deploy nothing under hosting (`firebase deploy`, `firebase deploy --only hosting` and `firebase deploy --only hosting:legacy` would all switch the redirect back on).
+
 Never delete or disable the old site, and never remove the old origins from CORS or authorized domains, until backlog 999.14.
 
 ---
