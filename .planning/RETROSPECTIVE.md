@@ -349,6 +349,63 @@ defaults, live-vamp-doc URL resolution).
 - Notable: Phase 142 (4 plans / 11 tasks / 3 waves) went discuss → UI-spec → plan → execute → review → UI
   audit → security → verify → deploy in a single session.
 
+## Milestone: v2.16 — Dated Rehearsals & WorshipBuilder
+
+**Shipped:** 2026-10-27 (planned, built, verified and deployed to prod the same day)
+**Phases:** 3 (143–145) | **Plans:** 8 | **Commits:** ~100
+
+### What Was Built
+Every rehearsal now has a date and time, edited in a new **Times** tab after Messages (legacy undated rows
+flagged for editors, never guessed); the app is renamed **WorshipBuilder** on every screen and app-naming
+email; and it moved to **https://worshipbuilder.web.app** — two Hosting targets, the old site a pure 302 regex
+redirect that never touches `/__/*` (Google sign-in still runs on the old auth domain), share/sign-in links on
+the new origin, Storage CORS + Auth allowlists updated, and an owner cutover runbook that was then run end to end
+with per-step approval.
+
+### What Worked
+- **The owner cutting scope mid-planning** — "I'm the only one using this system" turned a localStorage
+  hand-off bridge (allowlist, codec, boot-order bootstrap, notice) into two Hosting redirect rules. Asking
+  one sharp question at the right moment saved a whole plan.
+- **Planner checking production behavior in the emulator** — running the Hosting emulator found that a naive
+  `^/(.*)$` misses `/` and that a catch-all *would* redirect `/__/firebase/init.json` despite the docs; the
+  `/__`-skipping regex and the root rule came from that, and production curls confirmed both.
+- **A runbook that is a tested artifact** — heading order, per-step commands, status-only env checks and the
+  bare-deploy warning are all pinned by `cutoverRunbook.test.ts`; code review + integration check still found
+  real operator-safety gaps (subshell, armed config after rollback, missing site check) that were fixed before
+  the cutover.
+- **Per-step consent held** — every production write (CORS, authorized domain, three deploys) was asked for
+  individually; the one ambiguous "approve and wrap this up" was correctly refused by the deploy classifier
+  until the owner said "Deploy hosting:legacy".
+
+### What Was Inefficient
+- **A machine restart killed the planner mid-run** — recovered from disk (plans were committed), but the
+  checker loop then needed 3 rounds; two blockers in round 1 (graphs staging, 15-file plan) were generic
+  hygiene the planner should have encoded up front.
+- **Bookkeeping slips found late** — 143/144 VALIDATION frontmatter said `nyquist_compliant: false` despite
+  compliant sign-offs; the state tool keeps editing a stale v2.14 "Status" line in STATE.md; the archive tool's
+  MILESTONES entry again needed a hand rewrite.
+- **Subagents that can't write report files** (reviewer, fixer) returned content for the orchestrator to save
+  — workable, but it doubles the handling and is easy to drop.
+
+### Patterns Established
+- **Domain moves: redirect in Hosting config, not code** — two type-302 regex rules, constant destination
+  origin, `/__…` excluded; keep the old site alive while `authDomain` points at it.
+- **Status-only secret checks** — `grep -qE '^KEY=value[[:space:]]*$' file && echo OK || echo NOT OK` (CRLF-safe)
+  and a PowerShell `Select-String -Quiet` twin; never print the file.
+- **Targeted deploys only once `firebase.json` holds more than one site** — `hosting:app` / `hosting:legacy`.
+
+### Key Lessons
+- **Ask "who actually uses this?" before building migration machinery.** The owner's answer removed the
+  most complex part of the milestone.
+- **Docs about reserved paths are not proof** — test redirect precedence in the emulator, then curl production.
+- **Prefer explicit consent words for production deploys**; a general "wrap it up" is not a deploy approval.
+
+### Cost Observations
+- Model mix: **opus** for the orchestrator and planner; **sonnet** for executors, verifier, reviewer, fixer;
+  **haiku** for the plan checker and integration checker.
+- Production writes: Storage CORS, Auth authorized domain, `hosting:app`, functions (27, incl. first-time
+  `cleanupStalePresence`), `hosting:legacy` — all owner-approved individually.
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -361,6 +418,7 @@ defaults, live-vamp-doc URL resolution).
 | v1.7 | 7 | First messaging/backend-send milestone; deploy-gated Functions built against a mocked provider, one owner deploy at close; two stacked milestones combined at archive |
 | v2.2 | 5 | Phases added mid-milestone from owner testing feedback; a delivered requirement (R230) removed at close and reconciled across all records; hosting deployed at close with backend owner-gated |
 | v2.15 | 5 | Research-first autonomous run with prod deployed mid-milestone (owner feedback → 4 quick tasks + 1 backlog phase); a Claude Design phase (142) added from a mockup; 22-item batched UAT owner-waived at close (override_closeout) |
+| v2.16 | 3 | One-day plan → build → verify → production cutover; owner scope cut mid-planning (bridge → plain Hosting redirect); runbook as a tested artifact run with per-step consent; partial owner UAT, rest waived (override_closeout) |
 
 ### Top Lessons (Verified Across Milestones)
 
