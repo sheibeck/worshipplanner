@@ -28,7 +28,7 @@ git status
 git log -1
 npm run type-check
 npx vitest run
-cd functions && npx vitest run && npm run build && cd ..
+(cd functions && npx vitest run && npm run build)
 npm run build
 firebase target
 ```
