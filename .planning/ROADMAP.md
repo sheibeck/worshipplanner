@@ -846,7 +846,7 @@ authorized domain, Storage CORS, and the `SERVICE_SHARE_BASE_URL` default. Full 
 
   5. Dated rehearsals and the report time still show exactly as before on the dashboard, Services cards, My Schedule, the volunteer service view, the public plan/share page and both public projections (`buildServiceSnapshot` / `buildRehearseAccess`), with regression tests guarding the R433 behavior (R445).
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 **Wave 1**
@@ -856,7 +856,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 143-03-PLAN.md — Times tab wired into ServiceEditorView (tab + editor-only dot + panel, header block removed, validated R036-gated handlers) + action-bar 'times' branch + tab-order test updates (R441, R442, R443, R444) [wave 2]
+- [x] 143-03-PLAN.md — Times tab wired into ServiceEditorView (tab + editor-only dot + panel, header block removed, validated R036-gated handlers) + action-bar 'times' branch + tab-order test updates (R441, R442, R443, R444) [wave 2]
 
 **UI hint**: yes
 

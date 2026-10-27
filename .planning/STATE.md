@@ -4,17 +4,17 @@ milestone: v2.16
 milestone_name: Dated Rehearsals & WorshipBuilder
 current_phase: 143
 current_phase_name: Dated Rehearsals & Times Tab
-status: executing
-stopped_at: Completed 143-02-PLAN.md
-last_updated: "2026-10-27T15:14:19.920Z"
+status: verifying
+stopped_at: Completed 143-03-PLAN.md
+last_updated: "2026-10-27T15:49:13.807Z"
 last_activity: 2026-10-27
 last_activity_desc: Phase 143 execution started
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 0
+  completed_plans: 3
+  percent: 33
 ---
 
 ## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27)
@@ -108,7 +108,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1456,10 +1456,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 143 (Dated Rehearsals & Times Tab) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-27 — Phase 143 execution started
 
-Progress: [███████░░░] 67% (0/3 phases)
+Progress: [██████████] 100% (0/3 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3793,6 +3793,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 142 P04 | 31min | 3 tasks | 6 files |
 | Phase 143 P01 | 25min | 3 tasks | 12 files |
 | Phase 143 P02 | 25min | 3 tasks | 5 files |
+| Phase 143 P03 | 35min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -4427,6 +4428,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 142-04: SlidesTab.recentBackgrounds casts updatedAt through {seconds?:number} so plain test fixtures sort safely without a real Timestamp instance
 - [Phase ?]: 143-01: createService writes rehearsals [] explicitly; org default rehearsal times only pre-fill the Times-tab add form (ADR-0245); reportTime still copied at creation
 - [Phase ?]: 143-02: legacy non-displayable rehearsal rows render first in the Times panel (local partition); sortRehearsals unchanged
+- [Phase ?]: [143-03] Times tab unconditional in visibleTabOrder; handlers only create dated+timed rows and reject clearing a dated/timed value (R036-gated, regex-validated)
 
 ### Roadmap Evolution
 
@@ -4768,8 +4770,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-10-27T15:14:19.843Z
-Stopped at: Completed 143-02-PLAN.md
+Last session: 2026-10-27T15:49:13.725Z
+Stopped at: Completed 143-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

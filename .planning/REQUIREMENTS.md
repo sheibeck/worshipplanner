@@ -33,7 +33,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Rehearsal Times — Every Rehearsal Is Dated (revises R430 / R432)
 
-- [ ] **R441**: A rehearsal on a service **always has a date**. Adding a rehearsal produces a dated row (the
+- [x] **R441**: A rehearsal on a service **always has a date**. Adding a rehearsal produces a dated row (the
   planner picks the date as part of adding it, or it defaults from the service date — decided in discuss),
   and an existing rehearsal's date cannot be cleared back to blank. The editor can no longer create an
   undated rehearsal row.
@@ -44,13 +44,13 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   decided in discuss). The org-default **report time** keeps its current behavior (copied onto a new
   service). Changing an org default still never mutates an existing service.
 
-- [ ] **R443**: Services created under v2.15 that already carry **undated** rehearsal rows lose no data: the
+- [x] **R443**: Services created under v2.15 that already carry **undated** rehearsal rows lose no data: the
   planner sees each such row flagged as needing a date and can date or remove it, and an undated row stays
   hidden from every read-only and public surface until it is dated. No migration guesses dates.
 
 ### Service Editor — Times Tab
 
-- [ ] **R444**: The rehearsal and report-time controls move off the top of the service editor into a
+- [x] **R444**: The rehearsal and report-time controls move off the top of the service editor into a
   dedicated **Times** tab placed **after Messages** (Service Order · Slides · Roles · Stage Layout ·
   Messages · Times). The tab follows the existing tab-strip patterns: same tab styling and keyboard
   navigation, the horizontally scrolling mobile strip, the same role/lock gating the Times block has today
@@ -142,10 +142,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R441 | Phase 143 | Pending |
+| R441 | Phase 143 | Complete |
 | R442 | Phase 143 | Complete |
-| R443 | Phase 143 | Pending |
-| R444 | Phase 143 | Pending |
+| R443 | Phase 143 | Complete |
+| R444 | Phase 143 | Complete |
 | R445 | Phase 143 | Complete |
 | R446 | Phase 144 | Pending |
 | R447 | Phase 144 | Pending |
