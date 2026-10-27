@@ -33,9 +33,9 @@ created: 2026-10-27
 ## Sampling Rate
 
 - **After every task commit:** quick run command (or the functions gate for functions tasks)
-- **Before every task commit:** staging gate `git diff --cached --name-only | grep -cE '^(\.planning/graphs/|dist-legacy/|functions/lib/|functions/\.env$)'` prints 0; explicit-path staging only
+- **Before every task commit:** staging gate `! git diff --cached --name-only | grep -qE '^(\.planning/graphs/|dist-legacy/|functions/lib/|functions/\.env$)'` exits 0; explicit-path staging only
 - **After every plan wave:** root `npx vitest run` + `npm run type-check` (+ the functions gate when `params.ts` changes)
-- **Before `/gsd-verify-work`:** full root suite at baseline, type-check clean, functions gate green, `npm run build` still passes the Firebase env guard, cumulative staging gate over `c59dab23..HEAD` prints 0
+- **Before `/gsd-verify-work`:** full root suite at baseline, type-check clean, functions gate green, `npm run build` still passes the Firebase env guard, cumulative staging gate over `c59dab23..HEAD` exits 0
 - **Max feedback latency:** 30 s (quick)
 
 ---
@@ -71,7 +71,7 @@ Batched to the v2.16 milestone-end owner UAT (PENDING, not owner-accepted) — a
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Google + password + magic-link sign-in on the new domain | R450/R451 | Real OAuth / email flows | Runbook Step 4, before the redirect deploy |
+| Google + password + magic-link sign-in on the new domain | R450/R451 | Real OAuth / email flows | Runbook Step 5 (after the functions deploy), before the redirect deploy |
 | Production redirect keeps path + query; `/__/auth/handler` and `/__/firebase/init.json` still 200 on the old firebaseapp.com | R451 | Production Hosting behavior (docs silent on query strings; emulator-verified only) | Runbook Step 6 curls right after `hosting:legacy`; record the `?y=a%2Fb` result |
 | Old bookmark / share link (with #section) lands on the same page at the new domain | R451 | Real browser redirect | Open an old bookmark and an old share link |
 | Run computer re-set (church, monitor setup, video key color) + Window management / Automatic Fullscreen re-grant | R453 | Per-origin browser state and permissions | On each Run computer after cutover (runbook Step 7) |

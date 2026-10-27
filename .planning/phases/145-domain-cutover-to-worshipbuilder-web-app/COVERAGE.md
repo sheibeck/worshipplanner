@@ -17,7 +17,7 @@
 | hosting-release-rollback | INTEGRATE | |
 | hosting-clone | INTEGRATE | |
 | hosting-cleanurls-trailingslash-i18n | OPT-OUT | explicitly out of scope — would alter the request path, and R451 requires the exact path/query/hash |
-| hosting-preview-channels | OPT-OUT | not needed — the new site is smoke-tested live before the redirect deploy (runbook Step 4) |
+| hosting-preview-channels | OPT-OUT | not needed — the new site is smoke-tested live before the redirect deploy (runbook Step 5) |
 | hosting-custom-domain | OPT-OUT | explicitly out of scope — deferred to backlog 999.14 |
 | storage-bucket-cors | INTEGRATE | |
 | auth-authorized-domains | INTEGRATE | |

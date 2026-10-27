@@ -518,15 +518,19 @@ Suggested caps (Claude's discretion, tune in plan): fragment ≤ 48 KiB encoded,
 | A9 | Chrome bounce-tracking mitigation may delete the bridge's own flag | Pitfall 7 | Low — idempotent by design |
 | A10 | `worshipbuilder.web.app` is already on Auth authorized domains (CONTEXT claims verified 2026-10-27; not re-verified here) | Other Origin-Scoped Config | Medium — runbook step should list both domains and confirm |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Deploy order functions vs hosting:app**
    - Known: CONTEXT lists functions before `hosting:app`; with the fixed base URL, a functions deploy first would make emails link to a site that returns "Site Not Found" until `hosting:app` lands.
    - Recommendation: runbook puts `hosting:app` first (both happen in one session); flag to owner as a deliberate deviation.
+   - **RESOLVED (CONTEXT Amendment, deploy order):** `hosting:app` → functions → new-domain smoke → `hosting:legacy`. 145-03's runbook follows it exactly (Step 3 `hosting:app`, Step 4 functions with a new-origin link check, Step 5 smoke, Step 6 `hosting:legacy`), and its guard test enforces the heading order.
 2. **Who edits `functions/.env`?**
    - The file is gitignored and local to the owner's checkout; the phase cannot commit the fix. Recommendation: runbook pre-flight step + the executor may edit the local file only if the owner approves (it is not production), otherwise leave a clearly marked owner action.
+   - **RESOLVED (CONTEXT Amendment, functions/.env):** the owner edits it in the runbook's Step 0 pre-flight (owner-confirmed), followed by a quiet, CRLF-tolerant status check. No plan reads, edits or commits the file; 145-02 changes only the `params.ts` default and documents the override.
 3. **Move `wp:tagFilter` too?** CONTEXT's "song-list column/visibility prefs" reads as columns; tag filters are the other song-list pref. Recommendation: move both (same pattern, cheap), flagged as discretionary.
+   - **RESOLVED — moot (CONTEXT Amendment 2, owner scope cut 2026-10-27):** R452 is descoped and nothing is carried across, so no key (tag filters included) moves. Each Run computer re-sets its setup once (runbook Step 7).
 4. **Does the legacy site need a favicon or `robots`/`noindex`?** Cosmetic; add `<meta name="robots" content="noindex">` to the bridge.
+   - **RESOLVED (Amendment 2 changed the shape):** there is no bridge page. The legacy site is a plain 302 Hosting redirect, and its one committed fallback page `legacy-site/index.html` carries `<meta name="robots" content="noindex">` (asserted by 145-01's test). No favicon: nothing on the legacy site is shown in normal use.
 
 ## Environment Availability
 
