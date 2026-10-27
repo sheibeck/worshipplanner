@@ -1349,7 +1349,7 @@ async function onSaveRehearsalDefaults(): Promise<void> {
   // Blank rows (an add with no time picked yet) are dropped rather than saved
   // as an empty-string default — a rehearsal default with no time is not a
   // meaningful default.
-  const newRehearsalDefaults = rehearsalTimeDefaultsInput.value.filter((t) => t !== '')
+  const newRehearsalDefaults = [...new Set(rehearsalTimeDefaultsInput.value.filter((t) => t !== ''))]
   const newReportTimeDefault = reportTimeDefaultInput.value
   rehearsalDefaultsSaveError.value = null
   isSavingRehearsalDefaults.value = true

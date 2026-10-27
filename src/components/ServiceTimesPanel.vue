@@ -68,6 +68,8 @@ const newTime = computed<string>({
     newTimeOverride.value = v
   },
 })
+// Duplicate org defaults would collide as :key and double-press a chip.
+const chipTimes = computed(() => [...new Set(props.defaultTimes)])
 const canAdd = computed(() => props.canEdit && YMD_RE.test(newDate.value) && HM_RE.test(newTime.value))
 const newDateInput = ref<HTMLInputElement | null>(null)
 
@@ -295,13 +297,13 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <div
-            v-if="defaultTimes.length > 1"
+            v-if="chipTimes.length > 1"
             class="flex flex-wrap items-center gap-2 mt-2"
             data-testid="rehearsal-default-chips"
           >
             <span class="text-xs text-gray-400">Default times:</span>
             <button
-              v-for="t in defaultTimes"
+              v-for="t in chipTimes"
               :key="t"
               type="button"
               data-testid="rehearsal-default-chip"

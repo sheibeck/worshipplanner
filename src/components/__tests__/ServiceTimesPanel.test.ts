@@ -200,6 +200,16 @@ describe('ServiceTimesPanel — R442 defaults', () => {
     expect(two.emitted('add')).toBeUndefined()
   })
 
+  it('R442: duplicate default times collapse to one chip (no double pressed state)', () => {
+    const one = mountPanel({ canEdit: true, defaultTimes: ['18:30', '18:30'] })
+    expect(one.findAll('[data-testid="rehearsal-default-chip"]')).toHaveLength(0)
+
+    const two = mountPanel({ canEdit: true, defaultTimes: ['18:30', '18:30', '19:00'] })
+    const chips = two.findAll('[data-testid="rehearsal-default-chip"]')
+    expect(chips.map((c) => c.text())).toEqual(['6:30 PM', '7:00 PM'])
+    expect(chips.filter((c) => c.attributes('aria-pressed') === 'true')).toHaveLength(1)
+  })
+
   it('R442: pressed state follows the form time when it matches a default', async () => {
     const wrapper = mountPanel({ canEdit: true, defaultTimes: ['18:30', '19:00'] })
     const chips = wrapper.findAll('[data-testid="rehearsal-default-chip"]')

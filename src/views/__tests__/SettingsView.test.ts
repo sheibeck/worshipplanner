@@ -366,6 +366,17 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     expect(text).toContain('pre-fill the time when a planner adds a rehearsal')
     expect(text).toContain('Dates are always chosen per service.')
   })
+
+  it('WR-02: saving rehearsal defaults de-duplicates repeated times', async () => {
+    mockRehearsalTimeDefaults = ['18:30', '18:30', '19:00']
+    const wrapper = mountSettingsView()
+    await wrapper.get('[data-testid="save-rehearsal-defaults-btn"]').trigger('click')
+    await flushPromises()
+    expect(mockUpdateOrgSettings).toHaveBeenCalledWith({
+      'settings.rehearsalTimeDefaults': ['18:30', '19:00'],
+      'settings.reportTimeDefault': '',
+    })
+  })
 })
 
 // ── Toggle checkbox indices, in DOM order (Task 2 markup order — Wave 2) ──────
