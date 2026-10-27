@@ -920,7 +920,7 @@ Area: user-facing strings in `src/` views/components and `index.html`; email cop
 
   5. The owner can follow a cutover runbook that covers: the pre-cutover allowlist steps; deploy order (new site live before the old site redirects); not cutting over during a service; the one-time sign-in on the new domain; re-granting the multi-screen (window placement) permission on each Run computer; optional console renames (Firebase public-facing project name, OAuth consent-screen app name); rollback; and a post-cutover smoke checklist (R453).
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 **Wave 1**
@@ -930,7 +930,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 145-03-PLAN.md — owner cutover runbook + guard test (CRLF-tolerant status-only env checks); ADR-0247 (plain redirect, no hand-off); INTEGRATIONS.md targeted deploy docs (R448, R450, R451, R453) [wave 2]
+- [x] 145-03-PLAN.md — owner cutover runbook + guard test (CRLF-tolerant status-only env checks); ADR-0247 (plain redirect, no hand-off); INTEGRATIONS.md targeted deploy docs (R448, R450, R451, R453) [wave 2]
 
 **Owner-gated**: no production change in this phase. Storage CORS apply, authorized domain, `hosting:app`, functions and `hosting:legacy` deploys are owner-confirmed runbook steps at milestone end.
 **UI hint**: no (the old site is a non-visual Hosting redirect, not a designed screen)

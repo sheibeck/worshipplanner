@@ -103,7 +103,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   selected church and list prefs are re-set once on the new domain (runbook Step 7). No settings hand-off
   code ships; reopen as a new requirement only if other churches need it before the old site retires.
 
-- [ ] **R453**: A cutover runbook gives the owner the exact ordered steps and checks: the pre-cutover
+- [x] **R453**: A cutover runbook gives the owner the exact ordered steps and checks: the pre-cutover
   allowlist steps, deploy order (new site live before the old site starts redirecting), "don't cut over
   during a service" timing, the one-time sign-in everyone does on the new domain, re-granting the
   multi-screen (window placement) permission on each Run computer, optional console renames (Firebase
@@ -158,7 +158,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R450 | Phase 145 | Complete |
 | R451 | Phase 145 | Complete |
 | R452 | Phase 145 | Descoped (owner, 2026-10-27) |
-| R453 | Phase 145 | Pending |
+| R453 | Phase 145 | Complete |
 
 **Coverage:**
 
