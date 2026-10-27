@@ -307,3 +307,38 @@ describe('ServiceCard — Run affordance (R284)', () => {
     )
   })
 })
+
+describe('R445: report/rehearsal times regression (R433)', () => {
+  const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
+  const stubs = { 'router-link': { template: '<a><slot /></a>' } }
+
+  it('R445: renders the report time and sorted dated rehearsals, hiding undated/untimed rows', () => {
+    const service: Service = {
+      ...mockService,
+      reportTime: '08:00',
+      rehearsals: [
+        { id: 'r2', date: '2099-03-06', time: '19:00' },
+        { id: 'u1', date: '', time: '19:00' },
+        { id: 'r1', date: '2099-03-05', time: '18:30' },
+        { id: 'u2', date: '2099-03-04', time: '' },
+      ],
+    }
+    const wrapper = mount(ServiceCard, { props: { service }, global: { stubs } })
+    expect(norm(wrapper.get('[data-testid="service-card-times"]').text())).toBe(
+      'Report 8:00 AM · Rehearsals: Mar 5, 6:30 PM; Mar 6, 7:00 PM',
+    )
+  })
+
+  it('R445: a service with only undated/untimed rows and no report time renders no times element', () => {
+    const service: Service = {
+      ...mockService,
+      reportTime: '',
+      rehearsals: [
+        { id: 'u1', date: '', time: '19:00' },
+        { id: 'u2', date: '2099-03-04', time: '' },
+      ],
+    }
+    const wrapper = mount(ServiceCard, { props: { service }, global: { stubs } })
+    expect(wrapper.find('[data-testid="service-card-times"]').exists()).toBe(false)
+  })
+})

@@ -147,6 +147,22 @@ describe('MyScheduleView', () => {
     vi.useRealTimers()
   })
 
+  it('R445: a doc carrying projected rehearsals + reportTime renders them on the schedule card (R433)', () => {
+    mockScheduleState.docs = [
+      makeDoc({
+        reportTime: '08:00',
+        rehearsals: [
+          { id: 'r1', date: '2099-03-05', time: '18:30' },
+          { id: 'r2', date: '2099-03-06', time: '19:00' },
+        ],
+      }),
+    ]
+    const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
+    const text = wrapper.get('[data-testid="schedule-card-times"]').text().replace(/\s+/g, ' ').trim()
+    expect(text).toContain('Report 8:00 AM')
+    expect(text).toContain('Mar 5, 6:30 PM; Mar 6, 7:00 PM')
+  })
+
   it('subscribes on mount and unsubscribes on unmount (Change A: live data)', () => {
     const wrapper = mount(MyScheduleView, { global: { stubs: globalStubs } })
     expect(mockSubscribe).toHaveBeenCalledOnce()

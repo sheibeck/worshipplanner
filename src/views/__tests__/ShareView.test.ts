@@ -468,3 +468,46 @@ describe('ShareView', () => {
     expect(wrapper.text()).toContain('<img src=x onerror=alert(1)>')
   })
 })
+
+describe('R445: share-times regression (R433)', () => {
+  const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    delete mockRouteParams.slug
+    delete mockRouteParams.date
+    mockRouteParams.token = 'test-token-123'
+    delete mockRouteQuery.view
+  })
+
+  it('R445: renders the projected report time and rehearsals', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          reportTime: '08:00',
+          rehearsals: [
+            { id: 'r1', date: '2099-03-05', time: '18:30' },
+            { id: 'r2', date: '2099-03-06', time: '19:00' },
+          ],
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+    expect(norm(wrapper.get('[data-testid="share-times"]').text())).toBe(
+      'Report 8:00 AM · Rehearsals: Mar 5, 6:30 PM; Mar 6, 7:00 PM',
+    )
+  })
+
+  it('R445: renders no share-times element when the snapshot has neither field', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ serviceSnapshot: mockSnapshot }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="share-times"]').exists()).toBe(false)
+  })
+})

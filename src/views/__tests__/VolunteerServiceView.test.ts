@@ -180,6 +180,20 @@ describe('VolunteerServiceView', () => {
       expect(wrapper.text()).toContain('Sunday Worship (updated)')
     })
 
+    it('R445: renders the projected report time and rehearsals (R433)', () => {
+      mockDoc.value = makeDoc({
+        reportTime: '08:00',
+        rehearsals: [
+          { id: 'r1', date: '2099-03-05', time: '18:30' },
+          { id: 'r2', date: '2099-03-06', time: '19:00' },
+        ],
+      })
+      const wrapper = mount(VolunteerServiceView, { global: { stubs: globalStubs } })
+      expect(wrapper.get('[data-testid="vsv-times"]').text().replace(/\s+/g, ' ').trim()).toBe(
+        'Report 8:00 AM · Rehearsals: Mar 5, 6:30 PM; Mar 6, 7:00 PM',
+      )
+    })
+
     it('renders the service header (name + date) and Rehearse is the default active tab', () => {
       const wrapper = mount(VolunteerServiceView, { global: { stubs: globalStubs } })
       expect(wrapper.text()).toContain('Sunday Worship')
