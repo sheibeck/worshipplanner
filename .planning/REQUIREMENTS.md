@@ -75,7 +75,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Domain Cutover — worshipbuilder.web.app
 
-- [ ] **R448**: The `worshipbuilder` Hosting site is the **single** deploy target for the app: a hosting
+- [x] **R448**: The `worshipbuilder` Hosting site is the **single** deploy target for the app: a hosting
   deploy publishes the app — with its `/api/**` → `api` function rewrite, SPA fallback and cache headers —
   to `https://worshipbuilder.web.app`, and the build/deploy docs reference it.
 
@@ -89,7 +89,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   `worshipbuilder.firebaseapp.com`), and any other origin-scoped configuration research finds — so uploads,
   downloads, Google sign-in, password sign-in and magic links all work on the new domain.
 
-- [ ] **R451**: The old addresses (`worship-planner-bc515.web.app` and `worship-planner-bc515.firebaseapp.com`)
+- [x] **R451**: The old addresses (`worship-planner-bc515.web.app` and `worship-planner-bc515.firebaseapp.com`)
   send every request to the **same path, query string and hash** on `worshipbuilder.web.app`, so existing
   share links, magic links in already-sent emails, bookmarks and home-screen shortcuts keep working.
 
@@ -153,10 +153,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | R445 | Phase 143 | Complete |
 | R446 | Phase 144 | Complete |
 | R447 | Phase 144 | Complete |
-| R448 | Phase 145 | Pending |
+| R448 | Phase 145 | Complete |
 | R449 | Phase 145 | Pending |
 | R450 | Phase 145 | Pending |
-| R451 | Phase 145 | Pending |
+| R451 | Phase 145 | Complete |
 | R452 | Phase 145 | Descoped (owner, 2026-10-27) |
 | R453 | Phase 145 | Pending |
 

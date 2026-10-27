@@ -5,15 +5,15 @@ milestone_name: Dated Rehearsals & WorshipBuilder
 current_phase: 145
 current_phase_name: Domain Cutover to worshipbuilder.web.app
 status: executing
-stopped_at: Phase 145 planned (3 plans, 2 waves)
-last_updated: "2026-10-27T21:23:14.605Z"
+stopped_at: Completed 145-01-PLAN.md
+last_updated: "2026-10-27T21:34:48.964Z"
 last_activity: 2026-10-27
-last_activity_desc: Phase 145 planned — 3 plans, 2 waves; R452 descoped by owner
+last_activity_desc: Phase 145 execution started
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 6
   percent: 67
 ---
 
@@ -121,7 +121,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1457,7 +1457,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 144 — WorshipBuilder Rename
+**Current focus:** Phase 145 — Domain Cutover to worshipbuilder.web.app
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1467,12 +1467,12 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 145 (Domain Cutover to worshipbuilder.web.app) — PLANNED
-Plan: 0 of 3
+Phase: 145 (Domain Cutover to worshipbuilder.web.app) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-10-27 — Phase 145 planned (3 plans, 2 waves)
+Last activity: 2026-10-27 — Phase 145 execution started
 
-Progress: [██████████] 100% (0/3 phases)
+Progress: [████████░░] 75% (0/3 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3809,6 +3809,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 143 P03 | 35min | 3 tasks | 6 files |
 | Phase 144 P01 | 25min | 2 tasks | 26 files |
 | Phase 144 P02 | 30min | 2 tasks | 10 files |
+| Phase 145 P01 | 15min | 1 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -4446,6 +4447,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [143-03] Times tab unconditional in visibleTabOrder; handlers only create dated+timed rows and reject clearing a dated/timed value (R036-gated, regex-validated)
 - [Phase ?]: Phase 144-01: brand literals edited in place (no shared constant); U1/U2 covered by 144-02 static guard (ADR-0246 exception)
 - [Phase ?]: Phase 144-02: email subjects naming no app stay unchanged (pinned by exact tests); brand guard at src/__tests__/brandName.test.ts; ADR-0246
+- [Phase ?]: 145-01: legacy hosting target is redirects-only (two 302 regex rules; second excludes /__ to keep /__/auth/* and init.json served); .firebaserc hand-written in target:apply shape
 
 ### Roadmap Evolution
 
@@ -4787,8 +4789,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-10-27T17:24:25.319Z
-Stopped at: Completed 144-02-PLAN.md
+Last session: 2026-10-27T21:34:48.878Z
+Stopped at: Completed 145-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

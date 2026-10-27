@@ -920,12 +920,12 @@ Area: user-facing strings in `src/` views/components and `index.html`; email cop
 
   5. The owner can follow a cutover runbook that covers: the pre-cutover allowlist steps; deploy order (new site live before the old site redirects); not cutting over during a service; the one-time sign-in on the new domain; re-granting the multi-screen (window placement) permission on each Run computer; optional console renames (Firebase public-facing project name, OAuth consent-screen app name); rollback; and a post-cutover smoke checklist (R453).
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 145-01-PLAN.md — two targeted hosting sites (app -> worshipbuilder; legacy -> worship-planner-bc515 as a plain 302 Hosting redirect to the same path + query, never capturing /__/*) + .firebaserc targets + one-file legacy-site/ public dir + shape/redirect/header tests (R448, R451) [wave 1]
+- [x] 145-01-PLAN.md — two targeted hosting sites (app -> worshipbuilder; legacy -> worship-planner-bc515 as a plain 302 Hosting redirect to the same path + query, never capturing /__/*) + .firebaserc targets + one-file legacy-site/ public dir + shape/redirect/header tests (R448, R451) [wave 1]
 - [ ] 145-02-PLAN.md — SERVICE_SHARE_BASE_URL default -> new origin + one-slash link tests; storage-cors.json +2 origins + CORS guard + old-origin source scan + DEPLOY-EMAIL-DOMAIN.md (R449, R450) [wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -976,6 +976,7 @@ Owner request, 2026-10-27, after the Phase 143 Times-tab check.
 
 - Builds on Phase 143's Times tab and the org Settings rehearsal defaults (`rehearsalTimeDefaults`
   chips are time-only today).
+
 - Open questions for discuss: one default or several (e.g. Wed + Sat); what to do when the service
   itself falls on the default weekday (same day vs. the week before); whether it auto-adds a rehearsal
   to new services or only pre-fills the add form.
