@@ -2,35 +2,25 @@
 phase: 144-worshipbuilder-rename
 reviewed: 2026-10-27T00:00:00Z
 depth: standard
-files_reviewed: 34
+files_reviewed: 24
 files_reviewed_list:
-  - docs/adr/0246-app-brand-is-worshipbuilder-internal-identifiers-keep-their-names.md
-  - docs/adr/README.md
-  - functions/src/adminEmail.test.ts
-  - functions/src/adminEmail.ts
-  - functions/src/index.test.ts
-  - functions/src/inviteOnboarding.test.ts
-  - functions/src/inviteOnboarding.ts
-  - functions/src/volunteerLink.test.ts
-  - functions/src/volunteerLink.ts
-  - index.html
+  - firebase.json
   - src/__tests__/brandName.test.ts
+  - src/__tests__/firebaseFunctionsPredeploy.test.ts
+  - functions/src/adminEmail.ts
+  - functions/src/inviteOnboarding.ts
+  - functions/src/volunteerLink.ts
+  - functions/src/adminEmail.test.ts
+  - functions/src/inviteOnboarding.test.ts
+  - functions/src/volunteerLink.test.ts
+  - functions/src/index.test.ts
+  - docs/adr/0246-app-brand-is-worshipbuilder-internal-identifiers-keep-their-names.md
+  - index.html
   - src/App.vue
-  - src/components/__tests__/AppShell.test.ts
-  - src/components/__tests__/AppSidebar.test.ts
-  - src/components/__tests__/RosterPrintLayout.test.ts
-  - src/components/__tests__/ServicePrintLayout.test.ts
   - src/components/AppShell.vue
   - src/components/AppSidebar.vue
   - src/components/RosterPrintLayout.vue
   - src/components/ServicePrintLayout.vue
-  - src/views/__tests__/LoginView.test.ts
-  - src/views/__tests__/QuarterShareView.test.ts
-  - src/views/__tests__/SelectChurchView.test.ts
-  - src/views/__tests__/ShareView.test.ts
-  - src/views/__tests__/VolunteerLinkCompleteView.test.ts
-  - src/views/__tests__/VolunteerRequestView.test.ts
-  - src/views/__tests__/VolunteerSignInView.test.ts
   - src/views/LoginView.vue
   - src/views/QuarterShareView.vue
   - src/views/SelectChurchView.vue
@@ -40,75 +30,42 @@ files_reviewed_list:
   - src/views/VolunteerSignInView.vue
 findings:
   critical: 0
-  warning: 3
-  info: 3
-  total: 6
-status: issues_found
+  warning: 0
+  info: 2
+  total: 2
+status: clean
 ---
 
-# Phase 144: Code Review Report
+# Phase 144: Code Review Report (iteration 2)
 
 **Reviewed:** 2026-10-27
 **Depth:** standard
-**Files Reviewed:** 34
-**Status:** issues_found
+**Files Reviewed:** 24
+**Status:** clean (no critical or warning findings; 2 info)
 
 ## Summary
 
-The source diffs are clean single-token copy changes. No user-facing "Worship Planner"/"WorshipPlanner" remains in `src/`, `functions/src/` or `index.html` (verified with a case-insensitive grep across src, functions/src, index.html, public, render-service). No internal identifier was changed: `worshipplanner.app`, the `worship-planner-bc515` project id, package names and the lowercase `claudeApi.ts` phrase are all intact. The guard test passes (20/20) and Windows path handling is correct (`\` is normalised to `/` in `walk`). The remaining concerns are guard false negatives and one deploy hazard.
+Re-review after the WR-01/02/03 fixes (f8989162, 70ccad1d, 1e7b693f). All three fixes are correct and introduce no new bugs.
 
-## Warnings
+- **WR-03 (predeploy).** `firebase.json` now has `"predeploy": ["npm --prefix functions run build"]` on the functions block only. `functions/package.json` defines `"build": "tsc"`, and `main` is `lib/index.js`. The Firebase CLI runs predeploy hooks with the project root as cwd, through the platform shell. `npm --prefix <dir> run <script>` is plain npm with no shell-specific syntax, so it behaves the same on Windows and POSIX. I ran it from the repo root: exit 0, and `git status` shows no tracked changes because `lib` is gitignored. The hosting predeploy is untouched. The array form fails the deploy on a non-zero exit. The new test checks the exact command string.
+- **WR-01 (case and separator variants).** `OLD_NAME = /worship[\s_-]?planner/i` catches sentence case, upper case, hyphen, underscore, whitespace and `WorshipPlanner`. The allow-list has three entries: one phrase scoped to a single file (`claudeApi.ts`: "The worship planner applies"), plus the exact strings `worshipplanner.app` and `worship-planner-bc515`. Both global strings are documented non-renames in ADR-0246. The self-tests prove the claudeApi phrase is still flagged in other files, and that other prose in `claudeApi.ts` and a bare `worshipplanner` are still flagged. This is narrow enough. The two global strings could in principle mask brand prose such as "visit worshipplanner.app", but that string is the real domain.
+- **WR-02 (comment-aware scanner).** The logic holds under tracing. Escapes, newline termination of single-line quotes, template literals, `${}` nesting (the `'b'`/`'t'` frame stack), inline and multi-line block comments, and a trailing `//` all behave as the self-tests assert. I ran a copy of the scanner over every non-test `.ts` file and every `.vue` `<script>` block under `src/` and `functions/src/`, and checked the end state. All end balanced, in code mode, with no open quote. Only two test files end unbalanced (`src/storage.rules.test.ts`, `functions/src/index.test.ts`, presumably regex literals), and tests are excluded from the guard. So the documented regex-literal limitation does not affect the real scan today, and it is acceptable as documented.
 
-### WR-01: Guard is case-sensitive, so common variants of the old name pass undetected
-
-**File:** `src/__tests__/brandName.test.ts:10`
-**Issue:** `OLD_NAME = /Worship ?Planner/` misses `Worship planner` (sentence case), `WORSHIP PLANNER`, `Worship-Planner` and `Worship_Planner`. The comment justifies case-sensitivity by the lowercase phrase in `claudeApi.ts` and the `worshipplanner.app` address. That justification only supports excluding all-lowercase matches. `WRONG_VARIANT` covers hyphenated spellings of the NEW brand but nothing covers hyphenated or sentence-case spellings of the OLD one. A regression like "Welcome to Worship planner" ships green.
-**Fix:**
-```ts
-// Matches any casing except the all-lowercase prose/domain forms
-const OLD_NAME = /\bWorship[ _-]?Planner\b|\bWorship[ _-]planner\b|\bWORSHIP[ _-]?PLANNER\b|WorshipPlanner/
-```
-or use `/worship[ _-]?planner/i` and filter out the two known benign cases (`worshipplanner.app`, the `claudeApi.ts` lowercase phrase) with a small explicit allow-list.
-
-### WR-02: `stripComments` line-prefix heuristic can hide real user-facing text (false negatives)
-
-**File:** `src/__tests__/brandName.test.ts:16`
-**Issue:** `/^\s*(?:\/\/|\/\*|\*).*$/gm` deletes the whole line for any line that starts with `*`, `/*` or `//`.
-- A line that starts with `*` inside a multi-line template or string is dropped. Examples are a markdown-style bullet in an email body or the Claude prompt text, e.g. `* Sign in to Worship Planner`.
-- `/* note */ const label = 'Worship Planner'` is dropped entirely.
-- The opposite error is fail-safe but noisy. Trailing `code // Worship Planner` comments and non-star continuation lines of a block comment are NOT stripped, so they produce false positives and force authors to reword comments.
-
-The self-test only exercises the happy paths (` * ...`, `// ...`, `<!-- -->`), so none of this is pinned.
-**Fix:** Strip real comments with a small tokenizer, or scope the stripping:
-- For `.vue`, remove `<!-- -->` and then only the `<script>` block's `/* */` and `//` comments.
-- For `.ts`, remove `/\/\*[\s\S]*?\*\//g` (true block comments) and `/(^|[^:'"`])\/\/.*$/gm` (line comments not preceded by a scheme colon or quote).
-- Add self-test cases for a `*`-prefixed string line, a trailing comment, and `/* x */ 'Worship Planner'`.
-
-### WR-03: Compiled `functions/lib` still carries the old brand; Functions have no predeploy build
-
-**File:** `functions/lib/adminEmail.js`, `functions/lib/inviteOnboarding.js`, `functions/lib/volunteerLink.js` (gitignored build output); `firebase.json:17`
-**Issue:** `functions/package.json` has `"main": "lib/index.js"`, and the only `predeploy` in `firebase.json` (`npm run build`) belongs to the hosting block. A `firebase deploy --only functions` run without a prior `cd functions && npm run build` ships invite, admin and volunteer-link emails that still say "Worship Planner". This is the same failure mode as the known "no predeploy build hook" memory. The source guard cannot see it, because `lib/` is not scanned. The phase's email changes (R447) are only real once `lib/` is rebuilt.
-**Fix:** Add a functions `predeploy` (`npm --prefix "$RESOURCE_DIR" run build`) in `firebase.json`. As a minimum, put "rebuild `functions/` before deploy" in the Phase 144 deploy checklist and verify with `grep -r "Worship Planner" functions/lib` after the build.
+Vitest: `brandName.test.ts` (23) and `firebaseFunctionsPredeploy.test.ts` (1) all pass.
 
 ## Info
 
-### IN-01: Guard scope is `.vue`/`.ts` plus `index.html` only
+### IN-01: Regex literal ending in `\//` blanks the rest of its line
 
-**File:** `src/__tests__/brandName.test.ts:29-33`
-**Issue:** The guard does not scan `public/`, `render-service/src` (which may produce PPTX/PDF text), JSON/MD/HTML assets under `src/`, or `firebase.json`. Today nothing leaks (verified by grep), but the comment and ADR read as if the guard covers "every user-facing surface".
-**Fix:** Either extend the scanned globs (`render-service/src/**/*.ts`, `public/**/*.{html,json,webmanifest}`) or state the exact scope in the test comment and ADR-0246.
+**File:** `src/__tests__/brandName.test.ts:48`
+**Issue:** A regex such as `/https?:\/\//` ends with `\//`. The scanner treats the closing `/` plus the next character as a `//` comment and drops the remainder of that line. A quote inside a regex is already documented as a limitation. This one is bounded to a single line, so it can only hide an old-name occurrence that sits on the same line after such a regex. It is currently harmless.
+**Fix:** Optional. Extend the limitation comment to mention it, or skip a `/` immediately preceded by `\` in the `//` branch.
 
-### IN-02: No vacuous-pass protection and no self-test for `WRONG_VARIANT`
+### IN-02: Fix report claims an NBSP self-test that does not exist
 
-**File:** `src/__tests__/brandName.test.ts:40-48, 74-81`
-**Issue:** If `walk` returned an empty list (wrong `cwd`, an unsupported `recursive` option on an older Node), the two offender tests would pass vacuously. Only the count rows would fail, and with `ENOENT` rather than a clear message. The self-test never exercises `WRONG_VARIANT`.
-**Fix:** Add `expect(userFacingFiles.length).toBeGreaterThan(50)` and `expect(userFacingFiles).toContain('src/App.vue')`. Add `hit` cases for `Worship Builder`, `Worship-Builder` and `Worshipbuilder`.
-
-### IN-03: Count-pinned literal rows are brittle
-
-**File:** `src/__tests__/brandName.test.ts:50-72`
-**Issue:** Exact counts (`'Sign in to WorshipBuilder'` x4, `'on WorshipBuilder'` x3 and x4) and markup-coupled literals (`>WorshipBuilder</h1>`) fail on any legitimate edit, such as a new email variant or a reformatted tag or attribute. Per-component behavioural tests added in this phase (e.g. `wrapper.get('h1').text()`) already assert the same facts more robustly.
-**Fix:** Prefer `>= 1` for email literals, or drop the markup-coupled rows that the component tests duplicate.
+**File:** `src/__tests__/brandName.test.ts:161-173`
+**Issue:** `144-REVIEW-FIX.md` says NBSP is among the variants the self-tests prove are caught. The variant list has no NBSP case. `\s` does match NBSP, so the behavior is correct, but it is unpinned.
+**Fix:** Add `'Worship Planner'` to the variant list.
 
 ---
 
