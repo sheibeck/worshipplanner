@@ -44,7 +44,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
   decided in discuss). The org-default **report time** keeps its current behavior (copied onto a new
   service). Changing an org default still never mutates an existing service.
 
-- [x] **R443**: Services created under v2.15 that already carry **undated** rehearsal rows lose no data: the
+- [ ] **R443**: Services created under v2.15 that already carry **undated** rehearsal rows lose no data: the
   planner sees each such row flagged as needing a date and can date or remove it, and an undated row stays
   hidden from every read-only and public surface until it is dated. No migration guesses dates.
 
@@ -144,7 +144,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 |-------------|-------|--------|
 | R441 | Phase 143 | Pending |
 | R442 | Phase 143 | Complete |
-| R443 | Phase 143 | Complete |
+| R443 | Phase 143 | Pending |
 | R444 | Phase 143 | Pending |
 | R445 | Phase 143 | Complete |
 | R446 | Phase 144 | Pending |
