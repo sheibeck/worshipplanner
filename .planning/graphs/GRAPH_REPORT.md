@@ -1,16 +1,16 @@
 # Graph Report - worshipplanner  (2026-10-27)
 
 ## Corpus Check
-- 2899 files · ~6,680,500 words
+- 2927 files · ~6,738,831 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 36068 nodes · 35292 edges · 3056 communities (2756 shown, 300 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 82 edges (avg confidence: 0.61)
+- 36404 nodes · 35607 edges · 3091 communities (2791 shown, 300 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 86 edges (avg confidence: 0.62)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1e7b693f`
+- Built from commit: `e67594ba`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -2949,9 +2949,44 @@
 - [[_COMMUNITY_Info|Info]]
 - [[_COMMUNITY_orgTemplateSeed.ts|orgTemplateSeed.ts]]
 - [[_COMMUNITY_FakeFirestore|FakeFirestore]]
+- [[_COMMUNITY_song.ts|song.ts]]
+- [[_COMMUNITY_FakeFirestore|FakeFirestore]]
+- [[_COMMUNITY_144-UI-REVIEW|144-UI-REVIEW.md]]
+- [[_COMMUNITY_Phase 145 Domain Cutover to worshipbuilder.web.app - Research|Phase 145: Domain Cutover to worshipbuilder.web.app - Research]]
+- [[_COMMUNITY_SlotVideoOutputControl.vue|SlotVideoOutputControl.vue]]
+- [[_COMMUNITY_Phase 145 — Validation Strategy|Phase 145 — Validation Strategy]]
+- [[_COMMUNITY_Milestone v2.13 — Audit PASSED (code); UAT + deploy PENDING|Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING]]
+- [[_COMMUNITY_Common Pitfalls|Common Pitfalls]]
+- [[_COMMUNITY_onDuplicate|onDuplicate]]
+- [[_COMMUNITY_Architecture Patterns|Architecture Patterns]]
+- [[_COMMUNITY_body|body]]
+- [[_COMMUNITY_lockDraft|lockDraft]]
+- [[_COMMUNITY_145-01-PLAN|145-01-PLAN.md]]
+- [[_COMMUNITY_145-03-PLAN|145-03-PLAN.md]]
+- [[_COMMUNITY_Validation Architecture|Validation Architecture]]
+- [[_COMMUNITY_Standard Stack|Standard Stack]]
+- [[_COMMUNITY_User Constraints (from CONTEXT.md)|User Constraints (from CONTEXT.md)]]
+- [[_COMMUNITY_Sources|Sources]]
+- [[_COMMUNITY_Security Domain|Security Domain]]
+- [[_COMMUNITY_Code Examples|Code Examples]]
+- [[_COMMUNITY_COVERAGE|COVERAGE.md]]
+- [[_COMMUNITY_FakeFirestore|FakeFirestore]]
+- [[_COMMUNITY_Phase 145 Plan 02 Share-link default and CORS allowlist Summary|Phase 145 Plan 02: Share-link default and CORS allowlist Summary]]
+- [[_COMMUNITY_legacyOriginLiterals.test.ts|legacyOriginLiterals.test.ts]]
+- [[_COMMUNITY_storageCors.test.ts|storageCors.test.ts]]
+- [[_COMMUNITY_0247. App home is worshipbuilder.web.app; the old addresses redirect there|0247. App home is worshipbuilder.web.app; the old addresses redirect there]]
+- [[_COMMUNITY_RunChannelHandle|RunChannelHandle]]
+- [[_COMMUNITY_Goal Achievement|Goal Achievement]]
+- [[_COMMUNITY_lockDraft|lockDraft]]
+- [[_COMMUNITY_Tests|Tests]]
+- [[_COMMUNITY_Milestone v2.13 — Audit PASSED (code); UAT + deploy PENDING|Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING]]
+- [[_COMMUNITY_Fixed Issues|Fixed Issues]]
+- [[_COMMUNITY_Phase 145 — Security|Phase 145 — Security]]
+- [[_COMMUNITY_v2.16 Milestone Audit — Dated Rehearsals & WorshipBuilder|v2.16 Milestone Audit — Dated Rehearsals & WorshipBuilder]]
+- [[_COMMUNITY_slideGroups.ts|slideGroups.ts]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Communities (3056 total, 298 thin omitted)` - 2637 edges
+1. `Communities (3088 total, 300 thin omitted)` - 2667 edges
 2. `Bucket B — Behavioral/Architectural` - 117 edges
 3. `Bucket A — Decision-Rationale` - 95 edges
 4. `Project State` - 57 edges
@@ -2977,11 +3012,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (3056 total, 300 thin omitted)
+## Communities (3091 total, 300 thin omitted)
 
 ### Community 0 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.00
-Nodes (2637): Communities (3056 total, 298 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2629 more)
+Nodes (2667): Communities (3088 total, 300 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2659 more)
 
 ### Community 1 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.02
@@ -3026,14 +3061,14 @@ Nodes (88): ADR-0019, ADR-0020, ADR-0021, ADR-0022, ADR-0023, ADR-0024, ADR-0026
 
 ### Community 7 - "QuarterView.vue"
 Cohesion: 0.04
-Nodes (61): ADR-0011, ADR-0013, ADR-0016, ADR-0017, ADR-0018, ADR-0045, ADR-0046, ADR-0047 (+53 more)
+Nodes (60): ADR-0011, ADR-0013, ADR-0016, ADR-0017, ADR-0018, ADR-0045, ADR-0046, ADR-0047 (+52 more)
 
 ### Community 8 - "QuarterView.vue"
 Cohesion: 0.04
 Nodes (30): activeTab, addQuarterOpen, authStore, changedDates, csvModalOpen, deleteConfirmOpen, deleteConfirmText, deleteQuarterError (+22 more)
 
 ### Community 9 - "Phase 3: Service Planning - Research"
-Cohesion: 0.04
+Cohesion: 0.05
 Nodes (61): ADR-0050, ADR-0051, ADR-0052, ADR-0053, patchNestedClaimKey(), AdminTarget, AdminWriter, assertSuperAdminCaller() (+53 more)
 
 ### Community 10 - "Phase 16: Quarterly Schedule Share Link — Research"
@@ -3053,8 +3088,8 @@ Cohesion: 0.04
 Nodes (48): Anti-Patterns to Avoid, AppShell Wrapper (verified pattern from SongsView.vue), Architecture Patterns, Claude's Discretion, Code Examples, Common Pitfalls, Core, Deferred Ideas (OUT OF SCOPE) (+40 more)
 
 ### Community 14 - "Phase 16: Quarterly Schedule Share Link — Research"
-Cohesion: 0.07
-Nodes (46): ADR-0033, ADR-0034, ADR-0035, ADR-0036, ADR-0037, ADR-0038, AdminOnboardingKind, buildAddedContent() (+38 more)
+Cohesion: 0.08
+Nodes (38): ADR-0033, ADR-0034, ADR-0035, ADR-0036, ADR-0037, ADR-0038, AdminOnboardingKind, buildAddedContent() (+30 more)
 
 ### Community 15 - "Phase 21: PowerPoint Import for Announcements and Sermon - Research"
 Cohesion: 0.04
@@ -3397,8 +3432,8 @@ Cohesion: 0.07
 Nodes (23): emit, form, FormState, isCreateMode, isDeleting, isDuplicateName(), isSaving, localOrdinals (+15 more)
 
 ### Community 100 - "devDependencies"
-Cohesion: 0.09
-Nodes (21): ADR-0039, ADR-0040, ADR-0041, ADR-0042, ADR-0043, applyPendingWrite(), chunk(), deleteOrganization (+13 more)
+Cohesion: 0.10
+Nodes (19): ADR-0039, ADR-0040, ADR-0041, ADR-0042, ADR-0043, applyPendingWrite(), chunk(), deleteOrganization (+11 more)
 
 ### Community 101 - "Pattern Assignments"
 Cohesion: 0.06
@@ -3442,7 +3477,7 @@ Nodes (28): Auto-Save Architecture, CCLI Parser, CCLI SongSelect Paste Format (R
 
 ### Community 111 - "Progress"
 Cohesion: 0.07
-Nodes (27): Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation, Phase 126: My Schedule — Volunteer Home (+19 more)
+Nodes (28): Milestones, Phase 100: Invite & Login Onboarding Wiring, Phase 104: Notification & Multi-Church Foundations, Phase 105: Presentation Blackout & Inline Black Slide, Phase 106: Per-Item Loop Playback, Phase 107: Visual Stage Layout, Phase 125: Passwordless Magic-Link Access & Scoped Read Isolation, Phase 126: My Schedule — Volunteer Home (+20 more)
 
 ### Community 112 - "QuarterShareView.vue"
 Cohesion: 0.07
@@ -3497,8 +3532,8 @@ Cohesion: 0.08
 Nodes (16): audioEl, authStore, containerClass, currentTime, duration, loop, onLoadedMetadata(), onTimeUpdate() (+8 more)
 
 ### Community 125 - "SongsView.vue"
-Cohesion: 0.12
-Nodes (26): AppConfig, cleanupExpiredMedia, cleanupExpiredMediaHandler(), cleanupOrphanBackgrounds, cleanupOrphanBackgroundsHandler(), cleanupOrphanRenders, cleanupOrphanRendersHandler(), cleanupPptxSources (+18 more)
+Cohesion: 0.10
+Nodes (32): FAKE_DB, mockConfig(), { mockSend }, AppConfig, getAppConfig(), cleanupExpiredMedia, cleanupExpiredMediaHandler(), cleanupOrphanBackgrounds (+24 more)
 
 ### Community 126 - "Implementation Decisions"
 Cohesion: 0.07
@@ -3896,7 +3931,7 @@ Nodes (20): Changes applied, Decisions Made, Deviations from instructions, Devia
 
 ### Community 222 - "Phase 11 Plan 04: Picker Type-Agnostic, Load-More, Pills, Tag Filter Summary"
 Cohesion: 0.10
-Nodes (12): churches(), mockLoadMySchedule, mockLogout, mockMemberships, mockMyScheduleDocs, mockRouterPush, mockSelectOrg, mockSetSelectedChurch (+4 more)
+Nodes (13): churches(), memberships(), mockLoadMySchedule, mockLogout, mockMemberships, mockMyScheduleDocs, mockRouterPush, mockSelectOrg (+5 more)
 
 ### Community 223 - "Tests"
 Cohesion: 0.15
@@ -3972,11 +4007,11 @@ Nodes (18): mockCallable, mockDoc, mockGetDoc, mockRouteParams, churchName, emai
 
 ### Community 241 - "Phase 6 Plan 02: AI Song Suggestions UI Summary"
 Cohesion: 0.15
-Nodes (13): ADR-0205, ADR-0206, ADD_SECTION_KINDS, addSection(), AddSectionKind, buildSectionRows(), deriveSectionKind(), linesAreEquivalent() (+5 more)
+Nodes (14): ADR-0205, ADR-0206, ADD_SECTION_KINDS, addSection(), AddSectionKind, buildSectionRows(), deriveSectionKind(), linesAreEquivalent() (+6 more)
 
 ### Community 242 - "Phase 6 Plan 03: AI Scripture Discovery Summary"
-Cohesion: 0.16
-Nodes (12): coerceLegacyRoleGroup(), findQuarterForDate(), PortedPerson, PortedQuarter, PortedRole, PortedService, ReachableRecipient, RecipientSelection (+4 more)
+Cohesion: 0.10
+Nodes (19): formatServiceDate(), resolveEditorEmail(), resolveServiceLink(), sendQueuedMessageHandler(), MessageTokenContext, renderMessageTokens(), coerceLegacyRoleGroup(), findQuarterForDate() (+11 more)
 
 ### Community 243 - "Phase 6 Plan 04: AI Workflow Human Verification Summary"
 Cohesion: 0.11
@@ -4575,8 +4610,8 @@ Nodes (12): mockAuthState, {
 }, mockQuarters, mockRoles, mockRosterPeople, mockRoute, mockService, mockServicesList (+4 more)
 
 ### Community 390 - "Phase 14 Plan 01: Frequency Tier Data Contract + Scheduler Two-Pass Fill Summary"
-Cohesion: 0.19
-Nodes (13): ADR-0179, ADR-0180, ADR-0181, ADR-0182, importedEntryContent, ImportedRenderMode, ImportedRenderResolution, importedSourceSignature() (+5 more)
+Cohesion: 0.18
+Nodes (14): ADR-0179, ADR-0180, ADR-0181, ADR-0182, importedEntryContent, importedEntryIdentities(), ImportedRenderMode, ImportedRenderResolution (+6 more)
 
 ### Community 391 - "Phase 14 Plan 02: Selective Planning Center Fetch Summary"
 Cohesion: 0.12
@@ -4991,8 +5026,8 @@ Cohesion: 0.09
 Nodes (3): body(), mockSlideTypography, slideText()
 
 ### Community 494 - "slideshowAssembler.ts"
-Cohesion: 0.14
-Nodes (26): ADR-0198, ADR-0199, ADR-0200, ADR-0201, ADR-0202, importedEntryIdentities(), resolveImportedRender(), congregationalSectionFromRef() (+18 more)
+Cohesion: 0.11
+Nodes (30): ADR-0198, ADR-0199, ADR-0200, ADR-0201, ADR-0202, resolveImportedRender(), BIBLE_BOOKS, bibleGatewayLink() (+22 more)
 
 ### Community 495 - "RosterView.test.ts"
 Cohesion: 0.10
@@ -5424,7 +5459,7 @@ Nodes (25): AudioTab, derivedTab, duration, emit, fileName, formatDuration(), is
 
 ### Community 602 - "SongLyricEditor.vue"
 Cohesion: 0.04
-Nodes (39): authStore, confirmRemove(), creditsForm, currentLyrics, EditableLyricsState, editableState, editingCredits, expandedRowKeys (+31 more)
+Nodes (30): authStore, creditsForm, currentLyrics, EditableLyricsState, editableState, editingCredits, expandedRowKeys, hasCredits (+22 more)
 
 ### Community 603 - "T06: Performance Order Builder with drag-and-drop reorder, section add/remove, and reset — 8 passing tests"
 Cohesion: 0.13
@@ -5643,8 +5678,8 @@ Cohesion: 0.09
 Nodes (18): makeFourLineLyrics(), makeLyrics(), makeRepeatLyrics(), mockCurrentLyrics, mockIsEditor, mockIsLoading, mockLyricVersions, mockRevertToVersion (+10 more)
 
 ### Community 658 - "claudeApi.ts"
-Cohesion: 0.19
-Nodes (18): ADR-0176, ADR-0177, AiScriptureSuggestion, AiSongSuggestion, getClient(), getScriptureSuggestions(), GetScriptureSuggestionsParams, getSongSuggestions() (+10 more)
+Cohesion: 0.20
+Nodes (17): ADR-0176, ADR-0177, AiScriptureSuggestion, AiSongSuggestion, getClient(), getScriptureSuggestions(), GetScriptureSuggestionsParams, getSongSuggestions() (+9 more)
 
 ### Community 659 - "slideshowAssembler.test.ts"
 Cohesion: 0.11
@@ -7259,7 +7294,7 @@ Cohesion: 0.33
 Nodes (3): mockGetDownloadURL, mockRef, mockUploadBytesResumable
 
 ### Community 1062 - "useSlideshowAssembly.ts"
-Cohesion: 0.14
+Cohesion: 0.15
 Nodes (11): ADR-0136, ADR-0137, ADR-0138, ADR-0139, ADR-0141, EnsureGroupMaterializedResult, LyricsSubscriber, LyricsUnsubscribe (+3 more)
 
 ### Community 1063 - "storage.rules.test.ts"
@@ -8278,8 +8313,8 @@ Cohesion: 0.18
 Nodes (4): emit, errored, loading, props
 
 ### Community 1309 - "13-03-PLAN.md"
-Cohesion: 0.06
-Nodes (27): alignRight, Chip, ChipId, chipRefs, chips, ChipState, close(), closeAndRefocus() (+19 more)
+Cohesion: 0.09
+Nodes (18): alignRight, Chip, ChipId, chipRefs, chips, ChipState, close(), closeAndRefocus() (+10 more)
 
 ### Community 1310 - "13-04-PLAN.md"
 Cohesion: 0.24
@@ -9731,8 +9766,8 @@ Cohesion: 0.29
 Nodes (6): 0034. Resolve the app's usable share/sign-in base URL, or '' when, Consequences, Context, Decision, Source comments, Status
 
 ### Community 1703 - "02-02-PLAN.md"
-Cohesion: 0.11
-Nodes (15): 0035. Collapse any CR/LF out of a header-bound value (the email subject), Consequences, Context, Decision, Source comments, Status, 0103. For its own duration (25-REVIEW-FIX WR-01), so offering a, Consequences (+7 more)
+Cohesion: 0.29
+Nodes (6): 0035. Collapse any CR/LF out of a header-bound value (the email subject), Consequences, Context, Decision, Source comments, Status
 
 ### Community 1704 - "02-03-PLAN.md"
 Cohesion: 0.29
@@ -10095,8 +10130,8 @@ Cohesion: 0.29
 Nodes (6): 0127. Which display was refused when EXACTLY ONE of the two window.open, Consequences, Context, Decision, Source comments, Status
 
 ### Community 1831 - "PLAN.md"
-Cohesion: 0.29
-Nodes (6): 0128. PRE-LIVE (State A, !live): ONLY Enter (go live) and Escape act, Consequences, Context, Decision, Source comments, Status
+Cohesion: 0.11
+Nodes (15): 0128. PRE-LIVE (State A, !live): ONLY Enter (go live) and Escape act, Consequences, Context, Decision, Source comments, Status, 0148. Via enterOrgAsSuperAdmin, with NO membership document of their own, Consequences (+7 more)
 
 ### Community 1832 - "260714-f4p-PLAN.md"
 Cohesion: 0.29
@@ -10175,8 +10210,8 @@ Cohesion: 0.29
 Nodes (6): 0147. Phase 82 (R242/R243) — the super-admin MASTER AI gate, read from the, Consequences, Context, Decision, Source comments, Status
 
 ### Community 1858 - "0148. Via enterOrgAsSuperAdmin, with NO membership document of their own"
-Cohesion: 0.29
-Nodes (6): 0148. Via enterOrgAsSuperAdmin, with NO membership document of their own, Consequences, Context, Decision, Source comments, Status
+Cohesion: 0.20
+Nodes (9): Deviations from Plan, Known Stubs, Pending (backstop, owner cutover), Phase 145 Plan 03: Cutover runbook, ADR-0247 and deploy docs Summary, Phase gate results, Self-Check: PASSED, Task Commits, Threat Flags (+1 more)
 
 ### Community 1859 - "0149. (68-REVIEW.md) — the requiresSuperAdmin router guard read"
 Cohesion: 0.29
@@ -10976,7 +11011,7 @@ Nodes (4): mockUnsubscribe, SnapshotCallback, snapshotCallbacks, SnapshotDoc
 
 ### Community 2059 - "firebaseHostingHeaders.test.ts"
 Cohesion: 0.33
-Nodes (4): effectiveCacheControl(), FirebaseHeaderEntry, FirebaseHostingConfig, globToRegExp()
+Nodes (4): effectiveCacheControl(), FirebaseHeaderEntry, globToRegExp(), HostingBlock
 
 ### Community 2060 - "lastUsed.ts"
 Cohesion: 0.33
@@ -11435,8 +11470,8 @@ Cohesion: 0.33
 Nodes (3): heading, props, roles
 
 ### Community 2176 - "VolunteerConfirmBar.test.ts"
-Cohesion: 0.33
-Nodes (3): ASSIGNMENTS, { mockOnSnapshot, snapshotCallbacks, mockUnsubscribe, mockSetDoc, mockDeleteDoc, emailState }, TWO_ASSIGNMENTS
+Cohesion: 0.20
+Nodes (7): config, Firebaserc, HostingBlock, IGNORE, legacyPage, Redirect, ADR-0247
 
 ### Community 2177 - "SlidePlanRail.test.ts"
 Cohesion: 0.22
@@ -13451,12 +13486,12 @@ Cohesion: 0.17
 Nodes (11): Accomplishments, Decisions Made, Deviations from Plan, Files Created/Modified, Issues Encountered, Next Phase Readiness, Performance, Quick Task 260919-mvw: Vamp audio resolves from the live vamp doc Summary (+3 more)
 
 ### Community 3003 - "Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback"
-Cohesion: 0.27
-Nodes (6): BIBLE_BOOKS, bibleGatewayLink(), esvLink(), nltLink(), parseScriptureInput(), scriptureWebLink()
+Cohesion: 0.14
+Nodes (13): Post-cutover smoke checklist, Rollback, Step 0 — Pre-flight (local, no production change), Step 1 — Apply Storage CORS (production), Step 2 — Add the authorized domain (production), Step 3 — Deploy the app to the new site (production), Step 4 — Deploy functions (production), Step 5 — Smoke-test the new domain (before the redirect) (+5 more)
 
 ### Community 3005 - "onDuplicate"
-Cohesion: 0.10
-Nodes (16): Milestones, Phases, Roadmap: WorshipPlanner, Milestones, Phases, Roadmap: WorshipPlanner, 1. Requirement Coverage (R295–R301), 2. Milestone-Goal Achievement — Full Path Traced (+8 more)
+Cohesion: 0.08
+Nodes (23): Always target hosting deploys, Comment convention, Defensive storage access, `docs/runbooks/worshipbuilder-cutover.md`, File Classification, `firebase.json` / `.firebaserc`, `functions/DEPLOY-EMAIL-DOMAIN.md`, `functions/src/params.ts` (+15 more)
 
 ### Community 3006 - "song.ts"
 Cohesion: 0.67
@@ -13582,6 +13617,10 @@ Nodes (5): Fixes Applied (orchestrator, 2026-10-27, owner pre-approved recommend
 Cohesion: 0.18
 Nodes (10): AI Proxy Cost Controls, Deferred / Future, Fan-out & Instance Guardrails, Out of Scope, Reminder-Cron Read Cost, Requirements Archive: v1.8 Cost & Billing Hardening, Requirements: WorshipPlanner — v1.8 Cost & Billing Hardening, Storage Retention (+2 more)
 
+### Community 3039 - "v2.16 — Deferred Verification (batched owner UAT)"
+Cohesion: 0.40
+Nodes (4): Phase 143 — Dated Rehearsals & Times Tab (R441–R445), Phase 144 — WorshipBuilder Rename (R446–R447), Phase 145 — Domain Cutover to worshipbuilder.web.app (R448–R451, R453; R452 descoped), v2.16 — Deferred Verification (batched owner UAT)
+
 ### Community 3040 - "Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback"
 Cohesion: 0.23
 Nodes (8): ADR-0246, ALLOWED, hasOldName(), root, stripAllowed(), stripComments(), stripJsComments(), userFacingFiles
@@ -13595,8 +13634,8 @@ Cohesion: 0.29
 Nodes (6): 0246. App brand is WorshipBuilder; internal identifiers keep their names, Consequences, Context, Decision, Source comments, Status
 
 ### Community 3043 - "Phase 144 — Validation Strategy"
-Cohesion: 0.20
-Nodes (9): audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117), Manual-Only Verifications, Per-Task Verification Map, Phase 144 — Validation Strategy, Sampling Rate, status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6), Test Infrastructure, Validation Sign-Off (+1 more)
+Cohesion: 0.18
+Nodes (10): audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: true) (#2117), Manual-Only Verifications, Per-Task Verification Map, Phase 144 — Validation Strategy, Sampling Rate, status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6), Test Infrastructure, Validation Audit 2026-10-27 (+2 more)
 
 ### Community 3044 - "144-01-PLAN.md"
 Cohesion: 0.40
@@ -13611,16 +13650,20 @@ Cohesion: 0.20
 Nodes (9): Deviations from Plan, Known Stubs, Manual / batched UAT items (deferred to milestone end), Phase 144 Plan 01: WorshipBuilder UI rename Summary, Requirements, Self-Check: PASSED, Tasks, Threat Flags (+1 more)
 
 ### Community 3047 - "Requirements: WorshipPlanner — v2.6 Per-Org Bible API Toggle & Manual Fallback"
-Cohesion: 0.33
-Nodes (5): invokeRenderService(), InvokeRenderServiceArgs, RenderServiceResponse, getIdTokenClient, requestSpy
+Cohesion: 0.11
+Nodes (18): Allowlists (R450), Amendment 2 — owner scope cut 2026-10-27 (authoritative; supersedes the bridge, receiving-side and hand-off text above), Amendment — research-driven decisions (2026-10-27, recommendations auto-accepted), Claude's Discretion, Deferred Ideas, Established Patterns, Existing Code Insights, Google sign-in safety (R451) (+10 more)
 
 ### Community 3048 - "onDuplicate"
 Cohesion: 0.25
 Nodes (7): Fixed Issues, Phase 144: Code Review Fix Report, Skipped Issues, Verification, WR-01: Guard is case-sensitive, so common variants of the old name pass undetected, WR-02: `stripComments` line-prefix heuristic can hide real user-facing text, WR-03: Compiled `functions/lib` still carries the old brand; Functions have no predeploy build
 
+### Community 3049 - "FakeFirestore"
+Cohesion: 0.20
+Nodes (9): Anti-Patterns, Gaps Summary, Gates Run, Key Links, Observable Truths, Phase 144: WorshipBuilder Rename Verification Report, Prohibitions (judgment-tier, non-authoritative verdict; flagged `unverified-prohibition - human review recommended`), Required Artifacts (+1 more)
+
 ### Community 3050 - "messageTokens.ts"
-Cohesion: 0.33
-Nodes (5): ADR-0167, ADR-0168, ADR-0169, ADR-0170, useSlideGroups
+Cohesion: 0.22
+Nodes (8): Accepted Risks Log, Phase 144 — Security, Security Audit 2026-10-27, Security Audit Trail, Sign-Off, Threat Register, threats_open = count of OPEN threats at or above workflow.security_block_on severity (the blocking gate), Trust Boundaries
 
 ### Community 3051 - "Phase 144 Plan 02: WorshipBuilder emails + brand guard Summary"
 Cohesion: 0.18
@@ -13630,25 +13673,157 @@ Nodes (10): Deviations from Plan, Fail-first evidence, Known Stubs, Manual / bat
 Cohesion: 0.33
 Nodes (5): IN-01: Regex literal ending in `\//` blanks the rest of its line, IN-02: Fix report claims an NBSP self-test that does not exist, Info, Phase 144: Code Review Report (iteration 2), Summary
 
+### Community 3053 - "orgTemplateSeed.ts"
+Cohesion: 0.22
+Nodes (8): 1. R447 — real emails after deploy, 2. R446 — returning-user continuity after deploy (backstop truth), 3. R446 — visual brand check, 4. R447 — owner confirms SC3 wording, Current Test, Gaps, Summary, Tests
+
+### Community 3056 - "song.ts"
+Cohesion: 0.15
+Nodes (10): useSlideshowAssembly(), fenced, HEADINGS, lines, RUNBOOK, secs, section(), ADR-0247 (+2 more)
+
+### Community 3057 - "FakeFirestore"
+Cohesion: 0.33
+Nodes (5): invokeRenderService(), InvokeRenderServiceArgs, RenderServiceResponse, getIdTokenClient, requestSpy
+
+### Community 3059 - "Phase 145: Domain Cutover to worshipbuilder.web.app - Research"
+Cohesion: 0.12
+Nodes (16): Architectural Responsibility Map, Assumptions Log, Don't Hand-Roll, Environment Availability, Link Inventory (R449), Metadata, Open Questions (RESOLVED), Other Origin-Scoped Configuration (R450) (+8 more)
+
+### Community 3060 - "SlotVideoOutputControl.vue"
+Cohesion: 0.10
+Nodes (16): Milestones, Phases, Roadmap: WorshipPlanner, Milestones, Phases, Roadmap: WorshipPlanner, 1. Requirement Coverage (R295–R301), 2. Milestone-Goal Achievement — Full Path Traced (+8 more)
+
+### Community 3061 - "Phase 145 — Validation Strategy"
+Cohesion: 0.18
+Nodes (10): audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117), Manual-Only Verifications, Per-Task Verification Map, Phase 145 — Validation Strategy, Sampling Rate, status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6), Test Infrastructure, Validation Audit 2026-10-27 (+2 more)
+
+### Community 3062 - "Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING"
+Cohesion: 0.40
+Nodes (4): Artifacts this phase produces, Planner Assumptions (flagged, not silently dropped), STRIDE Threat Register, Trust Boundaries
+
+### Community 3063 - "Common Pitfalls"
+Cohesion: 0.22
+Nodes (9): Common Pitfalls, Pitfall 1: `functions/.env` silently pins the old base URL, Pitfall 2: Fragment consumed too late (router snapshot), Pitfall 3: Protocol-relative path injection, Pitfall 4: Existing header test breaks on the array shape, Pitfall 5: New tests not type-checked, Pitfall 6: `dist-legacy/` committed, Pitfall 7: Hand-off marker race / bounce-tracking cleanup (+1 more)
+
+### Community 3064 - "onDuplicate"
+Cohesion: 0.18
+Nodes (10): Auto-fixed Issues, Deviations from Plan, Known Stubs, Pending (backstop), Phase 145 Plan 01: Two-target hosting and legacy redirect Summary, Self-Check: PASSED, Task Commit, Threat Flags (+2 more)
+
+### Community 3065 - "Architecture Patterns"
+Cohesion: 0.25
+Nodes (8): Anti-Patterns to Avoid, Architecture Patterns, Pattern 1: Hosting config shape (verified), Pattern 2: Boot-order-safe import (R452), Pattern 3: Redirect URL construction (injection-safe), Pattern 4: Legacy Vite build that avoids the Firebase env guard, Recommended Project Structure, System Architecture Diagram
+
+### Community 3066 - "body"
+Cohesion: 0.29
+Nodes (6): 0103. For its own duration (25-REVIEW-FIX WR-01), so offering a, Consequences, Context, Decision, Source comments, Status
+
+### Community 3067 - "lockDraft"
+Cohesion: 0.25
+Nodes (9): confirmRemove(), expandRowKey(), isExpanded(), mintSlotId(), onAddSection(), onDuplicate(), onRemove(), orderIndexForRow() (+1 more)
+
+### Community 3068 - "145-01-PLAN.md"
+Cohesion: 0.40
+Nodes (4): Artifacts this phase produces, Planner Assumptions (flagged, not silently dropped), STRIDE Threat Register, Trust Boundaries
+
+### Community 3069 - "145-03-PLAN.md"
+Cohesion: 0.29
+Nodes (6): Artifacts this phase produces, Batched owner UAT (milestone end, PENDING — not owner-accepted; all need the production cutover), Multi-Source Coverage Audit (phase-level), Planner Assumptions (flagged, not silently dropped), STRIDE Threat Register, Trust Boundaries
+
+### Community 3070 - "Validation Architecture"
+Cohesion: 0.40
+Nodes (5): Phase Requirements → Test Map, Sampling Rate, Test Framework, Validation Architecture, Wave 0 Gaps
+
+### Community 3071 - "Standard Stack"
+Cohesion: 0.50
+Nodes (4): Alternatives Considered, Core, Standard Stack, Supporting
+
+### Community 3072 - "User Constraints (from CONTEXT.md)"
+Cohesion: 0.50
+Nodes (4): Claude's Discretion, Deferred Ideas (OUT OF SCOPE), Locked Decisions, User Constraints (from CONTEXT.md)
+
+### Community 3073 - "Sources"
+Cohesion: 0.50
+Nodes (4): Primary (HIGH confidence), Secondary (MEDIUM confidence), Sources, Tertiary (LOW confidence)
+
+### Community 3074 - "Security Domain"
+Cohesion: 0.67
+Nodes (3): Applicable ASVS Categories, Known Threat Patterns for this stack, Security Domain
+
+### Community 3075 - "Code Examples"
+Cohesion: 0.67
+Nodes (3): Code Examples, Codec (pure, UTF-8 safe), Receiving side core loop (iterate the PAYLOAD, match against allowlist; validators rebuild values)
+
+### Community 3078 - "Phase 145 Plan 02: Share-link default and CORS allowlist Summary"
+Cohesion: 0.22
+Nodes (8): Deviations from Plan, Fail-first proof (legacyOriginLiterals scan), Known Stubs, Phase 145 Plan 02: Share-link default and CORS allowlist Summary, Self-Check: PASSED, Tasks, Threat Flags, Verification
+
+### Community 3079 - "legacyOriginLiterals.test.ts"
+Cohesion: 0.29
+Nodes (3): root, scanned, ADR-0247
+
+### Community 3080 - "storageCors.test.ts"
+Cohesion: 0.40
+Nodes (4): CorsRule, EXPECTED_ORIGINS, rules, ADR-0247
+
+### Community 3081 - "0247. App home is worshipbuilder.web.app; the old addresses redirect there"
+Cohesion: 0.29
+Nodes (6): 0247. App home is worshipbuilder.web.app; the old addresses redirect there, Consequences, Context, Decision, Source comments, Status
+
+### Community 3082 - "RunChannelHandle"
+Cohesion: 0.22
+Nodes (8): IN-01: Test helper treats `$` in the replacement as a special pattern, IN-02: Host-invariance test is near-tautological; `//` double slash only documented, IN-03: `legacy-site/index.html` is unreachable in practice, IN-04: `DEPLOY-EMAIL-DOMAIN.md` still says `SERVICE_SHARE_BASE_URL` is "intentionally left alone", IN-05: Rollback warning is broader than needed and the rollback check is not test-guarded, Info, Phase 145: Code Review Report, Summary
+
+### Community 3083 - "Goal Achievement"
+Cohesion: 0.15
+Nodes (12): Anti-Patterns Found, Behavioral Spot-Checks (Gates), Data-Flow Trace (Level 4), Gaps Summary, Goal Achievement, Human Verification Required, Key Link Verification, Observable Truths (ROADMAP success criteria + PLAN must_haves) (+4 more)
+
+### Community 3084 - "lockDraft"
+Cohesion: 0.33
+Nodes (3): ASSIGNMENTS, { mockOnSnapshot, snapshotCallbacks, mockUnsubscribe, mockSetDoc, mockDeleteDoc, emailState }, TWO_ASSIGNMENTS
+
+### Community 3085 - "Tests"
+Cohesion: 0.17
+Nodes (11): 1. R450 — Storage CORS + authorized domain (Steps 1–2), 2. R448 — new site live (Step 3: `firebase deploy --only hosting:app`), 3. R449 — functions deployed with the new share base URL (Step 4), 4. R450/R451 — new-domain smoke (Step 5), 5. R451 — old addresses redirect (Step 6: `firebase deploy --only hosting:legacy`), 6. R453 — per-computer setup (Step 7), 7. R453 — runbook walk + rollback understood, Current Test (+3 more)
+
+### Community 3086 - "Milestone v2.13 — Audit: PASSED (code); UAT + deploy PENDING"
+Cohesion: 0.20
+Nodes (9): emit, mode, props, select(), sizeHint, SlotVideoOutput, mountControl(), slot() (+1 more)
+
+### Community 3087 - "Fixed Issues"
+Cohesion: 0.33
+Nodes (5): Fixed Issues, Phase 145: Code Review Fix Report, WR-01: Bare-deploy warning is narrower than the real hazard, WR-02: Step 0 leaves the shell in `functions/` when a step fails, WR-03: Rollback leaves the redirect config armed
+
+### Community 3088 - "Phase 145 — Security"
+Cohesion: 0.22
+Nodes (8): Accepted Risks Log, Phase 145 — Security, Security Audit 2026-10-27, Security Audit Trail, Sign-Off, Threat Register, threats_open = count of OPEN threats at or above workflow.security_block_on severity (the blocking gate), Trust Boundaries
+
+### Community 3089 - "v2.16 Milestone Audit — Dated Rehearsals & WorshipBuilder"
+Cohesion: 0.25
+Nodes (7): Definition of done, Integration (gsd-integration-checker, read-only, 2026-10-27), Next, Phases, Requirements (3-source cross-reference), Tech debt, v2.16 Milestone Audit — Dated Rehearsals & WorshipBuilder
+
+### Community 3090 - "slideGroups.ts"
+Cohesion: 0.33
+Nodes (5): ADR-0167, ADR-0168, ADR-0169, ADR-0170, useSlideGroups
+
 ## Knowledge Gaps
-- **26594 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+26589 more)
+- **26860 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+26855 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **300 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Communities (3056 total, 298 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
-  _High betweenness centrality (0.006) - this node is a cross-community bridge._
-- **Why does `data()` connect `Phase 17 Plan 03: Service store write surface — scoped overrides + names-only share Summary` to `ServiceEditorView.test.ts`, `Phase 16 Plan 11: Remove Deprecated Frequency Fields Summary`, `Phase 3: Service Planning - Research`, `Phase 17: Sync schedule with planned services - Research`, `RosterImportModal.vue`, `Implementation Landscape`, `Phase 16: Quarterly Schedule Share Link — Research`?**
-  _High betweenness centrality (0.001) - this node is a cross-community bridge._
+- **Why does `Communities (3088 total, 300 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
+  _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `main` to the rest of the system?**
-  _26597 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _26863 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
-  _Cohesion score 0.0007584376185058779 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0007499062617172854 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.017094017094017096 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.021549213744903904 - nodes in this community are weakly interconnected._
 - **Should `ServiceEditorView.vue` be split into smaller, more focused modules?**
   _Cohesion score 0.0111731843575419 - nodes in this community are weakly interconnected._
+- **Should `ServiceEditorView.vue` be split into smaller, more focused modules?**
+  _Cohesion score 0.021052631578947368 - nodes in this community are weakly interconnected._
