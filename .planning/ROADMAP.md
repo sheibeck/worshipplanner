@@ -881,7 +881,17 @@ Area: `src/views/ServiceEditorView.vue` (Times block above the tab strip + the t
 
   4. Internal identifiers are unchanged: the Firebase project id, `wp`-prefixed storage keys and code symbols. After the rename ships, a returning user's sign-in, saved Run monitor setup, selected church and list prefs carry on as before (R446).
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 144-01-PLAN.md — UI rename U1-U14 (tab title, splash, sidebar/mobile header, login, church picker, volunteer pages, Shared/Generated-from footers) + R446 rendered-text assertions in 9 existing tests (R446) [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 144-02-PLAN.md — Email copy E1-E12 + functions test updates T1-T4 (R447) + static brand guard src/__tests__/brandName.test.ts + ADR-0246 + phase gates (R446, R447) [wave 2]
+
 **Deploy**: hosting + functions (email copy). Rebuild functions first; each production deploy is owner-confirmed.
 **UI hint**: yes (copy-only; no layout change)
 
