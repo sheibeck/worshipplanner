@@ -1628,6 +1628,27 @@ second caller (D-15), not a second implementation. Guarded against re-entry: thi
 single-batch state machine, and a second concurrent import while one is already uploading/parsing/
 confirming would corrupt its preview state — the guard silently no-ops instead.
 
+### src/components/ServiceTimesPanel.vue
+
+**Module overview (Phase 143, R441-R444):** the Times tab body — props-in/events-out with no store
+access; the parent `ServiceEditorView` owns persistence through the existing `useAutoSave` path and
+the R036 `canEditService` self-gates. Behavior worth knowing before editing:
+
+- **Add form time:** a nullable local override that follows `defaultTimes[0]` until the planner types
+  or picks a chip, so late-arriving org defaults still pre-fill; it resets to `null` (re-pre-fills)
+  after each successful add. A row is created only on submit with both date and time.
+- **Reject-clear:** clearing a set date/time forces the native input value back (an unchanged one-way
+  `:value` binding is never repainted by Vue) and shows a 4-second `role="status"` message; nothing is
+  emitted, so a stored row is only ever deleted by an explicit Remove.
+- **Row order:** legacy (non-displayable) rows first in stored order, then dated rows via
+  `sortRehearsals`; the partition is local so the shared undated-last `sortRehearsals`, which both
+  projections use, stays untouched.
+- **Read-only:** a bare `v-if="!canEdit"` branch (CR-02) listing only `isDisplayableRehearsal` rows.
+  Under the view's `shallowMount` tests the panel is stubbed, so its DOM is tested directly with
+  `mount` in `ServiceTimesPanel.test.ts`.
+
+Decision record: ADR-0245 (`docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md`).
+
 ### src/components/SongSlotPicker.vue
 
 **`tagFilteredSongs`:** visible songs filtered by the shared store tag-filter state (D-09/D-10:
