@@ -2,14 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { reactive } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
 
-// ── 139-01 Task 2 — R429/R432 copy-not-live-bind org-defaults pre-fill ──────
-//
-// createService() reads authStore.settings.rehearsalTimeDefaults/
-// reportTimeDefault and COPIES them into the new doc's own rehearsals[]/
-// reportTime at creation time — never a live read at display time. Mirrors
-// services.sharePii.test.ts's mock scaffold plus services.test.ts's
-// mockAuthState/crypto.randomUUID setup (createService's rehearsals-copy
-// path mints crypto.randomUUID() per row).
+// R442 (ADR-0245): createService writes rehearsals [] and still copies
+// reportTimeDefault once at creation (copy-not-live-bind).
 
 let uuidCounter = 0
 vi.stubGlobal('crypto', {
@@ -75,7 +69,7 @@ vi.mock('@/stores/auth', () => ({
   useAuthStore: () => mockAuthState,
 }))
 
-describe('createService — copy-not-live-bind org defaults (R429/R432)', () => {
+describe('createService — no seeded rehearsals, report-time copy (R442)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
@@ -83,7 +77,7 @@ describe('createService — copy-not-live-bind org defaults (R429/R432)', () => 
     mockAuthState.settings.reportTimeDefault = ''
   })
 
-  it('copies rehearsalTimeDefaults/reportTimeDefault into the new service — one row per default, date blank', async () => {
+  it('R442: with org default times, createService writes rehearsals [] and copies reportTime', async () => {
     const { addDoc } = await import('firebase/firestore')
     mockAuthState.settings.rehearsalTimeDefaults = ['18:30', '19:00']
     mockAuthState.settings.reportTimeDefault = '08:00'
@@ -96,14 +90,11 @@ describe('createService — copy-not-live-bind org defaults (R429/R432)', () => 
 
     const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
     const rehearsals = data.rehearsals as Array<{ id: string; date: string; time: string }>
-    expect(rehearsals).toHaveLength(2)
-    expect(rehearsals.every((r) => r.date === '')).toBe(true)
-    expect(rehearsals.map((r) => r.time)).toEqual(['18:30', '19:00'])
-    expect(rehearsals.every((r) => typeof r.id === 'string' && r.id.length > 0)).toBe(true)
+    expect(rehearsals).toEqual([])
     expect(data.reportTime).toBe('08:00')
   })
 
-  it('copy-not-live-bind: mutating org defaults AFTER createService leaves the already-created service byte-identical', async () => {
+  it('R442: copy-not-live-bind: mutating org defaults AFTER createService leaves the already-created service byte-identical', async () => {
     const { addDoc } = await import('firebase/firestore')
     mockAuthState.settings.rehearsalTimeDefaults = ['18:30']
     mockAuthState.settings.reportTimeDefault = '08:00'
@@ -123,11 +114,12 @@ describe('createService — copy-not-live-bind org defaults (R429/R432)', () => 
 
     // The already-created service's captured payload must be untouched —
     // proves the copy was independent, not a live reference into settings.
+    expect(capturedRehearsals).toEqual([])
     expect(firstCallData.rehearsals).toEqual(capturedRehearsals)
     expect(firstCallData.reportTime).toBe(capturedReportTime)
   })
 
-  it('fresh-copy inverse: a service created AFTER a defaults change picks up the NEW defaults', async () => {
+  it('R442: fresh-copy inverse: a service created AFTER the report default changes picks up the NEW report time, rehearsals still []', async () => {
     const { addDoc } = await import('firebase/firestore')
     const { useServiceStore } = await import('../services')
     const store = useServiceStore()
@@ -142,12 +134,11 @@ describe('createService — copy-not-live-bind org defaults (R429/R432)', () => 
     await store.createService({ date: '2026-09-20', name: '', teams: [] })
 
     const secondCallData = vi.mocked(addDoc).mock.calls[1]![1] as Record<string, unknown>
-    const rehearsals = secondCallData.rehearsals as Array<{ time: string }>
-    expect(rehearsals.map((r) => r.time)).toEqual(['20:00'])
+    expect(secondCallData.rehearsals).toEqual([])
     expect(secondCallData.reportTime).toBe('09:15')
   })
 
-  it('an empty rehearsalTimeDefaults produces an empty rehearsals array, not undefined', async () => {
+  it('R442: an empty rehearsalTimeDefaults produces an empty rehearsals array, not undefined', async () => {
     const { addDoc } = await import('firebase/firestore')
     const { useServiceStore } = await import('../services')
     const store = useServiceStore()

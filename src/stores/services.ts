@@ -471,16 +471,8 @@ export const useServiceStore = defineStore('services', () => {
       effectiveTemplate,
       authStore.settings.vwModeEnabled,
     )
-    // R429/R432 (Phase 139) — copy org defaults into the new doc's OWN
-    // fields, once, at creation. NEVER read authStore.settings.rehearsal-
-    // TimeDefaults/reportTimeDefault from a display component — a later
-    // org-default edit must not retroactively change an already-created
-    // service. Mirrors the `defaultServiceTemplate` read immediately above.
-    const rehearsals = authStore.settings.rehearsalTimeDefaults.map((time) => ({
-      id: crypto.randomUUID(),
-      date: '', // planner dates each rehearsal — an org default cannot know a future service's date
-      time,
-    }))
+    // R442 — report time is copied once at creation; rehearsals start empty and are added dated in the Times tab. See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md)
+    const rehearsals: { id: string; date: string; time: string }[] = []
     const reportTime = authStore.settings.reportTimeDefault
     const ref = await addDoc(collection(db, 'organizations', orgId.value, 'services'), {
       ...data,

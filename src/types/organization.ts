@@ -99,11 +99,8 @@ export interface OrgSettings {
    *  R133. Only load-bearing for Phase 61's scheduled reminder cron; this
    *  phase just persists the field + its Settings `<select>`. */
   timezone: string
-  /** Org-level default rehearsal time(s) (R429), time-of-day only — a
-   *  default cannot know a future service's date, so no `date` field here.
-   *  Each entry is `'HH:mm'`. Copied (never live-bound) into a new
-   *  Service's `rehearsals[]` at `createService` time — see
-   *  `src/stores/services.ts::createService`. */
+  /** Org-level default rehearsal time(s), 'HH:mm', time-of-day only; pre-fills the
+   *  time of the Times-tab add form (R442), never copied into a service; see ADR-0245. */
   rehearsalTimeDefaults: string[]
   /** Org-level default day-of report time (R429), `'HH:mm'`, `''` = unset. */
   reportTimeDefault: string

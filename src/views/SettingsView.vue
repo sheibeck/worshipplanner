@@ -540,19 +540,12 @@
         </div>
       </div>
 
-      <!-- Rehearsal & Report Defaults (R429, Phase 139) — mirrors the Messaging
-           section's structure exactly: h2 label, explanatory copy, add/remove
-           list inputs, one "Saved!"/error line. These are starting values
-           copied into a service's OWN rehearsals[]/reportTime at creation
-           (createService, services.ts) — editing a default here never changes
-           an already-created service (139-CONTEXT.md's copy-not-live-bind
-           decision). -->
+      <!-- Rehearsal & Report Defaults (R429/R442). See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md) -->
       <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
         <h2 class="text-sm font-semibold text-gray-300 mb-3">Rehearsal &amp; Report Defaults</h2>
 
-        <p class="text-xs text-gray-400 mb-3">
-          Starting rehearsal time(s) and a report time copied onto every new service — a
-          planner can still add, edit, or remove them per service in the editor.
+        <p class="text-xs text-gray-400 mb-3" data-testid="rehearsal-defaults-helper">
+          Default rehearsal time(s) pre-fill the time when a planner adds a rehearsal to a service, and the report time is copied onto every new service. Dates are always chosen per service.
         </p>
 
         <div class="space-y-2">

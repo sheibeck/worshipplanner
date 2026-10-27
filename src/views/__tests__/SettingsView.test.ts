@@ -359,6 +359,13 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     const wrapper = mountSettingsView()
     expect(wrapper.text()).toContain('Vertical Worship')
   })
+
+  it('R442: the Rehearsal & Report Defaults helper says default times pre-fill the add form', () => {
+    const wrapper = mountSettingsView()
+    const text = wrapper.get('[data-testid="rehearsal-defaults-helper"]').text().replace(/\s+/g, ' ')
+    expect(text).toContain('pre-fill the time when a planner adds a rehearsal')
+    expect(text).toContain('Dates are always chosen per service.')
+  })
 })
 
 // ── Toggle checkbox indices, in DOM order (Task 2 markup order — Wave 2) ──────
