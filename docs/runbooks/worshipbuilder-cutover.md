@@ -31,11 +31,13 @@ npx vitest run
 (cd functions && npx vitest run && npm run build)
 npm run build
 firebase target
+firebase hosting:sites:list
 ```
 
 - `git status` shows a clean tree on `master`. The full `npx vitest run` baseline is that only `src/storage.rules.test.ts` fails (a known Storage-emulator limit).
 - `npm run build` needs `.env.local` in the repo root.
 - `firebase target` shows `app` -> `worshipbuilder` and `legacy` -> `worship-planner-bc515`.
+- `firebase hosting:sites:list` (read-only) lists both `worshipbuilder` and `worship-planner-bc515`. If `worshipbuilder` is missing, stop: Step 3 has nowhere to deploy.
 
 Check the Auth domain setting (prints status only, never the value):
 
@@ -48,13 +50,13 @@ grep -qE '^VITE_FIREBASE_AUTH_DOMAIN=worship-planner-bc515\.firebaseapp\.com[[:s
 Then check it (status only):
 
 ```bash
-grep -qE '^SERVICE_SHARE_BASE_URL=https://worshipbuilder\.web\.app[[:space:]]*$' functions/.env && echo "share base URL: OK (new origin)" || echo "share base URL: NOT the new origin - fix before Step 4"
+grep -qE '^SERVICE_SHARE_BASE_URL=https://worshipbuilder\.web\.app[[:space:]]*$' functions/.env && echo "share base URL: OK (new origin)" || echo "share base URL: NOT the new origin - fix it now (before Step 1)"
 ```
 
 PowerShell equivalent:
 
 ```powershell
-if (Select-String -Path functions/.env -Pattern '^SERVICE_SHARE_BASE_URL=https://worshipbuilder\.web\.app\s*$' -Quiet) { 'share base URL: OK (new origin)' } else { 'share base URL: NOT the new origin - fix before Step 4' }
+if (Select-String -Path functions/.env -Pattern '^SERVICE_SHARE_BASE_URL=https://worshipbuilder\.web\.app\s*$' -Quiet) { 'share base URL: OK (new origin)' } else { 'share base URL: NOT the new origin - fix it now (before Step 1)' }
 ```
 
 These checks end in `[[:space:]]*$`, so they read a Windows (CRLF) file correctly, and they print only OK or NOT OK, never the line or any other value.

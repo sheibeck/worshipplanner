@@ -109,6 +109,7 @@ describe('cutover runbook', () => {
 
   it('step bodies carry their required phrases', () => {
     const need: [number, string[]][] = [
+      [0, ['firebase hosting:sites:list', 'fix it now (before Step 1)']],
       [2, ['worshipbuilder.firebaseapp.com']],
       [4, ['links start with https://worshipbuilder.web.app']],
       [5, ['Google sign-in', 'magic link']],
