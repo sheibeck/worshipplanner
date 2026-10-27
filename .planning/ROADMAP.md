@@ -917,7 +917,19 @@ Area: user-facing strings in `src/` views/components and `index.html`; email cop
 
   5. The owner can follow a cutover runbook that covers: the pre-cutover allowlist steps; deploy order (new site live before the old site redirects); not cutting over during a service; the one-time sign-in on the new domain; re-granting the multi-screen (window placement) permission on each Run computer; optional console renames (Firebase public-facing project name, OAuth consent-screen app name); rollback; and a post-cutover smoke checklist (R453).
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 145-01-PLAN.md — two targeted hosting sites (app -> worshipbuilder, legacy -> worship-planner-bc515 bridge) + .firebaserc targets + shape/header tests + targeted deploy docs; SERVICE_SHARE_BASE_URL default -> new origin + one-slash link tests; storage-cors.json +2 origins + CORS guard + old-origin source scan (R448, R449, R450, R451) [wave 1]
+- [ ] 145-02-PLAN.md — receiving-side settings hand-off: src/originHandoff allowlist/denylist + per-key validators + base64url #wph1= codec + fill-if-absent apply + boot bootstrap as main.ts's first import + one-time "new address" notice (R452) [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 145-03-PLAN.md — old-site bridge (constant-origin redirect + allowlisted fragment payload + once-per-browser flag) + vite.config.legacy.ts -> dist-legacy + build:legacy; owner cutover runbook + guard test; ADR-0247; ARCHITECTURE.md entry (R448, R450, R451, R452, R453) [wave 2]
+
+**Owner-gated**: no production change in this phase. Storage CORS apply, authorized domain, `hosting:app`, functions and `hosting:legacy` deploys are owner-confirmed runbook steps at milestone end.
 **UI hint**: no (the old-site bridge is a non-visual redirect, not a designed screen)
 
 Area: `firebase.json` + `.firebaserc` (multi-site hosting targets), `functions/src/params.ts`

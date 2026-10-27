@@ -43,12 +43,15 @@ Requirement-level map (task IDs filled once PLAN.md files exist).
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | R448 | — | Two hosting targets; legacy has only `/api/**` + `**` rewrites | unit (JSON shape) | `npx vitest run src/__tests__/firebaseHostingTargets.test.ts src/__tests__/firebaseHostingHeaders.test.ts` | ❌ W0 / ♻️ adapt | ⬜ pending |
-| TBD | TBD | TBD | R449 | — | No old-domain literal in shipped code; new default base URL | unit (source scan) | `npx vitest run src/__tests__/legacyOriginLiterals.test.ts` + `cd functions && npx vitest run` | ❌ W0 / ✅ | ⬜ pending |
-| TBD | TBD | TBD | R450 | — | CORS lists exact origins, no wildcard | unit (JSON) | `npx vitest run src/__tests__/storageCors.test.ts` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | R451 | — | Redirect host is constant; `//evil` cannot change it | unit + build | `npx vitest run src/originHandoff/__tests__/bridge.test.ts src/originHandoff/__tests__/legacyBuild.test.ts` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | R452 | — | Allowlist + per-key validation, fill-if-absent, size caps, no auth state, fragment-only | unit (jsdom) | `npx vitest run src/originHandoff/__tests__/allowlist.test.ts src/originHandoff/__tests__/apply.test.ts src/originHandoff/__tests__/mainOrder.test.ts src/utils/__tests__/monitorConfig.test.ts` | ❌ W0 / ✅ | ⬜ pending |
-| TBD | TBD | TBD | R453 | — | Runbook marks every production step owner-confirmed | unit (string) | `npx vitest run src/__tests__/cutoverRunbook.test.ts` | ❌ W0 | ⬜ pending |
+| 145-01-T1 | 01 | 1 | R448/R451 | T-145-01, T-145-04, T-145-05 | Two targeted hosting blocks; legacy has only `/api/**` + `**` rewrites, no `/__` source, `/bridge-assets/**`-only immutable | unit (JSON shape) | `npx vitest run src/__tests__/firebaseHostingTargets.test.ts src/__tests__/firebaseHostingHeaders.test.ts` | ❌ W0 / ♻️ adapt | ⬜ pending |
+| 145-01-T2 | 01 | 1 | R449 | T-145-03, T-145-07 | New default base URL; one-slash links for every builder family | unit | `cd functions && npx vitest run src/params.test.ts src/adminEmail.test.ts src/inviteOnboarding.test.ts src/volunteerLink.test.ts src/index.test.ts` | ❌ W0 / ✅ | ⬜ pending |
+| 145-01-T3 | 01 | 1 | R449/R450 | T-145-02, T-145-06, T-145-08 | CORS lists exact five origins, no wildcard; no old-domain literal in shipped code | unit (JSON + source scan) | `npx vitest run src/__tests__/storageCors.test.ts src/__tests__/legacyOriginLiterals.test.ts` | ❌ W0 | ⬜ pending |
+| 145-02-T1 | 02 | 1 | R452 | T-145-10, T-145-11, T-145-12, T-145-14 | Allowlist + denylist + per-key validate-and-rebuild; codec rejects malformed | unit | `npx vitest run src/originHandoff/__tests__/allowlist.test.ts src/originHandoff/__tests__/codec.test.ts src/utils/__tests__/monitorConfig.test.ts` | ❌ W0 / ✅ | ⬜ pending |
+| 145-02-T2 | 02 | 1 | R452 | T-145-13, T-145-16, T-145-17, T-145-19 | Fill-if-absent, caps, strip + hash restore, no re-import on reload | unit (jsdom) | `npx vitest run src/originHandoff/__tests__/apply.test.ts src/originHandoff/__tests__/bootstrap.test.ts` | ❌ W0 | ⬜ pending |
+| 145-02-T3 | 02 | 1 | R452 | T-145-18 | Bootstrap is main.ts's first import; one keyed notice when consumed | unit (source order + store) | `npx vitest run src/originHandoff/__tests__/mainOrder.test.ts && npm run build` | ❌ W0 | ⬜ pending |
+| 145-03-T1 | 03 | 2 | R451/R452 | T-145-20, T-145-21, T-145-22 | Redirect host is constant; `//evil` cannot change it; fragment-only allowlisted payload; flag once | unit | `npx vitest run src/originHandoff/__tests__/bridge.test.ts` | ❌ W0 | ⬜ pending |
+| 145-03-T2 | 03 | 2 | R451 | T-145-23, T-145-24 | Bridge bundle has no Vue/Pinia/Firebase, noscript link, bridge-assets dir; dist-legacy ignored | build integration | `npx vitest run src/originHandoff/__tests__/legacyBuild.test.ts && npm run build:legacy` | ❌ W0 | ⬜ pending |
+| 145-03-T3 | 03 | 2 | R453 (+R448/R450 docs) | T-145-25, T-145-26, T-145-27 | Runbook order, per-step commands, owner-confirmed, status-only env checks | unit (string) | `npx vitest run src/__tests__/cutoverRunbook.test.ts` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -56,8 +59,9 @@ Requirement-level map (task IDs filled once PLAN.md files exist).
 
 ## Wave 0 Requirements
 
-- [ ] `src/originHandoff/__tests__/{allowlist,apply,bridge,legacyBuild,mainOrder}.test.ts`
-- [ ] `src/__tests__/{firebaseHostingTargets,legacyOriginLiterals,storageCors,cutoverRunbook}.test.ts`
+- [ ] `src/originHandoff/__tests__/{allowlist,codec,apply,bootstrap,mainOrder}.test.ts` (145-02) and `{bridge,legacyBuild}.test.ts` (145-03)
+- [ ] `src/__tests__/{firebaseHostingTargets,legacyOriginLiterals,storageCors}.test.ts` (145-01) and `cutoverRunbook.test.ts` (145-03)
+- [ ] `functions/src/params.test.ts` + one-slash cases in `adminEmail`/`inviteOnboarding`/`volunteerLink`/`index` tests (145-01)
 - [ ] Adapt `src/__tests__/firebaseHostingHeaders.test.ts` (`loadFirebaseConfig` returns the `app` block; add `legacy` assertions) — file contains a NUL byte; edit carefully
 - [ ] Export `isValidMapping`, `isValidVideoKeyColor` from `src/utils/monitorConfig.ts`
 - Framework install: none.
