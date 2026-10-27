@@ -91,7 +91,7 @@ Firebase console -> Authentication -> Settings -> Authorized domains:
 
 **Owner confirms before running.** Precondition: the Step 2 domain list is saved.
 
-Never use a bare hosting deploy: it would publish the old-address redirect too, before the smoke test.
+Never run `firebase deploy` or `firebase deploy --only hosting` before Step 6: both also publish the old-address redirect before the smoke test (a plain `firebase deploy` also ships rules and functions). Use only the targeted commands in this runbook.
 
 ```bash
 firebase deploy --only hosting:app

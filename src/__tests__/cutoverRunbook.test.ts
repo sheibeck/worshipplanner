@@ -137,6 +137,12 @@ describe('cutover runbook', () => {
     }
   })
 
+  it('Step 3 warns off the untargeted deploy forms that would publish the redirect', () => {
+    const body = section(HEADINGS[3]!)
+    expect(body).toContain('`firebase deploy --only hosting`')
+    expect(body).toContain('`firebase deploy`')
+  })
+
   it('has no placeholders and never prints an env file wholesale', () => {
     for (const { line } of fenced) {
       expect(line).not.toMatch(/<[A-Za-z_][\w-]*>/)
