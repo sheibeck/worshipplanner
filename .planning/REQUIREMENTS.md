@@ -141,25 +141,34 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R441 | — | Pending |
-| R442 | — | Pending |
-| R443 | — | Pending |
-| R444 | — | Pending |
-| R445 | — | Pending |
-| R446 | — | Pending |
-| R447 | — | Pending |
-| R448 | — | Pending |
-| R449 | — | Pending |
-| R450 | — | Pending |
-| R451 | — | Pending |
-| R452 | — | Pending |
-| R453 | — | Pending |
+| R441 | Phase 143 | Pending |
+| R442 | Phase 143 | Pending |
+| R443 | Phase 143 | Pending |
+| R444 | Phase 143 | Pending |
+| R445 | Phase 143 | Pending |
+| R446 | Phase 144 | Pending |
+| R447 | Phase 144 | Pending |
+| R448 | Phase 145 | Pending |
+| R449 | Phase 145 | Pending |
+| R450 | Phase 145 | Pending |
+| R451 | Phase 145 | Pending |
+| R452 | Phase 145 | Pending |
+| R453 | Phase 145 | Pending |
 
 **Coverage:**
 
 - v1 requirements: 13 total (R441–R453)
-- Mapped to phases: 0
-- Unmapped: 13
+- Mapped to phases: 13 (100%)
+- Unmapped: 0
+
+**Phase map:**
+
+- Phase 143 — Dated Rehearsals & Times Tab (R441, R442, R443, R444, R445) — promoted from backlog 999.6
+- Phase 144 — WorshipBuilder Rename (R446, R447) — promoted from backlog 999.2 (rename half)
+- Phase 145 — Domain Cutover to worshipbuilder.web.app (R448, R449, R450, R451, R452, R453) — promoted from backlog 999.2 (domain half); depends on 144; production steps owner-gated per deploy
+
+v2 "Custom Domain & Email" requirements are tracked as backlog **999.14** in ROADMAP.md.
 
 ---
 *Requirements defined: 2026-10-27*
+*Last updated: 2026-10-27 after v2.16 ROADMAP.md creation — 3 phases (143-145), 13/13 requirements mapped*

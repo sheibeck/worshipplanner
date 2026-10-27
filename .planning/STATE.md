@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-10-27T13:52:03.952Z"
 last_activity: 2026-10-27
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -1439,7 +1439,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 142 — Slides Tab panel UX from Claude Design
+**Current focus:** Phase 143 — Dated Rehearsals & Times Tab (v2.16, Phases 143-145)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1449,10 +1449,12 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 143 (not yet planned)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-27 — Milestone v2.16 started
+Status: Roadmap created — ready to plan Phase 143
+Last activity: 2026-10-27 — v2.16 ROADMAP.md created (3 phases, 143-145; R441-R453, 13/13 mapped)
+
+Progress: [░░░░░░░░░░] 0% (0/3 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -1518,6 +1520,25 @@ Per owner instruction "defer uat to the end". Items accumulate in `.planning/v2.
 ### Preceding: Phase 130 (complete — final phase of v2.13, shipped & deployed 2026-09-07)
 
 Status: v2.13 Volunteer Self-Service & Multi-Church Access shipped, deployed to production, and archived 2026-09-07 — multi-church volunteer switcher (My Schedule + sidebar), live volunteer service doc via onSnapshot, and a resolved same-org-collision fix for volunteers serving more than one church.
+
+## ★ v2.16 ROADMAP.md phase breakdown (created 2026-10-27)
+
+3 phases (143-145), derived from R441-R453 (13 requirements) at the project's `coarse` granularity.
+Numbering continues from v2.15, which ended at Phase 142. Backlog 999.6 is promoted into Phase 143;
+backlog 999.2 is split into a rename phase (144) and a domain-cutover phase (145). The rename is kept
+separate because it is pure copy and can ship on the current domain at any time, while the cutover is
+infra-plus-production work gated by the owner. Keeping them apart lets the rename land first, so the new
+domain debuts as WorshipBuilder. Dependencies: 143 is independent of 144/145, and 145 depends on 144.
+
+| Phase | Goal | Requirements | Depends on | UI hint |
+|-------|------|--------------|------------|---------|
+| 143 Dated Rehearsals & Times Tab | A planner manages rehearsals + report time in a dedicated Times tab (after Messages) where every rehearsal has a date; legacy undated v2.15 rows are flagged, recoverable and hidden from read-only/public surfaces; R433 display unchanged | R441, R442, R443, R444, R445 | Nothing | yes |
+| 144 WorshipBuilder Rename | Every user-facing app name in the web app and in outbound email reads WorshipBuilder; internal ids, storage keys and sign-ins unchanged | R446, R447 | Nothing (lands before 145) | yes (copy-only) |
+| 145 Domain Cutover to worshipbuilder.web.app | The app is served, linked and allowlisted on worshipbuilder.web.app; old addresses redirect to the same path/query/hash and carry the browser's allowlisted `wp` settings; owner runbook for the gated cutover | R448, R449, R450, R451, R452, R453 | Phase 144 | no |
+
+**Owner gate (Phase 145):** the Storage CORS re-apply, the Auth authorized-domain change, the new-site
+deploy and the old-site redirect deploy are each production changes that need per-deploy owner
+confirmation. Build/test/runbook work proceeds autonomously, but the cutover does not.
 
 ## ★ v2.15 ROADMAP.md phase breakdown (created 2026-09-09)
 
