@@ -967,5 +967,25 @@ Plans:
 
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
+### Phase 999.15: Default rehearsal day and time (BACKLOG)
+
+**Goal:** [Captured for future planning] Let a church set a default rehearsal day and time, for example
+Wednesday at 6:30 PM. When someone adds a rehearsal to a service, the date pre-fills to that weekday
+before the service date (for a Sunday service, the Wednesday before it) and the time pre-fills too.
+Owner request, 2026-10-27, after the Phase 143 Times-tab check.
+
+- Builds on Phase 143's Times tab and the org Settings rehearsal defaults (`rehearsalTimeDefaults`
+  chips are time-only today).
+- Open questions for discuss: one default or several (e.g. Wed + Sat); what to do when the service
+  itself falls on the default weekday (same day vs. the week before); whether it auto-adds a rehearsal
+  to new services or only pre-fills the add form.
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
 > **Promoted 2026-08-31:** Phase 999.3 (Per-org Bible API toggle with BibleGateway manual fallback) was
 > promoted into the active milestone **v2.6** (requirements R295–R301). See the v2.6 phases below.
