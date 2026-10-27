@@ -5,8 +5,10 @@ import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import {
   formatRehearsalDateShort,
   formatWallClockTime,
+  HM_RE,
   isDisplayableRehearsal,
   sortRehearsals,
+  YMD_RE,
   type Rehearsal,
 } from '@/utils/rehearsalTimes'
 
@@ -66,7 +68,7 @@ const newTime = computed<string>({
     newTimeOverride.value = v
   },
 })
-const canAdd = computed(() => props.canEdit && newDate.value !== '' && newTime.value !== '')
+const canAdd = computed(() => props.canEdit && YMD_RE.test(newDate.value) && HM_RE.test(newTime.value))
 const newDateInput = ref<HTMLInputElement | null>(null)
 
 function focusAddDate(): void {
@@ -82,7 +84,7 @@ function onSubmitAdd(): void {
 }
 
 // Reject-clear: an unchanged one-way binding is not repainted by Vue, so the DOM value is forced back.
-const revert = ref<{ id: string; field: 'date' | 'time' } | null>(null)
+const revert = ref<{ id: string; field: 'date' | 'time'; invalid: boolean } | null>(null)
 let revertTimer: ReturnType<typeof setTimeout> | null = null
 
 function clearRevert(): void {
@@ -91,9 +93,9 @@ function clearRevert(): void {
   revert.value = null
 }
 
-function showRevert(id: string, field: 'date' | 'time'): void {
+function showRevert(id: string, field: 'date' | 'time', invalid = false): void {
   clearRevert()
-  revert.value = { id, field }
+  revert.value = { id, field, invalid }
   revertTimer = setTimeout(() => {
     revert.value = null
     revertTimer = null
@@ -110,6 +112,12 @@ function onFieldChange(row: Rehearsal, field: 'date' | 'time', event: Event): vo
     return
   }
   if (current === '' && next === '') return
+  // A malformed value (e.g. a 5-digit year) would be dropped by the parent guard and leave the DOM out of sync.
+  if (!(field === 'date' ? YMD_RE : HM_RE).test(next)) {
+    el.value = current
+    showRevert(row.id, field, true)
+    return
+  }
   clearRevert()
   if (field === 'date') emit('date-change', { id: row.id, date: next })
   else emit('time-change', { id: row.id, time: next })
@@ -204,6 +212,7 @@ onBeforeUnmount(() => {
               <input
                 type="date"
                 :value="row.date"
+                max="9999-12-31"
                 :disabled="!canEdit"
                 aria-label="Rehearsal date"
                 data-testid="rehearsal-date-input"
@@ -236,9 +245,13 @@ onBeforeUnmount(() => {
               class="text-xs text-amber-300 mt-1"
             >
               {{
-                revert.field === 'date'
-                  ? 'A rehearsal needs a date. Use Remove to delete it.'
-                  : 'A rehearsal needs a time. Use Remove to delete it.'
+                revert.invalid
+                  ? revert.field === 'date'
+                    ? 'That date is not valid. Use a four-digit year.'
+                    : 'That time is not valid.'
+                  : revert.field === 'date'
+                    ? 'A rehearsal needs a date. Use Remove to delete it.'
+                    : 'A rehearsal needs a time. Use Remove to delete it.'
               }}
             </p>
           </li>
@@ -257,6 +270,7 @@ onBeforeUnmount(() => {
                 ref="newDateInput"
                 v-model="newDate"
                 type="date"
+                max="9999-12-31"
                 data-testid="new-rehearsal-date"
                 :class="`${inputBase} ${inputOk}`"
               />

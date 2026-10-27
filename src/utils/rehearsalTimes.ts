@@ -13,6 +13,10 @@ export interface Rehearsal {
   time: string
 }
 
+/** Shape guards shared by the Times panel and the editor's handler guards (143 WR-01). */
+export const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
+export const HM_RE = /^\d{2}:\d{2}$/
+
 /**
  * Chronological order by date then time — NEVER trust array/storage order.
  * Undated rehearsals (date === '') sort last, since they have no real position

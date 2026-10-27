@@ -1881,7 +1881,7 @@ import { db, functions } from '@/firebase'
 import { resolveRecipients } from '@/utils/messagingRecipients'
 import { fingerprintSlideGroups, diffServiceSnapshots, type ChangeEntry, type SlideFingerprint } from '@/utils/serviceLockDiff'
 import { confirmationKey, type ConfirmationStatus } from '@/utils/confirmations'
-import { isDisplayableRehearsal } from '@/utils/rehearsalTimes'
+import { HM_RE, isDisplayableRehearsal, YMD_RE } from '@/utils/rehearsalTimes'
 import ServiceTimesPanel from '@/components/ServiceTimesPanel.vue'
 import Sortable from 'sortablejs'
 
@@ -2757,8 +2757,6 @@ function onDateChange(newDate: string) {
 }
 
 // Times tab handlers — each re-checks canEditService (R036); see ADR-0245.
-const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
-const HM_RE = /^\d{2}:\d{2}$/
 
 const hasNonDisplayableRehearsal = computed(() =>
   (localService.value?.rehearsals ?? []).some((r) => !isDisplayableRehearsal(r)),

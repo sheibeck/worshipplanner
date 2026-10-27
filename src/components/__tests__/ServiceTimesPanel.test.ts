@@ -119,6 +119,36 @@ describe('ServiceTimesPanel — R441 add form', () => {
     expect(wrapper.find('[data-testid="rehearsal-revert-message"]').exists()).toBe(false)
   })
 
+  it('R441: a malformed date edit (6-digit year) reverts the input, shows a message and emits nothing', async () => {
+    const wrapper = mountPanel({
+      canEdit: true,
+      rehearsals: [{ id: 'r1', date: '2026-11-05', time: '19:00' }],
+    })
+    const input = wrapper.get('[data-testid="rehearsal-date-input"]')
+    ;(input.element as HTMLInputElement).value = '20266-01-01'
+    await input.trigger('change')
+
+    expect(wrapper.emitted('date-change')).toBeUndefined()
+    expect((input.element as HTMLInputElement).value).toBe('2026-11-05')
+    expect(wrapper.get('[data-testid="rehearsal-revert-message"]').text()).toBe(
+      'That date is not valid. Use a four-digit year.',
+    )
+  })
+
+  it('R441: a malformed add-form date keeps Add disabled and emits nothing', async () => {
+    const wrapper = mountPanel({ canEdit: true, defaultTimes: ['19:00'] })
+    await wrapper.get('[data-testid="new-rehearsal-date"]').setValue('20266-01-01')
+    expect(wrapper.get('[data-testid="add-rehearsal-btn"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-testid="add-rehearsal-form"]').trigger('submit')
+    expect(wrapper.emitted('add')).toBeUndefined()
+  })
+
+  it('R441: date inputs cap the year at four digits', () => {
+    const wrapper = mountPanel({ canEdit: true, rehearsals: [{ id: 'r1', date: '2026-11-05', time: '19:00' }] })
+    expect(wrapper.get('[data-testid="new-rehearsal-date"]').attributes('max')).toBe('9999-12-31')
+    expect(wrapper.get('[data-testid="rehearsal-date-input"]').attributes('max')).toBe('9999-12-31')
+  })
+
   it('R441: after a successful add and after Remove, focus returns to the add-form date input', async () => {
     const wrapper = mountPanel(
       { canEdit: true, defaultTimes: ['19:00'], rehearsals: [{ id: 'r1', date: '2026-11-05', time: '19:00' }] },
