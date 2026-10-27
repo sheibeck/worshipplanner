@@ -5,7 +5,7 @@
  */
 import type { ActionBarItem } from '@/components/actionBarItems'
 
-export type ActionBarTab = 'service-order' | 'roles' | 'slides' | 'messages' | 'stage'
+export type ActionBarTab = 'service-order' | 'roles' | 'slides' | 'messages' | 'stage' | 'times'
 
 export interface ActionBarHandlers {
   suggestAllSongs: () => void
@@ -227,6 +227,8 @@ export function buildActionBarItems(tab: ActionBarTab, ctx: ActionBarContext): A
   // same "expose nothing" precedent as Roles/Messages above. Marker persistence
   // rides the existing autosave path with no dedicated Save/Present affordance.
   if (tab === 'stage') return []
+  // Phase 143 (R444): the Times tab exposes no action-bar items, like Roles/Messages/Stage.
+  if (tab === 'times') return []
   if (tab === 'slides') return buildSlidesItems(ctx)
   return buildServiceOrderItems(ctx)
 }

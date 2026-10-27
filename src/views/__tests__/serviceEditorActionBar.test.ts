@@ -137,6 +137,12 @@ describe('buildActionBarItems', () => {
     }
   })
 
+  it('TIMES EMPTY: the times item list has length 0 across the same cartesian product', () => {
+    for (const ctx of cartesianContexts()) {
+      expect(buildActionBarItems('times', ctx).length).toBe(0)
+    }
+  })
+
   it('SC3: the ✉ Messages composer key stays on the Service Order tab (not the Messages tab)', () => {
     const ctx = makeContext({ canEditService: true })
     expect(keysOf('service-order', ctx)).toContain('messages')
@@ -147,6 +153,8 @@ describe('buildActionBarItems', () => {
     const rows: Array<{ name: string; tab: ActionBarTab; overrides: Partial<ActionBarContext>; expected: string[] }> = [
       { name: 'roles, editor', tab: 'roles', overrides: { canEditService: true }, expected: [] },
       { name: 'roles, viewer', tab: 'roles', overrides: { canEditService: false }, expected: [] },
+      { name: 'times, editor', tab: 'times', overrides: { canEditService: true }, expected: [] },
+      { name: 'times, viewer', tab: 'times', overrides: { canEditService: false }, expected: [] },
       { name: 'slides, canEditService false', tab: 'slides', overrides: { canEditService: false }, expected: ['present'] },
       // No Save on Slides (owner 2026-09-01) — slide edits don't dirty localService.
       { name: 'slides, canEditService true', tab: 'slides', overrides: { canEditService: true }, expected: ['present'] },
