@@ -467,8 +467,8 @@ describe('ServiceEditorView - Times tab (Phase 143, R441-R444)', () => {
       const rows = vmOf(wrapper).localService.rehearsals ?? []
       expect(rows).toHaveLength(1)
       expect(rows[0]).toMatchObject({ date: '2026-03-05', time: '19:00' })
-      expect(typeof rows[0].id).toBe('string')
-      expect(rows[0].id.length).toBeGreaterThan(0)
+      expect(typeof rows[0]?.id).toBe('string')
+      expect(rows[0]?.id.length).toBeGreaterThan(0)
     })
 
     it.each([

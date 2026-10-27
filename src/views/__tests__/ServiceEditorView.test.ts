@@ -9024,6 +9024,8 @@ describe('ServiceEditorView - ARIA tab semantics (R239)', () => {
     // The always-present tabs are unaffected.
     expect(wrapper.get('#svc-tab-service-order').attributes('role')).toBe('tab')
     expect(wrapper.get('#svc-tab-slides').attributes('role')).toBe('tab')
+    // Phase 143 (R444): the Times tab is visible to everyone.
+    expect(wrapper.get('#svc-tab-times').attributes('role')).toBe('tab')
   })
 })
 
@@ -9068,16 +9070,17 @@ describe('ServiceEditorView - tab strip keyboard navigation (WR-01, 81-REVIEW)',
     expect(wrapper.get('#svc-tab-slides').attributes('tabindex')).toBe('-1')
     expect(wrapper.get('#svc-tab-roles').attributes('tabindex')).toBe('-1')
     expect(wrapper.get('#svc-tab-messages').attributes('tabindex')).toBe('-1')
+    expect(wrapper.get('#svc-tab-times').attributes('tabindex')).toBe('-1')
   })
 
   // Phase 107 (R313): 'svc-tab-stage' was inserted between Roles and Messages
   // in visibleTabOrder, so the ArrowRight sequence now includes it.
-  it('ArrowRight steps through Service Order -> Slides -> Roles -> Stage Layout -> Messages -> wraps to Service Order', async () => {
+  it('ArrowRight steps through Service Order -> Slides -> Roles -> Stage Layout -> Messages -> Times -> wraps to Service Order', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
     const tablist = wrapper.get('[role="tablist"]')
-    const order = ['svc-tab-slides', 'svc-tab-roles', 'svc-tab-stage', 'svc-tab-messages', 'svc-tab-service-order']
+    const order = ['svc-tab-slides', 'svc-tab-roles', 'svc-tab-stage', 'svc-tab-messages', 'svc-tab-times', 'svc-tab-service-order']
     for (const nextId of order) {
       await tablist.trigger('keydown', { key: 'ArrowRight' })
       expect(wrapper.get(`#${nextId}`).attributes('aria-selected')).toBe('true')
@@ -9090,7 +9093,7 @@ describe('ServiceEditorView - tab strip keyboard navigation (WR-01, 81-REVIEW)',
 
     await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowLeft' })
 
-    expect(wrapper.get('#svc-tab-messages').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('#svc-tab-times').attributes('aria-selected')).toBe('true')
   })
 
   it('Home and End jump to the first and last visible tab respectively', async () => {
@@ -9098,7 +9101,7 @@ describe('ServiceEditorView - tab strip keyboard navigation (WR-01, 81-REVIEW)',
     await wrapper.vm.$nextTick()
 
     await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'End' })
-    expect(wrapper.get('#svc-tab-messages').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('#svc-tab-times').attributes('aria-selected')).toBe('true')
 
     await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'Home' })
     expect(wrapper.get('#svc-tab-service-order').attributes('aria-selected')).toBe('true')
@@ -9111,9 +9114,9 @@ describe('ServiceEditorView - tab strip keyboard navigation (WR-01, 81-REVIEW)',
 
     await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowLeft' })
 
-    // Only Service Order + Slides are visible for a non-editor, so
-    // ArrowLeft from Service Order wraps straight to Slides.
-    expect(wrapper.get('#svc-tab-slides').attributes('aria-selected')).toBe('true')
+    // Only Service Order, Slides and Times are visible for a non-editor, so
+    // ArrowLeft from Service Order wraps straight to Times.
+    expect(wrapper.get('#svc-tab-times').attributes('aria-selected')).toBe('true')
   })
 })
 

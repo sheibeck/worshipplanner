@@ -353,6 +353,7 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
       'svc-tab-roles',
       'svc-tab-stage',
       'svc-tab-messages',
+      'svc-tab-times',
     ])
     expect(wrapper.get('#svc-tab-stage').text()).toBe('Stage Layout')
   })
@@ -516,10 +517,13 @@ describe('ServiceEditorView - Stage Layout tab (Phase 107, R313/R314)', () => {
 
     const tablist = wrapper.get('[role="tablist"]')
     await tablist.trigger('keydown', { key: 'ArrowLeft' })
-    // Last visible tab for an editor with messaging on is Messages, so
-    // ArrowLeft from the default Service Order tab wraps straight to it —
-    // proving Stage Layout is correctly threaded into the SAME order used
-    // elsewhere, not a dead end that breaks wrap-around.
+    // Last visible tab for an editor is Times (Phase 143), so ArrowLeft from
+    // the default Service Order tab wraps straight to it, then Messages, then
+    // Stage Layout — proving Stage Layout is correctly threaded into the SAME
+    // order used elsewhere, not a dead end that breaks wrap-around.
+    expect(wrapper.get('#svc-tab-times').attributes('aria-selected')).toBe('true')
+
+    await tablist.trigger('keydown', { key: 'ArrowLeft' })
     expect(wrapper.get('#svc-tab-messages').attributes('aria-selected')).toBe('true')
 
     await tablist.trigger('keydown', { key: 'ArrowLeft' })

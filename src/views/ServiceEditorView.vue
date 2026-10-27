@@ -238,99 +238,6 @@
           </div>
         </div>
 
-        <!-- "Times" subsection (R429-R431, Phase 139) — mirrors the date
-             picker's own `v-if="!canEditService"` / `v-else` split above
-             (line ~51-65): a read-only viewer/locked-service branch showing
-             only DATED rehearsals (undated rows are editor-only seed state,
-             filtered here the same way both public projections filter them —
-             139-RESEARCH.md Pattern 2), and a canEditService-gated add/edit/
-             remove list showing EVERY row, including undated ones, so the
-             planner can date each org-default-seeded rehearsal. Writes flow
-             through the SAME debounced-autosave -> `updateService(id,
-             { rehearsals, reportTime })` path as every other field (onSave
-             below) — no new save mechanism.
-
-             CR-02 (139-REVIEW.md): the `v-if` MUST be a bare `!canEditService`
-             (the "anything to show" check moves to `v-show` on the read-only
-             `<p>`, not into the branch condition) — folding both into one
-             `v-if` let the editable branch render for a non-editor/locked
-             viewer whenever there was nothing to show yet. The three inputs
-             also carry `:disabled="!canEditService"` as defense in depth,
-             matching SettingsView.vue's equivalent inputs. -->
-        <div class="mb-3" data-testid="service-times-section">
-          <p
-            v-if="!canEditService"
-            v-show="readOnlyRehearsals.length > 0 || !!localService.reportTime"
-            class="text-sm text-gray-400"
-            data-testid="service-times-readonly"
-          >
-            <span v-if="localService.reportTime">Report {{ formatWallClockTime(localService.reportTime) }}</span>
-            <span v-if="localService.reportTime && readOnlyRehearsals.length > 0"> &middot; </span>
-            <span v-if="readOnlyRehearsals.length > 0">
-              Rehearsal{{ readOnlyRehearsals.length > 1 ? 's' : '' }}:
-              {{ readOnlyRehearsals.map((r) => `${formatRehearsalDateShort(r.date)}, ${formatWallClockTime(r.time)}`).join('; ') }}
-            </span>
-          </p>
-
-          <template v-else>
-            <h2 class="text-sm font-semibold text-gray-300 mb-2">Times</h2>
-            <div class="space-y-2 mb-2">
-              <div
-                v-for="rehearsal in editableRehearsals"
-                :key="rehearsal.id"
-                class="flex items-center gap-2"
-              >
-                <input
-                  type="date"
-                  :value="rehearsal.date"
-                  :disabled="!canEditService"
-                  data-testid="rehearsal-date-input"
-                  class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  @change="onRehearsalDateChange(rehearsal.id, ($event.target as HTMLInputElement).value)"
-                />
-                <input
-                  type="time"
-                  :value="rehearsal.time"
-                  :disabled="!canEditService"
-                  data-testid="rehearsal-time-input"
-                  class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  @change="onRehearsalTimeChange(rehearsal.id, ($event.target as HTMLInputElement).value)"
-                />
-                <button
-                  type="button"
-                  :disabled="!canEditService"
-                  data-testid="remove-rehearsal-btn"
-                  class="text-xs text-red-400 hover:text-red-300 transition-colors"
-                  @click="onRemoveRehearsal(rehearsal.id)"
-                >
-                  Remove
-                </button>
-              </div>
-              <button
-                type="button"
-                :disabled="!canEditService"
-                data-testid="add-rehearsal-btn"
-                class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-                @click="onAddRehearsal"
-              >
-                + Add rehearsal
-              </button>
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-xs text-gray-400" for="report-time-input">Report time</label>
-              <input
-                id="report-time-input"
-                type="time"
-                :value="localService.reportTime ?? ''"
-                :disabled="!canEditService"
-                data-testid="report-time-input"
-                class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                @change="onReportTimeChange(($event.target as HTMLInputElement).value)"
-              />
-            </div>
-          </template>
-        </div>
-
         <!-- Failed-transition surface while DRAFT. The locked counterpart
              lives in the lock banner, because the autosave error line above
              is removed at locked statuses (31-04) — precisely when a failed
@@ -911,6 +818,30 @@
             @click="activeTab = 'messages'"
           >
             Messages
+          </button>
+          <button
+            id="svc-tab-times"
+            ref="timesTabButtonRef"
+            role="tab"
+            type="button"
+            :aria-selected="activeTab === 'times'"
+            aria-controls="svc-panel-times"
+            :tabindex="activeTab === 'times' ? 0 : -1"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'times'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'times'"
+          >
+            Times
+            <template v-if="authStore.isEditor && hasNonDisplayableRehearsal">
+              <span
+                data-testid="times-tab-attention-dot"
+                class="inline-block h-2 w-2 rounded-full bg-amber-400 ml-1.5 align-middle"
+                aria-hidden="true"
+              ></span>
+              <span class="sr-only">(needs attention)</span>
+            </template>
           </button>
         </div>
 
@@ -1809,6 +1740,28 @@
         />
         </div>
 
+        <!-- Times tab (Phase 143, R441-R444). See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md) -->
+        <div
+          v-show="activeTab === 'times'"
+          id="svc-panel-times"
+          role="tabpanel"
+          aria-labelledby="svc-tab-times"
+          data-testid="times-panel"
+        >
+          <ServiceTimesPanel
+            :rehearsals="localService.rehearsals ?? []"
+            :report-time="localService.reportTime ?? ''"
+            :service-date="localService.date"
+            :can-edit="canEditService"
+            :default-times="authStore.settings.rehearsalTimeDefaults ?? []"
+            @add="onAddRehearsal"
+            @remove="onRemoveRehearsal"
+            @date-change="(p) => onRehearsalDateChange(p.id, p.date)"
+            @time-change="(p) => onRehearsalTimeChange(p.id, p.time)"
+            @report-time-change="onReportTimeChange"
+          />
+        </div>
+
         <!-- See ADR-0225 (docs/adr/0225-non-editor-no-roster-quarters-data-was-ever-subscribed-to-pi.md) -->
         <div class="mt-6 pt-4 border-t border-gray-800 flex flex-wrap items-center justify-end gap-2 print:hidden">
           <!-- Delete button: editor only -->
@@ -1928,7 +1881,8 @@ import { db, functions } from '@/firebase'
 import { resolveRecipients } from '@/utils/messagingRecipients'
 import { fingerprintSlideGroups, diffServiceSnapshots, type ChangeEntry, type SlideFingerprint } from '@/utils/serviceLockDiff'
 import { confirmationKey, type ConfirmationStatus } from '@/utils/confirmations'
-import { isDisplayableRehearsal, sortRehearsals, formatWallClockTime } from '@/utils/rehearsalTimes'
+import { isDisplayableRehearsal } from '@/utils/rehearsalTimes'
+import ServiceTimesPanel from '@/components/ServiceTimesPanel.vue'
 import Sortable from 'sortablejs'
 
 const route = useRoute()
@@ -1956,17 +1910,18 @@ const saveStatus = useSaveStatus()
 // the editor still opens on the Service Order tab (renamed from 'music' in
 // Phase 27, D-03); D-05's auto-selection is about which GROUP is selected
 // once the Slides tab itself is opened, not about which tab opens first.
-const activeTab = ref<'service-order' | 'roles' | 'slides' | 'messages' | 'stage'>('service-order')
+const activeTab = ref<'service-order' | 'roles' | 'slides' | 'messages' | 'stage' | 'times'>('service-order')
 
 // See ADR-0217 (docs/adr/0217-roving-tabindex-on-the-tab-bar-above-removes-inactive-tabs-f.md)
 // concern, matching Roles' own gate), independent of the messaging kill-switch.
-type ServiceEditorTabId = 'service-order' | 'roles' | 'slides' | 'messages' | 'stage'
+type ServiceEditorTabId = 'service-order' | 'roles' | 'slides' | 'messages' | 'stage' | 'times'
 const visibleTabOrder = computed<ServiceEditorTabId[]>(() => {
   const tabs: ServiceEditorTabId[] = ['service-order', 'slides']
   if (authStore.isEditor) tabs.push('roles')
   if (authStore.isEditor) tabs.push('stage')
   // 260908-dgq: editor-gated only — the tab shows even when messaging is off.
   if (authStore.isEditor) tabs.push('messages')
+  tabs.push('times')
   return tabs
 })
 const serviceOrderTabButtonRef = ref<HTMLButtonElement | null>(null)
@@ -1974,6 +1929,7 @@ const slidesTabButtonRef = ref<HTMLButtonElement | null>(null)
 const rolesTabButtonRef = ref<HTMLButtonElement | null>(null)
 const stageTabButtonRef = ref<HTMLButtonElement | null>(null)
 const messagesTabButtonRef = ref<HTMLButtonElement | null>(null)
+const timesTabButtonRef = ref<HTMLButtonElement | null>(null)
 
 function tabButtonRef(tab: ServiceEditorTabId) {
   switch (tab) {
@@ -1987,6 +1943,8 @@ function tabButtonRef(tab: ServiceEditorTabId) {
       return stageTabButtonRef
     case 'messages':
       return messagesTabButtonRef
+    case 'times':
+      return timesTabButtonRef
   }
 }
 
@@ -2798,37 +2756,20 @@ function onDateChange(newDate: string) {
   localService.value.date = newDate
 }
 
-// ── "Times" subsection (R429-R431, Phase 139) ───────────────────────────────────
-// Mirrors onDateChange's handler-gates-itself pattern (R036/30-VERIFICATION I-01)
-// verbatim: every handler below re-checks canEditService itself, not just the
-// template's v-else, since the control stays reachable for one tick after a
-// status flip.
+// Times tab handlers — each re-checks canEditService (R036); see ADR-0245.
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
+const HM_RE = /^\d{2}:\d{2}$/
 
-/** Editor-only render order: EVERY row, including undated seed rows, so the
- *  planner can see and date each org-default-seeded rehearsal. */
-const editableRehearsals = computed(() => sortRehearsals(localService.value?.rehearsals ?? []))
-
-/** Read-only (viewer / locked-service) render order: displayable rows only
- *  (both date AND time set) — mirrors buildServiceSnapshot/buildRehearseAccess's
- *  own filter so this page never shows a partially-filled "Invalid Date"
- *  artifact a volunteer/public viewer would never see either (CR-01,
- *  139-REVIEW.md). */
-const readOnlyRehearsals = computed(() =>
-  sortRehearsals((localService.value?.rehearsals ?? []).filter(isDisplayableRehearsal)),
+const hasNonDisplayableRehearsal = computed(() =>
+  (localService.value?.rehearsals ?? []).some((r) => !isDisplayableRehearsal(r)),
 )
 
-/** 'YYYY-MM-DD' -> short local-midnight label (e.g. "Sep 11"), same
- *  split-then-construct idiom as `parsedDate` above — never `new Date(str)`. */
-function formatRehearsalDateShort(ymd: string): string {
-  const [year, month, day] = ymd.split('-').map(Number) as [number, number, number]
-  return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function onAddRehearsal(): void {
+function onAddRehearsal(payload: { date: string; time: string }): void {
   if (!canEditService.value) return
   if (!localService.value) return
+  if (!YMD_RE.test(payload.date) || !HM_RE.test(payload.time)) return
   if (!localService.value.rehearsals) localService.value.rehearsals = []
-  localService.value.rehearsals.push({ id: crypto.randomUUID(), date: '', time: '' })
+  localService.value.rehearsals.push({ id: crypto.randomUUID(), date: payload.date, time: payload.time })
 }
 
 function onRemoveRehearsal(id: string): void {
@@ -2841,6 +2782,8 @@ function onRehearsalDateChange(id: string, newDate: string): void {
   if (!canEditService.value) return
   const rehearsal = localService.value?.rehearsals?.find((r) => r.id === id)
   if (!rehearsal) return
+  // A dated row can never go undated; malformed values are never stored.
+  if (newDate === '' ? rehearsal.date !== '' : !YMD_RE.test(newDate)) return
   rehearsal.date = newDate
 }
 
@@ -2848,6 +2791,7 @@ function onRehearsalTimeChange(id: string, newTime: string): void {
   if (!canEditService.value) return
   const rehearsal = localService.value?.rehearsals?.find((r) => r.id === id)
   if (!rehearsal) return
+  if (newTime === '' ? rehearsal.time !== '' : !HM_RE.test(newTime)) return
   rehearsal.time = newTime
 }
 
