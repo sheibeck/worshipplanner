@@ -30,6 +30,17 @@ progress:
 
 - Owner has no email domain yet: Resend verified-sender stays deferred (backlog).
 
+## Deferred Verification (v2.16 — ACTIVE, batched to milestone end)
+
+Per the owner instruction of 2026-10-27, v2.16 phases are built + auto-verified; real-browser/visual/AT UAT is
+batched into `.planning/v2.16-DEFERRED-VERIFICATION.md` for one owner pass at milestone end. These phases are
+executed, not fully closed — do NOT re-run them; close them via the batched UAT. Deferrals are PENDING, never
+owner-accepted.
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 143 | verification_deferred_human (auto-verified 5/5 roadmap criteria, full suite at baseline 6055 pass, type-check clean, code review clean after 1 fix round; 6 browser/visual/AT UAT items pending) | /gsd-verify-work 143 |
+
 ## Deferred Items (v2.15 close — 2026-09-21)
 
 Items acknowledged and deferred at **v2.15** milestone close on 2026-09-21 (owner chose "Waive and close" → `override_closeout`):
