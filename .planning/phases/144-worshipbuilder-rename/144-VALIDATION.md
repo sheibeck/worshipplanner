@@ -22,7 +22,7 @@ created: 2026-10-27
 |----------|-------|
 | **Framework** | Vitest — root 4.0.x (jsdom) + `functions/` 4.1.10 (node) |
 | **Config file** | `vite.config.ts` (root `test:` block); `functions/vitest.config.ts` |
-| **Quick run command** | `npx vitest run src/brandName.test.ts` ; `cd functions && npx vitest run src/adminEmail.test.ts src/inviteOnboarding.test.ts src/volunteerLink.test.ts` |
+| **Quick run command** | `npx vitest run src/__tests__/brandName.test.ts` ; `cd functions && npx vitest run src/adminEmail.test.ts src/inviteOnboarding.test.ts src/volunteerLink.test.ts` |
 | **Full suite command** | `npx vitest run` (baseline: only `src/storage.rules.test.ts` fails) + `cd functions && npx vitest run` + `npm run type-check` |
 | **Estimated runtime** | ~10 s quick · ~14 min root full |
 
@@ -43,7 +43,7 @@ Requirement-level map (task IDs filled once PLAN.md files exist).
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | R446 | — | N/A | guard (static scan) | `npx vitest run src/brandName.test.ts` | ❌ W0 | ⬜ pending |
+| TBD | TBD | TBD | R446 | — | N/A | guard (static scan) | `npx vitest run src/__tests__/brandName.test.ts` | ❌ W0 | ⬜ pending |
 | TBD | TBD | TBD | R446 | — | N/A | component | `npx vitest run src/components/__tests__/AppSidebar.test.ts src/components/__tests__/AppShell.test.ts src/components/__tests__/ServicePrintLayout.test.ts src/views/__tests__/LoginView.test.ts src/views/__tests__/SelectChurchView.test.ts src/views/__tests__/VolunteerRequestView.test.ts src/views/__tests__/VolunteerLinkCompleteView.test.ts src/views/__tests__/ShareView.test.ts src/views/__tests__/QuarterShareView.test.ts` | ✅ (add assertions) | ⬜ pending |
 | TBD | TBD | TBD | R447 | — | Email display name sanitizer untouched | unit | `cd functions && npx vitest run src/adminEmail.test.ts src/inviteOnboarding.test.ts src/volunteerLink.test.ts` | ✅ (update/add) | ⬜ pending |
 | TBD | TBD | TBD | R446/R447 | — | Internal identifiers unchanged | review gate | `git diff --stat` shows no change to `package.json`, `firebase.json`, `.firebaserc`, `functions/lib` | n/a | ⬜ pending |
@@ -54,7 +54,7 @@ Requirement-level map (task IDs filled once PLAN.md files exist).
 
 ## Wave 0 Requirements
 
-- [ ] `src/brandName.test.ts` — negative guard (no `Worship ?Planner` in user-facing source) + positive table (U1–U14, E1–E12 contain `WorshipBuilder`)
+- [ ] `src/__tests__/brandName.test.ts` — negative guard (no `Worship ?Planner` in user-facing source) + positive table (U1–U14, E1–E12 contain `WorshipBuilder`)
 - Framework install: none. Never run with `--dir src` (bypasses the root excludes).
 
 ---
