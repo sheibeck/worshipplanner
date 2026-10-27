@@ -2,10 +2,10 @@
 phase: 144
 slug: worshipbuilder-rename
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
-# audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
-status: draft
+# audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: true) (#2117)
+status: validated
 nyquist_compliant: false
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-10-27
 ---
 
@@ -39,22 +39,23 @@ created: 2026-10-27
 
 ## Per-Task Verification Map
 
-Requirement-level map (task IDs filled once PLAN.md files exist).
-
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | R446 | — | N/A | guard (static scan) | `npx vitest run src/__tests__/brandName.test.ts` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | R446 | — | N/A | component | `npx vitest run src/components/__tests__/AppSidebar.test.ts src/components/__tests__/AppShell.test.ts src/components/__tests__/ServicePrintLayout.test.ts src/views/__tests__/LoginView.test.ts src/views/__tests__/SelectChurchView.test.ts src/views/__tests__/VolunteerRequestView.test.ts src/views/__tests__/VolunteerLinkCompleteView.test.ts src/views/__tests__/ShareView.test.ts src/views/__tests__/QuarterShareView.test.ts` | ✅ (add assertions) | ⬜ pending |
-| TBD | TBD | TBD | R447 | — | Email display name sanitizer untouched | unit | `cd functions && npx vitest run src/adminEmail.test.ts src/inviteOnboarding.test.ts src/volunteerLink.test.ts` | ✅ (update/add) | ⬜ pending |
-| TBD | TBD | TBD | R446/R447 | — | Internal identifiers unchanged | review gate | `git diff --stat` shows no change to `package.json`, `firebase.json`, `.firebaserc`, `functions/lib` | n/a | ⬜ pending |
+| 144-01-01 | 01 | 1 | R446 | T-144-01/02 | Text-only swap; identifiers untouched | component | `npx vitest run src/components/__tests__/AppSidebar.test.ts src/components/__tests__/AppShell.test.ts src/views/__tests__/LoginView.test.ts src/views/__tests__/SelectChurchView.test.ts src/views/__tests__/VolunteerSignInView.test.ts src/views/__tests__/VolunteerRequestView.test.ts src/views/__tests__/VolunteerLinkCompleteView.test.ts` | ✅ | ✅ green |
+| 144-01-02 | 01 | 1 | R446 | T-144-02/03 | Static footer copy only | component | `npx vitest run src/views/__tests__/ShareView.test.ts src/views/__tests__/QuarterShareView.test.ts src/components/__tests__/ServicePrintLayout.test.ts src/components/__tests__/RosterPrintLayout.test.ts` | ✅ | ✅ green |
+| 144-02-01 | 02 | 2 | R447 | T-144-04/05 | From header + orgName handling unchanged | unit | `cd functions && npx vitest run src/adminEmail.test.ts src/inviteOnboarding.test.ts src/volunteerLink.test.ts src/index.test.ts` | ✅ | ✅ green |
+| 144-02-02 | 02 | 2 | R446/R447 | T-144-07 | Test-time fs reads only | guard (static scan) | `npx vitest run src/__tests__/brandName.test.ts` | ✅ | ✅ green |
+| review-fix | — | — | R447 | T-144-06 | Deploys always rebuild functions/lib | config test | `npx vitest run src/__tests__/firebaseFunctionsPredeploy.test.ts` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+Phase gate (verifier, 2026-10-27): root `npx vitest run` at the 1-file baseline (a machine-load pool crash took down ServiceEditorView.test.ts once; re-run alone 352/352); `cd functions && npx vitest run` 722/722; `npm run type-check` and `cd functions && npx tsc --noEmit` clean.
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `src/__tests__/brandName.test.ts` — negative guard (no `Worship ?Planner` in user-facing source) + positive table (U1–U14, E1–E12 contain `WorshipBuilder`)
+- [x] `src/__tests__/brandName.test.ts` — negative guard (no `Worship ?Planner` in user-facing source) + positive table (U1–U14, E1–E12 contain `WorshipBuilder`)
 - Framework install: none. Never run with `--dir src` (bypasses the root excludes).
 
 ---
@@ -73,11 +74,19 @@ Batched to the v2.16 milestone-end owner UAT (PENDING, not owner-accepted).
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s (targeted commands)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-10-27 (manual-only items batched to the v2.16 milestone-end UAT, PENDING)
+
+## Validation Audit 2026-10-27
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
