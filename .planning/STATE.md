@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v2.16
 milestone_name: Dated Rehearsals & WorshipBuilder
-current_phase: 144
-current_phase_name: WorshipBuilder Rename
-status: verifying
-stopped_at: Completed 144-02-PLAN.md
-last_updated: "2026-10-27T17:24:25.399Z"
+current_phase: 145
+current_phase_name: Domain Cutover to worshipbuilder.web.app
+status: executing
+stopped_at: Phase 145 planned (3 plans, 2 waves)
+last_updated: "2026-10-27T21:23:14.605Z"
 last_activity: 2026-10-27
-last_activity_desc: Phase 144 execution started
+last_activity_desc: Phase 145 planned — 3 plans, 2 waves; R452 descoped by owner
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 5
+  total_plans: 8
   completed_plans: 5
   percent: 67
 ---
@@ -20,7 +20,8 @@ progress:
 ## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27)
 
 - Scope approved: backlog 999.6 (dated rehearsals + Times tab) + 999.2 (WorshipBuilder rename + cutover to
-  `worshipbuilder.web.app`); old domain = **redirect + carry per-browser settings**; no milestone-level
+  `worshipbuilder.web.app`); old domain = **plain redirect only** (settings carry-over R452 descoped by owner later on 2026-10-27 — sole
+  user; a page refresh after the update is acceptable); no milestone-level
   research. Run via `/gsd-autonomous` with human/visual/hardware UAT **batched to milestone end** —
   deferrals are PENDING, never owner-accepted. Production deploys still need per-deploy owner confirmation.
 
@@ -1466,10 +1467,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 144 (WorshipBuilder Rename) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-10-27 — Phase 144 execution started
+Phase: 145 (Domain Cutover to worshipbuilder.web.app) — PLANNED
+Plan: 0 of 3
+Status: Ready to execute
+Last activity: 2026-10-27 — Phase 145 planned (3 plans, 2 waves)
 
 Progress: [██████████] 100% (0/3 phases)
 
@@ -1551,7 +1552,7 @@ domain debuts as WorshipBuilder. Dependencies: 143 is independent of 144/145, an
 |-------|------|--------------|------------|---------|
 | 143 Dated Rehearsals & Times Tab | A planner manages rehearsals + report time in a dedicated Times tab (after Messages) where every rehearsal has a date; legacy undated v2.15 rows are flagged, recoverable and hidden from read-only/public surfaces; R433 display unchanged | R441, R442, R443, R444, R445 | Nothing | yes |
 | 144 WorshipBuilder Rename | Every user-facing app name in the web app and in outbound email reads WorshipBuilder; internal ids, storage keys and sign-ins unchanged | R446, R447 | Nothing (lands before 145) | yes (copy-only) |
-| 145 Domain Cutover to worshipbuilder.web.app | The app is served, linked and allowlisted on worshipbuilder.web.app; old addresses redirect to the same path/query/hash and carry the browser's allowlisted `wp` settings; owner runbook for the gated cutover | R448, R449, R450, R451, R452, R453 | Phase 144 | no |
+| 145 Domain Cutover to worshipbuilder.web.app | The app is served, linked and allowlisted on worshipbuilder.web.app; old addresses redirect to the same path/query/hash (plain 302 config redirect; R452 settings carry-over descoped 2026-10-27); owner runbook for the gated cutover | R448, R449, R450, R451, R453 (R452 descoped) | Phase 144 | no |
 
 **Owner gate (Phase 145):** the Storage CORS re-apply, the Auth authorized-domain change, the new-site
 deploy and the old-site redirect deploy are each production changes that need per-deploy owner
