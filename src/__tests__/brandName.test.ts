@@ -122,9 +122,9 @@ describe('brand guard (R446/R447)', () => {
     ['src/components/ServicePrintLayout.vue', 'Generated from WorshipBuilder', 1],
     ['src/components/RosterPrintLayout.vue', 'Generated from WorshipBuilder', 1],
     ['functions/src/adminEmail.ts', 'Sign in to WorshipBuilder', 4],
-    ['functions/src/adminEmail.ts', 'on WorshipBuilder', 3],
+    ['functions/src/adminEmail.ts', 'on WorshipBuilder', 4],
     ['functions/src/inviteOnboarding.ts', 'on WorshipBuilder', 4],
-    ['functions/src/volunteerLink.ts', 'on WorshipBuilder:', 1],
+    ['functions/src/volunteerLink.ts', 'on WorshipBuilder', 2],
   ]
 
   it.each(rows)('R446/R447: %s carries %s x%d', (file, literal, count) => {

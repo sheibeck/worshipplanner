@@ -72,7 +72,7 @@ export async function mintAndSendVolunteerLink(
 
   const link = await mintVolunteerLink({ to, slug });
 
-  const subject = `Your sign-in link for ${orgName}`;
+  const subject = `Your sign-in link for ${orgName} on WorshipBuilder`;
   const text =
     `Here's your one-time sign-in link for ${orgName} on WorshipBuilder:\n\n` +
     `${link}\n\n` +

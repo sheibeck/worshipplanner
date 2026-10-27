@@ -59,7 +59,7 @@ describe("sendAdminOnboardingEmail", () => {
     const arg = mockSend.mock.calls[0]![0] as { from: string; to: string; subject: string; text: string };
     expect(arg.from).toBe('"Grace Church" <onboarding@resend.dev>');
     expect(arg.to).toBe("admin@church.org");
-    expect(arg.subject).toBe("You've been added as an admin to Grace Church");
+    expect(arg.subject).toBe("You've been added as an admin to Grace Church on WorshipBuilder");
     expect(arg.text).toContain("added as an admin to Grace Church");
     expect(arg.text).toContain("https://app.example.com");
     expect(arg.text).toContain("You've been added as an admin to Grace Church on WorshipBuilder.");

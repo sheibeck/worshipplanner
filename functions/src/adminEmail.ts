@@ -37,7 +37,7 @@ function resolveAppBaseUrl(): string {
 }
 
 function buildAddedContent(orgName: string, baseUrl: string): { subject: string; text: string } {
-  const subject = `You've been added as an admin to ${orgName}`;
+  const subject = `You've been added as an admin to ${orgName} on WorshipBuilder`;
   const signIn = baseUrl
     ? `Sign in to WorshipBuilder to get started: ${baseUrl}`
     : "Sign in to WorshipBuilder to get started.";
