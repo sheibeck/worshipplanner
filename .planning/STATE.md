@@ -31,7 +31,7 @@ progress:
 
 - Owner has no email domain yet: Resend verified-sender stays deferred (backlog).
 
-## Deferred Verification (v2.16 — ACTIVE, batched to milestone end)
+## Deferred Verification (v2.16 — CLOSED 2026-10-27, kept for the record)
 
 Per the owner instruction of 2026-10-27, v2.16 phases are built + auto-verified; real-browser/visual/AT UAT is
 batched into `.planning/v2.16-DEFERRED-VERIFICATION.md` for one owner pass at milestone end. These phases are
@@ -43,6 +43,19 @@ owner-accepted.
 | 143 | verification_deferred_human (auto-verified 5/5 roadmap criteria, full suite at baseline 6055 pass, type-check clean, code review clean after 1 fix round; 6 browser/visual/AT UAT items pending) | /gsd-verify-work 143 |
 | 144 | verification_deferred_human (auto-verified 12/12, root suite at baseline + functions 722/722, type gates clean, identifier gate clean, code review clean after 1 fix round incl. new functions predeploy build; 4 post-deploy/visual/decision UAT items pending) | /gsd-verify-work 144 |
 | 145 | verification_deferred_human (auto-verified all automatable criteria, R452 descoped by owner; root suite at baseline 6157 pass + functions 729/729, type gates + build clean; code review clean after 1 fix round; 7 production cutover UAT items pending — runbook docs/runbooks/worshipbuilder-cutover.md) | /gsd-verify-work 145 |
+
+## Deferred Items (v2.16 close — 2026-10-27)
+
+Items acknowledged and deferred at **v2.16** milestone close on 2026-10-27 (owner: "Let's just approve and wrap this
+up" → `override_closeout`). Production cutover done the same day with per-step owner approval.
+
+| Category | Item | Status | Note |
+|----------|------|--------|------|
+| verification | 143-VERIFICATION.md human_needed | waived (partial) | 4/6 UAT passed in local emulator; 143-5 (screen reader) and 143-6 (read surfaces) waived |
+| verification | 144-VERIFICATION.md human_needed | waived (partial) | 144-3 passed, 144-4 decided; 144-1 (real emails) waived; 144-2 superseded by the domain move |
+| verification | 145-VERIFICATION.md human_needed | waived (partial) | Steps 1–3, 6 verified by curl/read-back; owner verified Google sign-in + song upload/playback/delete; link check, password sign-in, download dialog, share link waived |
+| uat | Volunteer magic link on the new domain | deferred | No volunteers yet — owner: "More testing in that area to come in the future" |
+| uat | Per-Run-computer setup (runbook Step 7) | owner to-do | Sign in, re-select church, re-create Run monitor setup + video key color, re-grant Window management + Automatic Fullscreen at next use |
 
 ## Deferred Items (v2.15 close — 2026-09-21)
 
