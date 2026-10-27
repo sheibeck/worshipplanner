@@ -2,10 +2,10 @@
 phase: 143
 slug: dated-rehearsals-times-tab
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
-# audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
-status: draft
+# audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: true) (#2117)
+status: validated
 nyquist_compliant: false
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-10-27
 ---
 
@@ -40,25 +40,30 @@ created: 2026-10-27
 
 ## Per-Task Verification Map
 
-Requirement-level map (task IDs are filled in once PLAN.md files exist).
-
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | R441 | — | Undated row cannot be created; parent handlers re-check `canEditService` and reject clearing a non-empty date/time | component + view | `npx vitest run src/components/__tests__/ServiceTimesPanel.test.ts src/views/__tests__/ServiceEditorView.timesSection.test.ts` | ❌ W0 / ♻️ rewrite | ⬜ pending |
-| TBD | TBD | TBD | R442 | — | N/A | unit + component | `npx vitest run src/stores/__tests__/services.rehearsalDefaults.test.ts src/components/__tests__/ServiceTimesPanel.test.ts -t "default"` | ♻️ rewrite / ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | R443 | — | Undated rows never reach read-only/public surfaces or projections | component + unit | `npx vitest run src/components/__tests__/ServiceTimesPanel.test.ts -t "legacy" src/stores/__tests__/services.rehearsalProjection.test.ts` | ❌ W0 / ✅ | ⬜ pending |
-| TBD | TBD | TBD | R444 | — | Read-only for viewers/locked; Times tab exposes no action-bar items | view + unit | `npx vitest run src/views/__tests__/ServiceEditorView.stage.test.ts src/views/__tests__/ServiceEditorView.test.ts src/views/__tests__/serviceEditorActionBar.test.ts` | ♻️ update | ⬜ pending |
-| TBD | TBD | TBD | R445 | — | N/A | unit + review gate | `npx vitest run src/utils/__tests__/rehearsalTimes.test.ts src/stores/__tests__/services.rehearsalProjection.test.ts` + empty `git diff --stat` on display surfaces | ✅ / ♻️ add cases | ⬜ pending |
+| 143-01-01 | 01 | 1 | R442 | T-143 (plan 01) | Defaults never mutate existing services | unit | `npx vitest run src/stores/__tests__/services.rehearsalDefaults.test.ts src/views/__tests__/SettingsView.test.ts` | ✅ | ✅ green |
+| 143-01-02 | 01 | 1 | R442/R443 | — | N/A (ADR + index) | doc check | `test -f docs/adr/0245-…md && grep -c "ADR-0245" docs/adr/README.md` | ✅ | ✅ green |
+| 143-01-03 | 01 | 1 | R445 | — | Undated rows never reach read surfaces | component | `npx vitest run src/components/__tests__/ServiceCard.test.ts src/views/__tests__/ShareView.test.ts src/views/__tests__/VolunteerServiceView.test.ts src/views/__tests__/MyScheduleView.test.ts src/views/__tests__/DashboardView.rehearsalTimes.test.ts` | ✅ | ✅ green |
+| 143-02-01 | 02 | 1 | R444 | — | Malformed date renders "" not "Invalid Date" | unit | `npx vitest run src/utils/__tests__/rehearsalTimes.test.ts` | ✅ | ✅ green |
+| 143-02-02 | 02 | 1 | R441/R442/R443/R444 | T-143-09 | Undated row cannot be created; clear/malformed edit reverts, emits nothing; text interpolation only | component | `npx vitest run src/components/__tests__/ServiceTimesPanel.test.ts` | ✅ | ✅ green |
+| 143-02-03 | 02 | 1 | R444 | — | N/A (ARCHITECTURE note) | doc check | `grep -c "### src/components/ServiceTimesPanel.vue" .planning/codebase/ARCHITECTURE.md` | ✅ | ✅ green |
+| 143-03-01 | 03 | 2 | R444 | — | Times tab exposes no action-bar items | unit | `npx vitest run src/views/__tests__/serviceEditorActionBar.test.ts` | ✅ | ✅ green |
+| 143-03-02 | 03 | 2 | R441/R443/R444 | — | RED-first view tests (assertion failures only) | view | `npx vitest run src/views/__tests__/ServiceEditorView.timesSection.test.ts` | ✅ | ✅ green (post-GREEN) |
+| 143-03-03 | 03 | 2 | R441/R443/R444 | T-143-09 | canEditService gates (R036) never relaxed; format-guarded handlers | view | `npx vitest run src/views/__tests__/ServiceEditorView.timesSection.test.ts src/views/__tests__/ServiceEditorView.stage.test.ts src/views/__tests__/ServiceEditorView.test.ts` | ✅ | ✅ green |
+| review-fix | — | — | R441/R442 | WR-01/WR-02 | Shared YMD_RE/HM_RE; deduped defaults | component | `npx vitest run src/components/__tests__/ServiceTimesPanel.test.ts src/views/__tests__/SettingsView.test.ts` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+Phase gate (verifier, 2026-10-27, post review fixes): bare `npx vitest run` = 242 files pass / 1 baseline fail (`src/storage.rules.test.ts`), 6055 tests; `npm run type-check` exit 0.
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `src/components/__tests__/ServiceTimesPanel.test.ts` — R441/R442/R443/R444 panel behavior (`mount`, `attachTo: document.body` for focus, `vi.useFakeTimers()` for the 4 s revert message)
-- [ ] `src/views/__tests__/ServiceEditorView.timesSection.test.ts` — rewrite for Times tab / dot / header removal / handler invariants
-- [ ] `formatRehearsalDateShort` cases in `src/utils/__tests__/rehearsalTimes.test.ts`
+- [x] `src/components/__tests__/ServiceTimesPanel.test.ts` — R441/R442/R443/R444 panel behavior (`mount`, `attachTo: document.body` for focus, `vi.useFakeTimers()` for the 4 s revert message)
+- [x] `src/views/__tests__/ServiceEditorView.timesSection.test.ts` — rewrite for Times tab / dot / header removal / handler invariants
+- [x] `formatRehearsalDateShort` cases in `src/utils/__tests__/rehearsalTimes.test.ts`
 - Framework install: none — existing infrastructure covers the phase.
 
 ---
@@ -78,11 +83,19 @@ Batched to the v2.16 milestone-end human UAT (PENDING, not owner-accepted).
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 90s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 90s (targeted commands)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-10-27 (validate-phase audit; manual-only items batched to the v2.16 milestone-end owner UAT, PENDING)
+
+## Validation Audit 2026-10-27
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
