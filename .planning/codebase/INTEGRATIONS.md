@@ -90,17 +90,21 @@
 ## CI/CD & Deployment
 
 **Hosting:**
-- Firebase Hosting (static + Cloud Functions)
-  - Public: `dist/` directory
-  - Rewrites: `/api/**` routes to `api` Cloud Function
-  - SPA: `/**` rewrites to `/index.html` for client-side routing
+- Firebase Hosting, two sites (`firebase.json` `hosting` array, `.firebaserc` targets)
+  - `worshipbuilder` (target `app`): https://worshipbuilder.web.app
+    - Public: `dist/` directory
+    - Rewrites: `/api/**` routes to `api` Cloud Function
+    - SPA: `/**` rewrites to `/index.html` for client-side routing
+  - `worship-planner-bc515` (target `legacy`): `legacy-site/`, a plain 302 redirect to the same path and query on the new address; it never touches the reserved `/__/*` sign-in paths
 
 **CI Pipeline:**
 - Not detected in codebase; likely configured externally (GitHub Actions, etc.)
 
 **Deployment:**
 - Functions: `npm run build && firebase deploy --only functions` (in `functions/`)
-- Hosting: `firebase deploy --only hosting` (auto-deploy SPA)
+- Hosting app: `firebase deploy --only hosting:app` (publishes the SPA to https://worshipbuilder.web.app)
+- Hosting old-address redirect: `firebase deploy --only hosting:legacy`
+- A target-less `firebase deploy --only hosting` publishes BOTH sites and must not be used. Order and checks: `docs/runbooks/worshipbuilder-cutover.md`; rationale: ADR-0247.
 
 ## Environment Configuration
 
