@@ -1754,6 +1754,7 @@
             :service-date="localService.date"
             :can-edit="canEditService"
             :default-times="authStore.settings.rehearsalTimeDefaults ?? []"
+            :is-editor="authStore.isEditor"
             @add="onAddRehearsal"
             @remove="onRemoveRehearsal"
             @date-change="(p) => onRehearsalDateChange(p.id, p.date)"

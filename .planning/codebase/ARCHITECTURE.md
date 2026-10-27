@@ -1638,12 +1638,17 @@ the R036 `canEditService` self-gates. Behavior worth knowing before editing:
   or picks a chip, so late-arriving org defaults still pre-fill; it resets to `null` (re-pre-fills)
   after each successful add. A row is created only on submit with both date and time.
 - **Reject-clear:** clearing a set date/time forces the native input value back (an unchanged one-way
-  `:value` binding is never repainted by Vue) and shows a 4-second `role="status"` message; nothing is
-  emitted, so a stored row is only ever deleted by an explicit Remove.
+  `:value` binding is never repainted by Vue) and shows a 4-second message; nothing is emitted, so a
+  stored row is only ever deleted by an explicit Remove. Malformed values (e.g. a 5-digit year) revert
+  the same way. The visible line is `aria-hidden`; screen readers hear it through one persistent
+  `role="status"` live region at the panel root, because a region inserted together with its text is
+  often not announced.
 - **Row order:** legacy (non-displayable) rows first in stored order, then dated rows via
   `sortRehearsals`; the partition is local so the shared undated-last `sortRehearsals`, which both
   projections use, stays untouched.
 - **Read-only:** a bare `v-if="!canEdit"` branch (CR-02) listing only `isDisplayableRehearsal` rows.
+  When `isEditor` is set and legacy rows exist (a locked service still shows the tab's amber dot to
+  editors), it adds a "Reopen the service to fix them" notice so the dot has a referent.
   Under the view's `shallowMount` tests the panel is stubbed, so its DOM is tested directly with
   `mount` in `ServiceTimesPanel.test.ts`.
 

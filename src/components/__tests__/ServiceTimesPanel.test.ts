@@ -15,6 +15,7 @@ type PanelProps = {
   serviceDate?: string
   canEdit: boolean
   defaultTimes?: string[]
+  isEditor?: boolean
 }
 
 function mountPanel(props: PanelProps, options: { attachTo?: HTMLElement } = {}) {
@@ -77,11 +78,36 @@ describe('ServiceTimesPanel — R441 add form', () => {
     expect(wrapper.emitted('date-change')).toBeUndefined()
     expect((input.element as HTMLInputElement).value).toBe('2026-11-05')
     const msg = wrapper.get('[data-testid="rehearsal-revert-message"]')
-    expect(msg.attributes('role')).toBe('status')
     expect(msg.text()).toBe('A rehearsal needs a date. Use Remove to delete it.')
+    // The announcement goes through the persistent live region, not the inserted visual line.
+    const live = wrapper.get('[data-testid="times-live-region"]')
+    expect(live.attributes('role')).toBe('status')
+    expect(live.attributes('aria-live')).toBe('polite')
+    expect(live.text()).toBe('A rehearsal needs a date. Use Remove to delete it.')
 
     await vi.advanceTimersByTimeAsync(4000)
     expect(wrapper.find('[data-testid="rehearsal-revert-message"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="times-live-region"]').text()).toBe('')
+  })
+
+  it('UI review: the live region exists before any message so screen readers announce changes', () => {
+    const wrapper = mountPanel({ canEdit: true, rehearsals: [{ id: 'r1', date: '2026-11-05', time: '19:00' }] })
+    const live = wrapper.get('[data-testid="times-live-region"]')
+    expect(live.attributes('role')).toBe('status')
+    expect(live.text()).toBe('')
+  })
+
+  it('UI review: each Remove button names its rehearsal for assistive tech', () => {
+    const wrapper = mountPanel({
+      canEdit: true,
+      rehearsals: [
+        { id: 'u1', date: '', time: '19:00' },
+        { id: 'd1', date: '2026-11-06', time: '19:00' },
+      ],
+    })
+    const labels = wrapper.findAll('[data-testid="remove-rehearsal-btn"]').map((b) => b.attributes('aria-label'))
+    expect(labels[0]).toBe('Remove rehearsal without a date')
+    expect(labels[1]).toMatch(/^Remove rehearsal Nov 6, /)
   })
 
   it('R441: clearing a row time reverts the input, shows the time message and emits nothing', async () => {
@@ -360,5 +386,25 @@ describe('ServiceTimesPanel — R444 report time and read-only', () => {
     expect(wrapper.find('[data-testid="times-readonly-report"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="times-readonly"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="times-readonly-empty"]').exists()).toBe(false)
+  })
+
+  it('UI review: a locked-service editor with legacy rows is told to reopen the service', () => {
+    const wrapper = mountPanel({ canEdit: false, isEditor: true, rehearsals: mixedRows })
+    expect(wrapper.get('[data-testid="times-readonly-legacy-notice"]').text()).toBe(
+      'Some rehearsals are missing a date or time. Reopen the service to fix them.',
+    )
+  })
+
+  it('UI review: the reopen notice is hidden for viewers and when every rehearsal is complete', () => {
+    expect(
+      mountPanel({ canEdit: false, isEditor: false, rehearsals: mixedRows })
+        .find('[data-testid="times-readonly-legacy-notice"]')
+        .exists(),
+    ).toBe(false)
+    expect(
+      mountPanel({ canEdit: false, isEditor: true, rehearsals: [{ id: 'd1', date: '2026-11-06', time: '19:00' }] })
+        .find('[data-testid="times-readonly-legacy-notice"]')
+        .exists(),
+    ).toBe(false)
   })
 })

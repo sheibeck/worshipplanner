@@ -19,8 +19,9 @@ const props = withDefaults(
     serviceDate?: string
     canEdit: boolean
     defaultTimes?: string[]
+    isEditor?: boolean
   }>(),
-  { rehearsals: () => [], reportTime: '', serviceDate: '', defaultTimes: () => [] },
+  { rehearsals: () => [], reportTime: '', serviceDate: '', defaultTimes: () => [], isEditor: false },
 )
 
 const emit = defineEmits<{
@@ -52,6 +53,11 @@ const rows = computed<Rehearsal[]>(() => {
 
 const readOnlyRows = computed<Rehearsal[]>(() =>
   sortRehearsals(props.rehearsals.filter(isDisplayableRehearsal)),
+)
+
+// Locked/read-only editors still see the tab's attention dot, so say what it means.
+const showLegacyNotice = computed(
+  () => props.isEditor && props.rehearsals.some((r) => !isDisplayableRehearsal(r)),
 )
 
 const reportTimeHelper = computed(() => {
@@ -104,6 +110,21 @@ function showRevert(id: string, field: 'date' | 'time', invalid = false): void {
   }, REVERT_MS)
 }
 
+const revertMessage = computed(() => {
+  if (!revert.value) return ''
+  const { field, invalid } = revert.value
+  if (invalid) return field === 'date' ? 'That date is not valid. Use a four-digit year.' : 'That time is not valid.'
+  return field === 'date'
+    ? 'A rehearsal needs a date. Use Remove to delete it.'
+    : 'A rehearsal needs a time. Use Remove to delete it.'
+})
+
+function removeLabel(row: Rehearsal): string {
+  if (row.date === '') return 'Remove rehearsal without a date'
+  const time = formatWallClockTime(row.time)
+  return `Remove rehearsal ${formatRehearsalDateShort(row.date)}${time ? `, ${time}` : ''}`
+}
+
 function onFieldChange(row: Rehearsal, field: 'date' | 'time', event: Event): void {
   const el = event.target as HTMLInputElement
   const current = row[field]
@@ -141,8 +162,17 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="space-y-4">
+    <!-- Persistent live region: a region inserted together with its text is often not announced. -->
+    <p role="status" aria-live="polite" class="sr-only" data-testid="times-live-region">{{ revertMessage }}</p>
     <!-- Read-only: bare v-if so the editable branch can never render for a viewer (CR-02). -->
     <template v-if="!canEdit">
+      <p
+        v-if="showLegacyNotice"
+        class="rounded-lg border border-amber-800 bg-amber-900/20 p-4 text-sm text-amber-300"
+        data-testid="times-readonly-legacy-notice"
+      >
+        Some rehearsals are missing a date or time. Reopen the service to fix them.
+      </p>
       <div
         v-if="reportTime"
         class="rounded-lg bg-gray-900 border border-gray-800 p-4"
@@ -177,7 +207,7 @@ onBeforeUnmount(() => {
     <template v-else>
       <section class="rounded-lg bg-gray-900 border border-gray-800 p-4" data-testid="report-time-section">
         <h2 class="text-sm font-semibold text-gray-300 mb-3">Report time</h2>
-        <label class="block text-xs text-gray-400 mb-1" for="report-time-input">Report time</label>
+        <label class="sr-only" for="report-time-input">Report time</label>
         <input
           id="report-time-input"
           type="time"
@@ -233,8 +263,9 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 :disabled="!canEdit"
+                :aria-label="removeLabel(row)"
                 data-testid="remove-rehearsal-btn"
-                class="text-xs text-red-400 hover:text-red-300 transition-colors"
+                class="self-start px-1 py-2 text-xs text-red-400 hover:text-red-300 transition-colors sm:self-auto"
                 @click="onRemove(row.id)"
               >
                 Remove
@@ -242,19 +273,11 @@ onBeforeUnmount(() => {
             </div>
             <p
               v-if="revert && revert.id === row.id"
-              role="status"
+              aria-hidden="true"
               data-testid="rehearsal-revert-message"
               class="text-xs text-amber-300 mt-1"
             >
-              {{
-                revert.invalid
-                  ? revert.field === 'date'
-                    ? 'That date is not valid. Use a four-digit year.'
-                    : 'That time is not valid.'
-                  : revert.field === 'date'
-                    ? 'A rehearsal needs a date. Use Remove to delete it.'
-                    : 'A rehearsal needs a time. Use Remove to delete it.'
-              }}
+              {{ revertMessage }}
             </p>
           </li>
         </ul>
