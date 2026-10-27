@@ -119,7 +119,7 @@
 
       <!-- Footer -->
       <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
-        Shared from WorshipPlanner
+        Shared from WorshipBuilder
       </div>
     </div>
   </div>

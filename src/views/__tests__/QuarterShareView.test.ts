@@ -59,6 +59,12 @@ describe('QuarterShareView', () => {
     })
   })
 
+  it('R446: the footer reads Shared from WorshipBuilder', async () => {
+    const wrapper = await mountQuarterShareView()
+    await flushPromises()
+    expect(wrapper.findAll('div').some((d) => d.text() === 'Shared from WorshipBuilder')).toBe(true)
+  })
+
   it('renders the matrix view by default with roles as columns and dates as rows', async () => {
     const wrapper = await mountQuarterShareView()
     await flushPromises()

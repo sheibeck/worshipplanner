@@ -27,7 +27,7 @@
       </div>
       <p v-else class="text-gray-500 text-sm">No stage layout has been set up for this service.</p>
       <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
-        Shared from WorshipPlanner
+        Shared from WorshipBuilder
       </div>
     </div>
 
@@ -146,7 +146,7 @@
 
       <!-- Footer -->
       <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
-        Shared from WorshipPlanner
+        Shared from WorshipBuilder
       </div>
     </div>
   </div>

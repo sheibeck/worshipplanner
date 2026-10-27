@@ -40,6 +40,13 @@ describe('ServicePrintLayout', () => {
     expect(slotRows).toHaveLength(9)
   })
 
+  it('R446: the footer reads Generated from WorshipBuilder', () => {
+    const wrapper = mount(ServicePrintLayout, {
+      props: { service: mockService },
+    })
+    expect(wrapper.findAll('p').some((p) => p.text() === 'Generated from WorshipBuilder')).toBe(true)
+  })
+
   it('renders song title and key for a populated song slot', () => {
     const wrapper = mount(ServicePrintLayout, {
       props: { service: mockService },

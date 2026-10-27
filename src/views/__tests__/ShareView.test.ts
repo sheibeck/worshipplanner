@@ -511,3 +511,29 @@ describe('R445: share-times regression (R433)', () => {
     expect(wrapper.find('[data-testid="share-times"]').exists()).toBe(false)
   })
 })
+
+describe('ShareView — brand footer (R446)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    delete mockRouteParams.slug
+    delete mockRouteParams.date
+    mockRouteParams.token = 'test-token-123'
+    delete mockRouteQuery.view
+    mockGetDoc.mockResolvedValue({ exists: () => true, data: () => ({ serviceSnapshot: mockSnapshot }) })
+  })
+
+  const FOOTER = 'Shared from WorshipBuilder'
+
+  it('R446: the plan share footer reads Shared from WorshipBuilder', async () => {
+    const wrapper = await mountShareView()
+    await flushPromises()
+    expect(wrapper.findAll('div').some((d) => d.text() === FOOTER)).toBe(true)
+  })
+
+  it('R446: the ?view=stage footer reads Shared from WorshipBuilder', async () => {
+    mockRouteQuery.view = 'stage'
+    const wrapper = await mountShareView()
+    await flushPromises()
+    expect(wrapper.findAll('div').some((d) => d.text() === FOOTER)).toBe(true)
+  })
+})

@@ -109,7 +109,7 @@
 
     <!-- Footer -->
     <p class="text-xs text-gray-400 mt-6 pt-2 border-t border-gray-200">
-      Generated from WorshipPlanner
+      Generated from WorshipBuilder
     </p>
   </div>
 </template>
