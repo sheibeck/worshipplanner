@@ -417,20 +417,24 @@ it('Add is disabled until both date and time are set; pre-fills time from the fi
 | A2 | `stubs: { ServiceTimesPanel: false }` under `shallowMount` renders the real child (same mechanism as the existing `ContextualActionBar: false`) | Pitfall 4 | Low — fall back to `mount` for the panel and `findComponent(...).props()` at view level |
 | A3 | ADR number 0245 is the next free number | Project Structure | Trivial — check `docs/adr/` max at write time (0244 at research time, 245 files incl. README) |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Read-only list format: UI-SPEC example vs. its own rule**
+   - RESOLVED: use the existing formatter output, e.g. "Nov 6, 7:00 PM" (`formatRehearsalDateShort` + ", " + `formatWallClockTime`), with no weekday. Adopted in 143-02 Task 2.
    - What we know: UI-SPEC L172 gives the example "Thu, Nov 6 · 7:00 PM" but in the same sentence says the format "follows `formatRehearsalDateShort` + ', ' as in the current read-only string", which yields "Nov 6, 7:00 PM" (no weekday, comma not "·"). `formatRehearsalDateShort` has `{month:'short', day:'numeric'}` only.
    - What's unclear: whether a weekday is wanted.
    - Recommendation: use the existing formatter output ("Nov 6, 7:00 PM") — it is the stated rule, avoids changing a function other callers/tests depend on, and the example is plainly illustrative. Do not add a weekday formatter.
 
 2. **Non-displayable rows sort first (UI-SPEC) vs. last (`sortRehearsals`)**
+   - RESOLVED: partition inside the panel (legacy rows first, dated rows via the unchanged `sortRehearsals`); `sortRehearsals` is untouched. Adopted in 143-02 Task 2.
    - Recommendation: panel-local partition (Pattern 5); leave `sortRehearsals` untouched (pinned by tests and used by projections).
 
 3. **Should the panel or the parent own the "revert" UI?**
+   - RESOLVED: the panel owns the DOM revert and the `role="status"` message; the parent handlers silently re-enforce the same invariant (defense in depth). Adopted in 143-02 Task 2 and 143-03 Task 3.
    - Recommendation: panel (it owns DOM + message); parent re-enforces the invariant silently (Pattern 4). Both are tested.
 
 4. **Duplicate rehearsals (same date and time)**
+   - RESOLVED: allowed. No new rule; no plan adds a uniqueness check.
    - What we know: nothing in R441-R445 forbids them; real services carry 0-3 rows.
    - Recommendation: allow (no new rule). Out of scope.
 
