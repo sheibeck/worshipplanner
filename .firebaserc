@@ -1,1 +1,14 @@
-{ "projects": { "default": "worship-planner-bc515" } }
+{
+  "projects": {
+    "default": "worship-planner-bc515"
+  },
+  "targets": {
+    "worship-planner-bc515": {
+      "hosting": {
+        "app": ["worshipbuilder"],
+        "legacy": ["worship-planner-bc515"]
+      }
+    }
+  },
+  "etags": {}
+}
