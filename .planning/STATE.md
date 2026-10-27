@@ -42,6 +42,7 @@ owner-accepted.
 |-------|-------|--------|
 | 143 | verification_deferred_human (auto-verified 5/5 roadmap criteria, full suite at baseline 6055 pass, type-check clean, code review clean after 1 fix round; 6 browser/visual/AT UAT items pending) | /gsd-verify-work 143 |
 | 144 | verification_deferred_human (auto-verified 12/12, root suite at baseline + functions 722/722, type gates clean, identifier gate clean, code review clean after 1 fix round incl. new functions predeploy build; 4 post-deploy/visual/decision UAT items pending) | /gsd-verify-work 144 |
+| 145 | verification_deferred_human (auto-verified all automatable criteria, R452 descoped by owner; root suite at baseline 6157 pass + functions 729/729, type gates + build clean; code review clean after 1 fix round; 7 production cutover UAT items pending — runbook docs/runbooks/worshipbuilder-cutover.md) | /gsd-verify-work 145 |
 
 ## Deferred Items (v2.15 close — 2026-09-21)
 
