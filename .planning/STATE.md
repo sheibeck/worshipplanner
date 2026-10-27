@@ -1,21 +1,29 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.15
-milestone_name: Service Times, Vamps & Field Fixes — SHIPPED & DEPLOYED 2026-09-21 (closed; next milestone not yet scoped)
-status: completed
-stopped_at: v2.15 closed 2026-09-21 (audit passed, 22 UAT items owner-waived, tag v2.15). Next: /gsd-new-milestone (candidates: backlog 999.6 rehearsal-date UX rework, 999.2 WorshipBuilder rename)
-last_updated: "2026-09-21T16:02:46.653Z"
-last_activity: 2026-09-21
-last_activity_desc: Milestone v2.15 completed and archived
+milestone: v2.16
+milestone_name: Dated Rehearsals & WorshipBuilder
+status: planning
+last_updated: "2026-10-27T13:52:03.952Z"
+last_activity: 2026-10-27
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
-  percent: 100
-current_phase: 142
-current_phase_name: Slides Tab panel UX from Claude Design
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
+
+## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27)
+
+- Scope approved: backlog 999.6 (dated rehearsals + Times tab) + 999.2 (WorshipBuilder rename + cutover to
+  `worshipbuilder.web.app`); old domain = **redirect + carry per-browser settings**; no milestone-level
+  research. Run via `/gsd-autonomous` with human/visual/hardware UAT **batched to milestone end** —
+  deferrals are PENDING, never owner-accepted. Production deploys still need per-deploy owner confirmation.
+- Prod Auth change made 2026-10-27 with explicit owner consent: Email/Password provider enabled with
+  `passwordRequired: false` (Email-link on) via the Identity Toolkit admin API — it had been **disabled**,
+  so v2.5 password sign-in and v2.12/v2.13 volunteer magic-link sign-in could not work in production.
+- Owner has no email domain yet: Resend verified-sender stays deferred (backlog).
+
 
 ## Deferred Items (v2.15 close — 2026-09-21)
 
@@ -1441,10 +1449,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v2.15 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone — v2.15 shipped, tagged and deployed; run /gsd-new-milestone
-Last activity: 2026-09-21 — Milestone v2.15 completed and archived
+Status: Defining requirements
+Last activity: 2026-10-27 — Milestone v2.16 started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 

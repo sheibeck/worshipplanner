@@ -18,10 +18,43 @@ link; new-tab/deep-link church restore for multi-church members; and the Claude 
 chip strip (Display · Background · Audio popovers). See ROADMAP.md for the full milestone history;
 per-milestone detail archived under `.planning/milestones/`.
 
-**Active milestone:** none — next is `/gsd-new-milestone`. Standing follow-ups that outlived milestones:
-backlog **999.6** (owner UX feedback from v2.15 prod use: every rehearsal must have a date; Times on its
-own tab), backlog **999.2** (WorshipBuilder rename/domain), Resend verified-domain email, and the
-owner-waived v2.14/v2.15 human-hardware UAT lists (`milestones/v2.1{4,5}-DEFERRED-VERIFICATION.md`).
+**Active milestone:** v2.16 (below). Standing follow-ups that outlived milestones: Resend verified-domain
+email (owner has no domain yet — backlog), and the owner-waived v2.14/v2.15 human-hardware UAT lists
+(`milestones/v2.1{4,5}-DEFERRED-VERIFICATION.md`). Prod Auth's Email/Password + Email-link provider — found
+disabled 2026-10-27, which had left v2.5 password and v2.12/v2.13 magic-link sign-in non-functional in
+production — was enabled by owner consent the same day (Identity Toolkit config, `passwordRequired: false`).
+
+## Current Milestone: v2.16 Dated Rehearsals & WorshipBuilder
+
+**Goal:** Act on the owner's v2.15 field feedback on rehearsal times, and move the app to its new name and
+domain (`worshipbuilder.web.app`) without breaking existing links or any church computer's Sunday setup.
+
+**Target features:**
+
+- **Dated rehearsals + Times tab** (backlog 999.6) — every rehearsal has a date (an undated rehearsal row is
+  no longer a thing); org-default rehearsal *times* stay; the org-default report time is unchanged. The
+  `Times` / `+ Add rehearsal` / `Report time` cluster moves off the top of `ServiceEditorView.vue` into its own
+  **Times** tab after Messages (Service Order · Slides · Roles · Stage Layout · Messages · Times), following
+  the existing tab-strip patterns (mobile `.scrollbar-hide` strip, editor/locked read-only gating, autosave).
+  Cross-surface display (R433) is unchanged.
+- **Rename to WorshipBuilder** — every user-facing "Worship Planner"/"WorshipPlanner" string (page title,
+  sidebar/shell, login + volunteer pages, share/print footers, invite/admin/magic-link email copy).
+- **Domain cutover to `worshipbuilder.web.app`** (backlog 999.2) — the `worshipbuilder` Hosting site becomes
+  the single app deploy target; server-generated links (`SERVICE_SHARE_BASE_URL`) move to it; origin
+  allowlists (`storage-cors.json`, Auth authorized domains) include it; the old
+  `worship-planner-bc515.web.app` address **redirects every path + query to the same page on the new domain
+  and carries that browser's saved setup across** (Run monitor assignments/nicknames, video key color,
+  selected church, list prefs — all per-origin `localStorage`). Prod deploy is per-deploy owner-confirmed.
+
+**Key context / decisions:**
+- Owner decisions 2026-10-27: scope as above; old domain = redirect + carry settings; no milestone-level
+  research (per-phase research still runs); human UAT batched to milestone end (`/gsd-autonomous`).
+- Already true in prod: `worshipbuilder.web.app` is an Auth authorized domain; the browser API key has no
+  HTTP-referrer restriction. Not yet: `worshipbuilder.firebaseapp.com` authorized domain; Storage CORS.
+- Auth sessions are per-origin (IndexedDB) and are **not** migrated — everyone signs in once on the new
+  domain. Window-management (multi-screen placement) permission is per-origin and must be re-granted.
+- SEED-001 (owner admin settings UI) marked harvested — delivered by v1.9 (phases 68–71).
+- Requirements continue from v2.15 (last R440); phases continue from **143**.
 
 ## Shipped Milestone: v2.15 Service Times, Vamps & Field Fixes — ✅ SHIPPED & DEPLOYED 2026-09-21
 
@@ -836,6 +869,12 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
+**v2.16 Dated Rehearsals & WorshipBuilder** — 🚧 in planning (started 2026-10-27). Backlog 999.6 (every
+rehearsal dated; Times moved to its own tab after Messages) + 999.2 (rename to WorshipBuilder; cut hosting over
+to `worshipbuilder.web.app`, old domain redirects + carries per-browser settings). Run via `/gsd-autonomous`,
+human UAT batched to milestone end. Requirements continue from R441; phases from 143. See
+`.planning/REQUIREMENTS.md`.
+
 **v2.12 Rehearse Mode** — 🚧 in planning (started 2026-09-05). Step 2 (final) of the file-storage backlog
 (999.13 / SEED-003). Passwordless magic-link access (Firebase `signInWithEmailLink`, roster-email-tied, not
 public) → "My Schedule" volunteer home (anyone assigned to a service; all of a volunteer's assigned services
@@ -1175,4 +1214,4 @@ Resend DNS domain verification** (until verified, the test sender only reaches t
 Archived: `milestones/v2.5-ROADMAP.md` · `milestones/v2.5-REQUIREMENTS.md` · `milestones/v2.5-MILESTONE-AUDIT.md`.*
 
 ---
-*Last updated: 2026-09-21 after v2.15 milestone (shipped, deployed, tagged; UAT owner-waived; next: /gsd-new-milestone)*
+*Last updated: 2026-10-27 — milestone v2.16 Dated Rehearsals & WorshipBuilder started*
