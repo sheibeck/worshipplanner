@@ -144,3 +144,33 @@ permission; a naive origin move silently wipes them. The cutover must not happen
 - Removing the old origins from Storage CORS / authorized domains after a transition period.
 
 </deferred>
+
+## Amendment — research-driven decisions (2026-10-27, recommendations auto-accepted)
+
+- **`functions/.env` pins the old share base URL.** The gitignored local `functions/.env` sets
+  `SERVICE_SHARE_BASE_URL` to the old domain and wins over the `params.ts` default at deploy time. Change the
+  `params.ts` default anyway (code + tests), and make updating the local `functions/.env` value to
+  `https://worshipbuilder.web.app` an explicit **runbook pre-flight step** (owner-confirmed; the file is not
+  committed). The runbook must include a check that prints only whether the key matches the new origin —
+  never the file's other values.
+- **Deploy order:** `hosting:app` first (new site live), then functions (emails start linking to the new
+  site), then smoke tests, then `hosting:legacy` (bridge). Supersedes the order sketched above.
+- **Reserved paths:** Firebase Hosting serves `/__/*` before redirects/rewrites (docs + live check), so no
+  explicit exclusion is needed. The legacy site must stay alive (as the bridge) until backlog 999.14 moves
+  `authDomain`, because Google sign-in, password-reset and magic-link flows use
+  `worship-planner-bc515.firebaseapp.com/__/auth/*`.
+- **Moved keys** (explicit allowlist, not a prefix scan): `wp:runMonitorConfig:v2`, `wp:videoKeyColor:v1`,
+  `wp.selectedOrg.persist`, `volunteerSelectedChurch`, `wp:songTableColumns:v1:{org}:{uid}`,
+  `wp:tagFilter:v2:{org}:{uid}` (tag filters move too), `wp:gettingStartedDismissed`. Never moved:
+  `emailForSignIn`, Firebase Auth state, sessionStorage `wp.selectedOrg`, `rehearse-audio-position:*`, the
+  bridge's own flag.
+- **Boot order:** the import runs from a side-effect module imported **first** in `src/main.ts` (vue-router's
+  `createWebHistory` snapshots `location` at module evaluation). Build the redirect target by string
+  concatenation onto the constant origin after collapsing leading `//` (never `new URL(path, base)`).
+- **Legacy build:** `vite.config.legacy.ts` → `dist-legacy/` (gitignored), bridge entry under `src/legacy/`.
+- **Docs:** update the old-domain URL in `functions/DEPLOY-EMAIL-DOMAIN.md`.
+- **Runbook additions:** tabs left open on the old origin need one reload after the bridge deploy; Chrome's
+  Automatic Fullscreen setting/policy is origin-listed and must be re-granted with window-placement; Google
+  sign-in on the new domain is smoke-tested **before** the bridge deploy (OAuth-origin behavior is
+  [ASSUMED] fine); rollback = console "Roll back" on the legacy site or
+  `firebase hosting:clone worshipbuilder:live worship-planner-bc515:live`.
