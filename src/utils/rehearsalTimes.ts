@@ -7,7 +7,7 @@
 
 export interface Rehearsal {
   id: string
-  /** 'YYYY-MM-DD', may be '' (undated — editor-only state, filtered from read-only surfaces). */
+  /** 'YYYY-MM-DD'; '' only on a legacy v2.15 row or in-progress edit — the editor flags it, read-only surfaces filter it (ADR-0245). */
   date: string
   /** 'HH:mm' (24h, native <input type="time"> value format). */
   time: string
@@ -43,6 +43,15 @@ export function formatWallClockTime(hhmm: string): string {
   const [h, m] = hhmm.split(':').map(Number) as [number, number]
   if (Number.isNaN(h) || Number.isNaN(m)) return ''
   return new Date(2000, 0, 1, h, m).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+/** 'YYYY-MM-DD' to a short local label, e.g. "Sep 11"; '' for empty/malformed. */
+export function formatRehearsalDateShort(ymd: string): string {
+  if (!ymd) return ''
+  const parts = ymd.split('-').map(Number)
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return ''
+  const [year, month, day] = parts as [number, number, number]
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { sortRehearsals, formatWallClockTime, isDisplayableRehearsal, type Rehearsal } from '../rehearsalTimes'
+import { sortRehearsals, formatWallClockTime, formatRehearsalDateShort, isDisplayableRehearsal, type Rehearsal } from '../rehearsalTimes'
 
 describe('sortRehearsals', () => {
   it('orders by date ascending then time ascending, regardless of insert order', () => {
@@ -97,5 +97,20 @@ describe('isDisplayableRehearsal', () => {
 
   it('is false when both are blank', () => {
     expect(isDisplayableRehearsal({ id: 'a', date: '', time: '' })).toBe(false)
+  })
+})
+
+describe('formatRehearsalDateShort', () => {
+  it('formats a YYYY-MM-DD string as a short month/day label', () => {
+    expect(formatRehearsalDateShort('2026-09-11')).toBe('Sep 11')
+    expect(formatRehearsalDateShort('2026-11-06')).toBe('Nov 6')
+  })
+
+  it('returns "" for an empty string', () => {
+    expect(formatRehearsalDateShort('')).toBe('')
+  })
+
+  it('returns "" for a malformed string (never "Invalid Date")', () => {
+    expect(formatRehearsalDateShort('not-a-date')).toBe('')
   })
 })
