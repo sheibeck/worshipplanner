@@ -60,6 +60,13 @@ describe('SelectChurchView', () => {
     expect(wrapper.find('[data-testid="no-church"]').exists()).toBe(true)
   })
 
+  it('R446: the brand heading reads WorshipBuilder', () => {
+    mockStore = { memberships: [], selectOrg, logout }
+    const wrapper = mount(SelectChurchView)
+
+    expect(wrapper.get('h1').text()).toBe('WorshipBuilder')
+  })
+
   it('logs out and returns to the login screen', async () => {
     mockStore = { memberships: [], selectOrg, logout }
     const wrapper = mount(SelectChurchView)

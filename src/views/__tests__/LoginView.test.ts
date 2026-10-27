@@ -58,6 +58,11 @@ describe('LoginView', () => {
     expect(wrapper.text()).toContain('Incorrect password. Try again or reset your password.')
   })
 
+  it('R446: the brand heading reads WorshipBuilder', () => {
+    const wrapper = mount(LoginView)
+    expect(wrapper.get('h1').text()).toBe('WorshipBuilder')
+  })
+
   it('shows a discoverability hint on the sign-in form (showForgotPassword false)', () => {
     const wrapper = mount(LoginView)
     expect(wrapper.text()).toContain('Open the link we sent')

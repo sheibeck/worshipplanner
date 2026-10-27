@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-gray-950 flex items-center justify-center px-4">
     <div class="w-full max-w-sm">
       <div class="text-center mb-8">
-        <h1 class="text-2xl font-semibold text-white tracking-tight">Worship Planner</h1>
+        <h1 class="text-2xl font-semibold text-white tracking-tight">WorshipBuilder</h1>
         <p class="text-sm text-gray-400 mt-1">Get your sign-in link</p>
       </div>
 

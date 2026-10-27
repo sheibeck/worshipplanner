@@ -50,6 +50,15 @@ describe('VolunteerLinkCompleteView — "Request a new link" (R399)', () => {
     })
   })
 
+  it('R446: the brand heading reads WorshipBuilder', async () => {
+    mockRouteQuery.slug = 'grace-church'
+    mockVolunteerAuth.errorMessage = 'This link is invalid or has expired.'
+    const wrapper = mount(VolunteerLinkCompleteView)
+    await flushPromises()
+
+    expect(wrapper.get('h1').text()).toBe('WorshipBuilder')
+  })
+
   it('falls back to volunteer-home when route.query.slug is absent', async () => {
     mockVolunteerAuth.errorMessage = 'This link is invalid or has expired.'
     const wrapper = mount(VolunteerLinkCompleteView)

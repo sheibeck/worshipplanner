@@ -51,6 +51,17 @@ describe('VolunteerRequestView', () => {
     expect(wrapper.find('input#volunteer-request-email').exists()).toBe(true)
   })
 
+  it('R446: the brand heading reads WorshipBuilder', async () => {
+    mockGetDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({ orgId: 'org-A', name: 'Grace Church' }),
+    })
+    const wrapper = mount(VolunteerRequestView)
+    await flushPromises()
+
+    expect(wrapper.get('h1').text()).toBe('WorshipBuilder')
+  })
+
   it('shows the request form gracefully when the slug doc has no name field (legacy claim)', async () => {
     mockGetDoc.mockResolvedValueOnce({
       exists: () => true,

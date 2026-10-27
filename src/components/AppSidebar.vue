@@ -7,7 +7,7 @@
     <!-- Brand -->
     <div class="flex items-center h-14 px-5 border-b border-gray-800 shrink-0">
       <div>
-        <span class="text-sm font-semibold text-gray-100 tracking-tight">Worship Planner</span>
+        <span class="text-sm font-semibold text-gray-100 tracking-tight">WorshipBuilder</span>
         <p class="text-[10px] text-gray-600 leading-none">v{{ appVersion }}</p>
       </div>
     </div>

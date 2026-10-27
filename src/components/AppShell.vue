@@ -27,7 +27,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span class="ml-3 text-sm font-semibold text-gray-100">Worship Planner</span>
+        <span class="ml-3 text-sm font-semibold text-gray-100">WorshipBuilder</span>
       </div>
 
       <!-- R227 (Phase 78) — persistent "viewing as super-admin" mode

@@ -590,3 +590,11 @@ describe('AppSidebar — cold-render subscribe guard (WR-01, Phase 130 review)',
     expect(mockSubscribe).not.toHaveBeenCalled()
   })
 })
+
+describe('AppSidebar — brand (R446)', () => {
+  it('R446: the sidebar brand reads WorshipBuilder', () => {
+    const wrapper = mountSidebar()
+    const brand = wrapper.findAll('span').filter((s) => s.text() === 'WorshipBuilder')
+    expect(brand).toHaveLength(1)
+  })
+})

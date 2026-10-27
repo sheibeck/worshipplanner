@@ -113,3 +113,10 @@ describe('AppShell -- viewing-as-super-admin banner (R227, Phase 78)', () => {
     expect(wrapper.find('[data-testid="page-content"]').exists()).toBe(true)
   })
 })
+
+describe('AppShell — brand (R446)', () => {
+  it('R446: the mobile header brand reads WorshipBuilder', async () => {
+    const wrapper = await mountShell()
+    expect(wrapper.get('button[aria-label="Open sidebar"] + span').text()).toBe('WorshipBuilder')
+  })
+})
