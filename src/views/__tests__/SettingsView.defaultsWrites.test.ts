@@ -149,4 +149,49 @@ describe('Save defaults, against the real auth store', () => {
     expect(Object.keys(patch).length).toBeGreaterThan(0)
     expect(Object.keys(patch).every((k) => k.startsWith('settings.'))).toBe(true)
   })
+
+  describe('after a save, the inputs do not share an array with the store (AC-RHD-69)', () => {
+    async function mountSavedAt19(): Promise<{
+      wrapper: ReturnType<typeof mount>
+      authStore: ReturnType<typeof useAuthStore>
+    }> {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      const authStore = useAuthStore()
+      const callback = (globalThis as Record<string, unknown>).__settingsAuthCallback as (u: unknown) => Promise<void>
+      await callback({ uid: 'test-uid', email: 'test@example.com', displayName: 'Test User', photoURL: null })
+      authStore.userRole = 'editor'
+      expect(authStore.settings.rehearsalTimeDefaults).toEqual(['18:30'])
+
+      const wrapper = mount(SettingsView, {
+        global: { plugins: [pinia], stubs: { AppShell: { template: '<div><slot /></div>' } } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="rehearsal-default-time-0"]').setValue('19:00')
+      await wrapper.get('[data-testid="save-rehearsal-defaults-btn"]').trigger('click')
+      await flushPromises()
+      expect(authStore.settings.rehearsalTimeDefaults).toEqual(['19:00'])
+      return { wrapper, authStore }
+    }
+
+    it('leaves the saved times alone when a time is edited after a save (AC-RHD-69)', async () => {
+      const { wrapper, authStore } = await mountSavedAt19()
+
+      await wrapper.get('[data-testid="rehearsal-default-time-0"]').setValue('20:00')
+      await flushPromises()
+
+      expect(authStore.settings.rehearsalTimeDefaults).toEqual(['19:00'])
+    })
+
+    it('does not push a blank time into the saved times when Add is pressed after a save (AC-RHD-69)', async () => {
+      const { wrapper, authStore } = await mountSavedAt19()
+
+      await wrapper.get('[data-testid="add-rehearsal-default-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="rehearsal-default-time-1"]').exists()).toBe(true)
+      expect(authStore.settings.rehearsalTimeDefaults).toEqual(['19:00'])
+    })
+  })
 })
