@@ -810,11 +810,19 @@ const isSlugSaveDisabled = computed(() => {
   return isSlugSaving.value || candidate === '' || candidate === persistedSlug.value
 })
 
-// An in-place church switch swaps the settings object; reseed the weekday select from it.
+// An in-place church switch keeps this view mounted; reseed all three inputs. selectOrg sets the
+// org id before the new church's settings load, so the settings values are sources too.
 watch(
-  () => authStore.settings.rehearsalDefaultWeekday,
-  (weekday) => {
-    rehearsalDefaultWeekdayInput.value = normalizeWeekday(weekday)
+  [
+    () => authStore.orgId,
+    () => authStore.settings.rehearsalDefaultWeekday,
+    () => authStore.settings.rehearsalTimeDefaults,
+    () => authStore.settings.reportTimeDefault,
+  ],
+  () => {
+    rehearsalDefaultWeekdayInput.value = normalizeWeekday(authStore.settings.rehearsalDefaultWeekday)
+    rehearsalTimeDefaultsInput.value = [...authStore.settings.rehearsalTimeDefaults]
+    reportTimeDefaultInput.value = authStore.settings.reportTimeDefault
   },
 )
 
