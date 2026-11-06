@@ -31,6 +31,7 @@ The marker is internal. In the Times tab an auto-added rehearsal looks like any 
 - **AC-RHD-01** - In the "Rehearsal & Report Defaults" card the "Default rehearsal day" select lists None, then Sunday to Saturday, and shows the saved day, or None when the church has none. (R459)
 - **AC-RHD-02** - "Save defaults" saves the chosen day with the card's other defaults, as 0 (Sunday) to 6 (Saturday), or null for None. (R459)
 - **AC-RHD-03** - Choosing a day saves nothing until "Save defaults" is pressed. (R459)
+- **AC-RHD-69** - After a save, typing in the default time fields changes nothing in the church's settings until "Save defaults" is pressed. (R459)
 - **AC-RHD-04** - When the save fails, the previous day is restored with the other defaults and the card's existing error line shows. (R459)
 - **AC-RHD-05** - For a user who is not an editor the select is disabled and "Save defaults" is not shown. (R459)
 - **AC-RHD-06** - A church's saved default day is still there after the organization reloads. (R459)
