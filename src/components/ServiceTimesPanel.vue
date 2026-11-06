@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Times tab panel. See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md)
+// Times tab panel. See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md) and ADR-0249 (docs/adr/0249-new-services-start-with-a-default-rehearsal.md)
 // and .planning/codebase/ARCHITECTURE.md (Component & Composable Behavioral Notes (R318) -> src/components/ServiceTimesPanel.vue).
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import {
@@ -7,6 +7,7 @@ import {
   formatWallClockTime,
   HM_RE,
   isDisplayableRehearsal,
+  mostRecentWeekdayOnOrBefore,
   sortRehearsals,
   YMD_RE,
   type Rehearsal,
@@ -20,8 +21,9 @@ const props = withDefaults(
     canEdit: boolean
     defaultTimes?: string[]
     isEditor?: boolean
+    defaultWeekday?: number | null
   }>(),
-  { rehearsals: () => [], reportTime: '', serviceDate: '', defaultTimes: () => [], isEditor: false },
+  { rehearsals: () => [], reportTime: '', serviceDate: '', defaultTimes: () => [], isEditor: false, defaultWeekday: null },
 )
 
 const emit = defineEmits<{
@@ -66,7 +68,20 @@ const reportTimeHelper = computed(() => {
 })
 
 // Add form. The time follows defaultTimes[0] until the planner types or picks a chip.
-const newDate = ref('')
+const newDateOverride = ref<string | null>(null)
+// Blank when there is no usable default or a row already sits on it (ADR-0249).
+const defaultDate = computed<string>(() => {
+  const d = mostRecentWeekdayOnOrBefore(props.serviceDate, props.defaultWeekday)
+  if (d === null || props.rehearsals.some((r) => r.date === d)) return ''
+  return d
+})
+// ?? not ||: a cleared date is '' and must stay blank.
+const newDate = computed<string>({
+  get: () => newDateOverride.value ?? defaultDate.value,
+  set: (v) => {
+    newDateOverride.value = v
+  },
+})
 const newTimeOverride = ref<string | null>(null)
 const newTime = computed<string>({
   get: () => newTimeOverride.value ?? props.defaultTimes[0] ?? '',
@@ -86,7 +101,7 @@ function focusAddDate(): void {
 function onSubmitAdd(): void {
   if (!canAdd.value) return
   emit('add', { date: newDate.value, time: newTime.value })
-  newDate.value = ''
+  newDateOverride.value = null
   newTimeOverride.value = null
   focusAddDate()
 }
