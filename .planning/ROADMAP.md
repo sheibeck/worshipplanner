@@ -29,6 +29,7 @@
 - ✅ **v2.14 — Services UX Alignment, Dashboard & Live-Stream Video Output** — Phases 131-137 (shipped & deployed to production 2026-09-09; Services page brought to the app's standard header/mobile pattern + `/share` zebra banding + incidental PC-verbiage cleanup, a "needs your attention" dashboard (readiness feed + unconfirmed-volunteers + live editor-presence roll-up + empty state), volunteer responsibility confirmation with live planner roster status + unconfirmed-only nudge (a Critical rules gap CR-01 caught+fixed in review), Firestore-only editor presence, and a third **"Video"** live-stream output — fullscreen slice + per-item Banner lower-third with transparency/key-color fallback — R406-R427; audit PASSED 7/7 phases + 22/22 reqs + 5/5 integration seams; human/hardware UAT owner-accepted as deferred (override_closeout); tag v2.14 — see [milestones/v2.14-ROADMAP.md](milestones/v2.14-ROADMAP.md))
 - ✅ **v2.15 — Service Times, Vamps & Field Fixes** — Phases 138-142 (shipped & deployed to production 2026-09-21; org-default rehearsal/report *times* copied onto each service and shown on all 6 date surfaces + both public projections, a keyed **Vamps** library (Songs → Vamps tab, one key + one MP3 ≤50 MB, editor-gated `vamp-files/` storage) assignable per slide or as a group bed and audible live from the Run control window only (armed by default, outputs muted, blocked-audio banner + retry, delete-warns-but-keeps-MP3), service-update emails always carry a self-healed plan link, new-tab/deep-link church restore for multi-church members, and the Claude Design "Slides Tab" 7a chip strip (Display · Background · Audio popovers) — R428-R440; audit PASSED 5/5 phases + 13/13 reqs + 14/14 integration + 3/3 flows; 22 human/hardware UAT items owner-waived (override_closeout); tag v2.15 — see [milestones/v2.15-ROADMAP.md](milestones/v2.15-ROADMAP.md))
 - ✅ **v2.16 — Dated Rehearsals & WorshipBuilder** — Phases 143-145 (shipped & deployed to production 2026-10-27; every rehearsal has a date and time, edited in a new **Times** tab after Messages; the app is renamed **WorshipBuilder** on every screen and email; and it now lives at **https://worshipbuilder.web.app**, with the old `worship-planner-bc515` addresses 302-redirecting to the same page (reserved `/__/*` auth paths untouched) — R441-R453 (R452 settings carry-over descoped by owner); audit tech_debt, no blockers (12/12 reqs, 14/14 integration, 3/3 flows); cutover run with per-step owner approval; remaining UAT owner-waived (override_closeout); tag v2.16 — see [milestones/v2.16-ROADMAP.md](milestones/v2.16-ROADMAP.md))
+- 🚧 **v2.17 — Spec-Driven Foundation & Rehearsal Defaults** — Phases 146-147 (in progress; specifications become the source of truth: a `docs/specs/` template, the spec, then tests, then code rule, a check that every acceptance criterion has a test, and `tdd_mode` on, piloted on default rehearsal day and time, promoted from backlog 999.15)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -774,6 +775,111 @@ Full details: [milestones/v2.13-ROADMAP.md](milestones/v2.13-ROADMAP.md) · requ
 
 ### ✅ v2.16 Dated Rehearsals & WorshipBuilder — SHIPPED & DEPLOYED 2026-10-27 (Phases 143-145) — R441-R453 (R452 descoped), audit tech_debt with no blockers (3/3 phases, 12/12 reqs, 14/14 integration, 3/3 flows); production cutover via `docs/runbooks/worshipbuilder-cutover.md`; remaining UAT owner-waived (`milestones/v2.16-DEFERRED-VERIFICATION.md`, override_closeout). Full detail archived: [milestones/v2.16-ROADMAP.md](milestones/v2.16-ROADMAP.md)
 
+### 🚧 v2.17 Spec-Driven Foundation & Rehearsal Defaults (Phases 146-147) — IN PROGRESS
+
+**Milestone Goal:** Make specifications the project's source of truth, then prove the process on a real feature.
+
+**Requirements:** [REQUIREMENTS.md](REQUIREMENTS.md) — R454–R465 (12 mapped, 100% coverage)
+
+**Key context:** The order is spec, then tests, then code (owner directive, 2026-11-06). Phase 146 sets the
+standard and Phase 147 pilots it on one real feature; v2.18 then backfills specs for every existing feature in the
+format proven here. Promotes backlog **999.15** (Phase 147); 999.14 stays in the backlog. No milestone-level
+research pass (per-phase research still runs). Production deploys are per-deploy owner-confirmed. Full detail is
+in PROJECT.md's "Current Milestone: v2.17" section.
+
+**Flagged at roadmap time:**
+
+- **R457 cannot be proven on a real spec inside Phase 146, so the pilot closes that loop.** `docs/specs/` holds only
+  `TEMPLATE.md` until Phase 147, and a pass on a directory with no real specs proves nothing. Phase 146 proves the
+  check on fixtures: one spec that must fail and one that must pass. Phase 147's spec is the first real run: the
+  check fails when the spec lands and passes once tests cite every criterion. R457 stays mapped to Phase 146.
+
+- **The check has to run where nobody can forget it.** The repo has no CI, so it belongs in the `npx vitest run`
+  gate. It must still read test files that gate does not execute (`src/rules.test.ts`, `functions/`,
+  `render-service/`), because R458 puts functions and security rules under test-first. Phase 146 decides whether a
+  comment-only mention or an `it.skip`/`it.todo` counts as a citation. During the pilot the gate goes red on
+  purpose between the spec commit and the test commits; nothing may quiet it with an empty test or an exclusion.
+
+- **`tdd_mode` does not enforce R458 by itself.** GSD's planner heuristic treats "UI, config, glue code, CRUD" as
+  non-TDD work, but R458 wants a failing test first for all store changes. The rule and its UI exception have to be
+  written in `CLAUDE.md`, where planners will read them.
+
+- **R455 has to outlive the milestone.** PROJECT.md's philosophy text sits in the Current Milestone section, which
+  becomes history at close, so the rule needs a standing section such as `## Constraints`. It should also say the
+  rule applies from Phase 147 on, since Phase 146 builds the standard itself, and how specs relate to the
+  `.planning/codebase/` map docs, which the comment convention names as the home for behavior narration.
+
+- **The auto-added marker leaks by default (R465).** `buildServiceSnapshot` and `buildRehearseAccess` both pass
+  whole rehearsal rows through `sortRehearsals`, which keeps every field, and `createService` mints the share link
+  in the same call. A marker on the row would reach a public payload on a service's first write. Both projections
+  need to narrow rows to `{ id, date, time }`, with tests on the payloads they produce.
+
+- **The ADR-0245 reversal is wider than (b).** Auto-add also contradicts (a) ("created only by the Times-tab add
+  form"), and R464's pre-filled date contradicts (a) too ("always picked by the planner"). The new ADR supersedes
+  parts of both, and (c)–(f) stand. `src/views/__tests__/SettingsView.test.ts` pins the helper text "Dates are always
+  chosen per service.", so that test changes on purpose. The `rehearsals` equal to `[]` tests in
+  `src/stores/__tests__/services.rehearsalDefaults.test.ts` set no weekday, so they stay true under R461.
+
+- **"Admin" in R459 means the editor role today.** `firestore.rules` keeps `admin` synonymous with `editor` on
+  purpose (R348), `/settings` requires an editor, and the rehearsal defaults beside this control are editor-gated.
+  The rules comment warns that a real admin-only gate must not inherit the editor self-escalation path, so the
+  spec should follow the existing editor gate unless the owner asks for a new one.
+
+- **Edge cases the pilot spec has to settle:** whether a removed auto-added rehearsal stays gone when the service
+  moves; what happens when a moved rehearsal lands on a date that already has one; and whether the add form
+  pre-fills a date when a weekday is set but no time is (R461 only blocks the auto-add).
+
+- [ ] **Phase 146: Spec Standard** - Feature specs have a template, a home in `docs/specs/` and stable criterion IDs. The spec-first rule and test-first setting are in force, and an automated check catches any criterion with no test
+- [ ] **Phase 147: Default Rehearsal Day and Time** - A church sets one default weekday and new services start with the rehearsal on them, built spec-first as the pilot for the Phase 146 standard
+
+### Phase 146: Spec Standard
+
+**Goal**: A feature can only start from a written spec. The spec format, the spec, then tests, then code rule and the test-first setting are all in force, and an automated check catches any acceptance criterion that no test cites.
+**Depends on**: Nothing (first phase of v2.17)
+**Requirements**: R454, R455, R456, R457, R458
+**Success Criteria** (what must be TRUE):
+
+  1. A new feature spec can be started by copying `docs/specs/TEMPLATE.md`, which has sections for purpose, behavior, numbered acceptance criteria, edge cases, out of scope, and links to tests and ADRs (R454).
+
+  2. `CLAUDE.md` and `.planning/PROJECT.md` both state the same rule: no feature work starts until its spec exists, and a behavior change updates the spec before the tests and code. In PROJECT.md it sits in a standing section, so it is still there after v2.17 closes (R455).
+
+  3. The template shows the acceptance-criterion ID format and how a test cites an ID. An ID is unique across specs, and it does not change when other criteria are added, removed or reordered (R456).
+
+  4. Run against a fixture spec with one uncited criterion, the automated check fails and names that ID. Run against a fixture spec with every criterion cited, it passes. It ignores the sample criteria in `TEMPLATE.md`, finds citations in every test location (app, rules, `functions/`, `render-service/`), and runs inside `npx vitest run` because the repo has no CI (R457).
+
+  5. `workflow.tdd_mode` is `true` in `.planning/config.json`, and `CLAUDE.md` says stores, utilities, functions and security rules need a failing test first, while UI layout tests may land with the code but must cite spec criteria (R458).
+
+**Plans**: TBD
+
+Area: `docs/specs/TEMPLATE.md` (new), the automated check and its fixtures (new), `CLAUDE.md`, `.planning/PROJECT.md`,
+`.planning/config.json`.
+
+### Phase 147: Default Rehearsal Day and Time
+
+**Goal**: A church sets one default rehearsal weekday, and every new service starts with its rehearsal already on it, while existing services stay as they are and public views show nothing new. The feature is built spec-first as the pilot for the Phase 146 standard.
+**Depends on**: Phase 146 (the pilot needs the template, the ID format, the check and the test-first setting)
+**Requirements**: R459, R460, R461, R462, R463, R464, R465
+**Promoted from**: backlog 999.15 (owner request, 2026-10-27, after the Phase 143 Times-tab check). Builds on Phase 143's Times tab and the org Settings rehearsal defaults (`rehearsalTimeDefaults` chips are time-only today). The backlog entry's open questions are settled: one default weekday, not several; the same day when the service falls on that weekday; and auto-add to new services, not pre-fill only.
+**Success Criteria** (what must be TRUE):
+
+  1. The feature's spec exists in `docs/specs/` before any of its tests or code: git history shows the spec commit ahead of every test and code commit for this phase. Each of R459–R465 traces to numbered acceptance criteria. This is the first real run of the Phase 146 check, which fails when the spec lands and passes once tests cite every criterion.
+
+  2. In Settings, an admin can choose one default rehearsal weekday or none, and the choice survives a reload (R459). With Wednesday set and 6:30 PM as the first default time, a new Sunday service starts with one rehearsal on the Wednesday before it at 6:30 PM, and a new Wednesday service starts with one that same day, with the same date in any computer's timezone (R460). If either default is missing, a new service starts with no rehearsal (R461).
+
+  3. Moving a service moves an auto-added rehearsal nobody has changed, keeping its weekday and time even if the Settings default has changed since. A rehearsal a planner has changed stays where it is (R462). Changing the Settings default alters no existing service, and no data migration runs (R463).
+
+  4. When the service has no rehearsal on the default date, the add-rehearsal form opens with that date filled in. When it already has one there, the date stays blank, so adding that rehearsal leaves the date blank for the next one (R464).
+
+  5. A new ADR supersedes the reversed parts of ADR-0245. The auto-added rehearsal shows like any other rehearsal on share links, the volunteer view and other read-only views, and its marker appears on none of them and in neither public payload (`buildServiceSnapshot`, `buildRehearseAccess`) (R465).
+
+**Plans**: TBD
+**UI hint**: yes
+
+Area: `createService` and `buildServiceSnapshot` in `src/stores/services.ts`, `src/utils/rehearsalTimes.ts`,
+`src/utils/rehearseAccess.ts`, `onDateChange` and the rehearsal handlers in `src/views/ServiceEditorView.vue`,
+`src/components/ServiceTimesPanel.vue`, `src/views/SettingsView.vue`, `src/types/organization.ts`,
+`src/types/service.ts`, and a new ADR in `docs/adr/`.
+
 ### Phase 999.14: Custom domain + verified Resend email sender (BACKLOG)
 
 **Goal:** [Captured for future planning] Give WorshipBuilder a real custom domain, so volunteer and invite
@@ -797,27 +903,6 @@ v2.16's v2 requirements ("Custom Domain & Email", 2026-10-27).
 When promoted, the new domain needs the same origin treatment Phase 145 gives `worshipbuilder.web.app`:
 Storage CORS, Auth authorized domains, the `SERVICE_SHARE_BASE_URL` default, and a redirect from the
 prior address if it becomes the primary.
-
-Plans:
-
-- [ ] TBD (promote with /gsd-review-backlog when ready)
-
-### Phase 999.15: Default rehearsal day and time (BACKLOG)
-
-**Goal:** [Captured for future planning] Let a church set a default rehearsal day and time, for example
-Wednesday at 6:30 PM. When someone adds a rehearsal to a service, the date pre-fills to that weekday
-before the service date (for a Sunday service, the Wednesday before it) and the time pre-fills too.
-Owner request, 2026-10-27, after the Phase 143 Times-tab check.
-
-- Builds on Phase 143's Times tab and the org Settings rehearsal defaults (`rehearsalTimeDefaults`
-  chips are time-only today).
-
-- Open questions for discuss: one default or several (e.g. Wed + Sat); what to do when the service
-  itself falls on the default weekday (same day vs. the week before); whether it auto-adds a rehearsal
-  to new services or only pre-fills the add form.
-
-**Requirements:** TBD
-**Plans:** 0 plans
 
 Plans:
 

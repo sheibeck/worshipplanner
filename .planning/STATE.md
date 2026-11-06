@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-11-06T13:58:10.347Z"
 last_activity: 2026-11-06
 progress:
-  total_phases: 0
+  total_phases: 2
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -1467,7 +1467,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 145 — Domain Cutover to worshipbuilder.web.app
+**Current focus:** v2.17 Spec-Driven Foundation & Rehearsal Defaults — Phase 146 Spec Standard is next
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1477,10 +1477,12 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 146 (Spec Standard)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-11-06 — Milestone v2.17 started
+Status: Roadmap created — ready to plan Phase 146
+Last activity: 2026-11-06 — v2.17 ROADMAP.md created (2 phases, 146-147; R454-R465, 12/12 mapped)
+
+Progress: [░░░░░░░░░░] 0% (0/2 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 

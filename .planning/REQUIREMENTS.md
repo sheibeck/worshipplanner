@@ -15,7 +15,7 @@ through the full song stable and respecting team configurations.
 > - **Specs live in `docs/specs/`**, one file per feature, beside `docs/adr/`, so they outlast milestones.
 > - **Promotes backlog 999.15** (default rehearsal day and time). 999.14 stays in the backlog.
 > - **One default weekday**, not several. When the service falls on that weekday, the rehearsal is the same day.
-> - **Auto-add, not pre-fill only:** new services start with the rehearsal on them. This reverses ADR-0245 (b).
+> - **Auto-add, not pre-fill only:** new services start with the rehearsal on them. This reverses parts of ADR-0245 (a) and (b).
 > - **Deploy guard dropped:** the legacy redirect is already live, so a stray deploy republishes the same redirect
 >   and the owner is the sole user. This closes the v2.16 audit tech-debt item as won't-fix.
 > - No milestone-level research pass (per-phase research still runs). Prod deploys are per-deploy owner-confirmed.
@@ -81,12 +81,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| R454 | Phase 146 | Pending |
+| R455 | Phase 146 | Pending |
+| R456 | Phase 146 | Pending |
+| R457 | Phase 146 | Pending |
+| R458 | Phase 146 | Pending |
+| R459 | Phase 147 | Pending |
+| R460 | Phase 147 | Pending |
+| R461 | Phase 147 | Pending |
+| R462 | Phase 147 | Pending |
+| R463 | Phase 147 | Pending |
+| R464 | Phase 147 | Pending |
+| R465 | Phase 147 | Pending |
 
 **Coverage:**
 
 - v1 requirements: 12 total (R454–R465)
-- Mapped to phases: 0
-- Unmapped: 12
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-11-06*
