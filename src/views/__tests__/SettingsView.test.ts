@@ -495,7 +495,7 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     expect(wrapper.find('[data-testid="save-rehearsal-defaults-btn"]').exists()).toBe(false)
   })
 
-  it('writes only organization settings when the defaults are saved, and no service (AC-RHD-09)', async () => {
+  it('hands the store only settings.* keys and does no direct write when the defaults are saved', async () => {
     const wrapper = mountSettingsView()
     await chooseDay(wrapper, 4)
     await pressSave(wrapper)
