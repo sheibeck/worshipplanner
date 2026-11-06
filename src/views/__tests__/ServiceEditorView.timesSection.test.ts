@@ -184,6 +184,7 @@ const mockAuthState = reactive<{
     bibleVersion: 'ESV' | 'NLT'
     messaging: { enabled: boolean; lockNotifyDefault: boolean; reminderEnabled: boolean; reminderDaysBefore: number }
     rehearsalTimeDefaults?: string[]
+    rehearsalDefaultWeekday?: number | null
   }
   isAiEnabled: boolean
 }>({
@@ -268,6 +269,7 @@ beforeEach(() => {
   mockServiceStoreOrgId = 'org-1'
   mockAuthState.isEditor = true
   delete mockAuthState.settings.rehearsalTimeDefaults
+  mockAuthState.settings.rehearsalDefaultWeekday = null
   mockUpdateService.mockClear()
 })
 
@@ -313,10 +315,14 @@ async function mountView(overrides: Partial<Service> = {}, extraStubs: Record<st
 
 type TimesVm = {
   localService: {
+    date: string
     notes: string
     reportTime?: string
-    rehearsals?: Array<{ id: string; date: string; time: string }>
+    rehearsals?: Array<{ id: string; date: string; time: string; autoAdded?: true }>
   }
+  isDirty: boolean
+  onDateChange: (date: string) => void
+  onUndo: () => void
   onAddRehearsal: (payload: { date: string; time: string }) => void
   onRemoveRehearsal: (id: string) => void
   onRehearsalDateChange: (id: string, date: string) => void
@@ -600,5 +606,193 @@ describe('ServiceEditorView - Times tab (Phase 143, R441-R444)', () => {
     await wrapper.get('#svc-tab-service-order').trigger('click')
     await wrapper.get('#svc-tab-times').trigger('click')
     expect((wrapper.get('[data-testid="new-rehearsal-date"]').element as HTMLInputElement).value).toBe('2026-03-05')
+  })
+})
+
+describe('Default rehearsal: moving a service (R462)', () => {
+  // Rows sit on the Sunday '2026-03-08' service; AUTO is the Wednesday before it.
+  const autoRow = () => ({ id: 'a1', date: '2026-03-04', time: '18:30', autoAdded: true as const })
+  const rowOf = (w: Wrapper, id: string) => (vmOf(w).localService.rehearsals ?? []).find((r) => r.id === id)
+  type SavedData = { date: string; rehearsals: Array<Record<string, unknown>> }
+  const lastSaved = () => mockUpdateService.mock.calls[mockUpdateService.mock.calls.length - 1]?.[1] as SavedData
+
+  it('moves a still-marked rehearsal to its own weekday before the new date, keeping its time (AC-RHD-27)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    vmOf(wrapper).onDateChange('2026-03-15')
+    expect(rowOf(wrapper, 'a1')).toMatchObject({ date: '2026-03-11', time: '18:30', autoAdded: true })
+  })
+
+  it('leaves an unmarked rehearsal where it is (AC-RHD-31)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [{ id: 'h1', date: '2026-03-04', time: '18:30' }] })
+    vmOf(wrapper).onDateChange('2026-03-15')
+    expect(rowOf(wrapper, 'h1')).toEqual({ id: 'h1', date: '2026-03-04', time: '18:30' })
+  })
+
+  it("keeps the rehearsal's own weekday after the Settings day changed (AC-RHD-28)", async () => {
+    mockAuthState.settings.rehearsalDefaultWeekday = 5
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    vmOf(wrapper).onDateChange('2026-03-15')
+    expect(rowOf(wrapper, 'a1')?.date).toBe('2026-03-11')
+  })
+
+  it.each([
+    ['a date edit', (vm: TimesVm) => vm.onRehearsalDateChange('a1', '2026-03-05'), '2026-03-05', '18:30'],
+    ['a time edit', (vm: TimesVm) => vm.onRehearsalTimeChange('a1', '19:00'), '2026-03-04', '19:00'],
+    ['a date set back to the old value', (vm: TimesVm) => vm.onRehearsalDateChange('a1', '2026-03-04'), '2026-03-04', '18:30'],
+    ['a time set back to the old value', (vm: TimesVm) => vm.onRehearsalTimeChange('a1', '18:30'), '2026-03-04', '18:30'],
+  ])('ends auto-moving for good after %s (AC-RHD-29)', async (_label, edit, date, time) => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    edit(vmOf(wrapper))
+    vmOf(wrapper).onDateChange('2026-03-15')
+    const row = rowOf(wrapper, 'a1')
+    expect(row).toEqual({ id: 'a1', date, time })
+    expect(row).not.toHaveProperty('autoAdded')
+  })
+
+  it('a rejected edit keeps auto-moving (AC-RHD-30)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    const vm = vmOf(wrapper)
+    vm.onRehearsalDateChange('a1', '')
+    vm.onRehearsalDateChange('a1', 'not-a-date')
+    vm.onRehearsalTimeChange('a1', '')
+    vm.onRehearsalTimeChange('a1', '7pm')
+    expect(rowOf(wrapper, 'a1')).toEqual(autoRow())
+    vm.onDateChange('2026-03-15')
+    expect(rowOf(wrapper, 'a1')).toMatchObject({ date: '2026-03-11', autoAdded: true })
+  })
+
+  it('never re-adds a removed rehearsal (AC-RHD-32)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    vmOf(wrapper).onRemoveRehearsal('a1')
+    vmOf(wrapper).onDateChange('2026-03-15')
+    expect(vmOf(wrapper).localService.rehearsals).toEqual([])
+  })
+
+  it('a rehearsal added from the form never carries the marker (AC-RHD-26)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [] })
+    panelOf(wrapper).vm.$emit('add', { date: '2026-03-05', time: '19:00' })
+    await wrapper.vm.$nextTick()
+    const rows = vmOf(wrapper).localService.rehearsals ?? []
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).not.toHaveProperty('autoAdded')
+  })
+
+  it.each([
+    ['cleared', ''],
+    ['not a real day', '2026-02-30'],
+    ['not a date', 'not-a-date'],
+  ])('does not apply a %s date or move anything (AC-RHD-35)', async (_label, bad) => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    vmOf(wrapper).onDateChange(bad)
+    expect(vmOf(wrapper).localService.date).toBe('2026-03-08')
+    expect(vmOf(wrapper).localService.rehearsals).toEqual([autoRow()])
+  })
+
+  it('ignores a date past the year 9999 (AC-RHD-35)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    vmOf(wrapper).onDateChange('12026-11-08')
+    expect(vmOf(wrapper).localService.date).toBe('2026-03-08')
+    expect(vmOf(wrapper).localService.rehearsals).toEqual([autoRow()])
+    expect(wrapper.get('input[type="date"]').attributes('max')).toBe('9999-12-31')
+    vmOf(wrapper).onDateChange('9999-12-31')
+    expect(vmOf(wrapper).localService.date).toBe('9999-12-31')
+  })
+
+  it.each([
+    ['a viewer', true, false],
+    ['a planned service', false, true],
+  ])('changes nothing for %s (AC-RHD-36)', async (_label, viewer, planned) => {
+    mockAuthState.isEditor = !viewer
+    const wrapper = await mountView({ status: planned ? 'planned' : 'draft', rehearsals: [autoRow()] })
+    vmOf(wrapper).onDateChange('2026-03-15')
+    expect(vmOf(wrapper).localService.date).toBe('2026-03-08')
+    expect(vmOf(wrapper).localService.rehearsals).toEqual([autoRow()])
+  })
+
+  it('saves a changed service date (AC-RHD-37)', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    vmOf(wrapper).onDateChange('2026-03-15')
+    await wait900()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    expect(lastSaved().date).toBe('2026-03-15')
+  })
+
+  it('saves the new date and the moved rehearsal in the same write (AC-RHD-38)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    vmOf(wrapper).onDateChange('2026-03-15')
+    await wait900()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    expect(lastSaved().date).toBe('2026-03-15')
+    expect(lastSaved().rehearsals).toEqual([{ id: 'a1', date: '2026-03-11', time: '18:30', autoAdded: true }])
+  })
+
+  it('keeps the marker when the service is opened and saved again (AC-RHD-39)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    vmOf(wrapper).localService.notes = 'touched'
+    await wrapper.vm.$nextTick()
+    await wait900()
+    expect(mockUpdateService).toHaveBeenCalled()
+    expect(lastSaved().rehearsals).toEqual([autoRow()])
+  })
+
+  it('shows as saved after a date change and sends no second save (AC-RHD-63)', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    vmOf(wrapper).onDateChange('2026-03-15')
+    await wait900()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    expect(lastSaved().date).toBe('2026-03-15')
+    expect(vmOf(wrapper).isDirty).toBe(false)
+    await wait900()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+  })
+
+  it('undoing a saved date change restores the date and rehearsals in one save (AC-RHD-64)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    const vm = vmOf(wrapper)
+    vm.onDateChange('2026-03-15')
+    await wait900()
+    vm.onUndo()
+    await wait900()
+    expect(vm.localService.date).toBe('2026-03-08')
+    expect(vm.localService.rehearsals).toEqual([autoRow()])
+    expect(mockUpdateService).toHaveBeenCalledTimes(2)
+    expect(lastSaved().date).toBe('2026-03-08')
+    expect(lastSaved().rehearsals).toEqual([autoRow()])
+    expect(vm.isDirty).toBe(false)
+  })
+
+  it('undoing an edit of an auto-added rehearsal restores it with auto-moving (AC-RHD-65)', async () => {
+    const wrapper = await mountView({ status: 'draft', rehearsals: [autoRow()] })
+    const vm = vmOf(wrapper)
+    vm.onRehearsalTimeChange('a1', '19:00')
+    await wait900()
+    vm.onUndo()
+    await wait900()
+    expect(rowOf(wrapper, 'a1')).toEqual(autoRow())
+    vm.onDateChange('2026-03-15')
+    expect(rowOf(wrapper, 'a1')).toMatchObject({ date: '2026-03-11', autoAdded: true })
+  })
+
+  it('never adds a rehearsal when opening or saving a service that has none (AC-RHD-11)', async () => {
+    mockAuthState.settings.rehearsalDefaultWeekday = 3
+    mockAuthState.settings.rehearsalTimeDefaults = ['18:30']
+    const wrapper = await mountView({ status: 'draft', rehearsals: [] })
+    await wait900()
+    expect(mockUpdateService).not.toHaveBeenCalled()
+    vmOf(wrapper).localService.notes = 'touched'
+    await wrapper.vm.$nextTick()
+    await wait900()
+    expect(mockUpdateService).toHaveBeenCalled()
+    expect(lastSaved().rehearsals).toEqual([])
+  })
+
+  it('gives the add form the Settings day through the editor (AC-RHD-45)', async () => {
+    mockAuthState.settings.rehearsalDefaultWeekday = 3
+    const withDay = await mountView({ status: 'draft', rehearsals: [] })
+    expect(panelOf(withDay).props('defaultWeekday')).toBe(3)
+    withDay.unmount()
+    mockAuthState.settings.rehearsalDefaultWeekday = null
+    const without = await mountView({ status: 'draft', rehearsals: [] })
+    expect(panelOf(without).props('defaultWeekday')).toBeNull()
   })
 })
