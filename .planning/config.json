@@ -15,7 +15,7 @@
     "ui_phase": true,
     "ui_safety_gate": true,
     "ui_review": true,
-    "tdd_mode": false,
+    "tdd_mode": true,
     "code_review": true,
     "auto_advance": false,
     "skip_discuss": false,
