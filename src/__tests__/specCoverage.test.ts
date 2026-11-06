@@ -915,3 +915,14 @@ describe('test-first setting (R458)', () => {
     expect(testing).toContain('Do not quiet it')
   })
 })
+
+describe('the run caveats (R457)', () => {
+  it('CLAUDE.md, the template and the ADR say a bare run does not run render-service', () => {
+    const docs = [
+      sectionBody(readRepoFile('CLAUDE.md'), '## Spec-driven development'),
+      readRepoFile('docs/specs/TEMPLATE.md'),
+      readRepoFile('docs/adr/0248-feature-specs-are-the-source-of-truth-tests-cite-criteria-in-titles.md'),
+    ]
+    for (const doc of docs) expect(doc).toContain('cd render-service && npm test')
+  })
+})

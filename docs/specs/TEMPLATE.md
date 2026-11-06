@@ -44,11 +44,14 @@ Cite a criterion by putting its ID in a test title. A comment does not count:
     it('does the thing (AC-XXX-01)', () => { ... })
 
 A test that is skipped, `todo`, `fails`, conditional (`skipIf`, `runIf`), switched off by an options object, missing its
-function or empty does not count either, and neither does a `describe` title with no counted test under it.
+function or empty (only `;`, a bare `return` or `undefined`) does not count either, nor does any test in a file with
+`.only`, nor a `describe` title with no counted test under it.
 
-`src/__tests__/specCoverage.test.ts` fails if a criterion has no citing test. That proves a test title cites the
-criterion, not that the test ran or asserts anything. Criteria for security rules are cited from `src/rules.test.ts` or
-`src/storage.rules.test.ts`, which a bare `npx vitest run` does not prove, so those also need `npm run test:rules`.
+`src/__tests__/specCoverage.test.ts` fails if a criterion has no citing test, or if a line under Acceptance criteria is
+not a criterion. That proves a test title cites the criterion, not that the test ran or asserts anything, and it cannot
+see a test inside `if (false)` or a function nobody calls. Criteria for security rules are cited from `src/rules.test.ts`
+or `src/storage.rules.test.ts`, which a bare `npx vitest run` does not prove, so those also need `npm run test:rules`.
+Criteria cited from `render-service/src` need `cd render-service && npm test`, which a bare run does not run either.
 
 ## ADRs
 
