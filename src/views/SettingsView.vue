@@ -1395,7 +1395,7 @@ async function onSaveRehearsalDefaults(): Promise<void> {
       'settings.reportTimeDefault': newReportTimeDefault,
       'settings.rehearsalDefaultWeekday': rehearsalDefaultWeekdayInput.value,
     })
-    rehearsalTimeDefaultsInput.value = newRehearsalDefaults
+    rehearsalTimeDefaultsInput.value = [...newRehearsalDefaults]
 
     rehearsalDefaultsSavedFeedback.value = true
     setTimeout(() => {
