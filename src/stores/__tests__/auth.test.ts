@@ -1373,6 +1373,32 @@ describe('useAuthStore', () => {
     })
   })
 
+  describe('OrgSettings.rehearsalDefaultWeekday (R459)', () => {
+    it('AC-RHD-06: a saved default day of 3 is still there after the organization loads', async () => {
+      mockOrgDocPath({ name: 'Test Org', settings: { rehearsalDefaultWeekday: 3 } })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.rehearsalDefaultWeekday).toBe(3)
+    })
+
+    it('AC-RHD-06: a saved Sunday (0) survives the load and is not read as none', async () => {
+      mockOrgDocPath({ name: 'Test Org', settings: { rehearsalDefaultWeekday: 0 } })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.rehearsalDefaultWeekday).toBe(0)
+    })
+
+    it('AC-RHD-07: a church with no saved default day reads as null', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.rehearsalDefaultWeekday).toBeNull()
+    })
+  })
+
   // CR-01 (46-REVIEW.md) — loadOrgContext must eager-load the org's actual
   // chosen slide face, not just resolve the settings object, so the Slides
   // grid and Edit Slide drawer (soft-gate surfaces) don't silently fall

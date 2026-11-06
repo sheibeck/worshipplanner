@@ -197,3 +197,35 @@ describe('buildServiceSnapshot / buildRehearseAccess — rehearsals/reportTime p
     expect('rehearsals' in rehearseAccess).toBe(false)
   })
 })
+describe('public rehearsal rows carry exactly id, date and time (R465)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  const markedService = () =>
+    makeService({
+      rehearsals: [
+        { id: 'r1', date: '2026-09-04', time: '19:00', autoAdded: true },
+        { id: 'r2', date: '2026-09-05', time: '18:00' },
+      ],
+    }) as unknown as Service
+
+  it('AC-RHD-49: the public share snapshot rows have exactly id, date and time', async () => {
+    const { buildServiceSnapshot, toPublicServiceSnapshot } = await import('../services')
+    const snapshot = toPublicServiceSnapshot(buildServiceSnapshot(markedService()))
+    expect(snapshot.rehearsals).toHaveLength(2)
+    for (const row of snapshot.rehearsals ?? []) {
+      expect(Object.keys(row).sort()).toEqual(['date', 'id', 'time'])
+    }
+  })
+
+  it('AC-RHD-50: the volunteer rehearse projection rows have exactly id, date and time', async () => {
+    const { buildRehearseAccess } = await import('@/utils/rehearseAccess')
+    const access = buildRehearseAccess(markedService(), 'org-1', undefined, [], [], [], [])
+    expect(access.rehearsals).toHaveLength(2)
+    for (const row of access.rehearsals ?? []) {
+      expect(Object.keys(row).sort()).toEqual(['date', 'id', 'time'])
+    }
+  })
+})
