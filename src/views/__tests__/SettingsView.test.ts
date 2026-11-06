@@ -404,7 +404,9 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
   }
   /** Picks by option position (0 = None, 1 = Sunday ... 7 = Saturday); setValue is unreliable for the null option. */
   async function chooseDay(wrapper: ReturnType<typeof mountSettingsView>, optionIndex: number) {
-    await daySelect(wrapper).findAll('option')[optionIndex]!.setSelected()
+    const select = daySelect(wrapper)
+    ;(select.element as HTMLSelectElement).selectedIndex = optionIndex
+    await select.trigger('change')
   }
   async function pressSave(wrapper: ReturnType<typeof mountSettingsView>) {
     await wrapper.get('[data-testid="save-rehearsal-defaults-btn"]').trigger('click')

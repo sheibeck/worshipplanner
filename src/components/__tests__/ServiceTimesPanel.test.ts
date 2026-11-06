@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
 import ServiceTimesPanel from '../ServiceTimesPanel.vue'
-import type { Rehearsal } from '@/utils/rehearsalTimes'
+import type { Rehearsal, StoredRehearsal } from '@/utils/rehearsalTimes'
 
 enableAutoUnmount(afterEach)
 
@@ -498,8 +498,8 @@ describe('ServiceTimesPanel — Phase 147 default date', () => {
   })
 
   it('renders an auto-added rehearsal like any other, for editors and viewers (AC-RHD-53)', () => {
-    const plain = [{ id: 'r1', date: '2026-11-04', time: '19:00' }] as Rehearsal[]
-    const marked = [{ id: 'r1', date: '2026-11-04', time: '19:00', autoAdded: true }] as Rehearsal[]
+    const plain: Rehearsal[] = [{ id: 'r1', date: '2026-11-04', time: '19:00' }]
+    const marked: StoredRehearsal[] = [{ id: 'r1', date: '2026-11-04', time: '19:00', autoAdded: true }]
     for (const canEdit of [true, false]) {
       const a = mountPanel({ canEdit, serviceDate: SERVICE, rehearsals: plain })
       const b = mountPanel({ canEdit, serviceDate: SERVICE, rehearsals: marked })
