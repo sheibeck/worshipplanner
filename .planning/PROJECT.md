@@ -43,11 +43,11 @@ philosophy, followed by Test Driven Design. The order is spec, then tests, then 
   has set both a weekday and a time. Moving a service moves a rehearsal nobody has changed. Existing services
   are not touched. The add-rehearsal form pre-fills that same date only if the service has no rehearsal on it
   yet. A new ADR supersedes the parts of ADR-0245 this reverses.
-- **Deploy guard:** a bare `firebase deploy` or `--only hosting` cannot publish the legacy redirect by accident.
 
 **Key context:** Pilot for the new process; v2.18 backfills specs for every existing feature using the format
 proven here. No milestone research. Out of scope: spec backfill (v2.18), custom domain and email (999.14 stays in
-the backlog), and the Planning Center export's hard-coded Wednesday rehearsal (future requirement).
+the backlog), the Planning Center export's hard-coded Wednesday rehearsal (future requirement), and a deploy guard
+for the legacy site (dropped by the owner: the redirect is already live and the owner is the sole user).
 
 ## Shipped Milestone: v2.16 Dated Rehearsals & WorshipBuilder — ✅ SHIPPED & DEPLOYED 2026-10-27
 
