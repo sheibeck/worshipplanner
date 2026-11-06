@@ -1,10 +1,10 @@
-| ✅ | ✅ green (4) || ✅ | ✅ green (106) || ✅ | ✅ green (64) || ✅ | ✅ green (4) || ✅ | ✅ green (5) |---
+---
 phase: 146
 slug: spec-standard
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
-# audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: true) (#2117)
+# audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
 status: validated
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: true
 created: 2026-11-06
 ---
@@ -39,15 +39,15 @@ created: 2026-11-06
 
 ## Per-Task Verification Map
 
-Filled in by the plans. Requirement-level map:
+Requirement-level map, with the passing test count for each `-t` filter:
 
 | Requirement | Behavior | Test Type | Automated Command | File Exists | Status |
 |-------------|----------|-----------|-------------------|-------------|--------|
-| R454 | Template parses clean and has every required section | unit (reads template) | `npx vitest run src/__tests__/specCoverage.test.ts -t R454` | ❌ W0 | ⬜ pending |
-| R455 | `CLAUDE.md` and `PROJECT.md` carry the same rule sentence; the `PROJECT.md` section sits outside milestone blocks | repo check | same file, `-t R455` | ❌ W0 | ⬜ pending |
-| R456 | IDs are literal, strictly formatted, unique across specs, and retired IDs aren't reused | unit (inline strings) | same file, `-t R456` | ❌ W0 | ⬜ pending |
-| R457 | An uncited criterion fails and names its ID; fully cited passes; template ignored; all four test locations read; `functions/lib` and `node_modules` ignored; skipped tests, comments and strings not counted; real repo clean | unit + temp-dir + real run | same file, `-t R457` | ❌ W0 | ⬜ pending |
-| R458 | `workflow.tdd_mode` is true; `CLAUDE.md` states the test-first split | repo check | same file, `-t R458` | ❌ W0 | ⬜ pending |
+| R454 | Template parses clean and has every required section | unit (reads template) | `npx vitest run src/__tests__/specCoverage.test.ts -t R454` | ✅ | ✅ green (5) |
+| R455 | `CLAUDE.md` and `PROJECT.md` carry the same rule sentence; the `PROJECT.md` section sits outside milestone blocks | repo check | same file, `-t R455` | ✅ | ✅ green (4) |
+| R456 | IDs are literal, strictly formatted, unique across specs, and retired IDs aren't reused | unit (inline strings) | same file, `-t R456` | ✅ | ✅ green (64) |
+| R457 | An uncited criterion fails and names its ID; fully cited passes; template ignored; all four test locations read; `functions/lib` and `node_modules` ignored; skipped tests, comments and strings not counted; real repo clean | unit + temp-dir + real run | same file, `-t R457` | ✅ | ✅ green (106) |
+| R458 | `workflow.tdd_mode` is true; `CLAUDE.md` states the test-first split | repo check | same file, `-t R458` | ✅ | ✅ green (4) |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
