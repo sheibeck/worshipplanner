@@ -455,6 +455,11 @@ describe('parseSpec (R456)', () => {
     { label: 'an indented bullet with a colon separator', line: '  - **AC-FIX-02**: b' },
     { label: 'a table row', line: '| AC-FIX-02 | b |' },
     { label: 'a blockquote', line: '> - **AC-FIX-02** - b' },
+    { label: 'a bold id and separator with no bullet', line: '**AC-FIX-02** - b' },
+    { label: 'an indented bold id and separator with no bullet', line: '  **AC-FIX-02** - b' },
+    { label: 'an indented bullet with the colon inside the bold', line: '  - **AC-FIX-02:** b' },
+    { label: 'an underscore bold id and separator with no bullet', line: '__AC-FIX-02__ - b' },
+    { label: 'an indented bullet with an underscore bold id', line: '  - __AC-FIX-02__ - b' },
   ])('still reports $label that defines a criterion after an open one (R456)', ({ line }) => {
     const errors = parseSpec(openItem(line), 'a.md').errors
     expect(errors).toContain(`a.md:7: acceptance criteria line is not a top-level list item: ${line.trim()}`)

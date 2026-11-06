@@ -195,9 +195,11 @@ const H2 = /^##(?!#)\s+(.*)$/
 const FENCE = /^ {0,3}(`{3,}|~{3,})/
 // A line that opens like a criterion (table row, quote, indented or bold id) but is not a column-0 list item.
 const LOOKS_LIKE_CRITERION = /^[\s>|]*(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?AC-/
-// What stays an error while an item is open: a quote or table row, or an indented bullet that defines a criterion
-// (bold id, then a separator). A wrapped line or a sub-bullet that merely mentions an id is a continuation.
-const CRITERION_SHAPE = /^\s*[>|]|^\s*(?:[-*+]|\d+[.)])\s+(?:\*\*|__)AC-[A-Za-z0-9-]*(?:\*\*|__)\s*[-–—:]/
+// What stays an error while an item is open: a quote or table row, or a line that defines a criterion (optional
+// bullet, then a bold id closed by a colon inside the bold, or followed by a separator). A wrapped line or a
+// sub-bullet that merely mentions an id, with no bold id and separator, is a continuation.
+const CRITERION_SHAPE =
+  /^\s*[>|]|^\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)AC-[A-Za-z0-9-]*(?::(?:\*\*|__)|(?:\*\*|__)\s*[-–—:])/
 
 // Line-based parse. Never throws: every problem lands in errors, each naming the spec.
 export function parseSpec(markdown: string, name: string): ParsedSpec {
