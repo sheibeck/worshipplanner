@@ -51,7 +51,6 @@ describe('extractCitations (R457)', () => {
       expected: ['AC-FIX-09'],
     },
     { label: 'for', src: "it.for([1])('AC-FIX-10', () => { run() })", expected: ['AC-FIX-10'] },
-    { label: 'only', src: "it.only('AC-FIX-11', () => { run() })", expected: ['AC-FIX-11'] },
     {
       label: 'concurrent',
       src: "it.concurrent('AC-FIX-12', () => { run() })",
@@ -102,6 +101,46 @@ describe('extractCitations (R457)', () => {
       label: 'a mistyped id is still returned so it can be reported',
       src: "it('AC-RH-3', () => { run() })",
       expected: ['AC-RH-3'],
+    },
+    {
+      label: 'a body that starts with an empty statement and then runs',
+      src: "it('AC-FIX-23', () => { ; run() })",
+      expected: ['AC-FIX-23'],
+    },
+    {
+      label: 'a body that returns a value',
+      src: "it('AC-FIX-24', () => { return run() })",
+      expected: ['AC-FIX-24'],
+    },
+    {
+      label: 'an identifier as the function, which cannot be resolved statically',
+      src: "it('AC-FIX-25', noop)",
+      expected: ['AC-FIX-25'],
+    },
+    {
+      label: 'a spread options object, which is a static limit',
+      src: "it('AC-FIX-26', { ...opts }, () => { run() })",
+      expected: ['AC-FIX-26'],
+    },
+    {
+      label: 'a parenthesised title',
+      src: "it(('AC-FIX-27'), () => { run() })",
+      expected: ['AC-FIX-27'],
+    },
+    {
+      label: 'a title with an as cast',
+      src: "it('AC-FIX-28' as string, () => { run() })",
+      expected: ['AC-FIX-28'],
+    },
+    {
+      label: 'a parenthesised concatenation with a cast',
+      src: "it(('first ' + 'AC-FIX-29') as string, () => { run() })",
+      expected: ['AC-FIX-29'],
+    },
+    {
+      label: 'text in the middle of a template',
+      src: 'it(`a ${x} AC-FIX-32 ${y} b`, () => { run() })',
+      expected: ['AC-FIX-32'],
     },
   ]
 
@@ -190,6 +229,31 @@ describe('extractCitations (R457)', () => {
       src: "describe('s AC-FIX-40', () => { it('x', () => {}) })",
     },
     { label: 'an id split by a template expression', src: 'it(`AC-FIX-${n}`, () => { run() })' },
+    { label: 'a body of only an empty statement', src: "it('AC-FIX-40', () => { ; })" },
+    { label: 'a body that only returns', src: "it('AC-FIX-40', () => { return })" },
+    { label: 'a body of only nested empty blocks', src: "it('AC-FIX-40', () => { {} ; })" },
+    { label: 'an arrow that returns undefined', src: "it('AC-FIX-40', () => undefined)" },
+    { label: 'an arrow that returns void 0', src: "it('AC-FIX-40', () => void 0)" },
+    { label: 'an arrow that returns null', src: "it('AC-FIX-40', () => null)" },
+    {
+      label: 'a function expression holding only an empty statement',
+      src: "it('AC-FIX-40', function () { ; })",
+    },
+    { label: 'null as the function', src: "it('AC-FIX-40', null)" },
+    { label: 'false as the function', src: "it('AC-FIX-40', false)" },
+    {
+      label: 'a computed skip key in the options',
+      src: "it('AC-FIX-40', { ['skip']: true }, () => { run() })",
+    },
+    {
+      label: 'an id only in a conditional branch inside a template',
+      src: "it(`x ${c ? 'AC-FIX-40' : ''}`, () => { run() })",
+    },
+    {
+      label: 'an id passed to a call inside a concatenation',
+      src: "it(f('AC-FIX-40') + 'x', () => { run() })",
+    },
+    { label: 'an id in a conditional title', src: "it(c ? 'AC-FIX-40' : 'x', () => { run() })" },
     { label: 'a regex test call', src: "/x/.test('AC-FIX-40')" },
     { label: 'a test method on another object', src: "obj.test('AC-FIX-40', () => { run() })" },
     {
@@ -200,6 +264,30 @@ describe('extractCitations (R457)', () => {
 
   it.each(notCounted)('does not count $label', ({ src }) => {
     expect(extractCitations(`${src}\n${CONTROL}`)).toEqual(['AC-FIX-99'])
+  })
+
+  // A focused test stops the rest of its file from running, so the file cites nothing at all.
+  const withOnly: { label: string; src: string }[] = [
+    { label: 'it.only', src: "it.only('AC-FIX-40', () => { run() })" },
+    { label: 'test.only', src: "test.only('AC-FIX-40', () => { run() })" },
+    {
+      label: 'describe.only',
+      src: "describe.only('s', () => { it('AC-FIX-40', () => { run() }) })",
+    },
+    { label: 'it.only.each', src: "it.only.each([1])('AC-FIX-40', () => { run() })" },
+    { label: 'it.concurrent.only', src: "it.concurrent.only('AC-FIX-40', () => { run() })" },
+    {
+      label: 'an only on a nested test beside a plain one',
+      src: "describe('s AC-FIX-41', () => { it.only('x', () => { run() }); it('AC-FIX-42', () => { run() }) })",
+    },
+  ]
+
+  it.each(withOnly)('counts nothing from a file holding $label (R457)', ({ src }) => {
+    expect(extractCitations(`${src}\n${CONTROL}`)).toEqual([])
+  })
+
+  it('does not mistake an only method on another object for a focused test (R457)', () => {
+    expect(extractCitations(`obj.only('AC-FIX-40')\n${CONTROL}`)).toEqual(['AC-FIX-99'])
   })
 
   it('returns nothing for an empty source and something for a one-citation source', () => {

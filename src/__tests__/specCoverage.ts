@@ -39,29 +39,41 @@ function callee(expr: ts.Expression): { base: string; mods: string[] } | null {
   }
 }
 
-// String pieces only: comments are trivia and never visited. Joining with a space keeps an id from
-// matching across a template expression.
-function titleText(arg: ts.Expression): string {
-  let out = ''
-  const visit = (n: ts.Node): void => {
-    if (
-      ts.isStringLiteral(n) ||
-      ts.isNoSubstitutionTemplateLiteral(n) ||
-      ts.isTemplateHead(n) ||
-      ts.isTemplateMiddle(n) ||
-      ts.isTemplateTail(n)
-    )
-      out += n.text + ' '
-    else ts.forEachChild(n, visit)
+// Parentheses, casts and non-null marks do not change what string the runner prints.
+function unwrap(e: ts.Expression): ts.Expression {
+  let x = e
+  while (
+    ts.isParenthesizedExpression(x) ||
+    ts.isAsExpression(x) ||
+    ts.isSatisfiesExpression(x) ||
+    ts.isNonNullExpression(x) ||
+    ts.isTypeAssertionExpression(x)
+  ) {
+    x = x.expression
   }
-  visit(arg)
-  return out
+  return x
+}
+
+// The static text of a title: string literals, template head and middle chunks, and + joins of those.
+// Text inside ${...}, conditionals and calls is not read, because the runner may not print it.
+// Pieces are joined with a space, so an id never matches across a template expression or a join.
+function titleText(arg: ts.Expression): string {
+  const e = unwrap(arg)
+  if (ts.isStringLiteralLike(e)) return e.text + ' '
+  if (ts.isTemplateExpression(e)) {
+    return e.head.text + ' ' + e.templateSpans.map((sp) => sp.literal.text + ' ').join('')
+  }
+  if (ts.isBinaryExpression(e) && e.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    return titleText(e.left) + titleText(e.right)
+  }
+  return ''
 }
 
 function propName(p: ts.ObjectLiteralElementLike): string | null {
   if (ts.isShorthandPropertyAssignment(p)) return p.name.text
   if (!ts.isPropertyAssignment(p)) return null
   const n = p.name
+  if (ts.isComputedPropertyName(n)) return ts.isStringLiteralLike(n.expression) ? n.expression.text : null
   return ts.isIdentifier(n) || ts.isStringLiteral(n) ? n.text : null
 }
 
@@ -79,26 +91,59 @@ function optionsOff(args: readonly ts.Expression[]): boolean {
   return false
 }
 
+// null, undefined, void <literal> and boolean literals stand for no value at all.
+function isNothing(e: ts.Expression): boolean {
+  const x = unwrap(e)
+  if (x.kind === ts.SyntaxKind.NullKeyword) return true
+  if (x.kind === ts.SyntaxKind.TrueKeyword || x.kind === ts.SyntaxKind.FalseKeyword) return true
+  if (ts.isIdentifier(x)) return x.text === 'undefined'
+  return ts.isVoidExpression(x) && ts.isLiteralExpression(unwrap(x.expression))
+}
+
+// A statement that does something: not ';', not a bare return, not a block of such statements.
+function isEffective(st: ts.Statement): boolean {
+  if (ts.isEmptyStatement(st)) return false
+  if (ts.isBlock(st)) return st.statements.some(isEffective)
+  if (ts.isReturnStatement(st)) return st.expression !== undefined && !isNothing(st.expression)
+  if (ts.isExpressionStatement(st)) return !isNothing(st.expression)
+  return true
+}
+
 // A case runs only with a body: the first argument after the title that is not options or a timeout.
+// A body with no effective statement is empty. A bare identifier cannot be resolved here, so it counts.
 function hasRunnableBody(args: readonly ts.Expression[]): boolean {
-  const body = args.slice(1).find((a) => !ts.isObjectLiteralExpression(a) && !ts.isNumericLiteral(a))
-  if (body === undefined) return false
-  if (ts.isIdentifier(body) && body.text === 'undefined') return false
-  if ((ts.isArrowFunction(body) || ts.isFunctionExpression(body)) && ts.isBlock(body.body)) {
-    return body.body.statements.length > 0
+  const found = args.slice(1).find((a) => !ts.isObjectLiteralExpression(a) && !ts.isNumericLiteral(a))
+  if (found === undefined) return false
+  const body = unwrap(found)
+  if (isNothing(body)) return false
+  if (ts.isArrowFunction(body) || ts.isFunctionExpression(body)) {
+    return ts.isBlock(body.body) ? body.body.statements.some(isEffective) : !isNothing(body.body)
   }
   return true
 }
 
-function isLiteralTitle(t: ts.Expression | undefined): t is ts.Expression {
-  return (
-    t !== undefined &&
-    (ts.isStringLiteralLike(t) || ts.isTemplateExpression(t) || ts.isBinaryExpression(t))
-  )
+// A focused test stops the rest of its file from running, so the whole file is dropped from the scan.
+function hasOnly(sf: ts.SourceFile): boolean {
+  const SUITE_CASE = new Set(['it', 'test', 'describe', 'suite'])
+  let found = false
+  const visit = (n: ts.Node): void => {
+    if (found) return
+    if (ts.isCallExpression(n)) {
+      const c = callee(n.expression)
+      if (c && SUITE_CASE.has(c.base) && c.mods.includes('only')) {
+        found = true
+        return
+      }
+    }
+    ts.forEachChild(n, visit)
+  }
+  visit(sf)
+  return found
 }
 
 export function extractCitations(source: string, fileName = 'x.test.ts'): string[] {
   const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.ES2022, false)
+  if (hasOnly(sf)) return []
   const ids: string[] = []
   // Returns the number of counted cases under node. A suite's title ids count only when that is above zero.
   const walk = (node: ts.Node, skipped: boolean): number => {
@@ -118,7 +163,7 @@ export function extractCitations(source: string, fileName = 'x.test.ts'): string
           const t = args[0]
           const off =
             skipped || x !== null || c.mods.some((m) => NOT_RUN.has(m)) || optionsOff(args.slice(1))
-          const found = isLiteralTitle(t) ? [...titleText(t).matchAll(ID_ANY)].map((m) => m[0]) : []
+          const found = t === undefined ? [] : [...titleText(t).matchAll(ID_ANY)].map((m) => m[0])
           if (isCase) {
             const counted = !off && hasRunnableBody(args)
             if (counted) ids.push(...found)
