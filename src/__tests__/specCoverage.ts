@@ -148,6 +148,8 @@ const CODE_LINE = /^\*\*Code:\*\*\s*(\S+)\s*$/
 const CODE_FORMAT = /^[A-Z]{2,6}$/
 const H2 = /^##(?!#)\s+(.*)$/
 const FENCE = /^ {0,3}(`{3,}|~{3,})/
+// A line that opens like a criterion (table row, quote, indented or bold id) but is not a column-0 list item.
+const LOOKS_LIKE_CRITERION = /^[\s>|]*(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?AC-/
 
 // Line-based parse. Never throws: every problem lands in errors, each naming the spec.
 export function parseSpec(markdown: string, name: string): ParsedSpec {
@@ -159,23 +161,34 @@ export function parseSpec(markdown: string, name: string): ParsedSpec {
   let section: 'head' | 'ac' | 'ret' | 'other' = 'head'
   let acItems = 0
   let fence: string | null = null
+  let fenceLine = 0
+  // In the acceptance criteria: an item has been seen, and the line before was part of it (lazy wrap).
+  let inItem = false
+  let lazy = false
 
   // Comments are blanked but keep their newlines, so line structure survives.
   const cleaned = markdown.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\r\n]/g, ''))
-  for (const line of cleaned.split(/\r?\n/)) {
+  const lines = cleaned.split(/\r?\n/)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? ''
     const f = FENCE.exec(line)
     if (fence !== null) {
-      if (f && f[1]?.[0] === fence[0] && line.trim() === f[1]) fence = null
+      // A closer uses the opener's character, is at least as long, and holds nothing else.
+      const run = f?.[1]
+      if (run && run[0] === fence[0] && run.length >= fence.length && line.trim() === run) fence = null
       continue
     }
     if (f) {
       fence = f[1] ?? null
+      fenceLine = i + 1
       continue
     }
     const h = H2.exec(line)
     if (h) {
       const title = (h[1] ?? '').trim().toLowerCase()
       section = title === 'acceptance criteria' ? 'ac' : title === 'retired criteria' ? 'ret' : 'other'
+      inItem = false
+      lazy = false
       continue
     }
     if (section === 'head') {
@@ -188,7 +201,23 @@ export function parseSpec(markdown: string, name: string): ParsedSpec {
     }
     if (section !== 'ac' && section !== 'ret') continue
     const item = LIST_ITEM.exec(line)
-    if (!item) continue
+    if (!item) {
+      if (section === 'ac') {
+        const trimmed = line.trim()
+        if (trimmed === '') lazy = false
+        else if (/^#{1,6}\s/.test(trimmed)) inItem = lazy = false
+        else if (LOOKS_LIKE_CRITERION.test(line)) {
+          errors.push(`${name}:${i + 1}: acceptance criteria line is not a top-level list item: ${trimmed.slice(0, 40)}`)
+          lazy = false
+        } else if (/^\s/.test(line) ? inItem : lazy) lazy = true
+        else {
+          errors.push(`${name}:${i + 1}: acceptance criteria line is not part of a criterion: ${trimmed.slice(0, 40)}`)
+          inItem = lazy = false
+        }
+      }
+      continue
+    }
+    if (section === 'ac') inItem = lazy = true
     const text = item[1] ?? ''
     if (section === 'ac') acItems++
     const head = ID_HEAD.exec(text)
@@ -213,6 +242,7 @@ export function parseSpec(markdown: string, name: string): ParsedSpec {
     else list.push(id)
   }
 
+  if (fence !== null) errors.push(`${name}: unclosed code fence opened at line ${fenceLine}`)
   if (code === null) errors.push(`${name}: missing or malformed Code line`)
   if (acItems === 0) errors.push(`${name}: no acceptance criteria`)
   for (const id of criteria) {

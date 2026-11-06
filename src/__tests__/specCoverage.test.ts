@@ -310,7 +310,100 @@ describe('parseSpec (R456)', () => {
     expect(parseSpec(makeSpec({ criteria: ['AC-FIX-01'] }), 'a.md').criteria).toEqual(['AC-FIX-01'])
   })
 
+  it('keeps indented continuations, sub-bullets and wrapped lines inside a criterion (R456)', () => {
+    const text = [
+      '# Spec: Demo',
+      '**Code:** FIX',
+      '',
+      '## Acceptance criteria',
+      '',
+      '- **AC-FIX-01** - first line',
+      '  continued on an indented line',
+      '  - sub-bullet with detail AC-FIX-77',
+      'wrapped line with no indent',
+      '',
+      '  indented paragraph after a blank line',
+      '',
+      '- **AC-FIX-02** - second',
+      '    indented four spaces',
+      '',
+    ].join('\n')
+    expect(parseSpec(text, 'a.md')).toEqual({
+      code: 'FIX',
+      criteria: ['AC-FIX-01', 'AC-FIX-02'],
+      retired: [],
+      errors: [],
+    })
+  })
+
+  it('closes a fence only on a fence of the same character that is at least as long (R456)', () => {
+    const text = (closer: string): string =>
+      [
+        '# Spec: Demo',
+        '**Code:** FIX',
+        '',
+        '## Acceptance criteria',
+        '- **AC-FIX-01** - real',
+        '````',
+        '```',
+        '- **AC-FIX-90** - inside the four-backtick fence',
+        '```',
+        '~~~~',
+        closer,
+        '- **AC-FIX-02** - after',
+        '',
+      ].join('\n')
+    expect(parseSpec(text('````'), 'a.md')).toEqual({
+      code: 'FIX',
+      criteria: ['AC-FIX-01', 'AC-FIX-02'],
+      retired: [],
+      errors: [],
+    })
+    expect(parseSpec(text('``````'), 'a.md').criteria).toEqual(['AC-FIX-01', 'AC-FIX-02'])
+    expect(parseSpec(text('~~~'), 'a.md').errors).toContain('a.md: unclosed code fence opened at line 6')
+  })
+
   const bad: { label: string; text: string; error: string }[] = [
+    {
+      label: 'an item indented by one space',
+      text: makeSpec({ criteria: ['AC-FIX-01'] }) + ' - **AC-FIX-02** - b\n',
+      error: 'a.md:8: acceptance criteria line is not a top-level list item: - **AC-FIX-02** - b',
+    },
+    {
+      label: 'a criterion written as a table row next to an item',
+      text: makeSpec({ criteria: ['AC-FIX-01'] }) + '| AC-FIX-02 | b |\n',
+      error: 'a.md:8: acceptance criteria line is not a top-level list item: | AC-FIX-02 | b |',
+    },
+    {
+      label: 'a criterion written as a table row after a blank line',
+      text: makeSpec({ criteria: ['AC-FIX-01'] }) + '\n| AC-FIX-02 | b |\n',
+      error: 'a.md:9: acceptance criteria line is not a top-level list item: | AC-FIX-02 | b |',
+    },
+    {
+      label: 'a criterion inside a blockquote',
+      text: makeSpec({ criteria: ['AC-FIX-01'] }) + '> - **AC-FIX-02** - b\n',
+      error: 'a.md:8: acceptance criteria line is not a top-level list item: > - **AC-FIX-02** - b',
+    },
+    {
+      label: 'a sub-bullet that opens with an id',
+      text: makeSpec({ criteria: ['AC-FIX-01'] }) + '  - AC-FIX-02 - b\n',
+      error: 'a.md:8: acceptance criteria line is not a top-level list item: - AC-FIX-02 - b',
+    },
+    {
+      label: 'stray prose after a blank line',
+      text: makeSpec({ criteria: ['AC-FIX-01'] }) + '\nSome stray prose\n',
+      error: 'a.md:9: acceptance criteria line is not part of a criterion: Some stray prose',
+    },
+    {
+      label: 'an indented line with no criterion above it',
+      text: '# Spec\n**Code:** FIX\n\n## Acceptance criteria\n\n  orphan detail\n- **AC-FIX-01** - x\n',
+      error: 'a.md:6: acceptance criteria line is not part of a criterion: orphan detail',
+    },
+    {
+      label: 'an unclosed code fence',
+      text: makeSpec({ criteria: ['AC-FIX-01'] }) + '```\n- **AC-FIX-02** - swallowed\n',
+      error: 'a.md: unclosed code fence opened at line 8',
+    },
     {
       label: 'a missing Code line',
       text: '# Spec\n\n## Acceptance criteria\n- **AC-FIX-01** - x\n',
