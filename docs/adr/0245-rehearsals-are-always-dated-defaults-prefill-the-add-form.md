@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted; (a) in part and (b) superseded by ADR-0249
 
 ## Context
 
@@ -23,9 +23,7 @@ Projections and display surfaces are unchanged and pinned by R445 regression tes
 
 ## Source comments
 
-- `src/stores/services.ts` (createService)
 - `src/views/SettingsView.vue` (Rehearsal & Report Defaults card)
-- `src/types/organization.ts` (rehearsalTimeDefaults)
 - `src/components/ServiceTimesPanel.vue` (header)
 - `src/views/ServiceEditorView.vue` (Times tab handlers)
 - `src/views/serviceEditorActionBar.ts` (times branch)

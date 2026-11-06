@@ -262,7 +262,8 @@ re-deriving the rationale). Plus an optional **Source comments** backlink list o
 | ADR-0242 | [R101 (48-03): Print, relocated verbatim from the page-bottom button](./0242-r101-48-03-print-relocated-verbatim-from-the-page-bottom-but.md) | Accepted |
 | ADR-0243 | [HIDE-ON-FAIL when messaging is off (owner UAT, 2026-08-17): "The](./0243-hide-on-fail-when-messaging-is-off-owner-uat-2026-08-17-the.md) | Accepted |
 | ADR-0244 | ["Suggest All Songs" is a live AI entry point (calls](./0244-suggest-all-songs-is-a-live-ai-entry-point-calls.md) | Accepted |
-| ADR-0245 | [Rehearsals are always dated; org-default times pre-fill the add form](./0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md) | Accepted |
+| ADR-0245 | [Rehearsals are always dated; org-default times pre-fill the add form](./0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md) | Accepted; (a) in part and (b) superseded by ADR-0249 |
 | ADR-0246 | [App brand is WorshipBuilder; internal identifiers keep their names](./0246-app-brand-is-worshipbuilder-internal-identifiers-keep-their-names.md) | Accepted |
 | ADR-0247 | [App home is worshipbuilder.web.app; the old addresses redirect there](./0247-app-home-is-worshipbuilder-web-app-old-addresses-redirect.md) | Accepted |
 | ADR-0248 | [Feature specs are the source of truth; tests cite criteria in their titles](./0248-feature-specs-are-the-source-of-truth-tests-cite-criteria-in-titles.md) | Accepted |
+| ADR-0249 | [New services start with a default rehearsal that follows the service date](./0249-new-services-start-with-a-default-rehearsal.md) | Accepted |
