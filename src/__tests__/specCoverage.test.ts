@@ -592,3 +592,145 @@ describe('the real repo (R457)', () => {
     expect(extractCitations(own, 'specCoverage.test.ts')).toEqual([])
   }, 30000)
 })
+
+// R454/R455/R458 guards. They bind the template, the rule text and tdd_mode to the check.
+const SPEC_RULE =
+  'No feature work starts until its spec exists in docs/specs/, and a behavior change updates the spec before the tests and the code.'
+const TEST_FIRST_RULE =
+  'Stores, utilities, functions and security rules need a failing test first; UI layout tests may land with the code but must cite spec criteria.'
+const SHARED_PHRASES = ['Phase 147', '.planning/codebase/', 'v2.18', '/gsd-quick', '/gsd-fast']
+const CLAUDE_PHRASES = [
+  'regression test',
+  'Retired list',
+  'not that the test ran',
+  'skipIf',
+  'runIf',
+  'options object',
+]
+
+const readRepoFile = (rel: string): string => readFileSync(resolve(root, rel), 'utf8')
+
+// Lines between an exact H2 line and the next H2, CRLF-safe.
+function sectionBody(text: string, heading: string): string {
+  const lines = text.split(/\r?\n/)
+  const start = lines.findIndex((l) => l === heading)
+  if (start === -1) return ''
+  const rest = lines.slice(start + 1)
+  const end = rest.findIndex((l) => l.startsWith('## '))
+  return (end === -1 ? rest : rest.slice(0, end)).join('\n')
+}
+
+describe('docs/specs/TEMPLATE.md (R454, R456)', () => {
+  it('parses clean with code XXX and at least two sample criteria (R454)', () => {
+    const parsed = parseSpec(readRepoFile('docs/specs/TEMPLATE.md'), 'TEMPLATE.md')
+    expect(parsed.errors).toEqual([])
+    expect(parsed.code).toBe('XXX')
+    expect(parsed.criteria.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('has every required section in order (R454)', () => {
+    const h2 = readRepoFile('docs/specs/TEMPLATE.md')
+      .split(/\r?\n/)
+      .filter((l) => l.startsWith('## '))
+      .map((l) => l.slice(3))
+    expect(h2).toEqual([
+      'Purpose',
+      'Behavior',
+      'Acceptance criteria',
+      'Edge cases',
+      'Out of scope',
+      'Retired criteria',
+      'Tests',
+      'ADRs',
+    ])
+  })
+
+  it('shows the ID format, the Retired list and a citation in a test title (R456)', () => {
+    const template = readRepoFile('docs/specs/TEMPLATE.md')
+    expect(template).toContain('**AC-XXX-01**')
+    const tests = sectionBody(template, '## Tests')
+    expect(tests.split('\n').some((l) => l.includes("it('") && l.includes('(AC-XXX-01)'))).toBe(true)
+    expect(parseSpec(template, 'TEMPLATE.md').retired).toContain('AC-XXX-00')
+  })
+
+  it('a copied template is read as a real spec while the template stays ignored (R454, R457)', () => {
+    const template = readRepoFile('docs/specs/TEMPLATE.md')
+    const dir = makeRepo({
+      'docs/specs/TEMPLATE.md': template,
+      'docs/specs/copied.md': template,
+      'src/a.test.ts': "it('cites the sample AC-XXX-01', () => { run() })",
+    })
+    expect(runSpecCoverage(dir)).toEqual(['AC-XXX-02 (copied.md) has no test citing it'])
+  }, 30000)
+
+  it('says a pass does not prove the test ran (R457)', () => {
+    expect(readRepoFile('docs/specs/TEMPLATE.md')).toContain('not that the test ran')
+  })
+})
+
+describe('the spec rule (R455)', () => {
+  it('CLAUDE.md and PROJECT.md carry the same rule sentence (R455)', () => {
+    expect(sectionBody(readRepoFile('CLAUDE.md'), '## Spec-driven development')).toContain(SPEC_RULE)
+    expect(sectionBody(readRepoFile('.planning/PROJECT.md'), '## Development Philosophy')).toContain(
+      SPEC_RULE,
+    )
+  })
+
+  it('PROJECT.md keeps it in a standing section ahead of the milestone blocks (R455)', () => {
+    const h2 = readRepoFile('.planning/PROJECT.md')
+      .split(/\r?\n/)
+      .filter((l) => l.startsWith('## '))
+    const philosophy = h2.indexOf('## Development Philosophy')
+    const milestone = h2.findIndex((l) => /^## (Current|Shipped|Previous)/.test(l))
+    expect(philosophy).toBeGreaterThanOrEqual(0)
+    expect(milestone).toBeGreaterThan(philosophy)
+  })
+
+  it('both docs say when the rule starts and how specs relate to the map docs (R455)', () => {
+    const sections = [
+      sectionBody(readRepoFile('CLAUDE.md'), '## Spec-driven development'),
+      sectionBody(readRepoFile('.planning/PROJECT.md'), '## Development Philosophy'),
+    ]
+    for (const section of sections) {
+      for (const phrase of SHARED_PHRASES) expect(section).toContain(phrase)
+    }
+  })
+
+  it('CLAUDE.md covers bug fixes, retired criteria, what does not count and what a pass proves (R455)', () => {
+    const section = sectionBody(readRepoFile('CLAUDE.md'), '## Spec-driven development')
+    for (const phrase of CLAUDE_PHRASES) expect(section).toContain(phrase)
+  })
+})
+
+describe('test-first setting (R458)', () => {
+  it('workflow.tdd_mode is true in .planning/config.json (R458)', () => {
+    const config = JSON.parse(readRepoFile('.planning/config.json')) as {
+      workflow?: { tdd_mode?: boolean }
+    }
+    expect(config.workflow?.tdd_mode).toBe(true)
+  })
+
+  it('CLAUDE.md and PROJECT.md state the test-first split (R458)', () => {
+    expect(sectionBody(readRepoFile('CLAUDE.md'), '## Spec-driven development')).toContain(
+      TEST_FIRST_RULE,
+    )
+    expect(sectionBody(readRepoFile('.planning/PROJECT.md'), '## Development Philosophy')).toContain(
+      TEST_FIRST_RULE,
+    )
+  })
+
+  it('CLAUDE.md warns the planner heuristic does not exempt a store change (R458)', () => {
+    expect(sectionBody(readRepoFile('CLAUDE.md'), '## Spec-driven development')).toContain(
+      'does not exempt a store change',
+    )
+  })
+
+  it('the Testing baseline says the check fails on purpose in the spec-to-tests window (R458)', () => {
+    const testing = sectionBody(
+      readRepoFile('CLAUDE.md'),
+      '## Testing: two suites, one of which the default run skips',
+    )
+    expect(testing).toContain('src/__tests__/specCoverage.test.ts')
+    expect(testing).toContain('Do not quiet it')
+  })
+})
