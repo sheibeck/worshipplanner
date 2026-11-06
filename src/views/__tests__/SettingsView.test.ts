@@ -9,6 +9,7 @@
  * file with real assertions instead of first having to invent the mock shape.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { ref } from 'vue'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import SettingsView from '../SettingsView.vue'
 import type { ServiceTemplateEntry } from '@/types/organization'
@@ -141,6 +142,9 @@ let mockTimezone = 'America/Chicago'
 // set yet" state it saw before this field existed.
 let mockRehearsalTimeDefaults: string[] = []
 let mockReportTimeDefault = ''
+// Phase 147 (R459). Ref-backed so a church switch after mount is observable: Vue cannot
+// watch a plain `let` behind a getter (AC-RHD-67).
+const mockRehearsalDefaultWeekday = ref<number | null | undefined>(null)
 
 const mockSetPcCredentials = vi.fn()
 const mockUpdateOrgSettings = vi.fn(() => Promise.resolve())
@@ -304,6 +308,12 @@ vi.mock('@/stores/auth', () => ({
       set reportTimeDefault(v: string) {
         mockReportTimeDefault = v
       },
+      get rehearsalDefaultWeekday() {
+        return mockRehearsalDefaultWeekday.value
+      },
+      set rehearsalDefaultWeekday(v: number | null | undefined) {
+        mockRehearsalDefaultWeekday.value = v
+      },
     },
     updateOrgSettings: mockUpdateOrgSettings,
   }),
@@ -343,6 +353,7 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -360,11 +371,12 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     expect(wrapper.text()).toContain('Vertical Worship')
   })
 
-  it('R442: the Rehearsal & Report Defaults helper says default times pre-fill the add form', () => {
+  it('the Rehearsal & Report Defaults helper text is the default-rehearsal sentence (AC-RHD-08)', () => {
     const wrapper = mountSettingsView()
     const text = wrapper.get('[data-testid="rehearsal-defaults-helper"]').text().replace(/\s+/g, ' ')
-    expect(text).toContain('pre-fill the time when a planner adds a rehearsal')
-    expect(text).toContain('Dates are always chosen per service.')
+    expect(text).toBe(
+      "New services start with one rehearsal on the default day at the first default time. The report time is copied onto every new service. Changing these defaults doesn't affect existing services.",
+    )
   })
 
   it('WR-02: saving rehearsal defaults de-duplicates repeated times', async () => {
@@ -375,7 +387,128 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     expect(mockUpdateOrgSettings).toHaveBeenCalledWith({
       'settings.rehearsalTimeDefaults': ['18:30', '19:00'],
       'settings.reportTimeDefault': '',
+      'settings.rehearsalDefaultWeekday': null,
     })
+  })
+
+  // ── Phase 147 (R459/R463): Default rehearsal day ──────────────────────────────
+  const DAY_SELECT = '[data-testid="rehearsal-default-day-select"]'
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+  function daySelect(wrapper: ReturnType<typeof mountSettingsView>) {
+    return wrapper.get(DAY_SELECT)
+  }
+  function selectedDayText(wrapper: ReturnType<typeof mountSettingsView>): string {
+    const el = daySelect(wrapper).element as HTMLSelectElement
+    return el.options[el.selectedIndex]!.text
+  }
+  /** Picks by option position (0 = None, 1 = Sunday ... 7 = Saturday); setValue is unreliable for the null option. */
+  async function chooseDay(wrapper: ReturnType<typeof mountSettingsView>, optionIndex: number) {
+    await daySelect(wrapper).findAll('option')[optionIndex]!.setSelected()
+  }
+  async function pressSave(wrapper: ReturnType<typeof mountSettingsView>) {
+    await wrapper.get('[data-testid="save-rehearsal-defaults-btn"]').trigger('click')
+    await flushPromises()
+  }
+
+  it('lists None then Sunday to Saturday, in that order (AC-RHD-01)', () => {
+    const wrapper = mountSettingsView()
+    const texts = daySelect(wrapper).findAll('option').map((o) => o.text())
+    expect(texts).toEqual(['None', ...DAY_NAMES])
+  })
+
+  it('shows the saved day, and Sunday as Sunday rather than None (AC-RHD-01)', () => {
+    mockRehearsalDefaultWeekday.value = 3
+    expect(selectedDayText(mountSettingsView())).toBe('Wednesday')
+    mockRehearsalDefaultWeekday.value = 0
+    expect(selectedDayText(mountSettingsView())).toBe('Sunday')
+  })
+
+  it('shows None when the church has no saved day (AC-RHD-01)', () => {
+    mockRehearsalDefaultWeekday.value = null
+    expect(selectedDayText(mountSettingsView())).toBe('None')
+    mockRehearsalDefaultWeekday.value = undefined
+    expect(selectedDayText(mountSettingsView())).toBe('None')
+  })
+
+  it('saves the chosen day as 0 to 6 with the other defaults (AC-RHD-02)', async () => {
+    mockRehearsalTimeDefaults = ['18:30']
+    const wrapper = mountSettingsView()
+    await chooseDay(wrapper, 4)
+    await pressSave(wrapper)
+    expect(mockUpdateOrgSettings).toHaveBeenCalledWith({
+      'settings.rehearsalTimeDefaults': ['18:30'],
+      'settings.reportTimeDefault': '',
+      'settings.rehearsalDefaultWeekday': 3,
+    })
+  })
+
+  it('saves Sunday as 0 and None as null, keeping them distinct (AC-RHD-02)', async () => {
+    const wrapper = mountSettingsView()
+    await chooseDay(wrapper, 1)
+    await pressSave(wrapper)
+    expect(mockUpdateOrgSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ 'settings.rehearsalDefaultWeekday': 0 }),
+    )
+    await chooseDay(wrapper, 0)
+    await pressSave(wrapper)
+    expect(mockUpdateOrgSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ 'settings.rehearsalDefaultWeekday': null }),
+    )
+  })
+
+  it('saves nothing until Save defaults is pressed (AC-RHD-03)', async () => {
+    const wrapper = mountSettingsView()
+    await chooseDay(wrapper, 4)
+    await flushPromises()
+    expect(selectedDayText(wrapper)).toBe('Wednesday')
+    expect(mockUpdateOrgSettings).not.toHaveBeenCalled()
+  })
+
+  it('restores the previous day and shows the error line when the save fails (AC-RHD-04)', async () => {
+    mockRehearsalDefaultWeekday.value = 5
+    mockUpdateOrgSettings.mockRejectedValueOnce(new Error('boom'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = mountSettingsView()
+    await chooseDay(wrapper, 2)
+    expect(selectedDayText(wrapper)).toBe('Monday')
+    await pressSave(wrapper)
+    expect(selectedDayText(wrapper)).toBe('Friday')
+    expect(wrapper.text()).toContain('Failed to save. Please try again.')
+    consoleError.mockRestore()
+  })
+
+  it('disables the select and hides Save defaults for a non-editor (AC-RHD-05)', () => {
+    mockIsEditor = false
+    mockRehearsalDefaultWeekday.value = 3
+    const wrapper = mountSettingsView()
+    expect((daySelect(wrapper).element as HTMLSelectElement).disabled).toBe(true)
+    expect(selectedDayText(wrapper)).toBe('Wednesday')
+    expect(wrapper.find('[data-testid="save-rehearsal-defaults-btn"]').exists()).toBe(false)
+  })
+
+  it('writes only organization settings when the defaults are saved, and no service (AC-RHD-09)', async () => {
+    const wrapper = mountSettingsView()
+    await chooseDay(wrapper, 4)
+    await pressSave(wrapper)
+    expect(mockUpdateOrgSettings).toHaveBeenCalledTimes(1)
+    const payload = (mockUpdateOrgSettings.mock.calls as unknown as Record<string, unknown>[][])[0]![0]!
+    const keys = Object.keys(payload)
+    expect(keys.length).toBeGreaterThan(0)
+    expect(keys.every((k) => k.startsWith('settings.'))).toBe(true)
+    expect(mockUpdateDoc).not.toHaveBeenCalled()
+  })
+
+  it('shows the new church day after an in-place church switch (AC-RHD-67)', async () => {
+    mockRehearsalDefaultWeekday.value = 3
+    const wrapper = mountSettingsView()
+    expect(selectedDayText(wrapper)).toBe('Wednesday')
+    mockRehearsalDefaultWeekday.value = 6
+    await flushPromises()
+    expect(selectedDayText(wrapper)).toBe('Saturday')
+    mockRehearsalDefaultWeekday.value = null
+    await flushPromises()
+    expect(selectedDayText(wrapper)).toBe('None')
   })
 })
 
@@ -415,6 +548,7 @@ describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -527,6 +661,7 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -611,6 +746,7 @@ describe('SettingsView — no Services template card (R113)', () => {
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -649,6 +785,7 @@ describe('SettingsView Bible Translation card (R090) — 45-02', () => {
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -757,6 +894,7 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -918,6 +1056,7 @@ describe('SettingsView Messaging card — kill-switch + automatic email defaults
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -1090,6 +1229,7 @@ describe('SettingsView organization timezone select (R133) — 58-04', () => {
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -1167,6 +1307,7 @@ describe('SettingsView AI Features card visibility (Phase 82, R242/R243)', () =>
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
@@ -1218,6 +1359,7 @@ describe('SettingsView Bible Translation card visibility (R300)', () => {
     mockReminderDaysBefore = 7
     mockTimezone = 'America/Chicago'
     mockRehearsalTimeDefaults = []
+    mockRehearsalDefaultWeekday.value = null
     mockReportTimeDefault = ''
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
