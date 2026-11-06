@@ -577,7 +577,7 @@ describe('the real repo (R457)', () => {
       'render-service/src/render.test.ts',
       'src/__tests__/specCoverage.test.ts',
     ]) {
-      expect(files, f).toContain(f)
+      expect(files).toContain(f)
     }
     expect(files.filter((f) => /(^|\/)node_modules\//.test(f) || f.startsWith('functions/lib/'))).toEqual([])
     expect(files).toEqual([...files].sort())
