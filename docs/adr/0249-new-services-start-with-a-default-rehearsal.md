@@ -24,6 +24,8 @@ Owner decisions of 2026-11-06 (R459-R465), promoted from backlog 999.15. The Tim
 
 The Rules are unchanged, and an editor could forge the flag, which is harmless because it only decides auto-moving on that one service. If the new page cannot be written or the removal fails, the old page stays and no later save retries, because the old date is gone by then. On a local cache miss the share refresh does not run, so the new page usually does not exist and the old page stays. Two services on one date still share one memorable page, so moving the one the page records removes it until the other's next save writes it again. The owner accepts this (AC-RHD-68), and the other service's token link is unaffected. The Planning Center export's hard-coded rehearsal is unchanged.
 
+- Autosave writes the whole document, so a stale second tab with unsaved edits can write back the old date and rows. `date` always travels with `rehearsals`, so that write stays consistent.
+
 ## Source comments
 
 - `src/utils/rehearsalTimes.ts`
