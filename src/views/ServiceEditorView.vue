@@ -58,6 +58,7 @@
                 <input
                   ref="dateInput"
                   type="date"
+                  max="9999-12-31"
                   :value="localService.date"
                   class="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
                   @change="onDateChange(($event.target as HTMLInputElement).value)"
@@ -1740,7 +1741,8 @@
         />
         </div>
 
-        <!-- Times tab (Phase 143, R441-R444). See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md) -->
+        <!-- Times tab (Phase 143, R441-R444). See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md)
+    and ADR-0249 (docs/adr/0249-new-services-start-with-a-default-rehearsal.md) -->
         <div
           v-show="activeTab === 'times'"
           id="svc-panel-times"
@@ -1754,6 +1756,7 @@
             :service-date="localService.date"
             :can-edit="canEditService"
             :default-times="authStore.settings.rehearsalTimeDefaults ?? []"
+            :default-weekday="authStore.settings.rehearsalDefaultWeekday ?? null"
             :is-editor="authStore.isEditor"
             @add="onAddRehearsal"
             @remove="onRemoveRehearsal"
@@ -1882,7 +1885,7 @@ import { db, functions } from '@/firebase'
 import { resolveRecipients } from '@/utils/messagingRecipients'
 import { fingerprintSlideGroups, diffServiceSnapshots, type ChangeEntry, type SlideFingerprint } from '@/utils/serviceLockDiff'
 import { confirmationKey, type ConfirmationStatus } from '@/utils/confirmations'
-import { HM_RE, isDisplayableRehearsal, YMD_RE } from '@/utils/rehearsalTimes'
+import { HM_RE, isDisplayableRehearsal, isRealYmd, moveAutoRehearsals, YMD_RE } from '@/utils/rehearsalTimes'
 import ServiceTimesPanel from '@/components/ServiceTimesPanel.vue'
 import Sortable from 'sortablejs'
 
@@ -2753,11 +2756,15 @@ function onDateChange(newDate: string) {
   // and a lock enforced only by `v-if` inherits exactly the fragility I-01
   // documented for the Slides tab (BL-01).
   if (!canEditService.value) return
-  if (!localService.value || !newDate) return
+  if (!localService.value || !isRealYmd(newDate)) return
   localService.value.date = newDate
+  // One synchronous mutation so autosave sends the date and the moved rows in one write (ADR-0249).
+  if (localService.value.rehearsals) {
+    localService.value.rehearsals = moveAutoRehearsals(localService.value.rehearsals, newDate)
+  }
 }
 
-// Times tab handlers — each re-checks canEditService (R036); see ADR-0245.
+// Times tab handlers — each re-checks canEditService (R036); see ADR-0245 and ADR-0249.
 
 const hasNonDisplayableRehearsal = computed(() =>
   (localService.value?.rehearsals ?? []).some((r) => !isDisplayableRehearsal(r)),
@@ -2784,6 +2791,7 @@ function onRehearsalDateChange(id: string, newDate: string): void {
   // A dated row can never go undated; malformed values are never stored.
   if (newDate === '' ? rehearsal.date !== '' : !YMD_RE.test(newDate)) return
   rehearsal.date = newDate
+  delete rehearsal.autoAdded
 }
 
 function onRehearsalTimeChange(id: string, newTime: string): void {
@@ -2792,6 +2800,7 @@ function onRehearsalTimeChange(id: string, newTime: string): void {
   if (!rehearsal) return
   if (newTime === '' ? rehearsal.time !== '' : !HM_RE.test(newTime)) return
   rehearsal.time = newTime
+  delete rehearsal.autoAdded
 }
 
 function onReportTimeChange(newTime: string): void {
@@ -4759,6 +4768,7 @@ async function onSave() {
     const normalizedSlots = reindexSlots(orderSlotsBySection(data.slots))
     const payload = {
       name: data.name,
+      date: data.date,
       teams: data.teams,
       sermonPassage: data.sermonPassage,
       sermonTopic: data.sermonTopic ?? '',
@@ -4805,6 +4815,7 @@ async function onSave() {
       localService.value &&
       JSON.stringify({
         name: localService.value.name,
+        date: localService.value.date,
         teams: localService.value.teams,
         sermonPassage: localService.value.sermonPassage,
         sermonTopic: localService.value.sermonTopic ?? '',
