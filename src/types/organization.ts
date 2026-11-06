@@ -100,10 +100,12 @@ export interface OrgSettings {
    *  phase just persists the field + its Settings `<select>`. */
   timezone: string
   /** Org-level default rehearsal time(s), 'HH:mm', time-of-day only; pre-fills the
-   *  time of the Times-tab add form (R442), never copied into a service; see ADR-0245. */
+   *  time of the Times-tab add form (R442); the first is copied onto a new service's auto-added rehearsal. See ADR-0249. */
   rehearsalTimeDefaults: string[]
   /** Org-level default day-of report time (R429), `'HH:mm'`, `''` = unset. */
   reportTimeDefault: string
+  /** Default rehearsal day: 0 Sunday to 6 Saturday, null none (R459). See ADR-0249. */
+  rehearsalDefaultWeekday: number | null
 }
 
 /**
@@ -184,4 +186,5 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
   // both start empty/unset until an editor sets them in Settings.
   rehearsalTimeDefaults: [],
   reportTimeDefault: '',
+  rehearsalDefaultWeekday: null,
 }

@@ -11,7 +11,7 @@ import type { PublicStageMarker } from '@/stores/services'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { mapOrderedSlots, mapStageMarkers, resolvePersonName } from '@/utils/serviceProjection'
 import { orderSlotsBySection } from '@/utils/slotTypes'
-import { isDisplayableRehearsal, sortRehearsals } from '@/utils/rehearsalTimes'
+import { isDisplayableRehearsal, sortRehearsals, toPublicRehearsal } from '@/utils/rehearsalTimes'
 
 export interface RehearseAttachment {
   id: string
@@ -278,7 +278,7 @@ export function buildRehearseAccess(
     orgId,
     ...(orgName ? { orgName } : {}),
     serviceDate: service.date,
-    ...(datedRehearsals.length > 0 ? { rehearsals: sortRehearsals(datedRehearsals) } : {}),
+    ...(datedRehearsals.length > 0 ? { rehearsals: sortRehearsals(datedRehearsals).map(toPublicRehearsal) } : {}),
     ...(service.reportTime ? { reportTime: service.reportTime } : {}),
     title: service.name,
     status: service.status,

@@ -31,7 +31,7 @@ import { stripUndefined } from '@/utils/stripUndefined'
 import { mapSlotAllowlist, mapStageMarkerAllowlist, resolvePersonName } from '@/utils/serviceProjection'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import { buildRehearseAccess } from '@/utils/rehearseAccess'
-import { isDisplayableRehearsal, sortRehearsals } from '@/utils/rehearsalTimes'
+import { isDisplayableRehearsal, sortRehearsals, toPublicRehearsal } from '@/utils/rehearsalTimes'
 import {
   computeLastUsedDate,
   serviceDateToMillis,
@@ -202,7 +202,7 @@ export function buildServiceSnapshot(service: Service): ServiceSnapshot {
 
   return {
     date: service.date,
-    ...(datedRehearsals.length > 0 ? { rehearsals: sortRehearsals(datedRehearsals) } : {}),
+    ...(datedRehearsals.length > 0 ? { rehearsals: sortRehearsals(datedRehearsals).map(toPublicRehearsal) } : {}),
     ...(service.reportTime ? { reportTime: service.reportTime } : {}),
     name: service.name,
     progression: service.progression,

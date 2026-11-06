@@ -1,6 +1,7 @@
 import type { Timestamp } from 'firebase/firestore'
 import type { VWType } from './song'
 import type { CongregationalSection } from './slide'
+import type { StoredRehearsal } from '../utils/rehearsalTimes'
 
 export type Progression = '1-2-2-3' | '1-2-3-3'
 export type ServiceStatus = 'draft' | 'planned' | 'exported'
@@ -278,8 +279,9 @@ export interface Service {
    * wall-clock label for a single physical venue, not an absolute instant).
    * Display order is NEVER trusted from array/storage order — always run
    * through the shared `sortRehearsals()` util (src/utils/rehearsalTimes.ts).
+   * A row from a default carries `autoAdded: true`; it never reaches a public view. See ADR-0249.
    */
-  rehearsals?: { id: string; date: string; time: string }[]
+  rehearsals?: StoredRehearsal[]
   /**
    * Single day-of report time (R431), `'HH:mm'` 24h (native
    * `<input type="time">` value format — no AM/PM parsing needed at the
