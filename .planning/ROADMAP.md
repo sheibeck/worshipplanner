@@ -881,7 +881,7 @@ Area: `docs/specs/TEMPLATE.md` (new), the automated check and its fixtures (new)
 
   5. A new ADR supersedes the reversed parts of ADR-0245. The auto-added rehearsal shows like any other rehearsal on share links, the volunteer view and other read-only views, and its marker appears on none of them and in neither public payload (`buildServiceSnapshot`, `buildRehearseAccess`) (R465).
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed
 
 Plans:
 **Wave 1**
@@ -899,7 +899,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 147-05-PLAN.md — Test-first editor work: a changed date saves and moves the auto-added rehearsal in one write, edits clear the marker, Undo stays in step; then map docs, the spec set Active, and the full gate
+- [x] 147-05-PLAN.md — Test-first editor work: a changed date saves and moves the auto-added rehearsal in one write, edits clear the marker, Undo stays in step; then map docs, the spec set Active, and the full gate
 
 **UI hint**: yes
 
