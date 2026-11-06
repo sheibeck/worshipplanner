@@ -195,6 +195,9 @@ const H2 = /^##(?!#)\s+(.*)$/
 const FENCE = /^ {0,3}(`{3,}|~{3,})/
 // A line that opens like a criterion (table row, quote, indented or bold id) but is not a column-0 list item.
 const LOOKS_LIKE_CRITERION = /^[\s>|]*(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?AC-/
+// What stays an error while an item is open: a quote or table row, or an indented bullet that defines a criterion
+// (bold id, then a separator). A wrapped line or a sub-bullet that merely mentions an id is a continuation.
+const CRITERION_SHAPE = /^\s*[>|]|^\s*(?:[-*+]|\d+[.)])\s+(?:\*\*|__)AC-[A-Za-z0-9-]*(?:\*\*|__)\s*[-–—:]/
 
 // Line-based parse. Never throws: every problem lands in errors, each naming the spec.
 export function parseSpec(markdown: string, name: string): ParsedSpec {
@@ -249,12 +252,13 @@ export function parseSpec(markdown: string, name: string): ParsedSpec {
     if (!item) {
       if (section === 'ac') {
         const trimmed = line.trim()
+        const continues = /^\s/.test(line) ? inItem : lazy
         if (trimmed === '') lazy = false
         else if (/^#{1,6}\s/.test(trimmed)) inItem = lazy = false
-        else if (LOOKS_LIKE_CRITERION.test(line)) {
+        else if (LOOKS_LIKE_CRITERION.test(line) && (!continues || CRITERION_SHAPE.test(line))) {
           errors.push(`${name}:${i + 1}: acceptance criteria line is not a top-level list item: ${trimmed.slice(0, 40)}`)
           lazy = false
-        } else if (/^\s/.test(line) ? inItem : lazy) lazy = true
+        } else if (continues) lazy = true
         else {
           errors.push(`${name}:${i + 1}: acceptance criteria line is not part of a criterion: ${trimmed.slice(0, 40)}`)
           inItem = lazy = false

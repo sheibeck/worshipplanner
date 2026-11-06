@@ -424,6 +424,42 @@ describe('parseSpec (R456)', () => {
     })
   })
 
+  const openItem = (...rest: string[]): string =>
+    ['# Spec: Demo', '**Code:** FIX', '', '## Acceptance criteria', '', '- **AC-FIX-01** - Behaves the same as', ...rest, ''].join(
+      '\n',
+    )
+
+  it.each([
+    { label: 'a plain wrapped line', line: '  AC-FIX-01 when the list is empty.' },
+    { label: 'a plain wrapped line at column 0', line: 'AC-FIX-01 when the list is empty.' },
+    { label: 'a wrapped line that starts with a bold id', line: '  **AC-FIX-01** does' },
+    { label: 'a wrapped line at column 0 that starts with a bold id', line: '**AC-FIX-01** does' },
+    { label: 'a sub-bullet that starts with a plain id', line: '  - AC-FIX-01 still holds' },
+    { label: 'a sub-bullet that starts with a plain id and a separator', line: '  - AC-FIX-01 - b' },
+    { label: 'a sub-bullet that starts with a bold id and no separator', line: '  - **AC-FIX-01** still holds' },
+  ])('keeps $label inside the open criterion (R456)', ({ line }) => {
+    expect(parseSpec(openItem(line), 'a.md')).toEqual({
+      code: 'FIX',
+      criteria: ['AC-FIX-01'],
+      retired: [],
+      errors: [],
+    })
+  })
+
+  it.each([
+    { label: 'an indented bullet', line: '  - **AC-FIX-02** - b' },
+    { label: 'a bullet indented by one space', line: ' - **AC-FIX-02** - b' },
+    { label: 'a bullet indented by two spaces', line: '  - **AC-FIX-02** - b' },
+    { label: 'a bullet indented by three spaces', line: '   - **AC-FIX-02** - b' },
+    { label: 'an indented numbered item', line: '  1. **AC-FIX-02** - b' },
+    { label: 'an indented bullet with a colon separator', line: '  - **AC-FIX-02**: b' },
+    { label: 'a table row', line: '| AC-FIX-02 | b |' },
+    { label: 'a blockquote', line: '> - **AC-FIX-02** - b' },
+  ])('still reports $label that defines a criterion after an open one (R456)', ({ line }) => {
+    const errors = parseSpec(openItem(line), 'a.md').errors
+    expect(errors).toContain(`a.md:7: acceptance criteria line is not a top-level list item: ${line.trim()}`)
+  })
+
   it('closes a fence only on a fence of the same character that is at least as long (R456)', () => {
     const text = (closer: string): string =>
       [
@@ -473,9 +509,9 @@ describe('parseSpec (R456)', () => {
       error: 'a.md:8: acceptance criteria line is not a top-level list item: > - **AC-FIX-02** - b',
     },
     {
-      label: 'a sub-bullet that opens with an id',
-      text: makeSpec({ criteria: ['AC-FIX-01'] }) + '  - AC-FIX-02 - b\n',
-      error: 'a.md:8: acceptance criteria line is not a top-level list item: - AC-FIX-02 - b',
+      label: 'a sub-bullet that defines a criterion with a bold id',
+      text: makeSpec({ criteria: ['AC-FIX-01'] }) + '  - **AC-FIX-02** - b\n',
+      error: 'a.md:8: acceptance criteria line is not a top-level list item: - **AC-FIX-02** - b',
     },
     {
       label: 'stray prose after a blank line',
