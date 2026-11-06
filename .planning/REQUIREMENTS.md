@@ -47,20 +47,20 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 The feature's spec lands in `docs/specs/` before any of its tests or code.
 
-- [ ] **R459**: An admin can set one default rehearsal weekday, or none, in Settings.
-- [ ] **R460**: With a default weekday and at least one default time set, a new service gets one rehearsal on the most
+- [x] **R459**: An admin can set one default rehearsal weekday, or none, in Settings.
+- [x] **R460**: With a default weekday and at least one default time set, a new service gets one rehearsal on the most
   recent default weekday on or before the service date (the service date itself when it falls on that weekday), at
   the first default time.
 
-- [ ] **R461**: Unless both a default weekday and a default time are set, a new service gets no rehearsal.
-- [ ] **R462**: Changing a service's date moves an auto-added rehearsal nobody has changed, keeping its weekday and
+- [x] **R461**: Unless both a default weekday and a default time are set, a new service gets no rehearsal.
+- [x] **R462**: Changing a service's date moves an auto-added rehearsal nobody has changed, keeping its weekday and
   time. A rehearsal a planner has changed stays where it is.
 
-- [ ] **R463**: Changing the Settings default does not touch existing services, and there is no data migration.
-- [ ] **R464**: The add-rehearsal form pre-fills the default date only if the service has no rehearsal on that date;
+- [x] **R463**: Changing the Settings default does not touch existing services, and there is no data migration.
+- [x] **R464**: The add-rehearsal form pre-fills the default date only if the service has no rehearsal on that date;
   otherwise the date stays blank.
 
-- [ ] **R465**: A new ADR supersedes the reversed parts of ADR-0245, and the auto-added marker never appears on share
+- [x] **R465**: A new ADR supersedes the reversed parts of ADR-0245, and the auto-added marker never appears on share
   links or other read-only views.
 
 ## v2 Requirements
@@ -91,13 +91,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | R456 | Phase 146 | Complete |
 | R457 | Phase 146 | Complete |
 | R458 | Phase 146 | Complete |
-| R459 | Phase 147 | Pending |
-| R460 | Phase 147 | Pending |
-| R461 | Phase 147 | Pending |
-| R462 | Phase 147 | Pending |
-| R463 | Phase 147 | Pending |
-| R464 | Phase 147 | Pending |
-| R465 | Phase 147 | Pending |
+| R459 | Phase 147 | Complete |
+| R460 | Phase 147 | Complete |
+| R461 | Phase 147 | Complete |
+| R462 | Phase 147 | Complete |
+| R463 | Phase 147 | Complete |
+| R464 | Phase 147 | Complete |
+| R465 | Phase 147 | Complete |
 
 **Coverage:**
 

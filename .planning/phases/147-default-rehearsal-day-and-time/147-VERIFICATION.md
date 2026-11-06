@@ -1,8 +1,8 @@
 ---
 phase: 147-default-rehearsal-day-and-time
 verified: 2026-11-06T22:50:00Z
-status: human_needed
-score: 5/5 roadmap success criteria verified (all plan must-have truths verified; 0 present-but-behavior-unverified)
+status: passed
+score: 5/5 roadmap success criteria verified; 6 human checks passed by the owner 2026-11-06 in the local emulator
 behavior_unverified: 0
 overrides_applied: 0
 gaps: []
@@ -32,7 +32,7 @@ human_verification:
 
 **Phase Goal:** A church sets one default rehearsal weekday, and every new service starts with its rehearsal already on it, while existing services stay as they are and public views show nothing new. Built spec-first as the pilot for the Phase 146 standard.
 **Verified:** 2026-11-06
-**Status:** human_needed (no gaps; automated checks all pass; real-Firestore and layout checks need a person)
+**Status:** passed (owner ran the real-app checks in the local emulator and approved the wording on 2026-11-06)
 **Re-verification:** No, initial verification
 
 R459-R465 are deliberately left unticked in REQUIREMENTS.md for the orchestrator to close. Not reported as a gap.

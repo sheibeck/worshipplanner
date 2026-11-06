@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.17
 milestone_name: Spec-Driven Foundation & Rehearsal Defaults
-current_phase: 147
-current_phase_name: Default Rehearsal Day and Time
-status: verifying
+current_phase: 999.14
+current_phase_name: BACKLOG
+status: planning
 stopped_at: Completed 147-05-PLAN.md
-last_updated: "2026-11-06T21:57:13.511Z"
+last_updated: "2026-11-06T23:53:16.379Z"
 last_activity: 2026-11-06
-last_activity_desc: Phase 147 execution started
+last_activity_desc: Phase 147 complete, transitioned to Phase 999.14
 progress:
   total_phases: 2
   completed_phases: 2
@@ -135,7 +135,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Phase complete — ready for verification
+**Status:** Ready to plan
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1481,10 +1481,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 147 (Default Rehearsal Day and Time) — EXECUTING
-Plan: 5 of 5
+Phase: 999.14 — Custom domain + verified Resend email sender (BACKLOG)
+Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-11-06 — Phase 147 execution started
+Last activity: 2026-11-06 — Phase 147 complete, transitioned to Phase 999.14
 
 Progress: [██████████] 100% (0/2 phases)
 
