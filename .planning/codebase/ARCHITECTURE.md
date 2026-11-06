@@ -1637,6 +1637,9 @@ the R036 `canEditService` self-gates. Behavior worth knowing before editing:
 - **Add form time:** a nullable local override that follows `defaultTimes[0]` until the planner types
   or picks a chip, so late-arriving org defaults still pre-fill; it resets to `null` (re-pre-fills)
   after each successful add. A row is created only on submit with both date and time.
+- **Add form date:** follows the most recent `defaultWeekday` day on or before the service date, and
+  stays blank when no weekday is set, the date is not real, or a rehearsal already sits on that date.
+  A date the planner typed or cleared is held in `newDateOverride` until Add; nothing extra is stored.
 - **Reject-clear:** clearing a set date/time forces the native input value back (an unchanged one-way
   `:value` binding is never repainted by Vue) and shows a 4-second message; nothing is emitted, so a
   stored row is only ever deleted by an explicit Remove. Malformed values (e.g. a 5-digit year) revert
@@ -1652,7 +1655,7 @@ the R036 `canEditService` self-gates. Behavior worth knowing before editing:
   Under the view's `shallowMount` tests the panel is stubbed, so its DOM is tested directly with
   `mount` in `ServiceTimesPanel.test.ts`.
 
-Decision record: ADR-0245 (`docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md`).
+Decision record: ADR-0245 (`docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md`) and ADR-0249 (`docs/adr/0249-new-services-start-with-a-default-rehearsal.md`).
 
 ### src/components/SongSlotPicker.vue
 
@@ -2486,6 +2489,9 @@ likewise only edits this person's list, leaving the partner's own record untouch
 
 ### src/stores/services.ts
 
+- **`createService` default rehearsal:** adds one marked rehearsal built by `buildAutoRehearsal` from the org's default weekday and first default time; nothing is added when either is missing or the date is not real (ADR-0249).
+- **`updateService` old-date page:** on a real date change, once the new date's page exists, `retireOldServiceShare` removes the old `serviceShares/{slug}__service-{oldDate}` page only if this service owns it; a failed removal never fails the save (ADR-0249).
+
 **`ServiceLockedError` (R036 draft-only write guard, enforcement layer 2 of 3):** thrown by the
 store's draft-only write guard. The guard is defence-in-depth, NOT the primary enforcement: the
 Firestore rule added in 31-01 is what actually stops a determined client. This exists so a
@@ -2775,6 +2781,8 @@ section from per-kind position numbering (R304), and `slideshowAssembler.ts` res
 `BlackoutSlide` (`src/types/slide.ts`) instead of lyric content.
 
 ### src/views/ServiceEditorView.vue
+
+- **Date change:** `onDateChange` rejects an unreal date, then sets the date and runs `moveAutoRehearsals` in one synchronous mutation so autosave sends both in one write. `onRehearsalDateChange` and `onRehearsalTimeChange` delete the `autoAdded` marker after their guards pass. `date` sits at the same key position in `onSave`'s `payload` and its post-save mirror, or `isDirty` never clears (ADR-0235, ADR-0249).
 
 **`deleteServiceConfirmBody` (D-15):** delete stays available at every status, but must not stay
 un-warned. The reasoning that justifies NO friction on Reopen runs the opposite way here: reopening

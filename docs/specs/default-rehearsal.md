@@ -1,7 +1,7 @@
 # Spec: Default rehearsal day and time
 
 **Code:** RHD
-**Status:** Draft
+**Status:** Active
 **Last changed:** 2026-11-06
 
 ## Purpose
