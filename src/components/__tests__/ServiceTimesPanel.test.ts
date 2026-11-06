@@ -16,6 +16,7 @@ type PanelProps = {
   canEdit: boolean
   defaultTimes?: string[]
   isEditor?: boolean
+  defaultWeekday?: number | null
 }
 
 function mountPanel(props: PanelProps, options: { attachTo?: HTMLElement } = {}) {
@@ -406,5 +407,103 @@ describe('ServiceTimesPanel — R444 report time and read-only', () => {
         .find('[data-testid="times-readonly-legacy-notice"]')
         .exists(),
     ).toBe(false)
+  })
+})
+
+describe('ServiceTimesPanel — Phase 147 default date', () => {
+  // 2026-11-08 is a Sunday, so a Wednesday default lands on 2026-11-04.
+  const SERVICE = '2026-11-08'
+  const DATE = '[data-testid="new-rehearsal-date"]'
+  const TIME = '[data-testid="new-rehearsal-time"]'
+  const value = (w: ReturnType<typeof mountPanel>, sel: string) =>
+    (w.get(sel).element as HTMLInputElement).value
+
+  it('fills the Date with the default date when no rehearsal sits on it (AC-RHD-40)', () => {
+    const wrapper = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: ['19:00'] })
+    expect(value(wrapper, DATE)).toBe('2026-11-04')
+  })
+
+  it('leaves the Date blank when a rehearsal already sits on the default date (AC-RHD-41)', () => {
+    const wrapper = mountPanel({
+      canEdit: true,
+      serviceDate: SERVICE,
+      defaultWeekday: 3,
+      defaultTimes: ['19:00'],
+      rehearsals: [{ id: 'r1', date: '2026-11-04', time: '19:00' }],
+    })
+    expect(value(wrapper, DATE)).toBe('')
+  })
+
+  it('leaves the Date blank with no default day, no service date, or a bad service date (AC-RHD-42)', () => {
+    expect(value(mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: null }), DATE)).toBe('')
+    expect(value(mountPanel({ canEdit: true, serviceDate: '', defaultWeekday: 3 }), DATE)).toBe('')
+    expect(value(mountPanel({ canEdit: true, serviceDate: 'not-a-date', defaultWeekday: 3 }), DATE)).toBe('')
+  })
+
+  it('fills the Date but not the Time with no default time, and Add waits for a time (AC-RHD-43)', async () => {
+    const wrapper = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: [] })
+    expect(value(wrapper, DATE)).toBe('2026-11-04')
+    expect(value(wrapper, TIME)).toBe('')
+    const btn = wrapper.get('[data-testid="add-rehearsal-btn"]')
+    expect(btn.attributes('disabled')).toBeDefined()
+    await wrapper.get(TIME).setValue('19:00')
+    expect(btn.attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps a date the planner typed or cleared when the service date changes (AC-RHD-44)', async () => {
+    const typed = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: ['19:00'] })
+    await typed.get(DATE).setValue('2026-11-10')
+    await typed.setProps({ serviceDate: '2026-11-22' })
+    expect(value(typed, DATE)).toBe('2026-11-10')
+
+    const cleared = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: ['19:00'] })
+    await cleared.get(DATE).setValue('')
+    await cleared.setProps({ serviceDate: '2026-11-22' })
+    expect(value(cleared, DATE)).toBe('')
+  })
+
+  it('follows the service date and the Settings day while the date is untouched (AC-RHD-45)', async () => {
+    const wrapper = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: ['19:00'] })
+    expect(value(wrapper, DATE)).toBe('2026-11-04')
+    await wrapper.setProps({ serviceDate: '2026-11-22' })
+    expect(value(wrapper, DATE)).toBe('2026-11-18')
+    await wrapper.setProps({ defaultWeekday: 5 })
+    expect(value(wrapper, DATE)).toBe('2026-11-20')
+  })
+
+  it('returns the Date to the default after Add, or to blank once that date holds the new rehearsal (AC-RHD-46)', async () => {
+    const wrapper = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: ['19:00'] })
+    await wrapper.get(DATE).setValue('2026-11-10')
+    await wrapper.get('[data-testid="add-rehearsal-form"]').trigger('submit')
+    expect(wrapper.emitted('add')![0]).toEqual([{ date: '2026-11-10', time: '19:00' }])
+    expect(value(wrapper, DATE)).toBe('2026-11-04')
+
+    await wrapper.setProps({ rehearsals: [{ id: 'r1', date: '2026-11-04', time: '19:00' }] })
+    expect(value(wrapper, DATE)).toBe('')
+  })
+
+  it('adds nothing by pre-filling the Date alone (AC-RHD-47)', async () => {
+    const wrapper = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: ['19:00'] })
+    expect(value(wrapper, DATE)).toBe('2026-11-04')
+    await wrapper.setProps({ serviceDate: '2026-11-22' })
+    expect(wrapper.emitted('add')).toBeUndefined()
+  })
+
+  it('shows no note about a default beside the Date field (AC-RHD-48)', () => {
+    const withDay = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: 3, defaultTimes: ['19:00'] })
+    const without = mountPanel({ canEdit: true, serviceDate: SERVICE, defaultWeekday: null, defaultTimes: ['19:00'] })
+    const field = (w: ReturnType<typeof mountPanel>) => w.get(DATE).element.parentElement as HTMLElement
+    expect(field(withDay).outerHTML).toBe(field(without).outerHTML)
+    expect(norm(field(withDay).textContent ?? '')).toBe('Date')
+  })
+
+  it('renders an auto-added rehearsal like any other, for editors and viewers (AC-RHD-53)', () => {
+    const plain = [{ id: 'r1', date: '2026-11-04', time: '19:00' }] as Rehearsal[]
+    const marked = [{ id: 'r1', date: '2026-11-04', time: '19:00', autoAdded: true }] as Rehearsal[]
+    for (const canEdit of [true, false]) {
+      const a = mountPanel({ canEdit, serviceDate: SERVICE, rehearsals: plain })
+      const b = mountPanel({ canEdit, serviceDate: SERVICE, rehearsals: marked })
+      expect(b.html()).toBe(a.html())
+    }
   })
 })

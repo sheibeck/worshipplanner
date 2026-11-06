@@ -341,4 +341,18 @@ describe('R445: report/rehearsal times regression (R433)', () => {
     const wrapper = mount(ServiceCard, { props: { service }, global: { stubs } })
     expect(wrapper.find('[data-testid="service-card-times"]').exists()).toBe(false)
   })
+
+  it('shows an auto-added rehearsal like any other on the card (AC-RHD-54)', () => {
+    const timesOf = (marked: boolean) => {
+      const service: Service = {
+        ...mockService,
+        reportTime: '08:00',
+        rehearsals: [{ id: 'r1', date: '2099-03-05', time: '18:30', ...(marked ? { autoAdded: true as const } : {}) }],
+      }
+      const wrapper = mount(ServiceCard, { props: { service }, global: { stubs } })
+      return wrapper.get('[data-testid="service-card-times"]').html()
+    }
+    expect(timesOf(true)).toBe(timesOf(false))
+    expect(norm(timesOf(true).replace(/<[^>]*>/g, ' '))).toContain('Rehearsal: Mar 5, 6:30 PM')
+  })
 })

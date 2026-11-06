@@ -82,6 +82,22 @@ const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
 enableAutoUnmount(afterEach)
 
 describe('R445: dashboard report/rehearsal times regression (R433)', () => {
+  it('shows an auto-added rehearsal like any other on the dashboard (AC-RHD-54)', () => {
+    const timesOf = (marked: boolean) => {
+      mockServices.value = [
+        makeService({
+          id: 'next',
+          date: '2099-03-08',
+          reportTime: '08:00',
+          rehearsals: [{ id: 'r1', date: '2099-03-05', time: '18:30', ...(marked ? { autoAdded: true as const } : {}) }],
+        }),
+      ]
+      return mountDashboard().get('[data-testid="dashboard-next-service-times"]').html()
+    }
+    expect(timesOf(true)).toBe(timesOf(false))
+    expect(norm(timesOf(true).replace(/<[^>]*>/g, ' '))).toContain('Rehearsal: Mar 5, 6:30 PM')
+  })
+
   it('R445: next service renders the sorted dated rehearsals and report time, hiding undated/untimed rows', () => {
     mockServices.value = [
       makeService({
