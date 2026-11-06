@@ -80,9 +80,10 @@ When this phase ends, `docs/specs/` holds only the template, so the check passes
   files mention an R-number.
 - Every test file is `*.test.ts` (256 files); there are no `*.spec.*` files. Skip, todo, each and only appear
   about 18 times.
-- `tsconfig.vitest.json` includes `src/**/__tests__/*`, and `tsconfig.app.json` excludes the same glob. Both
-  match direct children only, so a `.ts` file deeper down, such as `src/__tests__/fixtures/x.ts`, lands in the
-  app build's type-check. Fixture files should not be `.ts`, and must not match `*.test.ts`.
+- `tsconfig.vitest.json` includes `src/**/__tests__/*` (direct children only). `tsconfig.app.json`'s exclude also covers
+  subdirectories, so a `.ts` file deeper down, such as `src/__tests__/fixtures/x.ts`, is type-checked by neither
+  (confirmed in Phase 146 research with `tsc --listFilesOnly`), though eslint still lints it. Fixture files must not
+  match `*.test.ts`, and non-`.ts` or inline fixtures avoid the linting.
 
 ### Integration Points
 - Test locations the check must read: `src/**` (including `src/rules.test.ts` and `src/storage.rules.test.ts`,
