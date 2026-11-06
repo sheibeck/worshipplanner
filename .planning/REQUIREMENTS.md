@@ -34,10 +34,12 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 - [ ] **R454**: `docs/specs/TEMPLATE.md` defines a feature spec with these sections: purpose, behavior, numbered
   acceptance criteria, edge cases, out of scope, and links to tests and ADRs.
+
 - [ ] **R455**: `CLAUDE.md` and `.planning/PROJECT.md` record the rule: no feature work starts until its spec exists,
   and a behavior change updates the spec before the tests and code.
-- [ ] **R456**: Each acceptance criterion has a stable ID, and tests cite those IDs.
-- [ ] **R457**: An automated check fails when a spec's acceptance criterion has no test citing its ID.
+
+- [x] **R456**: Each acceptance criterion has a stable ID, and tests cite those IDs.
+- [x] **R457**: An automated check fails when a spec's acceptance criterion has no test citing its ID.
 - [ ] **R458**: `workflow.tdd_mode` is on. Stores, utilities, functions and security rules need a failing test first;
   UI layout tests may land with the code but must cite spec criteria.
 
@@ -49,12 +51,15 @@ The feature's spec lands in `docs/specs/` before any of its tests or code.
 - [ ] **R460**: With a default weekday and at least one default time set, a new service gets one rehearsal on the most
   recent default weekday on or before the service date (the service date itself when it falls on that weekday), at
   the first default time.
+
 - [ ] **R461**: Unless both a default weekday and a default time are set, a new service gets no rehearsal.
 - [ ] **R462**: Changing a service's date moves an auto-added rehearsal nobody has changed, keeping its weekday and
   time. A rehearsal a planner has changed stays where it is.
+
 - [ ] **R463**: Changing the Settings default does not touch existing services, and there is no data migration.
 - [ ] **R464**: The add-rehearsal form pre-fills the default date only if the service has no rehearsal on that date;
   otherwise the date stays blank.
+
 - [ ] **R465**: A new ADR supersedes the reversed parts of ADR-0245, and the auto-added marker never appears on share
   links or other read-only views.
 
@@ -83,8 +88,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | R454 | Phase 146 | Pending |
 | R455 | Phase 146 | Pending |
-| R456 | Phase 146 | Pending |
-| R457 | Phase 146 | Pending |
+| R456 | Phase 146 | Complete |
+| R457 | Phase 146 | Complete |
 | R458 | Phase 146 | Pending |
 | R459 | Phase 147 | Pending |
 | R460 | Phase 147 | Pending |

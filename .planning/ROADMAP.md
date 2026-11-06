@@ -849,12 +849,12 @@ in PROJECT.md's "Current Milestone: v2.17" section.
 
   5. `workflow.tdd_mode` is `true` in `.planning/config.json`, and `CLAUDE.md` says stores, utilities, functions and security rules need a failing test first, while UI layout tests may land with the code but must cite spec criteria (R458).
 
-**Plans**: 2 plans
+**Plans**: 1/2 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 146-01-PLAN.md — Build the automated spec check test-first: reads test titles with the `typescript` parser, parses specs, names each uncited criterion, runs inside `npx vitest run` (R456, R457)
+- [x] 146-01-PLAN.md — Build the automated spec check test-first: reads test titles with the `typescript` parser, parses specs, names each uncited criterion, runs inside `npx vitest run` (R456, R457)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
