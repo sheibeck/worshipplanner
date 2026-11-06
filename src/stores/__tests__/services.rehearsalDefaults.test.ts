@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { reactive } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
+import { inZone, TZ_ZONES } from '@/utils/__tests__/inZone'
 
-// R442 (ADR-0245): createService writes rehearsals [] and still copies
-// reportTimeDefault once at creation (copy-not-live-bind).
+// createService writes rehearsals [] unless a default day and a usable first time are set, and
+// copies reportTimeDefault once at creation (copy-not-live-bind). See ADR-0249
+// (docs/adr/0249-new-services-start-with-a-default-rehearsal.md)
 
 let uuidCounter = 0
 vi.stubGlobal('crypto', {
@@ -50,6 +52,7 @@ const mockAuthState = reactive<{
     pcEnabled: boolean
     vwModeEnabled: boolean
     defaultServiceTemplate: unknown[]
+    rehearsalDefaultWeekday?: number | null
     rehearsalTimeDefaults: string[]
     reportTimeDefault: string
   }
@@ -69,10 +72,11 @@ vi.mock('@/stores/auth', () => ({
   useAuthStore: () => mockAuthState,
 }))
 
-describe('createService — no seeded rehearsals, report-time copy (R442)', () => {
+describe('createService — default rehearsal and report-time copy (R442, R460, R461)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    mockAuthState.settings.rehearsalDefaultWeekday = null
     mockAuthState.settings.rehearsalTimeDefaults = []
     mockAuthState.settings.reportTimeDefault = ''
   })
@@ -149,5 +153,102 @@ describe('createService — no seeded rehearsals, report-time copy (R442)', () =
     const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
     expect(data.rehearsals).toEqual([])
     expect(data.reportTime).toBe('')
+  })
+})
+
+describe('createService — the default rehearsal row', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    mockAuthState.settings.rehearsalDefaultWeekday = null
+    mockAuthState.settings.rehearsalTimeDefaults = []
+    mockAuthState.settings.reportTimeDefault = ''
+  })
+
+  type Row = { id: string; date: string; time: string; autoAdded?: boolean }
+
+  async function create(date: string, weekday: number | null | undefined, times: string[]): Promise<Row[]> {
+    const { addDoc } = await import('firebase/firestore')
+    mockAuthState.settings.rehearsalDefaultWeekday = weekday
+    mockAuthState.settings.rehearsalTimeDefaults = times
+    const { useServiceStore } = await import('../services')
+    const store = useServiceStore()
+    store.subscribe('org-1')
+    await store.createService({ date, name: '', teams: [] })
+    const calls = vi.mocked(addDoc).mock.calls
+    return (calls[calls.length - 1]![1] as { rehearsals: Row[] }).rehearsals
+  }
+
+  it('adds one rehearsal on the prior Wednesday for a Sunday service (AC-RHD-17)', async () => {
+    const rows = await create('2026-11-08', 3, ['18:30'])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ date: '2026-11-04', time: '18:30' })
+  })
+
+  it('adds the rehearsal the same day for a Wednesday service (AC-RHD-18)', async () => {
+    const rows = await create('2026-11-04', 3, ['18:30'])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ date: '2026-11-04', time: '18:30' })
+  })
+
+  it('uses the first default time in stored order, not the earliest (AC-RHD-19)', async () => {
+    const rows = await create('2026-11-08', 3, ['19:00', '18:30'])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.time).toBe('19:00')
+  })
+
+  it('still adds a rehearsal whose date is in the past (AC-RHD-20)', async () => {
+    const rows = await create('2020-01-05', 3, ['18:30'])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.date).toBe('2020-01-01')
+    expect(rows[0]!.date < new Date().toISOString().slice(0, 10)).toBe(true)
+  })
+
+  it.each(TZ_ZONES)('gives the same rehearsal date in %s (AC-RHD-21)', async (tz, offset) => {
+    const rows = await inZone(tz, offset, () => create('2026-11-08', 3, ['18:30']))
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.date).toBe('2026-11-04')
+  })
+
+  it('adds no rehearsal when the default day is null (AC-RHD-22)', async () => {
+    expect(await create('2026-11-08', null, ['18:30'])).toEqual([])
+  })
+
+  it('adds no rehearsal when the default day was never stored (AC-RHD-22)', async () => {
+    expect(await create('2026-11-08', undefined, ['18:30'])).toEqual([])
+  })
+
+  it('adds no rehearsal when there is no default time (AC-RHD-23)', async () => {
+    expect(await create('2026-11-08', 3, [])).toEqual([])
+  })
+
+  it.each(['not-a-date', '2026-02-30'])('still creates a service dated %s, with no rehearsal (AC-RHD-24)', async (date) => {
+    const { addDoc } = await import('firebase/firestore')
+    expect(await create(date, 3, ['18:30'])).toEqual([])
+    expect(vi.mocked(addDoc)).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks the added rehearsal as auto-added (AC-RHD-25)', async () => {
+    const rows = await create('2026-11-08', 3, ['18:30'])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.autoAdded).toBe(true)
+  })
+
+  it.each([[''], ['7pm']])('adds no rehearsal when the first default time is %j (AC-RHD-66)', async (time) => {
+    expect(await create('2026-11-08', 3, [time])).toEqual([])
+  })
+
+  it('leaves a service created earlier as it was when the default day later changes (AC-RHD-10)', async () => {
+    const { addDoc } = await import('firebase/firestore')
+    const rows = await create('2026-11-08', 3, ['18:30'])
+    const payload = vi.mocked(addDoc).mock.calls[0]![1] as { rehearsals: unknown[] }
+    expect(rows).toHaveLength(1)
+    const before = JSON.parse(JSON.stringify(payload.rehearsals))
+
+    mockAuthState.settings.rehearsalDefaultWeekday = 5
+    mockAuthState.settings.rehearsalTimeDefaults = ['20:00']
+
+    expect(payload.rehearsals).toEqual(before)
+    expect(payload.rehearsals).toHaveLength(1)
   })
 })
