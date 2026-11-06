@@ -4,9 +4,9 @@ milestone: v2.17
 milestone_name: Spec-Driven Foundation & Rehearsal Defaults
 current_phase: 147
 current_phase_name: Default Rehearsal Day and Time
-status: planning
+status: executing
 stopped_at: Phase 147 UI-SPEC approved
-last_updated: "2026-11-06T18:51:21.245Z"
+last_updated: "2026-11-06T21:00:20.356Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 146 complete, transitioned to Phase 147
 progress:
@@ -135,7 +135,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Ready to plan
+**Status:** Ready to execute
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1483,7 +1483,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 147 — Default Rehearsal Day and Time
 Plan: Not started
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Last activity: 2026-11-06 — Phase 146 complete, transitioned to Phase 147
 
 Progress: [██████████] 100% (0/2 phases)

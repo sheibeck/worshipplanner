@@ -49,10 +49,12 @@ Filled in by the plans. Requirement-level map:
 | R459 | Stored day survives load; missing reads none | store | `npx vitest run src/stores/__tests__/auth.test.ts` | ✅ edit | ⬜ pending |
 | R460 | Weekday maths, boundaries, timezone | unit | `npx vitest run src/utils/__tests__/rehearsalTimes.test.ts` | ✅ edit | ⬜ pending |
 | R460, R461 | Auto-add and its guards in `createService` | store | `npx vitest run src/stores/__tests__/services.rehearsalDefaults.test.ts` | ✅ edit | ⬜ pending |
-| R462 | Move, sticky edit, collisions, date saved, old page removed, marker survives | unit + store + view | `npx vitest run src/utils/__tests__/rehearsalTimes.test.ts src/views/__tests__/ServiceEditorView.timesSection.test.ts` | ✅ edit | ⬜ pending |
+| R462 | Move, sticky edit, collisions, date saved, marker survives, Undo | unit + view | `npx vitest run src/utils/__tests__/rehearsalTimes.test.ts src/views/__tests__/ServiceEditorView.timesSection.test.ts` | ✅ edit | ⬜ pending |
+| R462 | Old page removed, token link kept, two services on one date, cold-cache old date | store | `npx vitest run src/stores/__tests__/services.publicDocs.test.ts` | ❌ W0 | ⬜ pending |
 | R463 | Defaults never touch existing services | store + view | `npx vitest run src/stores/__tests__/services.rehearsalDefaults.test.ts` | ✅ edit | ⬜ pending |
 | R464 | Add-form default date | component | `npx vitest run src/components/__tests__/ServiceTimesPanel.test.ts` | ✅ edit | ⬜ pending |
 | R465 | Projections narrowed, payloads clean, display unchanged | store + unit + component | `npx vitest run src/stores/__tests__/services.rehearsalProjection.test.ts src/utils/rehearseAccess.test.ts` | ✅ edit | ⬜ pending |
+| R465 | Written and rewritten share documents carry no marker | store | `npx vitest run src/stores/__tests__/services.publicDocs.test.ts` | ❌ W0 | ⬜ pending |
 | R465 | ADR-0249 and pointers | doc guard | `npx vitest run src/__tests__/defaultRehearsalAdr.test.ts` | ❌ W0 | ⬜ pending |
 | R457 (pilot) | Every criterion cited | check | `npx vitest run src/__tests__/specCoverage.test.ts` | ✅ | ⬜ pending |
 
@@ -64,6 +66,8 @@ Filled in by the plans. Requirement-level map:
 
 - [ ] `docs/specs/default-rehearsal.md` — the spec, committed before any test or code
 - [ ] `src/__tests__/defaultRehearsalAdr.test.ts` — doc guard, failing before the ADR exists
+- [ ] `src/stores/__tests__/services.publicDocs.test.ts` — in-memory document store for what the store really writes and
+  removes, created by 147-03 Task 1
 - [ ] Mock updates for the new settings field in `SettingsView.test.ts` and `ServiceEditorView.timesSection.test.ts`
 - [ ] A timezone helper with an offset canary, because a shell `TZ=` prefix is silently ignored in Git Bash here
 

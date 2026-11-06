@@ -881,7 +881,26 @@ Area: `docs/specs/TEMPLATE.md` (new), the automated check and its fixtures (new)
 
   5. A new ADR supersedes the reversed parts of ADR-0245. The auto-added rehearsal shows like any other rehearsal on share links, the volunteer view and other read-only views, and its marker appears on none of them and in neither public payload (`buildServiceSnapshot`, `buildRehearseAccess`) (R465).
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 147-01-PLAN.md — The feature spec, alone, ahead of every test and code commit: `docs/specs/default-rehearsal.md` with 68 numbered criteria tracing R459-R465
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 147-02-PLAN.md — Test-first foundation: timezone-free date helpers, the row marker type, the weekday setting, both public projections narrowed, and ADR-0249 superseding the reversed parts of ADR-0245
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 147-03-PLAN.md — Test-first store work: `createService` adds the rehearsal, and a date change retires the old date's public page, soft-failing
+- [ ] 147-04-PLAN.md — Test-first UI behavior: the Default rehearsal day select and help text in Settings, the add form's default date, and display parity for an auto-added rehearsal
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 147-05-PLAN.md — Test-first editor work: a changed date saves and moves the auto-added rehearsal in one write, edits clear the marker, Undo stays in step; then map docs, the spec set Active, and the full gate
+
 **UI hint**: yes
 
 Area: `createService` and `buildServiceSnapshot` in `src/stores/services.ts`, `src/utils/rehearsalTimes.ts`,

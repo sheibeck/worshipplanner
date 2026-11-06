@@ -54,6 +54,12 @@ code for this phase.
   link already sent with the old date stops working, and the regular share link (the token) keeps working and stays
   current. This overrides RESEARCH.md's suggestion to accept the stale page; don't record it as an accepted residual.
 - **Soft failure:** a failed removal must not fail the save, matching how the other share writes behave.
+- **Two services on one date:** the public date page records only one of them. If that service moves, its page is
+  removed, and the other service has no date page until its next save rewrites it. Its token link is unaffected. The
+  owner accepts this; a spec criterion and a test record it.
+- **Undo:** the editor's Undo restores the whole service, including the auto-added marker, so undoing an edit restores
+  auto-moving. Undo means the edit never happened. The "ends auto-moving for good" rule covers setting a value back by
+  hand. No extra code in `onUndo`.
 - **Role overrides keyed by date** now follow the service's new date. That's correct and needs no change.
 - The spec must have criteria for the date being saved and for the old page being removed.
 
