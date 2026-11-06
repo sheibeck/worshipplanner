@@ -35,7 +35,7 @@ The marker is internal. In the Times tab an auto-added rehearsal looks like any 
 - **AC-RHD-05** - For a user who is not an editor the select is disabled and "Save defaults" is not shown. (R459)
 - **AC-RHD-06** - A church's saved default day is still there after the organization reloads. (R459)
 - **AC-RHD-07** - A church with no saved default day reads as None. (R459)
-- **AC-RHD-67** - After an in-place switch to another church, the select shows that church's saved day. (R459)
+- **AC-RHD-67** - After an in-place switch to another church, the card shows that church's saved default day, default times and report time, and "Save defaults" writes those values, not the previous church's. (R459)
 - **AC-RHD-08** - The card's help text reads "New services start with one rehearsal on the default day at the first default time. The report time is copied onto every new service. Changing these defaults doesn't affect existing services." (R463)
 - **AC-RHD-09** - Saving the defaults changes only the organization's settings and writes to no service. (R463)
 - **AC-RHD-10** - Changing the default day leaves a service created earlier with the rehearsals it already has. (R463)
