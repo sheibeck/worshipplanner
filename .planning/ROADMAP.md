@@ -881,12 +881,12 @@ Area: `docs/specs/TEMPLATE.md` (new), the automated check and its fixtures (new)
 
   5. A new ADR supersedes the reversed parts of ADR-0245. The auto-added rehearsal shows like any other rehearsal on share links, the volunteer view and other read-only views, and its marker appears on none of them and in neither public payload (`buildServiceSnapshot`, `buildRehearseAccess`) (R465).
 
-**Plans**: 5 plans
+**Plans**: 1/5 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 147-01-PLAN.md — The feature spec, alone, ahead of every test and code commit: `docs/specs/default-rehearsal.md` with 68 numbered criteria tracing R459-R465
+- [x] 147-01-PLAN.md — The feature spec, alone, ahead of every test and code commit: `docs/specs/default-rehearsal.md` with 68 numbered criteria tracing R459-R465
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

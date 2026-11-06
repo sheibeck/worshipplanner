@@ -5,16 +5,16 @@ milestone_name: Spec-Driven Foundation & Rehearsal Defaults
 current_phase: 147
 current_phase_name: Default Rehearsal Day and Time
 status: executing
-stopped_at: Phase 147 UI-SPEC approved
-last_updated: "2026-11-06T21:00:20.356Z"
+stopped_at: Completed 147-01-PLAN.md
+last_updated: "2026-11-06T21:01:56.808Z"
 last_activity: 2026-11-06
-last_activity_desc: Phase 146 complete, transitioned to Phase 147
+last_activity_desc: Phase 147 execution started
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 50
+  total_plans: 7
+  completed_plans: 3
+  percent: 43
 ---
 
 ## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27) — CLOSED: milestone shipped + archived 2026-10-27
@@ -1471,7 +1471,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 146 — Spec Standard
+**Current focus:** Phase 147 — Default Rehearsal Day and Time
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -1481,12 +1481,12 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 147 — Default Rehearsal Day and Time
-Plan: Not started
+Phase: 147 (Default Rehearsal Day and Time) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-11-06 — Phase 146 complete, transitioned to Phase 147
+Last activity: 2026-11-06 — Phase 147 execution started
 
-Progress: [██████████] 100% (0/2 phases)
+Progress: [████░░░░░░] 43% (0/2 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3828,6 +3828,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 145 P03 | 45min | 2 tasks | 5 files |
 | Phase 146 P01 | 15min | 2 tasks | 2 files |
 | Phase 146 P02 | 25min | 3 tasks | 6 files |
+| Phase 147 P01 | 5min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -4471,6 +4472,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 146-01: spec check sorts specs by name and uses a literal-text ID check; describe citations need an active child; skip/todo/fails/skipIf/runIf/options-off/empty-body tests never count
 - [Phase ?]: 146-02: ADR-0248 records fails/skipIf/runIf/options-object/empty-body and describe active-child rules as Claude's discretion extending the owner's .skip/.todo decision
 - [Phase ?]: 146-02: spec-first rule lives verbatim in CLAUDE.md and a standing PROJECT.md Development Philosophy section, guarded by specCoverage.test.ts
+- [Phase ?]: 147-01: spec committed alone ahead of tests/code; 68 criteria final, IDs cited by number
 
 ### Roadmap Evolution
 
@@ -4812,9 +4814,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-11-06T18:51:21.192Z
-Stopped at: Phase 147 UI-SPEC approved
-Resume file: .planning/phases/147-default-rehearsal-day-and-time/147-UI-SPEC.md
+Last session: 2026-11-06T21:01:56.737Z
+Stopped at: Completed 147-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 
