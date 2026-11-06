@@ -145,6 +145,9 @@ let mockReportTimeDefault = ''
 // Phase 147 (R459). Ref-backed so a church switch after mount is observable: Vue cannot
 // watch a plain `let` behind a getter (AC-RHD-67).
 const mockRehearsalDefaultWeekday = ref<number | null | undefined>(null)
+// The org id and the two plain `let` defaults above are not reactive. Their getters read this
+// tick, and `switchChurch` bumps it, so a switch after mount is observable (AC-RHD-67).
+const mockSwitchTick = ref(0)
 
 const mockSetPcCredentials = vi.fn()
 const mockUpdateOrgSettings = vi.fn(() => Promise.resolve())
@@ -152,6 +155,7 @@ const mockUpdateOrgSettings = vi.fn(() => Promise.resolve())
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     get orgId() {
+      void mockSwitchTick.value
       return mockOrgId
     },
     get orgName() {
@@ -297,12 +301,14 @@ vi.mock('@/stores/auth', () => ({
       // component throws "is not iterable" on mount, mirroring every other
       // settings.* field above.
       get rehearsalTimeDefaults() {
+        void mockSwitchTick.value
         return mockRehearsalTimeDefaults
       },
       set rehearsalTimeDefaults(v: string[]) {
         mockRehearsalTimeDefaults = v
       },
       get reportTimeDefault() {
+        void mockSwitchTick.value
         return mockReportTimeDefault
       },
       set reportTimeDefault(v: string) {
@@ -511,6 +517,75 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockRehearsalDefaultWeekday.value = null
     await flushPromises()
     expect(selectedDayText(wrapper)).toBe('None')
+  })
+
+  /** An in-place switch: the org id, the weekday and the other defaults change, with no remount. */
+  function switchChurch(to: {
+    orgId: string
+    weekday: number | null
+    times: string[]
+    reportTime: string
+  }) {
+    mockOrgId = to.orgId
+    mockRehearsalDefaultWeekday.value = to.weekday
+    mockRehearsalTimeDefaults = to.times
+    mockReportTimeDefault = to.reportTime
+    mockSwitchTick.value += 1
+  }
+  function timeInputValues(wrapper: ReturnType<typeof mountSettingsView>): string[] {
+    return wrapper
+      .findAll('[data-testid^="rehearsal-default-time-"]')
+      .map((i) => (i.element as HTMLInputElement).value)
+  }
+  const REPORT_TIME_SELECTOR = '[data-testid="report-time-default-input"]'
+
+  it('shows the new church day, times and report time when two churches share a weekday (AC-RHD-67)', async () => {
+    mockOrgId = 'org-a'
+    mockRehearsalDefaultWeekday.value = 3
+    mockRehearsalTimeDefaults = ['18:30']
+    mockReportTimeDefault = '17:45'
+    const wrapper = mountSettingsView()
+    expect(selectedDayText(wrapper)).toBe('Wednesday')
+    switchChurch({ orgId: 'org-b', weekday: 3, times: ['19:00', '20:15'], reportTime: '18:15' })
+    await flushPromises()
+    expect(selectedDayText(wrapper)).toBe('Wednesday')
+    expect(timeInputValues(wrapper)).toEqual(['19:00', '20:15'])
+    expect((wrapper.get(REPORT_TIME_SELECTOR).element as HTMLInputElement).value).toBe('18:15')
+  })
+
+  it('shows the new church values when its settings arrive after the org id changes (AC-RHD-67)', async () => {
+    mockOrgId = 'org-a'
+    mockRehearsalDefaultWeekday.value = 3
+    mockRehearsalTimeDefaults = ['18:30']
+    mockReportTimeDefault = '17:45'
+    const wrapper = mountSettingsView()
+    // selectOrg sets the org id before it awaits the new church's document, so the first
+    // change still carries the old church's settings.
+    mockOrgId = 'org-b'
+    mockSwitchTick.value += 1
+    await flushPromises()
+    switchChurch({ orgId: 'org-b', weekday: 3, times: ['19:00'], reportTime: '18:15' })
+    await flushPromises()
+    expect(selectedDayText(wrapper)).toBe('Wednesday')
+    expect(timeInputValues(wrapper)).toEqual(['19:00'])
+    expect((wrapper.get(REPORT_TIME_SELECTOR).element as HTMLInputElement).value).toBe('18:15')
+  })
+
+  it('writes the new church values, not the previous church, when Save defaults is pressed after a switch (AC-RHD-67)', async () => {
+    mockOrgId = 'org-a'
+    mockRehearsalDefaultWeekday.value = 3
+    mockRehearsalTimeDefaults = ['18:30']
+    mockReportTimeDefault = '17:45'
+    const wrapper = mountSettingsView()
+    switchChurch({ orgId: 'org-b', weekday: 3, times: ['19:00', '20:15'], reportTime: '18:15' })
+    await flushPromises()
+    await pressSave(wrapper)
+    expect(mockUpdateOrgSettings).toHaveBeenCalledTimes(1)
+    expect(mockUpdateOrgSettings).toHaveBeenCalledWith({
+      'settings.rehearsalTimeDefaults': ['19:00', '20:15'],
+      'settings.reportTimeDefault': '18:15',
+      'settings.rehearsalDefaultWeekday': 3,
+    })
   })
 })
 
