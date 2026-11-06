@@ -401,12 +401,14 @@ Suggested: `No feature work starts until its spec exists in docs/specs/, and a b
 | A3 | Excluding `README.md` from the spec scan is wanted | Q5 | Low; a later index would otherwise register as a criterion-less spec |
 | A4 | Describe-title citations should require an active child | Q1 | Low; CONTEXT silent; stricter is safer |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should a `describe`-level citation satisfy a criterion at all, or only `it`/`test`?**
    - Known: CONTEXT says citation goes "in the test title"; the task prompt listed `describe` titles as counted (existing habit: `describe('... (R448)')`).
    - Recommendation: count describe titles, but only with an active child (implemented above).
+   - RESOLVED: Yes, but only when the describe holds at least one counted test (assumption A4). Plan 01 Task 1 implements this: a suite adds its title IDs only when its active count is above zero.
 2. **Visible fixture files vs inline strings.** Recommendation above is inline + temp dir; the planner may prefer committed `.md`/`.txt` fixtures for readability. Both satisfy R457.
+   - RESOLVED: Inline strings plus a temp tree, with no fixture files in the repo. Plan 01 Task 1 uses inline strings, and Plan 01 Task 2 adds `makeRepo` for the temp tree.
 
 ## Environment Availability
 
