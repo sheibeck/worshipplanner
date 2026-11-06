@@ -28,7 +28,7 @@ addresses 302-redirecting to the same page (reserved `/__/*` auth paths untouche
 `worship-planner-bc515.firebaseapp.com`). See ROADMAP.md for the full milestone history; per-milestone detail
 archived under `.planning/milestones/`.
 
-**Active milestone: v2.17** (see below). Standing follow-ups: the volunteer magic
+**Active milestone: v2.17** (see below). Phase 146 (Spec Standard) is complete: `docs/specs/TEMPLATE.md`, the spec-first rule, `tdd_mode` on, and `src/__tests__/specCoverage.test.ts` inside `npx vitest run` (R454-R458). Standing follow-ups: the volunteer magic
 link on the new domain is untested (no volunteers yet); each Run computer needs a one-time re-setup on the new
 address (sign in, church, Run monitor setup, video key color, Window management + Automatic Fullscreen);
 backlog **999.14** (custom domain + verified Resend sender + `authDomain` switch — the old site must stay up
@@ -1267,3 +1267,4 @@ Archived: `milestones/v2.5-ROADMAP.md` · `milestones/v2.5-REQUIREMENTS.md` · `
 *Last updated: 2026-10-27 — milestone v2.16 Dated Rehearsals & WorshipBuilder started*
 *Last updated: 2026-10-27 — archived milestone v2.16 Dated Rehearsals & WorshipBuilder (Phases 143-145, R441-R453; R452 descoped), shipped & deployed to production the same day*
 *Last updated: 2026-11-06 — milestone v2.17 Spec-Driven Foundation & Rehearsal Defaults started*
+*Last updated: 2026-11-06 — Phase 146 Spec Standard complete (R454-R458); Phase 147 is next*

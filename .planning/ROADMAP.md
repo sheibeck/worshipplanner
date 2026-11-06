@@ -829,7 +829,7 @@ in PROJECT.md's "Current Milestone: v2.17" section.
   moves; what happens when a moved rehearsal lands on a date that already has one; and whether the add form
   pre-fills a date when a weekday is set but no time is (R461 only blocks the auto-add).
 
-- [ ] **Phase 146: Spec Standard** - Feature specs have a template, a home in `docs/specs/` and stable criterion IDs. The spec-first rule and test-first setting are in force, and an automated check catches any criterion with no test
+- [x] **Phase 146: Spec Standard** - Feature specs have a template, a home in `docs/specs/` and stable criterion IDs. The spec-first rule and test-first setting are in force, and an automated check catches any criterion with no test (completed 2026-11-06)
 - [ ] **Phase 147: Default Rehearsal Day and Time** - A church sets one default weekday and new services start with the rehearsal on them, built spec-first as the pilot for the Phase 146 standard
 
 ### Phase 146: Spec Standard
