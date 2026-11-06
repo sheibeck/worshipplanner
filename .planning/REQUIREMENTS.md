@@ -32,15 +32,15 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (see Tra
 
 ### Spec Standard
 
-- [ ] **R454**: `docs/specs/TEMPLATE.md` defines a feature spec with these sections: purpose, behavior, numbered
+- [x] **R454**: `docs/specs/TEMPLATE.md` defines a feature spec with these sections: purpose, behavior, numbered
   acceptance criteria, edge cases, out of scope, and links to tests and ADRs.
 
-- [ ] **R455**: `CLAUDE.md` and `.planning/PROJECT.md` record the rule: no feature work starts until its spec exists,
+- [x] **R455**: `CLAUDE.md` and `.planning/PROJECT.md` record the rule: no feature work starts until its spec exists,
   and a behavior change updates the spec before the tests and code.
 
 - [x] **R456**: Each acceptance criterion has a stable ID, and tests cite those IDs.
 - [x] **R457**: An automated check fails when a spec's acceptance criterion has no test citing its ID.
-- [ ] **R458**: `workflow.tdd_mode` is on. Stores, utilities, functions and security rules need a failing test first;
+- [x] **R458**: `workflow.tdd_mode` is on. Stores, utilities, functions and security rules need a failing test first;
   UI layout tests may land with the code but must cite spec criteria.
 
 ### Default Rehearsal Day and Time (promotes backlog 999.15)
@@ -86,11 +86,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R454 | Phase 146 | Pending |
-| R455 | Phase 146 | Pending |
+| R454 | Phase 146 | Complete |
+| R455 | Phase 146 | Complete |
 | R456 | Phase 146 | Complete |
 | R457 | Phase 146 | Complete |
-| R458 | Phase 146 | Pending |
+| R458 | Phase 146 | Complete |
 | R459 | Phase 147 | Pending |
 | R460 | Phase 147 | Pending |
 | R461 | Phase 147 | Pending |

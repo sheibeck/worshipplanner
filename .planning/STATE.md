@@ -4,17 +4,17 @@ milestone: v2.17
 milestone_name: Spec-Driven Foundation & Rehearsal Defaults
 current_phase: 146
 current_phase_name: Spec Standard
-status: executing
-stopped_at: Completed 146-01-PLAN.md
-last_updated: "2026-11-06T17:11:30.330Z"
+status: verifying
+stopped_at: Completed 146-02-PLAN.md
+last_updated: "2026-11-06T17:29:58.799Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 146 execution started
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 ## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27) — CLOSED: milestone shipped + archived 2026-10-27
@@ -135,7 +135,7 @@ confirm with me before doing so."*
 
 # ▶ ACTIVE MILESTONE — v2.14 Services UX Alignment, Dashboard & Live-Stream Output (roadmap created 2026-09-07)
 
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 
 **Goal:** Bring the Services page and share views up to the app's UX/mobile standard, make the dashboard
 genuinely useful, add worship-team confirmation and editor presence, and introduce a third "Video"
@@ -1483,10 +1483,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 146 (Spec Standard) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-11-06 — Phase 146 execution started
 
-Progress: [█████░░░░░] 50% (0/2 phases)
+Progress: [██████████] 100% (0/2 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3827,6 +3827,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 145 P02 | 15min | 2 tasks | 10 files |
 | Phase 145 P03 | 45min | 2 tasks | 5 files |
 | Phase 146 P01 | 15min | 2 tasks | 2 files |
+| Phase 146 P02 | 25min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -4468,6 +4469,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [145-02] Share-link default = https://worshipbuilder.web.app; builders unchanged; CORS file edited only (bucket apply is an owner runbook step)
 - [Phase ?]: Phase 145-03: cutover deploy order is CORS, authorized domain, hosting:app, functions, new-domain smoke, hosting:legacy last; env checks status-only and CRLF-tolerant; ADR-0247
 - [Phase ?]: 146-01: spec check sorts specs by name and uses a literal-text ID check; describe citations need an active child; skip/todo/fails/skipIf/runIf/options-off/empty-body tests never count
+- [Phase ?]: 146-02: ADR-0248 records fails/skipIf/runIf/options-object/empty-body and describe active-child rules as Claude's discretion extending the owner's .skip/.todo decision
+- [Phase ?]: 146-02: spec-first rule lives verbatim in CLAUDE.md and a standing PROJECT.md Development Philosophy section, guarded by specCoverage.test.ts
 
 ### Roadmap Evolution
 
@@ -4809,8 +4812,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-11-06T17:11:30.258Z
-Stopped at: Completed 146-01-PLAN.md
+Last session: 2026-11-06T17:29:58.742Z
+Stopped at: Completed 146-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

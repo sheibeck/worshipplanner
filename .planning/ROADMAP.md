@@ -849,7 +849,7 @@ in PROJECT.md's "Current Milestone: v2.17" section.
 
   5. `workflow.tdd_mode` is `true` in `.planning/config.json`, and `CLAUDE.md` says stores, utilities, functions and security rules need a failing test first, while UI layout tests may land with the code but must cite spec criteria (R458).
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 Plans:
 **Wave 1**
@@ -858,7 +858,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 146-02-PLAN.md — Guards first, then the template, ADR-0248 and the same rule in `CLAUDE.md` and a standing `PROJECT.md` section (R454, R455, R456, R458)
+- [x] 146-02-PLAN.md — Guards first, then the template, ADR-0248 and the same rule in `CLAUDE.md` and a standing `PROJECT.md` section (R454, R455, R456, R458)
 
 Area: `docs/specs/TEMPLATE.md` (new), the automated check and its fixtures (new), `CLAUDE.md`, `.planning/PROJECT.md`,
 `.planning/config.json`.
