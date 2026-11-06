@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.16
-milestone_name: Dated Rehearsals & WorshipBuilder
-status: completed
-stopped_at: Completed 145-03-PLAN.md
-last_updated: "2026-10-27T23:25:13.713Z"
-last_activity: 2026-10-27
-last_activity_desc: Milestone v2.16 completed and archived
+milestone: v2.17
+milestone_name: Spec-Driven Foundation & Rehearsal Defaults
+status: planning
+last_updated: "2026-11-06T13:58:10.347Z"
+last_activity: 2026-11-06
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
-current_phase: 145
-current_phase_name: Domain Cutover to worshipbuilder.web.app
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 ## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27) — CLOSED: milestone shipped + archived 2026-10-27
@@ -1481,10 +1477,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v2.16 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-10-27 — Milestone v2.16 completed and archived
+Status: Defining requirements
+Last activity: 2026-11-06 — Milestone v2.17 started
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 

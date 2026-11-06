@@ -18,12 +18,36 @@ addresses 302-redirecting to the same page (reserved `/__/*` auth paths untouche
 `worship-planner-bc515.firebaseapp.com`). See ROADMAP.md for the full milestone history; per-milestone detail
 archived under `.planning/milestones/`.
 
-**No active milestone** — next one is scoped via `/gsd-new-milestone`. Standing follow-ups: the volunteer magic
+**Active milestone: v2.17** (see below). Standing follow-ups: the volunteer magic
 link on the new domain is untested (no volunteers yet); each Run computer needs a one-time re-setup on the new
 address (sign in, church, Run monitor setup, video key color, Window management + Automatic Fullscreen);
 backlog **999.14** (custom domain + verified Resend sender + `authDomain` switch — the old site must stay up
-until then) and **999.15** (default rehearsal day and time); the owner-waived v2.14–v2.16 UAT lists
+until then); the owner-waived v2.14–v2.16 UAT lists
 (`milestones/v2.1{4,5,6}-DEFERRED-VERIFICATION.md`).
+
+## Current Milestone: v2.17 Spec-Driven Foundation & Rehearsal Defaults
+
+**Goal:** Make specifications the project's source of truth, then prove the process on a real feature.
+
+**Development philosophy (owner directive, 2026-11-06):** Specification Driven Development is the core
+philosophy, followed by Test Driven Design. The order is spec, then tests, then code.
+
+**Target features:**
+
+- **Spec standard:** living per-feature specs in `docs/specs/`, a template, and the spec → tests → code order
+  recorded in `CLAUDE.md` and here. `workflow.tdd_mode` turned on: a failing test first for stores, utilities,
+  functions and security rules; visual layout work needs tests tied to spec criteria, which may land with the code.
+- **Default rehearsal day and time, built spec-first (promotes backlog 999.15):** one default weekday in Settings.
+  A new service gets a rehearsal on the most recent default weekday on or before the service date (the service
+  date itself when it falls on that weekday), using the first default time. Nothing is added unless the church
+  has set both a weekday and a time. Moving a service moves a rehearsal nobody has changed. Existing services
+  are not touched. The add-rehearsal form pre-fills that same date only if the service has no rehearsal on it
+  yet. A new ADR supersedes the parts of ADR-0245 this reverses.
+- **Deploy guard:** a bare `firebase deploy` or `--only hosting` cannot publish the legacy redirect by accident.
+
+**Key context:** Pilot for the new process; v2.18 backfills specs for every existing feature using the format
+proven here. No milestone research. Out of scope: spec backfill (v2.18), custom domain and email (999.14 stays in
+the backlog), and the Planning Center export's hard-coded Wednesday rehearsal (future requirement).
 
 ## Shipped Milestone: v2.16 Dated Rehearsals & WorshipBuilder — ✅ SHIPPED & DEPLOYED 2026-10-27
 
@@ -885,6 +909,8 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
+**v2.17 Spec-Driven Foundation & Rehearsal Defaults** — 🚧 in planning (started 2026-11-06). See Current Milestone above and `.planning/REQUIREMENTS.md`. Requirements continue from R454; phases from 146.
+
 **v2.16 Dated Rehearsals & WorshipBuilder** — ✅ SHIPPED & DEPLOYED 2026-10-27 (moved to Validated above).
 
 **v2.12 Rehearse Mode** — 🚧 in planning (started 2026-09-05). Step 2 (final) of the file-storage backlog
@@ -1231,3 +1257,4 @@ Archived: `milestones/v2.5-ROADMAP.md` · `milestones/v2.5-REQUIREMENTS.md` · `
 ---
 *Last updated: 2026-10-27 — milestone v2.16 Dated Rehearsals & WorshipBuilder started*
 *Last updated: 2026-10-27 — archived milestone v2.16 Dated Rehearsals & WorshipBuilder (Phases 143-145, R441-R453; R452 descoped), shipped & deployed to production the same day*
+*Last updated: 2026-11-06 — milestone v2.17 Spec-Driven Foundation & Rehearsal Defaults started*
