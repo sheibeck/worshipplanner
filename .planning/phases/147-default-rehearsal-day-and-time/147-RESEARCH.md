@@ -10,6 +10,8 @@ The feature is small in code and large in bookkeeping. The code is: one new `Org
 
 **Three findings change the plan and the planner must read them first.**
 
+**Owner decision, 2026-11-06, overrides this file:** the date fix is approved for this phase, and when a date changes the old `serviceShares/{slug}__service-{oldDate}` doc is removed, soft-failing. It is not an accepted residual. Add criteria for it to the spec. See CONTEXT.md "Saving a date change".
+
 1. **A service date change made in the editor is never saved today.** `onSave` in `ServiceEditorView.vue` sends an explicit allow-list payload (`name, teams, sermonPassage, sermonTopic, notes, status, slots, stageLayout, stageLayoutAutoSeeded, rehearsals, reportTime`). `date` is not in it, and never was (git history shows `date` was never added). I reproduced this by running the real view test harness: `onDateChange('2026-12-25')` then a second change, one autosave fired, payload keys exactly as above. `onDateChange` is the only code path that edits `date` on an existing service, so R462 as written ("changing a service's date moves an auto-added rehearsal") would persist the moved rehearsal but not the date, leaving the document inconsistent on reload. This phase must make the date persist, and the new payload key must be added in two places (the payload and the post-save "mirror" comparison) or `isDirty` strands and autosave loops. See Pitfall 1 and Open Question 1.
 2. **Row flag is the right marker, but only with a shared narrowing function.** A flag on the row rides the existing `rehearsals` payload and dirty-mirror with no new plumbing, and removal or edit of the row removes or clears it for free. The cost is that both public projections spread whole rows, so narrowing is mandatory (it is also what the roadmap already demands). Recommended: `autoAdded?: true` on the stored row, narrowed by one shared `toPublicRehearsal` used by both builders.
 3. **The timezone proof must be in-process.** `process.env.TZ = '...'` assigned inside a vitest test works on this Windows machine and is restored in `finally`. A shell prefix `TZ=Pacific/Kiritimati npx vitest ...` from Git Bash is **silently ignored** (the child sees `process.env.TZ === undefined`, zone stays America/New_York); only `TZ=UTC` and PowerShell `$env:TZ=` work. A test that relies on the shell prefix would pass vacuously.
@@ -585,7 +587,7 @@ await authStore.updateOrgSettings({
    - What we know: `onSave` never sends `date`; reproduced by test; no other path writes it.
    - RESOLVED: include the fix in Plan 05 (`date` in payload and mirror, `YMD_RE` guard, `max` on the input), covered by AC-RHD-35, 37 and 38 and called out in the spec's Edge cases. The orchestrator should surface this to the owner as a discovered pre-existing defect at the consent gate before executing Plan 05 (A1).
 2. **Stale `serviceShares/{slug}__service-{oldDate}` after a persisted date change.**
-   - RESOLVED: accept and record in ADR-0249 Consequences and the spec's Out of scope; deleting the old doc is a separate decision (the id format is frozen per R347).
+   - RESOLVED by the owner, 2026-11-06: remove the old doc on a date change, soft-failing. This replaces the earlier "accept and record" answer. See CONTEXT.md.
 3. **Marker storage and name.**
    - RESOLVED: row flag `autoAdded?: true`, cleared with `delete`, narrowed out of both projections by `toPublicRehearsal`.
 4. **Weekday encoding.**

@@ -46,6 +46,17 @@ code for this phase.
 - **A rehearsal date in the past is still added.** R460 has no exception, and a planner can remove it.
 - From R462: a moved rehearsal keeps its own weekday and time, even if the Settings default has changed since.
 
+### Saving a date change (owner, 2026-11-06, added after research)
+- **Today's bug:** changing a service's date in the editor looks like it works, but `onSave` never sends `date`, so it
+  reverts on reload. R462 can't work until that's fixed, so the fix is in this phase's scope. Add `date` to the `onSave`
+  payload and to the post-save mirror comparison, at the same position, or `isDirty` never clears.
+- **Retire the old public page:** when a service's date changes, remove `serviceShares/{slug}__service-{oldDate}`. A
+  link already sent with the old date stops working, and the regular share link (the token) keeps working and stays
+  current. This overrides RESEARCH.md's suggestion to accept the stale page; don't record it as an accepted residual.
+- **Soft failure:** a failed removal must not fail the save, matching how the other share writes behave.
+- **Role overrides keyed by date** now follow the service's new date. That's correct and needs no change.
+- The spec must have criteria for the date being saved and for the old page being removed.
+
 ### The add-rehearsal form
 - **Weekday set, no default time:** the date still fills in and the time stays blank. R461 only stops the auto-add.
 - **Which weekday:** the current Settings weekday, worked out from the service's current date. Nothing extra is stored

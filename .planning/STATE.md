@@ -5,8 +5,8 @@ milestone_name: Spec-Driven Foundation & Rehearsal Defaults
 current_phase: 147
 current_phase_name: Default Rehearsal Day and Time
 status: planning
-stopped_at: Completed 146-02-PLAN.md
-last_updated: "2026-11-06T18:28:51.807Z"
+stopped_at: Phase 147 UI-SPEC approved
+last_updated: "2026-11-06T18:51:21.245Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 146 complete, transitioned to Phase 147
 progress:
@@ -4812,9 +4812,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-11-06T17:29:58.742Z
-Stopped at: Completed 146-02-PLAN.md
-Resume file: None
+Last session: 2026-11-06T18:51:21.192Z
+Stopped at: Phase 147 UI-SPEC approved
+Resume file: .planning/phases/147-default-rehearsal-day-and-time/147-UI-SPEC.md
 
 ## Operator Next Steps
 
