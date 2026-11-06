@@ -472,4 +472,35 @@ describe('public share documents (R462, R465)', () => {
       expect(servicePathReads()).toBe(0)
     })
   })
+
+  describe('a service created earlier is left alone when the defaults change', () => {
+    const ORIGINAL = [{ id: 'r1', date: '2026-03-04', time: '18:30', autoAdded: true }]
+
+    it('keeps its rehearsals in the stored service and the public documents after a later save (AC-RHD-10)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      mockAuthState.settings.rehearsalDefaultWeekday = 3
+      mockAuthState.settings.rehearsalTimeDefaults = ['18:30']
+      const store = await loadStore()
+      triggerSnapshot([makeService('service-1', '2026-03-08', { rehearsals: ORIGINAL })])
+      h.store.set(svcPath('service-1'), makeService('service-1', '2026-03-08', { rehearsals: ORIGINAL }))
+      seedShared('service-1', 'tok-existing', '2026-03-08')
+      seedPage('2026-03-08', 'service-1')
+
+      // The church changes its defaults, then the service is saved for an unrelated reason.
+      mockAuthState.settings.rehearsalDefaultWeekday = 5
+      mockAuthState.settings.rehearsalTimeDefaults = ['20:00']
+      vi.mocked(updateDoc).mockClear()
+      await store.updateService('service-1', { notes: 'x' })
+
+      const serviceWrites = vi
+        .mocked(updateDoc)
+        .mock.calls.filter((c) => (c[0] as { path: string }).path === svcPath('service-1'))
+      expect(serviceWrites).toHaveLength(1)
+      expect(serviceWrites[0]![1]).not.toHaveProperty('rehearsals')
+      expect((h.store.get(svcPath('service-1')) as { rehearsals: unknown }).rehearsals).toEqual(ORIGINAL)
+      for (const path of ['shareTokens/tok-existing', pagePath('2026-03-08')]) {
+        expect(docAt(path)!.serviceSnapshot.rehearsals).toEqual([{ id: 'r1', date: '2026-03-04', time: '18:30' }])
+      }
+    })
+  })
 })

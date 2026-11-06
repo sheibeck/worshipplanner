@@ -237,18 +237,4 @@ describe('createService — the default rehearsal row', () => {
   it.each([[''], ['7pm']])('adds no rehearsal when the first default time is %j (AC-RHD-66)', async (time) => {
     expect(await create('2026-11-08', 3, [time])).toEqual([])
   })
-
-  it('leaves a service created earlier as it was when the default day later changes (AC-RHD-10)', async () => {
-    const { addDoc } = await import('firebase/firestore')
-    const rows = await create('2026-11-08', 3, ['18:30'])
-    const payload = vi.mocked(addDoc).mock.calls[0]![1] as { rehearsals: unknown[] }
-    expect(rows).toHaveLength(1)
-    const before = JSON.parse(JSON.stringify(payload.rehearsals))
-
-    mockAuthState.settings.rehearsalDefaultWeekday = 5
-    mockAuthState.settings.rehearsalTimeDefaults = ['20:00']
-
-    expect(payload.rehearsals).toEqual(before)
-    expect(payload.rehearsals).toHaveLength(1)
-  })
 })
