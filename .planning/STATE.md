@@ -5,15 +5,15 @@ milestone_name: Spec-Driven Foundation & Rehearsal Defaults
 current_phase: 147
 current_phase_name: Default Rehearsal Day and Time
 status: executing
-stopped_at: Completed 147-02-PLAN.md
-last_updated: "2026-11-06T21:11:36.622Z"
+stopped_at: Completed 147-03-PLAN.md
+last_updated: "2026-11-06T21:27:07.532Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 147 execution started
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 5
   percent: 50
 ---
 
@@ -1482,11 +1482,11 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 147 (Default Rehearsal Day and Time) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 147 execution started
 
-Progress: [██████░░░░] 57% (0/2 phases)
+Progress: [███████░░░] 71% (0/2 phases)
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
@@ -3830,6 +3830,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 146 P02 | 25min | 3 tasks | 6 files |
 | Phase 147 P01 | 5min | 1 tasks | 1 files |
 | Phase 147 P02 | 8min | 3 tasks | 13 files |
+| Phase 147 P03 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -4475,6 +4476,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 146-02: spec-first rule lives verbatim in CLAUDE.md and a standing PROJECT.md Development Philosophy section, guarded by specCoverage.test.ts
 - [Phase ?]: 147-01: spec committed alone ahead of tests/code; 68 criteria final, IDs cited by number
 - [Phase ?]: 147-02: inZone test helper is async so the zone is restored after awaited store calls; ADR-0249 landed in Plan 02 so later pointers resolve
+- [Phase ?]: 147-03: old date read before updateDoc (cache, else one direct read); retireOldServiceShare requires the new page to record the service before removing the old one
 
 ### Roadmap Evolution
 
@@ -4816,8 +4818,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-09-01 — 108-01 comment audit + triage inventory complete (R316)
-Last session: 2026-11-06T21:11:36.484Z
-Stopped at: Completed 147-02-PLAN.md
+Last session: 2026-11-06T21:27:07.408Z
+Stopped at: Completed 147-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -881,7 +881,7 @@ Area: `docs/specs/TEMPLATE.md` (new), the automated check and its fixtures (new)
 
   5. A new ADR supersedes the reversed parts of ADR-0245. The auto-added rehearsal shows like any other rehearsal on share links, the volunteer view and other read-only views, and its marker appears on none of them and in neither public payload (`buildServiceSnapshot`, `buildRehearseAccess`) (R465).
 
-**Plans**: 2/5 plans executed
+**Plans**: 3/5 plans executed
 
 Plans:
 **Wave 1**
@@ -894,7 +894,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 147-03-PLAN.md — Test-first store work: `createService` adds the rehearsal, and a date change retires the old date's public page, soft-failing
+- [x] 147-03-PLAN.md — Test-first store work: `createService` adds the rehearsal, and a date change retires the old date's public page, soft-failing
 - [ ] 147-04-PLAN.md — Test-first UI behavior: the Default rehearsal day select and help text in Settings, the add form's default date, and display parity for an auto-added rehearsal
 
 **Wave 4** *(blocked on Wave 3 completion)*
