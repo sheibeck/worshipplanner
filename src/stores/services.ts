@@ -31,7 +31,13 @@ import { stripUndefined } from '@/utils/stripUndefined'
 import { mapSlotAllowlist, mapStageMarkerAllowlist, resolvePersonName } from '@/utils/serviceProjection'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import { buildRehearseAccess } from '@/utils/rehearseAccess'
-import { isDisplayableRehearsal, sortRehearsals, toPublicRehearsal } from '@/utils/rehearsalTimes'
+import {
+  buildAutoRehearsal,
+  isDisplayableRehearsal,
+  sortRehearsals,
+  toPublicRehearsal,
+  type StoredRehearsal,
+} from '@/utils/rehearsalTimes'
 import {
   computeLastUsedDate,
   serviceDateToMillis,
@@ -471,8 +477,13 @@ export const useServiceStore = defineStore('services', () => {
       effectiveTemplate,
       authStore.settings.vwModeEnabled,
     )
-    // R442 — report time is copied once at creation; rehearsals start empty and are added dated in the Times tab. See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md)
-    const rehearsals: { id: string; date: string; time: string }[] = []
+    // R442/R460 — defaults are read once here. See ADR-0249 (docs/adr/0249-new-services-start-with-a-default-rehearsal.md)
+    const autoRehearsal = buildAutoRehearsal(
+      data.date,
+      authStore.settings.rehearsalDefaultWeekday,
+      authStore.settings.rehearsalTimeDefaults?.[0],
+    )
+    const rehearsals: StoredRehearsal[] = autoRehearsal ? [autoRehearsal] : []
     const reportTime = authStore.settings.reportTimeDefault
     const ref = await addDoc(collection(db, 'organizations', orgId.value, 'services'), {
       ...data,
@@ -626,6 +637,13 @@ export const useServiceStore = defineStore('services', () => {
   async function updateService(id: string, data: Record<string, unknown>) {
     if (!orgId.value) return
     assertWritable(id, data)
+    // The pre-write date, taken before updateDoc: afterwards the stored doc already holds the new one.
+    const cachedService = services.value.find((s) => s.id === id)
+    const oldDate = cachedService
+      ? cachedService.date
+      : typeof data.date === 'string'
+        ? await readStoredServiceDate(id)
+        : undefined
     // R111 (51-03): a "No Section" move sets slot.section = undefined, which
     // rides through onSave into this payload. Firestore rejects raw `undefined`
     // at any depth ("Unsupported field value: undefined"), so strip the plain
@@ -641,6 +659,11 @@ export const useServiceStore = defineStore('services', () => {
     // current without a second Share press. The refresh hook is defined
     // further down this file, below ensureShareLink.
     await maybeRefreshShareLink(id, data as Partial<Service>)
+    // R462 — only a real date change retires the old date's public page.
+    const newDate = data.date
+    if (typeof newDate === 'string' && oldDate && oldDate !== newDate) {
+      await retireOldServiceShare(id, oldDate, newDate)
+    }
   }
 
   // ── R037 status transitions ──────────────────────────────────────────────────
@@ -1262,6 +1285,42 @@ export const useServiceStore = defineStore('services', () => {
    */
   async function createShareToken(service: Service, orgIdValue: string): Promise<string> {
     return ensureShareLink(service, orgIdValue)
+  }
+
+  /** The stored date for the cold-cache case; soft-fails, because it only serves the old-page removal. */
+  async function readStoredServiceDate(id: string): Promise<string | undefined> {
+    try {
+      if (!orgId.value) return undefined
+      const snap = await getDoc(doc(db, 'organizations', orgId.value, 'services', id))
+      const date = snap.exists() ? snap.data().date : undefined
+      return typeof date === 'string' ? date : undefined
+    } catch (err) {
+      console.error(`updateService: failed to read the stored date for service ${id} — continuing`, err)
+      return undefined
+    }
+  }
+
+  /**
+   * R462 — after a date change, removes the old date's public page. Runs only once the new date's page exists
+   * and records this service, and never rethrows: the user's save has already succeeded.
+   */
+  async function retireOldServiceShare(id: string, oldDate: string, newDate: string): Promise<void> {
+    try {
+      if (!orgId.value) return
+      const orgSnap = await getDoc(doc(db, 'organizations', orgId.value))
+      const slug = orgSnap.exists() ? (orgSnap.data().slug as string | undefined) : undefined
+      if (!slug) return
+      const newSnap = await getDoc(doc(db, 'serviceShares', `${slug}__service-${newDate}`))
+      if (!newSnap.exists() || newSnap.data().serviceId !== id) return
+      const oldRef = doc(db, 'serviceShares', `${slug}__service-${oldDate}`)
+      const oldSnap = await getDoc(oldRef)
+      // See ADR-0163 (docs/adr/0163-this-doc-is-keyed-purely-by-slug-date-and-the-app-enforces-n.md)
+      if (oldSnap.exists() && oldSnap.data().serviceId === id) {
+        await deleteDoc(oldRef)
+      }
+    } catch (err) {
+      console.error(`updateService: failed to retire the old serviceShares doc for service ${id} — continuing`, err)
+    }
   }
 
   /** See ADR-0165 (docs/adr/0165-subscribes-to-sharetokens-or-servicesharelinks-so-a-write-to.md) */
