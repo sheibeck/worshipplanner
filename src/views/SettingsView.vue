@@ -540,15 +540,29 @@
         </div>
       </div>
 
-      <!-- Rehearsal & Report Defaults (R429/R442). See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md) -->
+      <!-- Rehearsal & Report Defaults (R429/R442). See ADR-0245 (docs/adr/0245-rehearsals-are-always-dated-defaults-prefill-the-add-form.md) and ADR-0249 (docs/adr/0249-new-services-start-with-a-default-rehearsal.md) -->
       <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
         <h2 class="text-sm font-semibold text-gray-300 mb-3">Rehearsal &amp; Report Defaults</h2>
 
         <p class="text-xs text-gray-400 mb-3" data-testid="rehearsal-defaults-helper">
-          Default rehearsal time(s) pre-fill the time when a planner adds a rehearsal to a service, and the report time is copied onto every new service. Dates are always chosen per service.
+          New services start with one rehearsal on the default day at the first default time. The report time is copied onto every new service. Changing these defaults doesn't affect existing services.
         </p>
 
-        <div class="space-y-2">
+        <div>
+          <label for="rehearsal-default-day" class="block text-xs text-gray-400 mb-1">Default rehearsal day</label>
+          <select
+            id="rehearsal-default-day"
+            v-model="rehearsalDefaultWeekdayInput"
+            :disabled="!authStore.isEditor"
+            data-testid="rehearsal-default-day-select"
+            class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option :value="null">None</option>
+            <option v-for="(name, index) in REHEARSAL_WEEKDAY_NAMES" :key="name" :value="index">{{ name }}</option>
+          </select>
+        </div>
+
+        <div class="mt-4 space-y-2">
           <label class="block text-xs text-gray-400 mb-1">Default rehearsal time(s)</label>
           <div
             v-for="(time, index) in rehearsalTimeDefaultsInput"
@@ -624,6 +638,7 @@ import { deriveSlug, claimSlug } from '@/utils/slug'
 import { normalizeOrgName, claimOrgName } from '@/utils/orgName'
 import { SLIDE_FONTS, SLIDE_FONT_FAMILY_NAMES } from '@/config/slideFonts'
 import { cssVarsFor, snapWeight, loadFontCss } from '@/utils/slideTypography'
+import { normalizeWeekday } from '@/utils/rehearsalTimes'
 
 const authStore = useAuthStore()
 
@@ -730,6 +745,9 @@ const timezoneSaveError = ref<string | null>(null)
 // as messagingEnabledInput above. A copy (`[...]`), never the live array, so
 // add/remove/edit here don't mutate the store until Save is clicked.
 const rehearsalTimeDefaultsInput = ref<string[]>([...authStore.settings.rehearsalTimeDefaults])
+// Index is the stored value (0 Sunday to 6 Saturday); null means None (ADR-0249).
+const REHEARSAL_WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
+const rehearsalDefaultWeekdayInput = ref<number | null>(normalizeWeekday(authStore.settings.rehearsalDefaultWeekday))
 const reportTimeDefaultInput = ref(authStore.settings.reportTimeDefault)
 const isSavingRehearsalDefaults = ref(false)
 const rehearsalDefaultsSavedFeedback = ref(false)
@@ -791,6 +809,14 @@ const isSlugSaveDisabled = computed(() => {
   const candidate = deriveSlug(editSlug.value)
   return isSlugSaving.value || candidate === '' || candidate === persistedSlug.value
 })
+
+// An in-place church switch swaps the settings object; reseed the weekday select from it.
+watch(
+  () => authStore.settings.rehearsalDefaultWeekday,
+  (weekday) => {
+    rehearsalDefaultWeekdayInput.value = normalizeWeekday(weekday)
+  },
+)
 
 // ── Sync editName if orgName changes externally (skip during save) ────────────
 
@@ -1346,6 +1372,7 @@ async function onSaveRehearsalDefaults(): Promise<void> {
 
   const previousRehearsalDefaults = [...authStore.settings.rehearsalTimeDefaults]
   const previousReportTimeDefault = authStore.settings.reportTimeDefault
+  const previousWeekday = normalizeWeekday(authStore.settings.rehearsalDefaultWeekday)
   // Blank rows (an add with no time picked yet) are dropped rather than saved
   // as an empty-string default — a rehearsal default with no time is not a
   // meaningful default.
@@ -1358,6 +1385,7 @@ async function onSaveRehearsalDefaults(): Promise<void> {
     await authStore.updateOrgSettings({
       'settings.rehearsalTimeDefaults': newRehearsalDefaults,
       'settings.reportTimeDefault': newReportTimeDefault,
+      'settings.rehearsalDefaultWeekday': rehearsalDefaultWeekdayInput.value,
     })
     rehearsalTimeDefaultsInput.value = newRehearsalDefaults
 
@@ -1370,6 +1398,7 @@ async function onSaveRehearsalDefaults(): Promise<void> {
     rehearsalDefaultsSaveError.value = 'Failed to save. Please try again.'
     rehearsalTimeDefaultsInput.value = previousRehearsalDefaults
     reportTimeDefaultInput.value = previousReportTimeDefault
+    rehearsalDefaultWeekdayInput.value = previousWeekday
   } finally {
     isSavingRehearsalDefaults.value = false
   }
