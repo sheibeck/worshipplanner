@@ -881,7 +881,7 @@ Area: `docs/specs/TEMPLATE.md` (new), the automated check and its fixtures (new)
 
   5. A new ADR supersedes the reversed parts of ADR-0245. The auto-added rehearsal shows like any other rehearsal on share links, the volunteer view and other read-only views, and its marker appears on none of them and in neither public payload (`buildServiceSnapshot`, `buildRehearseAccess`) (R465).
 
-**Plans**: 1/5 plans executed
+**Plans**: 2/5 plans executed
 
 Plans:
 **Wave 1**
@@ -890,7 +890,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 147-02-PLAN.md — Test-first foundation: timezone-free date helpers, the row marker type, the weekday setting, both public projections narrowed, and ADR-0249 superseding the reversed parts of ADR-0245
+- [x] 147-02-PLAN.md — Test-first foundation: timezone-free date helpers, the row marker type, the weekday setting, both public projections narrowed, and ADR-0249 superseding the reversed parts of ADR-0245
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
