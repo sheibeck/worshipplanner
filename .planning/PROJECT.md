@@ -9,6 +9,16 @@ the Firebase project id `worship-planner-bc515`, `wp` storage keys and package n
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
+## Development Philosophy
+
+Specification Driven Development is the core philosophy, followed by Test Driven Design (owner directive, 2026-11-06). The order is spec, then tests, then code.
+
+No feature work starts until its spec exists in docs/specs/, and a behavior change updates the spec before the tests and the code.
+
+Stores, utilities, functions and security rules need a failing test first; UI layout tests may land with the code but must cite spec criteria.
+
+This applies from Phase 147 on, because Phase 146 built the standard itself. Only new features need a spec until v2.18, and `/gsd-quick` and `/gsd-fast` follow the same rule. A spec says what a feature must do, in testable terms; the `.planning/codebase/` map docs narrate how the code does it, and ADRs record why. `CLAUDE.md` has the working detail, and `src/__tests__/specCoverage.test.ts` enforces citations inside `npx vitest run`.
+
 ## Current State
 
 **Shipped through v2.16** (2026-10-27), deployed to production. Latest milestone — every rehearsal has a date
@@ -29,8 +39,7 @@ until then); the owner-waived v2.14–v2.16 UAT lists
 
 **Goal:** Make specifications the project's source of truth, then prove the process on a real feature.
 
-**Development philosophy (owner directive, 2026-11-06):** Specification Driven Development is the core
-philosophy, followed by Test Driven Design. The order is spec, then tests, then code.
+**Development philosophy:** see the standing `## Development Philosophy` section, which stays after this milestone closes.
 
 **Target features:**
 

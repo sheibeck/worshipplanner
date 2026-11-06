@@ -44,6 +44,24 @@ verification gate used the narrower form and reported clean. Use `npm run type-c
 `-p tsconfig.app.json` form is fine as a fast inner-loop check, but it is not sufficient evidence that a
 plan or phase is type-clean.
 
+## Spec-driven development
+
+No feature work starts until its spec exists in docs/specs/, and a behavior change updates the spec before the tests and the code.
+
+Stores, utilities, functions and security rules need a failing test first; UI layout tests may land with the code but must cite spec criteria.
+
+The order is spec, then tests, then code. This applies from Phase 147 on, because Phase 146 built the standard itself. Rationale: ADR-0248.
+
+- **Starting a spec:** copy `docs/specs/TEMPLATE.md` to `docs/specs/<feature-slug>.md` and give it a short uppercase code.
+- **Citing a criterion:** put its ID in the test title, as in `it('adds it on the prior Wednesday (AC-RHD-03)')`. A comment does not count. Neither does a test that is skipped, `todo`, `fails`, conditional (`skipIf`, `runIf`), switched off by an options object (`{ skip: true }`), missing its function, or empty. A `describe` title counts only if it holds a test that counts.
+- **Removing a criterion:** move it to the spec's Retired list. Its number is never reused.
+- **Features with no spec yet:** only new features need a spec until v2.18. A change to an existing feature without a spec goes ahead. Once a feature has a spec, every behavior change updates it first.
+- **Bug fixes:** the spec changes only if the fix changes what it says. A fix that makes the app match its spec cites the criterion in its regression test. A bug the spec doesn't cover gets a new criterion first.
+- **Quick tasks:** `/gsd-quick` and `/gsd-fast` follow the same rule.
+- **`tdd_mode` does not do this for you:** `workflow.tdd_mode` is on, but GSD's planner heuristic treats "UI, config, glue code, CRUD" as non-TDD work. That does not exempt a store change. Only UI layout tests may land with the code.
+- **Specs, map docs and ADRs:** a spec says what a feature must do, in testable terms. The `.planning/codebase/` map docs narrate how the code does it, and ADRs record why. A spec does not replace either one.
+- **The check:** `src/__tests__/specCoverage.test.ts` runs inside a bare `npx vitest run`. It fails on an uncited criterion, a duplicate or malformed ID, a test citing a retired or undefined ID, and a spec with no criteria. It proves a test title cites each criterion, not that the test ran or asserts anything. Rules criteria still need `npm run test:rules`.
+
 ## Testing: two suites, one of which the default run skips
 
 - `npx vitest run` — the app suite. **Excludes `src/rules.test.ts`** (see `vite.config.ts`), so it
@@ -71,7 +89,7 @@ plan or phase is type-clean.
   rules install and the per-test `clearFirestore()` leave real data alone.
 
 Known-failing baseline: `src/storage.rules.test.ts` only (Storage-emulator dependent — see below). A bare
-`npx vitest run` should show exactly one failing file.
+`npx vitest run` should show exactly one failing file. One exception is on purpose: between a spec's commit and the commits that add its tests, `src/__tests__/specCoverage.test.ts` fails too, naming each uncited criterion (Phase 147 is the first time). Do not quiet it with an empty test or an exclusion.
 
 > ### ⚠ `src/storage.rules.test.ts` IS A REAL DEFECT — corrected 2026-08-06
 >
