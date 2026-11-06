@@ -908,5 +908,28 @@ Plans:
 
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
+### Phase 999.16: Song picker shows last used date and sorts by it (BACKLOG)
+
+**Goal:** [Captured for future planning] When choosing a song in the service plan, a planner can see when each
+song was last used and order the list by it, so `type:1` sorted by last played shows the longest-unused or
+most recent songs first. Owner request, 2026-11-06.
+
+- **Last used date missing from search results:** in `src/components/SongSlotPicker.vue`, rotation suggestions
+  already show "Last used Nw ago" or "Never used", but search result rows show only title, key, tags and type
+  badge. That covers anything typed, including `type:1`.
+
+- **No sort in the picker:** search results keep the underlying song order and the picker has no sort control.
+  `src/components/SongTable.vue` on the Songs page already sorts by Last Used from `song.lastUsedAt`.
+
+- Open questions for spec: a sort control, a search token, or both; ascending as well as descending; where
+  never-used songs sort; whether the choice persists; whether sort also applies to rotation suggestions.
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
 > **Promoted 2026-08-31:** Phase 999.3 (Per-org Bible API toggle with BibleGateway manual fallback) was
 > promoted into the active milestone **v2.6** (requirements R295–R301). See the v2.6 phases below.
