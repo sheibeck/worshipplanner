@@ -74,7 +74,7 @@ created: 2026-11-07
 |------------|---------------|--------|------|--------|
 | 2026-11-07 | 15 | 15 | 0 | Orchestrator, ASVS L1 grep depth (short-circuit: plan-time register, no open threats) |
 
-No rules file changed in this phase, and no new package was installed. Each summary's Threat Flags section reports nothing new.
+No rules file changed in this phase, and no new package was installed. The Threat Flags sections in the 147-02 to 147-05 summaries report nothing new; the 147-01 summary, which covers only the spec text, has none.
 
 ---
 
