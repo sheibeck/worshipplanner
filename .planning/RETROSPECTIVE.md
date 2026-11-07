@@ -406,6 +406,54 @@ with per-step approval.
 - Production writes: Storage CORS, Auth authorized domain, `hosting:app`, functions (27, incl. first-time
   `cleanupStalePresence`), `hosting:legacy` — all owner-approved individually.
 
+## Milestone: v2.17 — Spec-Driven Foundation & Rehearsal Defaults
+
+**Shipped:** 2026-11-07 (started 2026-11-06; deployed to prod at close)
+**Phases:** 2 (146–147) | **Plans:** 7 | **Commits:** ~85
+
+### What Was Built
+Specifications became the project's source of truth: `docs/specs/` with a copy-and-fill template, the
+spec → tests → code rule in `CLAUDE.md` and a standing PROJECT.md section (ADR-0248), `tdd_mode` on, and
+`src/__tests__/specCoverage.test.ts`, an AST-based check inside a bare `npx vitest run` that fails on any
+criterion no real test cites. Piloted on **default rehearsal day and time**: one default weekday in Settings,
+every new service starts with a marked rehearsal on it, an untouched auto-added rehearsal moves with the service
+date, the add form pre-fills that day, and public projections were narrowed to id/date/time (ADR-0249).
+
+### What Worked
+- **The spec as the review surface** — 71 numbered criteria made the audit concrete: each one was traced to a
+  test that ran and passed (vitest JSON reporter), not just a title that mentions it.
+- **Spec-first held for audit debt too** — the two items the owner chose to fix (AC-RHD-70, AC-RHD-71) went
+  spec → failing tests → fix in three commits, the same order as the feature.
+- **Building the pilot found a real production bug** — an editor's date change was not saving (`onSave`
+  omitted `date`); the moving-rehearsal criteria forced the date path under test.
+
+### What Was Inefficient
+- **Bookkeeping drift again** — 147-01's SUMMARY claimed R459–R465, the seeded validation map pointed at the
+  wrong files, and `milestone.complete` once more edited the stale v2.14 "Status" line in STATE.md.
+- **`gsd-tools graphify build` only pre-flights** — it returns `spawn_agent` and builds nothing; the graph on
+  disk looked fresh only because the auto-update hook had run. The real build is `graphify update .` + copy.
+- **Fixes after verification left it stale** — the verifier's staleness check is SUMMARY-mtime based, so even a
+  docs-only SUMMARY correction needs a recorded re-verification before close.
+
+### Patterns Established
+- **Criterion IDs in test titles, checked statically, proven by a run** — `specCoverage.test.ts` for citation,
+  the vitest JSON report for "it ran and passed".
+- **A marker field for system-made rows** (`autoAdded`) — the system may move what it made, and any human edit
+  clears the marker so nothing a planner set is ever overwritten.
+- **Retired criteria keep their numbers** — removing one moves it to the spec's Retired list.
+
+### Key Lessons
+- **A citation check proves a test exists, not that it ran** — pair the static check with a reporter run when
+  auditing.
+- **Re-verify after any post-verification change, even docs** — and record it in VERIFICATION.md rather than
+  hand-waving the stale flag.
+- **Read what a tool actually did, not its exit code** — `graphify build` succeeding was not a build.
+
+### Cost Observations
+- Model mix: **opus** for the orchestrator; **sonnet** for executors, verifier, reviewer, auditors.
+- Production writes: one owner-requested deploy at close (`hosting:app`, `hosting:legacy`, functions, Firestore
+  and Storage rules, indexes); functions skipped as unchanged, rules re-released unchanged.
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -419,6 +467,7 @@ with per-step approval.
 | v2.2 | 5 | Phases added mid-milestone from owner testing feedback; a delivered requirement (R230) removed at close and reconciled across all records; hosting deployed at close with backend owner-gated |
 | v2.15 | 5 | Research-first autonomous run with prod deployed mid-milestone (owner feedback → 4 quick tasks + 1 backlog phase); a Claude Design phase (142) added from a mockup; 22-item batched UAT owner-waived at close (override_closeout) |
 | v2.16 | 3 | One-day plan → build → verify → production cutover; owner scope cut mid-planning (bridge → plain Hosting redirect); runbook as a tested artifact run with per-step consent; partial owner UAT, rest waived (override_closeout) |
+| v2.17 | 2 | Spec-driven development adopted: `docs/specs/`, spec → tests → code, `tdd_mode` on, and a citation check in the default test run; piloted spec-first on default rehearsal day; audit debt fixed spec-first before close; owner UAT passed |
 
 ### Top Lessons (Verified Across Milestones)
 
