@@ -1,6 +1,7 @@
 ---
 phase: 147-default-rehearsal-day-and-time
-verified: 2026-11-06T22:50:00Z
+verified: 2026-11-07T18:00:00Z
+re_verification: 2026-11-07 (after the AC-RHD-70/71 fix and the SUMMARY requirement-attribution correction)
 status: passed
 score: 5/5 roadmap success criteria verified; 6 human checks passed by the owner 2026-11-06 in the local emulator
 behavior_unverified: 0
@@ -33,7 +34,7 @@ human_verification:
 **Phase Goal:** A church sets one default rehearsal weekday, and every new service starts with its rehearsal already on it, while existing services stay as they are and public views show nothing new. Built spec-first as the pilot for the Phase 146 standard.
 **Verified:** 2026-11-06
 **Status:** passed (owner ran the real-app checks in the local emulator and approved the wording on 2026-11-06)
-**Re-verification:** No, initial verification
+**Re-verification:** Yes, 2026-11-07. See "Re-verification 2026-11-07" at the end.
 
 R459-R465 are deliberately left unticked in REQUIREMENTS.md for the orchestrator to close. Not reported as a gap.
 
@@ -185,3 +186,16 @@ No gaps. All five roadmap criteria and all plan truths hold in code and in tests
 
 _Verified: 2026-11-06_
 _Verifier: Claude (gsd-verifier)_
+
+## Re-verification 2026-11-07
+
+Two changes landed after the first verification. Both were re-checked and neither changes the verdict.
+
+- **Code: AC-RHD-70 and AC-RHD-71** (spec 05066803, then failing tests d913d2c5, then the fix d00b97be).
+  - The viewer's Settings select and the two time fields carry `disabled:opacity-60 disabled:cursor-not-allowed`.
+  - The add-form Time field turns amber only while the Date holds a real date and the Time is blank.
+  - Evidence: `SettingsView.test.ts`, `ServiceTimesPanel.test.ts` and `specCoverage.test.ts` pass (267/267), and `npm run type-check` is clean.
+  - The full suite after the fix had only the `storage.rules` baseline failing (6444 passed), and all 71 criteria have passing tests.
+- **Docs:** `requirements-completed` in 147-01/03/04/05-SUMMARY was corrected so each requirement is credited to the plan that finished it. No code changed.
+
+The change is deployed to production on 2026-11-07. Status stays **passed**.
