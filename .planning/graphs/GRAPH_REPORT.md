@@ -1,16 +1,16 @@
 # Graph Report - worshipplanner  (2026-11-07)
 
 ## Corpus Check
-- 2978 files · ~6,883,612 words
+- 2978 files · ~6,883,690 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 37183 nodes · 36407 edges · 3166 communities (2862 shown, 304 thin omitted)
+- 37180 nodes · 36404 edges · 3169 communities (2866 shown, 303 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 90 edges (avg confidence: 0.63)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d00b97be`
+- Built from commit: `5e6fe1b4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -3058,10 +3058,12 @@
 - [[_COMMUNITY_SettingsView.defaultsWrites.test.ts|SettingsView.defaultsWrites.test.ts]]
 - [[_COMMUNITY_roster.ts|roster.ts]]
 - [[_COMMUNITY_songs.ts|songs.ts]]
+- [[_COMMUNITY_SlotVideoOutputControl.vue|SlotVideoOutputControl.vue]]
 - [[_COMMUNITY_v2.17 Milestone Audit — Spec-Driven Foundation & Rehearsal Defaults|v2.17 Milestone Audit — Spec-Driven Foundation & Rehearsal Defaults]]
+- [[_COMMUNITY_dropRouting.ts|dropRouting.ts]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `Communities (3169 total, 303 thin omitted)` - 2744 edges
+1. `Communities (3166 total, 304 thin omitted)` - 2741 edges
 2. `Bucket B — Behavioral/Architectural` - 117 edges
 3. `Bucket A — Decision-Rationale` - 95 edges
 4. `Project State` - 57 edges
@@ -3087,11 +3089,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (3166 total, 304 thin omitted)
+## Communities (3169 total, 303 thin omitted)
 
 ### Community 0 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.00
-Nodes (2744): Communities (3169 total, 303 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2736 more)
+Nodes (2741): Communities (3166 total, 304 thin omitted), Community 0 - "Communities (496 total, 90 thin omitted)", Community 1000 - "Quick Task 260703-246 — Summary", Community 1001 - "Summary: Schedule & Volunteers tabbed layout", Community 1002 - "Quick Task: Roles tab Save button feedback", Community 1003 - "Quick Task 4: Dismissing the Import Dialog Should Be Explicit — Summary", Community 1004 - "Quick Task 6: Fix Service Editor Autosave Race Condition — Summary", Community 1005 - "Quick Task 7: Remove (Key: X) Suffix from PC Export Song Titles" (+2733 more)
 
 ### Community 1 - "Communities (496 total, 90 thin omitted)"
 Cohesion: 0.02
@@ -3148,11 +3150,11 @@ Nodes (61): ADR-0050, ADR-0051, ADR-0052, ADR-0053, patchNestedClaimKey(), Admin
 
 ### Community 10 - "Phase 16: Quarterly Schedule Share Link — Research"
 Cohesion: 0.05
-Nodes (56): close(), emit, onItemClick(), onPanelKeydown(), onTriggerClick(), panelRef, props, triggerRef (+48 more)
+Nodes (50): close(), emit, onItemClick(), onPanelKeydown(), onTriggerClick(), panelRef, props, triggerRef (+42 more)
 
 ### Community 11 - "Phase 3: Service Planning - Research"
 Cohesion: 0.04
-Nodes (58): ClassifiedFiles, classifyFiles(), isPptxFile(), NATURAL_ORDER_COLLATOR, ResolvedDrop, resolveDrop(), appendToGroup(), appendVideoEntries() (+50 more)
+Nodes (51): appendToGroup(), appendVideoEntries(), attachDroppedAudio(), authStore, canLoopSlot, canMutateGroup, canReorder, canWriteGroupMedia (+43 more)
 
 ### Community 12 - "Phase 16: Quarterly Schedule Share Link — Research"
 Cohesion: 0.04
@@ -3435,7 +3437,7 @@ Cohesion: 0.04
 Nodes (44): Anti-Patterns to Avoid, Applicable ASVS Categories, Architectural Responsibility Map, Architecture Patterns, Assumptions Log, Claude's Discretion, Code Examples, Common Pitfalls (+36 more)
 
 ### Community 82 - "Human Verification Required"
-Cohesion: 0.05
+Cohesion: 0.07
 Nodes (20): audioBlocked, audioRef, CardKind, currentAudioKey, currentAudioUrl, currentBackgroundUrl, currentRenderFailureSentence, currentRenderState (+12 more)
 
 ### Community 83 - "Pattern Assignments"
@@ -8388,8 +8390,8 @@ Cohesion: 0.18
 Nodes (4): emit, errored, loading, props
 
 ### Community 1309 - "13-03-PLAN.md"
-Cohesion: 0.06
-Nodes (27): alignRight, Chip, ChipId, chipRefs, chips, ChipState, close(), closeAndRefocus() (+19 more)
+Cohesion: 0.09
+Nodes (18): alignRight, Chip, ChipId, chipRefs, chips, ChipState, close(), closeAndRefocus() (+10 more)
 
 ### Community 1310 - "13-04-PLAN.md"
 Cohesion: 0.24
@@ -13524,6 +13526,10 @@ Nodes (3): Artifacts this phase produces, STRIDE Threat Register, Trust Boundari
 Cohesion: 0.11
 Nodes (17): Anti-Patterns, Behavioral Spot-Checks, Data-Flow (Level 4), Deferred Items, Gaps Summary, Gates run by the verifier, Goal Achievement, Human Verification Required (+9 more)
 
+### Community 2992 - "SlidePlanRail.test.ts"
+Cohesion: 0.15
+Nodes (7): emit, props, RailRow, rows, showEmptyState, showSkeleton, mockTimestamp
+
 ### Community 2993 - "onDuplicate"
 Cohesion: 0.50
 Nodes (3): Artifacts this phase produces, STRIDE Threat Register, Trust Boundaries
@@ -14160,24 +14166,32 @@ Nodes (4): driveRoundTrip(), makeView(), orgId, pick()
 Cohesion: 0.40
 Nodes (4): create(), mockAuthState, Row, ADR-0249
 
+### Community 3165 - "SlotVideoOutputControl.vue"
+Cohesion: 0.20
+Nodes (9): emit, mode, props, select(), sizeHint, SlotVideoOutput, mountControl(), slot() (+1 more)
+
 ### Community 3166 - "v2.17 Milestone Audit — Spec-Driven Foundation & Rehearsal Defaults"
 Cohesion: 0.20
 Nodes (9): Definition of done, End-to-end flows, Evidence, Integration, Not verified, Phases, Requirements (3-source cross-reference), Tech debt (+1 more)
 
+### Community 3168 - "dropRouting.ts"
+Cohesion: 0.39
+Nodes (7): ClassifiedFiles, classifyFiles(), isPptxFile(), NATURAL_ORDER_COLLATOR, ResolvedDrop, resolveDrop(), file()
+
 ## Knowledge Gaps
-- **27440 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+27435 more)
+- **27437 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+27432 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **304 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **303 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Communities (3169 total, 303 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
+- **Why does `Communities (3166 total, 304 thin omitted)` connect `Communities (496 total, 90 thin omitted)` to `Graph Report - worshipplanner-fbbba7ac  (2026-07-16)`?**
   _High betweenness centrality (0.004) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `main` to the rest of the system?**
-  _27443 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _27440 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
-  _Cohesion score 0.0007288629737609329 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0007296607077708865 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.017094017094017096 - nodes in this community are weakly interconnected._
 - **Should `Communities (496 total, 90 thin omitted)` be split into smaller, more focused modules?**
