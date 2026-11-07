@@ -19,7 +19,7 @@ key-decisions:
   - "Spec lands alone in its own commit so git history proves spec-then-tests-then-code order"
 patterns-established:
   - "Criteria numbering is final; later plans cite IDs by number"
-requirements-completed: [R459, R460, R461, R462, R463, R464, R465]
+requirements-completed: []
 duration: 5min
 completed: 2026-11-06
 status: complete

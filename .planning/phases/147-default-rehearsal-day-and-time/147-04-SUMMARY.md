@@ -34,7 +34,7 @@ key-decisions:
   - "Day-select tests pick an option by selectedIndex plus a change event; setSelected is private in the VTU typings"
   - "Plan 05 still has to pass defaultWeekday to ServiceTimesPanel; until then the prop defaults to null and the form is unchanged"
 
-requirements-completed: []
+requirements-completed: [R459, R465]
 requirements-note: "R459, R463, R464, R465 are in the plan frontmatter but deliberately left open; the orchestrator closes them after phase verification."
 
 duration: 25min

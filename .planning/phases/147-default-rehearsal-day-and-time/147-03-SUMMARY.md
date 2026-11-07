@@ -32,7 +32,7 @@ key-decisions:
   - "retireOldServiceShare reads the new date's page and requires it to record this service before it touches the old one"
   - "The in-memory mock clones with JSON, not structuredClone, because the store passes Vue reactive proxies that structuredClone rejects"
 
-requirements-completed: []
+requirements-completed: [R460, R461]
 requirements-note: "R460, R461, R462, R463, R465 are in the plan frontmatter but deliberately left open; the orchestrator closes them after phase verification."
 
 duration: 25min

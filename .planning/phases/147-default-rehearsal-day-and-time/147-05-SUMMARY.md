@@ -37,7 +37,7 @@ key-decisions:
 patterns-established:
   - "Spec first, then tests citing AC-RHD-NN in titles, then code: git history shows the spec ahead of every 147-02..05 commit"
 
-requirements-completed: []
+requirements-completed: [R462, R463, R464]
 requirements-note: "R462, R463, R464 are in the plan frontmatter but deliberately left open; the orchestrator closes R459-R465 after phase verification."
 
 duration: 30min
