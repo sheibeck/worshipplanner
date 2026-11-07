@@ -555,7 +555,7 @@
             v-model="rehearsalDefaultWeekdayInput"
             :disabled="!authStore.isEditor"
             data-testid="rehearsal-default-day-select"
-            class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <option :value="null">None</option>
             <option v-for="(name, index) in REHEARSAL_WEEKDAY_NAMES" :key="name" :value="index">{{ name }}</option>
@@ -574,7 +574,7 @@
               type="time"
               :disabled="!authStore.isEditor"
               :data-testid="`rehearsal-default-time-${index}`"
-              class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
             />
             <button
               v-if="authStore.isEditor"
@@ -604,7 +604,7 @@
             type="time"
             :disabled="!authStore.isEditor"
             data-testid="report-time-default-input"
-            class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            class="bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
           />
         </div>
 

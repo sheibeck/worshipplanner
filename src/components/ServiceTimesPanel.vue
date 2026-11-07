@@ -7,6 +7,7 @@ import {
   formatWallClockTime,
   HM_RE,
   isDisplayableRehearsal,
+  isRealYmd,
   mostRecentWeekdayOnOrBefore,
   sortRehearsals,
   YMD_RE,
@@ -92,6 +93,8 @@ const newTime = computed<string>({
 // Duplicate org defaults would collide as :key and double-press a chip.
 const chipTimes = computed(() => [...new Set(props.defaultTimes)])
 const canAdd = computed(() => props.canEdit && YMD_RE.test(newDate.value) && HM_RE.test(newTime.value))
+// A dated form with no time is the one stall the greyed Add can't explain (AC-RHD-71).
+const newTimeMissing = computed(() => newTime.value === '' && isRealYmd(newDate.value))
 const newDateInput = ref<HTMLInputElement | null>(null)
 
 function focusAddDate(): void {
@@ -322,7 +325,7 @@ onBeforeUnmount(() => {
                 v-model="newTime"
                 type="time"
                 data-testid="new-rehearsal-time"
-                :class="`${inputBase} ${inputOk}`"
+                :class="`${inputBase} ${newTimeMissing ? inputMissing : inputOk}`"
               />
             </div>
             <button

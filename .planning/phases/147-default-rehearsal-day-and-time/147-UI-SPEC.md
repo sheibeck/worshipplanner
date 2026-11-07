@@ -94,7 +94,7 @@ Markup contract:
 | Wrapper | `<div>` (no extra classes) |
 | Label | `<label for="rehearsal-default-day" class="block text-xs text-gray-400 mb-1">Default rehearsal day</label>` (same class string as the card's other labels; `for`/`id` added so the label names the control, which the neighbouring labels lack) |
 | Select | `id="rehearsal-default-day"`, `data-testid="rehearsal-default-day-select"`, `:disabled="!authStore.isEditor"` |
-| Select classes | `bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500` (identical to the card's time inputs; no width utility, so it sizes to its longest option, "Wednesday", like the time inputs size to their content) |
+| Select classes | `bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed` (the two `disabled:` utilities were added 2026-11-07 after the UI review, AC-RHD-70; identical to the card's time inputs; no width utility, so it sizes to its longest option, "Wednesday", like the time inputs size to their content) |
 | Options, in order | `None`, `Sunday`, `Monday`, `Tuesday`, `Wednesday`, `Thursday`, `Friday`, `Saturday` |
 | Initial selection | `None` when the org has no value (old orgs read as none). Otherwise the saved weekday. |
 | Value encoding | planner's choice (number or name), per CONTEXT. "None" must be distinct from Sunday. |
@@ -106,7 +106,7 @@ Interaction states (all inherited from existing card behaviour):
 |-------|-----------|
 | Default | gray-800 fill, gray-700 border, gray-100 text |
 | Focus | outline removed, 1px indigo-500 ring |
-| Disabled (non-editor) | native `disabled`. It shows the saved value, cannot be changed, and no Save button renders. Same as the card's time inputs. |
+| Disabled (non-editor) | native `disabled`, dimmed to 60% with a not-allowed cursor (AC-RHD-70, added 2026-11-07; the card's time and report-time inputs match). It shows the saved value, cannot be changed, and no Save button renders. |
 | Saving | existing "Save defaults" button goes `disabled:opacity-50` while `isSavingRehearsalDefaults` |
 | Saved | existing `<p class="text-green-400 text-sm mt-2">Saved!</p>` |
 | Save failed | existing `<p class="text-red-400 text-sm mt-2">{{ rehearsalDefaultsSaveError }}</p>`, and the existing rollback restores the previous weekday too |
@@ -135,7 +135,7 @@ Behaviour contract:
 | Weekday set, but the service already has a rehearsal on that date | blank |
 | Weekday is None or the org has no value | blank (as today) |
 | Service has no date or an invalid date | blank |
-| Weekday set, no default time | date still fills, Time stays blank (Time already follows `defaultTimes[0] ?? ''`); Add stays disabled until Time is filled |
+| Weekday set, no default time | date still fills, Time stays blank (Time already follows `defaultTimes[0] ?? ''`); Add stays disabled until Time is filled. Since 2026-11-07 the blank Time has the amber `inputMissing` border while the Date holds a real date (AC-RHD-71) |
 | Planner has edited the date | their value stands until they add the rehearsal. It does not follow later service-date changes. |
 | Planner has not touched the date | the shown value follows the service date and the Settings weekday as they change |
 | After "Add rehearsal" is pressed | the planner's edit is cleared, so the field returns to the computed default. If that date now holds the just-added rehearsal, it shows blank (R464). |
