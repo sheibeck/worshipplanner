@@ -1,5 +1,24 @@
 # Milestones
 
+## v2.17 Spec-Driven Foundation & Rehearsal Defaults (Shipped & deployed to production: 2026-11-07)
+
+**Phases completed:** 2 phases (146–147), 7 plans · **Requirements:** R454–R465 (12/12)
+
+**Key accomplishments:**
+
+- A vitest-wired check that fails a bare `npx vitest run` whenever a spec criterion has no real test citing its AC ID in a title, using the TypeScript AST so skipped, todo and empty tests never count.
+- A copy-and-fill spec template, ADR-0248, and the spec-then-tests-then-code rule written verbatim into CLAUDE.md and a standing PROJECT.md section, with 13 guard tests that fail the root run if any of it drifts.
+- UTC-safe weekday and date helpers, an `autoAdded` row marker, a `rehearsalDefaultWeekday` org setting, both public projections narrowed to exactly id/date/time, and ADR-0249.
+- `createService` now starts a service with one marked rehearsal on the default day (first default time), and `updateService` removes the old date's public page after a real date change, only once the new page exists and records the service.
+- A "Default rehearsal day" select in Settings that saves 0-6 or null with the card's other defaults, and an add-rehearsal Date that pre-fills with the most recent default weekday on or before the service date.
+- A service date change now saves, moves an untouched auto-added rehearsal in the same write, and shows as saved with no second save; the default-rehearsal spec is Active with every criterion cited.
+
+**Audit:** tech_debt, no blockers (6/6 integration, 5/5 flows; both phases Nyquist-compliant and secured). Owner UAT passed (146: 4/4, 147: 6/6). Debt fixed spec-first before close: AC-RHD-70 (viewers' Settings controls dimmed) and AC-RHD-71 (amber missing-time cue in the add form); 71/71 criteria passing.
+
+**Archived:** [milestones/v2.17-ROADMAP.md](milestones/v2.17-ROADMAP.md) · [milestones/v2.17-REQUIREMENTS.md](milestones/v2.17-REQUIREMENTS.md) · [milestones/v2.17-MILESTONE-AUDIT.md](milestones/v2.17-MILESTONE-AUDIT.md)
+
+---
+
 ## v2.16 Dated Rehearsals & WorshipBuilder (Shipped & deployed to production: 2026-10-27)
 
 **Phases completed:** 3 phases (143–145), 8 plans · **Requirements:** R441–R453 (12/12 active; R452 descoped by owner)

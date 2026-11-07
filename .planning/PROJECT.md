@@ -21,21 +21,32 @@ This applies from Phase 147 on, because Phase 146 built the standard itself. Onl
 
 ## Current State
 
-**Shipped through v2.16** (2026-10-27), deployed to production. Latest milestone — every rehearsal has a date
-and time, edited in a new **Times** tab; the app is renamed **WorshipBuilder** on every screen and email; and it
-lives at **https://worshipbuilder.web.app**, with the old `worship-planner-bc515.web.app` / `.firebaseapp.com`
-addresses 302-redirecting to the same page (reserved `/__/*` auth paths untouched, because `authDomain` is still
-`worship-planner-bc515.firebaseapp.com`). See ROADMAP.md for the full milestone history; per-milestone detail
-archived under `.planning/milestones/`.
+**Shipped through v2.17** (2026-11-07), deployed to production. Latest milestone — specifications are now the
+project's source of truth: `docs/specs/` with a template, the spec → tests → code rule in `CLAUDE.md` and the
+standing Development Philosophy section, `tdd_mode` on, and `src/__tests__/specCoverage.test.ts` failing a bare
+`npx vitest run` on any uncited criterion. Piloted on **default rehearsal day and time**: one default weekday in
+Settings, and every new service starts with its rehearsal on it; an untouched auto-added rehearsal moves with the
+service. See ROADMAP.md for the full milestone history; per-milestone detail archived under `.planning/milestones/`.
 
-**Active milestone: v2.17** (see below). Phase 146 (Spec Standard) is complete: `docs/specs/TEMPLATE.md`, the spec-first rule, `tdd_mode` on, and `src/__tests__/specCoverage.test.ts` inside `npx vitest run` (R454-R458). Standing follow-ups: the volunteer magic
-link on the new domain is untested (no volunteers yet); each Run computer needs a one-time re-setup on the new
-address (sign in, church, Run monitor setup, video key color, Window management + Automatic Fullscreen);
-backlog **999.14** (custom domain + verified Resend sender + `authDomain` switch — the old site must stay up
-until then); the owner-waived v2.14–v2.16 UAT lists
+**No active milestone** — next one is scoped via `/gsd-new-milestone`. Per the owner (2026-11-06), **v2.18
+backfills specs for every existing feature** using the format proven in v2.17. Standing follow-ups: the volunteer
+magic link on the new domain is untested (no volunteers yet); each Run computer needs a one-time re-setup on the new
+address; backlog **999.14** (custom domain + verified Resend sender + `authDomain` switch — the old site must stay
+up until then) and **999.16** (song picker last used date and sort); the Planning Center export's hard-coded
+Wednesday rehearsal is a future requirement; the owner-waived v2.14–v2.16 UAT lists
 (`milestones/v2.1{4,5,6}-DEFERRED-VERIFICATION.md`).
 
-## Current Milestone: v2.17 Spec-Driven Foundation & Rehearsal Defaults
+## Shipped Milestone: v2.17 Spec-Driven Foundation & Rehearsal Defaults — ✅ SHIPPED & DEPLOYED 2026-11-07
+
+**Outcome:** Phases 146–147, R454–R465 (12/12). Audit tech_debt with no blockers (6/6 integration, 5/5 flows;
+both phases Nyquist-compliant and secured, 15/15 Phase 147 threats closed). Owner UAT passed in the local
+emulator (146: 4/4, 147: 6/6). The `default-rehearsal` spec holds 71 criteria, every one cited by a test that ran
+and passed. Two debt items found at audit were fixed spec-first before close (AC-RHD-70 dimmed viewer controls,
+AC-RHD-71 amber missing-time cue). Owner decisions at close: the Share button keeps the `/share/{token}` link and
+the Settings help text stays. Fixed along the way: an editor's date change was not saving (`onSave` omitted
+`date`). Deployed 2026-11-07 (hosting both sites; rules, indexes and functions unchanged).
+
+## v2.17 (shipped) — original goal & target features
 
 **Goal:** Make specifications the project's source of truth, then prove the process on a real feature.
 
@@ -915,10 +926,12 @@ for non-technical users — plus item-editing and preview polish.
 - ✓ Every rehearsal on a service has a date and time; editors manage rehearsals and report time in a Times tab after Messages; legacy undated rows are flagged for editors and hidden everywhere else — v2.16 (Phase 143)
 - ✓ Every user-facing screen and app-naming email says WorshipBuilder; internal identifiers unchanged — v2.16 (Phase 144)
 - ✓ The app is served at https://worshipbuilder.web.app, every generated link points there, origin allowlists include it, and the old addresses redirect to the same page — v2.16 (Phase 145)
+- ✓ Every feature has a living spec in `docs/specs/`; work goes spec → tests → code, and a bare `npx vitest run` fails on any uncited acceptance criterion — v2.17 (Phase 146)
+- ✓ A church sets one default rehearsal weekday; every new service starts with a rehearsal on it, an untouched auto-added rehearsal moves with the service date, and public views show only id/date/time — v2.17 (Phase 147)
 
 ### Active
 
-**v2.17 Spec-Driven Foundation & Rehearsal Defaults** — 🚧 in planning (started 2026-11-06). See Current Milestone above and `.planning/REQUIREMENTS.md`. Requirements continue from R454; phases from 146.
+**v2.17 Spec-Driven Foundation & Rehearsal Defaults** — ✅ SHIPPED & DEPLOYED 2026-11-07 (moved to Validated above).
 
 **v2.16 Dated Rehearsals & WorshipBuilder** — ✅ SHIPPED & DEPLOYED 2026-10-27 (moved to Validated above).
 
@@ -1132,6 +1145,8 @@ Administrative, Communication, Rehearsal, Service time, Training, Physical setup
 | Every rehearsal is dated; undated legacy rows are flagged for editors, never migrated with a guessed date (v2.16) | Owner field feedback (999.6): an undated rehearsal is meaningless to volunteers | ✓ Good — owner-checked locally |
 | Brand renamed to WorshipBuilder in UI + email copy only; internal identifiers keep the old name (v2.16, ADR-0246) | Renaming the project id / storage keys would sign everyone out and drop per-browser settings | ✓ Good |
 | Old domain = plain 302 Hosting redirect that skips `/__…`; no settings carry-over (v2.16, ADR-0247) | Owner is the sole user; Google sign-in still runs on the old auth domain until 999.14 | ✓ Good — production curls confirmed path + query kept and `/__/*` served |
+| Spec → tests → code, enforced by a static citation check inside `npx vitest run` (v2.17, ADR-0248) | Owner directive 2026-11-06: specs are the source of truth; a check keeps them from drifting | ✓ Good — Phase 147 built spec-first; 71/71 criteria passing |
+| One default rehearsal weekday; the auto-added rehearsal carries a marker and moves with the service until edited (v2.17, ADR-0249, reverses parts of ADR-0245) | Owner wants new services pre-filled without overwriting anything a planner set | ✓ Good — owner UAT 6/6 |
 | Batched human/hardware UAT waived at v2.15 close (override_closeout) | Owner ran prod from 09-18 and chose to close; deferrals stay labelled waived, never verified | — Pending — regressions become quick tasks |
 
 ## Evolution
@@ -1268,3 +1283,4 @@ Archived: `milestones/v2.5-ROADMAP.md` · `milestones/v2.5-REQUIREMENTS.md` · `
 *Last updated: 2026-10-27 — archived milestone v2.16 Dated Rehearsals & WorshipBuilder (Phases 143-145, R441-R453; R452 descoped), shipped & deployed to production the same day*
 *Last updated: 2026-11-06 — milestone v2.17 Spec-Driven Foundation & Rehearsal Defaults started*
 *Last updated: 2026-11-06 — Phase 146 Spec Standard complete (R454-R458); Phase 147 is next*
+*Last updated: 2026-11-07 — archived milestone v2.17 Spec-Driven Foundation & Rehearsal Defaults (Phases 146-147, R454-R465), shipped & deployed to production the same day*

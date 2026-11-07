@@ -2,20 +2,27 @@
 gsd_state_version: 1.0
 milestone: v2.17
 milestone_name: Spec-Driven Foundation & Rehearsal Defaults
-current_phase: 999.14
-current_phase_name: BACKLOG
-status: planning
+status: completed
 stopped_at: Completed 147-05-PLAN.md
-last_updated: "2026-11-06T23:53:16.379Z"
-last_activity: 2026-11-06
-last_activity_desc: Phase 147 complete, transitioned to Phase 999.14
+last_updated: "2026-11-07T16:32:15.714Z"
+last_activity: 2026-11-07
+last_activity_desc: Milestone v2.17 completed and archived
 progress:
   total_phases: 2
   completed_phases: 2
   total_plans: 7
   completed_plans: 7
   percent: 100
+current_phase: 999.14
+current_phase_name: BACKLOG
 ---
+
+## ★ v2.17 CLOSED (2026-11-07) — shipped, deployed, archived, tagged v2.17
+
+- Phases 146-147 (R454-R465) archived to `milestones/v2.17-*`. Deployed 2026-11-07 (hosting both sites; rules,
+  indexes and functions unchanged). Pushed to GitHub.
+- Next: `/gsd-new-milestone`. Owner direction (2026-11-06): v2.18 backfills specs for every existing feature
+  using the `docs/specs/` format. Backlog: 999.14, 999.16.
 
 ## ★ v2.16 RUN INSTRUCTIONS (owner, 2026-10-27) — CLOSED: milestone shipped + archived 2026-10-27
 
@@ -1481,12 +1488,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 999.14 — Custom domain + verified Resend email sender (BACKLOG)
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-11-06 — Phase 147 complete, transitioned to Phase 999.14
-
-Progress: [██████████] 100% (0/2 phases)
+Phase: Milestone v2.17 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-11-07 — Milestone v2.17 completed and archived
 
 ### UAT fixes applied on master (2026-09-08, post-audit, pre-deploy)
 
